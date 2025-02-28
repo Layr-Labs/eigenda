@@ -39,9 +39,11 @@ type DispersalClient interface {
 	// StoreBlobs is simiar to StoreChunks, but it stores the blobs using a different storage schema
 	// so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
 	// StoreBlobs + AttestBatch will eventually replace and deprecate StoreChunks method.
+	// DEPRECATED: StoreBlobs method is not used
 	StoreBlobs(ctx context.Context, in *StoreBlobsRequest, opts ...grpc.CallOption) (*StoreBlobsReply, error)
 	// AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch.
 	// It will return a signature at the end to attest to the aggregated batch.
+	// DEPRECATED: AttestBatch method is not used
 	AttestBatch(ctx context.Context, in *AttestBatchRequest, opts ...grpc.CallOption) (*AttestBatchReply, error)
 	// Retrieve node info metadata
 	NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error)
@@ -105,9 +107,11 @@ type DispersalServer interface {
 	// StoreBlobs is simiar to StoreChunks, but it stores the blobs using a different storage schema
 	// so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
 	// StoreBlobs + AttestBatch will eventually replace and deprecate StoreChunks method.
+	// DEPRECATED: StoreBlobs method is not used
 	StoreBlobs(context.Context, *StoreBlobsRequest) (*StoreBlobsReply, error)
 	// AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch.
 	// It will return a signature at the end to attest to the aggregated batch.
+	// DEPRECATED: AttestBatch method is not used
 	AttestBatch(context.Context, *AttestBatchRequest) (*AttestBatchReply, error)
 	// Retrieve node info metadata
 	NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error)

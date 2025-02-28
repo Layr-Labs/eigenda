@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -164,9 +165,11 @@ func ReadAllowlistFromFile(f string) (Allowlist, error) {
 	}
 
 	for _, entry := range allowlistEntries {
-		rateInfoByQuorum, ok := allowlist[entry.Account]
+		// normalize to lowercase (non-checksummed) address or IP address
+		account := strings.ToLower(entry.Account)
+		rateInfoByQuorum, ok := allowlist[account]
 		if !ok {
-			allowlist[entry.Account] = map[core.QuorumID]PerUserRateInfo{
+			allowlist[account] = map[core.QuorumID]PerUserRateInfo{
 				core.QuorumID(entry.QuorumID): {
 					Name:       entry.Name,
 					Throughput: common.RateParam(entry.ByteRate),

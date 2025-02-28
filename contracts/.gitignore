@@ -17,4 +17,11 @@ docs/
 data/
 
 script/output/*
-script/eigenda_deploy_config.json
+script/input/eigenda_deploy_config.json
+
+# yarn dependencies
+yarn.lock
+node_modules
+
+# release dependencies
+artifacts/

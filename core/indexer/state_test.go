@@ -18,6 +18,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	indexedstate "github.com/Layr-Labs/eigenda/core/indexer"
@@ -26,6 +27,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -50,7 +53,10 @@ func mustRegisterOperators(env *deploy.Config, logger logging.Logger) {
 	for _, op := range env.Operators {
 		tx := mustMakeOperatorTransactor(env, op, logger)
 
-		keyPair, err := core.MakeKeyPairFromString(op.NODE_TEST_PRIVATE_BLS)
+		signer, err := blssigner.NewSigner(blssignerTypes.SignerConfig{
+			PrivateKey: op.NODE_TEST_PRIVATE_BLS,
+			SignerType: blssignerTypes.PrivateKey,
+		})
 		Expect(err).To(BeNil())
 
 		socket := fmt.Sprintf("%v:%v", op.NODE_HOSTNAME, op.NODE_DISPERSAL_PORT)
@@ -63,12 +69,12 @@ func mustRegisterOperators(env *deploy.Config, logger logging.Logger) {
 		privKey, err := crypto.HexToECDSA(op.NODE_PRIVATE_KEY)
 		Expect(err).To(BeNil())
 
-		err = tx.RegisterOperator(context.Background(), keyPair, socket, quorums, privKey, salt, expiry)
+		err = tx.RegisterOperator(context.Background(), signer, socket, quorums, privKey, salt, expiry)
 		Expect(err).To(BeNil())
 	}
 }
 
-func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logger logging.Logger) core.Transactor {
+func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logger logging.Logger) core.Writer {
 
 	deployer, ok := env.GetDeployer(env.EigenDA.Deployer)
 	Expect(ok).To(BeTrue())
@@ -83,7 +89,7 @@ func mustMakeOperatorTransactor(env *deploy.Config, op deploy.OperatorVars, logg
 	c, err := geth.NewClient(config, gethcommon.Address{}, 0, logger)
 	Expect(err).ToNot(HaveOccurred())
 
-	tx, err := eth.NewTransactor(logger, c, op.NODE_BLS_OPERATOR_STATE_RETRIVER, op.NODE_EIGENDA_SERVICE_MANAGER)
+	tx, err := eth.NewWriter(logger, c, op.NODE_BLS_OPERATOR_STATE_RETRIVER, op.NODE_EIGENDA_SERVICE_MANAGER)
 	Expect(err).To(BeNil())
 	return tx
 
@@ -118,7 +124,7 @@ func mustMakeTestClients(env *deploy.Config, privateKey string, logger logging.L
 func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger logging.Logger) *indexedstate.IndexedChainState {
 	client, rpcClient := mustMakeTestClients(env, env.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 
-	tx, err := eth.NewTransactor(logger, client, env.EigenDA.OperatorStateRetreiver, env.EigenDA.ServiceManager)
+	tx, err := eth.NewWriter(logger, client, env.EigenDA.OperatorStateRetreiver, env.EigenDA.ServiceManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	var (
@@ -154,7 +160,7 @@ var _ = Describe("Indexer", func() {
 				Skip("No test path provided")
 			}
 
-			logger := logging.NewNoopLogger()
+			logger := testutils.GetLogger()
 			ctx, cancel := context.WithCancel(context.Background())
 			_ = cancel
 

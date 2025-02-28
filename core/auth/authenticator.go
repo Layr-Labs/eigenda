@@ -12,18 +12,12 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-type AuthConfig struct {
-}
+type authenticator struct{}
 
-type authenticator struct {
-	config AuthConfig
-}
+var _ core.BlobRequestAuthenticator = &authenticator{}
 
-func NewAuthenticator(config AuthConfig) core.BlobRequestAuthenticator {
-
-	return &authenticator{
-		config: config,
-	}
+func NewAuthenticator() core.BlobRequestAuthenticator {
+	return &authenticator{}
 }
 
 func (*authenticator) AuthenticateBlobRequest(header core.BlobAuthHeader) error {

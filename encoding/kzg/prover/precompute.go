@@ -19,8 +19,6 @@ import (
 )
 
 type SubTable struct {
-	//SizeLow   uint64
-	//SizeUp    uint64
 	FilePath string
 }
 

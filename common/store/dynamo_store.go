@@ -13,11 +13,11 @@ import (
 )
 
 type dynamodbBucketStore[T any] struct {
-	client    *commondynamodb.Client
+	client    commondynamodb.Client
 	tableName string
 }
 
-func NewDynamoParamStore[T any](client *commondynamodb.Client, tableName string) common.KVStore[T] {
+func NewDynamoParamStore[T any](client commondynamodb.Client, tableName string) common.KVStore[T] {
 	return &dynamodbBucketStore[T]{
 		client:    client,
 		tableName: tableName,

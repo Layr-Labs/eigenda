@@ -21,7 +21,27 @@ function create_binding {
 forge clean
 forge build
 
-contracts="AVSDirectory DelegationManager BitmapUtils OperatorStateRetriever RegistryCoordinator BLSApkRegistry IndexRegistry StakeRegistry BN254 EigenDAServiceManager IEigenDAServiceManager MockRollup EjectionManager"
+contracts="PaymentVault \
+  SocketRegistry \
+  AVSDirectory \
+  DelegationManager \
+  BitmapUtils \
+  OperatorStateRetriever \
+  RegistryCoordinator \
+  BLSApkRegistry \
+  IIndexRegistry \
+  StakeRegistry \
+  BN254 \
+  EigenDAServiceManager \
+  IEigenDAServiceManager \
+  MockRollup \
+  EjectionManager \
+  EigenDACertVerifier \
+  EigenDAThresholdRegistry \
+  EigenDARelayRegistry \
+  IEigenDARelayRegistry \
+  EigenDADisperserRegistry"
+
 for contract in $contracts; do
     create_binding ./ $contract ./bindings
 done

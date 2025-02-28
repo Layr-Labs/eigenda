@@ -1,0 +1,22 @@
+name: compile-protobufs
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  golangci:
+    name: Compile Protobufs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout EigenDA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+      - name: Recompile Protobufs
+        run: |
+          make clean
+          make protoc
+      - name: Verify No Git Changes
+        run: ./api/builder/is-repo-clean.sh

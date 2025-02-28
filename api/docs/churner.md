@@ -3,7 +3,7 @@
 
 ## Table of Contents
 
-- [churner.proto](#churner-proto)
+- [churner/churner.proto](#churner_churner-proto)
     - [ChurnReply](#churner-ChurnReply)
     - [ChurnRequest](#churner-ChurnRequest)
     - [OperatorToChurn](#churner-OperatorToChurn)
@@ -15,10 +15,10 @@
 
 
 
-<a name="churner-proto"></a>
+<a name="churner_churner-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## churner.proto
+## churner/churner.proto
 
 
 

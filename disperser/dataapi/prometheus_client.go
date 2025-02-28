@@ -18,6 +18,8 @@ type (
 	PrometheusClient interface {
 		QueryDisperserBlobSizeBytesPerSecond(ctx context.Context, start time.Time, end time.Time) (*PrometheusResult, error)
 		QueryDisperserAvgThroughputBlobSizeBytes(ctx context.Context, start time.Time, end time.Time, windowSizeInSec uint16) (*PrometheusResult, error)
+		QueryDisperserBlobSizeBytesPerSecondV2(ctx context.Context, start time.Time, end time.Time) (*PrometheusResult, error)
+		QueryDisperserAvgThroughputBlobSizeBytesV2(ctx context.Context, start time.Time, end time.Time, windowSizeInSec uint16) (*PrometheusResult, error)
 	}
 
 	PrometheusResultValues struct {
@@ -46,8 +48,18 @@ func (pc *prometheusClient) QueryDisperserBlobSizeBytesPerSecond(ctx context.Con
 	return pc.queryRange(ctx, query, start, end)
 }
 
+func (pc *prometheusClient) QueryDisperserBlobSizeBytesPerSecondV2(ctx context.Context, start time.Time, end time.Time) (*PrometheusResult, error) {
+	query := fmt.Sprintf("eigenda_dispatcher_completed_blobs_total{state=\"complete\",data=\"size\",cluster=\"%s\"}", pc.cluster)
+	return pc.queryRange(ctx, query, start, end)
+}
+
 func (pc *prometheusClient) QueryDisperserAvgThroughputBlobSizeBytes(ctx context.Context, start time.Time, end time.Time, throughputRateSecs uint16) (*PrometheusResult, error) {
-	query := fmt.Sprintf("sum by (job) (rate(eigenda_batcher_blobs_total{state=\"confirmed\",data=\"size\",cluster=\"%s\"}[%ds]))", pc.cluster, throughputRateSecs)
+	query := fmt.Sprintf("avg_over_time( sum by (job) (rate(eigenda_batcher_blobs_total{state=\"confirmed\",data=\"size\",cluster=\"%s\"}[%ds])) [9m:])", pc.cluster, throughputRateSecs)
+	return pc.queryRange(ctx, query, start, end)
+}
+
+func (pc *prometheusClient) QueryDisperserAvgThroughputBlobSizeBytesV2(ctx context.Context, start time.Time, end time.Time, throughputRateSecs uint16) (*PrometheusResult, error) {
+	query := fmt.Sprintf("avg_over_time( sum by (job) (rate(eigenda_dispatcher_completed_blobs_total{state=\"complete\",data=\"size\",cluster=\"%s\"}[%ds])) [9m:])", pc.cluster, throughputRateSecs)
 	return pc.queryRange(ctx, query, start, end)
 }
 

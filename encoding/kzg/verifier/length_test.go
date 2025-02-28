@@ -12,9 +12,12 @@ import (
 )
 
 func TestLengthProof(t *testing.T) {
+	group, err := prover.NewProver(kzgConfig, nil)
+	require.Nil(t, err)
 
-	group, _ := prover.NewProver(kzgConfig, true)
-	v, _ := verifier.NewVerifier(kzgConfig, true)
+	v, err := verifier.NewVerifier(kzgConfig, nil)
+	require.Nil(t, err)
+
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
 	enc, err := group.GetKzgEncoder(params)
 	require.Nil(t, err)

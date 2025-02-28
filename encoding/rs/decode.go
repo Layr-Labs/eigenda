@@ -15,9 +15,15 @@ import (
 // the coefficient of the interpolating polynomina, hence interpolation is needed before
 // recovery.
 // maxInputSize is the upper bound of the original data size. This is needed because
-// the frames and indices don't encode the length of the original data. If maxInputSize
+// the Frames and indices don't encode the length of the original data. If maxInputSize
 // is smaller than the original input size, decoded data will be trimmed to fit the maxInputSize.
-func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) ([]byte, error) {
+func (e *Encoder) Decode(frames []FrameCoeffs, indices []uint64, maxInputSize uint64, params encoding.EncodingParams) ([]byte, error) {
+	// Get encoder
+	g, err := e.GetRsEncoder(params)
+	if err != nil {
+		return nil, err
+	}
+
 	numSys := encoding.GetNumSys(maxInputSize, g.ChunkLength)
 
 	if uint64(len(frames)) < numSys {
@@ -33,7 +39,7 @@ func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) 
 			return nil, err
 		}
 
-		evals, err := g.GetInterpolationPolyEval(f.Coeffs, uint32(e))
+		evals, err := g.GetInterpolationPolyEval(f, uint32(e))
 		if err != nil {
 			return nil, err
 		}
@@ -42,7 +48,6 @@ func (g *Encoder) Decode(frames []Frame, indices []uint64, maxInputSize uint64) 
 		for j := uint64(0); j < g.ChunkLength; j++ {
 			p := j*g.NumChunks + uint64(e)
 			samples[p] = new(fr.Element)
-			
 			samples[p].Set(&evals[j])
 		}
 	}

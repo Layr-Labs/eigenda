@@ -13,11 +13,15 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/dataapi/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
+	serverv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/urfave/cli"
@@ -30,7 +34,7 @@ var (
 	gitDate   string
 )
 
-// @title			EigenDA Data Access API
+// @title			EigenDA Data Access API V1
 // @description	This is the EigenDA Data Access API server.
 // @version		1
 // @Schemes		https http
@@ -82,7 +86,7 @@ func RunDataApi(ctx *cli.Context) error {
 		return err
 	}
 
-	tx, err := coreeth.NewTransactor(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := coreeth.NewReader(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return err
 	}
@@ -94,7 +98,8 @@ func RunDataApi(ctx *cli.Context) error {
 		subgraphApi       = subgraph.NewApi(config.SubgraphApiBatchMetadataAddr, config.SubgraphApiOperatorStateAddr)
 		subgraphClient    = dataapi.NewSubgraphClient(subgraphApi, logger)
 		chainState        = coreeth.NewChainState(tx, client)
-		metrics           = dataapi.NewMetrics(blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
+		indexedChainState = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
+		metrics           = dataapi.NewMetrics(config.ServerVersion, blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
 		server            = dataapi.NewServer(
 			dataapi.Config{
 				ServerMode:         config.ServerMode,
@@ -109,6 +114,7 @@ func RunDataApi(ctx *cli.Context) error {
 			subgraphClient,
 			tx,
 			chainState,
+			indexedChainState,
 			logger,
 			metrics,
 			nil,
@@ -117,6 +123,38 @@ func RunDataApi(ctx *cli.Context) error {
 		)
 	)
 
+	if config.ServerVersion == 2 {
+		blobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
+		metrics = dataapi.NewMetrics(config.ServerVersion, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)
+		serverv2 := serverv2.NewServerV2(
+			dataapi.Config{
+				ServerMode:         config.ServerMode,
+				SocketAddr:         config.SocketAddr,
+				AllowOrigins:       config.AllowOrigins,
+				DisperserHostname:  config.DisperserHostname,
+				ChurnerHostname:    config.ChurnerHostname,
+				BatcherHealthEndpt: config.BatcherHealthEndpt,
+			},
+			blobMetadataStorev2,
+			promClient,
+			subgraphClient,
+			tx,
+			chainState,
+			indexedChainState,
+			logger,
+			metrics,
+		)
+
+		// Enable Metrics Block
+		if config.MetricsConfig.EnableMetrics {
+			httpSocket := fmt.Sprintf(":%s", config.MetricsConfig.HTTPPort)
+			metrics.Start(context.Background())
+			logger.Info("Enabled metrics for Data Access API", "socket", httpSocket)
+		}
+
+		return runServer(serverv2, logger)
+	}
+
 	// Enable Metrics Block
 	if config.MetricsConfig.EnableMetrics {
 		httpSocket := fmt.Sprintf(":%s", config.MetricsConfig.HTTPPort)
@@ -124,6 +162,10 @@ func RunDataApi(ctx *cli.Context) error {
 		logger.Info("Enabled metrics for Data Access API", "socket", httpSocket)
 	}
 
+	return runServer(server, logger)
+}
+
+func runServer[T dataapi.ServerInterface](server T, logger logging.Logger) error {
 	// Setup channel to listen for termination signals
 	quit := make(chan os.Signal, 1)
 	// catch SIGINT (Ctrl+C) and SIGTERM (e.g., from `kill`)
@@ -139,7 +181,7 @@ func RunDataApi(ctx *cli.Context) error {
 	// Block until a signal is received.
 	<-quit
 	logger.Info("Shutting down server...")
-	err = server.Shutdown()
+	err := server.Shutdown()
 
 	if err != nil {
 		logger.Errorf("Failed to shutdown server: %v", err)

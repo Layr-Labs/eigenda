@@ -11,9 +11,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigensdk-go/logging"
-
 	cmock "github.com/Layr-Labs/eigenda/common/mock"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -38,9 +37,9 @@ var (
 )
 
 type batcherComponents struct {
-	transactor       *coremock.MockTransactor
+	transactor       *coremock.MockWriter
 	txnManager       *batchermock.MockTxnManager
-	blobStore        disperser.BlobStore
+	blobStore        *inmem.BlobStore
 	encoderClient    *disperser.LocalEncoderClient
 	encodingStreamer *bat.EncodingStreamer
 	ethClient        *cmock.MockEthClient
@@ -58,9 +57,10 @@ func makeTestProver() (encoding.Prover, error) {
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
 	}
 
-	return prover.NewProver(config, true)
+	return prover.NewProver(config, nil)
 }
 
 func makeTestBlob(securityParams []*core.SecurityParam) core.Blob {
@@ -77,7 +77,7 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 	// Common Components
 	// logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	// assert.NoError(t, err)
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 
 	finalizationBlockDelay := uint(75)
 
@@ -90,7 +90,7 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 	assert.NoError(t, err)
 	cst.On("GetCurrentBlockNumber").Return(uint(10)+finalizationBlockDelay, nil)
 	asgn := &core.StdAssignmentCoordinator{}
-	transactor := &coremock.MockTransactor{}
+	transactor := &coremock.MockWriter{}
 	transactor.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
 	agg, err := core.NewStdSignatureAggregator(logger, transactor)
 	assert.NoError(t, err)
@@ -101,7 +101,10 @@ func makeBatcher(t *testing.T) (*batcherComponents, *bat.Batcher, func() []time.
 
 	// Disperser Components
 	dispatcher := dmock.NewDispatcher(state)
-	blobStore := inmem.NewBlobStore()
+	blobStore := &inmem.BlobStore{
+		Blobs:    make(map[disperser.BlobHash]*inmem.BlobHolder),
+		Metadata: make(map[disperser.BlobKey]*disperser.BlobMetadata),
+	}
 
 	pullInterval := 100 * time.Millisecond
 	config := bat.Config{
@@ -227,7 +230,7 @@ func TestBatcherIterations(t *testing.T) {
 	assert.NoError(t, err)
 	count, size := components.encodingStreamer.EncodedBlobstore.GetEncodedResultSize()
 	assert.Equal(t, 2, count)
-	assert.Equal(t, uint64(24576), size) // Robert checks it
+	assert.Equal(t, uint64(27631), size)
 
 	txn := types.NewTransaction(0, gethcommon.Address{}, big.NewInt(0), 0, big.NewInt(0), nil)
 	components.transactor.On("BuildConfirmBatchTxn", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -750,4 +753,86 @@ func TestBlobAttestationFailures2(t *testing.T) {
 	// Test with receipt response with error
 	err = batcher.HandleSingleBatch(ctx)
 	assert.NoError(t, err)
+}
+
+func TestBatcherRecoverState(t *testing.T) {
+	blob0 := makeTestBlob([]*core.SecurityParam{
+		{
+			QuorumID:              0,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+		{
+			QuorumID:              2,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 50,
+		},
+	})
+
+	blob1 := makeTestBlob([]*core.SecurityParam{
+		{
+			QuorumID:              0,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+		{
+			QuorumID:              2,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+	})
+
+	blob2 := makeTestBlob([]*core.SecurityParam{
+		{
+			QuorumID:              0,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+		{
+			QuorumID:              2,
+			AdversaryThreshold:    80,
+			ConfirmationThreshold: 100,
+		},
+	})
+
+	components, batcher, _ := makeBatcher(t)
+
+	blobStore := components.blobStore
+	ctx := context.Background()
+	_, key0 := queueBlob(t, ctx, &blob0, blobStore)
+	_, key1 := queueBlob(t, ctx, &blob1, blobStore)
+	_, key2 := queueBlob(t, ctx, &blob2, blobStore)
+	components.blobStore.Metadata[key2].Expiry = uint64(time.Now().Add(time.Hour * (-24)).Unix())
+
+	err := blobStore.MarkBlobDispersing(ctx, key0)
+	assert.NoError(t, err)
+	err = blobStore.MarkBlobDispersing(ctx, key2)
+	assert.NoError(t, err)
+
+	b0, err := blobStore.GetBlobMetadata(ctx, key0)
+	assert.NoError(t, err)
+	assert.Equal(t, b0.BlobStatus, disperser.Dispersing)
+
+	b1, err := blobStore.GetBlobMetadata(ctx, key1)
+	assert.NoError(t, err)
+	assert.Equal(t, b1.BlobStatus, disperser.Processing)
+
+	b2, err := blobStore.GetBlobMetadata(ctx, key2)
+	assert.NoError(t, err)
+	assert.Equal(t, b2.BlobStatus, disperser.Dispersing)
+
+	err = batcher.RecoverState(context.Background())
+	assert.NoError(t, err)
+
+	b0, err = blobStore.GetBlobMetadata(ctx, key0)
+	assert.NoError(t, err)
+	assert.Equal(t, b0.BlobStatus, disperser.Processing)
+
+	b1, err = blobStore.GetBlobMetadata(ctx, key1)
+	assert.NoError(t, err)
+	assert.Equal(t, b1.BlobStatus, disperser.Processing)
+
+	b2, err = blobStore.GetBlobMetadata(ctx, key2)
+	assert.NoError(t, err)
+	assert.Equal(t, b2.BlobStatus, disperser.Failed)
 }

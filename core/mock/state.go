@@ -2,11 +2,14 @@ package mock
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"sort"
 
 	"github.com/Layr-Labs/eigenda/core"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -23,10 +26,13 @@ var _ core.IndexedChainState = (*ChainDataMock)(nil)
 
 type PrivateOperatorInfo struct {
 	*core.IndexedOperatorInfo
-	KeyPair       *core.KeyPair
-	Host          string
-	DispersalPort string
-	RetrievalPort string
+	KeyPair         *core.KeyPair
+	Signer          blssigner.Signer
+	Host            string
+	DispersalPort   string
+	RetrievalPort   string
+	V2DispersalPort string
+	V2RetrievalPort string
 }
 
 type PrivateOperatorState struct {
@@ -36,7 +42,8 @@ type PrivateOperatorState struct {
 }
 
 func MakeOperatorId(id int) core.OperatorID {
-	data := [32]byte{uint8(id)}
+	var data [32]byte
+	binary.LittleEndian.PutUint64(data[:8], uint64(id))
 	return data
 }
 
@@ -133,7 +140,9 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 		host := "0.0.0.0"
 		dispersalPort := fmt.Sprintf("3%03v", 2*i)
 		retrievalPort := fmt.Sprintf("3%03v", 2*i+1)
-		socket := core.MakeOperatorSocket(host, dispersalPort, retrievalPort)
+		v2DispersalPort := fmt.Sprintf("3%03v", 2*i+2)
+		v2RetrievalPort := fmt.Sprintf("3%03v", 2*i+3)
+		socket := core.MakeOperatorSocket(host, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort)
 
 		indexed := &core.IndexedOperatorInfo{
 			Socket:   string(socket),
@@ -141,12 +150,20 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 			PubkeyG2: d.KeyPairs[id].GetPubKeyG2(),
 		}
 
+		signer, _ := blssigner.NewSigner(blssignerTypes.SignerConfig{
+			PrivateKey: d.KeyPairs[id].PrivKey.String(),
+			SignerType: blssignerTypes.PrivateKey,
+		})
+
 		private := &PrivateOperatorInfo{
 			IndexedOperatorInfo: indexed,
 			KeyPair:             d.KeyPairs[id],
+			Signer:              signer,
 			Host:                host,
 			DispersalPort:       dispersalPort,
 			RetrievalPort:       retrievalPort,
+			V2DispersalPort:     v2DispersalPort,
+			V2RetrievalPort:     v2RetrievalPort,
 		}
 
 		indexedOperators[id] = indexed
@@ -229,11 +246,24 @@ func (d *ChainDataMock) GetOperatorState(ctx context.Context, blockNumber uint, 
 }
 
 func (d *ChainDataMock) GetOperatorStateByOperator(ctx context.Context, blockNumber uint, operator core.OperatorID) (*core.OperatorState, error) {
+	quorums := make([]core.QuorumID, 0)
+	for quorumID, stake := range d.Stakes {
+		if _, ok := stake[operator]; ok {
+			quorums = append(quorums, quorumID)
+		}
+	}
 
-	state := d.GetTotalOperatorState(ctx, blockNumber)
+	state := d.GetTotalOperatorStateWithQuorums(ctx, blockNumber, quorums)
 
 	return state.OperatorState, nil
 
+}
+
+func (d *ChainDataMock) GetOperatorSocket(ctx context.Context, blockNumber uint, operator core.OperatorID) (string, error) {
+
+	state := d.GetTotalOperatorState(ctx, blockNumber)
+
+	return state.IndexedOperatorState.IndexedOperators[operator].Socket, nil
 }
 
 func (d *ChainDataMock) GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.IndexedOperatorState, error) {
@@ -244,7 +274,13 @@ func (d *ChainDataMock) GetIndexedOperatorState(ctx context.Context, blockNumber
 
 }
 
-func (d *ChainDataMock) GetCurrentBlockNumber() (uint, error) {
+func (d *ChainDataMock) GetIndexedOperators(ctx context.Context, blockNumber uint) (map[core.OperatorID]*core.IndexedOperatorInfo, error) {
+	state := d.GetTotalOperatorState(ctx, blockNumber)
+
+	return state.IndexedOperatorState.IndexedOperators, nil
+}
+
+func (d *ChainDataMock) GetCurrentBlockNumber(ctx context.Context) (uint, error) {
 	args := d.Called()
 	return args.Get(0).(uint), args.Error(1)
 }

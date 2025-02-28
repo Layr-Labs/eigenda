@@ -38,12 +38,12 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		customQuorumsUint8[i] = uint8(q)
 	}
 	return &Config{
-		Config: *clients.NewConfig(
-			ctx.GlobalString(flags.HostnameFlag.Name),
-			ctx.GlobalString(flags.GrpcPortFlag.Name),
-			ctx.Duration(flags.TimeoutFlag.Name),
-			ctx.GlobalBool(flags.UseSecureGrpcFlag.Name),
-		),
+		Config: clients.Config{
+			Hostname:          ctx.GlobalString(flags.HostnameFlag.Name),
+			Port:              ctx.GlobalString(flags.GrpcPortFlag.Name),
+			Timeout:           ctx.Duration(flags.TimeoutFlag.Name),
+			UseSecureGrpcFlag: ctx.GlobalBool(flags.UseSecureGrpcFlag.Name),
+		},
 		NumInstances:           ctx.GlobalUint(flags.NumInstancesFlag.Name),
 		RequestInterval:        ctx.Duration(flags.RequestIntervalFlag.Name),
 		DataSize:               ctx.GlobalUint64(flags.DataSizeFlag.Name),

@@ -2,7 +2,9 @@ package node
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/hex"
 	"errors"
 	"time"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"google.golang.org/grpc"
@@ -21,7 +24,7 @@ type ChurnerClient interface {
 	// Churn sends a churn request to the churner service
 	// The quorumIDs cannot be empty, but may contain quorums that the operator is already registered in.
 	// If the operator is already registered in a quorum, the churner will ignore it and continue with the other quorums.
-	Churn(ctx context.Context, operatorAddress string, keyPair *core.KeyPair, quorumIDs []core.QuorumID) (*churnerpb.ChurnReply, error)
+	Churn(ctx context.Context, operatorAddress string, blssigner blssigner.Signer, quorumIDs []core.QuorumID) (*churnerpb.ChurnReply, error)
 }
 
 type churnerClient struct {
@@ -40,18 +43,31 @@ func NewChurnerClient(churnerURL string, useSecureGrpc bool, timeout time.Durati
 	}
 }
 
-func (c *churnerClient) Churn(ctx context.Context, operatorAddress string, keyPair *core.KeyPair, quorumIDs []core.QuorumID) (*churnerpb.ChurnReply, error) {
+func (c *churnerClient) Churn(
+	ctx context.Context,
+	operatorAddress string,
+	blssigner blssigner.Signer,
+	quorumIDs []core.QuorumID,
+) (*churnerpb.ChurnReply, error) {
 	if len(quorumIDs) == 0 {
 		return nil, errors.New("quorumIDs cannot be empty")
 	}
 	// generate salt
-	privateKeyBytes := []byte(keyPair.PrivKey.String())
-	salt := crypto.Keccak256([]byte("churn"), []byte(time.Now().String()), quorumIDs[:], privateKeyBytes)
+	bytes := make([]byte, 32)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return nil, err
+	}
+	salt := crypto.Keccak256([]byte("churn"), []byte(time.Now().String()), quorumIDs[:], bytes)
 
+	g1, g2, err := getG1G2Fromblssigner(blssigner)
+	if err != nil {
+		return nil, err
+	}
 	churnRequest := &churner.ChurnRequest{
 		OperatorAddress:            gethcommon.HexToAddress(operatorAddress),
-		OperatorToRegisterPubkeyG1: keyPair.PubKey,
-		OperatorToRegisterPubkeyG2: keyPair.GetPubKeyG2(),
+		OperatorToRegisterPubkeyG1: g1,
+		OperatorToRegisterPubkeyG2: g2,
 		OperatorRequestSignature:   &core.Signature{},
 		QuorumIDs:                  quorumIDs,
 	}
@@ -59,7 +75,20 @@ func (c *churnerClient) Churn(ctx context.Context, operatorAddress string, keyPa
 	copy(churnRequest.Salt[:], salt)
 
 	// sign the request
-	churnRequest.OperatorRequestSignature = keyPair.SignMessage(churner.CalculateRequestHash(churnRequest))
+	messageHash := churner.CalculateRequestHash(churnRequest)
+	messageHashBytes := messageHash[:]
+	signatureBytes, err := blssigner.Sign(ctx, messageHashBytes)
+	if err != nil {
+		return nil, err
+	}
+	signature := new(core.Signature)
+	g1Signature, err := signature.Deserialize(signatureBytes)
+	if err != nil {
+		return nil, err
+	}
+	churnRequest.OperatorRequestSignature = &core.Signature{
+		G1Point: g1Signature,
+	}
 
 	// convert to protobuf
 	churnRequestPb := &churnerpb.ChurnRequest{
@@ -80,7 +109,7 @@ func (c *churnerClient) Churn(ctx context.Context, operatorAddress string, keyPa
 		credential = credentials.NewTLS(config)
 	}
 
-	conn, err := grpc.Dial(
+	conn, err := grpc.NewClient(
 		c.churnerURL,
 		grpc.WithTransportCredentials(credential),
 	)
@@ -97,4 +126,26 @@ func (c *churnerClient) Churn(ctx context.Context, operatorAddress string, keyPa
 	opt := grpc.MaxCallSendMsgSize(1024 * 1024 * 300)
 
 	return gc.Churn(ctx, churnRequestPb, opt)
+}
+
+func getG1G2Fromblssigner(blssigner blssigner.Signer) (*core.G1Point, *core.G2Point, error) {
+	g1 := new(core.G1Point)
+	g2 := new(core.G2Point)
+	g1KeyBytes, err := hex.DecodeString(blssigner.GetPublicKeyG1())
+	if err != nil {
+		return nil, nil, err
+	}
+	g1, err = g1.Deserialize(g1KeyBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	g2KeyBytes, err := hex.DecodeString(blssigner.GetPublicKeyG2())
+	if err != nil {
+		return nil, nil, err
+	}
+	g2, err = g2.Deserialize(g2KeyBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	return g1, g2, nil
 }

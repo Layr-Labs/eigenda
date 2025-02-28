@@ -16,8 +16,8 @@ import (
 )
 
 func TestVerify(t *testing.T) {
-
-	group, _ := prover.NewProver(kzgConfig, true)
+	group, err := prover.NewProver(kzgConfig, nil)
+	require.Nil(t, err)
 
 	params := encoding.ParamsFromSysPar(numSys, numPar, uint64(len(gettysburgAddressBytes)))
 
@@ -34,10 +34,10 @@ func TestVerify(t *testing.T) {
 	fs := fft.NewFFTSettings(n)
 	require.NotNil(t, fs)
 
-	lc := enc.Fs.ExpandedRootsOfUnity[uint64(0)]
+	lc := fs.ExpandedRootsOfUnity[uint64(0)]
 	require.NotNil(t, lc)
 
-	g2Atn, err := kzg.ReadG2Point(uint64(len(frames[0].Coeffs)), kzgConfig)
+	g2Atn, err := kzg.ReadG2Point(uint64(len(frames[0].Coeffs)), kzgConfig.SRSOrder, kzgConfig.G2Path)
 	require.Nil(t, err)
 	assert.Nil(t, verifier.VerifyFrame(&frames[0], enc.Ks, commit, &lc, &g2Atn))
 }

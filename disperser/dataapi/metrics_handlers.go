@@ -5,15 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
-)
-
-const (
-	maxWorkersGetOperatorState = 10  // The maximum number of workers to use when querying operator state.
-	defaultThroughputRateSecs  = 240 // 4m rate is used for < 7d window to match $__rate_interval
-	sevenDayThroughputRateSecs = 660 // 11m rate is used for >= 7d window to match $__rate_interval
 )
 
 func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64) (*Metric, error) {
@@ -49,21 +42,9 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64) 
 		}
 	}
 
-	result, err := s.promClient.QueryDisperserBlobSizeBytesPerSecond(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0))
+	throughput, err := s.metricsHandler.GetAvgThroughput(ctx, startTime, endTime)
 	if err != nil {
 		return nil, err
-	}
-
-	var (
-		totalBytes   float64
-		timeDuration float64
-		throughput   float64
-		valuesSize   = len(result.Values)
-	)
-	if valuesSize > 1 {
-		totalBytes = result.Values[valuesSize-1].Value - result.Values[0].Value
-		timeDuration = result.Values[valuesSize-1].Timestamp.Sub(result.Values[0].Timestamp).Seconds()
-		throughput = totalBytes / timeDuration
 	}
 
 	costInGas, err := s.calculateTotalCostGasUsed(ctx)
@@ -77,32 +58,6 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64) 
 		TotalStake:          totalStakePerQuorum[0],
 		TotalStakePerQuorum: totalStakePerQuorum,
 	}, nil
-}
-
-func (s *server) getThroughput(ctx context.Context, start int64, end int64) ([]*Throughput, error) {
-	throughputRateSecs := uint16(defaultThroughputRateSecs)
-	if end-start >= 7*24*60*60 {
-		throughputRateSecs = uint16(sevenDayThroughputRateSecs)
-	}
-	result, err := s.promClient.QueryDisperserAvgThroughputBlobSizeBytes(ctx, time.Unix(start, 0), time.Unix(end, 0), throughputRateSecs)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(result.Values) <= 1 {
-		return []*Throughput{}, nil
-	}
-
-	throughputs := make([]*Throughput, 0)
-	for i := throughputRateSecs; i < uint16(len(result.Values)); i++ {
-		v := result.Values[i]
-		throughputs = append(throughputs, &Throughput{
-			Timestamp:  uint64(v.Timestamp.Unix()),
-			Throughput: v.Value,
-		})
-	}
-
-	return throughputs, nil
 }
 
 func (s *server) calculateTotalCostGasUsed(ctx context.Context) (float64, error) {

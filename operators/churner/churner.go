@@ -20,8 +20,7 @@ import (
 )
 
 var (
-	bipMultiplier     = big.NewInt(10000)
-	secondsTillExpiry = 3600 * time.Second
+	bipMultiplier = big.NewInt(10000)
 )
 
 type ChurnRequest struct {
@@ -47,18 +46,19 @@ type ChurnResponse struct {
 type churner struct {
 	mu          sync.Mutex
 	Indexer     thegraph.IndexedChainState
-	Transactor  core.Transactor
+	Transactor  core.Writer
 	QuorumCount uint8
 
-	privateKey *ecdsa.PrivateKey
-	logger     logging.Logger
-	metrics    *Metrics
+	privateKey            *ecdsa.PrivateKey
+	logger                logging.Logger
+	metrics               *Metrics
+	churnApprovalInterval time.Duration
 }
 
 func NewChurner(
 	config *Config,
 	indexer thegraph.IndexedChainState,
-	transactor core.Transactor,
+	transactor core.Writer,
 	logger logging.Logger,
 	metrics *Metrics,
 ) (*churner, error) {
@@ -67,14 +67,17 @@ func NewChurner(
 		return nil, err
 	}
 
+	logger.Info("Churner created with config", "ChurnApprovalInterval", config.ChurnApprovalInterval)
+
 	return &churner{
 		Indexer:     indexer,
 		Transactor:  transactor,
 		QuorumCount: 0,
 
-		privateKey: privateKey,
-		logger:     logger.With("component", "Churner"),
-		metrics:    metrics,
+		privateKey:            privateKey,
+		logger:                logger.With("component", "Churner"),
+		metrics:               metrics,
+		churnApprovalInterval: config.ChurnApprovalInterval,
 	}, nil
 }
 
@@ -110,7 +113,7 @@ func (c *churner) ProcessChurnRequest(ctx context.Context, operatorToRegisterAdd
 	for _, quorumID := range churnRequest.QuorumIDs {
 		for _, quorumIDAlreadyRegisteredFor := range quorumIDsAlreadyRegisteredFor {
 			if quorumIDAlreadyRegisteredFor == quorumID {
-				return nil, api.NewInvalidArgError("operator is already registered in quorum")
+				return nil, api.NewErrorInvalidArg("operator is already registered in quorum")
 			}
 		}
 	}
@@ -219,7 +222,7 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 		churnBIPsOfOperatorStake := big.NewInt(int64(operatorSetParams.ChurnBIPsOfOperatorStake))
 		churnBIPsOfTotalStake := big.NewInt(int64(operatorSetParams.ChurnBIPsOfTotalStake))
 
-		c.logger.Info("lowestStake", "lowestStake", lowestStake.String(), "operatorToRegisterStake", operatorToRegisterStake.String(), "totalStake", totalStake.String(), "operatorToRegisterAddress", operatorToRegisterAddress.Hex())
+		c.logger.Info("lowestStake", "lowestStake", lowestStake.String(), "operatorToRegisterStake", operatorToRegisterStake.String(), "totalStake", totalStake.String(), "operatorToRegisterAddress", operatorToRegisterAddress.Hex(), "lowestStakeOperatorId", lowestStakeOperatorId.Hex())
 
 		// verify the lowest stake against the registering operator's stake
 		// make sure that: lowestStake * churnBIPsOfOperatorStake < operatorToRegisterStake * bipMultiplier
@@ -235,7 +238,7 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 				"registering operator address: %s, registering operator stake: %d, " +
 				"stake of lowest-stake operator: %d, operatorId of lowest-stake operator: " +
 				"%x, quorum ID: %d"
-			return nil, api.NewInvalidArgError(fmt.Sprintf(msg, float64(operatorSetParams.ChurnBIPsOfOperatorStake)/100.0-100.0, currentBlockNumber, operatorToRegisterAddress.Hex(), operatorToRegisterStake, lowestStake, lowestStakeOperatorId, quorumID))
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf(msg, float64(operatorSetParams.ChurnBIPsOfOperatorStake)/100.0-100.0, currentBlockNumber, operatorToRegisterAddress.Hex(), operatorToRegisterStake, lowestStake, lowestStakeOperatorId, quorumID))
 		}
 
 		// verify the lowest stake against the total stake
@@ -251,7 +254,7 @@ func (c *churner) getOperatorsToChurn(ctx context.Context, quorumIDs []uint8, op
 				"Block number used for this decision: %d, operatorId of the operator " +
 				"to churn: %x, stake of the operator to churn: %d, total stake in " +
 				"quorum: %d, quorum ID: %d"
-			return nil, api.NewInvalidArgError(fmt.Sprintf(msg, float64(operatorSetParams.ChurnBIPsOfTotalStake)/100.0, currentBlockNumber, lowestStakeOperatorId.Hex(), lowestStake, totalStake, quorumID))
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf(msg, float64(operatorSetParams.ChurnBIPsOfTotalStake)/100.0, currentBlockNumber, lowestStakeOperatorId.Hex(), lowestStake, totalStake, quorumID))
 		}
 
 		operatorToChurnAddress, err := c.Transactor.OperatorIDToAddress(ctx, lowestStakeOperatorId)
@@ -285,8 +288,8 @@ func (c *churner) sign(ctx context.Context, operatorToRegisterAddress gethcommon
 	var salt [32]byte
 	copy(salt[:], saltKeccak256)
 
-	// set expiry to 3600s in the future
-	expiry := big.NewInt(now.Add(secondsTillExpiry).Unix())
+	// set expiry to ChurnApprovalInterval in the future
+	expiry := big.NewInt(now.Add(c.churnApprovalInterval).Unix())
 
 	// sign and return signature
 	hashToSign, err := c.Transactor.CalculateOperatorChurnApprovalDigestHash(ctx, operatorToRegisterAddress, operatorToRegisterId, operatorsToChurn, salt, expiry)

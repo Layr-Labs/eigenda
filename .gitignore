@@ -10,4 +10,14 @@ coverage.*
 
 contracts/broadcast
 
+lightnode/docker/build-info.txt
+lightnode/docker/args.sh
+
 .idea
+.env
+.vscode
+
+icicle/*
+
+# OSX specific
+.DS_Store

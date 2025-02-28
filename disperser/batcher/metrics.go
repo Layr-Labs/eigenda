@@ -7,6 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
+	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -32,7 +33,8 @@ type MetricsConfig struct {
 }
 
 type EncodingStreamerMetrics struct {
-	EncodedBlobs *prometheus.GaugeVec
+	EncodedBlobs        *prometheus.GaugeVec
+	BlobEncodingLatency *prometheus.SummaryVec
 }
 
 type TxnManagerMetrics struct {
@@ -50,7 +52,8 @@ type FinalizerMetrics struct {
 }
 
 type DispatcherMetrics struct {
-	Latency *prometheus.SummaryVec
+	Latency         *prometheus.SummaryVec
+	OperatorLatency *prometheus.GaugeVec
 }
 
 type Metrics struct {
@@ -65,6 +68,8 @@ type Metrics struct {
 	Batch                     *prometheus.CounterVec
 	BatchProcLatency          *prometheus.SummaryVec
 	BatchProcLatencyHistogram *prometheus.HistogramVec
+	BlobAge                   *prometheus.SummaryVec
+	BlobSizeTotal             *prometheus.CounterVec
 	Attestation               *prometheus.GaugeVec
 	BatchError                *prometheus.CounterVec
 
@@ -85,6 +90,15 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 				Help:      "number and size of all encoded blobs",
 			},
 			[]string{"type"},
+		),
+		BlobEncodingLatency: promauto.With(reg).NewSummaryVec(
+			prometheus.SummaryOpts{
+				Namespace:  namespace,
+				Name:       "blob_encoding_latency_ms",
+				Help:       "blob encoding latency summary in milliseconds",
+				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
+			},
+			[]string{"state", "quorum", "size_bucket"},
 		),
 	}
 
@@ -166,6 +180,14 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			},
 			[]string{"operator_id", "status"},
 		),
+		OperatorLatency: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Name:      "operator_attestation_latency_ms",
+				Help:      "attestation latency in ms observed for operators",
+			},
+			[]string{"operator_id"},
+		),
 	}
 
 	metrics := &Metrics{
@@ -177,7 +199,7 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 			prometheus.CounterOpts{
 				Namespace: namespace,
 				Name:      "blobs_total",
-				Help:      "the number and unencoded size of total dispersal blobs",
+				Help:      "the number and unencoded size of total dispersal blobs, if a blob is in multiple quorums, it'll only be counted once",
 			},
 			[]string{"state", "data"}, // state is either success or failure
 		),
@@ -207,6 +229,25 @@ func NewMetrics(httpPort string, logger logging.Logger) *Metrics {
 				Buckets: []float64{60_000, 120_000, 180_000, 300_000, 480_000, 600_000, 780_000, 900_000, 1_260_000, 2_040_000, 3_300_000, 5_340_000},
 			},
 			[]string{"stage"},
+		),
+		BlobAge: promauto.With(reg).NewSummaryVec(
+			prometheus.SummaryOpts{
+				Namespace:  namespace,
+				Name:       "blob_age_ms",
+				Help:       "blob age (in ms) since dispersal request time at different stages of its lifecycle",
+				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.95: 0.01, 0.99: 0.001},
+			},
+			// The stage would be:
+			// encoding_requested -> encoded -> batched -> attestation_requested -> attested -> confirmed
+			[]string{"stage"},
+		),
+		BlobSizeTotal: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "blob_size_total",
+				Help:      "the size in bytes of unencoded blobs, if a blob is in multiple quorums, it'll be acounted multiple times",
+			},
+			[]string{"stage", "quorum"},
 		),
 		Attestation: promauto.With(reg).NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -257,7 +298,14 @@ func (t *DispatcherMetrics) ObserveLatency(operatorId string, success bool, late
 	if !success {
 		label = "failure"
 	}
-	t.Latency.WithLabelValues(operatorId, label).Observe(latencyMS)
+	// The Latency metric has "operator_id" but we null it out because it's separately
+	// tracked in OperatorLatency.
+	t.Latency.WithLabelValues("", label).Observe(latencyMS)
+	// Only tracks successful requests, so there is one stream per operator.
+	// This is sufficient to provide insights of operators' performance.
+	if success {
+		t.OperatorLatency.WithLabelValues(operatorId).Set(latencyMS)
+	}
 }
 
 // UpdateCompletedBlob increments the number and updates size of processed blobs.
@@ -294,6 +342,14 @@ func (g *Metrics) ObserveLatency(stage string, latencyMs float64) {
 	g.BatchProcLatencyHistogram.WithLabelValues(stage).Observe(latencyMs)
 }
 
+func (g *Metrics) ObserveBlobAge(stage string, ageMs float64) {
+	g.BlobAge.WithLabelValues(stage).Observe(ageMs)
+}
+
+func (g *Metrics) IncrementBlobSize(stage string, quorumId core.QuorumID, blobSize int) {
+	g.BlobSizeTotal.WithLabelValues(stage, fmt.Sprintf("%d", quorumId)).Add(float64(blobSize))
+}
+
 func (g *Metrics) Start(ctx context.Context) {
 	g.logger.Info("starting metrics server at ", "port", g.httpPort)
 	addr := fmt.Sprintf(":%s", g.httpPort)
@@ -312,6 +368,10 @@ func (g *Metrics) Start(ctx context.Context) {
 func (e *EncodingStreamerMetrics) UpdateEncodedBlobs(count int, size uint64) {
 	e.EncodedBlobs.WithLabelValues("size").Set(float64(size))
 	e.EncodedBlobs.WithLabelValues("number").Set(float64(count))
+}
+
+func (e *EncodingStreamerMetrics) ObserveEncodingLatency(state string, quorumId core.QuorumID, blobSize int, latencyMs float64) {
+	e.BlobEncodingLatency.WithLabelValues(state, fmt.Sprintf("%d", quorumId), common.BlobSizeBucket(blobSize)).Observe(latencyMs)
 }
 
 func (t *TxnManagerMetrics) ObserveLatency(stage string, latencyMs float64) {

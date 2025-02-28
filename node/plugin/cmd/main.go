@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"log"
 	"os"
 	"strings"
@@ -14,7 +15,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/plugin"
-	"github.com/Layr-Labs/eigensdk-go/crypto/bls"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+	blssignerTypes "github.com/Layr-Labs/eigensdk-go/signer/bls/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/urfave/cli"
 )
@@ -34,6 +36,11 @@ func main() {
 		plugin.EigenDAServiceManagerFlag,
 		plugin.ChurnerUrlFlag,
 		plugin.NumConfirmationsFlag,
+		plugin.PubIPProviderFlag,
+		plugin.BLSRemoteSignerUrlFlag,
+		plugin.BLSPublicKeyHexFlag,
+		plugin.BLSSignerCertFileFlag,
+		plugin.BLSSignerAPIKeyFlag,
 	}
 	app.Name = "eigenda-node-plugin"
 	app.Usage = "EigenDA Node Plugin"
@@ -53,21 +60,48 @@ func pluginOps(ctx *cli.Context) {
 	}
 	log.Printf("Info: plugin configs and flags parsed")
 
-	kp, err := bls.ReadPrivateKeyFromFile(config.BlsKeyFile, config.BlsKeyPassword)
+	signerCfg := blssignerTypes.SignerConfig{
+		PublicKeyHex:     config.BLSPublicKeyHex,
+		CerberusUrl:      config.BLSRemoteSignerUrl,
+		CerberusPassword: config.BlsKeyPassword,
+		TLSCertFilePath:  config.BLSSignerCertFile,
+		Path:             config.BlsKeyFile,
+		Password:         config.BlsKeyPassword,
+		CerberusAPIKey:   config.BLSSignerAPIKey,
+	}
+	if config.BLSRemoteSignerUrl != "" {
+		signerCfg.SignerType = blssignerTypes.Cerberus
+	} else {
+		signerCfg.SignerType = blssignerTypes.Local
+	}
+	signer, err := blssigner.NewSigner(signerCfg)
 	if err != nil {
-		log.Printf("Error: failed to read or decrypt the BLS private key: %v", err)
+		log.Printf("Error: failed to create BLS signer: %v", err)
 		return
 	}
-	g1point := &core.G1Point{
-		G1Affine: kp.PubKey.G1Affine,
-	}
-	keyPair := &core.KeyPair{
-		PrivKey: kp.PrivKey,
-		PubKey:  g1point,
-	}
-	log.Printf("Info: Bls key read and decrypted from %s", config.BlsKeyFile)
 
-	operatorID := keyPair.GetPubKeyG1().GetOperatorID()
+	opID, err := signer.GetOperatorId()
+	if err != nil {
+		log.Printf("Error: failed to get operator ID: %v", err)
+		return
+	}
+	operatorID, err := core.OperatorIDFromHex(opID)
+	if err != nil {
+		log.Printf("Error: failed to convert operator ID: %v", err)
+		return
+	}
+	pubKeyG1Hex := signer.GetPublicKeyG1()
+	pubKeyG1, err := hex.DecodeString(pubKeyG1Hex)
+	if err != nil {
+		log.Printf("Error: failed to decode public key G1: %v", err)
+		return
+	}
+	pubKeyG1Point := new(core.G1Point)
+	pubKeyG1Point, err = pubKeyG1Point.Deserialize(pubKeyG1)
+	if err != nil {
+		log.Printf("Error: failed to deserialize public key G1: %v", err)
+		return
+	}
 
 	sk, privateKey, err := plugin.GetECDSAPrivateKey(config.EcdsaKeyFile, config.EcdsaKeyPassword)
 	if err != nil {
@@ -95,13 +129,13 @@ func pluginOps(ctx *cli.Context) {
 	}
 	log.Printf("Info: ethclient created for url: %s", config.ChainRpcUrl)
 
-	tx, err := eth.NewTransactor(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		log.Printf("Error: failed to create EigenDA transactor: %v", err)
 		return
 	}
 
-	_, dispersalPort, retrievalPort, err := core.ParseOperatorSocket(config.Socket)
+	_, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, err := core.ParseOperatorSocket(config.Socket)
 	if err != nil {
 		log.Printf("Error: failed to parse operator socket: %v", err)
 		return
@@ -109,8 +143,8 @@ func pluginOps(ctx *cli.Context) {
 
 	socket := config.Socket
 	if isLocalhost(socket) {
-		pubIPProvider := pubip.ProviderOrDefault(config.PubIPProvider)
-		socket, err = node.SocketAddress(context.Background(), pubIPProvider, dispersalPort, retrievalPort)
+		pubIPProvider := pubip.ProviderOrDefault(logger, config.PubIPProvider)
+		socket, err = node.SocketAddress(context.Background(), pubIPProvider, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort)
 		if err != nil {
 			log.Printf("Error: failed to get socket address from ip provider: %v", err)
 			return
@@ -122,8 +156,8 @@ func pluginOps(ctx *cli.Context) {
 		Socket:              socket,
 		Timeout:             10 * time.Second,
 		PrivKey:             sk.PrivateKey,
-		KeyPair:             keyPair,
-		OperatorId:          keyPair.GetPubKeyG1().GetOperatorID(),
+		Signer:              signer,
+		OperatorId:          operatorID,
 		QuorumIDs:           config.QuorumIDList,
 		RegisterNodeAtStart: false,
 	}
@@ -138,7 +172,7 @@ func pluginOps(ctx *cli.Context) {
 		log.Printf("Info: successfully opt-in the EigenDA, for operator ID: %x, operator address: %x, socket: %s, and quorums: %v", operatorID, sk.Address, config.Socket, config.QuorumIDList)
 	} else if config.Operation == plugin.OperationOptOut {
 		log.Printf("Info: Operator with Operator Address: %x and OperatorID: %x is opting out of EigenDA", sk.Address, operatorID)
-		err = node.DeregisterOperator(context.Background(), operator, keyPair, tx)
+		err = node.DeregisterOperator(context.Background(), operator, pubKeyG1Point, tx)
 		if err != nil {
 			log.Printf("Error: failed to opt-out EigenDA Node Network for operator ID: %x, operator address: %x, quorums: %v, error: %v", operatorID, sk.Address, config.QuorumIDList, err)
 			return

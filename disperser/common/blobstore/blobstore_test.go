@@ -10,10 +10,10 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/google/uuid"
 
-	cmock "github.com/Layr-Labs/eigenda/common/mock"
+	awsmock "github.com/Layr-Labs/eigenda/common/aws/mock"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -21,7 +21,7 @@ import (
 )
 
 var (
-	logger         = logging.NewNoopLogger()
+	logger         = testutils.GetLogger()
 	securityParams = []*core.SecurityParam{{
 		QuorumID:           1,
 		AdversaryThreshold: 80,
@@ -34,7 +34,7 @@ var (
 		},
 		Data: []byte("test"),
 	}
-	s3Client   = cmock.NewS3Client()
+	s3Client   = awsmock.NewS3Client()
 	bucketName = "test-eigenda-blobstore"
 	blobHash   = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
 	blobSize   = uint(len(blob.Data))
@@ -45,12 +45,13 @@ var (
 	deployLocalStack bool
 	localStackPort   = "4569"
 
-	dynamoClient      *dynamodb.Client
+	dynamoClient      dynamodb.Client
 	blobMetadataStore *blobstore.BlobMetadataStore
 	sharedStorage     *blobstore.SharedBlobStore
 
-	UUID              = uuid.New()
-	metadataTableName = fmt.Sprintf("test-BlobMetadata-%v", UUID)
+	UUID                    = uuid.New()
+	metadataTableName       = fmt.Sprintf("test-BlobMetadata-%v", UUID)
+	shadowMetadataTableName = fmt.Sprintf("test-BlobMetadata-Shadow-%v", UUID)
 )
 
 func TestMain(m *testing.M) {
@@ -88,6 +89,14 @@ func setup(m *testing.M) {
 	if err != nil {
 		teardown()
 		panic("failed to create dynamodb table: " + err.Error())
+	}
+
+	if shadowMetadataTableName != "" {
+		_, err = test_utils.CreateTable(context.Background(), cfg, shadowMetadataTableName, blobstore.GenerateTableSchema(shadowMetadataTableName, 10, 10))
+		if err != nil {
+			teardown()
+			panic("failed to create shadow dynamodb table: " + err.Error())
+		}
 	}
 
 	dynamoClient, err = dynamodb.NewClient(cfg, logger)

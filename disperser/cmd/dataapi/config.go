@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/dataapi/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
@@ -12,12 +15,14 @@ import (
 )
 
 type Config struct {
+	ServerVersion    uint
 	AwsClientConfig  aws.ClientConfig
 	BlobstoreConfig  blobstore.Config
 	EthClientConfig  geth.EthClientConfig
 	LoggerConfig     common.LoggerConfig
 	PrometheusConfig prometheus.Config
 	MetricsConfig    dataapi.MetricsConfig
+	ChainStateConfig thegraph.Config
 
 	SocketAddr                   string
 	PrometheusApiAddr            string
@@ -35,6 +40,11 @@ type Config struct {
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
+	version := ctx.GlobalUint(flags.DataApiServerVersionFlag.Name)
+	if version != 1 && version != 2 {
+		return Config{}, fmt.Errorf("unknown server version %d, must be in [1, 2]", version)
+	}
+
 	loggerConfig, err := common.ReadLoggerCLIConfig(ctx, flags.FlagPrefix)
 	if err != nil {
 		return Config{}, err
@@ -54,6 +64,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		ServerMode:                    ctx.GlobalString(flags.ServerModeFlag.Name),
+		ServerVersion:                 version,
 		PrometheusConfig: prometheus.Config{
 			ServerURL: ctx.GlobalString(flags.PrometheusServerURLFlag.Name),
 			Username:  ctx.GlobalString(flags.PrometheusServerUsernameFlag.Name),
@@ -69,6 +80,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		DisperserHostname:  ctx.GlobalString(flags.DisperserHostnameFlag.Name),
 		ChurnerHostname:    ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
 		BatcherHealthEndpt: ctx.GlobalString(flags.BatcherHealthEndptFlag.Name),
+		ChainStateConfig:   thegraph.ReadCLIConfig(ctx),
 	}
 	return config, nil
 }

@@ -116,3 +116,8 @@ func (c *MockDisperserClient) RetrieveBlob(ctx context.Context, batchHeaderHash 
 	}
 	return blob, err
 }
+
+func (c *MockDisperserClient) Close() error {
+	args := c.Called()
+	return args.Error(0)
+}

@@ -4,10 +4,17 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
+	"strconv"
+	"time"
 
+	commonpbv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"golang.org/x/crypto/sha3"
 )
 
 type AccountID = string
@@ -30,6 +37,7 @@ type SecurityParam struct {
 	QuorumRate common.RateParam
 }
 
+type ChunkEncodingFormat = uint8
 type BundleEncodingFormat = uint8
 
 const (
@@ -45,9 +53,162 @@ const (
 
 	// The list of supported encoding formats for bundle.
 	// Values must be in range [0, 255].
+	// Note that the IDs here may not be the same as the ChunkEncodingFormat enum in
+	// the node.proto file. For example, GobBundleEncodingFormat is 0 here, but in
+	// ChunkEncodingFormat the GOB is 2 (and UNKNOWN is 0). The reason is because
+	// we need to set GobBundleEncodingFormat to 0 for backward compatibility (and
+	// in protobuf, UNKNOWN as 0 is a convention).
 	GobBundleEncodingFormat   BundleEncodingFormat = 0
 	GnarkBundleEncodingFormat BundleEncodingFormat = 1
+
+	// Similar to bundle encoding format, this describes the encoding format of chunks.
+	// The difference is ChunkEncodingFormat is just about chunks, whereas BundleEncodingFormat
+	// is also about how multiple chunks of the same bundle are packed into a single byte array.
+	GobChunkEncodingFormat   ChunkEncodingFormat = 0
+	GnarkChunkEncodingFormat ChunkEncodingFormat = 1
 )
+
+type ChunksData struct {
+	// Chunks is the encoded bytes of the chunks.
+	Chunks [][]byte
+	// Format describes how the bytes of the chunks are encoded.
+	Format ChunkEncodingFormat
+	// The number of symbols in each chunk.
+	// Note each chunk of the same blob will always have the same number of symbols.
+	ChunkLen int
+}
+
+func (cd *ChunksData) Size() uint64 {
+	if len(cd.Chunks) == 0 {
+		return 0
+	}
+	// GnarkChunkEncoding will create chunks of equal size.
+	if cd.Format == GnarkChunkEncodingFormat {
+		return uint64(len(cd.Chunks)) * uint64(len(cd.Chunks[0]))
+	}
+	// GobChunkEncoding can create chunks of different sizes.
+	size := uint64(0)
+	for _, c := range cd.Chunks {
+		size += uint64(len(c))
+	}
+	return size
+}
+
+func (cd *ChunksData) FromFrames(fr []*encoding.Frame) (*ChunksData, error) {
+	if len(fr) == 0 {
+		return nil, errors.New("no frame is provided")
+	}
+	var c ChunksData
+	c.Format = GnarkChunkEncodingFormat
+	c.ChunkLen = fr[0].Length()
+	c.Chunks = make([][]byte, 0, len(fr))
+	for _, f := range fr {
+		bytes, err := f.SerializeGnark()
+		if err != nil {
+			return nil, err
+		}
+		c.Chunks = append(c.Chunks, bytes)
+	}
+	return &c, nil
+}
+
+func (cd *ChunksData) ToFrames() ([]*encoding.Frame, error) {
+	frames := make([]*encoding.Frame, 0, len(cd.Chunks))
+	switch cd.Format {
+	case GobChunkEncodingFormat:
+		for _, data := range cd.Chunks {
+			fr, err := new(encoding.Frame).Deserialize(data)
+			if err != nil {
+				return nil, err
+			}
+			frames = append(frames, fr)
+		}
+	case GnarkChunkEncodingFormat:
+		for _, data := range cd.Chunks {
+			fr, err := new(encoding.Frame).DeserializeGnark(data)
+			if err != nil {
+				return nil, err
+			}
+			frames = append(frames, fr)
+		}
+	default:
+		return nil, fmt.Errorf("invalid chunk encoding format: %v", cd.Format)
+	}
+	return frames, nil
+}
+
+func (cd *ChunksData) FlattenToBundle() ([]byte, error) {
+	// Only Gnark coded chunks are dispersed as a byte array.
+	// Gob coded chunks are not flattened.
+	if cd.Format != GnarkChunkEncodingFormat {
+		return nil, fmt.Errorf("unsupported chunk encoding format to flatten: %v", cd.Format)
+	}
+	result := make([]byte, cd.Size()+8)
+	buf := result
+	metadata := (uint64(cd.Format) << (NumBundleHeaderBits - NumBundleEncodingFormatBits)) | uint64(cd.ChunkLen)
+	binary.LittleEndian.PutUint64(buf, metadata)
+	buf = buf[8:]
+	for _, c := range cd.Chunks {
+		if len(c) != len(cd.Chunks[0]) {
+			return nil, errors.New("all chunks must be of same size")
+		}
+		copy(buf, c)
+		buf = buf[len(c):]
+	}
+	return result, nil
+}
+
+func (cd *ChunksData) ToGobFormat() (*ChunksData, error) {
+	if cd.Format == GobChunkEncodingFormat {
+		return cd, nil
+	}
+	if cd.Format != GnarkChunkEncodingFormat {
+		return nil, fmt.Errorf("unsupported chunk encoding format: %d", cd.Format)
+	}
+	gobChunks := make([][]byte, 0, len(cd.Chunks))
+	for _, chunk := range cd.Chunks {
+		c, err := new(encoding.Frame).DeserializeGnark(chunk)
+		if err != nil {
+			return nil, err
+		}
+		gob, err := c.Serialize()
+		if err != nil {
+			return nil, err
+		}
+		gobChunks = append(gobChunks, gob)
+	}
+	return &ChunksData{
+		Chunks:   gobChunks,
+		Format:   GobChunkEncodingFormat,
+		ChunkLen: cd.ChunkLen,
+	}, nil
+}
+
+func (cd *ChunksData) ToGnarkFormat() (*ChunksData, error) {
+	if cd.Format == GnarkChunkEncodingFormat {
+		return cd, nil
+	}
+	if cd.Format != GobChunkEncodingFormat {
+		return nil, fmt.Errorf("unsupported chunk encoding format: %d", cd.Format)
+	}
+	gnarkChunks := make([][]byte, 0, len(cd.Chunks))
+	for _, chunk := range cd.Chunks {
+		c, err := new(encoding.Frame).Deserialize(chunk)
+		if err != nil {
+			return nil, err
+		}
+		gnark, err := c.SerializeGnark()
+		if err != nil {
+			return nil, err
+		}
+		gnarkChunks = append(gnarkChunks, gnark)
+	}
+	return &ChunksData{
+		Chunks:   gnarkChunks,
+		Format:   GnarkChunkEncodingFormat,
+		ChunkLen: cd.ChunkLen,
+	}, nil
+}
 
 func (s *SecurityParam) String() string {
 	return fmt.Sprintf("QuorumID: %d, AdversaryThreshold: %d, ConfirmationThreshold: %d", s.QuorumID, s.AdversaryThreshold, s.ConfirmationThreshold)
@@ -64,6 +225,14 @@ type QuorumResult struct {
 type Blob struct {
 	RequestHeader BlobRequestHeader
 	Data          []byte
+}
+
+func (b *Blob) GetQuorumNumbers() []uint8 {
+	quorumNumbers := make([]uint8, 0, len(b.RequestHeader.SecurityParams))
+	for _, sp := range b.RequestHeader.SecurityParams {
+		quorumNumbers = append(quorumNumbers, sp.QuorumID)
+	}
+	return quorumNumbers
 }
 
 // BlobAuthHeader contains the data that a user must sign to authenticate a blob request.
@@ -137,7 +306,7 @@ func (b *BlobHeader) EncodedSizeAllQuorums() int64 {
 	size := int64(0)
 	for _, quorum := range b.QuorumInfos {
 
-		size += int64(roundUpDivide(b.Length*percentMultiplier*encoding.BYTES_PER_SYMBOL, uint(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
+		size += int64(RoundUpDivide(b.Length*percentMultiplier*encoding.BYTES_PER_SYMBOL, uint(quorum.ConfirmationThreshold-quorum.AdversaryThreshold)))
 	}
 	return size
 }
@@ -157,6 +326,8 @@ type BatchHeader struct {
 type EncodedBlob struct {
 	BlobHeader        *BlobHeader
 	BundlesByOperator map[OperatorID]Bundles
+	// EncodedBundlesByOperator is bundles in encoded format (not deserialized)
+	EncodedBundlesByOperator map[OperatorID]EncodedBundles
 }
 
 // A Bundle is the collection of chunks associated with a single blob, for a single operator and a single quorum.
@@ -165,10 +336,21 @@ type Bundle []*encoding.Frame
 // Bundles is the collection of bundles associated with a single blob and a single operator.
 type Bundles map[QuorumID]Bundle
 
+// This is similar to Bundle, but tracks chunks in encoded format (i.e. not deserialized).
+type EncodedBundles map[QuorumID]*ChunksData
+
 // BlobMessage is the message that is sent to DA nodes. It contains the blob header and the associated chunk bundles.
 type BlobMessage struct {
 	BlobHeader *BlobHeader
 	Bundles    Bundles
+}
+
+// This is similar to BlobMessage, but keep the commitments and chunks in encoded format
+// (i.e. not deserialized)
+type EncodedBlobMessage struct {
+	// TODO(jianoaix): Change the commitments to encoded format.
+	BlobHeader     *BlobHeader
+	EncodedBundles map[QuorumID]*ChunksData
 }
 
 func (b Bundle) Size() uint64 {
@@ -177,6 +359,13 @@ func (b Bundle) Size() uint64 {
 		size += chunk.Size()
 	}
 	return size
+}
+
+// BinaryBundleHeader returns the header of a bundle in binary format.
+func BinaryBundleHeader(elementCount uint64) uint64 {
+	header := uint64(GnarkBundleEncodingFormat) << (NumBundleHeaderBits - NumBundleEncodingFormatBits)
+	header |= elementCount
+	return header
 }
 
 // Serialize returns the serialized bytes of the bundle.
@@ -208,7 +397,7 @@ func (b Bundle) Serialize() ([]byte, error) {
 	}
 	result := make([]byte, size+8)
 	buf := result
-	metadata := (uint64(GnarkBundleEncodingFormat) << (NumBundleHeaderBits - NumBundleEncodingFormatBits)) | uint64(len(b[0].Coeffs))
+	metadata := BinaryBundleHeader(uint64(len(b[0].Coeffs)))
 	binary.LittleEndian.PutUint64(buf, metadata)
 	buf = buf[8:]
 	for _, f := range b {
@@ -278,4 +467,185 @@ func (cb Bundles) Size() uint64 {
 		size += bundle.Size()
 	}
 	return size
+}
+
+func (cb Bundles) ToEncodedBundles() (EncodedBundles, error) {
+	eb := make(EncodedBundles)
+	for quorum, bundle := range cb {
+		cd, err := new(ChunksData).FromFrames(bundle)
+		if err != nil {
+			return nil, err
+		}
+		eb[quorum] = cd
+	}
+	return eb, nil
+}
+
+func (cb Bundles) FromEncodedBundles(eb EncodedBundles) (Bundles, error) {
+	c := make(Bundles)
+	for quorum, chunkData := range eb {
+		fr, err := chunkData.ToFrames()
+		if err != nil {
+			return nil, err
+		}
+		c[quorum] = fr
+	}
+	return c, nil
+}
+
+// PaymentMetadata represents the header information for a blob
+type PaymentMetadata struct {
+	// AccountID is the ETH account address for the payer
+	AccountID string `json:"account_id"`
+
+	// Timestamp represents the nanosecond of the dispersal request creation
+	Timestamp int64 `json:"timestamp"`
+	// CumulativePayment represents the total amount of payment (in wei) made by the user up to this point
+	CumulativePayment *big.Int `json:"cumulative_payment"`
+}
+
+// Hash returns the Keccak256 hash of the PaymentMetadata
+func (pm *PaymentMetadata) Hash() ([32]byte, error) {
+	if pm == nil {
+		return [32]byte{}, errors.New("payment metadata is nil")
+	}
+	blobHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+		{
+			Name: "accountID",
+			Type: "string",
+		},
+		{
+			Name: "timestamp",
+			Type: "int64",
+		},
+		{
+			Name: "cumulativePayment",
+			Type: "uint256",
+		},
+	})
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	arguments := abi.Arguments{
+		{
+			Type: blobHeaderType,
+		},
+	}
+
+	bytes, err := arguments.Pack(pm)
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	var hash [32]byte
+	hasher := sha3.NewLegacyKeccak256()
+	hasher.Write(bytes)
+	copy(hash[:], hasher.Sum(nil)[:32])
+
+	return hash, nil
+}
+
+func (pm *PaymentMetadata) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
+	if pm == nil {
+		return nil, errors.New("payment metadata is nil")
+	}
+
+	return &types.AttributeValueMemberM{
+		Value: map[string]types.AttributeValue{
+			"AccountID": &types.AttributeValueMemberS{Value: pm.AccountID},
+			"Timestamp": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.Timestamp)},
+			"CumulativePayment": &types.AttributeValueMemberN{
+				Value: pm.CumulativePayment.String(),
+			},
+		},
+	}, nil
+}
+
+func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error {
+	m, ok := av.(*types.AttributeValueMemberM)
+	if !ok {
+		return fmt.Errorf("expected *types.AttributeValueMemberM, got %T", av)
+	}
+	accountID, ok := m.Value["AccountID"].(*types.AttributeValueMemberS)
+	if !ok {
+		return fmt.Errorf("expected *types.AttributeValueMemberS for AccountID, got %T", m.Value["AccountID"])
+	}
+	pm.AccountID = accountID.Value
+	rp, ok := m.Value["Timestamp"].(*types.AttributeValueMemberN)
+	if !ok {
+		return fmt.Errorf("expected *types.AttributeValueMemberN for Timestamp, got %T", m.Value["Timestamp"])
+	}
+	timestamp, err := strconv.ParseInt(rp.Value, 10, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse Timestamp: %w", err)
+	}
+	pm.Timestamp = timestamp
+	cp, ok := m.Value["CumulativePayment"].(*types.AttributeValueMemberN)
+	if !ok {
+		return fmt.Errorf("expected *types.AttributeValueMemberN for CumulativePayment, got %T", m.Value["CumulativePayment"])
+	}
+	pm.CumulativePayment, _ = new(big.Int).SetString(cp.Value, 10)
+	return nil
+}
+
+func (pm *PaymentMetadata) ToProtobuf() *commonpbv2.PaymentHeader {
+	if pm == nil {
+		return nil
+	}
+	return &commonpbv2.PaymentHeader{
+		AccountId:         pm.AccountID,
+		Timestamp:         pm.Timestamp,
+		CumulativePayment: pm.CumulativePayment.Bytes(),
+	}
+}
+
+// ConvertToProtoPaymentHeader converts a PaymentMetadata to a protobuf payment header
+func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) *PaymentMetadata {
+	if ph == nil {
+		return nil
+	}
+
+	return &PaymentMetadata{
+		AccountID:         ph.AccountId,
+		Timestamp:         ph.Timestamp,
+		CumulativePayment: new(big.Int).SetBytes(ph.CumulativePayment),
+	}
+}
+
+// ReservedPayment contains information the onchain state about a reserved payment
+type ReservedPayment struct {
+	// reserve number of symbols per second
+	SymbolsPerSecond uint64
+	// reservation activation timestamp
+	StartTimestamp uint64
+	// reservation expiration timestamp
+	EndTimestamp uint64
+
+	// allowed quorums
+	QuorumNumbers []uint8
+	// ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
+	QuorumSplits []byte
+}
+
+type OnDemandPayment struct {
+	// Total amount deposited by the user
+	CumulativePayment *big.Int
+}
+
+type BlobVersionParameters struct {
+	CodingRate      uint32
+	MaxNumOperators uint32
+	NumChunks       uint32
+}
+
+// IsActive returns true if the reservation is active at the given timestamp
+func (ar *ReservedPayment) IsActive(currentTimestamp uint64) bool {
+	return ar.StartTimestamp <= currentTimestamp && ar.EndTimestamp >= currentTimestamp
+}
+
+// IsActive returns true if the reservation is active at the given timestamp
+func (ar *ReservedPayment) IsActiveByNanosecond(currentTimestamp int64) bool {
+	timestamp := uint64((time.Duration(currentTimestamp) * time.Nanosecond).Seconds())
+	return ar.StartTimestamp <= timestamp && ar.EndTimestamp >= timestamp
 }

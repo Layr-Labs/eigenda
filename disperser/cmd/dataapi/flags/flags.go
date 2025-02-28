@@ -4,6 +4,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/urfave/cli"
 )
 
@@ -131,6 +132,13 @@ var (
 		Value:    "9100",
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METRICS_HTTP_PORT"),
 	}
+	DataApiServerVersionFlag = cli.UintFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "dataapi-version"),
+		Usage:    "DataApi server version. Options are 1 and 2.",
+		Required: false,
+		Value:    1,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DATA_API_VERSION"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -155,6 +163,7 @@ var requiredFlags = []cli.Flag{
 var optionalFlags = []cli.Flag{
 	ServerModeFlag,
 	MetricsHTTPPort,
+	DataApiServerVersionFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
@@ -165,4 +174,5 @@ func init() {
 	Flags = append(Flags, common.LoggerCLIFlags(envVarPrefix, FlagPrefix)...)
 	Flags = append(Flags, geth.EthClientFlags(envVarPrefix)...)
 	Flags = append(Flags, aws.ClientFlags(envVarPrefix, FlagPrefix)...)
+	Flags = append(Flags, thegraph.CLIFlags(envVarPrefix)...)
 }

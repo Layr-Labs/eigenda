@@ -8,6 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/mock"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
@@ -17,12 +18,11 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	indexermock "github.com/Layr-Labs/eigenda/indexer/mock"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/wealdtech/go-merkletree"
-	"github.com/wealdtech/go-merkletree/keccak256"
+	"github.com/wealdtech/go-merkletree/v2"
+	"github.com/wealdtech/go-merkletree/v2/keccak256"
 )
 
 const numOperators = 10
@@ -35,14 +35,15 @@ func makeTestComponents() (encoding.Prover, encoding.Verifier, error) {
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    true,
 	}
 
-	p, err := prover.NewProver(config, true)
+	p, err := prover.NewProver(config, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	v, err := verifier.NewVerifier(config, true)
+	v, err := verifier.NewVerifier(config, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -60,8 +61,8 @@ var (
 	retrievalClient   clients.RetrievalClient
 	blobHeader        *core.BlobHeader
 	encodedBlob       core.EncodedBlob = core.EncodedBlob{
-		BlobHeader:        nil,
-		BundlesByOperator: make(map[core.OperatorID]core.Bundles),
+		BlobHeader:               nil,
+		EncodedBundlesByOperator: make(map[core.OperatorID]core.EncodedBundles),
 	}
 	batchHeaderHash        [32]byte
 	batchRoot              [32]byte
@@ -95,7 +96,7 @@ func setup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	indexer = &indexermock.MockIndexer{}
 	indexer.On("Index").Return(nil).Once()
 
@@ -198,7 +199,11 @@ func setup(t *testing.T) {
 		bundles := make(map[core.QuorumID]core.Bundle, len(blobHeader.QuorumInfos))
 		bundles[quorumID] = chunks[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks]
 		encodedBlob.BlobHeader = blobHeader
-		encodedBlob.BundlesByOperator[id] = bundles
+		eb, err := core.Bundles(bundles).ToEncodedBundles()
+		if err != nil {
+			t.Fatal(err)
+		}
+		encodedBlob.EncodedBundlesByOperator[id] = eb
 	}
 
 }

@@ -11,16 +11,17 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
+	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	coreindexer "github.com/Layr-Labs/eigenda/core/indexer"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
@@ -39,15 +40,19 @@ var (
 	dockertestResource *dockertest.Resource
 	localStackPort     string
 
-	metadataTableName = "test-BlobMetadata"
-	bucketTableName   = "test-BucketStore"
-	logger            logging.Logger
-	ethClient         common.EthClient
-	rpcClient         common.RPCEthClient
-	mockRollup        *rollupbindings.ContractMockRollup
-	retrievalClient   clients.RetrievalClient
-	numConfirmations  int = 3
-	numRetries            = 0
+	metadataTableName   = "test-BlobMetadata"
+	bucketTableName     = "test-BucketStore"
+	metadataTableNameV2 = "test-BlobMetadata-v2"
+	logger              logging.Logger
+	ethClient           common.EthClient
+	rpcClient           common.RPCEthClient
+	mockRollup          *rollupbindings.ContractMockRollup
+	verifierContract    *verifierbindings.ContractEigenDACertVerifier
+	retrievalClient     clients.RetrievalClient
+	retrievalClientV2   clientsv2.RetrievalClient
+	numConfirmations    int = 3
+	numRetries              = 0
+	chainReader         core.Reader
 
 	cancel context.CancelFunc
 )
@@ -91,9 +96,8 @@ var _ = BeforeSuite(func() {
 			dockertestPool = pool
 			dockertestResource = resource
 
-			err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName)
+			err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName, metadataTableNameV2)
 			Expect(err).To(BeNil())
-
 		} else {
 			fmt.Println("Using in-memory Blob Store")
 		}
@@ -106,32 +110,46 @@ var _ = BeforeSuite(func() {
 			testConfig.StartGraphNode()
 		}
 
+		loggerConfig := common.DefaultLoggerConfig()
+		logger, err = common.NewLogger(loggerConfig)
+		Expect(err).To(BeNil())
+
 		fmt.Println("Deploying experiment")
 		testConfig.DeployExperiment()
 
+		pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
+		pk = strings.TrimPrefix(pk, "0x")
+		pk = strings.TrimPrefix(pk, "0X")
+		ethClient, err = geth.NewMultiHomingClient(geth.EthClientConfig{
+			RPCURLs:          []string{testConfig.Deployers[0].RPC},
+			PrivateKeyString: pk,
+			NumConfirmations: numConfirmations,
+			NumRetries:       numRetries,
+		}, gcommon.Address{}, logger)
+		Expect(err).To(BeNil())
+
+		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
+		Expect(err).To(BeNil())
+
+		fmt.Println("Registering blob versions and relays")
+		testConfig.RegisterBlobVersionAndRelays(ethClient)
+
+		fmt.Println("Registering disperser keypair")
+		err = testConfig.RegisterDisperserKeypair(ethClient)
+		if err != nil {
+			panic(err)
+		}
+
 		fmt.Println("Starting binaries")
 		testConfig.StartBinaries()
-	}
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err = common.NewLogger(loggerConfig)
-	Expect(err).To(BeNil())
 
-	pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
-	pk = strings.TrimPrefix(pk, "0x")
-	pk = strings.TrimPrefix(pk, "0X")
-	ethClient, err = geth.NewMultiHomingClient(geth.EthClientConfig{
-		RPCURLs:          []string{testConfig.Deployers[0].RPC},
-		PrivateKeyString: pk,
-		NumConfirmations: numConfirmations,
-		NumRetries:       numRetries,
-	}, gcommon.Address{}, logger)
-	Expect(err).To(BeNil())
-	rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
-	Expect(err).To(BeNil())
-	mockRollup, err = rollupbindings.NewContractMockRollup(gcommon.HexToAddress(testConfig.MockRollup), ethClient)
-	Expect(err).To(BeNil())
-	err = setupRetrievalClient(testConfig)
-	Expect(err).To(BeNil())
+		mockRollup, err = rollupbindings.NewContractMockRollup(gcommon.HexToAddress(testConfig.MockRollup), ethClient)
+		Expect(err).To(BeNil())
+		verifierContract, err = verifierbindings.NewContractEigenDACertVerifier(gcommon.HexToAddress(testConfig.EigenDA.CertVerifier), ethClient)
+		Expect(err).To(BeNil())
+		err = setupRetrievalClient(testConfig)
+		Expect(err).To(BeNil())
+	}
 })
 
 func setupRetrievalClient(testConfig *deploy.Config) error {
@@ -141,74 +159,84 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		NumConfirmations: numConfirmations,
 		NumRetries:       numRetries,
 	}
-	client, err := geth.NewMultiHomingClient(ethClientConfig, gcommon.Address{}, logger)
-	if err != nil {
-		return err
+	var err error
+	if ethClient == nil {
+		ethClient, err = geth.NewMultiHomingClient(ethClientConfig, gcommon.Address{}, logger)
+		if err != nil {
+			return err
+		}
 	}
-	rpcClient, err := ethrpc.Dial(testConfig.Deployers[0].RPC)
-	if err != nil {
-		log.Fatalln("could not start tcp listener", err)
+	if rpcClient == nil {
+		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
+		if err != nil {
+			log.Fatalln("could not start tcp listener", err)
+		}
 	}
-	tx, err := eth.NewTransactor(logger, client, testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER, testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
+	tx, err := eth.NewWriter(logger, ethClient, testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER, testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
 	if err != nil {
 		return err
 	}
 
-	cs := eth.NewChainState(tx, client)
+	cs := eth.NewChainState(tx, ethClient)
 	agn := &core.StdAssignmentCoordinator{}
 	nodeClient := clients.NewNodeClient(20 * time.Second)
 	srsOrder, err := strconv.Atoi(testConfig.Retriever.RETRIEVER_SRS_ORDER)
 	if err != nil {
 		return err
 	}
-	v, err := verifier.NewVerifier(&kzg.KzgConfig{
+	kzgConfig := &kzg.KzgConfig{
 		G1Path:          testConfig.Retriever.RETRIEVER_G1_PATH,
 		G2Path:          testConfig.Retriever.RETRIEVER_G2_PATH,
 		G2PowerOf2Path:  testConfig.Retriever.RETRIEVER_G2_POWER_OF_2_PATH,
 		CacheDir:        testConfig.Retriever.RETRIEVER_CACHE_PATH,
-		NumWorker:       1,
 		SRSOrder:        uint64(srsOrder),
 		SRSNumberToLoad: uint64(srsOrder),
-		Verbose:         true,
+		NumWorker:       1,
 		PreloadEncoder:  false,
-	}, false)
+		LoadG2Points:    true,
+	}
+
+	v, err := verifier.NewVerifier(kzgConfig, nil)
 	if err != nil {
 		return err
 	}
 
-	indexer, err := coreindexer.CreateNewIndexer(
-		&indexer.Config{
-			PullInterval: 100 * time.Millisecond,
-		},
-		client,
-		rpcClient,
-		testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER,
-		logger,
-	)
+	graphBackoff, err := time.ParseDuration(testConfig.Retriever.RETRIEVER_GRAPH_BACKOFF)
 	if err != nil {
 		return err
 	}
-
-	ics, err := coreindexer.NewIndexedChainState(cs, indexer)
+	maxRetries, err := strconv.Atoi(testConfig.Retriever.RETRIEVER_GRAPH_MAX_RETRIES)
 	if err != nil {
 		return err
 	}
+	ics := thegraph.MakeIndexedChainState(thegraph.Config{
+		Endpoint:     testConfig.Retriever.RETRIEVER_GRAPH_URL,
+		PullInterval: graphBackoff,
+		MaxRetries:   maxRetries,
+	}, cs, logger)
 
 	retrievalClient, err = clients.NewRetrievalClient(logger, ics, agn, nodeClient, v, 10)
 	if err != nil {
 		return err
 	}
+	chainReader, err = eth.NewReader(
+		logger,
+		ethClient,
+		testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER,
+		testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
+	if err != nil {
+		return err
+	}
+	retrievalClientV2 = clientsv2.NewRetrievalClient(logger, chainReader, ics, v, 10)
 
-	var ctx context.Context
-	ctx, cancel = context.WithCancel(context.Background())
-
-	return indexer.Index(ctx)
+	return ics.Start(context.Background())
 }
 
 var _ = AfterSuite(func() {
 	if testConfig.Environment.IsLocal() {
-
-		cancel()
+		if cancel != nil {
+			cancel()
+		}
 
 		fmt.Println("Stopping binaries")
 		testConfig.StopBinaries()

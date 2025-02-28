@@ -18,22 +18,23 @@ import (
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	_ "go.uber.org/automaxprocs"
 )
 
 type Verifier struct {
-	*kzg.KzgConfig
-	Srs          *kzg.SRS
-	G2Trailing   []bn254.G2Affine
-	mu           sync.Mutex
-	LoadG2Points bool
+	kzgConfig *kzg.KzgConfig
+	encoder   *rs.Encoder
+
+	Srs        *kzg.SRS
+	G2Trailing []bn254.G2Affine
+	mu         sync.Mutex
 
 	ParametrizedVerifiers map[encoding.EncodingParams]*ParametrizedVerifier
 }
 
 var _ encoding.Verifier = &Verifier{}
 
-func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
-
+func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifier, error) {
 	if config.SRSNumberToLoad > config.SRSOrder {
 		return nil, errors.New("SRSOrder is less than srsNumberToLoad")
 	}
@@ -41,23 +42,21 @@ func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
 	// read the whole order, and treat it as entire SRS for low degree proof
 	s1, err := kzg.ReadG1Points(config.G1Path, config.SRSNumberToLoad, config.NumWorker)
 	if err != nil {
-		log.Println("failed to read G1 points", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to read %d G1 points from %s: %v", config.SRSNumberToLoad, config.G1Path, err)
 	}
 
 	s2 := make([]bn254.G2Affine, 0)
 	g2Trailing := make([]bn254.G2Affine, 0)
 
 	// PreloadEncoder is by default not used by operator node, PreloadEncoder
-	if loadG2Points {
+	if config.LoadG2Points {
 		if len(config.G2Path) == 0 {
 			return nil, errors.New("G2Path is empty. However, object needs to load G2Points")
 		}
 
 		s2, err = kzg.ReadG2Points(config.G2Path, config.SRSNumberToLoad, config.NumWorker)
 		if err != nil {
-			log.Println("failed to read G2 points", err)
-			return nil, err
+			return nil, fmt.Errorf("failed to read %d G2 points from %s: %v", config.SRSNumberToLoad, config.G2Path, err)
 		}
 
 		g2Trailing, err = kzg.ReadG2PointSection(
@@ -67,7 +66,7 @@ func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
 			config.NumWorker,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read trailing G2 points from %s: %v", config.G2Path, err)
 		}
 	} else {
 		if len(config.G2PowerOf2Path) == 0 && len(config.G2Path) == 0 {
@@ -90,100 +89,96 @@ func NewVerifier(config *kzg.KzgConfig, loadG2Points bool) (*Verifier, error) {
 	}
 	srs, err := kzg.NewSrs(s1, s2)
 	if err != nil {
-		log.Println("Could not create srs", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create SRS: %v", err)
 	}
 
 	fmt.Println("numthread", runtime.GOMAXPROCS(0))
 
+	encoder, err := rs.NewEncoder(encoderConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create encoder: %v", err)
+	}
+
 	encoderGroup := &Verifier{
-		KzgConfig:             config,
+		kzgConfig:             config,
+		encoder:               encoder,
 		Srs:                   srs,
 		G2Trailing:            g2Trailing,
 		ParametrizedVerifiers: make(map[encoding.EncodingParams]*ParametrizedVerifier),
-		LoadG2Points:          loadG2Points,
 	}
 
 	return encoderGroup, nil
-
 }
 
 type ParametrizedVerifier struct {
 	*kzg.KzgConfig
 	Srs *kzg.SRS
 
-	*rs.Encoder
-
 	Fs *fft.FFTSettings
 	Ks *kzg.KZGSettings
 }
 
-func (g *Verifier) GetKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
+func (v *Verifier) GetKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
 
-	if err := params.Validate(); err != nil {
+	if err := encoding.ValidateEncodingParams(params, v.kzgConfig.SRSOrder); err != nil {
 		return nil, err
 	}
 
-	ver, ok := g.ParametrizedVerifiers[params]
+	ver, ok := v.ParametrizedVerifiers[params]
 	if ok {
 		return ver, nil
 	}
 
-	ver, err := g.newKzgVerifier(params)
+	ver, err := v.newKzgVerifier(params)
 	if err == nil {
-		g.ParametrizedVerifiers[params] = ver
+		v.ParametrizedVerifiers[params] = ver
 	}
 
 	return ver, err
 }
 
 func (g *Verifier) NewKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
 	return g.newKzgVerifier(params)
 }
 
-func (g *Verifier) newKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
-
+func (v *Verifier) newKzgVerifier(params encoding.EncodingParams) (*ParametrizedVerifier, error) {
 	if err := params.Validate(); err != nil {
 		return nil, err
 	}
 
+	// Create FFT settings based on params
 	n := uint8(math.Log2(float64(params.NumEvaluations())))
 	fs := fft.NewFFTSettings(n)
-	ks, err := kzg.NewKZGSettings(fs, g.Srs)
 
+	// Create KZG settings
+	ks, err := kzg.NewKZGSettings(fs, v.Srs)
 	if err != nil {
-		return nil, err
-	}
-
-	encoder, err := rs.NewEncoder(params, g.Verbose)
-	if err != nil {
-		log.Println("Could not create encoder: ", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create KZG settings: %w", err)
 	}
 
 	return &ParametrizedVerifier{
-		KzgConfig: g.KzgConfig,
-		Srs:       g.Srs,
-		Encoder:   encoder,
+		KzgConfig: v.kzgConfig,
+		Srs:       v.Srs,
 		Fs:        fs,
 		Ks:        ks,
 	}, nil
 }
 
 func (v *Verifier) VerifyBlobLength(commitments encoding.BlobCommitments) error {
-	return v.VerifyCommit((*bn254.G2Affine)(commitments.LengthCommitment), (*bn254.G2Affine)(commitments.LengthProof), uint64(commitments.Length))
-
+	return v.VerifyCommit(
+		(*bn254.G2Affine)(commitments.LengthCommitment),
+		(*bn254.G2Affine)(commitments.LengthProof),
+		uint64(commitments.Length),
+	)
 }
 
 // VerifyCommit verifies the low degree proof; since it doesn't depend on the encoding parameters
 // we leave it as a method of the KzgEncoderGroup
 func (v *Verifier) VerifyCommit(lengthCommit *bn254.G2Affine, lengthProof *bn254.G2Affine, length uint64) error {
 
-	g1Challenge, err := kzg.ReadG1Point(v.SRSOrder-length, v.KzgConfig)
+	g1Challenge, err := kzg.ReadG1Point(v.kzgConfig.SRSOrder-length, v.kzgConfig.SRSOrder, v.kzgConfig.G1Path)
 	if err != nil {
 		return err
 	}
@@ -206,7 +201,15 @@ func VerifyLengthProof(lengthCommit *bn254.G2Affine, proof *bn254.G2Affine, g1Ch
 	return PairingsVerify(g1Challenge, lengthCommit, &kzg.GenG1, proof)
 }
 
-func (v *Verifier) VerifyFrames(frames []*encoding.Frame, indices []encoding.ChunkNumber, commitments encoding.BlobCommitments, params encoding.EncodingParams) error {
+func (v *Verifier) VerifyFrames(
+	frames []*encoding.Frame,
+	indices []encoding.ChunkNumber,
+	commitments encoding.BlobCommitments,
+	params encoding.EncodingParams) error {
+
+	if len(frames) != len(indices) {
+		return fmt.Errorf("invalid number of frames and indices: %d != %d", len(frames), len(indices))
+	}
 
 	verifier, err := v.GetKzgVerifier(params)
 	if err != nil {
@@ -218,6 +221,7 @@ func (v *Verifier) VerifyFrames(frames []*encoding.Frame, indices []encoding.Chu
 			(*bn254.G1Affine)(commitments.Commitment),
 			frames[ind],
 			uint64(indices[ind]),
+			params.NumChunks,
 		)
 
 		if err != nil {
@@ -226,20 +230,19 @@ func (v *Verifier) VerifyFrames(frames []*encoding.Frame, indices []encoding.Chu
 	}
 
 	return nil
-
 }
 
-func (v *ParametrizedVerifier) VerifyFrame(commit *bn254.G1Affine, f *encoding.Frame, index uint64) error {
+func (v *ParametrizedVerifier) VerifyFrame(commit *bn254.G1Affine, f *encoding.Frame, index uint64, numChunks uint64) error {
 
 	j, err := rs.GetLeadingCosetIndex(
 		uint64(index),
-		v.NumChunks,
+		numChunks,
 	)
 	if err != nil {
 		return err
 	}
 
-	g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), v.KzgConfig)
+	g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), v.KzgConfig.SRSOrder, v.KzgConfig.G2Path)
 	if err != nil {
 		return err
 	}
@@ -298,18 +301,12 @@ func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bn254.G1Aff
 // Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
 // The result is trimmed to the given maxInputSize.
 func (v *Verifier) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64) ([]byte, error) {
-	frames := make([]rs.Frame, len(chunks))
+	frames := make([]rs.FrameCoeffs, len(chunks))
 	for i := range chunks {
-		frames[i] = rs.Frame{
-			Coeffs: chunks[i].Coeffs,
-		}
-	}
-	encoder, err := v.GetKzgVerifier(params)
-	if err != nil {
-		return nil, err
+		frames[i] = chunks[i].Coeffs
 	}
 
-	return encoder.Decode(frames, toUint64Array(indices), maxInputSize)
+	return v.encoder.Decode(frames, toUint64Array(indices), maxInputSize, params)
 }
 
 func toUint64Array(chunkIndices []encoding.ChunkNumber) []uint64 {

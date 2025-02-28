@@ -24,6 +24,9 @@ const (
 	queryTickerDuration     = 3 * time.Second
 )
 
+// EjectionResponse encapsulates the response of an ejection request.
+// It contains the transaction hash of the ejection transaction.
+// If the ejection resulted in no transaction due to no operators to eject (without any errors), the transaction hash will be empty.
 type EjectionResponse struct {
 	TransactionHash string `json:"transaction_hash"`
 }
@@ -78,7 +81,7 @@ type Ejector struct {
 	wallet                  walletsdk.Wallet
 	ethClient               common.EthClient
 	logger                  logging.Logger
-	transactor              core.Transactor
+	transactor              core.Writer
 	metrics                 *Metrics
 	txnTimeout              time.Duration
 	nonsigningRateThreshold int
@@ -87,7 +90,7 @@ type Ejector struct {
 	mu sync.Mutex
 }
 
-func NewEjector(wallet walletsdk.Wallet, ethClient common.EthClient, logger logging.Logger, tx core.Transactor, metrics *Metrics, txnTimeout time.Duration, nonsigningRateThreshold int) *Ejector {
+func NewEjector(wallet walletsdk.Wallet, ethClient common.EthClient, logger logging.Logger, tx core.Writer, metrics *Metrics, txnTimeout time.Duration, nonsigningRateThreshold int) *Ejector {
 	return &Ejector{
 		wallet:                  wallet,
 		ethClient:               ethClient,
@@ -114,6 +117,14 @@ func (e *Ejector) Eject(ctx context.Context, nonsignerMetrics []*NonSignerMetric
 		if metric.Percentage/100.0 > 1-stakeShareToSLA(metric.StakePercentage/100.0) {
 			nonsigners = append(nonsigners, metric)
 		}
+	}
+
+	if len(nonsigners) == 0 {
+		e.logger.Info("No operators to eject")
+		e.metrics.IncrementEjectionRequest(mode, codes.OK)
+		return &EjectionResponse{
+			TransactionHash: "",
+		}, nil
 	}
 
 	// Rank the operators for each quorum by the operator performance score.

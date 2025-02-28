@@ -21,6 +21,7 @@ const maxNumOperatorAddresses = 300
 var (
 	ErrPubKeysNotEqual     = errors.New("public keys are not equal")
 	ErrInsufficientEthSigs = errors.New("insufficient eth signatures")
+	ErrAggPubKeyNotValid   = errors.New("aggregated public key is not valid")
 	ErrAggSigNotValid      = errors.New("aggregated signature is not valid")
 )
 
@@ -79,12 +80,12 @@ type SignatureAggregator interface {
 
 type StdSignatureAggregator struct {
 	Logger     logging.Logger
-	Transactor Transactor
+	Transactor Reader
 	// OperatorAddresses contains the ethereum addresses of the operators corresponding to their operator IDs
 	OperatorAddresses *lru.Cache[OperatorID, gethcommon.Address]
 }
 
-func NewStdSignatureAggregator(logger logging.Logger, transactor Transactor) (*StdSignatureAggregator, error) {
+func NewStdSignatureAggregator(logger logging.Logger, transactor Reader) (*StdSignatureAggregator, error) {
 	operatorAddrs, err := lru.New[OperatorID, gethcommon.Address](maxNumOperatorAddresses)
 	if err != nil {
 		return nil, err
@@ -137,7 +138,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 		if !ok && a.Transactor != nil {
 			operatorAddr, err = a.Transactor.OperatorIDToAddress(ctx, r.Operator)
 			if err != nil {
-				a.Logger.Error("failed to get operator address from registry", "operatorID", operatorIDHex)
+				a.Logger.Warn("failed to get operator address from registry", "operatorID", operatorIDHex)
 				operatorAddr = gethcommon.Address{}
 			} else {
 				a.OperatorAddresses.Add(r.Operator, operatorAddr)
@@ -223,6 +224,11 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 			PercentSigned: percent,
 		}
 
+		if percent == 0 {
+			a.Logger.Warn("no stake signed for quorum", "quorumID", quorumID)
+			continue
+		}
+
 		// Verify that the aggregated public key for the quorum matches the on-chain quorum aggregate public key sans non-signers of the quorum
 		quorumAggKey := state.AggKeys[quorumID]
 		quorumAggPubKeys[quorumID] = quorumAggKey
@@ -236,7 +242,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 		}
 
 		if aggPubKeys[quorumID] == nil {
-			return nil, ErrAggSigNotValid
+			return nil, ErrAggPubKeyNotValid
 		}
 
 		ok, err := signersAggKey.VerifyEquivalence(aggPubKeys[quorumID])
@@ -267,6 +273,10 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics In
 	// Aggregate the aggregated signatures. We reuse the first aggregated signature as the accumulator
 	var aggSig *Signature
 	for _, quorumID := range quorumIDs {
+		if quorumAttestation.AggSignature[quorumID] == nil {
+			a.Logger.Error("cannot aggregate signature for quorum because aggregated signature is nil", "quorumID", quorumID)
+			continue
+		}
 		sig := quorumAttestation.AggSignature[quorumID]
 		if aggSig == nil {
 			aggSig = &Signature{sig.G1Point.Clone()}
@@ -278,6 +288,10 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics In
 	// Aggregate the aggregated public keys. We reuse the first aggregated public key as the accumulator
 	var aggPubKey *G2Point
 	for _, quorumID := range quorumIDs {
+		if quorumAttestation.SignersAggPubKey[quorumID] == nil {
+			a.Logger.Error("cannot aggregate public key for quorum because signers aggregated public key is nil", "quorumID", quorumID)
+			continue
+		}
 		apk := quorumAttestation.SignersAggPubKey[quorumID]
 		if aggPubKey == nil {
 			aggPubKey = apk.Clone()
@@ -309,6 +323,10 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics In
 
 	quorumAggKeys := make(map[QuorumID]*G1Point, len(quorumIDs))
 	for _, quorumID := range quorumIDs {
+		if quorumAttestation.QuorumAggPubKey[quorumID] == nil {
+			a.Logger.Error("cannot aggregate public key for quorum because aggregated public key is nil", "quorumID", quorumID)
+			continue
+		}
 		quorumAggKeys[quorumID] = quorumAttestation.QuorumAggPubKey[quorumID]
 	}
 
@@ -333,15 +351,19 @@ func GetStakeThreshold(state *OperatorState, quorum QuorumID, quorumThreshold ui
 	quorumThresholdBig := new(big.Int).SetUint64(uint64(quorumThreshold))
 	stakeThreshold := new(big.Int)
 	stakeThreshold.Mul(quorumThresholdBig, state.Totals[quorum].Stake)
-	stakeThreshold = roundUpDivideBig(stakeThreshold, new(big.Int).SetUint64(percentMultiplier))
+	stakeThreshold = RoundUpDivideBig(stakeThreshold, new(big.Int).SetUint64(percentMultiplier))
 
 	return stakeThreshold
 }
 
 func GetSignedPercentage(state *OperatorState, quorum QuorumID, stakeAmount *big.Int) uint8 {
+	totalStake := state.Totals[quorum].Stake
+	if totalStake.Cmp(big.NewInt(0)) == 0 {
+		return 0
+	}
 
 	stakeAmount = stakeAmount.Mul(stakeAmount, new(big.Int).SetUint64(percentMultiplier))
-	quorumThresholdBig := stakeAmount.Div(stakeAmount, state.Totals[quorum].Stake)
+	quorumThresholdBig := stakeAmount.Div(stakeAmount, totalStake)
 
 	quorumThreshold := uint8(quorumThresholdBig.Uint64())
 

@@ -1,23 +1,43 @@
 // SPDX-License-Identifier: UNLICENSED 
 pragma solidity ^0.8.9;
 
-import {PauserRegistry} from "eigenlayer-core/contracts/permissions/PauserRegistry.sol";
-import {EmptyContract} from "eigenlayer-core/test/mocks/EmptyContract.sol";
+import {PauserRegistry} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
+import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
-import {RegistryCoordinator} from "eigenlayer-middleware/RegistryCoordinator.sol";
-import {IndexRegistry} from "eigenlayer-middleware/IndexRegistry.sol";
-import {StakeRegistry} from "eigenlayer-middleware/StakeRegistry.sol";
-import {IIndexRegistry} from "eigenlayer-middleware/interfaces/IIndexRegistry.sol";
+import {RegistryCoordinator} from "../lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {IndexRegistry} from "../lib/eigenlayer-middleware/src/IndexRegistry.sol";
+import {StakeRegistry} from "../lib/eigenlayer-middleware/src/StakeRegistry.sol";
+import {IIndexRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IIndexRegistry.sol";
 
 import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
+import {PaymentVault} from "../src/payments/PaymentVault.sol";
+import {IPaymentVault} from "../src/interfaces/IPaymentVault.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDADeployer} from "./EigenDADeployer.s.sol";
 import {EigenLayerUtils} from "./EigenLayerUtils.s.sol";
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 
 import "./DeployOpenEigenLayer.s.sol";
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
+
+
+// Helper function to create single-element arrays
+function toArray(address element) pure returns (address[] memory) {
+    address[] memory arr = new address[](1);
+    arr[0] = element;
+    return arr;
+}
+
+function toArray(uint256 element) pure returns (uint256[] memory) {
+    uint256[] memory arr = new uint256[](1);
+    arr[0] = element;
+    return arr;
+}
+
 
 // # To load the variables in the .env file
 // source .env
@@ -25,7 +45,7 @@ import "forge-std/StdJson.sol";
 // forge script script/Deployer.s.sol:SetupEigenDA --rpc-url $RPC_URL  --private-key $PRIVATE_KEY --broadcast -vvvv
 contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
-    string deployConfigPath = "script/eigenda_deploy_config.json";
+    string deployConfigPath = "script/input/eigenda_deploy_config.json";
 
     // deploy all the EigenDA contracts. Relies on many EL contracts having already been deployed.
     function run() external {
@@ -112,8 +132,7 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         }
 
         vm.startBroadcast();
-
-        // Allocate eth to stakers and operators
+        // Allocate eth to stakers, operators, dispserser clients
         _allocate(
             IERC20(address(0)),
             stakers,
@@ -156,6 +175,22 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             delegation.registerAsOperator(IDelegationManager.OperatorDetails(earningsReceiver, delegationApprover, stakerOptOutWindowBlocks), metadataURI);
         }
 
+
+        // Register Reservations for client as the eigenDACommunityMultisig
+        IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
+            symbolsPerSecond: 452198,
+            startTimestamp: uint64(block.timestamp),
+            endTimestamp: uint64(block.timestamp + 1000000000),
+            quorumNumbers: hex"0001",
+            quorumSplits: hex"3232"
+        });
+        address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
+        vm.startBroadcast(msg.sender);
+        paymentVault.setReservation(clientAddress, reservation);
+        // Deposit OnDemand 
+        paymentVault.depositOnDemand{value: 0.1 ether}(clientAddress);
+        vm.stopBroadcast();
+
         // Deposit stakers into EigenLayer and delegate to operators
         for (uint256 i = 0; i < stakerPrivateKeys.length; i++) {
             vm.startBroadcast(stakerPrivateKeys[i]);
@@ -179,6 +214,7 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         vm.serializeAddress(output, "operatorStateRetriever", address(operatorStateRetriever));
         vm.serializeAddress(output, "blsApkRegistry" , address(apkRegistry));
         vm.serializeAddress(output, "registryCoordinator", address(registryCoordinator));
+        vm.serializeAddress(output, "certVerifier", address(eigenDACertVerifier));
 
         string memory finalJson = vm.serializeString(output, "object", output);
 

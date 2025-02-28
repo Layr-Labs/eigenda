@@ -3,13 +3,12 @@ package node
 import (
 	"context"
 	"fmt"
-	"math/big"
-	"sort"
 	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/operators"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	eigenmetrics "github.com/Layr-Labs/eigensdk-go/metrics"
 
@@ -37,6 +36,8 @@ type Metrics struct {
 	AccuBatches *prometheus.CounterVec
 	// Accumulated number and size of batches that have been removed from the Node.
 	AccuRemovedBatches *prometheus.CounterVec
+	// Accumulated number and size of blobs that have been removed from the Node.
+	AccuRemovedBlobs *prometheus.CounterVec
 	// Accumulated number and size of blobs processed by quorums.
 	AccuBlobs *prometheus.CounterVec
 	// Total number of changes in the node's socket address.
@@ -54,12 +55,12 @@ type Metrics struct {
 	socketAddr             string
 	operatorId             core.OperatorID
 	onchainMetricsInterval int64
-	tx                     core.Transactor
+	tx                     core.Reader
 	chainState             core.ChainState
 	allQuorumCache         map[core.QuorumID]bool
 }
 
-func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, logger logging.Logger, socketAddr string, operatorId core.OperatorID, onchainMetricsInterval int64, tx core.Transactor, chainState core.ChainState) *Metrics {
+func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, logger logging.Logger, socketAddr string, operatorId core.OperatorID, onchainMetricsInterval int64, tx core.Reader, chainState core.ChainState) *Metrics {
 
 	// Add Go module collectors
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
@@ -123,6 +124,14 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 				Namespace: Namespace,
 				Name:      "eigenda_removed_batches_total",
 				Help:      "the total number and size of batches that have been removed by the DA node",
+			},
+			[]string{"type"},
+		),
+		AccuRemovedBlobs: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: Namespace,
+				Name:      "eigenda_removed_blobs_total",
+				Help:      "the total number and size of blobs that have been removed by the DA node",
 			},
 			[]string{"type"},
 		),
@@ -191,6 +200,13 @@ func (g *Metrics) RemoveNCurrentBatch(numBatches int, totalBatchSize int64) {
 	g.AccuRemovedBatches.WithLabelValues("size").Add(float64(totalBatchSize))
 }
 
+func (g *Metrics) RemoveNBlobs(numBlobs int, totalSize int64) {
+	for i := 0; i < numBlobs; i++ {
+		g.AccuRemovedBlobs.WithLabelValues("number").Inc()
+	}
+	g.AccuRemovedBatches.WithLabelValues("size").Add(float64(totalSize))
+}
+
 func (g *Metrics) AcceptBlobs(quorumId core.QuorumID, blobSize uint64) {
 	quorum := strconv.Itoa(int(quorumId))
 	g.AccuBlobs.WithLabelValues("number", quorum).Inc()
@@ -235,33 +251,14 @@ func (g *Metrics) collectOnchainMetrics() {
 			g.logger.Error("Failed to query chain RPC for operator state", "blockNumber", blockNum, "quorumIds", quorumIds, "err", err)
 			continue
 		}
-		type OperatorStakeShare struct {
-			operatorId core.OperatorID
-			stakeShare float64
-		}
-		for q, operators := range state.Operators {
-			operatorStakeShares := make([]*OperatorStakeShare, 0)
-			totalStake := new(big.Float).SetInt(state.Totals[q].Stake)
-			for opId, opInfo := range operators {
-				opStake := new(big.Float).SetInt(opInfo.Stake)
-				share, _ := new(big.Float).Quo(
-					new(big.Float).Mul(opStake, big.NewFloat(100000)),
-					totalStake).Float64()
-				operatorStakeShares = append(operatorStakeShares, &OperatorStakeShare{operatorId: opId, stakeShare: share})
-			}
-			// Descending order by stake share in the quorum.
-			sort.Slice(operatorStakeShares, func(i, j int) bool {
-				if operatorStakeShares[i].stakeShare == operatorStakeShares[j].stakeShare {
-					return operatorStakeShares[i].operatorId.Hex() < operatorStakeShares[j].operatorId.Hex()
-				}
-				return operatorStakeShares[i].stakeShare > operatorStakeShares[j].stakeShare
-			})
-			for i, op := range operatorStakeShares {
-				if op.operatorId == g.operatorId {
+		_, quorumRankedOperators := operators.GetRankedOperators(state)
+		for q := range state.Operators {
+			for i, op := range quorumRankedOperators[q] {
+				if op.OperatorId == g.operatorId {
 					g.allQuorumCache[q] = true
-					g.RegisteredQuorumsStakeShare.WithLabelValues(fmt.Sprintf("%d", q)).Set(op.stakeShare)
+					g.RegisteredQuorumsStakeShare.WithLabelValues(fmt.Sprintf("%d", q)).Set(op.StakeShare)
 					g.RegisteredQuorumsRank.WithLabelValues(fmt.Sprintf("%d", q)).Set(float64(i + 1))
-					g.logger.Info("Current operator registration onchain", "operatorId", g.operatorId.Hex(), "blockNumber", blockNum, "quorumId", q, "stakeShare (basis point)", op.stakeShare, "rank", i+1)
+					g.logger.Info("Current operator registration onchain", "operatorId", g.operatorId.Hex(), "blockNumber", blockNum, "quorumId", q, "stakeShare (basis point)", op.StakeShare, "rank", i+1)
 					break
 				}
 			}

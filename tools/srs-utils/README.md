@@ -9,7 +9,7 @@ This project is written for EigenDA SRS related works. It includes
 
 `wget https://pse-trusted-setup-ppot.s3.eu-central-1.amazonaws.com/challenge_0085`
 
-See more informations from 
+See more information from 
 1. https://docs.axiom.xyz/docs/transparency-and-security/kzg-trusted-setup
 2. https://github.com/privacy-scaling-explorations/perpetualpowersoftau/tree/master 
 

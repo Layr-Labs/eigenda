@@ -3,6 +3,8 @@ package dataapi
 import (
 	"fmt"
 	"sort"
+
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 )
 
 // NumBatchesAtBlock represents the number of batches at current block.
@@ -209,9 +211,9 @@ func ComputeNumBatches(quorumBatches *QuorumBatches, startBlock, endBlock uint32
 	return num
 }
 
-// CreatQuorumBatches returns quorumBatches, where quorumBatches[q] is a list of
-// QuorumBatches in ascending order by block number.
-func CreatQuorumBatches(batches []*BatchNonSigningInfo) map[uint8]*QuorumBatches {
+// CreateQuorumBatchMap returns quorumBatchMap, where quorumBatchMap[q][b] means the number of
+// batches at block b that have dispersed to quorum q.
+func CreateQuorumBatchMap(batches []*BatchNonSigningInfo) map[uint8]map[uint32]int {
 	quorumBatchMap := make(map[uint8]map[uint32]int)
 	for _, batch := range batches {
 		for _, q := range batch.QuorumNumbers {
@@ -221,6 +223,27 @@ func CreatQuorumBatches(batches []*BatchNonSigningInfo) map[uint8]*QuorumBatches
 			quorumBatchMap[q][batch.ReferenceBlockNumber]++
 		}
 	}
+	return quorumBatchMap
+}
+
+// CreateQuorumBatchMapV2 returns quorumBatchMap, where quorumBatchMap[q][b] means the number of
+// batches at block b that have dispersed to quorum q.
+func CreateQuorumBatchMapV2(attestations []*corev2.Attestation) map[uint8]map[uint32]int {
+	quorumBatchMap := make(map[uint8]map[uint32]int)
+	for _, at := range attestations {
+		for _, q := range at.QuorumNumbers {
+			if _, ok := quorumBatchMap[q]; !ok {
+				quorumBatchMap[q] = make(map[uint32]int)
+			}
+			quorumBatchMap[q][uint32(at.ReferenceBlockNumber)]++
+		}
+	}
+	return quorumBatchMap
+}
+
+// CreatQuorumBatches returns quorumBatches, where quorumBatches[q] is a list of
+// QuorumBatches in ascending order by block number.
+func CreatQuorumBatches(quorumBatchMap map[uint8]map[uint32]int) map[uint8]*QuorumBatches {
 	quorumBatches := make(map[uint8]*QuorumBatches)
 	for q, s := range quorumBatchMap {
 		numBatches := make([]*NumBatchesAtBlock, 0)

@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/mock"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/batcher"
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -26,7 +26,7 @@ const loopInterval = 6 * time.Minute
 
 func TestFinalizedBlob(t *testing.T) {
 	queue := inmem.NewBlobStore()
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	ethClient := &mock.MockEthClient{}
 	rpcClient := &mock.MockRPCEthClient{}
 
@@ -56,6 +56,7 @@ func TestFinalizedBlob(t *testing.T) {
 	blobIndex := uint32(10)
 	sigRecordHash := [32]byte{0}
 	inclusionProof := []byte{1, 2, 3, 4, 5}
+	expiry := uint64(time.Now().Add(time.Hour).Unix())
 	confirmationInfo := &disperser.ConfirmationInfo{
 		BatchHeaderHash:         batchHeaderHash,
 		BlobIndex:               blobIndex,
@@ -73,7 +74,7 @@ func TestFinalizedBlob(t *testing.T) {
 		BlobHash:     metadataKey1.BlobHash,
 		MetadataHash: metadataKey1.MetadataHash,
 		BlobStatus:   disperser.Processing,
-		Expiry:       0,
+		Expiry:       expiry,
 		NumRetries:   0,
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: core.BlobRequestHeader{
@@ -86,7 +87,7 @@ func TestFinalizedBlob(t *testing.T) {
 		BlobHash:     metadataKey2.BlobHash,
 		MetadataHash: metadataKey2.MetadataHash,
 		BlobStatus:   disperser.Processing,
-		Expiry:       0,
+		Expiry:       expiry + 1,
 		NumRetries:   0,
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: core.BlobRequestHeader{
@@ -124,7 +125,7 @@ func TestFinalizedBlob(t *testing.T) {
 func TestUnfinalizedBlob(t *testing.T) {
 	ctx := context.Background()
 	queue := inmem.NewBlobStore()
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	ethClient := &mock.MockEthClient{}
 	rpcClient := &mock.MockRPCEthClient{}
 
@@ -164,11 +165,12 @@ func TestUnfinalizedBlob(t *testing.T) {
 		ConfirmationBlockNumber: uint32(150),
 		Fee:                     []byte{0},
 	}
+	expiry := uint64(time.Now().Add(100000).Unix())
 	metadata := &disperser.BlobMetadata{
 		BlobHash:     metadataKey.BlobHash,
 		MetadataHash: metadataKey.MetadataHash,
 		BlobStatus:   disperser.Processing,
-		Expiry:       0,
+		Expiry:       expiry,
 		NumRetries:   0,
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: core.BlobRequestHeader{
@@ -196,7 +198,7 @@ func TestUnfinalizedBlob(t *testing.T) {
 func TestNoReceipt(t *testing.T) {
 	ctx := context.Background()
 	queue := inmem.NewBlobStore()
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	ethClient := &mock.MockEthClient{}
 	rpcClient := &mock.MockRPCEthClient{}
 
@@ -234,11 +236,12 @@ func TestNoReceipt(t *testing.T) {
 		ConfirmationBlockNumber: uint32(150),
 		Fee:                     []byte{0},
 	}
+	expiry := uint64(time.Now().Add(100000).Unix())
 	metadata := &disperser.BlobMetadata{
 		BlobHash:     metadataKey.BlobHash,
 		MetadataHash: metadataKey.MetadataHash,
 		BlobStatus:   disperser.Processing,
-		Expiry:       0,
+		Expiry:       expiry,
 		NumRetries:   0,
 		RequestMetadata: &disperser.RequestMetadata{
 			BlobRequestHeader: core.BlobRequestHeader{

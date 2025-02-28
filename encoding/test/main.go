@@ -69,11 +69,14 @@ func TestKzgRs() {
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		Verbose:         true,
+		LoadG2Points:    true,
 	}
 
 	// create encoding object
-	p, _ := prover.NewProver(kzgConfig, true)
+	p, err := prover.NewProver(kzgConfig, nil)
+	if err != nil {
+		log.Fatalf("Failed to create prover: %v", err)
+	}
 
 	params := encoding.EncodingParams{NumChunks: numNode, ChunkLength: uint64(numSymbols) / numSys}
 	enc, _ := p.GetKzgEncoder(params)
@@ -113,9 +116,13 @@ func TestKzgRs() {
 		}
 
 		fmt.Printf("frame %v leading coset %v\n", i, j)
-		lc := enc.Fs.ExpandedRootsOfUnity[uint64(j)]
+		rsEncoder, err := enc.GetRsEncoder(params)
+		if err != nil {
+			log.Fatalf("%v", err)
+		}
+		lc := rsEncoder.Fs.ExpandedRootsOfUnity[uint64(j)]
 
-		g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig)
+		g2Atn, err := kzg.ReadG2Point(uint64(len(f.Coeffs)), kzgConfig.SRSOrder, kzgConfig.G2Path)
 		if err != nil {
 			log.Fatalf("Load g2 %v failed\n", err)
 		}

@@ -241,6 +241,7 @@ func setupRetrievalClient(ethClient common.EthClient, retrievalClientConfig *Ret
 		SRSNumberToLoad: uint64(srsOrder),
 		Verbose:         true,
 		PreloadEncoder:  false,
+		LoadG2Points:    true,
 	}, false)
 	if err != nil {
 		return err
@@ -296,7 +297,7 @@ func TestDisperseBlobEndToEnd(t *testing.T) {
 	// For now log....later we can define a baseline value for this
 	logger.Printf("Time to Disperse Blob %s", disperseBlobStopTime.String())
 
-	// Set Confirmation DeaLine For Confirmation of Dispersed Blob
+	// Set Confirmation Deadline For Confirmation of Dispersed Blob
 	// Update this to a minute over Batcher_Pull_Interval
 	confirmationDeadline, err := time.ParseDuration(testSuite.BatcherPullInterval)
 

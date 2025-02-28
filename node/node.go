@@ -14,30 +14,42 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
+	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/prometheus/client_golang/prometheus"
 
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/Layr-Labs/eigensdk-go/metrics"
-	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
 	"github.com/Layr-Labs/eigensdk-go/nodeapi"
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
+
 	"github.com/gammazero/workerpool"
 )
 
 const (
 	// The percentage of time in garbage collection in a GC cycle.
 	gcPercentageTime = 0.1
+
+	v1CheckPath = "api/v1/operators-info/port-check"
+	v2CheckPath = "api/v2/operators/liveness"
 )
 
 var (
@@ -55,45 +67,49 @@ type Node struct {
 	Metrics                 *Metrics
 	NodeApi                 *nodeapi.NodeApi
 	Store                   *Store
+	StoreV2                 StoreV2
 	ChainState              core.ChainState
 	Validator               core.ShardValidator
-	Transactor              core.Transactor
+	ValidatorV2             corev2.ShardValidator
+	Transactor              core.Writer
 	PubIPProvider           pubip.Provider
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
 	ChainID                 *big.Int
 
+	BLSSigner blssigner.Signer
+
+	RelayClient atomic.Value
+
 	mu            sync.Mutex
 	CurrentSocket string
+
+	// BlobVersionParams is a map of blob version parameters loaded from the chain.
+	// It is used to determine blob parameters based on the version number.
+	BlobVersionParams atomic.Pointer[corev2.BlobVersionParameterMap]
 }
 
 // NewNode creates a new Node with the provided config.
-func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provider, logger logging.Logger) (*Node, error) {
+func NewNode(
+	reg *prometheus.Registry,
+	config *Config,
+	pubIPProvider pubip.Provider,
+	client *geth.InstrumentedEthClient,
+	logger logging.Logger,
+) (*Node, error) {
 	// Setup metrics
 	// sdkClients, err := buildSdkClients(config, logger)
 	// if err != nil {
 	// 	return nil, err
 	// }
 
-	eigenMetrics := metrics.NewEigenMetrics(AppName, ":"+config.MetricsPort, reg, logger.With("component", "EigenMetrics"))
-	rpcCallsCollector := rpccalls.NewCollector(AppName, reg)
+	nodeLogger := logger.With("component", "Node")
 
-	// Generate BLS keys
-	keyPair, err := core.MakeKeyPairFromString(config.PrivateBls)
-	if err != nil {
-		return nil, err
-	}
-
-	config.ID = keyPair.GetPubKeyG1().GetOperatorID()
+	eigenMetrics := metrics.NewEigenMetrics(AppName, fmt.Sprintf(":%d", config.MetricsPort), reg, logger.With("component", "EigenMetrics"))
 
 	// Make sure config folder exists.
-	err = os.MkdirAll(config.DbPath, os.ModePerm)
+	err := os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
 		return nil, fmt.Errorf("could not create db directory at %s: %w", config.DbPath, err)
-	}
-
-	client, err := geth.NewInstrumentedEthClient(config.EthClientConfig, rpcCallsCollector, logger)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create chain.Client: %w", err)
 	}
 
 	chainID, err := client.ChainID(context.Background())
@@ -102,7 +118,7 @@ func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provi
 	}
 
 	// Create Transactor
-	tx, err := eth.NewTransactor(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := eth.NewWriter(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -110,23 +126,39 @@ func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provi
 	// Create ChainState Client
 	cst := eth.NewChainState(tx, client)
 
+	blsSigner, err := blssigner.NewSigner(config.BlsSignerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create BLS signer: %w", err)
+	}
+	operatorID, err := blsSigner.GetOperatorId()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get operator ID: %w", err)
+	}
+	config.ID, err = core.OperatorIDFromHex(operatorID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert operator ID: %w", err)
+	}
+
 	// Setup Node Api
 	nodeApi := nodeapi.NewNodeApi(AppName, SemVer, ":"+config.NodeApiPort, logger.With("component", "NodeApi"))
 
-	metrics := NewMetrics(eigenMetrics, reg, logger, ":"+config.MetricsPort, config.ID, config.OnchainMetricsInterval, tx, cst)
+	metrics := NewMetrics(eigenMetrics, reg, logger, fmt.Sprintf(":%d", config.MetricsPort), config.ID, config.OnchainMetricsInterval, tx, cst)
 
 	// Make validator
-	v, err := verifier.NewVerifier(&config.EncoderConfig, false)
+	config.EncoderConfig.LoadG2Points = false
+	v, err := verifier.NewVerifier(&config.EncoderConfig, nil)
 	if err != nil {
 		return nil, err
 	}
 	asgn := &core.StdAssignmentCoordinator{}
 	validator := core.NewShardValidator(v, asgn, cst, config.ID)
+	validatorV2 := corev2.NewShardValidator(v, config.ID, logger)
 
 	// Resolve the BLOCK_STALE_MEASURE and STORE_DURATION_BLOCKS.
 	var blockStaleMeasure, storeDurationBlocks uint32
 	if config.EnableTestMode && config.OverrideBlockStaleMeasure > 0 {
 		blockStaleMeasure = uint32(config.OverrideBlockStaleMeasure)
+		logger.Info("Test Mode Override!", "blockStaleMeasure", blockStaleMeasure)
 	} else {
 		staleMeasure, err := tx.GetBlockStaleMeasure(context.Background())
 		if err != nil {
@@ -136,6 +168,7 @@ func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provi
 	}
 	if config.EnableTestMode && config.OverrideStoreDurationBlocks > 0 {
 		storeDurationBlocks = uint32(config.OverrideStoreDurationBlocks)
+		logger.Info("Test Mode Override!", "storeDurationBlocks", storeDurationBlocks)
 	} else {
 		storeDuration, err := tx.GetStoreDurationBlocks(context.Background())
 		if err != nil {
@@ -154,31 +187,89 @@ func NewNode(reg *prometheus.Registry, config *Config, pubIPProvider pubip.Provi
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new operator sockets filterer: %w", err)
 	}
-	nodeLogger := logger.With("component", "Node")
-	nodeLogger.Info("Creating node", "chainID", chainID.String(), "operatorID", config.ID.Hex(),
-		"dispersalPort", config.DispersalPort, "retrievalPort", config.RetrievalPort, "churnerUrl", config.ChurnerUrl,
-		"quorumIDs", fmt.Sprint(config.QuorumIDList), "registerNodeAtStart", config.RegisterNodeAtStart, "pubIPCheckInterval", config.PubIPCheckInterval,
-		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr, "blockStaleMeasure", blockStaleMeasure, "storeDurationBlocks", storeDurationBlocks)
 
-	return &Node{
+	nodeLogger.Info("Creating node", "chainID", chainID.String(), "operatorID", config.ID.Hex(),
+		"dispersalPort", config.DispersalPort, "v2DispersalPort", config.V2DispersalPort, "retrievalPort", config.RetrievalPort, "v2RetrievalPort", config.V2RetrievalPort, "churnerUrl", config.ChurnerUrl,
+		"quorumIDs", fmt.Sprint(config.QuorumIDList), "registerNodeAtStart", config.RegisterNodeAtStart, "pubIPCheckInterval", config.PubIPCheckInterval,
+		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr, "blockStaleMeasure", blockStaleMeasure, "storeDurationBlocks", storeDurationBlocks, "enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
+
+	n := &Node{
 		Config:                  config,
 		Logger:                  nodeLogger,
-		KeyPair:                 keyPair,
 		Metrics:                 metrics,
 		NodeApi:                 nodeApi,
 		Store:                   store,
 		ChainState:              cst,
 		Transactor:              tx,
 		Validator:               validator,
+		ValidatorV2:             validatorV2,
 		PubIPProvider:           pubIPProvider,
 		OperatorSocketsFilterer: socketsFilterer,
 		ChainID:                 chainID,
-	}, nil
+		BLSSigner:               blsSigner,
+	}
+
+	if !config.EnableV2 {
+		return n, nil
+	}
+
+	var storeV2 StoreV2
+	var blobVersionParams *corev2.BlobVersionParameterMap
+	if config.EnableV2 {
+		v2Path := config.DbPath + "/chunk_v2"
+		dbV2, err := tablestore.Start(logger, &tablestore.Config{
+			Type:                       tablestore.LevelDB,
+			Path:                       &v2Path,
+			GarbageCollectionEnabled:   true,
+			GarbageCollectionInterval:  time.Duration(config.ExpirationPollIntervalSec) * time.Second,
+			GarbageCollectionBatchSize: 1024,
+			Schema:                     []string{BatchHeaderTableName, BlobCertificateTableName, BundleTableName},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new tablestore: %w", err)
+		}
+		timeToExpire := (blockStaleMeasure + storeDurationBlocks) * 12 // 12s per block
+		storeV2 = NewLevelDBStoreV2(dbV2, logger, time.Duration(timeToExpire)*time.Second)
+
+		blobParams, err := tx.GetAllVersionedBlobParams(context.Background())
+		if err != nil {
+			return nil, fmt.Errorf("failed to get versioned blob parameters: %w", err)
+		}
+		blobVersionParams = corev2.NewBlobVersionParameterMap(blobParams)
+
+		relayClientConfig := &clients.RelayClientConfig{
+			UseSecureGrpcFlag:  config.UseSecureGrpc,
+			OperatorID:         &config.ID,
+			MessageSigner:      n.SignMessage,
+			MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
+		}
+
+		relayUrlProvider, err := relay.NewRelayUrlProvider(client, tx.GetRelayRegistryAddress())
+		if err != nil {
+			return nil, fmt.Errorf("create relay url provider: %w", err)
+		}
+
+		relayClient, err := clients.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new relay client: %w", err)
+		}
+
+		n.RelayClient.Store(relayClient)
+	}
+
+	n.StoreV2 = storeV2
+	n.BlobVersionParams.Store(blobVersionParams)
+	return n, nil
 }
 
-// Starts the Node. If the node is not registered, register it on chain, otherwise just
+// Start starts the Node. If the node is not registered, register it on chain, otherwise just
 // update its socket on chain.
 func (n *Node) Start(ctx context.Context) error {
+	pprofProfiler := pprof.NewPprofProfiler(n.Config.PprofHttpPort, n.Logger)
+	if n.Config.EnablePprof {
+		go pprofProfiler.Start()
+		n.Logger.Info("Enabled pprof for Node", "port", n.Config.PprofHttpPort)
+	}
 	if n.Config.EnableMetrics {
 		n.Metrics.Start()
 		n.Logger.Info("Enabled metrics", "socket", n.Metrics.socketAddr)
@@ -188,17 +279,25 @@ func (n *Node) Start(ctx context.Context) error {
 		n.Logger.Info("Enabled node api", "port", n.Config.NodeApiPort)
 	}
 
-	go n.expireLoop()
-	go n.checkNodeReachability()
+	if n.Config.EnableV1 {
+		go n.expireLoop()
+		go n.checkNodeReachability(v1CheckPath)
+	}
+
+	if n.Config.EnableV2 {
+		go func() {
+			_ = n.RefreshOnchainState(ctx)
+		}()
+		go n.checkNodeReachability(v2CheckPath)
+	}
 
 	// Build the socket based on the hostname/IP provided in the CLI
-	socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort))
+	socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort, n.Config.V2DispersalPort, n.Config.V2RetrievalPort))
 	var operator *Operator
 	if n.Config.RegisterNodeAtStart {
 		n.Logger.Info("Registering node on chain with the following parameters:", "operatorId",
-			n.Config.ID.Hex(), "hostname", n.Config.Hostname, "dispersalPort", n.Config.DispersalPort,
-			"retrievalPort", n.Config.RetrievalPort, "churnerUrl", n.Config.ChurnerUrl, "quorumIds", fmt.Sprint(n.Config.QuorumIDList))
-		socket := string(core.MakeOperatorSocket(n.Config.Hostname, n.Config.DispersalPort, n.Config.RetrievalPort))
+			n.Config.ID.Hex(), "hostname", n.Config.Hostname, "dispersalPort", n.Config.DispersalPort, "v2DispersalPort", n.Config.V2DispersalPort,
+			"retrievalPort", n.Config.RetrievalPort, "v2RetrievalPort", n.Config.V2RetrievalPort, "churnerUrl", n.Config.ChurnerUrl, "quorumIds", fmt.Sprint(n.Config.QuorumIDList))
 		privateKey, err := crypto.HexToECDSA(n.Config.EthClientConfig.PrivateKeyString)
 		if err != nil {
 			return fmt.Errorf("NewClient: cannot parse private key: %w", err)
@@ -208,7 +307,7 @@ func (n *Node) Start(ctx context.Context) error {
 			Socket:              socket,
 			Timeout:             10 * time.Second,
 			PrivKey:             privateKey,
-			KeyPair:             n.KeyPair,
+			Signer:              n.BLSSigner,
 			OperatorId:          n.Config.ID,
 			QuorumIDs:           n.Config.QuorumIDList,
 			RegisterNodeAtStart: n.Config.RegisterNodeAtStart,
@@ -219,6 +318,15 @@ func (n *Node) Start(ctx context.Context) error {
 			return fmt.Errorf("failed to register the operator: %w", err)
 		}
 	} else {
+		registeredSocket, err := n.Transactor.GetOperatorSocket(ctx, n.Config.ID)
+		// Error out if registration on-chain is a requirement
+		if err != nil {
+			n.Logger.Warnf("failed to get operator socket: %w", err)
+		}
+		if registeredSocket != socket {
+			n.Logger.Warnf("registered socket %s does not match expected socket %s", registeredSocket, socket)
+		}
+
 		eigenDAUrl, ok := eigenDAUIMap[n.ChainID.String()]
 		if ok {
 			n.Logger.Infof("The node has successfully started. Note: if it's not opted in on %s, then please follow the EigenDA operator guide section in docs.eigenlayer.xyz to register", eigenDAUrl)
@@ -239,7 +347,7 @@ func (n *Node) Start(ctx context.Context) error {
 
 	n.CurrentSocket = socket
 	// Start the Node IP updater only if the PUBLIC_IP_PROVIDER is greater than 0.
-	if n.Config.PubIPCheckInterval > 0 {
+	if n.Config.PubIPCheckInterval > 0 && n.Config.EnableV1 && n.Config.EnableV2 {
 		go n.checkRegisteredNodeIpOnChain(ctx)
 		go n.checkCurrentNodeIp(ctx)
 	}
@@ -262,14 +370,44 @@ func (n *Node) expireLoop() {
 		// The heuristic is to cap the GC time to a percentage of the poll interval, but at
 		// least have 1 second.
 		timeLimitSec := uint64(math.Max(float64(n.Config.ExpirationPollIntervalSec)*gcPercentageTime, 1.0))
-		numBatchesDeleted, err := n.Store.DeleteExpiredEntries(time.Now().Unix(), timeLimitSec)
-		n.Logger.Info("Complete an expiration cycle to remove expired batches", "num expired batches found and removed", numBatchesDeleted)
+		numBatchesDeleted, numMappingsDeleted, numBlobsDeleted, err := n.Store.DeleteExpiredEntries(time.Now().Unix(), timeLimitSec)
+		n.Logger.Info("Complete an expiration cycle to remove expired batches", "num expired batches found and removed", numBatchesDeleted, "num expired mappings found and removed", numMappingsDeleted, "num expired blobs found and removed", numBlobsDeleted)
 		if err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
 				n.Logger.Error("Expiration cycle exited with ContextDeadlineExceed, meaning more expired batches need to be removed, which will continue in next cycle", "time limit (sec)", timeLimitSec)
 			} else {
 				n.Logger.Error("Expiration cycle encountered error when removing expired batches, which will be retried in next cycle", "err", err)
 			}
+		}
+	}
+}
+
+// RefreshOnchainState refreshes the onchain state of the node.
+// It fetches the latest blob parameters from the chain and updates the BlobVersionParams.
+// It runs periodically based on the OnchainStateRefreshInterval.
+// WARNING: this method is not thread-safe and should not be called concurrently.
+func (n *Node) RefreshOnchainState(ctx context.Context) error {
+	if !n.Config.EnableV2 || n.Config.OnchainStateRefreshInterval <= 0 {
+		return nil
+	}
+	ticker := time.NewTicker(n.Config.OnchainStateRefreshInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			n.Logger.Info("Refreshing onchain state")
+			existingBlobParams := n.BlobVersionParams.Load()
+			blobParams, err := n.Transactor.GetAllVersionedBlobParams(ctx)
+			if err == nil {
+				if existingBlobParams == nil || !existingBlobParams.Equal(blobParams) {
+					n.BlobVersionParams.Store(corev2.NewBlobVersionParameterMap(blobParams))
+				}
+			} else {
+				n.Logger.Error("error fetching blob params", "err", err)
+			}
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
 }
@@ -380,12 +518,31 @@ func (n *Node) ProcessBatch(ctx context.Context, header *core.BatchHeader, blobs
 
 	// Sign batch header hash if all validation checks pass and data items are written to database.
 	stageTimer = time.Now()
-	sig := n.KeyPair.SignMessage(batchHeaderHash)
+	signature, err := n.SignMessage(ctx, batchHeaderHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign batch: %w", err)
+	}
+
 	n.Metrics.RecordStoreChunksStage("signed", batchSize, time.Since(stageTimer))
-	log.Debug("Sign batch succeeded", "pubkey", hexutil.Encode(n.KeyPair.GetPubKeyG2().Serialize()), "duration", time.Since(stageTimer))
+	log.Debug("Sign batch succeeded", "pubkey", n.BLSSigner.GetPublicKeyG1(), "duration", time.Since(stageTimer))
 
 	log.Debug("Exiting process batch", "duration", time.Since(start))
-	return sig, nil
+	return signature, nil
+}
+
+func (n *Node) SignMessage(ctx context.Context, data [32]byte) (*core.Signature, error) {
+	signature, err := n.BLSSigner.Sign(ctx, data[:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign message: %w", err)
+	}
+	sig := new(core.Signature)
+	g, err := sig.Deserialize(signature)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize signature: %w", err)
+	}
+	return &core.Signature{
+		G1Point: g,
+	}, nil
 }
 
 func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blobs []*core.BlobMessage) error {
@@ -463,7 +620,7 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			newSocketAddr, err := SocketAddress(ctx, n.PubIPProvider, n.Config.DispersalPort, n.Config.RetrievalPort)
+			newSocketAddr, err := SocketAddress(ctx, n.PubIPProvider, n.Config.DispersalPort, n.Config.RetrievalPort, n.Config.V2DispersalPort, n.Config.V2RetrievalPort)
 			if err != nil {
 				n.Logger.Error("failed to get socket address", "err", err)
 				continue
@@ -480,11 +637,13 @@ type OperatorReachabilityResponse struct {
 	RetrievalSocket string `json:"retrieval_socket"`
 	DispersalOnline bool   `json:"dispersal_online"`
 	RetrievalOnline bool   `json:"retrieval_online"`
+	DispersalStatus string `json:"dispersal_status"`
+	RetrievalStatus string `json:"retrieval_status"`
 }
 
-func (n *Node) checkNodeReachability() {
+func (n *Node) checkNodeReachability(checkPath string) {
 	if n.Config.ReachabilityPollIntervalSec == 0 {
-		n.Logger.Warn("Node reachability checks disabled!!! ReachabilityPollIntervalSec set to 0")
+		n.Logger.Warn("Node reachability checks disabled!")
 		return
 	}
 
@@ -493,7 +652,12 @@ func (n *Node) checkNodeReachability() {
 		return
 	}
 
-	checkURL, err := GetReachabilityURL(n.Config.DataApiUrl, n.Config.ID.Hex())
+	version := "v1"
+	if strings.Contains(checkPath, "v2") {
+		version = "v2"
+	}
+
+	checkURL, err := GetReachabilityURL(n.Config.DataApiUrl, checkPath, n.Config.ID.Hex())
 	if err != nil {
 		n.Logger.Error("Failed to get reachability check URL", err)
 		return
@@ -506,11 +670,11 @@ func (n *Node) checkNodeReachability() {
 	for {
 		<-ticker.C
 
-		n.Logger.Debug("Calling reachability check", "url", checkURL)
+		n.Logger.Debug(fmt.Sprintf("Calling %s reachability check", version), "url", checkURL)
 
 		resp, err := http.Get(checkURL)
 		if err != nil {
-			n.Logger.Error("Reachability check request failed", err)
+			n.Logger.Error(fmt.Sprintf("Reachability check %s - request failed", version), err)
 			continue
 		} else if resp.StatusCode == 404 {
 			body, _ := io.ReadAll(resp.Body)
@@ -521,13 +685,13 @@ func (n *Node) checkNodeReachability() {
 			}
 			continue
 		} else if resp.StatusCode != 200 {
-			n.Logger.Error("Reachability check request failed", "status", resp.StatusCode)
+			n.Logger.Error(fmt.Sprintf("Reachability check %s - request failed", version), "status", resp.StatusCode)
 			continue
 		}
 
 		data, err := io.ReadAll(resp.Body)
 		if err != nil {
-			n.Logger.Error("Failed to read reachability check response", err)
+			n.Logger.Error(fmt.Sprintf("Failed to read %s reachability check response", version), err)
 			continue
 		}
 
@@ -539,24 +703,24 @@ func (n *Node) checkNodeReachability() {
 		}
 
 		if responseObject.DispersalOnline {
-			n.Logger.Info("Reachability check - dispersal socket is ONLINE", "socket", responseObject.DispersalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues("dispersal").Set(1.0)
+			n.Logger.Info(fmt.Sprintf("Reachability check %s - dispersal socket ONLINE", version), "status", responseObject.DispersalStatus, "socket", responseObject.DispersalSocket)
+			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("dispersal-%s", version)).Set(1.0)
 		} else {
-			n.Logger.Error("Reachability check - dispersal socket is UNREACHABLE", "socket", responseObject.DispersalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues("dispersal").Set(0.0)
+			n.Logger.Error(fmt.Sprintf("Reachability check %s - dispersal socket UNREACHABLE", version), "status", responseObject.DispersalStatus, "socket", responseObject.DispersalSocket)
+			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("dispersal-%s", version)).Set(0.0)
 		}
 		if responseObject.RetrievalOnline {
-			n.Logger.Info("Reachability check - retrieval socket is ONLINE", "socket", responseObject.RetrievalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues("retrieval").Set(1.0)
+			n.Logger.Info(fmt.Sprintf("Reachability check %s - retrieval socket ONLINE", version), "status", responseObject.RetrievalStatus, "socket", responseObject.RetrievalSocket)
+			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("retrieval-%s", version)).Set(1.0)
 		} else {
-			n.Logger.Error("Reachability check - retrieval socket is UNREACHABLE", "socket", responseObject.RetrievalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues("retrieval").Set(0.0)
+			n.Logger.Error(fmt.Sprintf("Reachability check %s - retrieval socket UNREACHABLE", version), "status", responseObject.RetrievalStatus, "socket", responseObject.RetrievalSocket)
+			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("retrieval-%s", version)).Set(0.0)
 		}
 	}
 }
 
-func GetReachabilityURL(dataApiUrl, operatorID string) (string, error) {
-	checkURLString, err := url.JoinPath(dataApiUrl, "/api/v1/operators-info/port-check")
+func GetReachabilityURL(dataApiUrl, path, operatorID string) (string, error) {
+	checkURLString, err := url.JoinPath(dataApiUrl, path)
 	if err != nil {
 		return "", err
 	}

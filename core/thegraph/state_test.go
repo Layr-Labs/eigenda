@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	ethcomm "github.com/ethereum/go-ethereum/common"
 	"github.com/shurcooL/graphql"
 	"github.com/stretchr/testify/assert"
@@ -26,7 +26,7 @@ func (m mockGraphQLQuerier) Query(ctx context.Context, q any, variables map[stri
 }
 
 func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 
 	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
 		0: 1,
@@ -84,7 +84,7 @@ func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 	err = cs.Start(context.Background())
 	assert.NoError(t, err)
 
-	headerNum, err := cs.GetCurrentBlockNumber()
+	headerNum, err := cs.GetCurrentBlockNumber(context.Background())
 	assert.NoError(t, err)
 
 	indexedState, err := cs.GetIndexedOperatorState(context.Background(), headerNum, quorums)
@@ -93,7 +93,7 @@ func TestIndexedChainState_GetIndexedOperatorState(t *testing.T) {
 }
 
 func TestIndexedChainState_GetIndexedOperatorStateMissingOperator(t *testing.T) {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 
 	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
 		0: 2,
@@ -152,7 +152,7 @@ func TestIndexedChainState_GetIndexedOperatorStateMissingOperator(t *testing.T) 
 	err = cs.Start(context.Background())
 	assert.NoError(t, err)
 
-	headerNum, err := cs.GetCurrentBlockNumber()
+	headerNum, err := cs.GetCurrentBlockNumber(context.Background())
 	assert.NoError(t, err)
 
 	_, err = cs.GetIndexedOperatorState(context.Background(), headerNum, quorums)
@@ -160,7 +160,7 @@ func TestIndexedChainState_GetIndexedOperatorStateMissingOperator(t *testing.T) 
 }
 
 func TestIndexedChainState_GetIndexedOperatorStateExtraOperator(t *testing.T) {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 
 	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
 		0: 1,
@@ -233,7 +233,7 @@ func TestIndexedChainState_GetIndexedOperatorStateExtraOperator(t *testing.T) {
 	err = cs.Start(context.Background())
 	assert.NoError(t, err)
 
-	headerNum, err := cs.GetCurrentBlockNumber()
+	headerNum, err := cs.GetCurrentBlockNumber(context.Background())
 	assert.NoError(t, err)
 
 	indexedState, err := cs.GetIndexedOperatorState(context.Background(), headerNum, quorums)
@@ -243,7 +243,7 @@ func TestIndexedChainState_GetIndexedOperatorStateExtraOperator(t *testing.T) {
 }
 
 func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 
 	chainState, _ := mock.MakeChainDataMock(map[uint8]int{
 		0: 1,
@@ -287,7 +287,7 @@ func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 	err = cs.Start(context.Background())
 	assert.NoError(t, err)
 
-	headerNum, err := cs.GetCurrentBlockNumber()
+	headerNum, err := cs.GetCurrentBlockNumber(context.Background())
 	assert.NoError(t, err)
 
 	opID := ethcomm.HexToHash(id)

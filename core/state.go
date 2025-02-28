@@ -6,41 +6,87 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net"
 	"slices"
 	"strings"
 )
 
 // Operators
 
+// OperatorSocket is formatted as "host:dispersalPort;retrievalPort;v2DispersalPort"
 type OperatorSocket string
 
 func (s OperatorSocket) String() string {
 	return string(s)
 }
 
-func MakeOperatorSocket(nodeIP, dispersalPort, retrievalPort string) OperatorSocket {
-	return OperatorSocket(fmt.Sprintf("%s:%s;%s", nodeIP, dispersalPort, retrievalPort))
+func MakeOperatorSocket(nodeIP, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort string) OperatorSocket {
+	//TODO:  Add config checks for invalid v1/v2 configs -- for v1, both v2 ports must be empty and for v2, both ports must be valid, reject any other combinations.
+	if v2DispersalPort == "" && v2RetrievalPort == "" {
+		return OperatorSocket(fmt.Sprintf("%s:%s;%s", nodeIP, dispersalPort, retrievalPort))
+	}
+	return OperatorSocket(fmt.Sprintf("%s:%s;%s;%s;%s", nodeIP, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort))
 }
 
 type StakeAmount = *big.Int
 
-func ParseOperatorSocket(socket string) (host string, dispersalPort string, retrievalPort string, err error) {
+func ParseOperatorSocket(socket string) (host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort string, err error) {
+
 	s := strings.Split(socket, ";")
-	if len(s) != 2 {
-		err = fmt.Errorf("invalid socket address format, missing retrieval port: %s", socket)
+
+	host, v1DispersalPort, err = net.SplitHostPort(s[0])
+	if err != nil {
+		err = fmt.Errorf("invalid host address format in %s: it must specify valid IP or host name (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+
 		return
 	}
-	retrievalPort = s[1]
-
-	s = strings.Split(s[0], ":")
-	if len(s) != 2 {
-		err = fmt.Errorf("invalid socket address format: %s", socket)
+	if _, err = net.LookupHost(host); err != nil {
+		//Invalid host
+		host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
+			"", "", "", "", "",
+			fmt.Errorf("invalid host address format in %s: it must specify valid IP or host name (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
 		return
 	}
-	host = s[0]
-	dispersalPort = s[1]
+	if err = ValidatePort(v1DispersalPort); err != nil {
+		host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
+			"", "", "", "", "",
+			fmt.Errorf("invalid v1 dispersal port format in %s: it must specify valid v1 dispersal port (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+		return
+	}
 
-	return
+	switch len(s) {
+	case 4:
+		v2DispersalPort = s[2]
+		if err = ValidatePort(v2DispersalPort); err != nil {
+			host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
+				"", "", "", "", "",
+				fmt.Errorf("invalid v2 dispersal port format in %s: it must specify valid v2 dispersal port (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+			return
+		}
+
+		v2RetrievalPort = s[3]
+		if err = ValidatePort(v2RetrievalPort); err != nil {
+			host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
+				"", "", "", "", "",
+				fmt.Errorf("invalid v2 retrieval port format in %s: it must specify valid v2 retrieval port (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+			return
+		}
+		fallthrough
+	case 2:
+		// V1 Parsing
+		v1RetrievalPort = s[1]
+		if err = ValidatePort(v1RetrievalPort); err != nil {
+			host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
+				"", "", "", "", "",
+				fmt.Errorf("invalid v1 retrieval port format in %s: it must specify valid v1 retrieval port (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+		}
+		return
+	default:
+		host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err =
+			"", "", "", "", "",
+			fmt.Errorf("invalid socket address format %s: it must specify v1 dispersal/retrieval ports, or v2 dispersal/retrieval ports (ex. 0.0.0.0:32004;32005;32006;32007)", socket)
+		return
+	}
 }
 
 // OperatorInfo contains information about an operator which is stored on the blockchain state,
@@ -125,10 +171,10 @@ type IndexedOperatorState struct {
 
 // ChainState is an interface for getting information about the current chain state.
 type ChainState interface {
-	GetCurrentBlockNumber() (uint, error)
+	GetCurrentBlockNumber(ctx context.Context) (uint, error)
 	GetOperatorState(ctx context.Context, blockNumber uint, quorums []QuorumID) (*OperatorState, error)
 	GetOperatorStateByOperator(ctx context.Context, blockNumber uint, operator OperatorID) (*OperatorState, error)
-	// GetOperatorQuorums(blockNumber uint, operator OperatorId) ([]uint, error)
+	GetOperatorSocket(ctx context.Context, blockNumber uint, operator OperatorID) (string, error)
 }
 
 // ChainState is an interface for getting information about the current chain state.
@@ -137,5 +183,6 @@ type IndexedChainState interface {
 	// GetIndexedOperatorState returns the IndexedOperatorState for the given block number and quorums
 	// If the quorum is not found, the quorum will be ignored and the IndexedOperatorState will be returned for the remaining quorums
 	GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []QuorumID) (*IndexedOperatorState, error)
+	GetIndexedOperators(ctx context.Context, blockNumber uint) (map[OperatorID]*IndexedOperatorInfo, error)
 	Start(context context.Context) error
 }

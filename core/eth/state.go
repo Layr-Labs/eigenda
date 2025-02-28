@@ -10,10 +10,10 @@ import (
 
 type ChainState struct {
 	Client common.EthClient
-	Tx     core.Transactor
+	Tx     core.Reader
 }
 
-func NewChainState(tx core.Transactor, client common.EthClient) *ChainState {
+func NewChainState(tx core.Reader, client common.EthClient) *ChainState {
 	return &ChainState{
 		Client: client,
 		Tx:     tx,
@@ -41,14 +41,21 @@ func (cs *ChainState) GetOperatorState(ctx context.Context, blockNumber uint, qu
 	return getOperatorState(operatorsByQuorum, uint32(blockNumber))
 }
 
-func (cs *ChainState) GetCurrentBlockNumber() (uint, error) {
-	ctx := context.Background()
+func (cs *ChainState) GetCurrentBlockNumber(ctx context.Context) (uint, error) {
 	header, err := cs.Client.HeaderByNumber(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
 
 	return uint(header.Number.Uint64()), nil
+}
+
+func (cs *ChainState) GetOperatorSocket(ctx context.Context, blockNumber uint, operator core.OperatorID) (string, error) {
+	socket, err := cs.Tx.GetOperatorSocket(ctx, operator)
+	if err != nil {
+		return "", err
+	}
+	return socket, nil
 }
 
 func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32) (*core.OperatorState, error) {

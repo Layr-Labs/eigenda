@@ -9,9 +9,6 @@
   
     - [Retriever](#retriever-Retriever)
   
-- [common/common.proto](#common_common-proto)
-    - [G1Commitment](#common-G1Commitment)
-  
 - [Scalar Value Types](#scalar-value-types)
 
 
@@ -82,38 +79,6 @@ worse cost and performance.
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | RetrieveBlob | [BlobRequest](#retriever-BlobRequest) | [BlobReply](#retriever-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response. |
-
- 
-
-
-
-<a name="common_common-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## common/common.proto
-
-
-
-<a name="common-G1Commitment"></a>
-
-### G1Commitment
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| x | [bytes](#bytes) |  | The X coordinate of the KZG commitment. This is the raw byte representation of the field element. |
-| y | [bytes](#bytes) |  | The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. |
-
-
-
-
-
- 
-
- 
-
- 
 
  
 

@@ -4,11 +4,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -58,9 +60,22 @@ func setup() {
 	fmt.Println("Deploying experiment")
 	testConfig.DeployExperiment()
 
+	pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
+	pk = strings.TrimPrefix(pk, "0x")
+	pk = strings.TrimPrefix(pk, "0X")
+	ethClient, err := geth.NewMultiHomingClient(geth.EthClientConfig{
+		RPCURLs:          []string{testConfig.Deployers[0].RPC},
+		PrivateKeyString: pk,
+		NumConfirmations: 0,
+		NumRetries:       1,
+	}, gethcommon.Address{}, testutils.GetLogger())
+	if err != nil {
+		panic(err)
+	}
+	testConfig.RegisterBlobVersionAndRelays(ethClient)
+
 	fmt.Println("Starting binaries")
 	testConfig.StartBinaries()
-
 }
 
 func teardown() {
@@ -81,9 +96,9 @@ func TestIndexerIntegration(t *testing.T) {
 	setup()
 	defer teardown()
 
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	client := mustMakeTestClient(t, testConfig, testConfig.Batcher[0].BATCHER_PRIVATE_KEY, logger)
-	tx, err := eth.NewTransactor(logger, client, testConfig.EigenDA.OperatorStateRetreiver, testConfig.EigenDA.ServiceManager)
+	tx, err := eth.NewWriter(logger, client, testConfig.EigenDA.OperatorStateRetreiver, testConfig.EigenDA.ServiceManager)
 	assert.NoError(t, err)
 
 	cs := thegraph.NewIndexedChainState(eth.NewChainState(tx, client), graphql.NewClient(graphUrl, nil), logger)
@@ -92,7 +107,7 @@ func TestIndexerIntegration(t *testing.T) {
 	err = cs.Start(context.Background())
 	assert.NoError(t, err)
 
-	headerNum, err := cs.GetCurrentBlockNumber()
+	headerNum, err := cs.GetCurrentBlockNumber(context.Background())
 	assert.NoError(t, err)
 
 	state, err := cs.GetIndexedOperatorState(context.Background(), headerNum, quorums)

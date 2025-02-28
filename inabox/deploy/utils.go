@@ -160,10 +160,11 @@ func execForgeScript(script, privateKey string, deployer *ContractDeployer, extr
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 
+	log.Println("Executing forge script with command: ", cmd.String())
 	err := cmd.Run()
 	if err != nil {
-		log.Print(fmt.Sprint(err) + ": " + stderr.String())
-		log.Panicf("Failed to execute forge script. Err: %s", err)
+		log.Panicf("Failed to execute forge script: %s\n Err: %s\n--- std out ---\n%s\n--- std err ---\n%s\n",
+			cmd, err, out.String(), stderr.String())
 	} else {
 		log.Print(out.String())
 	}
@@ -275,7 +276,7 @@ func CreateNewTestDirectory(templateName, rootPath string) (string, error) {
 	templatePath := filepath.Join(rootPath, fmt.Sprintf("inabox/templates/%s", templateName))
 	err = execCmd(
 		"cp",
-		[]string{templatePath, fmt.Sprintf("%s/config.yaml", testPath)}, []string{})
+		[]string{templatePath, fmt.Sprintf("%s/config.yaml", testPath)}, []string{}, true)
 	if err != nil {
 		return "", fmt.Errorf("failed to copy template to test directory: %s", err.Error())
 	}
@@ -296,7 +297,7 @@ func GetLatestTestDirectory(rootPath string) (string, error) {
 	return testname, nil
 }
 
-func execCmd(name string, args []string, envVars []string) error {
+func execCmd(name string, args []string, envVars []string, print bool) error {
 	cmd := exec.Command(name, args...)
 	if len(envVars) > 0 {
 		cmd.Env = os.Environ()
@@ -304,9 +305,10 @@ func execCmd(name string, args []string, envVars []string) error {
 	}
 	var out bytes.Buffer
 	var stderr bytes.Buffer
-	// TODO: When these are uncommented, the deployer sometimes fails to start anvil
-	// cmd.Stdout = &out
-	// cmd.Stderr = &stderr
+	if print {
+		cmd.Stdout = &out
+		cmd.Stderr = &stderr
+	}
 
 	err := cmd.Run()
 	if err != nil {

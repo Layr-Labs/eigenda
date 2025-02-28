@@ -16,7 +16,7 @@ import (
 // The reason behind is because Reed Solomon extension using FFT insert evaluation within original
 // Data. i.e. [o_1, o_2, o_3..] with coding ratio 0.5 becomes [o_1, p_1, o_2, p_2...]
 
-func (g *Encoder) GetInterpolationPolyEval(
+func (g *ParametrizedEncoder) GetInterpolationPolyEval(
 	interpolationPoly []fr.Element,
 	j uint32,
 ) ([]fr.Element, error) {
@@ -62,7 +62,7 @@ func (g *Encoder) GetInterpolationPolyEval(
 }
 
 // Since both F W are invertible, c = W^-1 F^-1 d, convert it back. F W W^-1 F^-1 d = c
-func (g *Encoder) GetInterpolationPolyCoeff(chunk []fr.Element, k uint32) ([]fr.Element, error) {
+func (g *ParametrizedEncoder) GetInterpolationPolyCoeff(chunk []fr.Element, k uint32) ([]fr.Element, error) {
 	coeffs := make([]fr.Element, g.ChunkLength)
 	shiftedInterpolationPoly := make([]fr.Element, len(chunk))
 	err := g.Fs.InplaceFFT(chunk, shiftedInterpolationPoly, true)

@@ -15,14 +15,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThreshold int, refBlockNumber uint) (*core.BatchHeader, map[core.OperatorID][]*core.BlobMessage) {
+func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThreshold int, refBlockNumber uint) (*core.BatchHeader, map[core.OperatorID][]*core.EncodedBlobMessage) {
 	p, _, err := makeTestComponents()
 	assert.NoError(t, err)
 	asn := &core.StdAssignmentCoordinator{}
 
 	blobHeaders := make([]*core.BlobHeader, numBlobs)
 	blobChunks := make([][]*encoding.Frame, numBlobs)
-	blobMessagesByOp := make(map[core.OperatorID][]*core.BlobMessage)
+	blobMessagesByOp := make(map[core.OperatorID][]*core.EncodedBlobMessage)
 	for i := 0; i < numBlobs; i++ {
 		// create data
 		ranData := make([]byte, blobSize)
@@ -67,6 +67,13 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 		assert.NoError(t, err)
 		blobChunks[i] = chunks
 
+		chunkBytes := make([][]byte, len(chunks))
+		for _, c := range chunks {
+			serialized, err := c.Serialize()
+			assert.NotNil(t, err)
+			chunkBytes = append(chunkBytes, serialized)
+		}
+
 		// populate blob header
 		blobHeaders[i] = &core.BlobHeader{
 			BlobCommitments: commits,
@@ -75,11 +82,13 @@ func makeBatch(t *testing.T, blobSize int, numBlobs int, advThreshold, quorumThr
 
 		// populate blob messages
 		for opID, assignment := range quorumInfo.Assignments {
-			blobMessagesByOp[opID] = append(blobMessagesByOp[opID], &core.BlobMessage{
-				BlobHeader: blobHeaders[i],
-				Bundles:    make(core.Bundles),
+			blobMessagesByOp[opID] = append(blobMessagesByOp[opID], &core.EncodedBlobMessage{
+				BlobHeader:     blobHeaders[i],
+				EncodedBundles: make(core.EncodedBundles),
 			})
-			blobMessagesByOp[opID][i].Bundles[0] = append(blobMessagesByOp[opID][i].Bundles[0], chunks[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
+			blobMessagesByOp[opID][i].EncodedBundles[0].Format = core.GobChunkEncodingFormat
+			blobMessagesByOp[opID][i].EncodedBundles[0].ChunkLen = int(params.ChunkLength)
+			blobMessagesByOp[opID][i].EncodedBundles[0].Chunks = append(blobMessagesByOp[opID][i].EncodedBundles[0].Chunks, chunkBytes[assignment.StartIndex:assignment.StartIndex+assignment.NumChunks]...)
 		}
 	}
 
@@ -100,10 +109,10 @@ func TestStoreChunks(t *testing.T) {
 	batchHeader, blobMessagesByOp := makeBatch(t, 200*1024, 50, 80, 100, 1)
 	numTotalChunks := 0
 	for i := range blobMessagesByOp[opID] {
-		numTotalChunks += len(blobMessagesByOp[opID][i].Bundles[0])
+		numTotalChunks += len(blobMessagesByOp[opID][i].EncodedBundles[0].Chunks)
 	}
 	t.Logf("Batch numTotalChunks: %d", numTotalChunks)
-	req, totalSize, err := dispatcher.GetStoreChunksRequest(blobMessagesByOp[opID], batchHeader)
+	req, totalSize, err := dispatcher.GetStoreChunksRequest(blobMessagesByOp[opID], batchHeader, false)
 	fmt.Println("totalSize", totalSize)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(26214400), totalSize)

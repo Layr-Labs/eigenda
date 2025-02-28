@@ -16,16 +16,46 @@ import (
 	gcommon "github.com/ethereum/go-ethereum/common"
 )
 
+// BlobStatus represents the status of a blob.
+// The status of a blob is updated as the blob is processed by the disperser.
+// The status of a blob can be queried by the client using the GetBlobStatus API.
+// Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:
+// - PROCESSING
+// - DISPERSING
+// - CONFIRMED
+// Terminal states are states that will not be updated to a different state:
+// - FAILED
+// - FINALIZED
+// - INSUFFICIENT_SIGNATURES
+//
+// Note: this docstring and the enum ones below are copied from the disperser.proto,
+// which is the source of truth for BlobStatus.
 type BlobStatus uint
 
 // WARNING: THESE VALUES BECOME PART OF PERSISTENT SYSTEM STATE;
 // ALWAYS INSERT NEW ENUM VALUES AS THE LAST ELEMENT TO MAINTAIN COMPATIBILITY
 const (
+	// PROCESSING means that the blob is currently being processed by the disperser
 	Processing BlobStatus = iota
+	// CONFIRMED means that the blob has been dispersed to DA Nodes and the dispersed
+	// batch containing the blob has been confirmed onchain
 	Confirmed
+	// FAILED means that the blob has failed permanently (for reasons other than insufficient
+	// signatures, which is a separate state). This status is somewhat of a catch-all category,
+	// containg (but not necessarily exclusively as errors can be added in the future):
+	//  - blob has expired
+	//  - internal logic error while requesting encoding
+	//  - blob retry has exceeded its limit while waiting for blob finalization after confirmation.
+	//  Most likely triggered by a chain reorg: see https://github.com/Layr-Labs/eigenda/blob/master/disperser/batcher/finalizer.go#L179-L189.
 	Failed
+	// FINALIZED means that the block containing the blob's confirmation transaction has been finalized on Ethereum
 	Finalized
+	// INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met
+	// for at least one quorum.
 	InsufficientSignatures
+	// The DISPERSING state is comprised of two separate phases:
+	//  - Dispersing to DA nodes and collecting signature
+	//  - Submitting the transaction on chain and waiting for tx receipt
 	Dispersing
 )
 
@@ -131,7 +161,14 @@ type BlobStoreExclusiveStartKey struct {
 	BlobHash     BlobHash
 	MetadataHash MetadataHash
 	BlobStatus   int32 // BlobStatus is an integer
-	RequestedAt  int64 //  RequestedAt is epoch time in seconds
+	Expiry       int64 // Expiry is epoch time in seconds
+}
+
+type BatchIndexExclusiveStartKey struct {
+	BlobHash        BlobHash
+	MetadataHash    MetadataHash
+	BatchHeaderHash []byte
+	BlobIndex       uint32
 }
 
 type BlobStore interface {
@@ -168,8 +205,12 @@ type BlobStore interface {
 	GetBlobMetadataByStatusWithPagination(ctx context.Context, blobStatus BlobStatus, limit int32, exclusiveStartKey *BlobStoreExclusiveStartKey) ([]*BlobMetadata, *BlobStoreExclusiveStartKey, error)
 	// GetAllBlobMetadataByBatch returns the metadata of all the blobs in the batch.
 	GetAllBlobMetadataByBatch(ctx context.Context, batchHeaderHash [32]byte) ([]*BlobMetadata, error)
+	// GetAllBlobMetadataByBatchWithPagination returns all the blobs in the batch using pagination
+	GetAllBlobMetadataByBatchWithPagination(ctx context.Context, batchHeaderHash [32]byte, limit int32, exclusiveStartKey *BatchIndexExclusiveStartKey) ([]*BlobMetadata, *BatchIndexExclusiveStartKey, error)
 	// GetBlobMetadata returns a blob metadata given a metadata key
 	GetBlobMetadata(ctx context.Context, blobKey BlobKey) (*BlobMetadata, error)
+	// GetBulkBlobMetadata returns a list of blob metadata given a list of blob keys
+	GetBulkBlobMetadata(ctx context.Context, blobKeys []BlobKey) ([]*BlobMetadata, error)
 	// HandleBlobFailure handles a blob failure by either incrementing the retry count or marking the blob as failed
 	// Returns a boolean indicating whether the blob should be retried and an error
 	HandleBlobFailure(ctx context.Context, metadata *BlobMetadata, maxRetry uint) (bool, error)
@@ -177,7 +218,6 @@ type BlobStore interface {
 
 type Dispatcher interface {
 	DisperseBatch(context.Context, *core.IndexedOperatorState, []core.EncodedBlob, *core.BatchHeader) chan core.SigningMessage
-	SendBlobsToOperator(ctx context.Context, blobs []*core.BlobMessage, batchHeader *core.BatchHeader, op *core.IndexedOperatorInfo) ([]*core.Signature, error)
 }
 
 // GenerateReverseIndexKey returns the key used to store the blob key in the reverse index

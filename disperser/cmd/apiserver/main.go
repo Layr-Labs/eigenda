@@ -8,8 +8,12 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	mt "github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
+	"github.com/Layr-Labs/eigenda/encoding/fft"
+	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -17,10 +21,12 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
+	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/urfave/cli"
 )
 
@@ -58,13 +64,14 @@ func RunDisperserServer(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
+
 	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
 		return err
 	}
 
-	transactor, err := eth.NewTransactor(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	transactor, err := eth.NewReader(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return err
 	}
@@ -87,12 +94,43 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return err
 	}
 
-	bucketName := config.BlobstoreConfig.BucketName
-	logger.Info("Creating blob store", "bucket", bucketName)
-	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
-	blobStore := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
-
 	reg := prometheus.NewRegistry()
+
+	var meterer *mt.Meterer
+	if config.EnablePaymentMeterer {
+		mtConfig := mt.Config{
+			ChainReadTimeout: config.ChainReadTimeout,
+			UpdateInterval:   config.OnchainStateRefreshInterval,
+		}
+
+		paymentChainState, err := mt.NewOnchainPaymentState(context.Background(), transactor, logger)
+		if err != nil {
+			return fmt.Errorf("failed to create onchain payment state: %w", err)
+		}
+		if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
+			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
+		}
+
+		offchainStore, err := mt.NewOffchainStore(
+			config.AwsClientConfig,
+			config.ReservationsTableName,
+			config.OnDemandTableName,
+			config.GlobalRateTableName,
+			logger,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create offchain store: %w", err)
+		}
+		// add some default sensible configs
+		meterer = mt.NewMeterer(
+			mtConfig,
+			paymentChainState,
+			offchainStore,
+			logger,
+			// metrics.NewNoopMetrics(),
+		)
+		meterer.Start(context.Background())
+	}
 
 	var ratelimiter common.RateLimiter
 	if config.EnableRatelimiter {
@@ -114,6 +152,49 @@ func RunDisperserServer(ctx *cli.Context) error {
 		ratelimiter = ratelimit.NewRateLimiter(reg, globalParams, bucketStore, logger)
 	}
 
+	if config.MaxBlobSize <= 0 || config.MaxBlobSize > 32*1024*1024 {
+		return fmt.Errorf("configured max blob size is invalid %v", config.MaxBlobSize)
+	}
+
+	if !fft.IsPowerOfTwo(uint64(config.MaxBlobSize)) {
+		return fmt.Errorf("configured max blob size must be power of 2 %v", config.MaxBlobSize)
+	}
+
+	bucketName := config.BlobstoreConfig.BucketName
+	logger.Info("Blob store", "bucket", bucketName)
+	if config.DisperserVersion == V2 {
+		config.EncodingConfig.LoadG2Points = true
+		prover, err := prover.NewProver(&config.EncodingConfig, nil)
+		if err != nil {
+			return fmt.Errorf("failed to create encoder: %w", err)
+		}
+		blobMetadataStore := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
+		blobStore := blobstorev2.NewBlobStore(bucketName, s3Client, logger)
+
+		server, err := apiserver.NewDispersalServerV2(
+			config.ServerConfig,
+			blobStore,
+			blobMetadataStore,
+			transactor,
+			meterer,
+			authv2.NewAuthenticator(),
+			prover,
+			uint64(config.MaxNumSymbolsPerBlob),
+			config.OnchainStateRefreshInterval,
+			logger,
+			reg,
+			config.MetricsConfig,
+		)
+		if err != nil {
+			return err
+		}
+		return server.Start(context.Background())
+	}
+
+	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, time.Duration((storeDurationBlocks+blockStaleMeasure)*12)*time.Second)
+	blobStore := blobstore.NewSharedStorage(bucketName, s3Client, blobMetadataStore, logger)
+
+	grpcMetrics := grpcprom.NewServerMetrics()
 	metrics := disperser.NewMetrics(reg, config.MetricsConfig.HTTPPort, logger)
 	server := apiserver.NewDispersalServer(
 		config.ServerConfig,
@@ -121,9 +202,14 @@ func RunDisperserServer(ctx *cli.Context) error {
 		transactor,
 		logger,
 		metrics,
+		grpcMetrics,
+		meterer,
 		ratelimiter,
 		config.RateConfig,
+		config.MaxBlobSize,
 	)
+
+	reg.MustRegister(grpcMetrics)
 
 	// Enable Metrics Block
 	if config.MetricsConfig.EnableMetrics {

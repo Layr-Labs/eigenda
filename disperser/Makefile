@@ -1,7 +1,7 @@
 clean:
 	rm -rf ./bin
 
-build: build_server build_batcher build_encoder build_dataapi
+build: build_server build_batcher build_encoder build_dataapi build_controller
 
 build_batcher:
 	go build -o ./bin/batcher ./cmd/batcher
@@ -14,6 +14,9 @@ build_encoder:
 
 build_dataapi:
 	go build -o ./bin/dataapi ./cmd/dataapi
+
+build_controller:
+	go build -o ./bin/controller ./cmd/controller
 
 run_batcher: build_batcher
 	./bin/batcher \

@@ -24,7 +24,6 @@ func (p EncodingParams) NumEvaluations() uint64 {
 }
 
 func (p EncodingParams) Validate() error {
-
 	if NextPowerOf2(p.NumChunks) != p.NumChunks {
 		return ErrInvalidParams
 	}
@@ -51,14 +50,12 @@ func ParamsFromMins(numChunks, chunkLen uint64) EncodingParams {
 		NumChunks: numChunks,
 		ChunkLen:  chunkLen,
 	}
-
 }
 
 func GetEncodingParams(numSys, numPar, dataSize uint64) EncodingParams {
-
 	numNodes := numSys + numPar
 	dataLen := RoundUpDivision(dataSize, encoding.BYTES_PER_SYMBOL)
 	chunkLen := RoundUpDivision(dataLen, numSys)
-	return ParamsFromMins(numNodes, chunkLen)
 
+	return ParamsFromMins(numNodes, chunkLen)
 }

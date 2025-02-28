@@ -6,7 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/stretchr/testify/mock"
-	"github.com/wealdtech/go-merkletree"
+	"github.com/wealdtech/go-merkletree/v2"
 )
 
 type MockNodeClient struct {
@@ -54,9 +54,18 @@ func (c *MockNodeClient) GetChunks(
 ) {
 	args := c.Called(opID, opInfo, batchHeaderHash, blobIndex)
 	encodedBlob := (args.Get(0)).(core.EncodedBlob)
+	chunks, err := encodedBlob.EncodedBundlesByOperator[opID][quorumID].ToFrames()
+	if err != nil {
+		chunksChan <- clients.RetrievedChunks{
+			OperatorID: opID,
+			Err:        err,
+			Chunks:     nil,
+		}
+
+	}
 	chunksChan <- clients.RetrievedChunks{
 		OperatorID: opID,
 		Err:        nil,
-		Chunks:     encodedBlob.BundlesByOperator[opID][quorumID],
+		Chunks:     chunks,
 	}
 }

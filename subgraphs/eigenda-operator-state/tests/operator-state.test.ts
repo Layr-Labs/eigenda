@@ -5,15 +5,14 @@ import {
     clearStore,
     beforeAll,
     afterAll,
-    newMockCall,
     createMockedFunction
   } from "matchstick-as/assembly/index"
   import { Address, BigInt, Bytes, ethereum } from "@graphprotocol/graph-ts"
-  import { createNewOperatorDeregisteredEvent, createNewOperatorRegisteredEvent, createNewOperatorSocketUpdateEvent, createNewPubkeyRegistrationEvent } from "./operator-state-utils"
+  import { createNewOperatorDeregisteredEvent, createNewOperatorRegisteredEvent, createNewOperatorSocketUpdateEvent, createNewPubkeyRegistrationEvent, createNewOperatorEjectedEvent } from "./operator-state-utils"
   import { handleNewPubkeyRegistration } from "../src/operator-creation"
   import { handleOperatorDeregistered, handleOperatorRegistered } from "../src/operator-registration-status"
   import { handleOperatorSocketUpdate } from "../src/registry-coordinator"
-  
+  import { handleOperatorEjected } from "../src/ejection-manager"
   
   let operator: Address = Address.fromBytes(Bytes.fromHexString("0xa16081f360e3847006db660bae1c6d1b2e17ec2a"))
   let pubkeyG1_X = BigInt.fromI32(123)
@@ -146,4 +145,17 @@ import {
       )
 
     })
-  })
+
+    test("operator registered", () => {
+      assert.fieldEquals("Operator", operator.toHex(), "id", operator.toHex())
+      assert.fieldEquals("Operator", operator.toHex(), "pubkeyG1_X", pubkeyG1_X.toString())
+      assert.fieldEquals("Operator", operator.toHex(), "pubkeyG1_Y", pubkeyG1_Y.toString())
+    })
+
+    test("operator ejected", () => {
+      let ejectionEvent = createNewOperatorEjectedEvent(operator)
+      handleOperatorEjected(ejectionEvent)
+
+      assert.fieldEquals("Operator", operator.toHex(), "status", "ejected")
+    })
+})

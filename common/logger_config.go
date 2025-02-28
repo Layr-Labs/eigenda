@@ -52,6 +52,8 @@ func LoggerCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 	}
 }
 
+// DefaultLoggerConfig returns a LoggerConfig with the default settings for a JSON logger.
+// In general, this should be the baseline config for most services running in production.
 func DefaultLoggerConfig() LoggerConfig {
 	return LoggerConfig{
 		Format:       JSONLogFormat,
@@ -59,6 +61,36 @@ func DefaultLoggerConfig() LoggerConfig {
 		HandlerOpts: logging.SLoggerOptions{
 			AddSource: true,
 			Level:     slog.LevelDebug,
+			NoColor:   true,
+		},
+	}
+}
+
+// DefaultTextLoggerConfig returns a LoggerConfig with the default settings for a text logger.
+// For use in tests or other scenarios where the logs are consumed by humans.
+func DefaultTextLoggerConfig() LoggerConfig {
+	return LoggerConfig{
+		Format:       TextLogFormat,
+		OutputWriter: os.Stdout,
+		HandlerOpts: logging.SLoggerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+			NoColor:   true, // color is nice in the console, but not nice when written to a file
+		},
+	}
+}
+
+// DefaultConsoleLoggerConfig returns a LoggerConfig with the default settings
+// for logging to a console (i.e. with human eyeballs). Adds color, and so should
+// not be used when logs are captured in a file.
+func DefaultConsoleLoggerConfig() LoggerConfig {
+	return LoggerConfig{
+		Format:       TextLogFormat,
+		OutputWriter: os.Stdout,
+		HandlerOpts: logging.SLoggerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+			NoColor:   false,
 		},
 	}
 }

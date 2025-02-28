@@ -6,15 +6,16 @@ import (
 	"log"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	dacore "github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	indexermock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/operators/churner"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
@@ -26,8 +27,8 @@ import (
 var (
 	keyPair                        *dacore.KeyPair
 	quorumIds                      = []uint32{0, 1}
-	logger                         = logging.NewNoopLogger()
-	transactorMock                 = &coremock.MockTransactor{}
+	logger                         = testutils.GetLogger()
+	transactorMock                 = &coremock.MockWriter{}
 	mockIndexer                    = &indexermock.MockIndexedChainState{}
 	operatorAddr                   = gethcommon.HexToAddress("0x0000000000000000000000000000000000000001")
 	operatorToChurnInPrivateKeyHex = "0000000000000000000000000000000000000000000000000000000000000020"
@@ -92,7 +93,7 @@ func TestChurn(t *testing.T) {
 	// retry prior to expiry should fail
 	_, err = s.Churn(ctx, request)
 	assert.NotNil(t, err)
-	assert.Equal(t, err.Error(), "rpc error: code = ResourceExhausted desc = previous approval not expired, retry in 3600 seconds")
+	assert.Equal(t, err.Error(), "rpc error: code = ResourceExhausted desc = previous approval not expired, retry in 900 seconds")
 }
 
 func TestChurnWithInvalidQuorum(t *testing.T) {
@@ -128,7 +129,7 @@ func TestChurnWithInvalidQuorum(t *testing.T) {
 	assert.Equal(t, err.Error(), "rpc error: code = InvalidArgument desc = invalid request: invalid request: the quorum_id must be in range [0, 1], but found 2")
 }
 
-func setupMockTransactor() {
+func setupMockWriter() {
 	transactorMock.On("StakeRegistry").Return(gethcommon.HexToAddress("0x0000000000000000000000000000000000000001"), nil).Once()
 	transactorMock.On("OperatorIDToAddress").Return(operatorAddr, nil)
 	transactorMock.On("GetCurrentQuorumBitmapByOperatorId").Return(big.NewInt(0), nil)
@@ -169,6 +170,7 @@ func newTestServer(t *testing.T) *churner.Server {
 			PrivateKeyString: churnerPrivateKeyHex,
 			NumRetries:       numRetries,
 		},
+		ChurnApprovalInterval: 15 * time.Minute,
 	}
 
 	var err error
@@ -177,7 +179,7 @@ func newTestServer(t *testing.T) *churner.Server {
 		t.Fatalf("Generating random BLS keys Error: %s", err.Error())
 	}
 
-	setupMockTransactor()
+	setupMockWriter()
 
 	metrics := churner.NewMetrics("9001", logger)
 	cn, err := churner.NewChurner(config, mockIndexer, transactorMock, logger, metrics)

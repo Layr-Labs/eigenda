@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/kvstore"
+	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
+
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/node/leveldb"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -28,7 +30,7 @@ var ErrBatchAlreadyExist = errors.New("batch already exists")
 
 // Store is a key-value database to store blob data (blob header, blob chunks etc).
 type Store struct {
-	db     DB
+	db     kvstore.Store[[]byte]
 	logger logging.Logger
 
 	blockStaleMeasure   uint32
@@ -43,7 +45,7 @@ type Store struct {
 func NewLevelDBStore(path string, logger logging.Logger, metrics *Metrics, blockStaleMeasure, storeDurationBlocks uint32) (*Store, error) {
 	// Create the db at the path. This is currently hardcoded to use
 	// levelDB.
-	db, err := leveldb.NewLevelDBStore(path)
+	db, err := leveldb.NewStore(logger, path)
 	if err != nil {
 		logger.Error("Could not create leveldb database", "err", err)
 		return nil, err
@@ -66,95 +68,268 @@ func NewLevelDBStore(path string, logger logging.Logger, metrics *Metrics, block
 // The function returns the number of batches deleted and the status of deletion. Note that the
 // number of batches deleted can be positive even if the status is error (e.g. the error happened
 // after it had successfully deleted some batches).
-func (s *Store) DeleteExpiredEntries(currentTimeUnixSec int64, timeLimitSec uint64) (int, error) {
+func (s *Store) DeleteExpiredEntries(currentTimeUnixSec int64, timeLimitSec uint64) (numBatchesDeleted int, numMappingsDeleted int, numBlobsDeleted int, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeLimitSec)*time.Second)
 	defer cancel()
 
-	numBatchesDeleted := 0
+	totalBatchesDeleted := 0
+	totalMappingsDeleted := 0
+	totalBlobsDeleted := 0
 	for {
 		select {
 		case <-ctx.Done():
-			return numBatchesDeleted, ctx.Err()
+			return totalBatchesDeleted, totalMappingsDeleted, totalBlobsDeleted, ctx.Err()
 		default:
-			numDeleted, err := s.deleteNBatches(currentTimeUnixSec, numBatchesToDeleteAtomically)
+			blobsDeleted, err := s.deleteExpiredBlobs(currentTimeUnixSec, numBatchesToDeleteAtomically)
 			if err != nil {
-				return numBatchesDeleted, err
+				return totalBatchesDeleted, totalMappingsDeleted, totalBlobsDeleted, err
 			}
+			totalBlobsDeleted += blobsDeleted
+
+			batchesDeleted, err := s.deleteNBatches(currentTimeUnixSec, numBatchesToDeleteAtomically)
+			if err != nil {
+				return totalBatchesDeleted, totalMappingsDeleted, totalBlobsDeleted, err
+			}
+			totalBatchesDeleted += batchesDeleted
+
+			mappingsDeleted, batchesDeleted, err := s.deleteExpiredBatchMapping(currentTimeUnixSec, numBatchesToDeleteAtomically)
+			if err != nil {
+				return totalBatchesDeleted, totalMappingsDeleted, totalBlobsDeleted, err
+			}
+			totalMappingsDeleted += mappingsDeleted
+			totalBatchesDeleted += batchesDeleted
 			// When there is no error and we didn't delete any batch, it means we have
 			// no obsolete batches to delete, so we can return.
-			if numDeleted == 0 {
-				return numBatchesDeleted, nil
+			if blobsDeleted == 0 && batchesDeleted == 0 && mappingsDeleted == 0 {
+				return totalBatchesDeleted, totalMappingsDeleted, totalBlobsDeleted, nil
 			}
-			numBatchesDeleted += numDeleted
 		}
 	}
 }
 
-// Returns the number of batches we deleted and the status of deletion. The number
-// is set to -1 (invalid value) if the deletion status is an error.
-func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, error) {
+// deleteExpiredBlobs returns the number of blobs deleted and the status of deletion.
+// The number is set to -1 (invalid value) if the deletion status is an error.
+// Note that the blobs/blob headers expired by this method are those that are not associated with any batch.
+// All blobs & blob headers in a batch are expired by deleteNBatches method.
+func (s *Store) deleteExpiredBlobs(currentTimeUnixSec int64, numBlobs int) (int, error) {
 	// Scan for expired batches.
-	iter := s.db.NewIterator(EncodeBatchExpirationKeyPrefix())
-	expiredKeys := make([][]byte, 0)
-	expiredBatches := make([][]byte, 0)
+	iter, err := s.db.NewIterator(EncodeBlobExpirationKeyPrefix())
+	if err != nil {
+		return -1, fmt.Errorf("failed to create an iterator for the expired blobs: %w", err)
+	}
+	batch := s.db.NewBatch()
+	expiredBlobHeaders := make([][32]byte, 0)
 	for iter.Next() {
-		ts, err := DecodeBatchExpirationKey(iter.Key())
+		ts, err := DecodeBlobExpirationKey(iter.Key())
 		if err != nil {
-			s.logger.Error("Could not decode the expiration key", "key:", iter.Key(), "error:", err)
+			s.logger.Error("Could not decode the expiration key", "key", iter.Key(), "error", err)
 			continue
 		}
 		// No more rows expired up to current time.
 		if currentTimeUnixSec < ts {
 			break
 		}
-		expiredKeys = append(expiredKeys, copyBytes(iter.Key()))
-		expiredBatches = append(expiredBatches, copyBytes(iter.Value()))
-		if len(expiredKeys) == numBatches {
+		batch.Delete(copyBytes(iter.Key()))
+		blobHeaderBytes := copyBytes(iter.Value())
+		blobHeaders, err := DecodeHashSlice(blobHeaderBytes)
+		if err != nil {
+			s.logger.Error("Could not decode the blob header hashes", "error", err)
+			continue
+		}
+		expiredBlobHeaders = append(expiredBlobHeaders, blobHeaders...)
+		if int(batch.Size()) == numBlobs {
 			break
 		}
 	}
 	iter.Release()
 
 	// No expired batch found.
-	if len(expiredKeys) == 0 {
+	if batch.Size() == 0 {
 		return 0, nil
 	}
 
 	// Calculate the num of bytes (for chunks) that will be purged from the database.
 	size := int64(0)
 	// Scan for the batch header, blob headers and chunks of each expired batch.
-	for _, hash := range expiredBatches {
-		var batchHeaderHash [32]byte
-		copy(batchHeaderHash[:], hash)
-
-		// Batch header.
-		expiredKeys = append(expiredKeys, EncodeBatchHeaderKey(batchHeaderHash))
-
+	for _, blobHeaderHash := range expiredBlobHeaders {
 		// Blob headers.
-		blobHeaderIter := s.db.NewIterator(EncodeBlobHeaderKeyPrefix(batchHeaderHash))
+		blobHeaderIter, err := s.db.NewIterator(EncodeBlobHeaderKeyByHash(blobHeaderHash))
+		if err != nil {
+			return -1, fmt.Errorf("failed to create an iterator for the blob headers: %w", err)
+		}
 		for blobHeaderIter.Next() {
-			expiredKeys = append(expiredKeys, copyBytes(blobHeaderIter.Key()))
+			batch.Delete(copyBytes(blobHeaderIter.Key()))
 		}
 		blobHeaderIter.Release()
 
 		// Blob chunks.
-		blobIter := s.db.NewIterator(bytes.NewBuffer(hash).Bytes())
+		blobIter, err := s.db.NewIterator(EncodeBlobKeyByHashPrefix(blobHeaderHash))
+		if err != nil {
+			return -1, fmt.Errorf("failed to create an iterator for the blob chunks: %w", err)
+		}
 		for blobIter.Next() {
-			expiredKeys = append(expiredKeys, copyBytes(blobIter.Key()))
+			batch.Delete(copyBytes(blobIter.Key()))
 			size += int64(len(blobIter.Value()))
 		}
 		blobIter.Release()
 	}
 
 	// Perform the removal.
-	err := s.db.DeleteBatch(expiredKeys)
+	err = batch.Apply()
 	if err != nil {
-		s.logger.Error("Failed to delete the expired keys in batch", "keys:", expiredKeys, "error:", err)
+		return -1, fmt.Errorf("failed to delete the expired keys in batch: %w", err)
+	}
+
+	// Update the current live metric.
+	s.metrics.RemoveNBlobs(len(expiredBlobHeaders), size)
+
+	return len(expiredBlobHeaders), nil
+}
+
+// deleteExpiredBatchMapping returns the number of batch to blob index mapping entries deleted and the status of deletion.
+// The first return value is the number of batch to blob index mapping entries deleted.
+// The second return value is the number of batch header entries deleted.
+func (s *Store) deleteExpiredBatchMapping(currentTimeUnixSec int64, numBatches int) (numExpiredMappings int, numExpiredBatches int, err error) {
+	// Scan for expired batches.
+	iter, err := s.db.NewIterator(EncodeBatchMappingExpirationKeyPrefix())
+	if err != nil {
+		return -1, -1, fmt.Errorf("failed to create an iterator for the expired batch mapping: %w", err)
+	}
+	batch := s.db.NewBatch()
+	expiredBatches := make([][]byte, 0)
+	for iter.Next() {
+		ts, err := DecodeBatchMappingExpirationKey(iter.Key())
+		if err != nil {
+			s.logger.Error("Could not decode the batch mapping expiration key", "key", iter.Key(), "error", err)
+			continue
+		}
+		// No more rows expired up to current time.
+		if currentTimeUnixSec < ts {
+			break
+		}
+		batch.Delete(copyBytes(iter.Key()))
+		expiredBatches = append(expiredBatches, copyBytes(iter.Value()))
+		if int(batch.Size()) == numBatches {
+			break
+		}
+	}
+	iter.Release()
+
+	// No expired batch found.
+	if batch.Size() == 0 {
+		return 0, 0, nil
+	}
+
+	numMappings := 0
+	// Scan for the batch header, blob headers and chunks of each expired batch.
+	for _, hash := range expiredBatches {
+		var batchHeaderHash [32]byte
+		copy(batchHeaderHash[:], hash)
+
+		// Batch header.
+		batch.Delete(EncodeBatchHeaderKey(batchHeaderHash))
+
+		// Blob index mapping.
+		blobIndexIter, err := s.db.NewIterator(EncodeBlobIndexKeyPrefix(batchHeaderHash))
+		if err != nil {
+			return -1, -1, fmt.Errorf("failed to create an iterator for the blob index mapping: %w", err)
+		}
+		for blobIndexIter.Next() {
+			batch.Delete(copyBytes(blobIndexIter.Key()))
+			numMappings++
+		}
+		blobIndexIter.Release()
+	}
+
+	// Perform the removal.
+	err = batch.Apply()
+	if err != nil {
+		return -1, -1, fmt.Errorf("failed to delete the expired keys in batch: %w", err)
+	}
+
+	s.logger.Info("Deleted expired batch mapping", "numBatches", len(expiredBatches), "numMappings", numMappings)
+	numExpiredMappings = numMappings
+	numExpiredBatches = len(expiredBatches)
+	return numExpiredMappings, numExpiredBatches, nil
+}
+
+// deleteNBatches returns the number of batches we deleted and the status of deletion. The number
+// is set to -1 (invalid value) if the deletion status is an error.
+func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, error) {
+	// Scan for expired batches.
+	iter, err := s.db.NewIterator(EncodeBatchExpirationKeyPrefix())
+	if err != nil {
+		return -1, fmt.Errorf("failed to create an iterator for the expired batches: %w", err)
+	}
+	batch := s.db.NewBatch()
+	expiredBatches := make([][]byte, 0)
+	for iter.Next() {
+		ts, err := DecodeBatchExpirationKey(iter.Key())
+		if err != nil {
+			s.logger.Error("Could not decode the expiration key", "key:", iter.Key(), "error", err)
+			continue
+		}
+		// No more rows expired up to current time.
+		if currentTimeUnixSec < ts {
+			break
+		}
+		batch.Delete(copyBytes(iter.Key()))
+		expiredBatches = append(expiredBatches, copyBytes(iter.Value()))
+		if int(batch.Size()) == numBatches {
+			break
+		}
+	}
+	iter.Release()
+
+	// No expired batch found.
+	if batch.Size() == 0 {
+		return 0, nil
+	}
+
+	// Calculate the num of bytes (for chunks) that will be purged from the database.
+	size := int64(0)
+	numBlobs := 0
+	// Scan for the batch header, blob headers and chunks of each expired batch.
+	for _, hash := range expiredBatches {
+		var batchHeaderHash [32]byte
+		copy(batchHeaderHash[:], hash)
+
+		// Batch header.
+		batch.Delete(EncodeBatchHeaderKey(batchHeaderHash))
+
+		// Blob headers.
+		blobHeaderIter, err := s.db.NewIterator(EncodeBlobHeaderKeyPrefix(batchHeaderHash))
+		if err != nil {
+			return -1, fmt.Errorf("failed to create an iterator for the blob headers: %w", err)
+		}
+		for blobHeaderIter.Next() {
+			batch.Delete(copyBytes(blobHeaderIter.Key()))
+			numBlobs++
+		}
+		blobHeaderIter.Release()
+
+		// Blob chunks.
+		blobIter, err := s.db.NewIterator(bytes.NewBuffer(hash).Bytes())
+		if err != nil {
+			return -1, fmt.Errorf("failed to create an iterator for the blob chunks: %w", err)
+		}
+		for blobIter.Next() {
+			batch.Delete(copyBytes(blobIter.Key()))
+			size += int64(len(blobIter.Value()))
+		}
+		blobIter.Release()
+	}
+
+	// Perform the removal.
+	err = batch.Apply()
+	if err != nil {
+		s.logger.Error("Failed to delete the expired keys in batch", "error", err)
 		return -1, err
 	}
 
 	// Update the current live batch metric.
 	s.metrics.RemoveNCurrentBatch(len(expiredBatches), size)
+	s.metrics.RemoveNBlobs(numBlobs, 0)
 
 	return len(expiredBatches), nil
 }
@@ -177,9 +352,8 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 		return nil, err
 	}
 
-	// The key/value pairs that need to be written to the local database.
 	keys := make([][]byte, 0)
-	values := make([][]byte, 0)
+	batch := s.db.NewBatch()
 
 	// Generate the key/value pair for batch header.
 	batchHeaderKey := EncodeBatchHeaderKey(batchHeaderHash)
@@ -197,28 +371,12 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 	}
 
 	keys = append(keys, batchHeaderKey)
-	values = append(values, batchHeaderBytes)
+	batch.Put(batchHeaderKey, batchHeaderBytes)
 
-	// Setting the expiration time for the batch.
-	curr := time.Now().Unix()
-	timeToExpire := (s.blockStaleMeasure + s.storeDurationBlocks) * 12 // 12s per block
-	// Why this expiration time is safe?
-	//
-	// The batch must be confirmed before referenceBlockNumber+blockStaleMeasure, otherwise
-	// it's stale and won't be accepted onchain. This means the blob's lifecycle will end
-	// before referenceBlockNumber+blockStaleMeasure+storeDurationBlocks.
-	// Since time@referenceBlockNumber < time.Now() (we always use a reference block that's
-	// already onchain), we have
-	// time@(referenceBlockNumber+blockStaleMeasure+storeDurationBlocks)
-	// = time@referenceBlockNumber + 12*(blockStaleMeasure+storeDurationBlocks)
-	// < time.Now() + 12*(blockStaleMeasure+storeDurationBlocks).
-	//
-	// Note if a batch is unconfirmed, it could be removed even earlier; here we treat its
-	// lifecycle the same as confirmed batches for simplicity.
-	expirationTime := curr + int64(timeToExpire)
+	expirationTime := s.expirationTime()
 	expirationKey := EncodeBatchExpirationKey(expirationTime)
 	keys = append(keys, expirationKey)
-	values = append(values, batchHeaderHash[:])
+	batch.Put(expirationKey, batchHeaderHash[:])
 
 	// Generate key/value pairs for all blob headers and blob chunks .
 	size := int64(0)
@@ -236,7 +394,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 			return nil, err
 		}
 		keys = append(keys, blobHeaderKey)
-		values = append(values, blobHeaderBytes)
+		batch.Put(blobHeaderKey, blobHeaderBytes)
 
 		// Get raw chunks
 		start := time.Now()
@@ -276,7 +434,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 				if ok {
 					size += int64(len(rawBundle))
 					keys = append(keys, key)
-					values = append(values, rawBundle)
+					batch.Put(key, rawBundle)
 				}
 			} else if format == core.GobBundleEncodingFormat {
 				if len(rawChunks[quorumID]) != len(bundle) {
@@ -295,7 +453,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 					}
 					size += int64(len(chunkBytes))
 					keys = append(keys, key)
-					values = append(values, chunkBytes)
+					batch.Put(key, chunkBytes)
 				}
 			} else {
 				return nil, fmt.Errorf("invalid bundle encoding format: %d", format)
@@ -306,7 +464,7 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 
 	start := time.Now()
 	// Write all the key/value pairs to the local database atomically.
-	err = s.db.WriteBatch(keys, values)
+	err = batch.Apply()
 	if err != nil {
 		log.Error("Failed to write the batch into local database:", "err", err)
 		return nil, err
@@ -318,12 +476,32 @@ func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs 
 	return &keys, nil
 }
 
+func (s *Store) expirationTime() int64 {
+	// Setting the expiration time for the batch.
+	curr := time.Now().Unix()
+	timeToExpire := (s.blockStaleMeasure + s.storeDurationBlocks) * 12 // 12s per block
+	// Why this expiration time is safe?
+	//
+	// The batch must be confirmed before referenceBlockNumber+blockStaleMeasure, otherwise
+	// it's stale and won't be accepted onchain. This means the blob's lifecycle will end
+	// before referenceBlockNumber+blockStaleMeasure+storeDurationBlocks.
+	// Since time@referenceBlockNumber < time.Now() (we always use a reference block that's
+	// already onchain), we have
+	// time@(referenceBlockNumber+blockStaleMeasure+storeDurationBlocks)
+	// = time@referenceBlockNumber + 12*(blockStaleMeasure+storeDurationBlocks)
+	// < time.Now() + 12*(blockStaleMeasure+storeDurationBlocks).
+	//
+	// Note if a batch is unconfirmed, it could be removed even earlier; here we treat its
+	// lifecycle the same as confirmed batches for simplicity.
+	return curr + int64(timeToExpire)
+}
+
 // GetBatchHeader returns the batch header for the given batchHeaderHash.
 func (s *Store) GetBatchHeader(ctx context.Context, batchHeaderHash [32]byte) ([]byte, error) {
 	batchHeaderKey := EncodeBatchHeaderKey(batchHeaderHash)
 	data, err := s.db.Get(batchHeaderKey)
 	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
+		if errors.Is(err, kvstore.ErrNotFound) {
 			return nil, ErrKeyNotFound
 		}
 		return nil, err
@@ -338,8 +516,35 @@ func (s *Store) GetBlobHeader(ctx context.Context, batchHeaderHash [32]byte, blo
 		return nil, err
 	}
 	data, err := s.db.Get(blobHeaderKey)
+	if err == nil {
+		return data, nil
+	}
+
+	if !errors.Is(err, kvstore.ErrNotFound) {
+		return nil, err
+	}
+
+	// error is kvstore.ErrNotFound
+	// try to get blob header by blobIndexPrefix
+	blobIndexKey := EncodeBlobIndexKey(batchHeaderHash, blobIndex)
+	blobHeaderHashBytes, err := s.db.Get(blobIndexKey)
 	if err != nil {
-		if errors.Is(err, leveldb.ErrNotFound) {
+		if errors.Is(err, kvstore.ErrNotFound) {
+			return nil, ErrKeyNotFound
+		}
+		return nil, err
+	}
+	var blobHeaderHash [32]byte
+	copy(blobHeaderHash[:], blobHeaderHashBytes)
+	return s.GetBlobHeaderByHeaderHash(ctx, blobHeaderHash)
+}
+
+// GetBlobHeaderByHeaderHash returns the blob header for the given blobHeaderHash.
+func (s *Store) GetBlobHeaderByHeaderHash(ctx context.Context, blobHeaderHash [32]byte) ([]byte, error) {
+	blobHeaderKey := EncodeBlobHeaderKeyByHash(blobHeaderHash)
+	data, err := s.db.Get(blobHeaderKey)
+	if err != nil {
+		if errors.Is(err, kvstore.ErrNotFound) {
 			return nil, ErrKeyNotFound
 		}
 		return nil, err
@@ -347,26 +552,57 @@ func (s *Store) GetBlobHeader(ctx context.Context, batchHeaderHash [32]byte, blo
 	return data, nil
 }
 
-// GetChunks returns the list of byte arrays stored for given blobKey along with a boolean
-// indicating if the read was unsuccessful or the chunks were serialized correctly
-func (s *Store) GetChunks(ctx context.Context, batchHeaderHash [32]byte, blobIndex int, quorumID core.QuorumID) ([][]byte, node.ChunkEncoding, bool) {
+// GetChunks returns the list of byte arrays stored for given blobKey along with the encoding
+// format of the bytes.
+func (s *Store) GetChunks(ctx context.Context, batchHeaderHash [32]byte, blobIndex int, quorumID core.QuorumID) ([][]byte, node.ChunkEncodingFormat, error) {
 	log := s.logger
-
+	var err error
 	blobKey, err := EncodeBlobKey(batchHeaderHash, blobIndex, quorumID)
 	if err != nil {
-		return nil, node.ChunkEncoding_UNKNOWN, false
+		return nil, node.ChunkEncodingFormat_UNKNOWN, err
 	}
-	data, err := s.db.Get(blobKey)
+	var data []byte
+	data, err = s.db.Get(blobKey)
+	if errors.Is(err, kvstore.ErrNotFound) {
+		// If the blob is not found, try to get the blob header hash and get the blob by the hash (stored via minibatch dispersal).
+		var blobHeaderHash [32]byte
+		blobHeaderHash, err = s.GetBlobHeaderHashAtIndex(ctx, batchHeaderHash, blobIndex)
+		if err != nil {
+			return nil, node.ChunkEncodingFormat_UNKNOWN, err
+		}
+		var key []byte
+		key, err = EncodeBlobKeyByHash(blobHeaderHash, quorumID)
+		if err != nil {
+			return nil, node.ChunkEncodingFormat_UNKNOWN, fmt.Errorf("failed to generate the key for storing blob: %w", err)
+		}
+		data, err = s.db.Get(key)
+	}
+
 	if err != nil {
-		return nil, node.ChunkEncoding_UNKNOWN, false
+		return nil, node.ChunkEncodingFormat_UNKNOWN, err
 	}
-	log.Debug("Retrieved chunk", "blobKey", hexutil.Encode(blobKey), "length", len(data))
 
 	chunks, format, err := DecodeChunks(data)
 	if err != nil {
-		return nil, format, false
+		return nil, format, err
 	}
-	return chunks, format, true
+	log.Debug("Retrieved chunk", "blobKey", hexutil.Encode(blobKey), "length", len(data), "chunk encoding format", format)
+
+	return chunks, format, nil
+}
+
+func (s *Store) GetBlobHeaderHashAtIndex(ctx context.Context, batchHeaderHash [32]byte, blobIndex int) ([32]byte, error) {
+	var res [32]byte
+	blobIndexKey := EncodeBlobIndexKey(batchHeaderHash, blobIndex)
+	data, err := s.db.Get(blobIndexKey)
+	if err != nil {
+		if errors.Is(err, kvstore.ErrNotFound) {
+			return res, ErrKeyNotFound
+		}
+		return res, err
+	}
+	copy(res[:], data)
+	return res, nil
 }
 
 // HasKey returns if a given key has been stored.
@@ -380,7 +616,11 @@ func (s *Store) HasKey(ctx context.Context, key []byte) bool {
 // Note: caller should ensure these keys are exactly all the data items for a single batch
 // to maintain the integrity of the store.
 func (s *Store) DeleteKeys(ctx context.Context, keys *[][]byte) error {
-	return s.db.DeleteBatch(*keys)
+	batch := s.db.NewBatch()
+	for _, key := range *keys {
+		batch.Delete(key)
+	}
+	return batch.Apply()
 }
 
 // Flattens an array of byte arrays (chunks) into a single byte array
@@ -469,28 +709,28 @@ func parseHeader(data []byte) (core.BundleEncodingFormat, uint64, error) {
 
 // DecodeChunks converts a flattened array of chunks into an array of its constituent chunks,
 // throwing an error in case the chunks were not serialized correctly.
-func DecodeChunks(data []byte) ([][]byte, node.ChunkEncoding, error) {
+func DecodeChunks(data []byte) ([][]byte, node.ChunkEncodingFormat, error) {
 	// Empty chunk is valid, but there is nothing to decode.
 	if len(data) == 0 {
-		return [][]byte{}, node.ChunkEncoding_UNKNOWN, nil
+		return [][]byte{}, node.ChunkEncodingFormat_UNKNOWN, nil
 	}
 	format, _, err := parseHeader(data)
 	if err != nil {
-		return nil, node.ChunkEncoding_UNKNOWN, err
+		return nil, node.ChunkEncodingFormat_UNKNOWN, err
 	}
 
 	// Note: the encoding format IDs may not be the same as the field ID in protobuf.
-	// For example, GobBundleEncodingFormat is 1 but node.ChunkEncoding_GOB has proto
+	// For example, GobBundleEncodingFormat is 1 but node.ChunkEncodingFormat_GOB has proto
 	// field ID 2.
 	switch format {
 	case 0:
 		chunks, err := DecodeGobChunks(data)
-		return chunks, node.ChunkEncoding_GOB, err
+		return chunks, node.ChunkEncodingFormat_GOB, err
 	case 1:
 		chunks, err := DecodeGnarkChunks(data)
-		return chunks, node.ChunkEncoding_GNARK, err
+		return chunks, node.ChunkEncodingFormat_GNARK, err
 	default:
-		return nil, node.ChunkEncoding_UNKNOWN, errors.New("invalid data encoding format")
+		return nil, node.ChunkEncodingFormat_UNKNOWN, errors.New("invalid data encoding format")
 	}
 }
 

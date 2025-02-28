@@ -34,6 +34,12 @@ var _ dacommon.EthClient = (*MultiHomingClient)(nil)
 func NewMultiHomingClient(config EthClientConfig, senderAddress gethcommon.Address, logger logging.Logger) (*MultiHomingClient, error) {
 	rpcUrls := config.RPCURLs
 
+	if len(config.RPCURLs) > 1 {
+		logger.Info("Fallback chain RPC enabled")
+	} else {
+		logger.Info("Fallback chain RPC not available")
+	}
+
 	FailoverController, err := NewFailoverController(logger, rpcUrls)
 	if err != nil {
 		return nil, err

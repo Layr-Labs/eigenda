@@ -100,11 +100,13 @@ func (d *rateLimiter) checkAllowed(ctx context.Context, params common.RequestPar
 		}
 	}
 
+	bucketLevels := make([]time.Duration, len(d.globalRateParams.BucketSizes))
+
 	// Check whether the request is allowed based on the rate
 
 	// Get interval since last request
 	interval := time.Since(bucketParams.LastRequestTime)
-	bucketParams.LastRequestTime = time.Now().UTC()
+	lastRequestTime := time.Now().UTC()
 
 	// Calculate updated bucket levels
 	allowed := true
@@ -113,13 +115,11 @@ func (d *rateLimiter) checkAllowed(ctx context.Context, params common.RequestPar
 		// Determine bucket deduction
 		deduction := time.Microsecond * time.Duration(1e6*float32(params.BlobSize)/float32(params.Rate)/d.globalRateParams.Multipliers[i])
 
-		prevLevel := bucketParams.BucketLevels[i]
-
 		// Update the bucket level
-		bucketParams.BucketLevels[i] = getBucketLevel(bucketParams.BucketLevels[i], size, interval, deduction)
-		allowed = allowed && bucketParams.BucketLevels[i] > 0
+		bucketLevels[i] = getBucketLevel(bucketParams.BucketLevels[i], size, interval, deduction)
+		allowed = allowed && bucketLevels[i] > 0
 
-		d.logger.Debug("Bucket level updated", "key", params.RequesterID, "name", params.RequesterName, "prevLevel", prevLevel, "level", bucketParams.BucketLevels[i], "size", size, "interval", interval, "deduction", deduction, "allowed", allowed)
+		d.logger.Debug("Bucket level updated", "key", params.RequesterID, "name", params.RequesterName, "prevLevel", bucketParams.BucketLevels[i], "level", bucketLevels[i], "size", size, "interval", interval, "deduction", deduction, "allowed", allowed)
 
 		// Update metrics only if the requester name is provided. We're making
 		// an assumption that the requester name is only provided for authenticated
@@ -129,8 +129,13 @@ func (d *rateLimiter) checkAllowed(ctx context.Context, params common.RequestPar
 				"requester_id":   params.RequesterID,
 				"requester_name": params.RequesterName,
 				"bucket_index":   strconv.Itoa(i),
-			}).Set(float64(bucketParams.BucketLevels[i]))
+			}).Set(float64(bucketLevels[i]))
 		}
+	}
+
+	bucketParams = &common.RateBucketParams{
+		LastRequestTime: lastRequestTime,
+		BucketLevels:    bucketLevels,
 	}
 
 	return allowed, bucketParams

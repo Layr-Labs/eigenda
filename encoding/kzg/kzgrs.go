@@ -11,4 +11,5 @@ type KzgConfig struct {
 	SRSNumberToLoad uint64 // Number of points to be loaded from the beginning
 	Verbose         bool
 	PreloadEncoder  bool
+	LoadG2Points    bool
 }

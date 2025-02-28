@@ -28,6 +28,11 @@ func (v *MockShardValidator) ValidateBatch(batchHeader *core.BatchHeader, blobs 
 	return args.Error(0)
 }
 
+func (v *MockShardValidator) ValidateBlobs(blobs []*core.BlobMessage, operatorState *core.OperatorState, pool common.WorkerPool) error {
+	args := v.Called(blobs, operatorState, pool)
+	return args.Error(0)
+}
+
 func (v *MockShardValidator) UpdateOperatorID(operatorID core.OperatorID) {
 	v.Called(operatorID)
 }

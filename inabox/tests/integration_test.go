@@ -36,12 +36,12 @@ var _ = Describe("Inabox Integration", func() {
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
 		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
 
-		disp := clients.NewDisperserClient(&clients.Config{
+		disp, err := clients.NewDisperserClient(&clients.Config{
 			Hostname: "localhost",
 			Port:     "32003",
 			Timeout:  10 * time.Second,
 		}, signer)
-
+		Expect(err).To(BeNil())
 		Expect(disp).To(Not(BeNil()))
 
 		data := make([]byte, 1024)
@@ -67,8 +67,8 @@ var _ = Describe("Inabox Integration", func() {
 
 		var reply1 *disperserpb.BlobStatusReply
 		var reply2 *disperserpb.BlobStatusReply
-	loop:
-		for {
+
+		for loop := true; loop; {
 			select {
 			case <-ctx.Done():
 				Fail("timed out")
@@ -114,7 +114,7 @@ var _ = Describe("Inabox Integration", func() {
 				mineAnvilBlocks(numConfirmations + 1)
 				_, err = ethClient.EnsureTransactionEvaled(ctx, tx, "PostCommitment")
 				Expect(err).To(BeNil())
-				break loop
+				loop = false
 			}
 		}
 		Expect(*blobStatus1).To(Equal(disperser.Confirmed))
@@ -141,6 +141,15 @@ var _ = Describe("Inabox Integration", func() {
 			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
 			1, // retrieve blob 1 from quorum 1
 		)
+		Expect(err).To(BeNil())
+
+		_, err = retrievalClient.RetrieveBlob(ctx,
+			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+			reply1.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+			uint(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+			[32]byte(reply1.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+			2, // retrieve blob 1 from quorum 2
+		)
 		Expect(err).NotTo(BeNil())
 
 		retrieved, err = retrievalClient.RetrieveBlob(ctx,
@@ -160,21 +169,29 @@ var _ = Describe("Inabox Integration", func() {
 			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
 			1, // retrieve from quorum 1
 		)
+		Expect(err).To(BeNil())
+		_, err = retrievalClient.RetrieveBlob(ctx,
+			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeaderHash()),
+			reply2.GetInfo().GetBlobVerificationProof().GetBlobIndex(),
+			uint(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetReferenceBlockNumber()),
+			[32]byte(reply2.GetInfo().GetBlobVerificationProof().GetBatchMetadata().GetBatchHeader().GetBatchRoot()),
+			2, // retrieve from quorum 2
+		)
 		Expect(err).NotTo(BeNil())
 	})
 })
 
-func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.IEigenDAServiceManagerBlobHeader {
-	quorums := make([]rollupbindings.IEigenDAServiceManagerQuorumBlobParam, len(blobHeader.GetBlobQuorumParams()))
+func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.BlobHeader {
+	quorums := make([]rollupbindings.QuorumBlobParam, len(blobHeader.GetBlobQuorumParams()))
 	for i, quorum := range blobHeader.GetBlobQuorumParams() {
-		quorums[i] = rollupbindings.IEigenDAServiceManagerQuorumBlobParam{
+		quorums[i] = rollupbindings.QuorumBlobParam{
 			QuorumNumber:                    uint8(quorum.GetQuorumNumber()),
 			AdversaryThresholdPercentage:    uint8(quorum.GetAdversaryThresholdPercentage()),
 			ConfirmationThresholdPercentage: uint8(quorum.GetConfirmationThresholdPercentage()),
 			ChunkLength:                     quorum.ChunkLength,
 		}
 	}
-	return rollupbindings.IEigenDAServiceManagerBlobHeader{
+	return rollupbindings.BlobHeader{
 		Commitment: rollupbindings.BN254G1Point{
 			X: new(big.Int).SetBytes(blobHeader.GetCommitment().X),
 			Y: new(big.Int).SetBytes(blobHeader.GetCommitment().Y),
@@ -184,12 +201,12 @@ func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.IEig
 	}
 }
 
-func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificationProof) rollupbindings.EigenDARollupUtilsBlobVerificationProof {
+func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificationProof) rollupbindings.BlobVerificationProof {
 	batchMetadataProto := verificationProof.GetBatchMetadata()
 	batchHeaderProto := verificationProof.GetBatchMetadata().GetBatchHeader()
 	var batchRoot [32]byte
 	copy(batchRoot[:], batchHeaderProto.GetBatchRoot())
-	batchHeader := rollupbindings.IEigenDAServiceManagerBatchHeader{
+	batchHeader := rollupbindings.BatchHeader{
 		BlobHeadersRoot:       batchRoot,
 		QuorumNumbers:         batchHeaderProto.GetQuorumNumbers(),
 		SignedStakeForQuorums: batchHeaderProto.GetQuorumSignedPercentages(),
@@ -197,12 +214,12 @@ func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificat
 	}
 	var sig [32]byte
 	copy(sig[:], batchMetadataProto.GetSignatoryRecordHash())
-	batchMetadata := rollupbindings.IEigenDAServiceManagerBatchMetadata{
+	batchMetadata := rollupbindings.BatchMetadata{
 		BatchHeader:             batchHeader,
 		SignatoryRecordHash:     sig,
 		ConfirmationBlockNumber: batchMetadataProto.GetConfirmationBlockNumber(),
 	}
-	return rollupbindings.EigenDARollupUtilsBlobVerificationProof{
+	return rollupbindings.BlobVerificationProof{
 		BatchId:        verificationProof.GetBatchId(),
 		BlobIndex:      verificationProof.GetBlobIndex(),
 		BatchMetadata:  batchMetadata,

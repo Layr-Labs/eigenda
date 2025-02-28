@@ -12,14 +12,14 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/common/store"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
-	logger = logging.NewNoopLogger()
+	logger = testutils.GetLogger()
 
 	dockertestPool     *dockertest.Pool
 	dockertestResource *dockertest.Resource
@@ -27,7 +27,7 @@ var (
 	deployLocalStack bool
 	localStackPort   = "4566"
 
-	dynamoClient     *dynamodb.Client
+	dynamoClient     dynamodb.Client
 	dynamoParamStore common.KVStore[common.RateBucketParams]
 	bucketTableName  = "BucketStore"
 )
