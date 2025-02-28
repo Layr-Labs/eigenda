@@ -1,8 +1,9 @@
 package segment
 
 import (
+	"context"
 	"fmt"
-	"sync"
+	"math"
 	"sync/atomic"
 	"time"
 
@@ -10,10 +11,20 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
+// unflushedKeysInitialCapacity is the initial capacity of the unflushedKeys slice. This slice is used to store keys
+// that have been written to the segment but have not yet been flushed to disk.
+const unflushedKeysInitialCapacity = 128
+
+// shardControlChannelCapacity is the capacity of the channel used to send messages to the shard control loop.
+const shardControlChannelCapacity = 32
+
 // Segment is a chunk of data stored on disk. All data in a particular data segment is expired at the same time.
 //
-// This struct is not thread safe, access control must be handled by the caller.
+// This struct is not thread safe for operations that mutate the segment, access control must be handled by the caller.
 type Segment struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	// The logger for the segment.
 	logger logging.Logger
 
@@ -26,11 +37,21 @@ type Segment struct {
 	// This file contains the keys for the data segment, and is used for performing garbage collection on the key index.
 	keys *keyFile
 
-	// This file contains the values for the data segment.
-	values *valueFile
+	// The value files, one for each shard in the segment. Indexed by shard number.
+	shards []*valueFile
 
-	// lock controls access to the segment.
-	lock sync.RWMutex
+	// shardSizes is a list of the current sizes of each shard in the segment. Indexed by shard number.
+	shardSizes []uint64
+
+	// The maximum size of all shards in this segment.
+	maxShardSize uint64
+
+	// shardChannels is a list of channels used to send messages to the goroutine responsible for writing to
+	// each shard. Indexed by shard number.
+	shardChannels []chan any
+
+	// keyFileChannel is a channel used to send messages to the goroutine responsible for writing to the key file.
+	keyFileChannel chan any
 
 	// deletionMutex permits a caller to block until this segment is fully deleted. The channel has a capacity of 1, and
 	// there is an element in the channel up until the segment is fully deleted.
@@ -52,6 +73,7 @@ type Segment struct {
 // Note that shardingFactor and salt parameters are ignored if this is not a new segment. Segments loaded from
 // disk always use their original sharding factor and salt values
 func NewSegment(
+	ctx context.Context,
 	logger logging.Logger,
 	index uint32,
 	parentDirectory string,
@@ -77,17 +99,37 @@ func NewSegment(
 		return nil, fmt.Errorf("failed to open key file: %v", err)
 	}
 
-	values, err := newValueFile(logger, index, parentDirectory, metadata.sealed)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open value file: %v", err)
+	shards := make([]*valueFile, metadata.shardingFactor)
+	for shard := uint32(0); shard < metadata.shardingFactor; shard++ {
+		values, err := newValueFile(logger, index, shard, parentDirectory, metadata.sealed)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open value file: %v", err)
+		}
+		shards[shard] = values
 	}
 
+	shardSizes := make([]uint64, metadata.shardingFactor)
+
+	shardChannels := make([]chan any, metadata.shardingFactor)
+	for shard := uint32(0); shard < metadata.shardingFactor; shard++ {
+		shardChannels[shard] = make(chan any, shardControlChannelCapacity)
+	}
+
+	keyFileChannel := make(chan any, shardControlChannelCapacity*metadata.shardingFactor)
+
+	ctx, cancel := context.WithCancel(ctx)
+
 	segment := &Segment{
+		ctx:             ctx,
+		cancel:          cancel,
 		logger:          logger,
 		index:           index,
 		metadata:        metadata,
 		keys:            keys,
-		values:          values,
+		shards:          shards,
+		shardSizes:      shardSizes,
+		shardChannels:   shardChannels,
+		keyFileChannel:  keyFileChannel,
 		deletionChannel: make(chan struct{}, 1),
 	}
 
@@ -98,6 +140,15 @@ func NewSegment(
 	// have a reference to the segment.
 	segment.reservationCount.Store(1)
 
+	// If the segment is mutable, start up the control loops.
+	if !segment.IsSealed() {
+		for shard := uint32(0); shard < metadata.shardingFactor; shard++ {
+			go segment.shardControlLoop(shard)
+		}
+
+		go segment.keyFileControlLoop()
+	}
+
 	return segment, nil
 }
 
@@ -107,41 +158,48 @@ func (s *Segment) SetNextSegment(nextSegment *Segment) {
 	s.nextSegment = nextSegment
 }
 
-// Write records a key-value pair in the data segment, returning the resulting address of the data.
-//
-// This method does not ensure that the key-value pair is actually written to disk, only that it is recorded
-// in the data segment. Flush must be called to ensure that all data previously passed to Put is written to disk.
-func (s *Segment) Write(key []byte, value []byte) (address types.Address, err error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	address, err = s.values.write(value)
-	if err != nil {
-		return 0, fmt.Errorf("failed to write value: %v", err)
-	}
-
-	err = s.keys.write(key, address)
-	if err != nil {
-		return 0, fmt.Errorf("failed to write key: %v", err)
-	}
-
-	return address, nil
+// getShard returns the shard number for a key.
+func (s *Segment) getShard(key []byte) uint32 {
+	return hashKey(key, s.metadata.salt) % s.metadata.shardingFactor
 }
 
-// CurrentSize returns the current size of the data segment.
-func (s *Segment) CurrentSize() uint64 {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+// Write records a key-value pair in the data segment, returning the maximum size of all shards within this segment.
+//
+// This method does not ensure that the key-value pair is actually written to disk, only that it will eventually be
+// written to disk. Flush must be called to ensure that all data previously passed to Put is written to disk.
+func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
+	if s.metadata.sealed {
+		return 0, fmt.Errorf("segment is sealed, cannot write data")
+	}
 
-	return s.values.currentSize
+	shard := s.getShard(data.Key)
+
+	if s.shardSizes[shard] > math.MaxUint32 {
+		// No mater the configuration, we absolutely cannot permit a value to be written if the first byte of the
+		// value would be beyond position 2^32. This is because we only have 32 bits in an address to store the
+		// position of a value's first byte.
+		return 0,
+			fmt.Errorf("value file already contains %d bytes, cannot add a new value", s.shardSizes[shard])
+	}
+
+	s.shardSizes[shard] += uint64(len(data.Value)) + 4 /* uint32 length */
+	if s.shardSizes[shard] > s.maxShardSize {
+		s.maxShardSize = s.shardSizes[shard]
+	}
+
+	s.shardChannels[shard] <- data
+
+	return maxShardSize, nil
 }
 
 // Read fetches the data for a key from the data segment.
-func (s *Segment) Read(dataAddress types.Address) ([]byte, error) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+//
+// It is only thread safe to read from a segment if the key being read has previously been flushed to disk.
+func (s *Segment) Read(key []byte, dataAddress types.Address) ([]byte, error) {
+	shard := s.getShard(key)
+	values := s.shards[shard]
 
-	value, err := s.values.read(dataAddress)
+	value, err := values.read(dataAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read value: %v", err)
 	}
@@ -150,8 +208,9 @@ func (s *Segment) Read(dataAddress types.Address) ([]byte, error) {
 
 // GetKeys returns all keys in the data segment. Only permitted to be called after the segment has been sealed.
 func (s *Segment) GetKeys() ([]*types.KAPair, error) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
+	if !s.metadata.sealed {
+		return nil, fmt.Errorf("segment is not sealed, cannot read keys")
+	}
 
 	keys, err := s.keys.readKeys()
 	if err != nil {
@@ -160,62 +219,109 @@ func (s *Segment) GetKeys() ([]*types.KAPair, error) {
 	return keys, nil
 }
 
-// Flush writes the data segment to disk.
-func (s *Segment) Flush() error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	err := s.keys.flush()
-	if err != nil {
-		return fmt.Errorf("failed to flush key file: %v", err)
+// Flush writes the data segment to disk. Returns all keys that were flushed and are now durable on disk.
+func (s *Segment) Flush() ([]*types.KAPair, error) {
+	// Flush all shards.
+	shardResponseChannels := make([]chan error, s.metadata.shardingFactor)
+	for shard, shardChannel := range s.shardChannels {
+		shardResponseChannels[shard] = make(chan error, 1)
+		shardChannel <- shardFlushRequest{
+			completionChannel: shardResponseChannels[shard],
+		}
 	}
 
-	err = s.values.flush()
-	if err != nil {
-		return fmt.Errorf("failed to flush value file: %v", err)
+	// Wait for each shard to finish flushing.
+	for i := range s.shardChannels {
+		err := <-shardResponseChannels[i]
+		if err != nil {
+			return nil, fmt.Errorf("failed to flush shard %d: %v", i, err)
+		}
 	}
 
-	return nil
+	// Now that all shards have sent their key/address pairs to the key file, flush the key file.
+	keyResponseChannel := make(chan *keyFileFlushResponse, 1)
+	s.keyFileChannel <- keyFileFlushRequest{
+		completionChannel: keyResponseChannel,
+	}
+
+	// Wait for the key file to finish flushing.
+	response := <-keyResponseChannel
+	if response.err != nil {
+		return nil, fmt.Errorf("failed to flush key file: %v", response.err)
+	}
+
+	return response.addresses, nil
 }
 
-// Seal flushes all data to disk and finalizes the metadata. After this method is called, no more data can be written
-// to the data segment.
-func (s *Segment) Seal(now time.Time) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+// keyFileFlushRequest is a message sent to the key file control loop to request that it flush its data to disk.
+type keyFileFlushRequest struct {
+	// If true, seal the key file after flushing. If false, do not seal the key file.
+	seal bool
 
-	err := s.keys.seal()
-	if err != nil {
-		return fmt.Errorf("failed to seal key file: %v", err)
+	// As the key file finishes its flush, it will either send an error if something went wrong, or nil if the flush was
+	// successful.
+	completionChannel chan *keyFileFlushResponse
+}
+
+// keyFileFlushResponse is a message sent from the key file control loop to the caller of Flush to indicate that the
+// key file has been flushed.
+type keyFileFlushResponse struct {
+	// The error encountered during the flush, if any.
+	err       error
+	addresses []*types.KAPair
+}
+
+// Seal flushes all data to disk and finalizes the metadata. Returns addresses that became durable as a result of
+// this method call. After this method is called, no more data can be written to this segment.
+func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
+	// Flush+seal the shards
+	shardResponseChannels := make([]chan error, s.metadata.shardingFactor)
+	for _, shardChannel := range s.shardChannels {
+		responseChannel := make(chan error, 1)
+		shardChannel <- shardFlushRequest{
+			seal:              true,
+			completionChannel: responseChannel,
+		}
 	}
 
-	err = s.values.seal()
-	if err != nil {
-		return fmt.Errorf("failed to seal value file: %v", err)
+	// Wait for each shard to finish flushing.
+	for i := range s.shardChannels {
+		err := <-shardResponseChannels[i]
+		if err != nil {
+			return nil, fmt.Errorf("failed to flush shard %d: %v", i, err)
+		}
 	}
 
-	err = s.metadata.seal(now)
-	if err != nil {
-		return fmt.Errorf("failed to seal metadata file: %v", err)
+	// Flush+seal the key file
+	keyResponseChannel := make(chan *keyFileFlushResponse, 1)
+	s.keyFileChannel <- keyFileFlushRequest{
+		seal:              true,
+		completionChannel: keyResponseChannel,
 	}
 
-	return nil
+	// Wait for the key file to finish flushing.
+	response := <-keyResponseChannel
+	if response.err != nil {
+		return nil, fmt.Errorf("failed to flush key file: %v", response.err)
+	}
+
+	// Seal the metadata file.
+	err := s.metadata.seal(now)
+	if err != nil {
+		return nil, fmt.Errorf("failed to seal metadata file: %v", err)
+	}
+
+	return response.addresses, nil
 }
 
 // IsSealed returns true if the segment is sealed, and false otherwise.
 func (s *Segment) IsSealed() bool {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
 	return s.metadata.sealed
 }
 
 // GetSealTime returns the time at which the segment was sealed. If the file is not sealed, this method will return
 // the zero time.
 func (s *Segment) GetSealTime() time.Time {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
 	return time.Unix(0, int64(s.metadata.timestamp))
 }
 
@@ -264,9 +370,7 @@ func (s *Segment) BlockUntilFullyDeleted() {
 
 // delete deletes the segment from disk.
 func (s *Segment) delete() error {
-	s.lock.Lock()
 	defer func() {
-		s.lock.Unlock()
 		<-s.deletionChannel
 	}()
 
@@ -274,9 +378,11 @@ func (s *Segment) delete() error {
 	if err != nil {
 		return fmt.Errorf("failed to delete key file: %v", err)
 	}
-	err = s.values.delete()
-	if err != nil {
-		return fmt.Errorf("failed to delete value file: %v", err)
+	for _, shard := range s.shards {
+		err = shard.delete()
+		if err != nil {
+			return fmt.Errorf("failed to delete value file: %v", err)
+		}
 	}
 	err = s.metadata.delete()
 	if err != nil {
@@ -300,4 +406,154 @@ func (s *Segment) String() string {
 	}
 
 	return fmt.Sprintf("[seg %d - %s]", s.index, sealedString)
+}
+
+// shardControlLoop is the main loop for performing modifications to a particular shard. Each shard is managed
+// by its own goroutine, which is running this function.
+func (s *Segment) shardControlLoop(shard uint32) {
+	var shardError error
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			s.logger.Infof("segment %d shard %d control loop exiting, context cancelled", s.index, shard)
+		case operation := <-s.shardChannels[shard]:
+			// Handle flush requests, and possibly also seal the shard.
+			if flushRequest, ok := operation.(shardFlushRequest); ok {
+				shardError = s.handleShardFlushRequest(shard, flushRequest, shardError)
+			}
+
+			// If this shard has encountered an error, don't bother processing any other operations.
+			if shardError != nil {
+				s.logger.Warnf("shard %d is in an error state, ignoring operation: %v", shard, shardError)
+				continue
+			}
+
+			// Handle write requests.
+			if data, ok := operation.(*types.KVPair); ok {
+				// This is a request to write a value to the file.
+				shardError = s.handleShardWrite(shard, data)
+				continue
+			}
+
+			// If we reach this point, the operation type is unknown.
+			s.logger.Errorf("unknown operation type: %T", operation)
+		}
+	}
+}
+
+// shardFlushRequest is a message sent to shard control loops to request that they flush their data to disk.
+type shardFlushRequest struct {
+	// If true, seal the shard after flushing. If false, do not seal the shard.
+	seal bool
+
+	// As each shard finishes its flush, it will either send an error if something went wrong, or nil if the flush was
+	// successful.
+	completionChannel chan error
+}
+
+// handleShardFlushRequest handles a request to flush a shard to disk.
+func (s *Segment) handleShardFlushRequest(shard uint32, request shardFlushRequest, shardError error) error {
+	if shardError != nil {
+		// Report an error previously encountered
+		request.completionChannel <- shardError
+		return shardError
+	}
+
+	err := s.shards[shard].flush()
+	if err != nil {
+		request.completionChannel <- fmt.Errorf("failed to flush value file: %v", err)
+	}
+
+	if request.seal {
+		err = s.shards[shard].seal()
+		if err != nil {
+			request.completionChannel <- fmt.Errorf("failed to seal value file: %v", err)
+			return err
+		}
+	}
+
+	request.completionChannel <- nil
+	return err
+}
+
+// handleShardWrite applies a single write operation to a shard.
+func (s *Segment) handleShardWrite(shard uint32, data *types.KVPair) error {
+	address, err := s.shards[shard].write(data.Value)
+	if err != nil {
+		s.logger.Errorf("failed to write value: %v", err)
+		return err
+	}
+
+	// Forward the address to the key file control loop.
+	s.keyFileChannel <- &types.KAPair{
+		Key:     data.Key,
+		Address: address,
+	}
+
+	return nil
+}
+
+// keyFileControlLoop is the main loop for performing modifications to the key file. This goroutine is responsible
+// for writing key-address pairs to the key file.
+func (s *Segment) keyFileControlLoop() {
+	var keyFileError error
+
+	unflushedKeys := make([]*types.KAPair, 0, unflushedKeysInitialCapacity)
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			s.logger.Infof("segment %d key file control loop exiting, context cancelled", s.index)
+			return
+		case operation := <-s.keyFileChannel:
+			// Handle flush requests, and possibly also seal the key file.
+			if flushRequest, ok := operation.(keyFileFlushRequest); ok {
+				keyFileError = s.handleKeyFileFlushRequest(flushRequest, unflushedKeys)
+				unflushedKeys = make([]*types.KAPair, 0, unflushedKeysInitialCapacity)
+			}
+
+			// If the key file is in an error state, don't bother processing any other operations.
+			if keyFileError != nil {
+				s.logger.Warnf("key file is in an error state, ignoring operation: %v", keyFileError)
+				continue
+			}
+
+			// Handle requests to write to the key file.
+			if data, ok := operation.(*types.KAPair); ok {
+				keyFileError = s.handleKeyFileWrite(data)
+				unflushedKeys = append(unflushedKeys, data)
+				continue
+			}
+
+			// If we reach this point, the operation type is unknown.
+			s.logger.Errorf("unknown operation type: %T", operation)
+		}
+	}
+}
+
+// handleKeyFileWrite writes a key to the key file.
+func (s *Segment) handleKeyFileWrite(data *types.KAPair) error {
+	err := s.keys.write(data.Key, data.Address)
+	if err != nil {
+		s.logger.Errorf("failed to write key to key file: %v", err)
+	}
+	return err
+}
+
+// handleKeyFileFlushRequest handles a request to flush the key file to disk.
+func (s *Segment) handleKeyFileFlushRequest(request keyFileFlushRequest, unflushedKeys []*types.KAPair) error {
+	err := s.keys.flush()
+	if err != nil {
+		request.completionChannel <- &keyFileFlushResponse{
+			err: err,
+		}
+		return err
+	}
+
+	request.completionChannel <- &keyFileFlushResponse{
+		addresses: unflushedKeys,
+	}
+
+	return nil
 }

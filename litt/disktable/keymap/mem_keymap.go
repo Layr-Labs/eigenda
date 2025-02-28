@@ -93,7 +93,7 @@ func (m *memKeymap) LoadFromSegments(
 			key := keys[keyIndex]
 
 			if !isValid {
-				_, err = segments[segmentIndex].Read(key.Address)
+				_, err = segments[segmentIndex].Read(key.Key, key.Address)
 				if err == nil {
 					// we found a valid key/value pair. All subsequent keys are valid.
 					isValid = true

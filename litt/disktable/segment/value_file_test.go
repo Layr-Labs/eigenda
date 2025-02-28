@@ -17,6 +17,7 @@ func TestWriteThenReadValues(t *testing.T) {
 	directory := t.TempDir()
 
 	index := rand.Uint32()
+	shard := rand.Uint32()
 	valueCount := rand.Int32Range(100, 200)
 	values := make([][]byte, valueCount)
 	for i := 0; i < int(valueCount); i++ {
@@ -25,7 +26,7 @@ func TestWriteThenReadValues(t *testing.T) {
 
 	addressMap := make(map[types.Address][]byte)
 
-	file, err := newValueFile(logger, index, directory, false)
+	file, err := newValueFile(logger, index, shard, directory, false)
 	require.NoError(t, err)
 
 	for _, value := range values {
@@ -79,6 +80,7 @@ func TestReadingTruncatedValueFile(t *testing.T) {
 	directory := t.TempDir()
 
 	index := rand.Uint32()
+	shard := rand.Uint32()
 	valueCount := rand.Int32Range(100, 200)
 	values := make([][]byte, valueCount)
 	for i := 0; i < int(valueCount); i++ {
@@ -87,7 +89,7 @@ func TestReadingTruncatedValueFile(t *testing.T) {
 
 	addressMap := make(map[types.Address][]byte)
 
-	file, err := newValueFile(logger, index, directory, false)
+	file, err := newValueFile(logger, index, shard, directory, false)
 	require.NoError(t, err)
 
 	var lastAddress types.Address
@@ -115,7 +117,7 @@ func TestReadingTruncatedValueFile(t *testing.T) {
 	err = os.WriteFile(filePath, bytes, 0644)
 	require.NoError(t, err)
 
-	file, err = newValueFile(logger, index, directory, true)
+	file, err = newValueFile(logger, index, shard, directory, true)
 	require.NoError(t, err)
 
 	// We should be able to read all values except for the last one.
@@ -137,7 +139,7 @@ func TestReadingTruncatedValueFile(t *testing.T) {
 	err = os.WriteFile(filePath, bytes, 0644)
 	require.NoError(t, err)
 
-	file, err = newValueFile(logger, index, directory, true)
+	file, err = newValueFile(logger, index, shard, directory, true)
 	require.NoError(t, err)
 
 	// We should be able to read all values except for the last one.

@@ -18,9 +18,6 @@ import (
 
 var _ litt.ManagedTable = (*DiskTable)(nil)
 
-// keysPendingFlushInitialCapacity is the initial capacity of the keysPendingFlush slice.
-const keysPendingFlushInitialCapacity = 64
-
 // segmentDirectory is the directory where segment files are stored, relative to the root directory.
 const segmentDirectory = "segments"
 
@@ -56,11 +53,6 @@ type DiskTable struct {
 	// unflushedDataCache is a map of keys to their values that may not have been flushed to disk yet. This is used as a
 	// lookup table when data is requested from the table before it has been flushed to disk.
 	unflushedDataCache sync.Map
-
-	// keysPendingFlush is a list keys that have not yet been flushed out to the key map. A key is only eligible
-	// to be flushed to the key map after its value has been written to disk. This is important! If write a key
-	// first then crash before writing the value, then the key will be dangling in the key map.
-	keysPendingFlush []*types.KAPair
 
 	// The index of the lowest numbered segment. After initial creation, only the garbage collection
 	// thread is permitted to read/write this value  for the sake of thread safety.
@@ -170,7 +162,6 @@ func NewDiskTable(
 		metadata:                metadata,
 		salt:                    salt,
 		keyMap:                  keyMap,
-		keysPendingFlush:        make([]*types.KAPair, 0, keysPendingFlushInitialCapacity),
 		targetFileSize:          targetFileSize,
 		segments:                make(map[uint32]*segment.Segment),
 		controllerChan:          make(chan any, controlChannelSize),
@@ -182,6 +173,7 @@ func NewDiskTable(
 
 	table.lowestSegmentIndex, table.highestSegmentIndex, table.segments, err =
 		segment.GatherSegmentFiles(
+			ctx,
 			logger,
 			table.segmentDirectory,
 			timeSource(),
@@ -349,7 +341,7 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 	defer seg.Release()
 
 	// Read the data from disk.
-	data, err := seg.Read(address)
+	data, err := seg.Read(key, address)
 
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to read data: %v", err)
@@ -404,15 +396,13 @@ func (d *DiskTable) handleWriteRequest(req *writeRequest) {
 	for _, kv := range req.values {
 		// Do the write.
 		seg := d.segments[d.highestSegmentIndex]
-		address, err := seg.Write(kv.Key, kv.Value)
+		shardSize, err := seg.Write(kv)
 		if err != nil {
 			d.panic(fmt.Errorf("failed to write to segment %d: %v", d.highestSegmentIndex, err))
 		}
 
-		d.keysPendingFlush = append(d.keysPendingFlush, &types.KAPair{Key: kv.Key, Address: address})
-
 		// Check to see if the write caused the mutable segment to become full.
-		if d.segments[d.highestSegmentIndex].CurrentSize() > uint64(d.targetFileSize) {
+		if shardSize > uint64(d.targetFileSize) {
 			// Mutable segment is full. Before continuing, we need to expand the segments.
 			err = d.expandSegments()
 			if err != nil {
@@ -436,20 +426,27 @@ func (d *DiskTable) panic(err error) {
 func (d *DiskTable) expandSegments() error {
 	// Seal the previous segment.
 	now := d.timeSource()
-	err := d.segments[d.highestSegmentIndex].Seal(now)
+	durableKeys, err := d.segments[d.highestSegmentIndex].Seal(now)
 	if err != nil {
 		return fmt.Errorf("failed to seal segment %d: %v", d.highestSegmentIndex, err)
 	}
 
-	// All keys are now eligible to be flushed.
-	err = d.flushKeys()
+	// Flush the keys that are now durable in the segment.
+	err = d.flushKeys(durableKeys)
 	if err != nil {
 		return fmt.Errorf("failed to flush keys: %v", err)
 	}
 
 	// Create a new segment.
-	newSegment, err :=
-		segment.NewSegment(d.logger, d.highestSegmentIndex+1, d.segmentDirectory, now, d.metadata.GetShardingFactor(), d.salt, false)
+	newSegment, err := segment.NewSegment(
+		d.ctx,
+		d.logger,
+		d.highestSegmentIndex+1,
+		d.segmentDirectory,
+		now,
+		d.metadata.GetShardingFactor(),
+		d.salt,
+		false)
 	if err != nil {
 		d.segmentLock.Unlock()
 		return fmt.Errorf("failed to create new segment: %v", err)
@@ -487,18 +484,17 @@ type flushRequest struct {
 	responseChan chan error
 }
 
-// TODO parallel flush, why not
-
 // handleFlushRequest handles a flushRequest control message.
 func (d *DiskTable) handleFlushRequest(req *flushRequest) {
-	err := d.segments[d.highestSegmentIndex].Flush()
+	durableKeys, err := d.segments[d.highestSegmentIndex].Flush()
+
 	if err != nil {
 		err = fmt.Errorf("failed to flush mutable segment: %v", err)
 		req.responseChan <- err
 		return
 	}
 
-	err = d.flushKeys()
+	err = d.flushKeys(durableKeys)
 	if err != nil {
 		err = fmt.Errorf("failed to flush keys: %v", err)
 		d.panic(err)
@@ -510,24 +506,23 @@ func (d *DiskTable) handleFlushRequest(req *flushRequest) {
 }
 
 // flushKeys flushes all keys to the key map. As they are flushed, it also removes them from the unflushedDataCache.
-func (d *DiskTable) flushKeys() error {
-	if len(d.keysPendingFlush) == 0 {
+func (d *DiskTable) flushKeys(keys []*types.KAPair) error {
+	if len(keys) == 0 {
+		// Nothing to flush.
 		return nil
 	}
 
-	err := d.keyMap.Put(d.keysPendingFlush)
+	err := d.keyMap.Put(keys)
 	if err != nil {
 		return fmt.Errorf("failed to flush keys: %v", err)
 	}
 
-	// This method will only be called when all values have been written to disk. Since we just flushed the keys,
-	// it is now the case that a caller to Get() can fetch data using the key map and the files on disk. So
-	// it's safe to remove the keys from the unflushedDataCache.
-	for _, ka := range d.keysPendingFlush {
+	// Keys are now durably written to both the segment and the key map. It is therefore safe to remove them from the
+	// unflushed data cache.
+	for _, ka := range keys {
 		d.unflushedDataCache.Delete(string(ka.Key))
 	}
 
-	d.keysPendingFlush = make([]*types.KAPair, 0, keysPendingFlushInitialCapacity)
 	return nil
 }
 
@@ -559,9 +554,15 @@ func (d *DiskTable) controlLoop() {
 // shutdownTasks performs tasks necessary to cleanly shut down the disk table.
 func (d *DiskTable) shutdownTasks() {
 	// Seal the mutable segment
-	err := d.segments[d.highestSegmentIndex].Seal(d.timeSource())
+	durableKeys, err := d.segments[d.highestSegmentIndex].Seal(d.timeSource())
 	if err != nil {
 		d.logger.Errorf("failed to seal mutable segment: %v", err)
+	}
+
+	// Flush the keys that are now durable in the segment.
+	err = d.flushKeys(durableKeys)
+	if err != nil {
+		d.logger.Errorf("failed to flush keys: %v", err)
 	}
 
 	// Stop the key map
