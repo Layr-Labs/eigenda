@@ -1,120 +1,164 @@
 package segment
 
-// TODO
+import (
+	"context"
+	"os"
+	"testing"
+	"time"
 
-//// countFilesInDirectory returns the number of files in the given directory.
-//func countFilesInDirectory(t *testing.T, directory string) int {
-//	files, err := os.ReadDir(directory)
-//	require.NoError(t, err)
-//	return len(files)
-//}
-//
-//func TestWriteAndReadSegmentSingleShard(t *testing.T) {
-//	rand := random.NewTestRandom()
-//	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-//	require.NoError(t, err)
-//	directory := t.TempDir()
-//
-//	index := rand.Uint32()
-//	valueCount := rand.Int32Range(100, 200)
-//	keys := make([]*types.KAPair, valueCount)
-//	values := make([][]byte, valueCount)
-//	for i := 0; i < int(valueCount); i++ {
-//		key := rand.VariableBytes(1, 100)
-//		keys[i] = &types.KAPair{Key: key}
-//		values[i] = rand.VariableBytes(1, 100)
-//	}
-//
-//	addressMap := make(map[types.Address][]byte)
-//
-//	seg, err := NewSegment(
-//		context.Background(),
-//		logger,
-//		index,
-//		directory,
-//		time.Now(),
-//		1,
-//		rand.Uint32(),
-//		false)
-//
-//	require.NoError(t, err)
-//
-//	// Write values to the segment.
-//	for i := 0; i < int(valueCount); i++ {
-//		key := keys[i]
-//		value := values[i]
-//
-//		key.Address, err = seg.Write(key.Key, value)
-//		require.NoError(t, err)
-//		addressMap[key.Address] = value
-//
-//		// Occasionally flush the segment to disk.
-//		if rand.BoolWithProbability(0.25) {
-//			err := seg.Flush()
-//			require.NoError(t, err)
-//		}
-//
-//		// Occasionally scan all addresses and values in the segment.
-//		if rand.BoolWithProbability(0.1) {
-//			err := seg.Flush()
-//			require.NoError(t, err)
-//			for addr, val := range addressMap {
-//				readValue, err := seg.Read(addr)
-//				require.NoError(t, err)
-//				require.Equal(t, val, readValue)
-//			}
-//		}
-//	}
-//
-//	// Seal the segment and read all keys and values.
-//	require.False(t, seg.IsSealed())
-//	sealTime := rand.Time()
-//	err = seg.Seal(sealTime)
-//	require.NoError(t, err)
-//	require.True(t, seg.IsSealed())
-//
-//	require.Equal(t, sealTime.UnixNano(), seg.GetSealTime().UnixNano())
-//
-//	for addr, val := range addressMap {
-//		readValue, err := seg.Read(addr)
-//		require.NoError(t, err)
-//		require.Equal(t, val, readValue)
-//	}
-//
-//	keysFromSegment, err := seg.GetKeys()
-//	require.NoError(t, err)
-//	require.Equal(t, keys, keysFromSegment)
-//
-//	expectedSize := uint64(0)
-//	for _, value := range values {
-//		expectedSize += uint64(len(value)) + 4
-//	}
-//	require.Equal(t, expectedSize, seg.CurrentSize())
-//
-//	// Reopen the segment and read all keys and values.
-//	seg2, err := NewSegment(logger, index, directory, time.Now(), false)
-//	require.NoError(t, err)
-//	require.True(t, seg2.IsSealed())
-//
-//	require.Equal(t, sealTime.UnixNano(), seg2.GetSealTime().UnixNano())
-//
-//	for addr, val := range addressMap {
-//		readValue, err := seg2.Read(addr)
-//		require.NoError(t, err)
-//		require.Equal(t, val, readValue)
-//	}
-//
-//	keysFromSegment2, err := seg2.GetKeys()
-//	require.NoError(t, err)
-//	require.Equal(t, keys, keysFromSegment2)
-//
-//	require.Equal(t, expectedSize, seg2.CurrentSize())
-//
-//	// delete the segment
-//	require.Equal(t, 3, countFilesInDirectory(t, directory))
-//
-//	err = seg.delete()
-//	require.NoError(t, err)
-//
-//	require.Equal(t, 0, countFilesInDirectory(t, directory))
-//}
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/stretchr/testify/require"
+)
+
+// countFilesInDirectory returns the number of files in the given directory.
+func countFilesInDirectory(t *testing.T, directory string) int {
+	files, err := os.ReadDir(directory)
+	require.NoError(t, err)
+	return len(files)
+}
+
+func TestWriteAndReadSegmentSingleShard(t *testing.T) {
+	rand := random.NewTestRandom()
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+	directory := t.TempDir()
+
+	index := rand.Uint32()
+	valueCount := rand.Int32Range(1000, 2000)
+	keys := make([][]byte, valueCount)
+	values := make([][]byte, valueCount)
+	for i := 0; i < int(valueCount); i++ {
+		key := rand.VariableBytes(1, 100)
+		keys[i] = key
+		values[i] = rand.VariableBytes(1, 100)
+	}
+
+	// a map from keys to values
+	expectedValues := make(map[string][]byte)
+
+	// a map from keys to addresses
+	addressMap := make(map[string]types.Address)
+
+	expectedLargestShardSize := uint64(0)
+
+	salt := rand.Uint32()
+	seg, err := NewSegment(
+		context.Background(),
+		logger,
+		index,
+		directory,
+		time.Now(),
+		1,
+		salt,
+		false)
+
+	require.NoError(t, err)
+
+	// Write values to the segment.
+	for i := 0; i < int(valueCount); i++ {
+		key := keys[i]
+		value := values[i]
+		expectedValues[string(key)] = value
+
+		expectedLargestShardSize += uint64(len(value)) + 4 /* uint32 length */
+
+		largestShardSize, err := seg.Write(&types.KVPair{Key: key, Value: value})
+		require.NoError(t, err)
+		require.Equal(t, expectedLargestShardSize, largestShardSize)
+
+		// Occasionally flush the segment to disk.
+		if rand.BoolWithProbability(0.25) {
+			flushedKeys, err := seg.Flush()
+			require.NoError(t, err)
+			for _, flushedKey := range flushedKeys {
+				addressMap[string(flushedKey.Key)] = flushedKey.Address
+			}
+
+			// after flushing, the address map should be the same size as the expected values map
+			require.Equal(t, len(expectedValues), len(addressMap))
+		}
+
+		// Occasionally scan all addresses and values in the segment.
+		if rand.BoolWithProbability(0.1) {
+			flushedKeys, err := seg.Flush()
+			require.NoError(t, err)
+			for _, flushedKey := range flushedKeys {
+				addressMap[string(flushedKey.Key)] = flushedKey.Address
+			}
+
+			// after flushing, the address map should be the same size as the expected values map
+			require.Equal(t, len(expectedValues), len(addressMap))
+
+			for k, addr := range addressMap {
+				readValue, err := seg.Read([]byte(k), addr)
+				require.NoError(t, err)
+				require.Equal(t, expectedValues[k], readValue)
+			}
+		}
+	}
+
+	// Seal the segment and read all keys and values.
+	require.False(t, seg.IsSealed())
+	sealTime := rand.Time()
+	flushedKeys, err := seg.Seal(sealTime)
+	require.NoError(t, err)
+	require.True(t, seg.IsSealed())
+
+	for _, flushedKey := range flushedKeys {
+		addressMap[string(flushedKey.Key)] = flushedKey.Address
+	}
+
+	// after flushing, the address map should be the same size as the expected values map
+	require.Equal(t, len(expectedValues), len(addressMap))
+
+	require.Equal(t, sealTime.UnixNano(), seg.GetSealTime().UnixNano())
+
+	for k, addr := range addressMap {
+		readValue, err := seg.Read([]byte(k), addr)
+		require.NoError(t, err)
+		require.Equal(t, expectedValues[k], readValue)
+	}
+
+	keysFromSegment, err := seg.GetKeys()
+	require.NoError(t, err)
+	for i, ka := range keysFromSegment {
+		require.Equal(t, ka.Key, keysFromSegment[i])
+	}
+
+	// Reopen the segment and read all keys and values.
+	seg2, err := NewSegment(
+		context.Background(),
+		logger,
+		index,
+		directory,
+		time.Now(),
+		1,
+		salt,
+		false)
+	require.NoError(t, err)
+	require.True(t, seg2.IsSealed())
+
+	require.Equal(t, sealTime.UnixNano(), seg2.GetSealTime().UnixNano())
+
+	for k, addr := range addressMap {
+		readValue, err := seg2.Read([]byte(k), addr)
+		require.NoError(t, err)
+		require.Equal(t, expectedValues[k], readValue)
+	}
+
+	keysFromSegment2, err := seg2.GetKeys()
+	require.NoError(t, err)
+	require.Equal(t, keysFromSegment, keysFromSegment2)
+
+	require.Equal(t, keys, keysFromSegment2)
+
+	// delete the segment
+	require.Equal(t, 3, countFilesInDirectory(t, directory))
+
+	err = seg.delete()
+	require.NoError(t, err)
+
+	require.Equal(t, 0, countFilesInDirectory(t, directory))
+}
