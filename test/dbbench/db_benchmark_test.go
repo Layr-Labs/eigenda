@@ -3,6 +3,7 @@ package dbbench
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 
 type writer func(key []byte, value []byte) error
 
-const totalToWrite = 10 * units.GiB
+const totalToWrite = 1024 * units.GiB
 const dataSize = 1 * units.MiB
 const batchSize = 100
 
@@ -118,10 +119,86 @@ func TestLevelDBWrite(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestLevelDBNoCompactionWrite(t *testing.T) {
+	directory := "./test-data"
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	require.NoError(t, err)
+
+	config := tablestore.DefaultLevelDBConfig(directory)
+	config.DisableCompaction = true
+	config.Schema = []string{"test"}
+	db, err := tablestore.Start(logger, config)
+	require.NoError(t, err)
+
+	keyBuilder, err := db.GetKeyBuilder("test")
+	require.NoError(t, err)
+
+	batch := db.NewBatch()
+
+	writeFunction := func(key []byte, value []byte) error {
+		batch.Put(keyBuilder.Key(key), value)
+		if batch.Size() >= batchSize {
+			err = batch.Apply()
+			if err != nil {
+				return err
+			}
+			batch = db.NewBatch()
+		}
+
+		return nil
+	}
+
+	runWriteBenchmark(t, writeFunction, totalToWrite, dataSize)
+
+	err = db.Shutdown()
+	require.NoError(t, err)
+}
+
 func TestLittDBWrite(t *testing.T) {
 	directory := "./test-data"
 
 	config := littbuilder.DefaultConfig(directory)
+
+	db, err := config.Build(context.Background())
+	require.NoError(t, err)
+
+	err = db.Start()
+	require.NoError(t, err)
+
+	table, err := db.GetTable("test")
+	require.NoError(t, err)
+
+	unflushedCount := uint32(0)
+
+	writeFunction := func(key []byte, value []byte) error {
+		err = table.Put(key, value)
+		if err != nil {
+			return err
+		}
+
+		unflushedCount++
+		if unflushedCount >= batchSize {
+			err = table.Flush()
+			if err != nil {
+				return err
+			}
+			unflushedCount = 0
+		}
+
+		return nil
+	}
+
+	runWriteBenchmark(t, writeFunction, totalToWrite, dataSize)
+
+	err = db.Stop()
+	require.NoError(t, err)
+}
+
+func TestLittDBWithGCWrite(t *testing.T) {
+	directory := "./test-data"
+
+	config := littbuilder.DefaultConfig(directory)
+	config.GCPeriod = 2 * time.Hour
 
 	db, err := config.Build(context.Background())
 	require.NoError(t, err)
@@ -230,6 +307,74 @@ func TestBadgerDBWrite(t *testing.T) {
 	}
 
 	runWriteBenchmark(t, writeFunction, totalToWrite, dataSize)
+
+	err = db.Close()
+	require.NoError(t, err)
+}
+
+func TestBadgerDBWithGCWrite(t *testing.T) {
+	directory := "./test-data"
+	opts := badger.DefaultOptions(directory)
+
+	opts.Logger = nil
+	db, err := badger.Open(opts)
+	require.NoError(t, err)
+
+	batch := db.NewWriteBatch()
+	objectsInBatch := 0
+
+	ttl := 2 * time.Hour
+
+	writeFunction := func(key []byte, value []byte) error {
+
+		now := time.Now()
+		expiresAt := now.Add(ttl)
+
+		err = batch.SetEntry(&badger.Entry{
+			Key:       key,
+			Value:     value,
+			ExpiresAt: uint64(expiresAt.Unix()),
+		})
+
+		if err != nil {
+			return err
+		}
+		objectsInBatch++
+
+		if objectsInBatch >= batchSize {
+			err = batch.Flush()
+			if err != nil {
+				return err
+			}
+			batch = db.NewWriteBatch()
+			objectsInBatch = 0
+		}
+
+		return nil
+	}
+
+	// Start the garbage collector goroutine.
+	alive := atomic.Bool{}
+	alive.Store(true)
+	gcDone := make(chan struct{})
+	ticker := time.NewTicker(5 * time.Minute)
+	go func() {
+		defer func() {
+			gcDone <- struct{}{}
+		}()
+		for alive.Load() {
+			<-ticker.C
+
+			err := db.RunValueLogGC(0.5)
+			if err != nil {
+				fmt.Printf("Error running GC: %v\n", err)
+			}
+		}
+	}()
+
+	runWriteBenchmark(t, writeFunction, totalToWrite, dataSize)
+	alive.Store(false)
+	<-gcDone
 
 	err = db.Close()
 	require.NoError(t, err)

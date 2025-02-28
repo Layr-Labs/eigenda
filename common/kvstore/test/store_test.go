@@ -1,6 +1,10 @@
 package test
 
 import (
+	"math/rand"
+	"os"
+	"testing"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
@@ -9,9 +13,6 @@ import (
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/assert"
-	"math/rand"
-	"os"
-	"testing"
 )
 
 // A list of builders for various stores to be tested.
@@ -20,7 +21,7 @@ var storeBuilders = []func(logger logging.Logger, path string) (kvstore.Store[[]
 		return mapstore.NewStore(), nil
 	},
 	func(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
-		return leveldb.NewStore(logger, path)
+		return leveldb.NewStore(logger, false, path)
 	},
 	func(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
 		config := tablestore.DefaultMapStoreConfig()
