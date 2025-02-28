@@ -73,7 +73,7 @@ func buildMemKeyDiskTable(
 		segmentsPath,
 		uint32(100), // intentionally use a very small segment size
 		10,
-		1,
+		4,
 		1234,
 		1*time.Millisecond)
 
@@ -110,7 +110,7 @@ func buildLevelDBKeyDiskTable(
 		segmentsPath,
 		uint32(100), // intentionally use a very small segment size
 		10,
-		1,
+		4,
 		1234,
 		1*time.Millisecond)
 
