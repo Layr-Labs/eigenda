@@ -1,7 +1,6 @@
 package clients
 
 import (
-	"errors"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
@@ -10,11 +9,6 @@ import (
 
 // PayloadClientConfig contains configuration values that are needed by both PayloadRetriever and PayloadDisperser
 type PayloadClientConfig struct {
-	// The payload encoding version to use when encoding payload bytes
-	//
-	// This is the version that is put into the header of the EncodedPayload.
-	PayloadEncodingVersion codecs.PayloadEncodingVersion
-
 	// PayloadPolynomialForm is the initial form of a Payload after being encoded. The configured form does not imply
 	// any restrictions on the contents of a payload: it merely dictates how payload data is treated after being
 	// encoded.
@@ -29,16 +23,6 @@ type PayloadClientConfig struct {
 	// commitment) then it will not be possible to create a commitment opening: the blob will need to be supplied in its
 	// entirety to perform a verification that any part of the data matches the KZG commitment.
 	PayloadPolynomialForm codecs.PolynomialForm
-
-	// The timeout duration for contract calls
-	ContractCallTimeout time.Duration
-
-	// BlockNumberPollInterval is how frequently to check latest block number when waiting for the internal eth client
-	// to advance to a certain block.
-	//
-	// If this is configured to be <= 0, then contract calls which require the internal eth client to have reached a
-	// certain block height will fail if the internal client is behind.
-	BlockNumberPollInterval time.Duration
 
 	// The BlobVersion to use when creating new blobs, or interpreting blob bytes.
 	//
@@ -64,15 +48,6 @@ type ValidatorPayloadRetrieverConfig struct {
 	// The timeout duration for retrieving chunks from a given quorum, and reassembling the chunks into a blob.
 	// Once this timeout triggers, the retriever will give up on the quorum, and retry with the next quorum (if one exists)
 	RetrievalTimeout time.Duration
-
-	// The address of the BlsOperatorStateRetriever contract
-	BlsOperatorStateRetrieverAddr string
-
-	// The address of the EigenDAServiceManager contract
-	EigenDAServiceManagerAddr string
-
-	// The maximum number of simultaneous connections to use when fetching chunks during validator retrieval
-	MaxConnectionCount uint
 }
 
 // PayloadDisperserConfig contains an embedded PayloadClientConfig, plus all additional configuration values needed
@@ -91,42 +66,17 @@ type PayloadDisperserConfig struct {
 	// BlobStatusPollInterval is the tick rate for the PayloadDisperser to use, while polling the disperser with
 	// GetBlobStatus.
 	BlobStatusPollInterval time.Duration
+
+	// The timeout duration for contract calls
+	ContractCallTimeout time.Duration
 }
 
 // GetDefaultPayloadClientConfig creates a PayloadClientConfig with default values
-//
-// NOTE: EigenDACertVerifierAddr does not have a defined default. It must always be specifically configured.
 func GetDefaultPayloadClientConfig() *PayloadClientConfig {
 	return &PayloadClientConfig{
-		PayloadEncodingVersion:  codecs.PayloadEncodingVersion0,
-		PayloadPolynomialForm:   codecs.PolynomialFormEval,
-		ContractCallTimeout:     5 * time.Second,
-		BlockNumberPollInterval: 1 * time.Second,
-		BlobVersion:             0,
+		PayloadPolynomialForm: codecs.PolynomialFormEval,
+		BlobVersion:           0,
 	}
-}
-
-// checkAndSetDefaults checks an existing config struct. It performs one of the following actions for any contained 0 values:
-//
-// 1. If 0 is an acceptable value for the field, do nothing.
-// 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
-// 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
-func (cc *PayloadClientConfig) checkAndSetDefaults() error {
-	// BlobEncodingVersion may be 0, so don't do anything
-
-	// Nothing to do for PayloadPolynomialForm
-
-	defaultConfig := GetDefaultPayloadClientConfig()
-
-	if cc.ContractCallTimeout == 0 {
-		cc.ContractCallTimeout = defaultConfig.ContractCallTimeout
-	}
-
-	// BlockNumberPollInterval may be 0, so don't do anything
-
-	// BlobVersion may be 0, so don't do anything
-
-	return nil
 }
 
 // GetDefaultRelayPayloadRetrieverConfig creates a RelayPayloadRetrieverConfig with default values
@@ -145,11 +95,6 @@ func GetDefaultRelayPayloadRetrieverConfig() *RelayPayloadRetrieverConfig {
 // 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
 // 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
 func (rc *RelayPayloadRetrieverConfig) checkAndSetDefaults() error {
-	err := rc.PayloadClientConfig.checkAndSetDefaults()
-	if err != nil {
-		return err
-	}
-
 	defaultConfig := GetDefaultRelayPayloadRetrieverConfig()
 	if rc.RelayTimeout == 0 {
 		rc.RelayTimeout = defaultConfig.RelayTimeout
@@ -159,16 +104,10 @@ func (rc *RelayPayloadRetrieverConfig) checkAndSetDefaults() error {
 }
 
 // GetDefaultValidatorPayloadRetrieverConfig creates a ValidatorPayloadRetrieverConfig with default values
-//
-// NOTE: The following fields do not have defined defaults and must always be specifically configured:
-// - EigenDACertVerifierAddr
-// - BlsOperatorStateRetrieverAddr
-// - EigenDAServiceManagerAddr
 func GetDefaultValidatorPayloadRetrieverConfig() *ValidatorPayloadRetrieverConfig {
 	return &ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig: *GetDefaultPayloadClientConfig(),
 		RetrievalTimeout:    30 * time.Second,
-		MaxConnectionCount:  100,
 	}
 }
 
@@ -178,25 +117,9 @@ func GetDefaultValidatorPayloadRetrieverConfig() *ValidatorPayloadRetrieverConfi
 // 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
 // 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
 func (rc *ValidatorPayloadRetrieverConfig) checkAndSetDefaults() error {
-	err := rc.PayloadClientConfig.checkAndSetDefaults()
-	if err != nil {
-		return err
-	}
-
-	if rc.BlsOperatorStateRetrieverAddr == "" {
-		return errors.New("BlsOperatorStateRetrieverAddr is required")
-	}
-
-	if rc.EigenDAServiceManagerAddr == "" {
-		return errors.New("EigenDAServiceManagerAddr is required")
-	}
-
 	defaultConfig := GetDefaultValidatorPayloadRetrieverConfig()
 	if rc.RetrievalTimeout == 0 {
 		rc.RetrievalTimeout = defaultConfig.RetrievalTimeout
-	}
-	if rc.MaxConnectionCount == 0 {
-		rc.MaxConnectionCount = defaultConfig.MaxConnectionCount
 	}
 
 	return nil
@@ -211,6 +134,7 @@ func GetDefaultPayloadDisperserConfig() *PayloadDisperserConfig {
 		DisperseBlobTimeout:    2 * time.Minute,
 		BlobCertifiedTimeout:   2 * time.Minute,
 		BlobStatusPollInterval: 1 * time.Second,
+		ContractCallTimeout:    5 * time.Second,
 	}
 }
 
@@ -220,11 +144,6 @@ func GetDefaultPayloadDisperserConfig() *PayloadDisperserConfig {
 // 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
 // 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
 func (dc *PayloadDisperserConfig) checkAndSetDefaults() error {
-	err := dc.PayloadClientConfig.checkAndSetDefaults()
-	if err != nil {
-		return err
-	}
-
 	defaultConfig := GetDefaultPayloadDisperserConfig()
 
 	if dc.DisperseBlobTimeout == 0 {
@@ -237,6 +156,10 @@ func (dc *PayloadDisperserConfig) checkAndSetDefaults() error {
 
 	if dc.BlobStatusPollInterval == 0 {
 		dc.BlobStatusPollInterval = defaultConfig.BlobStatusPollInterval
+	}
+
+	if dc.ContractCallTimeout == 0 {
+		dc.ContractCallTimeout = defaultConfig.ContractCallTimeout
 	}
 
 	return nil
