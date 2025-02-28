@@ -4,12 +4,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
+	"sort"
+
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
 	"github.com/Layr-Labs/eigenda/common/kvstore/mapstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"math"
-	"sort"
 )
 
 // The table ID reserved for the metadata table. The metadata table is used for internal bookkeeping.
@@ -49,7 +50,7 @@ func Start(logger logging.Logger, config *Config) (kvstore.TableStore, error) {
 		return nil, errors.New("config is required")
 	}
 
-	base, err := buildBaseStore(config.Type, logger, config.Path)
+	base, err := buildBaseStore(config.Type, logger, config.DisableCompaction, config.Path)
 	if err != nil {
 		return nil, fmt.Errorf("error building base store: %w", err)
 	}
@@ -115,6 +116,7 @@ func start(
 func buildBaseStore(
 	storeType StoreType,
 	logger logging.Logger,
+	disableCompaction bool,
 	path *string) (kvstore.Store[[]byte], error) {
 
 	switch storeType {
@@ -122,7 +124,7 @@ func buildBaseStore(
 		if path == nil {
 			return nil, errors.New("path is required for LevelDB store")
 		}
-		return leveldb.NewStore(logger, *path)
+		return leveldb.NewStore(logger, disableCompaction, *path)
 	case MapStore:
 		return mapstore.NewStore(), nil
 	default:

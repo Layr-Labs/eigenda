@@ -2,6 +2,9 @@ package test
 
 import (
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
@@ -9,8 +12,6 @@ import (
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/exp/rand"
-	"testing"
-	"time"
 )
 
 func writeThenReadBenchmark(b *testing.B, store kvstore.Store[[]byte]) {
@@ -111,7 +112,7 @@ func BenchmarkLevelDB(b *testing.B) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(b, err)
 
-	store, err := leveldb.NewStore(logger, dbPath)
+	store, err := leveldb.NewStore(logger, false, dbPath)
 	assert.NoError(b, err)
 
 	writeThenReadBenchmark(b, store)
