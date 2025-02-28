@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
@@ -33,7 +34,28 @@ func NewStore(logger logging.Logger, path string) (kvstore.Store[[]byte], error)
 // NewStoreWithMetrics returns a new levelDBStore built using LevelDB with metrics collection.
 // If reg is nil, metrics will not be collected.
 func NewStoreWithMetrics(logger logging.Logger, path string, reg *prometheus.Registry) (kvstore.Store[[]byte], error) {
-	levelDB, err := leveldb.OpenFile(path, nil)
+	opts := &opt.Options{
+		// Memory components
+		BlockCacheCapacity: 64 * 1024 * 1024, // 64MB cache (increased from 8MB default)
+		WriteBuffer:        64 * 1024 * 1024, // 64MB write buffer (increased from 4MB default)
+		BlockSize:          16 * 1024,        // 16KB blocks (increased from 4KB default)
+
+		// Compaction configuration
+		CompactionTableSize: 8 * 1024 * 1024,  // 8MB (increased from 2MB default)
+		CompactionL0Trigger: 12,               // Increased from 4 default to delay compaction
+		CompactionTotalSize: 64 * 1024 * 1024, // 64MB per level (increased from 10MB default)
+
+		// Write slowdown and pause triggers
+		WriteL0PauseTrigger:    36, // Increased from 12 default
+		WriteL0SlowdownTrigger: 24, // Increased from 8 default
+
+		// Level size control
+		CompactionTableSizeMultiplier: 1.5, // Changed from 1.0 default for more gradual level growth
+
+		// Additional optimizations
+		DisableSeeksCompaction: true, // Default is false (seeks trigger compaction)
+	}
+	levelDB, err := leveldb.OpenFile(path, opts)
 
 	if err != nil {
 		return nil, err
