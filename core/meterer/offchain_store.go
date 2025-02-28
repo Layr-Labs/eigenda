@@ -121,7 +121,7 @@ func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod u
 	return binUsageValue, nil
 }
 
-func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, symbolsCharged uint64) error {
+func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, charge *big.Int) error {
 	result, err := s.dynamoClient.GetItem(ctx, s.onDemandTableName,
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID},
@@ -138,7 +138,7 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID},
 			"CumulativePayments": &types.AttributeValueMemberN{Value: paymentMetadata.CumulativePayment.String()},
-			"DataLength":         &types.AttributeValueMemberN{Value: strconv.FormatUint(symbolsCharged, 10)},
+			"Charge":             &types.AttributeValueMemberN{Value: charge.String()},
 		},
 	)
 
@@ -164,9 +164,9 @@ func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID str
 	return nil
 }
 
-// GetRelevantOnDemandRecords gets previous cumulative payment, next cumulative payment, blob size of next payment
+// GetRelevantOnDemandRecords gets previous cumulative payment, next cumulative payment, and charge
 // The queries are done sequentially instead of one-go for efficient querying and would not cause race condition errors for honest requests
-func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountID string, cumulativePayment *big.Int) (*big.Int, *big.Int, uint32, error) {
+func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountID string, cumulativePayment *big.Int) (*big.Int, *big.Int, *big.Int, error) {
 	// Fetch the largest entry smaller than the given cumulativePayment
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.onDemandTableName),
@@ -180,21 +180,21 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 	}
 	smallerResult, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
-		return nil, nil, 0, fmt.Errorf("failed to query smaller payments for account: %w", err)
+		return nil, nil, big.NewInt(0), fmt.Errorf("failed to query smaller payments for account: %w", err)
 	}
 	prevPayment := big.NewInt(0)
 	if len(smallerResult) > 0 {
 		cumulativePaymentsAttr, ok := smallerResult[0]["CumulativePayments"]
 		if !ok {
-			return nil, nil, 0, fmt.Errorf("CumulativePayments field not found in result")
+			return nil, nil, big.NewInt(0), fmt.Errorf("CumulativePayments field not found in result")
 		}
 		cumulativePaymentsNum, ok := cumulativePaymentsAttr.(*types.AttributeValueMemberN)
 		if !ok {
-			return nil, nil, 0, fmt.Errorf("CumulativePayments has invalid type")
+			return nil, nil, big.NewInt(0), fmt.Errorf("CumulativePayments has invalid type")
 		}
 		setPrevPayment, success := prevPayment.SetString(cumulativePaymentsNum.Value, 10)
 		if !success {
-			return nil, nil, 0, fmt.Errorf("failed to parse previous payment: %w", err)
+			return nil, nil, big.NewInt(0), fmt.Errorf("failed to parse previous payment: %w", err)
 		}
 		prevPayment = setPrevPayment
 	}
@@ -212,41 +212,39 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 	}
 	largerResult, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
-		return nil, nil, 0, fmt.Errorf("failed to query the next payment for account: %w", err)
+		return nil, nil, big.NewInt(0), fmt.Errorf("failed to query the next payment for account: %w", err)
 	}
 	nextPayment := big.NewInt(0)
-	nextDataLength := uint32(0)
+	charge := big.NewInt(0)
 	if len(largerResult) > 0 {
 		cumulativePaymentsAttr, ok := largerResult[0]["CumulativePayments"]
 		if !ok {
-			return nil, nil, 0, fmt.Errorf("CumulativePayments field not found in result")
+			return nil, nil, big.NewInt(0), fmt.Errorf("CumulativePayments field not found in result")
 		}
 		cumulativePaymentsNum, ok := cumulativePaymentsAttr.(*types.AttributeValueMemberN)
 		if !ok {
-			return nil, nil, 0, fmt.Errorf("CumulativePayments has invalid type")
+			return nil, nil, big.NewInt(0), fmt.Errorf("CumulativePayments has invalid type")
 		}
 		setNextPayment, success := nextPayment.SetString(cumulativePaymentsNum.Value, 10)
 		if !success {
-			return nil, nil, 0, fmt.Errorf("failed to parse previous payment: %w", err)
+			return nil, nil, big.NewInt(0), fmt.Errorf("failed to parse previous payment: %w", err)
 		}
 		nextPayment = setNextPayment
 
-		dataLengthAttr, ok := largerResult[0]["DataLength"]
+		chargeAttr, ok := largerResult[0]["Charge"]
 		if !ok {
-			return nil, nil, 0, fmt.Errorf("DataLength field not found in result")
+			return nil, nil, big.NewInt(0), fmt.Errorf("Charge field not found in result")
 		}
-		dataLengthNum, ok := dataLengthAttr.(*types.AttributeValueMemberN)
+		chargeNum, ok := chargeAttr.(*types.AttributeValueMemberN)
 		if !ok {
-			return nil, nil, 0, fmt.Errorf("DataLength has invalid type")
+			return nil, nil, big.NewInt(0), fmt.Errorf("Charge has invalid type")
 		}
-		dataLength, err := strconv.ParseUint(dataLengthNum.Value, 10, 32)
-		if err != nil {
-			return nil, nil, 0, fmt.Errorf("failed to parse data length: %w", err)
+		if _, success := charge.SetString(chargeNum.Value, 10); !success {
+			return nil, nil, big.NewInt(0), fmt.Errorf("failed to parse charge value: %w", err)
 		}
-		nextDataLength = uint32(dataLength)
 	}
 
-	return prevPayment, nextPayment, nextDataLength, nil
+	return prevPayment, nextPayment, charge, nil
 }
 
 func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID string, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error) {
