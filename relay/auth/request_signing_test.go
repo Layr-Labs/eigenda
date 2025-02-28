@@ -1,12 +1,13 @@
 package auth
 
 import (
+	"testing"
+
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
-	"testing"
 )
 
 func randomGetChunksRequest() *pb.GetChunksRequest {
@@ -52,21 +53,26 @@ func TestHashGetChunksRequest(t *testing.T) {
 	requestB := randomGetChunksRequest()
 
 	// Hashing the same request twice should yield the same hash
-	hashA := hashing.HashGetChunksRequest(requestA)
-	hashAA := hashing.HashGetChunksRequest(requestA)
+	hashA, err := hashing.HashGetChunksRequest(requestA)
+	require.NoError(t, err)
+	hashAA, err := hashing.HashGetChunksRequest(requestA)
+	require.NoError(t, err)
 	require.Equal(t, hashA, hashAA)
 
 	// Hashing different requests should yield different hashes
-	hashB := hashing.HashGetChunksRequest(requestB)
+	hashB, err := hashing.HashGetChunksRequest(requestB)
+	require.NoError(t, err)
 	require.NotEqual(t, hashA, hashB)
 
 	// Adding a signature should not affect the hash
 	requestA.OperatorSignature = tu.RandomBytes(32)
-	hashAA = hashing.HashGetChunksRequest(requestA)
+	hashAA, err = hashing.HashGetChunksRequest(requestA)
+	require.NoError(t, err)
 	require.Equal(t, hashA, hashAA)
 
 	// Changing the requester ID should change the hash
 	requestA.OperatorId = tu.RandomBytes(32)
-	hashAA = hashing.HashGetChunksRequest(requestA)
+	hashAA, err = hashing.HashGetChunksRequest(requestA)
+	require.NoError(t, err)
 	require.NotEqual(t, hashA, hashAA)
 }

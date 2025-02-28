@@ -1,6 +1,8 @@
 package hashing
 
 import (
+	"errors"
+
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"golang.org/x/crypto/sha3"
 )
@@ -13,7 +15,7 @@ var (
 )
 
 // HashGetChunksRequest hashes the given GetChunksRequest.
-func HashGetChunksRequest(request *pb.GetChunksRequest) []byte {
+func HashGetChunksRequest(request *pb.GetChunksRequest) ([]byte, error) {
 	hasher := sha3.NewLegacyKeccak256()
 
 	hasher.Write(request.GetOperatorId())
@@ -21,18 +23,20 @@ func HashGetChunksRequest(request *pb.GetChunksRequest) []byte {
 		if chunkRequest.GetByIndex() != nil {
 			getByIndex := chunkRequest.GetByIndex()
 			hasher.Write(iByte)
-			hasher.Write(getByIndex.BlobKey)
+			hasher.Write(getByIndex.GetBlobKey())
 			for _, index := range getByIndex.ChunkIndices {
 				hashUint32(hasher, index)
 			}
-		} else {
+		} else if chunkRequest.GetByRange() != nil {
 			getByRange := chunkRequest.GetByRange()
 			hasher.Write(rByte)
-			hasher.Write(getByRange.BlobKey)
-			hashUint32(hasher, getByRange.StartIndex)
-			hashUint32(hasher, getByRange.EndIndex)
+			hasher.Write(getByRange.GetBlobKey())
+			hashUint32(hasher, getByRange.GetStartIndex())
+			hashUint32(hasher, getByRange.GetEndIndex())
+		} else {
+			return nil, errors.New("invalid chunk request: must be either by index or by range")
 		}
 	}
 
-	return hasher.Sum(nil)
+	return hasher.Sum(nil), nil
 }
