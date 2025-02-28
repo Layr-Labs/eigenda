@@ -2,6 +2,7 @@ package tablestore
 
 import (
 	"encoding/binary"
+
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 )
 

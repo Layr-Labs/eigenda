@@ -1,8 +1,9 @@
 package tablestore
 
 import (
-	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/common/kvstore"
 )
 
 var _ kvstore.TTLBatch[kvstore.Key] = &tableStoreBatch{}

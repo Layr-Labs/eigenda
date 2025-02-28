@@ -2,11 +2,12 @@ package tablestore
 
 import (
 	"context"
+	"sync"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
-	"sync"
-	"time"
 )
 
 var _ kvstore.TableStore = &tableStore{}

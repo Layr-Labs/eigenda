@@ -1,9 +1,10 @@
 package tablestore
 
 import (
+	"testing"
+
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestGetName(t *testing.T) {
