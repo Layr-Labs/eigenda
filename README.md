@@ -89,7 +89,7 @@ $ make
 # github.com/Layr-Labs/eigenda-proxy/cmd/server
 
 ## Setup new keypair for EigenDA authentication
-$ cast wallet new -j > keypair.json
+$ cast wallet new --json > keypair.json
 
 ## Extract keypair ETH address
 $ jq -r '.[0].address' keypair.json
