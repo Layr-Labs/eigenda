@@ -80,9 +80,6 @@ type ValidatorPayloadRetrieverConfig struct {
 type PayloadDisperserConfig struct {
 	PayloadClientConfig
 
-	// SignerPaymentKey is the private key used for signing payment authorization headers
-	SignerPaymentKey string
-
 	// DisperseBlobTimeout is the duration after which the PayloadDisperser will time out, when trying to disperse a
 	// blob
 	DisperseBlobTimeout time.Duration
