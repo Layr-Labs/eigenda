@@ -93,9 +93,9 @@ func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID stri
 	return binUsageValue, nil
 }
 
-func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod uint32, size uint64) (uint64, error) {
+func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error) {
 	key := map[string]types.AttributeValue{
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(reservationPeriod), 10)},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 	}
 
 	res, err := s.dynamoClient.IncrementBy(ctx, s.globalBinTableName, key, "BinUsage", size)
@@ -121,7 +121,7 @@ func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod u
 	return binUsageValue, nil
 }
 
-func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, symbolsCharged uint32) error {
+func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, symbolsCharged uint64) error {
 	result, err := s.dynamoClient.GetItem(ctx, s.onDemandTableName,
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID},
@@ -138,7 +138,7 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID},
 			"CumulativePayments": &types.AttributeValueMemberN{Value: paymentMetadata.CumulativePayment.String()},
-			"DataLength":         &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(symbolsCharged), 10)},
+			"DataLength":         &types.AttributeValueMemberN{Value: strconv.FormatUint(symbolsCharged, 10)},
 		},
 	)
 
@@ -249,14 +249,14 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 	return prevPayment, nextPayment, nextDataLength, nil
 }
 
-func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID string, reservationPeriod uint32) ([MinNumBins]*pb.PeriodRecord, error) {
+func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID string, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error) {
 	// Fetch the 3 bins start from the current bin
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.reservationTableName),
 		KeyConditionExpression: aws.String("AccountID = :account AND ReservationPeriod > :reservationPeriod"),
 		ExpressionAttributeValues: commondynamodb.ExpressionValues{
 			":account":           &types.AttributeValueMemberS{Value: accountID},
-			":reservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(reservationPeriod), 10)},
+			":reservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 		},
 		ScanIndexForward: aws.Bool(true),
 		Limit:            aws.Int32(MinNumBins),

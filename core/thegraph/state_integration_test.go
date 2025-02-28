@@ -72,7 +72,7 @@ func setup() {
 	if err != nil {
 		panic(err)
 	}
-	_ = testConfig.RegisterBlobVersionAndRelays(ethClient)
+	testConfig.RegisterBlobVersionAndRelays(ethClient)
 
 	fmt.Println("Starting binaries")
 	testConfig.StartBinaries()

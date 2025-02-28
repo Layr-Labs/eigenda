@@ -3,9 +3,11 @@ package node_test
 import (
 	"context"
 	"fmt"
-	"github.com/docker/go-units"
 	"testing"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/api/clients/v2/test"
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core"
@@ -249,20 +251,21 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	c := newComponents(t, op0)
 	c.node.Config.EnableV2 = true
 	c.node.Config.OnchainStateRefreshInterval = time.Millisecond
-	relayURLs := map[v2.RelayKey]string{
-		0: "http://localhost:8080",
-	}
+
+	relayUrlProvider := test.NewTestRelayUrlProvider()
+	relayUrlProvider.StoreRelayUrl(0, "http://localhost:8080")
 
 	messageSigner := func(ctx context.Context, data [32]byte) (*core.Signature, error) {
 		return nil, nil
 	}
 
-	relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-		Sockets:            relayURLs,
+	relayClientConfig := &clients.RelayClientConfig{
 		OperatorID:         &c.node.Config.ID,
 		MessageSigner:      messageSigner,
 		MaxGRPCMessageSize: units.GiB,
-	}, c.node.Logger)
+	}
+
+	relayClient, err := clients.NewRelayClient(relayClientConfig, c.node.Logger, relayUrlProvider)
 	require.NoError(t, err)
 	// set up non-mock client
 	c.node.RelayClient.Store(relayClient)
@@ -286,11 +289,7 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 		0: blobParams,
 		1: blobParams2,
 	}, nil)
-	newRelayURLs := map[v2.RelayKey]string{
-		1: "http://localhost:8081",
-		2: "http://localhost:8082",
-	}
-	c.tx.On("GetRelayURLs", mock.Anything).Return(newRelayURLs, nil)
+
 	err = c.node.RefreshOnchainState(newCtx)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	bp, ok = c.node.BlobVersionParams.Load().Get(0)
@@ -299,9 +298,6 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	bp, ok = c.node.BlobVersionParams.Load().Get(1)
 	require.True(t, ok)
 	require.Equal(t, bp, blobParams2)
-	newRelayClient := c.node.RelayClient.Load().(clients.RelayClient)
-	require.NotSame(t, relayClient, newRelayClient)
-	require.Equal(t, newRelayURLs, newRelayClient.GetSockets())
 }
 
 func bundleEqual(t *testing.T, expected, actual core.Bundle) {
