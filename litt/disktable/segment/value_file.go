@@ -14,7 +14,7 @@ import (
 )
 
 // ValuesFileExtension is the file extension for the values file. This file contains the values for the data
-// segment.
+// segment. Value files are written in the form "X-Y.values", where X is the segment index and Y is the shard number.
 const ValuesFileExtension = ".values"
 
 // valueFile represents a file that stores values.
@@ -24,6 +24,9 @@ type valueFile struct {
 
 	// The segment index.
 	index uint32
+
+	// The shard number of this value file.
+	shard uint32
 
 	// The parent directory containing this file.
 	parentDirectory string
@@ -35,16 +38,20 @@ type valueFile struct {
 	currentSize uint64
 }
 
+// TODO verify behavior if value file is empty when sealed
+
 // newValueFile creates a new value file.
 func newValueFile(
 	logger logging.Logger,
 	index uint32,
+	shard uint32,
 	parentDirectory string,
 	sealed bool) (*valueFile, error) {
 
 	values := &valueFile{
 		logger:          logger,
 		index:           index,
+		shard:           shard,
 		parentDirectory: parentDirectory,
 	}
 
@@ -80,7 +87,7 @@ func newValueFile(
 
 // name returns the name of the value file.
 func (v *valueFile) name() string {
-	return fmt.Sprintf("%d%s", v.index, ValuesFileExtension)
+	return fmt.Sprintf("%d-%d%s", v.index, v.shard, ValuesFileExtension)
 }
 
 // path returns the path to the value file.
