@@ -177,10 +177,10 @@ func teardown() {
 
 func TestMetererReservations(t *testing.T) {
 	ctx := context.Background()
-	paymentChainState.On("GetReservationWindow", testifymock.Anything).Return(uint32(5), nil)
+	paymentChainState.On("GetReservationWindow", testifymock.Anything).Return(uint64(5), nil)
 	paymentChainState.On("GetGlobalSymbolsPerSecond", testifymock.Anything).Return(uint64(1009), nil)
-	paymentChainState.On("GetGlobalRatePeriodInterval", testifymock.Anything).Return(uint32(1), nil)
-	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(3), nil)
+	paymentChainState.On("GetGlobalRatePeriodInterval", testifymock.Anything).Return(uint64(1), nil)
+	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint64(3), nil)
 
 	now := time.Now().UnixNano()
 	reservationPeriod := meterer.GetReservationPeriodByNanosecond(now, mt.ChainPaymentState.GetReservationWindow())
@@ -237,7 +237,7 @@ func TestMetererReservations(t *testing.T) {
 	assert.ErrorContains(t, err, "invalid reservation period for reservation")
 
 	// test bin usage metering
-	symbolLength := uint(20)
+	symbolLength := uint64(20)
 	requiredLength := uint(21) // 21 should be charged for length of 20 since minNumSymbols is 3
 	for i := 0; i < 9; i++ {
 		now = time.Now().UnixNano()
@@ -250,7 +250,7 @@ func TestMetererReservations(t *testing.T) {
 			"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(reservationPeriod))},
 		})
 		assert.NoError(t, err)
-		assert.Equal(t, uint32(requiredLength), symbolsCharged)
+		assert.Equal(t, uint64(requiredLength), symbolsCharged)
 		assert.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
 		assert.Equal(t, strconv.Itoa(int(reservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 		assert.Equal(t, strconv.Itoa((i+1)*int(requiredLength)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
@@ -259,7 +259,7 @@ func TestMetererReservations(t *testing.T) {
 	header = createPaymentHeader(now, big.NewInt(0), accountID2)
 	symbolsCharged, err := mt.MeterRequest(ctx, *header, 25, quoromNumbers)
 	assert.NoError(t, err)
-	assert.Equal(t, uint32(27), symbolsCharged)
+	assert.Equal(t, uint64(27), symbolsCharged)
 	overflowedReservationPeriod := reservationPeriod + 2
 	item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
 		"AccountID":         &types.AttributeValueMemberS{Value: accountID2.Hex()},
@@ -281,8 +281,8 @@ func TestMetererReservations(t *testing.T) {
 func TestMetererOnDemand(t *testing.T) {
 	ctx := context.Background()
 	quorumNumbers := []uint8{0, 1}
-	paymentChainState.On("GetPricePerSymbol", testifymock.Anything, testifymock.Anything).Return(uint32(2), nil)
-	paymentChainState.On("GetMinNumSymbols", testifymock.Anything, testifymock.Anything).Return(uint32(3), nil)
+	paymentChainState.On("GetPricePerSymbol", testifymock.Anything, testifymock.Anything).Return(uint64(2), nil)
+	paymentChainState.On("GetMinNumSymbols", testifymock.Anything, testifymock.Anything).Return(uint64(3), nil)
 	now := time.Now().Unix()
 
 	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
@@ -322,13 +322,13 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.Equal(t, 0, len(result))
 
 	// test duplicated cumulative payments
-	symbolLength := uint(100)
+	symbolLength := uint64(100)
 	priceCharged := mt.PaymentCharged(symbolLength)
 	assert.Equal(t, big.NewInt(int64(102*mt.ChainPaymentState.GetPricePerSymbol())), priceCharged)
 	header = createPaymentHeader(now, priceCharged, accountID2)
 	symbolsCharged, err := mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
 	assert.NoError(t, err)
-	assert.Equal(t, uint32(102), symbolsCharged)
+	assert.Equal(t, uint64(102), symbolsCharged)
 	header = createPaymentHeader(now, priceCharged, accountID2)
 	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
 	assert.ErrorContains(t, err, "exact payment already exists")
@@ -339,7 +339,7 @@ func TestMetererOnDemand(t *testing.T) {
 		header = createPaymentHeader(now, new(big.Int).Mul(priceCharged, big.NewInt(int64(i+1))), accountID2)
 		symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
 		assert.NoError(t, err)
-		assert.Equal(t, uint32(102), symbolsCharged)
+		assert.Equal(t, uint64(102), symbolsCharged)
 	}
 
 	// test cumulative payment on-chain constraint
@@ -349,7 +349,7 @@ func TestMetererOnDemand(t *testing.T) {
 
 	// test insufficient increment in cumulative payment
 	previousCumulativePayment := priceCharged.Mul(priceCharged, big.NewInt(9))
-	symbolLength = uint(2)
+	symbolLength = uint64(2)
 	priceCharged = mt.PaymentCharged(symbolLength)
 	header = createPaymentHeader(now, big.NewInt(0).Add(previousCumulativePayment, big.NewInt(0).Sub(priceCharged, big.NewInt(1))), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers)
@@ -383,9 +383,9 @@ func TestMetererOnDemand(t *testing.T) {
 func TestMeterer_paymentCharged(t *testing.T) {
 	tests := []struct {
 		name           string
-		symbolLength   uint
-		pricePerSymbol uint32
-		minNumSymbols  uint32
+		symbolLength   uint64
+		pricePerSymbol uint64
+		minNumSymbols  uint64
 		expected       *big.Int
 	}{
 		{
@@ -427,8 +427,8 @@ func TestMeterer_paymentCharged(t *testing.T) {
 
 	paymentChainState := &mock.MockOnchainPaymentState{}
 	for _, tt := range tests {
-		paymentChainState.On("GetPricePerSymbol", testifymock.Anything, testifymock.Anything).Return(uint32(tt.pricePerSymbol), nil)
-		paymentChainState.On("GetMinNumSymbols", testifymock.Anything, testifymock.Anything).Return(uint32(tt.minNumSymbols), nil)
+		paymentChainState.On("GetPricePerSymbol", testifymock.Anything, testifymock.Anything).Return(uint64(tt.pricePerSymbol), nil)
+		paymentChainState.On("GetMinNumSymbols", testifymock.Anything, testifymock.Anything).Return(uint64(tt.minNumSymbols), nil)
 		t.Run(tt.name, func(t *testing.T) {
 			m := &meterer.Meterer{
 				ChainPaymentState: paymentChainState,
@@ -442,9 +442,9 @@ func TestMeterer_paymentCharged(t *testing.T) {
 func TestMeterer_symbolsCharged(t *testing.T) {
 	tests := []struct {
 		name          string
-		symbolLength  uint
-		minNumSymbols uint32
-		expected      uint32
+		symbolLength  uint64
+		minNumSymbols uint64
+		expected      uint64
 	}{
 		{
 			name:          "Data length equal to min number of symobols",
@@ -480,7 +480,7 @@ func TestMeterer_symbolsCharged(t *testing.T) {
 
 	paymentChainState := &mock.MockOnchainPaymentState{}
 	for _, tt := range tests {
-		paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint32(tt.minNumSymbols), nil)
+		paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint64(tt.minNumSymbols), nil)
 		t.Run(tt.name, func(t *testing.T) {
 			m := &meterer.Meterer{
 				ChainPaymentState: paymentChainState,

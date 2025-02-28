@@ -61,22 +61,22 @@ func (m *MockOnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
 	return args.Get(0).(uint64)
 }
 
-func (m *MockOnchainPaymentState) GetGlobalRatePeriodInterval() uint32 {
+func (m *MockOnchainPaymentState) GetGlobalRatePeriodInterval() uint64 {
 	args := m.Called()
-	return args.Get(0).(uint32)
+	return args.Get(0).(uint64)
 }
 
-func (m *MockOnchainPaymentState) GetMinNumSymbols() uint32 {
+func (m *MockOnchainPaymentState) GetMinNumSymbols() uint64 {
 	args := m.Called()
-	return args.Get(0).(uint32)
+	return args.Get(0).(uint64)
 }
 
-func (m *MockOnchainPaymentState) GetPricePerSymbol() uint32 {
+func (m *MockOnchainPaymentState) GetPricePerSymbol() uint64 {
 	args := m.Called()
-	return args.Get(0).(uint32)
+	return args.Get(0).(uint64)
 }
 
-func (m *MockOnchainPaymentState) GetReservationWindow() uint32 {
+func (m *MockOnchainPaymentState) GetReservationWindow() uint64 {
 	args := m.Called()
-	return args.Get(0).(uint32)
+	return args.Get(0).(uint64)
 }
