@@ -30,9 +30,9 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	keys := make([][]byte, valueCount)
 	values := make([][]byte, valueCount)
 	for i := 0; i < int(valueCount); i++ {
-		key := rand.VariableBytes(1, 100)
+		key := rand.PrintableVariableBytes(1, 100)
 		keys[i] = key
-		values[i] = rand.VariableBytes(1, 100)
+		values[i] = rand.PrintableVariableBytes(1, 100)
 	}
 
 	// a map from keys to values
@@ -124,7 +124,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	keysFromSegment, err := seg.GetKeys()
 	require.NoError(t, err)
 	for i, ka := range keysFromSegment {
-		require.Equal(t, ka.Key, keysFromSegment[i])
+		require.Equal(t, ka.Key, keys[i])
 	}
 
 	// Reopen the segment and read all keys and values.
@@ -151,8 +151,6 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	keysFromSegment2, err := seg2.GetKeys()
 	require.NoError(t, err)
 	require.Equal(t, keysFromSegment, keysFromSegment2)
-
-	require.Equal(t, keys, keysFromSegment2)
 
 	// delete the segment
 	require.Equal(t, 3, countFilesInDirectory(t, directory))

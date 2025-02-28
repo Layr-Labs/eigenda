@@ -276,11 +276,11 @@ type keyFileFlushResponse struct {
 func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
 	// Flush+seal the shards
 	shardResponseChannels := make([]chan error, s.metadata.shardingFactor)
-	for _, shardChannel := range s.shardChannels {
-		responseChannel := make(chan error, 1)
+	for shard, shardChannel := range s.shardChannels {
+		shardResponseChannels[shard] = make(chan error, 1)
 		shardChannel <- &shardFlushRequest{
 			seal:              true,
-			completionChannel: responseChannel,
+			completionChannel: shardResponseChannels[shard],
 		}
 	}
 
@@ -461,21 +461,21 @@ func (s *Segment) handleShardFlushRequest(shard uint32, request *shardFlushReque
 		return shardError
 	}
 
-	err := s.shards[shard].flush()
-	if err != nil {
-		request.completionChannel <- fmt.Errorf("failed to flush value file: %v", err)
-	}
-
 	if request.seal {
-		err = s.shards[shard].seal()
+		err := s.shards[shard].seal()
 		if err != nil {
 			request.completionChannel <- fmt.Errorf("failed to seal value file: %v", err)
 			return err
 		}
+	} else {
+		err := s.shards[shard].flush()
+		if err != nil {
+			request.completionChannel <- fmt.Errorf("failed to flush value file: %v", err)
+		}
 	}
 
 	request.completionChannel <- nil
-	return err
+	return nil
 }
 
 // handleShardWrite applies a single write operation to a shard.
@@ -545,12 +545,22 @@ func (s *Segment) handleKeyFileWrite(data *types.KAPair) error {
 
 // handleKeyFileFlushRequest handles a request to flush the key file to disk.
 func (s *Segment) handleKeyFileFlushRequest(request *keyFileFlushRequest, unflushedKeys []*types.KAPair) error {
-	err := s.keys.flush()
-	if err != nil {
-		request.completionChannel <- &keyFileFlushResponse{
-			err: err,
+	if request.seal {
+		err := s.keys.seal()
+		if err != nil {
+			request.completionChannel <- &keyFileFlushResponse{
+				err: err,
+			}
+			return err
 		}
-		return err
+	} else {
+		err := s.keys.flush()
+		if err != nil {
+			request.completionChannel <- &keyFileFlushResponse{
+				err: err,
+			}
+			return err
+		}
 	}
 
 	request.completionChannel <- &keyFileFlushResponse{

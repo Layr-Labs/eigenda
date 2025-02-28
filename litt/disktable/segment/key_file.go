@@ -124,6 +124,8 @@ func (k *keyFile) seal() error {
 		return fmt.Errorf("key file is already sealed")
 	}
 
+	fmt.Printf("sealing key file\n") // TODO
+
 	err := k.flush()
 	if err != nil {
 		return fmt.Errorf("failed to flush key file: %v", err)
