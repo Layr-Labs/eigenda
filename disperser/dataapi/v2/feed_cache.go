@@ -73,7 +73,8 @@ func (c *FeedCache[T]) Get(start, end time.Time, queryOrder SortOrder, limit int
 
 	// Handle no cache or no overlap cases together
 	if segment == nil || !queryRange.Overlaps(segment.TimeRange) {
-		return c.handleCacheMiss(start, end, queryOrder, limit)
+		shouldReplaceCache := segment == nil || !segment.TimeRange.End.After(start)
+		return c.handleCacheMiss(start, end, queryOrder, limit, shouldReplaceCache)
 	}
 
 	// Handle overlapping case
@@ -84,52 +85,48 @@ func (c *FeedCache[T]) Get(start, end time.Time, queryOrder SortOrder, limit int
 	}
 }
 
-func (c *FeedCache[T]) handleCacheMiss(start, end time.Time, queryOrder SortOrder, limit int) ([]*T, error) {
+func (c *FeedCache[T]) handleCacheMiss(start, end time.Time, queryOrder SortOrder, limit int, shouldReplaceCache bool) ([]*T, error) {
 	// Fetch directly with the requested order and limit
 	data, err := c.fetchFromDB(start, end, queryOrder, limit)
 	if err != nil {
 		return nil, err
 	}
-
 	hasMore := len(data) == limit
 
 	// Cache data if it's not empty
-	if len(data) > 0 {
+	if len(data) > 0 && shouldReplaceCache {
 		// Normalize data to ascending order before caching
 		dataToCache := data
 		if queryOrder == Descending {
 			dataToCache = reverseOrder(data)
 		}
 
-		var dataStart, dataEnd time.Time
+		var newStart, newEnd time.Time
 		if queryOrder == Ascending {
-			dataEnd = end
+			newStart = start
+			newEnd = end
 			if hasMore {
-				// If the query didn't exhaust the range, we can only be sure a more
-				// conservative endpoint.
-				dataEnd = c.getTimestamp(dataToCache[len(dataToCache)-1])
+				newEnd = c.getTimestamp(dataToCache[len(dataToCache)-1]).Add(time.Nanosecond)
 			}
 		} else {
-			dataEnd = end
-			dataStart = start
+			newEnd = end
+			newStart = start
 			if hasMore {
-				// If the query didn't exhaust the range, we can only be sure a more
-				// conservative endpoint.
-				dataStart = c.getTimestamp(dataToCache[0])
+				newStart = c.getTimestamp(dataToCache[0])
 			}
 		}
 
 		// If data exceeds maxItems, keep only the most recent ones
 		if len(dataToCache) > c.maxItems {
 			dataToCache = dataToCache[len(dataToCache)-c.maxItems:] // Keep newest
-			dataStart = c.getTimestamp(dataToCache[0])
+			newStart = c.getTimestamp(dataToCache[0])
 		}
 
 		c.mu.Lock()
 		c.segment = &CacheEntry[T]{
 			TimeRange: TimeRange{
-				Start: dataStart,
-				End:   dataEnd,
+				Start: newStart,
+				End:   newEnd,
 			},
 			Data: dataToCache,
 		}
@@ -167,7 +164,9 @@ func (c *FeedCache[T]) handleAscendingQuery(start, end time.Time, segment *Cache
 		if err != nil {
 			return nil, err
 		}
-		beforeHasMore = len(beforeData) == limit
+		if limit > 0 {
+			beforeHasMore = len(beforeData) == limit
+		}
 	}
 
 	// Check if we need data after cached segment
@@ -180,7 +179,7 @@ func (c *FeedCache[T]) handleAscendingQuery(start, end time.Time, segment *Cache
 		if err != nil {
 			return nil, err
 		}
-		afterHasMore = len(afterData) == limit
+		afterHasMore = len(afterData) == remaining
 	}
 
 	// Combine results: beforeData -> cachedOverlap -> afterData
@@ -220,10 +219,12 @@ func (c *FeedCache[T]) handleAscendingQuery(start, end time.Time, segment *Cache
 		newCacheData = newCacheData[len(newCacheData)-c.maxItems:] // Keep newest
 		newStart = c.getTimestamp(newCacheData[0])
 	}
-	newEnd = maxTime(end, segment.End)
-	if afterHasMore {
+	newEnd = end
+	if len(afterData) == 0 {
+		newEnd = segment.End
+	} else if afterHasMore {
 		// If the query didn't exhaust the range, we can only be sure a more conservative endpoint
-		newEnd = c.getTimestamp(newCacheData[len(newCacheData)-1])
+		newEnd = c.getTimestamp(newCacheData[len(newCacheData)-1]).Add(time.Nanosecond)
 	}
 
 	// Update cache
@@ -246,6 +247,7 @@ func (c *FeedCache[T]) handleDescendingQuery(start, end time.Time, segment *Cach
 	var beforeData, afterData []*T
 	var beforeHasMore, afterHasMore bool
 	var err error
+	// beforeHasMore, afterHasMore := false, false
 
 	// For descending query:
 	// 1. beforeData can always be merged (it's certainly connected)
@@ -271,7 +273,9 @@ func (c *FeedCache[T]) handleDescendingQuery(start, end time.Time, segment *Cach
 		if err != nil {
 			return nil, err
 		}
-		afterHasMore = len(afterData) == limit
+		if limit > 0 {
+			afterHasMore = len(afterData) == limit
+		}
 	}
 
 	// Check if we need data before cached segment
@@ -299,7 +303,7 @@ func (c *FeedCache[T]) handleDescendingQuery(start, end time.Time, segment *Cach
 
 	if len(result) < numToReturn {
 		overlapItems := min(numToReturn-len(result), len(cachedOverlap))
-		result = append(result, reverseOrder(cachedOverlap[:overlapItems])...)
+		result = append(result, reverseOrder(cachedOverlap)[:overlapItems]...)
 	}
 
 	if len(result) < numToReturn {
@@ -315,21 +319,19 @@ func (c *FeedCache[T]) handleDescendingQuery(start, end time.Time, segment *Cach
 	var newCacheData []*T
 	var newStart time.Time
 
-	if end.After(segment.End) && !afterHasMore {
-		newCacheData = append(beforeData, segment.Data...)
-		newCacheData = append(newCacheData, afterData...)
-		newStart = minTime(start, segment.Start)
-		if beforeHasMore {
-			newStart = c.getTimestamp(beforeData[0])
-		}
-	} else if end.After(segment.End) {
+	if afterHasMore {
+		// There is a afterData segment which is not connected to the cache, we'll replace the cache
+		// with this segment
 		newCacheData = afterData
 		newStart = c.getTimestamp(newCacheData[0])
 	} else {
 		newCacheData = append(beforeData, segment.Data...)
+		newCacheData = append(newCacheData, afterData...)
 		newStart = minTime(start, segment.Start)
-		if beforeHasMore {
-			newStart = c.getTimestamp(beforeData[0])
+		if len(beforeData) == 0 {
+			newStart = segment.Start
+		} else if beforeHasMore {
+			newStart = c.getTimestamp(newCacheData[0])
 		}
 	}
 
@@ -352,8 +354,7 @@ func (c *FeedCache[T]) handleDescendingQuery(start, end time.Time, segment *Cach
 
 	c.mu.Unlock()
 
-	// Return in descending order
-	return reverseOrder(result), nil
+	return result, nil
 }
 
 func (c *FeedCache[T]) filterDataInRange(data []*T, start, end time.Time) []*T {
