@@ -29,31 +29,6 @@ type RelayPayloadRetriever struct {
 
 var _ PayloadRetriever = &RelayPayloadRetriever{}
 
-// BuildRelayPayloadRetriever builds a RelayPayloadRetriever from config structs.
-func BuildRelayPayloadRetriever(
-	log logging.Logger,
-	relayPayloadRetrieverConfig RelayPayloadRetrieverConfig,
-	relayClientConfig *RelayClientConfig,
-	g1Srs []bn254.G1Affine) (*RelayPayloadRetriever, error) {
-
-	err := relayPayloadRetrieverConfig.checkAndSetDefaults()
-	if err != nil {
-		return nil, fmt.Errorf("check and set RelayPayloadRetrieverConfig config: %w", err)
-	}
-
-	relayClient, err := NewRelayClient(relayClientConfig, log)
-	if err != nil {
-		return nil, fmt.Errorf("new relay client: %w", err)
-	}
-
-	return NewRelayPayloadRetriever(
-		log,
-		rand.New(rand.NewSource(rand.Int63())),
-		relayPayloadRetrieverConfig,
-		relayClient,
-		g1Srs)
-}
-
 // NewRelayPayloadRetriever assembles a RelayPayloadRetriever from subcomponents that have already been constructed and
 // initialized.
 func NewRelayPayloadRetriever(
