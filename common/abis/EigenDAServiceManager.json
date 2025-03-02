@@ -3,7 +3,7 @@
         "type": "constructor",
         "inputs": [
             {
-                "name": "__delegationMananger",
+                "name": "__delegationManager",
                 "type": "address",
                 "internalType": "contract IDelegationManager"
             },

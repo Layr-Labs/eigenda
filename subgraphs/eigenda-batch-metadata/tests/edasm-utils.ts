@@ -3,7 +3,7 @@ import { ethereum, BigInt, Bytes, Address } from "@graphprotocol/graph-ts"
 import { BatchConfirmed as BatchConfirmedEvent, ConfirmBatchCall, ConfirmBatchCallBatchHeaderStruct, ConfirmBatchCallNonSignerStakesAndSignatureNonSignerPubkeysStruct, ConfirmBatchCallNonSignerStakesAndSignatureStruct } from "../generated/EigenDAServiceManager/EigenDAServiceManager"
 import { BatchHeader } from "../generated/schema"
 
-export function createNewConfimBatchCall(
+export function createNewConfirmBatchCall(
   blobHeadersRoot: Bytes,
   quorumNumbers: Bytes,
   quorumThresholdPercentages: Bytes,
