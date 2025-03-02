@@ -3,10 +3,12 @@ package leveldb
 import (
 	"errors"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/common/kvstore"
-	"github.com/Layr-Labs/eigensdk-go/logging"
 	"os"
 
+	"github.com/Layr-Labs/eigenda/common/kvstore"
+	"github.com/Layr-Labs/eigensdk-go/logging"
+
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -16,27 +18,40 @@ var _ kvstore.Store[[]byte] = &levelDBStore{}
 
 // levelDBStore implements kvstore.Store interfaces with levelDB as the backend engine.
 type levelDBStore struct {
-	db   *leveldb.DB
-	path string
-
-	logger logging.Logger
-
+	db       *leveldb.DB
+	path     string
 	shutdown bool
+	logger   logging.Logger
+	metrics  *MetricsCollector
 }
 
 // NewStore returns a new levelDBStore built using LevelDB.
 func NewStore(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
+	return NewStoreWithMetrics(logger, path, nil)
+}
+
+// NewStoreWithMetrics returns a new levelDBStore built using LevelDB with metrics collection.
+// If reg is nil, metrics will not be collected.
+func NewStoreWithMetrics(logger logging.Logger, path string, reg *prometheus.Registry) (kvstore.Store[[]byte], error) {
 	levelDB, err := leveldb.OpenFile(path, nil)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &levelDBStore{
+	store := &levelDBStore{
 		db:     levelDB,
 		path:   path,
 		logger: logger,
-	}, nil
+	}
+
+	if reg != nil {
+		config := DefaultMetricsConfig
+		config.Name = path
+		store.metrics = NewMetricsCollector(levelDB, logger, config, reg)
+	}
+
+	return store, nil
 }
 
 // Put stores a data in the store.
@@ -125,12 +140,16 @@ func (m *levelDBBatch) Size() uint32 {
 // Warning: it is not thread safe to call this method concurrently with other methods on this class,
 // or while there exist unclosed iterators.
 func (store *levelDBStore) Shutdown() error {
-	err := store.db.Close()
-	if err != nil {
-		return err
-	}
+	if !store.shutdown {
+		store.shutdown = true
 
-	store.shutdown = true
+		if store.metrics != nil {
+			store.logger.Info("Stopping metrics collection")
+			store.metrics.Stop()
+		}
+
+		return store.db.Close()
+	}
 	return nil
 }
 
