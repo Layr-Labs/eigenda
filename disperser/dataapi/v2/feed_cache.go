@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// SortOrder defines the ordering of data returned by fetchFromDB
+// SortOrder defines the ordering of data returned by fetchFromDB.
 type SortOrder int
 
 const (
@@ -15,18 +15,23 @@ const (
 	Descending
 )
 
-// TimeRange represents a time interval [start, end) where
-// start is inclusive and end is exclusive
+// TimeRange represents a time interval [start, end) where start is inclusive and end
+// is exclusive.
 type TimeRange struct {
 	Start time.Time
 	End   time.Time
 }
 
+// CacheEntry describes a segment of results fetched via fetchFromDB for a time range.
 type CacheEntry[T any] struct {
 	TimeRange
 	Data []*T
 }
 
+// FeedCache tracks the most recent segment of results fetched via fetchFromDB.
+// If new results (as a segment for the time range of query) are connected to the existing
+// cached segment, it'll extend the cache segment.
+// If there are more than maxItems in cache, it'll evict the oldest items.
 type FeedCache[T any] struct {
 	mu           sync.RWMutex
 	segment      *CacheEntry[T]
@@ -51,7 +56,6 @@ func (tr TimeRange) Overlaps(other TimeRange) bool {
 	return tr.Start.Before(other.End) && other.Start.Before(tr.End)
 }
 
-// reverseOrder reverses the order of elements in a slice
 func reverseOrder[T any](data []*T) []*T {
 	result := make([]*T, len(data))
 	for i, item := range data {
@@ -67,31 +71,30 @@ func (c *FeedCache[T]) Get(start, end time.Time, queryOrder SortOrder, limit int
 
 	queryRange := TimeRange{Start: start, End: end}
 
-	c.mu.RLock()
-	segment := c.segment
-	c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	// Handle no cache or no overlap cases together
-	if segment == nil || !queryRange.Overlaps(segment.TimeRange) {
-		shouldReplaceCache := segment == nil || !segment.TimeRange.End.After(start)
-		return c.handleCacheMiss(start, end, queryOrder, limit, shouldReplaceCache)
+	if c.segment == nil || !queryRange.Overlaps(c.segment.TimeRange) {
+		return c.handleCacheMiss(start, end, queryOrder, limit)
 	}
 
 	// Handle overlapping case
 	if queryOrder == Ascending {
-		return c.handleAscendingQuery(start, end, segment, limit)
+		return c.handleAscendingQuery(start, end, c.segment, limit)
 	} else {
-		return c.handleDescendingQuery(start, end, segment, limit)
+		return c.handleDescendingQuery(start, end, c.segment, limit)
 	}
 }
 
-func (c *FeedCache[T]) handleCacheMiss(start, end time.Time, queryOrder SortOrder, limit int, shouldReplaceCache bool) ([]*T, error) {
+func (c *FeedCache[T]) handleCacheMiss(start, end time.Time, queryOrder SortOrder, limit int) ([]*T, error) {
 	// Fetch directly with the requested order and limit
 	data, err := c.fetchFromDB(start, end, queryOrder, limit)
 	if err != nil {
 		return nil, err
 	}
-	hasMore := len(data) == limit
+
+	shouldReplaceCache := c.segment == nil || !c.segment.TimeRange.End.After(start)
 
 	// Cache data if it's not empty
 	if len(data) > 0 && shouldReplaceCache {
@@ -101,6 +104,7 @@ func (c *FeedCache[T]) handleCacheMiss(start, end time.Time, queryOrder SortOrde
 			dataToCache = reverseOrder(data)
 		}
 
+		hasMore := len(data) == limit
 		var newStart, newEnd time.Time
 		if queryOrder == Ascending {
 			newStart = start
@@ -122,7 +126,6 @@ func (c *FeedCache[T]) handleCacheMiss(start, end time.Time, queryOrder SortOrde
 			newStart = c.getTimestamp(dataToCache[0])
 		}
 
-		c.mu.Lock()
 		c.segment = &CacheEntry[T]{
 			TimeRange: TimeRange{
 				Start: newStart,
@@ -130,7 +133,6 @@ func (c *FeedCache[T]) handleCacheMiss(start, end time.Time, queryOrder SortOrde
 			},
 			Data: dataToCache,
 		}
-		c.mu.Unlock()
 	}
 
 	return data, nil
@@ -228,8 +230,6 @@ func (c *FeedCache[T]) handleAscendingQuery(start, end time.Time, segment *Cache
 	}
 
 	// Update cache
-	c.mu.Lock()
-
 	c.segment = &CacheEntry[T]{
 		TimeRange: TimeRange{
 			Start: newStart,
@@ -237,8 +237,6 @@ func (c *FeedCache[T]) handleAscendingQuery(start, end time.Time, segment *Cache
 		},
 		Data: newCacheData,
 	}
-
-	c.mu.Unlock()
 
 	return result, nil
 }
@@ -342,8 +340,6 @@ func (c *FeedCache[T]) handleDescendingQuery(start, end time.Time, segment *Cach
 	}
 
 	// Update cache
-	c.mu.Lock()
-
 	c.segment = &CacheEntry[T]{
 		TimeRange: TimeRange{
 			Start: newStart,
@@ -351,8 +347,6 @@ func (c *FeedCache[T]) handleDescendingQuery(start, end time.Time, segment *Cach
 		},
 		Data: newCacheData,
 	}
-
-	c.mu.Unlock()
 
 	return result, nil
 }
