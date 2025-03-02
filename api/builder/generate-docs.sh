@@ -5,9 +5,16 @@
 # The location where this script can be found.
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-API_DIR="${SCRIPT_DIR}/.."
+ROOT_DIR="${SCRIPT_DIR}/../.."
+API_DIR="${ROOT_DIR}/api"
 PROTO_DIR="${API_DIR}/proto"
-DOCS_DIR="${API_DIR}/docs"
+# Directories where output files are generated.
+# We place the MD files in the docs/spec directory so they can be included in the mdbook.
+HTML_OUTPUT_DIR="${API_DIR}/docs"
+MD_OUTPUT_DIR="${ROOT_DIR}/docs/spec/src/protobufs/generated"
+
+# We start by cleaning the old docs in both output directories.
+rm -rf "${HTML_OUTPUT_DIR}"/* "${MD_OUTPUT_DIR}"/*
 
 # Function to get the relative path of file in argument 1 with respect directory in argument 2.
 # Doesn't use the convenient 'realpath --relative-to' because it's not available on macOS.
@@ -28,11 +35,11 @@ IFS=$'\n' PROTO_FILES=($(sort <<<"${PROTO_FILES[*]}")); unset IFS
 
 PID_LIST=()
 
-# Generate unified HTML doc
+# Generate unified (single-page) HTML doc
 generateUnifiedHTML() {
   echo "Generating unified HTML documentation..."
   docker run --rm \
-    -v "${DOCS_DIR}":/out \
+    -v "${HTML_OUTPUT_DIR}":/out \
     -v "${PROTO_DIR}":/protos \
     pseudomuto/protoc-gen-doc \
     "${PROTO_FILES[@]}" \
@@ -46,11 +53,11 @@ generateUnifiedHTML() {
 generateUnifiedHTML &
 PID_LIST+=($!)
 
-# Generate unified markdown doc
+# Generate unified (single-page) markdown doc
 generateUnifiedMD() {
   echo "Generating unified markdown documentation..."
   docker run --rm \
-    -v "${DOCS_DIR}":/out \
+    -v "${MD_OUTPUT_DIR}":/out \
     -v "${PROTO_DIR}":/protos \
     pseudomuto/protoc-gen-doc \
     "${PROTO_FILES[@]}" \
@@ -68,7 +75,7 @@ PID_LIST+=($!)
 generateMD() {
   echo "Generating markdown documentation for ${1}..."
   docker run --rm \
-    -v "${DOCS_DIR}":/out \
+    -v "${MD_OUTPUT_DIR}":/out \
     -v "${PROTO_DIR}":/protos \
     pseudomuto/protoc-gen-doc \
     "${2}" \
@@ -84,7 +91,7 @@ generateMD() {
 generateHTML() {
     echo "Generating HTML documentation for ${1}..."
     docker run --rm \
-      -v "${DOCS_DIR}":/out \
+      -v "${HTML_OUTPUT_DIR}":/out \
       -v "${PROTO_DIR}":/protos \
       pseudomuto/protoc-gen-doc \
       "${2}" \
