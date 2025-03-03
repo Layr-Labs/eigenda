@@ -168,8 +168,6 @@ func NewDiskTable(
 		}
 	}
 
-	fmt.Printf("using TTL %v\n", metadata.GetTTL()) // TODO
-
 	table := &DiskTable{
 		ctx:                     ctx,
 		logger:                  logger,
@@ -623,13 +621,6 @@ func (d *DiskTable) shutdownTasks() {
 
 // doGarbageCollection performs garbage collection on all segments, deleting old ones as necessary.
 func (d *DiskTable) doGarbageCollection() {
-
-	defer func() {
-		fmt.Printf("    Finished GC\n") // TODO
-	}()
-
-	fmt.Printf("Waking up to do GC, ttl is %v\n", d.metadata.GetTTL()) // TODO
-
 	now := d.timeSource()
 	ttl := d.metadata.GetTTL()
 	if ttl.Nanoseconds() == 0 {
@@ -647,12 +638,9 @@ func (d *DiskTable) doGarbageCollection() {
 		sealTime := seg.GetSealTime()
 		segmentAge := now.Sub(sealTime)
 		if segmentAge < ttl {
-			fmt.Printf("    Segment %d is not old enough to delete, age is %v\n", index, segmentAge) // TODO
 			// Segment is not old enough to be deleted.
 			return
 		}
-
-		fmt.Printf("    Segment %d is old enough to delete, age is %v\n", index, segmentAge) // TODO
 
 		// Segment is old enough to be deleted.
 
