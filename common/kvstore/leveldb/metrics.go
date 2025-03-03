@@ -1,6 +1,7 @@
 package leveldb
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -68,7 +69,7 @@ var (
 
 func newLevelDBMetrics(reg *prometheus.Registry) error {
 	if reg == nil {
-		return fmt.Errorf("prometheus registry cannot be nil")
+		return errors.New("prometheus registry cannot be nil")
 	}
 
 	// Compaction metrics

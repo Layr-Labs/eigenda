@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -21,6 +22,7 @@ type levelDBStore struct {
 	db       *leveldb.DB
 	path     string
 	shutdown bool
+	mu       sync.Mutex
 	logger   logging.Logger
 	metrics  *MetricsCollector
 }
@@ -135,6 +137,9 @@ func (m *levelDBBatch) Size() uint32 {
 // Warning: it is not thread safe to call this method concurrently with other methods on this class,
 // or while there exist unclosed iterators.
 func (store *levelDBStore) Shutdown() error {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
 	if !store.shutdown {
 		store.shutdown = true
 
@@ -153,7 +158,11 @@ func (store *levelDBStore) Shutdown() error {
 // Warning: it is not thread safe to call this method concurrently with other methods on this class,
 // or while there exist unclosed iterators.
 func (store *levelDBStore) Destroy() error {
-	if !store.shutdown {
+	store.mu.Lock()
+	isShutdown := store.shutdown
+	store.mu.Unlock()
+
+	if !isShutdown {
 		err := store.Shutdown()
 		if err != nil {
 			return err
