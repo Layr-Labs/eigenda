@@ -75,6 +75,7 @@ func buildMemKeyDiskTable(
 		10,
 		4,
 		1234,
+		0,
 		1*time.Millisecond)
 
 	if err != nil {
@@ -112,6 +113,7 @@ func buildLevelDBKeyDiskTable(
 		10,
 		4,
 		1234,
+		0,
 		1*time.Millisecond)
 
 	if err != nil {

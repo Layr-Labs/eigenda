@@ -103,6 +103,7 @@ func NewDiskTable(
 	controlChannelSize int,
 	shardingFactor uint32,
 	salt uint32,
+	ttl time.Duration,
 	gcPeriod time.Duration) (litt.ManagedTable, error) {
 
 	if gcPeriod <= 0 {
@@ -153,7 +154,7 @@ func NewDiskTable(
 		// No metadata file exists yet. Create a new one in the first root.
 		var err error
 		metadataDir := roots[0]
-		metadata, err = newTableMetadata(logger, metadataDir, 0, shardingFactor)
+		metadata, err = newTableMetadata(logger, metadataDir, ttl, shardingFactor)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create table metadata: %v", err)
 		}
