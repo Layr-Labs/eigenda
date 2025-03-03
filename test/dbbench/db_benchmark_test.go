@@ -25,7 +25,7 @@ const totalToWrite = 1024 * units.GiB * 10
 const dataSize = 1 * units.MiB
 const batchSize = 100
 
-const littDBShards = 32
+const littDBShards = 1
 
 // runWriteBenchmark runs a simple benchmark. Its goal is to write a ton of data to the database as fast as possible.
 func runWriteBenchmark(
