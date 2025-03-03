@@ -19,7 +19,7 @@ import (
 
 type writer func(key []byte, value []byte) error
 
-const totalToWrite = 1024 * units.GiB
+const totalToWrite = 1024 * units.GiB * 10
 const dataSize = 1 * units.MiB
 const batchSize = 100
 
@@ -204,7 +204,7 @@ func TestLittDBWithGCWrite(t *testing.T) {
 	config, err := littbuilder.DefaultConfig(directory)
 	require.NoError(t, err)
 	config.ShardingFactor = littDBShards
-	config.GCPeriod = 2 * time.Hour
+	config.TTL = 2 * time.Hour
 
 	db, err := config.Build(context.Background())
 	require.NoError(t, err)
