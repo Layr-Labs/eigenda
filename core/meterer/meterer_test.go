@@ -381,6 +381,48 @@ func TestMetererOnDemand(t *testing.T) {
 		}})
 	assert.NoError(t, err)
 	assert.Equal(t, numValidPayments, len(result))
+
+	// test pricePerSymbol changes
+	symbolLengthA := uint64(30)
+	symbolLengthC := uint64(50)
+	
+	// pricePerSymbol is 2
+	chargeA := new(big.Int).Mul(big.NewInt(int64(mt.SymbolsCharged(symbolLengthA))), big.NewInt(2))
+	chargeC := new(big.Int).Mul(big.NewInt(int64(mt.SymbolsCharged(symbolLengthC))), big.NewInt(2))
+	
+	headerA := createPaymentHeader(now, chargeA, accountID2)
+	symbolsCharged, err = mt.MeterRequest(ctx, *headerA, symbolLengthA, quorumNumbers)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(30), symbolsCharged)
+	
+	headerC := createPaymentHeader(now, new(big.Int).Add(chargeA, chargeC), accountID2)
+	symbolsCharged, err = mt.MeterRequest(ctx, *headerC, symbolLengthC, quorumNumbers)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(50), symbolsCharged)
+	
+	// pricePerSymbol drops to 1 
+	symbolLengthB := uint64(50)
+	chargeB := new(big.Int).Mul(big.NewInt(int64(mt.SymbolsCharged(symbolLengthB))), big.NewInt(1))
+	
+	headerB := createPaymentHeader(now, new(big.Int).Add(chargeA, chargeB), accountID2)
+	_, err = mt.MeterRequest(ctx, *headerB, symbolLengthB, quorumNumbers)
+	assert.ErrorContains(t, err, "breaking cumulative payment invariants")
+	
+	// pricePerSymbol increases to 3
+	symbolLengthD := uint64(10)
+	chargeD := new(big.Int).Mul(big.NewInt(int64(mt.SymbolsCharged(symbolLengthD))), big.NewInt(3))
+	
+	headerD := createPaymentHeader(now, new(big.Int).Add(chargeA, chargeD), accountID2)
+	_, err = mt.MeterRequest(ctx, *headerD, symbolLengthD, quorumNumbers)
+	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
+	
+	// validate that the existing payment records remain unchanged
+	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
+		":account": &types.AttributeValueMemberS{
+			Value: accountID2.Hex(),
+		}})
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(result))
 }
 
 func TestMeterer_symbolsCharged(t *testing.T) {
