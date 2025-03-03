@@ -323,10 +323,11 @@ func TestMetererOnDemand(t *testing.T) {
 
 	// test duplicated cumulative payments
 	symbolLength := uint64(100)
-	priceCharged := new(big.Int).Mul(big.NewInt(int64(symbolLength)), big.NewInt(int64(mt.ChainPaymentState.GetPricePerSymbol())))
+	symbolsCharged := mt.SymbolsCharged(symbolLength)
+	priceCharged := new(big.Int).Mul(big.NewInt(int64(symbolsCharged)), big.NewInt(int64(mt.ChainPaymentState.GetPricePerSymbol())))
 	assert.Equal(t, big.NewInt(int64(102*mt.ChainPaymentState.GetPricePerSymbol())), priceCharged)
 	header = createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
-	symbolsCharged, err := mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
+	symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(102), symbolsCharged)
 	header = createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
@@ -350,7 +351,8 @@ func TestMetererOnDemand(t *testing.T) {
 	// test insufficient increment in cumulative payment
 	previousCumulativePayment := priceCharged.Mul(priceCharged, big.NewInt(9))
 	symbolLength = uint64(2)
-	priceCharged = new(big.Int).Mul(big.NewInt(int64(symbolLength)), big.NewInt(int64(mt.ChainPaymentState.GetPricePerSymbol())))
+	symbolsCharged = mt.SymbolsCharged(symbolLength)
+	priceCharged = new(big.Int).Mul(big.NewInt(int64(symbolsCharged)), big.NewInt(int64(mt.ChainPaymentState.GetPricePerSymbol())))
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, big.NewInt(0).Sub(priceCharged, big.NewInt(1))), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 	assert.ErrorContains(t, err, "invalid on-demand payment: insufficient cumulative payment increment")
