@@ -31,6 +31,9 @@ var (
 // which initializes test flags per init function which is called before an init in this package.
 func ParseEnv() {
 	runFuzzTests = os.Getenv("FUZZ") == "true" || os.Getenv("FUZZ") == "1"
+	runIntegrationTests = os.Getenv("INTEGRATION") == "true" || os.Getenv("INTEGRATION") == "1"
+	runTestnetIntegrationTests = os.Getenv("TESTNET") == "true" || os.Getenv("TESTNET") == "1"
+
 	if runIntegrationTests && runTestnetIntegrationTests {
 		panic("only one of INTEGRATION=true or TESTNET=true env var can be set")
 	}

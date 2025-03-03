@@ -197,7 +197,7 @@ func TestSuiteConfig(testCfg *Cfg) server.CLIConfig {
 			VerifyCerts:          false,
 			RPCURL:               ethRPC,
 			SvcManagerAddr:       svcManagerAddr,
-			EthConfirmationDepth: 0,
+			EthConfirmationDepth: 1,
 			KzgConfig: &kzg.KzgConfig{
 				G1Path:          "../resources/g1.point",
 				G2PowerOf2Path:  "../resources/g2.point.powerOf2",
@@ -206,6 +206,7 @@ func TestSuiteConfig(testCfg *Cfg) server.CLIConfig {
 				SRSNumberToLoad: maxBlobLengthBytes / 32,
 				NumWorker:       uint64(runtime.GOMAXPROCS(0)), // #nosec G115
 			},
+			WaitForFinalization: false,
 		},
 		MemstoreEnabled: testCfg.UseMemory,
 		MemstoreConfig: memconfig.NewSafeConfig(memconfig.Config{

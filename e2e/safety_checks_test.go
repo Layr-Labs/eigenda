@@ -182,11 +182,19 @@ func TestOversizedBlobRequestErrors(t *testing.T) {
 	require.Error(t, err)
 
 	oversizedError := false
+
+	// error returned from EigenDA V1 disperser
+	if strings.Contains(err.Error(), "blob size cannot exceed") {
+		oversizedError = true
+	}
+
+	// error caught within proxy
 	if strings.Contains(err.Error(), "blob is larger than max blob size") {
 		oversizedError = true
 	}
 
-	if strings.Contains(err.Error(), "blob size cannot exceed") {
+	// error caught within proxy
+	if strings.Contains(err.Error(), "http: request body too large") {
 		oversizedError = true
 	}
 
