@@ -147,9 +147,10 @@ func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, r
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
 	currentReservationPeriod := GetReservationPeriod(receivedAt.Unix(), reservationWindow)
 	// Valid reservation periodes are either the current bin or the previous bin
-	isCurrentOrPreviousPeriod := requestReservationPeriod == currentReservationPeriod || requestReservationPeriod == (currentReservationPeriod-1)
+	isCurrentOrPreviousPeriod := requestReservationPeriod == currentReservationPeriod || requestReservationPeriod == (currentReservationPeriod-reservationWindow)
 	startPeriod := GetReservationPeriod(int64(reservation.StartTimestamp), reservationWindow)
 	endPeriod := GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow)
+	fmt.Println("startPeriod", startPeriod, "endPeriod", endPeriod, "requestReservationPeriod", requestReservationPeriod, "currentReservationPeriod", currentReservationPeriod, "isCurrentOrPreviousPeriod", isCurrentOrPreviousPeriod)
 	isWithinReservationWindow := startPeriod <= requestReservationPeriod && requestReservationPeriod < endPeriod
 	if !isCurrentOrPreviousPeriod || !isWithinReservationWindow {
 		return false
@@ -182,8 +183,8 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 	return fmt.Errorf("overflow usage exceeds bin limit")
 }
 
-// GetReservationPeriodByNanosecondTimestamp returns the current reservation period by chunking nanosecond timestamp by the bin interval;
-// bin interval used by the disperser should be public information
+// GetReservationPeriodByNanosecondTimestamp returns the current reservation period by finding the nearest lower multiple of the bin interval;
+// bin interval used by the disperser is publicly recorded on-chain at the payment vault contract
 func GetReservationPeriodByNanosecond(nanosecondTimestamp int64, binInterval uint64) uint64 {
 	if nanosecondTimestamp < 0 {
 		return 0
@@ -191,13 +192,13 @@ func GetReservationPeriodByNanosecond(nanosecondTimestamp int64, binInterval uin
 	return GetReservationPeriod(int64((time.Duration(nanosecondTimestamp) * time.Nanosecond).Seconds()), binInterval)
 }
 
-// GetReservationPeriod returns the current reservation period by chunking time by the bin interval;
-// bin interval used by the disperser should be public information
+// GetReservationPeriod returns the current reservation period by finding the nearest lower multiple of the bin interval;
+// bin interval used by the disperser is publicly recorded on-chain at the payment vault contract
 func GetReservationPeriod(timestamp int64, binInterval uint64) uint64 {
 	if binInterval == 0 {
 		return 0
 	}
-	return uint64(timestamp) / binInterval
+	return uint64(timestamp) / binInterval * binInterval
 }
 
 // ServeOnDemandRequest handles the rate limiting logic for incoming requests

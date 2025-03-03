@@ -181,7 +181,7 @@ func TestAccountBlobCallSeries(t *testing.T) {
 	header, err := accountant.AccountBlob(ctx, now, 800, quorums)
 	assert.NoError(t, err)
 	timestamp := (time.Duration(header.Timestamp) * time.Nanosecond).Seconds()
-	assert.Equal(t, uint64(meterer.GetReservationPeriodByNanosecond(now, reservationWindow)), uint64(timestamp)/uint64(reservationWindow))
+	assert.Equal(t, uint64(meterer.GetReservationPeriodByNanosecond(now, reservationWindow)), uint64(meterer.GetReservationPeriod(int64(timestamp), reservationWindow)))
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 
 	// Second call: Use remaining reservation + overflow
@@ -189,7 +189,7 @@ func TestAccountBlobCallSeries(t *testing.T) {
 	header, err = accountant.AccountBlob(ctx, now, 300, quorums)
 	assert.NoError(t, err)
 	timestamp = (time.Duration(header.Timestamp) * time.Nanosecond).Seconds()
-	assert.Equal(t, uint64(meterer.GetReservationPeriodByNanosecond(now, reservationWindow)), uint64(timestamp)/uint64(reservationWindow))
+	assert.Equal(t, uint64(meterer.GetReservationPeriodByNanosecond(now, reservationWindow)), uint64(meterer.GetReservationPeriod(int64(timestamp), reservationWindow)))
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 
 	// Third call: Use on-demand
@@ -318,7 +318,7 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	header, err := accountant.AccountBlob(ctx, now, 800, quorums)
 	assert.NoError(t, err)
 	timestamp := (time.Duration(header.Timestamp) * time.Nanosecond).Seconds()
-	assert.Equal(t, uint64(meterer.GetReservationPeriodByNanosecond(now, reservationWindow)), uint64(timestamp)/uint64(reservationWindow))
+	assert.Equal(t, uint64(meterer.GetReservationPeriodByNanosecond(now, reservationWindow)), uint64(meterer.GetReservationPeriod(int64(timestamp), reservationWindow)))
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{800, 0, 0}, mapRecordUsage(accountant.periodRecords)), true)
 

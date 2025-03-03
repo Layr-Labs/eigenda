@@ -81,9 +81,10 @@ message PaymentHeader {
   // The reservation period of the dispersal request is used for rate-limiting the user's account against their dedicated 
   // bandwidth. This method requires users to set up reservation accounts with EigenDA team, and the team will set up an 
   // on-chain record of reserved bandwidth for the user for some period of time. The dispersal client's accountant will set 
-  // this value to the current timestamp divided by the on-chain configured reservation period interval, mapping each request 
+  // this value to the current timestamp in nanoseconds. The disperser server will find the corresponding reservation period by 
+  // taking the nearest lower multiple of the on-chain configured reservation period interval, mapping each request 
   // to a time-based window and is serialized and parsed as a uint32. The disperser server then validates that it matches 
-  // either the current or the previous period.
+  // either the current or the previous period, and check against the user's reserved bandwidth.
   //
   // Example Usage Flow:
   //   1. The user sets up a reservation with the EigenDA team, including throughput (symbolsPerSecond), startTimestamp,
@@ -93,7 +94,7 @@ message PaymentHeader {
   //       - If the reservation is active (t >= startTimestamp and t < endTimestamp).
   //       - After rounding up to the nearest multiple of `minNumSymbols` defined by the payment vault contract, the user still has enough bandwidth capacity
   //         (hasn’t exceeded symbolsPerSecond * reservationPeriodInterval).
-  //       - The request is ratelimited against the current reservation period, and calculated as reservation_period = t / reservationPeriodInterval.
+  //       - The request is ratelimited against the current reservation period, and calculated as reservation_period = floor(t / reservationPeriodInterval) * reservationPeriodInterval.
   //         the request's reservation period must either be the disperser server's current reservation period or the previous reservation period. 
   //   4. Server always go ahead with recording the received request in the current reservation period, and then categorize the scenarios 
   //       - If the remaining bandwidth is sufficient for the request, the dispersal request proceeds.
