@@ -35,7 +35,7 @@ func roundUpToNextMinute(t time.Time) time.Time {
 }
 
 // Implement fetch method matching the interface expected by FeedCache
-func (tf *testFetcher) fetch(start, end time.Time, order v2.SortOrder, limit int) ([]*testItem, error) {
+func (tf *testFetcher) fetch(start, end time.Time, order v2.FetchOrder, limit int) ([]*testItem, error) {
 	tf.fetchCount.Add(1)
 	var items []*testItem
 
@@ -110,7 +110,7 @@ func TestInvalidParameters(t *testing.T) {
 func TestFullCacheHit(t *testing.T) {
 	cache, fetcher, baseTime := setupTestCache(100)
 
-	test := func(direction v2.SortOrder) {
+	test := func(direction v2.FetchOrder) {
 		// Initial fetch with specified direction
 		start := baseTime
 		end := baseTime.Add(5 * time.Minute)
@@ -166,8 +166,8 @@ func TestFullCacheHit(t *testing.T) {
 func TestNoOverlap_NewerRange(t *testing.T) {
 	testCases := []struct {
 		name                string
-		initialDirection    v2.SortOrder
-		newerRangeDirection v2.SortOrder
+		initialDirection    v2.FetchOrder
+		newerRangeDirection v2.FetchOrder
 		expectedFetchCounts []int // Expected fetch counts after each fetch
 	}{
 		{
@@ -268,8 +268,8 @@ func TestNoOverlap_NewerRange_WithQueryLimit(t *testing.T) {
 func TestNoOverlap_OlderRange(t *testing.T) {
 	testCases := []struct {
 		name                string
-		initialDirection    v2.SortOrder
-		olderRangeDirection v2.SortOrder
+		initialDirection    v2.FetchOrder
+		olderRangeDirection v2.FetchOrder
 		expectedFetchCounts []int
 	}{
 		{
@@ -340,6 +340,7 @@ func TestWithLimit(t *testing.T) {
 	end := baseTime.Add(10 * time.Minute)
 	limit := 3
 
+	// Resulting in cache [0:00, 2:00+ns)
 	items, err := cache.Get(start, end, v2.Ascending, limit)
 	require.NoError(t, err)
 	require.Len(t, items, limit)
@@ -350,11 +351,23 @@ func TestWithLimit(t *testing.T) {
 	assert.Equal(t, 1, fetcher.getFetchCount())
 
 	// Full cache hit
-	_, err = cache.Get(start, start.Add(3*time.Minute), v2.Ascending, limit)
+	_, err = cache.Get(start, start.Add(2*time.Minute).Add(time.Nanosecond), v2.Ascending, limit)
 	require.NoError(t, err)
 	assert.Equal(t, 1, fetcher.getFetchCount())
 
+	// [0:00, 3:00) with limit=3 should also have full cache, because there are already 3 items in
+	// the cache, so it won't do more fetches for [2:00+ns, 3:00).
+	_, err = cache.Get(start, start.Add(3*time.Minute), v2.Ascending, limit)
+	require.NoError(t, err)
+	assert.Equal(t, 1, fetcher.getFetchCount())
+	// However, with descending, it will have to fetch [2:00+ns, 3:00) first (instead of using cache),
+	// so this will cause an increase in fetch count.
+	_, err = cache.Get(start, start.Add(3*time.Minute), v2.Descending, limit)
+	require.NoError(t, err)
+	assert.Equal(t, 2, fetcher.getFetchCount())
+
 	// Fetch with descending order and limit
+	// Resulting in cache [7:00, 10:00)
 	items, err = cache.Get(start, end, v2.Descending, limit)
 	require.NoError(t, err)
 	require.Len(t, items, limit)
@@ -362,26 +375,28 @@ func TestWithLimit(t *testing.T) {
 		expectedTime := end.Add(-time.Minute - time.Duration(i)*time.Minute)
 		assert.Equal(t, expectedTime, item.ts)
 	}
-	assert.Equal(t, 2, fetcher.getFetchCount())
+	assert.Equal(t, 3, fetcher.getFetchCount())
 
 	// Old cache dropped
+	// And this result won't be cached (remain as [7:00, 10:00)) as it's strictly older than
+	// what's in cache
 	_, err = cache.Get(start, start.Add(3*time.Minute), v2.Ascending, limit)
 	require.NoError(t, err)
-	assert.Equal(t, 3, fetcher.getFetchCount())
+	assert.Equal(t, 4, fetcher.getFetchCount())
 
 	// Full hit new cache
 	_, err = cache.Get(start.Add(7*time.Minute), end, v2.Ascending, limit)
 	require.NoError(t, err)
-	assert.Equal(t, 3, fetcher.getFetchCount())
+	assert.Equal(t, 4, fetcher.getFetchCount())
 }
 
 // Test partial overlap with newer range
 func TestPartialOverlap_NewerRange(t *testing.T) {
 	testCases := []struct {
 		name                string
-		initialDirection    v2.SortOrder
-		overlapDirection    v2.SortOrder
-		subRangeDirection   v2.SortOrder
+		initialDirection    v2.FetchOrder
+		overlapDirection    v2.FetchOrder
+		subRangeDirection   v2.FetchOrder
 		expectedFetchCounts []int
 	}{
 		{
@@ -533,22 +548,19 @@ func TestPartialOverlap_NewerRange_WithQueryLimit(t *testing.T) {
 		assert.Equal(t, 1, fetcher.getFetchCount())
 
 		// Query overlapping range [3:00, 8:00), but with descending so it'll fetch the
-		// high-end of items [5:00, 8:00) in the range
-		// Note: this also tests that even thouugh [0, 5:00) and [5:00, 8:00) are connected
-		// mathematically, because it finds 3 items in [5:00, 8:00) (reaching the limit), it
-		// conservatively assumes there are more items (hence the gaps to connect [3:00, 5:00))
+		// high-end of items [6:00, 8:00) in the range
 		newStart := baseTime.Add(3 * time.Minute)
 		newEnd := baseTime.Add(8 * time.Minute)
-		items, err := cache.Get(newStart, newEnd, v2.Descending, 3)
+		items, err := cache.Get(newStart, newEnd, v2.Descending, 2)
 		require.NoError(t, err)
-		require.Len(t, items, 3)
+		require.Len(t, items, 2)
 		for i, item := range items {
 			assert.Equal(t, newEnd.Add(time.Duration(-1*i-1)*time.Minute), item.ts)
 		}
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
-		// Querying [5:00, 8:00) will have full cache hit
-		_, err = cache.Get(baseTime.Add(5*time.Minute), baseTime.Add(8*time.Minute), v2.Ascending, 0)
+		// Querying [6:00, 8:00) will have full cache hit
+		_, err = cache.Get(baseTime.Add(6*time.Minute), baseTime.Add(8*time.Minute), v2.Ascending, 0)
 		require.NoError(t, err)
 		assert.Equal(t, 2, fetcher.getFetchCount())
 
