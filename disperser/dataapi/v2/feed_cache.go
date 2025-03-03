@@ -61,10 +61,12 @@ type cacheEntry[T any] struct {
 // executionPlan describes the breakdown of a data fetch query [start, end) into sub ranges
 // that hits cache and that need DB fetches.
 type executionPlan[T any] struct {
-	// data is the cache hit, ie. matching results that are in time range [before.end, after.start)
+	// cacheHit is the data items from the cache segment that overlap the query time range.
 	cacheHit []*T
-	before   *timeRange
-	after    *timeRange
+	// before is the sub time range that's prior to the cache segment.
+	before *timeRange
+	// after is the sub time range that's after the cache segment.
+	after *timeRange
 }
 
 // executionResult describes execution result of a plan.
@@ -132,15 +134,7 @@ func (c *FeedCache[T]) makePlan(start, end time.Time, queryOrder FetchOrder, lim
 	}
 
 	// Get cached data that's overlapping the query range
-	cachedOverlap := c.getCacheOverlap(segment.data, start, end)
-	// Apply limit to cached results
-	if limit > 0 && len(cachedOverlap) > limit {
-		if queryOrder == Ascending {
-			cachedOverlap = cachedOverlap[:limit] // Take first 'limit' items for ascending
-		} else {
-			cachedOverlap = cachedOverlap[len(cachedOverlap)-limit:] // Take last 'limit' items for descending
-		}
-	}
+	cachedOverlap := c.getCacheOverlap(segment.data, start, end, queryOrder, limit)
 
 	// The query range is fully contained in cache, it's a full cache hit
 	if !start.Before(segment.start) && !end.After(segment.end) {
@@ -413,24 +407,55 @@ func (c *FeedCache[T]) setCacheSegment(data []*T, start, end time.Time) {
 	}
 }
 
-func (c *FeedCache[T]) getCacheOverlap(data []*T, start, end time.Time) []*T {
-	result := make([]*T, 0)
+func (c *FeedCache[T]) getCacheOverlap(data []*T, start, end time.Time, queryOrder FetchOrder, limit int) []*T {
+	if len(data) == 0 {
+		return []*T{}
+	}
 
-	for _, item := range data {
+	// Find start and end indices of the overlap
+	startIdx := -1
+	endIdx := -1
+
+	for i, item := range data {
 		timestamp := c.getTimestamp(item)
 
-		// Since end is exclusive, we break on >=
-		if !timestamp.Before(end) {
-			break // since data is in ascending order
+		// Found the first item at or after the start time
+		if startIdx == -1 && !timestamp.Before(start) {
+			startIdx = i
 		}
 
-		// Since start is inclusive, we include >=
-		if !timestamp.Before(start) {
-			result = append(result, item)
+		// Found the first item at or past the end time (exclusive)
+		if !timestamp.Before(end) {
+			endIdx = i
+			break
 		}
 	}
 
-	return result
+	// If we never found the end, set it to the end of data
+	if endIdx == -1 {
+		endIdx = len(data)
+	}
+
+	// No overlap found
+	if startIdx == -1 || startIdx >= endIdx {
+		return []*T{}
+	}
+
+	// Calculate how many items in the overlap
+	overlapCount := endIdx - startIdx
+
+	// Apply limit if needed
+	if limit > 0 && limit < overlapCount {
+		if queryOrder == Ascending {
+			// For ascending, take first 'limit' items
+			endIdx = startIdx + limit
+		} else {
+			// For descending, take last 'limit' items
+			startIdx = endIdx - limit
+		}
+	}
+
+	return data[startIdx:endIdx]
 }
 
 func reverseOrder[T any](data []*T) []*T {
