@@ -212,7 +212,7 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "1", item["CumulativePayments"].(*types.AttributeValueMemberN).Value)
-	assert.Equal(t, charge.String(), item["Charge"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "1000", item["Charge"].(*types.AttributeValueMemberN).Value)
 
 	queryResult, err := dynamoClient.Query(ctx, tableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
