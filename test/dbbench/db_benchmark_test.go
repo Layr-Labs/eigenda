@@ -342,6 +342,9 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	queueLock := sync.Mutex{}
 	expirationQueue := linkedlistqueue.New()
 
+	txn := db.NewTransaction(true)
+	txn.Delete([]byte("test"))
+
 	writeFunction := func(key []byte, value []byte) error {
 
 		now := time.Now()
@@ -421,6 +424,12 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 			err = db.RunValueLogGC(0.5)
 			if err != nil {
 				fmt.Printf("Error running GC: %v\n", err)
+			}
+
+			// flatten the DB
+			err = db.Flatten(1)
+			if err != nil {
+				fmt.Printf("Error flattening DB: %v\n", err)
 			}
 		}
 	}()
