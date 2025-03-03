@@ -381,43 +381,60 @@ func TestMetererOnDemand(t *testing.T) {
 		}})
 	assert.NoError(t, err)
 	assert.Equal(t, numValidPayments, len(result))
+}
 
-	// test pricePerSymbol changes
+func TestOnDemand_PricePerSymbolChanges(t *testing.T) {
+	ctx := context.Background()
+	quorumNumbers := []uint8{0, 1}
+	now := time.Now()
+
+	// Mock the initial price per symbol to 2
+	paymentChainState.On("GetPricePerSymbol", testifymock.Anything).Return(uint64(2), nil)
+	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint64(3), nil)
+	paymentChainState.On("GetOnDemandQuorumNumbers", testifymock.Anything).Return(quorumNumbers, nil)
+	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
+		return account == accountID2
+	})).Return(account2OnDemandPayments, nil)
+
+	// Test A - pricePerSymbol is 2
 	symbolLengthA := uint64(30)
 	symbolLengthC := uint64(50)
-	
-	// pricePerSymbol is 2
+
 	chargeA := new(big.Int).Mul(big.NewInt(int64(mt.SymbolsCharged(symbolLengthA))), big.NewInt(2))
 	chargeC := new(big.Int).Mul(big.NewInt(int64(mt.SymbolsCharged(symbolLengthC))), big.NewInt(2))
-	
+
 	headerA := createPaymentHeader(now.UnixNano(), chargeA, accountID2)
-	symbolsCharged, err = mt.MeterRequest(ctx, *headerA, symbolLengthA, quorumNumbers, now)
+	symbolsCharged, err := mt.MeterRequest(ctx, *headerA, symbolLengthA, quorumNumbers, now)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(30), symbolsCharged)
-	
+
 	headerC := createPaymentHeader(now.UnixNano(), new(big.Int).Add(chargeA, chargeC), accountID2)
 	symbolsCharged, err = mt.MeterRequest(ctx, *headerC, symbolLengthC, quorumNumbers, now)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(50), symbolsCharged)
-	
-	// pricePerSymbol drops to 1 
+
+	// Test B - pricePerSymbol drops to 1
+	paymentChainState.On("GetPricePerSymbol", testifymock.Anything).Return(uint64(1), nil)
+
 	symbolLengthB := uint64(50)
 	chargeB := new(big.Int).Mul(big.NewInt(int64(mt.SymbolsCharged(symbolLengthB))), big.NewInt(1))
-	
+
 	headerB := createPaymentHeader(now.UnixNano(), new(big.Int).Add(chargeA, chargeB), accountID2)
 	_, err = mt.MeterRequest(ctx, *headerB, symbolLengthB, quorumNumbers, now)
 	assert.ErrorContains(t, err, "breaking cumulative payment invariants")
-	
-	// pricePerSymbol increases to 3
+
+	// Test C - pricePerSymbol increases to 3
+	paymentChainState.On("GetPricePerSymbol", testifymock.Anything).Return(uint64(3), nil)
+
 	symbolLengthD := uint64(10)
 	chargeD := new(big.Int).Mul(big.NewInt(int64(mt.SymbolsCharged(symbolLengthD))), big.NewInt(3))
-	
+
 	headerD := createPaymentHeader(now.UnixNano(), new(big.Int).Add(chargeA, chargeD), accountID2)
 	_, err = mt.MeterRequest(ctx, *headerD, symbolLengthD, quorumNumbers, now)
 	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
-	
-	// validate that the existing payment records remain unchanged
-	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
+
+	// Validate that the existing payment records remain unchanged
+	result, err := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID2.Hex(),
 		}})
