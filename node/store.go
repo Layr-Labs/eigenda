@@ -48,17 +48,13 @@ func NewLevelDBStore(path string, logger logging.Logger, metrics *Metrics, block
 	var db kvstore.Store[[]byte]
 	var err error
 	if metrics != nil {
-		db, err = leveldb.NewStoreWithMetrics(logger, path, metrics.registry)
-		if err != nil {
-			logger.Error("Could not create leveldb database", "err", err)
-			return nil, err
-		}
+		db, err = leveldb.NewStore(logger, path, metrics.registry)
 	} else {
-		db, err = leveldb.NewStore(logger, path)
-		if err != nil {
-			logger.Error("Could not create leveldb database", "err", err)
-			return nil, err
-		}
+		db, err = leveldb.NewStore(logger, path, nil)
+	}
+	if err != nil {
+		logger.Error("Could not create leveldb database", "err", err)
+		return nil, err
 	}
 
 	return &Store{

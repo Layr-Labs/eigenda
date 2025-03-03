@@ -1134,7 +1134,7 @@ func TestInterruptedTableDeletion(t *testing.T) {
 	err = store.Shutdown()
 	assert.NoError(t, err)
 
-	base, err := leveldb.NewStore(logger, dbPath)
+	base, err := leveldb.NewStore(logger, dbPath, nil)
 	assert.NoError(t, err)
 
 	explodingBase := &explodingStore{

@@ -125,7 +125,7 @@ func buildBaseStore(
 		if path == nil {
 			return nil, errors.New("path is required for LevelDB store")
 		}
-		return leveldb.NewStoreWithMetrics(logger, *path, reg)
+		return leveldb.NewStore(logger, *path, reg)
 	case MapStore:
 		return mapstore.NewStore(), nil
 	default:

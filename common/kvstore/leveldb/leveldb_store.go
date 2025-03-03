@@ -26,13 +26,8 @@ type levelDBStore struct {
 }
 
 // NewStore returns a new levelDBStore built using LevelDB.
-func NewStore(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
-	return NewStoreWithMetrics(logger, path, nil)
-}
-
-// NewStoreWithMetrics returns a new levelDBStore built using LevelDB with metrics collection.
 // If reg is nil, metrics will not be collected.
-func NewStoreWithMetrics(logger logging.Logger, path string, reg *prometheus.Registry) (kvstore.Store[[]byte], error) {
+func NewStore(logger logging.Logger, path string, reg *prometheus.Registry) (kvstore.Store[[]byte], error) {
 	levelDB, err := leveldb.OpenFile(path, nil)
 
 	if err != nil {
