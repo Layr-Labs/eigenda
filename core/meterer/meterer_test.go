@@ -359,7 +359,8 @@ func TestMetererOnDemand(t *testing.T) {
 	previousCumulativePayment = big.NewInt(0).Add(previousCumulativePayment, priceCharged)
 
 	// test cannot insert cumulative payment in out of order
-	header = createPaymentHeader(now.Unix(), new(big.Int).Mul(big.NewInt(50), big.NewInt(int64(mt.ChainPaymentState.GetPricePerSymbol()))), accountID2)
+	symbolsCharged = mt.SymbolsCharged(uint64(50))
+	header = createPaymentHeader(now.UnixNano(), new(big.Int).Mul(big.NewInt(int64(symbolsCharged)), big.NewInt(int64(mt.ChainPaymentState.GetPricePerSymbol()))), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 50, quorumNumbers, now)
 	assert.ErrorContains(t, err, "invalid on-demand payment: breaking cumulative payment invariants")
 
@@ -370,7 +371,7 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, numValidPayments, len(result))
 	// test failed global rate limit (previously payment recorded: 2, global limit: 1009)
-	header = createPaymentHeader(now.Unix(), big.NewInt(0).Add(previousCumulativePayment, new(big.Int).Mul(big.NewInt(1010), big.NewInt(int64(mt.ChainPaymentState.GetPricePerSymbol())))), accountID1)
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, new(big.Int).Mul(big.NewInt(1010), big.NewInt(int64(mt.ChainPaymentState.GetPricePerSymbol())))), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1010, quorumNumbers, now)
 	assert.ErrorContains(t, err, "failed global rate limiting")
 	// Correct rollback
