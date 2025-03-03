@@ -113,6 +113,9 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 	timestamp := blobHeaderProto.GetPaymentHeader().GetTimestamp()
 	cumulativePayment := new(big.Int).SetBytes(blobHeaderProto.GetPaymentHeader().GetCumulativePayment())
 	accountID := blobHeaderProto.GetPaymentHeader().GetAccountId()
+	if !gethcommon.IsHexAddress(accountID) {
+		return api.NewErrorInvalidArg(fmt.Sprintf("invalid account ID: %s", accountID))
+	}
 
 	paymentHeader := core.PaymentMetadata{
 		AccountID:         gethcommon.HexToAddress(accountID),
