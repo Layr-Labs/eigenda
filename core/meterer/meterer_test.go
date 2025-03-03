@@ -391,12 +391,12 @@ func TestMetererOnDemand(t *testing.T) {
 	chargeC := new(big.Int).Mul(big.NewInt(int64(mt.SymbolsCharged(symbolLengthC))), big.NewInt(2))
 	
 	headerA := createPaymentHeader(now.UnixNano(), chargeA, accountID2)
-	symbolsCharged, err = mt.MeterRequest(ctx, *headerA, symbolLengthA, quorumNumbers)
+	symbolsCharged, err = mt.MeterRequest(ctx, *headerA, symbolLengthA, quorumNumbers, now)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(30), symbolsCharged)
 	
 	headerC := createPaymentHeader(now.UnixNano(), new(big.Int).Add(chargeA, chargeC), accountID2)
-	symbolsCharged, err = mt.MeterRequest(ctx, *headerC, symbolLengthC, quorumNumbers)
+	symbolsCharged, err = mt.MeterRequest(ctx, *headerC, symbolLengthC, quorumNumbers, now)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(50), symbolsCharged)
 	
@@ -405,7 +405,7 @@ func TestMetererOnDemand(t *testing.T) {
 	chargeB := new(big.Int).Mul(big.NewInt(int64(mt.SymbolsCharged(symbolLengthB))), big.NewInt(1))
 	
 	headerB := createPaymentHeader(now.UnixNano(), new(big.Int).Add(chargeA, chargeB), accountID2)
-	_, err = mt.MeterRequest(ctx, *headerB, symbolLengthB, quorumNumbers)
+	_, err = mt.MeterRequest(ctx, *headerB, symbolLengthB, quorumNumbers, now)
 	assert.ErrorContains(t, err, "breaking cumulative payment invariants")
 	
 	// pricePerSymbol increases to 3
@@ -413,7 +413,7 @@ func TestMetererOnDemand(t *testing.T) {
 	chargeD := new(big.Int).Mul(big.NewInt(int64(mt.SymbolsCharged(symbolLengthD))), big.NewInt(3))
 	
 	headerD := createPaymentHeader(now.UnixNano(), new(big.Int).Add(chargeA, chargeD), accountID2)
-	_, err = mt.MeterRequest(ctx, *headerD, symbolLengthD, quorumNumbers)
+	_, err = mt.MeterRequest(ctx, *headerD, symbolLengthD, quorumNumbers, now)
 	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
 	
 	// validate that the existing payment records remain unchanged
