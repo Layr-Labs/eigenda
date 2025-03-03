@@ -400,6 +400,9 @@ func (s *Segment) Reserve() bool {
 // reaches zero as a result of this call.
 func (s *Segment) Release() {
 	reservations := s.reservationCount.Add(-1)
+
+	fmt.Printf("Segment %d released, reservation count: %d\n", s.index, reservations) // TODO
+
 	if reservations > 0 {
 		return
 	}
@@ -414,6 +417,7 @@ func (s *Segment) Release() {
 		if err != nil {
 			s.logger.Errorf("failed to delete segment: %v", err)
 		}
+		fmt.Printf("Segment %d deleted\n", s.index) // TODO
 	}()
 }
 
