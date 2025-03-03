@@ -179,13 +179,13 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 
 	ctx := context.Background()
 
-	charge := big.NewInt(2000)
+	paymentCharged := big.NewInt(2000)
 
 	err = dynamoClient.PutItem(ctx, tableName,
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
 			"CumulativePayments": &types.AttributeValueMemberN{Value: "1"},
-			"Charge":             &types.AttributeValueMemberN{Value: charge.String()},
+			"PaymentCharged":     &types.AttributeValueMemberN{Value: paymentCharged.String()},
 		},
 	)
 	assert.NoError(t, err)
@@ -198,7 +198,7 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 		items[i] = commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: fmt.Sprintf("account%d", i%repetitions)},
 			"CumulativePayments": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", i)},
-			"Charge":             &types.AttributeValueMemberN{Value: chargeValue.String()},
+			"PaymentCharged":     &types.AttributeValueMemberN{Value: chargeValue.String()},
 		}
 	}
 	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items)
@@ -212,7 +212,7 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "1", item["CumulativePayments"].(*types.AttributeValueMemberN).Value)
-	assert.Equal(t, "1000", item["Charge"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "1000", item["PaymentCharged"].(*types.AttributeValueMemberN).Value)
 
 	queryResult, err := dynamoClient.Query(ctx, tableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
@@ -223,7 +223,7 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 	for _, item := range queryResult {
 		cumulativePayments, _ := strconv.Atoi(item["CumulativePayments"].(*types.AttributeValueMemberN).Value)
 		expectedCharge := fmt.Sprintf("%d", cumulativePayments*1000)
-		assert.Equal(t, expectedCharge, item["Charge"].(*types.AttributeValueMemberN).Value)
+		assert.Equal(t, expectedCharge, item["PaymentCharged"].(*types.AttributeValueMemberN).Value)
 	}
 	queryResult, err = dynamoClient.Query(ctx, tableName, "AccountID = :account_id", commondynamodb.ExpressionValues{
 		":account_id": &types.AttributeValueMemberS{
@@ -240,15 +240,15 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 	}, commondynamodb.Item{
 		"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
 		"CumulativePayments": &types.AttributeValueMemberN{Value: "3"},
-		"Charge":             &types.AttributeValueMemberN{Value: newCharge.String()},
+		"PaymentCharged":     &types.AttributeValueMemberN{Value: newCharge.String()},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, newCharge.String(), updatedItem["Charge"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, newCharge.String(), updatedItem["PaymentCharged"].(*types.AttributeValueMemberN).Value)
 
 	item, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
 		"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
 		"CumulativePayments": &types.AttributeValueMemberN{Value: "1"},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, newCharge.String(), item["Charge"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, newCharge.String(), item["PaymentCharged"].(*types.AttributeValueMemberN).Value)
 }

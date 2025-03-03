@@ -121,7 +121,7 @@ func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod u
 	return binUsageValue, nil
 }
 
-func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, charge *big.Int) error {
+func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, paymentCharged *big.Int) error {
 	result, err := s.dynamoClient.GetItem(ctx, s.onDemandTableName,
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID},
@@ -138,7 +138,7 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID},
 			"CumulativePayments": &types.AttributeValueMemberN{Value: paymentMetadata.CumulativePayment.String()},
-			"Charge":             &types.AttributeValueMemberN{Value: charge.String()},
+			"PaymentCharged":     &types.AttributeValueMemberN{Value: paymentCharged.String()},
 		},
 	)
 
@@ -164,7 +164,7 @@ func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID str
 	return nil
 }
 
-// GetRelevantOnDemandRecords gets previous cumulative payment, next cumulative payment, and charge
+// GetRelevantOnDemandRecords gets previous cumulative payment, next cumulative payment, and paymentCharged
 // The queries are done sequentially instead of one-go for efficient querying and would not cause race condition errors for honest requests
 func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountID string, cumulativePayment *big.Int) (*big.Int, *big.Int, *big.Int, error) {
 	// Fetch the largest entry smaller than the given cumulativePayment
@@ -215,7 +215,7 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 		return nil, nil, big.NewInt(0), fmt.Errorf("failed to query the next payment for account: %w", err)
 	}
 	nextPayment := big.NewInt(0)
-	charge := big.NewInt(0)
+	paymentCharged := big.NewInt(0)
 	if len(largerResult) > 0 {
 		cumulativePaymentsAttr, ok := largerResult[0]["CumulativePayments"]
 		if !ok {
@@ -231,20 +231,20 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 		}
 		nextPayment = setNextPayment
 
-		chargeAttr, ok := largerResult[0]["Charge"]
+		chargeAttr, ok := largerResult[0]["PaymentCharged"]
 		if !ok {
-			return nil, nil, big.NewInt(0), fmt.Errorf("Charge field not found in result")
+			return nil, nil, big.NewInt(0), fmt.Errorf("PaymentCharged field not found in result")
 		}
 		chargeNum, ok := chargeAttr.(*types.AttributeValueMemberN)
 		if !ok {
-			return nil, nil, big.NewInt(0), fmt.Errorf("Charge has invalid type")
+			return nil, nil, big.NewInt(0), fmt.Errorf("PaymentCharged has invalid type")
 		}
-		if _, success := charge.SetString(chargeNum.Value, 10); !success {
-			return nil, nil, big.NewInt(0), fmt.Errorf("failed to parse charge value: %w", err)
+		if _, success := paymentCharged.SetString(chargeNum.Value, 10); !success {
+			return nil, nil, big.NewInt(0), fmt.Errorf("failed to parse paymentCharged value: %w", err)
 		}
 	}
 
-	return prevPayment, nextPayment, charge, nil
+	return prevPayment, nextPayment, paymentCharged, nil
 }
 
 func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID string, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error) {

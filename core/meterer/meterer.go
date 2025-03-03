@@ -214,20 +214,17 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 		return fmt.Errorf("invalid quorum for On-Demand Request: %w", err)
 	}
 
-	// Compute charge at payment time
-	charge := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol())
-	if charge.Cmp(big.NewInt(0)) <= 0 {
-		return fmt.Errorf("invalid charge value: must be positive, got %s", charge.String())
-	}
+	// Compute paymentCharged at payment time
+	paymentCharged := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol())
 
 	// Validate payments attached
-	err = m.ValidatePayment(ctx, header, onDemandPayment, charge)
+	err = m.ValidatePayment(ctx, header, onDemandPayment, paymentCharged)
 	if err != nil {
 		// No tolerance for incorrect payment amounts; no rollbacks
 		return fmt.Errorf("invalid on-demand payment: %w", err)
 	}
 
-	err = m.OffchainStore.AddOnDemandPayment(ctx, header, charge)
+	err = m.OffchainStore.AddOnDemandPayment(ctx, header, paymentCharged)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
 	}
