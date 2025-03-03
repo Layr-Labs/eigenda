@@ -3,6 +3,7 @@ package dbbench
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -379,6 +380,9 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 		return nil
 	}
 
+	gcCountWithNoWork := 0
+	gcCount := 0
+
 	alive := atomic.Bool{}
 	alive.Store(true)
 	compactionDone := make(chan struct{})
@@ -405,7 +409,7 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 			}
 			queueLock.Unlock()
 
-			fmt.Printf("deleting %d records\n", len(thingsToDelete)) // TODO
+			//fmt.Printf("deleting %d records\n", len(thingsToDelete)) // TODO
 
 			gcBatch := db.NewWriteBatch()
 			for _, record := range thingsToDelete {
@@ -420,13 +424,16 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 				fmt.Printf("Error flushing GC batch: %v\n", err)
 			}
 
-			// do compaction
+			gcCount++
 			err = db.RunValueLogGC(0.5)
 			if err != nil {
-				fmt.Printf("Error running GC: %v\n", err)
+				if strings.Contains(err.Error(), "Value log GC attempt didn't result in any cleanup") {
+					gcCountWithNoWork++
+				} else {
+					fmt.Printf("Error running GC: %v\n", err)
+				}
 			}
 
-			// flatten the DB
 			err = db.Flatten(1)
 			if err != nil {
 				fmt.Printf("Error flattening DB: %v\n", err)
