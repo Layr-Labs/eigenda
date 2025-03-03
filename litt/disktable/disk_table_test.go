@@ -59,6 +59,7 @@ func buildMemKeyDiskTableSingleShard(
 		10,
 		1,
 		1234,
+		0,
 		1*time.Millisecond)
 
 	if err != nil {
@@ -96,6 +97,7 @@ func buildMemKeyDiskTableMultiShard(
 		10,
 		4,
 		1234,
+		0,
 		1*time.Millisecond)
 
 	if err != nil {
@@ -137,6 +139,7 @@ func buildLevelDBKeyDiskTableSingleShard(
 		10,
 		1,
 		1234,
+		0,
 		1*time.Millisecond)
 
 	if err != nil {
@@ -178,6 +181,7 @@ func buildLevelDBKeyDiskTableMultiShard(
 		10,
 		4,
 		1234,
+		0,
 		1*time.Millisecond)
 
 	if err != nil {
@@ -1669,6 +1673,7 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder tableB
 					"segments",
 					path.Base(file))
 				err = os.Rename(file, destination)
+				require.NoError(t, err)
 			}
 
 			table, err = tableBuilder(time.Now, tableName, directories)
@@ -1677,6 +1682,7 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder tableB
 			// Change the sharding factor. This should not cause problems.
 			shardingFactor := rand.Uint32Range(1, 10)
 			err = table.SetShardingFactor(shardingFactor)
+			require.NoError(t, err)
 
 			// TODO shuffle keymap location
 			// TODO shuffle table metadata location

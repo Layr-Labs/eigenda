@@ -174,6 +174,7 @@ func (c *LittDBConfig) buildTable(
 			c.ControlChannelSize,
 			c.ShardingFactor,
 			c.Salt,
+			c.TTL,
 			c.GCPeriod)
 
 		if err != nil {
