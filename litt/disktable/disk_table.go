@@ -168,6 +168,8 @@ func NewDiskTable(
 		}
 	}
 
+	fmt.Printf("using TTL %v\n", metadata.GetTTL()) // TODO
+
 	table := &DiskTable{
 		ctx:                     ctx,
 		logger:                  logger,
