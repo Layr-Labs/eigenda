@@ -140,9 +140,9 @@ type GetChunksRequest struct {
 	//
 	// Perform a keccak256 hash on the following data in the following order:
 	//  1. the length of the operator ID in bytes
-	//  1. the operator id
-	//  2. the number of chunk requests
-	//  3. for each chunk request:
+	//  2. the operator id
+	//  3. the number of chunk requests
+	//  4. for each chunk request:
 	//     a. if the chunk request is a request by index:
 	//     i.   a one byte ASCII representation of the character "i" (aka Ox69)
 	//     ii.  the length blob key in bytes

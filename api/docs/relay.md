@@ -136,7 +136,7 @@ The following describes the schema for computing the hash of this request This a
 
 All integers are encoded as unsigned 4 byte big endian values.
 
-Perform a keccak256 hash on the following data in the following order: 1. the length of the operator ID in bytes 1. the operator id 2. the number of chunk requests 3. for each chunk request: a. if the chunk request is a request by index: i. a one byte ASCII representation of the character &#34;i&#34; (aka Ox69) ii. the length blob key in bytes iii. the blob key iv. the start index v. the end index b. if the chunk request is a request by range: i. a one byte ASCII representation of the character &#34;r&#34; (aka Ox72) ii. the length of the blob key in bytes iii. the blob key iv. each requested chunk index, in order |
+Perform a keccak256 hash on the following data in the following order: 1. the length of the operator ID in bytes 2. the operator id 3. the number of chunk requests 4. for each chunk request: a. if the chunk request is a request by index: i. a one byte ASCII representation of the character &#34;i&#34; (aka Ox69) ii. the length blob key in bytes iii. the blob key iv. the start index v. the end index b. if the chunk request is a request by range: i. a one byte ASCII representation of the character &#34;r&#34; (aka Ox72) ii. the length of the blob key in bytes iii. the blob key iv. each requested chunk index, in order |
 
 
 
