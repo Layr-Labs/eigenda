@@ -154,6 +154,13 @@ func TestHashing(t *testing.T) {
 	hash, err = hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
+
+	// nil header
+	request = RandomStoreChunksRequest(rand)
+	request.Batch.Header = nil
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
+	require.NotEqual(t, originalRequestHash, hash)
 }
 
 func TestRequestSigning(t *testing.T) {

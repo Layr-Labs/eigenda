@@ -16,35 +16,35 @@ import (
 func HashStoreChunksRequest(request *grpc.StoreChunksRequest) ([]byte, error) {
 	hasher := sha3.NewLegacyKeccak256()
 
-	err := hashBatchHeader(hasher, request.Batch.Header)
+	err := hashBatchHeader(hasher, request.GetBatch().GetHeader())
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash batch header: %w", err)
 	}
-	err = hashLength(hasher, request.Batch.BlobCertificates)
+	err = hashLength(hasher, request.GetBatch().GetBlobCertificates())
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash BlobCertificates length: %w", err)
 	}
-	for _, blobCertificate := range request.Batch.BlobCertificates {
+	for _, blobCertificate := range request.GetBatch().GetBlobCertificates() {
 		err = hashBlobCertificate(hasher, blobCertificate)
 		if err != nil {
 			return nil, fmt.Errorf("failed to hash blob certificate: %w", err)
 		}
 	}
-	hashUint32(hasher, request.DisperserID)
+	hashUint32(hasher, request.GetDisperserID())
 
 	return hasher.Sum(nil), nil
 }
 
 func hashBlobCertificate(hasher hash.Hash, blobCertificate *common.BlobCertificate) error {
-	err := hashBlobHeader(hasher, blobCertificate.BlobHeader)
+	err := hashBlobHeader(hasher, blobCertificate.GetBlobHeader())
 	if err != nil {
 		return fmt.Errorf("failed to hash blob header: %w", err)
 	}
-	err = hashByteArray(hasher, blobCertificate.Signature)
+	err = hashByteArray(hasher, blobCertificate.GetSignature())
 	if err != nil {
 		return fmt.Errorf("failed to hash signature: %w", err)
 	}
-	err = hashUint32Array(hasher, blobCertificate.RelayKeys)
+	err = hashUint32Array(hasher, blobCertificate.GetRelayKeys())
 	if err != nil {
 		return fmt.Errorf("failed to hash RelayKeys: %w", err)
 	}
@@ -52,20 +52,20 @@ func hashBlobCertificate(hasher hash.Hash, blobCertificate *common.BlobCertifica
 }
 
 func hashBlobHeader(hasher hash.Hash, header *common.BlobHeader) error {
-	hashUint32(hasher, header.Version)
-	hashUint32(hasher, uint32(len(header.QuorumNumbers)))
+	hashUint32(hasher, header.GetVersion())
+	hashUint32(hasher, uint32(len(header.GetQuorumNumbers())))
 
-	err := hashUint32Array(hasher, header.QuorumNumbers)
+	err := hashUint32Array(hasher, header.GetQuorumNumbers())
 	if err != nil {
 		return fmt.Errorf("failed to hash QuorumNumbers: %w", err)
 	}
 
-	err = hashBlobCommitment(hasher, header.Commitment)
+	err = hashBlobCommitment(hasher, header.GetCommitment())
 	if err != nil {
 		return fmt.Errorf("failed to hash commitment: %w", err)
 	}
 
-	err = hashPaymentHeader(hasher, header.PaymentHeader)
+	err = hashPaymentHeader(hasher, header.GetPaymentHeader())
 	if err != nil {
 		return fmt.Errorf("failed to hash payment header: %w", err)
 	}
@@ -74,45 +74,45 @@ func hashBlobHeader(hasher hash.Hash, header *common.BlobHeader) error {
 }
 
 func hashBatchHeader(hasher hash.Hash, header *common.BatchHeader) error {
-	err := hashByteArray(hasher, header.BatchRoot)
+	err := hashByteArray(hasher, header.GetBatchRoot())
 	if err != nil {
 		return fmt.Errorf("failed to hash BatchRoot: %w", err)
 	}
-	hashUint64(hasher, header.ReferenceBlockNumber)
+	hashUint64(hasher, header.GetReferenceBlockNumber())
 
 	return nil
 }
 
 func hashBlobCommitment(hasher hash.Hash, commitment *commonv1.BlobCommitment) error {
-	err := hashByteArray(hasher, commitment.Commitment)
+	err := hashByteArray(hasher, commitment.GetCommitment())
 	if err != nil {
 		return fmt.Errorf("failed to hash commitment: %w", err)
 	}
 
-	err = hashByteArray(hasher, commitment.LengthCommitment)
+	err = hashByteArray(hasher, commitment.GetLengthCommitment())
 	if err != nil {
 		return fmt.Errorf("failed to hash LengthCommitment: %w", err)
 	}
 
-	err = hashByteArray(hasher, commitment.LengthProof)
+	err = hashByteArray(hasher, commitment.GetLengthProof())
 	if err != nil {
 		return fmt.Errorf("failed to hash LengthProof: %w", err)
 	}
 
-	hashUint32(hasher, commitment.Length)
+	hashUint32(hasher, commitment.GetLength())
 
 	return nil
 }
 
 func hashPaymentHeader(hasher hash.Hash, header *common.PaymentHeader) error {
-	err := hashByteArray(hasher, []byte(header.AccountId))
+	err := hashByteArray(hasher, []byte(header.GetAccountId()))
 	if err != nil {
 		return fmt.Errorf("failed to hash AccountId: %w", err)
 	}
 
-	hashInt64(hasher, header.Timestamp)
+	hashInt64(hasher, header.GetTimestamp())
 
-	err = hashByteArray(hasher, header.CumulativePayment)
+	err = hashByteArray(hasher, header.GetCumulativePayment())
 	if err != nil {
 		return fmt.Errorf("failed to hash CumulativePayment: %w", err)
 	}
