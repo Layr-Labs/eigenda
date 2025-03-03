@@ -215,7 +215,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 	}
 
 	// Compute charge at payment time
-	charge := m.PaymentCharged(big.NewInt(int64(symbolsCharged)), big.NewInt(int64(m.ChainPaymentState.GetPricePerSymbol())))
+	charge := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol())
 	if charge.Cmp(big.NewInt(0)) <= 0 {
 		return fmt.Errorf("invalid charge value: must be positive, got %s", charge.String())
 	}
@@ -273,9 +273,8 @@ func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetada
 }
 
 // PaymentCharged returns the chargeable price for a given number of symbols
-func (m *Meterer) PaymentCharged(numSymbols, pricePerSymbol *big.Int) *big.Int {
-	priceCharged := new(big.Int).Mul(numSymbols, pricePerSymbol)
-	return priceCharged
+func PaymentCharged(numSymbols, pricePerSymbol uint64) *big.Int {
+	return new(big.Int).Mul(big.NewInt(int64(numSymbols)), big.NewInt(int64(pricePerSymbol)))
 }
 
 // SymbolsCharged returns the number of symbols charged for a given data length

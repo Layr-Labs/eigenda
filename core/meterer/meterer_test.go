@@ -20,7 +20,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 )
@@ -324,7 +323,7 @@ func TestMetererOnDemand(t *testing.T) {
 	// test duplicated cumulative payments
 	symbolLength := uint64(100)
 	symbolsCharged := mt.SymbolsCharged(symbolLength)
-	priceCharged := mt.PaymentCharged(big.NewInt(int64(symbolsCharged)), big.NewInt(int64(mt.ChainPaymentState.GetPricePerSymbol())))
+	priceCharged := meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol())
 	assert.Equal(t, big.NewInt(int64(102*mt.ChainPaymentState.GetPricePerSymbol())), priceCharged)
 	header = createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
 	symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
@@ -352,7 +351,7 @@ func TestMetererOnDemand(t *testing.T) {
 	previousCumulativePayment := priceCharged.Mul(priceCharged, big.NewInt(9))
 	symbolLength = uint64(2)
 	symbolsCharged = mt.SymbolsCharged(symbolLength)
-	priceCharged = mt.PaymentCharged(big.NewInt(int64(symbolsCharged)), big.NewInt(int64(mt.ChainPaymentState.GetPricePerSymbol())))
+	priceCharged = meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol())
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, big.NewInt(0).Sub(priceCharged, big.NewInt(1))), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 	assert.ErrorContains(t, err, "invalid on-demand payment: insufficient cumulative payment increment")
@@ -360,7 +359,7 @@ func TestMetererOnDemand(t *testing.T) {
 
 	// test cannot insert cumulative payment in out of order
 	symbolsCharged = mt.SymbolsCharged(uint64(50))
-	header = createPaymentHeader(now.UnixNano(), mt.PaymentCharged(big.NewInt(int64(symbolsCharged)), big.NewInt(int64(mt.ChainPaymentState.GetPricePerSymbol()))), accountID2)
+	header = createPaymentHeader(now.UnixNano(), meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol()), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 50, quorumNumbers, now)
 	assert.ErrorContains(t, err, "invalid on-demand payment: breaking cumulative payment invariants")
 
@@ -371,7 +370,7 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, numValidPayments, len(result))
 	// test failed global rate limit (previously payment recorded: 2, global limit: 1009)
-	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, mt.PaymentCharged(big.NewInt(1010), big.NewInt(int64(mt.ChainPaymentState.GetPricePerSymbol())))), accountID1)
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, meterer.PaymentCharged(1010, mt.ChainPaymentState.GetPricePerSymbol())), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1010, quorumNumbers, now)
 	assert.ErrorContains(t, err, "failed global rate limiting")
 	// Correct rollback
@@ -383,49 +382,48 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.Equal(t, numValidPayments, len(result))
 }
 
-func TestMeterer_paymentCharged(t *testing.T) {
+func TestPaymentCharged(t *testing.T) {
 	tests := []struct {
 		name           string
-		numSymbols     *big.Int
-		pricePerSymbol *big.Int
+		numSymbols     uint64
+		pricePerSymbol uint64
 		expected       *big.Int
 	}{
 		{
 			name:           "Simple case: 1024 symbols, price per symbol is 1",
-			numSymbols:     big.NewInt(1024),
-			pricePerSymbol: big.NewInt(1),
+			numSymbols:     1024,
+			pricePerSymbol: 1,
 			expected:       big.NewInt(1024 * 1),
 		},
 		{
 			name:           "Higher price per symbol",
-			numSymbols:     big.NewInt(1024),
-			pricePerSymbol: big.NewInt(2),
+			numSymbols:     1024,
+			pricePerSymbol: 2,
 			expected:       big.NewInt(1024 * 2),
 		},
 		{
 			name:           "Zero symbols",
-			numSymbols:     big.NewInt(0),
-			pricePerSymbol: big.NewInt(5),
+			numSymbols:     0,
+			pricePerSymbol: 5,
 			expected:       big.NewInt(0),
 		},
 		{
 			name:           "Zero price per symbol",
-			numSymbols:     big.NewInt(512),
-			pricePerSymbol: big.NewInt(0),
+			numSymbols:     512,
+			pricePerSymbol: 0,
 			expected:       big.NewInt(0),
 		},
 		{
 			name:           "Large number of symbols",
-			numSymbols:     big.NewInt(1 << 20),
-			pricePerSymbol: big.NewInt(3),
+			numSymbols:     1 << 20, // 1 MB
+			pricePerSymbol: 3,
 			expected:       new(big.Int).Mul(big.NewInt(1<<20), big.NewInt(3)),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := &meterer.Meterer{}
-			result := m.PaymentCharged(tt.numSymbols, tt.pricePerSymbol)
+			result := meterer.PaymentCharged(tt.numSymbols, tt.pricePerSymbol)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
