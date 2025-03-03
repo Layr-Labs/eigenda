@@ -15,46 +15,46 @@ import (
 func HashStoreChunksRequest(request *grpc.StoreChunksRequest) []byte {
 	hasher := sha3.NewLegacyKeccak256()
 
-	hashBatchHeader(hasher, request.Batch.Header)
-	for _, blobCertificate := range request.Batch.BlobCertificates {
+	hashBatchHeader(hasher, request.GetBatch().GetHeader())
+	for _, blobCertificate := range request.GetBatch().GetBlobCertificates() {
 		hashBlobCertificate(hasher, blobCertificate)
 	}
-	hashUint32(hasher, request.DisperserID)
+	hashUint32(hasher, request.GetDisperserID())
 
 	return hasher.Sum(nil)
 }
 
 func hashBlobCertificate(hasher hash.Hash, blobCertificate *common.BlobCertificate) {
-	hashBlobHeader(hasher, blobCertificate.BlobHeader)
-	hasher.Write(blobCertificate.Signature)
-	for _, relayKey := range blobCertificate.RelayKeys {
+	hashBlobHeader(hasher, blobCertificate.GetBlobHeader())
+	hasher.Write(blobCertificate.GetSignature())
+	for _, relayKey := range blobCertificate.GetRelayKeys() {
 		hashUint32(hasher, relayKey)
 	}
 }
 
 func hashBlobHeader(hasher hash.Hash, header *common.BlobHeader) {
-	hashUint32(hasher, header.Version)
-	for _, quorum := range header.QuorumNumbers {
+	hashUint32(hasher, header.GetVersion())
+	for _, quorum := range header.GetQuorumNumbers() {
 		hashUint32(hasher, quorum)
 	}
-	hashBlobCommitment(hasher, header.Commitment)
-	hashPaymentHeader(hasher, header.PaymentHeader)
+	hashBlobCommitment(hasher, header.GetCommitment())
+	hashPaymentHeader(hasher, header.GetPaymentHeader())
 }
 
 func hashBatchHeader(hasher hash.Hash, header *common.BatchHeader) {
-	hasher.Write(header.BatchRoot)
-	hashUint64(hasher, header.ReferenceBlockNumber)
+	hasher.Write(header.GetBatchRoot())
+	hashUint64(hasher, header.GetReferenceBlockNumber())
 }
 
 func hashBlobCommitment(hasher hash.Hash, commitment *commonv1.BlobCommitment) {
-	hasher.Write(commitment.Commitment)
-	hasher.Write(commitment.LengthCommitment)
-	hasher.Write(commitment.LengthProof)
-	hashUint32(hasher, commitment.Length)
+	hasher.Write(commitment.GetCommitment())
+	hasher.Write(commitment.GetLengthCommitment())
+	hasher.Write(commitment.GetLengthProof())
+	hashUint32(hasher, commitment.GetLength())
 }
 
 func hashPaymentHeader(hasher hash.Hash, header *common.PaymentHeader) {
-	hasher.Write([]byte(header.AccountId))
-	hashInt64(hasher, header.Timestamp)
-	hasher.Write(header.CumulativePayment)
+	hasher.Write([]byte(header.GetAccountId()))
+	hashInt64(hasher, header.GetTimestamp())
+	hasher.Write(header.GetCumulativePayment())
 }
