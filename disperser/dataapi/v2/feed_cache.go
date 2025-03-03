@@ -75,7 +75,7 @@ type executionResult[T any] struct {
 	before *timeRange
 	after  *timeRange
 
-	// The DB fetch results corresponding to `before` and `after` range.
+	// The DB fetch results corresponding to `before` and `after` ranges.
 	beforeData []*T
 	afterData  []*T
 
@@ -195,7 +195,7 @@ func (c *FeedCache[T]) executePlanAscending(plan executionPlan[T], limit int) (*
 		}
 	}
 
-	// Combine results: beforeData -> cachedOverlap -> afterData
+	// Combine results: beforeData -> cacheHit -> afterData
 	numToReturn := len(beforeData) + len(plan.cacheHit) + len(afterData)
 	if limit > 0 {
 		numToReturn = min(numToReturn, limit)
@@ -258,7 +258,7 @@ func (c *FeedCache[T]) executePlanDescending(plan executionPlan[T], limit int) (
 		}
 	}
 
-	// Combine results: afterData -> cachedOverlap -> beforeData
+	// Combine results: afterData -> cacheHit -> beforeData
 	numToReturn := len(beforeData) + len(plan.cacheHit) + len(afterData)
 	if limit > 0 {
 		numToReturn = min(numToReturn, limit)
