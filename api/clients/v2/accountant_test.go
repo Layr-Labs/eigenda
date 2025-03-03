@@ -27,9 +27,9 @@ func TestNewAccountant(t *testing.T) {
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
 	}
-	reservationWindow := uint32(6)
-	pricePerSymbol := uint32(1)
-	minNumSymbols := uint32(100)
+	reservationWindow := uint64(6)
+	pricePerSymbol := uint64(1)
+	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
@@ -57,9 +57,9 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
 	}
-	reservationWindow := uint32(5)
-	pricePerSymbol := uint32(1)
-	minNumSymbols := uint32(100)
+	reservationWindow := uint64(5)
+	pricePerSymbol := uint64(1)
+	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
@@ -67,7 +67,7 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
-	symbolLength := uint32(500)
+	symbolLength := uint64(500)
 	quorums := []uint8{0, 1}
 	now := time.Now().UnixNano()
 
@@ -78,7 +78,7 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{500, 0, 0}, mapRecordUsage(accountant.periodRecords)), true)
 
-	symbolLength = uint32(700)
+	symbolLength = uint64(700)
 
 	now = time.Now().UnixNano()
 	header, err = accountant.AccountBlob(ctx, now, symbolLength, quorums)
@@ -108,9 +108,9 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1500),
 	}
-	reservationWindow := uint32(5)
-	pricePerSymbol := uint32(1)
-	minNumSymbols := uint32(100)
+	reservationWindow := uint64(5)
+	pricePerSymbol := uint64(1)
+	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
@@ -118,7 +118,7 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
-	numSymbols := uint32(1500)
+	numSymbols := uint64(1500)
 	quorums := []uint8{0, 1}
 	now := time.Now().UnixNano()
 	header, err := accountant.AccountBlob(ctx, now, numSymbols, quorums)
@@ -136,9 +136,9 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
 	}
-	reservationWindow := uint32(60)
-	pricePerSymbol := uint32(100)
-	minNumSymbols := uint32(100)
+	reservationWindow := uint64(60)
+	pricePerSymbol := uint64(100)
+	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
@@ -146,7 +146,7 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
-	numSymbols := uint32(2000)
+	numSymbols := uint64(2000)
 	quorums := []uint8{0, 1}
 	now := time.Now().UnixNano()
 	_, err = accountant.AccountBlob(ctx, now, numSymbols, quorums)
@@ -164,9 +164,9 @@ func TestAccountBlobCallSeries(t *testing.T) {
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
 	}
-	reservationWindow := uint32(5)
-	pricePerSymbol := uint32(1)
-	minNumSymbols := uint32(100)
+	reservationWindow := uint64(5)
+	pricePerSymbol := uint64(1)
+	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
@@ -217,9 +217,9 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
 	}
-	reservationWindow := uint32(1) // Set to 1 second for testing
-	pricePerSymbol := uint32(1)
-	minNumSymbols := uint32(100)
+	reservationWindow := uint64(1) // Set to 1 second for testing
+	pricePerSymbol := uint64(1)
+	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
@@ -258,9 +258,9 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
 	}
-	reservationWindow := uint32(1) // Set to 1 second for testing
-	pricePerSymbol := uint32(1)
-	minNumSymbols := uint32(100)
+	reservationWindow := uint64(1) // Set to 1 second for testing
+	pricePerSymbol := uint64(1)
+	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
@@ -301,9 +301,9 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
 	}
-	reservationWindow := uint32(5)
-	pricePerSymbol := uint32(1)
-	minNumSymbols := uint32(100)
+	reservationWindow := uint64(5)
+	pricePerSymbol := uint64(1)
+	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
@@ -348,9 +348,9 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
 	}
-	reservationWindow := uint32(1) // Set to 1 second for testing
-	pricePerSymbol := uint32(1)
-	minNumSymbols := uint32(100)
+	reservationWindow := uint64(1) // Set to 1 second for testing
+	pricePerSymbol := uint64(1)
+	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)

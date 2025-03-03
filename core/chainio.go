@@ -128,17 +128,11 @@ type Reader interface {
 	// GetOnDemandPaymentByAccount returns on-demand payment of an account
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*OnDemandPayment, error)
 
-	// GetNumRelays returns the number of registered relays.
-	GetNumRelays(ctx context.Context) (uint32, error)
-
-	// GetRelayURL returns the relay URL address for the given key.
-	GetRelayURL(ctx context.Context, key uint32) (string, error)
-
-	// GetRelayURLs returns the relay URL addresses for all relays.
-	GetRelayURLs(ctx context.Context) (map[uint32]string, error)
-
 	// GetDisperserAddress returns the disperser address with the given ID.
 	GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error)
+
+	// GetRelayRegistryAddress returns the Address of the EigenDARelayRegistry contract
+	GetRelayRegistryAddress() gethcommon.Address
 }
 
 type Writer interface {

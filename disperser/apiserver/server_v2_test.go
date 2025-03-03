@@ -455,11 +455,11 @@ func newTestServerV2(t *testing.T) *testComponents {
 	// append test name to each table name for an unique store
 	mockState := &mock.MockOnchainPaymentState{}
 	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil).Maybe()
-	mockState.On("GetReservationWindow", tmock.Anything).Return(uint32(1), nil)
-	mockState.On("GetPricePerSymbol", tmock.Anything).Return(uint32(2), nil)
+	mockState.On("GetReservationWindow", tmock.Anything).Return(uint64(1), nil)
+	mockState.On("GetPricePerSymbol", tmock.Anything).Return(uint64(2), nil)
 	mockState.On("GetGlobalSymbolsPerSecond", tmock.Anything).Return(uint64(1009), nil)
-	mockState.On("GetGlobalRatePeriodInterval", tmock.Anything).Return(uint32(1), nil)
-	mockState.On("GetMinNumSymbols", tmock.Anything).Return(uint32(3), nil)
+	mockState.On("GetGlobalRatePeriodInterval", tmock.Anything).Return(uint64(1), nil)
+	mockState.On("GetMinNumSymbols", tmock.Anything).Return(uint64(3), nil)
 
 	now := uint64(time.Now().Unix())
 	mockState.On("GetReservedPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)

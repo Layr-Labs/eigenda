@@ -8,14 +8,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/common/geth"
-	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	core "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // PayloadDisperser provides the ability to disperse payloads to EigenDA via a Disperser grpc service.
@@ -27,69 +21,6 @@ type PayloadDisperser struct {
 	disperserClient      DisperserClient
 	certVerifier         verification.ICertVerifier
 	requiredQuorumsStore *RequiredQuorumsStore
-}
-
-// BuildPayloadDisperser builds a PayloadDisperser from config structs.
-func BuildPayloadDisperser(
-	log logging.Logger,
-	payloadDispCfg PayloadDisperserConfig,
-	dispClientCfg *DisperserClientConfig,
-	ethCfg *geth.EthClientConfig,
-	kzgConfig *kzg.KzgConfig,
-	encoderCfg *encoding.Config,
-) (*PayloadDisperser, error) {
-
-	// 1 - verify key semantics and create signer
-	signer, err := auth.NewLocalBlobRequestSigner(payloadDispCfg.SignerPaymentKey)
-	if err != nil {
-		return nil, fmt.Errorf("new local blob request signer: %w", err)
-	}
-
-	// 2 - create prover (if applicable)
-	var kzgProver encoding.Prover
-	if kzgConfig != nil {
-		if encoderCfg == nil {
-			encoderCfg = encoding.DefaultConfig()
-		}
-
-		kzgProver, err = prover.NewProver(kzgConfig, encoderCfg)
-		if err != nil {
-			return nil, fmt.Errorf("new kzg prover: %w", err)
-		}
-	} else {
-		log.Warn("No prover provided, using disperser for blob commitment generation")
-	}
-
-	// 3 - create disperser client & set accountant to nil
-	// to then populate using signer field via in-place method
-	// which queries disperser directly for payment states
-	disperserClient, err := NewDisperserClient(dispClientCfg, signer, kzgProver, nil)
-	if err != nil {
-		return nil, fmt.Errorf("new disperser client: %w", err)
-	}
-
-	err = disperserClient.PopulateAccountant(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("populating accountant in disperser client: %w", err)
-	}
-
-	// 4 - construct eth client to wire up cert verifier
-	ethClient, err := geth.NewClient(*ethCfg, gethcommon.Address{}, 0, log)
-	if err != nil {
-		return nil, fmt.Errorf("new eth client: %w", err)
-	}
-
-	certVerifier, err := verification.NewCertVerifier(
-		log,
-		ethClient,
-		payloadDispCfg.BlockNumberPollInterval,
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("new cert verifier: %w", err)
-	}
-
-	return NewPayloadDisperser(log, payloadDispCfg, disperserClient, certVerifier)
 }
 
 // NewPayloadDisperser creates a PayloadDisperser from subcomponents that have already been constructed and initialized.

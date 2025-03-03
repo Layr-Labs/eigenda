@@ -15,6 +15,7 @@ on:
       - 'retriever/**'
       - 'disperser/**'
       - 'core/**'
+      - 'contracts/src'
       - 'common/**'
       - 'api/**'
       - 'subgraphs/**'
