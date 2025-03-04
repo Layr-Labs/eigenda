@@ -248,7 +248,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 // chargeOfNextPmt is the charge associated with nextPmt if exists
 // prevPmt + charge <= PaymentMetadata.CumulativePayment
 // <= nextPmt - chargeOfNextPmt > nextPmt
-func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, charge *big.Int) error {
+func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, currentPaymentCharge *big.Int) error {
 	if header.CumulativePayment.Cmp(onDemandPayment.CumulativePayment) > 0 {
 		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
 	}
@@ -258,7 +258,7 @@ func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetada
 		return fmt.Errorf("failed to get relevant on-demand records: %w", err)
 	}
 	// the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
-	if new(big.Int).Add(prevPmt, charge).Cmp(header.CumulativePayment) > 0 {
+	if new(big.Int).Add(prevPmt, currentPaymentCharge).Cmp(header.CumulativePayment) > 0 {
 		return fmt.Errorf("insufficient cumulative payment increment")
 	}
 	// the current request must not break the payment magnitude for the next payment if the two requests were delivered out-of-order
