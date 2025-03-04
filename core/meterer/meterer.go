@@ -125,7 +125,7 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 
 // ValidateQuorums ensures that the quorums listed in the blobHeader are present within allowedQuorums
 // Note: A reservation that does not utilize all of the allowed quorums will be accepted. However, it
-// will still charge against all of the allowed quorums. A on-demand requrests require and only allow
+// will still charge against all of the allowed quorums. A on-demand requests require and only allow
 // the ETH and EIGEN quorums.
 func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) error {
 	if len(headerQuorums) == 0 {
@@ -146,7 +146,7 @@ func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) 
 func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, requestReservationPeriod uint64, receivedAt time.Time) bool {
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
 	currentReservationPeriod := GetReservationPeriod(receivedAt.Unix(), reservationWindow)
-	// Valid reservation periodes are either the current bin or the previous bin
+	// Valid reservation periods are either the current bin or the previous bin
 	isCurrentOrPreviousPeriod := requestReservationPeriod == currentReservationPeriod || requestReservationPeriod == (currentReservationPeriod-1)
 	startPeriod := GetReservationPeriod(int64(reservation.StartTimestamp), reservationWindow)
 	endPeriod := GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow)
@@ -242,7 +242,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 // ValidatePayment checks if the provided payment header is valid against the local accounting
 // prevPmt is the largest  cumulative payment strictly less    than PaymentMetadata.cumulativePayment if exists
 // nextPmt is the smallest cumulative payment strictly greater than PaymentMetadata.cumulativePayment if exists
-// nextPmtnumSymbols is the numSymbols of corresponding to nextPmt if exists
+// nextPmtNumSymbols is the numSymbols of corresponding to nextPmt if exists
 // prevPmt + PaymentMetadata.numSymbols * m.FixedFeePerByte
 // <= PaymentMetadata.CumulativePayment
 // <= nextPmt - nextPmtNumSymbols * m.FixedFeePerByte > nextPmt
