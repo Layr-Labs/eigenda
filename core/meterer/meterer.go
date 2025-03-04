@@ -212,14 +212,17 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 		return fmt.Errorf("invalid quorum for On-Demand Request: %w", err)
 	}
 
+	// Compute paymentCharged at payment time
+	paymentCharged := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol())
+
 	// Validate payments attached
-	err = m.ValidatePayment(ctx, header, onDemandPayment, symbolsCharged)
+	err = m.ValidatePayment(ctx, header, onDemandPayment, paymentCharged)
 	if err != nil {
 		// No tolerance for incorrect payment amounts; no rollbacks
 		return fmt.Errorf("invalid on-demand payment: %w", err)
 	}
 
-	err = m.OffchainStore.AddOnDemandPayment(ctx, header, symbolsCharged)
+	err = m.OffchainStore.AddOnDemandPayment(ctx, header, paymentCharged)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
 	}
@@ -240,37 +243,33 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 // ValidatePayment checks if the provided payment header is valid against the local accounting
 // prevPmt is the largest  cumulative payment strictly less    than PaymentMetadata.cumulativePayment if exists
 // nextPmt is the smallest cumulative payment strictly greater than PaymentMetadata.cumulativePayment if exists
-// nextPmtNumSymbols is the numSymbols of corresponding to nextPmt if exists
-// prevPmt + PaymentMetadata.numSymbols * m.FixedFeePerByte
-// <= PaymentMetadata.CumulativePayment
-// <= nextPmt - nextPmtNumSymbols * m.FixedFeePerByte > nextPmt
-func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, symbolsCharged uint64) error {
+// chargeOfNextPmt is the charge associated with nextPmt if exists
+// prevPmt + currentPaymentCharge <= PaymentMetadata.CumulativePayment
+// <= nextPmt - chargeOfNextPmt > nextPmt
+func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, currentPaymentCharge *big.Int) error {
 	if header.CumulativePayment.Cmp(onDemandPayment.CumulativePayment) > 0 {
 		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
 	}
 
-	prevPmt, nextPmt, nextPmtNumSymbols, err := m.OffchainStore.GetRelevantOnDemandRecords(ctx, header.AccountID, header.CumulativePayment) // zero if DNE
+	prevPmt, nextPmt, chargeOfNextPmt, err := m.OffchainStore.GetRelevantOnDemandRecords(ctx, header.AccountID, header.CumulativePayment) // zero if DNE
 	if err != nil {
 		return fmt.Errorf("failed to get relevant on-demand records: %w", err)
 	}
 	// the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
-	if new(big.Int).Add(prevPmt, m.PaymentCharged(symbolsCharged)).Cmp(header.CumulativePayment) > 0 {
+	if new(big.Int).Add(prevPmt, currentPaymentCharge).Cmp(header.CumulativePayment) > 0 {
 		return fmt.Errorf("insufficient cumulative payment increment")
 	}
 	// the current request must not break the payment magnitude for the next payment if the two requests were delivered out-of-order
-	if nextPmt.Cmp(big.NewInt(0)) != 0 && new(big.Int).Add(header.CumulativePayment, m.PaymentCharged(uint64(nextPmtNumSymbols))).Cmp(nextPmt) > 0 {
+	if nextPmt.Cmp(big.NewInt(0)) != 0 && new(big.Int).Add(header.CumulativePayment, chargeOfNextPmt).Cmp(nextPmt) > 0 {
 		return fmt.Errorf("breaking cumulative payment invariants")
 	}
 	// check passed: blob can be safely inserted into the set of payments
 	return nil
 }
 
-// PaymentCharged returns the chargeable price for a given data length
-func (m *Meterer) PaymentCharged(numSymbols uint64) *big.Int {
-	// symbolsCharged == m.SymbolsCharged(numSymbols) if numSymbols is already a multiple of MinNumSymbols
-	symbolsCharged := big.NewInt(0).SetUint64(m.SymbolsCharged(numSymbols))
-	pricePerSymbol := big.NewInt(int64(m.ChainPaymentState.GetPricePerSymbol()))
-	return symbolsCharged.Mul(symbolsCharged, pricePerSymbol)
+// PaymentCharged returns the chargeable price for a given number of symbols
+func PaymentCharged(numSymbols, pricePerSymbol uint64) *big.Int {
+	return new(big.Int).Mul(big.NewInt(int64(numSymbols)), big.NewInt(int64(pricePerSymbol)))
 }
 
 // SymbolsCharged returns the number of symbols charged for a given data length
