@@ -382,20 +382,26 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 		for alive.Load() {
 			<-ticker.C
 
+			fmt.Printf("\nRunning GC\n")
+			startTime := time.Now()
+
 			gcCount++
 			err = db.RunValueLogGC(0.125)
 			if err != nil {
 				if strings.Contains(err.Error(), "Value log GC attempt didn't result in any cleanup") {
 					gcCountWithNoWork++
+					fmt.Printf("\nValue log GC had no work to do\n")
 				} else {
-					fmt.Printf("Error running GC: %v\n", err)
+					fmt.Printf("\nError running GC: %v\n", err)
 				}
 			}
 
 			err = db.Flatten(1)
 			if err != nil {
-				fmt.Printf("Error flattening DB: %v\n", err)
+				fmt.Printf("\nError flattening DB: %v\n", err)
 			}
+
+			fmt.Printf("\nGC took %v\n", time.Since(startTime))
 		}
 	}()
 
