@@ -7,7 +7,6 @@ import (
 	"math/rand"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -29,32 +28,6 @@ type RelayPayloadRetriever struct {
 }
 
 var _ PayloadRetriever = &RelayPayloadRetriever{}
-
-// BuildRelayPayloadRetriever builds a RelayPayloadRetriever from config structs.
-func BuildRelayPayloadRetriever(
-	log logging.Logger,
-	relayPayloadRetrieverConfig RelayPayloadRetrieverConfig,
-	relayClientConfig *RelayClientConfig,
-	relayUrlProvider relay.RelayUrlProvider,
-	g1Srs []bn254.G1Affine) (*RelayPayloadRetriever, error) {
-
-	err := relayPayloadRetrieverConfig.checkAndSetDefaults()
-	if err != nil {
-		return nil, fmt.Errorf("check and set RelayPayloadRetrieverConfig config: %w", err)
-	}
-
-	relayClient, err := NewRelayClient(relayClientConfig, log, relayUrlProvider)
-	if err != nil {
-		return nil, fmt.Errorf("new relay client: %w", err)
-	}
-
-	return NewRelayPayloadRetriever(
-		log,
-		rand.New(rand.NewSource(rand.Int63())),
-		relayPayloadRetrieverConfig,
-		relayClient,
-		g1Srs)
-}
 
 // NewRelayPayloadRetriever assembles a RelayPayloadRetriever from subcomponents that have already been constructed and
 // initialized.

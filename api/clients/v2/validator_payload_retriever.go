@@ -6,17 +6,11 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
-	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
-	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // ValidatorPayloadRetriever provides the ability to get payloads from the EigenDA validator nodes directly
@@ -30,56 +24,6 @@ type ValidatorPayloadRetriever struct {
 }
 
 var _ PayloadRetriever = &ValidatorPayloadRetriever{}
-
-// BuildValidatorPayloadRetriever builds a ValidatorPayloadRetriever from config structs.
-func BuildValidatorPayloadRetriever(
-	logger logging.Logger,
-	validatorPayloadRetrieverConfig ValidatorPayloadRetrieverConfig,
-	ethConfig geth.EthClientConfig,
-	thegraphConfig thegraph.Config,
-	kzgConfig kzg.KzgConfig,
-) (*ValidatorPayloadRetriever, error) {
-	err := validatorPayloadRetrieverConfig.checkAndSetDefaults()
-	if err != nil {
-		return nil, fmt.Errorf("check and set config defaults: %w", err)
-	}
-
-	ethClient, err := geth.NewClient(ethConfig, gethcommon.Address{}, 0, logger)
-	if err != nil {
-		return nil, fmt.Errorf("new eth client: %w", err)
-	}
-
-	reader, err := eth.NewReader(
-		logger,
-		ethClient,
-		validatorPayloadRetrieverConfig.BlsOperatorStateRetrieverAddr,
-		validatorPayloadRetrieverConfig.EigenDAServiceManagerAddr)
-	if err != nil {
-		return nil, fmt.Errorf("new reader: %w", err)
-	}
-
-	chainState := eth.NewChainState(reader, ethClient)
-	indexedChainState := thegraph.MakeIndexedChainState(thegraphConfig, chainState, logger)
-
-	kzgVerifier, err := verifier.NewVerifier(&kzgConfig, nil)
-	if err != nil {
-		return nil, fmt.Errorf("new verifier: %w", err)
-	}
-
-	retrievalClient := NewRetrievalClient(
-		logger,
-		reader,
-		indexedChainState,
-		kzgVerifier,
-		int(validatorPayloadRetrieverConfig.MaxConnectionCount))
-
-	return &ValidatorPayloadRetriever{
-		logger:          logger,
-		config:          validatorPayloadRetrieverConfig,
-		retrievalClient: retrievalClient,
-		g1Srs:           kzgVerifier.Srs.G1,
-	}, nil
-}
 
 // NewValidatorPayloadRetriever creates a new ValidatorPayloadRetriever from already constructed objects
 func NewValidatorPayloadRetriever(

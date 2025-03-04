@@ -33,7 +33,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	}
 
 	// Check against payment meter to make sure there is quota remaining
-	if err := s.checkPaymentMeter(ctx, req); err != nil {
+	if err := s.checkPaymentMeter(ctx, req, start); err != nil {
 		return nil, err
 	}
 
@@ -100,7 +100,7 @@ func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHead
 	return blobKey, err
 }
 
-func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.DisperseBlobRequest) error {
+func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.DisperseBlobRequest, receivedAt time.Time) error {
 	blobHeaderProto := req.GetBlobHeader()
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
 	if err != nil {
@@ -119,7 +119,7 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 		CumulativePayment: cumulativePayment,
 	}
 
-	symbolsCharged, err := s.meterer.MeterRequest(ctx, paymentHeader, uint64(blobLength), blobHeader.QuorumNumbers)
+	symbolsCharged, err := s.meterer.MeterRequest(ctx, paymentHeader, uint64(blobLength), blobHeader.QuorumNumbers, receivedAt)
 	if err != nil {
 		return api.NewErrorResourceExhausted(err.Error())
 	}

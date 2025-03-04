@@ -2,12 +2,13 @@ package auth
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 // TestMockSigning is a meta-test to verify that
@@ -67,7 +68,8 @@ func TestValidRequest(t *testing.T) {
 
 	request := randomGetChunksRequest()
 	request.OperatorId = operatorID[:]
-	signature := SignGetChunksRequest(ics.KeyPairs[operatorID], request)
+	signature, err := SignGetChunksRequest(ics.KeyPairs[operatorID], request)
+	require.NoError(t, err)
 	request.OperatorSignature = signature
 
 	now := time.Now()
@@ -136,7 +138,8 @@ func TestAuthenticationSavingDisabled(t *testing.T) {
 
 	request := randomGetChunksRequest()
 	request.OperatorId = operatorID[:]
-	signature := SignGetChunksRequest(ics.KeyPairs[operatorID], request)
+	signature, err := SignGetChunksRequest(ics.KeyPairs[operatorID], request)
+	require.NoError(t, err)
 	request.OperatorSignature = signature
 
 	now := time.Now()
@@ -217,7 +220,8 @@ func TestBadSignature(t *testing.T) {
 
 	request := randomGetChunksRequest()
 	request.OperatorId = operatorID[:]
-	request.OperatorSignature = SignGetChunksRequest(ics.KeyPairs[operatorID], request)
+	request.OperatorSignature, err = SignGetChunksRequest(ics.KeyPairs[operatorID], request)
+	require.NoError(t, err)
 
 	now := time.Now()
 
