@@ -253,7 +253,7 @@ func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID string, 
 	// Fetch the 3 bins start from the current bin
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.reservationTableName),
-		KeyConditionExpression: aws.String("AccountID = :account AND ReservationPeriod > :reservationPeriod"),
+		KeyConditionExpression: aws.String("AccountID = :account AND ReservationPeriod >= :reservationPeriod"),
 		ExpressionAttributeValues: commondynamodb.ExpressionValues{
 			":account":           &types.AttributeValueMemberS{Value: accountID},
 			":reservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
