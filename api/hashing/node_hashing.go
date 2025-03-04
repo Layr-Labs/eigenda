@@ -12,9 +12,16 @@ import (
 
 // This file contains code for hashing gRPC messages that are sent to the DA node.
 
+// ValidatorStoreChunksRequestDomain is the domain for hashing StoreChunksRequest messages (i.e. this string
+// is added to the digest before hashing the message). This makes it difficult for an attacker to create a
+// different type of object that has the same hash as a StoreChunksRequest.
+const ValidatorStoreChunksRequestDomain = "validator.StoreChunksRequest"
+
 // HashStoreChunksRequest hashes the given StoreChunksRequest.
 func HashStoreChunksRequest(request *grpc.StoreChunksRequest) ([]byte, error) {
 	hasher := sha3.NewLegacyKeccak256()
+
+	hasher.Write([]byte(ValidatorStoreChunksRequestDomain))
 
 	err := hashBatchHeader(hasher, request.GetBatch().GetHeader())
 	if err != nil {

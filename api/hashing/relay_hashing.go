@@ -9,9 +9,16 @@ import (
 
 // This file contains code for hashing gRPC messages that are sent to the relay.
 
+// RelayGetChunksRequestDomain is the domain for hashing GetChunksRequest messages (i.e. this string
+// is added to the digest before hashing the message). This makes it difficult for an attacker to create a
+// different type of object that has the same hash as a GetChunksRequest.
+const RelayGetChunksRequestDomain = "relay.GetChunksRequest"
+
 // HashGetChunksRequest hashes the given GetChunksRequest.
 func HashGetChunksRequest(request *pb.GetChunksRequest) ([]byte, error) {
 	hasher := sha3.NewLegacyKeccak256()
+
+	hasher.Write([]byte(RelayGetChunksRequestDomain))
 
 	err := hashByteArray(hasher, request.GetOperatorId())
 	if err != nil {
