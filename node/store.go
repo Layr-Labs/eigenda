@@ -45,7 +45,7 @@ type Store struct {
 func NewLevelDBStore(path string, logger logging.Logger, metrics *Metrics, blockStaleMeasure, storeDurationBlocks uint32) (*Store, error) {
 	// Create the db at the path. This is currently hardcoded to use
 	// levelDB.
-	db, err := leveldb.NewStore(logger, path)
+	db, err := leveldb.NewStore(logger, false, path)
 	if err != nil {
 		logger.Error("Could not create leveldb database", "err", err)
 		return nil, err

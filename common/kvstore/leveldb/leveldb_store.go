@@ -3,9 +3,11 @@ package leveldb
 import (
 	"errors"
 	"fmt"
+	"os"
+
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"os"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
@@ -25,8 +27,12 @@ type levelDBStore struct {
 }
 
 // NewStore returns a new levelDBStore built using LevelDB.
-func NewStore(logger logging.Logger, path string) (kvstore.Store[[]byte], error) {
-	levelDB, err := leveldb.OpenFile(path, nil)
+func NewStore(logger logging.Logger, disableCompaction bool, path string) (kvstore.Store[[]byte], error) {
+
+	options := &opt.Options{
+		DisableSeeksCompaction: disableCompaction,
+	}
+	levelDB, err := leveldb.OpenFile(path, options)
 
 	if err != nil {
 		return nil, err

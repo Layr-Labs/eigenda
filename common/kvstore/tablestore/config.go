@@ -30,6 +30,8 @@ type Config struct {
 	// The list of tables to create on startup. Any pre-existing table not in this list will be deleted. If
 	// this list is nil, the previous schema will be carried forward with no modifications. Default is nil.
 	Schema []string
+	// If true, the store will disable compaction. Default is false.
+	DisableCompaction bool
 }
 
 // DefaultConfig returns a Config with default values.
@@ -41,6 +43,7 @@ func DefaultConfig() *Config {
 		GarbageCollectionInterval:  5 * time.Minute,
 		GarbageCollectionBatchSize: 1024,
 		Schema:                     nil,
+		DisableCompaction:          false,
 	}
 }
 
