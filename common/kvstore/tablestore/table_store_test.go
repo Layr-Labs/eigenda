@@ -3,16 +3,17 @@ package tablestore
 import (
 	"encoding/binary"
 	"fmt"
+	"math/rand"
+	"os"
+	"sort"
+	"testing"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
-	"math/rand"
-	"os"
-	"sort"
-	"testing"
 )
 
 var dbPath = "test-store"
@@ -1133,7 +1134,7 @@ func TestInterruptedTableDeletion(t *testing.T) {
 	err = store.Shutdown()
 	assert.NoError(t, err)
 
-	base, err := leveldb.NewStore(logger, dbPath)
+	base, err := leveldb.NewStore(logger, dbPath, nil)
 	assert.NoError(t, err)
 
 	explodingBase := &explodingStore{

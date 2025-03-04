@@ -157,12 +157,16 @@ func (e *EncodingManager) dedupBlobs(blobMetadatas []*v2.BlobMetadata) []*v2.Blo
 		}
 		if !e.blobSet.Contains(key) {
 			dedupedBlobs = append(dedupedBlobs, blob)
-			e.blobSet.AddBlob(key)
 		}
 	}
 	return dedupedBlobs
 }
 
+// HandleBatch handles a batch of blobs to encode
+// It retrieves a batch of blobs from the blob metadata store, encodes them, and updates their status
+// It also creates BlobCertificates and stores them in the blob metadata store
+//
+// WARNING: This method is not thread-safe. It should only be called from a single goroutine.
 func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 	// Get a batch of blobs to encode
 	blobMetadatas, cursor, err := e.blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Queued, e.cursor, e.MaxNumBlobsPerIteration)
@@ -292,6 +296,15 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 	e.metrics.reportBatchSubmissionLatency(time.Since(submissionStart))
 
 	e.cursor = cursor
+
+	for _, blob := range blobMetadatas {
+		key, err := blob.BlobHeader.BlobKey()
+		if err != nil {
+			e.logger.Error("failed to get blob key", "err", err, "requestedAt", blob.RequestedAt)
+			continue
+		}
+		e.blobSet.AddBlob(key)
+	}
 
 	e.logger.Debug("successfully submitted encoding requests", "numBlobs", len(blobMetadatas))
 	return nil

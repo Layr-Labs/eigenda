@@ -67,7 +67,10 @@ func NewDispersalRequestSigner(
 }
 
 func (s *requestSigner) SignStoreChunksRequest(ctx context.Context, request *grpc.StoreChunksRequest) ([]byte, error) {
-	hash := hashing.HashStoreChunksRequest(request)
+	hash, err := hashing.HashStoreChunksRequest(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash request: %w", err)
+	}
 
 	signature, err := aws2.SignKMS(ctx, s.keyManager, s.keyID, s.publicKey, hash)
 	if err != nil {

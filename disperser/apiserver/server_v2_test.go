@@ -35,6 +35,7 @@ import (
 	pbcommonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	tmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -68,7 +69,7 @@ func TestV2DisperseBlob(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -138,7 +139,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		Version:       0,
 		QuorumNumbers: []uint32{0, 1},
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -158,7 +159,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1, 2, 3},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -176,7 +177,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		QuorumNumbers: []uint32{2, 54},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -194,7 +195,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -211,7 +212,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -230,7 +231,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         0,
 			CumulativePayment: big.NewInt(0).Bytes(),
 		},
@@ -255,7 +256,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    invalidCommitment,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -285,7 +286,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -311,7 +312,7 @@ func TestV2GetBlobStatus(t *testing.T) {
 		BlobCommitments: mockCommitment,
 		QuorumNumbers:   []core.QuorumID{0},
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x1234",
+			AccountID:         gethcommon.HexToAddress("0x1234"),
 			Timestamp:         0,
 			CumulativePayment: big.NewInt(532),
 		},
@@ -581,7 +582,7 @@ func TestInvalidLength(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
@@ -632,7 +633,7 @@ func TestTooShortCommitment(t *testing.T) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         accountID,
+			AccountId:         accountID.Hex(),
 			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},

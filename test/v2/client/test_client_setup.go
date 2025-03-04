@@ -24,6 +24,7 @@ var (
 
 const (
 	PreprodEnv = "../config/environment/preprod.json"
+	TestnetEnv = "../config/environment/testnet.json"
 
 	G1URL         = "https://srs-mainnet.s3.amazonaws.com/kzg/g1.point"
 	G2URL         = "https://srs-mainnet.s3.amazonaws.com/kzg/g2.point"
