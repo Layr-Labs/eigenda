@@ -152,49 +152,24 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 	// Validate the amount signed and aggregate signatures for each quorum
 	quorumResults := make(map[QuorumID]*QuorumResult)
 
+	// Evaluate the results for each quorum.
 	for _, quorumID := range quorumIDs {
-		// Check that quorum has sufficient stake
-		percent := GetSignedPercentage(state.OperatorState, quorumID, stakeSigned[quorumID])
-		quorumResults[quorumID] = &QuorumResult{
-			QuorumID:      quorumID,
-			PercentSigned: percent,
-		}
+		quorumAggKey, quorumResult, err := a.getQuorumResult(
+			state,
+			stakeSigned,
+			nonSignerKeys,
+			nonSignerOperatorIds,
+			aggPubKeys,
+			aggSigs,
+			batchHeaderHash,
+			quorumID)
 
-		if percent == 0 {
-			a.Logger.Warn("no stake signed for quorum", "quorumID", quorumID)
-			continue
-		}
-
-		// Verify that the aggregated public key for the quorum matches the on-chain
-		// quorum aggregate public key sans non-signers of the quorum
-		quorumAggKey := state.AggKeys[quorumID]
-		quorumAggPubKeys[quorumID] = quorumAggKey
-
-		signersAggKey := quorumAggKey.Clone()
-		for opInd, nsk := range nonSignerKeys {
-			ops := state.Operators[quorumID]
-			if _, ok := ops[nonSignerOperatorIds[opInd]]; ok {
-				signersAggKey.Sub(nsk)
-			}
-		}
-
-		if aggPubKeys[quorumID] == nil {
-			return nil, ErrAggPubKeyNotValid
-		}
-
-		ok, err := signersAggKey.VerifyEquivalence(aggPubKeys[quorumID])
 		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			return nil, ErrPubKeysNotEqual
+			return nil, fmt.Errorf("failed to get quorum result: %w", err)
 		}
 
-		// Verify the aggregated signature for the quorum
-		ok = aggSigs[quorumID].Verify(aggPubKeys[quorumID], batchHeaderHash)
-		if !ok {
-			return nil, ErrAggSigNotValid
-		}
+		quorumAggPubKeys[quorumID] = quorumAggKey
+		quorumResults[quorumID] = quorumResult
 	}
 
 	return &QuorumAttestation{
@@ -204,6 +179,61 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 		QuorumResults:    quorumResults,
 		SignerMap:        signerMap,
 	}, nil
+}
+
+// getQuorumResult evaluates the results for a single quorum.
+func (a *StdSignatureAggregator) getQuorumResult(
+	state *IndexedOperatorState,
+	stakeSigned map[QuorumID]*big.Int,
+	nonSignerKeys []*G1Point,
+	nonSignerOperatorIds []OperatorID,
+	aggPubKeys map[QuorumID]*G2Point,
+	aggSigs map[QuorumID]*Signature,
+	batchHeaderHash [32]byte,
+	quorumID QuorumID) (quorumAggKey *G1Point, quorumResult *QuorumResult, err error) {
+
+	percent := GetSignedPercentage(state.OperatorState, quorumID, stakeSigned[quorumID])
+	quorumResult = &QuorumResult{
+		QuorumID:      quorumID,
+		PercentSigned: percent,
+	}
+
+	if percent == 0 {
+		a.Logger.Warn("no stake signed for quorum", "quorumID", quorumID)
+		return nil, nil, nil
+	}
+
+	// Verify that the aggregated public key for the quorum matches the on-chain
+	// quorum aggregate public key sans non-signers of the quorum
+	quorumAggKey = state.AggKeys[quorumID]
+
+	signersAggKey := quorumAggKey.Clone()
+	for opInd, nsk := range nonSignerKeys {
+		ops := state.Operators[quorumID]
+		if _, ok := ops[nonSignerOperatorIds[opInd]]; ok {
+			signersAggKey.Sub(nsk)
+		}
+	}
+
+	if aggPubKeys[quorumID] == nil {
+		return nil, nil, ErrAggPubKeyNotValid
+	}
+
+	ok, err := signersAggKey.VerifyEquivalence(aggPubKeys[quorumID])
+	if err != nil {
+		return nil, nil, err
+	}
+	if !ok {
+		return nil, nil, ErrPubKeysNotEqual
+	}
+
+	// Verify the aggregated signature for the quorum
+	ok = aggSigs[quorumID].Verify(aggPubKeys[quorumID], batchHeaderHash)
+	if !ok {
+		return nil, nil, ErrAggSigNotValid
+	}
+
+	return quorumAggKey, quorumResult, nil
 }
 
 // aggregateNonSignerIDs returns the operator IDs and public keys of the operators that did not sign the batch.
