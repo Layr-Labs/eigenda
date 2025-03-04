@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
@@ -397,6 +398,64 @@ func TestDispatcherNewBatch(t *testing.T) {
 	require.ErrorContains(t, err, "no blobs to dispatch")
 
 	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, [][32]byte{bhh})
+}
+
+func TestDispatcherNewBatchFailure(t *testing.T) {
+	components := newDispatcherComponents(t)
+	numBlobs := int(maxBatchSize + 1)
+	components.CallbackBlobSet.On("RemoveBlob", mock.Anything).Return(nil)
+	components.BlobSet.On("AddBlob", mock.Anything).Return(nil)
+	components.BlobSet.On("Contains", mock.Anything).Return(false)
+	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
+	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, numBlobs)
+	require.Len(t, objs.blobHedaers, numBlobs)
+	require.Len(t, objs.blobKeys, numBlobs)
+	require.Len(t, objs.blobMetadatas, numBlobs)
+	require.Len(t, objs.blobCerts, numBlobs)
+	ctx := context.Background()
+
+	// process one batch to set cursor
+	_, err := components.Dispatcher.NewBatch(ctx, blockNumber)
+	require.NoError(t, err)
+	for i := 0; i < int(maxBatchSize); i++ {
+		err = blobMetadataStore.UpdateBlobStatus(ctx, objs.blobKeys[i], v2.GatheringSignatures)
+		require.NoError(t, err)
+	}
+
+	// create stale blob
+	staleKey, staleHeader := newBlob(t, []core.QuorumID{0, 1})
+	meta := &commonv2.BlobMetadata{
+		BlobHeader: staleHeader,
+		BlobStatus: commonv2.Encoded,
+		Expiry:     objs.blobMetadatas[0].Expiry,
+		NumRetries: 0,
+		UpdatedAt:  objs.blobMetadatas[0].UpdatedAt - uint64(time.Hour.Nanoseconds()),
+	}
+	err = blobMetadataStore.PutBlobMetadata(ctx, meta)
+	require.NoError(t, err)
+	staleCert := &corev2.BlobCertificate{
+		BlobHeader: staleHeader,
+		RelayKeys:  []corev2.RelayKey{0, 1, 2},
+	}
+	err = blobMetadataStore.PutBlobCertificate(ctx, staleCert, &encoding.FragmentInfo{})
+	require.NoError(t, err)
+
+	// process another batch (excludes stale blob)
+	batchData, err := components.Dispatcher.NewBatch(ctx, blockNumber)
+	require.NoError(t, err)
+	require.Len(t, batchData.Batch.BlobCertificates, 1)
+	require.Equal(t, objs.blobKeys[maxBatchSize], batchData.BlobKeys[0])
+	err = blobMetadataStore.UpdateBlobStatus(ctx, objs.blobKeys[maxBatchSize], v2.GatheringSignatures)
+	require.NoError(t, err)
+
+	// cursor should be reset and pick up stale blob
+	newBatchData, err := components.Dispatcher.NewBatch(ctx, blockNumber)
+	require.NoError(t, err)
+	require.Len(t, batchData.Batch.BlobCertificates, 1)
+	require.Equal(t, staleKey, newBatchData.BlobKeys[0])
+
+	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, [][32]byte{batchData.BatchHeaderHash, batchData.BatchHeaderHash})
+	deleteBlobs(t, components.BlobMetadataStore, []corev2.BlobKey{staleKey}, [][32]byte{newBatchData.BatchHeaderHash})
 }
 
 func TestDispatcherDedupBlobs(t *testing.T) {
