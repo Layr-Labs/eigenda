@@ -139,17 +139,21 @@ type GetChunksRequest struct {
 	// All integers are encoded as unsigned 4 byte big endian values.
 	//
 	// Perform a keccak256 hash on the following data in the following order:
-	//  1. the operator id
-	//  2. for each chunk request:
+	//  1. the length of the operator ID in bytes
+	//  2. the operator id
+	//  3. the number of chunk requests
+	//  4. for each chunk request:
 	//     a. if the chunk request is a request by index:
 	//     i.   a one byte ASCII representation of the character "i" (aka Ox69)
-	//     ii.  the blob key
-	//     iii. the start index
-	//     iv.  the end index
+	//     ii.  the length blob key in bytes
+	//     iii. the blob key
+	//     iv.  the start index
+	//     v.   the end index
 	//     b. if the chunk request is a request by range:
 	//     i.   a one byte ASCII representation of the character "r" (aka Ox72)
-	//     ii.  the blob key
-	//     iii. each requested chunk index, in order
+	//     ii.  the length of the blob key in bytes
+	//     iii. the blob key
+	//     iv.  each requested chunk index, in order
 	OperatorSignature []byte `protobuf:"bytes,3,opt,name=operator_signature,json=operatorSignature,proto3" json:"operator_signature,omitempty"`
 }
 

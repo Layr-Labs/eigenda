@@ -13,32 +13,37 @@ func TestHashing(t *testing.T) {
 	rand := random.NewTestRandom()
 
 	request := RandomStoreChunksRequest(rand)
-	originalRequestHash := hashing.HashStoreChunksRequest(request)
+	originalRequestHash, err := hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 
 	// modifying the signature should not change the hash
 	request.Signature = rand.Bytes(32)
-	hash := hashing.HashStoreChunksRequest(request)
+	hash, err := hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.Equal(t, originalRequestHash, hash)
 
 	// modify the disperser id
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.DisperserID = request.DisperserID + 1
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// remove a blob cert
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates = request.Batch.BlobCertificates[:len(request.Batch.BlobCertificates)-1]
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, modify a relay
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].RelayKeys[0] = request.Batch.BlobCertificates[0].RelayKeys[0] + 1
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, remove a relay
@@ -46,14 +51,16 @@ func TestHashing(t *testing.T) {
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].RelayKeys =
 		request.Batch.BlobCertificates[0].RelayKeys[:len(request.Batch.BlobCertificates[0].RelayKeys)-1]
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, add a relay
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].RelayKeys = append(request.Batch.BlobCertificates[0].RelayKeys, rand.Uint32())
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, modify a quorum number
@@ -61,7 +68,8 @@ func TestHashing(t *testing.T) {
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].BlobHeader.QuorumNumbers[0] =
 		request.Batch.BlobCertificates[0].BlobHeader.QuorumNumbers[0] + 1
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, remove a quorum number
@@ -70,7 +78,8 @@ func TestHashing(t *testing.T) {
 	request.Batch.BlobCertificates[0].BlobHeader.QuorumNumbers =
 		request.Batch.BlobCertificates[0].BlobHeader.QuorumNumbers[:len(
 			request.Batch.BlobCertificates[0].BlobHeader.QuorumNumbers)-1]
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, add a quorum number
@@ -78,69 +87,79 @@ func TestHashing(t *testing.T) {
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].BlobHeader.QuorumNumbers = append(
 		request.Batch.BlobCertificates[0].BlobHeader.QuorumNumbers, rand.Uint32())
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, modify the Commitment.Commitment
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].BlobHeader.Commitment.Commitment = rand.Bytes(32)
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, modify the Commitment.LengthCommitment
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].BlobHeader.Commitment.LengthCommitment = rand.Bytes(32)
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, modify the Commitment.LengthProof
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].BlobHeader.Commitment.LengthProof = rand.Bytes(32)
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, modify the Commitment.Length
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].BlobHeader.Commitment.Length = rand.Uint32()
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, modify the PaymentHeader.AccountId
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].BlobHeader.PaymentHeader.AccountId = rand.String(32)
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, modify the PaymentHeader.Timestamp
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].BlobHeader.PaymentHeader.Timestamp = rand.Time().UnixMicro()
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, modify the PaymentHeader.CumulativePayment
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].BlobHeader.PaymentHeader.CumulativePayment = rand.Bytes(32)
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// within a blob cert, modify the Signature
 	rand.Reset()
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.BlobCertificates[0].Signature = rand.Bytes(32)
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 
 	// nil header
 	request = RandomStoreChunksRequest(rand)
 	request.Batch.Header = nil
-	hash = hashing.HashStoreChunksRequest(request)
+	hash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
 	require.NotEqual(t, originalRequestHash, hash)
 }
 
