@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -15,8 +14,8 @@ import (
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v4"
+	"github.com/dgraph-io/badger/v4/options"
 	"github.com/docker/go-units"
-	"github.com/emirpasic/gods/queues/linkedlistqueue"
 	"github.com/stretchr/testify/require"
 )
 
@@ -286,11 +285,6 @@ func TestMemKeymapLittDBWrite(t *testing.T) {
 	require.NoError(t, err)
 }
 
-type writeRecord struct {
-	key            []byte
-	expirationTime time.Time
-}
-
 func TestBadgerDBWrite(t *testing.T) {
 	directory := "./test-data"
 	opts := badger.DefaultOptions(directory)
@@ -330,6 +324,7 @@ func TestBadgerDBWrite(t *testing.T) {
 func TestBadgerDBWithGCWrite(t *testing.T) {
 	directory := "./test-data"
 	opts := badger.DefaultOptions(directory)
+	opts.Compression = options.None
 
 	opts.Logger = nil
 	db, err := badger.Open(opts)
@@ -340,27 +335,15 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 
 	ttl := 2 * time.Hour
 
-	queueLock := sync.Mutex{}
-	expirationQueue := linkedlistqueue.New()
-
-	txn := db.NewTransaction(true)
-	txn.Delete([]byte("test"))
-
 	writeFunction := func(key []byte, value []byte) error {
 
 		now := time.Now()
 		expiresAt := now.Add(ttl)
 
-		queueLock.Lock()
-		expirationQueue.Enqueue(&writeRecord{
-			key:            key,
-			expirationTime: expiresAt,
-		})
-		queueLock.Unlock()
-
 		err = batch.SetEntry(&badger.Entry{
-			Key:   key,
-			Value: value,
+			Key:       key,
+			Value:     value,
+			ExpiresAt: uint64(expiresAt.Unix()),
 		})
 
 		if err != nil {
@@ -383,10 +366,15 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	gcCountWithNoWork := 0
 	gcCount := 0
 
+	defer func() {
+		fmt.Printf("GC count: %d\n", gcCount)
+		fmt.Printf("GC count with no work: %d\n", gcCountWithNoWork)
+	}()
+
 	alive := atomic.Bool{}
 	alive.Store(true)
 	compactionDone := make(chan struct{})
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(1 * time.Minute)
 	go func() {
 		defer func() {
 			compactionDone <- struct{}{}
@@ -394,38 +382,8 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 		for alive.Load() {
 			<-ticker.C
 
-			// Do garbage collection
-			thingsToDelete := make([]*writeRecord, 0)
-			now := time.Now()
-			queueLock.Lock()
-			for !expirationQueue.Empty() {
-				record, _ := expirationQueue.Peek()
-				if record.(*writeRecord).expirationTime.Before(now) {
-					expirationQueue.Dequeue()
-					thingsToDelete = append(thingsToDelete, record.(*writeRecord))
-				} else {
-					break
-				}
-			}
-			queueLock.Unlock()
-
-			//fmt.Printf("deleting %d records\n", len(thingsToDelete)) // TODO
-
-			gcBatch := db.NewWriteBatch()
-			for _, record := range thingsToDelete {
-				err := gcBatch.Delete(record.key)
-				if err != nil {
-					fmt.Printf("Error deleting key: %v\n", err)
-				}
-			}
-
-			err = gcBatch.Flush()
-			if err != nil {
-				fmt.Printf("Error flushing GC batch: %v\n", err)
-			}
-
 			gcCount++
-			err = db.RunValueLogGC(0.5)
+			err = db.RunValueLogGC(0.125)
 			if err != nil {
 				if strings.Contains(err.Error(), "Value log GC attempt didn't result in any cleanup") {
 					gcCountWithNoWork++
