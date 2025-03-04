@@ -146,7 +146,7 @@ func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) 
 func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, requestReservationPeriod uint64, receivedAt time.Time) bool {
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
 	currentReservationPeriod := GetReservationPeriod(receivedAt.Unix(), reservationWindow)
-	// Valid reservation periodes are either the current bin or the previous bin
+	// Valid reservation periods are either the current bin or the previous bin
 	isCurrentOrPreviousPeriod := requestReservationPeriod == currentReservationPeriod || requestReservationPeriod == (currentReservationPeriod-reservationWindow)
 	startPeriod := GetReservationPeriod(int64(reservation.StartTimestamp), reservationWindow)
 	endPeriod := GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow)
