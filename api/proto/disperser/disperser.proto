@@ -104,9 +104,9 @@ message DisperseBlobReply {
 	// BlobKey definition: https://github.com/Layr-Labs/eigenda/blob/6b02bf966afa2b9bf2385db8dd01f66f17334e17/disperser/disperser.go#L87
 	// BlobKey computation: https://github.com/Layr-Labs/eigenda/blob/6b02bf966afa2b9bf2385db8dd01f66f17334e17/disperser/common/blobstore/shared_storage.go#L83-L84
 	//
-	// Two different DisperseBlobRequests thus have different IDs, whereas the same DisperseBlobRequest 
-	// sent repeatedly at different times will have different IDs. Clients should thus store this ID
-	// and use it to query the processing status of the request via the GetBlobStatus API.
+	// Different DisperseBlobRequests have different IDs, including two identical DisperseBlobRequests 
+	// sent at different times. Clients should thus store this ID and use it to query the processing
+	// status of the request via the GetBlobStatus API.
 	bytes request_id = 2;
 }
 
