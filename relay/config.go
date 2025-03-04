@@ -49,11 +49,6 @@ type Config struct {
 	// AuthenticationKeyCacheSize is the maximum number of operator public keys that can be cached.
 	AuthenticationKeyCacheSize int
 
-	// AuthenticationTimeout is the duration for which an authentication is "cached". A request from the same client
-	// within this duration will not trigger a new authentication in order to save resources. If zero, then each request
-	// will be authenticated independently, regardless of timing.
-	AuthenticationTimeout time.Duration
-
 	// AuthenticationDisabled will disable authentication if set to true.
 	AuthenticationDisabled bool
 

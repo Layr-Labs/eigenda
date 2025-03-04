@@ -130,11 +130,7 @@ func NewServer(
 
 	var authenticator auth.RequestAuthenticator
 	if !config.AuthenticationDisabled {
-		authenticator, err = auth.NewRequestAuthenticator(
-			ctx,
-			ics,
-			config.AuthenticationKeyCacheSize,
-			config.AuthenticationTimeout)
+		authenticator, err = auth.NewRequestAuthenticator(ctx, ics, config.AuthenticationKeyCacheSize)
 		if err != nil {
 			return nil, fmt.Errorf("error creating authenticator: %w", err)
 		}
@@ -237,7 +233,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		}
 		clientAddress := client.Addr.String()
 
-		err := s.authenticator.AuthenticateGetChunksRequest(ctx, clientAddress, request, time.Now())
+		err := s.authenticator.AuthenticateGetChunksRequest(ctx, request, time.Now())
 		if err != nil {
 			s.metrics.ReportChunkAuthFailure()
 			s.logger.Debug("rejected GetChunks request", "client", clientAddress)
