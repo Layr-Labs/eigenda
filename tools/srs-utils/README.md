@@ -27,7 +27,7 @@ It produces two files, g1.point and g2.point. g1.point contains 8589934592 Bytes
 
 This procedure takes roughly 10 minutes.
 
-Note: The challenge files contains 2^29 G1 points and 2^28 G2 points with secret tau. We use only the first 2^28 G1 points for EigenDA.
+Note: The challenge files contain 2^29 G1 points and 2^28 G2 points with secret tau. We use only the first 2^28 G1 points for EigenDA.
 
 ### How to verify the parsed G1, G2 points
 
@@ -35,7 +35,7 @@ Note: The challenge files contains 2^29 G1 points and 2^28 G2 points with secret
 
 The verification is based on method listed here (https://github.com/ethereum/kzg-ceremony-specs/blob/master/docs/sequencer/sequencer.md#pairing-checks)
 
-This procedures takes roughly 27 Hours on a 8 thread machines.
+This procedure takes roughly 27 Hours on 8-thread machine.
 
 The program periodically prints out the time spent and its progress of validating 2^28 G1 and G2 points. If no error message is shown and program terminates with "Done. Everything is correct". Then SRS is deemed as correct. 
 
