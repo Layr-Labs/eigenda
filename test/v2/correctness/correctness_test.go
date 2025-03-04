@@ -16,7 +16,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/docker/go-units"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/stretchr/testify/require"
@@ -423,10 +422,9 @@ func dispersalWithInvalidSignatureTest(t *testing.T, environment string) {
 	signer, err := auth.NewLocalBlobRequestSigner(fmt.Sprintf("%x", rand.Bytes(32)))
 	require.NoError(t, err)
 
-	signerAccountId, err := signer.GetAccountID()
+	accountId, err := signer.GetAccountID()
 	require.NoError(t, err)
-	accountId := gethcommon.HexToAddress(signerAccountId)
-	fmt.Printf("Account ID: %s\n", accountId.String())
+	fmt.Printf("Account ID: %s\n", accountId.Hex())
 
 	disperserConfig := &clients.DisperserClientConfig{
 		Hostname:          c.GetConfig().DisperserHostname,
