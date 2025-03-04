@@ -23,7 +23,7 @@ type writer func(key []byte, value []byte) error
 
 const totalToWrite = 50 * units.GiB
 
-//const totalToWrite = 1024 * units.GiB * 10
+// const totalToWrite = 1024 * units.GiB * 10
 const dataSize = 1 * units.MiB
 const batchSize = 100
 
@@ -353,10 +353,10 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 				}
 			}
 
-			//err = db.Flatten(1)
-			//if err != nil {
-			//	fmt.Printf("\nError flattening DB: %v\n", err)
-			//}
+			err = db.Flatten(1)
+			if err != nil {
+				fmt.Printf("\nError flattening DB: %v\n", err)
+			}
 
 			fmt.Printf("\nGC took %v, did %d iterations\n", time.Since(startTime), gcIterations)
 		}
@@ -382,6 +382,11 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 		}
 	}
 	fmt.Printf("Compaction took %d iterations\n", iterations)
+	fmt.Printf("Now, let's flatten the DB\n")
+	err = db.Flatten(1)
+	if err != nil {
+		fmt.Printf("\nError flattening DB: %v\n", err)
+	}
 
 	err = db.Close()
 	require.NoError(t, err)
