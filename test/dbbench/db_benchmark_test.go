@@ -21,7 +21,9 @@ import (
 
 type writer func(key []byte, value []byte) error
 
-const totalToWrite = 1024 * units.GiB * 10
+const totalToWrite = 50 * units.GiB
+
+//const totalToWrite = 1024 * units.GiB * 10
 const dataSize = 1 * units.MiB
 const batchSize = 100
 
@@ -304,7 +306,6 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	writeFunction := func(key []byte, value []byte) error {
 		entry := badger.NewEntry(key, value).WithTTL(ttl)
 		err = transaction.SetEntry(entry)
-		//err = batch.SetEntry(entry)
 
 		if err != nil {
 			return err
@@ -364,6 +365,23 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	runWriteBenchmark(t, writeFunction, totalToWrite, dataSize)
 	alive.Store(false)
 	<-compactionDone
+
+	fmt.Printf("doing some final compaction to see what happens\n")
+	fmt.Printf("First, let's sleep for a little while (2 minutes)")
+	time.Sleep(2 * time.Minute)
+	fmt.Printf("Now, let's run the compaction\n")
+	iterations := 0
+	for {
+		iterations++
+		err = db.RunValueLogGC(0.125)
+		if err != nil {
+			if !strings.Contains(err.Error(), "Value log GC attempt didn't result in any cleanup") {
+				fmt.Printf("\nError running GC: %v\n", err)
+			}
+			break
+		}
+	}
+	fmt.Printf("Compaction took %d iterations\n", iterations)
 
 	err = db.Close()
 	require.NoError(t, err)
