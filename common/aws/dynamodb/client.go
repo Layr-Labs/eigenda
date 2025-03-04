@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"strconv"
 	"sync"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
@@ -237,14 +236,10 @@ func (c *client) UpdateItemWithCondition(
 
 // IncrementBy increments the attribute by the value for item that matches with the key
 func (c *client) IncrementBy(ctx context.Context, tableName string, key Key, attr string, value uint64) (Item, error) {
-	// ADD numeric values
-	f, err := strconv.ParseFloat(strconv.FormatUint(value, 10), 64)
-	if err != nil {
-		return nil, err
-	}
-
+	// ADD numeric values; small amounts of precision loss if the uint64 value is large and cannot be representing as a float64.
+	// We don't expect such a large value to be incremented as it is used in units of dispersed symbols.
 	update := expression.UpdateBuilder{}
-	update = update.Add(expression.Name(attr), expression.Value(aws.Float64(f)))
+	update = update.Add(expression.Name(attr), expression.Value(aws.Float64(float64(value))))
 	expr, err := expression.NewBuilder().WithUpdate(update).Build()
 	if err != nil {
 		return nil, err

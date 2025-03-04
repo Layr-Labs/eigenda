@@ -484,7 +484,7 @@ func TestMeterer_symbolsCharged(t *testing.T) {
 
 func createPaymentHeader(timestamp int64, cumulativePayment *big.Int, accountID gethcommon.Address) *core.PaymentMetadata {
 	return &core.PaymentMetadata{
-		AccountID:         accountID.Hex(),
+		AccountID:         accountID,
 		Timestamp:         timestamp,
 		CumulativePayment: cumulativePayment,
 	}

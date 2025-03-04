@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 const MinNumBins int32 = 3
@@ -64,9 +65,9 @@ func NewOffchainStore(
 	}, nil
 }
 
-func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID string, reservationPeriod uint64, size uint64) (uint64, error) {
+func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, size uint64) (uint64, error) {
 	key := map[string]types.AttributeValue{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID},
+		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 	}
 
@@ -124,7 +125,7 @@ func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod u
 func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, paymentCharged *big.Int) error {
 	result, err := s.dynamoClient.GetItem(ctx, s.onDemandTableName,
 		commondynamodb.Item{
-			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID},
+			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID.Hex()},
 			"CumulativePayments": &types.AttributeValueMemberN{Value: paymentMetadata.CumulativePayment.String()},
 		},
 	)
@@ -136,7 +137,7 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 	}
 	err = s.dynamoClient.PutItem(ctx, s.onDemandTableName,
 		commondynamodb.Item{
-			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID},
+			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID.Hex()},
 			"CumulativePayments": &types.AttributeValueMemberN{Value: paymentMetadata.CumulativePayment.String()},
 			"PaymentCharged":     &types.AttributeValueMemberN{Value: paymentCharged.String()},
 		},
@@ -149,10 +150,10 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 }
 
 // RemoveOnDemandPayment removes a specific payment from the list for a specific account
-func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID string, payment *big.Int) error {
+func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID gethcommon.Address, payment *big.Int) error {
 	err := s.dynamoClient.DeleteItem(ctx, s.onDemandTableName,
 		commondynamodb.Key{
-			"AccountID":          &types.AttributeValueMemberS{Value: accountID},
+			"AccountID":          &types.AttributeValueMemberS{Value: accountID.Hex()},
 			"CumulativePayments": &types.AttributeValueMemberN{Value: payment.String()},
 		},
 	)
@@ -166,13 +167,13 @@ func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID str
 
 // GetRelevantOnDemandRecords gets previous cumulative payment, next cumulative payment, and paymentCharged
 // The queries are done sequentially instead of one-go for efficient querying and would not cause race condition errors for honest requests
-func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountID string, cumulativePayment *big.Int) (*big.Int, *big.Int, *big.Int, error) {
+func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountID gethcommon.Address, cumulativePayment *big.Int) (*big.Int, *big.Int, *big.Int, error) {
 	// Fetch the largest entry smaller than the given cumulativePayment
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.onDemandTableName),
 		KeyConditionExpression: aws.String("AccountID = :account AND CumulativePayments < :cumulativePayment"),
 		ExpressionAttributeValues: commondynamodb.ExpressionValues{
-			":account":           &types.AttributeValueMemberS{Value: accountID},
+			":account":           &types.AttributeValueMemberS{Value: accountID.Hex()},
 			":cumulativePayment": &types.AttributeValueMemberN{Value: cumulativePayment.String()},
 		},
 		ScanIndexForward: aws.Bool(false),
@@ -204,7 +205,7 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 		TableName:              aws.String(s.onDemandTableName),
 		KeyConditionExpression: aws.String("AccountID = :account AND CumulativePayments > :cumulativePayment"),
 		ExpressionAttributeValues: commondynamodb.ExpressionValues{
-			":account":           &types.AttributeValueMemberS{Value: accountID},
+			":account":           &types.AttributeValueMemberS{Value: accountID.Hex()},
 			":cumulativePayment": &types.AttributeValueMemberN{Value: cumulativePayment.String()},
 		},
 		ScanIndexForward: aws.Bool(true),
@@ -247,13 +248,13 @@ func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountI
 	return prevPayment, nextPayment, paymentCharged, nil
 }
 
-func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID string, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error) {
+func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error) {
 	// Fetch the 3 bins start from the current bin
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.reservationTableName),
 		KeyConditionExpression: aws.String("AccountID = :account AND ReservationPeriod > :reservationPeriod"),
 		ExpressionAttributeValues: commondynamodb.ExpressionValues{
-			":account":           &types.AttributeValueMemberS{Value: accountID},
+			":account":           &types.AttributeValueMemberS{Value: accountID.Hex()},
 			":reservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 		},
 		ScanIndexForward: aws.Bool(true),
@@ -276,13 +277,13 @@ func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID string, 
 	return records, nil
 }
 
-func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, accountID string) (*big.Int, error) {
+func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
 	// Fetch the largest cumulative payment
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.onDemandTableName),
 		KeyConditionExpression: aws.String("AccountID = :account"),
 		ExpressionAttributeValues: commondynamodb.ExpressionValues{
-			":account": &types.AttributeValueMemberS{Value: accountID},
+			":account": &types.AttributeValueMemberS{Value: accountID.Hex()},
 		},
 		ScanIndexForward: aws.Bool(false),
 		Limit:            aws.Int32(1),

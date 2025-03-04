@@ -403,7 +403,6 @@ func (d *Dispatcher) dedupBlobs(blobs []*v2.BlobMetadata) []*v2.BlobMetadata {
 		}
 		if !d.blobSet.Contains(key) {
 			dedupedBlobs = append(dedupedBlobs, blob)
-			d.blobSet.AddBlob(key)
 		}
 	}
 	return dedupedBlobs
@@ -416,7 +415,6 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	defer func() {
 		d.metrics.reportNewBatchLatency(time.Since(newBatchStart))
 	}()
-
 	blobMetadatas, cursor, err := d.blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Encoded, d.cursor, d.MaxBatchSize)
 	getBlobMetadataFinished := time.Now()
 	d.metrics.reportGetBlobMetadataLatency(getBlobMetadataFinished.Sub(newBatchStart))
@@ -556,8 +554,11 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		return nil, fmt.Errorf("failed to put blob inclusion infos: %w", err)
 	}
 
-	if cursor != nil {
-		d.cursor = cursor
+	d.cursor = cursor
+
+	// Add blobs to the blob set to deduplicate blobs
+	for _, blobKey := range keys {
+		d.blobSet.AddBlob(blobKey)
 	}
 
 	d.logger.Debug("new batch", "referenceBlockNumber", referenceBlockNumber, "numBlobs", len(certs))

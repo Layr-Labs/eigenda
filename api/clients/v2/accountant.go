@@ -10,13 +10,14 @@ import (
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 var requiredQuorums = []uint8{0, 1}
 
 type Accountant struct {
 	// on-chain states
-	accountID         string
+	accountID         gethcommon.Address
 	reservation       *core.ReservedPayment
 	onDemand          *core.OnDemandPayment
 	reservationWindow uint64
@@ -38,7 +39,7 @@ type PeriodRecord struct {
 	Usage uint64
 }
 
-func NewAccountant(accountID string, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint64, pricePerSymbol uint64, minNumSymbols uint64, numBins uint32) *Accountant {
+func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint64, pricePerSymbol uint64, minNumSymbols uint64, numBins uint32) *Accountant {
 	periodRecords := make([]PeriodRecord, numBins)
 	for i := range periodRecords {
 		periodRecords[i] = PeriodRecord{Index: uint32(i), Usage: 0}

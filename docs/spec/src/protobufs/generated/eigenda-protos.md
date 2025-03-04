@@ -693,7 +693,7 @@ RetrieveBlobRequest contains parameters to retrieve the blob.
 BlobStatus represents the status of a blob.
 The status of a blob is updated as the blob is processed by the disperser.
 The status of a blob can be queried by the client using the GetBlobStatus API.
-Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:
+Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:
 - PROCESSING
 - DISPERSING
 - CONFIRMED
@@ -707,7 +707,7 @@ Terminal states are states that will not be updated to a different state:
 | UNKNOWN | 0 |  |
 | PROCESSING | 1 | PROCESSING means that the blob is currently being processed by the disperser |
 | CONFIRMED | 2 | CONFIRMED means that the blob has been dispersed to DA Nodes and the dispersed batch containing the blob has been confirmed onchain |
-| FAILED | 3 | FAILED means that the blob has failed permanently (for reasons other than insufficient signatures, which is a separate state). This status is somewhat of a catch-all category, containg (but not necessarily exclusively as errors can be added in the future): - blob has expired - internal logic error while requesting encoding - blob retry has exceeded its limit while waiting for blob finalization after confirmation. Most likely triggered by a chain reorg: see https://github.com/Layr-Labs/eigenda/blob/master/disperser/batcher/finalizer.go#L179-L189. |
+| FAILED | 3 | FAILED means that the blob has failed permanently (for reasons other than insufficient signatures, which is a separate state). This status is somewhat of a catch-all category, containing (but not necessarily exclusively as errors can be added in the future): - blob has expired - internal logic error while requesting encoding - blob retry has exceeded its limit while waiting for blob finalization after confirmation. Most likely triggered by a chain reorg: see https://github.com/Layr-Labs/eigenda/blob/master/disperser/batcher/finalizer.go#L179-L189. |
 | FINALIZED | 4 | FINALIZED means that the block containing the blob&#39;s confirmation transaction has been finalized on Ethereum |
 | INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met for at least one quorum. |
 | DISPERSING | 6 | The DISPERSING state is comprised of two separate phases: - Dispersing to DA nodes and collecting signature - Submitting the transaction on chain and waiting for tx receipt |
@@ -1394,7 +1394,7 @@ Used to facilitate the decoding of chunks.
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | StoreChunks | [StoreChunksRequest](#node-StoreChunksRequest) | [StoreChunksReply](#node-StoreChunksReply) | StoreChunks validates that the chunks match what the Node is supposed to receive ( different Nodes are responsible for different chunks, as EigenDA is horizontally sharded) and is correctly coded (e.g. each chunk must be a valid KZG multiproof) according to the EigenDA protocol. It also stores the chunks along with metadata for the protocol-defined length of custody. It will return a signature at the end to attest to the data in this request it has processed. |
-| StoreBlobs | [StoreBlobsRequest](#node-StoreBlobsRequest) | [StoreBlobsReply](#node-StoreBlobsReply) | StoreBlobs is simiar to StoreChunks, but it stores the blobs using a different storage schema so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch. StoreBlobs &#43; AttestBatch will eventually replace and deprecate StoreChunks method. DEPRECATED: StoreBlobs method is not used |
+| StoreBlobs | [StoreBlobsRequest](#node-StoreBlobsRequest) | [StoreBlobsReply](#node-StoreBlobsReply) | StoreBlobs is similar to StoreChunks, but it stores the blobs using a different storage schema so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch. StoreBlobs &#43; AttestBatch will eventually replace and deprecate StoreChunks method. DEPRECATED: StoreBlobs method is not used |
 | AttestBatch | [AttestBatchRequest](#node-AttestBatchRequest) | [AttestBatchReply](#node-AttestBatchReply) | AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch. It will return a signature at the end to attest to the aggregated batch. DEPRECATED: AttestBatch method is not used |
 | NodeInfo | [NodeInfoRequest](#node-NodeInfoRequest) | [NodeInfoReply](#node-NodeInfoReply) | Retrieve node info metadata |
 
@@ -1532,7 +1532,7 @@ The following describes the schema for computing the hash of this request This a
 
 All integers are encoded as unsigned 4 byte big endian values.
 
-Perform a keccak256 hash on the following data in the following order: 1. the operator id 2. for each chunk request: a. if the chunk request is a request by index: i. a one byte ASCII representation of the character &#34;i&#34; (aka Ox69) ii. the blob key iii. the start index iv. the end index b. if the chunk request is a request by range: i. a one byte ASCII representation of the character &#34;r&#34; (aka Ox72) ii. the blob key iii. each requested chunk index, in order |
+Perform a keccak256 hash on the following data in the following order: 1. the length of the operator ID in bytes 2. the operator id 3. the number of chunk requests 4. for each chunk request: a. if the chunk request is a request by index: i. a one byte ASCII representation of the character &#34;i&#34; (aka Ox69) ii. the length blob key in bytes iii. the blob key iv. the start index v. the end index b. if the chunk request is a request by range: i. a one byte ASCII representation of the character &#34;r&#34; (aka Ox72) ii. the length of the blob key in bytes iii. the blob key iv. each requested chunk index, in order |
 
 
 

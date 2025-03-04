@@ -10,7 +10,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // Config contains network parameters that should be published on-chain. We currently configure these params through disperser env vars.
@@ -75,12 +74,11 @@ func (m *Meterer) Start(ctx context.Context) {
 // MeterRequest validates a blob header and adds it to the meterer's state
 // TODO: return error if there's a rejection (with reasoning) or internal error (should be very rare)
 func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata, numSymbols uint64, quorumNumbers []uint8, receivedAt time.Time) (uint64, error) {
-	accountID := gethcommon.HexToAddress(header.AccountID)
 	symbolsCharged := m.SymbolsCharged(numSymbols)
 	m.logger.Info("Validating incoming request's payment metadata", "paymentMetadata", header, "numSymbols", numSymbols, "quorumNumbers", quorumNumbers)
 	// Validate against the payment method
 	if header.CumulativePayment.Sign() == 0 {
-		reservation, err := m.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
+		reservation, err := m.ChainPaymentState.GetReservedPaymentByAccount(ctx, header.AccountID)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get active reservation by account: %w", err)
 		}
@@ -88,7 +86,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 			return 0, fmt.Errorf("invalid reservation: %w", err)
 		}
 	} else {
-		onDemandPayment, err := m.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
+		onDemandPayment, err := m.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, header.AccountID)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get on-demand payment by account: %w", err)
 		}
@@ -125,7 +123,7 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 
 // ValidateQuorums ensures that the quorums listed in the blobHeader are present within allowedQuorums
 // Note: A reservation that does not utilize all of the allowed quorums will be accepted. However, it
-// will still charge against all of the allowed quorums. A on-demand requrests require and only allow
+// will still charge against all of the allowed quorums. A on-demand requests require and only allow
 // the ETH and EIGEN quorums.
 func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) error {
 	if len(headerQuorums) == 0 {
@@ -146,7 +144,7 @@ func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) 
 func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, requestReservationPeriod uint64, receivedAt time.Time) bool {
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
 	currentReservationPeriod := GetReservationPeriod(receivedAt.Unix(), reservationWindow)
-	// Valid reservation periodes are either the current bin or the previous bin
+	// Valid reservation periods are either the current bin or the previous bin
 	isCurrentOrPreviousPeriod := requestReservationPeriod == currentReservationPeriod || requestReservationPeriod == (currentReservationPeriod-1)
 	startPeriod := GetReservationPeriod(int64(reservation.StartTimestamp), reservationWindow)
 	endPeriod := GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow)
@@ -246,7 +244,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 // prevPmt is the largest  cumulative payment strictly less    than PaymentMetadata.cumulativePayment if exists
 // nextPmt is the smallest cumulative payment strictly greater than PaymentMetadata.cumulativePayment if exists
 // chargeOfNextPmt is the charge associated with nextPmt if exists
-// prevPmt + charge <= PaymentMetadata.CumulativePayment
+// prevPmt + currentPaymentCharge <= PaymentMetadata.CumulativePayment
 // <= nextPmt - chargeOfNextPmt > nextPmt
 func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, currentPaymentCharge *big.Int) error {
 	if header.CumulativePayment.Cmp(onDemandPayment.CumulativePayment) > 0 {

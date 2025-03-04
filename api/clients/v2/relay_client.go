@@ -126,7 +126,11 @@ func (c *relayClient) signGetChunksRequest(ctx context.Context, request *relaygr
 		return errors.New("no message signer provided in config, cannot sign get chunks request")
 	}
 
-	hash := hashing.HashGetChunksRequest(request)
+	hash, err := hashing.HashGetChunksRequest(request)
+	if err != nil {
+		return fmt.Errorf("failed to hash get chunks request: %v", err)
+	}
+
 	hashArray := [32]byte{}
 	copy(hashArray[:], hash)
 	signature, err := c.config.MessageSigner(ctx, hashArray)

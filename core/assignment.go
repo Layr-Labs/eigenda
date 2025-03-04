@@ -188,7 +188,7 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, blo
 		return false, fmt.Errorf("%w: chunk length: %d, min chunk length: %d", ErrChunkLengthTooSmall, info.ChunkLength, MinChunkLength)
 	}
 
-	// Get minimum stake amont
+	// Get minimum stake amount
 	minStake := state.Totals[info.QuorumID].Stake
 	for _, r := range state.Operators[info.QuorumID] {
 		if r.Stake.Cmp(minStake) < 0 {
