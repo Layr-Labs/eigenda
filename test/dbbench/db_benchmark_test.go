@@ -291,17 +291,15 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	directory := "./test-data"
 	opts := badger.DefaultOptions(directory)
 	opts.Compression = options.None
+	opts.CompactL0OnClose = true
 
-	opts.Logger = nil
 	db, err := badger.Open(opts)
 	require.NoError(t, err)
 
 	transaction := db.NewTransaction(true)
-	//batch := db.NewWriteBatch()
 	objectsInBatch := 0
 
 	ttl := 5 * time.Minute
-	//ttl := 2 * time.Hour
 
 	writeFunction := func(key []byte, value []byte) error {
 		entry := badger.NewEntry(key, value).WithTTL(ttl)
@@ -313,13 +311,11 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 		objectsInBatch++
 
 		if objectsInBatch >= batchSize {
-			//err = batch.Flush()
 			err = transaction.Commit()
 
 			if err != nil {
 				return err
 			}
-			//batch = db.NewWriteBatch()
 			transaction = db.NewTransaction(true)
 			objectsInBatch = 0
 		}
