@@ -302,15 +302,7 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	//ttl := 2 * time.Hour
 
 	writeFunction := func(key []byte, value []byte) error {
-		now := time.Now()
-		expiresAt := now.Add(ttl)
-
-		entry := &badger.Entry{
-			Key:       key,
-			Value:     value,
-			ExpiresAt: uint64(expiresAt.Unix()),
-		}
-
+		entry := badger.NewEntry(key, value).WithTTL(ttl)
 		err = transaction.SetEntry(entry)
 		//err = batch.SetEntry(entry)
 
