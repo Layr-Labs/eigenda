@@ -285,42 +285,6 @@ func TestMemKeymapLittDBWrite(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestBadgerDBWrite(t *testing.T) {
-	directory := "./test-data"
-	opts := badger.DefaultOptions(directory)
-
-	opts.Logger = nil
-	db, err := badger.Open(opts)
-	require.NoError(t, err)
-
-	batch := db.NewWriteBatch()
-	objectsInBatch := 0
-
-	writeFunction := func(key []byte, value []byte) error {
-		err = batch.Set(key, value)
-		if err != nil {
-			return err
-		}
-		objectsInBatch++
-
-		if objectsInBatch >= batchSize {
-			err = batch.Flush()
-			if err != nil {
-				return err
-			}
-			batch = db.NewWriteBatch()
-			objectsInBatch = 0
-		}
-
-		return nil
-	}
-
-	runWriteBenchmark(t, writeFunction, totalToWrite, dataSize)
-
-	err = db.Close()
-	require.NoError(t, err)
-}
-
 func TestBadgerDBWithGCWrite(t *testing.T) {
 	directory := "./test-data"
 	opts := badger.DefaultOptions(directory)
@@ -330,21 +294,25 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	db, err := badger.Open(opts)
 	require.NoError(t, err)
 
-	batch := db.NewWriteBatch()
+	transaction := db.NewTransaction(true)
+	//batch := db.NewWriteBatch()
 	objectsInBatch := 0
 
-	ttl := 2 * time.Hour
+	ttl := 5 * time.Minute
+	//ttl := 2 * time.Hour
 
 	writeFunction := func(key []byte, value []byte) error {
-
 		now := time.Now()
 		expiresAt := now.Add(ttl)
 
-		err = batch.SetEntry(&badger.Entry{
+		entry := &badger.Entry{
 			Key:       key,
 			Value:     value,
 			ExpiresAt: uint64(expiresAt.Unix()),
-		})
+		}
+
+		err = transaction.SetEntry(entry)
+		//err = batch.SetEntry(entry)
 
 		if err != nil {
 			return err
@@ -352,24 +320,19 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 		objectsInBatch++
 
 		if objectsInBatch >= batchSize {
-			err = batch.Flush()
+			//err = batch.Flush()
+			err = transaction.Commit()
+
 			if err != nil {
 				return err
 			}
-			batch = db.NewWriteBatch()
+			//batch = db.NewWriteBatch()
+			transaction = db.NewTransaction(true)
 			objectsInBatch = 0
 		}
 
 		return nil
 	}
-
-	gcCountWithNoWork := 0
-	gcCount := 0
-
-	defer func() {
-		fmt.Printf("GC count: %d\n", gcCount)
-		fmt.Printf("GC count with no work: %d\n", gcCountWithNoWork)
-	}()
 
 	alive := atomic.Bool{}
 	alive.Store(true)
@@ -385,23 +348,24 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 			fmt.Printf("\nRunning GC\n")
 			startTime := time.Now()
 
-			gcCount++
-			err = db.RunValueLogGC(0.125)
-			if err != nil {
-				if strings.Contains(err.Error(), "Value log GC attempt didn't result in any cleanup") {
-					gcCountWithNoWork++
-					fmt.Printf("\nValue log GC had no work to do\n")
-				} else {
-					fmt.Printf("\nError running GC: %v\n", err)
+			gcIterations := 0
+			for {
+				gcIterations++
+				err = db.RunValueLogGC(0.125)
+				if err != nil {
+					if !strings.Contains(err.Error(), "Value log GC attempt didn't result in any cleanup") {
+						fmt.Printf("\nError running GC: %v\n", err)
+					}
+					break
 				}
 			}
 
-			err = db.Flatten(1)
-			if err != nil {
-				fmt.Printf("\nError flattening DB: %v\n", err)
-			}
+			//err = db.Flatten(1)
+			//if err != nil {
+			//	fmt.Printf("\nError flattening DB: %v\n", err)
+			//}
 
-			fmt.Printf("\nGC took %v\n", time.Since(startTime))
+			fmt.Printf("\nGC took %v, did %d iterations\n", time.Since(startTime), gcIterations)
 		}
 	}()
 
