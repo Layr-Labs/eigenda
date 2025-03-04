@@ -13,11 +13,7 @@ import (
 func SignGetChunksRequest(keys *core.KeyPair, request *pb.GetChunksRequest) ([]byte, error) {
 	hash, err := hashing.HashGetChunksRequest(request)
 	if err != nil {
-<<<<<<< HEAD
 		return nil, fmt.Errorf("failed to hash request: %w", err)
-=======
-		return nil, err
->>>>>>> add46e5a (make sure each getchunks request is either by index or by range)
 	}
 	signature := keys.SignMessage(([32]byte)(hash))
 	return signature.G1Point.Serialize(), nil

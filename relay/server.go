@@ -215,9 +215,6 @@ func (s *Server) validateGetChunksRequest(request *pb.GetChunksRequest) error {
 	if request == nil {
 		return api.NewErrorInvalidArg("request is nil")
 	}
-	if len(request.OperatorId) == 0 {
-		return api.NewErrorInvalidArg("operator ID is empty")
-	}
 	if len(request.ChunkRequests) == 0 {
 		return api.NewErrorInvalidArg("no chunk requests provided")
 	}
