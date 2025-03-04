@@ -528,33 +528,33 @@ func decode(data []byte, obj any) error {
 }
 
 func (s OperatorSocket) GetV1DispersalSocket() string {
-	ip, v1DispersalPort, _, _, _, err := ParseOperatorSocket(string(s))
-	if err != nil {
+	if s.host == "" || s.v1DispersalPort == "" {
 		return ""
 	}
-	return fmt.Sprintf("%s:%s", ip, v1DispersalPort)
+	return fmt.Sprintf("%s:%s", s.host, s.v1DispersalPort)
 }
 
 func (s OperatorSocket) GetV2DispersalSocket() string {
-	ip, _, _, v2DispersalPort, _, err := ParseOperatorSocket(string(s))
-	if err != nil || v2DispersalPort == "" {
+	if s.host == "" || s.v2DispersalPort == "" {
 		return ""
 	}
-	return fmt.Sprintf("%s:%s", ip, v2DispersalPort)
+	return fmt.Sprintf("%s:%s", s.host, s.v2DispersalPort)
 }
 
 func (s OperatorSocket) GetV1RetrievalSocket() string {
-	ip, _, v1retrievalPort, _, _, err := ParseOperatorSocket(string(s))
-	if err != nil {
+	if s.host == "" || s.v1RetrievalPort == "" {
 		return ""
 	}
-	return fmt.Sprintf("%s:%s", ip, v1retrievalPort)
+	return fmt.Sprintf("%s:%s", s.host, s.v1RetrievalPort)
 }
 
 func (s OperatorSocket) GetV2RetrievalSocket() string {
-	ip, _, _, _, v2RetrievalPort, err := ParseOperatorSocket(string(s))
-	if err != nil || v2RetrievalPort == "" {
+	if s.host == "" || s.v2RetrievalPort == "" {
 		return ""
 	}
-	return fmt.Sprintf("%s:%s", ip, v2RetrievalPort)
+	return fmt.Sprintf("%s:%s", s.host, s.v2RetrievalPort)
+}
+
+func (s OperatorSocket) GetHost() string {
+	return s.host
 }
