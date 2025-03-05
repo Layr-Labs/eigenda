@@ -1,6 +1,7 @@
 package v2_test
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -35,7 +36,7 @@ func roundUpToNextMinute(t time.Time) time.Time {
 }
 
 // Implement fetch method matching the interface expected by FeedCache
-func (tf *testFetcher) fetch(start, end time.Time, order v2.FetchOrder, limit int) ([]*testItem, error) {
+func (tf *testFetcher) fetch(ctx context.Context, start, end time.Time, order v2.FetchOrder, limit int) ([]*testItem, error) {
 	tf.fetchCount.Add(1)
 	var items []*testItem
 
@@ -98,7 +99,7 @@ func setupTestCache(maxItems int) (*v2.FeedCache[testItem], *testFetcher, time.T
 }
 
 func syncCacheGet(cache *v2.FeedCache[testItem], start, end time.Time, order v2.FetchOrder, limit int) ([]*testItem, error) {
-	items, err := cache.Get(start, end, order, limit)
+	items, err := cache.Get(context.Background(), start, end, order, limit)
 	cache.WaitForCacheUpdates()
 	return items, err
 }
@@ -1043,7 +1044,7 @@ func TestConcurrentAccess(t *testing.T) {
 			if offset%2 == 0 {
 				direction = v2.Descending
 			}
-			items, err := cache.Get(start, end, direction, 0)
+			items, err := cache.Get(context.Background(), start, end, direction, 0)
 			require.NoError(t, err)
 			require.Equal(t, 5, len(items))
 			if direction == v2.Ascending {
