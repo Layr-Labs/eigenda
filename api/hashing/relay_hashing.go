@@ -32,23 +32,23 @@ func HashGetChunksRequest(request *pb.GetChunksRequest) ([]byte, error) {
 		if chunkRequest.GetByIndex() != nil {
 			getByIndex := chunkRequest.GetByIndex()
 			hashChar(hasher, 'i')
-			err = hashByteArray(hasher, getByIndex.BlobKey)
+			err = hashByteArray(hasher, getByIndex.GetBlobKey())
 			if err != nil {
 				return nil, fmt.Errorf("failed to hash blob key: %w", err)
 			}
-			err = hashUint32Array(hasher, getByIndex.ChunkIndices)
+			err = hashUint32Array(hasher, getByIndex.GetChunkIndices())
 			if err != nil {
 				return nil, fmt.Errorf("failed to hash ChunkIndices: %w", err)
 			}
-		} else {
+		} else if chunkRequest.GetByRange() != nil {
 			getByRange := chunkRequest.GetByRange()
 			hashChar(hasher, 'r')
-			err = hashByteArray(hasher, getByRange.BlobKey)
+			err = hashByteArray(hasher, getByRange.GetBlobKey())
 			if err != nil {
 				return nil, fmt.Errorf("failed to hash blob key: %w", err)
 			}
-			hashUint32(hasher, getByRange.StartIndex)
-			hashUint32(hasher, getByRange.EndIndex)
+			hashUint32(hasher, getByRange.GetStartIndex())
+			hashUint32(hasher, getByRange.GetEndIndex())
 		}
 	}
 
