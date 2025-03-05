@@ -221,11 +221,11 @@ func NewServerV2(
 	fetchBatchFn := func(ctx context.Context, start, end time.Time, order FetchOrder, limit int) ([]*corev2.Attestation, error) {
 		if order == Ascending {
 			return blobMetadataStore.GetAttestationByAttestedAtForward(
-				ctx, uint64(start.UnixNano())+1, uint64(end.UnixNano()), limit,
+				ctx, uint64(start.UnixNano())-1, uint64(end.UnixNano()), limit,
 			)
 		}
 		return blobMetadataStore.GetAttestationByAttestedAtBackward(
-			ctx, uint64(end.UnixNano()), uint64(start.UnixNano())+1, limit,
+			ctx, uint64(end.UnixNano()), uint64(start.UnixNano())-1, limit,
 		)
 	}
 	batchFeedCache := NewFeedCache[corev2.Attestation](
