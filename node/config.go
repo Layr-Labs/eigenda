@@ -79,6 +79,8 @@ type Config struct {
 	RelayMaxMessageSize            uint
 	ReachabilityPollIntervalSec    uint64
 	DisableNodeInfoResources       bool
+	StoreChunksRequestMaxPastAge   time.Duration
+	StoreChunksRequestMaxFutureAge time.Duration
 
 	BlsSignerConfig blssignerTypes.SignerConfig
 
@@ -102,11 +104,6 @@ type Config struct {
 	DispersalAuthenticationKeyCacheSize int
 	// the timeout for disperser keys (after which the disperser key is reloaded from the chain)
 	DisperserKeyTimeout time.Duration
-	// the timeout for disperser authentication (set to 0 to disable), if enabled then a successful authentication
-	// of a StoreChunks request causes the node to skip validation for requests coming from the same IP address
-	// for this duration. Adds risk of disruptive behavior if an attacker is able to send requests from the same IP
-	// address as a legitimate disperser, but reduces performance overhead of StoreChunks validation.
-	DispersalAuthenticationTimeout time.Duration
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -322,6 +319,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DisableDispersalAuthentication:      ctx.GlobalBool(flags.DisableDispersalAuthenticationFlag.Name),
 		DispersalAuthenticationKeyCacheSize: ctx.GlobalInt(flags.DispersalAuthenticationKeyCacheSizeFlag.Name),
 		DisperserKeyTimeout:                 ctx.GlobalDuration(flags.DisperserKeyTimeoutFlag.Name),
-		DispersalAuthenticationTimeout:      ctx.GlobalDuration(flags.DispersalAuthenticationTimeoutFlag.Name),
+		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),
+		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
 	}, nil
 }

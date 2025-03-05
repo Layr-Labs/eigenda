@@ -33,6 +33,10 @@ message GetChunksRequest {
   // unauthenticated requests.
   bytes operator_id = 2;
 
+  // Timestamp of the request in seconds since the Unix epoch. If too far out of sync with the server's clock,
+  // request may be rejected.
+  uint32 timestamp = 3;
+
   // If this is an authenticated request, this field will hold a BLS signature by the requester
   // on the hash of this request. Relays may choose to reject unauthenticated requests.
   //
@@ -57,7 +61,8 @@ message GetChunksRequest {
   //       ii.  the length of the blob key in bytes
   //       iii. the blob key
   //       iv.  each requested chunk index, in order
-  bytes operator_signature = 3;
+  // 5. the timestamp (seconds since the Unix epoch encoded as a 4 byte big endian value)
+  bytes operator_signature = 4;
 }
 
 // A request for chunks within a specific blob. Each chunk is requested individually by its index.

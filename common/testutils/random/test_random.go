@@ -4,13 +4,14 @@ import (
 	"crypto/ecdsa"
 	crand "crypto/rand"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/core"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	"github.com/ethereum/go-ethereum/crypto"
 	"io"
 	"math/big"
 	"math/rand"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // charset is the set of characters that can be used to generate random strings
@@ -81,6 +82,11 @@ func (r *TestRandom) VariableBytes(min int, max int) []byte {
 // Time generates a random time.
 func (r *TestRandom) Time() time.Time {
 	return time.Unix(r.Int63(), r.Int63())
+}
+
+// TimeInRange generates a random time between min (inclusive) and max (exclusive).
+func (r *TestRandom) TimeInRange(min time.Time, max time.Time) time.Time {
+	return min.Add(time.Duration(r.Int63n(int64(max.Sub(min)))))
 }
 
 // String generates a random string out of printable ASCII characters.

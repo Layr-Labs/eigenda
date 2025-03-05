@@ -176,14 +176,17 @@ func TestRequestSigning(t *testing.T) {
 	require.NoError(t, err)
 	request.Signature = signature
 
-	err = VerifyStoreChunksRequest(publicAddress, request)
+	hash, err := VerifyStoreChunksRequest(publicAddress, request)
 	require.NoError(t, err)
+	expectedHash, err := hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
+	require.Equal(t, expectedHash, hash)
 
 	// Using a different public key should make the signature invalid
 	otherPublic, _, err := rand.ECDSA()
 	require.NoError(t, err)
 	otherPublicAddress := crypto.PubkeyToAddress(*otherPublic)
-	err = VerifyStoreChunksRequest(otherPublicAddress, request)
+	_, err = VerifyStoreChunksRequest(otherPublicAddress, request)
 	require.Error(t, err)
 
 	// Changing a byte in the signature should make it invalid
@@ -191,12 +194,12 @@ func TestRequestSigning(t *testing.T) {
 	copy(alteredSignature, signature)
 	alteredSignature[0] = alteredSignature[0] + 1
 	request.Signature = alteredSignature
-	err = VerifyStoreChunksRequest(publicAddress, request)
+	_, err = VerifyStoreChunksRequest(publicAddress, request)
 	require.Error(t, err)
 
 	// Changing a field in the request should make it invalid
 	request.DisperserID = request.DisperserID + 1
 	request.Signature = signature
-	err = VerifyStoreChunksRequest(publicAddress, request)
+	_, err = VerifyStoreChunksRequest(publicAddress, request)
 	require.Error(t, err)
 }
