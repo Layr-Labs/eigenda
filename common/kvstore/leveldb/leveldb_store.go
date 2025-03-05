@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
@@ -30,7 +31,10 @@ type levelDBStore struct {
 // NewStore returns a new levelDBStore built using LevelDB.
 // If reg is nil, metrics will not be collected.
 func NewStore(logger logging.Logger, path string, reg *prometheus.Registry) (kvstore.Store[[]byte], error) {
-	levelDB, err := leveldb.OpenFile(path, nil)
+	opts := &opt.Options{
+		DisableSeeksCompaction: true, // Default is false (seeks trigger compaction)
+	}
+	levelDB, err := leveldb.OpenFile(path, opts)
 
 	if err != nil {
 		return nil, err
