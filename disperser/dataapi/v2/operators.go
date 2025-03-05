@@ -114,8 +114,8 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 		startTime = oldestTime
 	}
 
-	attestations, err := s.blobMetadataStore.GetAttestationByAttestedAtForward(
-		c.Request.Context(), uint64(startTime.UnixNano())+1, uint64(endTime.UnixNano()), -1,
+	attestations, err := s.batchFeedCache.Get(
+		c.Request.Context(), startTime.Add(time.Nanosecond), endTime, Ascending, -1,
 	)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchOperatorSigningInfo")
