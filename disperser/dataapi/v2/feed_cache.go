@@ -25,6 +25,9 @@ type FeedCache[T any] struct {
 	maxItems     int
 	fetchFromDB  func(start, end time.Time, order FetchOrder, limit int) ([]*T, error)
 	getTimestamp func(*T) time.Time
+
+	// Async updates to the cache segment
+	updateWg *sync.WaitGroup
 }
 
 func NewFeedCache[T any](
@@ -36,6 +39,7 @@ func NewFeedCache[T any](
 		maxItems:     maxItems,
 		fetchFromDB:  fetchFn,
 		getTimestamp: timestampFn,
+		updateWg:     &sync.WaitGroup{},
 	}
 }
 
@@ -111,11 +115,18 @@ func (c *FeedCache[T]) Get(start, end time.Time, queryOrder FetchOrder, limit in
 		return nil, err
 	}
 
-	// TODO(jianxiao): make this run async so the results can return asap; this needs to get
-	// unit tests work.
-	c.updateCache(result)
+	// Update the cache segment async
+	c.updateWg.Add(1)
+	go func() {
+		defer c.updateWg.Done()
+		c.updateCache(result)
+	}()
 
 	return result.result, nil
+}
+
+func (c *FeedCache[T]) WaitForCacheUpdates() {
+	c.updateWg.Wait()
 }
 
 func (c *FeedCache[T]) makePlan(start, end time.Time, queryOrder FetchOrder, limit int) executionPlan[T] {
@@ -455,7 +466,13 @@ func (c *FeedCache[T]) getCacheOverlap(data []*T, start, end time.Time, queryOrd
 		}
 	}
 
-	return data[startIdx:endIdx]
+	// Note: we need to make a copy of the overlap because the cache data can be mutated
+	// by other threads after this function returns (within this function, the caller
+	// makes sure a reader lock is held)
+	result := make([]*T, endIdx-startIdx)
+	copy(result, data[startIdx:endIdx])
+
+	return result
 }
 
 func reverseOrder[T any](data []*T) []*T {
