@@ -79,6 +79,8 @@ type Config struct {
 	RelayMaxMessageSize            uint
 	ReachabilityPollIntervalSec    uint64
 	DisableNodeInfoResources       bool
+	StoreChunksRequestMaxPastAge   time.Duration
+	StoreChunksRequestMaxFutureAge time.Duration
 
 	BlsSignerConfig blssignerTypes.SignerConfig
 
@@ -317,5 +319,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DisableDispersalAuthentication:      ctx.GlobalBool(flags.DisableDispersalAuthenticationFlag.Name),
 		DispersalAuthenticationKeyCacheSize: ctx.GlobalInt(flags.DispersalAuthenticationKeyCacheSizeFlag.Name),
 		DisperserKeyTimeout:                 ctx.GlobalDuration(flags.DisperserKeyTimeoutFlag.Name),
+		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),
+		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
 	}, nil
 }

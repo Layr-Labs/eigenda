@@ -67,7 +67,10 @@ func NewServerV2(
 		}
 	}
 
-	replayGuardian := replay.NewReplayGuardian(time.Now, time.Minute, time.Minute) // TODO configuration for this!
+	replayGuardian := replay.NewReplayGuardian(
+		time.Now,
+		config.StoreChunksRequestMaxPastAge,
+		config.StoreChunksRequestMaxFutureAge)
 
 	return &ServerV2{
 		config:         config,
