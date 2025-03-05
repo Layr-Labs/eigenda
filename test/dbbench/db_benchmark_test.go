@@ -293,7 +293,7 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	opts.Compression = options.None
 	//opts.CompactL0OnClose = true
 
-	opts.ValueThreshold = 1 * units.KiB
+	opts.ValueThreshold = 0
 
 	opts.BaseTableSize = 10 * units.KiB // size / 32[key size] * 2[multiplier] * dataSize == data without expiration
 	opts.TableSizeMultiplier = 2
