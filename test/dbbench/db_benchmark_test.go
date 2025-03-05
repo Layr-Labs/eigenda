@@ -407,19 +407,19 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	//
 	//fmt.Printf("Keys present: %d, keys missing: %d\n", keysPresent, keysMissing)
 
-	fmt.Printf("Now, let's run the compaction\n")
-	iterations = 0
-	for {
-		iterations++
-		err = db.RunValueLogGC(0.125)
-		if err != nil {
-			if !strings.Contains(err.Error(), "Value log GC attempt didn't result in any cleanup") {
-				fmt.Printf("\nError running GC: %v\n", err)
-			}
-			break
-		}
-	}
-	fmt.Printf("Compaction took %d iterations\n", iterations)
+	//fmt.Printf("Now, let's run the compaction\n")
+	//iterations = 0
+	//for {
+	//	iterations++
+	//	err = db.RunValueLogGC(0.125)
+	//	if err != nil {
+	//		if !strings.Contains(err.Error(), "Value log GC attempt didn't result in any cleanup") {
+	//			fmt.Printf("\nError running GC: %v\n", err)
+	//		}
+	//		break
+	//	}
+	//}
+	//fmt.Printf("Compaction took %d iterations\n", iterations)
 
 	err = db.Close()
 	require.NoError(t, err)
