@@ -121,7 +121,10 @@ func (cv *CertVerifier) verifyBatchConfirmedOnChain(
 	// 3. Ensure that hash generated from local cert matches one stored on-chain.
 	equal := slices.Equal(onchainHash[:], computedHash[:])
 	if !equal {
-		return fmt.Errorf("batch hash mismatch, onchain: %x, computed: %x", onchainHash, computedHash)
+		return &BatchMetadataHashMismatchError{
+			OnchainHash:  onchainHash[:],
+			ComputedHash: computedHash[:],
+		}
 	}
 
 	return nil

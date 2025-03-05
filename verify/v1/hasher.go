@@ -11,7 +11,7 @@ import (
 
 // HashBatchMetadata regenerates a batch data hash
 // replicates: https://github.com/Layr-Labs/eigenda-utils/blob/c4cbc9ec078aeca3e4a04bd278e2fb136bf3e6de/src/libraries/EigenDAHasher.sol#L46-L54
-func HashBatchMetadata(bh *binding.BatchHeader, sigHash [32]byte, blockNum uint32) (geth_common.Hash, error) {
+func HashBatchMetadata(bh *binding.BatchHeader, sigHash [32]byte, confirmedBlockNum uint32) (geth_common.Hash, error) {
 	batchHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{
 			Name: "blobHeadersRoot",
@@ -59,7 +59,7 @@ func HashBatchMetadata(bh *binding.BatchHeader, sigHash [32]byte, blockNum uint3
 	}
 
 	headerHash := crypto.Keccak256Hash(bytes)
-	return HashBatchHashedMetadata(headerHash, sigHash, blockNum)
+	return HashBatchHashedMetadata(headerHash, sigHash, confirmedBlockNum)
 }
 
 // HashBatchHashedMetadata hashes the given metadata into the commitment that will be stored in the contract
