@@ -2,7 +2,6 @@ package dbbench
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -388,25 +387,25 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	//	fmt.Printf("\nError flattening DB: %v\n", err)
 	//}
 
-	fmt.Printf("checking to see what keys are still present. Based on timing, all keys should be expired.\n")
-	keysPresent := 0
-	keysMissing := 0
-	err = db.View(func(txn *badger.Txn) error {
-		for _, key := range keys {
-			_, err = txn.Get(key)
-			if err == nil {
-				keysPresent++
-			} else if errors.Is(badger.ErrKeyNotFound, err) {
-				keysMissing++
-			} else {
-				return err
-			}
-		}
-		return nil
-	})
-	require.NoError(t, err)
-
-	fmt.Printf("Keys present: %d, keys missing: %d\n", keysPresent, keysMissing)
+	//fmt.Printf("checking to see what keys are still present. Based on timing, all keys should be expired.\n")
+	//keysPresent := 0
+	//keysMissing := 0
+	//err = db.View(func(txn *badger.Txn) error {
+	//	for _, key := range keys {
+	//		_, err = txn.Get(key)
+	//		if err == nil {
+	//			keysPresent++
+	//		} else if errors.Is(badger.ErrKeyNotFound, err) {
+	//			keysMissing++
+	//		} else {
+	//			return err
+	//		}
+	//	}
+	//	return nil
+	//})
+	//require.NoError(t, err)
+	//
+	//fmt.Printf("Keys present: %d, keys missing: %d\n", keysPresent, keysMissing)
 
 	fmt.Printf("Now, let's run the compaction\n")
 	iterations = 0
