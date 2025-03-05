@@ -19,7 +19,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/mem"
-	"google.golang.org/grpc/peer"
 )
 
 // ServerV2 implements the Node v2 proto APIs.
@@ -57,7 +56,6 @@ func NewServerV2(
 			reader,
 			config.DispersalAuthenticationKeyCacheSize,
 			config.DisperserKeyTimeout,
-			config.DispersalAuthenticationTimeout,
 			func(id uint32) bool {
 				return id == api.EigenLabsDisperserID
 			},
@@ -125,13 +123,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	}
 
 	if s.authenticator != nil {
-		disperserPeer, ok := peer.FromContext(ctx)
-		if !ok {
-			return nil, api.NewErrorInvalidArg("could not get peer information from request context")
-		}
-		disperserAddress := disperserPeer.Addr.String()
-
-		err := s.authenticator.AuthenticateStoreChunksRequest(ctx, disperserAddress, in, time.Now())
+		err := s.authenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
 		if err != nil {
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
 		}
