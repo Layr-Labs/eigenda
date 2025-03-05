@@ -406,6 +406,8 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	fmt.Printf("Keys present: %d, keys missing: %d\n", keysPresent, keysMissing)
+
 	err = db.Close()
 	require.NoError(t, err)
 }
