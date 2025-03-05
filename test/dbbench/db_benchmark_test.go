@@ -21,7 +21,7 @@ import (
 
 type writer func(key []byte, value []byte) error
 
-const totalToWrite = 500 * units.GiB
+const totalToWrite = 10 * units.TiB
 
 // const totalToWrite = 1024 * units.GiB * 10
 const dataSize = 1 * units.MiB
@@ -296,7 +296,7 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 
 	opts.ValueThreshold = 0
 
-	opts.BaseTableSize = 10 * units.KiB // size / 32[key size] * 2[multiplier] * dataSize == data without expiration
+	opts.BaseTableSize = 10 * units.KiB
 	opts.TableSizeMultiplier = 2
 
 	opts.BaseLevelSize = 10 * units.KiB
@@ -313,7 +313,7 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	transaction := db.NewTransaction(true)
 	objectsInBatch := 0
 
-	ttl := 5 * time.Minute
+	ttl := 2 * time.Hour
 
 	keys := make([][]byte, 0)
 	writeFunction := func(key []byte, value []byte) error {
