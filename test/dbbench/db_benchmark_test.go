@@ -21,7 +21,7 @@ import (
 
 type writer func(key []byte, value []byte) error
 
-const totalToWrite = 50 * units.GiB
+const totalToWrite = 500 * units.GiB
 
 // const totalToWrite = 1024 * units.GiB * 10
 const dataSize = 1 * units.MiB
@@ -292,6 +292,7 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	opts := badger.DefaultOptions(directory)
 	opts.Compression = options.None
 	//opts.CompactL0OnClose = true
+	opts.Logger = nil
 
 	opts.ValueThreshold = 0
 
@@ -364,10 +365,10 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 			fmt.Printf("\nRunning GC\n")
 			startTime := time.Now()
 
-			levels := db.Levels()
-			for i, level := range levels {
-				fmt.Printf("\n>> Level %d: %+v\n", i, level)
-			}
+			//levels := db.Levels()
+			//for i, level := range levels {
+			//	fmt.Printf("\n>> Level %d: %+v\n", i, level)
+			//}
 
 			err = db.Flatten(8)
 			if err != nil {
@@ -393,62 +394,6 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	runWriteBenchmark(t, writeFunction, totalToWrite, dataSize)
 	alive.Store(false)
 	<-compactionDone
-
-	//fmt.Printf("doing some final compaction to see what happens\n")
-	//fmt.Printf("First, let's sleep for a little while (2 minutes)")
-	//time.Sleep(2 * time.Minute)
-	//fmt.Printf("Now, let's run the compaction\n")
-	//iterations := 0
-	//for {
-	//	iterations++
-	//	err = db.RunValueLogGC(0.125)
-	//	if err != nil {
-	//		if !strings.Contains(err.Error(), "Value log GC attempt didn't result in any cleanup") {
-	//			fmt.Printf("\nError running GC: %v\n", err)
-	//		}
-	//		break
-	//	}
-	//}
-	//fmt.Printf("Compaction took %d iterations\n", iterations)
-	//fmt.Printf("Now, let's flatten the DB\n")
-	//err = db.Flatten(1)
-	//if err != nil {
-	//	fmt.Printf("\nError flattening DB: %v\n", err)
-	//}
-
-	//fmt.Printf("checking to see what keys are still present. Based on timing, all keys should be expired.\n")
-	//keysPresent := 0
-	//keysMissing := 0
-	//err = db.View(func(txn *badger.Txn) error {
-	//	for _, key := range keys {
-	//		_, err = txn.Get(key)
-	//		if err == nil {
-	//			keysPresent++
-	//		} else if errors.Is(badger.ErrKeyNotFound, err) {
-	//			keysMissing++
-	//		} else {
-	//			return err
-	//		}
-	//	}
-	//	return nil
-	//})
-	//require.NoError(t, err)
-	//
-	//fmt.Printf("Keys present: %d, keys missing: %d\n", keysPresent, keysMissing)
-
-	//fmt.Printf("Now, let's run the compaction\n")
-	//iterations = 0
-	//for {
-	//	iterations++
-	//	err = db.RunValueLogGC(0.125)
-	//	if err != nil {
-	//		if !strings.Contains(err.Error(), "Value log GC attempt didn't result in any cleanup") {
-	//			fmt.Printf("\nError running GC: %v\n", err)
-	//		}
-	//		break
-	//	}
-	//}
-	//fmt.Printf("Compaction took %d iterations\n", iterations)
 
 	err = db.Close()
 	require.NoError(t, err)
