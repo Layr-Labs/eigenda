@@ -353,10 +353,10 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 				}
 			}
 
-			err = db.Flatten(1)
-			if err != nil {
-				fmt.Printf("\nError flattening DB: %v\n", err)
-			}
+			//err = db.Flatten(1)
+			//if err != nil {
+			//	fmt.Printf("\nError flattening DB: %v\n", err)
+			//}
 
 			fmt.Printf("\nGC took %v, did %d iterations\n", time.Since(startTime), gcIterations)
 		}
@@ -382,11 +382,11 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 		}
 	}
 	fmt.Printf("Compaction took %d iterations\n", iterations)
-	fmt.Printf("Now, let's flatten the DB\n")
-	err = db.Flatten(1)
-	if err != nil {
-		fmt.Printf("\nError flattening DB: %v\n", err)
-	}
+	//fmt.Printf("Now, let's flatten the DB\n")
+	//err = db.Flatten(1)
+	//if err != nil {
+	//	fmt.Printf("\nError flattening DB: %v\n", err)
+	//}
 
 	fmt.Printf("checking to see what keys are still present. Based on timing, all keys should be expired.\n")
 	keysPresent := 0
@@ -407,6 +407,20 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	require.NoError(t, err)
 
 	fmt.Printf("Keys present: %d, keys missing: %d\n", keysPresent, keysMissing)
+
+	fmt.Printf("Now, let's run the compaction\n")
+	iterations = 0
+	for {
+		iterations++
+		err = db.RunValueLogGC(0.125)
+		if err != nil {
+			if !strings.Contains(err.Error(), "Value log GC attempt didn't result in any cleanup") {
+				fmt.Printf("\nError running GC: %v\n", err)
+			}
+			break
+		}
+	}
+	fmt.Printf("Compaction took %d iterations\n", iterations)
 
 	err = db.Close()
 	require.NoError(t, err)
