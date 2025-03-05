@@ -293,8 +293,11 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	opts.Compression = options.None
 	//opts.CompactL0OnClose = true
 
-	opts.BaseTableSize = 0.5 * units.MiB // size / 32[key size] * 2[multiplier] * dataSize == data without expiration
+	opts.BaseTableSize = 10 * units.KiB // size / 32[key size] * 2[multiplier] * dataSize == data without expiration
 	opts.TableSizeMultiplier = 2
+
+	opts.BaseLevelSize = 10 * units.MiB
+	opts.LevelSizeMultiplier = 2
 
 	db, err := badger.Open(opts)
 	require.NoError(t, err)
