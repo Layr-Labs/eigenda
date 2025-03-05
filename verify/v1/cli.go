@@ -51,30 +51,26 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Category: category,
 		},
 		// kzg flags
+		// we use a relative path for these so that the path works for both the binary and the docker container
+		// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir of the container
 		&cli.StringFlag{
-			Name:    G1PathFlagName,
-			Usage:   "Directory path to g1.point file.",
-			EnvVars: []string{withEnvPrefix(envPrefix, "TARGET_KZG_G1_PATH")},
-			// we use a relative path so that the path works for both the binary and the docker container
-			// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir of the container
+			Name:     G1PathFlagName,
+			Usage:    "path to g1.point file.",
+			EnvVars:  []string{withEnvPrefix(envPrefix, "TARGET_KZG_G1_PATH")},
 			Value:    "resources/g1.point",
 			Category: category,
 		},
 		&cli.StringFlag{
-			Name:    G2PowerOf2PathFlagName,
-			Usage:   "Directory path to g2.point.powerOf2 file. This resource is not currently used, but needed because of the shared eigenda KZG library that we use. We will eventually fix this.",
-			EnvVars: []string{withEnvPrefix(envPrefix, "TARGET_KZG_G2_POWER_OF_2_PATH")},
-			// we use a relative path so that the path works for both the binary and the docker container
-			// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir of the container
+			Name:     G2PowerOf2PathFlagName,
+			Usage:    "path to g2.point.powerOf2 file. This resource is not currently used, but needed because of the shared eigenda KZG library that we use. We will eventually fix this.",
+			EnvVars:  []string{withEnvPrefix(envPrefix, "TARGET_KZG_G2_POWER_OF_2_PATH")},
 			Value:    "resources/g2.point.powerOf2",
 			Category: category,
 		},
 		&cli.StringFlag{
-			Name:    CachePathFlagName,
-			Usage:   "Directory path to SRS tables for caching. This resource is not currently used, but needed because of the shared eigenda KZG library that we use. We will eventually fix this.",
-			EnvVars: []string{withEnvPrefix(envPrefix, "TARGET_CACHE_PATH")},
-			// we use a relative path so that the path works for both the binary and the docker container
-			// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir of the container
+			Name:     CachePathFlagName,
+			Usage:    "path to SRS tables for caching. This resource is not currently used, but needed because of the shared eigenda KZG library that we use. We will eventually fix this.",
+			EnvVars:  []string{withEnvPrefix(envPrefix, "TARGET_CACHE_PATH")},
 			Value:    "resources/SRSTables/",
 			Category: category,
 		},
@@ -97,7 +93,9 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 					return fmt.Errorf("max blob length is 0")
 				}
 				if numBytes > MaxAllowedBlobSize {
-					return fmt.Errorf("excluding disperser constraints on max blob size, SRS points constrain the maxBlobLength configuration parameter to be less than than %d bytes", MaxAllowedBlobSize)
+					return fmt.Errorf(
+						"excluding disperser constraints on max blob size, SRS points constrain the maxBlobLength configuration parameter to be less than than %d bytes",
+						MaxAllowedBlobSize)
 				}
 				MaxBlobLengthBytes = numBytes
 				return nil

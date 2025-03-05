@@ -5,7 +5,7 @@ import "github.com/ethereum/go-ethereum/crypto"
 type DAServiceOPCommitmentType byte
 
 const (
-	EigenDACommitmentType DAServiceOPCommitmentType = 0
+	EigenDAOPCommitmentType DAServiceOPCommitmentType = 0
 )
 
 // OPCommitment is the binary representation of a commitment.
@@ -33,10 +33,10 @@ func DecodeEigenDASvcCommitment(commitment []byte) (EigenDASvcCommitment, error)
 
 // CommitmentType returns the commitment type of Keccak256.
 func (c EigenDASvcCommitment) CommitmentType() DAServiceOPCommitmentType {
-	return EigenDACommitmentType
+	return EigenDAOPCommitmentType
 }
 
 // Encode adds a commitment type prefix self describing the commitment.
 func (c EigenDASvcCommitment) Encode() []byte {
-	return append([]byte{byte(EigenDACommitmentType)}, c...)
+	return append([]byte{byte(EigenDAOPCommitmentType)}, c...)
 }

@@ -21,7 +21,7 @@ func TestRouting(t *testing.T) {
 	mockRouter := mocks.NewMockIManager(ctrl)
 
 	m := metrics.NewMetrics("default")
-	server := NewServer("localhost", 8080, mockRouter, testLogger, m)
+	server := NewServer(testCfg, mockRouter, testLogger, m)
 	r := mux.NewRouter()
 	err := server.Start(r)
 	require.NoError(t, err)
@@ -93,14 +93,15 @@ func TestRouting(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, tt.url, nil)
-			rec := httptest.NewRecorder()
-			server.httpServer.Handler.ServeHTTP(rec, req)
+		t.Run(
+			tt.name, func(t *testing.T) {
+				req := httptest.NewRequest(tt.method, tt.url, nil)
+				rec := httptest.NewRecorder()
+				server.httpServer.Handler.ServeHTTP(rec, req)
 
-			require.Equal(t, tt.expectedCode, rec.Code)
-			require.Equal(t, tt.expectedBody, rec.Body.String())
+				require.Equal(t, tt.expectedCode, rec.Code)
+				require.Equal(t, tt.expectedBody, rec.Body.String())
 
-		})
+			})
 	}
 }

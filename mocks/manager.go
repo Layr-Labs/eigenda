@@ -36,7 +36,7 @@ func (m *MockIManager) EXPECT() *MockIManagerMockRecorder {
 }
 
 // Get mocks base method.
-func (m *MockIManager) Get(arg0 context.Context, arg1 []byte, arg2 commitments.CommitmentMode) ([]byte, error) {
+func (m *MockIManager) Get(arg0 context.Context, arg1 []byte, arg2 commitments.CommitmentMeta) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", arg0, arg1, arg2)
 	ret0, _ := ret[0].([]byte)

@@ -74,7 +74,11 @@ func NewL2AltDA(t actions.Testing, daHost string, altDA bool) *L2AltDA {
 		storage = altda.NewDAClient(daHost, false, false)
 	}
 
-	l1F, err := sources.NewL1Client(miner.RPCClient(), log, nil, sources.L1ClientDefaultConfig(sd.RollupCfg, false, sources.RPCKindBasic))
+	l1F, err := sources.NewL1Client(
+		miner.RPCClient(),
+		log,
+		nil,
+		sources.L1ClientDefaultConfig(sd.RollupCfg, false, sources.RPCKindBasic))
 	require.NoError(t, err)
 
 	altdaCfg, err := sd.RollupCfg.GetOPAltDAConfig()
@@ -95,7 +99,14 @@ func NewL2AltDA(t actions.Testing, daHost string, altDA bool) *L2AltDA {
 	miner.ActL1SetFeeRecipient(common.Address{'A'})
 	sequencer.ActL2PipelineFull(t)
 
-	batcher := actions.NewL2Batcher(log, sd.RollupCfg, actions.AltDABatcherCfg(dp, storage), sequencer.RollupClient(), l1Client, engine.EthClient(), engCl)
+	batcher := actions.NewL2Batcher(
+		log,
+		sd.RollupCfg,
+		actions.AltDABatcherCfg(dp, storage),
+		sequencer.RollupClient(),
+		l1Client,
+		engine.EthClient(),
+		engCl)
 
 	return &L2AltDA{
 		log:       log,
@@ -120,15 +131,16 @@ func (a *L2AltDA) ActL1Finalized(t actions.Testing) {
 }
 
 func TestOptimismKeccak256Commitment(gt *testing.T) {
-	if !runIntegrationTests && !runTestnetIntegrationTests {
+	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
 		gt.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
-	testCfg := e2e.TestConfig(useMemory())
+	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
 	testCfg.UseKeccak256ModeS3 = true
 
 	tsConfig := e2e.TestSuiteConfig(testCfg)
-	proxyTS, shutDown := e2e.CreateTestSuite(tsConfig)
+	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
+	proxyTS, shutDown := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer shutDown()
 
 	t := actions.NewDefaultTesting(gt)
@@ -173,12 +185,15 @@ func TestOptimismKeccak256Commitment(gt *testing.T) {
 }
 
 func TestOptimismGenericCommitment(gt *testing.T) {
-	if !runIntegrationTests && !runTestnetIntegrationTests {
+	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
 		gt.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
-	tsConfig := e2e.TestSuiteConfig(e2e.TestConfig(useMemory()))
-	proxyTS, shutDown := e2e.CreateTestSuite(tsConfig)
+	testConfig := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
+
+	tsConfig := e2e.TestSuiteConfig(testConfig)
+	tsSecretConfig := e2e.TestSuiteSecretConfig(testConfig)
+	proxyTS, shutDown := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer shutDown()
 
 	t := actions.NewDefaultTesting(gt)

@@ -3,18 +3,15 @@ package memstore
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"math/big"
-	"sync"
-	"time"
 
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/ephemeraldb"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
-	"github.com/Layr-Labs/eigenda-proxy/verify"
-	"github.com/Layr-Labs/eigenda/api"
+	"github.com/Layr-Labs/eigenda-proxy/verify/v1"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	eigenda_common "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
@@ -25,32 +22,23 @@ import (
 )
 
 const (
-	DefaultPruneInterval = 500 * time.Millisecond
 	BytesPerFieldElement = 32
 )
 
 /*
 MemStore is a simple in-memory store for blobs which uses an expiration
 time to evict blobs to best emulate the ephemeral nature of blobs dispersed to
-EigenDA operators.
+EigenDA V1 operators.
 */
 type MemStore struct {
-	// We use a SafeConfig because it is shared with the MemStore api
-	// which can change its values concurrently.
-	config *memconfig.SafeConfig
-	log    logging.Logger
+	*ephemeraldb.DB
+	log logging.Logger
 
-	// mu protects keyStarts and store (and verifier??)
-	mu        sync.RWMutex
-	keyStarts map[string]time.Time
-	store     map[string][]byte
 	// We only use the verifier for kzgCommitment verification.
 	// MemStore generates random certs which can't be verified.
 	// TODO: we should probably refactor the Verifier to be able to only take in a BlobVerifier here.
 	verifier *verify.Verifier
 	codec    codecs.BlobCodec
-
-	reads int
 }
 
 var _ common.GeneratedKeyStore = (*MemStore)(nil)
@@ -59,51 +47,12 @@ var _ common.GeneratedKeyStore = (*MemStore)(nil)
 func New(
 	ctx context.Context, verifier *verify.Verifier, log logging.Logger, config *memconfig.SafeConfig,
 ) (*MemStore, error) {
-	store := &MemStore{
-		log:       log,
-		config:    config,
-		keyStarts: make(map[string]time.Time),
-		store:     make(map[string][]byte),
-		verifier:  verifier,
-		codec:     codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()),
-	}
-
-	if store.config.BlobExpiration() != 0 {
-		log.Info("memstore expiration enabled", "time", store.config.BlobExpiration)
-		go store.pruningLoop(ctx)
-	}
-
-	return store, nil
-}
-
-// pruningLoop ... runs a background goroutine to prune expired blobs from the store on a regular interval.
-func (e *MemStore) pruningLoop(ctx context.Context) {
-	timer := time.NewTicker(DefaultPruneInterval)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-
-		case <-timer.C:
-			e.pruneExpired()
-		}
-	}
-}
-
-// pruneExpired ... removes expired blobs from the store based on the expiration time.
-func (e *MemStore) pruneExpired() {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	for commit, dur := range e.keyStarts {
-		if time.Since(dur) >= e.config.BlobExpiration() {
-			delete(e.keyStarts, commit)
-			delete(e.store, commit)
-
-			e.log.Debug("blob pruned", "commit", commit)
-		}
-	}
+	return &MemStore{
+		ephemeraldb.New(ctx, config, log),
+		log,
+		verifier,
+		codecs.NewIFFTCodec(codecs.NewDefaultBlobCodec()),
+	}, nil
 }
 
 // generateRandomCert ... generates random EigenDA V1 certificate
@@ -183,14 +132,9 @@ func (e *MemStore) generateRandomCert(blobValue []byte) (*verify.Certificate, er
 
 // Get fetches a value from the store.
 func (e *MemStore) Get(_ context.Context, commit []byte) ([]byte, error) {
-	time.Sleep(e.config.LatencyGETRoute())
-	e.reads++
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-	var encodedBlob []byte
-	var exists bool
-	if encodedBlob, exists = e.store[crypto.Keccak256Hash(commit).String()]; !exists {
-		return nil, fmt.Errorf("commitment key not found")
+	encodedBlob, err := e.FetchEntry(crypto.Keccak256Hash(commit).Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("fetching entry via v1 memstore: %w", err)
 	}
 
 	return e.codec.DecodeBlob(encodedBlob)
@@ -198,21 +142,10 @@ func (e *MemStore) Get(_ context.Context, commit []byte) ([]byte, error) {
 
 // Put inserts a value into the store.
 func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
-	time.Sleep(e.config.LatencyPUTRoute())
-	if e.config.PutReturnsFailoverError() {
-		return nil, api.NewErrorFailover(errors.New("memstore in failover simulation mode"))
-	}
 	encodedVal, err := e.codec.EncodeBlob(value)
 	if err != nil {
 		return nil, err
 	}
-
-	if uint64(len(encodedVal)) > e.config.MaxBlobSizeBytes() {
-		return nil, fmt.Errorf("%w: blob length %d, max blob size %d", common.ErrProxyOversizedBlob, len(value), e.config.MaxBlobSizeBytes())
-	}
-
-	e.mu.Lock()
-	defer e.mu.Unlock()
 
 	cert, err := e.generateRandomCert(encodedVal)
 	if err != nil {
@@ -224,16 +157,12 @@ func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	certKey := crypto.Keccak256Hash(certBytes).String()
+	certKey := crypto.Keccak256Hash(certBytes).Bytes()
 
-	// construct key
-	if _, exists := e.store[certKey]; exists {
-		return nil, fmt.Errorf("commitment key already exists")
+	err = e.InsertEntry(certKey, encodedVal)
+	if err != nil {
+		return nil, err
 	}
-
-	e.store[certKey] = encodedVal
-	// add expiration
-	e.keyStarts[certKey] = time.Now()
 
 	return certBytes, nil
 }
@@ -243,5 +172,5 @@ func (e *MemStore) Verify(_ context.Context, _, _ []byte) error {
 }
 
 func (e *MemStore) BackendType() common.BackendType {
-	return common.MemoryBackendType
+	return common.MemstoreV1BackendType
 }

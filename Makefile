@@ -32,9 +32,10 @@ clean:
 test-unit:
 	go test ./... -parallel 4
 
-# Local E2E tests, leveraging op-e2e framework. Also tests the standard client against the proxy.
+# Local V1/V2 E2E tests, leveraging op-e2e framework. Also tests the standard client against the proxy.
 test-e2e-local:
 	INTEGRATION=true go test -timeout 1m ./e2e -parallel 4
+	INTEGRATION_V2=true go test -timeout 1m ./e2e -parallel 4
 
 # E2E tests against holesky testnet
 # Holesky is currently broken after recent pectra hardfork.

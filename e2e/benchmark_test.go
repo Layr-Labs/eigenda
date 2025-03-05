@@ -12,8 +12,9 @@ import (
 
 // BenchmarkPutsWithSecondary  ... Takes in an async worker count and profiles blob insertions using
 // constant blob sizes in parallel
+// TODO: test variations with V2
 func BenchmarkPutsWithSecondary(b *testing.B) {
-	testCfg := TestConfig(true)
+	testCfg := TestConfig(true, false)
 	testCfg.UseS3Caching = true
 	writeThreadCount := os.Getenv("WRITE_THREAD_COUNT")
 	threadInt, err := strconv.Atoi(writeThreadCount)
@@ -23,7 +24,8 @@ func BenchmarkPutsWithSecondary(b *testing.B) {
 	testCfg.WriteThreadCount = threadInt
 
 	tsConfig := TestSuiteConfig(testCfg)
-	ts, kill := CreateTestSuite(tsConfig)
+	tsSecretConfig := TestSuiteSecretConfig(testCfg)
+	ts, kill := CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
 	cfg := &standard_client.Config{

@@ -19,17 +19,18 @@ func useMemory() bool {
 }
 
 func TestOptimismClientWithKeccak256Commitment(t *testing.T) {
-	if !runIntegrationTests && !runTestnetIntegrationTests {
+	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
 		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
 	t.Parallel()
 
-	testCfg := e2e.TestConfig(useMemory())
+	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
 	testCfg.UseKeccak256ModeS3 = true
 
 	tsConfig := e2e.TestSuiteConfig(testCfg)
-	ts, kill := e2e.CreateTestSuite(tsConfig)
+	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
+	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
 	requireOPClientSetGet(t, ts, e2e.RandBytes(100), true)
@@ -41,14 +42,17 @@ with a concurrent S3 backend configured
 */
 func TestOptimismClientWithGenericCommitment(t *testing.T) {
 
-	if !runIntegrationTests && !runTestnetIntegrationTests {
+	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
 		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
 	t.Parallel()
 
-	tsConfig := e2e.TestSuiteConfig(e2e.TestConfig(useMemory()))
-	ts, kill := e2e.CreateTestSuite(tsConfig)
+	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
+
+	tsConfig := e2e.TestSuiteConfig(testCfg)
+	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
+	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
 	requireOPClientSetGet(t, ts, e2e.RandBytes(100), false)
@@ -61,12 +65,15 @@ func TestOptimismClientWithGenericCommitment(t *testing.T) {
 func TestProxyClientServerIntegration(t *testing.T) {
 	t.Parallel()
 
-	if !runIntegrationTests && !runTestnetIntegrationTests {
+	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
 		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
-	tsConfig := e2e.TestSuiteConfig(e2e.TestConfig(useMemory()))
-	ts, kill := e2e.CreateTestSuite(tsConfig)
+	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
+
+	tsConfig := e2e.TestSuiteConfig(testCfg)
+	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
+	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
 	t.Cleanup(kill)
 
 	cfg := &standard_client.Config{
@@ -74,67 +81,79 @@ func TestProxyClientServerIntegration(t *testing.T) {
 	}
 	daClient := standard_client.New(cfg)
 
-	t.Run("single byte preimage set data case", func(t *testing.T) {
-		t.Parallel()
-		testPreimage := []byte{1} // single byte preimage
-		t.Log("Setting input data on proxy server...")
-		_, err := daClient.SetData(ts.Ctx, testPreimage)
-		require.NoError(t, err)
-	})
+	t.Run(
+		"single byte preimage set data case", func(t *testing.T) {
+			t.Parallel()
+			testPreimage := []byte{1} // single byte preimage
+			t.Log("Setting input data on proxy server...")
+			_, err := daClient.SetData(ts.Ctx, testPreimage)
+			require.NoError(t, err)
+		})
 
-	t.Run("unicode preimage set data case", func(t *testing.T) {
-		t.Parallel()
-		testPreimage := []byte("§§©ˆªªˆ˙√ç®∂§∞¶§ƒ¥√¨¥√¨¥ƒƒ©˙˜ø˜˜˜∫˙∫¥∫√†®®√ç¨ˆ¨˙ï") // many unicode characters
-		t.Log("Setting input data on proxy server...")
-		_, err := daClient.SetData(ts.Ctx, testPreimage)
-		require.NoError(t, err)
+	t.Run(
+		"unicode preimage set data case", func(t *testing.T) {
+			t.Parallel()
+			testPreimage := []byte("§§©ˆªªˆ˙√ç®∂§∞¶§ƒ¥√¨¥√¨¥ƒƒ©˙˜ø˜˜˜∫˙∫¥∫√†®®√ç¨ˆ¨˙ï") // many unicode characters
+			t.Log("Setting input data on proxy server...")
+			_, err := daClient.SetData(ts.Ctx, testPreimage)
+			require.NoError(t, err)
 
-		testPreimage = []byte("§") // single unicode character
-		t.Log("Setting input data on proxy server...")
-		_, err = daClient.SetData(ts.Ctx, testPreimage)
-		require.NoError(t, err)
+			testPreimage = []byte("§") // single unicode character
+			t.Log("Setting input data on proxy server...")
+			_, err = daClient.SetData(ts.Ctx, testPreimage)
+			require.NoError(t, err)
 
-	})
+		})
 
-	t.Run("empty preimage set data case", func(t *testing.T) {
-		t.Parallel()
-		testPreimage := []byte("") // Empty preimage
-		t.Log("Setting input data on proxy server...")
-		_, err := daClient.SetData(ts.Ctx, testPreimage)
-		require.NoError(t, err)
-	})
+	t.Run(
+		"empty preimage set data case", func(t *testing.T) {
+			t.Parallel()
+			testPreimage := []byte("") // Empty preimage
+			t.Log("Setting input data on proxy server...")
+			_, err := daClient.SetData(ts.Ctx, testPreimage)
+			require.NoError(t, err)
+		})
 
-	t.Run("get data edge cases", func(t *testing.T) {
-		t.Parallel()
-		testCert := []byte("")
-		_, err := daClient.GetData(ts.Ctx, testCert)
-		require.Error(t, err)
-		assert.True(t, strings.Contains(err.Error(),
-			"404") && !isNilPtrDerefPanic(err.Error()))
+	t.Run(
+		"get data edge cases", func(t *testing.T) {
+			t.Parallel()
+			testCert := []byte("")
+			_, err := daClient.GetData(ts.Ctx, testCert)
+			require.Error(t, err)
+			assert.True(
+				t, strings.Contains(
+					err.Error(),
+					"404") && !isNilPtrDerefPanic(err.Error()))
 
-		testCert = []byte{1}
-		_, err = daClient.GetData(ts.Ctx, testCert)
-		require.Error(t, err)
-		assert.True(t, strings.Contains(err.Error(),
-			"400") && !isNilPtrDerefPanic(err.Error()))
+			testCert = []byte{2}
+			_, err = daClient.GetData(ts.Ctx, testCert)
+			require.Error(t, err)
+			assert.True(
+				t, strings.Contains(
+					err.Error(),
+					"400") && !isNilPtrDerefPanic(err.Error()))
 
-		testCert = e2e.RandBytes(10000)
-		_, err = daClient.GetData(ts.Ctx, testCert)
-		require.Error(t, err)
-		assert.True(t, strings.Contains(err.Error(), "400") && !isNilPtrDerefPanic(err.Error()))
-	})
+			testCert = e2e.RandBytes(10000)
+			_, err = daClient.GetData(ts.Ctx, testCert)
+			require.Error(t, err)
+			assert.True(t, strings.Contains(err.Error(), "400") && !isNilPtrDerefPanic(err.Error()))
+		})
 
 }
 
 func TestProxyClient(t *testing.T) {
-	if !runIntegrationTests && !runTestnetIntegrationTests {
+	t.Log(runIntegrationTests)
+	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
 		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
 	t.Parallel()
 
-	tsConfig := e2e.TestSuiteConfig(e2e.TestConfig(useMemory()))
-	ts, kill := e2e.CreateTestSuite(tsConfig)
+	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
+
+	tsConfig := e2e.TestSuiteConfig(testCfg)
+	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
+	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
 	cfg := &standard_client.Config{
@@ -145,24 +164,27 @@ func TestProxyClient(t *testing.T) {
 	testPreimage := e2e.RandBytes(100)
 
 	t.Log("Setting input data on proxy server...")
-	blobInfo, err := daClient.SetData(ts.Ctx, testPreimage)
+	daCommitment, err := daClient.SetData(ts.Ctx, testPreimage)
 	require.NoError(t, err)
 
 	t.Log("Getting input data from proxy server...")
-	preimage, err := daClient.GetData(ts.Ctx, blobInfo)
+	preimage, err := daClient.GetData(ts.Ctx, daCommitment)
 	require.NoError(t, err)
 	require.Equal(t, testPreimage, preimage)
 }
 
 func TestProxyClientWriteRead(t *testing.T) {
-	if !runIntegrationTests && !runTestnetIntegrationTests {
+	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
 		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
 	t.Parallel()
 
-	tsConfig := e2e.TestSuiteConfig(e2e.TestConfig(useMemory()))
-	ts, kill := e2e.CreateTestSuite(tsConfig)
+	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
+
+	tsConfig := e2e.TestSuiteConfig(testCfg)
+	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
+	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
 	requireStandardClientSetGet(t, ts, e2e.RandBytes(100))
@@ -170,14 +192,17 @@ func TestProxyClientWriteRead(t *testing.T) {
 }
 
 func TestProxyWithMaximumSizedBlob(t *testing.T) {
-	if !runIntegrationTests && !runTestnetIntegrationTests {
+	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
 		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
 	t.Parallel()
 
-	tsConfig := e2e.TestSuiteConfig(e2e.TestConfig(useMemory()))
-	ts, kill := e2e.CreateTestSuite(tsConfig)
+	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
+
+	tsConfig := e2e.TestSuiteConfig(testCfg)
+	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
+	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
 	requireStandardClientSetGet(t, ts, e2e.RandBytes(16_000_000))
@@ -188,17 +213,18 @@ func TestProxyWithMaximumSizedBlob(t *testing.T) {
 Ensure that proxy is able to write/read from a cache backend when enabled
 */
 func TestProxyCaching(t *testing.T) {
-	if !runIntegrationTests && !runTestnetIntegrationTests {
+	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
 		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
 	t.Parallel()
 
-	testCfg := e2e.TestConfig(useMemory())
+	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
 	testCfg.UseS3Caching = true
 
 	tsConfig := e2e.TestSuiteConfig(testCfg)
-	ts, kill := e2e.CreateTestSuite(tsConfig)
+	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
+	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
 	requireStandardClientSetGet(t, ts, e2e.RandBytes(1_000_000))
@@ -207,17 +233,18 @@ func TestProxyCaching(t *testing.T) {
 }
 
 func TestProxyCachingWithRedis(t *testing.T) {
-	if !runIntegrationTests && !runTestnetIntegrationTests {
+	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
 		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
 	}
 
 	t.Parallel()
 
-	testCfg := e2e.TestConfig(useMemory())
+	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
 	testCfg.UseRedisCaching = true
 
 	tsConfig := e2e.TestSuiteConfig(testCfg)
-	ts, kill := e2e.CreateTestSuite(tsConfig)
+	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
+	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
 	requireStandardClientSetGet(t, ts, e2e.RandBytes(1_000_000))
@@ -240,13 +267,14 @@ func TestProxyReadFallback(t *testing.T) {
 	t.Parallel()
 
 	// setup server with S3 as a fallback option
-	testCfg := e2e.TestConfig(useMemory())
+	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
 	testCfg.UseS3Fallback = true
 	// ensure that blob memstore eviction times result in near immediate activation
 	testCfg.Expiration = time.Millisecond * 1
 
 	tsConfig := e2e.TestSuiteConfig(testCfg)
-	ts, kill := e2e.CreateTestSuite(tsConfig)
+	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
+	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
 	cfg := &standard_client.Config{
@@ -276,13 +304,17 @@ func TestProxyMemConfigClientCanGetAndPatch(t *testing.T) {
 	}
 	t.Parallel()
 
-	tsConfig := e2e.TestSuiteConfig(e2e.TestConfig(useMemory()))
-	ts, kill := e2e.CreateTestSuite(tsConfig)
+	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
+
+	tsConfig := e2e.TestSuiteConfig(testCfg)
+	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
+	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
-	memClient := memconfig_client.New(&memconfig_client.Config{
-		URL: "http://" + ts.Server.Endpoint(),
-	})
+	memClient := memconfig_client.New(
+		&memconfig_client.Config{
+			URL: "http://" + ts.Server.Endpoint(),
+		})
 
 	// 1 - ensure cfg can be read from memconfig handlers
 	cfg, err := memClient.GetConfig(ts.Ctx)

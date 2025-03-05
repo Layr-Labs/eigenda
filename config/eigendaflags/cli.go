@@ -24,7 +24,6 @@ var (
 	SignerPrivateKeyHexFlagName          = withFlagPrefix("signer-private-key-hex")
 	PutBlobEncodingVersionFlagName       = withFlagPrefix("put-blob-encoding-version")
 	DisablePointVerificationModeFlagName = withFlagPrefix("disable-point-verification-mode")
-	WaitForFinalizationFlagName          = withFlagPrefix("wait-for-finalization")
 	ConfirmationDepthFlagName            = withFlagPrefix("confirmation-depth")
 	EthRPCURLFlagName                    = withFlagPrefix("eth-rpc")
 	SvcManagerAddrFlagName               = withFlagPrefix("svc-manager-addr")
@@ -117,18 +116,6 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Value:    false,
 			Category: category,
 		},
-		&cli.BoolFlag{
-			// This flag is DEPRECATED. Use ConfirmationDepthFlagName, which accept "finalization" or a number <64.
-			Name:     WaitForFinalizationFlagName,
-			Usage:    "Wait for blob finalization before returning from PutBlob.",
-			EnvVars:  []string{withEnvPrefix(envPrefix, "WAIT_FOR_FINALIZATION")},
-			Value:    false,
-			Category: category,
-			Hidden:   true,
-			Action: func(_ *cli.Context, _ bool) error {
-				return fmt.Errorf("flag --%s is deprecated, instead use --%s finalized", WaitForFinalizationFlagName, ConfirmationDepthFlagName)
-			},
-		},
 		&cli.StringFlag{
 			Name: ConfirmationDepthFlagName,
 			Usage: "Number of Ethereum blocks to wait after the blob's batch has been included on-chain, " +
@@ -169,15 +156,16 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 func ReadConfig(ctx *cli.Context) clients.EigenDAClientConfig {
 	waitForFinalization, confirmationDepth := parseConfirmationFlag(ctx.String(ConfirmationDepthFlagName))
 	return clients.EigenDAClientConfig{
-		RPC:                          ctx.String(DisperserRPCFlagName),
-		ResponseTimeout:              ctx.Duration(ResponseTimeoutFlagName),
-		ConfirmationTimeout:          ctx.Duration(ConfirmationTimeoutFlagName),
-		StatusQueryRetryInterval:     ctx.Duration(StatusQueryRetryIntervalFlagName),
-		StatusQueryTimeout:           ctx.Duration(StatusQueryTimeoutFlagName),
-		DisableTLS:                   ctx.Bool(DisableTLSFlagName),
-		CustomQuorumIDs:              ctx.UintSlice(CustomQuorumIDsFlagName),
-		SignerPrivateKeyHex:          ctx.String(SignerPrivateKeyHexFlagName),
-		PutBlobEncodingVersion:       codecs.BlobEncodingVersion(ctx.Uint(PutBlobEncodingVersionFlagName)),
+		RPC:                      ctx.String(DisperserRPCFlagName),
+		ResponseTimeout:          ctx.Duration(ResponseTimeoutFlagName),
+		ConfirmationTimeout:      ctx.Duration(ConfirmationTimeoutFlagName),
+		StatusQueryRetryInterval: ctx.Duration(StatusQueryRetryIntervalFlagName),
+		StatusQueryTimeout:       ctx.Duration(StatusQueryTimeoutFlagName),
+		DisableTLS:               ctx.Bool(DisableTLSFlagName),
+		CustomQuorumIDs:          ctx.UintSlice(CustomQuorumIDsFlagName),
+		SignerPrivateKeyHex:      ctx.String(SignerPrivateKeyHexFlagName),
+		// #nosec G115 - only overflow on incorrect user input
+		PutBlobEncodingVersion:       codecs.PayloadEncodingVersion(ctx.Uint(PutBlobEncodingVersionFlagName)),
 		DisablePointVerificationMode: ctx.Bool(DisablePointVerificationModeFlagName),
 		WaitForFinalization:          waitForFinalization,
 		WaitForConfirmationDepth:     confirmationDepth,

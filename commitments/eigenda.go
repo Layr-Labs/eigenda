@@ -1,39 +1,40 @@
 package commitments
 
-type CertEncodingCommitment byte
+type EigenDACommitmentType byte
 
 const (
-	CertV0 CertEncodingCommitment = 0
+	// EigenDA V1
+	CertV0 EigenDACommitmentType = iota
+	// EigenDA V2
+	CertV1
 )
 
-// OPCommitment is the binary representation of a commitment.
+// CertCommitment is the binary representation of a commitment.
 type CertCommitment interface {
-	CommitmentType() CertEncodingCommitment
+	CommitmentType() EigenDACommitmentType
 	Encode() []byte
 	Verify(input []byte) error
 }
 
-type CertCommitmentV0 []byte
-
-// NewV0CertCommitment creates a new commitment from the given input.
-func NewV0CertCommitment(input []byte) CertCommitmentV0 {
-	return CertCommitmentV0(input)
+type EigenDACommitment struct {
+	prefix EigenDACommitmentType
+	b      []byte
 }
 
-// DecodeCertCommitment validates and casts the commitment into a Keccak256Commitment.
-func DecodeCertCommitment(commitment []byte) (CertCommitmentV0, error) {
-	if len(commitment) == 0 {
-		return nil, ErrInvalidCommitment
+// NewEigenDACommitment creates a new commitment from the given input.
+func NewEigenDACommitment(input []byte, commitmentType EigenDACommitmentType) EigenDACommitment {
+	return EigenDACommitment{
+		prefix: commitmentType,
+		b:      input,
 	}
-	return commitment, nil
 }
 
-// CommitmentType returns the commitment type of Keccak256.
-func (c CertCommitmentV0) CommitmentType() CertEncodingCommitment {
-	return CertV0
+// CommitmentType returns the commitment type of EigenDACommitment.
+func (c EigenDACommitment) CommitmentType() EigenDACommitmentType {
+	return c.prefix
 }
 
 // Encode adds a commitment type prefix self describing the commitment.
-func (c CertCommitmentV0) Encode() []byte {
-	return append([]byte{byte(CertV0)}, c...)
+func (c EigenDACommitment) Encode() []byte {
+	return append([]byte{byte(c.prefix)}, c.b...)
 }

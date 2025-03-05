@@ -33,8 +33,8 @@ func (svr *Server) handleGetStdCommitment(w http.ResponseWriter, r *http.Request
 		return fmt.Errorf("error parsing version byte: %w", err)
 	}
 	commitmentMeta := commitments.CommitmentMeta{
-		Mode:        commitments.Standard,
-		CertVersion: versionByte,
+		Mode:    commitments.Standard,
+		Version: commitments.EigenDACommitmentType(versionByte),
 	}
 
 	rawCommitmentHex, ok := mux.Vars(r)[routingVarNamePayloadHex]
@@ -59,8 +59,8 @@ func (svr *Server) handleGetOPKeccakCommitment(w http.ResponseWriter, r *http.Re
 	// 	return err
 	// }
 	commitmentMeta := commitments.CommitmentMeta{
-		Mode:        commitments.OptimismKeccak,
-		CertVersion: byte(commitments.CertV0),
+		Mode:    commitments.OptimismKeccak,
+		Version: commitments.CertV0,
 	}
 
 	rawCommitmentHex, ok := mux.Vars(r)[routingVarNamePayloadHex]
@@ -82,8 +82,8 @@ func (svr *Server) handleGetOPGenericCommitment(w http.ResponseWriter, r *http.R
 		return fmt.Errorf("error parsing version byte: %w", err)
 	}
 	commitmentMeta := commitments.CommitmentMeta{
-		Mode:        commitments.OptimismGeneric,
-		CertVersion: versionByte,
+		Mode:    commitments.OptimismGeneric,
+		Version: commitments.EigenDACommitmentType(versionByte),
 	}
 
 	rawCommitmentHex, ok := mux.Vars(r)[routingVarNamePayloadHex]
@@ -98,10 +98,15 @@ func (svr *Server) handleGetOPGenericCommitment(w http.ResponseWriter, r *http.R
 	return svr.handleGetShared(r.Context(), w, commitment, commitmentMeta)
 }
 
-func (svr *Server) handleGetShared(ctx context.Context, w http.ResponseWriter, comm []byte, meta commitments.CommitmentMeta) error {
+func (svr *Server) handleGetShared(
+	ctx context.Context,
+	w http.ResponseWriter,
+	comm []byte,
+	meta commitments.CommitmentMeta,
+) error {
 	commitmentHex := hex.EncodeToString(comm)
 	svr.log.Info("Processing GET request", "commitment", commitmentHex, "commitmentMeta", meta)
-	input, err := svr.sm.Get(ctx, comm, meta.Mode)
+	input, err := svr.sm.Get(ctx, comm, meta)
 	if err != nil {
 		err = MetaError{
 			Err:  fmt.Errorf("get request failed with commitment %v: %w", commitmentHex, err),
@@ -126,9 +131,14 @@ func (svr *Server) handleGetShared(ctx context.Context, w http.ResponseWriter, c
 // handlePostStdCommitment handles the POST request for std commitments.
 func (svr *Server) handlePostStdCommitment(w http.ResponseWriter, r *http.Request) error {
 	commitmentMeta := commitments.CommitmentMeta{
-		Mode:        commitments.Standard,
-		CertVersion: byte(commitments.CertV0), // TODO: hardcoded for now
+		Mode:    commitments.Standard,
+		Version: commitments.CertV0,
 	}
+
+	if svr.cfg.DisperseV2 {
+		commitmentMeta.Version = commitments.CertV1
+	}
+
 	return svr.handlePostShared(w, r, nil, commitmentMeta)
 }
 
@@ -142,8 +152,8 @@ func (svr *Server) handlePostOPKeccakCommitment(w http.ResponseWriter, r *http.R
 	// 	return err
 	// }
 	commitmentMeta := commitments.CommitmentMeta{
-		Mode:        commitments.OptimismKeccak,
-		CertVersion: byte(commitments.CertV0),
+		Mode:    commitments.OptimismKeccak,
+		Version: commitments.CertV0,
 	}
 
 	rawCommitmentHex, ok := mux.Vars(r)[routingVarNamePayloadHex]
@@ -161,14 +171,24 @@ func (svr *Server) handlePostOPKeccakCommitment(w http.ResponseWriter, r *http.R
 // handlePostOPGenericCommitment handles the POST request for optimism generic commitments.
 func (svr *Server) handlePostOPGenericCommitment(w http.ResponseWriter, r *http.Request) error {
 	commitmentMeta := commitments.CommitmentMeta{
-		Mode:        commitments.OptimismGeneric,
-		CertVersion: byte(commitments.CertV0), // TODO: hardcoded for now
+		Mode:    commitments.OptimismGeneric,
+		Version: commitments.CertV0,
 	}
+
+	if svr.cfg.DisperseV2 {
+		commitmentMeta.Version = commitments.CertV1
+	}
+
 	return svr.handlePostShared(w, r, nil, commitmentMeta)
 }
 
-func (svr *Server) handlePostShared(w http.ResponseWriter, r *http.Request, comm []byte, meta commitments.CommitmentMeta) error {
-	svr.log.Info("Processing POST request", "commitment", hex.EncodeToString(comm), "commitmentMeta", meta)
+func (svr *Server) handlePostShared(
+	w http.ResponseWriter,
+	r *http.Request,
+	comm []byte,
+	meta commitments.CommitmentMeta,
+) error {
+	svr.log.Info("Processing POST request", "commitment", hex.EncodeToString(comm), "meta", meta)
 	input, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRequestBodySize))
 	if err != nil {
 		err = MetaError{
@@ -199,7 +219,7 @@ func (svr *Server) handlePostShared(w http.ResponseWriter, r *http.Request, comm
 		return err
 	}
 
-	responseCommit, err := commitments.EncodeCommitment(commitment, meta.Mode)
+	responseCommit, err := commitments.EncodeCommitment(commitment, meta.Mode, meta.Version)
 	if err != nil {
 		err = MetaError{
 			Err:  fmt.Errorf("failed to encode commitment %v (commitment mode %v): %w", commitment, meta.Mode, err),

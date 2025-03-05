@@ -110,7 +110,6 @@ linters-settings:
     # Default: false
     all: true
 
-
 linters:
   disable-all: true
   enable:
@@ -134,7 +133,6 @@ linters:
     - errorlint # finds code that will cause problems with the error wrapping scheme introduced in Go 1.13
     - exhaustive # checks exhaustiveness of enum switch statements
     - copyloopvar # checks for pointers to enclosing loop variables
-    - forbidigo # forbids identifiers
     - funlen # tool for detection of long functions
     - gocheckcompilerdirectives # validates go compiler directive comments (//go:)
     # - gochecknoinits # checks that no init functions are present in Go code

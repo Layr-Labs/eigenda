@@ -5,13 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/config"
+	eigendaflags_v2 "github.com/Layr-Labs/eigenda-proxy/config/eigendaflags/v2"
+
 	proxy_logging "github.com/Layr-Labs/eigenda-proxy/logging"
+	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
 
-	"github.com/Layr-Labs/eigenda-proxy/flags"
-	"github.com/Layr-Labs/eigenda-proxy/metrics"
+	proxy_metrics "github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/server"
 	"github.com/urfave/cli/v2"
 
@@ -31,7 +35,11 @@ func StartProxySvr(cliCtx *cli.Context) error {
 
 	log.Info("Starting EigenDA Proxy Server", "version", Version, "date", Date, "commit", Commit)
 
-	cfg := server.ReadCLIConfig(cliCtx)
+	cfg, err := config.ReadCLIConfig(cliCtx)
+	if err != nil {
+		return fmt.Errorf("read cli config: %w", err)
+	}
+
 	if err := cfg.Check(); err != nil {
 		return err
 	}
@@ -40,17 +48,43 @@ func StartProxySvr(cliCtx *cli.Context) error {
 		return fmt.Errorf("failed to pretty print config: %w", err)
 	}
 
-	m := metrics.NewMetrics("default")
+	var secretConfig common.SecretConfigV2
+	if cfg.EigenDAConfig.EdaClientConfigV2.Enabled {
+		// secret config is kept entirely separate from the other config values, which may be printed
+		secretConfig = eigendaflags_v2.ReadSecretConfigV2(cliCtx)
+		if err := secretConfig.Check(); err != nil {
+			return err
+		}
+	}
+
+	metrics := proxy_metrics.NewMetrics("default")
 
 	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
 	defer ctxCancel()
 
-	sm, err := server.LoadStoreManager(ctx, cfg, log, m)
+	memConfig := cfg.EigenDAConfig.MemstoreConfig
+	if !cfg.EigenDAConfig.MemstoreEnabled {
+		memConfig = nil
+	}
+
+	storageManager, err := store.NewStorageManagerBuilder(
+		ctx,
+		log,
+		metrics,
+		cfg.EigenDAConfig.StorageConfig,
+		cfg.EigenDAConfig.EdaVerifierConfigV1,
+		cfg.EigenDAConfig.EdaClientConfigV1,
+		cfg.EigenDAConfig.EdaClientConfigV2,
+		secretConfig,
+		memConfig,
+		cfg.EigenDAConfig.EdaClientConfigV2.PutRetries,
+		cfg.EigenDAConfig.MaxBlobSizeBytes,
+	).Build(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create store: %w", err)
 	}
 
-	server := server.NewServer(cliCtx.String(flags.ListenAddrFlagName), cliCtx.Int(flags.PortFlagName), sm, log, m)
+	server := server.NewServer(cfg.EigenDAConfig.ServerConfig, storageManager, log, metrics)
 	r := mux.NewRouter()
 	server.RegisterRoutes(r)
 	if cfg.EigenDAConfig.MemstoreEnabled {
@@ -72,8 +106,8 @@ func StartProxySvr(cliCtx *cli.Context) error {
 	}()
 
 	if cfg.MetricsCfg.Enabled {
-		log.Debug("starting metrics server", "addr", cfg.MetricsCfg.ListenAddr, "port", cfg.MetricsCfg.ListenPort)
-		svr, err := m.StartServer(cfg.MetricsCfg.ListenAddr, cfg.MetricsCfg.ListenPort)
+		log.Debug("starting metrics server", "addr", cfg.MetricsCfg.Host, "port", cfg.MetricsCfg.Port)
+		svr, err := metrics.StartServer(cfg.MetricsCfg.Host, cfg.MetricsCfg.Port)
 		if err != nil {
 			return fmt.Errorf("failed to start metrics server: %w", err)
 		}
@@ -83,7 +117,7 @@ func StartProxySvr(cliCtx *cli.Context) error {
 			}
 		}()
 		log.Info("started metrics server", "addr", svr.Addr())
-		m.RecordUp()
+		metrics.RecordUp()
 	}
 
 	return ctxinterrupt.Wait(cliCtx.Context)
@@ -91,19 +125,31 @@ func StartProxySvr(cliCtx *cli.Context) error {
 
 // TODO: we should probably just change EdaClientConfig struct definition in eigenda-client
 func prettyPrintConfig(cliCtx *cli.Context, log logging.Logger) error {
+	redacted := "******"
+
 	// we read a new config which we modify to hide private info in order to log the rest
-	cfg := server.ReadCLIConfig(cliCtx)
-	if cfg.EigenDAConfig.EdaClientConfig.SignerPrivateKeyHex != "" {
-		cfg.EigenDAConfig.EdaClientConfig.SignerPrivateKeyHex = "*****" // marshaling defined in client config
+	cfg, err := config.ReadCLIConfig(cliCtx)
+	if err != nil {
+		return fmt.Errorf("read cli config: %w", err)
 	}
-	if cfg.EigenDAConfig.EdaClientConfig.EthRpcUrl != "" {
-		cfg.EigenDAConfig.EdaClientConfig.EthRpcUrl = "*****" // hiding as RPC providers typically use sensitive API keys within
+	if cfg.EigenDAConfig.EdaClientConfigV1.SignerPrivateKeyHex != "" {
+		cfg.EigenDAConfig.EdaClientConfigV1.SignerPrivateKeyHex = redacted // marshaling defined in client config
+	}
+	if cfg.EigenDAConfig.EdaClientConfigV1.EthRpcUrl != "" {
+		cfg.EigenDAConfig.EdaClientConfigV1.EthRpcUrl = redacted // hiding as RPC providers typically use sensitive API keys within
+	}
+	if cfg.EigenDAConfig.StorageConfig.RedisConfig.Password != "" {
+		cfg.EigenDAConfig.StorageConfig.RedisConfig.Password = redacted // masking Redis password
 	}
 
 	configJSON, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
-	log.Info(fmt.Sprintf("Initializing EigenDA proxy server with config (\"*****\" fields are hidden): %v", string(configJSON)))
+	log.Info(
+		fmt.Sprintf(
+			"Initializing EigenDA proxy server with config (\"*****\" fields are hidden): %v",
+			string(configJSON)))
+
 	return nil
 }

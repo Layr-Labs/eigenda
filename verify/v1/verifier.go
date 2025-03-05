@@ -65,7 +65,10 @@ func NewVerifier(cfg *Config, l logging.Logger) (*Verifier, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create cert verifier: %w", err)
 		}
-		log.Info("Certificate verification against Ethereum state enabled", "confirmation_depth", cfg.EthConfirmationDepth)
+		log.Info(
+			"Certificate verification against Ethereum state enabled",
+			"confirmation_depth",
+			cfg.EthConfirmationDepth)
 	} else {
 		log.Warn("Certificate verification against Ethereum state disabled")
 	}
@@ -97,7 +100,11 @@ func (v *Verifier) VerifyCert(ctx context.Context, cert *Certificate) error {
 	}
 
 	// 2 - verify merkle inclusion proof
-	err = v.cv.verifyMerkleProof(cert.Proof().GetInclusionProof(), cert.BatchHeaderRoot(), cert.Proof().GetBlobIndex(), cert.ReadBlobHeader())
+	err = v.cv.verifyMerkleProof(
+		cert.Proof().GetInclusionProof(),
+		cert.BatchHeaderRoot(),
+		cert.Proof().GetBlobIndex(),
+		cert.ReadBlobHeader())
 	if err != nil {
 		return fmt.Errorf("failed to verify merkle proof: %w", err)
 	}
@@ -120,7 +127,10 @@ func (v *Verifier) Commit(blob []byte) (*bn254.G1Affine, error) {
 	}
 
 	if len(v.kzgVerifier.Srs.G1) < len(inputFr) {
-		return nil, fmt.Errorf("cannot verify commitment because the number of stored srs in the memory is insufficient, have %v need %v", len(v.kzgVerifier.Srs.G1), len(inputFr))
+		return nil, fmt.Errorf(
+			"cannot verify commitment because the number of stored srs in the memory is insufficient, have %v need %v",
+			len(v.kzgVerifier.Srs.G1),
+			len(inputFr))
 	}
 
 	config := ecc.MultiExpConfig{}
@@ -158,8 +168,14 @@ func (v *Verifier) VerifyCommitment(certCommitment *common.G1Commitment, blob []
 
 	errMsg := ""
 	if !actualCommit.X.Equal(certCommitmentX) || !actualCommit.Y.Equal(certCommitmentY) {
-		errMsg += fmt.Sprintf("field elements do not match, x actual commit: %x, x expected commit: %x, ", actualCommit.X.Marshal(), certCommitmentX.Marshal())
-		errMsg += fmt.Sprintf("y actual commit: %x, y expected commit: %x", actualCommit.Y.Marshal(), certCommitmentY.Marshal())
+		errMsg += fmt.Sprintf(
+			"field elements do not match, x actual commit: %x, x expected commit: %x, ",
+			actualCommit.X.Marshal(),
+			certCommitmentX.Marshal())
+		errMsg += fmt.Sprintf(
+			"y actual commit: %x, y expected commit: %x",
+			actualCommit.Y.Marshal(),
+			certCommitmentY.Marshal())
 		return fmt.Errorf("%s", errMsg)
 	}
 
@@ -173,7 +189,10 @@ func (v *Verifier) verifySecurityParams(blobHeader BlobHeader, batchHeader *disp
 	// require that the security param in each blob is met
 	for i := 0; i < len(blobHeader.QuorumBlobParams); i++ {
 		if batchHeader.QuorumNumbers[i] != blobHeader.QuorumBlobParams[i].QuorumNumber {
-			return fmt.Errorf("quorum number mismatch, expected: %d, got: %d", batchHeader.QuorumNumbers[i], blobHeader.QuorumBlobParams[i].QuorumNumber)
+			return fmt.Errorf(
+				"quorum number mismatch, expected: %d, got: %d",
+				batchHeader.QuorumNumbers[i],
+				blobHeader.QuorumBlobParams[i].QuorumNumber)
 		}
 
 		if blobHeader.QuorumBlobParams[i].AdversaryThresholdPercentage > blobHeader.QuorumBlobParams[i].ConfirmationThresholdPercentage {
@@ -184,7 +203,10 @@ func (v *Verifier) verifySecurityParams(blobHeader BlobHeader, batchHeader *disp
 		// but it is good practice in case the contract changes in the future
 		quorumAdversaryThreshold, ok := v.cv.quorumAdversaryThresholds[blobHeader.QuorumBlobParams[i].QuorumNumber]
 		if !ok {
-			log.Warn("CertVerifier.quorumAdversaryThresholds map does not contain quorum number", "quorumNumber", blobHeader.QuorumBlobParams[i].QuorumNumber)
+			log.Warn(
+				"CertVerifier.quorumAdversaryThresholds map does not contain quorum number",
+				"quorumNumber",
+				blobHeader.QuorumBlobParams[i].QuorumNumber)
 		} else if blobHeader.QuorumBlobParams[i].AdversaryThresholdPercentage < quorumAdversaryThreshold {
 			return fmt.Errorf("adversary threshold percentage must be greater than or equal to quorum adversary threshold percentage")
 		}

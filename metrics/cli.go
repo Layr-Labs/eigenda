@@ -23,11 +23,11 @@ func withEnvPrefix(envPrefix, s string) []string {
 	return []string{envPrefix + "_METRICS_" + s}
 }
 
-func DefaultCLIConfig() CLIConfig {
-	return CLIConfig{
-		Enabled:    false,
-		ListenAddr: defaultListenAddr,
-		ListenPort: defaultListenPort,
+func DefaultConfig() Config {
+	return Config{
+		Enabled: false,
+		Host:    defaultListenAddr,
+		Port:    defaultListenPort,
 	}
 }
 
@@ -56,28 +56,22 @@ func CLIFlags(envPrefix string, category string) []cli.Flag {
 	}
 }
 
-type CLIConfig struct {
-	Enabled    bool
-	ListenAddr string
-	ListenPort int
-}
-
-func (m CLIConfig) Check() error {
+func (m Config) Check() error {
 	if !m.Enabled {
 		return nil
 	}
 
-	if m.ListenPort < 0 || m.ListenPort > math.MaxUint16 {
+	if m.Port < 0 || m.Port > math.MaxUint16 {
 		return ErrInvalidPort
 	}
 
 	return nil
 }
 
-func ReadCLIConfig(ctx *cli.Context) CLIConfig {
-	return CLIConfig{
-		Enabled:    ctx.Bool(EnabledFlagName),
-		ListenAddr: ctx.String(ListenAddrFlagName),
-		ListenPort: ctx.Int(PortFlagName),
+func ReadConfig(ctx *cli.Context) Config {
+	return Config{
+		Enabled: ctx.Bool(EnabledFlagName),
+		Host:    ctx.String(ListenAddrFlagName),
+		Port:    ctx.Int(PortFlagName),
 	}
 }

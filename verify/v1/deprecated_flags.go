@@ -3,7 +3,7 @@ package verify
 import (
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda-proxy/flags/eigendaflags"
+	"github.com/Layr-Labs/eigenda-proxy/config/eigendaflags"
 	"github.com/urfave/cli/v2"
 )
 
@@ -72,7 +72,7 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 		// kzg flags
 		&cli.StringFlag{
 			Name:    DeprecatedG1PathFlagName,
-			Usage:   "Directory path to g1.point file.",
+			Usage:   "path to g1.point file.",
 			EnvVars: []string{withDeprecatedEnvPrefix(envPrefix, "TARGET_KZG_G1_PATH")},
 			// we use a relative path so that the path works for both the binary and the docker container
 			// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir of the container
@@ -86,7 +86,7 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 		},
 		&cli.StringFlag{
 			Name:    DeprecatedG2TauFlagName,
-			Usage:   "Directory path to g2.point.powerOf2 file.",
+			Usage:   "path to g2.point.powerOf2 file.",
 			EnvVars: []string{withDeprecatedEnvPrefix(envPrefix, "TARGET_G2_TAU_PATH")},
 			// we use a relative path so that the path works for both the binary and the docker container
 			// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir of the container
@@ -100,7 +100,7 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 		},
 		&cli.StringFlag{
 			Name:    DeprecatedCachePathFlagName,
-			Usage:   "Directory path to SRS tables for caching.",
+			Usage:   "path to SRS tables for caching.",
 			EnvVars: []string{withDeprecatedEnvPrefix(envPrefix, "TARGET_CACHE_PATH")},
 			// we use a relative path so that the path works for both the binary and the docker container
 			// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir of the container

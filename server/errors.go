@@ -21,7 +21,7 @@ func (me MetaError) Error() string {
 	return fmt.Sprintf("Error: %s (Mode: %s, CertVersion: %b)",
 		me.Err.Error(),
 		me.Meta.Mode,
-		me.Meta.CertVersion)
+		me.Meta.Version)
 }
 
 func (me MetaError) Unwrap() error {
