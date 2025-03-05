@@ -3637,6 +3637,14 @@ unauthenticated requests. </p></td>
                 </tr>
               
                 <tr>
+                  <td>timestamp</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Timestamp of the request in seconds since the Unix epoch. If too far out of sync with the server&#39;s clock,
+request may be rejected. </p></td>
+                </tr>
+              
+                <tr>
                   <td>operator_signature</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
@@ -3663,7 +3671,8 @@ Perform a keccak256 hash on the following data in the following order:
       i.   a one byte ASCII representation of the character &#34;r&#34; (aka Ox72)
       ii.  the length of the blob key in bytes
       iii. the blob key
-      iv.  each requested chunk index, in order </p></td>
+      iv.  each requested chunk index, in order
+5. the timestamp (seconds since the Unix epoch encoded as a 4 byte big endian value) </p></td>
                 </tr>
               
             </tbody>
@@ -4094,7 +4103,8 @@ The ID must be in range [0, 254]. </p></td>
                   <td>timestamp</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p>Timestamp of the disperser&#39;s request, in seconds since the Unix epoch. </p></td>
+                  <td><p>Timestamp of the request in seconds since the Unix epoch. If too far out of sync with the server&#39;s clock,
+request may be rejected. </p></td>
                 </tr>
               
                 <tr>
@@ -4134,8 +4144,8 @@ https://github.com/Layr-Labs/eigenda/blob/master/disperser/auth/request_signing.
   r. digest len(certificate.Relays) (4 bytes, unsigned big endian)
   s. for each relay in certificate.Relays:
     i. digest relay (4 bytes, unsigned big endian)
-6. digest timestamp (4 bytes, unsigned big endian)
-7. digest disperserID (4 bytes, unsigned big endian)
+6. digest disperserID (4 bytes, unsigned big endian)
+7. digest timestamp (4 bytes, unsigned big endian)
 
 Note that this signature is not included in the hash for obvious reasons. </p></td>
                 </tr>

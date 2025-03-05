@@ -100,7 +100,8 @@ type StoreChunksRequest struct {
 	Batch *v2.Batch `protobuf:"bytes,1,opt,name=batch,proto3" json:"batch,omitempty"`
 	// ID of the disperser that is requesting the storage of the batch.
 	DisperserID uint32 `protobuf:"varint,2,opt,name=disperserID,proto3" json:"disperserID,omitempty"`
-	// Timestamp of the disperser's request, in seconds since the Unix epoch.
+	// Timestamp of the request in seconds since the Unix epoch. If too far out of sync with the server's clock,
+	// request may be rejected.
 	Timestamp uint32 `protobuf:"varint,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	// Signature using the disperser's ECDSA key over keccak hash of the batch. The purpose of this signature
 	// is to prevent hooligans from tricking validators into storing data that they shouldn't be storing.
@@ -135,8 +136,8 @@ type StoreChunksRequest struct {
 	//     r. digest len(certificate.Relays) (4 bytes, unsigned big endian)
 	//     s. for each relay in certificate.Relays:
 	//     i. digest relay (4 bytes, unsigned big endian)
-	//  6. digest timestamp (4 bytes, unsigned big endian)
-	//  7. digest disperserID (4 bytes, unsigned big endian)
+	//  6. digest disperserID (4 bytes, unsigned big endian)
+	//  7. digest timestamp (4 bytes, unsigned big endian)
 	//
 	// Note that this signature is not included in the hash for obvious reasons.
 	Signature []byte `protobuf:"bytes,4,opt,name=signature,proto3" json:"signature,omitempty"`

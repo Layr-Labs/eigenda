@@ -409,7 +409,8 @@ The ID must be in range [0, 254]. </p></td>
                   <td>timestamp</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p>Timestamp of the disperser&#39;s request, in seconds since the Unix epoch. </p></td>
+                  <td><p>Timestamp of the request in seconds since the Unix epoch. If too far out of sync with the server&#39;s clock,
+request may be rejected. </p></td>
                 </tr>
               
                 <tr>
@@ -449,8 +450,8 @@ https://github.com/Layr-Labs/eigenda/blob/master/disperser/auth/request_signing.
   r. digest len(certificate.Relays) (4 bytes, unsigned big endian)
   s. for each relay in certificate.Relays:
     i. digest relay (4 bytes, unsigned big endian)
-6. digest timestamp (4 bytes, unsigned big endian)
-7. digest disperserID (4 bytes, unsigned big endian)
+6. digest disperserID (4 bytes, unsigned big endian)
+7. digest timestamp (4 bytes, unsigned big endian)
 
 Note that this signature is not included in the hash for obvious reasons. </p></td>
                 </tr>

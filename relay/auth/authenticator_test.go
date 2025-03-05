@@ -3,8 +3,8 @@ package auth
 import (
 	"context"
 	"testing"
-	"time"
 
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
@@ -70,10 +70,11 @@ func TestValidRequest(t *testing.T) {
 	require.NoError(t, err)
 	request.OperatorSignature = signature
 
-	now := time.Now()
-
-	err = authenticator.AuthenticateGetChunksRequest(ctx, request, now)
+	hash, err := authenticator.AuthenticateGetChunksRequest(ctx, request)
 	require.NoError(t, err)
+	expectedHash, err := hashing.HashGetChunksRequest(request)
+	require.NoError(t, err)
+	require.Equal(t, expectedHash, hash)
 }
 
 func TestNonExistingClient(t *testing.T) {
@@ -99,7 +100,7 @@ func TestNonExistingClient(t *testing.T) {
 	request := randomGetChunksRequest()
 	request.OperatorId = invalidOperatorID
 
-	err = authenticator.AuthenticateGetChunksRequest(ctx, request, time.Now())
+	_, err = authenticator.AuthenticateGetChunksRequest(ctx, request)
 	require.Error(t, err)
 }
 
@@ -126,15 +127,16 @@ func TestBadSignature(t *testing.T) {
 	request.OperatorSignature, err = SignGetChunksRequest(ics.KeyPairs[operatorID], request)
 	require.NoError(t, err)
 
-	now := time.Now()
-
-	err = authenticator.AuthenticateGetChunksRequest(ctx, request, now)
+	hash, err := authenticator.AuthenticateGetChunksRequest(ctx, request)
 	require.NoError(t, err)
+	expectedHash, err := hashing.HashGetChunksRequest(request)
+	require.NoError(t, err)
+	require.Equal(t, expectedHash, hash)
 
 	// Change a byte in the signature to make it invalid
 	request.OperatorSignature[0] = request.OperatorSignature[0] ^ 1
 
-	err = authenticator.AuthenticateGetChunksRequest(ctx, request, now)
+	_, err = authenticator.AuthenticateGetChunksRequest(ctx, request)
 	require.Error(t, err)
 }
 
@@ -159,6 +161,6 @@ func TestMissingOperatorID(t *testing.T) {
 	request := randomGetChunksRequest()
 	request.OperatorId = nil
 
-	err = authenticator.AuthenticateGetChunksRequest(ctx, request, time.Now())
+	_, err = authenticator.AuthenticateGetChunksRequest(ctx, request)
 	require.Error(t, err)
 }

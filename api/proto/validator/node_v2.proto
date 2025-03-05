@@ -37,7 +37,8 @@ message StoreChunksRequest {
   // ID of the disperser that is requesting the storage of the batch.
   uint32 disperserID = 2;
 
-  // Timestamp of the disperser's request, in seconds since the Unix epoch.
+  // Timestamp of the request in seconds since the Unix epoch. If too far out of sync with the server's clock,
+  // request may be rejected.
   uint32 timestamp = 3;
 
   // Signature using the disperser's ECDSA key over keccak hash of the batch. The purpose of this signature

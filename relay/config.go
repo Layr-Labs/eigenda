@@ -52,6 +52,12 @@ type Config struct {
 	// AuthenticationDisabled will disable authentication if set to true.
 	AuthenticationDisabled bool
 
+	// GetChunksRequestMaxPastAge is the maximum age of a GetChunks request that the server will accept.
+	GetChunksRequestMaxPastAge time.Duration
+
+	// GetChunksRequestMaxFutureAge is the maximum future age of a GetChunks request that the server will accept.
+	GetChunksRequestMaxFutureAge time.Duration
+
 	// Timeouts contains configuration for relay timeouts.
 	Timeouts TimeoutConfig
 

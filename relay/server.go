@@ -12,6 +12,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/common/pprof"
+	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -57,6 +58,9 @@ type Server struct {
 
 	// authenticator is used to authenticate requests to the relay service.
 	authenticator auth.RequestAuthenticator
+
+	// replayGuardian is used to guard against replay attacks.
+	replayGuardian replay.ReplayGuardian
 
 	// chainReader is the core.Reader used to fetch blob parameters.
 	chainReader core.Reader
@@ -136,6 +140,11 @@ func NewServer(
 		}
 	}
 
+	replayGuardian := replay.NewReplayGuardian(
+		time.Now,
+		config.GetChunksRequestMaxPastAge,
+		config.GetChunksRequestMaxPastAge)
+
 	return &Server{
 		config:           config,
 		logger:           logger.With("component", "RelayServer"),
@@ -145,6 +154,7 @@ func NewServer(
 		blobRateLimiter:  limiter.NewBlobRateLimiter(&config.RateLimits, relayMetrics),
 		chunkRateLimiter: limiter.NewChunkRateLimiter(&config.RateLimits, relayMetrics),
 		authenticator:    authenticator,
+		replayGuardian:   replayGuardian,
 		metrics:          relayMetrics,
 	}, nil
 }
@@ -233,12 +243,20 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		}
 		clientAddress := client.Addr.String()
 
-		err := s.authenticator.AuthenticateGetChunksRequest(ctx, request, time.Now())
+		hash, err := s.authenticator.AuthenticateGetChunksRequest(ctx, request)
 		if err != nil {
 			s.metrics.ReportChunkAuthFailure()
 			s.logger.Debug("rejected GetChunks request", "client", clientAddress)
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("auth failed: %v", err))
 		}
+
+		timestamp := time.Unix(int64(request.Timestamp), 0)
+		err = s.replayGuardian.VerifyRequest(hash, timestamp)
+		if err != nil {
+			s.metrics.ReportChunkAuthFailure()
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
+		}
+
 		s.logger.Debug("received authenticated GetChunks request", "client", clientAddress)
 	}
 

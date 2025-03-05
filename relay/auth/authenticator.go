@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/api/hashing"
 
@@ -16,10 +15,8 @@ import (
 // RequestAuthenticator authenticates requests to the relay service. This object is thread safe.
 type RequestAuthenticator interface {
 	// AuthenticateGetChunksRequest authenticates a GetChunksRequest, returning an error if the request is invalid.
-	AuthenticateGetChunksRequest(
-		ctx context.Context,
-		request *pb.GetChunksRequest,
-		now time.Time) error
+	// Returns the hash of the request if the request is valid.
+	AuthenticateGetChunksRequest(ctx context.Context, request *pb.GetChunksRequest) ([]byte, error)
 }
 
 var _ RequestAuthenticator = &requestAuthenticator{}
@@ -74,21 +71,20 @@ func (a *requestAuthenticator) preloadCache(ctx context.Context) error {
 
 func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 	ctx context.Context,
-	request *pb.GetChunksRequest,
-	now time.Time) error {
+	request *pb.GetChunksRequest) ([]byte, error) {
 
 	if request.OperatorId == nil || len(request.OperatorId) != 32 {
-		return errors.New("invalid operator ID")
+		return nil, errors.New("invalid operator ID")
 	}
 
 	key, err := a.getOperatorKey(ctx, core.OperatorID(request.OperatorId))
 	if err != nil {
-		return fmt.Errorf("failed to get operator key: %w", err)
+		return nil, fmt.Errorf("failed to get operator key: %w", err)
 	}
 
 	g1Point, err := (&core.G1Point{}).Deserialize(request.OperatorSignature)
 	if err != nil {
-		return fmt.Errorf("failed to deserialize signature: %w", err)
+		return nil, fmt.Errorf("failed to deserialize signature: %w", err)
 	}
 
 	signature := core.Signature{
@@ -97,15 +93,15 @@ func (a *requestAuthenticator) AuthenticateGetChunksRequest(
 
 	hash, err := hashing.HashGetChunksRequest(request)
 	if err != nil {
-		return fmt.Errorf("failed to hash request: %w", err)
+		return nil, fmt.Errorf("failed to hash request: %w", err)
 	}
 	isValid := signature.Verify(key, ([32]byte)(hash))
 
 	if !isValid {
-		return errors.New("signature verification failed")
+		return nil, errors.New("signature verification failed")
 	}
 
-	return nil
+	return hash, nil
 }
 
 // getOperatorKey returns the public key of the operator with the given ID, caching the result.
