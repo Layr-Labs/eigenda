@@ -299,6 +299,9 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	opts.BaseLevelSize = 10 * units.KiB
 	opts.LevelSizeMultiplier = 2
 
+	opts.NumMemtables = 1
+	opts.NumLevelZeroTables = 1
+
 	db, err := badger.Open(opts)
 	require.NoError(t, err)
 
