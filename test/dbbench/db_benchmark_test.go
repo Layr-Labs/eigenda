@@ -2,6 +2,7 @@ package dbbench
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -301,7 +302,10 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 
 	ttl := 5 * time.Minute
 
+	keys := make([][]byte, 0)
 	writeFunction := func(key []byte, value []byte) error {
+		keys = append(keys, key)
+
 		entry := badger.NewEntry(key, value).WithTTL(ttl)
 		err = transaction.SetEntry(entry)
 
@@ -362,10 +366,6 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	alive.Store(false)
 	<-compactionDone
 
-	fmt.Printf("\ndropping all data\n")
-	err = db.DropAll()
-	require.NoError(t, err)
-
 	fmt.Printf("doing some final compaction to see what happens\n")
 	fmt.Printf("First, let's sleep for a little while (2 minutes)")
 	time.Sleep(2 * time.Minute)
@@ -387,6 +387,24 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	if err != nil {
 		fmt.Printf("\nError flattening DB: %v\n", err)
 	}
+
+	fmt.Printf("checking to see what keys are still present. Based on timing, all keys should be expired.\n")
+	keysPresent := 0
+	keysMissing := 0
+	err = db.View(func(txn *badger.Txn) error {
+		for _, key := range keys {
+			_, err = txn.Get(key)
+			if err == nil {
+				keysPresent++
+			} else if errors.Is(badger.ErrKeyNotFound, err) {
+				keysMissing++
+			} else {
+				return err
+			}
+		}
+		return nil
+	})
+	require.NoError(t, err)
 
 	err = db.Close()
 	require.NoError(t, err)
