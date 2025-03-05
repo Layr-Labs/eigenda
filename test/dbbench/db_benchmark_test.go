@@ -346,6 +346,11 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 			fmt.Printf("\nRunning GC\n")
 			startTime := time.Now()
 
+			levels := db.Levels()
+			for i, level := range levels {
+				fmt.Printf("\n>> Level %d: %v\n", i, level)
+			}
+
 			err = db.Flatten(8)
 			if err != nil {
 				fmt.Printf("\nError flattening DB: %v\n", err)
