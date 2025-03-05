@@ -7,7 +7,7 @@ on:
     branches: ["main"]
 
 env:
-  GO_VERSION: '1.22'
+  GO_VERSION: "1.22"
 
 jobs:
   lint:
@@ -25,7 +25,7 @@ jobs:
         with:
           version: v1.61
           args: --timeout 3m
-  
+
   # This checks that the flags in .env.holesky.example are valid and allow the proxy to start.
   flags:
     runs-on: ubuntu-latest
@@ -37,7 +37,7 @@ jobs:
       - name: Run flag test
         run: ${{ github.workspace }}/scripts/test-proxy-startup-with-env-vars.sh
 
-  test:
+  test-local:
     outputs:
       COVERAGE: ${{ steps.unit.outputs.coverage }}
     runs-on: ubuntu-latest
@@ -50,15 +50,34 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
       - run: go mod download
 
-      # These tests are all pretty fast (<15s each), so we run them sequentially.
+      # These tests are all pretty fast (<2mins each), so we run them sequentially.
       # If ever they become slow we could parallelize them by using a matrix strategy.
       - run: make test-unit
       - run: make test-e2e-local
+
+  # Holesky is currently broken after recent pectra hardfork.
+  # This test is thus flaky depending on whether the testnet producing blocks or not
+  # at the time it is run...
+  # In good cases it runs in ~20 mins, so we set a timeout of 30 mins.
+  # The test failing in CI is currently expected however, so expect to have to re-run it.
+  # See https://dora.holesky.ethpandaops.io/epochs for block production status.
+  test-holesky:
+    outputs:
+      COVERAGE: ${{ steps.unit.outputs.coverage }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - run: go mod download
       - run: make test-e2e-holesky
         env:
           SIGNER_PRIVATE_KEY: ${{ secrets.SIGNER_PRIVATE_KEY }}
           ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
-  
+
   fuzz:
     runs-on: ubuntu-latest
     steps:
