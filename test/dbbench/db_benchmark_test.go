@@ -348,7 +348,7 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 
 			levels := db.Levels()
 			for i, level := range levels {
-				fmt.Printf("\n>> Level %d: %v\n", i, level)
+				fmt.Printf("\n>> Level %d: %+v\n", i, level)
 			}
 
 			err = db.Flatten(8)
