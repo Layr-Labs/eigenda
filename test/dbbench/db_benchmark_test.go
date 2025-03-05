@@ -299,6 +299,8 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	opts.BaseLevelSize = 10 * units.KiB
 	opts.LevelSizeMultiplier = 2
 
+	opts.MemTableSize = 10 * units.KiB
+
 	opts.NumMemtables = 1
 	opts.NumLevelZeroTables = 1
 
