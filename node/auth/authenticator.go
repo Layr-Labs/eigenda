@@ -13,6 +13,7 @@ import (
 )
 
 // RequestAuthenticator authenticates requests to the DA node. This object is thread safe.
+// Returns the hash of the request and an error if the request is invalid.
 //
 // This class has largely been future-proofed for decentralized dispersers, with the exception of the
 // preloadCache method, which will need to be updated to handle decentralized dispersers.
@@ -21,7 +22,7 @@ type RequestAuthenticator interface {
 	AuthenticateStoreChunksRequest(
 		ctx context.Context,
 		request *grpc.StoreChunksRequest,
-		now time.Time) error
+		now time.Time) ([]byte, error)
 }
 
 // keyWithTimeout is a key with that key's expiration time. After a key "expires", it should be reloaded
@@ -92,19 +93,19 @@ func (a *requestAuthenticator) preloadCache(ctx context.Context, now time.Time) 
 func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 	ctx context.Context,
 	request *grpc.StoreChunksRequest,
-	now time.Time) error {
+	now time.Time) ([]byte, error) {
 
 	key, err := a.getDisperserKey(ctx, now, request.DisperserID)
 	if err != nil {
-		return fmt.Errorf("failed to get operator key: %w", err)
+		return nil, fmt.Errorf("failed to get operator key: %w", err)
 	}
 
-	err = VerifyStoreChunksRequest(*key, request)
+	hash, err := VerifyStoreChunksRequest(*key, request)
 	if err != nil {
-		return fmt.Errorf("failed to verify request: %w", err)
+		return nil, fmt.Errorf("failed to verify request: %w", err)
 	}
 
-	return nil
+	return hash, nil
 }
 
 // getDisperserKey returns the public key of the operator with the given ID, caching the result.

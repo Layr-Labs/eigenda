@@ -4091,6 +4091,13 @@ The ID must be in range [0, 254]. </p></td>
                 </tr>
               
                 <tr>
+                  <td>timestamp</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Timestamp of the disperser&#39;s request, in seconds since the Unix epoch. </p></td>
+                </tr>
+              
+                <tr>
                   <td>signature</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
@@ -4101,23 +4108,34 @@ Algorithm for computing the hash is as follows. All integer values are serialize
 A reference implementation (golang) can be found at
 https://github.com/Layr-Labs/eigenda/blob/master/disperser/auth/request_signing.go
 
-1. digest batch.BatchHeader.BatchRoot
-2. digest batch.BatchHeader.ReferenceBlockNumber (8 bytes, unsigned big endian)
-3. for each certificate in batch.BlobCertificates:
+1. digest len(batch.BatchHeader.BatchRoot) (4 bytes, unsigned big endian)
+2. digest batch.BatchHeader.BatchRoot
+3. digest batch.BatchHeader.ReferenceBlockNumber (8 bytes, unsigned big endian)
+4. digest len(batch.BlobCertificates) (4 bytes, unsigned big endian)
+5. for each certificate in batch.BlobCertificates:
   a. digest certificate.BlobHeader.Version (4 bytes, unsigned big endian)
-  b. for each quorum_number in certificate.BlobHeader.QuorumNumbers:
+  b. digest len(certificate.BlobHeader.QuorumNumbers) (4 bytes, unsigned big endian)
+  c. for each quorum_number in certificate.BlobHeader.QuorumNumbers:
     i. digest quorum_number (4 bytes, unsigned big endian)
-  c. digest certificate.BlobHeader.Commitment.Commitment
-  d. digest certificate.BlobHeader.Commitment.LengthCommitment
-  e. digest certificate.BlobHeader.Commitment.LengthProof
-  f. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian)
-  g. digest certificate.BlobHeader.PaymentHeader.AccountId
-  h. digest certificate.BlobHeader.PaymentHeader.Timestamp (4 bytes, signed big endian)
-  i. digest certificate.BlobHeader.PaymentHeader.CumulativePayment
-  j. digest certificate.BlobHeader.Signature
-  k. for each relay in certificate.Relays:
+  d. digest len(certificate.BlobHeader.Commitment.Commitment) (4 bytes, unsigned big endian)
+  e. digest certificate.BlobHeader.Commitment.Commitment
+  f  digest len(certificate.BlobHeader.Commitment.LengthCommitment) (4 bytes, unsigned big endian)
+  g. digest certificate.BlobHeader.Commitment.LengthCommitment
+  h. digest len(certificate.BlobHeader.Commitment.LengthProof) (4 bytes, unsigned big endian)
+  i. digest certificate.BlobHeader.Commitment.LengthProof
+  j. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian)
+  k. digest len(certificate.BlobHeader.PaymentHeader.AccountId) (4 bytes, unsigned big endian)
+  l. digest certificate.BlobHeader.PaymentHeader.AccountId
+  m. digest certificate.BlobHeader.PaymentHeader.Timestamp (4 bytes, signed big endian)
+  n  digest len(certificate.BlobHeader.PaymentHeader.CumulativePayment) (4 bytes, unsigned big endian)
+  o. digest certificate.BlobHeader.PaymentHeader.CumulativePayment
+  p  digest len(certificate.BlobHeader.Signature) (4 bytes, unsigned big endian)
+  q. digest certificate.BlobHeader.Signature
+  r. digest len(certificate.Relays) (4 bytes, unsigned big endian)
+  s. for each relay in certificate.Relays:
     i. digest relay (4 bytes, unsigned big endian)
-4. digest disperserID (4 bytes, unsigned big endian)
+6. digest timestamp (4 bytes, unsigned big endian)
+7. digest disperserID (4 bytes, unsigned big endian)
 
 Note that this signature is not included in the hash for obvious reasons. </p></td>
                 </tr>

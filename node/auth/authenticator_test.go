@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	wmock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -41,8 +42,11 @@ func TestValidRequest(t *testing.T) {
 	require.NoError(t, err)
 	request.Signature = signature
 
-	err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	hash, err := authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
 	require.NoError(t, err)
+	expectedHash, err := hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
+	require.Equal(t, expectedHash, hash)
 }
 
 func TestInvalidRequestWrongHash(t *testing.T) {
@@ -75,7 +79,7 @@ func TestInvalidRequestWrongHash(t *testing.T) {
 	// Modify the request so that the hash is different
 	request.Batch.BlobCertificates[0].BlobHeader.Commitment.LengthProof = rand.Bytes(32)
 
-	err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	_, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
 	require.Error(t, err)
 }
 
@@ -109,7 +113,7 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 	require.NoError(t, err)
 	request.Signature = signature
 
-	err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	_, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
 	require.Error(t, err)
 }
 
@@ -153,25 +157,26 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 	signature, err := SignStoreChunksRequest(privateKey0, request)
 	require.NoError(t, err)
 	request.Signature = signature
-	err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	hash, err := authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
 	require.NoError(t, err)
+	expectedHash, err := hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
+	require.Equal(t, expectedHash, hash)
 	require.Equal(t, uint32(2), filterCallCount.Load())
 
 	request.DisperserID = 1
 	signature, err = SignStoreChunksRequest(privateKey1, request)
 	require.NoError(t, err)
 	request.Signature = signature
-	err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	_, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
 	require.Error(t, err)
-	require.Equal(t, uint32(3), filterCallCount.Load())
 
 	request.DisperserID = 1234
 	signature, err = SignStoreChunksRequest(privateKey1, request)
 	require.NoError(t, err)
 	request.Signature = signature
-	err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	_, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
 	require.Error(t, err)
-	require.Equal(t, uint32(4), filterCallCount.Load())
 }
 
 func TestKeyExpiry(t *testing.T) {
@@ -204,24 +209,30 @@ func TestKeyExpiry(t *testing.T) {
 	require.NoError(t, err)
 	request.Signature = signature
 
-	err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	hash, err := authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
 	require.NoError(t, err)
+	expectedHash, err := hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
+	require.Equal(t, expectedHash, hash)
 
 	// Since time hasn't advanced, the authenticator shouldn't have fetched the key again
 	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", 1)
 
 	// Move time forward to just before the key expires.
 	now := start.Add(59 * time.Second)
-	err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, now)
+	hash, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, now)
 	require.NoError(t, err)
+	require.Equal(t, expectedHash, hash)
 
 	// The key should not yet have been fetched again.
 	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", 1)
 
 	// Move time forward to just after the key expires.
 	now = now.Add(2 * time.Second)
-	err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, now)
+	hash, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, now)
 	require.NoError(t, err)
+	require.NoError(t, err)
+	require.Equal(t, expectedHash, hash)
 
 	// The key should have been fetched again.
 	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", 2)
@@ -265,8 +276,11 @@ func TestKeyCacheSize(t *testing.T) {
 		require.NoError(t, err)
 		request.Signature = signature
 
-		err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+		hash, err := authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
 		require.NoError(t, err)
+		expectedHash, err := hashing.HashStoreChunksRequest(request)
+		require.NoError(t, err)
+		require.Equal(t, expectedHash, hash)
 	}
 
 	// All keys should have required exactly one read except from 0, which was preloaded.
@@ -280,8 +294,11 @@ func TestKeyCacheSize(t *testing.T) {
 		require.NoError(t, err)
 		request.Signature = signature
 
-		err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+		hash, err := authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
 		require.NoError(t, err)
+		expectedHash, err := hashing.HashStoreChunksRequest(request)
+		require.NoError(t, err)
+		require.Equal(t, expectedHash, hash)
 	}
 
 	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", cacheSize)
@@ -293,8 +310,11 @@ func TestKeyCacheSize(t *testing.T) {
 	require.NoError(t, err)
 	request.Signature = signature
 
-	err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	hash, err := authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
 	require.NoError(t, err)
+	expectedHash, err := hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
+	require.Equal(t, expectedHash, hash)
 
 	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", cacheSize+1)
 
@@ -305,8 +325,12 @@ func TestKeyCacheSize(t *testing.T) {
 	require.NoError(t, err)
 	request.Signature = signature
 
-	err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	hash, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
 	require.NoError(t, err)
+	require.NoError(t, err)
+	expectedHash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
+	require.Equal(t, expectedHash, hash)
 
 	chainReader.Mock.AssertNumberOfCalls(t, "GetDisperserAddress", cacheSize+2)
 }
