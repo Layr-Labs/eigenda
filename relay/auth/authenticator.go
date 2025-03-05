@@ -22,12 +22,6 @@ type RequestAuthenticator interface {
 		now time.Time) error
 }
 
-// authenticationTimeout is used to track the expiration of an auth.
-type authenticationTimeout struct {
-	origin     string
-	expiration time.Time
-}
-
 var _ RequestAuthenticator = &requestAuthenticator{}
 
 type requestAuthenticator struct {

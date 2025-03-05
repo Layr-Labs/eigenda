@@ -83,7 +83,6 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 				MaxConcurrentGetChunkOpsClient:  ctx.Int(flags.MaxConcurrentGetChunkOpsClientFlag.Name),
 			},
 			AuthenticationKeyCacheSize:  ctx.Int(flags.AuthenticationKeyCacheSizeFlag.Name),
-			AuthenticationTimeout:       ctx.Duration(flags.AuthenticationTimeoutFlag.Name),
 			AuthenticationDisabled:      ctx.Bool(flags.AuthenticationDisabledFlag.Name),
 			OnchainStateRefreshInterval: ctx.Duration(flags.OnchainStateRefreshIntervalFlag.Name),
 			Timeouts: relay.TimeoutConfig{
