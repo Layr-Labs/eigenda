@@ -362,6 +362,10 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	alive.Store(false)
 	<-compactionDone
 
+	fmt.Printf("\ndropping all data\n")
+	err = db.DropAll()
+	require.NoError(t, err)
+
 	fmt.Printf("doing some final compaction to see what happens\n")
 	fmt.Printf("First, let's sleep for a little while (2 minutes)")
 	time.Sleep(2 * time.Minute)
