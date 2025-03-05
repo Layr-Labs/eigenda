@@ -291,7 +291,10 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	directory := "./test-data"
 	opts := badger.DefaultOptions(directory)
 	opts.Compression = options.None
-	opts.CompactL0OnClose = true
+	//opts.CompactL0OnClose = true
+
+	opts.BaseTableSize = 0.5 * units.MiB // size / 32[key size] * 2[multiplier] * dataSize == data without expiration
+	opts.TableSizeMultiplier = 2
 
 	db, err := badger.Open(opts)
 	require.NoError(t, err)
@@ -340,8 +343,13 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 			fmt.Printf("\nRunning GC\n")
 			startTime := time.Now()
 
+			err = db.Flatten(8)
+			if err != nil {
+				fmt.Printf("\nError flattening DB: %v\n", err)
+			}
+
 			gcIterations := 0
-			for {
+			for alive.Load() {
 				gcIterations++
 				err = db.RunValueLogGC(0.125)
 				if err != nil {
@@ -352,11 +360,6 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 				}
 			}
 
-			//err = db.Flatten(1)
-			//if err != nil {
-			//	fmt.Printf("\nError flattening DB: %v\n", err)
-			//}
-
 			fmt.Printf("\nGC took %v, did %d iterations\n", time.Since(startTime), gcIterations)
 		}
 	}()
@@ -365,22 +368,22 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	alive.Store(false)
 	<-compactionDone
 
-	fmt.Printf("doing some final compaction to see what happens\n")
-	fmt.Printf("First, let's sleep for a little while (2 minutes)")
-	time.Sleep(2 * time.Minute)
-	fmt.Printf("Now, let's run the compaction\n")
-	iterations := 0
-	for {
-		iterations++
-		err = db.RunValueLogGC(0.125)
-		if err != nil {
-			if !strings.Contains(err.Error(), "Value log GC attempt didn't result in any cleanup") {
-				fmt.Printf("\nError running GC: %v\n", err)
-			}
-			break
-		}
-	}
-	fmt.Printf("Compaction took %d iterations\n", iterations)
+	//fmt.Printf("doing some final compaction to see what happens\n")
+	//fmt.Printf("First, let's sleep for a little while (2 minutes)")
+	//time.Sleep(2 * time.Minute)
+	//fmt.Printf("Now, let's run the compaction\n")
+	//iterations := 0
+	//for {
+	//	iterations++
+	//	err = db.RunValueLogGC(0.125)
+	//	if err != nil {
+	//		if !strings.Contains(err.Error(), "Value log GC attempt didn't result in any cleanup") {
+	//			fmt.Printf("\nError running GC: %v\n", err)
+	//		}
+	//		break
+	//	}
+	//}
+	//fmt.Printf("Compaction took %d iterations\n", iterations)
 	//fmt.Printf("Now, let's flatten the DB\n")
 	//err = db.Flatten(1)
 	//if err != nil {
