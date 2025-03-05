@@ -322,6 +322,17 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 		err = transaction.SetEntry(entry)
 
 		if err != nil {
+			if strings.Contains(err.Error(), "Txn is too big to fit into one request") {
+				err = transaction.Commit()
+				if err != nil {
+					return err
+				}
+				transaction = db.NewTransaction(true)
+				objectsInBatch = 0
+				err = transaction.SetEntry(entry)
+			} else {
+				return err
+			}
 			return err
 		}
 		objectsInBatch++
