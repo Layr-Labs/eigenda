@@ -1255,7 +1255,8 @@ func TestFetchBatchFeed(t *testing.T) {
 		}
 
 		// Test 3: Custom end time with 1-hour window
-		// With 1h ending time at attestedAt[66], this retrieves batch[65] throught batch[7] (59 batches, as the `before` is exclusive)
+		// With 1h ending time at attestedAt[66], this retrieves batch[65] throught batch[7] (59 batches,
+		// as the `before` is exclusive)
 		tm := time.Unix(0, int64(attestedAt[66])).UTC()
 		beforeTime := tm.Format("2006-01-02T15:04:05.999999999Z")
 		reqUrl = fmt.Sprintf("/v2/batches/feed?direction=backward&before=%s&limit=-1", beforeTime)
