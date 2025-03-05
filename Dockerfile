@@ -103,6 +103,13 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     make build
 
+# Encoding Load Generator build stage
+FROM common-builder AS encoding-load-generator-builder
+WORKDIR /app/test/v2/encoding-load
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    make build
+
 # Final stages for each component
 FROM alpine:3.18 AS churner
 COPY --from=churner-builder /app/operators/bin/churner /usr/local/bin
@@ -151,3 +158,7 @@ ENTRYPOINT ["generator"]
 FROM alpine:3.18 AS generator2
 COPY --from=generator2-builder /app/test/v2/bin/load /usr/local/bin
 ENTRYPOINT ["load", "-", "-"]
+
+FROM alpine:3.18 AS encoding-load-generator
+COPY --from=encoding-load-generator-builder /app/test/v2/encoding-load/encoding-load-generator /usr/local/bin/encoding_load_generator
+ENTRYPOINT ["encoding_load_generator"]
