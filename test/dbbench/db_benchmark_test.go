@@ -296,7 +296,7 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	opts.BaseTableSize = 10 * units.KiB // size / 32[key size] * 2[multiplier] * dataSize == data without expiration
 	opts.TableSizeMultiplier = 2
 
-	opts.BaseLevelSize = 10 * units.MiB
+	opts.BaseLevelSize = 10 * units.KiB
 	opts.LevelSizeMultiplier = 2
 
 	db, err := badger.Open(opts)
