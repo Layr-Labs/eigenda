@@ -224,7 +224,7 @@ func runBenchmark(t *testing.T, write writer, read reader) {
 				timeSinceStart.Seconds()
 
 			fmt.Printf("%d%%: wrote %d MiB. %0.1f mb/s during recent period, %0.1f mb/s overall. "+
-				"Average read latency is %f0.1µs, average read throughput is %0.1f mb/s.\r",
+				"Average read latency is %0.1fµs, average read throughput is %0.1f mb/s.\r",
 				completionPercentage, int(mbWritten), mbPerSecondOverLastInterval, mbPerSecondTotal,
 				averageReadLatencyMicroseconds, averageReadThroughputMBPerSecond)
 		}
