@@ -76,7 +76,8 @@ func buildMemKeyDiskTable(
 		4,
 		1234,
 		0,
-		1*time.Millisecond)
+		1*time.Millisecond,
+		true)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -114,7 +115,8 @@ func buildLevelDBKeyDiskTable(
 		4,
 		1234,
 		0,
-		1*time.Millisecond)
+		1*time.Millisecond,
+		false)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)

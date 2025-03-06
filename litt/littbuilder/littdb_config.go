@@ -54,6 +54,9 @@ type LittDBConfig struct {
 	// The sharding factor for the database. The default is 8. Must be at least 1.
 	ShardingFactor uint32
 
+	// The random number generator used for generating sharding salts. The default is math/rand. TODO
+	SaltShaker rand.Rand
+
 	// The salt used for sharding. Chosen randomly at boot time by default.
 	// This doesn't need to be cryptographically secure, but it should be kept private.
 	// In theory, an attacker who knows the salt could craft keys that all hash to the same shard.
@@ -93,15 +96,23 @@ func cacheWeight(key string, value []byte) uint64 {
 	return uint64(len(key) + len(value))
 }
 
+// TODO restrict the names that can be used for tables
+
 // buildKeyMap creates a new key map based on the configuration.
-func (c *LittDBConfig) buildKeyMap(name string, logger logging.Logger) (keymap.KeyMap, bool, error) {
+func (c *LittDBConfig) buildKeyMap(logger logging.Logger, tableName string) (keymap.KeyMap, bool, error) {
+
+	keymapDirectories := make([]string, len(c.Paths))
+	for i, p := range c.Paths {
+		keymapDirectories[i] = path.Join(p, tableName)
+	}
+
 	// For each KeyMap type we are not using, delete any files associated with it if they exist.
 	var chosenBuilder keymap.KeyMapBuilder
 	for _, builder := range keyMapBuilders {
 		if builder.Type() == c.KeyMapType {
 			chosenBuilder = builder
 		} else {
-			err := builder.DeleteFiles(logger, c.Paths)
+			err := builder.DeleteFiles(logger, keymapDirectories)
 			if err != nil {
 				return nil, false, fmt.Errorf("error deleting key map files: %w", err)
 			}
@@ -111,7 +122,7 @@ func (c *LittDBConfig) buildKeyMap(name string, logger logging.Logger) (keymap.K
 		return nil, false, fmt.Errorf("unsupported key map type: %v", c.KeyMapType)
 	}
 
-	keyMap, requiresReload, err := chosenBuilder.Build(logger, c.Paths)
+	keyMap, requiresReload, err := chosenBuilder.Build(logger, keymapDirectories)
 	if err != nil {
 		return nil, false, fmt.Errorf("error building key map: %w", err)
 	}
@@ -133,7 +144,7 @@ func (c *LittDBConfig) buildTable(
 		return nil, fmt.Errorf("sharding factor must be at least 1")
 	}
 
-	keyMap, requiresReload, err := c.buildKeyMap(name, logger)
+	keyMap, requiresReload, err := c.buildKeyMap(logger, name)
 	if err != nil {
 		return nil, fmt.Errorf("error creating key map: %w", err)
 	}
@@ -177,5 +188,5 @@ func (c *LittDBConfig) Build(ctx context.Context) (litt.DB, error) {
 		return nil, fmt.Errorf("error creating logger: %w", err)
 	}
 
-	return newDB(ctx, logger, c.TimeSource, c.TTL, c.GCPeriod, c.buildTable), nil
+	return NewDB(ctx, logger, c.TimeSource, c.TTL, c.GCPeriod, c.buildTable), nil
 }
