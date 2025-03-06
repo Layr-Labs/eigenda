@@ -2,7 +2,6 @@ package verification
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -128,7 +127,7 @@ func (bnp *BlockNumberProvider) MaybeWaitForBlockNumber(ctx context.Context, tar
 func (bnp *BlockNumberProvider) FetchLatestBlockNumber(ctx context.Context) (uint64, error) {
 	blockNumber, err := bnp.ethClient.BlockNumber(ctx)
 	if err != nil {
-		return 0, errors.New("get block number from eth client")
+		return 0, fmt.Errorf("get block number from eth client: %w", err)
 	}
 
 	bnp.latestBlockNumber.Store(blockNumber)

@@ -37,25 +37,25 @@ func getEnvironmentName(environment string) string {
 	return environmentName
 }
 
+// checkAndSetCertVerifierAddress checks whether the input address string is empty, and skips the test if it is
+//
+// If the input address is not empty, this method configures the test client to use the input address as the cert
+// verifier address.
+func checkAndSetCertVerifierAddress(t *testing.T, c *client.TestClient, certVerifierAddress string) {
+	if certVerifierAddress == "" {
+		t.Skip("Requested cert verifier address is not configured")
+	}
+	c.SetCertVerifierAddress(certVerifierAddress)
+}
+
 // Tests the basic dispersal workflow:
 // - disperse a blob
 // - wait for it to be confirmed
 // - read the blob from the relays
 // - read the blob from the validators
-func testBasicDispersal(
-	t *testing.T,
-	c *client.TestClient,
-	payload []byte,
-	certVerifierAddress string,
-) error {
-	if certVerifierAddress == "" {
-		t.Skip("Requested cert verifier address is not configured")
-	}
-
+func testBasicDispersal(c *client.TestClient, payload []byte) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-
-	c.SetCertVerifierAddress(certVerifierAddress)
 
 	err := c.DisperseAndVerify(ctx, payload)
 	if err != nil {
@@ -99,8 +99,9 @@ func emptyPayloadDispersalTest(t *testing.T, environment string) {
 	require.NoError(t, err)
 
 	c := client.GetTestClient(t, environment)
+	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(t, c, payload, config.EigenDACertVerifierAddressQuorums0_1)
+	err = testBasicDispersal(c, payload)
 	require.NoError(t, err)
 }
 
@@ -120,8 +121,9 @@ func testZeroPayloadDispersalTest(t *testing.T, environment string) {
 	require.NoError(t, err)
 
 	c := client.GetTestClient(t, environment)
+	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(t, c, payload, config.EigenDACertVerifierAddressQuorums0_1)
+	err = testBasicDispersal(c, payload)
 	require.NoError(t, err)
 }
 
@@ -165,8 +167,9 @@ func microscopicBlobDispersalTest(t *testing.T, environment string) {
 	require.NoError(t, err)
 
 	c := client.GetTestClient(t, environment)
+	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(t, c, payload, config.EigenDACertVerifierAddressQuorums0_1)
+	err = testBasicDispersal(c, payload)
 	require.NoError(t, err)
 }
 
@@ -186,8 +189,9 @@ func microscopicBlobDispersalWithPadding(t *testing.T, environment string) {
 	require.NoError(t, err)
 
 	c := client.GetTestClient(t, environment)
+	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(t, c, payload, config.EigenDACertVerifierAddressQuorums0_1)
+	err = testBasicDispersal(c, payload)
 	require.NoError(t, err)
 }
 
@@ -208,8 +212,9 @@ func smallBlobDispersalTest(t *testing.T, environment string) {
 	require.NoError(t, err)
 
 	c := client.GetTestClient(t, environment)
+	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(t, c, payload, config.EigenDACertVerifierAddressQuorums0_1)
+	err = testBasicDispersal(c, payload)
 	require.NoError(t, err)
 }
 
@@ -230,8 +235,9 @@ func mediumBlobDispersalTest(t *testing.T, environment string) {
 	require.NoError(t, err)
 
 	c := client.GetTestClient(t, environment)
+	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(t, c, payload, config.EigenDACertVerifierAddressQuorums0_1)
+	err = testBasicDispersal(c, payload)
 	require.NoError(t, err)
 }
 
@@ -254,8 +260,9 @@ func largeBlobDispersalTest(t *testing.T, environment string) {
 	payload := rand.VariableBytes(maxBlobSize/2, maxBlobSize*3/4)
 
 	c := client.GetTestClient(t, environment)
+	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(t, c, payload, config.EigenDACertVerifierAddressQuorums0_1)
+	err = testBasicDispersal(c, payload)
 	require.NoError(t, err)
 }
 
@@ -277,11 +284,16 @@ func smallBlobDispersalAllQuorumsSetsTest(t *testing.T, environment string) {
 
 	c := client.GetTestClient(t, environment)
 
-	err = testBasicDispersal(t, c, payload, config.EigenDACertVerifierAddressQuorums0_1)
+	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
+	err = testBasicDispersal(c, payload)
 	require.NoError(t, err)
-	err = testBasicDispersal(t, c, payload, config.EigenDACertVerifierAddressQuorums0_1_2)
+
+	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1_2)
+	err = testBasicDispersal(c, payload)
 	require.NoError(t, err)
-	err = testBasicDispersal(t, c, payload, config.EigenDACertVerifierAddressQuorums2)
+
+	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums2)
+	err = testBasicDispersal(c, payload)
 	require.NoError(t, err)
 }
 
@@ -306,8 +318,9 @@ func maximumSizedBlobDispersalTest(t *testing.T, environment string) {
 	payload := rand.Bytes(int(maxPermissibleDataLength))
 
 	c := client.GetTestClient(t, environment)
+	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(t, c, payload, config.EigenDACertVerifierAddressQuorums0_1)
+	err = testBasicDispersal(c, payload)
 	require.NoError(t, err)
 }
 
@@ -331,8 +344,9 @@ func tooLargeBlobDispersalTest(t *testing.T, environment string) {
 	payload := rand.Bytes(int(maxPermissibleDataLength) + 1)
 
 	c := client.GetTestClient(t, environment)
+	checkAndSetCertVerifierAddress(t, c, config.EigenDACertVerifierAddressQuorums0_1)
 
-	err = testBasicDispersal(t, c, payload, config.EigenDACertVerifierAddressQuorums0_1)
+	err = testBasicDispersal(c, payload)
 	require.Error(t, err)
 }
 

@@ -8,9 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
@@ -35,8 +33,7 @@ type LoadGenerator struct {
 	// The channel to signal when the load generator is finished.
 	finishedChan chan struct{}
 	// The metrics for the load generator.
-	metrics                     *loadGeneratorMetrics
-	certVerifierAddressProvider clients.CertVerifierAddressProvider
+	metrics *loadGeneratorMetrics
 }
 
 // ReadConfigFile loads a LoadGeneratorConfig from a file.
@@ -84,20 +81,18 @@ func NewLoadGenerator(
 		client.GetLogger().Info("Enabled pprof", "port", config.PprofHttpPort)
 	}
 
-	certVerifierAddressProvider := verification.NewStaticCertVerifierAddressProvider(
-		client.GetConfig().EigenDACertVerifierAddressQuorums0_1)
+	client.SetCertVerifierAddress(client.GetConfig().EigenDACertVerifierAddressQuorums0_1)
 
 	return &LoadGenerator{
-		ctx:                         ctx,
-		cancel:                      cancel,
-		config:                      config,
-		client:                      client,
-		submissionPeriod:            submissionPeriodAsDuration,
-		parallelismLimiter:          parallelismLimiter,
-		alive:                       atomic.Bool{},
-		finishedChan:                make(chan struct{}),
-		metrics:                     metrics,
-		certVerifierAddressProvider: certVerifierAddressProvider,
+		ctx:                ctx,
+		cancel:             cancel,
+		config:             config,
+		client:             client,
+		submissionPeriod:   submissionPeriodAsDuration,
+		parallelismLimiter: parallelismLimiter,
+		alive:              atomic.Bool{},
+		finishedChan:       make(chan struct{}),
+		metrics:            metrics,
 	}
 }
 

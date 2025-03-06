@@ -55,7 +55,6 @@ func NewCertVerifier(
 		ethClient:                   ethClient,
 		certVerifierAddressProvider: certVerifierAddressProvider,
 		blockNumberProvider:         blockNumberProvider,
-		requiredQuorums:             sync.Map{},
 	}, nil
 }
 
