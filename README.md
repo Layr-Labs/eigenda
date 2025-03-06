@@ -8,7 +8,7 @@ A basic REST server for Rollups with the following endpoints:
 [![push-image-ghcr](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/push-ghcr.yml/badge.svg)](https://github.com/Layr-Labs/eigenda-proxy/actions/workflows/push-ghcr.yml)
 
 
-[Integration Guide](https://docs.eigenda.xyz/integrations-guides/dispersal/clients/eigenda-proxy) | [EigenDA Repo](https://github.com/Layr-Labs/eigenda)
+[V1 Integration Guide](https://docs.eigenda.xyz/integrations-guides/dispersal/clients/eigenda-proxy) | [V2 Integration Spec](https://layr-labs.github.io/eigenda/integration.html) | [EigenDA Repo](https://github.com/Layr-Labs/eigenda)
 
 ## Overview
 
