@@ -23,11 +23,8 @@ func GetDefaultRelayPayloadRetrieverConfig() *RelayPayloadRetrieverConfig {
 	}
 }
 
-// checkAndSetDefaults checks an existing config struct. It performs one of the following actions for any contained 0 values:
-//
-// 1. If 0 is an acceptable value for the field, do nothing.
-// 2. If 0 is NOT an acceptable value for the field, and a default value is defined, then set it to the default.
-// 3. If 0 is NOT an acceptable value for the field, and a default value is NOT defined, return an error.
+// checkAndSetDefaults checks an existing config struct. If a given field is 0, and 0 is not an acceptable value, then
+// this method sets it to the default.
 func (rc *RelayPayloadRetrieverConfig) checkAndSetDefaults() error {
 	defaultConfig := GetDefaultRelayPayloadRetrieverConfig()
 	if rc.RelayTimeout == 0 {
