@@ -218,7 +218,7 @@ func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context) ([]uint8, 
 // before attempting to get the verifier caller.
 //
 // This method caches ContractEigenDACertVerifierCaller instances, since their construction requires acquiring a lock
-// and parsing json, and is therefore not trivially inexpensive.
+// and parsing json, and is therefore non-trivially expensive.
 func (cv *CertVerifier) getVerifierCallerFromBlockNumber(
 	ctx context.Context,
 	blockNumber uint64,
@@ -240,7 +240,7 @@ func (cv *CertVerifier) getVerifierCallerFromBlockNumber(
 // address
 //
 // This method caches ContractEigenDACertVerifierCaller instances, since their construction requires acquiring a lock
-// and parsing json, and is therefore not trivially inexpensive.
+// and parsing json, and is therefore non-trivially expensive.
 func (cv *CertVerifier) getVerifierCallerFromAddress(
 	certVerifierAddress string,
 ) (*verifierBindings.ContractEigenDACertVerifierCaller, error) {
