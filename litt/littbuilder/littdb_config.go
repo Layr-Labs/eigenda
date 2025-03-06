@@ -14,33 +14,14 @@ import (
 	tablecache "github.com/Layr-Labs/eigenda/litt/cache"
 	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
-	"github.com/Layr-Labs/eigenda/litt/memtable"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// DBType is an enum for the type of database.
-type DBType int
-
-// DiskDB stores data persistently on disk
-const DiskDB DBType = 0
-
-// MemDB stores data in memory. This data is not persistent. This database type is useful for testing, but
-// probably isn't suitable for production use (i.e. just use a map).
-const MemDB DBType = 1
-
-// KeyMapType is an enum for the type of key map. A key map is used to store the mapping between keys and the
-// addresses of their corresponding values.
-type KeyMapType int
-
-// MemKeyMap stores the key map in memory. It is much faster than LevelDBKeyMap, but it may take a lot longer
-// to load from disk, and may have a large memory footprint (depending on the number of keys).
-const MemKeyMap KeyMapType = 0
-
-// LevelDBKeyMap stores the key map on disk using LevelDB. This is slower than MemKeyMap, but has a much smaller
-// memory footprint, and is much faster to load from disk.
-const LevelDBKeyMap KeyMapType = 1
-
-// TODO can these configurations be sorted better?
+// keyMapBuilders contains a list of the supported key map builders.
+var keyMapBuilders = []keymap.KeyMapBuilder{
+	keymap.NewMemKeyMapBuilder(),
+	keymap.NewLevelDBKeyMapBuilder(),
+}
 
 // LittDBConfig is configuration for a litt.DB.
 type LittDBConfig struct {
@@ -53,11 +34,9 @@ type LittDBConfig struct {
 	// The logger configuration for the database.
 	loggerConfig common.LoggerConfig
 
-	// The type of the DB. Choices are DiskDB and MemDB. Default is DiskDB.
-	DBType DBType
-
-	// The type of the key map. Choices are MemKeyMap and LevelDBKeyMap. Default is LevelDBKeyMap.
-	KeyMapType KeyMapType
+	// The type of the key map. Choices are keymap.MemKeyMapType and keymap.LevelDBKeyMapType.
+	// Default is keymap.LevelDBKeyMapType.
+	KeyMapType keymap.KeyMapType
 
 	// The default TTL for newly created tables (either ones with data on disk or new tables).
 	// The default is 0 (no TTL). TTL can be set individually on each table by calling Table.SetTTL().
@@ -78,7 +57,7 @@ type LittDBConfig struct {
 	// The salt used for sharding. Chosen randomly at boot time by default.
 	// This doesn't need to be cryptographically secure, but it should be kept private.
 	// In theory, an attacker who knows the salt could craft keys that all hash to the same shard.
-	Salt uint32
+	Salt uint32 // TODO regenerate this for each segment
 
 	// The size of the cache for tables that have not had their cache size set. The default is 0 (no cache).
 	// Cache size is in bytes, and includes the size of both the key and the value. Cache size can be set
@@ -103,8 +82,7 @@ func DefaultConfig(paths ...string) (*LittDBConfig, error) {
 		GCPeriod:              5 * time.Minute,
 		ShardingFactor:        8,
 		Salt:                  rand.Uint32(),
-		DBType:                DiskDB,
-		KeyMapType:            LevelDBKeyMap,
+		KeyMapType:            keymap.LevelDBKeyMapType,
 		ControlChannelSize:    64,
 		TargetSegmentFileSize: math.MaxUint32,
 	}, nil
@@ -116,25 +94,29 @@ func cacheWeight(key string, value []byte) uint64 {
 }
 
 // buildKeyMap creates a new key map based on the configuration.
-func (c *LittDBConfig) buildKeyMap(name string, logger logging.Logger) (keymap.KeyMap, error) {
-	var keyMap keymap.KeyMap
-	var err error
-
-	switch c.KeyMapType {
-	case MemKeyMap:
-		keyMap = keymap.NewMemKeyMap(logger)
-	case LevelDBKeyMap:
-		keymapPath := path.Join(c.Paths[0], name, "keymap")
-		keyMap, err = keymap.NewLevelDBKeyMap(logger, keymapPath)
-	default:
-		return nil, fmt.Errorf("unsupported key map type: %v", c.KeyMapType)
+func (c *LittDBConfig) buildKeyMap(name string, logger logging.Logger) (keymap.KeyMap, bool, error) {
+	// For each KeyMap type we are not using, delete any files associated with it if they exist.
+	var chosenBuilder keymap.KeyMapBuilder
+	for _, builder := range keyMapBuilders {
+		if builder.Type() == c.KeyMapType {
+			chosenBuilder = builder
+		} else {
+			err := builder.DeleteFiles(logger, c.Paths)
+			if err != nil {
+				return nil, false, fmt.Errorf("error deleting key map files: %w", err)
+			}
+		}
+	}
+	if chosenBuilder == nil {
+		return nil, false, fmt.Errorf("unsupported key map type: %v", c.KeyMapType)
 	}
 
+	keyMap, requiresReload, err := chosenBuilder.Build(logger, c.Paths)
 	if err != nil {
-		return nil, fmt.Errorf("error creating key map: %w", err)
+		return nil, false, fmt.Errorf("error building key map: %w", err)
 	}
 
-	return keyMap, nil
+	return keyMap, requiresReload, nil
 }
 
 // buildTable creates a new table based on the configuration.
@@ -151,39 +133,33 @@ func (c *LittDBConfig) buildTable(
 		return nil, fmt.Errorf("sharding factor must be at least 1")
 	}
 
-	switch c.DBType {
-	case DiskDB:
-		keyMap, err := c.buildKeyMap(name, logger)
-		if err != nil {
-			return nil, fmt.Errorf("error creating key map: %w", err)
-		}
+	keyMap, requiresReload, err := c.buildKeyMap(name, logger)
+	if err != nil {
+		return nil, fmt.Errorf("error creating key map: %w", err)
+	}
 
-		tableRoots := make([]string, len(c.Paths))
-		for i, p := range c.Paths {
-			tableRoots[i] = path.Join(p, name)
-		}
+	tableRoots := make([]string, len(c.Paths))
+	for i, p := range c.Paths {
+		tableRoots[i] = path.Join(p, name)
+	}
 
-		table, err = disktable.NewDiskTable(
-			ctx,
-			logger,
-			time.Now,
-			name,
-			keyMap,
-			tableRoots,
-			c.TargetSegmentFileSize,
-			c.ControlChannelSize,
-			c.ShardingFactor,
-			c.Salt,
-			c.TTL,
-			c.GCPeriod)
+	table, err = disktable.NewDiskTable(
+		ctx,
+		logger,
+		timeSource,
+		name,
+		keyMap,
+		tableRoots,
+		c.TargetSegmentFileSize,
+		c.ControlChannelSize,
+		c.ShardingFactor,
+		c.Salt,
+		ttl,
+		c.GCPeriod,
+		requiresReload)
 
-		if err != nil {
-			return nil, fmt.Errorf("error creating table: %w", err)
-		}
-	case MemDB:
-		table = memtable.NewMemTable(timeSource, name, ttl)
-	default:
-		return nil, fmt.Errorf("unsupported DB type: %v", c.DBType)
+	if err != nil {
+		return nil, fmt.Errorf("error creating table: %w", err)
 	}
 
 	tableCache := cache.NewFIFOCache[string, []byte](c.CacheSize, cacheWeight)
@@ -191,7 +167,6 @@ func (c *LittDBConfig) buildTable(
 	cachedTable := tablecache.NewCachedTable(table, tableCache)
 
 	return cachedTable, nil
-
 }
 
 // Build creates a new litt.DB from the configuration. After calling Build, the configuration should not be

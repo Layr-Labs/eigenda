@@ -6,7 +6,6 @@ import (
 	"os"
 	"sync/atomic"
 
-	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -107,14 +106,5 @@ func (l *LevelDBKeyMap) Destroy() error {
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-func (l *LevelDBKeyMap) LoadFromSegments(
-	segments map[uint32]*segment.Segment,
-	lowestSegmentIndex uint32,
-	highestSegmentIndex uint32) error {
-
-	// All data is persisted on disk via levelDB, so no need to do anything here.
 	return nil
 }

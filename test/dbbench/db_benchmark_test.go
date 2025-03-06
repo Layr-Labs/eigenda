@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/dgraph-io/badger/v4/options"
@@ -55,7 +56,7 @@ func randomUnexpiredSeed(
 	unexpiredData map[int64]struct{}) (int64, bool) {
 	lock.RLock()
 	defer lock.RUnlock()
-	for seed, _ := range unexpiredData {
+	for seed := range unexpiredData {
 		return seed, true
 	}
 	return 0, false
@@ -427,7 +428,7 @@ func TestMemKeymapLittDBWrite(t *testing.T) {
 
 	config, err := littbuilder.DefaultConfig(directory)
 	require.NoError(t, err)
-	config.KeyMapType = littbuilder.MemKeyMap
+	config.KeyMapType = keymap.MemKeyMapType
 
 	db, err := config.Build(context.Background())
 	require.NoError(t, err)

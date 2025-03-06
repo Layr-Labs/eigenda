@@ -21,6 +21,9 @@ var _ litt.ManagedTable = (*DiskTable)(nil)
 // segmentDirectory is the directory where segment files are stored, relative to the root directory.
 const segmentDirectory = "segments"
 
+// keyMapReloadBatchSize is the size of the batch used for reloading keys from segments into the key map.
+const keyMapReloadBatchSize = 1024
+
 // DiskTable manages a table's Segments.
 type DiskTable struct {
 	// The context for the disk table.
@@ -104,7 +107,8 @@ func NewDiskTable(
 	shardingFactor uint32,
 	salt uint32,
 	ttl time.Duration,
-	gcPeriod time.Duration) (litt.ManagedTable, error) {
+	gcPeriod time.Duration,
+	reloadKeyMap bool) (litt.ManagedTable, error) {
 
 	if gcPeriod <= 0 {
 		return nil, fmt.Errorf("garbage collection period must be greater than 0")
@@ -201,12 +205,80 @@ func NewDiskTable(
 		return nil, fmt.Errorf("failed to gather segment files: %v", err)
 	}
 
-	err = table.keyMap.LoadFromSegments(table.segments, table.lowestSegmentIndex, table.highestSegmentIndex)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load key map from segments: %v", err)
+	if reloadKeyMap {
+		logger.Infof("reloading key map from segments")
+		err = table.reloadKeyMap()
+		if err != nil {
+			return nil, fmt.Errorf("failed to load key map from segments: %v", err)
+		}
 	}
 
 	return table, nil
+}
+
+// reloadKeyMap reloads the key map from the segments. This is necessary when the key map is lost, the key map doesn't
+// save its data on disk, or we are migrating from one key map type to another.
+func (d *DiskTable) reloadKeyMap() error {
+
+	start := d.timeSource()
+	defer func() {
+		d.logger.Infof("spent %v reloading key map", d.timeSource().Sub(start))
+	}()
+
+	// It's possible that some of the data written near the end of the previous session was corrupted.
+	// Read data from the end until the first valid key/value pair is found.
+	isValid := false
+
+	batch := make([]*types.KAPair, 0, keyMapReloadBatchSize)
+
+	for i := d.highestSegmentIndex; i >= d.lowestSegmentIndex && i+1 != 0; i-- {
+		if !d.segments[i].IsSealed() {
+			// ignore unsealed segment, this will have been created in the current session and will not
+			// yet contain any data.
+			continue
+		}
+
+		keys, err := d.segments[i].GetKeys()
+		if err != nil {
+			return fmt.Errorf("failed to get keys from segment: %v", err)
+		}
+		for keyIndex := len(keys) - 1; keyIndex >= 0; keyIndex-- {
+			key := keys[keyIndex]
+
+			if !isValid {
+				_, err = d.segments[i].Read(key.Key, key.Address)
+				if err == nil {
+					// we found a valid key/value pair. All subsequent keys are valid.
+					isValid = true
+				} else {
+					// This is not cause for alarm (probably).
+					// This can happen when the database is not cleanly shut down,
+					// and just means that some data near the end was not fully committed.
+					d.logger.Infof("truncated value for key %s with address %s", key.Key, key.Address)
+				}
+			}
+
+			if isValid {
+				batch = append(batch, key)
+				if len(batch) == keyMapReloadBatchSize {
+					err = d.keyMap.Put(batch)
+					if err != nil {
+						return fmt.Errorf("failed to put keys: %v", err)
+					}
+					batch = make([]*types.KAPair, 0, keyMapReloadBatchSize)
+				}
+			}
+		}
+
+		if len(batch) > 0 {
+			err = d.keyMap.Put(batch)
+			if err != nil {
+				return fmt.Errorf("failed to put keys: %v", err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (d *DiskTable) Name() string {
