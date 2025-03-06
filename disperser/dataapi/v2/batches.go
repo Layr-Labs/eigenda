@@ -101,24 +101,22 @@ func (s *ServerV2) FetchBatchFeed(c *gin.Context) {
 		limit = maxNumBatchesPerBatchFeedResponse
 	}
 
-	// Convert times to unix nano timestamps
-	afterTimestamp := uint64(afterTime.UnixNano())
-	beforeTimestamp := uint64(beforeTime.UnixNano())
-
 	var attestations []*corev2.Attestation
 
 	if direction == "forward" {
-		attestations, err = s.blobMetadataStore.GetAttestationByAttestedAtForward(
+		attestations, err = s.batchFeedCache.Get(
 			c.Request.Context(),
-			afterTimestamp+1, // +1ns to make it exclusive
-			beforeTimestamp,
+			afterTime.Add(time.Nanosecond), // +1ns to make it exclusive
+			beforeTime,
+			Ascending,
 			limit,
 		)
 	} else {
-		attestations, err = s.blobMetadataStore.GetAttestationByAttestedAtBackward(
+		attestations, err = s.batchFeedCache.Get(
 			c.Request.Context(),
-			beforeTimestamp,
-			afterTimestamp+1, // +1ns to make it exclusive
+			afterTime.Add(time.Nanosecond), // +1ns to make it exclusive
+			beforeTime,
+			Descending,
 			limit,
 		)
 	}
