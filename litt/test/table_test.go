@@ -74,7 +74,7 @@ func buildMemKeyDiskTable(
 		uint32(100), // intentionally use a very small segment size
 		10,
 		4,
-		1234,
+		random.NewTestRandom().Rand,
 		0,
 		1*time.Millisecond,
 		true)
@@ -113,7 +113,7 @@ func buildLevelDBKeyDiskTable(
 		uint32(100), // intentionally use a very small segment size
 		10,
 		4,
-		1234,
+		random.NewTestRandom().Rand,
 		0,
 		1*time.Millisecond,
 		false)
