@@ -7,10 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
+	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
+	"github.com/Layr-Labs/eigenda/litt/memtable"
 	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,19 +32,31 @@ var restartableBuilders = []dbBuilder{
 }
 
 func buildMemDB(t *testing.T, path string) (litt.DB, error) {
-	config, err := littbuilder.DefaultConfig(path)
-	require.NoError(t, err)
-	config.DBType = littbuilder.MemDB
-	config.CacheSize = 1000
+	tb := func(
+		ctx context.Context,
+		logger logging.Logger,
+		timeSource func() time.Time,
+		name string,
+		ttl time.Duration) (litt.ManagedTable, error) {
+		return memtable.NewMemTable(timeSource, name, ttl), nil
+	}
 
-	return config.Build(context.Background())
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	require.NoError(t, err)
+
+	return littbuilder.NewDB(
+		context.Background(),
+		logger,
+		time.Now,
+		0,
+		50*time.Millisecond,
+		tb), nil
 }
 
 func buildMemKeyDiskDB(t *testing.T, path string) (litt.DB, error) {
 	config, err := littbuilder.DefaultConfig(path)
 	require.NoError(t, err)
-	config.DBType = littbuilder.DiskDB
-	config.KeyMapType = littbuilder.MemKeyMap
+	config.KeyMapType = keymap.MemKeyMapType
 	config.CacheSize = 1000
 	config.TargetSegmentFileSize = 100
 	config.ShardingFactor = 4
@@ -51,8 +67,7 @@ func buildMemKeyDiskDB(t *testing.T, path string) (litt.DB, error) {
 func buildLevelDBDiskDB(t *testing.T, path string) (litt.DB, error) {
 	config, err := littbuilder.DefaultConfig(path)
 	require.NoError(t, err)
-	config.DBType = littbuilder.DiskDB
-	config.KeyMapType = littbuilder.LevelDBKeyMap
+	config.KeyMapType = keymap.LevelDBKeyMapType
 	config.CacheSize = 1000
 	config.TargetSegmentFileSize = 100
 	config.ShardingFactor = 4

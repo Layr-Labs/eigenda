@@ -46,7 +46,8 @@ type db struct {
 	started bool
 }
 
-func newDB(
+// NewDB creates a new DB instance. In general, this should not be used directly. Instead, use LittDBConfig.Build()
+func NewDB(
 	ctx context.Context,
 	logger logging.Logger,
 	timeSource func() time.Time,

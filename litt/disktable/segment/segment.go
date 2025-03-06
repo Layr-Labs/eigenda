@@ -134,7 +134,10 @@ func NewSegment(
 			parentDirectory = path.Dir(valuesPath)
 		} else {
 			// Assign value files to parent directories in a round-robin fashion.
-			parentDirectory = parentDirectories[int(shard)%len(parentDirectories)]
+			// Assign the first shard to the directory at index 1. The first directory
+			// is used by the keymap, so if we have enough directories we don't want to
+			// use it for value files too.
+			parentDirectory = parentDirectories[int(shard+1)%len(parentDirectories)]
 		}
 		values, err := newValueFile(logger, index, shard, parentDirectory, metadata.sealed)
 		if err != nil {

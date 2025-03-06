@@ -60,7 +60,8 @@ func buildMemKeyDiskTableSingleShard(
 		1,
 		1234,
 		0,
-		1*time.Millisecond)
+		1*time.Millisecond,
+		false)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -98,7 +99,8 @@ func buildMemKeyDiskTableMultiShard(
 		4,
 		1234,
 		0,
-		1*time.Millisecond)
+		1*time.Millisecond,
+		false)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -140,7 +142,8 @@ func buildLevelDBKeyDiskTableSingleShard(
 		1,
 		1234,
 		0,
-		1*time.Millisecond)
+		1*time.Millisecond,
+		false)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -182,7 +185,8 @@ func buildLevelDBKeyDiskTableMultiShard(
 		4,
 		1234,
 		0,
-		1*time.Millisecond)
+		1*time.Millisecond,
+		false)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -1684,7 +1688,6 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder tableB
 			err = table.SetShardingFactor(shardingFactor)
 			require.NoError(t, err)
 
-			// TODO shuffle keymap location
 			// TODO shuffle table metadata location
 
 			err = table.Start()
