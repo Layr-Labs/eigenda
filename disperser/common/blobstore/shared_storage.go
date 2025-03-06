@@ -21,6 +21,8 @@ const (
 
 var errProcessingToDispersing = errors.New("blob transit to dispersing from non processing")
 
+var errProcessingMeetingPrecondition = errors.New("blob not meeting precondition to processing")
+
 // The shared blob store that the disperser is operating on.
 // The metadata store is backed by DynamoDB and the blob store is backed by S3.
 //
@@ -88,6 +90,24 @@ func (s *SharedBlobStore) StoreBlob(ctx context.Context, blob *core.Blob, reques
 	}
 	metadataKey.BlobHash = blobHash
 	metadataKey.MetadataHash = metadataHash
+
+	refreshedMetadata, err := s.GetBlobMetadata(ctx, metadataKey)
+
+	// the only safe condition:
+	// err is disperser.ErrMetadataNotFound && refreshedMetadata is nil
+	if err == nil && refreshedMetadata != nil {
+		s.logger.Error("error blob not meeting precondition", "status", refreshedMetadata.BlobStatus, "metadataKey", refreshedMetadata.GetBlobKey().String())
+		return metadataKey, errProcessingMeetingPrecondition
+	} else if err != nil && refreshedMetadata == nil {
+		if !errors.Is(err, disperser.ErrMetadataNotFound) {
+			s.logger.Error("error blob request or marshal error", "err", err)
+			return metadataKey, errProcessingMeetingPrecondition
+		}
+		// else it is expected
+	} else {
+		s.logger.Error("error get blob status abnormality ", "err", err)
+		return metadataKey, errProcessingMeetingPrecondition
+	}
 
 	err = s.s3Client.UploadObject(ctx, s.bucketName, blobObjectKey(blobHash), blob.Data)
 	if err != nil {
