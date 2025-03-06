@@ -3,6 +3,7 @@ package disktable
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"path"
 	"sync"
@@ -44,8 +45,8 @@ type DiskTable struct {
 	// The table's metadata.
 	metadata *tableMetadata
 
-	// Random data to make the sharding hash function hard for an attacker to predict.
-	salt uint32
+	// A source of randomness used for generating sharding salt.
+	saltShaker *rand.Rand
 
 	// A map of keys to their addresses.
 	keyMap keymap.KeyMap
@@ -105,7 +106,7 @@ func NewDiskTable(
 	targetFileSize uint32,
 	controlChannelSize int,
 	shardingFactor uint32,
-	salt uint32,
+	saltShaker *rand.Rand,
 	ttl time.Duration,
 	gcPeriod time.Duration,
 	reloadKeyMap bool) (litt.ManagedTable, error) {
@@ -180,7 +181,7 @@ func NewDiskTable(
 		segmentDirectories:      segDirs,
 		name:                    name,
 		metadata:                metadata,
-		salt:                    salt,
+		saltShaker:              saltShaker,
 		keyMap:                  keyMap,
 		targetFileSize:          targetFileSize,
 		segments:                make(map[uint32]*segment.Segment),
@@ -199,7 +200,7 @@ func NewDiskTable(
 			table.segmentDirectories,
 			timeSource(),
 			shardingFactor,
-			salt,
+			saltShaker.Uint32(),
 			true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather segment files: %v", err)
@@ -544,7 +545,7 @@ func (d *DiskTable) expandSegments() error {
 		d.segmentDirectories,
 		now,
 		d.metadata.GetShardingFactor(),
-		d.salt,
+		d.saltShaker.Uint32(),
 		false)
 	if err != nil {
 		d.segmentLock.Unlock()

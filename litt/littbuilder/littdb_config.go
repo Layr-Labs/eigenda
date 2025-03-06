@@ -55,12 +55,7 @@ type LittDBConfig struct {
 	ShardingFactor uint32
 
 	// The random number generator used for generating sharding salts. The default is math/rand. TODO
-	SaltShaker rand.Rand
-
-	// The salt used for sharding. Chosen randomly at boot time by default.
-	// This doesn't need to be cryptographically secure, but it should be kept private.
-	// In theory, an attacker who knows the salt could craft keys that all hash to the same shard.
-	Salt uint32 // TODO regenerate this for each segment
+	SaltShaker *rand.Rand
 
 	// The size of the cache for tables that have not had their cache size set. The default is 0 (no cache).
 	// Cache size is in bytes, and includes the size of both the key and the value. Cache size can be set
@@ -78,13 +73,16 @@ func DefaultConfig(paths ...string) (*LittDBConfig, error) {
 		return nil, fmt.Errorf("at least one path must be provided")
 	}
 
+	seed := time.Now().UnixNano()
+	saltShaker := rand.New(rand.NewSource(seed))
+
 	return &LittDBConfig{
 		Paths:                 paths,
 		loggerConfig:          common.DefaultLoggerConfig(),
 		TimeSource:            time.Now,
 		GCPeriod:              5 * time.Minute,
 		ShardingFactor:        8,
-		Salt:                  rand.Uint32(),
+		SaltShaker:            saltShaker,
 		KeyMapType:            keymap.LevelDBKeyMapType,
 		ControlChannelSize:    64,
 		TargetSegmentFileSize: math.MaxUint32,
@@ -164,7 +162,7 @@ func (c *LittDBConfig) buildTable(
 		c.TargetSegmentFileSize,
 		c.ControlChannelSize,
 		c.ShardingFactor,
-		c.Salt,
+		c.SaltShaker,
 		ttl,
 		c.GCPeriod,
 		requiresReload)

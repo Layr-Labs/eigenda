@@ -58,7 +58,7 @@ func buildMemKeyDiskTableSingleShard(
 		uint32(100), // intentionally use a very small segment size
 		10,
 		1,
-		1234,
+		random.NewTestRandom().Rand,
 		0,
 		1*time.Millisecond,
 		false)
@@ -97,7 +97,7 @@ func buildMemKeyDiskTableMultiShard(
 		uint32(100), // intentionally use a very small segment size
 		10,
 		4,
-		1234,
+		random.NewTestRandom().Rand,
 		0,
 		1*time.Millisecond,
 		false)
@@ -140,7 +140,7 @@ func buildLevelDBKeyDiskTableSingleShard(
 		uint32(100), // intentionally use a very small segment size
 		10,
 		1,
-		1234,
+		random.NewTestRandom().Rand,
 		0,
 		1*time.Millisecond,
 		false)
@@ -183,7 +183,7 @@ func buildLevelDBKeyDiskTableMultiShard(
 		uint32(100), // intentionally use a very small segment size
 		10,
 		4,
-		1234,
+		random.NewTestRandom().Rand,
 		0,
 		1*time.Millisecond,
 		false)
