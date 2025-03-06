@@ -259,17 +259,13 @@ func (l *EncodingLoadGenerator) performEncoding(ctx context.Context, blob *coret
 
 	// Length should be power of 2
 	blobLength := uint(len(blob.Serialize()))
-	// Round up to next power of 2
-	powerOf2Length := uint(1)
-	for powerOf2Length < blobLength {
-		powerOf2Length *= 2
-	}
+	symbolLength := encoding.GetBlobLengthPowerOf2(blobLength)
 
 	blobCommitments := encoding.BlobCommitments{
 		Commitment:       commitment,
 		LengthCommitment: (*encoding.G2Commitment)(&lengthG2),
 		LengthProof:      (*encoding.G2Commitment)(&lengthG2),
-		Length:           powerOf2Length,
+		Length:           symbolLength,
 	}
 
 	// Create a mock PaymentMetadata

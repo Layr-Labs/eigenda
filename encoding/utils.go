@@ -11,7 +11,7 @@ func GetBlobLength(blobSize uint) uint {
 	return RoundUpDivide(blobSize, BYTES_PER_SYMBOL)
 }
 
-// GetBlobLength converts from blob size in bytes to blob size in symbols
+// GetBlobLengthPowerOf2 converts from blob size in bytes to blob size in symbols
 func GetBlobLengthPowerOf2(blobSize uint) uint {
 	return NextPowerOf2(GetBlobLength(blobSize))
 }
@@ -21,7 +21,7 @@ func GetBlobSize(blobLength uint) uint {
 	return blobLength * BYTES_PER_SYMBOL
 }
 
-// GetBlobLength converts from blob size in bytes to blob size in symbols
+// GetEncodedBlobLength converts from blob size in bytes to blob size in symbols
 func GetEncodedBlobLength(blobLength uint, quorumThreshold, advThreshold uint8) uint {
 	return RoundUpDivide(blobLength*100, uint(quorumThreshold-advThreshold))
 }
