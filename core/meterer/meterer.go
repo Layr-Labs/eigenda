@@ -214,17 +214,15 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 
 	// Compute paymentCharged at payment time
 	paymentCharged := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol())
-
+	err = m.OffchainStore.AddOnDemandPayment(ctx, header, paymentCharged)
+	if err != nil {
+		return fmt.Errorf("failed to update cumulative payment: %w", err)
+	}
 	// Validate payments attached
 	err = m.ValidatePayment(ctx, header, onDemandPayment, paymentCharged)
 	if err != nil {
 		// No tolerance for incorrect payment amounts; no rollbacks
 		return fmt.Errorf("invalid on-demand payment: %w", err)
-	}
-
-	err = m.OffchainStore.AddOnDemandPayment(ctx, header, paymentCharged)
-	if err != nil {
-		return fmt.Errorf("failed to update cumulative payment: %w", err)
 	}
 
 	// Update bin usage atomically and check against bin capacity
