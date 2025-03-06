@@ -18,14 +18,14 @@ type Config struct {
 }
 
 // MemConfig ... contains properties that are used to configure the MemStore's behavior.
-// this is copied directly from /store/generated_key/memstore/memconfig. 
-// importing the struct isn't possible since it'd create cyclic dependency loop 
+// this is copied directly from /store/generated_key/memstore/memconfig.
+// importing the struct isn't possible since it'd create cyclic dependency loop
 // with core proxy's go.mod
 type MemConfig struct {
-	MaxBlobSizeBytes uint64
-	BlobExpiration   time.Duration
-	PutLatency time.Duration
-	GetLatency time.Duration
+	MaxBlobSizeBytes        uint64
+	BlobExpiration          time.Duration
+	PutLatency              time.Duration
+	GetLatency              time.Duration
 	PutReturnsFailoverError bool
 }
 
@@ -42,7 +42,6 @@ func (c MemConfig) MarshalJSON() ([]byte, error) {
 	})
 }
 
-
 // intermediaryCfg ... used for decoding into a less rich type before
 // translating to a structured MemConfig
 type intermediaryCfg struct {
@@ -53,7 +52,7 @@ type intermediaryCfg struct {
 	PutReturnsFailoverError bool
 }
 
-// IntoMemConfig ... converts an intermediary config into a memconfig 
+// IntoMemConfig ... converts an intermediary config into a memconfig
 // with structured type definitions
 func (cfg *intermediaryCfg) IntoMemConfig() (*MemConfig, error) {
 	getLatency, err := time.ParseDuration(cfg.GetLatency)
@@ -72,14 +71,13 @@ func (cfg *intermediaryCfg) IntoMemConfig() (*MemConfig, error) {
 	}
 
 	return &MemConfig{
-		MaxBlobSizeBytes: cfg.MaxBlobSizeBytes,
-		BlobExpiration: blobExpiration,
-		PutLatency: putLatency,
-		GetLatency: getLatency,
+		MaxBlobSizeBytes:        cfg.MaxBlobSizeBytes,
+		BlobExpiration:          blobExpiration,
+		PutLatency:              putLatency,
+		GetLatency:              getLatency,
 		PutReturnsFailoverError: cfg.PutReturnsFailoverError,
 	}, nil
 }
-
 
 // Client implements a standard client for the eigenda-proxy
 // that can be used for updating a memstore configuration in real-time
@@ -95,7 +93,7 @@ func New(cfg *Config) *Client {
 	cfg.URL = cfg.URL + memConfigEndpoint // initialize once to avoid unnecessary ops when patch/get
 
 	scc := &Client{
-		cfg: cfg,
+		cfg:        cfg,
 		httpClient: http.DefaultClient,
 	}
 
@@ -110,11 +108,12 @@ func decodeResponseToMemCfg(resp *http.Response) (*MemConfig, error) {
 	}
 	return cfg.IntoMemConfig()
 }
+
 // GetConfig retrieves the current configuration.
 func (c *Client) GetConfig(ctx context.Context) (*MemConfig, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.cfg.URL, &bytes.Buffer{})
 	if err != nil {
-		return nil, err 
+		return nil, err
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -132,7 +131,7 @@ func (c *Client) GetConfig(ctx context.Context) (*MemConfig, error) {
 
 // UpdateConfig updates the configuration using the new MemConfig instance
 // Despite the API using a PATH method, this function treats the "update" config
-// as a POST and modifies every associated field. This could present issues if 
+// as a POST and modifies every associated field. This could present issues if
 // misused in a testing framework which imports it.
 func (c *Client) UpdateConfig(ctx context.Context, update *MemConfig) (*MemConfig, error) {
 	body, err := update.MarshalJSON()

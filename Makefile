@@ -1,7 +1,3 @@
-LINTER_VERSION = v1.52.1
-LINTER_URL = https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh
-GET_LINT_CMD = "curl -sSfL $(LINTER_URL) | sh -s -- -b $(go env GOPATH)/bin $(LINTER_VERSION)"
-
 GIT_COMMIT ?= $(shell git rev-parse HEAD)
 BUILD_TIME := $(shell date -u '+%Y-%m-%d--%H:%M:%S')
 GIT_TAG := $(shell git describe --tags --always --dirty)
@@ -55,27 +51,31 @@ test-e2e-fuzz:
 
 .PHONY: lint
 lint:
-	@if ! test -f  &> /dev/null; \
+	@if ! command -v golangci-lint  &> /dev/null; \
 	then \
     	echo "golangci-lint command could not be found...."; \
-		echo "\nTo install, please run $(GET_LINT_CMD)"; \
-		echo "\nBuild instructions can be found at: https://golangci-lint.run/usage/install/."; \
+		echo "You can install via 'go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest'"; \
+		echo "or visit https://golangci-lint.run/welcome/install/ for other installation methods."; \
     	exit 1; \
 	fi
-
 	@golangci-lint run
 
 .PHONY: format
 format:
+	# We also format line lengths. The length here should match that in the lll linter in .golangci.yml
+	@if ! command -v golines  &> /dev/null; \
+	then \
+    	echo "golines command could not be found...."; \
+		echo "You can install via 'go install github.com/segmentio/golines@latest'"; \
+		echo "or visit https://github.com/segmentio/golines for other installation methods."; \
+    	exit 1; \
+	fi
 	@go fmt ./...
+	@golines --write-output --shorten-comments --max-len 120 .
 
 go-gen-mocks:
 	@echo "generating go mocks..."
 	@GO111MODULE=on go generate --run "mockgen*" ./...
-
-install-lint:
-	@echo "Installing golangci-lint..."
-	@sh -c $(GET_LINT_CMD)
 
 op-devnet-allocs:
 	@echo "Generating devnet allocs..."

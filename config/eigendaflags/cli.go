@@ -201,8 +201,9 @@ func validateConfirmationFlag(val string) error {
 	if depth >= uint64(consts.EthHappyPathFinalizationDepthBlocks) {
 		// We keep this low (<128) to avoid requiring an archive node (see how this is used in CertVerifier).
 		// Note: assuming here that no sane person would ever need to set this to a number >64.
-		// But perhaps someone testing crazy reorg scenarios where finalization takes >2 epochs might want to set this to a higher number.
-		// Do keep in mind if you ever change this that it might affect a LOT of validators on your rollup who would now need an archival node.
+		// But perhaps someone testing crazy reorg scenarios where finalization takes >2 epochs might want to set this
+		// to a higher number. Do keep in mind if you ever change this that it might affect a LOT of validators on your
+		// rollup who would now need an archival node.
 		return fmt.Errorf("confirmation depth set to %d, which is > 2 epochs (64). Use 'finalized' instead", depth)
 	}
 

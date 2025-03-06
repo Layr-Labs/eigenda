@@ -16,7 +16,8 @@ import "fmt"
 // update the cert retrieved from the batcher inbox.
 // However, the cert does not contain the request_id, which is needed to query the GetBlobStatus endpoint,
 // so this turns out to be impossible in the V1 model without a major refactor.
-// See https://github.com/Layr-Labs/eigenda/blob/af6d88552a13f452f365014ff80a52b2e3ec8e70/api/proto/disperser/disperser.proto#L101-L119
+// See
+// https://github.com/Layr-Labs/eigenda/blob/af6d88552a13f452f365014ff80a52b2e3ec8e70/api/proto/disperser/disperser.proto#L101-L119
 // for more information.
 type BatchMetadataHashMismatchError struct {
 	// batch metadata hash that is stored in the EigenDAServiceManager
@@ -27,7 +28,11 @@ type BatchMetadataHashMismatchError struct {
 
 // Implement the Error interface
 func (e *BatchMetadataHashMismatchError) Error() string {
-	return fmt.Sprintf("batch hash mismatch, onchain: %x, computed: %x; did an L1 reorg happen?", e.OnchainHash, e.ComputedHash)
+	return fmt.Sprintf(
+		"batch hash mismatch, onchain: %x, computed: %x; did an L1 reorg happen?",
+		e.OnchainHash,
+		e.ComputedHash,
+	)
 }
 
 // Sentry error for the error type BatchMetadataHashMismatchError

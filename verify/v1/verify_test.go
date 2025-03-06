@@ -106,7 +106,11 @@ func TestCommitmentWithTooLargeBlob(t *testing.T) {
 	require.NoError(t, err)
 
 	err = v.VerifyCommitment(c, blob)
-	msg := fmt.Sprintf("cannot verify commitment because the number of stored srs in the memory is insufficient, have %v need %v", kzgConfig.SRSNumberToLoad, len(inputFr))
+	msg := fmt.Sprintf(
+		"cannot verify commitment because the number of stored srs in the memory is insufficient, have %v need %v",
+		kzgConfig.SRSNumberToLoad,
+		len(inputFr),
+	)
 	require.EqualError(t, err, msg)
 
 }

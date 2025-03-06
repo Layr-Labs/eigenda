@@ -52,7 +52,8 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 		},
 		// kzg flags
 		// we use a relative path for these so that the path works for both the binary and the docker container
-		// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir of the container
+		// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir of
+		// the container
 		&cli.StringFlag{
 			Name:     G1PathFlagName,
 			Usage:    "path to g1.point file.",
@@ -95,7 +96,8 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 				if numBytes > MaxAllowedBlobSize {
 					return fmt.Errorf(
 						"excluding disperser constraints on max blob size, SRS points constrain the maxBlobLength configuration parameter to be less than than %d bytes",
-						MaxAllowedBlobSize)
+						MaxAllowedBlobSize,
+					)
 				}
 				MaxBlobLengthBytes = numBytes
 				return nil
@@ -107,7 +109,8 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 	}
 }
 
-// MaxBlobLengthBytes ... there's def a better way to deal with this... perhaps a generic flag that can parse the string into a uint64?
+// MaxBlobLengthBytes ... there's def a better way to deal with this... perhaps a generic flag that can parse the string
+// into a uint64?
 // this var is set by the action in the MaxBlobLengthFlagName flag
 var MaxBlobLengthBytes uint64
 

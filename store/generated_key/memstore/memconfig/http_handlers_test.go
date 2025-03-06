@@ -181,7 +181,11 @@ func TestHandlersHTTP_PatchConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			router, safeConfig := setup(tt.initialConfig)
 
-			req := httptest.NewRequest(http.MethodPatch, "/memstore/config", bytes.NewReader([]byte(tt.requestBodyJSON)))
+			req := httptest.NewRequest(
+				http.MethodPatch,
+				"/memstore/config",
+				bytes.NewReader([]byte(tt.requestBodyJSON)),
+			)
 			rec := httptest.NewRecorder()
 
 			router.ServeHTTP(rec, req)

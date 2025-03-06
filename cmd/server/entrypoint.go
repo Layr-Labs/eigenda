@@ -133,10 +133,12 @@ func prettyPrintConfig(cliCtx *cli.Context, log logging.Logger) error {
 		return fmt.Errorf("read cli config: %w", err)
 	}
 	if cfg.EigenDAConfig.EdaClientConfigV1.SignerPrivateKeyHex != "" {
-		cfg.EigenDAConfig.EdaClientConfigV1.SignerPrivateKeyHex = redacted // marshaling defined in client config
+		// marshaling defined in client config
+		cfg.EigenDAConfig.EdaClientConfigV1.SignerPrivateKeyHex = redacted
 	}
 	if cfg.EigenDAConfig.EdaClientConfigV1.EthRpcUrl != "" {
-		cfg.EigenDAConfig.EdaClientConfigV1.EthRpcUrl = redacted // hiding as RPC providers typically use sensitive API keys within
+		// hiding as RPC providers typically use sensitive API keys within
+		cfg.EigenDAConfig.EdaClientConfigV1.EthRpcUrl = redacted
 	}
 	if cfg.EigenDAConfig.StorageConfig.RedisConfig.Password != "" {
 		cfg.EigenDAConfig.StorageConfig.RedisConfig.Password = redacted // masking Redis password

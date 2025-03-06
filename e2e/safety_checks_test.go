@@ -67,7 +67,8 @@ func TestOpClientKeccak256MalformedInputs(t *testing.T) {
 
 }
 
-// TestProxyClientMalformedInputCases tests the proxy client and server integration by setting the data as a single byte,
+// TestProxyClientMalformedInputCases tests the proxy client and server integration by setting the data as a single
+// byte,
 // many unicode characters, single unicode character and an empty preimage. It then tries to get the data from the
 // proxy server with empty byte, single byte and random string.
 func TestProxyClientMalformedInputCases(t *testing.T) {

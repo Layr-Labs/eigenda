@@ -65,7 +65,11 @@ func (e Store) Get(ctx context.Context, key []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to verify DA cert: %w", err)
 	}
 
-	decodedBlob, err := e.client.GetBlob(ctx, cert.BlobVerificationProof.GetBatchMetadata().GetBatchHeaderHash(), cert.BlobVerificationProof.GetBlobIndex())
+	decodedBlob, err := e.client.GetBlob(
+		ctx,
+		cert.BlobVerificationProof.GetBatchMetadata().GetBatchHeaderHash(),
+		cert.BlobVerificationProof.GetBlobIndex(),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("EigenDA client failed to retrieve decoded blob: %w", err)
 	}
@@ -81,7 +85,12 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 	}
 	// TODO: We should move this length check inside PutBlob
 	if uint64(len(encodedBlob)) > e.cfg.MaxBlobSizeBytes {
-		return nil, fmt.Errorf("%w: blob length %d, max blob size %d", common.ErrProxyOversizedBlob, len(value), e.cfg.MaxBlobSizeBytes)
+		return nil, fmt.Errorf(
+			"%w: blob length %d, max blob size %d",
+			common.ErrProxyOversizedBlob,
+			len(value),
+			e.cfg.MaxBlobSizeBytes,
+		)
 	}
 
 	// We attempt to disperse the blob to EigenDA up to 3 times, unless we get a 400 error on any attempt.
@@ -139,7 +148,8 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 	if err != nil {
 		if errors.Is(err, verify.ErrBatchMetadataHashMismatch) {
 			// This error might have been caused by an L1 reorg.
-			// See https://github.com/Layr-Labs/eigenda-proxy/blob/main/docs/troubleshooting_v1.md#batch-hash-mismatch-error
+			// See
+			// https://github.com/Layr-Labs/eigenda-proxy/blob/main/docs/troubleshooting_v1.md#batch-hash-mismatch-error
 			// We could try to update the cert's confirmation block number here,
 			// but it's currently not possible because the client.PutBlob call doesn't return the
 			// request_id to be able to query the GetBlobStatus endpoint...

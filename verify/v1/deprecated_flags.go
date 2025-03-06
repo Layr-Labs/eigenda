@@ -63,9 +63,13 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 			EnvVars: []string{withDeprecatedEnvPrefix(envPrefix, "ETH_CONFIRMATION_DEPTH")},
 			Value:   0,
 			Action: func(_ *cli.Context, _ uint64) error {
-				return fmt.Errorf("flag --%s (env var %s) is deprecated, use --%s (env var %s) instead",
-					DeprecatedEthConfirmationDepthFlagName, withDeprecatedEnvPrefix(envPrefix, "ETH_CONFIRMATION_DEPTH"),
-					eigendaflags.ConfirmationDepthFlagName, withEnvPrefix(envPrefix, "CONFIRMATION_DEPTH"))
+				return fmt.Errorf(
+					"flag --%s (env var %s) is deprecated, use --%s (env var %s) instead",
+					DeprecatedEthConfirmationDepthFlagName,
+					withDeprecatedEnvPrefix(envPrefix, "ETH_CONFIRMATION_DEPTH"),
+					eigendaflags.ConfirmationDepthFlagName,
+					withEnvPrefix(envPrefix, "CONFIRMATION_DEPTH"),
+				)
 			},
 			Category: category,
 		},
@@ -75,7 +79,8 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 			Usage:   "path to g1.point file.",
 			EnvVars: []string{withDeprecatedEnvPrefix(envPrefix, "TARGET_KZG_G1_PATH")},
 			// we use a relative path so that the path works for both the binary and the docker container
-			// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir of the container
+			// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir
+			// of the container
 			Value: "resources/g1.point",
 			Action: func(_ *cli.Context, _ string) error {
 				return fmt.Errorf("flag --%s (env var %s) is deprecated, use --%s (env var %s) instead",
@@ -89,7 +94,8 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 			Usage:   "path to g2.point.powerOf2 file.",
 			EnvVars: []string{withDeprecatedEnvPrefix(envPrefix, "TARGET_G2_TAU_PATH")},
 			// we use a relative path so that the path works for both the binary and the docker container
-			// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir of the container
+			// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir
+			// of the container
 			Value: "resources/g2.point.powerOf2",
 			Action: func(_ *cli.Context, _ string) error {
 				return fmt.Errorf("flag --%s (env var %s) is deprecated, use --%s (env var %s) instead",
@@ -103,7 +109,8 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 			Usage:   "path to SRS tables for caching.",
 			EnvVars: []string{withDeprecatedEnvPrefix(envPrefix, "TARGET_CACHE_PATH")},
 			// we use a relative path so that the path works for both the binary and the docker container
-			// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir of the container
+			// aka we assume the binary is run from root dir, and that the resources/ dir is copied into the working dir
+			// of the container
 			Value: "resources/SRSTables/",
 			Action: func(_ *cli.Context, _ string) error {
 				return fmt.Errorf("flag --%s (env var %s) is deprecated, use --%s (env var %s) instead",

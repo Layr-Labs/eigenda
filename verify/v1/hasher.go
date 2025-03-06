@@ -10,7 +10,8 @@ import (
 )
 
 // HashBatchMetadata regenerates a batch data hash
-// replicates: https://github.com/Layr-Labs/eigenda-utils/blob/c4cbc9ec078aeca3e4a04bd278e2fb136bf3e6de/src/libraries/EigenDAHasher.sol#L46-L54
+// replicates:
+// https://github.com/Layr-Labs/eigenda-utils/blob/c4cbc9ec078aeca3e4a04bd278e2fb136bf3e6de/src/libraries/EigenDAHasher.sol#L46-L54
 func HashBatchMetadata(bh *binding.BatchHeader, sigHash [32]byte, confirmedBlockNum uint32) (geth_common.Hash, error) {
 	batchHeaderType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{
@@ -63,8 +64,13 @@ func HashBatchMetadata(bh *binding.BatchHeader, sigHash [32]byte, confirmedBlock
 }
 
 // HashBatchHashedMetadata hashes the given metadata into the commitment that will be stored in the contract
-// replicates: https://github.com/Layr-Labs/eigenda-utils/blob/c4cbc9ec078aeca3e4a04bd278e2fb136bf3e6de/src/libraries/EigenDAHasher.sol#L19-L25
-func HashBatchHashedMetadata(batchHeaderHash [32]byte, signatoryRecordHash [32]byte, blockNumber uint32) (geth_common.Hash, error) {
+// replicates:
+// https://github.com/Layr-Labs/eigenda-utils/blob/c4cbc9ec078aeca3e4a04bd278e2fb136bf3e6de/src/libraries/EigenDAHasher.sol#L19-L25
+func HashBatchHashedMetadata(
+	batchHeaderHash [32]byte,
+	signatoryRecordHash [32]byte,
+	blockNumber uint32,
+) (geth_common.Hash, error) {
 	// since the solidity function uses abi.encodePacked, we need to consolidate the byte space that
 	// blockNum occupies to only 4 bytes versus 28 or 256 bits when encoded to abi buffer
 	a := make([]byte, 4)

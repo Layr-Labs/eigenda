@@ -346,7 +346,8 @@ func (smb *StorageManagerBuilder) buildPayloadDisperser(
 }
 
 // buildLocalSigner attempts to check the pending balance of the created signer account. If the check fails, or if the
-// balance is determined to be 0, the user is warned with a log. This method doesn't return an error based on this check:
+// balance is determined to be 0, the user is warned with a log. This method doesn't return an error based on this
+// check:
 // it's possible that a user could want to set up a signer before it's actually ready to be used
 //
 // TODO: the checks performed in this method could be improved in the future, e.g. by checking payment vault state,

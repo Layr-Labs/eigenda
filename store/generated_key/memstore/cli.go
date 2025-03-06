@@ -60,10 +60,13 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			},
 		},
 		&cli.DurationFlag{
-			Name:     ExpirationFlagName,
-			Usage:    "Duration that a memstore blob/commitment pair is allowed to live. Setting to (0) results in no expiration.",
-			Value:    25 * time.Minute,
-			EnvVars:  []string{withEnvPrefix(envPrefix, "EXPIRATION"), withDeprecatedEnvPrefix(envPrefix, "EXPIRATION")},
+			Name:  ExpirationFlagName,
+			Usage: "Duration that a memstore blob/commitment pair is allowed to live. Setting to (0) results in no expiration.",
+			Value: 25 * time.Minute,
+			EnvVars: []string{
+				withEnvPrefix(envPrefix, "EXPIRATION"),
+				withDeprecatedEnvPrefix(envPrefix, "EXPIRATION"),
+			},
 			Category: category,
 			Action: func(_ *cli.Context, _ time.Duration) error {
 				if _, ok := os.LookupEnv(withDeprecatedEnvPrefix(envPrefix, "EXPIRATION")); ok {
@@ -90,8 +93,11 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Category: category,
 		},
 		&cli.BoolFlag{
-			Name:     PutReturnsFailoverErrorFlagName,
-			Usage:    fmt.Sprintf("When true, Put requests will return a failover error, after sleeping for --%s duration.", PutLatencyFlagName),
+			Name: PutReturnsFailoverErrorFlagName,
+			Usage: fmt.Sprintf(
+				"When true, Put requests will return a failover error, after sleeping for --%s duration.",
+				PutLatencyFlagName,
+			),
 			Value:    false,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "PUT_RETURNS_FAILOVER_ERROR")},
 			Category: category,

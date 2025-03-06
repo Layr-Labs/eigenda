@@ -99,7 +99,11 @@ func (c *Client) GetData(ctx context.Context, comm []byte) ([]byte, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("received error response when reading from eigenda-proxy, code=%d, msg = %s", resp.StatusCode, string(b))
+		return nil, fmt.Errorf(
+			"received error response when reading from eigenda-proxy, code=%d, msg = %s",
+			resp.StatusCode,
+			string(b),
+		)
 	}
 
 	return b, nil
@@ -131,7 +135,11 @@ func (c *Client) SetData(ctx context.Context, b []byte) ([]byte, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("received error response when dispersing to eigenda-proxy, code=%d, err = %s", resp.StatusCode, string(b))
+		return nil, fmt.Errorf(
+			"received error response when dispersing to eigenda-proxy, code=%d, err = %s",
+			resp.StatusCode,
+			string(b),
+		)
 	}
 
 	if len(b) == 0 {

@@ -69,16 +69,18 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Category: category,
 		},
 		&cli.BoolFlag{
-			Name:     PointEvaluationDisabledFlagName,
-			Usage:    "Disables IFFT transformation done during payload encoding. Using this mode results in blobs that can't be proven.",
+			Name: PointEvaluationDisabledFlagName,
+			Usage: "Disables IFFT transformation done during payload encoding. " +
+				"Using this mode results in blobs that can't be proven.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "DISABLE_POINT_EVALUATION")},
 			Value:    false,
 			Category: category,
 		},
 		&cli.StringFlag{
 			Name: SvcManagerAddrFlagName,
-			Usage: `Address of the EigenDAServiceManager contract. Required for initializing onchain system context and reading relay states from registry.
-					   See https://github.com/Layr-Labs/eigenlayer-middleware/?tab=readme-ov-file#current-mainnet-deployment`,
+			Usage: "Address of the EigenDAServiceManager contract. " +
+				"Required for initializing onchain system context and reading relay states from registry. " +
+				"See https://github.com/Layr-Labs/eigenlayer-middleware/?tab=readme-ov-file#current-mainnet-deployment",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "SERVICE_MANAGER_ADDR")},
 			Category: category,
 			Required: false,
@@ -107,8 +109,9 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Value:    time.Second * 30,
 		},
 		&cli.StringFlag{
-			Name:     CertVerifierAddrFlagName,
-			Usage:    "Address of the EigenDACertVerifier contract. Required for performing eth_calls to verify EigenDA certificates.",
+			Name: CertVerifierAddrFlagName,
+			Usage: "Address of the EigenDACertVerifier contract. " +
+				"Required for performing eth_calls to verify EigenDA certificates.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "CERT_VERIFIER_ADDR")},
 			Category: category,
 			Required: false,

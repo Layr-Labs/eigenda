@@ -1,3 +1,4 @@
+//nolint:lll // long lines are expected in this file
 package server
 
 import (
@@ -29,7 +30,8 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 		"{"+routingVarNameCommitTypeByteHex+":00}"+ // 00 for keccak256 commitments
 		// we don't use version_byte for keccak commitments, because not expecting keccak commitments to change,
 		// but perhaps we should (in case we want a v2 to use another hash for eg?)
-		// "{version_byte_hex:[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a 404
+		// "{version_byte_hex:[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a
+		// 404
 		"{"+routingVarNamePayloadHex+"}",
 		withLogging(withMetrics(svr.handleGetOPKeccakCommitment, svr.m, commitments.OptimismKeccak), svr.log),
 	)
@@ -47,7 +49,11 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 		"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
 		"{"+routingVarNameCommitTypeByteHex+":[0-9a-fA-F]{2}}",
 		func(w http.ResponseWriter, r *http.Request) {
-			svr.log.Info("unsupported commitment type", routingVarNameCommitTypeByteHex, mux.Vars(r)[routingVarNameCommitTypeByteHex])
+			svr.log.Info(
+				"unsupported commitment type",
+				routingVarNameCommitTypeByteHex,
+				mux.Vars(r)[routingVarNameCommitTypeByteHex],
+			)
 			commitType := mux.Vars(r)[routingVarNameCommitTypeByteHex]
 			http.Error(w, fmt.Sprintf("unsupported commitment type %s", commitType), http.StatusBadRequest)
 		},
@@ -65,7 +71,8 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 		"{"+routingVarNameCommitTypeByteHex+":00}"+ // 00 for keccak256 commitments
 		// we don't use version_byte for keccak commitments, because not expecting keccak commitments to change,
 		// but perhaps we should (in case we want a v2 to use another hash for eg?)
-		// "{version_byte_hex:[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a 404
+		// "{version_byte_hex:[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a
+		// 404
 		"{"+routingVarNamePayloadHex+"}",
 		withLogging(withMetrics(svr.handlePostOPKeccakCommitment, svr.m, commitments.OptimismKeccak), svr.log),
 	)

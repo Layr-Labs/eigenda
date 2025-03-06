@@ -33,7 +33,8 @@ func flagActivated(envVar string) bool {
 	return os.Getenv(envVar) == "true" || os.Getenv(envVar) == "1"
 }
 
-// ParseEnv ... reads testing cfg fields. Go test flags don't work for this library due to the dependency on Optimism's E2E framework
+// ParseEnv ... reads testing cfg fields. Go test flags don't work for this library due to the dependency on Optimism's
+// E2E framework
 // which initializes test flags per init function which is called before an init in this package.
 func ParseEnv() {
 	runFuzzTests = flagActivated("FUZZ")

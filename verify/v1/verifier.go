@@ -195,11 +195,15 @@ func (v *Verifier) verifySecurityParams(blobHeader BlobHeader, batchHeader *disp
 				blobHeader.QuorumBlobParams[i].QuorumNumber)
 		}
 
-		if blobHeader.QuorumBlobParams[i].AdversaryThresholdPercentage > blobHeader.QuorumBlobParams[i].ConfirmationThresholdPercentage {
-			return fmt.Errorf("adversary threshold percentage must be greater than or equal to confirmation threshold percentage")
+		if blobHeader.QuorumBlobParams[i].AdversaryThresholdPercentage >
+			blobHeader.QuorumBlobParams[i].ConfirmationThresholdPercentage {
+			return fmt.Errorf(
+				"adversary threshold percentage must be greater than or equal to confirmation threshold percentage",
+			)
 		}
-		// we get the quorum adversary threshold at the batch's reference block number. This is not strictly needed right now
-		// since this threshold is hardcoded into the contract: https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDAServiceManagerStorage.sol
+		// we get the quorum adversary threshold at the batch's reference block number. This is not strictly needed
+		// right now since this threshold is hardcoded into the contract:
+		// https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDAServiceManagerStorage.sol
 		// but it is good practice in case the contract changes in the future
 		quorumAdversaryThreshold, ok := v.cv.quorumAdversaryThresholds[blobHeader.QuorumBlobParams[i].QuorumNumber]
 		if !ok {
@@ -208,11 +212,13 @@ func (v *Verifier) verifySecurityParams(blobHeader BlobHeader, batchHeader *disp
 				"quorumNumber",
 				blobHeader.QuorumBlobParams[i].QuorumNumber)
 		} else if blobHeader.QuorumBlobParams[i].AdversaryThresholdPercentage < quorumAdversaryThreshold {
-			return fmt.Errorf("adversary threshold percentage must be greater than or equal to quorum adversary threshold percentage")
+			return fmt.Errorf("adversary threshold percentage must be >= quorum adversary threshold percentage")
 		}
 
 		if batchHeader.QuorumSignedPercentages[i] < blobHeader.QuorumBlobParams[i].ConfirmationThresholdPercentage {
-			return fmt.Errorf("signed stake for quorum must be greater than or equal to confirmation threshold percentage")
+			return fmt.Errorf(
+				"signed stake for quorum must be >= to confirmation threshold percentage",
+			)
 		}
 
 		confirmedQuorums[blobHeader.QuorumBlobParams[i].QuorumNumber] = true
@@ -229,7 +235,8 @@ func (v *Verifier) verifySecurityParams(blobHeader BlobHeader, batchHeader *disp
 }
 
 func requiredQuorum(referenceBlockNumber uint32, v *Verifier) []uint8 {
-	// This check is required due to a bug we had when we updated the EigenDAServiceManager in Holesky. For a brief period of time, the quorum 1 was not
+	// This check is required due to a bug we had when we updated the EigenDAServiceManager in Holesky. For a brief
+	// period of time, the quorum 1 was not
 	// required for the commitment to be confirmed, so the disperser created batches with only quorum 0 signatures.
 	// Archive nodes trying to sync from these stored batches would thus fail validation here since
 	// quorumsRequired is read from the latestBlock, where the bug has been fixed and both quorums are required.
