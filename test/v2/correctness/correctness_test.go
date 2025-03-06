@@ -55,7 +55,9 @@ func testBasicDispersal(
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	err := c.DisperseAndVerify(ctx, certVerifierAddress, payload)
+	c.SetCertVerifierAddress(certVerifierAddress)
+
+	err := c.DisperseAndVerify(ctx, payload)
 	if err != nil {
 		return fmt.Errorf("failed to disperse and verify: %v", err)
 	}
@@ -354,11 +356,13 @@ func doubleDispersalTest(t *testing.T, environment string) {
 	config, err := client.GetConfig(environment)
 	require.NoError(t, err)
 
-	err = c.DisperseAndVerify(ctx, config.EigenDACertVerifierAddressQuorums0_1, payload)
+	c.SetCertVerifierAddress(config.EigenDACertVerifierAddressQuorums0_1)
+
+	err = c.DisperseAndVerify(ctx, payload)
 	require.NoError(t, err)
 
 	// disperse again
-	err = c.DisperseAndVerify(ctx, config.EigenDACertVerifierAddressQuorums0_1, payload)
+	err = c.DisperseAndVerify(ctx, payload)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "blob already exists"))
 }
@@ -384,7 +388,9 @@ func unauthorizedGetChunksTest(t *testing.T, environment string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	eigenDACert, err := c.DispersePayload(ctx, config.EigenDACertVerifierAddressQuorums0_1, payload)
+	c.SetCertVerifierAddress(config.EigenDACertVerifierAddressQuorums0_1)
+
+	eigenDACert, err := c.DispersePayload(ctx, payload)
 	require.NoError(t, err)
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
