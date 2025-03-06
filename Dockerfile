@@ -161,4 +161,4 @@ ENTRYPOINT ["load", "-", "-"]
 
 FROM alpine:3.18 AS encoding-load-generator
 COPY --from=encoding-load-generator-builder /app/test/v2/encoding-load/encoding-load-generator /usr/local/bin/encoding_load_generator
-ENTRYPOINT ["encoding_load_generator"]
+ENTRYPOINT ["encoding_load_generator", "-"]
