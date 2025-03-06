@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"context"
 	"errors"
 	"math"
 	"sync"
@@ -23,19 +24,23 @@ type FeedCache[T any] struct {
 	mu           sync.RWMutex
 	segment      *cacheEntry[T]
 	maxItems     int
-	fetchFromDB  func(start, end time.Time, order FetchOrder, limit int) ([]*T, error)
+	fetchFromDB  func(ctx context.Context, start, end time.Time, order FetchOrder, limit int) ([]*T, error)
 	getTimestamp func(*T) time.Time
+
+	// Async updates to the cache segment
+	updateWg *sync.WaitGroup
 }
 
 func NewFeedCache[T any](
 	maxItems int,
-	fetchFn func(start, end time.Time, order FetchOrder, limit int) ([]*T, error),
+	fetchFn func(ctx context.Context, start, end time.Time, order FetchOrder, limit int) ([]*T, error),
 	timestampFn func(*T) time.Time,
 ) *FeedCache[T] {
 	return &FeedCache[T]{
 		maxItems:     maxItems,
 		fetchFromDB:  fetchFn,
 		getTimestamp: timestampFn,
+		updateWg:     &sync.WaitGroup{},
 	}
 }
 
@@ -93,7 +98,7 @@ func (tr timeRange) overlaps(other timeRange) bool {
 	return tr.start.Before(other.end) && other.start.Before(tr.end)
 }
 
-func (c *FeedCache[T]) Get(start, end time.Time, queryOrder FetchOrder, limit int) ([]*T, error) {
+func (c *FeedCache[T]) Get(ctx context.Context, start, end time.Time, queryOrder FetchOrder, limit int) ([]*T, error) {
 	if !start.Before(end) {
 		return nil, errors.New("the start must be before end")
 	}
@@ -103,19 +108,26 @@ func (c *FeedCache[T]) Get(start, end time.Time, queryOrder FetchOrder, limit in
 	var result *executionResult[T]
 	var err error
 	if queryOrder == Ascending {
-		result, err = c.executePlanAscending(plan, limit)
+		result, err = c.executePlanAscending(ctx, plan, limit)
 	} else {
-		result, err = c.executePlanDescending(plan, limit)
+		result, err = c.executePlanDescending(ctx, plan, limit)
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO(jianxiao): make this run async so the results can return asap; this needs to get
-	// unit tests work.
-	c.updateCache(result)
+	// Update the cache segment async
+	c.updateWg.Add(1)
+	go func() {
+		defer c.updateWg.Done()
+		c.updateCache(result)
+	}()
 
 	return result.result, nil
+}
+
+func (c *FeedCache[T]) WaitForCacheUpdates() {
+	c.updateWg.Wait()
 }
 
 func (c *FeedCache[T]) makePlan(start, end time.Time, queryOrder FetchOrder, limit int) executionPlan[T] {
@@ -164,14 +176,14 @@ func (c *FeedCache[T]) makePlan(start, end time.Time, queryOrder FetchOrder, lim
 	}
 }
 
-func (c *FeedCache[T]) executePlanAscending(plan executionPlan[T], limit int) (*executionResult[T], error) {
+func (c *FeedCache[T]) executePlanAscending(ctx context.Context, plan executionPlan[T], limit int) (*executionResult[T], error) {
 	var beforeData, afterData []*T
 	var beforeHasMore, afterHasMore bool
 	var err error
 
 	// Fetch data before cache segment if needed
 	if plan.before != nil {
-		beforeData, err = c.fetchFromDB(plan.before.start, plan.before.end, Ascending, limit)
+		beforeData, err = c.fetchFromDB(ctx, plan.before.start, plan.before.end, Ascending, limit)
 		if err != nil {
 			return nil, err
 		}
@@ -187,7 +199,7 @@ func (c *FeedCache[T]) executePlanAscending(plan executionPlan[T], limit int) (*
 			remaining = limit - len(beforeData) - len(plan.cacheHit)
 		}
 		if remaining > 0 {
-			afterData, err = c.fetchFromDB(plan.after.start, plan.after.end, Ascending, remaining)
+			afterData, err = c.fetchFromDB(ctx, plan.after.start, plan.after.end, Ascending, remaining)
 			if err != nil {
 				return nil, err
 			}
@@ -227,14 +239,14 @@ func (c *FeedCache[T]) executePlanAscending(plan executionPlan[T], limit int) (*
 	}, nil
 }
 
-func (c *FeedCache[T]) executePlanDescending(plan executionPlan[T], limit int) (*executionResult[T], error) {
+func (c *FeedCache[T]) executePlanDescending(ctx context.Context, plan executionPlan[T], limit int) (*executionResult[T], error) {
 	var beforeData, afterData []*T
 	var beforeHasMore, afterHasMore bool
 	var err error
 
 	// Fetch data after cache segment if needed
 	if plan.after != nil {
-		afterData, err = c.fetchFromDB(plan.after.start, plan.after.end, Descending, limit)
+		afterData, err = c.fetchFromDB(ctx, plan.after.start, plan.after.end, Descending, limit)
 		if err != nil {
 			return nil, err
 		}
@@ -250,7 +262,7 @@ func (c *FeedCache[T]) executePlanDescending(plan executionPlan[T], limit int) (
 			remaining = limit - len(beforeData) - len(plan.cacheHit)
 		}
 		if remaining > 0 {
-			beforeData, err = c.fetchFromDB(plan.before.start, plan.before.end, Descending, remaining)
+			beforeData, err = c.fetchFromDB(ctx, plan.before.start, plan.before.end, Descending, remaining)
 			if err != nil {
 				return nil, err
 			}
@@ -455,7 +467,13 @@ func (c *FeedCache[T]) getCacheOverlap(data []*T, start, end time.Time, queryOrd
 		}
 	}
 
-	return data[startIdx:endIdx]
+	// Note: we need to make a copy of the overlap because the cache data can be mutated
+	// by other threads after this function returns (within this function, the caller
+	// makes sure a reader lock is held)
+	result := make([]*T, endIdx-startIdx)
+	copy(result, data[startIdx:endIdx])
+
+	return result
 }
 
 func reverseOrder[T any](data []*T) []*T {
