@@ -10,7 +10,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // Config contains network parameters that should be published on-chain. We currently configure these params through disperser env vars.
@@ -75,12 +74,11 @@ func (m *Meterer) Start(ctx context.Context) {
 // MeterRequest validates a blob header and adds it to the meterer's state
 // TODO: return error if there's a rejection (with reasoning) or internal error (should be very rare)
 func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata, numSymbols uint64, quorumNumbers []uint8, receivedAt time.Time) (uint64, error) {
-	accountID := gethcommon.HexToAddress(header.AccountID)
 	symbolsCharged := m.SymbolsCharged(numSymbols)
 	m.logger.Info("Validating incoming request's payment metadata", "paymentMetadata", header, "numSymbols", numSymbols, "quorumNumbers", quorumNumbers)
 	// Validate against the payment method
 	if header.CumulativePayment.Sign() == 0 {
-		reservation, err := m.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
+		reservation, err := m.ChainPaymentState.GetReservedPaymentByAccount(ctx, header.AccountID)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get active reservation by account: %w", err)
 		}
@@ -88,7 +86,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 			return 0, fmt.Errorf("invalid reservation: %w", err)
 		}
 	} else {
-		onDemandPayment, err := m.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
+		onDemandPayment, err := m.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, header.AccountID)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get on-demand payment by account: %w", err)
 		}
@@ -125,7 +123,7 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 
 // ValidateQuorums ensures that the quorums listed in the blobHeader are present within allowedQuorums
 // Note: A reservation that does not utilize all of the allowed quorums will be accepted. However, it
-// will still charge against all of the allowed quorums. A on-demand requrests require and only allow
+// will still charge against all of the allowed quorums. A on-demand requests require and only allow
 // the ETH and EIGEN quorums.
 func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) error {
 	if len(headerQuorums) == 0 {
@@ -215,14 +213,17 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 		return fmt.Errorf("invalid quorum for On-Demand Request: %w", err)
 	}
 
+	// Compute paymentCharged at payment time
+	paymentCharged := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol())
+
 	// Validate payments attached
-	err = m.ValidatePayment(ctx, header, onDemandPayment, symbolsCharged)
+	err = m.ValidatePayment(ctx, header, onDemandPayment, paymentCharged)
 	if err != nil {
 		// No tolerance for incorrect payment amounts; no rollbacks
 		return fmt.Errorf("invalid on-demand payment: %w", err)
 	}
 
-	err = m.OffchainStore.AddOnDemandPayment(ctx, header, symbolsCharged)
+	err = m.OffchainStore.AddOnDemandPayment(ctx, header, paymentCharged)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
 	}
@@ -243,37 +244,33 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 // ValidatePayment checks if the provided payment header is valid against the local accounting
 // prevPmt is the largest  cumulative payment strictly less    than PaymentMetadata.cumulativePayment if exists
 // nextPmt is the smallest cumulative payment strictly greater than PaymentMetadata.cumulativePayment if exists
-// nextPmtnumSymbols is the numSymbols of corresponding to nextPmt if exists
-// prevPmt + PaymentMetadata.numSymbols * m.FixedFeePerByte
-// <= PaymentMetadata.CumulativePayment
-// <= nextPmt - nextPmtNumSymbols * m.FixedFeePerByte > nextPmt
-func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, symbolsCharged uint64) error {
+// chargeOfNextPmt is the charge associated with nextPmt if exists
+// prevPmt + currentPaymentCharge <= PaymentMetadata.CumulativePayment
+// <= nextPmt - chargeOfNextPmt > nextPmt
+func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, currentPaymentCharge *big.Int) error {
 	if header.CumulativePayment.Cmp(onDemandPayment.CumulativePayment) > 0 {
 		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
 	}
 
-	prevPmt, nextPmt, nextPmtNumSymbols, err := m.OffchainStore.GetRelevantOnDemandRecords(ctx, header.AccountID, header.CumulativePayment) // zero if DNE
+	prevPmt, nextPmt, chargeOfNextPmt, err := m.OffchainStore.GetRelevantOnDemandRecords(ctx, header.AccountID, header.CumulativePayment) // zero if DNE
 	if err != nil {
 		return fmt.Errorf("failed to get relevant on-demand records: %w", err)
 	}
 	// the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
-	if new(big.Int).Add(prevPmt, m.PaymentCharged(symbolsCharged)).Cmp(header.CumulativePayment) > 0 {
+	if new(big.Int).Add(prevPmt, currentPaymentCharge).Cmp(header.CumulativePayment) > 0 {
 		return fmt.Errorf("insufficient cumulative payment increment")
 	}
 	// the current request must not break the payment magnitude for the next payment if the two requests were delivered out-of-order
-	if nextPmt.Cmp(big.NewInt(0)) != 0 && new(big.Int).Add(header.CumulativePayment, m.PaymentCharged(uint64(nextPmtNumSymbols))).Cmp(nextPmt) > 0 {
+	if nextPmt.Cmp(big.NewInt(0)) != 0 && new(big.Int).Add(header.CumulativePayment, chargeOfNextPmt).Cmp(nextPmt) > 0 {
 		return fmt.Errorf("breaking cumulative payment invariants")
 	}
 	// check passed: blob can be safely inserted into the set of payments
 	return nil
 }
 
-// PaymentCharged returns the chargeable price for a given data length
-func (m *Meterer) PaymentCharged(numSymbols uint64) *big.Int {
-	// symbolsCharged == m.SymbolsCharged(numSymbols) if numSymbols is already a multiple of MinNumSymbols
-	symbolsCharged := big.NewInt(0).SetUint64(m.SymbolsCharged(numSymbols))
-	pricePerSymbol := big.NewInt(int64(m.ChainPaymentState.GetPricePerSymbol()))
-	return symbolsCharged.Mul(symbolsCharged, pricePerSymbol)
+// PaymentCharged returns the chargeable price for a given number of symbols
+func PaymentCharged(numSymbols, pricePerSymbol uint64) *big.Int {
+	return new(big.Int).Mul(big.NewInt(int64(numSymbols)), big.NewInt(int64(pricePerSymbol)))
 }
 
 // SymbolsCharged returns the number of symbols charged for a given data length

@@ -4,12 +4,14 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
+	"sort"
+
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
 	"github.com/Layr-Labs/eigenda/common/kvstore/mapstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"math"
-	"sort"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // The table ID reserved for the metadata table. The metadata table is used for internal bookkeeping.
@@ -49,7 +51,7 @@ func Start(logger logging.Logger, config *Config) (kvstore.TableStore, error) {
 		return nil, errors.New("config is required")
 	}
 
-	base, err := buildBaseStore(config.Type, logger, config.Path)
+	base, err := buildBaseStore(config.Type, logger, config.Path, config.MetricsRegistry)
 	if err != nil {
 		return nil, fmt.Errorf("error building base store: %w", err)
 	}
@@ -115,14 +117,15 @@ func start(
 func buildBaseStore(
 	storeType StoreType,
 	logger logging.Logger,
-	path *string) (kvstore.Store[[]byte], error) {
+	path *string,
+	reg *prometheus.Registry) (kvstore.Store[[]byte], error) {
 
 	switch storeType {
 	case LevelDB:
 		if path == nil {
 			return nil, errors.New("path is required for LevelDB store")
 		}
-		return leveldb.NewStore(logger, *path)
+		return leveldb.NewStore(logger, *path, reg)
 	case MapStore:
 		return mapstore.NewStore(), nil
 	default:

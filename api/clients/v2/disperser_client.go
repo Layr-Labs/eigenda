@@ -299,7 +299,7 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 	}
 
 	request := &disperser_rpc.GetPaymentStateRequest{
-		AccountId: accountID,
+		AccountId: accountID.Hex(),
 		Signature: signature,
 	}
 	return c.client.GetPaymentState(ctx, request)

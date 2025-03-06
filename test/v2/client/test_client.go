@@ -27,7 +27,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 const (
@@ -76,11 +75,10 @@ func NewTestClient(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signer: %w", err)
 	}
-	signerAccountId, err := signer.GetAccountID()
+	accountId, err := signer.GetAccountID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account ID: %w", err)
 	}
-	accountId := gethcommon.HexToAddress(signerAccountId)
 	logger.Infof("Account ID: %s", accountId.String())
 
 	g1Path, err := config.ResolveSRSPath(SRSPathG1)
