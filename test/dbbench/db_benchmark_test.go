@@ -290,16 +290,16 @@ func TestLevelDBNoCompactionWrite(t *testing.T) {
 	keyBuilder, err := db.GetKeyBuilder("test")
 	require.NoError(t, err)
 
-	batch := db.NewBatch()
+	batch := db.NewTTLBatch()
 
 	writeFunction := func(key []byte, value []byte) error {
-		batch.Put(keyBuilder.Key(key), value)
+		batch.PutWithTTL(keyBuilder.Key(key), value, TTL)
 		if batch.Size() >= batchSize {
 			err = batch.Apply()
 			if err != nil {
 				return err
 			}
-			batch = db.NewBatch()
+			batch = db.NewTTLBatch()
 		}
 
 		return nil
