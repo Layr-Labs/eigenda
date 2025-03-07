@@ -8,8 +8,10 @@ import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.s
 import "../interfaces/IEigenDAStructs.sol";
 
 /**
- * @title The `EigenDAThresholdRegistry` contract.
- * @author Layr Labs, Inc.
+ * @title EigenDAThresholdRegistry
+ * @notice This contract is used for storing:
+ * - The threshold percentages used for V1 certificate verification
+ * - The parameters for the blob versions used for V2 certificate verification
  */
 contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpgradeable {
 
@@ -35,10 +37,16 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         }
     }
 
+    /**
+     * @notice Appends a new blob version to the registry
+     * @param _versionedBlobParams The blob version parameters to add
+     * @dev This function is append only and cannot be used to update existing blob versions
+     */
     function addVersionedBlobParams(VersionedBlobParams memory _versionedBlobParams) external onlyOwner returns (uint16) {
         return _addVersionedBlobParams(_versionedBlobParams);
     }
 
+    /// @notice Internal function to append a new blob version to the registry
     function _addVersionedBlobParams(VersionedBlobParams memory _versionedBlobParams) internal returns (uint16) {
         versionedBlobParams[nextBlobVersion] = _versionedBlobParams;
         emit VersionedBlobParamsAdded(nextBlobVersion, _versionedBlobParams);
@@ -47,7 +55,8 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
 
     ///////////////////////// V1 ///////////////////////////////
 
-    /// @notice Gets the adversary threshold percentage for a quorum
+    /// @notice Returns the adversary threshold percentage for a quorum for V1 verification
+    /// @param quorumNumber The number of the quorum to get the adversary threshold percentage for
     function getQuorumAdversaryThresholdPercentage(
         uint8 quorumNumber
     ) public view virtual returns (uint8 adversaryThresholdPercentage) {
@@ -56,7 +65,8 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         }
     }
 
-    /// @notice Gets the confirmation threshold percentage for a quorum
+    /// @notice Returns the confirmation threshold percentage for a quorum for V1 verification
+    /// @param quorumNumber The number of the quorum to get the confirmation threshold percentage for
     function getQuorumConfirmationThresholdPercentage(
         uint8 quorumNumber
     ) public view virtual returns (uint8 confirmationThresholdPercentage) {
@@ -65,7 +75,8 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         }
     }
 
-    /// @notice Checks if a quorum is required
+    /// @notice Returns true if a quorum is required for V1 verification
+    /// @param quorumNumber The number of the quorum to check if it is required for V1 verification
     function getIsQuorumRequired(
         uint8 quorumNumber
     ) public view virtual returns (bool) {
@@ -76,6 +87,7 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
     ///////////////////////// V2 ///////////////////////////////
 
     /// @notice Returns the blob params for a given blob version
+    /// @param version The version of the blob to get the params for
     function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {
         return versionedBlobParams[version];
     }
