@@ -313,13 +313,13 @@ func TestMetererOnDemand(t *testing.T) {
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(1), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers, now)
 	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
-	// No rollback after meter request
+	// rollback for invalid payments
 	result, err := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID1.Hex(),
 		}})
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(result))
+	assert.Equal(t, 0, len(result))
 
 	// test duplicated cumulative payments
 	symbolLength := uint64(100)
@@ -335,7 +335,8 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.ErrorContains(t, err, "exact payment already exists")
 
 	// test valid payments
-	for i := 1; i < 9; i++ {
+	numValidPayments := 9
+	for i := 1; i < numValidPayments; i++ {
 		header = createPaymentHeader(now.UnixNano(), new(big.Int).Mul(priceCharged, big.NewInt(int64(i+1))), accountID2)
 		symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 		assert.NoError(t, err)
@@ -360,27 +361,33 @@ func TestMetererOnDemand(t *testing.T) {
 	// test cannot insert cumulative payment in out of order
 	symbolsCharged = mt.SymbolsCharged(uint64(50))
 	header = createPaymentHeader(now.UnixNano(), meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol()), accountID2)
-	_, err = mt.MeterRequest(ctx, *header, 50, quorumNumbers, now)
+	_, err = mt.MeterRequest(ctx, *header, 1, quorumNumbers, now)
 	assert.ErrorContains(t, err, "invalid on-demand payment: breaking cumulative payment invariants")
 
-	numPrevRecords := 12
 	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID2.Hex(),
 		}})
 	assert.NoError(t, err)
-	assert.Equal(t, numPrevRecords, len(result))
+	assert.Equal(t, numValidPayments, len(result))
+
+	// with rollback of invalid payments, users cannot cheat by inserting an invalid cumulative payment
+	symbolsCharged = mt.SymbolsCharged(uint64(30))
+	header = createPaymentHeader(now.UnixNano(), meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol()), accountID2)
+	_, err = mt.MeterRequest(ctx, *header, 30, quorumNumbers, now)
+	assert.ErrorContains(t, err, "invalid on-demand payment: breaking cumulative payment invariants")
+
 	// test failed global rate limit (previously payment recorded: 2, global limit: 1009)
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, meterer.PaymentCharged(1010, mt.ChainPaymentState.GetPricePerSymbol())), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1010, quorumNumbers, now)
 	assert.ErrorContains(t, err, "failed global rate limiting")
-	// Correct rollback
+	// Correct rollback when exceeding global rate limit
 	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID2.Hex(),
 		}})
 	assert.NoError(t, err)
-	assert.Equal(t, numPrevRecords, len(result))
+	assert.Equal(t, numValidPayments, len(result))
 }
 
 func TestPaymentCharged(t *testing.T) {
