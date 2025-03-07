@@ -77,7 +77,7 @@ type DiskTable struct {
 
 	// This channel can be used to block until the disk table has been stopped. The channel has a capacity of 1, and
 	// there is an element in the channel up until the disk table has been stopped.
-	stopChannel chan struct{}
+	stopChan chan struct{}
 
 	// controllerChan is the channel for messages sent to controller goroutine. No data managed by the DiskTable
 	// may be mutated by anything other than the controller, with the exception of the
@@ -186,11 +186,11 @@ func NewDiskTable(
 		targetFileSize:          targetFileSize,
 		segments:                make(map[uint32]*segment.Segment),
 		controllerChan:          make(chan any, controlChannelSize),
-		stopChannel:             make(chan struct{}, 1),
+		stopChan:                make(chan struct{}, 1),
 		garbageCollectionPeriod: gcPeriod,
 	}
 	table.alive.Store(true)
-	table.stopChannel <- struct{}{}
+	table.stopChan <- struct{}{}
 
 	var err error
 	table.lowestSegmentIndex, table.highestSegmentIndex, table.segments, err =
@@ -312,8 +312,8 @@ func (d *DiskTable) Stop() error {
 	}
 
 	// Wait for the control loop to stop.
-	d.stopChannel <- struct{}{}
-	<-d.stopChannel
+	d.stopChan <- struct{}{}
+	<-d.stopChan
 
 	err := d.keyMap.Stop()
 	if err != nil {
@@ -660,7 +660,6 @@ func (d *DiskTable) controlLoop() {
 			} else if flushReq, ok := message.(*flushRequest); ok {
 				d.handleFlushRequest(flushReq)
 				if flushReq.shutdown {
-					<-d.stopChannel
 					return
 				}
 			} else {
@@ -693,7 +692,7 @@ func (d *DiskTable) shutdownTasks() {
 	}
 
 	// unblock the Stop() method
-	<-d.stopChannel
+	<-d.stopChan
 }
 
 // doGarbageCollection performs garbage collection on all segments, deleting old ones as necessary.
