@@ -29,7 +29,7 @@ type reader func(key []byte) ([]byte, error)
 const totalToWrite = 10 * units.TiB
 const dataSize = 1 * units.MiB
 const batchSize = 100
-const parallelWriters = 1
+const parallelWriters = 2
 const readBytesPerSecond = 1 * units.MiB
 const readerCount = 1
 const TTL = 2 * time.Minute
