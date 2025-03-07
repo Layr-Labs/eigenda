@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/test/v2/client"
@@ -81,6 +81,8 @@ func NewLoadGenerator(
 		client.GetLogger().Info("Enabled pprof", "port", config.PprofHttpPort)
 	}
 
+	client.SetCertVerifierAddress(client.GetConfig().EigenDACertVerifierAddressQuorums0_1)
+
 	return &LoadGenerator{
 		ctx:                ctx,
 		cancel:             cancel,
@@ -144,10 +146,7 @@ func (l *LoadGenerator) submitBlob() {
 		float64(l.client.GetConfig().MaxBlobSize+1)))
 	payload := rand.Bytes(payloadSize)
 
-	eigenDACert, err := l.client.DispersePayload(
-		ctx,
-		l.client.GetConfig().EigenDACertVerifierAddressQuorums0_1,
-		payload)
+	eigenDACert, err := l.client.DispersePayload(ctx, payload)
 	if err != nil {
 		l.client.GetLogger().Errorf("failed to disperse blob: %v", err)
 		return
@@ -175,7 +174,7 @@ func (l *LoadGenerator) submitBlob() {
 	}
 
 	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := verification.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
+	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
 	if err != nil {
 		l.client.GetLogger().Errorf("failed to bind blob commitments: %v", err)
 		return
