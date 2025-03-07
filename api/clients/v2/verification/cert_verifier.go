@@ -60,10 +60,11 @@ func NewCertVerifier(
 
 // VerifyCertV2FromSignedBatch calls the verifyDACertV2FromSignedBatch view function on the EigenDACertVerifier contract.
 //
-// Before verifying the cert, this method will wait for the internal client to advance to a sufficient block height.
-// This wait will time out if the duration exceeds the timeout configured for the input ctx parameter. If
-// CertVerifier.pollInterval is configured to be <= 0, then this method will *not* wait for the internal client to
-// advance, and will instead simply fail verification if the internal client is behind.
+// Before verifying the cert, this method will wait for the internal client to advance to a sufficient block height,
+// as dictated by the reference block number contained in the input signed batch. This wait will time out if the
+// duration exceeds the timeout configured for the input ctx parameter. If pollInterval is configured to be <= 0, then
+// this method will *not* wait for the internal client to advance, and will instead simply fail verification if the
+// internal client is behind, and the required cert verifier contract cannot be located.
 //
 // This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
 func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
@@ -84,9 +85,9 @@ func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
 		return fmt.Errorf("convert blob inclusion info: %w", err)
 	}
 
-	blockNumber := signedBatch.GetHeader().GetReferenceBlockNumber()
+	referenceBlockNumber := signedBatch.GetHeader().GetReferenceBlockNumber()
 
-	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, blockNumber)
+	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, referenceBlockNumber)
 	if err != nil {
 		return fmt.Errorf("get verifier caller: %w", err)
 	}
@@ -105,16 +106,17 @@ func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
 
 // VerifyCertV2 calls the VerifyCertV2 view function on the EigenDACertVerifier contract.
 //
-// Before verifying the cert, this method will wait for the internal client to advance to a sufficient block height.
-// This wait will time out if the duration exceeds the timeout configured for the input ctx parameter. If
-// CertVerifier.pollInterval is configured to be <= 0, then this method will *not* wait for the internal client to
-// advance, and will instead simply fail verification if the internal client is behind.
+// Before verifying the cert, this method will wait for the internal client to advance to a sufficient block height,
+// as dictated by the reference block number contained in the input eigenDACert. This wait will time out if the
+// duration exceeds the timeout configured for the input ctx parameter. If pollInterval is configured to be <= 0, then
+// this method will *not* wait for the internal client to advance, and will instead simply fail verification if the
+// internal client is behind, and the required cert verifier contract cannot be located.
 //
 // This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
 func (cv *CertVerifier) VerifyCertV2(ctx context.Context, eigenDACert *coretypes.EigenDACert) error {
-	blockNumber := uint64(eigenDACert.BatchHeader.ReferenceBlockNumber)
+	referenceBlockNumber := uint64(eigenDACert.BatchHeader.ReferenceBlockNumber)
 
-	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, blockNumber)
+	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, referenceBlockNumber)
 	if err != nil {
 		return fmt.Errorf("get verifier caller: %w", err)
 	}
@@ -137,10 +139,11 @@ func (cv *CertVerifier) VerifyCertV2(ctx context.Context, eigenDACert *coretypes
 // contract, and returns the resulting NonSignerStakesAndSignature object.
 //
 // Before getting the NonSignerStakesAndSignature, this method will wait for the internal client to advance to a
-// sufficient block height. This wait will time out if the duration exceeds the timeout configured for the input ctx
-// parameter. If CertVerifier.pollInterval is configured to be <= 0, then this method will *not* wait for the internal
-// client to advance, and will instead simply fail to get the NonSignerStakesAndSignature if the internal client is
-// behind.
+// sufficient block height, as dictated by the reference block number contained in the input signed batch. This wait
+// will time out if the duration exceeds the timeout configured for the input ctx parameter. If pollInterval is
+// configured to be <= 0, then this method will *not* wait for the internal client to advance, and will instead simply
+// fail to get the NonSignerStakesAndSignature if the internal client is behind, and the required cert verifier
+// contract cannot be located.
 func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 	ctx context.Context,
 	signedBatch *disperser.SignedBatch,
@@ -150,9 +153,9 @@ func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 		return nil, fmt.Errorf("convert signed batch: %w", err)
 	}
 
-	blockNumber := signedBatch.GetHeader().GetReferenceBlockNumber()
+	referenceBlockNumber := signedBatch.GetHeader().GetReferenceBlockNumber()
 
-	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, blockNumber)
+	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, referenceBlockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("get verifier caller: %w", err)
 	}
@@ -211,8 +214,8 @@ func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context) ([]uint8, 
 	return quorumNumbersRequired, nil
 }
 
-// getVerifierCallerFromBlockNumber returns a ContractEigenDACertVerifierCaller that corresponds to the input block
-// number
+// getVerifierCallerFromBlockNumber returns a ContractEigenDACertVerifierCaller that corresponds to the input reference
+// block number.
 //
 // If the eth node hasn't yet advanced to the input block number, this method will wait until that block is reached
 // before attempting to get the verifier caller.
@@ -221,14 +224,14 @@ func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context) ([]uint8, 
 // and parsing json, and is therefore non-trivially expensive.
 func (cv *CertVerifier) getVerifierCallerFromBlockNumber(
 	ctx context.Context,
-	blockNumber uint64,
+	referenceBlockNumber uint64,
 ) (*verifierBindings.ContractEigenDACertVerifierCaller, error) {
-	err := cv.blockNumberProvider.WaitForBlockNumber(ctx, blockNumber)
+	err := cv.blockNumberProvider.WaitForBlockNumber(ctx, referenceBlockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("wait for block number: %w", err)
 	}
 
-	certVerifierAddress, err := cv.certVerifierAddressProvider.GetCertVerifierAddress(blockNumber)
+	certVerifierAddress, err := cv.certVerifierAddressProvider.GetCertVerifierAddress(referenceBlockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("get cert verifier address: %w", err)
 	}
