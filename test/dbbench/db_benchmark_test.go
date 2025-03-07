@@ -29,7 +29,7 @@ type reader func(key []byte) ([]byte, error)
 const totalToWrite = 10 * units.TiB
 const dataSize = 1 * units.MiB
 const batchSize = 100
-const parallelWriters = 2
+const parallelWriters = 1
 const readBytesPerSecond = 1 * units.MiB
 const readerCount = 1
 const TTL = 2 * time.Minute
@@ -76,6 +76,7 @@ func runBenchmark(t *testing.T, write writer, read reader) {
 	fmt.Printf("Read bytes per second: %d\n", readBytesPerSecond)
 	fmt.Printf("Reader count: %d\n", readerCount)
 	fmt.Printf("TTL: %v\n", TTL)
+	fmt.Printf("Write parallelism: %d\n", parallelWriters)
 
 	start := time.Now()
 	dataWritten := uint64(0)
