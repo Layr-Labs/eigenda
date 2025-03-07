@@ -18,6 +18,7 @@ function create_binding {
     abigen --bin=data/tmp.bin --abi=data/tmp.abi --pkg=contract${contract} --out=$binding_dir/${contract}/binding.go
 }
 
+rm -rf ./out
 forge clean
 forge build
 
