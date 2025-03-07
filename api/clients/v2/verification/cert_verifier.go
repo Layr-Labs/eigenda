@@ -223,7 +223,7 @@ func (cv *CertVerifier) getVerifierCallerFromBlockNumber(
 	ctx context.Context,
 	blockNumber uint64,
 ) (*verifierBindings.ContractEigenDACertVerifierCaller, error) {
-	err := cv.blockNumberProvider.MaybeWaitForBlockNumber(ctx, blockNumber)
+	err := cv.blockNumberProvider.WaitForBlockNumber(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("wait for block number: %w", err)
 	}

@@ -22,7 +22,7 @@ func TestWaitForBlockNumber(t *testing.T) {
 
 	blockNumberProvider := NewBlockNumberProvider(logger, mockEthClient, pollRate)
 
-	// number of goroutines to start, each of which will call MaybeWaitForBlockNumber
+	// number of goroutines to start, each of which will call WaitForBlockNumber
 	callCount := 5
 
 	for i := uint64(0); i < uint64(callCount); i++ {
@@ -48,11 +48,11 @@ func TestWaitForBlockNumber(t *testing.T) {
 
 			if i == callCount-1 {
 				// the last call is set up to fail, by setting the target block to a number that will never be attained
-				err := blockNumberProvider.MaybeWaitForBlockNumber(timeoutCtx, uint64(i)+1)
+				err := blockNumberProvider.WaitForBlockNumber(timeoutCtx, uint64(i)+1)
 				require.Error(t, err)
 			} else {
 				// all calls except the final call wait for a block number corresponding to their index
-				err := blockNumberProvider.MaybeWaitForBlockNumber(timeoutCtx, uint64(i))
+				err := blockNumberProvider.WaitForBlockNumber(timeoutCtx, uint64(i))
 				require.NoError(t, err)
 			}
 		}(index)

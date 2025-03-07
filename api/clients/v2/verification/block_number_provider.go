@@ -44,19 +44,21 @@ func NewBlockNumberProvider(
 	}
 }
 
-// MaybeWaitForBlockNumber waits until the internal eth client has advanced to a certain targetBlockNumber, unless
-// configured pollInterval is <= 0, in which case this method will NOT wait for the internal client to advance.
+// WaitForBlockNumber waits until the internal eth client has advanced to a certain targetBlockNumber.
 //
 // This method will check the current block number of the internal client every pollInterval duration.
 // It will return nil if the internal client advances to (or past) the targetBlockNumber. It will return an error
 // if the input context times out, or if any error occurs when checking the block number of the internal client.
 //
+// If configured pollInterval is <= 0, this method will NOT wait for the internal client to advance, and instead will
+// simply return nil.
+//
 // This method is synchronized in a way that, if called by multiple goroutines, only a single goroutine will actually
 // poll the internal eth client for the most recent block number. The goroutine responsible for polling at a given time
 // updates an atomic integer, so that all goroutines may check the most recent block without duplicating work.
-func (bnp *BlockNumberProvider) MaybeWaitForBlockNumber(ctx context.Context, targetBlockNumber uint64) error {
+func (bnp *BlockNumberProvider) WaitForBlockNumber(ctx context.Context, targetBlockNumber uint64) error {
 	if bnp.pollIntervalDuration <= 0 {
-		// don't wait for the internal client to advance
+		// don't wait for the internal client to advance. duration <= 0 would cause the ticker to panic
 		return nil
 	}
 
@@ -123,7 +125,7 @@ func (bnp *BlockNumberProvider) MaybeWaitForBlockNumber(ctx context.Context, tar
 // This method atomically stores the latest block number for internal use.
 //
 // Calling this method doesn't have an impact on the cadence of the standard block number polling that occurs
-// in MaybeWaitForBlockNumber.
+// in WaitForBlockNumber.
 func (bnp *BlockNumberProvider) FetchLatestBlockNumber(ctx context.Context) (uint64, error) {
 	blockNumber, err := bnp.ethClient.BlockNumber(ctx)
 	if err != nil {
