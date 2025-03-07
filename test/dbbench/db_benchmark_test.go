@@ -30,14 +30,14 @@ type reader func(key []byte) ([]byte, error)
 const totalToWrite = 10 * units.TiB
 const dataSize = 1 * units.MiB
 const batchSize = 100
-const readBytesPerSecond = 100 * units.MiB
-const readerCount = 32
-const TTL = 2 * time.Hour
+const readBytesPerSecond = 1 * units.MiB
+const readerCount = 1
+const TTL = 2 * time.Minute
 
 // given a seed, deterministically generate a key/value pair
 func generateKVPair(seed int64) ([]byte, []byte) {
 	rand := random.NewTestRandomNoPrint(seed)
-	key := rand.Bytes(32)
+	key := []byte(rand.String(32))
 	value := rand.Bytes(dataSize)
 	return key, value
 }
@@ -167,10 +167,17 @@ func runBenchmark(t *testing.T, write writer, read reader) {
 		}
 	}()
 
+	keysToPrint := 100
+
 	// Write data to the database
 	for dataWritten < totalToWrite {
 		seed := rand.Int63()
 		key, value := generateKVPair(seed)
+
+		if keysToPrint > 0 {
+			keysToPrint--
+			fmt.Printf("Key: %s\n", key)
+		}
 
 		err := write(key, value)
 		require.NoError(t, err)
