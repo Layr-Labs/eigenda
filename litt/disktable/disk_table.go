@@ -548,7 +548,6 @@ func (d *DiskTable) expandSegments() error {
 		d.saltShaker.Uint32(),
 		false)
 	if err != nil {
-		d.segmentLock.Unlock()
 		return fmt.Errorf("failed to create new segment: %v", err)
 	}
 	d.segments[d.highestSegmentIndex].SetNextSegment(newSegment)
