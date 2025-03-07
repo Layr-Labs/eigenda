@@ -30,6 +30,7 @@ type reader func(key []byte) ([]byte, error)
 const totalToWrite = 10 * units.TiB
 const dataSize = 1 * units.MiB
 const batchSize = 100
+const parallelWriters = 2
 const readBytesPerSecond = 1 * units.MiB
 const readerCount = 1
 const TTL = 2 * time.Minute
@@ -167,17 +168,10 @@ func runBenchmark(t *testing.T, write writer, read reader) {
 		}
 	}()
 
-	keysToPrint := 100
-
 	// Write data to the database
 	for dataWritten < totalToWrite {
 		seed := rand.Int63()
 		key, value := generateKVPair(seed)
-
-		if keysToPrint > 0 {
-			keysToPrint--
-			fmt.Printf("Key: %s\n", key)
-		}
 
 		err := write(key, value)
 		require.NoError(t, err)
@@ -245,45 +239,6 @@ func runBenchmark(t *testing.T, write writer, read reader) {
 	fmt.Printf("Write benchmark speed: %.2f MB/s\n", mbPerSecond)
 }
 
-func TestLevelDBWrite(t *testing.T) {
-	directory := "./test-data"
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
-	require.NoError(t, err)
-
-	config := tablestore.DefaultLevelDBConfig(directory)
-	config.Schema = []string{"test"}
-	db, err := tablestore.Start(logger, config)
-	require.NoError(t, err)
-
-	keyBuilder, err := db.GetKeyBuilder("test")
-	require.NoError(t, err)
-
-	batch := db.NewBatch()
-
-	writeFunction := func(key []byte, value []byte) error {
-
-		batch.Put(keyBuilder.Key(key), value)
-		if batch.Size() >= batchSize {
-			err = batch.Apply()
-			if err != nil {
-				return err
-			}
-			batch = db.NewBatch()
-		}
-
-		return nil
-	}
-
-	readFunction := func(key []byte) ([]byte, error) {
-		return db.Get(keyBuilder.Key(key))
-	}
-
-	runBenchmark(t, writeFunction, readFunction)
-
-	err = db.Shutdown()
-	require.NoError(t, err)
-}
-
 func TestLevelDBNoCompactionWrite(t *testing.T) {
 	directory := "./test-data"
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
@@ -300,13 +255,23 @@ func TestLevelDBNoCompactionWrite(t *testing.T) {
 
 	batch := db.NewTTLBatch()
 
+	writeLimiter := make(chan struct{}, parallelWriters)
+
 	writeFunction := func(key []byte, value []byte) error {
 		batch.PutWithTTL(keyBuilder.Key(key), value, TTL)
 		if batch.Size() >= batchSize {
-			err = batch.Apply()
-			if err != nil {
-				return err
-			}
+
+			writeLimiter <- struct{}{}
+
+			batchToFlush := batch
+			go func() {
+				err = batchToFlush.Apply()
+				if err != nil {
+					panic(err)
+				}
+				<-writeLimiter
+			}()
+
 			batch = db.NewTTLBatch()
 		}
 
