@@ -313,13 +313,13 @@ func TestMetererOnDemand(t *testing.T) {
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(1), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers, now)
 	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
-	// Not record for invalid payment
+	// No rollback after meter request
 	result, err := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID1.Hex(),
 		}})
 	assert.NoError(t, err)
-	assert.Equal(t, 0, len(result))
+	assert.Equal(t, 1, len(result))
 
 	// test duplicated cumulative payments
 	symbolLength := uint64(100)
@@ -335,8 +335,7 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.ErrorContains(t, err, "exact payment already exists")
 
 	// test valid payments
-	numValidPayments := 9
-	for i := 1; i < numValidPayments; i++ {
+	for i := 1; i < 9; i++ {
 		header = createPaymentHeader(now.UnixNano(), new(big.Int).Mul(priceCharged, big.NewInt(int64(i+1))), accountID2)
 		symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 		assert.NoError(t, err)
@@ -364,12 +363,13 @@ func TestMetererOnDemand(t *testing.T) {
 	_, err = mt.MeterRequest(ctx, *header, 50, quorumNumbers, now)
 	assert.ErrorContains(t, err, "invalid on-demand payment: breaking cumulative payment invariants")
 
+	numPrevRecords := 12
 	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID2.Hex(),
 		}})
 	assert.NoError(t, err)
-	assert.Equal(t, numValidPayments, len(result))
+	assert.Equal(t, numPrevRecords, len(result))
 	// test failed global rate limit (previously payment recorded: 2, global limit: 1009)
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, meterer.PaymentCharged(1010, mt.ChainPaymentState.GetPricePerSymbol())), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1010, quorumNumbers, now)
@@ -380,7 +380,7 @@ func TestMetererOnDemand(t *testing.T) {
 			Value: accountID2.Hex(),
 		}})
 	assert.NoError(t, err)
-	assert.Equal(t, numValidPayments, len(result))
+	assert.Equal(t, numPrevRecords, len(result))
 }
 
 func TestPaymentCharged(t *testing.T) {
