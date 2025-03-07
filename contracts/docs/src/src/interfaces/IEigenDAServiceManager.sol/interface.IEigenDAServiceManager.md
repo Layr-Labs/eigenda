@@ -1,8 +1,13 @@
 # IEigenDAServiceManager
-[Git Source](https://github.com/Layr-Labs/eigenda/blob/538f0525d9ff112a8ba32701edaf2860a0ad7306/src/interfaces/IEigenDAServiceManager.sol)
+[Git Source](https://github.com/Layr-Labs/eigenda/blob/f0d0dc5708f7e00684e5f5d89ab0227171768419/src/interfaces/IEigenDAServiceManager.sol)
 
 **Inherits:**
 IServiceManager, [IEigenDAThresholdRegistry](/src/interfaces/IEigenDAThresholdRegistry.sol/interface.IEigenDAThresholdRegistry.md)
+
+The Service Manager is the central contract of the EigenDA AVS and is responsible for:
+- accepting and confirming the signature of bridged V1 batches
+- routing rewards submissions to operators
+- setting metadata for the AVS
 
 
 ## Functions

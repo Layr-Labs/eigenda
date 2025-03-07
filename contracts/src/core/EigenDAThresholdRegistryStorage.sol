@@ -5,9 +5,8 @@ import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry
 import "../interfaces/IEigenDAStructs.sol";
 
 /**
- * @title Storage variables for the `EigenDAThresholdRegistry` contract.
- * @author Layr Labs, Inc.
- * @notice This storage contract is separate from the logic to simplify the upgrade process.
+ * @title EigenDAThresholdRegistryStorage
+ * @notice This storage contract is separated from the logic to simplify the upgrade process.
  */
 abstract contract EigenDAThresholdRegistryStorage is IEigenDAThresholdRegistry {
 
@@ -26,7 +25,7 @@ abstract contract EigenDAThresholdRegistryStorage is IEigenDAThresholdRegistry {
     /// @notice mapping of blob version id to the params of the blob version
     mapping(uint16 => VersionedBlobParams) public versionedBlobParams;
 
-    // storage gap for upgradeability
+    /// @notice Storage gap for upgradeability
     // slither-disable-next-line shadowing-state
     uint256[45] private __GAP;
 }

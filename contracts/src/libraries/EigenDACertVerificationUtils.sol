@@ -15,14 +15,22 @@ import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
 /**
- * @title Library of functions to be used by smart contracts wanting to verify submissions of blob certificates on EigenDA.
- * @author Layr Labs, Inc.
+ * @title EigenDACertVerificationUtils
+ * @notice Library of functions to be used by smart contracts wanting to verify submissions of blob certificates on EigenDA.
  */
 library EigenDACertVerificationUtils {
     using BN254 for BN254.G1Point;
 
     uint256 public constant THRESHOLD_DENOMINATOR = 100;
     
+    /**
+     * @notice Verifies a V1 blob certificate for a set of quorums
+     * @param eigenDAThresholdRegistry is the ThresholdRegistry contract address
+     * @param batchMetadataStorage is the BatchMetadataStorage contract address
+     * @param blobHeader is the blob header to verify
+     * @param blobVerificationProof is the blob verification proof to verify
+     * @param requiredQuorumNumbers is the required quorum numbers to verify against
+     */
     function _verifyDACertV1ForQuorums(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDABatchMetadataStorage batchMetadataStorage,
@@ -86,6 +94,14 @@ library EigenDACertVerificationUtils {
         );
     }
 
+    /**
+     * @notice Verifies a set of V1 blob certificates for a set of quorums
+     * @param eigenDAThresholdRegistry is the ThresholdRegistry contract address
+     * @param batchMetadataStorage is the BatchMetadataStorage contract address
+     * @param blobHeaders is the set of blob headers to verify
+     * @param blobVerificationProofs is the set of blob verification proofs to verify for each blob header
+     * @param requiredQuorumNumbers is the required quorum numbers to verify against
+     */
     function _verifyDACertsV1ForQuorums(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDABatchMetadataStorage batchMetadataStorage,
@@ -159,6 +175,18 @@ library EigenDACertVerificationUtils {
         }
     }
 
+    /**
+     * @notice Verifies a V2 blob certificate for a set of quorums
+     * @param eigenDAThresholdRegistry is the ThresholdRegistry contract address
+     * @param signatureVerifier is the SignatureVerifier contract address
+     * @param eigenDARelayRegistry is the RelayRegistry contract address
+     * @param batchHeader is the batch header to verify
+     * @param blobInclusionInfo is the blob inclusion proof to verify against the batch
+     * @param nonSignerStakesAndSignature is the non-signer stakes and signatures to check the signature against
+     * @param securityThresholds are the confirmation and adversary thresholds to verify
+     * @param requiredQuorumNumbers is the required quorum numbers to verify against 
+     * @param signedQuorumNumbers are the quorum numbers that signed on the batch
+     */
     function _verifyDACertV2ForQuorums(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
@@ -265,6 +293,18 @@ library EigenDACertVerificationUtils {
         );
     }
 
+    /**
+     * @notice Verifies a V2 blob certificate for a set of quorums from a signed batch
+     * @param eigenDAThresholdRegistry is the ThresholdRegistry contract address
+     * @param signatureVerifier is the SignatureVerifier contract address
+     * @param eigenDARelayRegistry is the RelayRegistry contract address
+     * @param operatorStateRetriever is the OperatorStateRetriever contract address
+     * @param registryCoordinator is the RegistryCoordinator contract address
+     * @param signedBatch is the signed batch to verify
+     * @param blobInclusionInfo is the blob inclusion proof to verify against the batch
+     * @param securityThresholds are the confirmation and adversary thresholds to verify
+     * @param requiredQuorumNumbers is the required quorum numbers to verify against 
+     */
     function _verifyDACertV2ForQuorumsFromSignedBatch(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
@@ -298,6 +338,7 @@ library EigenDACertVerificationUtils {
         );
     }
 
+    /// @dev Internal function to get the non-signer stakes and signature from the Attestation of a signed batch
     function _getNonSignerStakesAndSignature(
         OperatorStateRetriever operatorStateRetriever,
         IRegistryCoordinator registryCoordinator,
@@ -329,6 +370,7 @@ library EigenDACertVerificationUtils {
         nonSignerStakesAndSignature.nonSignerStakeIndices = checkSignaturesIndices.nonSignerStakeIndices; 
     }
 
+    /// @dev Internal function to verify the security parameters of a V2 blob certificate
     function _verifyDACertSecurityParams(
         VersionedBlobParams memory blobParams,
         SecurityThresholds memory securityThresholds
@@ -342,6 +384,7 @@ library EigenDACertVerificationUtils {
         require(n >= blobParams.maxNumOperators * 10000, "EigenDACertVerificationUtils._verifyDACertSecurityParams: security assumptions are not met");
     }
 
+    /// @dev Internal function to verify that the provided relay keys are set on the RelayRegistry
     function _verifyRelayKeysSet(
         IEigenDARelayRegistry eigenDARelayRegistry,
         uint32[] memory relayKeys

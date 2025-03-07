@@ -7,8 +7,8 @@ import {IEigenDADisperserRegistry} from "../interfaces/IEigenDADisperserRegistry
 import "../interfaces/IEigenDAStructs.sol";
 
 /**
- * @title Registry for EigenDA disperser info
- * @author Layr Labs, Inc.
+ * @title EigenDADisperserRegistry
+ * @notice A registry for EigenDA disperser info
  */
 contract EigenDADisperserRegistry is OwnableUpgradeable, EigenDADisperserRegistryStorage, IEigenDADisperserRegistry {
 
@@ -22,11 +22,20 @@ contract EigenDADisperserRegistry is OwnableUpgradeable, EigenDADisperserRegistr
         _transferOwnership(_initialOwner);
     }
 
+    /**
+     * @notice Sets the disperser info for a given disperser key
+     * @param _disperserKey The key of the disperser to set the info for
+     * @param _disperserInfo The info to set for the disperser
+     */
     function setDisperserInfo(uint32 _disperserKey, DisperserInfo memory _disperserInfo) external onlyOwner {
         disperserKeyToInfo[_disperserKey] = _disperserInfo;
         emit DisperserAdded(_disperserKey, _disperserInfo.disperserAddress);
     }
 
+    /**
+     * @notice Returns the disperser address for a given disperser key
+     * @param _key The key of the disperser to get the address for
+     */
     function disperserKeyToAddress(uint32 _key) external view returns (address) {
         return disperserKeyToInfo[_key].disperserAddress;
     }

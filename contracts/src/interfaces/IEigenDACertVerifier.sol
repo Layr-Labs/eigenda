@@ -4,6 +4,12 @@ pragma solidity ^0.8.9;
 import {IEigenDAThresholdRegistry} from "./IEigenDAThresholdRegistry.sol";
 import "./IEigenDAStructs.sol";
 
+/**
+ * @title IEigenDACertVerifier
+ * @notice A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates 
+ * @notice For V2 verification this contract is deployed with immutable security thresholds and required quorum numbers,
+ *         to change these values or verification behavior a new CertVerifier must be deployed
+ */
 interface IEigenDACertVerifier is IEigenDAThresholdRegistry {
 
     /**

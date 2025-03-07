@@ -1,8 +1,7 @@
 # EigenDACertVerificationUtils
-[Git Source](https://github.com/Layr-Labs/eigenda/blob/538f0525d9ff112a8ba32701edaf2860a0ad7306/src/libraries/EigenDACertVerificationUtils.sol)
+[Git Source](https://github.com/Layr-Labs/eigenda/blob/f0d0dc5708f7e00684e5f5d89ab0227171768419/src/libraries/EigenDACertVerificationUtils.sol)
 
-**Author:**
-Layr Labs, Inc.
+Library of functions to be used by smart contracts wanting to verify submissions of blob certificates on EigenDA.
 
 
 ## State Variables
@@ -16,6 +15,8 @@ uint256 public constant THRESHOLD_DENOMINATOR = 100;
 ## Functions
 ### _verifyDACertV1ForQuorums
 
+Verifies a V1 blob certificate for a set of quorums
+
 
 ```solidity
 function _verifyDACertV1ForQuorums(
@@ -26,8 +27,20 @@ function _verifyDACertV1ForQuorums(
     bytes memory requiredQuorumNumbers
 ) internal view;
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`eigenDAThresholdRegistry`|`IEigenDAThresholdRegistry`|is the ThresholdRegistry contract address|
+|`batchMetadataStorage`|`IEigenDABatchMetadataStorage`|is the BatchMetadataStorage contract address|
+|`blobHeader`|`BlobHeader`|is the blob header to verify|
+|`blobVerificationProof`|`BlobVerificationProof`|is the blob verification proof to verify|
+|`requiredQuorumNumbers`|`bytes`|is the required quorum numbers to verify against|
+
 
 ### _verifyDACertsV1ForQuorums
+
+Verifies a set of V1 blob certificates for a set of quorums
 
 
 ```solidity
@@ -39,8 +52,20 @@ function _verifyDACertsV1ForQuorums(
     bytes memory requiredQuorumNumbers
 ) internal view;
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`eigenDAThresholdRegistry`|`IEigenDAThresholdRegistry`|is the ThresholdRegistry contract address|
+|`batchMetadataStorage`|`IEigenDABatchMetadataStorage`|is the BatchMetadataStorage contract address|
+|`blobHeaders`|`BlobHeader[]`|is the set of blob headers to verify|
+|`blobVerificationProofs`|`BlobVerificationProof[]`|is the set of blob verification proofs to verify for each blob header|
+|`requiredQuorumNumbers`|`bytes`|is the required quorum numbers to verify against|
+
 
 ### _verifyDACertV2ForQuorums
+
+Verifies a V2 blob certificate for a set of quorums
 
 
 ```solidity
@@ -56,6 +81,20 @@ function _verifyDACertV2ForQuorums(
     bytes memory signedQuorumNumbers
 ) internal view;
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`eigenDAThresholdRegistry`|`IEigenDAThresholdRegistry`|is the ThresholdRegistry contract address|
+|`signatureVerifier`|`IEigenDASignatureVerifier`|is the SignatureVerifier contract address|
+|`eigenDARelayRegistry`|`IEigenDARelayRegistry`|is the RelayRegistry contract address|
+|`batchHeader`|`BatchHeaderV2`|is the batch header to verify|
+|`blobInclusionInfo`|`BlobInclusionInfo`|is the blob inclusion proof to verify against the batch|
+|`nonSignerStakesAndSignature`|`NonSignerStakesAndSignature`|is the non-signer stakes and signatures to check the signature against|
+|`securityThresholds`|`SecurityThresholds`|are the confirmation and adversary thresholds to verify|
+|`requiredQuorumNumbers`|`bytes`|is the required quorum numbers to verify against|
+|`signedQuorumNumbers`|`bytes`|are the quorum numbers that signed on the batch|
+
 
 ### verifyDACertV2ForQuorumsExternal
 
@@ -78,6 +117,8 @@ function verifyDACertV2ForQuorumsExternal(
 
 ### _verifyDACertV2ForQuorumsFromSignedBatch
 
+Verifies a V2 blob certificate for a set of quorums from a signed batch
+
 
 ```solidity
 function _verifyDACertV2ForQuorumsFromSignedBatch(
@@ -92,8 +133,24 @@ function _verifyDACertV2ForQuorumsFromSignedBatch(
     bytes memory requiredQuorumNumbers
 ) internal view;
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`eigenDAThresholdRegistry`|`IEigenDAThresholdRegistry`|is the ThresholdRegistry contract address|
+|`signatureVerifier`|`IEigenDASignatureVerifier`|is the SignatureVerifier contract address|
+|`eigenDARelayRegistry`|`IEigenDARelayRegistry`|is the RelayRegistry contract address|
+|`operatorStateRetriever`|`OperatorStateRetriever`|is the OperatorStateRetriever contract address|
+|`registryCoordinator`|`IRegistryCoordinator`|is the RegistryCoordinator contract address|
+|`signedBatch`|`SignedBatch`|is the signed batch to verify|
+|`blobInclusionInfo`|`BlobInclusionInfo`|is the blob inclusion proof to verify against the batch|
+|`securityThresholds`|`SecurityThresholds`|are the confirmation and adversary thresholds to verify|
+|`requiredQuorumNumbers`|`bytes`|is the required quorum numbers to verify against|
+
 
 ### _getNonSignerStakesAndSignature
+
+*Internal function to get the non-signer stakes and signature from the Attestation of a signed batch*
 
 
 ```solidity
@@ -109,6 +166,8 @@ function _getNonSignerStakesAndSignature(
 
 ### _verifyDACertSecurityParams
 
+*Internal function to verify the security parameters of a V2 blob certificate*
+
 
 ```solidity
 function _verifyDACertSecurityParams(
@@ -118,6 +177,8 @@ function _verifyDACertSecurityParams(
 ```
 
 ### _verifyRelayKeysSet
+
+*Internal function to verify that the provided relay keys are set on the RelayRegistry*
 
 
 ```solidity

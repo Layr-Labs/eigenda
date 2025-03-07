@@ -1,16 +1,13 @@
 # EigenDAServiceManager
-[Git Source](https://github.com/Layr-Labs/eigenda/blob/538f0525d9ff112a8ba32701edaf2860a0ad7306/src/core/EigenDAServiceManager.sol)
+[Git Source](https://github.com/Layr-Labs/eigenda/blob/f0d0dc5708f7e00684e5f5d89ab0227171768419/src/core/EigenDAServiceManager.sol)
 
 **Inherits:**
 [EigenDAServiceManagerStorage](/src/core/EigenDAServiceManagerStorage.sol/abstract.EigenDAServiceManagerStorage.md), ServiceManagerBase, BLSSignatureChecker, Pausable
 
-**Author:**
-Layr Labs, Inc.
-
-This contract is used for:
-- initializing the data store by the disperser
-- confirming the data store by the disperser with inferred aggregated signatures of the quorum
-- freezing operators as the result of various "challenges"
+The Service Manager is the central contract of the EigenDA AVS and is responsible for:
+- accepting and confirming the signature of bridged V1 batches
+- routing rewards submissions to operators
+- setting metadata for the AVS
 
 
 ## State Variables
@@ -70,10 +67,7 @@ function initialize(
 
 ### confirmBatch
 
-This function is used for
-- submitting data availabilty certificates,
-- check that the aggregate signature is valid,
-- and check whether quorum has been achieved or not.
+Accepts a batch from the disperser and confirms its signature for V1 bridging
 
 
 ```solidity
@@ -82,19 +76,32 @@ function confirmBatch(BatchHeader calldata batchHeader, NonSignerStakesAndSignat
     onlyWhenNotPaused(PAUSED_CONFIRM_BATCH)
     onlyBatchConfirmer;
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`batchHeader`|`BatchHeader`|The batch header to confirm|
+|`nonSignerStakesAndSignature`|`NonSignerStakesAndSignature`|The non-signer stakes and signature to confirm the batch with|
+
 
 ### setBatchConfirmer
 
-This function is used for changing the batch confirmer
+Toggles a batch confirmer role to allow them to confirm batches
 
 
 ```solidity
 function setBatchConfirmer(address _batchConfirmer) external onlyOwner;
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_batchConfirmer`|`address`|The address of the batch confirmer to set|
+
 
 ### _setBatchConfirmer
 
-changes the batch confirmer
+internal function to set a batch confirmer
 
 
 ```solidity
@@ -118,10 +125,16 @@ Given a reference block number, returns the block until which operators must ser
 ```solidity
 function latestServeUntilBlock(uint32 referenceBlockNumber) external view returns (uint32);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`referenceBlockNumber`|`uint32`|The reference block number to get the serve until block for|
+
 
 ### quorumAdversaryThresholdPercentages
 
-Returns the bytes array of quorumAdversaryThresholdPercentages
+Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index for V1 verification
 
 
 ```solidity
@@ -130,7 +143,7 @@ function quorumAdversaryThresholdPercentages() external view returns (bytes memo
 
 ### quorumConfirmationThresholdPercentages
 
-Returns the bytes array of quorumAdversaryThresholdPercentages
+Returns an array of bytes where each byte represents the confirmation threshold percentage of the quorum at that index for V1 verification
 
 
 ```solidity
@@ -139,7 +152,7 @@ function quorumConfirmationThresholdPercentages() external view returns (bytes m
 
 ### quorumNumbersRequired
 
-Returns the bytes array of quorumsNumbersRequired
+Returns an array of bytes where each byte represents the number of a required quorum for V1 verification
 
 
 ```solidity
@@ -148,28 +161,48 @@ function quorumNumbersRequired() external view returns (bytes memory);
 
 ### getQuorumAdversaryThresholdPercentage
 
+Returns the adversary threshold percentage for a quorum for V1 verification
+
 
 ```solidity
 function getQuorumAdversaryThresholdPercentage(uint8 quorumNumber) external view returns (uint8);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`quorumNumber`|`uint8`|The number of the quorum to get the adversary threshold percentage for|
+
 
 ### getQuorumConfirmationThresholdPercentage
 
-Gets the confirmation threshold percentage for a quorum
+Returns the confirmation threshold percentage for a quorum for V1 verification
 
 
 ```solidity
 function getQuorumConfirmationThresholdPercentage(uint8 quorumNumber) external view returns (uint8);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`quorumNumber`|`uint8`|The number of the quorum to get the confirmation threshold percentage for|
+
 
 ### getIsQuorumRequired
 
-Checks if a quorum is required
+Returns true if a quorum is required for V1 verification
 
 
 ```solidity
 function getIsQuorumRequired(uint8 quorumNumber) external view returns (bool);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`quorumNumber`|`uint8`|The number of the quorum to check if it is required for V1 verification|
+
 
 ### getBlobParams
 
@@ -179,4 +212,10 @@ Returns the blob params for a given blob version
 ```solidity
 function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`version`|`uint16`|The version of the blob to get the params for|
+
 

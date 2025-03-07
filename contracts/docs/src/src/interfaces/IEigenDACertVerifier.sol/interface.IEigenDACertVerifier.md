@@ -1,8 +1,13 @@
 # IEigenDACertVerifier
-[Git Source](https://github.com/Layr-Labs/eigenda/blob/538f0525d9ff112a8ba32701edaf2860a0ad7306/src/interfaces/IEigenDACertVerifier.sol)
+[Git Source](https://github.com/Layr-Labs/eigenda/blob/f0d0dc5708f7e00684e5f5d89ab0227171768419/src/interfaces/IEigenDACertVerifier.sol)
 
 **Inherits:**
 [IEigenDAThresholdRegistry](/src/interfaces/IEigenDAThresholdRegistry.sol/interface.IEigenDAThresholdRegistry.md)
+
+A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates
+
+For V2 verification this contract is deployed with immutable security thresholds and required quorum numbers,
+to change these values or verification behavior a new CertVerifier must be deployed
 
 
 ## Functions

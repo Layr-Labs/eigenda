@@ -1,17 +1,16 @@
 # EigenDAServiceManagerStorage
-[Git Source](https://github.com/Layr-Labs/eigenda/blob/538f0525d9ff112a8ba32701edaf2860a0ad7306/src/core/EigenDAServiceManagerStorage.sol)
+[Git Source](https://github.com/Layr-Labs/eigenda/blob/f0d0dc5708f7e00684e5f5d89ab0227171768419/src/core/EigenDAServiceManagerStorage.sol)
 
 **Inherits:**
 [IEigenDAServiceManager](/src/interfaces/IEigenDAServiceManager.sol/interface.IEigenDAServiceManager.md)
 
-**Author:**
-Layr Labs, Inc.
-
-This storage contract is separate from the logic to simplify the upgrade process.
+This storage contract is separated from the logic to simplify the upgrade process.
 
 
 ## State Variables
 ### THRESHOLD_DENOMINATOR
+The denominator for the threshold percentages
+
 
 ```solidity
 uint256 public constant THRESHOLD_DENOMINATOR = 100;
@@ -52,6 +51,8 @@ uint32 public constant BLOCK_STALE_MEASURE = 300;
 
 
 ### eigenDAThresholdRegistry
+The EigenDAThresholdRegistry contract address
+
 
 ```solidity
 IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
@@ -59,6 +60,8 @@ IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
 
 
 ### eigenDARelayRegistry
+The EigenDARelayRegistry contract address
+
 
 ```solidity
 IEigenDARelayRegistry public immutable eigenDARelayRegistry;
@@ -66,6 +69,8 @@ IEigenDARelayRegistry public immutable eigenDARelayRegistry;
 
 
 ### paymentVault
+The PaymentVault contract address
+
 
 ```solidity
 IPaymentVault public immutable paymentVault;
@@ -73,6 +78,8 @@ IPaymentVault public immutable paymentVault;
 
 
 ### eigenDADisperserRegistry
+The EigenDADisperserRegistry contract address
+
 
 ```solidity
 IEigenDADisperserRegistry public immutable eigenDADisperserRegistry;
@@ -107,6 +114,8 @@ mapping(address => bool) public isBatchConfirmer;
 
 
 ### __GAP
+Storage gap for upgradeability
+
 
 ```solidity
 uint256[47] private __GAP;

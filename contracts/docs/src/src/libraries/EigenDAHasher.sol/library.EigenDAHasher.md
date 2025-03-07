@@ -1,8 +1,7 @@
 # EigenDAHasher
-[Git Source](https://github.com/Layr-Labs/eigenda/blob/538f0525d9ff112a8ba32701edaf2860a0ad7306/src/libraries/EigenDAHasher.sol)
+[Git Source](https://github.com/Layr-Labs/eigenda/blob/f0d0dc5708f7e00684e5f5d89ab0227171768419/src/libraries/EigenDAHasher.sol)
 
-**Author:**
-Layr Labs, Inc.
+Library of functions for hashing various EigenDA structs.
 
 
 ## Functions

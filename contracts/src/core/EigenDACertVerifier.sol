@@ -12,7 +12,8 @@ import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
 /**
- * @title A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates 
+ * @title EigenDACertVerifier
+ * @notice A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates 
  * @notice For V2 verification this contract is deployed with immutable security thresholds and required quorum numbers,
  *         to change these values or verification behavior a new CertVerifier must be deployed
  */
@@ -38,7 +39,10 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     /// @notice The EigenDA middleware RegistryCoordinator contract address
     IRegistryCoordinator public immutable registryCoordinator;
 
+    /// @notice The security thresholds checked against for V2 certificates
     SecurityThresholds public securityThresholdsV2;
+
+    /// @notice The quorum numbers required for V2 certificates
     bytes public quorumNumbersRequiredV2;
 
     constructor(
@@ -68,7 +72,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     ///////////////////////// V1 ///////////////////////////////
 
     /**
-     * @notice Verifies a the blob cert is valid for the required quorums
+     * @notice Verifies that a the blob cert is valid for the required quorums
      * @param blobHeader The blob header to verify
      * @param blobVerificationProof The blob cert verification proof to verify
      */
@@ -188,7 +192,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     ///////////////////////// HELPER FUNCTIONS ///////////////////////////////
 
     /**
-     * @notice Returns the nonSignerStakesAndSignature for a given blob cert and signed batch
+     * @notice Returns the nonSignerStakesAndSignature for a given blob cert and signed batch for V2 verification
      * @param signedBatch The signed batch to get the nonSignerStakesAndSignature for
      * @return nonSignerStakesAndSignature The nonSignerStakesAndSignature for the given signed batch attestation
      */
@@ -204,7 +208,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     }
 
     /**
-     * @notice Verifies the security parameters for a blob cert
+     * @notice Verifies the security parameters for a blob cert for V2 verification
      * @param blobParams The blob params to verify 
      * @param securityThresholds The security thresholds to verify against
      */
@@ -216,7 +220,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     }
 
     /**
-     * @notice Verifies the security parameters for a blob cert
+     * @notice Verifies the security parameters for a blob cert for V2 verification
      * @param version The version of the blob to verify
      * @param securityThresholds The security thresholds to verify against
      */
@@ -227,35 +231,39 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         EigenDACertVerificationUtils._verifyDACertSecurityParams(getBlobParams(version), securityThresholds);
     }
 
-    /// @notice Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index
+    /// @notice Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index for V1 verification
     function quorumAdversaryThresholdPercentages() external view returns (bytes memory) {
         return eigenDAThresholdRegistry.quorumAdversaryThresholdPercentages();
     }
 
-    /// @notice Returns an array of bytes where each byte represents the confirmation threshold percentage of the quorum at that index
+    /// @notice Returns an array of bytes where each byte represents the confirmation threshold percentage of the quorum at that index for V1 verification
     function quorumConfirmationThresholdPercentages() external view returns (bytes memory) {
         return eigenDAThresholdRegistry.quorumConfirmationThresholdPercentages();
     }
 
-    /// @notice Returns an array of bytes where each byte represents the number of a required quorum 
+    /// @notice Returns an array of bytes where each byte represents the number of a required quorum for V1 verification
     function quorumNumbersRequired() public view returns (bytes memory) {
         return eigenDAThresholdRegistry.quorumNumbersRequired();
     }
 
+    /// @notice Returns the adversary threshold percentage for a quorum for V1 verification
+    /// @param quorumNumber The number of the quorum to get the adversary threshold percentage for
     function getQuorumAdversaryThresholdPercentage(
         uint8 quorumNumber
     ) external view returns (uint8){
         return eigenDAThresholdRegistry.getQuorumAdversaryThresholdPercentage(quorumNumber);
     }
 
-    /// @notice Gets the confirmation threshold percentage for a quorum
+    /// @notice Returns the confirmation threshold percentage for a quorum for V1 verification
+    /// @param quorumNumber The number of the quorum to get the confirmation threshold percentage for
     function getQuorumConfirmationThresholdPercentage(
         uint8 quorumNumber
     ) external view returns (uint8){
         return eigenDAThresholdRegistry.getQuorumConfirmationThresholdPercentage(quorumNumber);
     }
 
-    /// @notice Checks if a quorum is required
+    /// @notice Returns true if a quorum is required for V1 verification
+    /// @param quorumNumber The number of the quorum to check if it is required for V1 verification
     function getIsQuorumRequired(
         uint8 quorumNumber
     ) external view returns (bool){
@@ -263,6 +271,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     }   
 
     /// @notice Returns the blob params for a given blob version
+    /// @param version The version of the blob to get the params for
     function getBlobParams(uint16 version) public view returns (VersionedBlobParams memory) {
         return eigenDAThresholdRegistry.getBlobParams(version);
     }

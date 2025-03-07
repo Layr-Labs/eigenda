@@ -1,8 +1,10 @@
 # EigenDACertVerifier
-[Git Source](https://github.com/Layr-Labs/eigenda/blob/538f0525d9ff112a8ba32701edaf2860a0ad7306/src/core/EigenDACertVerifier.sol)
+[Git Source](https://github.com/Layr-Labs/eigenda/blob/f0d0dc5708f7e00684e5f5d89ab0227171768419/src/core/EigenDACertVerifier.sol)
 
 **Inherits:**
 [IEigenDACertVerifier](/src/interfaces/IEigenDACertVerifier.sol/interface.IEigenDACertVerifier.md)
+
+A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates
 
 For V2 verification this contract is deployed with immutable security thresholds and required quorum numbers,
 to change these values or verification behavior a new CertVerifier must be deployed
@@ -68,6 +70,8 @@ IRegistryCoordinator public immutable registryCoordinator;
 
 
 ### securityThresholdsV2
+The security thresholds checked against for V2 certificates
+
 
 ```solidity
 SecurityThresholds public securityThresholdsV2;
@@ -75,6 +79,8 @@ SecurityThresholds public securityThresholdsV2;
 
 
 ### quorumNumbersRequiredV2
+The quorum numbers required for V2 certificates
+
 
 ```solidity
 bytes public quorumNumbersRequiredV2;
@@ -100,7 +106,7 @@ constructor(
 
 ### verifyDACertV1
 
-Verifies a the blob cert is valid for the required quorums
+Verifies that a the blob cert is valid for the required quorums
 
 
 ```solidity
@@ -203,7 +209,7 @@ function verifyDACertV2ForZKProof(
 
 ### getNonSignerStakesAndSignature
 
-Returns the nonSignerStakesAndSignature for a given blob cert and signed batch
+Returns the nonSignerStakesAndSignature for a given blob cert and signed batch for V2 verification
 
 
 ```solidity
@@ -227,7 +233,7 @@ function getNonSignerStakesAndSignature(SignedBatch calldata signedBatch)
 
 ### verifyDACertSecurityParams
 
-Verifies the security parameters for a blob cert
+Verifies the security parameters for a blob cert for V2 verification
 
 
 ```solidity
@@ -245,7 +251,7 @@ function verifyDACertSecurityParams(VersionedBlobParams memory blobParams, Secur
 
 ### verifyDACertSecurityParams
 
-Verifies the security parameters for a blob cert
+Verifies the security parameters for a blob cert for V2 verification
 
 
 ```solidity
@@ -261,7 +267,7 @@ function verifyDACertSecurityParams(uint16 version, SecurityThresholds memory se
 
 ### quorumAdversaryThresholdPercentages
 
-Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index
+Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index for V1 verification
 
 
 ```solidity
@@ -270,7 +276,7 @@ function quorumAdversaryThresholdPercentages() external view returns (bytes memo
 
 ### quorumConfirmationThresholdPercentages
 
-Returns an array of bytes where each byte represents the confirmation threshold percentage of the quorum at that index
+Returns an array of bytes where each byte represents the confirmation threshold percentage of the quorum at that index for V1 verification
 
 
 ```solidity
@@ -279,7 +285,7 @@ function quorumConfirmationThresholdPercentages() external view returns (bytes m
 
 ### quorumNumbersRequired
 
-Returns an array of bytes where each byte represents the number of a required quorum
+Returns an array of bytes where each byte represents the number of a required quorum for V1 verification
 
 
 ```solidity
@@ -288,28 +294,48 @@ function quorumNumbersRequired() public view returns (bytes memory);
 
 ### getQuorumAdversaryThresholdPercentage
 
+Returns the adversary threshold percentage for a quorum for V1 verification
+
 
 ```solidity
 function getQuorumAdversaryThresholdPercentage(uint8 quorumNumber) external view returns (uint8);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`quorumNumber`|`uint8`|The number of the quorum to get the adversary threshold percentage for|
+
 
 ### getQuorumConfirmationThresholdPercentage
 
-Gets the confirmation threshold percentage for a quorum
+Returns the confirmation threshold percentage for a quorum for V1 verification
 
 
 ```solidity
 function getQuorumConfirmationThresholdPercentage(uint8 quorumNumber) external view returns (uint8);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`quorumNumber`|`uint8`|The number of the quorum to get the confirmation threshold percentage for|
+
 
 ### getIsQuorumRequired
 
-Checks if a quorum is required
+Returns true if a quorum is required for V1 verification
 
 
 ```solidity
 function getIsQuorumRequired(uint8 quorumNumber) external view returns (bool);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`quorumNumber`|`uint8`|The number of the quorum to check if it is required for V1 verification|
+
 
 ### getBlobParams
 
@@ -319,4 +345,10 @@ Returns the blob params for a given blob version
 ```solidity
 function getBlobParams(uint16 version) public view returns (VersionedBlobParams memory);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`version`|`uint16`|The version of the blob to get the params for|
+
 

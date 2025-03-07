@@ -1,5 +1,7 @@
 # IPaymentVault
-[Git Source](https://github.com/Layr-Labs/eigenda/blob/538f0525d9ff112a8ba32701edaf2860a0ad7306/src/interfaces/IPaymentVault.sol)
+[Git Source](https://github.com/Layr-Labs/eigenda/blob/f0d0dc5708f7e00684e5f5d89ab0227171768419/src/interfaces/IPaymentVault.sol)
+
+Entrypoint for making reservations and on demand payments for EigenDA.
 
 
 ## Functions
@@ -36,39 +38,63 @@ function depositOnDemand(address _account) external payable;
 
 ### getReservation
 
-Fetches the current reservation for an account
+Returns the current reservation for an account
 
 
 ```solidity
 function getReservation(address _account) external view returns (Reservation memory);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_account`|`address`|is the address to get the reservation for|
+
 
 ### getReservations
 
-Fetches the current reservations for a set of accounts
+Returns the current reservations for a set of accounts
 
 
 ```solidity
 function getReservations(address[] memory _accounts) external view returns (Reservation[] memory _reservations);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_accounts`|`address[]`|is the set of accounts to get the reservations for|
+
 
 ### getOnDemandTotalDeposit
 
-Fetches the current total on demand balance of an account
+Returns the current total on demand balance of an account
 
 
 ```solidity
 function getOnDemandTotalDeposit(address _account) external view returns (uint80);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_account`|`address`|is the address to get the total on demand balance for|
+
 
 ### getOnDemandTotalDeposits
 
-Fetches the current total on demand balances for a set of accounts
+Returns the current total on demand balances for a set of accounts
 
 
 ```solidity
 function getOnDemandTotalDeposits(address[] memory _accounts) external view returns (uint80[] memory _payments);
 ```
+**Parameters**
+
+|Name|Type|Description|
+|----|----|-----------|
+|`_accounts`|`address[]`|is the set of accounts to get the total on demand balances for|
+
 
 ## Events
 ### ReservationUpdated
@@ -128,6 +154,8 @@ event PriceParamsUpdated(
 
 ## Structs
 ### Reservation
+A reservation for a set of quorums
+
 
 ```solidity
 struct Reservation {
@@ -140,6 +168,8 @@ struct Reservation {
 ```
 
 ### OnDemandPayment
+An on demand payment
+
 
 ```solidity
 struct OnDemandPayment {

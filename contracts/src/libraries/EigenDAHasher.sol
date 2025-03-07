@@ -6,8 +6,8 @@ import {IEigenDAServiceManager} from "../interfaces/IEigenDAServiceManager.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
 /**
- * @title Library of functions for hashing various EigenDA structs.
- * @author Layr Labs, Inc.
+ * @title EigenDAHasher
+ * @notice Library of functions for hashing various EigenDA structs.
  */
 library EigenDAHasher {
 

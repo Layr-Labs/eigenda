@@ -1,8 +1,10 @@
 # PaymentVaultStorage
-[Git Source](https://github.com/Layr-Labs/eigenda/blob/538f0525d9ff112a8ba32701edaf2860a0ad7306/src/payments/PaymentVaultStorage.sol)
+[Git Source](https://github.com/Layr-Labs/eigenda/blob/f0d0dc5708f7e00684e5f5d89ab0227171768419/src/payments/PaymentVaultStorage.sol)
 
 **Inherits:**
 [IPaymentVault](/src/interfaces/IPaymentVault.sol/interface.IPaymentVault.md)
+
+This storage contract is separated from the logic to simplify the upgrade process.
 
 
 ## State Variables
@@ -88,6 +90,8 @@ mapping(address => OnDemandPayment) public onDemandPayments;
 
 
 ### __GAP
+Storage gap for upgradeability
+
 
 ```solidity
 uint256[46] private __GAP;

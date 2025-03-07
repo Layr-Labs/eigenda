@@ -3,6 +3,10 @@ pragma solidity ^0.8.9;
 
 import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
 
+/**
+ * @title PaymentVaultStorage
+ * @notice This storage contract is separated from the logic to simplify the upgrade process.
+ */
 abstract contract PaymentVaultStorage is IPaymentVault {
 
     /// @notice minimum chargeable size for on-demand payments
@@ -26,5 +30,7 @@ abstract contract PaymentVaultStorage is IPaymentVault {
     /// @notice mapping from user address to current on-demand payment
     mapping(address => OnDemandPayment) public onDemandPayments;
 
+    /// @notice Storage gap for upgradeability
+    // slither-disable-next-line shadowing-state
     uint256[46] private __GAP;
 }

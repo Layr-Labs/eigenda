@@ -8,12 +8,12 @@ import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
 import {IEigenDADisperserRegistry} from "../interfaces/IEigenDADisperserRegistry.sol";
 
 /**
- * @title Storage variables for the `EigenDAServiceManager` contract.
- * @author Layr Labs, Inc.
- * @notice This storage contract is separate from the logic to simplify the upgrade process.
+ * @title EigenDAServiceManagerStorage
+ * @notice This storage contract is separated from the logic to simplify the upgrade process.
  */
 abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
-    // CONSTANTS
+
+    /// @notice The denominator for the threshold percentages
     uint256 public constant THRESHOLD_DENOMINATOR = 100;
 
     /// @notice Unit of measure (in blocks) for which data will be stored for after confirmation.
@@ -39,9 +39,16 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
      */
     uint32 public constant BLOCK_STALE_MEASURE = 300;
 
+    /// @notice The EigenDAThresholdRegistry contract address
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
+
+    /// @notice The EigenDARelayRegistry contract address
     IEigenDARelayRegistry public immutable eigenDARelayRegistry;
+
+    /// @notice The PaymentVault contract address
     IPaymentVault public immutable paymentVault;
+
+    /// @notice The EigenDADisperserRegistry contract address
     IEigenDADisperserRegistry public immutable eigenDADisperserRegistry;
     
     constructor(
@@ -65,7 +72,7 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
     /// @notice mapping of addressed that are permissioned to confirm batches
     mapping(address => bool) public isBatchConfirmer;
 
-    // storage gap for upgradeability
+    /// @notice Storage gap for upgradeability
     // slither-disable-next-line shadowing-state
     uint256[47] private __GAP;
 }

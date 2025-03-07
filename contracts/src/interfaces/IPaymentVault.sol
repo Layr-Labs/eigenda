@@ -1,8 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
+/**
+ * @title IPaymentVault
+ * @notice Entrypoint for making reservations and on demand payments for EigenDA.
+ */
 interface IPaymentVault {
 
+    /**
+     * @title Reservation
+     * @notice A reservation for a set of quorums
+     */
     struct Reservation {
         uint64 symbolsPerSecond; // Number of symbols reserved per second
         uint64 startTimestamp;   // timestamp of epoch where reservation begins
@@ -11,6 +19,10 @@ interface IPaymentVault {
         bytes quorumSplits;      // quorum splits in a bytes array that correspond to the quorum numbers
     }
 
+    /**
+     * @title OnDemandPayment
+     * @notice An on demand payment 
+     */
     struct OnDemandPayment {
         uint80 totalDeposit;
     }
@@ -51,15 +63,27 @@ interface IPaymentVault {
      */
     function depositOnDemand(address _account) external payable;
 
-    /// @notice Fetches the current reservation for an account
+    /**
+     * @notice Returns the current reservation for an account
+     * @param _account is the address to get the reservation for
+     */
     function getReservation(address _account) external view returns (Reservation memory);
 
-    /// @notice Fetches the current reservations for a set of accounts
+    /**
+     * @notice Returns the current reservations for a set of accounts
+     * @param _accounts is the set of accounts to get the reservations for
+     */
     function getReservations(address[] memory _accounts) external view returns (Reservation[] memory _reservations);
 
-    /// @notice Fetches the current total on demand balance of an account
+    /**
+     * @notice Returns the current total on demand balance of an account
+     * @param _account is the address to get the total on demand balance for
+     */
     function getOnDemandTotalDeposit(address _account) external view returns (uint80);
 
-    /// @notice Fetches the current total on demand balances for a set of accounts
+    /**
+     * @notice Returns the current total on demand balances for a set of accounts
+     * @param _accounts is the set of accounts to get the total on demand balances for
+     */
     function getOnDemandTotalDeposits(address[] memory _accounts) external view returns (uint80[] memory _payments);
 }

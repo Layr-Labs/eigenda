@@ -17,12 +17,11 @@ import {EigenDAHasher} from "../libraries/EigenDAHasher.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
 /**
- * @title Primary entrypoint for procuring services from EigenDA.
- * @author Layr Labs, Inc.
- * @notice This contract is used for:
- * - initializing the data store by the disperser
- * - confirming the data store by the disperser with inferred aggregated signatures of the quorum
- * - freezing operators as the result of various "challenges"
+ * @title EigenDAServiceManager
+ * @notice The Service Manager is the central contract of the EigenDA AVS and is responsible for:
+ * - accepting and confirming the signature of bridged V1 batches
+ * - routing rewards submissions to operators
+ * - setting metadata for the AVS
  */
 contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBase, BLSSignatureChecker, Pausable {
     using EigenDAHasher for BatchHeader;
@@ -72,10 +71,9 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
     }
 
     /**
-     * @notice This function is used for
-     * - submitting data availabilty certificates,
-     * - check that the aggregate signature is valid,
-     * - and check whether quorum has been achieved or not.
+     * @notice Accepts a batch from the disperser and confirms its signature for V1 bridging
+     * @param batchHeader The batch header to confirm
+     * @param nonSignerStakesAndSignature The non-signer stakes and signature to confirm the batch with
      */
     function confirmBatch(
         BatchHeader calldata batchHeader,
@@ -135,12 +133,15 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         batchId = batchIdMemory + 1;
     }
 
-    /// @notice This function is used for changing the batch confirmer
+    /**
+     * @notice Toggles a batch confirmer role to allow them to confirm batches
+     * @param _batchConfirmer The address of the batch confirmer to set
+     */
     function setBatchConfirmer(address _batchConfirmer) external onlyOwner() {
         _setBatchConfirmer(_batchConfirmer);
     }
 
-    /// @notice changes the batch confirmer
+    /// @notice internal function to set a batch confirmer
     function _setBatchConfirmer(address _batchConfirmer) internal {
         isBatchConfirmer[_batchConfirmer] = !isBatchConfirmer[_batchConfirmer];
         emit BatchConfirmerStatusChanged(_batchConfirmer, isBatchConfirmer[_batchConfirmer]);
@@ -151,40 +152,47 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         return batchId;
     }
 
-    /// @notice Given a reference block number, returns the block until which operators must serve.
+    /**
+     * @notice Given a reference block number, returns the block until which operators must serve.
+     * @param referenceBlockNumber The reference block number to get the serve until block for
+     */
     function latestServeUntilBlock(uint32 referenceBlockNumber) external view returns (uint32) {
         return referenceBlockNumber + STORE_DURATION_BLOCKS + BLOCK_STALE_MEASURE;
     }
 
-    /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
+    /// @notice Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index for V1 verification
     function quorumAdversaryThresholdPercentages() external view returns (bytes memory) {
         return eigenDAThresholdRegistry.quorumAdversaryThresholdPercentages();
     }
 
-    /// @notice Returns the bytes array of quorumAdversaryThresholdPercentages
+    /// @notice Returns an array of bytes where each byte represents the confirmation threshold percentage of the quorum at that index for V1 verification
     function quorumConfirmationThresholdPercentages() external view returns (bytes memory) {
         return eigenDAThresholdRegistry.quorumConfirmationThresholdPercentages();
     }
 
-    /// @notice Returns the bytes array of quorumsNumbersRequired
+    /// @notice Returns an array of bytes where each byte represents the number of a required quorum for V1 verification
     function quorumNumbersRequired() external view returns (bytes memory) {
         return eigenDAThresholdRegistry.quorumNumbersRequired();
     }
 
+    /// @notice Returns the adversary threshold percentage for a quorum for V1 verification
+    /// @param quorumNumber The number of the quorum to get the adversary threshold percentage for
     function getQuorumAdversaryThresholdPercentage(
         uint8 quorumNumber
     ) external view returns (uint8){
         return eigenDAThresholdRegistry.getQuorumAdversaryThresholdPercentage(quorumNumber);
     }
 
-    /// @notice Gets the confirmation threshold percentage for a quorum
+    /// @notice Returns the confirmation threshold percentage for a quorum for V1 verification
+    /// @param quorumNumber The number of the quorum to get the confirmation threshold percentage for
     function getQuorumConfirmationThresholdPercentage(
         uint8 quorumNumber
     ) external view returns (uint8){
         return eigenDAThresholdRegistry.getQuorumConfirmationThresholdPercentage(quorumNumber);
     }
 
-    /// @notice Checks if a quorum is required
+    /// @notice Returns true if a quorum is required for V1 verification
+    /// @param quorumNumber The number of the quorum to check if it is required for V1 verification
     function getIsQuorumRequired(
         uint8 quorumNumber
     ) external view returns (bool){
@@ -192,6 +200,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
     }
 
     /// @notice Returns the blob params for a given blob version
+    /// @param version The version of the blob to get the params for
     function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {
         return eigenDAThresholdRegistry.getBlobParams(version);
     }
