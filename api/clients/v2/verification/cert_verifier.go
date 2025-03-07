@@ -27,7 +27,7 @@ type CertVerifier struct {
 	certVerifierAddressProvider clients.CertVerifierAddressProvider
 	// maps contract address to a ContractEigenDACertVerifierCaller object
 	verifierCallers sync.Map
-	// maps cert verifier address to set of required quorums specified in the contract at that address
+	// maps contract address to set of required quorums specified in the contract at that address
 	requiredQuorums sync.Map
 }
 
