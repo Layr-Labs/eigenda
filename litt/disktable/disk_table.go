@@ -77,12 +77,12 @@ type DiskTable struct {
 
 	// This channel can be used to block until the disk table has been stopped. The channel has a capacity of 1, and
 	// there is an element in the channel up until the disk table has been stopped.
-	stopChan chan struct{}
+	stopChannel chan struct{}
 
-	// controllerChan is the channel for messages sent to controller goroutine. No data managed by the DiskTable
+	// controllerChannel is the channel for messages sent to controller goroutine. No data managed by the DiskTable
 	// may be mutated by anything other than the controller, with the exception of the
 	// segmentLock and reference counting.
-	controllerChan chan any
+	controllerChannel chan any
 
 	// garbageCollectionPeriod is the period at which garbage collection is run.
 	garbageCollectionPeriod time.Duration
@@ -185,12 +185,12 @@ func NewDiskTable(
 		keyMap:                  keyMap,
 		targetFileSize:          targetFileSize,
 		segments:                make(map[uint32]*segment.Segment),
-		controllerChan:          make(chan any, controlChannelSize),
-		stopChan:                make(chan struct{}, 1),
+		controllerChannel:       make(chan any, controlChannelSize),
+		stopChannel:             make(chan struct{}, 1),
 		garbageCollectionPeriod: gcPeriod,
 	}
 	table.alive.Store(true)
-	table.stopChan <- struct{}{}
+	table.stopChannel <- struct{}{}
 
 	var err error
 	table.lowestSegmentIndex, table.highestSegmentIndex, table.segments, err =
@@ -303,7 +303,7 @@ func (d *DiskTable) Stop() error {
 			shutdown:     true,
 			responseChan: make(chan error, 1),
 		}
-		d.controllerChan <- flushReq
+		d.controllerChannel <- flushReq
 		err := <-flushReq.responseChan
 
 		if err != nil {
@@ -312,8 +312,8 @@ func (d *DiskTable) Stop() error {
 	}
 
 	// Wait for the control loop to stop.
-	d.stopChan <- struct{}{}
-	<-d.stopChan
+	d.stopChannel <- struct{}{}
+	<-d.stopChannel
 
 	return nil
 }
@@ -460,7 +460,7 @@ func (d *DiskTable) Put(key []byte, value []byte) error {
 		Value: value,
 	}
 
-	d.controllerChan <- writeReq
+	d.controllerChannel <- writeReq
 
 	return nil
 }
@@ -477,7 +477,7 @@ func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 	request := &writeRequest{
 		values: batch,
 	}
-	d.controllerChan <- request
+	d.controllerChannel <- request
 	return nil
 }
 
@@ -564,7 +564,7 @@ func (d *DiskTable) Flush() error {
 	flushReq := &flushRequest{
 		responseChan: make(chan error, 1),
 	}
-	d.controllerChan <- flushReq
+	d.controllerChannel <- flushReq
 	err := <-flushReq.responseChan
 	if err != nil {
 		return fmt.Errorf("failed to flush: %v", err)
@@ -649,7 +649,7 @@ func (d *DiskTable) controlLoop() {
 		select {
 		case <-d.ctx.Done():
 			d.logger.Infof("context done, shutting down disk table control loop")
-		case message := <-d.controllerChan:
+		case message := <-d.controllerChannel:
 			if writeReq, ok := message.(*writeRequest); ok {
 				d.handleWriteRequest(writeReq)
 			} else if flushReq, ok := message.(*flushRequest); ok {
@@ -687,7 +687,7 @@ func (d *DiskTable) shutdownTasks() {
 	}
 
 	// unblock the Stop() method
-	<-d.stopChan
+	<-d.stopChannel
 }
 
 // doGarbageCollection performs garbage collection on all segments, deleting old ones as necessary.
