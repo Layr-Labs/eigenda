@@ -315,11 +315,6 @@ func (d *DiskTable) Stop() error {
 	d.stopChan <- struct{}{}
 	<-d.stopChan
 
-	err := d.keyMap.Stop()
-	if err != nil {
-		return fmt.Errorf("failed to stop key map: %v", err)
-	}
-
 	return nil
 }
 
