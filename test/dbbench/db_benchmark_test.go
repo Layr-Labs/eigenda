@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/dgraph-io/badger/v4/options"
@@ -239,7 +238,7 @@ func runBenchmark(t *testing.T, write writer, read reader) {
 	fmt.Printf("Write benchmark speed: %.2f MB/s\n", mbPerSecond)
 }
 
-func TestLevelDBNoCompactionWrite(t *testing.T) {
+func TestLevelDB(t *testing.T) {
 	directory := "./test-data"
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -288,60 +287,7 @@ func TestLevelDBNoCompactionWrite(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestLittDBWrite(t *testing.T) {
-	directory := "./test-data"
-
-	config, err := littbuilder.DefaultConfig(directory)
-	require.NoError(t, err)
-	config.ShardingFactor = 1
-
-	db, err := config.Build(context.Background())
-	require.NoError(t, err)
-
-	err = db.Start()
-	require.NoError(t, err)
-
-	table, err := db.GetTable("test")
-	require.NoError(t, err)
-
-	unflushedCount := uint32(0)
-
-	writeFunction := func(key []byte, value []byte) error {
-		err = table.Put(key, value)
-		if err != nil {
-			return err
-		}
-
-		unflushedCount++
-		if unflushedCount >= batchSize {
-			err = table.Flush()
-			if err != nil {
-				return err
-			}
-			unflushedCount = 0
-		}
-
-		return nil
-	}
-
-	readFunction := func(key []byte) ([]byte, error) {
-		value, ok, err := table.Get(key)
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			return nil, fmt.Errorf("key not found")
-		}
-		return value, nil
-	}
-
-	runBenchmark(t, writeFunction, readFunction)
-
-	err = db.Stop()
-	require.NoError(t, err)
-}
-
-func TestLittDBWithGCWrite(t *testing.T) {
+func TestLittDB(t *testing.T) {
 	directory := "./test-data"
 
 	config, err := littbuilder.DefaultConfig(directory)
@@ -360,58 +306,7 @@ func TestLittDBWithGCWrite(t *testing.T) {
 
 	unflushedCount := uint32(0)
 
-	writeFunction := func(key []byte, value []byte) error {
-		err = table.Put(key, value)
-		if err != nil {
-			return err
-		}
-
-		unflushedCount++
-		if unflushedCount >= batchSize {
-			err = table.Flush()
-			if err != nil {
-				return err
-			}
-			unflushedCount = 0
-		}
-
-		return nil
-	}
-
-	readFunction := func(key []byte) ([]byte, error) {
-		value, ok, err := table.Get(key)
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			return nil, fmt.Errorf("key not found")
-		}
-		return value, nil
-	}
-
-	runBenchmark(t, writeFunction, readFunction)
-
-	err = db.Stop()
-	require.NoError(t, err)
-}
-
-func TestMemKeymapLittDBWrite(t *testing.T) {
-	directory := "./test-data"
-
-	config, err := littbuilder.DefaultConfig(directory)
-	require.NoError(t, err)
-	config.KeyMapType = keymap.MemKeyMapType
-
-	db, err := config.Build(context.Background())
-	require.NoError(t, err)
-
-	err = db.Start()
-	require.NoError(t, err)
-
-	table, err := db.GetTable("test")
-	require.NoError(t, err)
-
-	unflushedCount := uint32(0)
+	writeLimiter := make(chan struct{}, parallelWriters)
 
 	writeFunction := func(key []byte, value []byte) error {
 		err = table.Put(key, value)
@@ -421,10 +316,16 @@ func TestMemKeymapLittDBWrite(t *testing.T) {
 
 		unflushedCount++
 		if unflushedCount >= batchSize {
-			err = table.Flush()
-			if err != nil {
-				return err
-			}
+
+			writeLimiter <- struct{}{}
+			go func() {
+				err = table.Flush()
+				if err != nil {
+					panic(err)
+				}
+				<-writeLimiter
+			}()
+
 			unflushedCount = 0
 		}
 
