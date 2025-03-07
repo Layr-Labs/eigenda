@@ -365,6 +365,20 @@ var (
 		Value:    ModeV1AndV2,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RUNTIME_MODE"),
 	}
+	StoreChunksRequestMaxPastAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "store-chunks-request-max-past-age"),
+		Usage:    "The maximum age of a StoreChunks request in the past that the node will accept.",
+		Required: false,
+		Value:    5 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_REQUEST_MAX_PAST_AGE"),
+	}
+	StoreChunksRequestMaxFutureAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "store-chunks-request-max-future-age"),
+		Usage:    "The maximum age of a StoreChunks request in the future that the node will accept.",
+		Required: false,
+		Value:    5 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_REQUEST_MAX_FUTURE_AGE"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -483,6 +497,8 @@ var optionalFlags = []cli.Flag{
 	DispersalAuthenticationTimeoutFlag,
 	RelayMaxGRPCMessageSizeFlag,
 	RuntimeModeFlag,
+	StoreChunksRequestMaxPastAgeFlag,
+	StoreChunksRequestMaxFutureAgeFlag,
 }
 
 func init() {

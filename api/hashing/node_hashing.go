@@ -38,6 +38,7 @@ func HashStoreChunksRequest(request *grpc.StoreChunksRequest) ([]byte, error) {
 		}
 	}
 	hashUint32(hasher, request.GetDisperserID())
+	hashUint32(hasher, request.GetTimestamp())
 
 	return hasher.Sum(nil), nil
 }
