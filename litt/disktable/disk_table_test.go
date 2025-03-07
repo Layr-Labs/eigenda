@@ -61,7 +61,7 @@ func buildMemKeyDiskTableSingleShard(
 		random.NewTestRandom().Rand,
 		0,
 		1*time.Millisecond,
-		false)
+		true)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -100,7 +100,7 @@ func buildMemKeyDiskTableMultiShard(
 		random.NewTestRandom().Rand,
 		0,
 		1*time.Millisecond,
-		false)
+		true)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -225,6 +225,7 @@ func restartTest(t *testing.T, tableBuilder tableBuilder) {
 			err = table.Stop()
 			require.NoError(t, err)
 			require.False(t, table.(*DiskTable).fatalError.Load())
+
 			table, err = tableBuilder(time.Now, tableName, []string{directory})
 			require.NoError(t, err)
 			err = table.Start()
@@ -234,7 +235,7 @@ func restartTest(t *testing.T, tableBuilder tableBuilder) {
 			for expectedKey, expectedValue := range expectedValues {
 				value, ok, err := table.Get([]byte(expectedKey))
 				require.NoError(t, err)
-				require.True(t, ok)
+				require.True(t, ok, "key %s not found", expectedKey)
 				require.Equal(t, expectedValue, value)
 			}
 
@@ -1667,7 +1668,7 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder tableB
 				entries, err := os.ReadDir(segmentDir)
 				require.NoError(t, err)
 				for _, entry := range entries {
-					files = append(files, path.Join(dir, entry.Name()))
+					files = append(files, path.Join(dir, "table", "segments", entry.Name()))
 				}
 			}
 			for _, file := range files {

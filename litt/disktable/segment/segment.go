@@ -554,6 +554,7 @@ func (s *Segment) shardControlLoop(shard uint32) {
 		case operation := <-s.shardChannels[shard]:
 			// Handle flush requests, and possibly also seal the shard.
 			if flushRequest, ok := operation.(*shardFlushRequest); ok {
+
 				shardError = s.handleShardFlushRequest(shard, flushRequest, shardError)
 
 				if flushRequest.seal {
@@ -571,6 +572,7 @@ func (s *Segment) shardControlLoop(shard uint32) {
 
 			// Handle write requests.
 			if data, ok := operation.(*types.KVPair); ok {
+
 				// This is a request to write a value to the file.
 				shardError = s.handleShardWrite(shard, data)
 				continue

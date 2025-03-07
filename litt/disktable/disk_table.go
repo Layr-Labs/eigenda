@@ -77,17 +77,21 @@ type DiskTable struct {
 	// alive is an atomic boolean that is true if the disk table is alive, or false if it has been shut down.
 	alive atomic.Bool
 
-	// This channel can be used to block until the disk table has been stopped. The channel has a capacity of 1, and
-	// there is an element in the channel up until the disk table has been stopped.
-	stopChannel chan struct{}
-
 	// controllerChannel is the channel for messages sent to controller goroutine. No data managed by the DiskTable
 	// may be mutated by anything other than the controller, with the exception of the
 	// segmentLock and reference counting.
 	controllerChannel chan any
 
+	// This channel can be used to block until controller thread has been stopped. The channel has a capacity of 1, and
+	// there is an element in the channel up until the controller thread has stopped.
+	controllerStoppedChannel chan struct{}
+
 	// flushChannel is a channel used to enqueue flush work. If nil is sent to this channel, the flush loop exits.
 	flushChannel chan func()
+
+	// flushStoppedChannel is a channel used to block until the flush loop has stopped. This channel has a capacity of
+	// 1, and there is an element in the channel up until the flush loop has stopped.
+	flushStoppedChannel chan struct{}
 
 	// garbageCollectionPeriod is the period at which garbage collection is run.
 	garbageCollectionPeriod time.Duration
@@ -179,24 +183,26 @@ func NewDiskTable(
 	}
 
 	table := &DiskTable{
-		ctx:                     ctx,
-		logger:                  logger,
-		timeSource:              timeSource,
-		roots:                   roots,
-		segmentDirectories:      segDirs,
-		name:                    name,
-		metadata:                metadata,
-		saltShaker:              saltShaker,
-		keyMap:                  keyMap,
-		targetFileSize:          targetFileSize,
-		segments:                make(map[uint32]*segment.Segment),
-		controllerChannel:       make(chan any, controlChannelSize),
-		flushChannel:            make(chan func(), tableFlushChannelCapacity),
-		stopChannel:             make(chan struct{}, 1),
-		garbageCollectionPeriod: gcPeriod,
+		ctx:                      ctx,
+		logger:                   logger,
+		timeSource:               timeSource,
+		roots:                    roots,
+		segmentDirectories:       segDirs,
+		name:                     name,
+		metadata:                 metadata,
+		saltShaker:               saltShaker,
+		keyMap:                   keyMap,
+		targetFileSize:           targetFileSize,
+		segments:                 make(map[uint32]*segment.Segment),
+		controllerChannel:        make(chan any, controlChannelSize),
+		controllerStoppedChannel: make(chan struct{}, 1),
+		flushChannel:             make(chan func(), tableFlushChannelCapacity),
+		flushStoppedChannel:      make(chan struct{}, 1),
+		garbageCollectionPeriod:  gcPeriod,
 	}
 	table.alive.Store(true)
-	table.stopChannel <- struct{}{}
+	table.controllerStoppedChannel <- struct{}{}
+	table.flushStoppedChannel <- struct{}{}
 
 	var err error
 	table.lowestSegmentIndex, table.highestSegmentIndex, table.segments, err =
@@ -311,16 +317,11 @@ func (d *DiskTable) Stop() error {
 			responseChan: make(chan error, 1),
 		}
 		d.controllerChannel <- flushReq
-		err := <-flushReq.responseChan
-
-		if err != nil {
-			return fmt.Errorf("failed to flush: %v", err)
-		}
 	}
 
 	// Wait for the control loop to stop.
-	d.stopChannel <- struct{}{}
-	<-d.stopChannel
+	d.controllerStoppedChannel <- struct{}{}
+	<-d.controllerStoppedChannel
 
 	return nil
 }
@@ -391,6 +392,8 @@ func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
 	if err != nil {
 		return fmt.Errorf("failed to set sharding factor: %v", err)
 	}
+
+	// TODO we need to force a new segment to be created here
 
 	return nil
 }
@@ -565,6 +568,8 @@ func (d *DiskTable) expandSegments() error {
 		d.segmentLock.Lock()
 		d.segments[d.highestSegmentIndex] = newSegment
 		d.segmentLock.Unlock()
+
+		errChan <- nil
 	}
 
 	return <-errChan
@@ -594,44 +599,34 @@ type flushRequest struct {
 	responseChan chan error
 }
 
-func (d *DiskTable) handleShutdownRequest(req *flushRequest) { // TODO make this a separate request type
-	durableKeys, err := d.segments[d.highestSegmentIndex].Seal(d.timeSource())
+// shutdownTasks performs tasks necessary to cleanly shut down the disk table.
+func (d *DiskTable) shutdownTasks() {
+	// Instruct the flush loop to stop.
+	d.flushChannel <- nil
+	// Block until it does.
+	d.flushStoppedChannel <- struct{}{}
+	<-d.flushStoppedChannel
 
+	// Seal the mutable segment
+	durableKeys, err := d.segments[d.highestSegmentIndex].Seal(d.timeSource())
 	if err != nil {
-		err = fmt.Errorf("failed to flush mutable segment: %v", err)
-		req.responseChan <- err
-		return
+		d.logger.Errorf("failed to seal mutable segment: %v", err)
 	}
 
+	// Flush the keys that are now durable in the segment.
 	err = d.flushKeys(durableKeys)
 	if err != nil {
-		err = fmt.Errorf("failed to flush keys: %v", err)
-		d.panic(err)
-		req.responseChan <- err
-		return
+		d.logger.Errorf("failed to flush keys: %v", err)
 	}
 
-	errChan := make(chan error, 1)
-
-	// We need to stop the key map in the flush loop. There may be enqueued flush operations, and we shouldn't
-	// stop the key map until they are all fully processed.
-	d.flushChannel <- func() {
-		err = d.keyMap.Stop()
-		if err != nil {
-			err = fmt.Errorf("failed to stop key map: %v", err)
-			d.panic(err)
-			errChan <- err
-
-		} else {
-			errChan <- nil
-		}
+	// Stop the key map
+	err = d.keyMap.Stop()
+	if err != nil {
+		d.logger.Errorf("failed to stop key map: %v", err)
 	}
 
-	// Shut down the flush loop.
-	d.flushChannel <- nil
-
-	// Even though we are running logic on the flush loop, we want this method to block until that work is done.
-	req.responseChan <- <-errChan
+	// unblock the Stop() method
+	<-d.controllerStoppedChannel
 }
 
 // handleFlushRequest handles a flushRequest control message.
@@ -644,6 +639,7 @@ func (d *DiskTable) handleFlushRequest(req *flushRequest) {
 	// TODO is there a better way than passing functions?
 
 	d.flushChannel <- func() {
+
 		flushResponse := <-flushResponseChannel
 		if flushResponse.Error != nil {
 			err := fmt.Errorf("failed to flush mutable segment: %v", flushResponse.Error)
@@ -671,6 +667,7 @@ func (d *DiskTable) flushLoop() {
 			d.logger.Infof("context done, shutting down disk table flush loop")
 		case flushFunc := <-d.flushChannel:
 			if flushFunc == nil {
+				<-d.flushStoppedChannel
 				return
 			}
 			flushFunc()
@@ -702,8 +699,6 @@ func (d *DiskTable) flushKeys(keys []*types.KAPair) error {
 // controlLoop is the main loop for the disk table. It has sole responsibility for mutating data managed by the
 // disk table (this vastly simplifies locking and thread safety).
 func (d *DiskTable) controlLoop() {
-	defer d.shutdownTasks()
-
 	ticker := time.NewTicker(d.garbageCollectionPeriod)
 
 	for {
@@ -715,7 +710,8 @@ func (d *DiskTable) controlLoop() {
 				d.handleWriteRequest(writeReq)
 			} else if flushReq, ok := message.(*flushRequest); ok {
 				if flushReq.shutdown {
-					d.handleShutdownRequest(flushReq)
+					d.shutdownTasks()
+					return
 				} else {
 					d.handleFlushRequest(flushReq)
 				}
@@ -726,30 +722,6 @@ func (d *DiskTable) controlLoop() {
 			d.doGarbageCollection()
 		}
 	}
-}
-
-// shutdownTasks performs tasks necessary to cleanly shut down the disk table.
-func (d *DiskTable) shutdownTasks() {
-	// Seal the mutable segment
-	durableKeys, err := d.segments[d.highestSegmentIndex].Seal(d.timeSource())
-	if err != nil {
-		d.logger.Errorf("failed to seal mutable segment: %v", err)
-	}
-
-	// Flush the keys that are now durable in the segment.
-	err = d.flushKeys(durableKeys)
-	if err != nil {
-		d.logger.Errorf("failed to flush keys: %v", err)
-	}
-
-	// Stop the key map
-	err = d.keyMap.Stop()
-	if err != nil {
-		d.logger.Errorf("failed to stop key map: %v", err)
-	}
-
-	// unblock the Stop() method
-	<-d.stopChannel
 }
 
 // doGarbageCollection performs garbage collection on all segments, deleting old ones as necessary.
