@@ -31,20 +31,16 @@ func NewBlockNumberMonitor(
 	logger logging.Logger,
 	ethClient common.EthClient,
 	pollIntervalDuration time.Duration,
-) *BlockNumberMonitor {
+) (*BlockNumberMonitor, error) {
 	if pollIntervalDuration <= time.Duration(0) {
-		logger.Warn(
-			`Poll interval duration is <= 0. Therefore, any method calls made with this object that 
-					rely on the internal client having reached a certain block number will fail if
-					the internal client is too far behind.`,
-			"pollIntervalDuration", pollIntervalDuration)
+		return nil, fmt.Errorf("input pollIntervalDuration (%v) must be greater than zero", pollIntervalDuration)
 	}
 
 	return &BlockNumberMonitor{
 		logger:               logger,
 		ethClient:            ethClient,
 		pollIntervalDuration: pollIntervalDuration,
-	}
+	}, nil
 }
 
 // WaitForBlockNumber waits until the internal eth client has advanced to a certain targetBlockNumber.
@@ -53,16 +49,13 @@ func NewBlockNumberMonitor(
 // It will return nil if the internal client advances to (or past) the targetBlockNumber. It will return an error
 // if the input context times out, or if any error occurs when checking the block number of the internal client.
 //
-// If configured pollInterval is <= 0, this method will NOT wait for the internal client to advance, and instead will
-// simply return nil.
-//
 // This method is synchronized in a way that, if called by multiple goroutines, only a single goroutine will actually
 // poll the internal eth client for the most recent block number. The goroutine responsible for polling at a given time
 // updates an atomic integer, so that all goroutines may check the most recent block without duplicating work.
 func (bnm *BlockNumberMonitor) WaitForBlockNumber(ctx context.Context, targetBlockNumber uint64) error {
 	if bnm.pollIntervalDuration <= 0 {
-		// don't wait for the internal client to advance. duration <= 0 would cause the ticker to panic
-		return nil
+		return fmt.Errorf(
+			"pollIntervalDuration is <= 0: you ought to be using the provided constructor, which checks this")
 	}
 
 	if bnm.latestBlockNumber.Load() >= targetBlockNumber {
