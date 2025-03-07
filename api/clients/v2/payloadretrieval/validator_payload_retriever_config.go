@@ -16,8 +16,8 @@ type ValidatorPayloadRetrieverConfig struct {
 	RetrievalTimeout time.Duration
 }
 
-// GetDefaultValidatorPayloadRetrieverConfig creates a ValidatorPayloadRetrieverConfig with default values
-func GetDefaultValidatorPayloadRetrieverConfig() *ValidatorPayloadRetrieverConfig {
+// getDefaultValidatorPayloadRetrieverConfig creates a ValidatorPayloadRetrieverConfig with default values
+func getDefaultValidatorPayloadRetrieverConfig() *ValidatorPayloadRetrieverConfig {
 	return &ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig: *clients.GetDefaultPayloadClientConfig(),
 		RetrievalTimeout:    30 * time.Second,
@@ -27,7 +27,7 @@ func GetDefaultValidatorPayloadRetrieverConfig() *ValidatorPayloadRetrieverConfi
 // checkAndSetDefaults checks an existing config struct. If a given field is 0, and 0 is not an acceptable value, then
 // this method sets it to the default.
 func (rc *ValidatorPayloadRetrieverConfig) checkAndSetDefaults() error {
-	defaultConfig := GetDefaultValidatorPayloadRetrieverConfig()
+	defaultConfig := getDefaultValidatorPayloadRetrieverConfig()
 	if rc.RetrievalTimeout == 0 {
 		rc.RetrievalTimeout = defaultConfig.RetrievalTimeout
 	}

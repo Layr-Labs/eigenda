@@ -15,8 +15,8 @@ type RelayPayloadRetrieverConfig struct {
 	RelayTimeout time.Duration
 }
 
-// GetDefaultRelayPayloadRetrieverConfig creates a RelayPayloadRetrieverConfig with default values
-func GetDefaultRelayPayloadRetrieverConfig() *RelayPayloadRetrieverConfig {
+// getDefaultRelayPayloadRetrieverConfig creates a RelayPayloadRetrieverConfig with default values
+func getDefaultRelayPayloadRetrieverConfig() *RelayPayloadRetrieverConfig {
 	return &RelayPayloadRetrieverConfig{
 		PayloadClientConfig: *clients.GetDefaultPayloadClientConfig(),
 		RelayTimeout:        5 * time.Second,
@@ -26,7 +26,7 @@ func GetDefaultRelayPayloadRetrieverConfig() *RelayPayloadRetrieverConfig {
 // checkAndSetDefaults checks an existing config struct. If a given field is 0, and 0 is not an acceptable value, then
 // this method sets it to the default.
 func (rc *RelayPayloadRetrieverConfig) checkAndSetDefaults() error {
-	defaultConfig := GetDefaultRelayPayloadRetrieverConfig()
+	defaultConfig := getDefaultRelayPayloadRetrieverConfig()
 	if rc.RelayTimeout == 0 {
 		rc.RelayTimeout = defaultConfig.RelayTimeout
 	}

@@ -27,8 +27,8 @@ type PayloadDisperserConfig struct {
 	ContractCallTimeout time.Duration
 }
 
-// GetDefaultPayloadDisperserConfig creates a PayloadDisperserConfig with default values
-func GetDefaultPayloadDisperserConfig() *PayloadDisperserConfig {
+// getDefaultPayloadDisperserConfig creates a PayloadDisperserConfig with default values
+func getDefaultPayloadDisperserConfig() *PayloadDisperserConfig {
 	return &PayloadDisperserConfig{
 		PayloadClientConfig:    *clients.GetDefaultPayloadClientConfig(),
 		DisperseBlobTimeout:    2 * time.Minute,
@@ -41,7 +41,7 @@ func GetDefaultPayloadDisperserConfig() *PayloadDisperserConfig {
 // checkAndSetDefaults checks an existing config struct. If a given field is 0, and 0 is not an acceptable value, then
 // this method sets it to the default.
 func (dc *PayloadDisperserConfig) checkAndSetDefaults() error {
-	defaultConfig := GetDefaultPayloadDisperserConfig()
+	defaultConfig := getDefaultPayloadDisperserConfig()
 
 	if dc.DisperseBlobTimeout == 0 {
 		dc.DisperseBlobTimeout = defaultConfig.DisperseBlobTimeout
