@@ -1,6 +1,10 @@
 package clients
 
-import "github.com/ethereum/go-ethereum/common"
+import (
+	"context"
+
+	"github.com/ethereum/go-ethereum/common"
+)
 
 // CertVerifierAddressProvider defines an object which can translate block number to cert verifier address
 //
@@ -10,5 +14,5 @@ import "github.com/ethereum/go-ethereum/common"
 // exceed the reference block number of the blob's batch.
 type CertVerifierAddressProvider interface {
 	// GetCertVerifierAddress returns the EigenDACertVerifierAddress that is active at the input reference block number
-	GetCertVerifierAddress(referenceBlockNumber uint64) (common.Address, error)
+	GetCertVerifierAddress(ctx context.Context, referenceBlockNumber uint64) (common.Address, error)
 }

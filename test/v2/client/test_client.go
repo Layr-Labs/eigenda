@@ -152,7 +152,7 @@ func NewTestClient(
 
 	certVerifierAddressProvider := &test.TestCertVerifierAddressProvider{}
 
-	certVerifier, err := verification.NewCertVerifier(logger, ethClient, certVerifierAddressProvider, time.Second)
+	certVerifier, err := verification.NewCertVerifier(logger, ethClient, certVerifierAddressProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cert verifier: %w", err)
 	}

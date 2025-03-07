@@ -1,6 +1,8 @@
 package verification
 
 import (
+	"context"
+
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -19,6 +21,9 @@ func NewStaticCertVerifierAddressProvider(certVerifierAddress common.Address) *S
 
 var _ clients.CertVerifierAddressProvider = &StaticCertVerifierAddressProvider{}
 
-func (s *StaticCertVerifierAddressProvider) GetCertVerifierAddress(_ uint64) (common.Address, error) {
+func (s *StaticCertVerifierAddressProvider) GetCertVerifierAddress(
+	_ context.Context,
+	_ uint64,
+) (common.Address, error) {
 	return s.certVerifierAddress, nil
 }

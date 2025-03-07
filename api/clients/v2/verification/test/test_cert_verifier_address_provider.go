@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"sync/atomic"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -17,7 +18,7 @@ type TestCertVerifierAddressProvider struct {
 
 var _ clients.CertVerifierAddressProvider = &TestCertVerifierAddressProvider{}
 
-func (s *TestCertVerifierAddressProvider) GetCertVerifierAddress(_ uint64) (common.Address, error) {
+func (s *TestCertVerifierAddressProvider) GetCertVerifierAddress(_ context.Context, _ uint64) (common.Address, error) {
 	return s.certVerifierAddress.Load().(common.Address), nil
 }
 

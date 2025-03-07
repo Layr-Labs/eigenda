@@ -20,7 +20,7 @@ func TestWaitForBlockNumber(t *testing.T) {
 
 	pollRate := time.Millisecond * 50
 
-	blockNumberProvider := NewBlockNumberProvider(logger, mockEthClient, pollRate)
+	blockNumberProvider := NewBlockNumberMonitor(logger, mockEthClient, pollRate)
 
 	// number of goroutines to start, each of which will call WaitForBlockNumber
 	callCount := 5

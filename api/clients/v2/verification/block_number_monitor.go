@@ -10,8 +10,11 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// BlockNumberProvider is a utility for interacting with the ethereum block number
-type BlockNumberProvider struct {
+// BlockNumberMonitor is a utility for waiting for a certain ethereum block number
+//
+// TODO: this utility is not currently in use, but DO NOT delete it. It will be necessary for the upcoming
+//  CertVerifierRouter effort
+type BlockNumberMonitor struct {
 	logger    logging.Logger
 	ethClient common.EthClient
 	// duration of interval when periodically polling the block number
@@ -23,12 +26,12 @@ type BlockNumberProvider struct {
 	pollingActive atomic.Bool
 }
 
-// NewBlockNumberProvider creates a new block number provider
-func NewBlockNumberProvider(
+// NewBlockNumberMonitor creates a new block number monitor
+func NewBlockNumberMonitor(
 	logger logging.Logger,
 	ethClient common.EthClient,
 	pollIntervalDuration time.Duration,
-) *BlockNumberProvider {
+) *BlockNumberMonitor {
 	if pollIntervalDuration <= time.Duration(0) {
 		logger.Warn(
 			`Poll interval duration is <= 0. Therefore, any method calls made with this object that 
@@ -37,7 +40,7 @@ func NewBlockNumberProvider(
 			"pollIntervalDuration", pollIntervalDuration)
 	}
 
-	return &BlockNumberProvider{
+	return &BlockNumberMonitor{
 		logger:               logger,
 		ethClient:            ethClient,
 		pollIntervalDuration: pollIntervalDuration,
@@ -56,25 +59,25 @@ func NewBlockNumberProvider(
 // This method is synchronized in a way that, if called by multiple goroutines, only a single goroutine will actually
 // poll the internal eth client for the most recent block number. The goroutine responsible for polling at a given time
 // updates an atomic integer, so that all goroutines may check the most recent block without duplicating work.
-func (bnp *BlockNumberProvider) WaitForBlockNumber(ctx context.Context, targetBlockNumber uint64) error {
-	if bnp.pollIntervalDuration <= 0 {
+func (bnm *BlockNumberMonitor) WaitForBlockNumber(ctx context.Context, targetBlockNumber uint64) error {
+	if bnm.pollIntervalDuration <= 0 {
 		// don't wait for the internal client to advance. duration <= 0 would cause the ticker to panic
 		return nil
 	}
 
-	if bnp.latestBlockNumber.Load() >= targetBlockNumber {
+	if bnm.latestBlockNumber.Load() >= targetBlockNumber {
 		// immediately return if the local client isn't behind the target block number
 		return nil
 	}
 
-	ticker := time.NewTicker(bnp.pollIntervalDuration)
+	ticker := time.NewTicker(bnm.pollIntervalDuration)
 	defer ticker.Stop()
 
 	polling := false
-	if bnp.pollingActive.CompareAndSwap(false, true) {
+	if bnm.pollingActive.CompareAndSwap(false, true) {
 		// no other goroutine is currently polling, so assume responsibility
 		polling = true
-		defer bnp.pollingActive.Store(false)
+		defer bnm.pollingActive.Store(false)
 	}
 
 	for {
@@ -82,57 +85,46 @@ func (bnp *BlockNumberProvider) WaitForBlockNumber(ctx context.Context, targetBl
 		case <-ctx.Done():
 			return fmt.Errorf(
 				"timed out waiting for block number %d (latest block number observed was %d): %w",
-				targetBlockNumber, bnp.latestBlockNumber.Load(), ctx.Err())
+				targetBlockNumber, bnm.latestBlockNumber.Load(), ctx.Err())
 		case <-ticker.C:
-			if bnp.latestBlockNumber.Load() >= targetBlockNumber {
+			if bnm.latestBlockNumber.Load() >= targetBlockNumber {
 				return nil
 			}
 
-			if bnp.pollingActive.CompareAndSwap(false, true) {
+			if bnm.pollingActive.CompareAndSwap(false, true) {
 				// no other goroutine is currently polling, so assume responsibility
 				polling = true
-				defer bnp.pollingActive.Store(false)
+				defer bnm.pollingActive.Store(false)
 			}
 
 			if polling {
-				fetchedBlockNumber, err := bnp.FetchLatestBlockNumber(ctx)
+				blockNumber, err := bnm.ethClient.BlockNumber(ctx)
 				if err != nil {
-					bnp.logger.Debug(
+					return fmt.Errorf("get block number from eth client: %w", err)
+				}
+
+				bnm.latestBlockNumber.Store(blockNumber)
+
+				if err != nil {
+					bnm.logger.Debug(
 						"ethClient.BlockNumber returned an error",
 						"targetBlockNumber", targetBlockNumber,
-						"latestBlockNumber", bnp.latestBlockNumber.Load(),
+						"latestBlockNumber", bnm.latestBlockNumber.Load(),
 						"error", err)
 
 					// tolerate some failures here. if failure continues for too long, it will be caught by the timeout
 					continue
 				}
 
-				if fetchedBlockNumber >= targetBlockNumber {
+				if blockNumber >= targetBlockNumber {
 					return nil
 				}
 			}
 
-			bnp.logger.Debug(
+			bnm.logger.Debug(
 				"local client is behind the reference block number",
 				"targetBlockNumber", targetBlockNumber,
-				"actualBlockNumber", bnp.latestBlockNumber.Load())
+				"actualBlockNumber", bnm.latestBlockNumber.Load())
 		}
 	}
-}
-
-// FetchLatestBlockNumber fetches the latest block number from the eth client, and returns it.
-//
-// This method atomically stores the latest block number for internal use.
-//
-// Calling this method doesn't have an impact on the cadence of the standard block number polling that occurs
-// in WaitForBlockNumber.
-func (bnp *BlockNumberProvider) FetchLatestBlockNumber(ctx context.Context) (uint64, error) {
-	blockNumber, err := bnp.ethClient.BlockNumber(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("get block number from eth client: %w", err)
-	}
-
-	bnp.latestBlockNumber.Store(blockNumber)
-
-	return blockNumber, nil
 }
