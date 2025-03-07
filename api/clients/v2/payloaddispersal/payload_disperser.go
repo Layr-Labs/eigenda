@@ -1,12 +1,12 @@
-package clients
+package payloaddispersal
 
 import (
 	"context"
 	"fmt"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -16,11 +16,10 @@ import (
 //
 // This struct is goroutine safe.
 type PayloadDisperser struct {
-	logger               logging.Logger
-	config               PayloadDisperserConfig
-	disperserClient      DisperserClient
-	certVerifier         verification.ICertVerifier
-	requiredQuorumsStore *RequiredQuorumsStore
+	logger          logging.Logger
+	config          PayloadDisperserConfig
+	disperserClient clients.DisperserClient
+	certVerifier    clients.ICertVerifier
 }
 
 // NewPayloadDisperser creates a PayloadDisperser from subcomponents that have already been constructed and initialized.
@@ -34,8 +33,8 @@ func NewPayloadDisperser(
 	// TODO: In the future, an optimized method of commitment verification using fiat shamir transformation will
 	//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
 	//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
-	disperserClient DisperserClient,
-	certVerifier verification.ICertVerifier,
+	disperserClient clients.DisperserClient,
+	certVerifier clients.ICertVerifier,
 ) (*PayloadDisperser, error) {
 
 	err := payloadDisperserConfig.checkAndSetDefaults()
@@ -43,17 +42,11 @@ func NewPayloadDisperser(
 		return nil, fmt.Errorf("check and set PayloadDisperserConfig defaults: %w", err)
 	}
 
-	requiredQuorumsStore, err := NewRequiredQuorumsStore(certVerifier)
-	if err != nil {
-		return nil, fmt.Errorf("new required quorums store: %w", err)
-	}
-
 	return &PayloadDisperser{
-		logger:               logger,
-		config:               payloadDisperserConfig,
-		disperserClient:      disperserClient,
-		certVerifier:         certVerifier,
-		requiredQuorumsStore: requiredQuorumsStore,
+		logger:          logger,
+		config:          payloadDisperserConfig,
+		disperserClient: disperserClient,
+		certVerifier:    certVerifier,
 	}, nil
 }
 
@@ -67,10 +60,9 @@ func NewPayloadDisperser(
 //  6. Return the valid cert
 func (pd *PayloadDisperser) SendPayload(
 	ctx context.Context,
-	certVerifierAddress string,
 	// payload is the raw data to be stored on eigenDA
 	payload *coretypes.Payload,
-) (*verification.EigenDACert, error) {
+) (*coretypes.EigenDACert, error) {
 	blob, err := payload.ToBlob(pd.config.PayloadPolynomialForm)
 	if err != nil {
 		return nil, fmt.Errorf("convert payload to blob: %w", err)
@@ -78,7 +70,7 @@ func (pd *PayloadDisperser) SendPayload(
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	requiredQuorums, err := pd.requiredQuorumsStore.GetQuorumNumbersRequired(timeoutCtx, certVerifierAddress)
+	requiredQuorums, err := pd.certVerifier.GetQuorumNumbersRequired(timeoutCtx)
 	if err != nil {
 		return nil, fmt.Errorf("get quorum numbers required: %w", err)
 	}
@@ -109,7 +101,7 @@ func (pd *PayloadDisperser) SendPayload(
 	}
 	pd.logger.Debug("Blob status CERTIFIED", "blobKey", blobKey.Hex())
 
-	eigenDACert, err := pd.buildEigenDACert(ctx, certVerifierAddress, blobKey, blobStatusReply)
+	eigenDACert, err := pd.buildEigenDACert(ctx, blobKey, blobStatusReply)
 	if err != nil {
 		// error returned from method is sufficiently descriptive
 		return nil, err
@@ -117,7 +109,7 @@ func (pd *PayloadDisperser) SendPayload(
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	err = pd.certVerifier.VerifyCertV2(timeoutCtx, certVerifierAddress, eigenDACert)
+	err = pd.certVerifier.VerifyCertV2(timeoutCtx, eigenDACert)
 	if err != nil {
 		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
 	}
@@ -205,21 +197,20 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 // contract, and then assembles an EigenDACert
 func (pd *PayloadDisperser) buildEigenDACert(
 	ctx context.Context,
-	certVerifierAddress string,
 	blobKey core.BlobKey,
 	blobStatusReply *dispgrpc.BlobStatusReply,
-) (*verification.EigenDACert, error) {
+) (*coretypes.EigenDACert, error) {
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
 	nonSignerStakesAndSignature, err := pd.certVerifier.GetNonSignerStakesAndSignature(
-		timeoutCtx, certVerifierAddress, blobStatusReply.GetSignedBatch())
+		timeoutCtx, blobStatusReply.GetSignedBatch())
 	if err != nil {
 		return nil, fmt.Errorf("get non signer stake and signature: %w", err)
 	}
 	pd.logger.Debug("Retrieved NonSignerStakesAndSignature", "blobKey", blobKey.Hex())
 
-	eigenDACert, err := verification.BuildEigenDACert(blobStatusReply, nonSignerStakesAndSignature)
+	eigenDACert, err := coretypes.BuildEigenDACert(blobStatusReply, nonSignerStakesAndSignature)
 	if err != nil {
 		return nil, fmt.Errorf("build eigen da cert: %w", err)
 	}

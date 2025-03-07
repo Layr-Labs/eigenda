@@ -1,4 +1,4 @@
-package clients
+package payloadretrieval
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	core "github.com/Layr-Labs/eigenda/core/v2"
@@ -23,11 +24,11 @@ type RelayPayloadRetriever struct {
 	// must be evaluated for thread safety.
 	random      *rand.Rand
 	config      RelayPayloadRetrieverConfig
-	relayClient RelayClient
+	relayClient clients.RelayClient
 	g1Srs       []bn254.G1Affine
 }
 
-var _ PayloadRetriever = &RelayPayloadRetriever{}
+var _ clients.PayloadRetriever = &RelayPayloadRetriever{}
 
 // NewRelayPayloadRetriever assembles a RelayPayloadRetriever from subcomponents that have already been constructed and
 // initialized.
@@ -35,7 +36,7 @@ func NewRelayPayloadRetriever(
 	log logging.Logger,
 	random *rand.Rand,
 	relayPayloadRetrieverConfig RelayPayloadRetrieverConfig,
-	relayClient RelayClient,
+	relayClient clients.RelayClient,
 	g1Srs []bn254.G1Affine) (*RelayPayloadRetriever, error) {
 
 	err := relayPayloadRetrieverConfig.checkAndSetDefaults()
@@ -63,7 +64,7 @@ func NewRelayPayloadRetriever(
 // verified prior to calling this method.
 func (pr *RelayPayloadRetriever) GetPayload(
 	ctx context.Context,
-	eigenDACert *verification.EigenDACert) (*coretypes.Payload, error) {
+	eigenDACert *coretypes.EigenDACert) (*coretypes.Payload, error) {
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	if err != nil {
@@ -76,7 +77,7 @@ func (pr *RelayPayloadRetriever) GetPayload(
 		return nil, errors.New("relay key count is zero")
 	}
 
-	blobCommitments, err := verification.BlobCommitmentsBindingToInternal(
+	blobCommitments, err := coretypes.BlobCommitmentsBindingToInternal(
 		&eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment)
 
 	if err != nil {

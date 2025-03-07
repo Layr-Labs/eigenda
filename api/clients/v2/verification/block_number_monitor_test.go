@@ -1,4 +1,4 @@
-package test
+package verification
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
@@ -14,21 +13,17 @@ import (
 )
 
 func TestWaitForBlockNumber(t *testing.T) {
-	mockEthClient := commonmock.MockEthClient{}
+	mockEthClient := &commonmock.MockEthClient{}
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
 
 	pollRate := time.Millisecond * 50
 
-	certVerifier, err := verification.NewCertVerifier(
-		logger,
-		&mockEthClient,
-		pollRate)
+	blockNumberMonitor, err := NewBlockNumberMonitor(logger, mockEthClient, pollRate)
 	require.NoError(t, err)
-	require.NotNil(t, certVerifier)
 
-	// number of goroutines to start, each of which will call MaybeWaitForBlockNumber
+	// number of goroutines to start, each of which will call WaitForBlockNumber
 	callCount := 5
 
 	for i := uint64(0); i < uint64(callCount); i++ {
@@ -54,11 +49,11 @@ func TestWaitForBlockNumber(t *testing.T) {
 
 			if i == callCount-1 {
 				// the last call is set up to fail, by setting the target block to a number that will never be attained
-				err := certVerifier.MaybeWaitForBlockNumber(timeoutCtx, uint64(i)+1)
+				err := blockNumberMonitor.WaitForBlockNumber(timeoutCtx, uint64(i)+1)
 				require.Error(t, err)
 			} else {
 				// all calls except the final call wait for a block number corresponding to their index
-				err := certVerifier.MaybeWaitForBlockNumber(timeoutCtx, uint64(i))
+				err := blockNumberMonitor.WaitForBlockNumber(timeoutCtx, uint64(i))
 				require.NoError(t, err)
 			}
 		}(index)
