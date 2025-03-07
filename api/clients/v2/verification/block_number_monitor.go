@@ -12,7 +12,7 @@ import (
 
 // BlockNumberMonitor is a utility for waiting for a certain ethereum block number
 //
-// TODO: this utility is not currently in use, but DO NOT delete it. It will be necessary for the upcoming
+// TODO (litt3): this utility is not currently in use, but DO NOT delete it. It will be necessary for the upcoming
 //  CertVerifierRouter effort
 type BlockNumberMonitor struct {
 	logger    logging.Logger
