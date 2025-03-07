@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
@@ -38,7 +39,7 @@ type RelayPayloadRetrieverTester struct {
 	RelayPayloadRetriever *RelayPayloadRetriever
 	MockRelayClient       *clientsmock.MockRelayClient
 	G1Srs                 []bn254.G1Affine
-	Config                RelayPayloadRetrieverConfig
+	PayloadPolynomialForm codecs.PolynomialForm
 }
 
 // buildRelayPayloadRetrieverTester sets up a client with mocks necessary for testing
@@ -75,7 +76,7 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 		RelayPayloadRetriever: client,
 		MockRelayClient:       &mockRelayClient,
 		G1Srs:                 g1Srs,
-		Config:                clientConfig,
+		PayloadPolynomialForm: clientConfig.PayloadPolynomialForm,
 	}
 }
 
@@ -87,7 +88,7 @@ func buildBlobAndCert(
 ) (core.BlobKey, []byte, *coretypes.EigenDACert) {
 
 	payloadBytes := tester.Random.Bytes(tester.Random.Intn(maxPayloadBytes))
-	blob, err := coretypes.NewPayload(payloadBytes).ToBlob(tester.Config.PayloadPolynomialForm)
+	blob, err := coretypes.NewPayload(payloadBytes).ToBlob(tester.PayloadPolynomialForm)
 	require.NoError(t, err)
 
 	blobBytes := blob.Serialize()
