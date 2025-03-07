@@ -16,6 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
@@ -348,7 +349,7 @@ func (c *TestClient) GetLogger() logging.Logger {
 // SetCertVerifierAddress sets the address string which will be returned by the cert verifier address to all users of
 // the provider
 func (c *TestClient) SetCertVerifierAddress(certVerifierAddress string) {
-	c.certVerifierAddressProvider.SetCertVerifierAddress(certVerifierAddress)
+	c.certVerifierAddressProvider.SetCertVerifierAddress(gethcommon.HexToAddress(certVerifierAddress))
 }
 
 // GetDisperserClient returns the test client's disperser client.

@@ -27,7 +27,7 @@ type CertVerifier struct {
 	certVerifierAddressProvider clients.CertVerifierAddressProvider
 	// maps contract address to a ContractEigenDACertVerifierCaller object
 	verifierCallers sync.Map
-	// maps cert verifier address string to set of required quorums specified in the contract at that address
+	// maps cert verifier address to set of required quorums specified in the contract at that address
 	requiredQuorums sync.Map
 }
 
@@ -242,7 +242,7 @@ func (cv *CertVerifier) getVerifierCallerFromBlockNumber(
 // This method caches ContractEigenDACertVerifierCaller instances, since their construction requires acquiring a lock
 // and parsing json, and is therefore non-trivially expensive.
 func (cv *CertVerifier) getVerifierCallerFromAddress(
-	certVerifierAddress string,
+	certVerifierAddress gethcommon.Address,
 ) (*verifierBindings.ContractEigenDACertVerifierCaller, error) {
 	existingCallerAny, valueExists := cv.verifierCallers.Load(certVerifierAddress)
 	if valueExists {
@@ -254,8 +254,7 @@ func (cv *CertVerifier) getVerifierCallerFromAddress(
 		return existingCaller, nil
 	}
 
-	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(
-		gethcommon.HexToAddress(certVerifierAddress), cv.ethClient)
+	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(certVerifierAddress, cv.ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
 	}
