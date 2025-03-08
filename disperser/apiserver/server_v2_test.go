@@ -111,12 +111,43 @@ func TestV2DisperseBlob(t *testing.T) {
 	assert.Greater(t, blobMetadata.RequestedAt, uint64(now.UnixNano()))
 	assert.Equal(t, blobMetadata.RequestedAt, blobMetadata.UpdatedAt)
 
-	// Try dispersing the same blob; if payment is different, blob will be considered as a differernt blob
-	// payment will cause failure before commitment check
+	// Try dispersing the same blob; blob key check will fail if the blob is already stored
 	reply, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
 		Blob:       data,
 		Signature:  sig,
 		BlobHeader: blobHeaderProto,
+	})
+	assert.Nil(t, reply)
+	assert.ErrorContains(t, err, "blob already exists")
+
+	data2 := make([]byte, 50)
+	_, err = rand.Read(data)
+	assert.NoError(t, err)
+
+	data2 = codec.ConvertByPaddingEmptyByte(data2)
+	commitments, err = prover.GetCommitmentsForPaddedLength(data2)
+	assert.NoError(t, err)
+	commitmentProto, err = commitments.ToProtobuf()
+	assert.NoError(t, err)
+	blobHeaderProto2 := &pbcommonv2.BlobHeader{
+		Version:       0,
+		QuorumNumbers: []uint32{0, 1},
+		Commitment:    commitmentProto,
+		PaymentHeader: &pbcommonv2.PaymentHeader{
+			AccountId:         accountID.Hex(),
+			Timestamp:         5,
+			CumulativePayment: big.NewInt(100).Bytes(),
+		},
+	}
+	blobHeader2, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto2)
+	assert.NoError(t, err)
+	sig2, err := signer.SignBlobRequest(blobHeader2)
+	assert.NoError(t, err)
+
+	reply, err = c.DispersalServerV2.DisperseBlob(ctx, &pbv2.DisperseBlobRequest{
+		Blob:       data2,
+		Signature:  sig2,
+		BlobHeader: blobHeaderProto2,
 	})
 	assert.Nil(t, reply)
 	assert.ErrorContains(t, err, "payment already exists")
