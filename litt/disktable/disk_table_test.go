@@ -1488,13 +1488,13 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 		}
 	}
 
-	// Enable a TTL for the table. The goal is to force the keys that were not flush to become eligible for
-	// garbage collection.
+	// Enable a TTL for the table. The goal is to force the keys that were removed from the key map artificially to
+	// become eligible for garbage collection.
 	err = table.SetTTL(1 * time.Millisecond)
 	require.NoError(t, err)
 
 	// Sleep for a short time to allow the TTL to expire, and to give the garbage collector a chance to
-	// do bad things if it is going to.
+	// do bad things if it is going to. Nothing bad should happen if the GC is implemented correctly.
 	time.Sleep(50 * time.Millisecond)
 
 	err = table.Destroy()
@@ -1777,3 +1777,5 @@ func TestRestartWithMultipleStorageDirectories(t *testing.T) {
 		restartWithMultipleStorageDirectoriesTest(t, tb)
 	}
 }
+
+// TODO unit test if it is possible for key/value file to be empty if segment is sealed before data is written

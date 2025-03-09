@@ -27,6 +27,8 @@ const keyMapReloadBatchSize = 1024
 
 const tableFlushChannelCapacity = 8
 
+// TODO handle all the scenarios where the DB needs to brick itself (i.e. an unrecoverable error)
+
 // DiskTable manages a table's Segments.
 type DiskTable struct {
 	// The context for the disk table.
@@ -82,16 +84,8 @@ type DiskTable struct {
 	// segmentLock and reference counting.
 	controllerChannel chan any
 
-	// This channel can be used to block until controller thread has been stopped. The channel has a capacity of 1, and
-	// there is an element in the channel up until the controller thread has stopped.
-	controllerStoppedChannel chan struct{}
-
-	// flushChannel is a channel used to enqueue flush work. If nil is sent to this channel, the flush loop exits.
-	flushChannel chan func()
-
-	// flushStoppedChannel is a channel used to block until the flush loop has stopped. This channel has a capacity of
-	// 1, and there is an element in the channel up until the flush loop has stopped.
-	flushStoppedChannel chan struct{}
+	// flushChannel is a channel used to enqueue work on the flush loop goroutine.
+	flushChannel chan any
 
 	// garbageCollectionPeriod is the period at which garbage collection is run.
 	garbageCollectionPeriod time.Duration
@@ -183,26 +177,22 @@ func NewDiskTable(
 	}
 
 	table := &DiskTable{
-		ctx:                      ctx,
-		logger:                   logger,
-		timeSource:               timeSource,
-		roots:                    roots,
-		segmentDirectories:       segDirs,
-		name:                     name,
-		metadata:                 metadata,
-		saltShaker:               saltShaker,
-		keyMap:                   keyMap,
-		targetFileSize:           targetFileSize,
-		segments:                 make(map[uint32]*segment.Segment),
-		controllerChannel:        make(chan any, controlChannelSize),
-		controllerStoppedChannel: make(chan struct{}, 1),
-		flushChannel:             make(chan func(), tableFlushChannelCapacity),
-		flushStoppedChannel:      make(chan struct{}, 1),
-		garbageCollectionPeriod:  gcPeriod,
+		ctx:                     ctx,
+		logger:                  logger,
+		timeSource:              timeSource,
+		roots:                   roots,
+		segmentDirectories:      segDirs,
+		name:                    name,
+		metadata:                metadata,
+		saltShaker:              saltShaker,
+		keyMap:                  keyMap,
+		targetFileSize:          targetFileSize,
+		segments:                make(map[uint32]*segment.Segment),
+		controllerChannel:       make(chan any, controlChannelSize),
+		flushChannel:            make(chan any, tableFlushChannelCapacity),
+		garbageCollectionPeriod: gcPeriod,
 	}
 	table.alive.Store(true)
-	table.controllerStoppedChannel <- struct{}{}
-	table.flushStoppedChannel <- struct{}{}
 
 	var err error
 	table.lowestSegmentIndex, table.highestSegmentIndex, table.segments, err =
@@ -311,17 +301,15 @@ func (d *DiskTable) Start() error {
 // Stop stops the disk table. Flushes all data out to disk.
 func (d *DiskTable) Stop() error {
 	alive := d.alive.Swap(false)
-	if alive {
-		flushReq := &flushRequest{
-			shutdown:     true,
-			responseChan: make(chan error, 1),
-		}
-		d.controllerChannel <- flushReq
+	if !alive {
+		return fmt.Errorf("DB is already shut down")
 	}
 
-	// Wait for the control loop to stop.
-	d.controllerStoppedChannel <- struct{}{}
-	<-d.controllerStoppedChannel
+	shutdownCompleteChan := make(chan struct{}, 1)
+	d.controllerChannel <- &controlLoopShutdownRequest{
+		shutdownCompleteChan: shutdownCompleteChan,
+	}
+	<-shutdownCompleteChan
 
 	return nil
 }
@@ -462,7 +450,7 @@ func (d *DiskTable) Put(key []byte, value []byte) error {
 
 	d.unflushedDataCache.Store(string(key), value)
 
-	writeReq := &writeRequest{
+	writeReq := &controlLoopWriteRequest{
 		values: make([]*types.KVPair, 1),
 	}
 	writeReq.values[0] = &types.KVPair{
@@ -484,20 +472,15 @@ func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 		d.unflushedDataCache.Store(string(kv.Key), kv.Value)
 	}
 
-	request := &writeRequest{
+	request := &controlLoopWriteRequest{
 		values: batch,
 	}
 	d.controllerChannel <- request
 	return nil
 }
 
-// writeRequest is a request to write a key-value pair.
-type writeRequest struct {
-	values []*types.KVPair
-}
-
-// handleWriteRequest handles a writeRequest control message.
-func (d *DiskTable) handleWriteRequest(req *writeRequest) {
+// handleWriteRequest handles a controlLoopWriteRequest control message.
+func (d *DiskTable) handleWriteRequest(req *controlLoopWriteRequest) {
 	for _, kv := range req.values {
 		// Do the write.
 		seg := d.segments[d.highestSegmentIndex]
@@ -527,61 +510,13 @@ func (d *DiskTable) panic(err error) {
 	}
 }
 
-// expandSegments checks if the highest segment is full, and if so, creates a new segment.
-func (d *DiskTable) expandSegments() error {
-	errChan := make(chan error, 1)
-
-	// This work is done in the flush goroutine to avoid a prior flush executing concurrently with this work.
-	d.flushChannel <- func() {
-		// Seal the previous segment.
-		now := d.timeSource()
-		durableKeys, err := d.segments[d.highestSegmentIndex].Seal(now)
-		if err != nil {
-			errChan <- fmt.Errorf("failed to seal segment %d: %v", d.highestSegmentIndex, err)
-			return
-		}
-
-		// Flush the keys that are now durable in the segment.
-		err = d.flushKeys(durableKeys)
-		if err != nil {
-			errChan <- fmt.Errorf("failed to flush keys: %v", err)
-			return
-		}
-
-		// Create a new segment.
-		newSegment, err := segment.NewSegment(
-			d.ctx,
-			d.logger,
-			d.highestSegmentIndex+1,
-			d.segmentDirectories,
-			now,
-			d.metadata.GetShardingFactor(),
-			d.saltShaker.Uint32(),
-			false)
-		if err != nil {
-			errChan <- fmt.Errorf("failed to create new segment: %v", err)
-			return
-		}
-		d.segments[d.highestSegmentIndex].SetNextSegment(newSegment)
-		d.highestSegmentIndex++
-
-		d.segmentLock.Lock()
-		d.segments[d.highestSegmentIndex] = newSegment
-		d.segmentLock.Unlock()
-
-		errChan <- nil
-	}
-
-	return <-errChan
-}
-
 // Flush flushes all data to disk. Blocks until all data previously submitted to Put has been written to disk.
 func (d *DiskTable) Flush() error {
 	if !d.alive.Load() {
 		return fmt.Errorf("DB is shut down")
 	}
 
-	flushReq := &flushRequest{
+	flushReq := &controlLoopFlushRequest{
 		responseChan: make(chan error, 1),
 	}
 	d.controllerChannel <- flushReq
@@ -593,19 +528,14 @@ func (d *DiskTable) Flush() error {
 	return nil
 }
 
-// flushRequest is a request to flush the writer.
-type flushRequest struct {
-	shutdown     bool
-	responseChan chan error
-}
-
-// shutdownTasks performs tasks necessary to cleanly shut down the disk table.
-func (d *DiskTable) shutdownTasks() {
+// handleControlLoopShutdownRequest performs tasks necessary to cleanly shut down the disk table.
+func (d *DiskTable) handleControlLoopShutdownRequest(req *controlLoopShutdownRequest) {
 	// Instruct the flush loop to stop.
-	d.flushChannel <- nil
-	// Block until it does.
-	d.flushStoppedChannel <- struct{}{}
-	<-d.flushStoppedChannel
+	shutdownCompleteChan := make(chan struct{})
+	d.flushChannel <- &flushLoopShutdownRequest{
+		shutdownCompleteChan: shutdownCompleteChan,
+	}
+	<-shutdownCompleteChan
 
 	// Seal the mutable segment
 	durableKeys, err := d.segments[d.highestSegmentIndex].Seal(d.timeSource())
@@ -614,7 +544,7 @@ func (d *DiskTable) shutdownTasks() {
 	}
 
 	// Flush the keys that are now durable in the segment.
-	err = d.flushKeys(durableKeys)
+	err = d.writeKeysToKeyMap(durableKeys)
 	if err != nil {
 		d.logger.Errorf("failed to flush keys: %v", err)
 	}
@@ -625,103 +555,7 @@ func (d *DiskTable) shutdownTasks() {
 		d.logger.Errorf("failed to stop key map: %v", err)
 	}
 
-	// unblock the Stop() method
-	<-d.controllerStoppedChannel
-}
-
-// handleFlushRequest handles a flushRequest control message.
-func (d *DiskTable) handleFlushRequest(req *flushRequest) {
-
-	// This method will enqueue a flush operation within the segment. Although it flushes asynchronously, the
-	// segment performs flush operations in the order they are enqueued.
-	flushResponseChannel := d.segments[d.highestSegmentIndex].Flush()
-
-	// TODO is there a better way than passing functions?
-
-	d.flushChannel <- func() {
-
-		flushResponse := <-flushResponseChannel
-		if flushResponse.Error != nil {
-			err := fmt.Errorf("failed to flush mutable segment: %v", flushResponse.Error)
-			req.responseChan <- err
-		}
-
-		durableKeys := flushResponse.Addresses
-
-		err := d.flushKeys(durableKeys)
-		if err != nil {
-			err = fmt.Errorf("failed to flush keys: %v", err)
-			d.panic(err)
-			req.responseChan <- err
-			return
-		}
-
-		req.responseChan <- nil
-	}
-}
-
-func (d *DiskTable) flushLoop() {
-	for {
-		select {
-		case <-d.ctx.Done():
-			d.logger.Infof("context done, shutting down disk table flush loop")
-		case flushFunc := <-d.flushChannel:
-			if flushFunc == nil {
-				<-d.flushStoppedChannel
-				return
-			}
-			flushFunc()
-		}
-	}
-}
-
-// flushKeys flushes all keys to the key map. As they are flushed, it also removes them from the unflushedDataCache.
-func (d *DiskTable) flushKeys(keys []*types.KAPair) error {
-	if len(keys) == 0 {
-		// Nothing to flush.
-		return nil
-	}
-
-	err := d.keyMap.Put(keys)
-	if err != nil {
-		return fmt.Errorf("failed to flush keys: %v", err)
-	}
-
-	// Keys are now durably written to both the segment and the key map. It is therefore safe to remove them from the
-	// unflushed data cache.
-	for _, ka := range keys {
-		d.unflushedDataCache.Delete(string(ka.Key))
-	}
-
-	return nil
-}
-
-// controlLoop is the main loop for the disk table. It has sole responsibility for mutating data managed by the
-// disk table (this vastly simplifies locking and thread safety).
-func (d *DiskTable) controlLoop() {
-	ticker := time.NewTicker(d.garbageCollectionPeriod)
-
-	for {
-		select {
-		case <-d.ctx.Done():
-			d.logger.Infof("context done, shutting down disk table control loop")
-		case message := <-d.controllerChannel:
-			if writeReq, ok := message.(*writeRequest); ok {
-				d.handleWriteRequest(writeReq)
-			} else if flushReq, ok := message.(*flushRequest); ok {
-				if flushReq.shutdown {
-					d.shutdownTasks()
-					return
-				} else {
-					d.handleFlushRequest(flushReq)
-				}
-			} else {
-				d.logger.Errorf("Unknown control message type %T", message)
-			}
-		case <-ticker.C:
-			d.doGarbageCollection()
-		}
-	}
+	req.shutdownCompleteChan <- struct{}{}
 }
 
 // doGarbageCollection performs garbage collection on all segments, deleting old ones as necessary.
@@ -773,4 +607,220 @@ func (d *DiskTable) doGarbageCollection() {
 
 func (d *DiskTable) SetCacheSize(size uint64) {
 	// this implementation does not provide a cache, if a cache is needed then it must be provided by a wrapper
+}
+
+// controlLoopFlushRequest is a request to flush the writer that is sent to the control loop.
+type controlLoopFlushRequest struct {
+	// responseChan will produce a nil if the flush was successful, or an error if it was not.
+	responseChan chan error
+}
+
+// controlLoopWriteRequest is a request to write a key-value pair that is sent to the control loop.
+type controlLoopWriteRequest struct {
+	// values is a slice of key-value pairs to write.
+	values []*types.KVPair
+}
+
+// controlLoopShutdownRequest is a request to shut down the table that is sent to the control loop.
+type controlLoopShutdownRequest struct {
+	// responseChan will produce a single struct{} when the control loop has stopped
+	// (i.e. when the handleControlLoopShutdownRequest is complete).
+	shutdownCompleteChan chan struct{}
+}
+
+// controlLoop is the main loop for the disk table. It has sole responsibility for mutating data managed by the
+// disk table (this vastly simplifies locking and thread safety).
+func (d *DiskTable) controlLoop() {
+	ticker := time.NewTicker(d.garbageCollectionPeriod)
+
+	for {
+		select {
+		case <-d.ctx.Done():
+			d.logger.Infof("context done, shutting down disk table control loop")
+		case message := <-d.controllerChannel:
+			if req, ok := message.(*controlLoopWriteRequest); ok {
+				d.handleWriteRequest(req)
+			} else if req, ok := message.(*controlLoopFlushRequest); ok {
+				d.handleControlLoopFlushRequest(req)
+			} else if req, ok := message.(*controlLoopShutdownRequest); ok {
+				d.handleControlLoopShutdownRequest(req)
+				return
+			} else {
+				d.logger.Errorf("Unknown control message type %T", message)
+			}
+		case <-ticker.C:
+			d.doGarbageCollection()
+		}
+	}
+}
+
+// flushLoopFlushRequest is a request to flush the writer that is sent to the flush loop.
+type flushLoopFlushRequest struct {
+	// when the flush loop begins handling a flush request, the flush will have already been sent to the segment
+	// by the control loop. When the segment finishes flushing, it will write its response to this channel.
+	segmentResponseChan chan *segment.FlushResponse
+
+	// responseChan the flush loop sends a nil if the flush was successfully completed, or an error if it was not.
+	responseChan chan error
+}
+
+// flushLoopSealRequest is a request to seal the mutable segment that is sent to the flush loop.
+type flushLoopSealRequest struct {
+	// the time when the segment is sealed
+	now time.Time
+	// responseChan will produce a nil if the seal was successful, or an error if it was not.
+	responseChan chan error
+}
+
+// flushLoopShutdownRequest is a request to shut down the flush loop.
+type flushLoopShutdownRequest struct {
+	// responseChan will produce a single struct{} when the flush loop has stopped.
+	shutdownCompleteChan chan struct{}
+}
+
+// flushLoop is responsible for handling operations that flush data (i.e. calls to Flush() and when the mutable segment
+// is sealed). In theory, this work could be done on the main control loop, but doing so would block new writes while
+// a flush is in progress. In order to keep the writing threads busy, it is critical that flush do not block the
+// control loop.
+func (d *DiskTable) flushLoop() {
+	for {
+		select {
+		case <-d.ctx.Done():
+			d.logger.Infof("context done, shutting down disk table flush loop")
+		case message := <-d.flushChannel:
+			if req, ok := message.(*flushLoopFlushRequest); ok {
+				d.handleFlushLoopFlushRequest(req)
+			} else if req, ok := message.(*flushLoopSealRequest); ok {
+				d.handleFlushLoopSealRequest(req)
+			} else if req, ok := message.(*flushLoopShutdownRequest); ok {
+				req.shutdownCompleteChan <- struct{}{}
+				return
+			} else {
+				d.logger.Errorf("Unknown flush message type %T", message)
+			}
+		}
+	}
+}
+
+// expandSegments checks if the highest segment is full, and if so, creates a new segment.
+func (d *DiskTable) expandSegments() error {
+	now := d.timeSource()
+
+	// Seal the previous segment.
+	flushLoopResponseChan := make(chan error, 1)
+	d.flushChannel <- &flushLoopSealRequest{
+		responseChan: flushLoopResponseChan,
+	}
+	// Unfortunately, it is necessary to block until the sealing has been completed. Although this may result
+	// in a brief interruption in new write work being sent to the segment, expanding the number of segments is
+	// infrequent, even for very high throughput workloads.
+	err := <-flushLoopResponseChan
+	if err != nil {
+		return fmt.Errorf("failed to seal segment: %v", err)
+	}
+
+	// Create a new segment.
+	newSegment, err := segment.NewSegment(
+		d.ctx,
+		d.logger,
+		d.highestSegmentIndex+1,
+		d.segmentDirectories,
+		now,
+		d.metadata.GetShardingFactor(),
+		d.saltShaker.Uint32(),
+		false)
+	if err != nil {
+		return err
+	}
+	d.segments[d.highestSegmentIndex].SetNextSegment(newSegment)
+	d.highestSegmentIndex++
+
+	d.segmentLock.Lock()
+	d.segments[d.highestSegmentIndex] = newSegment
+	d.segmentLock.Unlock()
+
+	return nil
+}
+
+// handleFlushLoopSealRequest handles the part of the seal operation that is performed on the flush loop.
+// We don't want to send a flush request to a segment that has already been sealed. By performing the sealing
+// on the flush loop, we ensure that this can never happen. Any previously scheduled flush requests against the
+// segment that is being sealed will be processed prior to this request being processed due to the FIFO nature
+// of the flush loop channel. When a sealing operation begins, the control loop blocks, and does not unblock until
+// the seal is finished and a new mutable segment has been created. This means that no future flush requests will be
+// sent to the segment that is being sealed, since only the control loop can schedule work for the flush loop.
+func (d *DiskTable) handleFlushLoopSealRequest(req *flushLoopSealRequest) {
+	durableKeys, err := d.segments[d.highestSegmentIndex].Seal(req.now)
+	if err != nil {
+		req.responseChan <- fmt.Errorf("failed to seal segment %d: %v", d.highestSegmentIndex, err)
+		return
+	}
+
+	// Flush the keys that are now durable in the segment.
+	err = d.writeKeysToKeyMap(durableKeys)
+	if err != nil {
+		req.responseChan <- fmt.Errorf("failed to flush keys: %v", err)
+		return
+	}
+
+	req.responseChan <- nil
+}
+
+// handleControlLoopFlushRequest handles the part of the flush that is performed on the control loop.
+// The control loop is responsible for enqueuing the flush request in the segment's work queue (thus
+// ensuring a serial ordering with respect to other operations on the control loop), but not for
+// waiting for the segment to finish the flush.
+func (d *DiskTable) handleControlLoopFlushRequest(req *controlLoopFlushRequest) {
+	// This method will enqueue a flush operation within the segment. Although it flushes asynchronously, the
+	// segment performs flush operations in the order they are enqueued.
+	flushResponseChannel := d.segments[d.highestSegmentIndex].Flush()
+
+	// The flush loop is responsible for the remaining parts of the flush.
+	d.flushChannel <- &flushLoopFlushRequest{
+		segmentResponseChan: flushResponseChannel,
+		responseChan:        req.responseChan,
+	}
+}
+
+// handleFlushLoopFlushRequest handles the part of the flush that is performed on the flush loop.
+func (d *DiskTable) handleFlushLoopFlushRequest(req *flushLoopFlushRequest) {
+	flushResponse := <-req.segmentResponseChan
+	if flushResponse.Error != nil {
+		err := fmt.Errorf("failed to flush mutable segment: %v", flushResponse.Error)
+		req.responseChan <- err
+	}
+
+	durableKeys := flushResponse.Addresses
+
+	err := d.writeKeysToKeyMap(durableKeys)
+	if err != nil {
+		err = fmt.Errorf("failed to flush keys: %v", err)
+		d.panic(err)
+		req.responseChan <- err
+		return
+	}
+
+	req.responseChan <- nil
+}
+
+// writeKeysToKeyMap flushes all keys to the key map. Once they are flushed, it also removes the keys from the
+// unflushedDataCache.
+func (d *DiskTable) writeKeysToKeyMap(keys []*types.KAPair) error {
+	if len(keys) == 0 {
+		// Nothing to flush.
+		return nil
+	}
+
+	err := d.keyMap.Put(keys)
+	if err != nil {
+		return fmt.Errorf("failed to flush keys: %v", err)
+	}
+
+	// Keys are now durably written to both the segment and the key map. It is therefore safe to remove them from the
+	// unflushed data cache.
+	for _, ka := range keys {
+		d.unflushedDataCache.Delete(string(ka.Key))
+	}
+
+	return nil
 }
