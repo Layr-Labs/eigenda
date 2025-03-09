@@ -608,99 +608,6 @@ func (d *DiskTable) SetCacheSize(size uint64) {
 	// this implementation does not provide a cache, if a cache is needed then it must be provided by a wrapper
 }
 
-// controlLoopFlushRequest is a request to flush the writer that is sent to the control loop.
-type controlLoopFlushRequest struct {
-	// responseChan will produce a nil if the flush was successful, or an error if it was not.
-	responseChan chan error
-}
-
-// controlLoopWriteRequest is a request to write a key-value pair that is sent to the control loop.
-type controlLoopWriteRequest struct {
-	// values is a slice of key-value pairs to write.
-	values []*types.KVPair
-}
-
-// controlLoopShutdownRequest is a request to shut down the table that is sent to the control loop.
-type controlLoopShutdownRequest struct {
-	// responseChan will produce a single struct{} when the control loop has stopped
-	// (i.e. when the handleControlLoopShutdownRequest is complete).
-	shutdownCompleteChan chan struct{}
-}
-
-// controlLoop is the main loop for the disk table. It has sole responsibility for mutating data managed by the
-// disk table (this vastly simplifies locking and thread safety).
-func (d *DiskTable) controlLoop() {
-	ticker := time.NewTicker(d.garbageCollectionPeriod)
-
-	for {
-		select {
-		case <-d.ctx.Done():
-			d.logger.Infof("context done, shutting down disk table control loop")
-		case message := <-d.controllerChannel:
-			if req, ok := message.(*controlLoopWriteRequest); ok {
-				d.handleWriteRequest(req)
-			} else if req, ok := message.(*controlLoopFlushRequest); ok {
-				d.handleControlLoopFlushRequest(req)
-			} else if req, ok := message.(*controlLoopShutdownRequest); ok {
-				d.handleControlLoopShutdownRequest(req)
-				return
-			} else {
-				d.logger.Errorf("Unknown control message type %T", message)
-			}
-		case <-ticker.C:
-			d.doGarbageCollection()
-		}
-	}
-}
-
-// flushLoopFlushRequest is a request to flush the writer that is sent to the flush loop.
-type flushLoopFlushRequest struct {
-	// when the flush loop begins handling a flush request, the flush will have already been sent to the segment
-	// by the control loop. When the segment finishes flushing, it will write its response to this channel.
-	segmentResponseChan chan *segment.FlushResponse
-
-	// responseChan the flush loop sends a nil if the flush was successfully completed, or an error if it was not.
-	responseChan chan error
-}
-
-// flushLoopSealRequest is a request to seal the mutable segment that is sent to the flush loop.
-type flushLoopSealRequest struct {
-	// the time when the segment is sealed
-	now time.Time
-	// responseChan will produce a nil if the seal was successful, or an error if it was not.
-	responseChan chan error
-}
-
-// flushLoopShutdownRequest is a request to shut down the flush loop.
-type flushLoopShutdownRequest struct {
-	// responseChan will produce a single struct{} when the flush loop has stopped.
-	shutdownCompleteChan chan struct{}
-}
-
-// flushLoop is responsible for handling operations that flush data (i.e. calls to Flush() and when the mutable segment
-// is sealed). In theory, this work could be done on the main control loop, but doing so would block new writes while
-// a flush is in progress. In order to keep the writing threads busy, it is critical that flush do not block the
-// control loop.
-func (d *DiskTable) flushLoop() {
-	for {
-		select {
-		case <-d.ctx.Done():
-			d.logger.Infof("context done, shutting down disk table flush loop")
-		case message := <-d.flushChannel:
-			if req, ok := message.(*flushLoopFlushRequest); ok {
-				d.handleFlushLoopFlushRequest(req)
-			} else if req, ok := message.(*flushLoopSealRequest); ok {
-				d.handleFlushLoopSealRequest(req)
-			} else if req, ok := message.(*flushLoopShutdownRequest); ok {
-				req.shutdownCompleteChan <- struct{}{}
-				return
-			} else {
-				d.logger.Errorf("Unknown flush message type %T", message)
-			}
-		}
-	}
-}
-
 // expandSegments checks if the highest segment is full, and if so, creates a new segment.
 func (d *DiskTable) expandSegments() error {
 	now := d.timeSource()
@@ -823,4 +730,97 @@ func (d *DiskTable) writeKeysToKeyMap(keys []*types.KAPair) error {
 	}
 
 	return nil
+}
+
+// controlLoopFlushRequest is a request to flush the writer that is sent to the control loop.
+type controlLoopFlushRequest struct {
+	// responseChan will produce a nil if the flush was successful, or an error if it was not.
+	responseChan chan error
+}
+
+// controlLoopWriteRequest is a request to write a key-value pair that is sent to the control loop.
+type controlLoopWriteRequest struct {
+	// values is a slice of key-value pairs to write.
+	values []*types.KVPair
+}
+
+// controlLoopShutdownRequest is a request to shut down the table that is sent to the control loop.
+type controlLoopShutdownRequest struct {
+	// responseChan will produce a single struct{} when the control loop has stopped
+	// (i.e. when the handleControlLoopShutdownRequest is complete).
+	shutdownCompleteChan chan struct{}
+}
+
+// controlLoop is the main loop for the disk table. It has sole responsibility for mutating data managed by the
+// disk table (this vastly simplifies locking and thread safety).
+func (d *DiskTable) controlLoop() {
+	ticker := time.NewTicker(d.garbageCollectionPeriod)
+
+	for {
+		select {
+		case <-d.ctx.Done():
+			d.logger.Infof("context done, shutting down disk table control loop")
+		case message := <-d.controllerChannel:
+			if req, ok := message.(*controlLoopWriteRequest); ok {
+				d.handleWriteRequest(req)
+			} else if req, ok := message.(*controlLoopFlushRequest); ok {
+				d.handleControlLoopFlushRequest(req)
+			} else if req, ok := message.(*controlLoopShutdownRequest); ok {
+				d.handleControlLoopShutdownRequest(req)
+				return
+			} else {
+				d.logger.Errorf("Unknown control message type %T", message)
+			}
+		case <-ticker.C:
+			d.doGarbageCollection()
+		}
+	}
+}
+
+// flushLoopFlushRequest is a request to flush the writer that is sent to the flush loop.
+type flushLoopFlushRequest struct {
+	// when the flush loop begins handling a flush request, the flush will have already been sent to the segment
+	// by the control loop. When the segment finishes flushing, it will write its response to this channel.
+	segmentResponseChan chan *segment.FlushResponse
+
+	// responseChan the flush loop sends a nil if the flush was successfully completed, or an error if it was not.
+	responseChan chan error
+}
+
+// flushLoopSealRequest is a request to seal the mutable segment that is sent to the flush loop.
+type flushLoopSealRequest struct {
+	// the time when the segment is sealed
+	now time.Time
+	// responseChan will produce a nil if the seal was successful, or an error if it was not.
+	responseChan chan error
+}
+
+// flushLoopShutdownRequest is a request to shut down the flush loop.
+type flushLoopShutdownRequest struct {
+	// responseChan will produce a single struct{} when the flush loop has stopped.
+	shutdownCompleteChan chan struct{}
+}
+
+// flushLoop is responsible for handling operations that flush data (i.e. calls to Flush() and when the mutable segment
+// is sealed). In theory, this work could be done on the main control loop, but doing so would block new writes while
+// a flush is in progress. In order to keep the writing threads busy, it is critical that flush do not block the
+// control loop.
+func (d *DiskTable) flushLoop() {
+	for {
+		select {
+		case <-d.ctx.Done():
+			d.logger.Infof("context done, shutting down disk table flush loop")
+		case message := <-d.flushChannel:
+			if req, ok := message.(*flushLoopFlushRequest); ok {
+				d.handleFlushLoopFlushRequest(req)
+			} else if req, ok := message.(*flushLoopSealRequest); ok {
+				d.handleFlushLoopSealRequest(req)
+			} else if req, ok := message.(*flushLoopShutdownRequest); ok {
+				req.shutdownCompleteChan <- struct{}{}
+				return
+			} else {
+				d.logger.Errorf("Unknown flush message type %T", message)
+			}
+		}
+	}
 }
