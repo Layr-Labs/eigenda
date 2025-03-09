@@ -349,6 +349,12 @@ func garbageCollectionTest(t *testing.T, tableBuilder tableBuilder) {
 			require.NoError(t, err)
 		}
 
+		// Once in a while, pause for a brief moment to give the garbage collector a chance to do work in the
+		// background. This is not required for the test to pass.
+		if rand.BoolWithProbability(0.01) {
+			time.Sleep(5 * time.Millisecond)
+		}
+
 		// Once in a while, scan the table and verify that all expected values are present.
 		// Don't do this every time for the sake of test runtime.
 		if rand.BoolWithProbability(0.01) || i == iterations-1 /* always check on the last iteration */ {
