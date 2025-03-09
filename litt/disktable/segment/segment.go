@@ -241,7 +241,7 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 	if s.metadata.sealed {
 		return 0, fmt.Errorf("segment is sealed, cannot write data")
 	}
-
+	
 	shard := s.GetShard(data.Key)
 
 	if s.shardSizes[shard] > math.MaxUint32 {
@@ -572,7 +572,6 @@ func (s *Segment) shardControlLoop(shard uint32) {
 
 			// Handle write requests.
 			if data, ok := operation.(*types.KVPair); ok {
-
 				// This is a request to write a value to the file.
 				shardError = s.handleShardWrite(shard, data)
 				continue

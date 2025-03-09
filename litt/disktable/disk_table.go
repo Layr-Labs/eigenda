@@ -582,7 +582,6 @@ func (d *DiskTable) doGarbageCollection() {
 		}
 
 		// Segment is old enough to be deleted.
-
 		keys, err := seg.GetKeys()
 		if err != nil {
 			d.logger.Errorf("Failed to get keys: %v", err)
@@ -709,6 +708,7 @@ func (d *DiskTable) expandSegments() error {
 	// Seal the previous segment.
 	flushLoopResponseChan := make(chan error, 1)
 	d.flushChannel <- &flushLoopSealRequest{
+		now:          now,
 		responseChan: flushLoopResponseChan,
 	}
 	// Unfortunately, it is necessary to block until the sealing has been completed. Although this may result
