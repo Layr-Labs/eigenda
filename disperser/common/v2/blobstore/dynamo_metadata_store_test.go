@@ -1497,7 +1497,7 @@ func TestBlobMetadataStoreDispersalsByDispersedAt(t *testing.T) {
 	ctx := context.Background()
 
 	numRequests := 60
-	opID := core.OperatorID{0, 1}
+	opID := core.OperatorID{16, 32}
 	now := uint64(time.Now().UnixNano())
 	firstRequestTs := now - uint64(int64(numRequests)*time.Second.Nanoseconds())
 	nanoSecsPerRequest := uint64(time.Second.Nanoseconds()) // 1 batch/s
