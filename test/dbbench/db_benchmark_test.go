@@ -1,6 +1,7 @@
 package dbbench
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -65,7 +66,7 @@ func randomUnexpiredSeed(
 // TODO separate out the benchmark framework from the DB implementations, make this into a struct, not a mega function
 
 // runBenchmark runs a simple benchmark. Its goal is to write a ton of data to the database as fast as possible.
-func runBenchmark(t *testing.T, write writer, read reader) {
+func runBenchmark(write writer, read reader) {
 
 	rand := random.NewTestRandom()
 
@@ -160,8 +161,12 @@ func runBenchmark(t *testing.T, write writer, read reader) {
 				readStart := time.Now()
 				value, err := read(key)
 				readLatency := time.Since(readStart)
-				require.NoError(t, err)
-				require.Equal(t, expectedValue, value)
+				if err != nil {
+					panic(fmt.Errorf("error reading key %v: %v", key, err))
+				}
+				if !bytes.Equal(expectedValue, value) {
+					panic(fmt.Errorf("expected value %v, got %v", expectedValue, value))
+				}
 				totalReadsPerformed.Add(1)
 				totalNanosecondsSpentOnReads.Add(uint64(readLatency.Nanoseconds()))
 
@@ -193,7 +198,9 @@ func runBenchmark(t *testing.T, write writer, read reader) {
 		writeStart := time.Now()
 
 		err := write(key, value)
-		require.NoError(t, err)
+		if err != nil {
+			panic(fmt.Errorf("error writing key %v: %v", key, err))
+		}
 
 		writeLatency := time.Since(writeStart)
 		longestWriteLock.Lock()
@@ -309,7 +316,7 @@ func TestLevelDB(t *testing.T) {
 		return db.Get(keyBuilder.Key(key))
 	}
 
-	runBenchmark(t, writeFunction, readFunction)
+	runBenchmark(writeFunction, readFunction)
 
 	err = db.Shutdown()
 	require.NoError(t, err)
@@ -371,7 +378,7 @@ func TestLittDB(t *testing.T) {
 		return value, nil
 	}
 
-	runBenchmark(t, writeFunction, readFunction)
+	runBenchmark(writeFunction, readFunction)
 
 	err = db.Stop()
 	require.NoError(t, err)
@@ -500,7 +507,7 @@ func TestBadgerDB(t *testing.T) {
 		return value, nil
 	}
 
-	runBenchmark(t, writeFunction, readFunction)
+	runBenchmark(writeFunction, readFunction)
 	alive.Store(false)
 	<-compactionDone
 
