@@ -40,6 +40,7 @@ group "all" {
     "batcher",
     "disperser",
     "encoder",
+    "encoding-load-generator",
     "retriever",
     "churner",
     "dataapi",
@@ -81,6 +82,7 @@ group "internal-release" {
     "batcher-internal",
     "disperser-internal",
     "encoder-internal",
+    "encoding-load-generator-internal",
     "retriever-internal",
     "churner-internal",
     "dataapi-internal",
@@ -154,6 +156,23 @@ target "encoder-icicle-internal" {
     "${REGISTRY}/eigenda-encoder-icicle:sha-${GIT_SHORT_SHA}"
   ]
 }
+
+target "encoding-load-generator" {
+  context    = "."
+  dockerfile = "./Dockerfile"
+  target     = "encoding-load-generator"
+  tags       = ["${REGISTRY}/${REPO}/encoding-load-generator:${BUILD_TAG}"]
+}
+
+target "encoding-load-generator-internal" {
+  inherits = ["encoding-load-generator"]
+  tags     = [
+    "${REGISTRY}/eigenda-encoding-load-generator:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-encoding-load-generator:${GIT_SHA}",
+    "${REGISTRY}/eigenda-encoding-load-generator:sha-${GIT_SHORT_SHA}"
+  ]
+}
+
 
 target "retriever" {
   context    = "."
