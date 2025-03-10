@@ -1555,7 +1555,6 @@ func TestBlobMetadataStoreDispersalsByDispersedAt(t *testing.T) {
 		checkDispersalsAsc(t, dispersals)
 
 		// Test with limit
-		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs, now, 10, true)
 		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs-1, now, 10, true)
 		require.NoError(t, err)
 		require.Equal(t, 10, len(dispersals))
