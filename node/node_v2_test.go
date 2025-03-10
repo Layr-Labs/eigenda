@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2/test"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval/test"
 	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"

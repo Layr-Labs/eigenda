@@ -26,18 +26,23 @@ func NewBlobStore(s3BucketName string, s3Client s3.Client, logger logging.Logger
 
 // StoreBlob adds a blob to the blob store
 func (b *BlobStore) StoreBlob(ctx context.Context, key corev2.BlobKey, data []byte) error {
-	_, err := b.s3Client.HeadObject(ctx, b.bucketName, s3.ScopedBlobKey(key))
-	if err == nil {
+	if b.CheckBlobExists(ctx, key) {
 		b.logger.Warnf("blob already exists in bucket %s: %s", b.bucketName, key)
 		return common.ErrAlreadyExists
 	}
 
-	err = b.s3Client.UploadObject(ctx, b.bucketName, s3.ScopedBlobKey(key), data)
+	err := b.s3Client.UploadObject(ctx, b.bucketName, s3.ScopedBlobKey(key), data)
 	if err != nil {
 		b.logger.Errorf("failed to upload blob in bucket %s: %v", b.bucketName, err)
 		return err
 	}
 	return nil
+}
+
+// CheckBlobExists checks if a blob exists in the blob store
+func (b *BlobStore) CheckBlobExists(ctx context.Context, key corev2.BlobKey) bool {
+	_, err := b.s3Client.HeadObject(ctx, b.bucketName, s3.ScopedBlobKey(key))
+	return err == nil
 }
 
 // GetBlob retrieves a blob from the blob store

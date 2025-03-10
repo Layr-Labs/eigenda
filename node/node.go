@@ -224,6 +224,7 @@ func NewNode(
 			GarbageCollectionInterval:  time.Duration(config.ExpirationPollIntervalSec) * time.Second,
 			GarbageCollectionBatchSize: 1024,
 			Schema:                     []string{BatchHeaderTableName, BlobCertificateTableName, BundleTableName},
+			MetricsRegistry:            reg,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new tablestore: %w", err)

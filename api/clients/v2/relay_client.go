@@ -130,7 +130,6 @@ func (c *relayClient) signGetChunksRequest(ctx context.Context, request *relaygr
 	if err != nil {
 		return fmt.Errorf("failed to hash get chunks request: %v", err)
 	}
-
 	hashArray := [32]byte{}
 	copy(hashArray[:], hash)
 	signature, err := c.config.MessageSigner(ctx, hashArray)

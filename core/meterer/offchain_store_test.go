@@ -3,6 +3,7 @@ package meterer_test
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"strconv"
 	"testing"
 	"time"
@@ -178,11 +179,13 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 
 	ctx := context.Background()
 
+	paymentCharged := big.NewInt(2000)
+
 	err = dynamoClient.PutItem(ctx, tableName,
 		commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
 			"CumulativePayments": &types.AttributeValueMemberN{Value: "1"},
-			"DataLength":         &types.AttributeValueMemberN{Value: "1000"},
+			"PaymentCharged":     &types.AttributeValueMemberN{Value: paymentCharged.String()},
 		},
 	)
 	assert.NoError(t, err)
@@ -191,10 +194,11 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 	repetitions := 5
 	items := make([]commondynamodb.Item, numItems)
 	for i := 0; i < numItems; i += 1 {
+		chargeValue := big.NewInt(int64(i * 1000))
 		items[i] = commondynamodb.Item{
 			"AccountID":          &types.AttributeValueMemberS{Value: fmt.Sprintf("account%d", i%repetitions)},
 			"CumulativePayments": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", i)},
-			"DataLength":         &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", i*1000)},
+			"PaymentCharged":     &types.AttributeValueMemberN{Value: chargeValue.String()},
 		}
 	}
 	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items)
@@ -208,7 +212,7 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, "1", item["CumulativePayments"].(*types.AttributeValueMemberN).Value)
-	assert.Equal(t, "1000", item["DataLength"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "1000", item["PaymentCharged"].(*types.AttributeValueMemberN).Value)
 
 	queryResult, err := dynamoClient.Query(ctx, tableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
@@ -218,7 +222,8 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 	assert.Len(t, queryResult, numItems/repetitions)
 	for _, item := range queryResult {
 		cumulativePayments, _ := strconv.Atoi(item["CumulativePayments"].(*types.AttributeValueMemberN).Value)
-		assert.Equal(t, fmt.Sprintf("%d", cumulativePayments*1000), item["DataLength"].(*types.AttributeValueMemberN).Value)
+		expectedCharge := fmt.Sprintf("%d", cumulativePayments*1000)
+		assert.Equal(t, expectedCharge, item["PaymentCharged"].(*types.AttributeValueMemberN).Value)
 	}
 	queryResult, err = dynamoClient.Query(ctx, tableName, "AccountID = :account_id", commondynamodb.ExpressionValues{
 		":account_id": &types.AttributeValueMemberS{
@@ -227,6 +232,7 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, queryResult, 0)
 
+	newCharge := big.NewInt(5000)
 	updatedItem, err := dynamoClient.UpdateItem(ctx, tableName, commondynamodb.Key{
 		"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
 		"CumulativePayments": &types.AttributeValueMemberN{Value: "1"},
@@ -234,15 +240,15 @@ func TestOnDemandUsageBasicOperations(t *testing.T) {
 	}, commondynamodb.Item{
 		"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
 		"CumulativePayments": &types.AttributeValueMemberN{Value: "3"},
-		"DataLength":         &types.AttributeValueMemberN{Value: "3000"},
+		"PaymentCharged":     &types.AttributeValueMemberN{Value: newCharge.String()},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "3000", updatedItem["DataLength"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, newCharge.String(), updatedItem["PaymentCharged"].(*types.AttributeValueMemberN).Value)
 
 	item, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
 		"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
 		"CumulativePayments": &types.AttributeValueMemberN{Value: "1"},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "3000", item["DataLength"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, newCharge.String(), item["PaymentCharged"].(*types.AttributeValueMemberN).Value)
 }
