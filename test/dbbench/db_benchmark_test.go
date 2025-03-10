@@ -218,15 +218,15 @@ func runBenchmark(t *testing.T, write writer, read reader) {
 			if totalReadsPerformed.Load() > 0 {
 				averageReadLatencyNanoseconds = totalNanosecondsSpentOnReads.Load() / totalReadsPerformed.Load()
 			}
-			averageReadLatencyMicroseconds := float64(averageReadLatencyNanoseconds) / float64(time.Microsecond)
+			averageReadLatencyMs := float64(averageReadLatencyNanoseconds) / float64(time.Millisecond)
 
 			averageReadThroughputMBPerSecond := float64(totalReadsPerformed.Load()*dataSize) / units.MiB /
 				timeSinceStart.Seconds()
 
 			fmt.Printf("%d%%: wrote %d MiB. %0.1f mb/s during recent period, %0.1f mb/s overall. "+
-				"Average read latency is %0.1fµs, average read throughput is %0.1f mb/s.\r",
+				"Average read latency is %0.3fms, average read throughput is %0.1f mb/s.\r",
 				completionPercentage, int(mbWritten), mbPerSecondOverLastInterval, mbPerSecondTotal,
-				averageReadLatencyMicroseconds, averageReadThroughputMBPerSecond)
+				averageReadLatencyMs, averageReadThroughputMBPerSecond)
 		}
 	}
 
@@ -350,7 +350,7 @@ func TestLittDB(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestBadgerDBWithGCWrite(t *testing.T) {
+func TestBadgerDB(t *testing.T) {
 	directory := "./test-data"
 	opts := badger.DefaultOptions(directory)
 	opts.Compression = options.None
@@ -379,6 +379,8 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 
 	ttl := TTL
 
+	writeLimiter := make(chan struct{}, parallelWriters)
+
 	keys := make([][]byte, 0)
 	writeFunction := func(key []byte, value []byte) error {
 		keys = append(keys, key)
@@ -403,11 +405,18 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 		objectsInBatch++
 
 		if objectsInBatch >= batchSize {
-			err = transaction.Commit()
 
-			if err != nil {
-				return err
-			}
+			writeLimiter <- struct{}{}
+			transactionToCommit := transaction
+
+			go func() {
+				err = transactionToCommit.Commit()
+				if err != nil {
+					panic(err)
+				}
+				<-writeLimiter
+			}()
+
 			transaction = db.NewTransaction(true)
 			objectsInBatch = 0
 		}
@@ -428,11 +437,6 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 
 			fmt.Printf("\nRunning GC\n")
 			startTime := time.Now()
-
-			//levels := db.Levels()
-			//for i, level := range levels {
-			//	fmt.Printf("\n>> Level %d: %+v\n", i, level)
-			//}
 
 			err = db.Flatten(8)
 			if err != nil {
@@ -476,40 +480,3 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	err = db.Close()
 	require.NoError(t, err)
 }
-
-//func TestPebbleDBWrite(t *testing.T) {
-//	directory := "./test-data"
-//
-//	options := &pebble.Options{}
-//
-//	db, err := pebble.Open(directory, options)
-//	require.NoError(t, err)
-//
-//	batch := db.NewBatch()
-//	objectsInBatch := 0
-//
-//	writeFunction := func(key []byte, value []byte) error {
-//
-//		err = batch.Set(key, value, nil)
-//		if err != nil {
-//			return err
-//		}
-//		objectsInBatch++
-//
-//		if objectsInBatch >= batchSize {
-//			err = batch.Commit(nil)
-//			if err != nil {
-//				return err
-//			}
-//			batch = db.NewBatch()
-//			objectsInBatch = 0
-//		}
-//
-//		return nil
-//	}
-//
-//	runBenchmark(t, writeFunction)
-//
-//	err = db.Close()
-//	require.NoError(t, err)
-//}
