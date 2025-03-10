@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/dgraph-io/badger/v4/options"
@@ -329,6 +330,7 @@ func TestLittDB(t *testing.T) {
 	require.NoError(t, err)
 	config.ShardingFactor = 1
 	config.TTL = TTL
+	config.KeyMapType = keymap.MemKeyMapType
 
 	db, err := config.Build(context.Background())
 	require.NoError(t, err)
