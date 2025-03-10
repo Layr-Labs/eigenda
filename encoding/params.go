@@ -3,6 +3,7 @@ package encoding
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"golang.org/x/exp/constraints"
 )
@@ -10,8 +11,6 @@ import (
 var (
 	ErrInvalidParams = errors.New("invalid encoding params")
 )
-
-const maxUint64 = ^uint64(0)
 
 type EncodingParams struct {
 	ChunkLength uint64 // ChunkSize is the length of the chunk in symbols
@@ -63,7 +62,14 @@ func GetNumSys(dataSize uint64, chunkLen uint64) uint64 {
 
 // ValidateEncodingParams takes in the encoding parameters and returns an error if they are invalid.
 func ValidateEncodingParams(params EncodingParams, SRSOrder uint64) error {
-	if params.ChunkLength != 0 && params.NumChunks > maxUint64/params.ChunkLength {
+	if params.NumChunks == 0 {
+		return errors.New("number of chunks must be greater than 0")
+	}
+	if params.ChunkLength == 0 {
+		return errors.New("chunk length must be greater than 0")
+	}
+
+	if params.NumChunks > math.MaxUint64/params.ChunkLength {
 		return fmt.Errorf("multiplication overflow: ChunkLength: %d, NumChunks: %d", params.ChunkLength, params.NumChunks)
 	}
 
