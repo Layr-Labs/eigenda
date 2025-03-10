@@ -231,7 +231,6 @@ func TestKeyExpiry(t *testing.T) {
 	now = now.Add(2 * time.Second)
 	hash, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, now)
 	require.NoError(t, err)
-	require.NoError(t, err)
 	require.Equal(t, expectedHash, hash)
 
 	// The key should have been fetched again.

@@ -24,7 +24,7 @@ type replayGuardian struct {
 	// A set of hashes that have been observed within the time window.
 	observedHashes map[string]struct{}
 
-	// A queue of observed hashes, ordered by expiration time. Used to prune old hashes.
+	// A queue of observed hashes, ordered by request timestamp. Used to prune old hashes.
 	expirationQueue *priorityqueue.Queue
 
 	// A mutex to protect the observedHashes and expirationQueue.
@@ -86,7 +86,7 @@ func compareHashWithTimestamp(a interface{}, b interface{}) int {
 // In order to be a verified unique request, the following conditions must be met:
 // - the request's timestamp must be no more than X minutes ahead of the local wall clock time
 // - the request's timestamp must be no more than Y minutes behind the local wall clock time
-// - the request's hash must not have been previously observed (hashes are remembered for Y minutes)
+// - the request's hash must not have been previously observed (hashes are remembered until they are Y in the past)
 func (r *replayGuardian) VerifyRequest(requestHash []byte, requestTimestamp time.Time) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
