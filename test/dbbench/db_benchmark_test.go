@@ -250,9 +250,10 @@ func runBenchmark(t *testing.T, write writer, read reader) {
 				timeSinceStart.Seconds()
 
 			fmt.Printf("%d%%: wrote %d MiB. %0.1f mb/s recently, %0.1f mb/s overall. "+
-				"Average rLat is %0.3fms, average rThrpt is %0.1f mb/s. Max read: %s, Max write: %s\r",
+				"Average rLat is %0.3fms, average rThrpt is %0.1f mb/s. Max read: %s, Max write: %s%s\r",
 				completionPercentage, int(mbWritten), mbPerSecondOverLastInterval, mbPerSecondTotal,
-				averageReadLatencyMs, averageReadThroughputMBPerSecond, *longestRead.Load(), *longestWrite.Load())
+				averageReadLatencyMs, averageReadThroughputMBPerSecond, *longestRead.Load(), *longestWrite.Load(),
+				strings.Repeat(" ", 10))
 		}
 	}
 
