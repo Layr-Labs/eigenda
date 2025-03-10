@@ -133,12 +133,18 @@ func runBenchmark(t *testing.T, write writer, read reader) {
 		<-gcDone
 	}()
 
-	// Set up goroutines to read data from the database
-	ratePerGoroutine := readBytesPerSecond / readerCount
-	readsPerSecond := ratePerGoroutine / dataSize
+	readRatePerGoroutine := readBytesPerSecond / readerCount
+	readsPerSecond := readRatePerGoroutine / dataSize
 	readerDoneChannels := make([]chan struct{}, readerCount)
 	totalReadsPerformed := atomic.Uint64{}
 	totalNanosecondsSpentOnReads := atomic.Uint64{}
+
+	longestRead := atomic.Pointer[time.Duration]{}
+	longestReadLock := &sync.Mutex{}
+	defaultLongestRead := time.Duration(0)
+	longestRead.Store(&defaultLongestRead)
+
+	// Set up goroutines to read data from the database
 	for i := 0; i < readerCount; i++ {
 		readerDoneChannels[i] = make(chan struct{})
 		readerTicker := time.NewTicker(time.Second / time.Duration(readsPerSecond))
@@ -158,6 +164,12 @@ func runBenchmark(t *testing.T, write writer, read reader) {
 				require.Equal(t, expectedValue, value)
 				totalReadsPerformed.Add(1)
 				totalNanosecondsSpentOnReads.Add(uint64(readLatency.Nanoseconds()))
+
+				longestReadLock.Lock()
+				if readLatency > *longestRead.Load() {
+					longestRead.Store(&readLatency)
+				}
+				longestReadLock.Unlock()
 			}
 			readerDoneChannels[readerIndex] <- struct{}{}
 		}()
@@ -168,13 +180,27 @@ func runBenchmark(t *testing.T, write writer, read reader) {
 		}
 	}()
 
+	longestWrite := atomic.Pointer[time.Duration]{}
+	longestWriteLock := &sync.Mutex{}
+	defaultLongestWrite := time.Duration(0)
+	longestWrite.Store(&defaultLongestWrite)
+
 	// Write data to the database
 	for dataWritten < totalToWrite {
 		seed := rand.Int63()
 		key, value := generateKVPair(seed)
 
+		writeStart := time.Now()
+
 		err := write(key, value)
 		require.NoError(t, err)
+
+		writeLatency := time.Since(writeStart)
+		longestWriteLock.Lock()
+		if writeLatency > *longestWrite.Load() {
+			longestWrite.Store(&writeLatency)
+		}
+		longestWriteLock.Unlock()
 
 		dataWritten += dataSize
 
@@ -224,9 +250,9 @@ func runBenchmark(t *testing.T, write writer, read reader) {
 				timeSinceStart.Seconds()
 
 			fmt.Printf("%d%%: wrote %d MiB. %0.1f mb/s recently, %0.1f mb/s overall. "+
-				"Average rLat is %0.3fms, average rThrpt is %0.1f mb/s.\r",
+				"Average rLat is %0.3fms, average rThrpt is %0.1f mb/s. Max read: %s, Max write: %s\r",
 				completionPercentage, int(mbWritten), mbPerSecondOverLastInterval, mbPerSecondTotal,
-				averageReadLatencyMs, averageReadThroughputMBPerSecond)
+				averageReadLatencyMs, averageReadThroughputMBPerSecond, *longestRead.Load(), *longestWrite.Load())
 		}
 	}
 
