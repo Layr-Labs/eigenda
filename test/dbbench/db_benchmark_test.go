@@ -354,7 +354,6 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 	directory := "./test-data"
 	opts := badger.DefaultOptions(directory)
 	opts.Compression = options.None
-	//opts.CompactL0OnClose = true
 	opts.Logger = nil
 
 	opts.ValueThreshold = 0
@@ -369,6 +368,8 @@ func TestBadgerDBWithGCWrite(t *testing.T) {
 
 	opts.NumMemtables = 1
 	opts.NumLevelZeroTables = 1
+
+	opts.MaxLevels = 10
 
 	db, err := badger.Open(opts)
 	require.NoError(t, err)
