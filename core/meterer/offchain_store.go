@@ -123,29 +123,24 @@ func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod u
 }
 
 func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, paymentCharged *big.Int) error {
-	result, err := s.dynamoClient.GetItem(ctx, s.onDemandTableName,
-		commondynamodb.Item{
-			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID.Hex()},
-			"CumulativePayments": &types.AttributeValueMemberN{Value: paymentMetadata.CumulativePayment.String()},
-		},
-	)
-	if err != nil {
-		fmt.Println("new payment record: %w", err)
+	item := commondynamodb.Item{
+		"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID.Hex()},
+		"CumulativePayments": &types.AttributeValueMemberN{Value: paymentMetadata.CumulativePayment.String()},
+		"PaymentCharged":     &types.AttributeValueMemberN{Value: paymentCharged.String()},
 	}
-	if result != nil {
+
+	// Use a conditional put with attribute_not_exists to ensure atomicity
+	// This ensures we don't overwrite an existing record with the same key
+	condition := "attribute_not_exists(AccountID) AND attribute_not_exists(CumulativePayments)"
+
+	err := s.dynamoClient.PutItemWithCondition(ctx, s.onDemandTableName, item, condition, nil, nil)
+	if errors.Is(err, commondynamodb.ErrConditionFailed) {
 		return fmt.Errorf("exact payment already exists")
 	}
-	err = s.dynamoClient.PutItem(ctx, s.onDemandTableName,
-		commondynamodb.Item{
-			"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID.Hex()},
-			"CumulativePayments": &types.AttributeValueMemberN{Value: paymentMetadata.CumulativePayment.String()},
-			"PaymentCharged":     &types.AttributeValueMemberN{Value: paymentCharged.String()},
-		},
-	)
-
 	if err != nil {
-		return fmt.Errorf("failed to add payment: %w", err)
+		return fmt.Errorf("failed to add on-demand payment: %w", err)
 	}
+
 	return nil
 }
 
