@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	relaygrpc "github.com/Layr-Labs/eigenda/api/grpc/relay"
@@ -171,6 +172,7 @@ func (c *relayClient) GetChunksByRange(
 	request := &relaygrpc.GetChunksRequest{
 		ChunkRequests: grpcRequests,
 		OperatorId:    c.config.OperatorID[:],
+		Timestamp:     uint32(time.Now().Unix()),
 	}
 	err = c.signGetChunksRequest(ctx, request)
 	if err != nil {
@@ -214,6 +216,7 @@ func (c *relayClient) GetChunksByIndex(
 	request := &relaygrpc.GetChunksRequest{
 		ChunkRequests: grpcRequests,
 		OperatorId:    c.config.OperatorID[:],
+		Timestamp:     uint32(time.Now().Unix()),
 	}
 	err = c.signGetChunksRequest(ctx, request)
 	if err != nil {
