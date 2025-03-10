@@ -241,7 +241,7 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 	if s.metadata.sealed {
 		return 0, fmt.Errorf("segment is sealed, cannot write data")
 	}
-	
+
 	shard := s.GetShard(data.Key)
 
 	if s.shardSizes[shard] > math.MaxUint32 {
@@ -294,6 +294,8 @@ type FlushResponse struct {
 	Addresses []*types.KAPair
 	Error     error
 }
+
+// TODO instead of returning a channel, return a function and have that function run on the flush loop
 
 // Flush writes the data segment to disk. Returns a channel. When the data is eventually flushed, the channel
 // will produce the results of the flush operation.
