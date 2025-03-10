@@ -32,7 +32,7 @@ const batchSize = 100
 const parallelWriters = 2
 const readBytesPerSecond = 1 * units.MiB
 const readerCount = 1
-const TTL = 2 * time.Minute
+const TTL = 2 * time.Hour
 
 // given a seed, deterministically generate a key/value pair
 func generateKVPair(seed int64) ([]byte, []byte) {
