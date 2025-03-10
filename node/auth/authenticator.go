@@ -13,12 +13,12 @@ import (
 )
 
 // RequestAuthenticator authenticates requests to the DA node. This object is thread safe.
-// Returns the hash of the request and an error if the request is invalid.
 //
 // This class has largely been future-proofed for decentralized dispersers, with the exception of the
 // preloadCache method, which will need to be updated to handle decentralized dispersers.
 type RequestAuthenticator interface {
 	// AuthenticateStoreChunksRequest authenticates a StoreChunksRequest, returning an error if the request is invalid.
+	// Returns the hash of the request and an error if the request is invalid.
 	AuthenticateStoreChunksRequest(
 		ctx context.Context,
 		request *grpc.StoreChunksRequest,

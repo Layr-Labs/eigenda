@@ -327,7 +327,6 @@ func TestKeyCacheSize(t *testing.T) {
 
 	hash, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
 	require.NoError(t, err)
-	require.NoError(t, err)
 	expectedHash, err = hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
 	require.Equal(t, expectedHash, hash)

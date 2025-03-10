@@ -8,71 +8,7 @@ import (
 	"github.com/emirpasic/gods/queues/priorityqueue"
 )
 
-// ReplayGuardian ensures that the same request is not processed more than once. It can be used to do things such
-// as protecting against replay attacks or accidental duplicate requests.
-type ReplayGuardian interface {
-
-	// VerifyRequest verifies that a request with the given hash and timestamp is not a replay
-	// of a previous request. If it cannot be determined if a request is a replay or not,
-	// then the request is rejected. Only if it can be guaranteed that the request is not a replay
-	// will this method return nil.
-	//
-	// In order to be a verified unique request, the following conditions must be met:
-	// - the request's timestamp must be no more than X minutes ahead of the local wall clock time
-	// - the request's timestamp must be no more than Y minutes behind the local wall clock time
-	// - the request's hash must not have been previously observed (hashes are remembered for Y minutes)
-	VerifyRequest(
-		requestHash []byte,
-		requestTimestamp time.Time) error
-}
-
-// NewReplayGuardian creates a new ReplayGuardian.
-//
-// maxTimeInFuture is the maximum amount of time that a request's timestamp can be ahead of the local wall clock time.
-// Increasing this value permits more leniency in the timestamp of incoming requests, at the potential cost of a higher
-// memory overhead. In theory, if requests are sent exactly at the maximum age, this utility will remember them for
-// that amount of time. If this is extremely large, then an attacker may be able to cause this utility to be forced
-// to remember a very large amount of data.
-//
-// maxTimeInPast is the maximum amount of time that a request's timestamp can be behind the local wall clock time.
-// Increasing this value permits more leniency in the timestamp of incoming requests, at the potential cost of a higher
-// memory overhead.
-func NewReplayGuardian(
-	timeSource func() time.Time,
-	maxTimeInPast time.Duration,
-	maxTimeInFuture time.Duration) ReplayGuardian {
-
-	return &replayGuardian{
-		timeSource:      timeSource,
-		maxTimeInFuture: maxTimeInFuture,
-		maxTimeInPast:   maxTimeInPast,
-		observedHashes:  make(map[string]struct{}),
-		expirationQueue: priorityqueue.NewWith(compareHashWithExpiration),
-	}
-}
-
 var _ ReplayGuardian = &replayGuardian{}
-
-// hashWithExpiration is a request hash with that request's expiration time.
-type hashWithExpiration struct {
-	hash       string
-	expiration time.Time
-}
-
-// compareKeyWithExpiration compares two hashWithExpiration objects by their expiration time. Used to create
-// a priority queue based on expiration time.
-func compareHashWithExpiration(a interface{}, b interface{}) int {
-
-	keyA := a.(*hashWithExpiration)
-	keyB := b.(*hashWithExpiration)
-
-	if keyA.expiration.Before(keyB.expiration) {
-		return -1
-	} else if keyA.expiration.After(keyB.expiration) {
-		return 1
-	}
-	return 0
-}
 
 // replayGuardian is an implementation of ReplayGuardian.
 type replayGuardian struct {
@@ -95,6 +31,62 @@ type replayGuardian struct {
 	lock sync.Mutex
 }
 
+// hashWithTimestamp is a request hash with self-reported timestamp associated with that request.
+type hashWithTimestamp struct {
+	hash      string
+	timestamp time.Time
+}
+
+// NewReplayGuardian creates a new ReplayGuardian.
+//
+// maxTimeInFuture is the maximum amount of time that a request's timestamp can be ahead of the local wall clock time.
+// Increasing this value permits more leniency in the timestamp of incoming requests, at the potential cost of a higher
+// memory overhead. In theory, if requests are sent with a timestamp exactly at the maximum time in the future,
+// this utility will remember them for a total of (maxTimeInFuture + maxTimeInPast), since that is the amount of time
+// that will need to elapse locally before the request exceeds the maximum age. If maxTimeInFuture is extremely large,
+// then an attacker may be able to cause this utility to be forced to remember a very large amount of data.
+//
+// maxTimeInPast is the maximum amount of time that a request's timestamp can be behind the local wall clock time.
+// Increasing this value permits more leniency in the timestamp of incoming requests, at the potential cost of a higher
+// memory overhead.
+func NewReplayGuardian(
+	timeSource func() time.Time,
+	maxTimeInPast time.Duration,
+	maxTimeInFuture time.Duration) ReplayGuardian {
+
+	return &replayGuardian{
+		timeSource:      timeSource,
+		maxTimeInFuture: maxTimeInFuture,
+		maxTimeInPast:   maxTimeInPast,
+		observedHashes:  make(map[string]struct{}),
+		expirationQueue: priorityqueue.NewWith(compareHashWithTimestamp),
+	}
+}
+
+// compareKeyWithExpiration compares two hashWithTimestamp objects by their expiration time. Used to create
+// a priority queue that orders the requests in chronological order (i.e. the order in which they will expire).
+func compareHashWithTimestamp(a interface{}, b interface{}) int {
+
+	keyA := a.(*hashWithTimestamp)
+	keyB := b.(*hashWithTimestamp)
+
+	if keyA.timestamp.Before(keyB.timestamp) {
+		return -1
+	} else if keyA.timestamp.After(keyB.timestamp) {
+		return 1
+	}
+	return 0
+}
+
+// VerifyRequest verifies that a request with the given hash and timestamp is not a replay
+// of a previous request. If it cannot be determined if a request is a replay or not,
+// then the request is rejected. Only if it can be guaranteed that the request is not a replay
+// will this method return nil.
+//
+// In order to be a verified unique request, the following conditions must be met:
+// - the request's timestamp must be no more than X minutes ahead of the local wall clock time
+// - the request's timestamp must be no more than Y minutes behind the local wall clock time
+// - the request's hash must not have been previously observed (hashes are remembered for Y minutes)
 func (r *replayGuardian) VerifyRequest(requestHash []byte, requestTimestamp time.Time) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -117,9 +109,9 @@ func (r *replayGuardian) VerifyRequest(requestHash []byte, requestTimestamp time
 
 	// The request is not a replay. Add the hash to the observedHashes set and the expirationQueue.
 	r.observedHashes[string(requestHash)] = struct{}{}
-	r.expirationQueue.Enqueue(&hashWithExpiration{
-		hash:       string(requestHash),
-		expiration: now.Add(r.maxTimeInPast),
+	r.expirationQueue.Enqueue(&hashWithTimestamp{
+		hash:      string(requestHash),
+		timestamp: requestTimestamp,
 	})
 
 	return nil
@@ -148,8 +140,12 @@ func (r *replayGuardian) verifyTimestamp(now time.Time, requestTimestamp time.Ti
 }
 
 // pruneObservedHashes removes any hashes from the observedHashes set that have expired. A hash is considered to have
-// expired if it was observed more than maxTimeInPast ago.
+// expired if its expiration time is before the current wall clock time.
 func (r *replayGuardian) pruneObservedHashes(now time.Time) {
+
+	// Any timestamp older than this is considered to be expired.
+	oldestNonExpiredTimestamp := now.Add(-r.maxTimeInPast)
+
 	for {
 		next, ok := r.expirationQueue.Peek()
 		if !ok {
@@ -157,13 +153,14 @@ func (r *replayGuardian) pruneObservedHashes(now time.Time) {
 			return
 		}
 
-		if next.(*hashWithExpiration).expiration.After(now) {
+		timestamp := next.(*hashWithTimestamp).timestamp
+		if !timestamp.Before(oldestNonExpiredTimestamp) {
 			// It's not yet time to remove this hash.
 			return
 		}
 
 		// Forget about expired hash.
 		r.expirationQueue.Dequeue()
-		delete(r.observedHashes, next.(*hashWithExpiration).hash)
+		delete(r.observedHashes, next.(*hashWithTimestamp).hash)
 	}
 }
