@@ -7,8 +7,14 @@ import {BN254} from "../../lib/eigenlayer-middleware/src/libraries/BN254.sol";
 import {IEigenDAThresholdRegistry} from "./IEigenDAThresholdRegistry.sol";
 import "./IEigenDAStructs.sol";
 
+/**
+ * @title IEigenDAServiceManager
+ * @notice The Service Manager is the central contract of the EigenDA AVS and is responsible for:
+ * - accepting and confirming the signature of bridged V1 batches
+ * - routing rewards submissions to operators
+ * - setting metadata for the AVS
+ */
 interface IEigenDAServiceManager is IServiceManager, IEigenDAThresholdRegistry {
-    // EVENTS
     
     /**
      * @notice Emitted when a Batch is confirmed.
