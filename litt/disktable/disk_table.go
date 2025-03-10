@@ -678,28 +678,26 @@ func (d *DiskTable) handleFlushLoopSealRequest(req *flushLoopSealRequest) {
 // ensuring a serial ordering with respect to other operations on the control loop), but not for
 // waiting for the segment to finish the flush.
 func (d *DiskTable) handleControlLoopFlushRequest(req *controlLoopFlushRequest) {
-	// This method will enqueue a flush operation within the segment. Although it flushes asynchronously, the
-	// segment performs flush operations in the order they are enqueued.
-	flushResponseChannel := d.segments[d.highestSegmentIndex].Flush()
+	// This method will enqueue a flush operation within the segment. Once that is done,
+	// it becomes the responsibility of the flush loop to wait for the flush to complete.
+	flushWaitFunction := d.segments[d.highestSegmentIndex].Flush()
 
 	// The flush loop is responsible for the remaining parts of the flush.
 	d.flushChannel <- &flushLoopFlushRequest{
-		segmentResponseChan: flushResponseChannel,
-		responseChan:        req.responseChan,
+		flushWaitFunction: flushWaitFunction,
+		responseChan:      req.responseChan,
 	}
 }
 
 // handleFlushLoopFlushRequest handles the part of the flush that is performed on the flush loop.
 func (d *DiskTable) handleFlushLoopFlushRequest(req *flushLoopFlushRequest) {
-	flushResponse := <-req.segmentResponseChan
-	if flushResponse.Error != nil {
-		err := fmt.Errorf("failed to flush mutable segment: %v", flushResponse.Error)
-		req.responseChan <- err
+	durableKeys, err := req.flushWaitFunction()
+	if err != nil {
+		req.responseChan <- fmt.Errorf("failed to flush mutable segment: %v", err)
+		return
 	}
 
-	durableKeys := flushResponse.Addresses
-
-	err := d.writeKeysToKeyMap(durableKeys)
+	err = d.writeKeysToKeyMap(durableKeys)
 	if err != nil {
 		err = fmt.Errorf("failed to flush keys: %v", err)
 		d.panic(err)
@@ -779,9 +777,8 @@ func (d *DiskTable) controlLoop() {
 
 // flushLoopFlushRequest is a request to flush the writer that is sent to the flush loop.
 type flushLoopFlushRequest struct {
-	// when the flush loop begins handling a flush request, the flush will have already been sent to the segment
-	// by the control loop. When the segment finishes flushing, it will write its response to this channel.
-	segmentResponseChan chan *segment.FlushResponse
+	// flushWaitFunction is the function that will wait for the flush to complete.
+	flushWaitFunction segment.FlushWaitFunction
 
 	// responseChan the flush loop sends a nil if the flush was successfully completed, or an error if it was not.
 	responseChan chan error

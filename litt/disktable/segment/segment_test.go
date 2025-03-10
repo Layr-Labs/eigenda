@@ -72,9 +72,8 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 
 		// Occasionally flush the segment to disk.
 		if rand.BoolWithProbability(0.25) {
-			flushResponse := <-seg.Flush()
-			require.NoError(t, flushResponse.Error)
-			flushedKeys := flushResponse.Addresses
+			flushedKeys, err := seg.Flush()()
+			require.NoError(t, err)
 			for _, flushedKey := range flushedKeys {
 				addressMap[string(flushedKey.Key)] = flushedKey.Address
 			}
@@ -85,9 +84,8 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 
 		// Occasionally scan all addresses and values in the segment.
 		if rand.BoolWithProbability(0.1) {
-			flushResponse := <-seg.Flush()
-			require.NoError(t, flushResponse.Error)
-			flushedKeys := flushResponse.Addresses
+			flushedKeys, err := seg.Flush()()
+			require.NoError(t, err)
 			for _, flushedKey := range flushedKeys {
 				addressMap[string(flushedKey.Key)] = flushedKey.Address
 			}
@@ -213,9 +211,8 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 
 		// Occasionally flush the segment to disk.
 		if rand.BoolWithProbability(0.25) {
-			flushResponse := <-seg.Flush()
-			require.NoError(t, flushResponse.Error)
-			flushedKeys := flushResponse.Addresses
+			flushedKeys, err := seg.Flush()()
+			require.NoError(t, err)
 			for _, flushedKey := range flushedKeys {
 				addressMap[string(flushedKey.Key)] = flushedKey.Address
 			}
@@ -226,9 +223,8 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 
 		// Occasionally scan all addresses and values in the segment.
 		if rand.BoolWithProbability(0.1) {
-			flushResponse := <-seg.Flush()
-			require.NoError(t, flushResponse.Error)
-			flushedKeys := flushResponse.Addresses
+			flushedKeys, err := seg.Flush()()
+			require.NoError(t, err)
 			for _, flushedKey := range flushedKeys {
 				addressMap[string(flushedKey.Key)] = flushedKey.Address
 			}

@@ -22,9 +22,6 @@ const unflushedKeysInitialCapacity = 128
 // shardControlChannelCapacity is the capacity of the channel used to send messages to the shard control loop.
 const shardControlChannelCapacity = 32
 
-// flushChannelCapacity is the capacity of the channel used to send messages to the flush control loop.
-const segmentFlushChannelCapacity = 8
-
 // Segment is a chunk of data stored on disk. All data in a particular data segment is expired at the same time.
 //
 // This struct is not thread safe for operations that mutate the segment, access control must be handled by the caller.
@@ -55,10 +52,6 @@ type Segment struct {
 	// shardChannels is a list of channels used to send messages to the goroutine responsible for writing to
 	// each shard. Indexed by shard number.
 	shardChannels []chan any
-
-	// flushChannel is a channel used to enqueue flush/seal work. If nil is sent to this channel, the segment is
-	// sealed and the flush loop exits.
-	flushChannel chan func()
 
 	// keyFileChannel is a channel used to send messages to the goroutine responsible for writing to the key file.
 	keyFileChannel chan any
@@ -173,7 +166,6 @@ func NewSegment(
 		shards:          shards,
 		shardSizes:      shardSizes,
 		shardChannels:   shardChannels,
-		flushChannel:    make(chan func(), segmentFlushChannelCapacity),
 		keyFileChannel:  keyFileChannel,
 		deletionChannel: make(chan struct{}, 1),
 	}
@@ -192,7 +184,6 @@ func NewSegment(
 		}
 
 		go segment.keyFileControlLoop()
-		go segment.flushLoop()
 	}
 
 	return segment, nil
@@ -289,17 +280,14 @@ func (s *Segment) GetKeys() ([]*types.KAPair, error) {
 	return keys, nil
 }
 
-// FlushResponse is a response to a Flush operation.
-type FlushResponse struct {
-	Addresses []*types.KAPair
-	Error     error
-}
+// FlushWaitFunction is a function that waits for a flush operation to complete. It returns the addresses of the data that
+// was flushed, or an error if the flush operation failed.
+type FlushWaitFunction func() ([]*types.KAPair, error)
 
-// TODO instead of returning a channel, return a function and have that function run on the flush loop
-
-// Flush writes the data segment to disk. Returns a channel. When the data is eventually flushed, the channel
-// will produce the results of the flush operation.
-func (s *Segment) Flush() chan *FlushResponse {
+// Flush schedules a flush operation. Flush operations are performed serially in the order they are scheduled.
+// This method returns a function that, when called, will block until the flush operation is complete. The function
+// returns the addresses of the data that was flushed, or an error if the flush operation failed.
+func (s *Segment) Flush() FlushWaitFunction {
 
 	// Schedule a flush for all shards.
 	shardResponseChannels := make([]chan error, s.metadata.shardingFactor)
@@ -310,41 +298,29 @@ func (s *Segment) Flush() chan *FlushResponse {
 		}
 	}
 
-	responseChannel := make(chan *FlushResponse, 1)
+	// Schedule a flush for the key channel.
+	// Now that all shards have sent their key/address pairs to the key file, flush the key file.
+	keyResponseChannel := make(chan *keyFileFlushResponse, 1)
+	s.keyFileChannel <- &keyFileFlushRequest{
+		completionChannel: keyResponseChannel,
+	}
 
-	s.flushChannel <- func() {
+	return func() ([]*types.KAPair, error) {
 		// Wait for each shard to finish flushing.
 		for i := range s.shardChannels {
 			err := <-shardResponseChannels[i]
 			if err != nil {
-				responseChannel <- &FlushResponse{
-					Error: fmt.Errorf("failed to flush shard %d: %v", i, err),
-				}
-				return
+				return nil, fmt.Errorf("failed to flush shard %d: %v", i, err)
 			}
 		}
 
-		// Now that all shards have sent their key/address pairs to the key file, flush the key file.
-		keyResponseChannel := make(chan *keyFileFlushResponse, 1)
-		s.keyFileChannel <- &keyFileFlushRequest{
-			completionChannel: keyResponseChannel,
-		}
-
-		// Wait for the key file to finish flushing.
 		keyFlushResponse := <-keyResponseChannel
 		if keyFlushResponse.err != nil {
-			responseChannel <- &FlushResponse{
-				Error: fmt.Errorf("failed to flush key file: %v", keyFlushResponse.err),
-			}
+			return nil, fmt.Errorf("failed to flush key file: %v", keyFlushResponse.err)
 		}
 
-		// Send the addresses flushed to the caller.
-		responseChannel <- &FlushResponse{
-			Addresses: keyFlushResponse.addresses,
-		}
+		return keyFlushResponse.addresses, nil
 	}
-
-	return responseChannel
 }
 
 // keyFileFlushRequest is a message sent to the key file control loop to request that it flush its data to disk.
@@ -378,57 +354,34 @@ func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
 		}
 	}
 
-	responseChannel := make(chan *FlushResponse, 1)
+	// Schedule a flush+seal for the key file
+	keyResponseChannel := make(chan *keyFileFlushResponse, 1)
+	s.keyFileChannel <- &keyFileFlushRequest{
+		seal:              true,
+		completionChannel: keyResponseChannel,
+	}
 
-	// Although Seal() is a synchronous method, it is important to execute this logic in the flush loop to ensure that
-	// we don't accidentally execute this logic concurrently with a flush, or execute a flush after sealing.
-	s.flushChannel <- func() {
-		// Wait for each shard to finish flushing.
-		for i := range s.shardChannels {
-			err := <-shardResponseChannels[i]
-			if err != nil {
-				responseChannel <- &FlushResponse{
-					Error: fmt.Errorf("failed to flush shard %d: %v", i, err),
-				}
-				return
-			}
-		}
-
-		// Flush+seal the key file
-		keyResponseChannel := make(chan *keyFileFlushResponse, 1)
-		s.keyFileChannel <- &keyFileFlushRequest{
-			seal:              true,
-			completionChannel: keyResponseChannel,
-		}
-
-		// Wait for the key file to finish flushing.
-		response := <-keyResponseChannel
-		if response.err != nil {
-			responseChannel <- &FlushResponse{
-				Error: fmt.Errorf("failed to flush key file: %v", response.err),
-			}
-			return
-		}
-
-		// Seal the metadata file.
-		err := s.metadata.seal(now)
+	// Wait for each shard to finish flushing.
+	for i := range s.shardChannels {
+		err := <-shardResponseChannels[i]
 		if err != nil {
-			responseChannel <- &FlushResponse{
-				Error: fmt.Errorf("failed to seal segment: %v", err),
-			}
-			return
-		}
-
-		responseChannel <- &FlushResponse{
-			Addresses: response.addresses,
+			return nil, fmt.Errorf("failed to flush shard %d: %v", i, err)
 		}
 	}
-	// Shut down the flush loop after sealing. The caller will never send us any more flush requests for
-	// this particular segment.
-	s.flushChannel <- nil
 
-	response := <-responseChannel
-	return response.Addresses, response.Error
+	// Wait for the key file to finish flushing.
+	response := <-keyResponseChannel
+	if response.err != nil {
+		return nil, fmt.Errorf("failed to flush key file: %v", response.err)
+	}
+
+	// Seal the metadata file.
+	err := s.metadata.seal(now)
+	if err != nil {
+		return nil, fmt.Errorf("failed to seal metadata file: %v", err)
+	}
+
+	return response.addresses, nil
 }
 
 // IsSealed returns true if the segment is sealed, and false otherwise.
@@ -524,24 +477,6 @@ func (s *Segment) String() string {
 	}
 
 	return fmt.Sprintf("[seg %d - %s]", s.index, sealedString)
-}
-
-// flushLoop is where all flush/seal work is done. We need to run these operations in serial order, and this goroutine
-// is responsible for that.
-func (s *Segment) flushLoop() {
-	for {
-		select {
-		case <-s.ctx.Done():
-			s.logger.Infof("segment %d flush loop exiting, context cancelled", s.index)
-			return
-		case operation := <-s.flushChannel:
-			if operation == nil {
-				// Segment is sealed, no more work to do
-				return
-			}
-			operation()
-		}
-	}
 }
 
 // shardControlLoop is the main loop for performing modifications to a particular shard. Each shard is managed
