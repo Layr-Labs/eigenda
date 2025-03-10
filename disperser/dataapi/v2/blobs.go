@@ -40,7 +40,7 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 	if dirStr := c.Query("direction"); dirStr != "" {
 		if dirStr != "forward" && dirStr != "backward" {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("direction must be either 'forward' or 'backward', found: %s", dirStr))
+			invalidParamsErrorResponse(c, fmt.Errorf("`direction` must be either \"forward\" or \"backward\", found: %q", dirStr))
 			return
 		}
 		direction = dirStr
@@ -55,12 +55,12 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 		beforeTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("before"))
 		if err != nil {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse before param: %w", err))
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse `before` param: %w", err))
 			return
 		}
 		if beforeTime.Before(oldestTime) {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("before time cannot be more than 14 days in the past, found: %s", c.Query("before")))
+			invalidParamsErrorResponse(c, fmt.Errorf("`before` time cannot be more than 14 days in the past, found: %q", c.Query("before")))
 			return
 		}
 		if now.Before(beforeTime) {
@@ -74,12 +74,12 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 		afterTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("after"))
 		if err != nil {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse after param: %w", err))
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse `after` param: %w", err))
 			return
 		}
 		if now.Before(afterTime) {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("'after' must be before current time, found: %s", c.Query("after")))
+			invalidParamsErrorResponse(c, fmt.Errorf("`after` must be before current time, found: %q", c.Query("after")))
 			return
 		}
 		if afterTime.Before(oldestTime) {
@@ -90,14 +90,15 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 	// Validate time range
 	if !afterTime.Before(beforeTime) {
 		s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-		invalidParamsErrorResponse(c, fmt.Errorf("after time must be before before time"))
+		invalidParamsErrorResponse(c, fmt.Errorf("`after` timestamp (%q) must be earlier than `before` timestamp (%q)",
+			afterTime.Format(time.RFC3339), beforeTime.Format(time.RFC3339)))
 		return
 	}
 
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	if err != nil {
 		s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-		invalidParamsErrorResponse(c, fmt.Errorf("failed to parse limit param: %w", err))
+		invalidParamsErrorResponse(c, fmt.Errorf("failed to parse `limit` param: %w", err))
 		return
 	}
 	if limit <= 0 || limit > maxNumBlobsPerBlobFeedResponse {
@@ -120,7 +121,7 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 		cursor, err := new(blobstore.BlobFeedCursor).FromCursorKey(cursorStr)
 		if err != nil {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse the cursor: %w", err))
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse the `cursor`: %w", err))
 			return
 		}
 		current = *cursor
