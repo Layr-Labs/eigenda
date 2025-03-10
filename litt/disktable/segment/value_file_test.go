@@ -6,7 +6,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +23,8 @@ func TestWriteThenReadValues(t *testing.T) {
 		values[i] = rand.VariableBytes(1, 100)
 	}
 
-	addressMap := make(map[types.Address][]byte)
+	// A map from the first byte index of the value to the value itself.
+	addressMap := make(map[uint32][]byte)
 
 	file, err := newValueFile(logger, index, shard, directory, false)
 	require.NoError(t, err)
@@ -87,12 +87,13 @@ func TestReadingTruncatedValueFile(t *testing.T) {
 		values[i] = rand.VariableBytes(1, 100)
 	}
 
-	addressMap := make(map[types.Address][]byte)
+	// A map from the first byte index of the value to the value itself.
+	addressMap := make(map[uint32][]byte)
 
 	file, err := newValueFile(logger, index, shard, directory, false)
 	require.NoError(t, err)
 
-	var lastAddress types.Address
+	var lastAddress uint32
 	for _, value := range values {
 		address, err := file.write(value)
 		require.NoError(t, err)
