@@ -221,7 +221,18 @@ func (s *Segment) SetNextSegment(nextSegment *Segment) {
 
 // GetShard returns the shard number for a key.
 func (s *Segment) GetShard(key []byte) uint32 {
+	if s.metadata.shardingFactor == 1 {
+		// Shortcut: if we have one shard, we don't need to hash the key to figure out the mapping.
+		return 0
+	}
+
 	return hashKey(key, s.metadata.salt) % s.metadata.shardingFactor
+}
+
+// valueToWrite is a message sent to the shard control loop to request that it write a value to the value file.
+type valueToWrite struct {
+	value                  []byte
+	expectedFirstByteIndex uint32
 }
 
 // Write records a key-value pair in the data segment, returning the maximum size of all shards within this segment.
@@ -232,23 +243,35 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 	if s.metadata.sealed {
 		return 0, fmt.Errorf("segment is sealed, cannot write data")
 	}
-
+	
 	shard := s.GetShard(data.Key)
+	newSize := s.shardSizes[shard]
 
-	if s.shardSizes[shard] > math.MaxUint32 {
+	if newSize > math.MaxUint32 {
 		// No mater the configuration, we absolutely cannot permit a value to be written if the first byte of the
 		// value would be beyond position 2^32. This is because we only have 32 bits in an address to store the
 		// position of a value's first byte.
 		return 0,
-			fmt.Errorf("value file already contains %d bytes, cannot add a new value", s.shardSizes[shard])
+			fmt.Errorf("value file already contains %d bytes, cannot add a new value", newSize)
 	}
+	firstByteIndex := uint32(newSize)
 
 	s.shardSizes[shard] += uint64(len(data.Value)) + 4 /* uint32 length */
 	if s.shardSizes[shard] > s.maxShardSize {
 		s.maxShardSize = s.shardSizes[shard]
 	}
 
-	s.shardChannels[shard] <- data
+	// Forward the value to the shard control loop, which asynchronously writes it to the value file.
+	s.shardChannels[shard] <- &valueToWrite{
+		value:                  data.Value,
+		expectedFirstByteIndex: uint32(firstByteIndex),
+	}
+
+	// Forward the value to the key and its address file control loop, which asynchronously writes it to the key file.
+	s.keyFileChannel <- &types.KAPair{
+		Key:     data.Key,
+		Address: types.NewAddress(s.index, firstByteIndex),
+	}
 
 	return s.maxShardSize, nil
 }
@@ -260,7 +283,7 @@ func (s *Segment) Read(key []byte, dataAddress types.Address) ([]byte, error) {
 	shard := s.GetShard(key)
 	values := s.shards[shard]
 
-	value, err := values.read(dataAddress)
+	value, err := values.read(dataAddress.Offset())
 	if err != nil {
 		return nil, fmt.Errorf("failed to read value: %v", err)
 	}
@@ -508,7 +531,7 @@ func (s *Segment) shardControlLoop(shard uint32) {
 			}
 
 			// Handle write requests.
-			if data, ok := operation.(*types.KVPair); ok {
+			if data, ok := operation.(*valueToWrite); ok {
 				// This is a request to write a value to the file.
 				shardError = s.handleShardWrite(shard, data)
 				continue
@@ -556,17 +579,16 @@ func (s *Segment) handleShardFlushRequest(shard uint32, request *shardFlushReque
 }
 
 // handleShardWrite applies a single write operation to a shard.
-func (s *Segment) handleShardWrite(shard uint32, data *types.KVPair) error {
-	address, err := s.shards[shard].write(data.Value)
+func (s *Segment) handleShardWrite(shard uint32, data *valueToWrite) error {
+	firstByteIndex, err := s.shards[shard].write(data.value)
 	if err != nil {
 		s.logger.Errorf("failed to write value: %v", err)
 		return err
 	}
 
-	// Forward the address to the key file control loop.
-	s.keyFileChannel <- &types.KAPair{
-		Key:     data.Key,
-		Address: address,
+	if firstByteIndex != data.expectedFirstByteIndex {
+		// This should never happen. But it's a good sanity check.
+		return fmt.Errorf("expected first byte index %d, got %d", data.expectedFirstByteIndex, firstByteIndex)
 	}
 
 	return nil

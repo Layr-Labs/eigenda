@@ -9,7 +9,6 @@ import (
 	"os"
 	"path"
 
-	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -94,13 +93,9 @@ func (v *valueFile) path() string {
 }
 
 // read reads a value from the value file.
-func (v *valueFile) read(address types.Address) ([]byte, error) {
-	if v.index != address.Index() {
-		return nil, fmt.Errorf("address %v does not belong to this value file", address)
-	}
-
-	if uint64(address.Offset()) >= v.currentSize {
-		return nil, fmt.Errorf("address %v is out of bounds", address)
+func (v *valueFile) read(firstByteIndex uint32) ([]byte, error) {
+	if uint64(firstByteIndex) >= v.currentSize {
+		return nil, fmt.Errorf("index %d is out of bounds (current size is %d)", firstByteIndex, v.currentSize)
 	}
 
 	file, err := os.OpenFile(v.path(), os.O_RDONLY, 0644)
@@ -114,7 +109,7 @@ func (v *valueFile) read(address types.Address) ([]byte, error) {
 		}
 	}()
 
-	_, err = file.Seek(int64(address.Offset()), 0)
+	_, err = file.Seek(int64(firstByteIndex), 0)
 	reader := bufio.NewReader(file)
 
 	// Read the length of the value.
@@ -138,8 +133,8 @@ func (v *valueFile) read(address types.Address) ([]byte, error) {
 	return value, nil
 }
 
-// write writes a value to the value file, returning its Address.
-func (v *valueFile) write(value []byte) (types.Address, error) {
+// write writes a value to the value file, returning the index of the first byte written.
+func (v *valueFile) write(value []byte) (uint32, error) {
 	if v.writer == nil {
 		return 0, fmt.Errorf("value file is sealed")
 	}
@@ -150,7 +145,7 @@ func (v *valueFile) write(value []byte) (types.Address, error) {
 		return 0, fmt.Errorf("value file already contains %d bytes, cannot add a new value", v.currentSize)
 	}
 
-	address := types.NewAddress(v.index, uint32(v.currentSize))
+	firstByteIndex := uint32(v.currentSize)
 
 	// First, write the length of the value.
 	err := binary.Write(v.writer, binary.BigEndian, uint32(len(value)))
@@ -166,7 +161,7 @@ func (v *valueFile) write(value []byte) (types.Address, error) {
 
 	v.currentSize += uint64(len(value)) + 4
 
-	return address, nil
+	return firstByteIndex, nil
 }
 
 // flush writes all unflushed data to disk.
