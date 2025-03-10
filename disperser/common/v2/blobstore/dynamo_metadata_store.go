@@ -854,6 +854,78 @@ func (s *BlobMetadataStore) GetDispersalRequest(ctx context.Context, batchHeader
 	return req, nil
 }
 
+// GetDispersalRequestByDispersedAt returns DispersalRequest within time range (start, end)
+// (both exclusive), retrieved and ordered by DispersedAt timestamp in specified order.
+//
+// If specified order is ascending (`ascending` is true), retrieve data from the oldest (`start`)
+// to the newest (`end`); otherwise retrieve by the opposite direction.
+//
+// If limit > 0, returns at most that many attestations. If limit <= 0, returns all results
+// in the time range.
+func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
+	ctx context.Context,
+	operatorId core.OperatorID,
+	start uint64,
+	end uint64,
+	limit int,
+	ascending bool,
+) ([]*corev2.DispersalRequest, error) {
+	if start+1 > end-1 {
+		return nil, fmt.Errorf("no time point in exclusive time range (%d, %d)", start, end)
+	}
+
+	dispersals := make([]*corev2.DispersalRequest, 0)
+	var lastEvaledKey map[string]types.AttributeValue
+	adjustedStart, adjustedEnd := start+1, end-1
+
+	// Iteratively fetch results from the bucket until we get desired number of items or
+	// exhaust the available data.
+	// This needs to be processed in a loop because DynamoDb has a limit on the response
+	// size of a query (1MB) and we may have more data than that.
+	for {
+		res, err := s.dynamoDBClient.QueryIndexWithPagination(
+			ctx,
+			s.tableName,
+			OperatorDispersalIndexName,
+			"OperatorID = :pk AND DispersedAt BETWEEN :start AND :end",
+			commondynamodb.ExpressionValues{
+				":pk":    &types.AttributeValueMemberS{Value: operatorId.Hex()},
+				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedStart), 10)},
+				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedEnd), 10)},
+			},
+			0, // no limit within a bucket
+			lastEvaledKey,
+			ascending,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("query failed for operatorId %s: %w", operatorId.Hex(), err)
+		}
+
+		// Collect results
+		for _, item := range res.Items {
+			it, err := UnmarshalDispersalRequest(item)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal DispersalRequest: %w", err)
+			}
+			dispersals = append(dispersals, it)
+
+			// Desired number of items collected
+			if limit > 0 && len(dispersals) >= limit {
+				return dispersals, nil
+			}
+		}
+
+		// Exhausted all items already
+		if res.LastEvaluatedKey == nil {
+			break
+		}
+		// For next iteration
+		lastEvaledKey = res.LastEvaluatedKey
+	}
+
+	return dispersals, nil
+}
+
 func (s *BlobMetadataStore) PutDispersalResponse(ctx context.Context, res *corev2.DispersalResponse) error {
 	item, err := MarshalDispersalResponse(res)
 	if err != nil {
