@@ -893,7 +893,7 @@ func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
 				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedStart), 10)},
 				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedEnd), 10)},
 			},
-			0, // no limit within a bucket
+			0, // no limit within one try
 			lastEvaledKey,
 			ascending,
 		)
