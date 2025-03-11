@@ -1,7 +1,6 @@
 package segment
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"os"
@@ -27,8 +26,6 @@ const shardControlChannelCapacity = 32
 //
 // This struct is not thread safe for operations that mutate the segment, access control must be handled by the caller.
 type Segment struct {
-	ctx context.Context
-
 	// The logger for the segment.
 	logger logging.Logger
 
@@ -61,8 +58,8 @@ type Segment struct {
 	// keyFileChannel is a channel used to send messages to the goroutine responsible for writing to the key file.
 	keyFileChannel chan any
 
-	// deletionMutex permits a caller to block until this segment is fully deleted. The channel has a capacity of 1, and
-	// there is an element in the channel up until the segment is fully deleted.
+	// deletionMutex permits a caller to block until this segment is fully deleted. An element is inserted into
+	// the channel when the segment is fully deleted.
 	deletionChannel chan struct{}
 
 	// reservationCount is the number of reservations on this segment. The segment will not be deleted until this count
@@ -81,7 +78,6 @@ type Segment struct {
 // Note that shardingFactor and salt parameters are ignored if this is not a new segment. Segments loaded from
 // disk always use their original sharding factor and salt values
 func NewSegment(
-	ctx context.Context,
 	logger logging.Logger,
 	panic *util.DBPanic,
 	index uint32,
@@ -164,7 +160,6 @@ func NewSegment(
 	keyFileChannel := make(chan any, shardControlChannelCapacity*metadata.shardingFactor)
 
 	segment := &Segment{
-		ctx:             ctx,
 		logger:          logger,
 		panic:           panic,
 		index:           index,
@@ -176,9 +171,6 @@ func NewSegment(
 		keyFileChannel:  keyFileChannel,
 		deletionChannel: make(chan struct{}, 1),
 	}
-
-	// This element is removed from the channel when the segment is fully deleted.
-	segment.deletionChannel <- struct{}{}
 
 	// Segments are returned with an initial reference count of 1, as the caller of the constructor is considered to
 	// have a reference to the segment.
@@ -269,15 +261,23 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 	}
 
 	// Forward the value to the shard control loop, which asynchronously writes it to the value file.
-	s.shardChannels[shard] <- &valueToWrite{
+	shardRequest := &valueToWrite{
 		value:                  data.Value,
 		expectedFirstByteIndex: firstByteIndex,
 	}
+	err = util.SendAny(s.panic, s.shardChannels[shard], shardRequest)
+	if err != nil {
+		return 0, fmt.Errorf("failed to send value to shard control loop: %v", err)
+	}
 
 	// Forward the value to the key and its address file control loop, which asynchronously writes it to the key file.
-	s.keyFileChannel <- &types.KAPair{
+	keyRequest := &types.KAPair{
 		Key:     data.Key,
 		Address: types.NewAddress(s.index, firstByteIndex),
+	}
+	err = util.SendAny(s.panic, s.keyFileChannel, keyRequest)
+	if err != nil {
+		return 0, fmt.Errorf("failed to send key to key file control loop: %v", err)
 	}
 
 	return s.maxShardSize, nil
@@ -317,40 +317,48 @@ type FlushWaitFunction func() ([]*types.KAPair, error)
 // Flush schedules a flush operation. Flush operations are performed serially in the order they are scheduled.
 // This method returns a function that, when called, will block until the flush operation is complete. The function
 // returns the addresses of the data that was flushed, or an error if the flush operation failed.
-func (s *Segment) Flush() FlushWaitFunction {
+func (s *Segment) Flush() (FlushWaitFunction, error) {
 
 	// Schedule a flush for all shards.
 	shardResponseChannels := make([]chan error, s.metadata.shardingFactor)
 	for shard, shardChannel := range s.shardChannels {
 		shardResponseChannels[shard] = make(chan error, 1)
-		shardChannel <- &shardFlushRequest{
+		request := &shardFlushRequest{
 			completionChannel: shardResponseChannels[shard],
+		}
+		err := util.SendAny(s.panic, shardChannel, request)
+		if err != nil {
+			return nil, fmt.Errorf("failed to send flush request to shard %d: %v", shard, err)
 		}
 	}
 
 	// Schedule a flush for the key channel.
 	// Now that all shards have sent their key/address pairs to the key file, flush the key file.
 	keyResponseChannel := make(chan *keyFileFlushResponse, 1)
-	s.keyFileChannel <- &keyFileFlushRequest{
+	request := &keyFileFlushRequest{
 		completionChannel: keyResponseChannel,
+	}
+	err := util.SendAny(s.panic, s.keyFileChannel, request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send flush request to key file: %v", err)
 	}
 
 	return func() ([]*types.KAPair, error) {
 		// Wait for each shard to finish flushing.
 		for i := range s.shardChannels {
-			err := <-shardResponseChannels[i]
+			_, err := util.Await(s.panic, shardResponseChannels[i])
 			if err != nil {
 				return nil, fmt.Errorf("failed to flush shard %d: %v", i, err)
 			}
 		}
 
-		keyFlushResponse := <-keyResponseChannel
-		if keyFlushResponse.err != nil {
+		keyFlushResponse, err := util.Await(s.panic, keyResponseChannel)
+		if err != nil {
 			return nil, fmt.Errorf("failed to flush key file: %v", keyFlushResponse.err)
 		}
 
 		return keyFlushResponse.addresses, nil
-	}
+	}, nil
 }
 
 // keyFileFlushRequest is a message sent to the key file control loop to request that it flush its data to disk.
@@ -378,35 +386,43 @@ func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
 	shardResponseChannels := make([]chan error, s.metadata.shardingFactor)
 	for shard, shardChannel := range s.shardChannels {
 		shardResponseChannels[shard] = make(chan error, 1)
-		shardChannel <- &shardFlushRequest{
+		request := &shardFlushRequest{
 			seal:              true,
 			completionChannel: shardResponseChannels[shard],
+		}
+		err := util.SendAny(s.panic, shardChannel, request)
+		if err != nil {
+			return nil, fmt.Errorf("failed to send flush request to shard %d: %v", shard, err)
 		}
 	}
 
 	// Schedule a flush+seal for the key file
 	keyResponseChannel := make(chan *keyFileFlushResponse, 1)
-	s.keyFileChannel <- &keyFileFlushRequest{
+	request := &keyFileFlushRequest{
 		seal:              true,
 		completionChannel: keyResponseChannel,
+	}
+	err := util.SendAny(s.panic, s.keyFileChannel, request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send flush request to key file: %v", err)
 	}
 
 	// Wait for each shard to finish flushing.
 	for i := range s.shardChannels {
-		err := <-shardResponseChannels[i]
+		_, err = util.Await(s.panic, shardResponseChannels[i])
 		if err != nil {
 			return nil, fmt.Errorf("failed to flush shard %d: %v", i, err)
 		}
 	}
 
 	// Wait for the key file to finish flushing.
-	response := <-keyResponseChannel
-	if response.err != nil {
-		return nil, fmt.Errorf("failed to flush key file: %v", response.err)
+	response, err := util.Await(s.panic, keyResponseChannel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to flush key file: %v", err)
 	}
 
 	// Seal the metadata file.
-	err := s.metadata.seal(now)
+	err = s.metadata.seal(now)
 	if err != nil {
 		return nil, fmt.Errorf("failed to seal metadata file: %v", err)
 	}
@@ -463,16 +479,20 @@ func (s *Segment) Release() {
 }
 
 // BlockUntilFullyDeleted blocks until the segment is fully deleted. If the segment is not yet fully released,
-// this method will block until it is.
-func (s *Segment) BlockUntilFullyDeleted() {
-	s.deletionChannel <- struct{}{}
-	<-s.deletionChannel
+// this method will block until it is. This method should only be called once per segment (the second call
+// will block forever!).
+func (s *Segment) BlockUntilFullyDeleted() error {
+	_, err := util.Await(s.panic, s.deletionChannel)
+	if err != nil {
+		return fmt.Errorf("failed to await segment deletion: %v", err)
+	}
+	return nil
 }
 
 // delete deletes the segment from disk.
 func (s *Segment) delete() error {
 	defer func() {
-		<-s.deletionChannel
+		s.deletionChannel <- struct{}{}
 	}()
 
 	err := s.keys.delete()
@@ -515,7 +535,7 @@ func (s *Segment) shardControlLoop(shard uint32) {
 
 	for {
 		select {
-		case <-s.ctx.Done():
+		case <-s.panic.ImmediateShutdownRequired():
 			s.logger.Infof("segment %d shard %d control loop exiting, context cancelled", s.index, shard)
 		case operation := <-s.shardChannels[shard]:
 			if flushRequest, ok := operation.(*shardFlushRequest); ok {
@@ -584,7 +604,7 @@ func (s *Segment) keyFileControlLoop() {
 
 	for {
 		select {
-		case <-s.ctx.Done():
+		case <-s.panic.ImmediateShutdownRequired():
 			s.logger.Infof("segment %d key file control loop exiting, context cancelled", s.index)
 			return
 		case operation := <-s.keyFileChannel:

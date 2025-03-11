@@ -48,9 +48,8 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 
 	salt := rand.Uint32()
 	seg, err := NewSegment(
-		context.Background(),
 		logger,
-		util.NewDBPanic(logger),
+		util.NewDBPanic(context.Background(), logger),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -74,7 +73,9 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 
 		// Occasionally flush the segment to disk.
 		if rand.BoolWithProbability(0.25) {
-			flushedKeys, err := seg.Flush()()
+			flushFunction, err := seg.Flush()
+			require.NoError(t, err)
+			flushedKeys, err := flushFunction()
 			require.NoError(t, err)
 			for _, flushedKey := range flushedKeys {
 				addressMap[string(flushedKey.Key)] = flushedKey.Address
@@ -86,7 +87,9 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 
 		// Occasionally scan all addresses and values in the segment.
 		if rand.BoolWithProbability(0.1) {
-			flushedKeys, err := seg.Flush()()
+			flushFunction, err := seg.Flush()
+			require.NoError(t, err)
+			flushedKeys, err := flushFunction()
 			require.NoError(t, err)
 			for _, flushedKey := range flushedKeys {
 				addressMap[string(flushedKey.Key)] = flushedKey.Address
@@ -133,9 +136,8 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 
 	// Reopen the segment and read all keys and values.
 	seg2, err := NewSegment(
-		context.Background(),
 		logger,
-		util.NewDBPanic(logger),
+		util.NewDBPanic(context.Background(), logger),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -191,9 +193,8 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 
 	salt := rand.Uint32()
 	seg, err := NewSegment(
-		context.Background(),
 		logger,
-		util.NewDBPanic(logger),
+		util.NewDBPanic(context.Background(), logger),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -215,7 +216,9 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 
 		// Occasionally flush the segment to disk.
 		if rand.BoolWithProbability(0.25) {
-			flushedKeys, err := seg.Flush()()
+			flushFunction, err := seg.Flush()
+			require.NoError(t, err)
+			flushedKeys, err := flushFunction()
 			require.NoError(t, err)
 			for _, flushedKey := range flushedKeys {
 				addressMap[string(flushedKey.Key)] = flushedKey.Address
@@ -227,7 +230,9 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 
 		// Occasionally scan all addresses and values in the segment.
 		if rand.BoolWithProbability(0.1) {
-			flushedKeys, err := seg.Flush()()
+			flushFunction, err := seg.Flush()
+			require.NoError(t, err)
+			flushedKeys, err := flushFunction()
 			require.NoError(t, err)
 			for _, flushedKey := range flushedKeys {
 				addressMap[string(flushedKey.Key)] = flushedKey.Address
@@ -281,9 +286,8 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 
 	// Reopen the segment and read all keys and values.
 	seg2, err := NewSegment(
-		context.Background(),
 		logger,
-		util.NewDBPanic(logger),
+		util.NewDBPanic(context.Background(), logger),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -343,9 +347,8 @@ func TestWriteAndReadColdShard(t *testing.T) {
 
 	salt := rand.Uint32()
 	seg, err := NewSegment(
-		context.Background(),
 		logger,
-		util.NewDBPanic(logger),
+		util.NewDBPanic(context.Background(), logger),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -403,9 +406,8 @@ func TestWriteAndReadColdShard(t *testing.T) {
 
 	// Reopen the segment and read all keys and values.
 	seg2, err := NewSegment(
-		context.Background(),
 		logger,
-		util.NewDBPanic(logger),
+		util.NewDBPanic(context.Background(), logger),
 		index,
 		[]string{directory},
 		time.Now(),

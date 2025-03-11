@@ -373,7 +373,6 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete
 
 	// Delete a file in the middle of the sequence of segments.
 	lowestSegmentIndex, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
-		context.Background(),
 		logger,
 		dbPanic,
 		[]string{directory + "/table/segments"},
@@ -488,7 +487,6 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelet
 	require.NoError(t, err)
 
 	lowestSegmentIndex, _, segments, err := segment.GatherSegmentFiles(
-		context.Background(),
 		logger,
 		table.(*DiskTable).panic,
 		[]string{directory + "/table/segments"},
@@ -680,7 +678,6 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete s
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
-		context.Background(),
 		logger,
 		table.(*DiskTable).panic,
 		[]string{directory + "/table/segments"},
@@ -875,7 +872,6 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 	// If the last segment is empty, write a final value to make it non-empty. This test isn't interesting
 	// if there is no data to be truncated.
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
-		context.Background(),
 		logger,
 		table.(*DiskTable).panic,
 		[]string{directory + "/table/segments"},
@@ -904,7 +900,6 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
-		context.Background(),
 		logger,
 		table.(*DiskTable).panic,
 		[]string{directory + "/table/segments"},
@@ -1109,7 +1104,6 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
-		context.Background(),
 		logger,
 		table.(*DiskTable).panic,
 		[]string{directory + "/table/segments"},
@@ -1138,7 +1132,6 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
-		context.Background(),
 		logger,
 		table.(*DiskTable).panic,
 		[]string{directory + "/table/segments"},
@@ -1364,7 +1357,6 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 	// If the last segment is empty, write a final value to make it non-empty. This test isn't interesting
 	// if there is no data left unflushed.
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
-		context.Background(),
 		logger,
 		table.(*DiskTable).panic,
 		[]string{directory + "/table/segments"},
@@ -1392,7 +1384,6 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
-		context.Background(),
 		logger,
 		table.(*DiskTable).panic,
 		[]string{directory + "/table/segments"},
