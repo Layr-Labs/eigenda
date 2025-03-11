@@ -1,3 +1,5 @@
+// Package memconfig_client provides a client for interacting with the eigenda-proxy's memstore configuration API.
+// It is used in tests to drive memstore behavior such as causing proxy to start returning 503 failover errors.
 package memconfig_client
 
 import (

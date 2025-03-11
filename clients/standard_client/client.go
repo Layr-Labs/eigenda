@@ -1,3 +1,14 @@
+// Package standard_client is the main client used for interacting with the eigenda-proxy.
+//
+// This client is used for sending/retrieving payloads to/from the proxy.
+// The `standard` prefix means that this client uses the proxy's [standard commitment mode] routes.
+// It hence receives DA Certs serialized using [standard commitment mode].
+//
+// Note that op rollups use a different [op-specific commitment] and should use op's [DAClient] instead.
+//
+// [standard commitment mode]: https://github.com/Layr-Labs/eigenda-proxy?tab=readme-ov-file#standard-commitment-mode
+// [op-specific commitment]: https://github.com/Layr-Labs/eigenda-proxy#optimism-commitment-mode
+// [DAClient]: https://pkg.go.dev/github.com/ethereum-optimism/optimism/op-alt-da#DAClient
 package standard_client
 
 import (

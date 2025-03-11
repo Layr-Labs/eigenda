@@ -1,3 +1,6 @@
+/*
+EigenDA Proxy provides a simple REST API to facilitate interacting with the EigenDA Network.
+*/
 package main
 
 import (
