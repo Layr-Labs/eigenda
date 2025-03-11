@@ -40,7 +40,7 @@ const TTL = 2 * time.Hour
 func generateKVPair(seed int64) ([]byte, []byte) {
 	rand := random.NewTestRandomNoPrint(seed)
 	key := []byte(rand.String(32))
-	value := rand.Bytes(dataSize)
+	value := []byte(rand.String(dataSize))
 	return key, value
 }
 
@@ -55,7 +55,7 @@ type dataWithExpiration struct {
 // false.
 func randomUnexpiredSeed(
 	lock *sync.RWMutex,
-	unexpiredData map[int64]struct{}) (int64, bool) {
+	unexpiredData map[int64]*writeMetadata) (int64, bool) {
 	lock.RLock()
 	defer lock.RUnlock()
 	for seed := range unexpiredData {
@@ -65,6 +65,13 @@ func randomUnexpiredSeed(
 }
 
 // TODO separate out the benchmark framework from the DB implementations, make this into a struct, not a mega function
+
+// Tracks metadata about a value written. Created to assist with debugging.
+type writeMetadata struct {
+	seed         int64
+	serialNumber uint64
+	creationTime time.Time
+}
 
 // runBenchmark runs a simple benchmark. Its goal is to write a ton of data to the database as fast as possible.
 func runBenchmark(write writer, read reader) {
@@ -88,9 +95,12 @@ func runBenchmark(write writer, read reader) {
 
 	// data in the database that is expected to be present when the reader threads read it. This map implements
 	// a set containing the seed values for all key-value pairs that are expected to be present in the database.
-	unexpiredData := map[int64]struct{}{}
+	unexpiredData := map[int64]*writeMetadata{}
 	// manually track expiration to maintain the unexpiredData map, which is needed by the reader threads.
 	expirationQueue := linkedlistqueue.New()
+
+	// Each write is assigned a serial number, used for debugging
+	nextSerialNumber := atomic.Uint64{}
 
 	// protects access to unexpiredData and expirationQueue
 	lock := &sync.RWMutex{}
@@ -163,7 +173,19 @@ func runBenchmark(write writer, read reader) {
 				value, err := read(key)
 				readLatency := time.Since(readStart)
 				if err != nil {
-					panic(fmt.Errorf("error reading key %v: %v", key, err))
+
+					lock.Lock()
+					metadata := unexpiredData[seed]
+					nextSN := nextSerialNumber.Load()
+					fmt.Printf("\n--- Key Debug Dump: %s ---\n", key)
+					fmt.Printf("Expected value: %s\n", expectedValue)
+					fmt.Printf("Serial number: %d\n", metadata.serialNumber)
+					fmt.Printf("Creation time: %v\n", metadata.creationTime)
+					fmt.Printf("Next serial number: %d\n", nextSN)
+					fmt.Printf("Current wall time: %v\n", time.Now())
+					lock.Unlock()
+
+					panic(fmt.Errorf("error reading key %s: %v", key, err))
 				}
 				if !bytes.Equal(expectedValue, value) {
 					panic(fmt.Errorf("expected value %v, got %v", expectedValue, value))
@@ -212,7 +234,12 @@ func runBenchmark(write writer, read reader) {
 
 		dataWritten += dataSize
 
-		possiblyUnflushedData.Enqueue(seed)
+		metadata := &writeMetadata{
+			seed:         seed,
+			serialNumber: nextSerialNumber.Add(1),
+			creationTime: time.Now(),
+		}
+		possiblyUnflushedData.Enqueue(metadata)
 		lock.Lock()
 		// Subtract 10 minutes from the actual expiration time to avoid race conditions with the reader threads.
 		// This means that the reader threads will stop making attempts to read a key/value pair 10 minutes before
@@ -223,7 +250,8 @@ func runBenchmark(write writer, read reader) {
 			// Data that has had a number of writes afterward that exceeds the maximum batchSize
 			// it is guaranteed to be flushed if the DB respects batch sizes.
 			next, _ := possiblyUnflushedData.Dequeue()
-			unexpiredData[next.(int64)] = struct{}{}
+			metadata = next.(*writeMetadata)
+			unexpiredData[metadata.seed] = metadata
 		}
 		lock.Unlock()
 
