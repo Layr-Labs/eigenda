@@ -219,7 +219,7 @@ func runBenchmark(write writer, read reader) {
 		// that key/value pair is actually scheduled to be deleted.
 		expirationQueue.Enqueue(dataWithExpiration{seed: seed, expiration: time.Now().Add(TTL).Add(-10 * time.Minute)})
 
-		if possiblyUnflushedData.Size() > batchSize {
+		if possiblyUnflushedData.Size() > batchSize*parallelWriters {
 			// Data that has had a number of writes afterward that exceeds the maximum batchSize
 			// it is guaranteed to be flushed if the DB respects batch sizes.
 			next, _ := possiblyUnflushedData.Dequeue()
