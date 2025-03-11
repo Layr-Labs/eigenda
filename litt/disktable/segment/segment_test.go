@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,6 +50,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	seg, err := NewSegment(
 		context.Background(),
 		logger,
+		util.NewDBPanic(logger),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -133,6 +135,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	seg2, err := NewSegment(
 		context.Background(),
 		logger,
+		util.NewDBPanic(logger),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -190,6 +193,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	seg, err := NewSegment(
 		context.Background(),
 		logger,
+		util.NewDBPanic(logger),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -279,6 +283,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	seg2, err := NewSegment(
 		context.Background(),
 		logger,
+		util.NewDBPanic(logger),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -340,6 +345,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	seg, err := NewSegment(
 		context.Background(),
 		logger,
+		util.NewDBPanic(logger),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -399,6 +405,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	seg2, err := NewSegment(
 		context.Background(),
 		logger,
+		util.NewDBPanic(logger),
 		index,
 		[]string{directory},
 		time.Now(),

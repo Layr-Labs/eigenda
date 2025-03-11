@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/cache"
@@ -75,9 +76,13 @@ func (c *cachedTable) SetTTL(ttl time.Duration) error {
 	return c.base.SetTTL(ttl)
 }
 
-func (c *cachedTable) SetCacheSize(size uint64) {
+func (c *cachedTable) SetCacheSize(size uint64) error {
 	c.cache.SetCapacity(size)
-	c.base.SetCacheSize(size)
+	err := c.base.SetCacheSize(size)
+	if err != nil {
+		return fmt.Errorf("failed to set base table cache size: %w", err)
+	}
+	return nil
 }
 
 func (c *cachedTable) Start() error {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -30,6 +31,10 @@ type Segment struct {
 
 	// The logger for the segment.
 	logger logging.Logger
+
+	// Used to signal an unrecoverable error in the segment. If panic.Panic() is called, the entire DB enters a
+	// "panic" state and will refuse to do additional work.
+	panic *util.DBPanic
 
 	// The index of the data segment. The first data segment ever created has index 0, the next has index 1, and so on.
 	index uint32
@@ -78,6 +83,7 @@ type Segment struct {
 func NewSegment(
 	ctx context.Context,
 	logger logging.Logger,
+	panic *util.DBPanic,
 	index uint32,
 	parentDirectories []string,
 	now time.Time,
@@ -160,6 +166,7 @@ func NewSegment(
 	segment := &Segment{
 		ctx:             ctx,
 		logger:          logger,
+		panic:           panic,
 		index:           index,
 		metadata:        metadata,
 		keys:            keys,
@@ -226,7 +233,7 @@ func (s *Segment) GetShard(key []byte) uint32 {
 		return 0
 	}
 
-	return hashKey(key, s.metadata.salt) % s.metadata.shardingFactor
+	return util.HashKey(key, s.metadata.salt) % s.metadata.shardingFactor
 }
 
 // valueToWrite is a message sent to the shard control loop to request that it write a value to the value file.
@@ -243,7 +250,7 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 	if s.metadata.sealed {
 		return 0, fmt.Errorf("segment is sealed, cannot write data")
 	}
-	
+
 	shard := s.GetShard(data.Key)
 	newSize := s.shardSizes[shard]
 
@@ -264,7 +271,7 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 	// Forward the value to the shard control loop, which asynchronously writes it to the value file.
 	s.shardChannels[shard] <- &valueToWrite{
 		value:                  data.Value,
-		expectedFirstByteIndex: uint32(firstByteIndex),
+		expectedFirstByteIndex: firstByteIndex,
 	}
 
 	// Forward the value to the key and its address file control loop, which asynchronously writes it to the key file.
@@ -444,13 +451,13 @@ func (s *Segment) Release() {
 
 	if reservations < 0 {
 		// This should be impossible.
-		s.logger.Errorf("segment %d has negative reservation count: %d", s.index, reservations)
+		s.panic.Panic(fmt.Errorf("segment %d has negative reservation count: %d", s.index, reservations))
 	}
 
 	go func() {
 		err := s.delete()
 		if err != nil {
-			s.logger.Errorf("failed to delete segment: %v", err)
+			s.panic.Panic(fmt.Errorf("failed to delete segment: %v", err))
 		}
 	}()
 }
@@ -505,40 +512,24 @@ func (s *Segment) String() string {
 // shardControlLoop is the main loop for performing modifications to a particular shard. Each shard is managed
 // by its own goroutine, which is running this function.
 func (s *Segment) shardControlLoop(shard uint32) {
-	var shardError error
 
 	for {
 		select {
 		case <-s.ctx.Done():
 			s.logger.Infof("segment %d shard %d control loop exiting, context cancelled", s.index, shard)
 		case operation := <-s.shardChannels[shard]:
-			// Handle flush requests, and possibly also seal the shard.
 			if flushRequest, ok := operation.(*shardFlushRequest); ok {
-
-				shardError = s.handleShardFlushRequest(shard, flushRequest, shardError)
-
+				s.handleShardFlushRequest(shard, flushRequest)
 				if flushRequest.seal {
 					// After sealing, we can exit the control loop.
 					return
 				}
+			} else if data, ok := operation.(*valueToWrite); ok {
+				s.handleShardWrite(shard, data)
 				continue
+			} else {
+				s.panic.Panic(fmt.Errorf("unknown operation type in shard control loop: %T", operation))
 			}
-
-			// If this shard has encountered an error, don't bother processing any other operations.
-			if shardError != nil {
-				s.logger.Warnf("shard %d is in an error state, ignoring operation: %v", shard, shardError)
-				continue
-			}
-
-			// Handle write requests.
-			if data, ok := operation.(*valueToWrite); ok {
-				// This is a request to write a value to the file.
-				shardError = s.handleShardWrite(shard, data)
-				continue
-			}
-
-			// If we reach this point, the operation type is unknown.
-			s.logger.Errorf("unknown operation type in shard control loop: %T", operation)
 		}
 	}
 }
@@ -554,18 +545,12 @@ type shardFlushRequest struct {
 }
 
 // handleShardFlushRequest handles a request to flush a shard to disk.
-func (s *Segment) handleShardFlushRequest(shard uint32, request *shardFlushRequest, shardError error) error {
-	if shardError != nil {
-		// Report an error previously encountered
-		request.completionChannel <- shardError
-		return shardError
-	}
-
+func (s *Segment) handleShardFlushRequest(shard uint32, request *shardFlushRequest) {
 	if request.seal {
 		err := s.shards[shard].seal()
 		if err != nil {
-			request.completionChannel <- fmt.Errorf("failed to seal value file: %v", err)
-			return err
+			request.completionChannel <- fmt.Errorf("failed to seal value file: %v", err) // TODO do we need to return this?
+			s.panic.Panic(fmt.Errorf("failed to seal value file: %v", err))
 		}
 	} else {
 		err := s.shards[shard].flush()
@@ -575,30 +560,26 @@ func (s *Segment) handleShardFlushRequest(shard uint32, request *shardFlushReque
 	}
 
 	request.completionChannel <- nil
-	return nil
 }
 
 // handleShardWrite applies a single write operation to a shard.
-func (s *Segment) handleShardWrite(shard uint32, data *valueToWrite) error {
+func (s *Segment) handleShardWrite(shard uint32, data *valueToWrite) {
 	firstByteIndex, err := s.shards[shard].write(data.value)
 	if err != nil {
-		s.logger.Errorf("failed to write value: %v", err)
-		return err
+		s.panic.Panic(fmt.Errorf("failed to write value to value file: %v", err))
 	}
 
 	if firstByteIndex != data.expectedFirstByteIndex {
 		// This should never happen. But it's a good sanity check.
-		return fmt.Errorf("expected first byte index %d, got %d", data.expectedFirstByteIndex, firstByteIndex)
+		if firstByteIndex != data.expectedFirstByteIndex {
+			s.panic.Panic(fmt.Errorf("expected first byte index %d, got %d", data.expectedFirstByteIndex, firstByteIndex))
+		}
 	}
-
-	return nil
 }
 
 // keyFileControlLoop is the main loop for performing modifications to the key file. This goroutine is responsible
 // for writing key-address pairs to the key file.
 func (s *Segment) keyFileControlLoop() {
-	var keyFileError error
-
 	unflushedKeys := make([]*types.KAPair, 0, unflushedKeysInitialCapacity)
 
 	for {
@@ -607,55 +588,44 @@ func (s *Segment) keyFileControlLoop() {
 			s.logger.Infof("segment %d key file control loop exiting, context cancelled", s.index)
 			return
 		case operation := <-s.keyFileChannel:
-			// Handle flush requests, and possibly also seal the key file.
+
 			if flushRequest, ok := operation.(*keyFileFlushRequest); ok {
-				keyFileError = s.handleKeyFileFlushRequest(flushRequest, unflushedKeys)
+				s.handleKeyFileFlushRequest(flushRequest, unflushedKeys)
 				unflushedKeys = make([]*types.KAPair, 0, unflushedKeysInitialCapacity)
 
 				if flushRequest.seal {
 					// After sealing, we can exit the control loop.
 					return
 				}
-				continue
-			}
 
-			// If the key file is in an error state, don't bother processing any other operations.
-			if keyFileError != nil {
-				s.logger.Warnf("key file is in an error state, ignoring operation: %v", keyFileError)
-				continue
-			}
-
-			// Handle requests to write to the key file.
-			if data, ok := operation.(*types.KAPair); ok {
-				keyFileError = s.handleKeyFileWrite(data)
+			} else if data, ok := operation.(*types.KAPair); ok {
+				s.handleKeyFileWrite(data)
 				unflushedKeys = append(unflushedKeys, data)
-				continue
-			}
 
-			// If we reach this point, the operation type is unknown.
-			s.logger.Errorf("unknown operation type in key file control loop: %T", operation)
+			} else {
+				s.panic.Panic(fmt.Errorf("unknown operation type in key file control loop: %T", operation))
+			}
 		}
 	}
 }
 
 // handleKeyFileWrite writes a key to the key file.
-func (s *Segment) handleKeyFileWrite(data *types.KAPair) error {
+func (s *Segment) handleKeyFileWrite(data *types.KAPair) {
 	err := s.keys.write(data.Key, data.Address)
 	if err != nil {
-		s.logger.Errorf("failed to write key to key file: %v", err)
+		s.panic.Panic(fmt.Errorf("failed to write key to key file: %v", err))
 	}
-	return err
 }
 
 // handleKeyFileFlushRequest handles a request to flush the key file to disk.
-func (s *Segment) handleKeyFileFlushRequest(request *keyFileFlushRequest, unflushedKeys []*types.KAPair) error {
+func (s *Segment) handleKeyFileFlushRequest(request *keyFileFlushRequest, unflushedKeys []*types.KAPair) {
 	if request.seal {
 		err := s.keys.seal()
 		if err != nil {
-			request.completionChannel <- &keyFileFlushResponse{
+			request.completionChannel <- &keyFileFlushResponse{ // TODO do we need to return an error here?
 				err: err,
 			}
-			return err
+			s.panic.Panic(fmt.Errorf("failed to seal key file: %v", err))
 		}
 	} else {
 		err := s.keys.flush()
@@ -663,13 +633,11 @@ func (s *Segment) handleKeyFileFlushRequest(request *keyFileFlushRequest, unflus
 			request.completionChannel <- &keyFileFlushResponse{
 				err: err,
 			}
-			return err
+			s.panic.Panic(fmt.Errorf("failed to flush key file: %v", err))
 		}
 	}
 
 	request.completionChannel <- &keyFileFlushResponse{
 		addresses: unflushedKeys,
 	}
-
-	return nil
 }
