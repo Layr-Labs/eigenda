@@ -188,6 +188,17 @@ func runBenchmark(write writer, read reader) {
 					panic(fmt.Errorf("error reading key %s: %v", key, err))
 				}
 				if !bytes.Equal(expectedValue, value) {
+					lock.Lock()
+					metadata := unexpiredData[seed]
+					nextSN := nextSerialNumber.Load()
+					fmt.Printf("\n--- Key Debug Dump: %s ---\n", key)
+					fmt.Printf("Expected value: %s\n", expectedValue)
+					fmt.Printf("Serial number: %d\n", metadata.serialNumber)
+					fmt.Printf("Creation time: %v\n", metadata.creationTime)
+					fmt.Printf("Next serial number: %d\n", nextSN)
+					fmt.Printf("Current wall time: %v\n", time.Now())
+					lock.Unlock()
+
 					panic(fmt.Errorf("expected value %v, got %v", expectedValue, value))
 				}
 				totalReadsPerformed.Add(1)
