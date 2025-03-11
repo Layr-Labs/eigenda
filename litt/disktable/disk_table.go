@@ -311,7 +311,7 @@ func (d *DiskTable) Stop() error {
 		return fmt.Errorf("failed to send shutdown request: %v", err)
 	}
 
-	_, err = util.Await(d.panic, shutdownCompleteChan) // TODO don't return an error on the channel
+	_, err = util.Await(d.panic, shutdownCompleteChan)
 	if err != nil {
 		return fmt.Errorf("failed to shutdown: %v", err)
 	}
@@ -534,7 +534,7 @@ func (d *DiskTable) Flush() error {
 	}
 
 	flushReq := &controlLoopFlushRequest{
-		responseChan: make(chan error, 1),
+		responseChan: make(chan struct{}, 1),
 	}
 	err := util.SendAny(d.panic, d.controllerChannel, flushReq)
 	if err != nil {
@@ -649,7 +649,7 @@ func (d *DiskTable) expandSegments() error {
 	now := d.timeSource()
 
 	// Seal the previous segment.
-	flushLoopResponseChan := make(chan error, 1)
+	flushLoopResponseChan := make(chan struct{}, 1)
 	request := &flushLoopSealRequest{
 		now:          now,
 		responseChan: flushLoopResponseChan,
@@ -700,18 +700,18 @@ func (d *DiskTable) expandSegments() error {
 func (d *DiskTable) handleFlushLoopSealRequest(req *flushLoopSealRequest) {
 	durableKeys, err := d.segments[d.highestSegmentIndex].Seal(req.now)
 	if err != nil {
-		req.responseChan <- fmt.Errorf("failed to seal segment %d: %v", d.highestSegmentIndex, err)
+		d.panic.Panic(fmt.Errorf("failed to seal segment %d: %v", d.highestSegmentIndex, err))
 		return
 	}
 
 	// Flush the keys that are now durable in the segment.
 	err = d.writeKeysToKeyMap(durableKeys)
 	if err != nil {
-		req.responseChan <- fmt.Errorf("failed to flush keys: %v", err)
+		d.panic.Panic(fmt.Errorf("failed to flush keys: %v", err))
 		return
 	}
 
-	req.responseChan <- nil
+	req.responseChan <- struct{}{}
 }
 
 // handleControlLoopFlushRequest handles the part of the flush that is performed on the control loop.
@@ -741,19 +741,15 @@ func (d *DiskTable) handleControlLoopFlushRequest(req *controlLoopFlushRequest) 
 func (d *DiskTable) handleFlushLoopFlushRequest(req *flushLoopFlushRequest) {
 	durableKeys, err := req.flushWaitFunction()
 	if err != nil {
-		err = fmt.Errorf("failed to flush mutable segment: %v", err)
-		req.responseChan <- fmt.Errorf("failed to flush mutable segment: %v", err)
-		d.panic.Panic(err)
+		d.panic.Panic(fmt.Errorf("failed to flush mutable segment: %v", err))
 	}
 
 	err = d.writeKeysToKeyMap(durableKeys)
 	if err != nil {
-		err = fmt.Errorf("failed to flush keys: %v", err)
-		req.responseChan <- err
-		d.panic.Panic(err)
+		d.panic.Panic(fmt.Errorf("failed to flush keys: %v", err))
 	}
 
-	req.responseChan <- nil
+	req.responseChan <- struct{}{}
 }
 
 // writeKeysToKeyMap flushes all keys to the key map. Once they are flushed, it also removes the keys from the
@@ -801,8 +797,8 @@ func (d *DiskTable) handleControlLoopSetShardingFactorRequest(req *controlLoopSe
 
 // controlLoopFlushRequest is a request to flush the writer that is sent to the control loop.
 type controlLoopFlushRequest struct {
-	// responseChan will produce a nil if the flush was successful, or an error if it was not.
-	responseChan chan error
+	// responseChan produces a value when the flush is complete.
+	responseChan chan struct{}
 }
 
 // controlLoopWriteRequest is a request to write a key-value pair that is sent to the control loop.
@@ -857,16 +853,16 @@ type flushLoopFlushRequest struct {
 	// flushWaitFunction is the function that will wait for the flush to complete.
 	flushWaitFunction segment.FlushWaitFunction
 
-	// responseChan the flush loop sends a nil if the flush was successfully completed, or an error if it was not.
-	responseChan chan error
+	// responseChan sends an object when the flush is complete.
+	responseChan chan struct{}
 }
 
 // flushLoopSealRequest is a request to seal the mutable segment that is sent to the flush loop.
 type flushLoopSealRequest struct {
 	// the time when the segment is sealed
 	now time.Time
-	// responseChan will produce a nil if the seal was successful, or an error if it was not.
-	responseChan chan error
+	// responseChan sends an object when the seal is complete.
+	responseChan chan struct{}
 }
 
 // flushLoopShutdownRequest is a request to shut down the flush loop.
