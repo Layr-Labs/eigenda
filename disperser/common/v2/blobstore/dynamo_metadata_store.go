@@ -898,7 +898,7 @@ func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
 			ascending,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("query failed for operatorId %s: %w", operatorId.Hex(), err)
+			return nil, fmt.Errorf("query failed for operatorId %s with time range (%d, %d): %w", operatorId.Hex(), adjustedStart, adjustedEnd, err)
 		}
 
 		// Collect results
