@@ -42,8 +42,6 @@ type db struct {
 
 	// Protects access to tables and ttl.
 	lock sync.Mutex
-
-	started bool
 }
 
 // NewDB creates a new DB instance. In general, this should not be used directly. Instead, use LittDBConfig.Build()
@@ -77,12 +75,6 @@ func (d *db) GetTable(name string) (litt.Table, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error creating table: %w", err)
 		}
-		if d.started {
-			err = table.Start()
-			if err != nil {
-				return nil, fmt.Errorf("error starting table: %w", err)
-			}
-		}
 
 		d.tables[name] = table
 	}
@@ -104,22 +96,6 @@ func (d *db) DropTable(name string) error {
 		return fmt.Errorf("error destroying table: %w", err)
 	}
 	delete(d.tables, name)
-
-	return nil
-}
-
-func (d *db) Start() error {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	for name, table := range d.tables {
-		err := table.Start()
-		if err != nil {
-			return fmt.Errorf("error starting table %s: %w", name, err)
-		}
-	}
-
-	d.started = true
 
 	return nil
 }

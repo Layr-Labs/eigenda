@@ -34,8 +34,6 @@ func TestKeyMapMigration(t *testing.T) {
 
 	db, err := config.Build(context.Background())
 	require.NoError(t, err)
-	err = db.Start()
-	require.NoError(t, err)
 	table, err := db.GetTable("test")
 	require.NoError(t, err)
 
@@ -111,8 +109,6 @@ func TestKeyMapMigration(t *testing.T) {
 	// Reload the table and check the data
 	db, err = config.Build(context.Background())
 	require.NoError(t, err)
-	err = db.Start()
-	require.NoError(t, err)
 	table, err = db.GetTable("test")
 	require.NoError(t, err)
 
@@ -129,8 +125,6 @@ func TestKeyMapMigration(t *testing.T) {
 	config.KeyMapType = keymap.MemKeyMapType
 
 	db, err = config.Build(context.Background())
-	require.NoError(t, err)
-	err = db.Start()
 	require.NoError(t, err)
 	table, err = db.GetTable("test")
 	require.NoError(t, err)
@@ -152,8 +146,6 @@ func TestKeyMapMigration(t *testing.T) {
 	config.KeyMapType = keymap.LevelDBKeyMapType
 
 	db, err = config.Build(context.Background())
-	require.NoError(t, err)
-	err = db.Start()
 	require.NoError(t, err)
 	table, err = db.GetTable("test")
 	require.NoError(t, err)

@@ -89,9 +89,6 @@ func randomDBOperationsTest(t *testing.T, builder dbBuilder) {
 		tableNames = append(tableNames, fmt.Sprintf("table-%d-%s", i, rand.PrintableBytes(8)))
 	}
 
-	err = db.Start()
-	require.NoError(t, err)
-
 	// first key is table name, second key is the key in the kv-pair
 	expectedValues := make(map[string]map[string][]byte)
 	for _, tableName := range tableNames {
@@ -189,9 +186,6 @@ func dbRestartTest(t *testing.T, builder dbBuilder) {
 		tableNames = append(tableNames, fmt.Sprintf("table-%d-%s", i, rand.PrintableBytes(8)))
 	}
 
-	err = db.Start()
-	require.NoError(t, err)
-
 	// first key is table name, second key is the key in the kv-pair
 	expectedValues := make(map[string]map[string][]byte)
 	for _, tableName := range tableNames {
@@ -208,8 +202,6 @@ func dbRestartTest(t *testing.T, builder dbBuilder) {
 			require.NoError(t, err)
 
 			db, err = builder(t, directory)
-			require.NoError(t, err)
-			err = db.Start()
 			require.NoError(t, err)
 
 			// Do a full scan of the table to verify that all expected values are still present.

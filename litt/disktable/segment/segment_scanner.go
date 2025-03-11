@@ -359,9 +359,7 @@ func GatherSegmentFiles(
 	rootDirectories []string,
 	now time.Time,
 	shardingFactor uint32,
-	salt uint32,
-	createMutableSegment bool,
-) (lowestSegmentIndex uint32, highestSegmentIndex uint32, segments map[uint32]*Segment, err error) {
+	salt uint32) (lowestSegmentIndex uint32, highestSegmentIndex uint32, segments map[uint32]*Segment, err error) {
 
 	// Scan the root directories for segment files.
 	metadataFiles, keyFiles, valueFiles, garbageFiles, highestSegmentIndex, lowestSegmentIndex, isEmpty, err :=
@@ -421,30 +419,6 @@ func GatherSegmentFiles(
 					fmt.Errorf("failed to create segment %d: %v", i, err)
 			}
 			segments[i] = segment
-		}
-	}
-
-	if createMutableSegment {
-		// Create a new mutable segment at the end.
-		if isEmpty {
-			segment, err := NewSegment(
-				logger, panic, lowestSegmentIndex, rootDirectories, now, shardingFactor, salt, false)
-			if err != nil {
-				return 0, 0, nil,
-					fmt.Errorf("failed to create segment %d: %v", lowestSegmentIndex, err)
-			}
-
-			segments[0] = segment
-		} else {
-			segment, err := NewSegment(
-				logger, panic, highestSegmentIndex+1, rootDirectories, now, shardingFactor, salt, false)
-			if err != nil {
-				return 0, 0, nil,
-					fmt.Errorf("failed to create segment %d: %v", highestSegmentIndex+1, err)
-			}
-
-			segments[highestSegmentIndex+1] = segment
-			highestSegmentIndex++
 		}
 	}
 

@@ -58,9 +58,6 @@ type Table interface {
 type ManagedTable interface {
 	Table
 
-	// Start starts the table. Should be called prior to any other methods.
-	Start() error // TODO do we actually need this method? Why not roll it into the constructor?
-
 	// Stop shuts down the table, flushing data to disk.
 	Stop() error
 

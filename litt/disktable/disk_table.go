@@ -197,11 +197,35 @@ func NewDiskTable(
 			table.segmentDirectories,
 			timeSource(),
 			shardingFactor,
-			saltShaker.Uint32(),
-			true)
+			saltShaker.Uint32())
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather segment files: %v", err)
 	}
+
+	// Create the mutable segment
+	var nextSegmentIndex uint32
+	if table.highestSegmentIndex == 0 {
+		nextSegmentIndex = 0
+	} else {
+		nextSegmentIndex = table.highestSegmentIndex + 1
+	}
+	mutableSegment, err := segment.NewSegment(
+		logger,
+		dbPanic,
+		nextSegmentIndex,
+		segDirs,
+		timeSource(),
+		metadata.GetShardingFactor(),
+		saltShaker.Uint32(),
+		false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mutable segment: %v", err)
+	}
+	if table.highestSegmentIndex > 0 {
+		table.segments[table.highestSegmentIndex].SetNextSegment(mutableSegment)
+		table.highestSegmentIndex++
+	}
+	table.segments[nextSegmentIndex] = mutableSegment
 
 	if reloadKeyMap {
 		logger.Infof("reloading key map from segments")
@@ -210,6 +234,9 @@ func NewDiskTable(
 			return nil, fmt.Errorf("failed to load key map from segments: %v", err)
 		}
 	}
+
+	go table.controlLoop()
+	go table.flushLoop()
 
 	return table, nil
 }
@@ -281,17 +308,6 @@ func (d *DiskTable) reloadKeyMap() error {
 
 func (d *DiskTable) Name() string {
 	return d.name
-}
-
-// Start starts the disk table.
-func (d *DiskTable) Start() error {
-	if ok, err := d.panic.IsOk(); !ok {
-		return fmt.Errorf("Cannot process Start() request: %v", err)
-	}
-
-	go d.controlLoop()
-	go d.flushLoop()
-	return nil
 }
 
 // Stop stops the disk table. Flushes all data out to disk.
@@ -382,8 +398,6 @@ func (d *DiskTable) SetTTL(ttl time.Duration) error {
 	}
 	return nil
 }
-
-// TODO test this on a live table
 
 func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
 	if ok, err := d.panic.IsOk(); !ok {

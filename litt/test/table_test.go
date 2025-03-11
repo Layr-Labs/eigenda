@@ -189,11 +189,6 @@ func randomOperationsTest(t *testing.T, tableBuilder tableBuilder) {
 
 	require.Equal(t, tableName, table.Name())
 
-	err = table.Start()
-	if err != nil {
-		t.Fatalf("failed to start table: %v", err)
-	}
-
 	expectedValues := make(map[string][]byte)
 
 	iterations := 1000
@@ -291,11 +286,6 @@ func garbageCollectionTest(t *testing.T, tableBuilder tableBuilder) {
 	require.NoError(t, err)
 
 	require.Equal(t, tableName, table.Name())
-
-	err = table.Start()
-	if err != nil {
-		t.Fatalf("failed to start table: %v", err)
-	}
 
 	expectedValues := make(map[string][]byte)
 	creationTimes := make(map[string]time.Time)

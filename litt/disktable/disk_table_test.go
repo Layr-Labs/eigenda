@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -208,11 +209,6 @@ func restartTest(t *testing.T, tableBuilder tableBuilder) {
 
 	require.Equal(t, tableName, table.Name())
 
-	err = table.Start()
-	if err != nil {
-		t.Fatalf("failed to start table: %v", err)
-	}
-
 	expectedValues := make(map[string][]byte)
 
 	iterations := 1000
@@ -228,8 +224,6 @@ func restartTest(t *testing.T, tableBuilder tableBuilder) {
 			require.NoError(t, err)
 
 			table, err = tableBuilder(time.Now, tableName, []string{directory})
-			require.NoError(t, err)
-			err = table.Start()
 			require.NoError(t, err)
 
 			// Do a full scan of the table to verify that all expected values are still present.
@@ -333,11 +327,6 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete
 
 	require.Equal(t, tableName, table.Name())
 
-	err = table.Start()
-	if err != nil {
-		t.Fatalf("failed to start table: %v", err)
-	}
-
 	expectedValues := make(map[string][]byte)
 
 	// Fill the table with random data.
@@ -378,8 +367,7 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0,
-		false)
+		0)
 	require.NoError(t, err)
 
 	middleIndex := lowestSegmentIndex + (highestSegmentIndex-lowestSegmentIndex)/2
@@ -450,11 +438,6 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelet
 
 	require.Equal(t, tableName, table.Name())
 
-	err = table.Start()
-	if err != nil {
-		t.Fatalf("failed to start table: %v", err)
-	}
-
 	expectedValues := make(map[string][]byte)
 
 	// Fill the table with random data.
@@ -492,8 +475,7 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelet
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0,
-		false)
+		0)
 	require.NoError(t, err)
 
 	// All keys in the initial segment are expected to be missing after the restart.
@@ -527,8 +509,6 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelet
 
 	// Restart the table.
 	table, err = tableBuilder(time.Now, tableName, []string{directory})
-	require.NoError(t, err)
-	err = table.Start()
 	require.NoError(t, err)
 
 	// Check the data in the table.
@@ -641,11 +621,6 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete s
 
 	require.Equal(t, tableName, table.Name())
 
-	err = table.Start()
-	if err != nil {
-		t.Fatalf("failed to start table: %v", err)
-	}
-
 	expectedValues := make(map[string][]byte)
 
 	// Fill the table with random data.
@@ -683,8 +658,7 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete s
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0,
-		false)
+		0)
 	require.NoError(t, err)
 
 	// All keys in the final segment are expected to be missing after the restart.
@@ -715,8 +689,6 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete s
 
 	// Restart the table.
 	table, err = tableBuilder(time.Now, tableName, []string{directory})
-	require.NoError(t, err)
-	err = table.Start()
 	require.NoError(t, err)
 
 	// Manually remove the keys from the last segment from the key map. If this happens in reality (as opposed
@@ -836,11 +808,6 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 
 	require.Equal(t, tableName, table.Name())
 
-	err = table.Start()
-	if err != nil {
-		t.Fatalf("failed to start table: %v", err)
-	}
-
 	expectedValues := make(map[string][]byte)
 
 	// Fill the table with random data.
@@ -877,8 +844,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0,
-		false)
+		0)
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
 		directory, highestSegmentIndex, segment.KeysFileExtension)
@@ -905,8 +871,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0,
-		false)
+		0)
 	require.NoError(t, err)
 
 	// Truncate the last key file.
@@ -951,8 +916,6 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 
 	// Restart the table.
 	table, err = tableBuilder(time.Now, tableName, []string{directory})
-	require.NoError(t, err)
-	err = table.Start()
 	require.NoError(t, err)
 
 	// Manually remove the keys from the last segment from the key map. If this happens in reality (as opposed
@@ -1070,11 +1033,6 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 
 	require.Equal(t, tableName, table.Name())
 
-	err = table.Start()
-	if err != nil {
-		t.Fatalf("failed to start table: %v", err)
-	}
-
 	expectedValues := make(map[string][]byte)
 
 	// Fill the table with random data.
@@ -1109,8 +1067,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0,
-		false)
+		0)
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
 		directory, highestSegmentIndex, segment.KeysFileExtension)
@@ -1137,8 +1094,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0,
-		false)
+		0)
 	require.NoError(t, err)
 
 	// Truncate a random shard of the last value file.
@@ -1201,8 +1157,6 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 
 	// Restart the table.
 	table, err = tableBuilder(time.Now, tableName, []string{directory})
-	require.NoError(t, err)
-	err = table.Start()
 	require.NoError(t, err)
 
 	// Manually remove the keys from the last segment from the key map. If this happens in reality (as opposed
@@ -1321,11 +1275,6 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 
 	require.Equal(t, tableName, table.Name())
 
-	err = table.Start()
-	if err != nil {
-		t.Fatalf("failed to start table: %v", err)
-	}
-
 	expectedValues := make(map[string][]byte)
 
 	// Fill the table with random data.
@@ -1362,8 +1311,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0,
-		false)
+		0)
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
 		directory, highestSegmentIndex, segment.KeysFileExtension)
@@ -1389,8 +1337,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0,
-		false)
+		0)
 	require.NoError(t, err)
 
 	// Identify keys in the last file. These will be removed from the key map to simulate keys that have not
@@ -1415,8 +1362,6 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 
 	// Restart the table.
 	table, err = tableBuilder(time.Now, tableName, []string{directory})
-	require.NoError(t, err)
-	err = table.Start()
 	require.NoError(t, err)
 
 	// Manually remove the keys from the last segment from the key map. If this happens in reality (as opposed
@@ -1545,11 +1490,6 @@ func metadataPreservedOnRestartTest(t *testing.T, tableBuilder tableBuilder) {
 	err = table.SetShardingFactor(shardingFactor)
 	require.NoError(t, err)
 
-	err = table.Start()
-	if err != nil {
-		t.Fatalf("failed to start table: %v", err)
-	}
-
 	// Stop the table
 	ok, _ := table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
@@ -1558,8 +1498,6 @@ func metadataPreservedOnRestartTest(t *testing.T, tableBuilder tableBuilder) {
 
 	// Restart the table.
 	table, err = tableBuilder(time.Now, tableName, []string{directory})
-	require.NoError(t, err)
-	err = table.Start()
 	require.NoError(t, err)
 
 	// Check the table metadata.
@@ -1598,11 +1536,6 @@ func orphanedMetadataTest(t *testing.T, tableBuilder tableBuilder) {
 	err = table.SetShardingFactor(shardingFactor)
 	require.NoError(t, err)
 
-	err = table.Start()
-	if err != nil {
-		t.Fatalf("failed to start table: %v", err)
-	}
-
 	// Stop the table
 	ok, _ := table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
@@ -1617,8 +1550,6 @@ func orphanedMetadataTest(t *testing.T, tableBuilder tableBuilder) {
 
 	// Restart the table.
 	table, err = tableBuilder(time.Now, tableName, []string{directory})
-	require.NoError(t, err)
-	err = table.Start()
 	require.NoError(t, err)
 
 	// Check the table metadata.
@@ -1656,11 +1587,6 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder tableB
 	}
 
 	require.Equal(t, tableName, table.Name())
-
-	err = table.Start()
-	if err != nil {
-		t.Fatalf("failed to start table: %v", err)
-	}
 
 	expectedValues := make(map[string][]byte)
 
@@ -1706,9 +1632,6 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder tableB
 			require.NoError(t, err)
 
 			// TODO shuffle table metadata location
-
-			err = table.Start()
-			require.NoError(t, err)
 
 			// Do a full scan of the table to verify that all expected values are still present.
 			for expectedKey, expectedValue := range expectedValues {
@@ -1795,4 +1718,194 @@ func TestRestartWithMultipleStorageDirectories(t *testing.T) {
 	}
 }
 
-// TODO unit test if it is possible for key/value file to be empty if segment is sealed before data is written
+// changingShardingFactorTest checks the number of shards in a particular segment and compares it to the expected
+// number of shards in the segment.
+func checkShardsInSegment(
+	t *testing.T,
+	roots []string,
+	segmentIndex uint32,
+	expectedShardCount uint32) {
+
+	// For each shard, there should be exactly one value file in the format <segmentIndex>-<shardIndex>.value
+	expectedValueFiles := make(map[string]struct{})
+	for i := uint32(0); i < expectedShardCount; i++ {
+		expectedValueFiles[fmt.Sprintf("%d-%d.values", segmentIndex, i)] = struct{}{}
+	}
+
+	discoveredShardFiles := make(map[string]struct{})
+	for _, root := range roots {
+		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			fileName := filepath.Base(path)
+			if _, ok := expectedValueFiles[fileName]; ok {
+				discoveredShardFiles[fileName] = struct{}{}
+			}
+
+			return nil
+		})
+		require.NoError(t, err)
+	}
+
+	require.Equal(t, expectedValueFiles, discoveredShardFiles)
+}
+
+// changingShardingFactorTest checks the number of shards in the latest segment.
+func checkShardsInSegments(
+	t *testing.T,
+	roots []string,
+	expectedShardCounts map[uint32]uint32) {
+
+	for segmentIndex, expectedShardCount := range expectedShardCounts {
+		checkShardsInSegment(t, roots, segmentIndex, expectedShardCount)
+	}
+}
+
+// getLatestSegmentIndex returns the index of the latest segment in the table.
+func getLatestSegmentIndex(table litt.Table) uint32 {
+	return (table.(*DiskTable)).highestSegmentIndex
+}
+
+func changingShardingFactorTest(t *testing.T, tableBuilder tableBuilder) {
+	rand := random.NewTestRandom()
+
+	directory := t.TempDir()
+	rootCount := rand.Uint32Range(1, 5)
+	roots := make([]string, 0, rootCount)
+	for i := uint32(0); i < rootCount; i++ {
+		roots = append(roots, path.Join(directory, fmt.Sprintf("root%d", i)))
+	}
+
+	tableName := rand.String(8)
+	table, err := tableBuilder(time.Now, tableName, roots)
+	if err != nil {
+		t.Fatalf("failed to create table: %v", err)
+	}
+
+	require.Equal(t, tableName, table.Name())
+
+	// Contains the expected number of shards in various segments. We won't check all segments, just the segments
+	// immediately before and immediately after a sharding factor change.
+	expectedShardCounts := make(map[uint32]uint32)
+
+	// Before data is written, change the sharding factor to a random value.
+	expectedShardCounts[getLatestSegmentIndex(table)] = table.(*DiskTable).metadata.GetShardingFactor()
+	shardingFactor := rand.Uint32Range(2, 10)
+	err = table.SetShardingFactor(shardingFactor)
+	require.NoError(t, err)
+	err = table.Flush()
+	require.NoError(t, err)
+	expectedShardCounts[getLatestSegmentIndex(table)] = shardingFactor
+
+	expectedValues := make(map[string][]byte)
+
+	iterations := 1000
+	restartIteration := iterations/2 + int(rand.Int64Range(-10, 10))
+
+	for i := 0; i < iterations; i++ {
+
+		// Somewhere in the middle of the test, restart the table.
+		if i == restartIteration {
+			expectedShardCounts[getLatestSegmentIndex(table)] = shardingFactor
+
+			ok, _ := table.(*DiskTable).panic.IsOk()
+			require.True(t, ok)
+			err = table.Stop()
+			require.NoError(t, err)
+
+			table, err = tableBuilder(time.Now, tableName, roots)
+			require.NoError(t, err)
+
+			expectedShardCounts[getLatestSegmentIndex(table)] = shardingFactor
+
+			// Do a full scan of the table to verify that all expected values are still present.
+			for expectedKey, expectedValue := range expectedValues {
+				value, ok, err := table.Get([]byte(expectedKey))
+				require.NoError(t, err)
+				require.True(t, ok, "key %s not found", expectedKey)
+				require.Equal(t, expectedValue, value)
+			}
+
+			// Try fetching a value that isn't in the table.
+			_, ok, err := table.Get(rand.PrintableVariableBytes(32, 64))
+			require.NoError(t, err)
+			require.False(t, ok)
+		}
+
+		// Write some data.
+		batchSize := rand.Int32Range(1, 10)
+
+		if batchSize == 1 {
+			key := rand.PrintableVariableBytes(32, 64)
+			value := rand.PrintableVariableBytes(1, 128)
+			err = table.Put(key, value)
+			require.NoError(t, err)
+			expectedValues[string(key)] = value
+		} else {
+			batch := make([]*types.KVPair, 0, batchSize)
+			for j := int32(0); j < batchSize; j++ {
+				key := rand.PrintableVariableBytes(32, 64)
+				value := rand.PrintableVariableBytes(1, 128)
+				batch = append(batch, &types.KVPair{Key: key, Value: value})
+				expectedValues[string(key)] = value
+			}
+			err = table.PutBatch(batch)
+			require.NoError(t, err)
+		}
+
+		// Once in a while, change the sharding factor to a random value.
+		if rand.BoolWithProbability(0.01) {
+			expectedShardCounts[getLatestSegmentIndex(table)] = shardingFactor
+			shardingFactor = rand.Uint32Range(1, 10)
+			err = table.SetShardingFactor(shardingFactor)
+			require.NoError(t, err)
+			err = table.Flush()
+			require.NoError(t, err)
+			expectedShardCounts[getLatestSegmentIndex(table)] = shardingFactor
+		}
+
+		// Once in a while, flush the table.
+		if rand.BoolWithProbability(0.1) {
+			err = table.Flush()
+			require.NoError(t, err)
+		}
+
+		// Once in a while, sleep for a short time. For tables that do garbage collection, the garbage
+		// collection interval has been configured to be 1ms. Sleeping 5ms should be enough to give
+		// the garbage collector a chance to run.
+		if rand.BoolWithProbability(0.01) {
+			time.Sleep(5 * time.Millisecond)
+		}
+
+		// Once in a while, scan the table and verify that all expected values are present.
+		// Don't do this every time for the sake of test runtime.
+		if rand.BoolWithProbability(0.01) || i == iterations-1 /* always check on the last iteration */ {
+
+			for expectedKey, expectedValue := range expectedValues {
+				value, ok, err := table.Get([]byte(expectedKey))
+				require.NoError(t, err)
+				require.True(t, ok)
+				require.Equal(t, expectedValue, value)
+			}
+
+			// Try fetching a value that isn't in the table.
+			_, ok, err := table.Get(rand.PrintableVariableBytes(32, 64))
+			require.NoError(t, err)
+			require.False(t, ok)
+		}
+	}
+
+	ok, _ := table.(*DiskTable).panic.IsOk()
+	require.True(t, ok)
+
+	err = table.Stop()
+	require.NoError(t, err)
+
+	checkShardsInSegments(t, roots, expectedShardCounts)
+}
+
+func TestChangingShardingFactor(t *testing.T) {
+	for _, tb := range tableBuilders {
+		changingShardingFactorTest(t, tb)
+	}
+}
+
+// TODO add a check to ensure there is no data outside of the provided root directories!

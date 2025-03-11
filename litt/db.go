@@ -31,9 +31,6 @@ type DB interface {
 	// The table returned by GetTable() before DropTable() is called must not be used once DropTable() is called.
 	DropTable(name string) error
 
-	// Start starts the database. This method must be called before any other method is called.
-	Start() error
-
 	// Stop stops the database. This method must be called when the database is no longer needed.
 	// Stop ensures that all non-flushed data is crash durable on disk before returning. Calls to
 	// Put() concurrent with Stop() may not be crash durable after Stop() returns.¬
