@@ -320,9 +320,9 @@ type FlushWaitFunction func() ([]*types.KAPair, error)
 func (s *Segment) Flush() (FlushWaitFunction, error) {
 
 	// Schedule a flush for all shards.
-	shardResponseChannels := make([]chan error, s.metadata.shardingFactor)
+	shardResponseChannels := make([]chan struct{}, s.metadata.shardingFactor)
 	for shard, shardChannel := range s.shardChannels {
-		shardResponseChannels[shard] = make(chan error, 1)
+		shardResponseChannels[shard] = make(chan struct{}, 1)
 		request := &shardFlushRequest{
 			completionChannel: shardResponseChannels[shard],
 		}
@@ -354,7 +354,7 @@ func (s *Segment) Flush() (FlushWaitFunction, error) {
 
 		keyFlushResponse, err := util.Await(s.panic, keyResponseChannel)
 		if err != nil {
-			return nil, fmt.Errorf("failed to flush key file: %v", keyFlushResponse.err)
+			return nil, fmt.Errorf("failed to flush key file: %v", err)
 		}
 
 		return keyFlushResponse.addresses, nil
@@ -374,8 +374,6 @@ type keyFileFlushRequest struct {
 // keyFileFlushResponse is a message sent from the key file control loop to the caller of Flush to indicate that the
 // key file has been flushed.
 type keyFileFlushResponse struct {
-	// The error encountered during the flush, if any.
-	err       error
 	addresses []*types.KAPair
 }
 
@@ -383,9 +381,9 @@ type keyFileFlushResponse struct {
 // this method call. After this method is called, no more data can be written to this segment.
 func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
 	// Schedule a flush+seal for all shards.
-	shardResponseChannels := make([]chan error, s.metadata.shardingFactor)
+	shardResponseChannels := make([]chan struct{}, s.metadata.shardingFactor)
 	for shard, shardChannel := range s.shardChannels {
-		shardResponseChannels[shard] = make(chan error, 1)
+		shardResponseChannels[shard] = make(chan struct{}, 1)
 		request := &shardFlushRequest{
 			seal:              true,
 			completionChannel: shardResponseChannels[shard],
@@ -559,9 +557,8 @@ type shardFlushRequest struct {
 	// If true, seal the shard after flushing. If false, do not seal the shard.
 	seal bool
 
-	// As each shard finishes its flush, it will either send an error if something went wrong, or nil if the flush was
-	// successful.
-	completionChannel chan error
+	// As each shard finishes its flush it will send an object to this channel.
+	completionChannel chan struct{}
 }
 
 // handleShardFlushRequest handles a request to flush a shard to disk.
@@ -569,17 +566,16 @@ func (s *Segment) handleShardFlushRequest(shard uint32, request *shardFlushReque
 	if request.seal {
 		err := s.shards[shard].seal()
 		if err != nil {
-			request.completionChannel <- fmt.Errorf("failed to seal value file: %v", err) // TODO do we need to return this?
 			s.panic.Panic(fmt.Errorf("failed to seal value file: %v", err))
 		}
 	} else {
 		err := s.shards[shard].flush()
 		if err != nil {
-			request.completionChannel <- fmt.Errorf("failed to flush value file: %v", err)
+			s.panic.Panic(fmt.Errorf("failed to flush value file: %v", err))
 		}
 	}
 
-	request.completionChannel <- nil
+	request.completionChannel <- struct{}{}
 }
 
 // handleShardWrite applies a single write operation to a shard.
@@ -642,17 +638,11 @@ func (s *Segment) handleKeyFileFlushRequest(request *keyFileFlushRequest, unflus
 	if request.seal {
 		err := s.keys.seal()
 		if err != nil {
-			request.completionChannel <- &keyFileFlushResponse{ // TODO do we need to return an error here?
-				err: err,
-			}
 			s.panic.Panic(fmt.Errorf("failed to seal key file: %v", err))
 		}
 	} else {
 		err := s.keys.flush()
 		if err != nil {
-			request.completionChannel <- &keyFileFlushResponse{
-				err: err,
-			}
 			s.panic.Panic(fmt.Errorf("failed to flush key file: %v", err))
 		}
 	}
