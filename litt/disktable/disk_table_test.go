@@ -222,10 +222,10 @@ func restartTest(t *testing.T, tableBuilder tableBuilder) {
 
 		// Somewhere in the middle of the test, restart the table.
 		if i == restartIteration {
-			err = table.Stop()
-			require.NoError(t, err)
 			ok, _ := table.(*DiskTable).panic.IsOk()
 			require.True(t, ok)
+			err = table.Stop()
+			require.NoError(t, err)
 
 			table, err = tableBuilder(time.Now, tableName, []string{directory})
 			require.NoError(t, err)
@@ -298,10 +298,10 @@ func restartTest(t *testing.T, tableBuilder tableBuilder) {
 		}
 	}
 
-	err = table.Destroy()
-	require.NoError(t, err)
 	ok, _ := table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
+	err = table.Destroy()
+	require.NoError(t, err)
 
 	// ensure that the test directory is empty
 	entries, err := os.ReadDir(directory)
@@ -364,10 +364,10 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete
 	}
 
 	// Stop the table
-	err = table.Stop()
-	require.NoError(t, err)
 	ok, _ := table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
+	err = table.Stop()
+	require.NoError(t, err)
 
 	dbPanic := table.(*DiskTable).panic
 
@@ -482,10 +482,10 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelet
 	}
 
 	// Stop the table
-	err = table.Stop()
-	require.NoError(t, err)
 	ok, _ := table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
+	err = table.Stop()
+	require.NoError(t, err)
 
 	lowestSegmentIndex, _, segments, err := segment.GatherSegmentFiles(
 		context.Background(),
@@ -606,10 +606,10 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelet
 		}
 	}
 
-	err = table.Destroy()
-	require.NoError(t, err)
 	ok, _ = table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
+	err = table.Destroy()
+	require.NoError(t, err)
 
 	// ensure that the test directory is empty
 	entries, err := os.ReadDir(directory)
@@ -674,10 +674,10 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete s
 	}
 
 	// Stop the table
-	err = table.Stop()
-	require.NoError(t, err)
 	ok, _ := table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
+	err = table.Stop()
+	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		context.Background(),
@@ -803,10 +803,10 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete s
 		}
 	}
 
-	err = table.Destroy()
-	require.NoError(t, err)
 	ok, _ = table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
+	err = table.Destroy()
+	require.NoError(t, err)
 
 	// ensure that the test directory is empty
 	entries, err := os.ReadDir(directory)
@@ -898,10 +898,10 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 	}
 
 	// Stop the table
-	err = table.Stop()
-	require.NoError(t, err)
 	ok, _ := table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
+	err = table.Stop()
+	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		context.Background(),
@@ -1041,10 +1041,10 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 		}
 	}
 
-	err = table.Destroy()
-	require.NoError(t, err)
 	ok, _ = table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
+	err = table.Destroy()
+	require.NoError(t, err)
 
 	// ensure that the test directory is empty
 	entries, err := os.ReadDir(directory)
@@ -1132,10 +1132,10 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 	}
 
 	// Stop the table
-	err = table.Stop()
-	require.NoError(t, err)
 	ok, _ := table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
+	err = table.Stop()
+	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		context.Background(),
@@ -1293,10 +1293,10 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 		}
 	}
 
-	err = table.Destroy()
-	require.NoError(t, err)
 	ok, _ = table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
+	err = table.Destroy()
+	require.NoError(t, err)
 
 	// ensure that the test directory is empty
 	entries, err := os.ReadDir(directory)
@@ -1386,10 +1386,10 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 	}
 
 	// Stop the table
-	err = table.Stop()
-	require.NoError(t, err)
 	ok, _ := table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
+	err = table.Stop()
+	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		context.Background(),
@@ -1518,10 +1518,10 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 	// do bad things if it is going to. Nothing bad should happen if the GC is implemented correctly.
 	time.Sleep(50 * time.Millisecond)
 
-	err = table.Destroy()
-	require.NoError(t, err)
 	ok, _ = table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
+	err = table.Destroy()
+	require.NoError(t, err)
 
 	// ensure that the test directory is empty
 	entries, err := os.ReadDir(directory)
@@ -1560,10 +1560,10 @@ func metadataPreservedOnRestartTest(t *testing.T, tableBuilder tableBuilder) {
 	}
 
 	// Stop the table
-	err = table.Stop()
-	require.NoError(t, err)
 	ok, _ := table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
+	err = table.Stop()
+	require.NoError(t, err)
 
 	// Restart the table.
 	table, err = tableBuilder(time.Now, tableName, []string{directory})
@@ -1613,10 +1613,10 @@ func orphanedMetadataTest(t *testing.T, tableBuilder tableBuilder) {
 	}
 
 	// Stop the table
-	err = table.Stop()
-	require.NoError(t, err)
 	ok, _ := table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
+	err = table.Stop()
+	require.NoError(t, err)
 
 	// Simulate an orphaned metadata file.
 	orphanedMetadataFileName := fmt.Sprintf("%s/table/%s", directory, tableMetadataSwapFileName)
@@ -1680,10 +1680,10 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder tableB
 
 		// Somewhere in the middle of the test, restart the table.
 		if i == restartIteration {
-			err = table.Stop()
-			require.NoError(t, err)
 			ok, _ := table.(*DiskTable).panic.IsOk()
 			require.True(t, ok)
+			err = table.Stop()
+			require.NoError(t, err)
 
 			// Shuffle around the segment files. This should not cause problems.
 			files := make([]string, 0)
@@ -1785,10 +1785,10 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder tableB
 		}
 	}
 
-	err = table.Destroy()
-	require.NoError(t, err)
 	ok, _ := table.(*DiskTable).panic.IsOk()
 	require.True(t, ok)
+	err = table.Destroy()
+	require.NoError(t, err)
 
 	// ensure that the test directories are empty
 	for _, dir := range directories {
