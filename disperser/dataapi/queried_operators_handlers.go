@@ -97,7 +97,7 @@ func (s *server) getRegisteredOperatorForDays(ctx context.Context, days int32) (
 }
 
 // Function to get operator ejection over last N days
-// Returns list of Ejections with operatorId, quorum, block number, txn and timestemp if ejection
+// Returns list of Ejections with operatorId, quorum, block number, txn and timestamp if ejection
 func (s *server) getOperatorEjections(ctx context.Context, days int32, operatorId string, first uint, skip uint) ([]*QueriedOperatorEjections, error) {
 	startTime := time.Now()
 

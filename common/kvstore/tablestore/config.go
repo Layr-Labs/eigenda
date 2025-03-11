@@ -1,6 +1,10 @@
 package tablestore
 
-import "time"
+import (
+	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+)
 
 // StoreType describes the underlying store implementation.
 type StoreType int
@@ -30,8 +34,8 @@ type Config struct {
 	// The list of tables to create on startup. Any pre-existing table not in this list will be deleted. If
 	// this list is nil, the previous schema will be carried forward with no modifications. Default is nil.
 	Schema []string
-	// If true, the store will disable compaction. Default is false.
-	DisableCompaction bool
+	// Optional Prometheus registry for metrics collection. If nil, metrics collection is disabled.
+	MetricsRegistry *prometheus.Registry
 }
 
 // DefaultConfig returns a Config with default values.
@@ -43,7 +47,7 @@ func DefaultConfig() *Config {
 		GarbageCollectionInterval:  5 * time.Minute,
 		GarbageCollectionBatchSize: 1024,
 		Schema:                     nil,
-		DisableCompaction:          false,
+		MetricsRegistry:            nil,
 	}
 }
 

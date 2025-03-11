@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -208,24 +209,32 @@ var _ = Describe("Inabox v2 Integration", func() {
 		)
 		Expect(err).To(BeNil())
 
-		// Test retrieval from relay
-		relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-			Sockets:            relays,
+		relayClientConfig := &clients.RelayClientConfig{
 			MaxGRPCMessageSize: units.GiB,
-		}, logger)
+		}
+
+		relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, chainReader.GetRelayRegistryAddress())
+		Expect(err).To(BeNil())
+
+		// Test retrieval from relay
+		relayClient, err := clients.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
 		Expect(err).To(BeNil())
 
 		blob1Relays := make(map[corev2.RelayKey]struct{}, 0)
 		blob2Relays := make(map[corev2.RelayKey]struct{}, 0)
 		for _, k := range blobCert1.RelayKeys {
-			blob1Relays[corev2.RelayKey(k)] = struct{}{}
+			blob1Relays[k] = struct{}{}
 		}
 		for _, k := range blobCert2.RelayKeys {
-			blob2Relays[corev2.RelayKey(k)] = struct{}{}
+			blob2Relays[k] = struct{}{}
 		}
-		for relayKey := range relays {
+
+		relayCount, err := relayUrlProvider.GetRelayCount(ctx)
+		Expect(err).To(BeNil())
+
+		for relayKey := uint32(0); relayKey < relayCount; relayKey++ {
 			blob1, err := relayClient.GetBlob(ctx, relayKey, key1)
-			if _, ok := blob1Relays[corev2.RelayKey(relayKey)]; ok {
+			if _, ok := blob1Relays[relayKey]; ok {
 				Expect(err).To(BeNil())
 				Expect(blob1).To(Equal(paddedData1))
 			} else {
@@ -233,7 +242,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 			}
 
 			blob2, err := relayClient.GetBlob(ctx, relayKey, key2)
-			if _, ok := blob2Relays[corev2.RelayKey(relayKey)]; ok {
+			if _, ok := blob2Relays[relayKey]; ok {
 				Expect(err).To(BeNil())
 				Expect(blob2).To(Equal(paddedData2))
 			} else {

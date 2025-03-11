@@ -133,6 +133,11 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 	for numReply := 0; numReply < numOperators; numReply++ {
 		var err error
 		r := <-messageChan
+		if seen := signerMap[r.Operator]; seen {
+			a.Logger.Warn("duplicate signature received", "operatorID", r.Operator.Hex())
+			continue
+		}
+
 		operatorIDHex := r.Operator.Hex()
 		operatorAddr, ok := a.OperatorAddresses.Get(r.Operator)
 		if !ok && a.Transactor != nil {
@@ -317,7 +322,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics In
 	sort.Slice(nonSignerKeys, func(i, j int) bool {
 		hash1 := nonSignerKeys[i].Hash()
 		hash2 := nonSignerKeys[j].Hash()
-		// sort in accending order
+		// sort in ascending order
 		return bytes.Compare(hash1[:], hash2[:]) == -1
 	})
 

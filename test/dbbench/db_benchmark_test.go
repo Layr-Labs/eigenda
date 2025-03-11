@@ -280,7 +280,6 @@ func TestLevelDB(t *testing.T) {
 	require.NoError(t, err)
 
 	config := tablestore.DefaultLevelDBConfig(directory)
-	config.DisableCompaction = true
 	config.Schema = []string{"test"}
 	db, err := tablestore.Start(logger, config)
 	require.NoError(t, err)

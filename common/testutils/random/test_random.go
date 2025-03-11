@@ -106,6 +106,11 @@ func (r *TestRandom) Time() time.Time {
 	return time.Date(1970+years, time.Month(months+1), days+1, hours, minutes, seconds, nanos, time.UTC)
 }
 
+// TimeInRange generates a random time between min (inclusive) and max (exclusive).
+func (r *TestRandom) TimeInRange(min time.Time, max time.Time) time.Time {
+	return min.Add(time.Duration(r.Int63n(int64(max.Sub(min)))))
+}
+
 // String generates a random string out of printable ASCII characters.
 func (r *TestRandom) String(length int) string {
 	b := make([]byte, length)

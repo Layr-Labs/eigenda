@@ -1282,7 +1282,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 				QuorumNumbers:   []core.QuorumID{0},
 				BlobCommitments: mockCommitment,
 				PaymentMetadata: core.PaymentMetadata{
-					AccountID:         "0x123",
+					AccountID:         gethcommon.HexToAddress("0x123"),
 					Timestamp:         int64(i),
 					CumulativePayment: big.NewInt(321),
 				},
@@ -1725,7 +1725,7 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 	accountBytes := make([]byte, 32)
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
-	accountID := hex.EncodeToString(accountBytes)
+	accountID := gethcommon.HexToAddress(hex.EncodeToString(accountBytes))
 	timestamp := time.Now().UnixNano()
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(1024))
 	require.NoError(t, err)

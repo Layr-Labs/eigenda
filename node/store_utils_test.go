@@ -44,7 +44,7 @@ func TestBatchMappingExpirationKeyOrdering(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(t, err)
 
-	db, err := leveldb.NewStore(logger, false, dbPath)
+	db, err := leveldb.NewStore(logger, dbPath, nil)
 	defer func() {
 		err = db.Destroy()
 		assert.NoError(t, err)

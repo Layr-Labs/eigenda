@@ -10,6 +10,7 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 )
@@ -69,7 +70,7 @@ func TestNoopSignerFail(t *testing.T) {
 	assert.EqualError(t, err, "noop signer cannot sign blob request")
 }
 
-func testHeader(t *testing.T, accountID string) *corev2.BlobHeader {
+func testHeader(t *testing.T, accountID gethcommon.Address) *corev2.BlobHeader {
 	var commitX, commitY fp.Element
 	_, err := commitX.SetString("21661178944771197726808973281966770251114553549453983978976194544185382599016")
 	assert.NoError(t, err)
@@ -133,7 +134,7 @@ func TestAuthenticatePaymentStateRequestValid(t *testing.T) {
 func TestAuthenticatePaymentStateRequestInvalidSignatureLength(t *testing.T) {
 	authenticator := auth.NewAuthenticator()
 
-	err := authenticator.AuthenticatePaymentStateRequest([]byte{1, 2, 3}, "0x123")
+	err := authenticator.AuthenticatePaymentStateRequest([]byte{1, 2, 3}, gethcommon.HexToAddress("0x123"))
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "signature length is unexpected")
 }
@@ -141,7 +142,7 @@ func TestAuthenticatePaymentStateRequestInvalidSignatureLength(t *testing.T) {
 func TestAuthenticatePaymentStateRequestInvalidPublicKey(t *testing.T) {
 	authenticator := auth.NewAuthenticator()
 
-	err := authenticator.AuthenticatePaymentStateRequest(make([]byte, 65), "not-hex-encoded")
+	err := authenticator.AuthenticatePaymentStateRequest(make([]byte, 65), gethcommon.Address{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to recover public key from signature")
 }
@@ -175,7 +176,7 @@ func TestAuthenticatePaymentStateRequestCorruptedSignature(t *testing.T) {
 	accountId, err := signer.GetAccountID()
 	assert.NoError(t, err)
 
-	hash := sha256.Sum256([]byte(accountId))
+	hash := sha256.Sum256(accountId.Bytes())
 	signature, err := crypto.Sign(hash[:], signer.PrivateKey)
 	assert.NoError(t, err)
 

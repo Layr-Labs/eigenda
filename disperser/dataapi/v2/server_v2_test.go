@@ -259,7 +259,7 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 	accountBytes := make([]byte, 32)
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
-	accountID := hex.EncodeToString(accountBytes)
+	accountID := gethcommon.HexToAddress(hex.EncodeToString(accountBytes))
 	timestamp, err := rand.Int(rand.Reader, big.NewInt(42))
 	require.NoError(t, err)
 	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(123))
@@ -1083,6 +1083,10 @@ func TestFetchBatchFeed(t *testing.T) {
 	}
 	defer deleteItems(t, dynamoKeys)
 
+	// Create a local server so the internal state (e.g. cache) will be re-created.
+	// This is needed because /v2/operators/signing-info API shares the cache state with
+	// /v2/batches/feed API.
+	testDataApiServerV2 := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
 	r.GET("/v2/batches/feed", testDataApiServerV2.FetchBatchFeed)
 
 	t.Run("invalid params", func(t *testing.T) {
@@ -1440,6 +1444,10 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		+------------------+-------------------+------------------+--------------+
 	*/
 
+	// Create a local server so the internal state (e.g. cache) will be re-created.
+	// This is needed because /v2/operators/signing-info API shares the cache state with
+	// /v2/batches/feed API.
+	testDataApiServerV2 := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
 	r.GET("/v2/operators/signing-info", testDataApiServerV2.FetchOperatorSigningInfo)
 
 	t.Run("invalid params", func(t *testing.T) {

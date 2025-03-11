@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"math"
 	"math/big"
 	"net/http"
@@ -18,6 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
@@ -224,6 +224,7 @@ func NewNode(
 			GarbageCollectionInterval:  time.Duration(config.ExpirationPollIntervalSec) * time.Second,
 			GarbageCollectionBatchSize: 1024,
 			Schema:                     []string{BatchHeaderTableName, BlobCertificateTableName, BundleTableName},
+			MetricsRegistry:            reg,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new tablestore: %w", err)
@@ -237,21 +238,19 @@ func NewNode(
 		}
 		blobVersionParams = corev2.NewBlobVersionParameterMap(blobParams)
 
-		var relayClient clients.RelayClient
-		relayURLs, err := tx.GetRelayURLs(context.Background())
-		if err != nil {
-			return nil, fmt.Errorf("failed to get relay URLs: %w", err)
-		}
-
-		logger.Info("Creating relay client", "relayURLs", relayURLs)
-		relayClient, err = clients.NewRelayClient(&clients.RelayClientConfig{
-			Sockets:            relayURLs,
+		relayClientConfig := &clients.RelayClientConfig{
 			UseSecureGrpcFlag:  config.UseSecureGrpc,
 			OperatorID:         &config.ID,
 			MessageSigner:      n.SignMessage,
 			MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
-		}, logger)
+		}
 
+		relayUrlProvider, err := relay.NewRelayUrlProvider(client, tx.GetRelayRegistryAddress())
+		if err != nil {
+			return nil, fmt.Errorf("create relay url provider: %w", err)
+		}
+
+		relayClient, err := clients.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new relay client: %w", err)
 		}
@@ -408,41 +407,6 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 			} else {
 				n.Logger.Error("error fetching blob params", "err", err)
 			}
-
-			existingRelayClient, ok := n.RelayClient.Load().(clients.RelayClient)
-			if !ok {
-				n.Logger.Error("error fetching relay client")
-				continue
-			}
-
-			existingURLs := map[corev2.RelayKey]string{}
-			if existingRelayClient != nil {
-				existingURLs = existingRelayClient.GetSockets()
-			}
-			relayURLs, err := n.Transactor.GetRelayURLs(ctx)
-			if err != nil {
-				n.Logger.Error("error fetching relay URLs", "err", err)
-				continue
-			}
-
-			if maps.Equal(existingURLs, relayURLs) {
-				n.Logger.Info("No change in relay URLs")
-				continue
-			}
-
-			relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-				Sockets:            relayURLs,
-				UseSecureGrpcFlag:  n.Config.UseSecureGrpc,
-				OperatorID:         &n.Config.ID,
-				MessageSigner:      n.SignMessage,
-				MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
-			}, n.Logger)
-			if err != nil {
-				n.Logger.Error("error creating relay client", "err", err)
-				continue
-			}
-
-			n.RelayClient.Store(clients.RelayClient(relayClient))
 		case <-ctx.Done():
 			return ctx.Err()
 		}
