@@ -1,0 +1,4 @@
+boto3==1.17.103
+web3==5.23.0
+asn1tools==0.158.0
+eth-account==0.5.9
