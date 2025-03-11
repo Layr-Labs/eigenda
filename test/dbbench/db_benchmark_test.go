@@ -335,9 +335,6 @@ func TestLittDB(t *testing.T) {
 	db, err := config.Build(context.Background())
 	require.NoError(t, err)
 
-	err = db.Start()
-	require.NoError(t, err)
-
 	table, err := db.GetTable("test")
 	require.NoError(t, err)
 

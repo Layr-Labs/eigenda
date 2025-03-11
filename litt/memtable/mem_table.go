@@ -148,11 +148,6 @@ func (m *memTable) Destroy() error {
 	return nil
 }
 
-func (m *memTable) Start() error {
-	// no-op
-	return nil
-}
-
 func (m *memTable) Stop() error {
 	// no-op
 	return nil

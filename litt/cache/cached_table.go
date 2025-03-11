@@ -85,10 +85,6 @@ func (c *cachedTable) SetCacheSize(size uint64) error {
 	return nil
 }
 
-func (c *cachedTable) Start() error {
-	return c.base.Start()
-}
-
 func (c *cachedTable) Stop() error {
 	return c.base.Stop()
 }
