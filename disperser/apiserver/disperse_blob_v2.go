@@ -225,8 +225,17 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	if err != nil {
 		return fmt.Errorf("failed to get blob key: %w", err)
 	}
-	if s.blobStore.CheckBlobExists(ctx, blobKey) {
+
+	// check if blob already exists
+	_, err = s.blobMetadataStore.GetBlobMetadata(ctx, blobKey)
+	if err == nil {
+		// If no error, the metadata exists, so the blob already exists
 		return fmt.Errorf("blob already exists: %s", blobKey.Hex())
+	}
+
+	// Check if the error is NOT "metadata not found" - which would be a real error
+	if err != nil && !errors.Is(err, common.ErrMetadataNotFound) {
+		return fmt.Errorf("failed to check blob existence: %w", err)
 	}
 
 	return nil
