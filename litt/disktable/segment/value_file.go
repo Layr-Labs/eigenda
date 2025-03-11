@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -53,7 +54,7 @@ func newValueFile(
 	}
 
 	filePath := values.path()
-	exists, size, err := verifyFilePermissions(filePath)
+	exists, size, err := util.VerifyFilePermissions(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("file %s has incorrect permissions: %v", filePath, err)
 	}

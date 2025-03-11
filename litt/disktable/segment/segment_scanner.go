@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -356,6 +357,7 @@ func linkSegments(lowestSegmentIndex uint32, highestSegmentIndex uint32, segment
 func GatherSegmentFiles(
 	ctx context.Context,
 	logger logging.Logger,
+	panic *util.DBPanic,
 	rootDirectories []string,
 	now time.Time,
 	shardingFactor uint32,
@@ -414,7 +416,8 @@ func GatherSegmentFiles(
 
 		// Load all healthy segments.
 		for i := lowestSegmentIndex; i <= highestSegmentIndex; i++ {
-			segment, err := NewSegment(ctx, logger, i, rootDirectories, now, shardingFactor, salt, true)
+			segment, err := NewSegment(
+				ctx, logger, panic, i, rootDirectories, now, shardingFactor, salt, true)
 			if err != nil {
 				return 0, 0, nil,
 					fmt.Errorf("failed to create segment %d: %v", i, err)
@@ -427,7 +430,7 @@ func GatherSegmentFiles(
 		// Create a new mutable segment at the end.
 		if isEmpty {
 			segment, err := NewSegment(
-				ctx, logger, lowestSegmentIndex, rootDirectories, now, shardingFactor, salt, false)
+				ctx, logger, panic, lowestSegmentIndex, rootDirectories, now, shardingFactor, salt, false)
 			if err != nil {
 				return 0, 0, nil,
 					fmt.Errorf("failed to create segment %d: %v", lowestSegmentIndex, err)
@@ -436,7 +439,7 @@ func GatherSegmentFiles(
 			segments[0] = segment
 		} else {
 			segment, err := NewSegment(
-				ctx, logger, highestSegmentIndex+1, rootDirectories, now, shardingFactor, salt, false)
+				ctx, logger, panic, highestSegmentIndex+1, rootDirectories, now, shardingFactor, salt, false)
 			if err != nil {
 				return 0, 0, nil,
 					fmt.Errorf("failed to create segment %d: %v", highestSegmentIndex+1, err)

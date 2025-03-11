@@ -6,6 +6,8 @@ import (
 	"os"
 	"path"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/litt/util"
 )
 
 const (
@@ -79,7 +81,7 @@ func newMetadataFile(
 	}
 
 	filePath := file.path()
-	exists, _, err := verifyFilePermissions(filePath)
+	exists, _, err := util.VerifyFilePermissions(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("file %s has incorrect permissions: %v", filePath, err)
 	}

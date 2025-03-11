@@ -8,6 +8,7 @@ import (
 	"path"
 
 	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -45,7 +46,7 @@ func newKeyFile(
 
 	filePath := keys.path()
 
-	exists, _, err := verifyFilePermissions(filePath)
+	exists, _, err := util.VerifyFilePermissions(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("file is not writeable: %v", err)
 	}
