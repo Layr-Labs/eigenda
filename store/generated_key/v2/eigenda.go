@@ -7,13 +7,13 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/avast/retry-go/v4"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
@@ -35,9 +35,9 @@ type Store struct {
 	cfg Config
 	log logging.Logger
 
-	disperser *clients.PayloadDisperser
+	disperser *payloaddispersal.PayloadDisperser
 	retriever clients.PayloadRetriever
-	verifier  verification.ICertVerifier
+	verifier  clients.ICertVerifier
 }
 
 var _ common.GeneratedKeyStore = (*Store)(nil)
@@ -45,9 +45,9 @@ var _ common.GeneratedKeyStore = (*Store)(nil)
 func NewStore(
 	log logging.Logger,
 	cfg Config,
-	disperser *clients.PayloadDisperser,
+	disperser *payloaddispersal.PayloadDisperser,
 	retriever clients.PayloadRetriever,
-	verifier verification.ICertVerifier,
+	verifier clients.ICertVerifier,
 ) (*Store, error) {
 	return &Store{
 		log:       log,
@@ -61,7 +61,7 @@ func NewStore(
 // Get fetches a blob from DA using certificate fields and verifies blob
 // against commitment to ensure data is valid and non-tampered.
 func (e Store) Get(ctx context.Context, key []byte) ([]byte, error) {
-	var cert verification.EigenDACert
+	var cert coretypes.EigenDACert
 	err := rlp.DecodeBytes(key, &cert)
 	if err != nil {
 		return nil, fmt.Errorf("RLP decoding EigenDA v2 cert: %w", err)
@@ -87,8 +87,8 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 	payload := coretypes.NewPayload(value)
 
 	cert, err := retry.DoWithData(
-		func() (*verification.EigenDACert, error) {
-			return e.disperser.SendPayload(ctx, e.cfg.CertVerifierAddress, payload)
+		func() (*coretypes.EigenDACert, error) {
+			return e.disperser.SendPayload(ctx, payload)
 		},
 		retry.RetryIf(
 			func(err error) bool {
@@ -137,11 +137,11 @@ func (e Store) BackendType() common.BackendType {
 // Since v2 methods for fetching a payload are responsible for verifying the received bytes against the certificate,
 // this Verify method only needs to check the cert on chain. That is why the third parameter is ignored.
 func (e Store) Verify(ctx context.Context, certBytes []byte, _ []byte) error {
-	var eigenDACert verification.EigenDACert
+	var eigenDACert coretypes.EigenDACert
 	err := rlp.DecodeBytes(certBytes, eigenDACert)
 	if err != nil {
 		return fmt.Errorf("RLP decoding EigenDA v2 cert: %w", err)
 	}
 
-	return e.verifier.VerifyCertV2(ctx, e.cfg.CertVerifierAddress, &eigenDACert)
+	return e.verifier.VerifyCertV2(ctx, &eigenDACert)
 }

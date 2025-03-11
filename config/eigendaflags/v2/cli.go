@@ -8,6 +8,8 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	clients_v2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/urfave/cli/v2"
 )
 
@@ -209,10 +211,10 @@ func readPayloadClientConfig(ctx *cli.Context) clients_v2.PayloadClientConfig {
 	}
 }
 
-func readPayloadDisperserCfg(ctx *cli.Context) clients_v2.PayloadDisperserConfig {
+func readPayloadDisperserCfg(ctx *cli.Context) payloaddispersal.PayloadDisperserConfig {
 	payCfg := readPayloadClientConfig(ctx)
 
-	return clients_v2.PayloadDisperserConfig{
+	return payloaddispersal.PayloadDisperserConfig{
 		PayloadClientConfig:    payCfg,
 		DisperseBlobTimeout:    ctx.Duration(DisperseBlobTimeoutFlagName),
 		BlobCertifiedTimeout:   ctx.Duration(BlobCertifiedTimeoutFlagName),
@@ -235,8 +237,8 @@ func readDisperserCfg(ctx *cli.Context) (clients_v2.DisperserClientConfig, error
 	}, nil
 }
 
-func readRetrievalConfig(ctx *cli.Context) clients_v2.RelayPayloadRetrieverConfig {
-	return clients_v2.RelayPayloadRetrieverConfig{
+func readRetrievalConfig(ctx *cli.Context) payloadretrieval.RelayPayloadRetrieverConfig {
+	return payloadretrieval.RelayPayloadRetrieverConfig{
 		PayloadClientConfig: readPayloadClientConfig(ctx),
 		RelayTimeout:        ctx.Duration(RelayTimeoutFlagName),
 	}

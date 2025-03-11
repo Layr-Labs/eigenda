@@ -5,6 +5,8 @@ import (
 	"time"
 
 	clients_v2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 )
 
 // ClientConfigV2 contains all non-sensitive configuration to construct V2 clients
@@ -12,8 +14,8 @@ type ClientConfigV2 struct {
 	// Enabled is true if using eigenDA v2, or false if using eigenDA v1
 	Enabled                  bool
 	DisperserClientCfg       clients_v2.DisperserClientConfig
-	PayloadDisperserCfg      clients_v2.PayloadDisperserConfig
-	RelayPayloadRetrieverCfg clients_v2.RelayPayloadRetrieverConfig
+	PayloadDisperserCfg      payloaddispersal.PayloadDisperserConfig
+	RelayPayloadRetrieverCfg payloadretrieval.RelayPayloadRetrieverConfig
 	// hex address of the EigenDAServiceManager contract
 	ServiceManagerAddress string
 	PutRetries            uint

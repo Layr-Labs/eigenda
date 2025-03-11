@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -78,7 +79,7 @@ func New(
 }
 
 // generateRandomCert ... generates a pseudo random EigenDA V2 certificate
-func (e *MemStore) generateRandomCert(blobContents []byte) (*verification.EigenDACert, error) {
+func (e *MemStore) generateRandomCert(blobContents []byte) (*coretypes.EigenDACert, error) {
 	// compute kzg data commitment. this is useful for testing
 	// READPREIMAGE functionality in the arbitrum x eigenda integration since
 	// preimage key is computed within the VM from hashing a recomputation of the data
@@ -159,7 +160,7 @@ func (e *MemStore) generateRandomCert(blobContents []byte) (*verification.EigenD
 		},
 	}
 
-	return &verification.EigenDACert{
+	return &coretypes.EigenDACert{
 		BlobInclusionInfo:           pseudoRandomBlobInclusionInfo,
 		BatchHeader:                 randomBatchHeader,
 		NonSignerStakesAndSignature: randomNonSignerStakesAndSigs,

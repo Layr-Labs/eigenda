@@ -18,6 +18,8 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/verify/v1"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clients_v2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	common_eigenda "github.com/Layr-Labs/eigenda/common"
@@ -197,8 +199,11 @@ func (smb *StorageManagerBuilder) buildEigenDAV2Backend(ctx context.Context) (co
 		return nil, fmt.Errorf("build relay payload retriever: %w", err)
 	}
 
+	certVerifierAddressProvider := verification.NewStaticCertVerifierAddressProvider(
+		geth_common.HexToAddress(smb.v2ClientCfg.EigenDACertVerifierAddress))
+
 	certVerifier, err := verification.NewCertVerifier(
-		smb.log, ethClient, smb.v2ClientCfg.BlockNumberPollIntervalDuration)
+		smb.log, ethClient, certVerifierAddressProvider)
 	if err != nil {
 		return nil, fmt.Errorf("new cert verifier: %w", err)
 	}
@@ -271,13 +276,13 @@ func (smb *StorageManagerBuilder) buildEthClient() (common_eigenda.EthClient, er
 func (smb *StorageManagerBuilder) buildRelayPayloadRetriever(
 	ethClient common_eigenda.EthClient,
 	g1Srs []bn254.G1Affine,
-) (*clients_v2.RelayPayloadRetriever, error) {
+) (*payloadretrieval.RelayPayloadRetriever, error) {
 	relayClient, err := smb.buildRelayClient(ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("build relay client: %w", err)
 	}
 
-	relayPayloadRetriever, err := clients_v2.NewRelayPayloadRetriever(
+	relayPayloadRetriever, err := payloadretrieval.NewRelayPayloadRetriever(
 		smb.log,
 		//nolint:gosec // disable G404: this doesn't need to be cryptographically secure
 		rand.New(rand.NewSource(time.Now().UnixNano())),
@@ -322,7 +327,7 @@ func (smb *StorageManagerBuilder) buildPayloadDisperser(
 	ethClient common_eigenda.EthClient,
 	kzgProver *prover.Prover,
 	certVerifier *verification.CertVerifier,
-) (*clients_v2.PayloadDisperser, error) {
+) (*payloaddispersal.PayloadDisperser, error) {
 	signer, err := smb.buildLocalSigner(ctx, ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("build local signer: %w", err)
@@ -333,7 +338,7 @@ func (smb *StorageManagerBuilder) buildPayloadDisperser(
 		return nil, fmt.Errorf("new disperser client: %w", err)
 	}
 
-	payloadDisperser, err := clients_v2.NewPayloadDisperser(
+	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
 		smb.log,
 		smb.v2ClientCfg.PayloadDisperserCfg,
 		disperserClient,

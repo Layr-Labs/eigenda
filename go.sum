@@ -24,8 +24,8 @@ github.com/DataDog/zstd v1.5.6-0.20230824185856-869dae002e5e h1:ZIWapoIRN1VqT8GR
 github.com/DataDog/zstd v1.5.6-0.20230824185856-869dae002e5e/go.mod h1:g4AWEaM3yOg3HYfnJ3YIawPnVdXJh9QME85blwSAmyw=
 github.com/Layr-Labs/cerberus-api v0.0.2-0.20250117193600-e69c5e8b08fd h1:prMzW4BY6KZtWEanf5EIsyHzIZKCNV2mVIXrE6glRRM=
 github.com/Layr-Labs/cerberus-api v0.0.2-0.20250117193600-e69c5e8b08fd/go.mod h1:Lm4fhzy0S3P7GjerzuseGaBFVczsIKmEhIjcT52Hluo=
-github.com/Layr-Labs/eigenda v0.9.0-rc.0.0.20250228180652-c7f0c3d62bbf h1:FBaauLjbm/P798FesrpC/OrcJNVpE6CIftf+TPlmowc=
-github.com/Layr-Labs/eigenda v0.9.0-rc.0.0.20250228180652-c7f0c3d62bbf/go.mod h1:MO3EyBXCmhzttrmmgqmIkzDg4gtqWjU+0fxSN0Q1EmM=
+github.com/Layr-Labs/eigenda v0.9.0-rc.0.0.20250307172427-8f43a4ac32f2 h1:UtC6SlSK+jqwSsH70/RF1xRZcfTy32oc1QKgeloVMJo=
+github.com/Layr-Labs/eigenda v0.9.0-rc.0.0.20250307172427-8f43a4ac32f2/go.mod h1:MO3EyBXCmhzttrmmgqmIkzDg4gtqWjU+0fxSN0Q1EmM=
 github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250118004418-2a25f31b3b28 h1:Wig5FBBizIB5Z/ZcXJlm7KdOLnrXc6E3DjO63uWRzQM=
 github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250118004418-2a25f31b3b28/go.mod h1:YNzORpoebdDNv0sJLm/H9LTx72M85zA54eBSXI5DULw=
 github.com/Layr-Labs/eigensdk-go/signer v0.0.0-20250118004418-2a25f31b3b28 h1:rhIC2XpFpCcRkv4QYczIUe/fXvE4T+0B1mF9f6NJCuo=
