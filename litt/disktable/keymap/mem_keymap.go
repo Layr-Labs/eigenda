@@ -1,6 +1,7 @@
 package keymap
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/litt/types"
@@ -34,6 +35,14 @@ func (m *memKeyMap) Put(pairs []*types.KAPair) error {
 	defer m.lock.Unlock()
 
 	for _, pair := range pairs {
+
+		// TODO make this check optional!!
+		// TODO: also add a similar but optional check to the LevelDBKeyMap
+		_, ok := m.data[string(pair.Key)]
+		if ok {
+			return fmt.Errorf("key %s already exists", pair.Key)
+		}
+
 		m.data[string(pair.Key)] = pair.Address
 	}
 	return nil
