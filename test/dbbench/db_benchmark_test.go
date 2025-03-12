@@ -122,7 +122,7 @@ func runBenchmark(write writer, read reader) {
 
 	// We are writing enough data that it takes nontrivial time to generate it. To avoid blocking the write threads,
 	//
-	dataToBeWritten := make(chan *generatedData, 100)
+	dataToBeWritten := make(chan *generatedData, 1024)
 	for i := 0; i < dataGeneratorCount; i++ {
 		go func() {
 			rand := random.NewTestRandomNoPrint()
