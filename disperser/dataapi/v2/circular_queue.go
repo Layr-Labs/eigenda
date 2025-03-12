@@ -128,14 +128,16 @@ func (c *CircularQueue[T]) MergeTimeRange(items []*T, start, end time.Time) {
 		return
 	}
 
+	// No cache yet, just take the provided data and cache it
 	if c.size == 0 {
 		c.reset(items)
 		c.start, c.end = maxTimestamp(start, c.headTimestamp()), end
 		return
 	}
 
+	// The provided items are non-overlapping with cache
 	if !c.overlaps(timeRange{start: start, end: end}) {
-		// Two special cases: non-overlapping but internewItems are connected
+		// Two special cases: non-overlapping but time ranges are connected
 		if start.Equal(c.end) {
 			c.appendItems(items)
 			c.start, c.end = maxTimestamp(c.start, c.headTimestamp()), end
@@ -160,7 +162,8 @@ func (c *CircularQueue[T]) MergeTimeRange(items []*T, start, end time.Time) {
 		return
 	}
 
-	// The data is newer than cache, extend the cache
+	// The items are overlapping and newer than cache, extend the cache forwards (to cover
+	// newer items)
 	if end.After(c.end) {
 		split := 0
 		for ; split < len(items); split++ {
@@ -175,7 +178,8 @@ func (c *CircularQueue[T]) MergeTimeRange(items []*T, start, end time.Time) {
 		return
 	}
 
-	// Now we must have start.Before(segment.start) && segment.start.Before(end)
+	// The items are overlapping and older than cache, extend the cache backwards (to cover
+	// older items)
 	split := len(items) - 1
 	for ; split >= 0; split-- {
 		if c.getTimestamp(items[split]).Before(c.start) {
