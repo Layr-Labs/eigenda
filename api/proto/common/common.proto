@@ -27,8 +27,7 @@ message BlobCommitment {
   // such that the claimed length below is verifiable.
   bytes length_commitment = 2;
   // A proof that the degree of the polynomial used to generate the blob commitment is valid.
-  // It is computed such that the coefficient of the polynomial is committing with the G2 SRS
-  // at the end of the highest order.
+  // It is computed as x^(SRSOrder-n) * P(x), where P(x) is polynomial of degree n representing the blob.
   bytes length_proof = 3;
   // The length of the blob in symbols (field elements), which must be a power of 2.
   // This also specifies the degree of the polynomial used to generate the blob commitment,
