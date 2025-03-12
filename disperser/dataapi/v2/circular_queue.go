@@ -30,7 +30,6 @@ type CircularQueue[T any] struct {
 }
 
 // NewCircularQueue creates a new CircularQueue with the specified capacity.
-// It returns an error if the capacity is not positive.
 func NewCircularQueue[T any](capacity int, getTimestampFn func(*T) time.Time) *CircularQueue[T] {
 	return &CircularQueue[T]{
 		items:        make([]*T, capacity),
@@ -44,13 +43,12 @@ func NewCircularQueue[T any](capacity int, getTimestampFn func(*T) time.Time) *C
 // QueryTimeRange returns cached data that's in time range [start, end).
 // If there are more than `limit` elements, it will cut off the results up to `limit`.
 //
-// Parameters:
-//   - start: The inclusive start time of the query range.
-//   - end: The exclusive end time of the query range.
-//   - order: The order in which to return results (Ascending or Descending).
-//     For ascending order, it'll get the oldest `limit` elements;
-//     for descending order, it'll get the newest `limit` elements.
-//   - limit: The maximum number of elements to return. If limit <= 0, all matching
+// The parameters:
+//   - [start, end): The inclusive start time and exclusive end time of the query range.
+//   - order: The order in which to fetch results (Ascending or Descending).
+//     For ascending order, it'll get the oldest `limit` elements in range;
+//     for descending order, it'll get the newest `limit` elements in range.
+//   - limit: The desired number of elements to return. If limit <= 0, all matching
 //     elements are returned.
 func (c *CircularQueue[T]) QueryTimeRange(start, end time.Time, order FetchOrder, limit int) []*T {
 	if c.size == 0 {
@@ -82,7 +80,6 @@ func (c *CircularQueue[T]) QueryTimeRange(start, end time.Time, order FetchOrder
 	if endIdx == -1 {
 		endIdx = c.size
 	}
-
 	// No overlap found
 	if startIdx == -1 || startIdx >= endIdx {
 		return []*T{}
@@ -90,7 +87,6 @@ func (c *CircularQueue[T]) QueryTimeRange(start, end time.Time, order FetchOrder
 
 	// Calculate how many items in the overlap
 	overlapCount := endIdx - startIdx
-
 	// Apply limit if needed
 	if limit > 0 && limit < overlapCount {
 		if order == Ascending {
@@ -216,7 +212,6 @@ func (c *CircularQueue[T]) reset(newItems []*T) {
 	// Determine how many data points to use (up to capacity)
 	numToAdd := len(newItems)
 	startIdx := 0
-
 	if numToAdd > c.capacity {
 		// Only add the most recent points that fit in the capacity
 		startIdx = len(newItems) - c.capacity
@@ -227,14 +222,13 @@ func (c *CircularQueue[T]) reset(newItems []*T) {
 	for i := 0; i < numToAdd; i++ {
 		c.items[i] = newItems[startIdx+i]
 	}
-
 	// Update size
 	c.size = numToAdd
 }
 
-// prependItems adds multiple elements to the front of the queue
-// Elements must be in ascending time order (oldest to newest)
-// This never drops newer elements to make room for older ones
+// prependItems adds multiple elements to the front of the queue.
+// Elements must be in ascending time order (oldest to newest).
+// This never drops newer elements to make room for older ones.
 func (c *CircularQueue[T]) prependItems(newItems []*T) {
 	if len(newItems) == 0 {
 		return
@@ -254,8 +248,9 @@ func (c *CircularQueue[T]) prependItems(newItems []*T) {
 		numToAdd = spaceAvailable
 	}
 
+	// Queue is full, no room to add older elements
 	if numToAdd <= 0 {
-		return // Queue is full, no room to add older elements
+		return
 	}
 
 	// Only add the newest numToAdd elements from newItems
@@ -273,9 +268,9 @@ func (c *CircularQueue[T]) prependItems(newItems []*T) {
 	c.size += numToAdd
 }
 
-// appendItems adds multiple elements to the back of the queue
-// Elements must be in ascending time order (oldest to newest)
-// Drops oldest elements if necessary to make room for newer ones
+// appendItems adds multiple elements to the back of the queue.
+// Elements must be in ascending time order (oldest to newest).
+// Drops oldest elements if necessary to make room for newer ones.
 func (c *CircularQueue[T]) appendItems(newItems []*T) {
 	if len(newItems) == 0 {
 		return
@@ -296,7 +291,6 @@ func (c *CircularQueue[T]) appendItems(newItems []*T) {
 	// Calculate if we need to drop oldest elements
 	totalSize := c.size + len(newItems)
 	overflow := totalSize - c.capacity
-
 	if overflow > 0 {
 		// We need to drop some oldest elements
 		c.head = (c.head + overflow) % c.capacity
