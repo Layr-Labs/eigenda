@@ -29,8 +29,10 @@ type G1Commitment struct {
 	unknownFields protoimpl.UnknownFields
 
 	// The X coordinate of the KZG commitment. This is the raw byte representation of the field element.
+	// x should contain 32 bytes.
 	X []byte `protobuf:"bytes,1,opt,name=x,proto3" json:"x,omitempty"`
 	// The Y coordinate of the KZG commitment. This is the raw byte representation of the field element.
+	// y should contain 32 bytes.
 	Y []byte `protobuf:"bytes,2,opt,name=y,proto3" json:"y,omitempty"`
 }
 
@@ -84,7 +86,7 @@ func (x *G1Commitment) GetY() []byte {
 // KZG commitment, degree proof, the actual degree, and data length in number of symbols (field elements).
 // It deserializes into https://github.com/Layr-Labs/eigenda/blob/ce89dab18d2f8f55004002e17dd3a18529277845/encoding/data.go#L27
 //
-// See https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/attestation/encoding.md#validation-via-kzg
+// See https://github.com/Layr-Labs/eigenda/blob/e86fb8515eb606d0eebb92097dc60d7238363e77/docs/spec/src/protocol/architecture/encoding.md#validation-via-kzg
 // to understand how this commitment is used to validate the blob.
 type BlobCommitment struct {
 	state         protoimpl.MessageState
@@ -97,8 +99,7 @@ type BlobCommitment struct {
 	// such that the claimed length below is verifiable.
 	LengthCommitment []byte `protobuf:"bytes,2,opt,name=length_commitment,json=lengthCommitment,proto3" json:"length_commitment,omitempty"`
 	// A proof that the degree of the polynomial used to generate the blob commitment is valid.
-	// It is computed such that the coefficient of the polynomial is committing with the G2 SRS
-	// at the end of the highest order.
+	// It is computed as x^(SRSOrder-n) * P(x), where P(x) is polynomial of degree n representing the blob.
 	LengthProof []byte `protobuf:"bytes,3,opt,name=length_proof,json=lengthProof,proto3" json:"length_proof,omitempty"`
 	// The length of the blob in symbols (field elements), which must be a power of 2.
 	// This also specifies the degree of the polynomial used to generate the blob commitment,

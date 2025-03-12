@@ -25,7 +25,7 @@ BlobCommitment represents commitment of a specific blob, containing its
 KZG commitment, degree proof, the actual degree, and data length in number of symbols (field elements).
 It deserializes into https://github.com/Layr-Labs/eigenda/blob/ce89dab18d2f8f55004002e17dd3a18529277845/encoding/data.go#L27
 
-See https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/attestation/encoding.md#validation-via-kzg
+See https://github.com/Layr-Labs/eigenda/blob/e86fb8515eb606d0eebb92097dc60d7238363e77/docs/spec/src/protocol/architecture/encoding.md#validation-via-kzg
 to understand how this commitment is used to validate the blob.
 
 
@@ -33,7 +33,7 @@ to understand how this commitment is used to validate the blob.
 | ----- | ---- | ----- | ----------- |
 | commitment | [bytes](#bytes) |  | Concatenation of the x and y coordinates of `common.G1Commitment`. |
 | length_commitment | [bytes](#bytes) |  | A commitment to the blob data with G2 SRS, used to work with length_proof such that the claimed length below is verifiable. |
-| length_proof | [bytes](#bytes) |  | A proof that the degree of the polynomial used to generate the blob commitment is valid. It is computed such that the coefficient of the polynomial is committing with the G2 SRS at the end of the highest order. |
+| length_proof | [bytes](#bytes) |  | A proof that the degree of the polynomial used to generate the blob commitment is valid. It is computed as x^(SRSOrder-n) * P(x), where P(x) is polynomial of degree n representing the blob. |
 | length | [uint32](#uint32) |  | The length of the blob in symbols (field elements), which must be a power of 2. This also specifies the degree of the polynomial used to generate the blob commitment, since length = degree &#43; 1. |
 
 
@@ -51,8 +51,8 @@ https://github.com/Consensys/gnark-crypto/blob/779e884dabb38b92e677f4891286637a3
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| x | [bytes](#bytes) |  | The X coordinate of the KZG commitment. This is the raw byte representation of the field element. |
-| y | [bytes](#bytes) |  | The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. |
+| x | [bytes](#bytes) |  | The X coordinate of the KZG commitment. This is the raw byte representation of the field element. x should contain 32 bytes. |
+| y | [bytes](#bytes) |  | The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. y should contain 32 bytes. |
 
 
 
