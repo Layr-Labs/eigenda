@@ -29,8 +29,24 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	if onchainState == nil {
 		return nil, api.NewErrorInternal("onchain state is nil")
 	}
-	if err := s.validateDispersalRequest(ctx, req, onchainState); err != nil {
+	blobHeader, err := s.validateDispersalRequest(req, onchainState)
+	if err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate the request: %v", err))
+	}
+
+	blobKey, err := blobHeader.BlobKey()
+	if err != nil {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to parse the blob header: %v", err))
+	}
+
+	// check if blob already exists
+	exists, err := s.blobMetadataStore.DoesBlobExist(ctx, blobKey)
+	if err != nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to check blob existence: %v", err))
+	}
+
+	if exists {
+		return nil, api.NewErrorAlreadyExists(fmt.Sprintf("blob already exists: %s", blobKey.Hex()))
 	}
 
 	// Check against payment meter to make sure there is quota remaining
@@ -43,13 +59,9 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 
 	blob := req.GetBlob()
 	s.metrics.reportDisperseBlobSize(len(blob))
-	blobHeader, err := corev2.BlobHeaderFromProtobuf(req.GetBlobHeader())
-	if err != nil {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to parse the blob header proto: %v", err))
-	}
 	s.logger.Debug("received a new blob dispersal request", "blobSizeBytes", len(blob), "quorums", req.GetBlobHeader().GetQuorumNumbers())
 
-	blobKey, err := s.StoreBlob(ctx, blob, blobHeader, req.GetSignature(), time.Now(), onchainState.TTL)
+	blobKey, err = s.StoreBlob(ctx, blob, blobHeader, req.GetSignature(), time.Now(), onchainState.TTL)
 	if err != nil {
 		return nil, err
 	}
@@ -133,68 +145,67 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 }
 
 func (s *DispersalServerV2) validateDispersalRequest(
-	ctx context.Context,
 	req *pb.DisperseBlobRequest,
-	onchainState *OnchainState) error {
+	onchainState *OnchainState) (*corev2.BlobHeader, error) {
 
 	signature := req.GetSignature()
 	if len(signature) != 65 {
-		return fmt.Errorf("signature is expected to be 65 bytes, but got %d bytes", len(signature))
+		return nil, fmt.Errorf("signature is expected to be 65 bytes, but got %d bytes", len(signature))
 	}
 	blob := req.GetBlob()
 	blobSize := len(blob)
 	if blobSize == 0 {
-		return errors.New("blob size must be greater than 0")
+		return nil, errors.New("blob size must be greater than 0")
 	}
 	blobLength := encoding.GetBlobLengthPowerOf2(uint(blobSize))
 	if blobLength > uint(s.maxNumSymbolsPerBlob) {
-		return errors.New("blob size too big")
+		return nil, errors.New("blob size too big")
 	}
 
 	blobHeaderProto := req.GetBlobHeader()
 	if blobHeaderProto.GetCommitment() == nil {
-		return errors.New("blob header must contain commitments")
+		return nil, errors.New("blob header must contain commitments")
 	}
 
 	if blobHeaderProto.GetCommitment() == nil {
-		return errors.New("blob header must contain a commitment")
+		return nil, errors.New("blob header must contain a commitment")
 	}
 	commitedBlobLength := blobHeaderProto.GetCommitment().GetLength()
 	if commitedBlobLength == 0 || commitedBlobLength != encoding.NextPowerOf2(commitedBlobLength) {
-		return errors.New("invalid commitment length, must be a power of 2")
+		return nil, errors.New("invalid commitment length, must be a power of 2")
 	}
 	lengthPowerOf2 := encoding.GetBlobLengthPowerOf2(uint(blobSize))
 	if lengthPowerOf2 > uint(commitedBlobLength) {
-		return fmt.Errorf("commitment length %d is less than blob length %d", commitedBlobLength, lengthPowerOf2)
+		return nil, fmt.Errorf("commitment length %d is less than blob length %d", commitedBlobLength, lengthPowerOf2)
 	}
 
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
 	if err != nil {
-		return fmt.Errorf("invalid blob header: %w", err)
+		return nil, fmt.Errorf("invalid blob header: %w", err)
 	}
 
 	if blobHeader.PaymentMetadata == (core.PaymentMetadata{}) {
-		return errors.New("payment metadata is required")
+		return nil, errors.New("payment metadata is required")
 	}
 
 	timestampIsNegative := blobHeader.PaymentMetadata.Timestamp < 0
 	paymentIsNegative := blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == -1
 	timestampIsZeroAndPaymentIsZero := blobHeader.PaymentMetadata.Timestamp == 0 && blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == 0
 	if timestampIsNegative || paymentIsNegative || timestampIsZeroAndPaymentIsZero {
-		return errors.New("invalid payment metadata")
+		return nil, errors.New("invalid payment metadata")
 	}
 
 	if len(blobHeaderProto.GetQuorumNumbers()) == 0 {
-		return errors.New("blob header must contain at least one quorum number")
+		return nil, errors.New("blob header must contain at least one quorum number")
 	}
 
 	if len(blobHeaderProto.GetQuorumNumbers()) > int(onchainState.QuorumCount) {
-		return fmt.Errorf("too many quorum numbers specified: maximum is %d", onchainState.QuorumCount)
+		return nil, fmt.Errorf("too many quorum numbers specified: maximum is %d", onchainState.QuorumCount)
 	}
 
 	for _, quorum := range blobHeaderProto.GetQuorumNumbers() {
 		if quorum > corev2.MaxQuorumID || uint8(quorum) >= onchainState.QuorumCount {
-			return fmt.Errorf("invalid quorum number %d; maximum is %d", quorum, onchainState.QuorumCount)
+			return nil, fmt.Errorf("invalid quorum number %d; maximum is %d", quorum, onchainState.QuorumCount)
 		}
 	}
 
@@ -202,41 +213,24 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	_, err = rs.ToFrArray(blob)
 	if err != nil {
 		s.logger.Error("failed to convert a 32bytes as a field element", "err", err)
-		return errors.New("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617")
+		return nil, errors.New("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617")
 	}
 
 	if _, ok := onchainState.BlobVersionParameters.Get(corev2.BlobVersion(blobHeaderProto.GetVersion())); !ok {
-		return fmt.Errorf("invalid blob version %d; valid blob versions are: %v", blobHeaderProto.GetVersion(), onchainState.BlobVersionParameters.Keys())
+		return nil, fmt.Errorf("invalid blob version %d; valid blob versions are: %v", blobHeaderProto.GetVersion(), onchainState.BlobVersionParameters.Keys())
 	}
 
 	if err = s.authenticator.AuthenticateBlobRequest(blobHeader, signature); err != nil {
-		return fmt.Errorf("authentication failed: %w", err)
+		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
 
 	commitments, err := s.prover.GetCommitmentsForPaddedLength(blob)
 	if err != nil {
-		return fmt.Errorf("failed to get commitments: %w", err)
+		return nil, fmt.Errorf("failed to get commitments: %w", err)
 	}
 	if !commitments.Equal(&blobHeader.BlobCommitments) {
-		return errors.New("invalid blob commitment")
+		return nil, errors.New("invalid blob commitment")
 	}
 
-	blobKey, err := blobHeader.BlobKey()
-	if err != nil {
-		return fmt.Errorf("failed to get blob key: %w", err)
-	}
-
-	// check if blob already exists
-	_, err = s.blobMetadataStore.GetBlobMetadata(ctx, blobKey)
-	if err == nil {
-		// If no error, the metadata exists, so the blob already exists
-		return fmt.Errorf("blob already exists: %s", blobKey.Hex())
-	}
-
-	// Check if the error is NOT "metadata not found" - which would be a real error
-	if err != nil && !errors.Is(err, common.ErrMetadataNotFound) {
-		return fmt.Errorf("failed to check blob existence: %w", err)
-	}
-
-	return nil
+	return blobHeader, nil
 }
