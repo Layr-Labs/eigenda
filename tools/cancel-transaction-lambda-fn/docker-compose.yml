@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=lambda,kms,iam
+      - DEBUG=1
+      - LAMBDA_EXECUTOR=local
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - HOSTNAME_EXTERNAL=localhost
+      - LAMBDA_REMOTE_DOCKER=0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - eth-test-network
+
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    ports:
+      - "8545:8545"
+    command: >
+      anvil 
+      --host 0.0.0.0 
+      --auto-impersonate 
+      --no-mining
+      --chain-id 1
+    networks:
+      - eth-test-network
+
+networks:
+  eth-test-network:
+    driver: bridge
