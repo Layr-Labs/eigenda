@@ -35,6 +35,7 @@ const parallelWriters = 2
 const readBytesPerSecond = 10 * units.MiB
 const readerCount = 1
 const TTL = 2 * time.Hour
+const dataGeneratorCount = 16
 
 // given a seed, deterministically generate a key/value pair
 func generateKVPair(seed int64) ([]byte, []byte) {
@@ -42,6 +43,13 @@ func generateKVPair(seed int64) ([]byte, []byte) {
 	key := []byte(rand.String(32))
 	value := []byte(rand.String(dataSize))
 	return key, value
+}
+
+// Data that has been generated and is ready to be written to the database.
+type generatedData struct {
+	seed  int64
+	key   []byte
+	value []byte
 }
 
 // Describes data with an expiration time. In order to determine the key and the expected value, use the seed with
@@ -75,9 +83,6 @@ type writeMetadata struct {
 
 // runBenchmark runs a simple benchmark. Its goal is to write a ton of data to the database as fast as possible.
 func runBenchmark(write writer, read reader) {
-
-	rand := random.NewTestRandom()
-
 	fmt.Printf("Starting benchmark\n")
 	fmt.Printf("Writing %d bytes\n", totalToWrite)
 	fmt.Printf("Data size: %d bytes\n", dataSize)
@@ -114,6 +119,20 @@ func runBenchmark(write writer, read reader) {
 	interval := 0
 	previousIntervalDataWritten := uint64(0)
 	previousIntervalTimestamp := time.Now()
+
+	// We are writing enough data that it takes nontrivial time to generate it. To avoid blocking the write threads,
+	//
+	dataToBeWritten := make(chan *generatedData, 100)
+	for i := 0; i < dataGeneratorCount; i++ {
+		go func() {
+			rand := random.NewTestRandomNoPrint()
+			for alive.Load() {
+				seed := rand.Int63()
+				key, value := generateKVPair(seed)
+				dataToBeWritten <- &generatedData{seed: seed, key: key, value: value}
+			}
+		}()
+	}
 
 	// Set up a goroutine to handle removal of elements from the unexpiredData map.
 	gcTicker := time.NewTicker(1 * time.Second)
@@ -226,8 +245,8 @@ func runBenchmark(write writer, read reader) {
 
 	// Write data to the database
 	for dataWritten < totalToWrite {
-		seed := rand.Int63()
-		key, value := generateKVPair(seed)
+		dataToWrite := <-dataToBeWritten
+		seed, key, value := dataToWrite.seed, dataToWrite.key, dataToWrite.value
 
 		writeStart := time.Now()
 
