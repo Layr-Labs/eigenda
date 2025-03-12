@@ -1,3 +1,5 @@
+// You can modify this file to customize mdbook-mermaid.
+// See https://github.com/badboy/mdbook-mermaid?tab=readme-ov-file#configure-your-mdbook-to-use-mdbook-mermaid
 (() => {
     const darkThemes = ['ayu', 'navy', 'coal'];
     const lightThemes = ['light', 'rust'];
