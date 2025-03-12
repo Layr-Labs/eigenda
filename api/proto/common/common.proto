@@ -7,8 +7,10 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/common";
 // https://github.com/Consensys/gnark-crypto/blob/779e884dabb38b92e677f4891286637a3d2e5734/ecc/bn254/fp/element.go#L862
 message G1Commitment {
   // The X coordinate of the KZG commitment. This is the raw byte representation of the field element.
+  // x should contain 32 bytes.
   bytes x = 1;
   // The Y coordinate of the KZG commitment. This is the raw byte representation of the field element.
+  // y should contain 32 bytes.
   bytes y = 2;
 }
 
