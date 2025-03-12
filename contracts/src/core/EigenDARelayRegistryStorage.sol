@@ -4,17 +4,18 @@ pragma solidity ^0.8.9;
 import "../interfaces/IEigenDAStructs.sol";
 
 /**
- * @title Storage variables for the `EigenDARelayRegistry` contract.
- * @author Layr Labs, Inc.
- * @notice This storage contract is separate from the logic to simplify the upgrade process.
+ * @title EigenDARelayRegistryStorage
+ * @notice This storage contract is separated from the logic to simplify the upgrade process.
  */
 abstract contract EigenDARelayRegistryStorage {
 
+    /// @notice A mapping of relay keys to relay info
     mapping(uint32 => RelayInfo) public relayKeyToInfo;
 
+    /// @notice The next relay key to be used
     uint32 public nextRelayKey;
 
-    // storage gap for upgradeability
+    /// @notice Storage gap for upgradeability
     // slither-disable-next-line shadowing-state
     uint256[48] private __GAP;
 }
