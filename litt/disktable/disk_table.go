@@ -518,8 +518,8 @@ func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 	return nil
 }
 
-// handleWriteRequest handles a controlLoopWriteRequest control message.
-func (d *DiskTable) handleWriteRequest(req *controlLoopWriteRequest) {
+// handleControlLoopWriteRequest handles a controlLoopWriteRequest control message.
+func (d *DiskTable) handleControlLoopWriteRequest(req *controlLoopWriteRequest) {
 	for _, kv := range req.values {
 		// Do the write.
 		seg := d.segments[d.highestSegmentIndex]
@@ -538,8 +538,6 @@ func (d *DiskTable) handleWriteRequest(req *controlLoopWriteRequest) {
 		}
 	}
 }
-
-// TODO ensure that if we panic, this doesn't block forever
 
 // Flush flushes all data to disk. Blocks until all data previously submitted to Put has been written to disk.
 func (d *DiskTable) Flush() error {
@@ -845,7 +843,7 @@ func (d *DiskTable) controlLoop() {
 			d.logger.Infof("context done, shutting down disk table control loop")
 		case message := <-d.controllerChannel:
 			if req, ok := message.(*controlLoopWriteRequest); ok {
-				d.handleWriteRequest(req)
+				d.handleControlLoopWriteRequest(req)
 			} else if req, ok := message.(*controlLoopFlushRequest); ok {
 				d.handleControlLoopFlushRequest(req)
 			} else if req, ok := message.(*controlLoopSetShardingFactorRequest); ok {

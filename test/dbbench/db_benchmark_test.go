@@ -32,7 +32,7 @@ const totalToWrite = 10 * units.TiB
 const dataSize = 1 * units.MiB
 const batchSize = 100
 const parallelWriters = 2
-const readBytesPerSecond = 1 * units.MiB
+const readBytesPerSecond = 10 * units.MiB
 const readerCount = 1
 const TTL = 2 * time.Hour
 
@@ -178,7 +178,7 @@ func runBenchmark(write writer, read reader) {
 					metadata := unexpiredData[seed]
 					nextSN := nextSerialNumber.Load()
 					fmt.Printf("\n--- Key Debug Dump: %s ---\n", key)
-					fmt.Printf("Expected value: %s\n", expectedValue)
+					fmt.Printf("Expected value (first 32 bytes): %s\n", expectedValue[0:32])
 					fmt.Printf("Serial number: %d\n", metadata.serialNumber)
 					fmt.Printf("Creation time: %v\n", metadata.creationTime)
 					fmt.Printf("Next serial number: %d\n", nextSN)
@@ -192,7 +192,7 @@ func runBenchmark(write writer, read reader) {
 					metadata := unexpiredData[seed]
 					nextSN := nextSerialNumber.Load()
 					fmt.Printf("\n--- Key Debug Dump: %s ---\n", key)
-					fmt.Printf("Expected value: %s\n", expectedValue)
+					fmt.Printf("Expected value (first 32 bytes): %s\n", expectedValue[0:32])
 					fmt.Printf("Serial number: %d\n", metadata.serialNumber)
 					fmt.Printf("Creation time: %v\n", metadata.creationTime)
 					fmt.Printf("Next serial number: %d\n", nextSN)
