@@ -24,14 +24,14 @@ message BlobCommitment {
   // Concatenation of the x and y coordinates of `common.G1Commitment`.
   bytes commitment = 1;
   // A commitment to the blob data with G2 SRS, used to work with length_proof
-	// such that the claimed length below is verifiable.
+  // such that the claimed length below is verifiable.
   bytes length_commitment = 2;
   // A proof that the degree of the polynomial used to generate the blob commitment is valid.
-	// It is computed such that the coefficient of the polynomial is committing with the G2 SRS
-	// at the end of the highest order.
+  // It is computed such that the coefficient of the polynomial is committing with the G2 SRS
+  // at the end of the highest order.
   bytes length_proof = 3;
   // The length of the blob in symbols (field elements), which must be a power of 2.
-	// This also specifies the degree of the polynomial used to generate the blob commitment,
-	// since length = degree + 1.
+  // This also specifies the degree of the polynomial used to generate the blob commitment,
+  // since length = degree + 1.
   uint32 length = 4;
 }
