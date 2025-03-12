@@ -20,3 +20,28 @@ Ensure the following environment variables are set in your Lambda configuration:
 - `NONCE` : The transaction nonce to be used for the cancellation transaction.
 - `PRIORITY_FEE_GWEI` : The maximum priority fee per gas (in gwei) for the transaction. The value will be converted to wei.
 - `KMS_KEY_ID` : The AWS KMS Key ID used to retrieve the public key for calculating the Ethereum address.
+
+
+### Lambda Packaging
+
+This project contains a Dockerfile and Makefile to create AWS Lambda deployment packages using Docker with Python 3.12.
+
+### Prerequisites
+
+- Docker
+- Make
+
+
+### Create the Lambda Package
+
+```bash
+make
+```
+
+
+### Clean Up
+
+```bash
+make clean
+```
+
