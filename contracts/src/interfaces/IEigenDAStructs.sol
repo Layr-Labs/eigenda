@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
+import {BN254} from "../../lib/eigenlayer-middleware/src/libraries/BN254.sol";
 
 ///////////////////////// V1 ///////////////////////////////
 
@@ -66,7 +66,7 @@ struct DisperserInfo {
     address disperserAddress;
 }
 
-struct BlobVerificationProofV2 {
+struct BlobInclusionInfo {
     BlobCertificate blobCertificate;
     uint32 blobIndex;
     bytes inclusionProof;
@@ -74,6 +74,7 @@ struct BlobVerificationProofV2 {
 
 struct BlobCertificate {
     BlobHeaderV2 blobHeader;
+    bytes signature;
     uint32[] relayKeys;
 }
 
@@ -88,7 +89,7 @@ struct BlobCommitment {
     BN254.G1Point commitment;
     BN254.G2Point lengthCommitment;
     BN254.G2Point lengthProof;
-    uint32 dataLength;
+    uint32 length;
 }
 
 struct SignedBatch {

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {Pausable} from "eigenlayer-core/contracts/permissions/Pausable.sol";
-import {IPauserRegistry} from "eigenlayer-core/contracts/interfaces/IPauserRegistry.sol";
+import {Pausable} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
+import {IPauserRegistry} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
 
-import {ServiceManagerBase, IAVSDirectory, IRewardsCoordinator, IServiceManager} from "eigenlayer-middleware/ServiceManagerBase.sol";
-import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
-import {IRegistryCoordinator} from "eigenlayer-middleware/interfaces/IRegistryCoordinator.sol";
-import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.sol";
+import {ServiceManagerBase, IAVSDirectory, IRewardsCoordinator, IServiceManager} from "../../lib/eigenlayer-middleware/src/ServiceManagerBase.sol";
+import {BLSSignatureChecker} from "../../lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
+import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {IStakeRegistry} from "../../lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
@@ -189,11 +189,6 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         uint8 quorumNumber
     ) external view returns (bool){
         return eigenDAThresholdRegistry.getIsQuorumRequired(quorumNumber);
-    }
-
-    /// @notice Gets the default security thresholds for V2
-    function getDefaultSecurityThresholdsV2() external view returns (SecurityThresholds memory) {
-        return eigenDAThresholdRegistry.getDefaultSecurityThresholdsV2();
     }
 
     /// @notice Returns the blob params for a given blob version

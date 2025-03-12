@@ -3,6 +3,7 @@ package dispatcher
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
@@ -55,6 +56,13 @@ func (c *dispatcher) sendAllChunks(ctx context.Context, state *core.IndexedOpera
 			hasAnyBundles := false
 			batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
 			if err != nil {
+				update <- core.SigningMessage{
+					Err:                  fmt.Errorf("failed to get batch header hash: %w", err),
+					Signature:            nil,
+					Operator:             id,
+					BatchHeaderHash:      [32]byte{},
+					AttestationLatencyMs: -1,
+				}
 				return
 			}
 			for _, blob := range blobs {
@@ -114,11 +122,11 @@ func (c *dispatcher) sendChunks(ctx context.Context, blobs []*core.EncodedBlobMe
 	// TODO Add secure Grpc
 
 	conn, err := grpc.NewClient(
-		core.OperatorSocket(op.Socket).GetDispersalSocket(),
+		core.OperatorSocket(op.Socket).GetV1DispersalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		c.logger.Warn("Disperser cannot connect to operator dispersal socket", "dispersal_socket", core.OperatorSocket(op.Socket).GetDispersalSocket(), "err", err)
+		c.logger.Warn("Disperser cannot connect to operator dispersal socket", "dispersal_socket", core.OperatorSocket(op.Socket).GetV1DispersalSocket(), "err", err)
 		return nil, err
 	}
 	defer conn.Close()

@@ -344,7 +344,6 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_AVAILABLE_RELAYS:                        "0,1,2,3",
 		CONTROLLER_DISPATCHER_PULL_INTERVAL:                "3s",
 		CONTROLLER_NODE_REQUEST_TIMEOUT:                    "5s",
-		CONTROLLER_NUM_CONNECTIONS_TO_NODES:                "10",
 		CONTROLLER_CHAIN_RPC:                               "",
 		CONTROLLER_PRIVATE_KEY:                             "123",
 		CONTROLLER_NUM_CONFIRMATIONS:                       "0",
@@ -369,7 +368,7 @@ func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVa
 		RELAY_GRPC_PORT:                             grpcPort,
 		RELAY_BUCKET_NAME:                           "test-eigenda-blobstore",
 		RELAY_METADATA_TABLE_NAME:                   "test-BlobMetadata-v2",
-		RELAY_RELAY_IDS:                             fmt.Sprint(ind),
+		RELAY_RELAY_KEYS:                            fmt.Sprint(ind),
 		RELAY_BLS_OPERATOR_STATE_RETRIEVER_ADDR:     env.EigenDA.OperatorStateRetreiver,
 		RELAY_EIGEN_DA_SERVICE_MANAGER_ADDR:         env.EigenDA.ServiceManager,
 		RELAY_PRIVATE_KEY:                           "123",
@@ -378,6 +377,7 @@ func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVa
 		RELAY_MAX_CONCURRENT_GET_CHUNK_OPS_CLIENT:   "10",
 		RELAY_MAX_GET_CHUNK_BYTES_PER_SECOND_CLIENT: "100000000",
 		RELAY_AUTHENTICATION_DISABLED:               "false",
+		RELAY_ENABLE_METRICS:                        "true",
 	}
 	env.applyDefaults(&v, "RELAY", "relay", ind)
 
@@ -385,7 +385,7 @@ func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVa
 }
 
 // Generates DA node .env
-func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, metricsPort, nodeApiPort string) OperatorVars {
+func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, metricsPort, nodeApiPort string) OperatorVars {
 
 	max, _ := new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
 	// max.Exp(big.NewInt(2), big.NewInt(130), nil).Sub(max, big.NewInt(1))
@@ -411,6 +411,8 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_RETRIEVAL_PORT:                   retrievalPort,
 		NODE_INTERNAL_DISPERSAL_PORT:          dispersalPort,
 		NODE_INTERNAL_RETRIEVAL_PORT:          retrievalPort,
+		NODE_V2_DISPERSAL_PORT:                v2DispersalPort,
+		NODE_V2_RETRIEVAL_PORT:                v2RetrievalPort,
 		NODE_ENABLE_METRICS:                   "true",
 		NODE_METRICS_PORT:                     metricsPort,
 		NODE_ENABLE_NODE_API:                  "true",
@@ -445,7 +447,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_PUBLIC_IP_CHECK_INTERVAL:         "10s",
 		NODE_NUM_CONFIRMATIONS:                "0",
 		NODE_ONCHAIN_METRICS_INTERVAL:         "-1",
-		NODE_ENABLE_V2:                        "true",
+		NODE_RUNTIME_MODE:                     "v1-and-v2",
 		NODE_DISABLE_DISPERSAL_AUTHENTICATION: "false",
 	}
 
@@ -651,8 +653,10 @@ func (env *Config) GenerateAllVariables() {
 		metricsPort := fmt.Sprint(port + 1) // port
 		dispersalPort := fmt.Sprint(port + 2)
 		retrievalPort := fmt.Sprint(port + 3)
-		nodeApiPort := fmt.Sprint(port + 4)
-		port += 5
+		v2DispersalPort := fmt.Sprint(port + 4)
+		v2RetrievalPort := fmt.Sprint(port + 5)
+		nodeApiPort := fmt.Sprint(port + 6)
+		port += 7
 
 		name := fmt.Sprintf("opr%v", i)
 		logPath, dbPath, filename, envFile := env.getPaths(name)
@@ -660,7 +664,7 @@ func (env *Config) GenerateAllVariables() {
 
 		// Convert key to address
 
-		operatorConfig := env.generateOperatorVars(i, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, fmt.Sprint(metricsPort), nodeApiPort)
+		operatorConfig := env.generateOperatorVars(i, name, key, churnerUrl, logPath, dbPath, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, fmt.Sprint(metricsPort), nodeApiPort)
 		writeEnv(operatorConfig.getEnvMap(), envFile)
 		env.Operators = append(env.Operators, operatorConfig)
 

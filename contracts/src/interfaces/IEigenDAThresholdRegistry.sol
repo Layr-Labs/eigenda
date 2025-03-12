@@ -43,9 +43,6 @@ interface IEigenDAThresholdRegistry {
 
     ///////////////////////// V2 ///////////////////////////////
 
-    /// @notice Gets the default security thresholds for V2
-    function getDefaultSecurityThresholdsV2() external view returns (SecurityThresholds memory);
-
     /// @notice Returns the blob params for a given blob version
     function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory);
 }

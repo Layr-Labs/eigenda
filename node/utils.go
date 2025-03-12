@@ -121,12 +121,12 @@ func ValidatePointsFromBlobHeader(h *pb.BlobHeader) error {
 	return nil
 }
 
-func SocketAddress(ctx context.Context, provider pubip.Provider, dispersalPort string, retrievalPort string) (string, error) {
+func SocketAddress(ctx context.Context, provider pubip.Provider, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort string) (string, error) {
 	ip, err := provider.PublicIPAddress(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get public ip address from IP provider: %w", err)
 	}
-	socket := core.MakeOperatorSocket(ip, dispersalPort, retrievalPort)
+	socket := core.MakeOperatorSocket(ip, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort)
 	return socket.String(), nil
 }
 

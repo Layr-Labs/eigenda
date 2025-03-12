@@ -3,12 +3,13 @@ package auth
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/api"
-	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
+	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/core"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
-	"time"
 )
 
 // RequestAuthenticator authenticates requests to the DA node. This object is thread safe.
@@ -17,13 +18,11 @@ import (
 // preloadCache method, which will need to be updated to handle decentralized dispersers.
 type RequestAuthenticator interface {
 	// AuthenticateStoreChunksRequest authenticates a StoreChunksRequest, returning an error if the request is invalid.
-	// The origin is the address of the peer that sent the request. This may be used to cache auth results
-	// in order to save node resources.
+	// Returns the hash of the request and an error if the request is invalid.
 	AuthenticateStoreChunksRequest(
 		ctx context.Context,
-		origin string,
 		request *grpc.StoreChunksRequest,
-		now time.Time) error
+		now time.Time) ([]byte, error)
 }
 
 // keyWithTimeout is a key with that key's expiration time. After a key "expires", it should be reloaded
@@ -48,14 +47,6 @@ type requestAuthenticator struct {
 	// reloaded from the chain state in case the key has been changed.
 	keyTimeoutDuration time.Duration
 
-	// authenticatedDispersers is a set of disperser addresses that have been recently authenticated, mapped
-	// to the time when that cached authentication will expire.
-	authenticatedDispersers *lru.Cache[string, time.Time]
-
-	// authenticationTimeoutDuration is the duration for which an auth is valid.
-	// If this is zero, then auth saving is disabled, and each request will be authenticated independently.
-	authenticationTimeoutDuration time.Duration
-
 	// disperserIDFilter is a function that returns true if the given disperser ID is valid.
 	disperserIDFilter func(uint32) bool
 }
@@ -66,7 +57,6 @@ func NewRequestAuthenticator(
 	chainReader core.Reader,
 	keyCacheSize int,
 	keyTimeoutDuration time.Duration,
-	authenticationTimeoutDuration time.Duration,
 	disperserIDFilter func(uint32) bool,
 	now time.Time) (RequestAuthenticator, error) {
 
@@ -75,18 +65,11 @@ func NewRequestAuthenticator(
 		return nil, fmt.Errorf("failed to create key cache: %w", err)
 	}
 
-	authenticatedDispersers, err := lru.New[string, time.Time](keyCacheSize)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create authenticated dispersers cache: %w", err)
-	}
-
 	authenticator := &requestAuthenticator{
-		chainReader:                   chainReader,
-		keyCache:                      keyCache,
-		keyTimeoutDuration:            keyTimeoutDuration,
-		authenticatedDispersers:       authenticatedDispersers,
-		authenticationTimeoutDuration: authenticationTimeoutDuration,
-		disperserIDFilter:             disperserIDFilter,
+		chainReader:        chainReader,
+		keyCache:           keyCache,
+		keyTimeoutDuration: keyTimeoutDuration,
+		disperserIDFilter:  disperserIDFilter,
 	}
 
 	err = authenticator.preloadCache(ctx, now)
@@ -109,27 +92,20 @@ func (a *requestAuthenticator) preloadCache(ctx context.Context, now time.Time) 
 
 func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
 	ctx context.Context,
-	origin string,
 	request *grpc.StoreChunksRequest,
-	now time.Time) error {
-
-	if a.isAuthenticationStillValid(now, origin) {
-		// We've recently authenticated this client. Do not authenticate again for a while.
-		return nil
-	}
+	now time.Time) ([]byte, error) {
 
 	key, err := a.getDisperserKey(ctx, now, request.DisperserID)
 	if err != nil {
-		return fmt.Errorf("failed to get operator key: %w", err)
+		return nil, fmt.Errorf("failed to get operator key: %w", err)
 	}
 
-	err = VerifyStoreChunksRequest(*key, request)
+	hash, err := VerifyStoreChunksRequest(*key, request)
 	if err != nil {
-		return fmt.Errorf("failed to verify request: %w", err)
+		return nil, fmt.Errorf("failed to verify request: %w", err)
 	}
 
-	a.cacheAuthenticationResult(now, origin)
-	return nil
+	return hash, nil
 }
 
 // getDisperserKey returns the public key of the operator with the given ID, caching the result.
@@ -161,25 +137,4 @@ func (a *requestAuthenticator) getDisperserKey(
 	})
 
 	return &address, nil
-}
-
-// cacheAuthenticationResult saves the result of an auth.
-func (a *requestAuthenticator) cacheAuthenticationResult(now time.Time, origin string) {
-	if a.authenticationTimeoutDuration == 0 {
-		// Authentication saving is disabled.
-		return
-	}
-
-	a.authenticatedDispersers.Add(origin, now.Add(a.authenticationTimeoutDuration))
-}
-
-// isAuthenticationStillValid returns true if the client at the given address has been authenticated recently.
-func (a *requestAuthenticator) isAuthenticationStillValid(now time.Time, address string) bool {
-	if a.authenticationTimeoutDuration == 0 {
-		// Authentication saving is disabled.
-		return false
-	}
-
-	expiration, ok := a.authenticatedDispersers.Get(address)
-	return ok && now.Before(expiration)
 }

@@ -201,7 +201,15 @@ func VerifyLengthProof(lengthCommit *bn254.G2Affine, proof *bn254.G2Affine, g1Ch
 	return PairingsVerify(g1Challenge, lengthCommit, &kzg.GenG1, proof)
 }
 
-func (v *Verifier) VerifyFrames(frames []*encoding.Frame, indices []encoding.ChunkNumber, commitments encoding.BlobCommitments, params encoding.EncodingParams) error {
+func (v *Verifier) VerifyFrames(
+	frames []*encoding.Frame,
+	indices []encoding.ChunkNumber,
+	commitments encoding.BlobCommitments,
+	params encoding.EncodingParams) error {
+
+	if len(frames) != len(indices) {
+		return fmt.Errorf("invalid number of frames and indices: %d != %d", len(frames), len(indices))
+	}
 
 	verifier, err := v.GetKzgVerifier(params)
 	if err != nil {
@@ -222,7 +230,6 @@ func (v *Verifier) VerifyFrames(frames []*encoding.Frame, indices []encoding.Chu
 	}
 
 	return nil
-
 }
 
 func (v *ParametrizedVerifier) VerifyFrame(commit *bn254.G1Affine, f *encoding.Frame, index uint64, numChunks uint64) error {
@@ -294,11 +301,9 @@ func VerifyFrame(f *encoding.Frame, ks *kzg.KZGSettings, commitment *bn254.G1Aff
 // Decode takes in the chunks, indices, and encoding parameters and returns the decoded blob
 // The result is trimmed to the given maxInputSize.
 func (v *Verifier) Decode(chunks []*encoding.Frame, indices []encoding.ChunkNumber, params encoding.EncodingParams, maxInputSize uint64) ([]byte, error) {
-	frames := make([]rs.Frame, len(chunks))
+	frames := make([]rs.FrameCoeffs, len(chunks))
 	for i := range chunks {
-		frames[i] = rs.Frame{
-			Coeffs: chunks[i].Coeffs,
-		}
+		frames[i] = chunks[i].Coeffs
 	}
 
 	return v.encoder.Decode(frames, toUint64Array(indices), maxInputSize, params)

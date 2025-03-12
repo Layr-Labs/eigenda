@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.12;
 
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
+import "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDAServiceManager, IRewardsCoordinator} from "../src/core/EigenDAServiceManager.sol";
-import {EigenDABlobVerificationUtils} from "../src/libraries/EigenDABlobVerificationUtils.sol";
+import {EigenDACertVerificationUtils} from "../src/libraries/EigenDACertVerificationUtils.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
 import {IEigenDAServiceManager} from "../src/interfaces/IEigenDAServiceManager.sol";
-import {EigenDABlobVerifier} from "../src/core/EigenDABlobVerifier.sol";
+import {EigenDACertVerifier} from "../src/core/EigenDACertVerifier.sol";
 import {EigenDAThresholdRegistry, IEigenDAThresholdRegistry} from "../src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "../src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../src/interfaces/IEigenDASignatureVerifier.sol";
-import {IRegistryCoordinator} from "../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IEigenDARelayRegistry} from "../src/interfaces/IEigenDARelayRegistry.sol";
 import {EigenDARelayRegistry} from "../src/core/EigenDARelayRegistry.sol";
 import {IPaymentVault} from "../src/interfaces/IPaymentVault.sol";
@@ -46,7 +46,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
     EigenDADisperserRegistry eigenDADisperserRegistryImplementation;
     PaymentVault paymentVault;
     PaymentVault paymentVaultImplementation;
-    EigenDABlobVerifier eigenDABlobVerifier;
+    EigenDACertVerifier eigenDACertVerifier;
 
     ERC20 mockToken;
 
@@ -150,8 +150,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
                 quorumAdversaryThresholdPercentages,
                 quorumConfirmationThresholdPercentages,
                 quorumNumbersRequired,
-                versionedBlobParams,
-                defaultSecurityThresholds
+                versionedBlobParams
             )
         );
 
@@ -198,13 +197,15 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
 
         mockToken = new ERC20("Mock Token", "MOCK");
 
-        eigenDABlobVerifier = new EigenDABlobVerifier(
+        eigenDACertVerifier = new EigenDACertVerifier(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDABatchMetadataStorage(address(eigenDAServiceManager)),
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             IEigenDARelayRegistry(address(eigenDARelayRegistry)),
             OperatorStateRetriever(address(operatorStateRetriever)),
-            IRegistryCoordinator(address(registryCoordinator))
+            IRegistryCoordinator(address(registryCoordinator)),
+            defaultSecurityThresholds,
+            quorumNumbersRequired
         );
     }
 
@@ -265,9 +266,9 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
                 quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = true;
             }
             
-            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = eigenDABlobVerifier.getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
+            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
             blobHeader.quorumBlobParams[i].chunkLength = uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))));
-            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDABlobVerifier.getQuorumConfirmationThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
+            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDACertVerifier.getQuorumConfirmationThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
         }
         // mark all quorum numbers as unused
         for (uint i = 0; i < numQuorumsBlobParams; i++) {

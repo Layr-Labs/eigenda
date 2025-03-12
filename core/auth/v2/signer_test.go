@@ -9,6 +9,7 @@ import (
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,10 +18,11 @@ import (
 func TestGetAccountID(t *testing.T) {
 	// Test case with known private key and expected account ID
 	privateKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-	expectedAccountID := "0x1aa8226f6d354380dDE75eE6B634875c4203e522"
+	expectedAccountID := gethcommon.HexToAddress("0x1aa8226f6d354380dDE75eE6B634875c4203e522")
 
 	// Create signer instance
-	signer := NewLocalBlobRequestSigner(privateKey)
+	signer, err := NewLocalBlobRequestSigner(privateKey)
+	require.NoError(t, err)
 
 	// Get account ID
 	accountID, err := signer.GetAccountID()
@@ -30,10 +32,11 @@ func TestGetAccountID(t *testing.T) {
 
 func TestSignBlobRequest(t *testing.T) {
 	privateKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-	signer := NewLocalBlobRequestSigner(privateKey)
+	signer, err := NewLocalBlobRequestSigner(privateKey)
+	require.NoError(t, err)
 	accountID, err := signer.GetAccountID()
 	require.NoError(t, err)
-	require.Equal(t, "0x1aa8226f6d354380dDE75eE6B634875c4203e522", accountID)
+	require.Equal(t, gethcommon.HexToAddress("0x1aa8226f6d354380dDE75eE6B634875c4203e522"), accountID)
 
 	var commitX, commitY fp.Element
 	_, err = commitX.SetString("21661178944771197726808973281966770251114553549453983978976194544185382599016")
@@ -75,7 +78,7 @@ func TestSignBlobRequest(t *testing.T) {
 		PaymentMetadata: corev1.PaymentMetadata{
 			AccountID:         accountID,
 			CumulativePayment: big.NewInt(100),
-			ReservationPeriod: 100,
+			Timestamp:         100,
 		},
 	}
 
@@ -94,16 +97,17 @@ func TestSignBlobRequest(t *testing.T) {
 
 	// Verify that the recovered address matches the signer's address
 	recoveredAddr := crypto.PubkeyToAddress(*pubKey).Hex()
-	assert.Equal(t, accountID, recoveredAddr)
+	assert.Equal(t, accountID, gethcommon.HexToAddress(recoveredAddr))
 }
 
 func TestSignPaymentStateRequest(t *testing.T) {
 	privateKey := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-	signer := NewLocalBlobRequestSigner(privateKey)
+	signer, err := NewLocalBlobRequestSigner(privateKey)
+	require.NoError(t, err)
 	expectedAddr := "0x1aa8226f6d354380dDE75eE6B634875c4203e522"
 	accountID, err := signer.GetAccountID()
 	require.NoError(t, err)
-	hash := sha256.Sum256([]byte(accountID))
+	hash := sha256.Sum256(accountID.Bytes())
 
 	// Sign payment state request
 	signature, err := signer.SignPaymentStateRequest()

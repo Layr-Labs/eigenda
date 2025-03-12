@@ -149,7 +149,7 @@ func (l *ChunkRateLimiter) FinishGetChunkOperation(requesterID string) {
 }
 
 // RequestGetChunkBandwidth should be called when a GetChunk is about to start downloading chunk data.
-func (l *ChunkRateLimiter) RequestGetChunkBandwidth(now time.Time, requesterID string, bytes int) error {
+func (l *ChunkRateLimiter) RequestGetChunkBandwidth(now time.Time, requesterID string, bytes uint32) error {
 	if l == nil {
 		// If the rate limiter is nil, do not enforce rate limits.
 		return nil
@@ -157,27 +157,37 @@ func (l *ChunkRateLimiter) RequestGetChunkBandwidth(now time.Time, requesterID s
 
 	// no lock needed here, as the bandwidth limiters themselves are thread-safe
 
-	allowed := l.globalBandwidthLimiter.AllowN(now, bytes)
+	allowed := l.globalBandwidthLimiter.AllowN(now, int(bytes))
 	if !allowed {
 		if l.relayMetrics != nil {
 			l.relayMetrics.ReportChunkRateLimited("global bandwidth")
 		}
-		return fmt.Errorf("global rate limit %dMiB exceeded for GetChunk bandwidth, try again later",
-			int(l.config.MaxGetChunkBytesPerSecond/1024/1024))
+
+		rateLimit := l.config.MaxGetChunkBytesPerSecond / 1024 / 1024
+		burstiness := l.config.GetChunkBytesBurstiness / 1024 / 1024
+
+		return fmt.Errorf(
+			"global rate limit %0.1fMiB (burstiness %dMiB) exceeded for GetChunk bandwidth, try again later",
+			rateLimit, burstiness)
 	}
 
 	limiter, ok := l.perClientBandwidthLimiter[requesterID]
 	if !ok {
 		return fmt.Errorf("internal error, unable to find bandwidth limiter for client ID %s", requesterID)
 	}
-	allowed = limiter.AllowN(now, bytes)
+	allowed = limiter.AllowN(now, int(bytes))
 	if !allowed {
-		l.globalBandwidthLimiter.AllowN(now, -bytes)
+		l.globalBandwidthLimiter.AllowN(now, -int(bytes))
 		if l.relayMetrics != nil {
 			l.relayMetrics.ReportChunkRateLimited("client bandwidth")
 		}
-		return fmt.Errorf("client rate limit %dMiB exceeded for GetChunk bandwidth, try again later",
-			int(l.config.MaxGetChunkBytesPerSecondClient/1024/1024))
+
+		rateLimit := l.config.MaxGetChunkBytesPerSecondClient / 1024 / 1024
+		burstiness := l.config.GetChunkBytesBurstinessClient / 1024 / 1024
+
+		return fmt.Errorf(
+			"client rate limit %0.1fMiB (burstiness %dMiB) exceeded for GetChunk bandwidth, try again later",
+			rateLimit, burstiness)
 	}
 
 	return nil

@@ -5,7 +5,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 
-	grpc "github.com/Layr-Labs/eigenda/api/grpc/node/v2"
+	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -67,7 +67,10 @@ func NewDispersalRequestSigner(
 }
 
 func (s *requestSigner) SignStoreChunksRequest(ctx context.Context, request *grpc.StoreChunksRequest) ([]byte, error) {
-	hash := hashing.HashStoreChunksRequest(request)
+	hash, err := hashing.HashStoreChunksRequest(request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash request: %w", err)
+	}
 
 	signature, err := aws2.SignKMS(ctx, s.keyManager, s.keyID, s.publicKey, hash)
 	if err != nil {

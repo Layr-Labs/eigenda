@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
+
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
@@ -23,7 +26,7 @@ type DisperserClientConfig struct {
 
 type DisperserClient interface {
 	Close() error
-	DisperseBlob(ctx context.Context, data []byte, blobVersion corev2.BlobVersion, quorums []core.QuorumID, salt uint32) (*dispv2.BlobStatus, corev2.BlobKey, error)
+	DisperseBlob(ctx context.Context, data []byte, blobVersion corev2.BlobVersion, quorums []core.QuorumID) (*dispv2.BlobStatus, corev2.BlobKey, error)
 	GetBlobStatus(ctx context.Context, blobKey corev2.BlobKey) (*disperser_rpc.BlobStatusReply, error)
 	GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error)
 }
@@ -124,7 +127,6 @@ func (c *disperserClient) DisperseBlob(
 	data []byte,
 	blobVersion corev2.BlobVersion,
 	quorums []core.QuorumID,
-	salt uint32,
 ) (*dispv2.BlobStatus, corev2.BlobKey, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
@@ -140,7 +142,7 @@ func (c *disperserClient) DisperseBlob(
 	}
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(ctx, uint32(symbolLength), quorums, salt)
+	payment, err := c.accountant.AccountBlob(ctx, time.Now().UnixNano(), uint64(symbolLength), quorums)
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
 	}
@@ -173,6 +175,18 @@ func (c *disperserClient) DisperseBlob(
 			return nil, [32]byte{}, fmt.Errorf("error deserializing blob commitments: %w", err)
 		}
 		blobCommitments = *deserialized
+
+		// We need to check that the disperser used the correct length. Even once checking the commitment from the
+		// disperser has been implemented, there is still an edge case where the disperser could truncate trailing 0s,
+		// yielding the wrong blob length, but not causing commitment verification to fail. It is important that the
+		// commitment doesn't report a blob length smaller than expected, since this could cause payload parsing to
+		// fail, if the length claimed in the encoded payload header is larger than the blob length in the commitment.
+		lengthFromCommitment := commitments.GetBlobCommitment().GetLength()
+		if lengthFromCommitment != uint32(symbolLength) {
+			return nil, [32]byte{}, fmt.Errorf(
+				"blob commitment length (%d) from disperser doesn't match expected length (%d): %w",
+				lengthFromCommitment, symbolLength, err)
+		}
 	} else {
 		// if prover is configured, get commitments from prover
 
@@ -193,13 +207,13 @@ func (c *disperserClient) DisperseBlob(
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error signing blob request: %w", err)
 	}
-	blobHeader.Signature = sig
 	blobHeaderProto, err := blobHeader.ToProtobuf()
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error converting blob header to protobuf: %w", err)
 	}
 	request := &disperser_rpc.DisperseBlobRequest{
-		Data:       data,
+		Blob:       data,
+		Signature:  sig,
 		BlobHeader: blobHeaderProto,
 	}
 
@@ -213,7 +227,45 @@ func (c *disperserClient) DisperseBlob(
 		return nil, [32]byte{}, err
 	}
 
+	if verifyReceivedBlobKey(blobHeader, reply) != nil {
+		return nil, [32]byte{}, fmt.Errorf("verify received blob key: %w", err)
+	}
+
 	return &blobStatus, corev2.BlobKey(reply.GetBlobKey()), nil
+}
+
+// verifyReceivedBlobKey computes the BlobKey from the BlobHeader which was sent to the disperser, and compares it with
+// the BlobKey which was returned by the disperser in the DisperseBlobReply
+//
+// A successful verification guarantees that the disperser didn't make any modifications to the BlobHeader that it
+// received from this client.
+//
+// This function returns nil if the verification succeeds, and otherwise returns an error describing the failure
+func verifyReceivedBlobKey(
+	// the blob header which was constructed locally and sent to the disperser
+	blobHeader *corev2.BlobHeader,
+	// the reply received back from the disperser
+	disperserReply *disperser_rpc.DisperseBlobReply,
+) error {
+
+	actualBlobKey, err := blobHeader.BlobKey()
+	if err != nil {
+		// this shouldn't be possible, since the blob key has already been used when signing dispersal
+		return fmt.Errorf("computing blob key: %w", err)
+	}
+
+	blobKeyFromDisperser, err := corev2.BytesToBlobKey(disperserReply.GetBlobKey())
+	if err != nil {
+		return fmt.Errorf("converting returned bytes to blob key: %w", err)
+	}
+
+	if actualBlobKey != blobKeyFromDisperser {
+		return fmt.Errorf(
+			"blob key returned by disperser (%v) doesn't match blob which was dispersed (%v)",
+			blobKeyFromDisperser, actualBlobKey)
+	}
+
+	return nil
 }
 
 // GetBlobStatus returns the status of a blob with the given blob key.
@@ -247,7 +299,7 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 	}
 
 	request := &disperser_rpc.GetPaymentStateRequest{
-		AccountId: accountID,
+		AccountId: accountID.Hex(),
 		Signature: signature,
 	}
 	return c.client.GetPaymentState(ctx, request)
@@ -264,7 +316,7 @@ func (c *disperserClient) GetBlobCommitment(ctx context.Context, data []byte) (*
 	}
 
 	request := &disperser_rpc.BlobCommitmentRequest{
-		Data: data,
+		Blob: data,
 	}
 	return c.client.GetBlobCommitment(ctx, request)
 }
@@ -275,7 +327,7 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 	var initErr error
 	c.initOnceGrpc.Do(func() {
 		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
-		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag)
+		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag, 4*units.MiB)
 		conn, err := grpc.NewClient(addr, dialOptions...)
 		if err != nil {
 			initErr = err

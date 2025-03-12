@@ -5,7 +5,10 @@ import (
 	"encoding/gob"
 	"fmt"
 	"math/big"
+	"slices"
 
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/wealdtech/go-merkletree/v2"
 	"github.com/wealdtech/go-merkletree/v2/keccak256"
@@ -27,10 +30,21 @@ type abiBlobCommitments struct {
 	DataLength       uint32
 }
 
-// BlobKey serializes the BlobHeader into a 32-byte unique identifier.
-// This serialization must ALWAYS match the serialization that we perform onchain:
+// ComputeBlobKey accepts as parameters the elements which contribute to the hash of a BlobHeader. It computes the
+// hash and returns the result, which represents a BlobKey.
+//
+// This function exists so that the BlobKey can be computed without first constructing a BlobHeader object. Since
+// the BlobHeader contains the full payment metadata, and payment metadata isn't stored on chain, it isn't always
+// possible to reconstruct from the data available.
+//
+// The hashing structure here must ALWAYS match the hashing structure that we perform onchain:
 // https://github.com/Layr-Labs/eigenda/blob/a6dd724acdf732af483fd2d9a86325febe7ebdcd/contracts/src/libraries/EigenDAHasher.sol#L119
-func (b *BlobHeader) BlobKey() (BlobKey, error) {
+func ComputeBlobKey(
+	blobVersion BlobVersion,
+	blobCommitments encoding.BlobCommitments,
+	quorumNumbers []core.QuorumID,
+	paymentMetadataHash [32]byte,
+) ([32]byte, error) {
 	versionType, err := abi.NewType("uint16", "", nil)
 	if err != nil {
 		return [32]byte{}, err
@@ -39,54 +53,55 @@ func (b *BlobHeader) BlobKey() (BlobKey, error) {
 	if err != nil {
 		return [32]byte{}, err
 	}
-	commitmentType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
-		{
-			Name: "commitment",
-			Type: "tuple",
-			Components: []abi.ArgumentMarshaling{
-				{
-					Name: "X",
-					Type: "uint256",
-				},
-				{
-					Name: "Y",
-					Type: "uint256",
-				},
-			},
-		},
-		{
-			Name: "lengthCommitment",
-			Type: "tuple",
-			Components: []abi.ArgumentMarshaling{
-				{
-					Name: "X",
-					Type: "uint256[2]",
-				},
-				{
-					Name: "Y",
-					Type: "uint256[2]",
+	commitmentType, err := abi.NewType(
+		"tuple", "", []abi.ArgumentMarshaling{
+			{
+				Name: "commitment",
+				Type: "tuple",
+				Components: []abi.ArgumentMarshaling{
+					{
+						Name: "X",
+						Type: "uint256",
+					},
+					{
+						Name: "Y",
+						Type: "uint256",
+					},
 				},
 			},
-		},
-		{
-			Name: "lengthProof",
-			Type: "tuple",
-			Components: []abi.ArgumentMarshaling{
-				{
-					Name: "X",
-					Type: "uint256[2]",
-				},
-				{
-					Name: "Y",
-					Type: "uint256[2]",
+			{
+				Name: "lengthCommitment",
+				Type: "tuple",
+				Components: []abi.ArgumentMarshaling{
+					{
+						Name: "X",
+						Type: "uint256[2]",
+					},
+					{
+						Name: "Y",
+						Type: "uint256[2]",
+					},
 				},
 			},
-		},
-		{
-			Name: "dataLength",
-			Type: "uint32",
-		},
-	})
+			{
+				Name: "lengthProof",
+				Type: "tuple",
+				Components: []abi.ArgumentMarshaling{
+					{
+						Name: "X",
+						Type: "uint256[2]",
+					},
+					{
+						Name: "Y",
+						Type: "uint256[2]",
+					},
+				},
+			},
+			{
+				Name: "dataLength",
+				Type: "uint32",
+			},
+		})
 	if err != nil {
 		return [32]byte{}, err
 	}
@@ -101,36 +116,46 @@ func (b *BlobHeader) BlobKey() (BlobKey, error) {
 			Type: commitmentType,
 		},
 	}
-
+	// Sort the quorum numbers to ensure the hash is consistent
+	sortedQuorums := make([]core.QuorumID, len(quorumNumbers))
+	copy(sortedQuorums, quorumNumbers)
+	slices.Sort(sortedQuorums)
 	packedBytes, err := arguments.Pack(
-		b.BlobVersion,
-		b.QuorumNumbers,
+		blobVersion,
+		sortedQuorums,
 		abiBlobCommitments{
 			Commitment: abiG1Commit{
-				X: b.BlobCommitments.Commitment.X.BigInt(new(big.Int)),
-				Y: b.BlobCommitments.Commitment.Y.BigInt(new(big.Int)),
+				X: blobCommitments.Commitment.X.BigInt(new(big.Int)),
+				Y: blobCommitments.Commitment.Y.BigInt(new(big.Int)),
 			},
+			// Most cryptography library serializes a G2 point by having
+			// A0 followed by A1 for both X, Y field of G2. However, ethereum
+			// precompile assumes an ordering of A1, A0. We choose
+			// to conform with Ethereum order when serializing a blobHeaderV2
+			// for instance, gnark, https://github.com/Consensys/gnark-crypto/blob/de0d77f2b4d520350bc54c612828b19ce2146eee/ecc/bn254/marshal.go#L1078
+			// Ethereum, https://eips.ethereum.org/EIPS/eip-197#definition-of-the-groups
 			LengthCommitment: abiG2Commit{
 				X: [2]*big.Int{
-					b.BlobCommitments.LengthCommitment.X.A0.BigInt(new(big.Int)),
-					b.BlobCommitments.LengthCommitment.X.A1.BigInt(new(big.Int)),
+					blobCommitments.LengthCommitment.X.A1.BigInt(new(big.Int)),
+					blobCommitments.LengthCommitment.X.A0.BigInt(new(big.Int)),
 				},
 				Y: [2]*big.Int{
-					b.BlobCommitments.LengthCommitment.Y.A0.BigInt(new(big.Int)),
-					b.BlobCommitments.LengthCommitment.Y.A1.BigInt(new(big.Int)),
+					blobCommitments.LengthCommitment.Y.A1.BigInt(new(big.Int)),
+					blobCommitments.LengthCommitment.Y.A0.BigInt(new(big.Int)),
 				},
 			},
+			// Same as above
 			LengthProof: abiG2Commit{
 				X: [2]*big.Int{
-					b.BlobCommitments.LengthProof.X.A0.BigInt(new(big.Int)),
-					b.BlobCommitments.LengthProof.X.A1.BigInt(new(big.Int)),
+					blobCommitments.LengthProof.X.A1.BigInt(new(big.Int)),
+					blobCommitments.LengthProof.X.A0.BigInt(new(big.Int)),
 				},
 				Y: [2]*big.Int{
-					b.BlobCommitments.LengthProof.Y.A0.BigInt(new(big.Int)),
-					b.BlobCommitments.LengthProof.Y.A1.BigInt(new(big.Int)),
+					blobCommitments.LengthProof.Y.A1.BigInt(new(big.Int)),
+					blobCommitments.LengthProof.Y.A0.BigInt(new(big.Int)),
 				},
 			},
-			DataLength: uint32(b.BlobCommitments.Length),
+			DataLength: uint32(blobCommitments.Length),
 		},
 	)
 	if err != nil {
@@ -162,11 +187,6 @@ func (b *BlobHeader) BlobKey() (BlobKey, error) {
 		},
 	}
 
-	paymentMetadataHash, err := b.PaymentMetadata.Hash()
-	if err != nil {
-		return [32]byte{}, err
-	}
-
 	s2 := struct {
 		BlobHeaderHash      [32]byte
 		PaymentMetadataHash [32]byte
@@ -188,12 +208,34 @@ func (b *BlobHeader) BlobKey() (BlobKey, error) {
 	return blobKey, nil
 }
 
+// BlobKey computes the BlobKey of the BlobHeader.
+//
+// A BlobKey simply the hash of the BlobHeader
+func (b *BlobHeader) BlobKey() (BlobKey, error) {
+	paymentMetadataHash, err := b.PaymentMetadata.Hash()
+	if err != nil {
+		return [32]byte{}, fmt.Errorf("hash payment metadata: %w", err)
+	}
+
+	return ComputeBlobKey(
+		b.BlobVersion,
+		b.BlobCommitments,
+		b.QuorumNumbers,
+		paymentMetadataHash,
+	)
+}
+
 func (c *BlobCertificate) Hash() ([32]byte, error) {
 	if c.BlobHeader == nil {
 		return [32]byte{}, fmt.Errorf("blob header is nil")
 	}
 
 	blobKeyType, err := abi.NewType("bytes32", "", nil)
+	if err != nil {
+		return [32]byte{}, err
+	}
+
+	signatureType, err := abi.NewType("bytes", "", nil)
 	if err != nil {
 		return [32]byte{}, err
 	}
@@ -208,6 +250,9 @@ func (c *BlobCertificate) Hash() ([32]byte, error) {
 			Type: blobKeyType,
 		},
 		{
+			Type: signatureType,
+		},
+		{
 			Type: relayKeysType,
 		},
 	}
@@ -217,7 +262,7 @@ func (c *BlobCertificate) Hash() ([32]byte, error) {
 		return [32]byte{}, err
 	}
 
-	bytes, err := arguments.Pack(blobKey, c.RelayKeys)
+	bytes, err := arguments.Pack(blobKey, c.Signature, c.RelayKeys)
 	if err != nil {
 		return [32]byte{}, err
 	}

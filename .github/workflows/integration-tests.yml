@@ -26,13 +26,13 @@ jobs:
           aws configure --profile test-profile set region us-east-1
           aws configure --profile test-profile set source_profile default
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 #5.3.0
         with:
           go-version: "1.21" # The Go version to download (if necessary) and use.
       - run: go version
 
       - name: Checkout EigenDA
-        uses: actions/checkout@v3
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
 
       - name: Update Submodule Commits
         run: |
@@ -60,15 +60,18 @@ jobs:
       - name: Get Forge version
         run: forge --version
 
-      - name: Build contracts
+      - name: Build contract dependencies
+        run: |
+          cd contracts && yarn
+
+      - name: Compile contracts
         run: |
           cd contracts && forge build
 
       # TODO: add back DA contracts if we will need them in tests.
       # - name: Compile contracts
       #   run: |
-      #     make compile-el
-      #     make compile-dl
+      #     make compile-contracts
 
       - name: Churner
         run: go test -v ./operators/churner/tests
@@ -79,15 +82,16 @@ jobs:
       - name: Node Plugin
         run: go test -v ./node/plugin/tests
 
-      - name: eigenda-client
-        run: go test -v ./api/clients --testnet-integration
+      # TODO(ian-shim): re-enable these tests once testnet is functional
+      # - name: eigenda-client
+      #   run: go test -v ./api/clients --testnet-integration
 
       - name: Inabox E2E
         run: make build && cd inabox && make run-e2e
 
       - name: Save logs
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6
         with:
           name: inabox-logs
           path: |

@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -80,9 +81,6 @@ type BlobHeader struct {
 
 	// PaymentMetadata contains the payment information for the blob
 	PaymentMetadata core.PaymentMetadata
-
-	// Signature is the signature of the blob header by the account ID
-	Signature []byte
 }
 
 func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
@@ -118,8 +116,13 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 		}
 		quorumNumbers[i] = core.QuorumID(q)
 	}
+	slices.Sort(quorumNumbers)
 
-	paymentMetadata := core.ConvertToPaymentMetadata(proto.GetPaymentHeader())
+	paymentMetadata, err := core.ConvertToPaymentMetadata(proto.GetPaymentHeader())
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert payment metadata: %v", err)
+	}
+
 	if paymentMetadata == nil {
 		return nil, errors.New("payment metadata is nil")
 	}
@@ -134,7 +137,6 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 		},
 		QuorumNumbers:   quorumNumbers,
 		PaymentMetadata: *paymentMetadata,
-		Signature:       proto.GetSignature(),
 	}, nil
 }
 
@@ -154,12 +156,11 @@ func (b *BlobHeader) ToProtobuf() (*commonpb.BlobHeader, error) {
 		QuorumNumbers: quorums,
 		Commitment:    commitments,
 		PaymentHeader: b.PaymentMetadata.ToProtobuf(),
-		Signature:     b.Signature,
 	}, nil
 }
 
-func (b *BlobHeader) GetEncodingParams(blobParams *core.BlobVersionParameters) (encoding.EncodingParams, error) {
-	length, err := GetChunkLength(uint32(b.BlobCommitments.Length), blobParams)
+func GetEncodingParams(blobLength uint, blobParams *core.BlobVersionParameters) (encoding.EncodingParams, error) {
+	length, err := GetChunkLength(uint32(blobLength), blobParams)
 	if err != nil {
 		return encoding.EncodingParams{}, err
 	}
@@ -174,6 +175,10 @@ type RelayKey = uint32
 
 type BlobCertificate struct {
 	BlobHeader *BlobHeader
+
+	// Signature is an ECDSA signature signed by the blob request signer's account ID over the blob key,
+	// which is a keccak hash of the serialized BlobHeader, and used to verify against blob dispersal request's account ID
+	Signature []byte
 
 	// RelayKeys
 	RelayKeys []RelayKey
@@ -196,7 +201,8 @@ func (c *BlobCertificate) ToProtobuf() (*commonpb.BlobCertificate, error) {
 
 	return &commonpb.BlobCertificate{
 		BlobHeader: blobHeader,
-		Relays:     relays,
+		Signature:  c.Signature,
+		RelayKeys:  relays,
 	}, nil
 }
 
@@ -210,13 +216,14 @@ func BlobCertificateFromProtobuf(proto *commonpb.BlobCertificate) (*BlobCertific
 		return nil, fmt.Errorf("failed to create blob header: %v", err)
 	}
 
-	relayKeys := make([]RelayKey, len(proto.GetRelays()))
-	for i, r := range proto.GetRelays() {
+	relayKeys := make([]RelayKey, len(proto.GetRelayKeys()))
+	for i, r := range proto.GetRelayKeys() {
 		relayKeys[i] = RelayKey(r)
 	}
 
 	return &BlobCertificate{
 		BlobHeader: blobHeader,
+		Signature:  proto.GetSignature(),
 		RelayKeys:  relayKeys,
 	}, nil
 }
@@ -298,9 +305,10 @@ func BatchFromProtobuf(proto *commonpb.Batch) (*Batch, error) {
 
 		blobCerts[i] = &BlobCertificate{
 			BlobHeader: blobHeader,
-			RelayKeys:  make([]RelayKey, len(cert.GetRelays())),
+			Signature:  cert.GetSignature(),
+			RelayKeys:  make([]RelayKey, len(cert.GetRelayKeys())),
 		}
-		for j, r := range cert.GetRelays() {
+		for j, r := range cert.GetRelayKeys() {
 			blobCerts[i].RelayKeys[j] = RelayKey(r)
 		}
 	}
@@ -314,7 +322,7 @@ func BatchFromProtobuf(proto *commonpb.Batch) (*Batch, error) {
 type Attestation struct {
 	*BatchHeader
 
-	// AttestedAt is the time the attestation was made
+	// AttestedAt is the time the attestation was made in nanoseconds
 	AttestedAt uint64
 	// NonSignerPubKeys are the public keys of the operators that did not sign the blob
 	NonSignerPubKeys []*core.G1Point
@@ -326,7 +334,7 @@ type Attestation struct {
 	Sigma *core.Signature
 	// QuorumNumbers contains the quorums relevant for the attestation
 	QuorumNumbers []core.QuorumID
-	// QuorumResults contains the results of the quorum verification
+	// QuorumResults contains the operators' total signing percentage of the quorum
 	QuorumResults map[core.QuorumID]uint8
 }
 
@@ -352,20 +360,28 @@ func (a *Attestation) ToProtobuf() (*disperserpb.Attestation, error) {
 		quorumResults[i] = a.QuorumResults[q]
 	}
 
-	apkG2Bytes := a.APKG2.Bytes()
-	sigmaBytes := a.Sigma.Bytes()
+	var apkG2Bytes []byte
+	var sigmaBytes []byte
+	if a.APKG2 != nil {
+		b := a.APKG2.Bytes()
+		apkG2Bytes = b[:]
+	}
+	if a.Sigma != nil {
+		b := a.Sigma.Bytes()
+		sigmaBytes = b[:]
+	}
 
 	return &disperserpb.Attestation{
 		NonSignerPubkeys:        nonSignerPubKeys,
-		ApkG2:                   apkG2Bytes[:],
+		ApkG2:                   apkG2Bytes,
 		QuorumApks:              quorumAPKs,
-		Sigma:                   sigmaBytes[:],
+		Sigma:                   sigmaBytes,
 		QuorumNumbers:           quorumNumbers,
 		QuorumSignedPercentages: quorumResults,
 	}, nil
 }
 
-type BlobVerificationInfo struct {
+type BlobInclusionInfo struct {
 	*BatchHeader
 
 	BlobKey
@@ -373,12 +389,12 @@ type BlobVerificationInfo struct {
 	InclusionProof []byte
 }
 
-func (v *BlobVerificationInfo) ToProtobuf(blobCert *BlobCertificate) (*disperserpb.BlobVerificationInfo, error) {
+func (v *BlobInclusionInfo) ToProtobuf(blobCert *BlobCertificate) (*disperserpb.BlobInclusionInfo, error) {
 	blobCertProto, err := blobCert.ToProtobuf()
 	if err != nil {
 		return nil, err
 	}
-	return &disperserpb.BlobVerificationInfo{
+	return &disperserpb.BlobInclusionInfo{
 		BlobCertificate: blobCertProto,
 		BlobIndex:       v.BlobIndex,
 		InclusionProof:  v.InclusionProof,

@@ -14,12 +14,11 @@ import (
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
+	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
-	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -48,12 +47,12 @@ var (
 	ethClient           common.EthClient
 	rpcClient           common.RPCEthClient
 	mockRollup          *rollupbindings.ContractMockRollup
-	verifierContract    *verifierbindings.ContractEigenDABlobVerifier
+	verifierContract    *verifierbindings.ContractEigenDACertVerifier
 	retrievalClient     clients.RetrievalClient
 	retrievalClientV2   clientsv2.RetrievalClient
 	numConfirmations    int = 3
 	numRetries              = 0
-	relays                  = map[corev2.RelayKey]string{}
+	chainReader         core.Reader
 
 	cancel context.CancelFunc
 )
@@ -133,7 +132,7 @@ var _ = BeforeSuite(func() {
 		Expect(err).To(BeNil())
 
 		fmt.Println("Registering blob versions and relays")
-		relays = testConfig.RegisterBlobVersionAndRelays(ethClient)
+		testConfig.RegisterBlobVersionAndRelays(ethClient)
 
 		fmt.Println("Registering disperser keypair")
 		err = testConfig.RegisterDisperserKeypair(ethClient)
@@ -146,7 +145,7 @@ var _ = BeforeSuite(func() {
 
 		mockRollup, err = rollupbindings.NewContractMockRollup(gcommon.HexToAddress(testConfig.MockRollup), ethClient)
 		Expect(err).To(BeNil())
-		verifierContract, err = verifierbindings.NewContractEigenDABlobVerifier(gcommon.HexToAddress(testConfig.EigenDA.BlobVerifier), ethClient)
+		verifierContract, err = verifierbindings.NewContractEigenDACertVerifier(gcommon.HexToAddress(testConfig.EigenDA.CertVerifier), ethClient)
 		Expect(err).To(BeNil())
 		err = setupRetrievalClient(testConfig)
 		Expect(err).To(BeNil())
@@ -220,7 +219,11 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	if err != nil {
 		return err
 	}
-	chainReader, err := eth.NewReader(logger, ethClient, testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER, testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
+	chainReader, err = eth.NewReader(
+		logger,
+		ethClient,
+		testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER,
+		testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
 	if err != nil {
 		return err
 	}

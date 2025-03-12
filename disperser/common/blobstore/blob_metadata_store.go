@@ -91,7 +91,7 @@ func (s *BlobMetadataStore) GetBulkBlobMetadata(ctx context.Context, blobKeys []
 			"MetadataHash": &types.AttributeValueMemberS{Value: blobKeys[i].MetadataHash},
 		}
 	}
-	items, err := s.dynamoDBClient.GetItems(ctx, s.tableName, keys)
+	items, err := s.dynamoDBClient.GetItems(ctx, s.tableName, keys, false)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Co
 		":expiry": &types.AttributeValueMemberN{
 			Value: strconv.FormatInt(time.Now().Unix(), 10),
 		},
-	}, limit, attributeMap)
+	}, limit, attributeMap, true)
 
 	if err != nil {
 		return nil, nil, err
@@ -268,6 +268,7 @@ func (s *BlobMetadataStore) GetAllBlobMetadataByBatchWithPagination(
 		},
 		limit,
 		attributeMap,
+		true,
 	)
 	if err != nil {
 		return nil, nil, err

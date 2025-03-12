@@ -20,6 +20,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
@@ -104,6 +105,7 @@ func RunController(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create encoder client: %v", err)
 	}
 	encodingPool := workerpool.New(config.NumConcurrentEncodingRequests)
+	encodingManagerBlobSet := controller.NewBlobSet()
 	encodingManager, err := controller.NewEncodingManager(
 		&config.EncodingManagerConfig,
 		blobMetadataStore,
@@ -112,6 +114,7 @@ func RunController(ctx *cli.Context) error {
 		chainReader,
 		logger,
 		metricsRegistry,
+		encodingManagerBlobSet,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create encoding manager: %v", err)
@@ -169,6 +172,11 @@ func RunController(ctx *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create node client manager: %v", err)
 	}
+	beforeDispatch := func(blobKey corev2.BlobKey) error {
+		encodingManagerBlobSet.RemoveBlob(blobKey)
+		return nil
+	}
+	dispatcherBlobSet := controller.NewBlobSet()
 	dispatcher, err := controller.NewDispatcher(
 		&config.DispatcherConfig,
 		blobMetadataStore,
@@ -178,12 +186,20 @@ func RunController(ctx *cli.Context) error {
 		nodeClientManager,
 		logger,
 		metricsRegistry,
+		beforeDispatch,
+		dispatcherBlobSet,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)
 	}
 
 	c := context.Background()
+
+	err = controller.RecoverState(c, blobMetadataStore, logger)
+	if err != nil {
+		return fmt.Errorf("failed to recover state: %v", err)
+	}
+
 	err = encodingManager.Start(c)
 	if err != nil {
 		return fmt.Errorf("failed to start encoding manager: %v", err)

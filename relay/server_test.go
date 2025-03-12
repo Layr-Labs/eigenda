@@ -3,11 +3,15 @@ package relay
 import (
 	"context"
 	"encoding/binary"
+	"testing"
+	"time"
+
+	"github.com/Layr-Labs/eigenda/common/replay"
+	"github.com/docker/go-units"
+
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/relay/auth"
 	"github.com/Layr-Labs/eigenda/relay/mock"
-	"testing"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/relay/limiter"
 
@@ -24,17 +28,19 @@ import (
 
 func defaultConfig() *Config {
 	return &Config{
-		GRPCPort:                   50051,
-		MaxGRPCMessageSize:         1024 * 1024 * 300,
-		MetadataCacheSize:          1024 * 1024,
-		MetadataMaxConcurrency:     32,
-		BlobCacheBytes:             1024 * 1024,
-		BlobMaxConcurrency:         32,
-		ChunkCacheSize:             1024 * 1024,
-		ChunkMaxConcurrency:        32,
-		MaxKeysPerGetChunksRequest: 1024,
-		AuthenticationKeyCacheSize: 1024,
-		AuthenticationDisabled:     false,
+		GRPCPort:                     50051,
+		MaxGRPCMessageSize:           units.MB,
+		MetadataCacheSize:            1024 * 1024,
+		MetadataMaxConcurrency:       32,
+		BlobCacheBytes:               1024 * 1024,
+		BlobMaxConcurrency:           32,
+		ChunkCacheBytes:              1024 * 1024,
+		ChunkMaxConcurrency:          32,
+		MaxKeysPerGetChunksRequest:   1024,
+		AuthenticationKeyCacheSize:   1024,
+		AuthenticationDisabled:       false,
+		GetChunksRequestMaxPastAge:   5 * time.Minute,
+		GetChunksRequestMaxFutureAge: 5 * time.Minute,
 		RateLimits: limiter.Config{
 			MaxGetBlobOpsPerSecond:          1024,
 			GetBlobOpsBurstiness:            1024,
@@ -91,7 +97,8 @@ func getChunks(
 	operatorIDBytes := make([]byte, 32)
 	binary.BigEndian.PutUint32(operatorIDBytes[24:], operatorID)
 	request.OperatorId = operatorIDBytes
-	signature := auth.SignGetChunksRequest(operatorKeys[operatorID], request)
+	signature, err := auth.SignGetChunksRequest(operatorKeys[operatorID], request)
+	require.NoError(t, err)
 	request.OperatorSignature = signature
 
 	var opts []grpc.DialOption
@@ -110,7 +117,7 @@ func getChunks(
 }
 
 func TestReadWriteBlobs(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -199,7 +206,7 @@ func TestReadWriteBlobs(t *testing.T) {
 }
 
 func TestReadNonExistentBlob(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -252,7 +259,7 @@ func TestReadNonExistentBlob(t *testing.T) {
 }
 
 func TestReadWriteBlobsWithSharding(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -282,7 +289,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
-	config.RelayIDs = shardList
+	config.RelayKeys = shardList
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
@@ -388,7 +395,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 }
 
 func TestReadWriteChunks(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -404,7 +411,8 @@ func TestReadWriteChunks(t *testing.T) {
 	operatorKeys := make(map[uint32]*core.KeyPair)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
 	for i := 0; i < operatorCount; i++ {
-		keypair := rand.BLS()
+		keypair, err := rand.BLS()
+		require.NoError(t, err)
 		operatorKeys[uint32(i)] = keypair
 
 		var operatorID core.OperatorID
@@ -459,9 +467,9 @@ func TestReadWriteChunks(t *testing.T) {
 		expectedData[blobKey] = chunks
 
 		coeffs, chunkProofs := disassembleFrames(chunks)
-		err = chunkWriter.PutChunkProofs(context.Background(), blobKey, chunkProofs)
+		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, chunkProofs)
 		require.NoError(t, err)
-		fragmentInfo, err := chunkWriter.PutChunkCoefficients(context.Background(), blobKey, coeffs)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, coeffs)
 		require.NoError(t, err)
 		fragmentInfoMap[blobKey] = fragmentInfo
 
@@ -491,6 +499,7 @@ func TestReadWriteChunks(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		response, err := getChunks(t, rand, operatorKeys, request)
@@ -525,6 +534,7 @@ func TestReadWriteChunks(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		response, err := getChunks(t, rand, operatorKeys, request)
@@ -558,6 +568,7 @@ func TestReadWriteChunks(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		response, err := getChunks(t, rand, operatorKeys, request)
@@ -594,6 +605,7 @@ func TestReadWriteChunks(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		response, err := getChunks(t, rand, operatorKeys, request)
@@ -613,7 +625,7 @@ func TestReadWriteChunks(t *testing.T) {
 }
 
 func TestBatchedReadWriteChunks(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -629,7 +641,8 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 	operatorKeys := make(map[uint32]*core.KeyPair)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
 	for i := 0; i < operatorCount; i++ {
-		keypair := rand.BLS()
+		keypair, err := rand.BLS()
+		require.NoError(t, err)
 		operatorKeys[uint32(i)] = keypair
 
 		var operatorID core.OperatorID
@@ -657,6 +670,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		chunkReader,
 		chainReader,
 		ics)
+	server.replayGuardian = replay.NewNoOpReplayGuardian() // disable replay protection
 	require.NoError(t, err)
 
 	go func() {
@@ -680,9 +694,9 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		expectedData[blobKey] = chunks
 
 		coeffs, chunkProofs := disassembleFrames(chunks)
-		err = chunkWriter.PutChunkProofs(context.Background(), blobKey, chunkProofs)
+		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, chunkProofs)
 		require.NoError(t, err)
-		fragmentInfo, err := chunkWriter.PutChunkCoefficients(context.Background(), blobKey, coeffs)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, coeffs)
 		require.NoError(t, err)
 		fragmentInfoMap[blobKey] = fragmentInfo
 
@@ -727,6 +741,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		}
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		response, err := getChunks(t, rand, operatorKeys, request)
@@ -748,7 +763,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 }
 
 func TestReadWriteChunksWithSharding(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -775,7 +790,8 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	operatorKeys := make(map[uint32]*core.KeyPair)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
 	for i := 0; i < operatorCount; i++ {
-		keypair := rand.BLS()
+		keypair, err := rand.BLS()
+		require.NoError(t, err)
 		operatorKeys[uint32(i)] = keypair
 
 		var operatorID core.OperatorID
@@ -793,7 +809,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
-	config.RelayIDs = shardList
+	config.RelayKeys = shardList
 	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
@@ -837,9 +853,9 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		shardMap[blobKey] = shards
 
 		coeffs, chunkProofs := disassembleFrames(chunks)
-		err = chunkWriter.PutChunkProofs(context.Background(), blobKey, chunkProofs)
+		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, chunkProofs)
 		require.NoError(t, err)
-		fragmentInfo, err := chunkWriter.PutChunkCoefficients(context.Background(), blobKey, coeffs)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, coeffs)
 		require.NoError(t, err)
 		fragmentInfoMap[blobKey] = fragmentInfo
 
@@ -870,6 +886,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		isBlobInCorrectShard := false
@@ -919,6 +936,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		isBlobInCorrectShard := false
@@ -967,6 +985,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		isBlobInCorrectShard := false
@@ -1014,6 +1033,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		isBlobInCorrectShard := false
@@ -1048,7 +1068,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 }
 
 func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -1075,7 +1095,8 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	operatorKeys := make(map[uint32]*core.KeyPair)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
 	for i := 0; i < operatorCount; i++ {
-		keypair := rand.BLS()
+		keypair, err := rand.BLS()
+		require.NoError(t, err)
 		operatorKeys[uint32(i)] = keypair
 
 		var operatorID core.OperatorID
@@ -1093,7 +1114,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 
 	// This is the server used to read it back
 	config := defaultConfig()
-	config.RelayIDs = shardList
+	config.RelayKeys = shardList
 	config.RateLimits.MaxGetChunkOpsPerSecond = 1000
 	config.RateLimits.GetChunkOpsBurstiness = 1000
 	config.RateLimits.MaxGetChunkOpsPerSecondClient = 1000
@@ -1109,6 +1130,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		chainReader,
 		ics)
 	require.NoError(t, err)
+	server.replayGuardian = replay.NewNoOpReplayGuardian() // disable replay protection
 
 	go func() {
 		err = server.Start(context.Background())
@@ -1131,9 +1153,9 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		expectedData[blobKey] = chunks
 
 		coeffs, chunkProofs := disassembleFrames(chunks)
-		err = chunkWriter.PutChunkProofs(context.Background(), blobKey, chunkProofs)
+		err = chunkWriter.PutFrameProofs(context.Background(), blobKey, chunkProofs)
 		require.NoError(t, err)
-		fragmentInfo, err := chunkWriter.PutChunkCoefficients(context.Background(), blobKey, coeffs)
+		fragmentInfo, err := chunkWriter.PutFrameCoefficients(context.Background(), blobKey, coeffs)
 		require.NoError(t, err)
 		fragmentInfoMap[blobKey] = fragmentInfo
 
@@ -1196,6 +1218,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		allInCorrectShard := true

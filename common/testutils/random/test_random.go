@@ -4,15 +4,14 @@ import (
 	"crypto/ecdsa"
 	crand "crypto/rand"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/core"
-	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/stretchr/testify/require"
 	"io"
 	"math/big"
 	"math/rand"
-	"testing"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/core"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // charset is the set of characters that can be used to generate random strings
@@ -23,16 +22,23 @@ type TestRandom struct {
 	// The source of randomness
 	*rand.Rand
 
-	// The testing object
-	t *testing.T
-
 	// The seed used to initialize the random number generator
 	seed int64
 }
 
 // NewTestRandom creates a new instance of TestRandom
 // This method may either be seeded, or not seeded. If no seed is provided, then current unix nano time is used.
-func NewTestRandom(t *testing.T, fixedSeed ...int64) *TestRandom {
+func NewTestRandom(fixedSeed ...int64) *TestRandom {
+	return newTestRandom(true, fixedSeed...)
+}
+
+// NewTestRandomNoPrint is similar to NewTestRandom, but does not print the seed to stdout.
+func NewTestRandomNoPrint(fixedSeed ...int64) *TestRandom {
+	return newTestRandom(false, fixedSeed...)
+}
+
+// NewTestRandomNoSeed creates a new instance of TestRandom.
+func newTestRandom(print bool, fixedSeed ...int64) *TestRandom {
 	var seed int64
 	if len(fixedSeed) == 0 {
 		seed = time.Now().UnixNano()
@@ -42,10 +48,11 @@ func NewTestRandom(t *testing.T, fixedSeed ...int64) *TestRandom {
 		panic("too many arguments, expected exactly one seed")
 	}
 
-	fmt.Printf("Random seed: %d\n", seed)
+	if print {
+		fmt.Printf("Random seed: %d\n", seed)
+	}
 	return &TestRandom{
 		Rand: rand.New(rand.NewSource(seed)),
-		t:    t,
 		seed: seed,
 	}
 }
@@ -66,9 +73,20 @@ func (r *TestRandom) Bytes(length int) []byte {
 	return bytes
 }
 
+// VariableBytes generates a random byte slice of a length between min (inclusive) and max (exclusive).
+func (r *TestRandom) VariableBytes(min int, max int) []byte {
+	length := r.Intn(max-min) + min
+	return r.Bytes(length)
+}
+
 // Time generates a random time.
 func (r *TestRandom) Time() time.Time {
 	return time.Unix(r.Int63(), r.Int63())
+}
+
+// TimeInRange generates a random time between min (inclusive) and max (exclusive).
+func (r *TestRandom) TimeInRange(min time.Time, max time.Time) time.Time {
+	return min.Add(time.Duration(r.Int63n(int64(max.Sub(min)))))
 }
 
 // String generates a random string out of printable ASCII characters.
@@ -78,6 +96,41 @@ func (r *TestRandom) String(length int) string {
 		b[i] = charset[r.Intn(len(charset))]
 	}
 	return string(b)
+}
+
+// VariableString generates a random string out of printable ASCII characters of a length between
+// min (inclusive) and max (exclusive).
+func (r *TestRandom) VariableString(min int, max int) string {
+	length := r.Intn(max-min) + min
+	return r.String(length)
+}
+
+// Uint32n generates a random uint32 less than n.
+func (r *TestRandom) Uint32n(n uint32) uint32 {
+	return r.Uint32() % n
+}
+
+// Uint64n generates a random uint64 less than n.
+func (r *TestRandom) Uint64n(n uint64) uint64 {
+	return r.Uint64() % n
+}
+
+// Gaussian generates a random float64 from a Gaussian distribution with the given mean and standard deviation.
+func (r *TestRandom) Gaussian(mean float64, stddev float64) float64 {
+	return r.NormFloat64()*stddev + mean
+}
+
+// BoundedGaussian generates a random float64 from a Gaussian distribution with the given mean and standard deviation,
+// but bounded by the given min and max values. If a generated value exceeds the bounds, the bound is returned instead.
+func (r *TestRandom) BoundedGaussian(mean float64, stddev float64, min float64, max float64) float64 {
+	val := r.Gaussian(mean, stddev)
+	if val < min {
+		return min
+	}
+	if val > max {
+		return max
+	}
+	return val
 }
 
 var _ io.Reader = &randIOReader{}
@@ -101,24 +154,28 @@ func (r *TestRandom) IOReader() io.Reader {
 // **intentionally** imposed by the Go standard libraries. (╯°□°)╯︵ ┻━┻
 //
 // NOT CRYPTOGRAPHICALLY SECURE!!! FOR TESTING PURPOSES ONLY. DO NOT USE THESE KEYS FOR SECURITY PURPOSES.
-func (r *TestRandom) ECDSA() (*ecdsa.PublicKey, *ecdsa.PrivateKey) {
+func (r *TestRandom) ECDSA() (*ecdsa.PublicKey, *ecdsa.PrivateKey, error) {
 	key, err := ecdsa.GenerateKey(crypto.S256(), crand.Reader)
-	require.NoError(r.t, err)
-	return &key.PublicKey, key
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate key: %w", err)
+	}
+	return &key.PublicKey, key, nil
 }
 
 // BLS generates a random BLS key pair.
 //
 // NOT CRYPTOGRAPHICALLY SECURE!!! FOR TESTING PURPOSES ONLY. DO NOT USE THESE KEYS FOR SECURITY PURPOSES.
-func (r *TestRandom) BLS() *core.KeyPair {
+func (r *TestRandom) BLS() (*core.KeyPair, error) {
 	//Max random value is order of the curve
 	maxValue := new(big.Int)
 	maxValue.SetString(fr.Modulus().String(), 10)
 
 	//Generate cryptographically strong pseudo-random between 0 - max
 	n, err := crand.Int(r.IOReader(), maxValue)
-	require.NoError(r.t, err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random number: %w", err)
+	}
 
 	sk := new(core.PrivateKey).SetBigInt(n)
-	return core.MakeKeyPair(sk)
+	return core.MakeKeyPair(sk), nil
 }

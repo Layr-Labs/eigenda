@@ -3,8 +3,8 @@ pragma solidity ^0.8.9;
 
 import {EigenDAThresholdRegistryStorage} from "./EigenDAThresholdRegistryStorage.sol";
 import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
-import {OwnableUpgradeable} from "@openzeppelin-upgrades/contracts/access/OwnableUpgradeable.sol";
-import {BitmapUtils} from "eigenlayer-middleware/libraries/BitmapUtils.sol";
+import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
+import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
 /**
@@ -22,15 +22,13 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         bytes memory _quorumAdversaryThresholdPercentages,
         bytes memory _quorumConfirmationThresholdPercentages,
         bytes memory _quorumNumbersRequired,
-        VersionedBlobParams[] memory _versionedBlobParams,
-        SecurityThresholds memory _defaultSecurityThresholdsV2
+        VersionedBlobParams[] memory _versionedBlobParams
     ) external initializer {
         _transferOwnership(_initialOwner);
 
         quorumAdversaryThresholdPercentages = _quorumAdversaryThresholdPercentages;
         quorumConfirmationThresholdPercentages = _quorumConfirmationThresholdPercentages;
         quorumNumbersRequired = _quorumNumbersRequired;
-        defaultSecurityThresholdsV2 = _defaultSecurityThresholdsV2;
         
         for (uint256 i = 0; i < _versionedBlobParams.length; ++i) {
             _addVersionedBlobParams(_versionedBlobParams[i]);
@@ -76,11 +74,6 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
     }
 
     ///////////////////////// V2 ///////////////////////////////
-
-    /// @notice Gets the default security thresholds for V2
-    function getDefaultSecurityThresholdsV2() external view returns (SecurityThresholds memory) {
-        return defaultSecurityThresholdsV2;
-    }
 
     /// @notice Returns the blob params for a given blob version
     function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {

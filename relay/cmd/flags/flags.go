@@ -7,6 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
+	"github.com/docker/go-units"
 	"github.com/urfave/cli"
 )
 
@@ -34,25 +35,25 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METADATA_TABLE_NAME"),
 	}
-	RelayIDsFlag = cli.IntSliceFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "relay-ids"),
-		Usage:    "Relay IDs to use",
+	RelayKeysFlag = cli.IntSliceFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "relay-keys"),
+		Usage:    "Relay keys to use",
 		Required: true,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RELAY_IDS"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RELAY_KEYS"),
 	}
 	MaxGRPCMessageSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-grpc-message-size"),
 		Usage:    "Max size of a gRPC message in bytes",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_GRPC_MESSAGE_SIZE"),
-		Value:    1024 * 1024 * 300,
+		Value:    4 * units.MiB,
 	}
 	MetadataCacheSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metadata-cache-size"),
 		Usage:    "Max number of items in the metadata cache",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METADATA_CACHE_SIZE"),
-		Value:    1024 * 1024,
+		Value:    units.MiB,
 	}
 	MetadataMaxConcurrencyFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metadata-max-concurrency"),
@@ -66,7 +67,7 @@ var (
 		Usage:    "The size of the blob cache, in bytes.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_CACHE_SIZE"),
-		Value:    1024 * 1024 * 1024,
+		Value:    units.GiB,
 	}
 	BlobMaxConcurrencyFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "blob-max-concurrency"),
@@ -75,12 +76,12 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BLOB_MAX_CONCURRENCY"),
 		Value:    32,
 	}
-	ChunkCacheSizeFlag = cli.Int64Flag{
-		Name:     common.PrefixFlag(FlagPrefix, "chunk-cache-size"),
+	ChunkCacheBytesFlag = cli.Int64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "chunk-cache-bytes"),
 		Usage:    "Size of the chunk cache, in bytes.",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHUNK_CACHE_SIZE"),
-		Value:    4 * 1024 * 1024 * 1024,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHUNK_CACHE_BYTES"),
+		Value:    units.GiB,
 	}
 	ChunkMaxConcurrencyFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "chunk-max-concurrency"),
@@ -115,14 +116,14 @@ var (
 		Usage:    "Max bandwidth for GetBlob operations in bytes per second",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_GET_BLOB_BYTES_PER_SECOND"),
-		Value:    20 * 1024 * 1024,
+		Value:    20 * units.MiB,
 	}
 	GetBlobBytesBurstinessFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "get-blob-bytes-burstiness"),
 		Usage:    "Burstiness of the GetBlob bandwidth rate limiter",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_BLOB_BYTES_BURSTINESS"),
-		Value:    20 * 1024 * 1024,
+		Value:    20 * units.MiB,
 	}
 	MaxConcurrentGetBlobOpsFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-concurrent-get-blob-ops"),
@@ -150,14 +151,14 @@ var (
 		Usage:    "Max bandwidth for GetChunk operations in bytes per second",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_GET_CHUNK_BYTES_PER_SECOND"),
-		Value:    20 * 1024 * 1024,
+		Value:    80 * units.MiB,
 	}
 	GetChunkBytesBurstinessFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "get-chunk-bytes-burstiness"),
 		Usage:    "Burstiness of the GetChunk bandwidth rate limiter",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNK_BYTES_BURSTINESS"),
-		Value:    20 * 1024 * 1024,
+		Value:    800 * units.MiB,
 	}
 	MaxConcurrentGetChunkOpsFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-concurrent-get-chunk-ops"),
@@ -185,14 +186,14 @@ var (
 		Usage:    "Max bandwidth for GetChunk operations in bytes per second per client",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_GET_CHUNK_BYTES_PER_SECOND_CLIENT"),
-		Value:    2 * 1024 * 1024,
+		Value:    40 * units.MiB,
 	}
 	GetChunkBytesBurstinessClientFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "get-chunk-bytes-burstiness-client"),
 		Usage:    "Burstiness of the GetChunk bandwidth rate limiter per client",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNK_BYTES_BURSTINESS_CLIENT"),
-		Value:    2 * 1024 * 1024,
+		Value:    400 * units.MiB,
 	}
 	MaxConcurrentGetChunkOpsClientFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "max-concurrent-get-chunk-ops-client"),
@@ -225,7 +226,7 @@ var (
 		Usage:    "Duration to keep authentication results",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTHENTICATION_TIMEOUT"),
-		Value:    5 * time.Minute,
+		Value:    0, // TODO(cody-littley) remove this feature
 	}
 	AuthenticationDisabledFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "authentication-disabled"),
@@ -289,15 +290,49 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METRICS_PORT"),
 		Value:    9101,
 	}
+	EnableMetricsFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-metrics"),
+		Usage:    "Enable prometheus metrics collection",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
+	}
+	EnablePprofFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-pprof"),
+		Usage:    "Enable pprof profiling",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_PPROF"),
+	}
+	PprofHttpPortFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "pprof-port"),
+		Usage:    "Port to listen on for pprof",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PPROF_PORT"),
+		Value:    6060,
+	}
+	GetChunksRequestMaxPastAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-request-max-past-age"),
+		Usage:    "Max age of a GetChunks request",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNKS_REQUEST_MAX_PAST_AGE"),
+		Value:    5 * time.Minute,
+	}
+	GetChunksRequestMaxFutureAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-request-max-future-age"),
+		Usage:    "Max future age of a GetChunks request",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNKS_REQUEST_MAX_FUTURE_AGE"),
+		Value:    5 * time.Minute,
+	}
 )
 
 var requiredFlags = []cli.Flag{
 	GRPCPortFlag,
 	BucketNameFlag,
 	MetadataTableNameFlag,
-	RelayIDsFlag,
+	RelayKeysFlag,
 	BlsOperatorStateRetrieverAddrFlag,
 	EigenDAServiceManagerAddrFlag,
+	EnableMetricsFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -306,7 +341,7 @@ var optionalFlags = []cli.Flag{
 	MetadataMaxConcurrencyFlag,
 	BlobCacheBytes,
 	BlobMaxConcurrencyFlag,
-	ChunkCacheSizeFlag,
+	ChunkCacheBytesFlag,
 	ChunkMaxConcurrencyFlag,
 	MaxKeysPerGetChunksRequestFlag,
 	MaxGetBlobOpsPerSecondFlag,
@@ -335,6 +370,10 @@ var optionalFlags = []cli.Flag{
 	InternalGetCoefficientsTimeoutFlag,
 	OnchainStateRefreshIntervalFlag,
 	MetricsPortFlag,
+	EnablePprofFlag,
+	PprofHttpPortFlag,
+	GetChunksRequestMaxPastAgeFlag,
+	GetChunksRequestMaxFutureAgeFlag,
 }
 
 var Flags []cli.Flag

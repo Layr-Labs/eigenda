@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity =0.8.12;
 
-import {EmptyContract} from "eigenlayer-core/test/mocks/EmptyContract.sol";
-import {EjectionManager} from "eigenlayer-middleware/EjectionManager.sol";
-import {IEjectionManager} from "eigenlayer-middleware/interfaces/IEjectionManager.sol";
-import {RegistryCoordinator} from "eigenlayer-middleware/RegistryCoordinator.sol";
-import {IRegistryCoordinator} from "eigenlayer-middleware/interfaces/IRegistryCoordinator.sol";
-import {StakeRegistry} from "eigenlayer-middleware/StakeRegistry.sol";
-import {IStakeRegistry} from "eigenlayer-middleware/interfaces/IStakeRegistry.sol";
+import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
+import {EjectionManager} from "../lib/eigenlayer-middleware/src/EjectionManager.sol";
+import {IEjectionManager} from "../lib/eigenlayer-middleware/src/interfaces/IEjectionManager.sol";
+import {RegistryCoordinator} from "../lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {IRegistryCoordinator} from "../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {StakeRegistry} from "../lib/eigenlayer-middleware/src/StakeRegistry.sol";
+import {IStakeRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
 import "forge-std/Test.sol";

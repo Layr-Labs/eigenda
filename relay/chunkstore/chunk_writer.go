@@ -9,18 +9,17 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
 // ChunkWriter writes chunks that can be read by ChunkReader.
 type ChunkWriter interface {
-	// PutChunkProofs writes a slice of proofs to the chunk store.
-	PutChunkProofs(ctx context.Context, blobKey corev2.BlobKey, proofs []*encoding.Proof) error
-	// PutChunkCoefficients writes a slice of frames to the chunk store.
-	PutChunkCoefficients(
+	// PutFrameProofs writes a slice of proofs to the chunk store.
+	PutFrameProofs(ctx context.Context, blobKey corev2.BlobKey, proofs []*encoding.Proof) error
+	// PutFrameCoefficients writes a slice of frames to the chunk store.
+	PutFrameCoefficients(
 		ctx context.Context,
 		blobKey corev2.BlobKey,
-		frames []*rs.Frame) (*encoding.FragmentInfo, error)
+		frames []rs.FrameCoeffs) (*encoding.FragmentInfo, error)
 	// ProofExists checks if the proofs for the blob key exist in the chunk store.
 	ProofExists(ctx context.Context, blobKey corev2.BlobKey) bool
 	// CoefficientsExists checks if the coefficients for the blob key exist in the chunk store.
@@ -52,18 +51,17 @@ func NewChunkWriter(
 	}
 }
 
-func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey corev2.BlobKey, proofs []*encoding.Proof) error {
+func (c *chunkWriter) PutFrameProofs(ctx context.Context, blobKey corev2.BlobKey, proofs []*encoding.Proof) error {
 	if len(proofs) == 0 {
 		return fmt.Errorf("no proofs to upload")
 	}
 
-	bytes := make([]byte, 0, bn254.SizeOfG1AffineCompressed*len(proofs))
-	for _, proof := range proofs {
-		proofBytes := proof.Bytes()
-		bytes = append(bytes, proofBytes[:]...)
+	bytes, err := rs.SerializeFrameProofs(proofs)
+	if err != nil {
+		c.logger.Error("Failed to encode proofs", "err", err)
+		return fmt.Errorf("failed to encode proofs: %v", err)
 	}
-
-	err := c.s3Client.UploadObject(ctx, c.bucketName, s3.ScopedProofKey(blobKey), bytes)
+	err = c.s3Client.UploadObject(ctx, c.bucketName, s3.ScopedProofKey(blobKey), bytes)
 	if err != nil {
 		c.logger.Errorf("Failed to upload chunk proofs to S3: %v", err)
 		return fmt.Errorf("failed to upload chunk proofs to S3: %v", err)
@@ -72,14 +70,14 @@ func (c *chunkWriter) PutChunkProofs(ctx context.Context, blobKey corev2.BlobKey
 	return nil
 }
 
-func (c *chunkWriter) PutChunkCoefficients(
+func (c *chunkWriter) PutFrameCoefficients(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
-	frames []*rs.Frame) (*encoding.FragmentInfo, error) {
+	frames []rs.FrameCoeffs) (*encoding.FragmentInfo, error) {
 	if len(frames) == 0 {
 		return nil, fmt.Errorf("no frames to upload")
 	}
-	bytes, err := rs.GnarkEncodeFrames(frames)
+	bytes, err := rs.SerializeFrameCoeffsSlice(frames)
 	if err != nil {
 		c.logger.Error("Failed to encode frames", "err", err)
 		return nil, fmt.Errorf("failed to encode frames: %v", err)

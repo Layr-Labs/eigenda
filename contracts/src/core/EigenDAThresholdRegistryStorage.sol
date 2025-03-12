@@ -26,10 +26,7 @@ abstract contract EigenDAThresholdRegistryStorage is IEigenDAThresholdRegistry {
     /// @notice mapping of blob version id to the params of the blob version
     mapping(uint16 => VersionedBlobParams) public versionedBlobParams;
 
-    /// @notice Default security thresholds for quorums
-    SecurityThresholds public defaultSecurityThresholdsV2;
-
     // storage gap for upgradeability
     // slither-disable-next-line shadowing-state
-    uint256[44] private __GAP;
+    uint256[45] private __GAP;
 }

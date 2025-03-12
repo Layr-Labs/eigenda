@@ -2,11 +2,12 @@ package deploy
 
 import (
 	"encoding/json"
-	"github.com/ethereum/go-ethereum/common"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/ethereum/go-ethereum/common"
 
 	"gopkg.in/yaml.v3"
 )
@@ -104,7 +105,7 @@ type EigenDAContract struct {
 	OperatorStateRetreiver string `json:"operatorStateRetriever"`
 	BlsApkRegistry         string `json:"blsApkRegistry"`
 	RegistryCoordinator    string `json:"registryCoordinator"`
-	BlobVerifier           string `json:"blobVerifier"`
+	CertVerifier           string `json:"certVerifier"`
 }
 
 type Stakes struct {

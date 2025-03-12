@@ -30,13 +30,14 @@ COPY encoding /app/encoding
 COPY relay /app/relay
 
 # Define Icicle versions and checksums
-ENV ICICLE_VERSION=3.1.0
-ENV ICICLE_BASE_SHA256=2e4e33b8bc3e335b2dd33dcfb10a9aaa18717885509614a24f492f47a2e4f4b1
-ENV ICICLE_CUDA_SHA256=cdba907eac6297445a6c128081ebba5c711d352003f69310145406a8fd781647
+ENV ICICLE_VERSION=3.4
+ENV ICICLE_BASE_SHA256=e3eec1d5fca0e4ba52e09630dc360eb5f1c1d54b3bb1834eeef1624c2f7f4c48
+ENV ICICLE_CUDA_SHA256=090bdf255b1beab05efa7eb2e67d50481c0c6f57beda969356e71bd11bb39f17
 
 # Download Icicle tarballs
-ADD https://github.com/ingonyama-zk/icicle/releases/download/v${ICICLE_VERSION}/icicle_${ICICLE_VERSION//./_}-ubuntu22.tar.gz /tmp/icicle.tar.gz
-ADD https://github.com/ingonyama-zk/icicle/releases/download/v${ICICLE_VERSION}/icicle_${ICICLE_VERSION//./_}-ubuntu22-cuda122.tar.gz /tmp/icicle-cuda.tar.gz
+# https://github.com/ingonyama-zk/icicle/releases/download/v3.4.0/icicle_3_4-ubuntu22-cuda122.tar.gz
+ADD https://github.com/ingonyama-zk/icicle/releases/download/v${ICICLE_VERSION}.0/icicle_${ICICLE_VERSION//./_}-ubuntu22.tar.gz /tmp/icicle.tar.gz
+ADD https://github.com/ingonyama-zk/icicle/releases/download/v${ICICLE_VERSION}.0/icicle_${ICICLE_VERSION//./_}-ubuntu22-cuda122.tar.gz /tmp/icicle-cuda.tar.gz
 
 # Verify checksums and install Icicle
 RUN echo "${ICICLE_BASE_SHA256} /tmp/icicle.tar.gz" | sha256sum -c - && \

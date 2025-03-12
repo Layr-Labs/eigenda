@@ -2,6 +2,7 @@ package rs
 
 import (
 	"errors"
+	"fmt"
 	"math"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -10,38 +11,55 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
-// ToFrArray deserializes a byte array into a list of bn254 field elements.,
-// where each 32-byte chunk needs to be a big-endian serialized bn254 field element.
-// The last chunk is allowed to not have 32-bytes, and will be padded with zeroes
-// on the right (so make sure that the last partial chunk represents a valid field element
-// when padded with zeroes on the right and interpreted as big-endian).
+// ToFrArray accept a byte array as an input, and converts it to an array of field elements
 //
-// TODO: we should probably just force the data to be a multiple of 32 bytes.
-// This would make the API and code simpler to read, and also allow the code
-// to be auto-vectorized by the compiler (it probably isn't right now given the if inside the for loop).
-func ToFrArray(data []byte) ([]fr.Element, error) {
-	numEle := GetNumElement(uint64(len(data)), encoding.BYTES_PER_SYMBOL)
-	eles := make([]fr.Element, numEle)
+// TODO (litt3): it would be nice to rename this to "DeserializeFieldElements", as the counterpart to "SerializeFieldElements",
+//  but doing so would be a very large diff. I'm leaving this comment as a potential future cleanup.
+func ToFrArray(inputData []byte) ([]fr.Element, error) {
+	bytes := padToBytesPerSymbol(inputData)
 
-	for i := uint64(0); i < numEle; i++ {
-		start := i * uint64(encoding.BYTES_PER_SYMBOL)
-		end := (i + 1) * uint64(encoding.BYTES_PER_SYMBOL)
-		if end >= uint64(len(data)) {
-			padded := make([]byte, encoding.BYTES_PER_SYMBOL)
-			copy(padded, data[start:])
-			err := eles[i].SetBytesCanonical(padded)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			err := eles[i].SetBytesCanonical(data[start:end])
-			if err != nil {
-				return nil, err
-			}
+	elementCount := len(bytes) / encoding.BYTES_PER_SYMBOL
+	outputElements := make([]fr.Element, elementCount)
+	for i := 0; i < elementCount; i++ {
+		destinationStartIndex := i * encoding.BYTES_PER_SYMBOL
+		destinationEndIndex := destinationStartIndex + encoding.BYTES_PER_SYMBOL
+
+		err := outputElements[i].SetBytesCanonical(bytes[destinationStartIndex:destinationEndIndex])
+		if err != nil {
+			return nil, fmt.Errorf("fr set bytes canonical: %w", err)
 		}
 	}
 
-	return eles, nil
+	return outputElements, nil
+}
+
+// SerializeFieldElements accepts an array of field elements, and serializes it to an array of bytes
+func SerializeFieldElements(fieldElements []fr.Element) []byte {
+	outputBytes := make([]byte, len(fieldElements)*encoding.BYTES_PER_SYMBOL)
+
+	for i := 0; i < len(fieldElements); i++ {
+		destinationStartIndex := i * encoding.BYTES_PER_SYMBOL
+		destinationEndIndex := destinationStartIndex + encoding.BYTES_PER_SYMBOL
+
+		fieldElementBytes := fieldElements[i].Bytes()
+
+		copy(outputBytes[destinationStartIndex:destinationEndIndex], fieldElementBytes[:])
+	}
+
+	return outputBytes
+}
+
+// padToBytesPerSymbol accepts input bytes, and returns the bytes padded to a multiple of encoding.BYTES_PER_SYMBOL
+func padToBytesPerSymbol(inputBytes []byte) []byte {
+	remainder := len(inputBytes) % encoding.BYTES_PER_SYMBOL
+
+	if remainder == 0 {
+		// no padding necessary, since bytes are already a multiple of BYTES_PER_SYMBOL
+		return inputBytes
+	} else {
+		necessaryPadding := encoding.BYTES_PER_SYMBOL - remainder
+		return append(inputBytes, make([]byte, necessaryPadding)...)
+	}
 }
 
 // ToByteArray serializes a slice of fields elements to a slice of bytes.

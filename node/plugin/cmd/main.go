@@ -105,7 +105,7 @@ func pluginOps(ctx *cli.Context) {
 
 	sk, privateKey, err := plugin.GetECDSAPrivateKey(config.EcdsaKeyFile, config.EcdsaKeyPassword)
 	if err != nil {
-		log.Printf("Error: failed to read or decrypt the ECDSA private key: %v", err)
+		log.Printf("Error: failed to read or decrypt the ECDSA from file (%s) for private key: %v", config.EcdsaKeyFile, err)
 		return
 	}
 	log.Printf("Info: ECDSA key read and decrypted from %s", config.EcdsaKeyFile)
@@ -135,7 +135,7 @@ func pluginOps(ctx *cli.Context) {
 		return
 	}
 
-	_, dispersalPort, retrievalPort, err := core.ParseOperatorSocket(config.Socket)
+	_, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, err := core.ParseOperatorSocket(config.Socket)
 	if err != nil {
 		log.Printf("Error: failed to parse operator socket: %v", err)
 		return
@@ -143,8 +143,8 @@ func pluginOps(ctx *cli.Context) {
 
 	socket := config.Socket
 	if isLocalhost(socket) {
-		pubIPProvider := pubip.ProviderOrDefault(config.PubIPProvider)
-		socket, err = node.SocketAddress(context.Background(), pubIPProvider, dispersalPort, retrievalPort)
+		pubIPProvider := pubip.ProviderOrDefault(logger, config.PubIPProvider)
+		socket, err = node.SocketAddress(context.Background(), pubIPProvider, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort)
 		if err != nil {
 			log.Printf("Error: failed to get socket address from ip provider: %v", err)
 			return

@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core"
+
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -19,9 +21,9 @@ type chunkProvider struct {
 	ctx    context.Context
 	logger logging.Logger
 
-	// metadataCache is an LRU cache of blob metadata. Each relay is authorized to serve data assigned to one or more
-	// relay IDs. Blobs that do not belong to one of the relay IDs assigned to this server will not be in the cache.
-	frameCache cache.CacheAccessor[blobKeyWithMetadata, []*encoding.Frame]
+	// frameCache contains encoding.Frame objects in a serialized form. This is much more memory efficient than
+	// storing the frames in their parsed form. These frames can be deserialized via rs.DeserializeBinaryFrame().
+	frameCache cache.CacheAccessor[blobKeyWithMetadata, *core.ChunksData]
 
 	// chunkReader is used to read chunks from the chunk store.
 	chunkReader chunkstore.ChunkReader
@@ -62,26 +64,26 @@ func newChunkProvider(
 		coefficientFetchTimeout: coefficientFetchTimeout,
 	}
 
-	cacheAccessor, err := cache.NewCacheAccessor[blobKeyWithMetadata, []*encoding.Frame](
-		cache.NewFIFOCache[blobKeyWithMetadata, []*encoding.Frame](cacheSize, computeFramesCacheWeight),
+	var err error
+	server.frameCache, err = cache.NewCacheAccessor[blobKeyWithMetadata, *core.ChunksData](
+		cache.NewFIFOCache[blobKeyWithMetadata, *core.ChunksData](cacheSize, server.computeFramesCacheWeight),
 		maxIOConcurrency,
 		server.fetchFrames,
 		metrics)
 	if err != nil {
 		return nil, err
 	}
-	server.frameCache = cacheAccessor
 
 	return server, nil
 }
 
-// frameMap is a map of blob keys to frames.
-type frameMap map[v2.BlobKey][]*encoding.Frame
+// frameMap is a map of blob keys to binary frames.
+type frameMap map[v2.BlobKey]*core.ChunksData
 
 // computeFramesCacheWeight computes the 'weight' of the frames for the cache. The weight of a list of frames
 // is equal to the size required to store the data, in bytes.
-func computeFramesCacheWeight(key blobKeyWithMetadata, frames []*encoding.Frame) uint64 {
-	return uint64(len(frames)) * uint64(key.metadata.chunkSizeBytes)
+func (s *chunkProvider) computeFramesCacheWeight(_ blobKeyWithMetadata, frames *core.ChunksData) uint64 {
+	return frames.Size()
 }
 
 // GetFrames retrieves the frames for a blob.
@@ -98,7 +100,7 @@ func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameM
 
 	type framesResult struct {
 		key  v2.BlobKey
-		data []*encoding.Frame
+		data *core.ChunksData
 		err  error
 	}
 
@@ -139,12 +141,12 @@ func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameM
 }
 
 // fetchFrames retrieves the frames for a single blob.
-func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) ([]*encoding.Frame, error) {
+func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) (*core.ChunksData, error) {
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	var proofs []*encoding.Proof
+	var proofs [][]byte
 	var proofsErr error
 
 	go func() {
@@ -154,7 +156,7 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) ([]*encoding.Frame,
 			cancel()
 		}()
 
-		proofs, proofsErr = s.chunkReader.GetChunkProofs(ctx, key.blobKey)
+		proofs, proofsErr = s.chunkReader.GetBinaryChunkProofs(ctx, key.blobKey)
 	}()
 
 	fragmentInfo := &encoding.FragmentInfo{
@@ -165,7 +167,7 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) ([]*encoding.Frame,
 	ctx, cancel := context.WithTimeout(s.ctx, s.coefficientFetchTimeout)
 	defer cancel()
 
-	coefficients, err := s.chunkReader.GetChunkCoefficients(ctx, key.blobKey, fragmentInfo)
+	elementCount, coefficients, err := s.chunkReader.GetBinaryChunkCoefficients(ctx, key.blobKey, fragmentInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -175,27 +177,10 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) ([]*encoding.Frame,
 		return nil, proofsErr
 	}
 
-	frames, err := assembleFrames(coefficients, proofs)
+	frames, err := rs.BuildChunksData(proofs, int(elementCount), coefficients)
 	if err != nil {
 		return nil, err
 	}
 
 	return frames, nil
-}
-
-// assembleFrames assembles a slice of frames from its composite proofs and coefficients.
-func assembleFrames(frames []*rs.Frame, proofs []*encoding.Proof) ([]*encoding.Frame, error) {
-	if len(frames) != len(proofs) {
-		return nil, fmt.Errorf("number of frames and proofs must be equal (%d != %d)", len(frames), len(proofs))
-	}
-
-	assembledFrames := make([]*encoding.Frame, len(frames))
-	for i := range frames {
-		assembledFrames[i] = &encoding.Frame{
-			Proof:  *proofs[i],
-			Coeffs: frames[i].Coeffs,
-		}
-	}
-
-	return assembledFrames, nil
 }

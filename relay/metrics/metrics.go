@@ -36,14 +36,16 @@ type RelayMetrics struct {
 	getChunksAuthFailures          *prometheus.CounterVec
 	getChunksRateLimited           *prometheus.CounterVec
 	getChunksKeyCount              *prometheus.GaugeVec
-	getChunksDataSize              *prometheus.GaugeVec
+	getChunksBandwidth             *prometheus.CounterVec
+	getChunksRequestedBandwidth    *prometheus.CounterVec
 
 	// GetBlob metrics
-	getBlobLatency         *prometheus.SummaryVec
-	getBlobMetadataLatency *prometheus.SummaryVec
-	getBlobDataLatency     *prometheus.SummaryVec
-	getBlobRateLimited     *prometheus.CounterVec
-	getBlobDataSize        *prometheus.GaugeVec
+	getBlobLatency            *prometheus.SummaryVec
+	getBlobMetadataLatency    *prometheus.SummaryVec
+	getBlobDataLatency        *prometheus.SummaryVec
+	getBlobRateLimited        *prometheus.CounterVec
+	getBlobBandwidth          *prometheus.CounterVec
+	getBlobRequestedBandwidth *prometheus.CounterVec
 }
 
 // NewRelayMetrics creates a new RelayMetrics instance, which encapsulates all metrics related to the relay.
@@ -144,11 +146,20 @@ func NewRelayMetrics(logger logging.Logger, port int) *RelayMetrics {
 		[]string{},
 	)
 
-	getChunksDataSize := promauto.With(registry).NewGaugeVec(
-		prometheus.GaugeOpts{
+	getChunksBandwidth := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      "get_chunks_data_size_bytes",
-			Help:      "Data size in a GetChunks request.",
+			Name:      "get_chunks_bandwidth_bytes",
+			Help:      "Running total bandwidth used in GetChunks requests.",
+		},
+		[]string{},
+	)
+
+	getChunksRequestedBandwidth := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "get_chunks_requested_bandwidth_bytes",
+			Help:      "Running total requested bandwidth in GetChunks requests (prior to throttling).",
 		},
 		[]string{},
 	)
@@ -192,11 +203,20 @@ func NewRelayMetrics(logger logging.Logger, port int) *RelayMetrics {
 		[]string{"reason"},
 	)
 
-	getBlobDataSize := promauto.With(registry).NewGaugeVec(
-		prometheus.GaugeOpts{
+	getBlobBandwidth := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      "get_blob_data_size_bytes",
-			Help:      "Data size of requested blobs.",
+			Name:      "get_blob_bandwidth_bytes",
+			Help:      "Running total bandwidth used in GetBlob requests.",
+		},
+		[]string{},
+	)
+
+	getBlobRequestedBandwidth := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Name:      "get_blob_requested_bandwidth_bytes",
+			Help:      "Running total requested bandwidth in GetBlob requests (prior to throttling).",
 		},
 		[]string{},
 	)
@@ -215,12 +235,14 @@ func NewRelayMetrics(logger logging.Logger, port int) *RelayMetrics {
 		getChunksAuthFailures:          getChunksAuthFailures,
 		getChunksRateLimited:           getChunksRateLimited,
 		getChunksKeyCount:              getChunksKeyCount,
-		getChunksDataSize:              getChunksDataSize,
+		getChunksBandwidth:             getChunksBandwidth,
+		getChunksRequestedBandwidth:    getChunksRequestedBandwidth,
 		getBlobLatency:                 getBlobLatency,
 		getBlobMetadataLatency:         getBlobMetadataLatency,
 		getBlobDataLatency:             getBlobDataLatency,
 		getBlobRateLimited:             getBlobRateLimited,
-		getBlobDataSize:                getBlobDataSize,
+		getBlobBandwidth:               getBlobBandwidth,
+		getBlobRequestedBandwidth:      getBlobRequestedBandwidth,
 	}
 }
 
@@ -272,8 +294,12 @@ func (m *RelayMetrics) ReportChunkKeyCount(count int) {
 	m.getChunksKeyCount.WithLabelValues().Set(float64(count))
 }
 
-func (m *RelayMetrics) ReportChunkDataSize(size int) {
-	m.getChunksDataSize.WithLabelValues().Set(float64(size))
+func (m *RelayMetrics) ReportGetChunksBandwidthUsage(size uint32) {
+	m.getChunksBandwidth.WithLabelValues().Add(float64(size))
+}
+
+func (m *RelayMetrics) ReportGetChunksRequestedBandwidthUsage(size uint32) {
+	m.getChunksRequestedBandwidth.WithLabelValues().Add(float64(size))
 }
 
 func (m *RelayMetrics) ReportBlobLatency(duration time.Duration) {
@@ -292,6 +318,10 @@ func (m *RelayMetrics) ReportBlobRateLimited(reason string) {
 	m.getBlobRateLimited.WithLabelValues(reason).Inc()
 }
 
-func (m *RelayMetrics) ReportBlobDataSize(size int) {
-	m.getBlobDataSize.WithLabelValues().Set(float64(size))
+func (m *RelayMetrics) ReportBlobBandwidthUsage(size int) {
+	m.getBlobBandwidth.WithLabelValues().Add(float64(size))
+}
+
+func (m *RelayMetrics) ReportBlobRequestedBandwidthUsage(size int) {
+	m.getBlobRequestedBandwidth.WithLabelValues().Add(float64(size))
 }

@@ -6,13 +6,15 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"time"
 
-	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
+	commonpbv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -20,7 +22,7 @@ type AccountID = string
 
 // Security and Quorum Parameters
 
-// QuorumID is a unique identifier for a quorum; initially EigenDA wil support upt to 256 quorums
+// QuorumID is a unique identifier for a quorum; initially EigenDA will support up to 256 quorums
 type QuorumID = uint8
 
 // SecurityParam contains the quorum ID and the adversary threshold for the quorum;
@@ -360,6 +362,13 @@ func (b Bundle) Size() uint64 {
 	return size
 }
 
+// BinaryBundleHeader returns the header of a bundle in binary format.
+func BinaryBundleHeader(elementCount uint64) uint64 {
+	header := uint64(GnarkBundleEncodingFormat) << (NumBundleHeaderBits - NumBundleEncodingFormatBits)
+	header |= elementCount
+	return header
+}
+
 // Serialize returns the serialized bytes of the bundle.
 //
 // The bytes are packed in this format:
@@ -389,7 +398,7 @@ func (b Bundle) Serialize() ([]byte, error) {
 	}
 	result := make([]byte, size+8)
 	buf := result
-	metadata := (uint64(GnarkBundleEncodingFormat) << (NumBundleHeaderBits - NumBundleEncodingFormatBits)) | uint64(len(b[0].Coeffs))
+	metadata := BinaryBundleHeader(uint64(len(b[0].Coeffs)))
 	binary.LittleEndian.PutUint64(buf, metadata)
 	buf = buf[8:]
 	for _, f := range b {
@@ -488,15 +497,12 @@ func (cb Bundles) FromEncodedBundles(eb EncodedBundles) (Bundles, error) {
 // PaymentMetadata represents the header information for a blob
 type PaymentMetadata struct {
 	// AccountID is the ETH account address for the payer
-	AccountID string `json:"account_id"`
+	AccountID gethcommon.Address `json:"account_id"`
 
-	// ReservationPeriod represents the range of time at which the dispersal is made
-	ReservationPeriod uint32 `json:"reservation_period"`
-	// TODO: we are thinking the contract can use uint128 for cumulative payment,
-	// but the definition on v2 uses uint64. Double check with team.
+	// Timestamp represents the nanosecond of the dispersal request creation
+	Timestamp int64 `json:"timestamp"`
+	// CumulativePayment represents the total amount of payment (in wei) made by the user up to this point
 	CumulativePayment *big.Int `json:"cumulative_payment"`
-	// Allow same blob to be dispersed multiple times within the same reservation period
-	Salt uint32 `json:"salt"`
 }
 
 // Hash returns the Keccak256 hash of the PaymentMetadata
@@ -510,16 +516,12 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 			Type: "string",
 		},
 		{
-			Name: "reservationPeriod",
-			Type: "uint32",
+			Name: "timestamp",
+			Type: "int64",
 		},
 		{
 			Name: "cumulativePayment",
 			Type: "uint256",
-		},
-		{
-			Name: "salt",
-			Type: "uint32",
 		},
 	})
 	if err != nil {
@@ -532,7 +534,17 @@ func (pm *PaymentMetadata) Hash() ([32]byte, error) {
 		},
 	}
 
-	bytes, err := arguments.Pack(pm)
+	s := struct {
+		AccountID         string
+		Timestamp         int64
+		CumulativePayment *big.Int
+	}{
+		AccountID:         pm.AccountID.Hex(),
+		Timestamp:         pm.Timestamp,
+		CumulativePayment: pm.CumulativePayment,
+	}
+
+	bytes, err := arguments.Pack(s)
 	if err != nil {
 		return [32]byte{}, err
 	}
@@ -552,12 +564,11 @@ func (pm *PaymentMetadata) MarshalDynamoDBAttributeValue() (types.AttributeValue
 
 	return &types.AttributeValueMemberM{
 		Value: map[string]types.AttributeValue{
-			"AccountID":         &types.AttributeValueMemberS{Value: pm.AccountID},
-			"ReservationPeriod": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.ReservationPeriod)},
+			"AccountID": &types.AttributeValueMemberS{Value: pm.AccountID.Hex()},
+			"Timestamp": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.Timestamp)},
 			"CumulativePayment": &types.AttributeValueMemberN{
 				Value: pm.CumulativePayment.String(),
 			},
-			"Salt": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", pm.Salt)},
 		},
 	}, nil
 }
@@ -567,45 +578,54 @@ func (pm *PaymentMetadata) UnmarshalDynamoDBAttributeValue(av types.AttributeVal
 	if !ok {
 		return fmt.Errorf("expected *types.AttributeValueMemberM, got %T", av)
 	}
-	pm.AccountID = m.Value["AccountID"].(*types.AttributeValueMemberS).Value
-	reservationPeriod, err := strconv.ParseUint(m.Value["ReservationPeriod"].(*types.AttributeValueMemberN).Value, 10, 32)
-	if err != nil {
-		return fmt.Errorf("failed to parse ReservationPeriod: %w", err)
+	accountID, ok := m.Value["AccountID"].(*types.AttributeValueMemberS)
+	if !ok {
+		return fmt.Errorf("expected *types.AttributeValueMemberS for AccountID, got %T", m.Value["AccountID"])
 	}
-	pm.ReservationPeriod = uint32(reservationPeriod)
-	pm.CumulativePayment, _ = new(big.Int).SetString(m.Value["CumulativePayment"].(*types.AttributeValueMemberN).Value, 10)
-	salt, err := strconv.ParseUint(m.Value["Salt"].(*types.AttributeValueMemberN).Value, 10, 32)
-	if err != nil {
-		return fmt.Errorf("failed to parse Salt: %w", err)
+	pm.AccountID = gethcommon.HexToAddress(accountID.Value)
+	rp, ok := m.Value["Timestamp"].(*types.AttributeValueMemberN)
+	if !ok {
+		return fmt.Errorf("expected *types.AttributeValueMemberN for Timestamp, got %T", m.Value["Timestamp"])
 	}
-	pm.Salt = uint32(salt)
+	timestamp, err := strconv.ParseInt(rp.Value, 10, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse Timestamp: %w", err)
+	}
+	pm.Timestamp = timestamp
+	cp, ok := m.Value["CumulativePayment"].(*types.AttributeValueMemberN)
+	if !ok {
+		return fmt.Errorf("expected *types.AttributeValueMemberN for CumulativePayment, got %T", m.Value["CumulativePayment"])
+	}
+	pm.CumulativePayment, _ = new(big.Int).SetString(cp.Value, 10)
 	return nil
 }
 
-func (pm *PaymentMetadata) ToProtobuf() *commonpb.PaymentHeader {
+func (pm *PaymentMetadata) ToProtobuf() *commonpbv2.PaymentHeader {
 	if pm == nil {
 		return nil
 	}
-	return &commonpb.PaymentHeader{
-		AccountId:         pm.AccountID,
-		ReservationPeriod: pm.ReservationPeriod,
+	return &commonpbv2.PaymentHeader{
+		AccountId:         pm.AccountID.Hex(),
+		Timestamp:         pm.Timestamp,
 		CumulativePayment: pm.CumulativePayment.Bytes(),
-		Salt:              pm.Salt,
 	}
 }
 
 // ConvertToProtoPaymentHeader converts a PaymentMetadata to a protobuf payment header
-func ConvertToPaymentMetadata(ph *commonpb.PaymentHeader) *PaymentMetadata {
+func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) (*PaymentMetadata, error) {
 	if ph == nil {
-		return nil
+		return nil, nil
+	}
+
+	if !gethcommon.IsHexAddress(ph.AccountId) {
+		return nil, fmt.Errorf("invalid account ID: %s", ph.AccountId)
 	}
 
 	return &PaymentMetadata{
-		AccountID:         ph.AccountId,
-		ReservationPeriod: ph.ReservationPeriod,
+		AccountID:         gethcommon.HexToAddress(ph.AccountId),
+		Timestamp:         ph.Timestamp,
 		CumulativePayment: new(big.Int).SetBytes(ph.CumulativePayment),
-		Salt:              ph.Salt,
-	}
+	}, nil
 }
 
 // ReservedPayment contains information the onchain state about a reserved payment
@@ -637,4 +657,10 @@ type BlobVersionParameters struct {
 // IsActive returns true if the reservation is active at the given timestamp
 func (ar *ReservedPayment) IsActive(currentTimestamp uint64) bool {
 	return ar.StartTimestamp <= currentTimestamp && ar.EndTimestamp >= currentTimestamp
+}
+
+// IsActive returns true if the reservation is active at the given timestamp
+func (ar *ReservedPayment) IsActiveByNanosecond(currentTimestamp int64) bool {
+	timestamp := uint64((time.Duration(currentTimestamp) * time.Nanosecond).Seconds())
+	return ar.StartTimestamp <= timestamp && ar.EndTimestamp >= timestamp
 }

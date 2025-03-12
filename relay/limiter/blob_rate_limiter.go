@@ -112,8 +112,13 @@ func (l *BlobRateLimiter) RequestGetBlobBandwidth(now time.Time, bytes uint32) e
 		if l.relayMetrics != nil {
 			l.relayMetrics.ReportBlobRateLimited("global bandwidth")
 		}
-		return fmt.Errorf("global rate limit %dMib/s exceeded for getBlob bandwidth, try again later",
-			int(l.config.MaxGetBlobBytesPerSecond/1024/1024))
+
+		rateLimit := l.config.MaxGetBlobBytesPerSecond / 1024 / 1024
+		burstiness := l.config.GetBlobBytesBurstiness / 1024 / 1024
+
+		return fmt.Errorf(
+			"global rate limit %0.1fMiB/s (burstiness %dMiB) exceeded for getBlob bandwidth, try again later",
+			rateLimit, burstiness)
 	}
 	return nil
 }

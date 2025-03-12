@@ -1,6 +1,6 @@
 // Imports used for compiling for bindings for clients
 
-import "eigenlayer-middleware/OperatorStateRetriever.sol";
-import "eigenlayer-middleware/BLSApkRegistry.sol";
-import "eigenlayer-middleware/RegistryCoordinator.sol";
-import "eigenlayer-middleware/EjectionManager.sol";
+import "../lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
+import "../lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
+import "../lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import "../lib/eigenlayer-middleware/src/EjectionManager.sol";

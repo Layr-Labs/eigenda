@@ -72,7 +72,7 @@ func setup() {
 	if err != nil {
 		panic(err)
 	}
-	_ = testConfig.RegisterBlobVersionAndRelays(ethClient)
+	testConfig.RegisterBlobVersionAndRelays(ethClient)
 
 	fmt.Println("Starting binaries")
 	testConfig.StartBinaries()
@@ -107,7 +107,7 @@ func TestIndexerIntegration(t *testing.T) {
 	err = cs.Start(context.Background())
 	assert.NoError(t, err)
 
-	headerNum, err := cs.GetCurrentBlockNumber()
+	headerNum, err := cs.GetCurrentBlockNumber(context.Background())
 	assert.NoError(t, err)
 
 	state, err := cs.GetIndexedOperatorState(context.Background(), headerNum, quorums)

@@ -8,10 +8,13 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/docker/go-units"
+
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDABlobVerifier"
+	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -30,7 +33,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 		defer cancel()
 
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+		signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+		Expect(err).To(BeNil())
 
 		disp, err := clients.NewDisperserClient(&clients.DisperserClientConfig{
 			Hostname: "localhost",
@@ -49,13 +53,13 @@ var _ = Describe("Inabox v2 Integration", func() {
 		paddedData1 := codec.ConvertByPaddingEmptyByte(data1)
 		paddedData2 := codec.ConvertByPaddingEmptyByte(data2)
 
-		blobStatus1, key1, err := disp.DisperseBlob(ctx, paddedData1, 0, []uint8{0, 1}, 0)
+		blobStatus1, key1, err := disp.DisperseBlob(ctx, paddedData1, 0, []uint8{0, 1})
 		Expect(err).To(BeNil())
 		Expect(key1).To(Not(BeNil()))
 		Expect(blobStatus1).To(Not(BeNil()))
 		Expect(*blobStatus1).To(Equal(dispv2.Queued))
 
-		blobStatus2, key2, err := disp.DisperseBlob(ctx, paddedData2, 0, []uint8{0, 1}, 0)
+		blobStatus2, key2, err := disp.DisperseBlob(ctx, paddedData2, 0, []uint8{0, 1})
 		Expect(err).To(BeNil())
 		Expect(key2).To(Not(BeNil()))
 		Expect(blobStatus2).To(Not(BeNil()))
@@ -72,8 +76,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 		var batchHeader2 *commonpb.BatchHeader
 		var signedBatch1 *disperserpb.SignedBatch
 		var signedBatch2 *disperserpb.SignedBatch
-		var blobVerification1 *disperserpb.BlobVerificationInfo
-		var blobVerification2 *disperserpb.BlobVerificationInfo
+		var blobInclusion1 *disperserpb.BlobInclusionInfo
+		var blobInclusion2 *disperserpb.BlobInclusionInfo
 		for loop := true; loop; {
 			select {
 			case <-ctx.Done():
@@ -91,7 +95,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 				status2, err := dispv2.BlobStatusFromProtobuf(reply2.GetStatus())
 				Expect(err).To(BeNil())
 
-				if status1 != dispv2.Certified || status2 != dispv2.Certified {
+				if status1 != dispv2.Complete || status2 != dispv2.Complete {
 					continue
 				}
 
@@ -107,13 +111,13 @@ var _ = Describe("Inabox v2 Integration", func() {
 				Expect(attestation.ApkG2).To(Not(BeNil()))
 				Expect(len(attestation.QuorumApks)).To(Equal(2))
 				Expect(attestation.QuorumSignedPercentages).To(Equal([]byte{100, 100}))
-				blobVerification1 = reply1.GetBlobVerificationInfo()
-				Expect(blobVerification1).To(Not(BeNil()))
-				Expect(blobVerification1.GetBlobCertificate()).To(Not(BeNil()))
-				blobCert1, err = corev2.BlobCertificateFromProtobuf(blobVerification1.GetBlobCertificate())
+				blobInclusion1 = reply1.GetBlobInclusionInfo()
+				Expect(blobInclusion1).To(Not(BeNil()))
+				Expect(blobInclusion1.GetBlobCertificate()).To(Not(BeNil()))
+				blobCert1, err = corev2.BlobCertificateFromProtobuf(blobInclusion1.GetBlobCertificate())
 				Expect(err).To(BeNil())
-				inclusionProofBytes := blobVerification1.GetInclusionProof()
-				blobIndex := blobVerification1.GetBlobIndex()
+				inclusionProofBytes := blobInclusion1.GetInclusionProof()
+				blobIndex := blobInclusion1.GetBlobIndex()
 				proof, err := core.DeserializeMerkleProof(inclusionProofBytes, uint64(blobIndex))
 				Expect(err).To(BeNil())
 				certHash, err := blobCert1.Hash()
@@ -123,6 +127,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 				verified, err := merkletree.VerifyProofUsing(certHash[:], false, proof, [][]byte{batchHeader1.BatchRoot}, keccak256.New())
 				Expect(err).To(BeNil())
 				Expect(verified).To(BeTrue())
+				Expect(blobCert1.Signature).To(HaveLen(65))
+				Expect(len(blobCert1.RelayKeys)).To((BeNumerically(">", 0)))
 
 				signedBatch2 = reply2.GetSignedBatch()
 				batchHeader2 = signedBatch2.GetHeader()
@@ -140,13 +146,13 @@ var _ = Describe("Inabox v2 Integration", func() {
 				Expect(len(attestation2.QuorumApks)).To(Equal(len(attestation.QuorumApks)))
 				Expect(attestation2.QuorumSignedPercentages).To(Equal(attestation.QuorumSignedPercentages))
 
-				blobVerification2 = reply2.GetBlobVerificationInfo()
-				Expect(blobVerification2).To(Not(BeNil()))
-				Expect(blobVerification2.GetBlobCertificate()).To(Not(BeNil()))
-				blobCert2, err = corev2.BlobCertificateFromProtobuf(blobVerification2.GetBlobCertificate())
+				blobInclusion2 = reply2.GetBlobInclusionInfo()
+				Expect(blobInclusion2).To(Not(BeNil()))
+				Expect(blobInclusion2.GetBlobCertificate()).To(Not(BeNil()))
+				blobCert2, err = corev2.BlobCertificateFromProtobuf(blobInclusion2.GetBlobCertificate())
 				Expect(err).To(BeNil())
-				inclusionProofBytes = blobVerification2.GetInclusionProof()
-				blobIndex = blobVerification2.GetBlobIndex()
+				inclusionProofBytes = blobInclusion2.GetInclusionProof()
+				blobIndex = blobInclusion2.GetBlobIndex()
 				proof, err = core.DeserializeMerkleProof(inclusionProofBytes, uint64(blobIndex))
 				Expect(err).To(BeNil())
 				certHash, err = blobCert2.Hash()
@@ -154,6 +160,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 				verified, err = merkletree.VerifyProofUsing(certHash[:], false, proof, [][]byte{batchHeader2.BatchRoot}, keccak256.New())
 				Expect(err).To(BeNil())
 				Expect(verified).To(BeTrue())
+				Expect(blobCert2.Signature).To(HaveLen(65))
+				Expect(len(blobCert2.RelayKeys)).To((BeNumerically(">", 0)))
 				loop = false
 			}
 		}
@@ -164,13 +172,13 @@ var _ = Describe("Inabox v2 Integration", func() {
 		// test onchain verification
 		attestation, err := convertAttestation(signedBatch1.GetAttestation())
 		Expect(err).To(BeNil())
-		proof, err := convertBlobVerificationInfo(blobVerification1)
+		proof, err := convertBlobInclusionInfo(blobInclusion1)
 		Expect(err).To(BeNil())
 
 		var batchRoot [32]byte
 		copy(batchRoot[:], batchHeader1.BatchRoot)
 
-		err = verifierContract.VerifyBlobV2FromSignedBatch(
+		err = verifierContract.VerifyDACertV2FromSignedBatch(
 			&bind.CallOpts{},
 			verifierbindings.SignedBatch{
 				BatchHeader: verifierbindings.BatchHeaderV2{
@@ -185,10 +193,10 @@ var _ = Describe("Inabox v2 Integration", func() {
 
 		attestation, err = convertAttestation(signedBatch2.GetAttestation())
 		Expect(err).To(BeNil())
-		proof, err = convertBlobVerificationInfo(blobVerification2)
+		proof, err = convertBlobInclusionInfo(blobInclusion2)
 		Expect(err).To(BeNil())
 		copy(batchRoot[:], batchHeader2.BatchRoot)
-		err = verifierContract.VerifyBlobV2FromSignedBatch(
+		err = verifierContract.VerifyDACertV2FromSignedBatch(
 			&bind.CallOpts{},
 			verifierbindings.SignedBatch{
 				BatchHeader: verifierbindings.BatchHeaderV2{
@@ -201,23 +209,32 @@ var _ = Describe("Inabox v2 Integration", func() {
 		)
 		Expect(err).To(BeNil())
 
+		relayClientConfig := &clients.RelayClientConfig{
+			MaxGRPCMessageSize: units.GiB,
+		}
+
+		relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, chainReader.GetRelayRegistryAddress())
+		Expect(err).To(BeNil())
+
 		// Test retrieval from relay
-		relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-			Sockets: relays,
-		}, logger)
+		relayClient, err := clients.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
 		Expect(err).To(BeNil())
 
 		blob1Relays := make(map[corev2.RelayKey]struct{}, 0)
 		blob2Relays := make(map[corev2.RelayKey]struct{}, 0)
 		for _, k := range blobCert1.RelayKeys {
-			blob1Relays[corev2.RelayKey(k)] = struct{}{}
+			blob1Relays[k] = struct{}{}
 		}
 		for _, k := range blobCert2.RelayKeys {
-			blob2Relays[corev2.RelayKey(k)] = struct{}{}
+			blob2Relays[k] = struct{}{}
 		}
-		for relayKey := range relays {
+
+		relayCount, err := relayUrlProvider.GetRelayCount(ctx)
+		Expect(err).To(BeNil())
+
+		for relayKey := uint32(0); relayKey < relayCount; relayKey++ {
 			blob1, err := relayClient.GetBlob(ctx, relayKey, key1)
-			if _, ok := blob1Relays[corev2.RelayKey(relayKey)]; ok {
+			if _, ok := blob1Relays[relayKey]; ok {
 				Expect(err).To(BeNil())
 				Expect(blob1).To(Equal(paddedData1))
 			} else {
@@ -225,7 +242,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 			}
 
 			blob2, err := relayClient.GetBlob(ctx, relayKey, key2)
-			if _, ok := blob2Relays[corev2.RelayKey(relayKey)]; ok {
+			if _, ok := blob2Relays[relayKey]; ok {
 				Expect(err).To(BeNil())
 				Expect(blob2).To(Equal(paddedData2))
 			} else {
@@ -233,28 +250,58 @@ var _ = Describe("Inabox v2 Integration", func() {
 			}
 		}
 
+		blob1Key, err := blobCert1.BlobHeader.BlobKey()
+		Expect(err).To(BeNil())
+
+		blob2Key, err := blobCert2.BlobHeader.BlobKey()
+		Expect(err).To(BeNil())
+
 		// Test retrieval from DA network
-		b, err := retrievalClientV2.GetBlob(ctx, blobCert1.BlobHeader, batchHeader1.ReferenceBlockNumber, 0)
+		b, err := retrievalClientV2.GetBlob(
+			ctx,
+			blob1Key,
+			blobCert1.BlobHeader.BlobVersion,
+			blobCert1.BlobHeader.BlobCommitments,
+			batchHeader1.ReferenceBlockNumber,
+			0)
 		Expect(err).To(BeNil())
 		restored := bytes.TrimRight(b, "\x00")
 		Expect(restored).To(Equal(paddedData1))
-		b, err = retrievalClientV2.GetBlob(ctx, blobCert1.BlobHeader, batchHeader1.ReferenceBlockNumber, 1)
+		b, err = retrievalClientV2.GetBlob(
+			ctx,
+			blob1Key,
+			blobCert1.BlobHeader.BlobVersion,
+			blobCert1.BlobHeader.BlobCommitments,
+			batchHeader1.ReferenceBlockNumber,
+			1)
 		restored = bytes.TrimRight(b, "\x00")
 		Expect(err).To(BeNil())
 		Expect(restored).To(Equal(paddedData1))
-		b, err = retrievalClientV2.GetBlob(ctx, blobCert2.BlobHeader, batchHeader2.ReferenceBlockNumber, 0)
+		b, err = retrievalClientV2.GetBlob(
+			ctx,
+			blob2Key,
+			blobCert2.BlobHeader.BlobVersion,
+			blobCert2.BlobHeader.BlobCommitments,
+			batchHeader2.ReferenceBlockNumber,
+			0)
 		restored = bytes.TrimRight(b, "\x00")
 		Expect(err).To(BeNil())
 		Expect(restored).To(Equal(paddedData2))
-		b, err = retrievalClientV2.GetBlob(ctx, blobCert2.BlobHeader, batchHeader2.ReferenceBlockNumber, 1)
+		b, err = retrievalClientV2.GetBlob(
+			ctx,
+			blob2Key,
+			blobCert2.BlobHeader.BlobVersion,
+			blobCert2.BlobHeader.BlobCommitments,
+			batchHeader2.ReferenceBlockNumber,
+			1)
 		restored = bytes.TrimRight(b, "\x00")
 		Expect(err).To(BeNil())
 		Expect(restored).To(Equal(paddedData2))
 	})
 })
 
-func convertBlobVerificationInfo(verificationInfo *disperserpb.BlobVerificationInfo) (*verifierbindings.BlobVerificationProofV2, error) {
-	blobCertificate, err := corev2.BlobCertificateFromProtobuf(verificationInfo.GetBlobCertificate())
+func convertBlobInclusionInfo(inclusionInfo *disperserpb.BlobInclusionInfo) (*verifierbindings.BlobInclusionInfo, error) {
+	blobCertificate, err := corev2.BlobCertificateFromProtobuf(inclusionInfo.GetBlobCertificate())
 	if err != nil {
 		return nil, err
 	}
@@ -263,8 +310,8 @@ func convertBlobVerificationInfo(verificationInfo *disperserpb.BlobVerificationI
 		return nil, err
 	}
 
-	inclusionProof := verificationInfo.GetInclusionProof()
-	blobIndex := verificationInfo.GetBlobIndex()
+	inclusionProof := inclusionInfo.GetInclusionProof()
+	blobIndex := inclusionInfo.GetBlobIndex()
 
 	commitX := big.NewInt(0)
 	blobCertificate.BlobHeader.BlobCommitments.Commitment.X.BigInt(commitX)
@@ -286,7 +333,7 @@ func convertBlobVerificationInfo(verificationInfo *disperserpb.BlobVerificationI
 	blobCertificate.BlobHeader.BlobCommitments.LengthProof.Y.A0.BigInt(lengthProofY0)
 	lengthProofY1 := big.NewInt(0)
 	blobCertificate.BlobHeader.BlobCommitments.LengthProof.Y.A1.BigInt(lengthProofY1)
-	return &verifierbindings.BlobVerificationProofV2{
+	return &verifierbindings.BlobInclusionInfo{
 		BlobCertificate: verifierbindings.BlobCertificate{
 			BlobHeader: verifierbindings.BlobHeaderV2{
 				Version:       uint16(blobCertificate.BlobHeader.BlobVersion),
@@ -296,18 +343,25 @@ func convertBlobVerificationInfo(verificationInfo *disperserpb.BlobVerificationI
 						X: commitX,
 						Y: commitY,
 					},
+					// Most crypptography library serializes a G2 point by having
+					// A0 followed by A1 for both X, Y field of G2. However, ethereum
+					// precompile assumes an ordering of A1, A0. We choose
+					// to conform with Ethereum order when serializing a blobHeaderV2
+					// for instance, gnark, https://github.com/Consensys/gnark-crypto/blob/de0d77f2b4d520350bc54c612828b19ce2146eee/ecc/bn254/marshal.go#L1078
+					// Ethereum, https://eips.ethereum.org/EIPS/eip-197#definition-of-the-groups
 					LengthCommitment: verifierbindings.BN254G2Point{
-						X: [2]*big.Int{lengthCommitX0, lengthCommitX1},
-						Y: [2]*big.Int{lengthCommitY0, lengthCommitY1},
+						X: [2]*big.Int{lengthCommitX1, lengthCommitX0},
+						Y: [2]*big.Int{lengthCommitY1, lengthCommitY0},
 					},
 					LengthProof: verifierbindings.BN254G2Point{
-						X: [2]*big.Int{lengthProofX0, lengthProofX1},
-						Y: [2]*big.Int{lengthProofY0, lengthProofY1},
+						X: [2]*big.Int{lengthProofX1, lengthProofX0},
+						Y: [2]*big.Int{lengthProofY1, lengthProofY0},
 					},
-					DataLength: uint32(blobCertificate.BlobHeader.BlobCommitments.Length),
+					Length: uint32(blobCertificate.BlobHeader.BlobCommitments.Length),
 				},
 				PaymentHeaderHash: paymentHeaderHash,
 			},
+			Signature: blobCertificate.Signature,
 			RelayKeys: blobCertificate.RelayKeys,
 		},
 		InclusionProof: inclusionProof,

@@ -175,42 +175,46 @@
         
           
           <li>
-            <a href="#node%2fv2%2fnode_v2.proto">node/v2/node_v2.proto</a>
+            <a href="#validator%2fnode_v2.proto">validator/node_v2.proto</a>
             <ul>
               
                 <li>
-                  <a href="#node.v2.GetChunksReply"><span class="badge">M</span>GetChunksReply</a>
+                  <a href="#validator.GetChunksReply"><span class="badge">M</span>GetChunksReply</a>
                 </li>
               
                 <li>
-                  <a href="#node.v2.GetChunksRequest"><span class="badge">M</span>GetChunksRequest</a>
+                  <a href="#validator.GetChunksRequest"><span class="badge">M</span>GetChunksRequest</a>
                 </li>
               
                 <li>
-                  <a href="#node.v2.GetNodeInfoReply"><span class="badge">M</span>GetNodeInfoReply</a>
+                  <a href="#validator.GetNodeInfoReply"><span class="badge">M</span>GetNodeInfoReply</a>
                 </li>
               
                 <li>
-                  <a href="#node.v2.GetNodeInfoRequest"><span class="badge">M</span>GetNodeInfoRequest</a>
+                  <a href="#validator.GetNodeInfoRequest"><span class="badge">M</span>GetNodeInfoRequest</a>
                 </li>
               
                 <li>
-                  <a href="#node.v2.StoreChunksReply"><span class="badge">M</span>StoreChunksReply</a>
+                  <a href="#validator.StoreChunksReply"><span class="badge">M</span>StoreChunksReply</a>
                 </li>
               
                 <li>
-                  <a href="#node.v2.StoreChunksRequest"><span class="badge">M</span>StoreChunksRequest</a>
+                  <a href="#validator.StoreChunksRequest"><span class="badge">M</span>StoreChunksRequest</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#validator.ChunkEncodingFormat"><span class="badge">E</span>ChunkEncodingFormat</a>
                 </li>
               
               
               
-              
                 <li>
-                  <a href="#node.v2.Dispersal"><span class="badge">S</span>Dispersal</a>
+                  <a href="#validator.Dispersal"><span class="badge">S</span>Dispersal</a>
                 </li>
               
                 <li>
-                  <a href="#node.v2.Retrieval"><span class="badge">S</span>Retrieval</a>
+                  <a href="#validator.Retrieval"><span class="badge">S</span>Retrieval</a>
                 </li>
               
             </ul>
@@ -223,12 +227,12 @@
     
       
       <div class="file-heading">
-        <h2 id="node/v2/node_v2.proto">node/v2/node_v2.proto</h2><a href="#title">Top</a>
+        <h2 id="validator/node_v2.proto">validator/node_v2.proto</h2><a href="#title">Top</a>
       </div>
       <p></p>
 
       
-        <h3 id="node.v2.GetChunksReply">GetChunksReply</h3>
+        <h3 id="validator.GetChunksReply">GetChunksReply</h3>
         <p>The response to the GetChunks() RPC.</p>
 
         
@@ -242,7 +246,14 @@
                   <td>chunks</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td>repeated</td>
-                  <td><p>All chunks the Node is storing for the requested blob per RetrieveChunksRequest. </p></td>
+                  <td><p>All chunks the Node is storing for the requested blob per GetChunksRequest. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>chunk_encoding_format</td>
+                  <td><a href="#validator.ChunkEncodingFormat">ChunkEncodingFormat</a></td>
+                  <td></td>
+                  <td><p>The format how the above chunks are encoded. </p></td>
                 </tr>
               
             </tbody>
@@ -252,7 +263,7 @@
 
         
       
-        <h3 id="node.v2.GetChunksRequest">GetChunksRequest</h3>
+        <h3 id="validator.GetChunksRequest">GetChunksRequest</h3>
         <p>The parameter for the GetChunks() RPC.</p>
 
         
@@ -287,7 +298,7 @@ The ID must be in range [0, 254]. </p></td>
 
         
       
-        <h3 id="node.v2.GetNodeInfoReply">GetNodeInfoReply</h3>
+        <h3 id="validator.GetNodeInfoReply">GetNodeInfoReply</h3>
         <p>Node info reply</p>
 
         
@@ -339,14 +350,14 @@ The ID must be in range [0, 254]. </p></td>
 
         
       
-        <h3 id="node.v2.GetNodeInfoRequest">GetNodeInfoRequest</h3>
+        <h3 id="validator.GetNodeInfoRequest">GetNodeInfoRequest</h3>
         <p>The parameter for the GetNodeInfo() RPC.</p>
 
         
 
         
       
-        <h3 id="node.v2.StoreChunksReply">StoreChunksReply</h3>
+        <h3 id="validator.StoreChunksReply">StoreChunksReply</h3>
         <p>StoreChunksReply is the message type used to respond to a StoreChunks() RPC.</p>
 
         
@@ -360,7 +371,7 @@ The ID must be in range [0, 254]. </p></td>
                   <td>signature</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>a custody signature of the received chunks </p></td>
+                  <td><p>The validator&#39;s BSL signature signed on the batch header hash. </p></td>
                 </tr>
               
             </tbody>
@@ -370,7 +381,7 @@ The ID must be in range [0, 254]. </p></td>
 
         
       
-        <h3 id="node.v2.StoreChunksRequest">StoreChunksRequest</h3>
+        <h3 id="validator.StoreChunksRequest">StoreChunksRequest</h3>
         <p>Request that the Node store a batch of chunks.</p>
 
         
@@ -395,34 +406,52 @@ The ID must be in range [0, 254]. </p></td>
                 </tr>
               
                 <tr>
+                  <td>timestamp</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Timestamp of the request in seconds since the Unix epoch. If too far out of sync with the server&#39;s clock,
+request may be rejected. </p></td>
+                </tr>
+              
+                <tr>
                   <td>signature</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>Signature using the disperser&#39;s ECDSA key over keccak hash of the batch. The purpose of this signature
-is to prevent hooligans from tricking DA nodes into storing data that they shouldn&#39;t be storing.
+is to prevent hooligans from tricking validators into storing data that they shouldn&#39;t be storing.
 
 Algorithm for computing the hash is as follows. All integer values are serialized in big-endian order (unsigned).
 A reference implementation (golang) can be found at
 https://github.com/Layr-Labs/eigenda/blob/master/disperser/auth/request_signing.go
 
-1. digest batch.BatchHeader.BatchRoot
-2. digest batch.BatchHeader.ReferenceBlockNumber (8 bytes, unsigned big endian)
-3. for each certificate in batch.BlobCertificates:
+1. digest len(batch.BatchHeader.BatchRoot) (4 bytes, unsigned big endian)
+2. digest batch.BatchHeader.BatchRoot
+3. digest batch.BatchHeader.ReferenceBlockNumber (8 bytes, unsigned big endian)
+4. digest len(batch.BlobCertificates) (4 bytes, unsigned big endian)
+5. for each certificate in batch.BlobCertificates:
   a. digest certificate.BlobHeader.Version (4 bytes, unsigned big endian)
-  b. for each quorum_number in certificate.BlobHeader.QuorumNumbers:
+  b. digest len(certificate.BlobHeader.QuorumNumbers) (4 bytes, unsigned big endian)
+  c. for each quorum_number in certificate.BlobHeader.QuorumNumbers:
     i. digest quorum_number (4 bytes, unsigned big endian)
-  c. digest certificate.BlobHeader.Commitment.Commitment
-  d. digest certificate.BlobHeader.Commitment.LengthCommitment
-  e. digest certificate.BlobHeader.Commitment.LengthProof
-  f. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian)
-  g. digest certificate.BlobHeader.PaymentHeader.AccountId
-  h. digest certificate.BlobHeader.PaymentHeader.ReservationPeriod (4 bytes, unsigned big endian)
-  i. digest certificate.BlobHeader.PaymentHeader.CumulativePayment
-  j. digest certificate.BlobHeader.PaymentHeader.Salt (4 bytes, unsigned big endian)
-  k. digest certificate.BlobHeader.Signature
-  l. for each relay in certificate.Relays:
+  d. digest len(certificate.BlobHeader.Commitment.Commitment) (4 bytes, unsigned big endian)
+  e. digest certificate.BlobHeader.Commitment.Commitment
+  f  digest len(certificate.BlobHeader.Commitment.LengthCommitment) (4 bytes, unsigned big endian)
+  g. digest certificate.BlobHeader.Commitment.LengthCommitment
+  h. digest len(certificate.BlobHeader.Commitment.LengthProof) (4 bytes, unsigned big endian)
+  i. digest certificate.BlobHeader.Commitment.LengthProof
+  j. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian)
+  k. digest len(certificate.BlobHeader.PaymentHeader.AccountId) (4 bytes, unsigned big endian)
+  l. digest certificate.BlobHeader.PaymentHeader.AccountId
+  m. digest certificate.BlobHeader.PaymentHeader.Timestamp (4 bytes, signed big endian)
+  n  digest len(certificate.BlobHeader.PaymentHeader.CumulativePayment) (4 bytes, unsigned big endian)
+  o. digest certificate.BlobHeader.PaymentHeader.CumulativePayment
+  p  digest len(certificate.BlobHeader.Signature) (4 bytes, unsigned big endian)
+  q. digest certificate.BlobHeader.Signature
+  r. digest len(certificate.Relays) (4 bytes, unsigned big endian)
+  s. for each relay in certificate.Relays:
     i. digest relay (4 bytes, unsigned big endian)
-4. digest disperserID (4 bytes, unsigned big endian)
+6. digest disperserID (4 bytes, unsigned big endian)
+7. digest timestamp (4 bytes, unsigned big endian)
 
 Note that this signature is not included in the hash for obvious reasons. </p></td>
                 </tr>
@@ -436,11 +465,53 @@ Note that this signature is not included in the hash for obvious reasons. </p></
       
 
       
+        <h3 id="validator.ChunkEncodingFormat">ChunkEncodingFormat</h3>
+        <p>This describes how the chunks returned in GetChunksReply are encoded.</p><p>Used to facilitate the decoding of chunks.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>UNKNOWN</td>
+                <td>0</td>
+                <td><p>A valid response should never use this value.
+If encountered, the client should treat it as an error.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GNARK</td>
+                <td>1</td>
+                <td><p>A chunk encoded in GNARK has the following format:
 
+[KZG proof: 32 bytes]
+[Coeff 1:   32 bytes]
+[Coeff 2:   32 bytes]
+...
+[Coeff n:   32 bytes]
+
+The KZG proof is a point on G1 and is serialized with bn254.G1Affine.Bytes().
+The coefficients are field elements in bn254 and serialized with fr.Element.Marshal().
+
+References:
+- bn254.G1Affine: github.com/consensys/gnark-crypto/ecc/bn254
+- fr.Element: github.com/consensys/gnark-crypto/ecc/bn254/fr
+
+Golang serialization and deserialization can be found in:
+- Frame.SerializeGnark()
+- Frame.DeserializeGnark()
+Package: github.com/Layr-Labs/eigenda/encoding</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
       
 
       
-        <h3 id="node.v2.Dispersal">Dispersal</h3>
+
+      
+        <h3 id="validator.Dispersal">Dispersal</h3>
         <p>Dispersal is utilized to disperse chunk data.</p>
         <table class="enum-table">
           <thead>
@@ -450,8 +521,8 @@ Note that this signature is not included in the hash for obvious reasons. </p></
             
               <tr>
                 <td>StoreChunks</td>
-                <td><a href="#node.v2.StoreChunksRequest">StoreChunksRequest</a></td>
-                <td><a href="#node.v2.StoreChunksReply">StoreChunksReply</a></td>
+                <td><a href="#validator.StoreChunksRequest">StoreChunksRequest</a></td>
+                <td><a href="#validator.StoreChunksReply">StoreChunksReply</a></td>
                 <td><p>StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator
 either acquires the chunks or the validator determines that it is unable to acquire the chunks. If
 the validator is able to acquire and validate the chunks, it returns a signature over the batch header.
@@ -461,8 +532,8 @@ is expected to fetch the chunk data from one of the relays that is in possession
             
               <tr>
                 <td>GetNodeInfo</td>
-                <td><a href="#node.v2.GetNodeInfoRequest">GetNodeInfoRequest</a></td>
-                <td><a href="#node.v2.GetNodeInfoReply">GetNodeInfoReply</a></td>
+                <td><a href="#validator.GetNodeInfoRequest">GetNodeInfoRequest</a></td>
+                <td><a href="#validator.GetNodeInfoReply">GetNodeInfoReply</a></td>
                 <td><p>GetNodeInfo fetches metadata about the node.</p></td>
               </tr>
             
@@ -470,7 +541,7 @@ is expected to fetch the chunk data from one of the relays that is in possession
         </table>
 
         
-        <h3 id="node.v2.Retrieval">Retrieval</h3>
+        <h3 id="validator.Retrieval">Retrieval</h3>
         <p>Retrieval is utilized to retrieve chunk data.</p>
         <table class="enum-table">
           <thead>
@@ -480,16 +551,16 @@ is expected to fetch the chunk data from one of the relays that is in possession
             
               <tr>
                 <td>GetChunks</td>
-                <td><a href="#node.v2.GetChunksRequest">GetChunksRequest</a></td>
-                <td><a href="#node.v2.GetChunksReply">GetChunksReply</a></td>
+                <td><a href="#validator.GetChunksRequest">GetChunksRequest</a></td>
+                <td><a href="#validator.GetChunksReply">GetChunksReply</a></td>
                 <td><p>GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally
 faster to retrieve chunks from the relay service if that service is available.</p></td>
               </tr>
             
               <tr>
                 <td>GetNodeInfo</td>
-                <td><a href="#node.v2.GetNodeInfoRequest">GetNodeInfoRequest</a></td>
-                <td><a href="#node.v2.GetNodeInfoReply">GetNodeInfoReply</a></td>
+                <td><a href="#validator.GetNodeInfoRequest">GetNodeInfoRequest</a></td>
+                <td><a href="#validator.GetNodeInfoReply">GetNodeInfoReply</a></td>
                 <td><p>Retrieve node info metadata</p></td>
               </tr>
             

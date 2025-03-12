@@ -461,7 +461,7 @@ func TestCreatQuorumBatches(t *testing.T) {
 		},
 	}
 
-	quorumBatches := dataapi.CreatQuorumBatches(batchNonSigningInfo)
+	quorumBatches := dataapi.CreatQuorumBatches(dataapi.CreateQuorumBatchMap(batchNonSigningInfo))
 
 	assert.Equal(t, 3, len(quorumBatches))
 

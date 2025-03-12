@@ -133,12 +133,17 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 	for numReply := 0; numReply < numOperators; numReply++ {
 		var err error
 		r := <-messageChan
+		if seen := signerMap[r.Operator]; seen {
+			a.Logger.Warn("duplicate signature received", "operatorID", r.Operator.Hex())
+			continue
+		}
+
 		operatorIDHex := r.Operator.Hex()
 		operatorAddr, ok := a.OperatorAddresses.Get(r.Operator)
 		if !ok && a.Transactor != nil {
 			operatorAddr, err = a.Transactor.OperatorIDToAddress(ctx, r.Operator)
 			if err != nil {
-				a.Logger.Error("failed to get operator address from registry", "operatorID", operatorIDHex)
+				a.Logger.Warn("failed to get operator address from registry", "operatorID", operatorIDHex)
 				operatorAddr = gethcommon.Address{}
 			} else {
 				a.OperatorAddresses.Add(r.Operator, operatorAddr)
@@ -317,7 +322,7 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics In
 	sort.Slice(nonSignerKeys, func(i, j int) bool {
 		hash1 := nonSignerKeys[i].Hash()
 		hash2 := nonSignerKeys[j].Hash()
-		// sort in accending order
+		// sort in ascending order
 		return bytes.Compare(hash1[:], hash2[:]) == -1
 	})
 
@@ -357,9 +362,13 @@ func GetStakeThreshold(state *OperatorState, quorum QuorumID, quorumThreshold ui
 }
 
 func GetSignedPercentage(state *OperatorState, quorum QuorumID, stakeAmount *big.Int) uint8 {
+	totalStake := state.Totals[quorum].Stake
+	if totalStake.Cmp(big.NewInt(0)) == 0 {
+		return 0
+	}
 
 	stakeAmount = stakeAmount.Mul(stakeAmount, new(big.Int).SetUint64(percentMultiplier))
-	quorumThresholdBig := stakeAmount.Div(stakeAmount, state.Totals[quorum].Stake)
+	quorumThresholdBig := stakeAmount.Div(stakeAmount, totalStake)
 
 	quorumThreshold := uint8(quorumThresholdBig.Uint64())
 

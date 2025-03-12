@@ -45,7 +45,13 @@ type Store struct {
 func NewLevelDBStore(path string, logger logging.Logger, metrics *Metrics, blockStaleMeasure, storeDurationBlocks uint32) (*Store, error) {
 	// Create the db at the path. This is currently hardcoded to use
 	// levelDB.
-	db, err := leveldb.NewStore(logger, path)
+	var db kvstore.Store[[]byte]
+	var err error
+	if metrics != nil {
+		db, err = leveldb.NewStore(logger, path, metrics.registry)
+	} else {
+		db, err = leveldb.NewStore(logger, path, nil)
+	}
 	if err != nil {
 		logger.Error("Could not create leveldb database", "err", err)
 		return nil, err

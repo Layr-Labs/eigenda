@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -73,7 +74,7 @@ func teardown() {
 }
 
 func TestRequestSigning(t *testing.T) {
-	rand := random.NewTestRandom(t)
+	rand := random.NewTestRandom()
 	setup(t)
 	defer teardown()
 
@@ -109,22 +110,27 @@ func TestRequestSigning(t *testing.T) {
 
 			require.Nil(t, request.Signature)
 			request.Signature = signature
-			err = auth.VerifyStoreChunksRequest(publicAddress, request)
+			hash, err := auth.VerifyStoreChunksRequest(publicAddress, request)
 			require.NoError(t, err)
+			expectedHash, err := hashing.HashStoreChunksRequest(request)
+			require.NoError(t, err)
+			require.Equal(t, expectedHash, hash)
 
 			// Changing a byte in the middle of the signature should make the verification fail
 			badSignature := make([]byte, len(signature))
 			copy(badSignature, signature)
 			badSignature[10] = badSignature[10] + 1
 			request.Signature = badSignature
-			err = auth.VerifyStoreChunksRequest(publicAddress, request)
+			hash, err = auth.VerifyStoreChunksRequest(publicAddress, request)
 			require.Error(t, err)
+			require.Nil(t, hash)
 
 			// Changing a byte in the middle of the request should make the verification fail
 			request.DisperserID = request.DisperserID + 1
 			request.Signature = signature
-			err = auth.VerifyStoreChunksRequest(publicAddress, request)
+			hash, err = auth.VerifyStoreChunksRequest(publicAddress, request)
 			require.Error(t, err)
+			require.Nil(t, hash)
 		}
 	}
 }

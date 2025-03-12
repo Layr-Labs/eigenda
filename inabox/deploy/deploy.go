@@ -4,6 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
+	"math/big"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	caws "github.com/Layr-Labs/eigenda/common/aws"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
@@ -14,14 +23,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/kms/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"io"
-	"log"
-	"math/big"
-	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -264,7 +265,7 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 	return fmt.Errorf("timed out waiting for disperser address to be set")
 }
 
-func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[uint32]string {
+func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
 	if err != nil {
@@ -305,9 +306,9 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[
 	if err != nil {
 		log.Panicf("Error: %s", err)
 	}
-	relays := map[uint32]string{}
+
 	ethAddr := ethClient.GetAccountAddress()
-	for i, relayVars := range env.Relays {
+	for _, relayVars := range env.Relays {
 		url := fmt.Sprintf("0.0.0.0:%s", relayVars.RELAY_GRPC_PORT)
 		txn, err := contractRelayRegistry.AddRelayInfo(opts, relayreg.RelayInfo{
 			RelayAddress: ethAddr,
@@ -320,10 +321,7 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) map[
 		if err != nil {
 			log.Panicf("Error: %s", err)
 		}
-		relays[uint32(i)] = url
 	}
-
-	return relays
 }
 
 // TODO: Supply the test path to the runner utility
@@ -364,7 +362,7 @@ func (env *Config) StopAnvil() {
 func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) {
 	changeDirectory(filepath.Join(env.rootPath, "inabox"))
 
-	socket := string(core.MakeOperatorSocket(operator.NODE_HOSTNAME, operator.NODE_DISPERSAL_PORT, operator.NODE_RETRIEVAL_PORT))
+	socket := string(core.MakeOperatorSocket(operator.NODE_HOSTNAME, operator.NODE_DISPERSAL_PORT, operator.NODE_RETRIEVAL_PORT, operator.NODE_V2_DISPERSAL_PORT, operator.NODE_V2_RETRIEVAL_PORT))
 
 	envVars := []string{
 		"NODE_OPERATION=" + operation,

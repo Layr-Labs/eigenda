@@ -45,9 +45,9 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		return Config{}, err
 	}
 	awsClientConfig := aws.ReadClientConfig(ctx, flags.FlagPrefix)
-	relayIDs := ctx.IntSlice(flags.RelayIDsFlag.Name)
-	if len(relayIDs) == 0 {
-		return Config{}, fmt.Errorf("no relay IDs specified")
+	relayKeys := ctx.IntSlice(flags.RelayKeysFlag.Name)
+	if len(relayKeys) == 0 {
+		return Config{}, fmt.Errorf("no relay keys specified")
 	}
 	config := Config{
 		Log:               *loggerConfig,
@@ -55,14 +55,14 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		BucketName:        ctx.String(flags.BucketNameFlag.Name),
 		MetadataTableName: ctx.String(flags.MetadataTableNameFlag.Name),
 		RelayConfig: relay.Config{
-			RelayIDs:                   make([]core.RelayKey, len(relayIDs)),
+			RelayKeys:                  make([]core.RelayKey, len(relayKeys)),
 			GRPCPort:                   ctx.Int(flags.GRPCPortFlag.Name),
 			MaxGRPCMessageSize:         ctx.Int(flags.MaxGRPCMessageSizeFlag.Name),
 			MetadataCacheSize:          ctx.Int(flags.MetadataCacheSizeFlag.Name),
 			MetadataMaxConcurrency:     ctx.Int(flags.MetadataMaxConcurrencyFlag.Name),
 			BlobCacheBytes:             ctx.Uint64(flags.BlobCacheBytes.Name),
 			BlobMaxConcurrency:         ctx.Int(flags.BlobMaxConcurrencyFlag.Name),
-			ChunkCacheSize:             ctx.Uint64(flags.ChunkCacheSizeFlag.Name),
+			ChunkCacheBytes:            ctx.Uint64(flags.ChunkCacheBytesFlag.Name),
 			ChunkMaxConcurrency:        ctx.Int(flags.ChunkMaxConcurrencyFlag.Name),
 			MaxKeysPerGetChunksRequest: ctx.Int(flags.MaxKeysPerGetChunksRequestFlag.Name),
 			RateLimits: limiter.Config{
@@ -82,10 +82,11 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 				GetChunkBytesBurstinessClient:   ctx.Int(flags.GetChunkBytesBurstinessClientFlag.Name),
 				MaxConcurrentGetChunkOpsClient:  ctx.Int(flags.MaxConcurrentGetChunkOpsClientFlag.Name),
 			},
-			AuthenticationKeyCacheSize:  ctx.Int(flags.AuthenticationKeyCacheSizeFlag.Name),
-			AuthenticationTimeout:       ctx.Duration(flags.AuthenticationTimeoutFlag.Name),
-			AuthenticationDisabled:      ctx.Bool(flags.AuthenticationDisabledFlag.Name),
-			OnchainStateRefreshInterval: ctx.Duration(flags.OnchainStateRefreshIntervalFlag.Name),
+			AuthenticationKeyCacheSize:   ctx.Int(flags.AuthenticationKeyCacheSizeFlag.Name),
+			AuthenticationDisabled:       ctx.Bool(flags.AuthenticationDisabledFlag.Name),
+			GetChunksRequestMaxPastAge:   ctx.Duration(flags.GetChunksRequestMaxPastAgeFlag.Name),
+			GetChunksRequestMaxFutureAge: ctx.Duration(flags.GetChunksRequestMaxFutureAgeFlag.Name),
+			OnchainStateRefreshInterval:  ctx.Duration(flags.OnchainStateRefreshIntervalFlag.Name),
 			Timeouts: relay.TimeoutConfig{
 				GetChunksTimeout:               ctx.Duration(flags.GetChunksTimeoutFlag.Name),
 				GetBlobTimeout:                 ctx.Duration(flags.GetBlobTimeoutFlag.Name),
@@ -94,15 +95,18 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 				InternalGetProofsTimeout:       ctx.Duration(flags.InternalGetProofsTimeoutFlag.Name),
 				InternalGetCoefficientsTimeout: ctx.Duration(flags.InternalGetCoefficientsTimeoutFlag.Name),
 			},
-			MetricsPort: ctx.Int(flags.MetricsPortFlag.Name),
+			MetricsPort:   ctx.Int(flags.MetricsPortFlag.Name),
+			EnableMetrics: ctx.Bool(flags.EnableMetricsFlag.Name),
+			EnablePprof:   ctx.Bool(flags.EnablePprofFlag.Name),
+			PprofHttpPort: ctx.Int(flags.PprofHttpPortFlag.Name),
 		},
 		EthClientConfig:               geth.ReadEthClientConfigRPCOnly(ctx),
 		BLSOperatorStateRetrieverAddr: ctx.String(flags.BlsOperatorStateRetrieverAddrFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.String(flags.EigenDAServiceManagerAddrFlag.Name),
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
 	}
-	for i, id := range relayIDs {
-		config.RelayConfig.RelayIDs[i] = core.RelayKey(id)
+	for i, id := range relayKeys {
+		config.RelayConfig.RelayKeys[i] = core.RelayKey(id)
 	}
 	return config, nil
 }
