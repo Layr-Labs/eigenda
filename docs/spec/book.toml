@@ -7,3 +7,12 @@ title = "EigenDA Spec"
 
 [output.html]
 mathjax-support = true
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
+
+[preprocessor]
+
+[preprocessor.mermaid]
+# Preprocesses the mermaid diagrams (see src/integration/proxy.md for an example)
+# and generates the corresponding SVG files.
+# See https://github.com/badboy/mdbook-mermaid for more information.
+command = "mdbook-mermaid"
