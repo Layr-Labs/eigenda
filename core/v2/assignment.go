@@ -9,6 +9,10 @@ import (
 )
 
 func GetAssignments(state *core.OperatorState, blobParams *core.BlobVersionParameters, quorum uint8) (map[core.OperatorID]Assignment, error) {
+	if state == nil {
+		return nil, fmt.Errorf("state cannot be nil")
+	}
+
 	if blobParams == nil {
 		return nil, fmt.Errorf("blob params cannot be nil")
 	}
