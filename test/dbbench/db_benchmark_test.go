@@ -3,7 +3,9 @@ package dbbench
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
+	"math/rand"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -37,11 +39,27 @@ const readerCount = 1
 const TTL = 2 * time.Hour
 const dataGeneratorCount = 16
 
-// given a seed, deterministically generate a key/value pair
+// Used to ensure that keys are truly unique
+var nextSeedSerialNumber = atomic.Uint32{}
+
+// Generate a new seed. The first 4 bytes are randomized, the last 4 bytes are a serial number.
+func generateSeed(rand *random.TestRandom) int64 {
+	randomData := rand.Uint32()
+	serialNumber := nextSeedSerialNumber.Add(1)
+
+	return int64(randomData) | (int64(serialNumber) << 32)
+}
+
+// given a seed, deterministically generate a key/value pair. The last 4 bytes of the seed are a serial number to
+// ensure that each key is unique.
 func generateKVPair(seed int64) ([]byte, []byte) {
-	rand := random.NewTestRandomNoPrint(seed)
-	key := []byte(rand.String(32))
-	value := []byte(rand.String(dataSize))
+	randomGenerator := random.NewTestRandomNoPrint(seed)
+	key := []byte(randomGenerator.String(32))
+
+	serialNumber := uint32(uint64(seed) << 32 >> 32)
+	binary.BigEndian.PutUint32(key[28:], serialNumber)
+
+	value := []byte(randomGenerator.String(dataSize))
 	return key, value
 }
 
@@ -125,9 +143,9 @@ func runBenchmark(write writer, read reader) {
 	dataToBeWritten := make(chan *generatedData, 1024)
 	for i := 0; i < dataGeneratorCount; i++ {
 		go func() {
-			rand := random.NewTestRandomNoPrint()
+			randGenerator := random.NewTestRandomNoPrint(rand.Int63())
 			for alive.Load() {
-				seed := rand.Int63()
+				seed := generateSeed(randGenerator)
 				key, value := generateKVPair(seed)
 				dataToBeWritten <- &generatedData{seed: seed, key: key, value: value}
 			}
