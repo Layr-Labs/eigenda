@@ -89,7 +89,7 @@ jobs:
           go-version: '1.21.13'
 
       - name: Install abi gen
-        run: go install github.com/ethereum/go-ethereum/cmd/abigen@latest
+        run: go install github.com/ethereum/go-ethereum/cmd/abigen@v1.14.8
 
           # TODO(0x0aa0): re-enable this once the failure is fixed
           # - name: Bindings diff check
