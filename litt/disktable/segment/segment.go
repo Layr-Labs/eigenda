@@ -71,6 +71,12 @@ type Segment struct {
 	// ensures that segments are always deleted strictly in sequence. This makes it impossible for a crash to cause
 	// segment X to be missing while segment X-1 is present.
 	nextSegment *Segment
+
+	// Used as a sanity checker. For each value written to the segment, the segment must eventually return
+	// a key to be written to the key map. This value tracks the number of values that have been written to the
+	// segment but have not yet been flushed to the key map. When the segment is eventually sealed, the code
+	// asserts that this value is zero. This check should never fail, bit is a nice safety net.
+	unflushedKeyCount atomic.Int64
 }
 
 // NewSegment creates a new data segment.
@@ -228,12 +234,6 @@ func (s *Segment) GetShard(key []byte) uint32 {
 	return util.HashKey(key, s.metadata.salt) % s.metadata.shardingFactor
 }
 
-// valueToWrite is a message sent to the shard control loop to request that it write a value to the value file.
-type valueToWrite struct {
-	value                  []byte
-	expectedFirstByteIndex uint32
-}
-
 // Write records a key-value pair in the data segment, returning the maximum size of all shards within this segment.
 //
 // This method does not ensure that the key-value pair is actually written to disk, only that it will eventually be
@@ -253,6 +253,7 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 		return 0,
 			fmt.Errorf("value file already contains %d bytes, cannot add a new value", newSize)
 	}
+	s.unflushedKeyCount.Add(1)
 	firstByteIndex := uint32(newSize)
 
 	s.shardSizes[shard] += uint64(len(data.Value)) + 4 /* uint32 length */
@@ -336,6 +337,7 @@ func (s *Segment) Flush() (FlushWaitFunction, error) {
 	// Now that all shards have sent their key/address pairs to the key file, flush the key file.
 	keyResponseChannel := make(chan *keyFileFlushResponse, 1)
 	request := &keyFileFlushRequest{
+		seal:              false,
 		completionChannel: keyResponseChannel,
 	}
 	err := util.SendAny(s.panic, s.keyFileChannel, request)
@@ -357,24 +359,9 @@ func (s *Segment) Flush() (FlushWaitFunction, error) {
 			return nil, fmt.Errorf("failed to flush key file: %v", err)
 		}
 
+		s.unflushedKeyCount.Add(-int64(len(keyFlushResponse.addresses)))
 		return keyFlushResponse.addresses, nil
 	}, nil
-}
-
-// keyFileFlushRequest is a message sent to the key file control loop to request that it flush its data to disk.
-type keyFileFlushRequest struct {
-	// If true, seal the key file after flushing. If false, do not seal the key file.
-	seal bool
-
-	// As the key file finishes its flush, it will either send an error if something went wrong, or nil if the flush was
-	// successful.
-	completionChannel chan *keyFileFlushResponse
-}
-
-// keyFileFlushResponse is a message sent from the key file control loop to the caller of Flush to indicate that the
-// key file has been flushed.
-type keyFileFlushResponse struct {
-	addresses []*types.KAPair
 }
 
 // Seal flushes all data to disk and finalizes the metadata. Returns addresses that became durable as a result of
@@ -423,6 +410,12 @@ func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
 	err = s.metadata.seal(now)
 	if err != nil {
 		return nil, fmt.Errorf("failed to seal metadata file: %v", err)
+	}
+
+	s.unflushedKeyCount.Add(-int64(len(response.addresses)))
+	unflushedKeyCount := s.unflushedKeyCount.Load()
+	if s.unflushedKeyCount.Load() != 0 {
+		return nil, fmt.Errorf("segment %d has %d unflushedKeyCount keys", s.index, unflushedKeyCount)
 	}
 
 	return response.addresses, nil
@@ -527,40 +520,6 @@ func (s *Segment) String() string {
 	return fmt.Sprintf("[seg %d - %s]", s.index, sealedString)
 }
 
-// shardControlLoop is the main loop for performing modifications to a particular shard. Each shard is managed
-// by its own goroutine, which is running this function.
-func (s *Segment) shardControlLoop(shard uint32) {
-
-	for {
-		select {
-		case <-s.panic.ImmediateShutdownRequired():
-			s.logger.Infof("segment %d shard %d control loop exiting, context cancelled", s.index, shard)
-		case operation := <-s.shardChannels[shard]:
-			if flushRequest, ok := operation.(*shardFlushRequest); ok {
-				s.handleShardFlushRequest(shard, flushRequest)
-				if flushRequest.seal {
-					// After sealing, we can exit the control loop.
-					return
-				}
-			} else if data, ok := operation.(*valueToWrite); ok {
-				s.handleShardWrite(shard, data)
-				continue
-			} else {
-				s.panic.Panic(fmt.Errorf("unknown operation type in shard control loop: %T", operation))
-			}
-		}
-	}
-}
-
-// shardFlushRequest is a message sent to shard control loops to request that they flush their data to disk.
-type shardFlushRequest struct {
-	// If true, seal the shard after flushing. If false, do not seal the shard.
-	seal bool
-
-	// As each shard finishes its flush it will send an object to this channel.
-	completionChannel chan struct{}
-}
-
 // handleShardFlushRequest handles a request to flush a shard to disk.
 func (s *Segment) handleShardFlushRequest(shard uint32, request *shardFlushRequest) {
 	if request.seal {
@@ -593,6 +552,89 @@ func (s *Segment) handleShardWrite(shard uint32, data *valueToWrite) {
 	}
 }
 
+// handleKeyFileWrite writes a key to the key file.
+func (s *Segment) handleKeyFileWrite(data *types.KAPair) {
+	err := s.keys.write(data.Key, data.Address)
+	if err != nil {
+		s.panic.Panic(fmt.Errorf("failed to write key to key file: %v", err))
+	}
+}
+
+// handleKeyFileFlushRequest handles a request to flush the key file to disk.
+func (s *Segment) handleKeyFileFlushRequest(request *keyFileFlushRequest, unflushedKeys []*types.KAPair) {
+	if request.seal {
+		err := s.keys.seal()
+		if err != nil {
+			s.panic.Panic(fmt.Errorf("failed to seal key file: %v", err))
+		}
+	} else {
+		err := s.keys.flush()
+		if err != nil {
+			s.panic.Panic(fmt.Errorf("failed to flush key file: %v", err))
+		}
+	}
+
+	request.completionChannel <- &keyFileFlushResponse{
+		addresses: unflushedKeys,
+	}
+}
+
+// shardFlushRequest is a message sent to shard control loops to request that they flush their data to disk.
+type shardFlushRequest struct {
+	// If true, seal the shard after flushing. If false, do not seal the shard.
+	seal bool
+
+	// As each shard finishes its flush it will send an object to this channel.
+	completionChannel chan struct{}
+}
+
+// valueToWrite is a message sent to the shard control loop to request that it write a value to the value file.
+type valueToWrite struct {
+	value                  []byte
+	expectedFirstByteIndex uint32
+}
+
+// shardControlLoop is the main loop for performing modifications to a particular shard. Each shard is managed
+// by its own goroutine, which is running this function.
+func (s *Segment) shardControlLoop(shard uint32) {
+
+	for {
+		select {
+		case <-s.panic.ImmediateShutdownRequired():
+			s.logger.Infof("segment %d shard %d control loop exiting, context cancelled", s.index, shard)
+		case operation := <-s.shardChannels[shard]:
+			if flushRequest, ok := operation.(*shardFlushRequest); ok {
+				s.handleShardFlushRequest(shard, flushRequest)
+				if flushRequest.seal {
+					// After sealing, we can exit the control loop.
+					return
+				}
+			} else if data, ok := operation.(*valueToWrite); ok {
+				s.handleShardWrite(shard, data)
+				continue
+			} else {
+				s.panic.Panic(fmt.Errorf("unknown operation type in shard control loop: %T", operation))
+			}
+		}
+	}
+}
+
+// keyFileFlushRequest is a message sent to the key file control loop to request that it flush its data to disk.
+type keyFileFlushRequest struct {
+	// If true, seal the key file after flushing. If false, do not seal the key file.
+	seal bool
+
+	// As the key file finishes its flush, it will either send an error if something went wrong, or nil if the flush was
+	// successful.
+	completionChannel chan *keyFileFlushResponse
+}
+
+// keyFileFlushResponse is a message sent from the key file control loop to the caller of Flush to indicate that the
+// key file has been flushed.
+type keyFileFlushResponse struct {
+	addresses []*types.KAPair
+}
+
 // keyFileControlLoop is the main loop for performing modifications to the key file. This goroutine is responsible
 // for writing key-address pairs to the key file.
 func (s *Segment) keyFileControlLoop() {
@@ -622,32 +664,5 @@ func (s *Segment) keyFileControlLoop() {
 				s.panic.Panic(fmt.Errorf("unknown operation type in key file control loop: %T", operation))
 			}
 		}
-	}
-}
-
-// handleKeyFileWrite writes a key to the key file.
-func (s *Segment) handleKeyFileWrite(data *types.KAPair) {
-	err := s.keys.write(data.Key, data.Address)
-	if err != nil {
-		s.panic.Panic(fmt.Errorf("failed to write key to key file: %v", err))
-	}
-}
-
-// handleKeyFileFlushRequest handles a request to flush the key file to disk.
-func (s *Segment) handleKeyFileFlushRequest(request *keyFileFlushRequest, unflushedKeys []*types.KAPair) {
-	if request.seal {
-		err := s.keys.seal()
-		if err != nil {
-			s.panic.Panic(fmt.Errorf("failed to seal key file: %v", err))
-		}
-	} else {
-		err := s.keys.flush()
-		if err != nil {
-			s.panic.Panic(fmt.Errorf("failed to flush key file: %v", err))
-		}
-	}
-
-	request.completionChannel <- &keyFileFlushResponse{
-		addresses: unflushedKeys,
 	}
 }
