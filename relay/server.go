@@ -12,6 +12,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/common/pprof"
+	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -57,6 +58,9 @@ type Server struct {
 
 	// authenticator is used to authenticate requests to the relay service.
 	authenticator auth.RequestAuthenticator
+
+	// replayGuardian is used to guard against replay attacks.
+	replayGuardian replay.ReplayGuardian
 
 	// chainReader is the core.Reader used to fetch blob parameters.
 	chainReader core.Reader
@@ -130,15 +134,16 @@ func NewServer(
 
 	var authenticator auth.RequestAuthenticator
 	if !config.AuthenticationDisabled {
-		authenticator, err = auth.NewRequestAuthenticator(
-			ctx,
-			ics,
-			config.AuthenticationKeyCacheSize,
-			config.AuthenticationTimeout)
+		authenticator, err = auth.NewRequestAuthenticator(ctx, ics, config.AuthenticationKeyCacheSize)
 		if err != nil {
 			return nil, fmt.Errorf("error creating authenticator: %w", err)
 		}
 	}
+
+	replayGuardian := replay.NewReplayGuardian(
+		time.Now,
+		config.GetChunksRequestMaxPastAge,
+		config.GetChunksRequestMaxPastAge)
 
 	return &Server{
 		config:           config,
@@ -149,6 +154,7 @@ func NewServer(
 		blobRateLimiter:  limiter.NewBlobRateLimiter(&config.RateLimits, relayMetrics),
 		chunkRateLimiter: limiter.NewChunkRateLimiter(&config.RateLimits, relayMetrics),
 		authenticator:    authenticator,
+		replayGuardian:   replayGuardian,
 		metrics:          relayMetrics,
 	}, nil
 }
@@ -211,6 +217,27 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	return reply, nil
 }
 
+func (s *Server) validateGetChunksRequest(request *pb.GetChunksRequest) error {
+	if request == nil {
+		return api.NewErrorInvalidArg("request is nil")
+	}
+	if len(request.ChunkRequests) == 0 {
+		return api.NewErrorInvalidArg("no chunk requests provided")
+	}
+	if len(request.ChunkRequests) > s.config.MaxKeysPerGetChunksRequest {
+		return api.NewErrorInvalidArg(fmt.Sprintf(
+			"too many chunk requests provided, max is %d", s.config.MaxKeysPerGetChunksRequest))
+	}
+
+	for _, chunkRequest := range request.ChunkRequests {
+		if chunkRequest.GetByIndex() == nil && chunkRequest.GetByRange() == nil {
+			return api.NewErrorInvalidArg("chunk request must be either by index or by range")
+		}
+	}
+
+	return nil
+}
+
 // GetChunks retrieves chunks from blobs stored by the relay.
 func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
 	start := time.Now()
@@ -220,14 +247,11 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		ctx, cancel = context.WithTimeout(ctx, s.config.Timeouts.GetChunksTimeout)
 		defer cancel()
 	}
+	err := s.validateGetChunksRequest(request)
+	if err != nil {
+		return nil, err
+	}
 
-	if len(request.ChunkRequests) <= 0 {
-		return nil, api.NewErrorInvalidArg("no chunk requests provided")
-	}
-	if len(request.ChunkRequests) > s.config.MaxKeysPerGetChunksRequest {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf(
-			"too many chunk requests provided, max is %d", s.config.MaxKeysPerGetChunksRequest))
-	}
 	s.metrics.ReportChunkKeyCount(len(request.ChunkRequests))
 
 	if s.authenticator != nil {
@@ -237,12 +261,20 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		}
 		clientAddress := client.Addr.String()
 
-		err := s.authenticator.AuthenticateGetChunksRequest(ctx, clientAddress, request, time.Now())
+		hash, err := s.authenticator.AuthenticateGetChunksRequest(ctx, request)
 		if err != nil {
 			s.metrics.ReportChunkAuthFailure()
 			s.logger.Debug("rejected GetChunks request", "client", clientAddress)
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("auth failed: %v", err))
 		}
+
+		timestamp := time.Unix(int64(request.Timestamp), 0)
+		err = s.replayGuardian.VerifyRequest(hash, timestamp)
+		if err != nil {
+			s.metrics.ReportChunkAuthFailure()
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
+		}
+
 		s.logger.Debug("received authenticated GetChunks request", "client", clientAddress)
 	}
 
@@ -252,7 +284,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	}
 
 	clientID := string(request.OperatorId)
-	err := s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
+	err = s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
 	if err != nil {
 		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("rate limit exceeded: %v", err))
 	}

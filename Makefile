@@ -1,4 +1,4 @@
-.PHONY: compile-el compile-dl clean protoc lint build unit-tests integration-tests-churner integration-tests-indexer integration-tests-inabox integration-tests-inabox-nochurner integration-tests-graph-indexer
+.PHONY: compile-el compile-dl clean protoc mdbook-serve lint build unit-tests integration-tests-churner integration-tests-indexer integration-tests-inabox integration-tests-inabox-nochurner integration-tests-graph-indexer
 
 ifeq ($(wildcard .git/*),)
 $(warning semver disabled - building from release zip)
@@ -31,6 +31,11 @@ clean:
 protoc: clean
 	./api/builder/protoc-docker.sh
 	./api/builder/generate-docs.sh
+
+# Serves the mdbook docs located in ./docs/spec.
+# Will open a browser window to view the docs.
+mdbook-serve:
+	mdbook serve ./docs/spec --open
 
 # Builds the protobuf files locally (i.e. without docker).
 protoc-local: clean

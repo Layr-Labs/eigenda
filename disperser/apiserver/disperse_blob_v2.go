@@ -15,6 +15,7 @@ import (
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
@@ -28,12 +29,12 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	if onchainState == nil {
 		return nil, api.NewErrorInternal("onchain state is nil")
 	}
-	if err := s.validateDispersalRequest(req, onchainState); err != nil {
+	if err := s.validateDispersalRequest(ctx, req, onchainState); err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate the request: %v", err))
 	}
 
 	// Check against payment meter to make sure there is quota remaining
-	if err := s.checkPaymentMeter(ctx, req); err != nil {
+	if err := s.checkPaymentMeter(ctx, req, start); err != nil {
 		return nil, err
 	}
 
@@ -100,7 +101,7 @@ func (s *DispersalServerV2) StoreBlob(ctx context.Context, data []byte, blobHead
 	return blobKey, err
 }
 
-func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.DisperseBlobRequest) error {
+func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.DisperseBlobRequest, receivedAt time.Time) error {
 	blobHeaderProto := req.GetBlobHeader()
 	blobHeader, err := corev2.BlobHeaderFromProtobuf(blobHeaderProto)
 	if err != nil {
@@ -112,14 +113,17 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 	timestamp := blobHeaderProto.GetPaymentHeader().GetTimestamp()
 	cumulativePayment := new(big.Int).SetBytes(blobHeaderProto.GetPaymentHeader().GetCumulativePayment())
 	accountID := blobHeaderProto.GetPaymentHeader().GetAccountId()
+	if !gethcommon.IsHexAddress(accountID) {
+		return api.NewErrorInvalidArg(fmt.Sprintf("invalid account ID: %s", accountID))
+	}
 
 	paymentHeader := core.PaymentMetadata{
-		AccountID:         accountID,
+		AccountID:         gethcommon.HexToAddress(accountID),
 		Timestamp:         timestamp,
 		CumulativePayment: cumulativePayment,
 	}
 
-	symbolsCharged, err := s.meterer.MeterRequest(ctx, paymentHeader, blobLength, blobHeader.QuorumNumbers)
+	symbolsCharged, err := s.meterer.MeterRequest(ctx, paymentHeader, uint64(blobLength), blobHeader.QuorumNumbers, receivedAt)
 	if err != nil {
 		return api.NewErrorResourceExhausted(err.Error())
 	}
@@ -129,6 +133,7 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 }
 
 func (s *DispersalServerV2) validateDispersalRequest(
+	ctx context.Context,
 	req *pb.DisperseBlobRequest,
 	onchainState *OnchainState) error {
 
@@ -172,11 +177,10 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		return errors.New("payment metadata is required")
 	}
 
-	accountIdIsEmpty := len(blobHeader.PaymentMetadata.AccountID) == 0
 	timestampIsNegative := blobHeader.PaymentMetadata.Timestamp < 0
 	paymentIsNegative := blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == -1
 	timestampIsZeroAndPaymentIsZero := blobHeader.PaymentMetadata.Timestamp == 0 && blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == 0
-	if accountIdIsEmpty || timestampIsNegative || paymentIsNegative || timestampIsZeroAndPaymentIsZero {
+	if timestampIsNegative || paymentIsNegative || timestampIsZeroAndPaymentIsZero {
 		return errors.New("invalid payment metadata")
 	}
 
@@ -215,6 +219,14 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	}
 	if !commitments.Equal(&blobHeader.BlobCommitments) {
 		return errors.New("invalid blob commitment")
+	}
+
+	blobKey, err := blobHeader.BlobKey()
+	if err != nil {
+		return fmt.Errorf("failed to get blob key: %w", err)
+	}
+	if s.blobStore.CheckBlobExists(ctx, blobKey) {
+		return fmt.Errorf("blob already exists: %s", blobKey.Hex())
 	}
 
 	return nil

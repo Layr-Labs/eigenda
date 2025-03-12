@@ -23,13 +23,29 @@ type TestClientConfig struct {
 	// The disperser's port
 	DisperserPort int
 	// The URL(s) to point the eth client to
+	//
+	// Either this or EthRPCURLsVar must be set. If both are set, EthRPCURLs is used.
 	EthRPCURLs []string
+	// The environment variable that contains the URL(s) to point the eth client to. Use a comma-separated list.
+	//
+	// Either this or EthRPCURLs must be set. If both are set, EthRPCURLs is used.
+	EthRPCUrlsVar string
 	// The contract address for the EigenDA BLS operator state retriever
 	BLSOperatorStateRetrieverAddr string
 	// The contract address for the EigenDA service manager
 	EigenDAServiceManagerAddr string
-	// The contract address for the EigenDA cert verifier
-	EigenDACertVerifierAddress string
+	// The contract address for the EigenDA cert verifier, which specifies required quorums 0 and 1
+	//
+	// If this value is not set, that tests utilizing it will be skipped
+	EigenDACertVerifierAddressQuorums0_1 string
+	// The contract address for the EigenDA cert verifier, which specifies required quorums 0, 1, and 2
+	//
+	// If this value is not set, that tests utilizing it will be skipped
+	EigenDACertVerifierAddressQuorums0_1_2 string
+	// The contract address for the EigenDA cert verifier, which specifies required quorum 2
+	//
+	// If this value is not set, that tests utilizing it will be skipped
+	EigenDACertVerifierAddressQuorums2 string
 	// The URL/IP of a subgraph to use for the chain state
 	SubgraphURL string
 	// The SRS order to use for the test

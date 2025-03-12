@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,7 +24,7 @@ func TestVerifyReceivedBlobKey(t *testing.T) {
 	quorumNumbers[0] = 8
 
 	paymentMetadata := core.PaymentMetadata{
-		AccountID:         "asdf",
+		AccountID:         gethcommon.Address{1},
 		Timestamp:         5,
 		CumulativePayment: big.NewInt(6),
 	}

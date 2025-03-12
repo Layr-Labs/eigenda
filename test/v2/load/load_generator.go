@@ -4,13 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/Layr-Labs/eigenda/test/v2/client"
-	"github.com/docker/go-units"
 	"os"
 	"sync/atomic"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/common/pprof"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/test/v2/client"
+	"github.com/docker/go-units"
 )
 
 // LoadGenerator is a utility for generating read and write load for the target network.
@@ -72,6 +74,14 @@ func NewLoadGenerator(
 	ctx, cancel := context.WithCancel(ctx)
 
 	metrics := newLoadGeneratorMetrics(client.GetMetricsRegistry())
+
+	if config.EnablePprof {
+		pprofProfiler := pprof.NewPprofProfiler(fmt.Sprintf("%d", config.PprofHttpPort), client.GetLogger())
+		go pprofProfiler.Start()
+		client.GetLogger().Info("Enabled pprof", "port", config.PprofHttpPort)
+	}
+
+	client.SetCertVerifierAddress(client.GetConfig().EigenDACertVerifierAddressQuorums0_1)
 
 	return &LoadGenerator{
 		ctx:                ctx,
@@ -136,11 +146,7 @@ func (l *LoadGenerator) submitBlob() {
 		float64(l.client.GetConfig().MaxBlobSize+1)))
 	payload := rand.Bytes(payloadSize)
 
-	eigenDACert, err := l.client.DispersePayload(
-		ctx,
-		l.client.GetConfig().EigenDACertVerifierAddress,
-		l.config.Quorums,
-		payload)
+	eigenDACert, err := l.client.DispersePayload(ctx, payload)
 	if err != nil {
 		l.client.GetLogger().Errorf("failed to disperse blob: %v", err)
 		return
@@ -152,20 +158,23 @@ func (l *LoadGenerator) submitBlob() {
 		return
 	}
 
+	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
+
 	// Read the blob from the relays and validators
 	for i := uint64(0); i < l.config.RelayReadAmplification; i++ {
 		err = l.client.ReadBlobFromRelays(
 			ctx,
 			*blobKey,
 			eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys,
-			payload)
+			payload,
+			blobLengthSymbols)
 		if err != nil {
 			l.client.GetLogger().Errorf("failed to read blob from relays: %v", err)
 		}
 	}
 
 	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := verification.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
+	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
 	if err != nil {
 		l.client.GetLogger().Errorf("failed to bind blob commitments: %v", err)
 		return

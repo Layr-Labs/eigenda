@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"strconv"
 	"sync"
 
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
@@ -61,7 +60,7 @@ type Client interface {
 	Query(ctx context.Context, tableName string, keyCondition string, expAttributeValues ExpressionValues) ([]Item, error)
 	QueryWithInput(ctx context.Context, input *dynamodb.QueryInput) ([]Item, error)
 	QueryIndexCount(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues) (int32, error)
-	QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue) (QueryResult, error)
+	QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue, ascending bool) (QueryResult, error)
 	DeleteItem(ctx context.Context, tableName string, key Key) error
 	DeleteItems(ctx context.Context, tableName string, keys []Key) ([]Key, error)
 	TableExists(ctx context.Context, name string) error
@@ -237,14 +236,10 @@ func (c *client) UpdateItemWithCondition(
 
 // IncrementBy increments the attribute by the value for item that matches with the key
 func (c *client) IncrementBy(ctx context.Context, tableName string, key Key, attr string, value uint64) (Item, error) {
-	// ADD numeric values
-	f, err := strconv.ParseFloat(strconv.FormatUint(value, 10), 64)
-	if err != nil {
-		return nil, err
-	}
-
+	// ADD numeric values; small amounts of precision loss if the uint64 value is large and cannot be representing as a float64.
+	// We don't expect such a large value to be incremented as it is used in units of dispersed symbols.
 	update := expression.UpdateBuilder{}
-	update = update.Add(expression.Name(attr), expression.Value(aws.Float64(f)))
+	update = update.Add(expression.Name(attr), expression.Value(aws.Float64(float64(value))))
 	expr, err := expression.NewBuilder().WithUpdate(update).Build()
 	if err != nil {
 		return nil, err
@@ -342,7 +337,7 @@ func (c *client) QueryIndexCount(ctx context.Context, tableName string, indexNam
 // QueryIndexWithPagination returns all items in the index that match the given key
 // Results are limited to the given limit and the pagination token is returned
 // When limit is 0, all items are returned
-func (c *client) QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue) (QueryResult, error) {
+func (c *client) QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue, ascending bool) (QueryResult, error) {
 	var queryInput *dynamodb.QueryInput
 
 	// Fetch all items if limit is 0
@@ -353,6 +348,7 @@ func (c *client) QueryIndexWithPagination(ctx context.Context, tableName string,
 			KeyConditionExpression:    aws.String(keyCondition),
 			ExpressionAttributeValues: expAttributeValues,
 			Limit:                     &limit,
+			ScanIndexForward:          aws.Bool(ascending),
 		}
 	} else {
 		queryInput = &dynamodb.QueryInput{
@@ -360,6 +356,7 @@ func (c *client) QueryIndexWithPagination(ctx context.Context, tableName string,
 			IndexName:                 aws.String(indexName),
 			KeyConditionExpression:    aws.String(keyCondition),
 			ExpressionAttributeValues: expAttributeValues,
+			ScanIndexForward:          aws.Bool(ascending),
 		}
 	}
 

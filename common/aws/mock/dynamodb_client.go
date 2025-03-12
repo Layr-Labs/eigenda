@@ -84,7 +84,7 @@ func (c *MockDynamoDBClient) QueryIndexCount(ctx context.Context, tableName stri
 	return args.Get(0).(int32), args.Error(1)
 }
 
-func (c *MockDynamoDBClient) QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues dynamodb.ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue) (dynamodb.QueryResult, error) {
+func (c *MockDynamoDBClient) QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues dynamodb.ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue, ascending bool) (dynamodb.QueryResult, error) {
 	args := c.Called()
 	return args.Get(0).(dynamodb.QueryResult), args.Error(1)
 }

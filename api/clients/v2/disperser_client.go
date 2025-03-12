@@ -142,7 +142,7 @@ func (c *disperserClient) DisperseBlob(
 	}
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(ctx, time.Now().UnixNano(), uint32(symbolLength), quorums)
+	payment, err := c.accountant.AccountBlob(ctx, time.Now().UnixNano(), uint64(symbolLength), quorums)
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
 	}
@@ -299,7 +299,7 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 	}
 
 	request := &disperser_rpc.GetPaymentStateRequest{
-		AccountId: accountID,
+		AccountId: accountID.Hex(),
 		Signature: signature,
 	}
 	return c.client.GetPaymentState(ctx, request)

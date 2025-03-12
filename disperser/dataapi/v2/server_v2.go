@@ -40,6 +40,10 @@ const (
 	// The quorum IDs that are allowed to query for signing info are [0, maxQuorumIDAllowed]
 	maxQuorumIDAllowed = 2
 
+	// Suppose 1 batch/s, we cache 2 days worth of batch attestations.
+	// Suppose 1KB for each attestation, this will be 173MB memory.
+	maxNumBatchesToCache = 3600 * 24 * 2
+
 	cacheControlParam       = "Cache-Control"
 	maxFeedBlobAge          = 300 // this is completely static
 	maxOperatorsStakeAge    = 300 // not expect the stake change to happen frequently
@@ -194,6 +198,8 @@ type ServerV2 struct {
 
 	operatorHandler *dataapi.OperatorHandler
 	metricsHandler  *dataapi.MetricsHandler
+
+	batchFeedCache *FeedCache[corev2.Attestation]
 }
 
 func NewServerV2(
@@ -208,6 +214,26 @@ func NewServerV2(
 	metrics *dataapi.Metrics,
 ) *ServerV2 {
 	l := logger.With("component", "DataAPIServerV2")
+
+	getBatchTimestampFn := func(item *corev2.Attestation) time.Time {
+		return time.Unix(0, int64(item.AttestedAt))
+	}
+	fetchBatchFn := func(ctx context.Context, start, end time.Time, order FetchOrder, limit int) ([]*corev2.Attestation, error) {
+		if order == Ascending {
+			return blobMetadataStore.GetAttestationByAttestedAtForward(
+				ctx, uint64(start.UnixNano())-1, uint64(end.UnixNano()), limit,
+			)
+		}
+		return blobMetadataStore.GetAttestationByAttestedAtBackward(
+			ctx, uint64(end.UnixNano()), uint64(start.UnixNano())-1, limit,
+		)
+	}
+	batchFeedCache := NewFeedCache[corev2.Attestation](
+		maxNumBatchesToCache,
+		fetchBatchFn,
+		getBatchTimestampFn,
+	)
+
 	return &ServerV2{
 		logger:            l,
 		serverMode:        config.ServerMode,
@@ -222,6 +248,7 @@ func NewServerV2(
 		metrics:           metrics,
 		operatorHandler:   dataapi.NewOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient),
 		metricsHandler:    dataapi.NewMetricsHandler(promClient, dataapi.V2),
+		batchFeedCache:    batchFeedCache,
 	}
 }
 

@@ -6,13 +6,17 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
+	relayv2 "github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
@@ -27,7 +31,6 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
-	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 const (
@@ -39,23 +42,21 @@ const (
 
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
 type TestClient struct {
-	config          *TestClientConfig
-	logger          logging.Logger
-	disperserClient clients.DisperserClient
-	// Each payload disperser serves a specific subset of quorums. The key in this map is a string representation
-	// of the quorum IDs served by the payload disperser.
-	payloadDispersers         map[string]*clients.PayloadDisperser
-	payloadDisperserLock      sync.Mutex
-	relayClient               clients.RelayClient
-	relayPayloadRetriever     *clients.RelayPayloadRetriever
-	indexedChainState         core.IndexedChainState
-	retrievalClient           clients.RetrievalClient
-	validatorPayloadRetriever *clients.ValidatorPayloadRetriever
-	certVerifier              *verification.CertVerifier
-	privateKey                string
-	metricsRegistry           *prometheus.Registry
-	metrics                   *testClientMetrics
-	blobCodec                 codecs.BlobCodec
+	config                      *TestClientConfig
+	payloadClientConfig         *clients.PayloadClientConfig
+	logger                      logging.Logger
+	certVerifierAddressProvider *test.TestCertVerifierAddressProvider
+	disperserClient             clients.DisperserClient
+	payloadDisperser            *payloaddispersal.PayloadDisperser
+	relayClient                 clients.RelayClient
+	relayPayloadRetriever       *payloadretrieval.RelayPayloadRetriever
+	indexedChainState           core.IndexedChainState
+	retrievalClient             clients.RetrievalClient
+	validatorPayloadRetriever   *payloadretrieval.ValidatorPayloadRetriever
+	certVerifier                *verification.CertVerifier
+	privateKey                  string
+	metricsRegistry             *prometheus.Registry
+	metrics                     *testClientMetrics
 }
 
 // NewTestClient creates a new TestClient instance.
@@ -79,11 +80,10 @@ func NewTestClient(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signer: %w", err)
 	}
-	signerAccountId, err := signer.GetAccountID()
+	accountId, err := signer.GetAccountID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account ID: %w", err)
 	}
-	accountId := gethcommon.HexToAddress(signerAccountId)
 	logger.Infof("Account ID: %s", accountId.String())
 
 	g1Path, err := config.ResolveSRSPath(SRSPathG1)
@@ -134,8 +134,13 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to populate accountant: %w", err)
 	}
 
+	ethRPCUrls, err := loadEthRPCURLs(config.EthRPCURLs, config.EthRPCUrlsVar)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load Ethereum RPC URLs: %w", err)
+	}
+
 	ethClientConfig := geth.EthClientConfig{
-		RPCURLs:          config.EthRPCURLs,
+		RPCURLs:          ethRPCUrls,
 		PrivateKeyString: privateKey,
 		NumConfirmations: 0,
 		NumRetries:       3,
@@ -145,12 +150,30 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create Ethereum client: %w", err)
 	}
 
-	certVerifier, err := verification.NewCertVerifier(
-		logger,
-		ethClient,
-		time.Second)
+	certVerifierAddressProvider := &test.TestCertVerifierAddressProvider{}
+
+	certVerifier, err := verification.NewCertVerifier(logger, ethClient, certVerifierAddressProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cert verifier: %w", err)
+	}
+
+	// TODO (litt3): the PayloadPolynomialForm field included inside this config should be tested with different
+	//  values, rather than just using the default. Consider a testing strategy that would exercise both encoding
+	//  options.
+	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
+
+	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
+		PayloadClientConfig:  *payloadClientConfig,
+		DisperseBlobTimeout:  1337 * time.Hour, // this suite enforces its own timeouts
+		BlobCertifiedTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
+	}
+	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
+		logger,
+		payloadDisperserConfig,
+		disperserClient,
+		certVerifier)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create payload disperser: %w", err)
 	}
 
 	// Construct the relay client
@@ -162,11 +185,6 @@ func NewTestClient(
 		config.EigenDAServiceManagerAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Ethereum reader: %w", err)
-	}
-
-	relayURLS, err := ethReader.GetRelayURLs(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get relay URLs: %w", err)
 	}
 
 	// If the relay client attempts to call GetChunks(), it will use this bogus signer.
@@ -182,13 +200,18 @@ func NewTestClient(
 	}
 
 	relayConfig := &clients.RelayClientConfig{
-		Sockets:            relayURLS,
 		UseSecureGrpcFlag:  true,
 		MaxGRPCMessageSize: units.GiB,
 		OperatorID:         &core.OperatorID{0},
 		MessageSigner:      fakeSigner,
 	}
-	relayClient, err := clients.NewRelayClient(relayConfig, logger)
+
+	relayUrlProvider, err := relayv2.NewRelayUrlProvider(ethClient, ethReader.GetRelayRegistryAddress())
+	if err != nil {
+		return nil, fmt.Errorf("create relay url provider: %w", err)
+	}
+
+	relayClient, err := clients.NewRelayClient(relayConfig, logger, relayUrlProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create relay client: %w", err)
 	}
@@ -198,24 +221,16 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create blob verifier: %w", err)
 	}
 
-	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
-	payloadClientConfig.EigenDACertVerifierAddr = config.EigenDACertVerifierAddress
-	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, codecs.PayloadEncodingVersion0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create blob codec: %w", err)
-	}
-
-	relayPayloadRetrieverConfig := &clients.RelayPayloadRetrieverConfig{
+	relayPayloadRetrieverConfig := &payloadretrieval.RelayPayloadRetrieverConfig{
 		PayloadClientConfig: *payloadClientConfig,
 		RelayTimeout:        1337 * time.Hour, // this suite enforces its own timeouts
 	}
 
-	relayPayloadRetriever, err := clients.NewRelayPayloadRetriever(
+	relayPayloadRetriever, err := payloadretrieval.NewRelayPayloadRetriever(
 		logger,
 		rand.Rand,
 		*relayPayloadRetrieverConfig,
 		relayClient,
-		blobCodec,
 		blobVerifier.Srs.G1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create relay payload retriever: %w", err)
@@ -231,12 +246,9 @@ func NewTestClient(
 	}
 	indexedChainState := thegraph.MakeIndexedChainState(icsConfig, chainState, logger)
 
-	validatorPayloadRetrieverConfig := &clients.ValidatorPayloadRetrieverConfig{
-		PayloadClientConfig:           *payloadClientConfig,
-		MaxConnectionCount:            20,
-		BlsOperatorStateRetrieverAddr: config.BLSOperatorStateRetrieverAddr,
-		EigenDAServiceManagerAddr:     config.EigenDAServiceManagerAddr,
-		RetrievalTimeout:              1337 * time.Hour, // this suite enforces its own timeouts
+	validatorPayloadRetrieverConfig := &payloadretrieval.ValidatorPayloadRetrieverConfig{
+		PayloadClientConfig: *payloadClientConfig,
+		RetrievalTimeout:    1337 * time.Hour, // this suite enforces its own timeouts
 	}
 
 	retrievalClient := clients.NewRetrievalClient(
@@ -244,12 +256,11 @@ func NewTestClient(
 		ethReader,
 		indexedChainState,
 		blobVerifier,
-		int(validatorPayloadRetrieverConfig.MaxConnectionCount))
+		20)
 
-	validatorPayloadRetriever, err := clients.NewValidatorPayloadRetriever(
+	validatorPayloadRetriever, err := payloadretrieval.NewValidatorPayloadRetriever(
 		logger,
 		*validatorPayloadRetrieverConfig,
-		blobCodec,
 		retrievalClient,
 		blobVerifier.Srs.G1)
 	if err != nil {
@@ -257,20 +268,21 @@ func NewTestClient(
 	}
 
 	return &TestClient{
-		config:                    config,
-		logger:                    logger,
-		disperserClient:           disperserClient,
-		payloadDispersers:         make(map[string]*clients.PayloadDisperser),
-		relayClient:               relayClient,
-		relayPayloadRetriever:     relayPayloadRetriever,
-		indexedChainState:         indexedChainState,
-		retrievalClient:           retrievalClient,
-		validatorPayloadRetriever: validatorPayloadRetriever,
-		certVerifier:              certVerifier,
-		privateKey:                privateKey,
-		metricsRegistry:           metrics.registry,
-		metrics:                   metrics,
-		blobCodec:                 blobCodec,
+		config:                      config,
+		payloadClientConfig:         payloadClientConfig,
+		logger:                      logger,
+		certVerifierAddressProvider: certVerifierAddressProvider,
+		disperserClient:             disperserClient,
+		payloadDisperser:            payloadDisperser,
+		relayClient:                 relayClient,
+		relayPayloadRetriever:       relayPayloadRetriever,
+		indexedChainState:           indexedChainState,
+		retrievalClient:             retrievalClient,
+		validatorPayloadRetriever:   validatorPayloadRetriever,
+		certVerifier:                certVerifier,
+		privateKey:                  privateKey,
+		metricsRegistry:             metrics.registry,
+		metrics:                     metrics,
 	}, nil
 }
 
@@ -299,6 +311,24 @@ func loadPrivateKey(keyPath string, keyVar string) (string, error) {
 	return formatPrivateKey(privateKey), nil
 }
 
+// loadEthRPCURLs loads the Ethereum RPC URLs from the file/env var specified in the config.
+func loadEthRPCURLs(urls []string, urlsVar string) ([]string, error) {
+	if len(urls) > 0 {
+		return urls, nil
+	}
+
+	if urlsVar == "" {
+		return nil, fmt.Errorf("either EthRPCURLs or EthRPCUrlsVar must be set")
+	}
+
+	ethRPCURLs := os.Getenv(urlsVar)
+	if ethRPCURLs == "" {
+		return nil, fmt.Errorf("URLs not found in environment variable %s", urlsVar)
+	}
+
+	return strings.Split(ethRPCURLs, ","), nil
+}
+
 // formatPrivateKey formats the private key by removing leading/trailing whitespace and "0x" prefix.
 func formatPrivateKey(privateKey string) string {
 	privateKey = strings.Trim(privateKey, "\n \t")
@@ -316,54 +346,20 @@ func (c *TestClient) GetLogger() logging.Logger {
 	return c.logger
 }
 
+// SetCertVerifierAddress sets the address string which will be returned by the cert verifier address to all users of
+// the provider
+func (c *TestClient) SetCertVerifierAddress(certVerifierAddress string) {
+	c.certVerifierAddressProvider.SetCertVerifierAddress(gethcommon.HexToAddress(certVerifierAddress))
+}
+
 // GetDisperserClient returns the test client's disperser client.
 func (c *TestClient) GetDisperserClient() clients.DisperserClient {
 	return c.disperserClient
 }
 
-// GetPayloadDisperser returns the test client's payload disperser for a specific set of quorums.
-func (c *TestClient) GetPayloadDisperser(quorums []core.QuorumID) (*clients.PayloadDisperser, error) {
-	quorumsString := ""
-	for _, quorum := range quorums {
-		quorumsString += fmt.Sprintf("%d,", quorum)
-	}
-
-	c.payloadDisperserLock.Lock()
-	defer c.payloadDisperserLock.Unlock()
-
-	if payloadDisperser, ok := c.payloadDispersers[quorumsString]; ok {
-		return payloadDisperser, nil
-	}
-
-	c.logger.Debugf("Creating payload disperser for quorums %v", quorums)
-
-	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
-	payloadClientConfig.EigenDACertVerifierAddr = c.config.EigenDACertVerifierAddress
-
-	payloadDisperserConfig := &clients.PayloadDisperserConfig{
-		PayloadClientConfig: *payloadClientConfig,
-		Quorums:             quorums,
-		DisperseBlobTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
-	}
-
-	blobCodec, err := codecs.CreateCodec(codecs.PolynomialFormEval, payloadDisperserConfig.PayloadEncodingVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create blob codec: %w", err)
-	}
-
-	payloadDisperser, err := clients.NewPayloadDisperser(
-		logger,
-		*payloadDisperserConfig,
-		blobCodec,
-		c.disperserClient,
-		c.certVerifier)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create payload disperser: %w", err)
-	}
-
-	c.payloadDispersers[quorumsString] = payloadDisperser
-
-	return payloadDisperser, nil
+// GetPayloadDisperser returns the test client's payload disperser.
+func (c *TestClient) GetPayloadDisperser() *payloaddispersal.PayloadDisperser {
+	return c.payloadDisperser
 }
 
 // GetRelayClient returns the test client's relay client.
@@ -372,7 +368,7 @@ func (c *TestClient) GetRelayClient() clients.RelayClient {
 }
 
 // GetRelayPayloadRetriever returns the test client's relay payload retriever.
-func (c *TestClient) GetRelayPayloadRetriever() *clients.RelayPayloadRetriever {
+func (c *TestClient) GetRelayPayloadRetriever() *payloadretrieval.RelayPayloadRetriever {
 	return c.relayPayloadRetriever
 }
 
@@ -387,7 +383,7 @@ func (c *TestClient) GetRetrievalClient() clients.RetrievalClient {
 }
 
 // GetValidatorPayloadRetriever returns the test client's validator payload retriever.
-func (c *TestClient) GetValidatorPayloadRetriever() *clients.ValidatorPayloadRetriever {
+func (c *TestClient) GetValidatorPayloadRetriever() *payloadretrieval.ValidatorPayloadRetriever {
 	return c.validatorPayloadRetriever
 }
 
@@ -413,15 +409,9 @@ func (c *TestClient) Stop() {
 
 // DisperseAndVerify sends a payload to the disperser. Waits until the payload is confirmed and then reads
 // it back from the relays and the validators.
-func (c *TestClient) DisperseAndVerify(
-	ctx context.Context,
-	certVerifierAddress string,
-	quorums []core.QuorumID,
-	payload []byte,
-) error {
-
+func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) error {
 	start := time.Now()
-	eigenDACert, err := c.DispersePayload(ctx, certVerifierAddress, quorums, payload)
+	eigenDACert, err := c.DispersePayload(ctx, payload)
 	if err != nil {
 		return fmt.Errorf("failed to disperse payload: %w", err)
 	}
@@ -433,31 +423,40 @@ func (c *TestClient) DisperseAndVerify(
 	}
 
 	// read blob from a single relay (assuming success, otherwise will retry)
-	payloadBytesFromRelayRetriever, err := c.relayPayloadRetriever.GetPayload(ctx, eigenDACert)
+	payloadFromRelayRetriever, err := c.relayPayloadRetriever.GetPayload(ctx, eigenDACert)
 	if err != nil {
-		return fmt.Errorf("failed to read blob from relay: %w", err)
+		return fmt.Errorf("failed to get payload from relay: %w", err)
 	}
+	payloadBytesFromRelayRetriever := payloadFromRelayRetriever.Serialize()
 	if !bytes.Equal(payload, payloadBytesFromRelayRetriever) {
 		return fmt.Errorf("payloads do not match")
 	}
 
 	// read blob from a single quorum (assuming success, otherwise will retry)
-	payloadBytesFromValidatorRetriever, err := c.validatorPayloadRetriever.GetPayload(ctx, eigenDACert)
+	payloadFromValidatorRetriever, err := c.validatorPayloadRetriever.GetPayload(ctx, eigenDACert)
 	if err != nil {
-		return fmt.Errorf("failed to read blob from validators: %w", err)
+		return fmt.Errorf("failed to get payload from validators: %w", err)
 	}
+	payloadBytesFromValidatorRetriever := payloadFromValidatorRetriever.Serialize()
 	if !bytes.Equal(payload, payloadBytesFromValidatorRetriever) {
 		return fmt.Errorf("payloads do not match")
 	}
 
+	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
+
 	// read blob from ALL relays
-	err = c.ReadBlobFromRelays(ctx, *blobKey, eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys, payload)
+	err = c.ReadBlobFromRelays(
+		ctx,
+		*blobKey,
+		eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys,
+		payload,
+		blobLengthSymbols)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relays: %w", err)
 	}
 
 	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := verification.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
+	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
 	if err != nil {
 		return fmt.Errorf("failed to convert blob commitments: %w", err)
 	}
@@ -478,25 +477,17 @@ func (c *TestClient) DisperseAndVerify(
 }
 
 // DispersePayload sends a payload to the disperser. Returns the blob key.
-func (c *TestClient) DispersePayload(
-	ctx context.Context,
-	certVerifierAddress string,
-	quorums []core.QuorumID,
-	payload []byte,
-) (*verification.EigenDACert, error) {
-
-	c.logger.Debugf("Dispersing payload of length %d", len(payload))
+func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (*coretypes.EigenDACert, error) {
+	c.logger.Debugf("Dispersing payload of length %d", len(payloadBytes))
 	start := time.Now()
 
-	payloadDisperser, err := c.GetPayloadDisperser(quorums)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get payload disperser: %w", err)
-	}
-	cert, err := payloadDisperser.SendPayload(ctx, certVerifierAddress, payload)
+	payload := coretypes.NewPayload(payloadBytes)
 
+	cert, err := c.GetPayloadDisperser().SendPayload(ctx, payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to disperse payload: %w", err)
 	}
+
 	c.metrics.reportDispersalTime(time.Since(start))
 
 	return cert, nil
@@ -507,23 +498,31 @@ func (c *TestClient) ReadBlobFromRelays(
 	ctx context.Context,
 	key corev2.BlobKey,
 	relayKeys []corev2.RelayKey,
-	expectedPayload []byte) error {
+	expectedPayload []byte,
+	blobLengthSymbols uint32) error {
 
 	for _, relayID := range relayKeys {
 		start := time.Now()
 
 		c.logger.Debugf("Reading blob from relay %d", relayID)
-		blobFromRelay, err := c.relayClient.GetBlob(ctx, relayID, key)
+		blobBytesFromRelay, err := c.relayClient.GetBlob(ctx, relayID, key)
 		if err != nil {
 			return fmt.Errorf("failed to read blob from relay: %w", err)
 		}
 
 		c.metrics.reportRelayReadTime(time.Since(start), relayID)
 
-		payloadBytesFromRelay, err := c.blobCodec.DecodeBlob(blobFromRelay)
+		blob, err := coretypes.DeserializeBlob(blobBytesFromRelay, blobLengthSymbols)
+		if err != nil {
+			return fmt.Errorf("failed to deserialize blob: %w", err)
+		}
+
+		payload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
 		if err != nil {
 			return fmt.Errorf("failed to decode blob: %w", err)
 		}
+
+		payloadBytesFromRelay := payload.Serialize()
 
 		if !bytes.Equal(payloadBytesFromRelay, expectedPayload) {
 			return fmt.Errorf("payloads do not match")
@@ -540,7 +539,7 @@ func (c *TestClient) ReadBlobFromValidators(
 	blobVersion corev2.BlobVersion,
 	blobCommitments encoding.BlobCommitments,
 	quorums []core.QuorumID,
-	expectedPayload []byte) error {
+	expectedPayloadBytes []byte) error {
 
 	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
@@ -552,7 +551,7 @@ func (c *TestClient) ReadBlobFromValidators(
 
 		start := time.Now()
 
-		retrievedBlob, err := c.retrievalClient.GetBlob(
+		retrievedBlobBytes, err := c.retrievalClient.GetBlob(
 			ctx,
 			blobKey,
 			blobVersion,
@@ -565,11 +564,19 @@ func (c *TestClient) ReadBlobFromValidators(
 
 		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
 
-		retrievedPayload, err := c.blobCodec.DecodeBlob(retrievedBlob)
+		blobLengthSymbols := uint32(blobCommitments.Length)
+		blob, err := coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
 		if err != nil {
-			return fmt.Errorf("failed to decode blob: %w", err)
+			return fmt.Errorf("failed to deserialize blob: %w", err)
 		}
-		if !bytes.Equal(retrievedPayload, expectedPayload) {
+
+		retrievedPayload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
+		if err != nil {
+			return fmt.Errorf("failed to convert blob to payload: %w", err)
+		}
+
+		payloadBytes := retrievedPayload.Serialize()
+		if !bytes.Equal(payloadBytes, expectedPayloadBytes) {
 			return fmt.Errorf("payloads do not match")
 		}
 	}
