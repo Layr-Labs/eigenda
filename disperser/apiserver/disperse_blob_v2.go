@@ -34,19 +34,8 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate the request: %v", err))
 	}
 
-	blobKey, err := blobHeader.BlobKey()
-	if err != nil {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to parse the blob header: %v", err))
-	}
-
-	// check if blob already exists
-	exists, err := s.blobMetadataStore.DoesBlobExist(ctx, blobKey)
-	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to check blob existence: %v", err))
-	}
-
-	if exists {
-		return nil, api.NewErrorAlreadyExists(fmt.Sprintf("blob already exists: %s", blobKey.Hex()))
+	if err := s.checkBlobExistence(ctx, blobHeader); err != nil {
+		return nil, err
 	}
 
 	// Check against payment meter to make sure there is quota remaining
@@ -61,7 +50,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	s.metrics.reportDisperseBlobSize(len(blob))
 	s.logger.Debug("received a new blob dispersal request", "blobSizeBytes", len(blob), "quorums", req.GetBlobHeader().GetQuorumNumbers())
 
-	blobKey, err = s.StoreBlob(ctx, blob, blobHeader, req.GetSignature(), time.Now(), onchainState.TTL)
+	blobKey, err := s.StoreBlob(ctx, blob, blobHeader, req.GetSignature(), time.Now(), onchainState.TTL)
 	if err != nil {
 		return nil, err
 	}
@@ -233,4 +222,23 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	}
 
 	return blobHeader, nil
+}
+
+func (s *DispersalServerV2) checkBlobExistence(ctx context.Context, blobHeader *corev2.BlobHeader) error {
+	blobKey, err := blobHeader.BlobKey()
+	if err != nil {
+		return api.NewErrorInvalidArg(fmt.Sprintf("failed to parse the blob header: %v", err))
+	}
+
+	// check if blob already exists
+	exists, err := s.blobMetadataStore.DoesBlobExist(ctx, blobKey)
+	if err != nil {
+		return api.NewErrorInternal(fmt.Sprintf("failed to check blob existence: %v", err))
+	}
+
+	if exists {
+		return api.NewErrorAlreadyExists(fmt.Sprintf("blob already exists: %s", blobKey.Hex()))
+	}
+
+	return nil
 }
