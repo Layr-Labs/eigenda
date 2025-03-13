@@ -1,6 +1,7 @@
 package dbbench
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/binary"
@@ -44,7 +45,9 @@ const TTL = 2 * time.Hour
 const dataGeneratorCount = 16
 
 const pprofEnabled = false
-const traceEnabled = true
+const traceEnabled = false
+
+const captureKeys = true
 
 // Used to ensure that keys are truly unique
 var nextSeedSerialNumber = atomic.Uint32{}
@@ -140,6 +143,45 @@ func runBenchmark(write writer, read reader) {
 			panic(fmt.Errorf("could not start trace file: %v", err))
 		}
 		defer trace.Stop()
+	}
+
+	var keyWriter bufio.Writer
+	if captureKeys {
+
+		// First, check if the key file exists. If it does, verify that each key it contains is in the database.
+		if _, err := os.Stat("keys.txt"); err == nil {
+			fmt.Printf("Found keys.txt, scanning DB\n")
+
+			data, err := os.ReadFile("keyfile.txt")
+			if err != nil {
+				panic(fmt.Errorf("could not read key file: %v", err))
+			}
+
+			elements := strings.Split(string(data), "\n")
+			fmt.Printf("Scanning %d keys\n", len(elements))
+			for _, key := range elements {
+				if len(key) != 32 {
+					fmt.Printf("found partial key: '%s', skipping\n", key)
+					continue
+				}
+				value, err := read([]byte(key))
+				if err != nil {
+					panic(fmt.Errorf("error reading key %s: %v", key, err))
+				}
+				if len(value) != dataSize {
+					panic(fmt.Errorf("expected value of length %d, got %d", dataSize, len(value)))
+				}
+			}
+
+			fmt.Printf("done scanning\n")
+		}
+
+		keyFile, err := os.Create("keys.txt")
+		if err != nil {
+			panic(fmt.Errorf("could not create key file: %v", err))
+		}
+		defer keyFile.Close()
+		keyWriter = *bufio.NewWriter(keyFile)
 	}
 
 	start := time.Now()
@@ -332,6 +374,13 @@ func runBenchmark(write writer, read reader) {
 			next, _ := possiblyUnflushedData.Dequeue()
 			metadata = next.(*writeMetadata)
 			unexpiredData[metadata.seed] = metadata
+
+			if captureKeys {
+				_, err = keyWriter.WriteString(fmt.Sprintf("%s\n", key))
+				if err != nil {
+					panic(err)
+				}
+			}
 		}
 		lock.Unlock()
 
