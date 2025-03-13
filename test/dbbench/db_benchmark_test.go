@@ -152,7 +152,7 @@ func runBenchmark(write writer, read reader) {
 		if _, err := os.Stat("keys.txt"); err == nil {
 			fmt.Printf("Found keys.txt, scanning DB\n")
 
-			data, err := os.ReadFile("keyfile.txt")
+			data, err := os.ReadFile("keys.txt")
 			if err != nil {
 				panic(fmt.Errorf("could not read key file: %v", err))
 			}
