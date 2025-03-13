@@ -556,10 +556,7 @@ func TestBadgerDB(t *testing.T) {
 		keyCaptureWriter = bufio.NewWriter(keyFile)
 	}
 
-	keys := make([][]byte, 0)
 	writeFunction := func(key []byte, value []byte) error {
-		keys = append(keys, key)
-
 		unflushedKeys = append(unflushedKeys, key)
 
 		entry := badger.NewEntry(key, value).WithTTL(ttl)
@@ -603,10 +600,11 @@ func TestBadgerDB(t *testing.T) {
 						}
 					}
 					err = keyCaptureWriter.Flush()
+					fmt.Printf("wrote %d keys\n", len(unflushedKeys))
 					if err != nil {
 						panic(err)
 					}
-					unflushedKeys = nil
+					unflushedKeys = make([][]byte, 0, 100)
 
 				}
 
