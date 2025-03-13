@@ -6,11 +6,14 @@ package litt
 // Litt: slang, a synonym for "cool" or "awesome". e.g. "Man, that database is litt, bro!".
 //
 // Supported features:
-// - writing values
-// - reading values
-// - TTLs and automatic (lazy) deletion of expired values
-// - tables with non-overlapping namespaces
-// - thread safety: all methods are safe to call concurrently, and all modifications are atomic
+//   - writing values
+//   - reading values
+//   - TTLs and automatic (lazy) deletion of expired values
+//   - tables with non-overlapping namespaces
+//   - thread safety: all methods are safe to call concurrently, and all modifications are atomic
+//   - dynamic multi-drive support (data can be spread across multiple physical volumes, and
+//     volume membership can be changed at runtime without stopping the DB)
+//   - incremental backups (both local and remote)
 //
 // Unsupported features:
 // - mutating existing values (once a value is written, it cannot be changed)
