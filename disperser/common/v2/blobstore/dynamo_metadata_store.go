@@ -267,15 +267,15 @@ func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey corev2.
 
 // CheckBlobExists checks if a blob exists without fetching the entire metadata.
 func (s *BlobMetadataStore) CheckBlobExists(ctx context.Context, blobKey corev2.BlobKey) (bool, error) {
-	// Use GetItem with ProjectionExpression to minimize data transfer
-	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+	// Use GetItemWithProjection to explicitly only fetch the PK attribute to minimize data transfer
+	item, err := s.dynamoDBClient.GetItemWithProjection(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
 		},
 		"SK": &types.AttributeValueMemberS{
 			Value: blobMetadataSK,
 		},
-	})
+	}, "PK")
 	if err != nil {
 		return false, fmt.Errorf("failed to check blob existence: %w", err)
 	}

@@ -55,6 +55,7 @@ type Client interface {
 	UpdateItemWithCondition(ctx context.Context, tableName string, key Key, item Item, condition expression.ConditionBuilder) (Item, error)
 	IncrementBy(ctx context.Context, tableName string, key Key, attr string, value uint64) (Item, error)
 	GetItem(ctx context.Context, tableName string, key Key) (Item, error)
+	GetItemWithProjection(ctx context.Context, tableName string, key Key, projectionExpression string) (Item, error)
 	GetItems(ctx context.Context, tableName string, keys []Key, consistentRead bool) ([]Item, error)
 	QueryIndex(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues) ([]Item, error)
 	Query(ctx context.Context, tableName string, keyCondition string, expAttributeValues ExpressionValues) ([]Item, error)
@@ -262,6 +263,22 @@ func (c *client) IncrementBy(ctx context.Context, tableName string, key Key, att
 
 func (c *client) GetItem(ctx context.Context, tableName string, key Key) (Item, error) {
 	resp, err := c.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{Key: key, TableName: aws.String(tableName)})
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Item, nil
+}
+
+// GetItemWithProjection retrieves an item from the table using the provided key and returns only the attributes specified in the projection expression
+func (c *client) GetItemWithProjection(ctx context.Context, tableName string, key Key, projectionExpression string) (Item, error) {
+	input := &dynamodb.GetItemInput{
+		Key:                  key,
+		TableName:            aws.String(tableName),
+		ProjectionExpression: aws.String(projectionExpression),
+	}
+
+	resp, err := c.dynamoClient.GetItem(ctx, input)
 	if err != nil {
 		return nil, err
 	}
