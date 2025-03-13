@@ -133,18 +133,17 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 	// 1. If no record exists, accept the payment
 	// 2. If record exists, the increment must be at least the payment charged
 	//    (which also ensures the new payment is larger than the existing one since paymentCharged > 0)
-	payment := big.NewInt(0).Sub(paymentMetadata.CumulativePayment, paymentCharged)
-	if payment.Sign() < 0 {
+	paymentCheckpoint := big.NewInt(0).Sub(paymentMetadata.CumulativePayment, paymentCharged)
+	if paymentCheckpoint.Sign() < 0 {
 		return nil, fmt.Errorf("payment validation failed: payment charged is greater than cumulative payment")
 	}
 	conditionExpression := "attribute_not_exists(CumulativePayment) OR " +
 		"CumulativePayment <= :payment"
 
 	expressionValues := map[string]types.AttributeValue{
-		":payment": &types.AttributeValueMemberN{Value: payment.String()},
+		":payment": &types.AttributeValueMemberN{Value: paymentCheckpoint.String()},
 	}
 
-	// Use PutItemWithConditionAndReturn to get the old value
 	oldItem, err := s.dynamoClient.PutItemWithConditionAndReturn(ctx, s.onDemandTableName, item, conditionExpression, nil, expressionValues)
 	if err != nil {
 		if errors.Is(err, commondynamodb.ErrConditionFailed) {

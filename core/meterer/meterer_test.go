@@ -370,6 +370,13 @@ func TestMetererOnDemand(t *testing.T) {
 		}})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(result))
+
+	// with rollback of invalid payments, users cannot cheat by inserting an invalid cumulative payment
+	symbolsCharged = mt.SymbolsCharged(uint64(30))
+	header = createPaymentHeader(now.UnixNano(), meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol()), accountID2)
+	_, err = mt.MeterRequest(ctx, *header, 30, quorumNumbers, now)
+	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
+
 	// test failed global rate limit (previously payment recorded: 2, global limit: 1009)
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, meterer.PaymentCharged(1010, mt.ChainPaymentState.GetPricePerSymbol())), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1010, quorumNumbers, now)

@@ -202,7 +202,7 @@ func GetReservationPeriod(timestamp int64, binInterval uint64) uint64 {
 // On-demand requests doesn't have additional quorum settings and should only be
 // allowed by ETH and EIGEN quorums
 func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, symbolsCharged uint64, headerQuorums []uint8, receivedAt time.Time) error {
-	m.logger.Info("Recording and validating on-demand usage", "header", header, "onDemandPayment", onDemandPayment)
+	m.logger.Debug("Recording and validating on-demand usage", "header", header, "onDemandPayment", onDemandPayment)
 	quorumNumbers, err := m.ChainPaymentState.GetOnDemandQuorumNumbers(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get on-demand quorum numbers: %w", err)
@@ -213,21 +213,16 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 	}
 
 	// Verify that the claimed cumulative payment doesn't exceed the on-chain deposit
-	fmt.Println("header.CumulativePayment", header.CumulativePayment, "onDemandPayment.CumulativePayment", onDemandPayment.CumulativePayment)
 	if header.CumulativePayment.Cmp(onDemandPayment.CumulativePayment) > 0 {
 		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
 	}
 
-	// Compute paymentCharged at payment time
 	paymentCharged := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol())
-	// Add the payment and get the old payment value
-	m.logger.Info("Adding on-demand payment", "header", header, "onDemandPayment", onDemandPayment, "paymentCharged", paymentCharged)
 	oldPayment, err := m.OffchainStore.AddOnDemandPayment(ctx, header, paymentCharged)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
 	}
 
-	m.logger.Info("Incrementing global bin usage", "header", header, "onDemandPayment", onDemandPayment, "oldPayment", oldPayment)
 	// Update bin usage atomically and check against bin capacity
 	if err := m.IncrementGlobalBinUsage(ctx, uint64(symbolsCharged), receivedAt); err != nil {
 		// If global bin usage update fails, roll back the payment to its previous value
@@ -239,7 +234,6 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 		}
 		return fmt.Errorf("failed global rate limiting: %w", err)
 	}
-	m.logger.Info("Successfully incremented global bin usage", "header", header, "onDemandPayment", onDemandPayment, "oldPayment", oldPayment)
 
 	return nil
 }
