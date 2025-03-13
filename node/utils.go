@@ -126,7 +126,7 @@ func SocketAddress(ctx context.Context, provider pubip.Provider, dispersalPort, 
 	if err != nil {
 		return "", fmt.Errorf("failed to get public ip address from IP provider: %w", err)
 	}
-	socket := core.MakeOperatorSocket(ip, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort)
+	socket := core.NewOperatorSocket(ip, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort)
 	return socket.String(), nil
 }
 
