@@ -16,6 +16,7 @@ import (
 	tablecache "github.com/Layr-Labs/eigenda/litt/cache"
 	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
+	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/memtable"
 	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/stretchr/testify/require"
@@ -423,4 +424,29 @@ func TestGarbageCollection(t *testing.T) {
 	for _, tb := range noCacheTableBuilders {
 		garbageCollectionTest(t, tb)
 	}
+}
+
+func TestInvalidTableName(t *testing.T) {
+	directory := t.TempDir()
+
+	config, err := littbuilder.DefaultConfig(directory)
+	require.NoError(t, err)
+
+	db, err := config.Build(context.Background())
+	require.NoError(t, err)
+
+	tableName := "invalid name"
+	table, err := db.GetTable(tableName)
+	require.Error(t, err)
+	require.Nil(t, table)
+
+	tableName = "invalid/name"
+	table, err = db.GetTable(tableName)
+	require.Error(t, err)
+	require.Nil(t, table)
+
+	tableName = ""
+	table, err = db.GetTable(tableName)
+	require.Error(t, err)
+	require.Nil(t, table)
 }
