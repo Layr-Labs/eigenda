@@ -581,7 +581,6 @@ func TestBadgerDB(t *testing.T) {
 						}
 					}
 					err = keyCaptureWriter.Flush()
-					fmt.Printf("\nwrote %d keys\n", len(unflushedKeys))
 					if err != nil {
 						panic(err)
 					}
