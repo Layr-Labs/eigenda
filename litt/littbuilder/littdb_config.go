@@ -54,7 +54,8 @@ type LittDBConfig struct {
 	// The sharding factor for the database. The default is 8. Must be at least 1.
 	ShardingFactor uint32
 
-	// The random number generator used for generating sharding salts. The default is math/rand. TODO
+	// The random number generator used for generating sharding salts. The default is a standard rand.New()
+	// seeded by the current time.
 	SaltShaker *rand.Rand
 
 	// The size of the cache for tables that have not had their cache size set. The default is 0 (no cache).
@@ -93,8 +94,6 @@ func DefaultConfig(paths ...string) (*LittDBConfig, error) {
 func cacheWeight(key string, value []byte) uint64 {
 	return uint64(len(key) + len(value))
 }
-
-// TODO restrict the names that can be used for tables
 
 // buildKeyMap creates a new key map based on the configuration.
 func (c *LittDBConfig) buildKeyMap(logger logging.Logger, tableName string) (keymap.KeyMap, bool, error) {

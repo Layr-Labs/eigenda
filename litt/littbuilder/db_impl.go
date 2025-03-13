@@ -3,12 +3,15 @@ package littbuilder
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
+
+var tableNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 
 var _ litt.DB = &db{}
 
@@ -64,12 +67,26 @@ func NewDB(
 	}
 }
 
+// isTableNameValid returns true if the table name is valid.
+func (d *db) isTableNameValid(name string) bool {
+	if name == "" {
+		return false
+	}
+	return tableNameRegex.MatchString(name)
+}
+
 func (d *db) GetTable(name string) (litt.Table, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
 	table, ok := d.tables[name]
 	if !ok {
+		if !d.isTableNameValid(name) {
+			return nil, fmt.Errorf(
+				"table name %s is invalid, must be at least one character long and "+
+					"contain only letters, numbers, and underscores", name)
+		}
+
 		var err error
 		table, err = d.tableBuilder(d.ctx, d.logger, d.timeSource, name, d.ttl)
 		if err != nil {
@@ -126,4 +143,20 @@ func (d *db) Destroy() error {
 	}
 
 	return nil
+}
+
+func (d *db) UpdateTopology(shardingFactor uint32, paths []string) (chan struct{}, error) {
+	return nil, fmt.Errorf("This is not yet implemented, and serves as a placeholder for planned work")
+}
+
+func (d *db) HardlinkBackup(path string) error {
+	return fmt.Errorf("This is not yet implemented, and serves as a placeholder for planned work")
+}
+
+func (d *db) LocalBackup(paths []string, maxBytesPerSecond uint64) error {
+	return fmt.Errorf("This is not yet implemented, and serves as a placeholder for planned work")
+}
+
+func (d *db) RemoteBackup(socket string, maxBytesPerSecond uint64) error {
+	return fmt.Errorf("This is not yet implemented, and serves as a placeholder for planned work")
 }

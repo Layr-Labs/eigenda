@@ -42,6 +42,8 @@ type Table interface {
 	// the table. Note that deletion is lazy. That is, when the data expires, it may not be deleted immediately.
 	SetTTL(ttl time.Duration) error
 
+	// TODO perhaps sharding factor should be a DB level property, not a table level property
+
 	// SetShardingFactor sets the number of write shards used. Increasing this value increases the number of parallel
 	// writes that can be performed.
 	SetShardingFactor(shardingFactor uint32) error
