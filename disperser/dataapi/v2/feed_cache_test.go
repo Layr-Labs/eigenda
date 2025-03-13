@@ -2,6 +2,7 @@ package v2_test
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -1060,4 +1061,70 @@ func TestConcurrentAccess(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+// BenchmarkCacheExtendStart benchmarks the scenario where a query expands
+// the cache segment from the beginning (prepending data)
+func BenchmarkCacheExtendStart(b *testing.B) {
+	// Setup base time for the test
+	baseTime := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	cacheSizes := []int{10000, 50000, 200000}
+
+	for _, cacheSize := range cacheSizes {
+		b.Run(fmt.Sprintf("CacheSize_%dK", cacheSize/1000), func(b *testing.B) {
+			// Create the cache
+			fetcher := newTestFetcher(baseTime)
+			cache := v2.NewFeedCache(
+				cacheSize,
+				fetcher.fetch,
+				func(item *testItem) time.Time { return item.ts },
+			)
+
+			ctx := context.Background()
+			querySize := 60 * time.Minute // 1 hour segment
+
+			// Initialize cache with a segment later in the timeline
+			// to ensure there's enough room to extend backwards
+			initialStart := baseTime.Add(100000 * time.Hour)
+			initialEnd := initialStart.Add(querySize)
+
+			_, err := cache.Get(ctx, initialStart, initialEnd, v2.Ascending, 0)
+			if err != nil {
+				b.Fatalf("Failed initial Get: %v", err)
+			}
+			// Wait for cache to update
+			cache.WaitForCacheUpdates()
+
+			// Prepare the extend-start query ranges
+			var queryRanges [][2]time.Time
+
+			// Create b.N query ranges that extend the start time
+			extendBy := 60 * time.Minute
+			currentStart := initialStart
+			for i := 0; i < b.N; i++ {
+				newStart := currentStart.Add(-extendBy)
+				queryRanges = append(queryRanges, [2]time.Time{newStart, currentStart.Add(time.Minute)})
+				currentStart = newStart
+			}
+
+			b.ResetTimer()
+
+			// Run the benchmark
+			for i := 0; i < b.N; i++ {
+				// Get a query range that extends the start of the cache
+				queryStart := queryRanges[i][0]
+				queryEnd := queryRanges[i][1]
+
+				// Execute Get operation which triggers the cache update
+				_, err := cache.Get(ctx, queryStart, queryEnd, v2.Ascending, 0)
+				if err != nil {
+					b.Fatalf("Failed Get: %v", err)
+				}
+
+				// Wait for cache update to complete before timing the next operation
+				cache.WaitForCacheUpdates()
+			}
+		})
+	}
 }
