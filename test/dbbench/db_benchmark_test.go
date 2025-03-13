@@ -14,6 +14,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
+	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
@@ -38,6 +39,8 @@ const readBytesPerSecond = 10 * units.MiB
 const readerCount = 1
 const TTL = 2 * time.Hour
 const dataGeneratorCount = 16
+
+const pprofEnabled = true
 
 // Used to ensure that keys are truly unique
 var nextSeedSerialNumber = atomic.Uint32{}
@@ -109,6 +112,15 @@ func runBenchmark(write writer, read reader) {
 	fmt.Printf("Reader count: %d\n", readerCount)
 	fmt.Printf("TTL: %v\n", TTL)
 	fmt.Printf("Write parallelism: %d\n", parallelWriters)
+
+	if pprofEnabled {
+		logger, err := common.NewLogger(common.DefaultLoggerConfig())
+		if err != nil {
+			panic(err)
+		}
+		pprofProfiler := pprof.NewPprofProfiler("6060", logger)
+		go pprofProfiler.Start()
+	}
 
 	start := time.Now()
 	dataWritten := uint64(0)
