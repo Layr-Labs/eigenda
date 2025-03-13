@@ -149,6 +149,14 @@ func (d *db) UpdateTopology(shardingFactor uint32, paths []string) (chan struct{
 	return nil, fmt.Errorf("This is not yet implemented, and serves as a placeholder for planned work")
 }
 
+func (d *db) SetGlobalReservedDriveCapacity(reservedBytes uint64) error {
+	return fmt.Errorf("This is not yet implemented, and serves as a placeholder for planned work")
+}
+
+func (d *db) SetReservedDriveCapacity(path string, reservedBytes uint64) error {
+	return fmt.Errorf("This is not yet implemented, and serves as a placeholder for planned work")
+}
+
 func (d *db) HardlinkBackup(path string) error {
 	return fmt.Errorf("This is not yet implemented, and serves as a placeholder for planned work")
 }

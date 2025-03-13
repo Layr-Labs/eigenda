@@ -73,6 +73,25 @@ type DB interface {
 	// immediately move data from the old paths to the new paths (unless there are deleted old paths).
 	UpdateTopology(shardingFactor uint32, paths []string) (chan struct{}, error)
 
+	// SetGlobalReservedDriveCapacity sets the amount of disk space for all drives that the DB is not allowed to
+	// fill up. If set to 100gb, then the DB will stop writing to any drive that has less than 100gb of free space.
+	//
+	// The default value is 64gb. If the reserved capacity is set to 0, then the DB will happily continue writing
+	// until the drive is full to capacity.
+	//
+	// Note that space reservations may not protect the DB from filling up a disk if some other process rapidly
+	// consumes disk space as well. The DB makes a best-effort attempt to avoid permitting a disk to fill up, but
+	// can only guarantee this if it is the only process writing to the disk. Note that in general, it's safe to
+	// allow other writers to the same disk as long as the reserved capacity is sufficiently large and the other
+	// writers are not writing data in extreme quantities. If other writers limit their data size to less than the
+	// reserved capacity, then the DB will always stop writing before the disk is 100% full.
+	SetGlobalReservedDriveCapacity(reservedBytes uint64) error
+
+	// SetReservedDriveCapacity sets the amount of disk space for the given path that the DB is not allowed to fill up.
+	// Where SetGlobalReservedDriveCapacity sets the reserved capacity for all drives, this method allows for setting
+	// the reserved capacity for individual drives, overriding the global setting.
+	SetReservedDriveCapacity(path string, reservedBytes uint64) error
+
 	// HardlinkBackup creates a backup of the database at the given path. The backup is a hardlink copy of the
 	// database, and so it is very fast and uses very little disk space. Due to the nature of hardlinking, the
 	// target path must be on the same volume as the database, and this method will return an error if it is not.
@@ -84,6 +103,11 @@ type DB interface {
 	// If the copy of the database is later opened, the TTL for all tables will be set to 0 (i.e. TTL is infinite).
 	// This is because it's plausible that the data in the backup could be quite old, and a backup is not very useful
 	// if the first thing the DB does when it reads the backup is to delete all the data.
+	//
+	// Backups are atomic w.r.t. individual key-value pairs in the DB, but are not atomic as a whole. That is, if a
+	// backup is interrupted mid-backup, some keys may be copied to the backup, while others may not. If a backup
+	// is interrupted, running another backup against the same target path will resume the backup from where it
+	// left off.
 	HardlinkBackup(path string) error
 
 	// LocalBackup creates a backup of the database at the given path(s). The backup is a full copy of the database.
@@ -96,6 +120,11 @@ type DB interface {
 	// If the copy of the database is later opened, the TTL for all tables will be set to 0 (i.e. TTL is infinite).
 	// This is because it's plausible that the data in the backup could be quite old, and a backup is not very useful
 	// if the first thing the DB does when it reads the backup is to delete all the data.
+	//
+	// Backups are atomic w.r.t. individual key-value pairs in the DB, but are not atomic as a whole. That is, if a
+	// backup is interrupted mid-backup, some keys may be copied to the backup, while others may not. If a backup
+	// is interrupted, running another backup against the same target path will resume the backup from where it
+	// left off.
 	LocalBackup(paths []string, maxBytesPerSecond uint64) error
 
 	// RemoteBackup creates a backup of the database at the given socket. This backup will not copy data faster than
@@ -107,5 +136,10 @@ type DB interface {
 	// If the copy of the database is later opened, the TTL for all tables will be set to 0 (i.e. TTL is infinite).
 	// This is because it's plausible that the data in the backup could be quite old, and a backup is not very useful
 	// if the first thing the DB does when it reads the backup is to delete all the data.
+	//
+	// Backups are atomic w.r.t. individual key-value pairs in the DB, but are not atomic as a whole. That is, if a
+	// backup is interrupted mid-backup, some keys may be copied to the backup, while others may not. If a backup
+	// is interrupted, running another backup against the same target path will resume the backup from where it
+	// left off.
 	RemoteBackup(socket string, maxBytesPerSecond uint64) error
 }
