@@ -127,7 +127,6 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             address(eigenDAServiceManagerImplementation),
             abi.encodeWithSelector(
                 EigenDAServiceManager.initialize.selector,
-                0,
                 registryCoordinatorOwner,
                 confirmers,
                 registryCoordinatorOwner

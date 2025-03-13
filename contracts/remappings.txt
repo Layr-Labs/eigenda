@@ -1,2 +1,2 @@
 @openzeppelin/=lib/eigenlayer-middleware/lib/openzeppelin-contracts
-@openzeppelin-upgradeable/=lib/eigenlayer-middleware/lib/openzeppelin-contracts-upgradeable
+@openzeppelin-upgrades/=lib/eigenlayer-middleware/lib/openzeppelin-contracts-upgradeable
