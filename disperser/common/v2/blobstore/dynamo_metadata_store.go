@@ -310,14 +310,6 @@ func (s *BlobMetadataStore) queryBucketBlobMetadata(
 ) ([]*v2.BlobMetadata, error) {
 	var lastEvaledKey map[string]types.AttributeValue
 	for {
-		start := startKey
-		if lastEvaledKey != nil {
-			requestedAtBlobkey, err := UnmarshalRequestedAtBlobKey(lastEvaledKey)
-			if err != nil {
-				return result, fmt.Errorf("failed to parse the RequestedAtBlobkey from the LastEvaluatedKey: %w", err)
-			}
-			start = requestedAtBlobkey
-		}
 		res, err := s.dynamoDBClient.QueryIndexWithPagination(
 			ctx,
 			s.tableName,
@@ -325,7 +317,7 @@ func (s *BlobMetadataStore) queryBucketBlobMetadata(
 			"RequestedAtBucket = :pk AND RequestedAtBlobKey BETWEEN :start AND :end",
 			commondynamodb.ExpressionValues{
 				":pk":    &types.AttributeValueMemberS{Value: fmt.Sprintf("%d", bucket)},
-				":start": &types.AttributeValueMemberS{Value: start},
+				":start": &types.AttributeValueMemberS{Value: startKey},
 				":end":   &types.AttributeValueMemberS{Value: endKey},
 			},
 			0, // no limit within a bucket
@@ -479,14 +471,6 @@ func (s *BlobMetadataStore) queryBucketAttestation(
 	// This needs to be processed in a loop because DynamoDb has a limit on the response
 	// size of a query (1MB) and we may have more data than that.
 	for {
-		startTime := start
-		if lastEvaledKey != nil {
-			at, err := UnmarshalAttestedAt(lastEvaledKey)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse the AttestedAt from the LastEvaluatedKey: %w", err)
-			}
-			startTime = at
-		}
 		res, err := s.dynamoDBClient.QueryIndexWithPagination(
 			ctx,
 			s.tableName,
@@ -494,7 +478,7 @@ func (s *BlobMetadataStore) queryBucketAttestation(
 			"AttestedAtBucket = :pk AND AttestedAt BETWEEN :start AND :end",
 			commondynamodb.ExpressionValues{
 				":pk":    &types.AttributeValueMemberS{Value: fmt.Sprintf("%d", bucket)},
-				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(startTime), 10)},
+				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(start), 10)},
 				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(end), 10)},
 			},
 			0, // no limit within a bucket
