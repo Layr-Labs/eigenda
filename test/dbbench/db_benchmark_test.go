@@ -526,8 +526,6 @@ func TestBadgerDB(t *testing.T) {
 	//writeLimiter := make(chan struct{}, parallelWriters)
 
 	var keyCaptureWriter *bufio.Writer
-	unflushedKeys := make([][]byte, 0, 100)
-
 	if captureKeys {
 		// First, check if the key file exists. If it does, verify that each key it contains is in the database.
 		if _, err := os.Stat("keys.txt"); err == nil {
@@ -557,6 +555,7 @@ func TestBadgerDB(t *testing.T) {
 		keyCaptureWriter = bufio.NewWriter(keyFile)
 	}
 
+	unflushedKeys := make([][]byte, 0, 100)
 	writeFunction := func(key []byte, value []byte) error {
 		if captureKeys {
 			unflushedKeys = append(unflushedKeys, key)
@@ -582,6 +581,7 @@ func TestBadgerDB(t *testing.T) {
 		objectsInBatch++
 
 		if objectsInBatch >= batchSize {
+			fmt.Printf("\nflushing batch\n")
 
 			//writeLimiter <- struct{}{}
 			transactionToCommit := transaction
