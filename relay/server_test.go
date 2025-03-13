@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
@@ -27,17 +28,19 @@ import (
 
 func defaultConfig() *Config {
 	return &Config{
-		GRPCPort:                   50051,
-		MaxGRPCMessageSize:         units.MB,
-		MetadataCacheSize:          1024 * 1024,
-		MetadataMaxConcurrency:     32,
-		BlobCacheBytes:             1024 * 1024,
-		BlobMaxConcurrency:         32,
-		ChunkCacheBytes:            1024 * 1024,
-		ChunkMaxConcurrency:        32,
-		MaxKeysPerGetChunksRequest: 1024,
-		AuthenticationKeyCacheSize: 1024,
-		AuthenticationDisabled:     false,
+		GRPCPort:                     50051,
+		MaxGRPCMessageSize:           units.MB,
+		MetadataCacheSize:            1024 * 1024,
+		MetadataMaxConcurrency:       32,
+		BlobCacheBytes:               1024 * 1024,
+		BlobMaxConcurrency:           32,
+		ChunkCacheBytes:              1024 * 1024,
+		ChunkMaxConcurrency:          32,
+		MaxKeysPerGetChunksRequest:   1024,
+		AuthenticationKeyCacheSize:   1024,
+		AuthenticationDisabled:       false,
+		GetChunksRequestMaxPastAge:   5 * time.Minute,
+		GetChunksRequestMaxFutureAge: 5 * time.Minute,
 		RateLimits: limiter.Config{
 			MaxGetBlobOpsPerSecond:          1024,
 			GetBlobOpsBurstiness:            1024,
@@ -496,6 +499,7 @@ func TestReadWriteChunks(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		response, err := getChunks(t, rand, operatorKeys, request)
@@ -530,6 +534,7 @@ func TestReadWriteChunks(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		response, err := getChunks(t, rand, operatorKeys, request)
@@ -563,6 +568,7 @@ func TestReadWriteChunks(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		response, err := getChunks(t, rand, operatorKeys, request)
@@ -599,6 +605,7 @@ func TestReadWriteChunks(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		response, err := getChunks(t, rand, operatorKeys, request)
@@ -663,6 +670,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		chunkReader,
 		chainReader,
 		ics)
+	server.replayGuardian = replay.NewNoOpReplayGuardian() // disable replay protection
 	require.NoError(t, err)
 
 	go func() {
@@ -733,6 +741,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		}
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		response, err := getChunks(t, rand, operatorKeys, request)
@@ -877,6 +886,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		isBlobInCorrectShard := false
@@ -926,6 +936,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		isBlobInCorrectShard := false
@@ -974,6 +985,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		isBlobInCorrectShard := false
@@ -1021,6 +1033,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		isBlobInCorrectShard := false
@@ -1117,6 +1130,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		chainReader,
 		ics)
 	require.NoError(t, err)
+	server.replayGuardian = replay.NewNoOpReplayGuardian() // disable replay protection
 
 	go func() {
 		err = server.Start(context.Background())
@@ -1204,6 +1218,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		})
 		request := &pb.GetChunksRequest{
 			ChunkRequests: requestedChunks,
+			Timestamp:     uint32(time.Now().Unix()),
 		}
 
 		allInCorrectShard := true

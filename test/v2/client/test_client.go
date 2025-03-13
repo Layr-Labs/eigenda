@@ -10,9 +10,13 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	relayv2 "github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
@@ -38,20 +42,21 @@ const (
 
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
 type TestClient struct {
-	config                    *TestClientConfig
-	payloadClientConfig       *clients.PayloadClientConfig
-	logger                    logging.Logger
-	disperserClient           clients.DisperserClient
-	payloadDisperser          *clients.PayloadDisperser
-	relayClient               clients.RelayClient
-	relayPayloadRetriever     *clients.RelayPayloadRetriever
-	indexedChainState         core.IndexedChainState
-	retrievalClient           clients.RetrievalClient
-	validatorPayloadRetriever *clients.ValidatorPayloadRetriever
-	certVerifier              *verification.CertVerifier
-	privateKey                string
-	metricsRegistry           *prometheus.Registry
-	metrics                   *testClientMetrics
+	config                      *TestClientConfig
+	payloadClientConfig         *clients.PayloadClientConfig
+	logger                      logging.Logger
+	certVerifierAddressProvider *test.TestCertVerifierAddressProvider
+	disperserClient             clients.DisperserClient
+	payloadDisperser            *payloaddispersal.PayloadDisperser
+	relayClient                 clients.RelayClient
+	relayPayloadRetriever       *payloadretrieval.RelayPayloadRetriever
+	indexedChainState           core.IndexedChainState
+	retrievalClient             clients.RetrievalClient
+	validatorPayloadRetriever   *payloadretrieval.ValidatorPayloadRetriever
+	certVerifier                *verification.CertVerifier
+	privateKey                  string
+	metricsRegistry             *prometheus.Registry
+	metrics                     *testClientMetrics
 }
 
 // NewTestClient creates a new TestClient instance.
@@ -145,10 +150,9 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create Ethereum client: %w", err)
 	}
 
-	certVerifier, err := verification.NewCertVerifier(
-		logger,
-		ethClient,
-		time.Second)
+	certVerifierAddressProvider := &test.TestCertVerifierAddressProvider{}
+
+	certVerifier, err := verification.NewCertVerifier(logger, ethClient, certVerifierAddressProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cert verifier: %w", err)
 	}
@@ -158,12 +162,12 @@ func NewTestClient(
 	//  options.
 	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
 
-	payloadDisperserConfig := clients.PayloadDisperserConfig{
+	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
 		PayloadClientConfig:  *payloadClientConfig,
 		DisperseBlobTimeout:  1337 * time.Hour, // this suite enforces its own timeouts
 		BlobCertifiedTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 	}
-	payloadDisperser, err := clients.NewPayloadDisperser(
+	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
 		disperserClient,
@@ -217,12 +221,12 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create blob verifier: %w", err)
 	}
 
-	relayPayloadRetrieverConfig := &clients.RelayPayloadRetrieverConfig{
+	relayPayloadRetrieverConfig := &payloadretrieval.RelayPayloadRetrieverConfig{
 		PayloadClientConfig: *payloadClientConfig,
 		RelayTimeout:        1337 * time.Hour, // this suite enforces its own timeouts
 	}
 
-	relayPayloadRetriever, err := clients.NewRelayPayloadRetriever(
+	relayPayloadRetriever, err := payloadretrieval.NewRelayPayloadRetriever(
 		logger,
 		rand.Rand,
 		*relayPayloadRetrieverConfig,
@@ -242,7 +246,7 @@ func NewTestClient(
 	}
 	indexedChainState := thegraph.MakeIndexedChainState(icsConfig, chainState, logger)
 
-	validatorPayloadRetrieverConfig := &clients.ValidatorPayloadRetrieverConfig{
+	validatorPayloadRetrieverConfig := &payloadretrieval.ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig: *payloadClientConfig,
 		RetrievalTimeout:    1337 * time.Hour, // this suite enforces its own timeouts
 	}
@@ -254,7 +258,7 @@ func NewTestClient(
 		blobVerifier,
 		20)
 
-	validatorPayloadRetriever, err := clients.NewValidatorPayloadRetriever(
+	validatorPayloadRetriever, err := payloadretrieval.NewValidatorPayloadRetriever(
 		logger,
 		*validatorPayloadRetrieverConfig,
 		retrievalClient,
@@ -264,20 +268,21 @@ func NewTestClient(
 	}
 
 	return &TestClient{
-		config:                    config,
-		payloadClientConfig:       payloadClientConfig,
-		logger:                    logger,
-		disperserClient:           disperserClient,
-		payloadDisperser:          payloadDisperser,
-		relayClient:               relayClient,
-		relayPayloadRetriever:     relayPayloadRetriever,
-		indexedChainState:         indexedChainState,
-		retrievalClient:           retrievalClient,
-		validatorPayloadRetriever: validatorPayloadRetriever,
-		certVerifier:              certVerifier,
-		privateKey:                privateKey,
-		metricsRegistry:           metrics.registry,
-		metrics:                   metrics,
+		config:                      config,
+		payloadClientConfig:         payloadClientConfig,
+		logger:                      logger,
+		certVerifierAddressProvider: certVerifierAddressProvider,
+		disperserClient:             disperserClient,
+		payloadDisperser:            payloadDisperser,
+		relayClient:                 relayClient,
+		relayPayloadRetriever:       relayPayloadRetriever,
+		indexedChainState:           indexedChainState,
+		retrievalClient:             retrievalClient,
+		validatorPayloadRetriever:   validatorPayloadRetriever,
+		certVerifier:                certVerifier,
+		privateKey:                  privateKey,
+		metricsRegistry:             metrics.registry,
+		metrics:                     metrics,
 	}, nil
 }
 
@@ -341,13 +346,19 @@ func (c *TestClient) GetLogger() logging.Logger {
 	return c.logger
 }
 
+// SetCertVerifierAddress sets the address string which will be returned by the cert verifier address to all users of
+// the provider
+func (c *TestClient) SetCertVerifierAddress(certVerifierAddress string) {
+	c.certVerifierAddressProvider.SetCertVerifierAddress(gethcommon.HexToAddress(certVerifierAddress))
+}
+
 // GetDisperserClient returns the test client's disperser client.
 func (c *TestClient) GetDisperserClient() clients.DisperserClient {
 	return c.disperserClient
 }
 
 // GetPayloadDisperser returns the test client's payload disperser.
-func (c *TestClient) GetPayloadDisperser() *clients.PayloadDisperser {
+func (c *TestClient) GetPayloadDisperser() *payloaddispersal.PayloadDisperser {
 	return c.payloadDisperser
 }
 
@@ -357,7 +368,7 @@ func (c *TestClient) GetRelayClient() clients.RelayClient {
 }
 
 // GetRelayPayloadRetriever returns the test client's relay payload retriever.
-func (c *TestClient) GetRelayPayloadRetriever() *clients.RelayPayloadRetriever {
+func (c *TestClient) GetRelayPayloadRetriever() *payloadretrieval.RelayPayloadRetriever {
 	return c.relayPayloadRetriever
 }
 
@@ -372,7 +383,7 @@ func (c *TestClient) GetRetrievalClient() clients.RetrievalClient {
 }
 
 // GetValidatorPayloadRetriever returns the test client's validator payload retriever.
-func (c *TestClient) GetValidatorPayloadRetriever() *clients.ValidatorPayloadRetriever {
+func (c *TestClient) GetValidatorPayloadRetriever() *payloadretrieval.ValidatorPayloadRetriever {
 	return c.validatorPayloadRetriever
 }
 
@@ -398,14 +409,9 @@ func (c *TestClient) Stop() {
 
 // DisperseAndVerify sends a payload to the disperser. Waits until the payload is confirmed and then reads
 // it back from the relays and the validators.
-func (c *TestClient) DisperseAndVerify(
-	ctx context.Context,
-	certVerifierAddress string,
-	payload []byte,
-) error {
-
+func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) error {
 	start := time.Now()
-	eigenDACert, err := c.DispersePayload(ctx, certVerifierAddress, payload)
+	eigenDACert, err := c.DispersePayload(ctx, payload)
 	if err != nil {
 		return fmt.Errorf("failed to disperse payload: %w", err)
 	}
@@ -450,7 +456,7 @@ func (c *TestClient) DisperseAndVerify(
 	}
 
 	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := verification.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
+	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
 	if err != nil {
 		return fmt.Errorf("failed to convert blob commitments: %w", err)
 	}
@@ -471,21 +477,17 @@ func (c *TestClient) DisperseAndVerify(
 }
 
 // DispersePayload sends a payload to the disperser. Returns the blob key.
-func (c *TestClient) DispersePayload(
-	ctx context.Context,
-	certVerifierAddress string,
-	payloadBytes []byte,
-) (*verification.EigenDACert, error) {
+func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (*coretypes.EigenDACert, error) {
 	c.logger.Debugf("Dispersing payload of length %d", len(payloadBytes))
 	start := time.Now()
 
 	payload := coretypes.NewPayload(payloadBytes)
 
-	cert, err := c.GetPayloadDisperser().SendPayload(ctx, certVerifierAddress, payload)
-
+	cert, err := c.GetPayloadDisperser().SendPayload(ctx, payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to disperse payload: %w", err)
 	}
+
 	c.metrics.reportDispersalTime(time.Since(start))
 
 	return cert, nil

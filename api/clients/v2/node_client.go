@@ -3,9 +3,11 @@ package clients
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/docker/go-units"
-	"sync"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	nodegrpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
@@ -73,6 +75,7 @@ func (c *nodeClient) StoreChunks(ctx context.Context, batch *corev2.Batch) (*cor
 			BlobCertificates: blobCerts,
 		},
 		DisperserID: api.EigenLabsDisperserID, // this will need to be updated when dispersers are decentralized
+		Timestamp:   uint32(time.Now().Unix()),
 	}
 
 	if c.requestSigner != nil {

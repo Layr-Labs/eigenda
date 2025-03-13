@@ -1,4 +1,4 @@
-package test
+package payloadretrieval
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
@@ -35,10 +36,10 @@ const maxPayloadBytes = 1025 // arbitrary value
 
 type RelayPayloadRetrieverTester struct {
 	Random                *testrandom.TestRandom
-	RelayPayloadRetriever *clients.RelayPayloadRetriever
+	RelayPayloadRetriever *RelayPayloadRetriever
 	MockRelayClient       *clientsmock.MockRelayClient
 	G1Srs                 []bn254.G1Affine
-	Config                clients.RelayPayloadRetrieverConfig
+	PayloadPolynomialForm codecs.PolynomialForm
 }
 
 // buildRelayPayloadRetrieverTester sets up a client with mocks necessary for testing
@@ -46,7 +47,7 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
 
-	clientConfig := clients.RelayPayloadRetrieverConfig{
+	clientConfig := RelayPayloadRetrieverConfig{
 		PayloadClientConfig: clients.PayloadClientConfig{},
 		RelayTimeout:        50 * time.Millisecond,
 	}
@@ -60,7 +61,7 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 	require.NotNil(t, g1Srs)
 	require.NoError(t, err)
 
-	client, err := clients.NewRelayPayloadRetriever(
+	client, err := NewRelayPayloadRetriever(
 		logger,
 		random.Rand,
 		clientConfig,
@@ -75,7 +76,7 @@ func buildRelayPayloadRetrieverTester(t *testing.T) RelayPayloadRetrieverTester 
 		RelayPayloadRetriever: client,
 		MockRelayClient:       &mockRelayClient,
 		G1Srs:                 g1Srs,
-		Config:                clientConfig,
+		PayloadPolynomialForm: clientConfig.PayloadPolynomialForm,
 	}
 }
 
@@ -84,10 +85,10 @@ func buildBlobAndCert(
 	t *testing.T,
 	tester RelayPayloadRetrieverTester,
 	relayKeys []core.RelayKey,
-) (core.BlobKey, []byte, *verification.EigenDACert) {
+) (core.BlobKey, []byte, *coretypes.EigenDACert) {
 
 	payloadBytes := tester.Random.Bytes(tester.Random.Intn(maxPayloadBytes))
-	blob, err := coretypes.NewPayload(payloadBytes).ToBlob(tester.Config.PayloadPolynomialForm)
+	blob, err := coretypes.NewPayload(payloadBytes).ToBlob(tester.PayloadPolynomialForm)
 	require.NoError(t, err)
 
 	blobBytes := blob.Serialize()
@@ -130,10 +131,10 @@ func buildBlobAndCert(
 		BlobCertificate: blobCertificate,
 	}
 
-	convertedInclusionInfo, err := verification.InclusionInfoProtoToBinding(inclusionInfo)
+	convertedInclusionInfo, err := coretypes.InclusionInfoProtoToBinding(inclusionInfo)
 	require.NoError(t, err)
 
-	eigenDACert := &verification.EigenDACert{
+	eigenDACert := &coretypes.EigenDACert{
 		BlobInclusionInfo: *convertedInclusionInfo,
 	}
 

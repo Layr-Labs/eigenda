@@ -29,7 +29,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	if onchainState == nil {
 		return nil, api.NewErrorInternal("onchain state is nil")
 	}
-	if err := s.validateDispersalRequest(req, onchainState); err != nil {
+	if err := s.validateDispersalRequest(ctx, req, onchainState); err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate the request: %v", err))
 	}
 
@@ -133,6 +133,7 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 }
 
 func (s *DispersalServerV2) validateDispersalRequest(
+	ctx context.Context,
 	req *pb.DisperseBlobRequest,
 	onchainState *OnchainState) error {
 
@@ -218,6 +219,14 @@ func (s *DispersalServerV2) validateDispersalRequest(
 	}
 	if !commitments.Equal(&blobHeader.BlobCommitments) {
 		return errors.New("invalid blob commitment")
+	}
+
+	blobKey, err := blobHeader.BlobKey()
+	if err != nil {
+		return fmt.Errorf("failed to get blob key: %w", err)
+	}
+	if s.blobStore.CheckBlobExists(ctx, blobKey) {
+		return fmt.Errorf("blob already exists: %s", blobKey.Hex())
 	}
 
 	return nil

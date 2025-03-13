@@ -4,251 +4,292 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"strconv"
 	"testing"
 	"time"
 
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestReservationBinsBasicOperations(t *testing.T) {
-	tableName := "reservations_test_basic"
-	err := meterer.CreateReservationTable(clientConfig, tableName)
-	assert.NoError(t, err)
-
-	ctx := context.Background()
-	err = dynamoClient.PutItem(ctx, tableName,
-		commondynamodb.Item{
-			"AccountID":         &types.AttributeValueMemberS{Value: "account1"},
-			"ReservationPeriod": &types.AttributeValueMemberN{Value: "1"},
-			"BinUsage":          &types.AttributeValueMemberN{Value: "1000"},
-			"UpdatedAt":         &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
-		},
-	)
-	assert.NoError(t, err)
-
-	item, err := dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: "account1"},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: "1"},
-	})
-	assert.NoError(t, err)
-
-	assert.Equal(t, "account1", item["AccountID"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, "1", item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
-	assert.Equal(t, "1000", item["BinUsage"].(*types.AttributeValueMemberN).Value)
-
-	items, err := dynamoClient.Query(ctx, tableName, "AccountID = :account", commondynamodb.ExpressionValues{
-		":account": &types.AttributeValueMemberS{Value: "account1"},
-	})
-	assert.NoError(t, err)
-	assert.Len(t, items, 1)
-
-	_, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
-		"AccountID": &types.AttributeValueMemberS{Value: "account2"},
-	})
-	assert.Error(t, err)
-
-	_, err = dynamoClient.UpdateItem(ctx, tableName, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: "account1"},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: "1"},
-	}, commondynamodb.Item{
-		"BinUsage": &types.AttributeValueMemberN{Value: "2000"},
-	})
-	assert.NoError(t, err)
-	err = dynamoClient.PutItem(ctx, tableName,
-		commondynamodb.Item{
-			"AccountID":         &types.AttributeValueMemberS{Value: "account2"},
-			"ReservationPeriod": &types.AttributeValueMemberN{Value: "1"},
-			"BinUsage":          &types.AttributeValueMemberN{Value: "3000"},
-			"UpdatedAt":         &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
-		},
-	)
-	assert.NoError(t, err)
-
-	item, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: "account1"},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: "1"},
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, "2000", item["BinUsage"].(*types.AttributeValueMemberN).Value)
-
-	items, err = dynamoClient.Query(ctx, tableName, "AccountID = :account", commondynamodb.ExpressionValues{
-		":account": &types.AttributeValueMemberS{Value: "account1"},
-	})
-	assert.NoError(t, err)
-	assert.Len(t, items, 1)
-	assert.Equal(t, "2000", items[0]["BinUsage"].(*types.AttributeValueMemberN).Value)
-
-	item, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: "account2"},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: "1"},
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, "3000", item["BinUsage"].(*types.AttributeValueMemberN).Value)
-
-	err = dynamoClient.DeleteTable(ctx, tableName)
-	assert.NoError(t, err)
+type testContext struct {
+	ctx              context.Context
+	store            meterer.OffchainStore
+	reservationTable string
+	onDemandTable    string
+	globalBinTable   string
 }
 
-func TestGlobalBinsBasicOperations(t *testing.T) {
-	tableName := "global_test_basic"
-	err := meterer.CreateGlobalReservationTable(clientConfig, tableName)
-	assert.NoError(t, err)
-
-	ctx := context.Background()
-	numItems := 30
-	items := make([]commondynamodb.Item, numItems)
-	for i := 0; i < numItems; i += 1 {
-		items[i] = commondynamodb.Item{
-			"ReservationPeriod": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", i)},
-			"BinUsage":          &types.AttributeValueMemberN{Value: "1000"},
-			"UpdatedAt":         &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
-		}
+// setupTest creates a test context with tables created and cleaned up after the test
+func setupTest(t *testing.T) *testContext {
+	tc := &testContext{
+		ctx:              context.Background(),
+		reservationTable: fmt.Sprintf("reservation_test_%d", rand.Int()),
+		onDemandTable:    fmt.Sprintf("ondemand_test_%d", rand.Int()),
+		globalBinTable:   fmt.Sprintf("global_bin_test_%d", rand.Int()),
 	}
-	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items)
-	assert.NoError(t, err)
-	assert.Len(t, unprocessed, 0)
 
-	queryResult, err := dynamoClient.Query(ctx, tableName, "ReservationPeriod = :index", commondynamodb.ExpressionValues{
-		":index": &types.AttributeValueMemberN{
-			Value: "1",
-		}})
-	assert.NoError(t, err)
-	assert.Len(t, queryResult, 1)
-	assert.Equal(t, "1", queryResult[0]["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
-	assert.Equal(t, "1000", queryResult[0]["BinUsage"].(*types.AttributeValueMemberN).Value)
+	var err error
 
-	queryResult, err = dynamoClient.Query(ctx, tableName, "ReservationPeriod = :index", commondynamodb.ExpressionValues{
-		":index": &types.AttributeValueMemberN{
-			Value: "1",
-		}})
-	assert.NoError(t, err)
-	assert.Len(t, queryResult, 1)
-	assert.Equal(t, "1", queryResult[0]["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
-	assert.Equal(t, "1000", queryResult[0]["BinUsage"].(*types.AttributeValueMemberN).Value)
+	// Create the tables
+	err = meterer.CreateReservationTable(clientConfig, tc.reservationTable)
+	require.NoError(t, err)
 
-	queryResult, err = dynamoClient.Query(ctx, tableName, "ReservationPeriod = :index", commondynamodb.ExpressionValues{
-		":index": &types.AttributeValueMemberN{
-			Value: "32",
-		}})
-	assert.NoError(t, err)
-	assert.Len(t, queryResult, 0)
+	err = meterer.CreateOnDemandTable(clientConfig, tc.onDemandTable)
+	require.NoError(t, err)
 
-	_, err = dynamoClient.UpdateItem(ctx, tableName, commondynamodb.Key{
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: "1"},
-	}, commondynamodb.Item{
-		"BinUsage": &types.AttributeValueMemberN{Value: "2000"},
+	err = meterer.CreateGlobalReservationTable(clientConfig, tc.globalBinTable)
+	require.NoError(t, err)
+
+	// Register cleanup to remove tables after test completes
+	t.Cleanup(func() {
+		cleanupTables(tc)
 	})
-	assert.NoError(t, err)
 
-	err = dynamoClient.PutItem(ctx, tableName,
-		commondynamodb.Item{
-			"ReservationPeriod": &types.AttributeValueMemberN{Value: "2"},
-			"BinUsage":          &types.AttributeValueMemberN{Value: "3000"},
-			"UpdatedAt":         &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)},
-		},
+	// Create the OffchainStore
+	tc.store, err = meterer.NewOffchainStore(
+		clientConfig,
+		tc.reservationTable,
+		tc.onDemandTable,
+		tc.globalBinTable,
+		nil, // Logger not needed for test
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	queryResult, err = dynamoClient.Query(ctx, tableName, "ReservationPeriod = :index", commondynamodb.ExpressionValues{
-		":index": &types.AttributeValueMemberN{
-			Value: "1",
-		}})
-	assert.NoError(t, err)
-	assert.Len(t, queryResult, 1)
-	assert.Equal(t, "1", queryResult[0]["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
-	assert.Equal(t, "2000", queryResult[0]["BinUsage"].(*types.AttributeValueMemberN).Value)
-
-	queryResult, err = dynamoClient.Query(ctx, tableName, "ReservationPeriod = :index", commondynamodb.ExpressionValues{
-		":index": &types.AttributeValueMemberN{
-			Value: "2",
-		}})
-	assert.NoError(t, err)
-	assert.Len(t, queryResult, 1)
-	assert.Equal(t, "2", queryResult[0]["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
-	assert.Equal(t, "3000", queryResult[0]["BinUsage"].(*types.AttributeValueMemberN).Value)
+	return tc
 }
 
-func TestOnDemandUsageBasicOperations(t *testing.T) {
-	tableName := "ondemand_test_basic"
-	err := meterer.CreateOnDemandTable(clientConfig, tableName)
-	assert.NoError(t, err)
+// cleanupTables removes all tables created for a test
+func cleanupTables(tc *testContext) {
+	_ = dynamoClient.DeleteTable(tc.ctx, tc.reservationTable)
+	_ = dynamoClient.DeleteTable(tc.ctx, tc.onDemandTable)
+	_ = dynamoClient.DeleteTable(tc.ctx, tc.globalBinTable)
+}
 
-	ctx := context.Background()
+// TestUpdateReservationBin tests the UpdateReservationBin function
+func TestUpdateReservationBin(t *testing.T) {
+	tc := setupTest(t)
 
-	paymentCharged := big.NewInt(2000)
+	// Test updating bin that doesn't exist yet (should create it)
+	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
+	reservationPeriod := uint64(1)
+	size := uint64(1000)
 
-	err = dynamoClient.PutItem(ctx, tableName,
-		commondynamodb.Item{
-			"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
-			"CumulativePayments": &types.AttributeValueMemberN{Value: "1"},
-			"PaymentCharged":     &types.AttributeValueMemberN{Value: paymentCharged.String()},
-		},
-	)
-	assert.NoError(t, err)
+	binUsage, err := tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, size)
+	require.NoError(t, err)
+	assert.Equal(t, size, binUsage)
 
-	numItems := 30
-	repetitions := 5
-	items := make([]commondynamodb.Item, numItems)
-	for i := 0; i < numItems; i += 1 {
-		chargeValue := big.NewInt(int64(i * 1000))
-		items[i] = commondynamodb.Item{
-			"AccountID":          &types.AttributeValueMemberS{Value: fmt.Sprintf("account%d", i%repetitions)},
-			"CumulativePayments": &types.AttributeValueMemberN{Value: fmt.Sprintf("%d", i)},
-			"PaymentCharged":     &types.AttributeValueMemberN{Value: chargeValue.String()},
+	// Get the bin directly from DynamoDB to verify
+	item, err := dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
+		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+	})
+	require.NoError(t, err)
+	binUsageStr := item["BinUsage"].(*types.AttributeValueMemberN).Value
+	binUsageVal, err := strconv.ParseUint(binUsageStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, size, binUsageVal)
+
+	// Test updating existing bin
+	additionalSize := uint64(500)
+	binUsage, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, additionalSize)
+	require.NoError(t, err)
+	assert.Equal(t, size+additionalSize, binUsage)
+
+	// Verify updated bin
+	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
+		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+	})
+	require.NoError(t, err)
+	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
+	binUsageVal, err = strconv.ParseUint(binUsageStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, size+additionalSize, binUsageVal)
+}
+
+// TestUpdateGlobalBin tests the UpdateGlobalBin function
+func TestUpdateGlobalBin(t *testing.T) {
+	tc := setupTest(t)
+
+	// Test updating global bin that doesn't exist yet (should create it)
+	reservationPeriod := uint64(1)
+	size := uint64(2000)
+
+	binUsage, err := tc.store.UpdateGlobalBin(tc.ctx, reservationPeriod, size)
+	require.NoError(t, err)
+	assert.Equal(t, size, binUsage)
+
+	// Get the bin directly from DynamoDB to verify
+	item, err := dynamoClient.GetItem(tc.ctx, tc.globalBinTable, commondynamodb.Key{
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+	})
+	require.NoError(t, err)
+	binUsageStr := item["BinUsage"].(*types.AttributeValueMemberN).Value
+	binUsageVal, err := strconv.ParseUint(binUsageStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, size, binUsageVal)
+
+	// Test updating existing bin
+	additionalSize := uint64(1000)
+	binUsage, err = tc.store.UpdateGlobalBin(tc.ctx, reservationPeriod, additionalSize)
+	require.NoError(t, err)
+	assert.Equal(t, size+additionalSize, binUsage)
+
+	// Verify updated bin
+	item, err = dynamoClient.GetItem(tc.ctx, tc.globalBinTable, commondynamodb.Key{
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+	})
+	require.NoError(t, err)
+	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
+	binUsageVal, err = strconv.ParseUint(binUsageStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, size+additionalSize, binUsageVal)
+}
+
+// TestAddOnDemandPayment tests the AddOnDemandPayment function
+func TestAddOnDemandPayment(t *testing.T) {
+	tc := setupTest(t)
+
+	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
+	payment := core.PaymentMetadata{
+		AccountID:         accountID,
+		Timestamp:         time.Now().Unix(),
+		CumulativePayment: big.NewInt(100),
+	}
+	charge := big.NewInt(100)
+
+	// Add the payment
+	err := tc.store.AddOnDemandPayment(tc.ctx, payment, charge)
+	require.NoError(t, err)
+
+	// Verify the payment was added - using the exact key structure expected by DynamoDB
+	item, err := dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
+		"AccountID":          &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"CumulativePayments": &types.AttributeValueMemberN{Value: payment.CumulativePayment.String()},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, item, "Item should exist in the table")
+
+	// Verify the PaymentCharged field
+	paymentChargedStr := item["PaymentCharged"].(*types.AttributeValueMemberN).Value
+	paymentChargedVal, err := strconv.ParseInt(paymentChargedStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, charge.Int64(), paymentChargedVal)
+
+	// Attempt to add the same payment again, should return an error
+	err = tc.store.AddOnDemandPayment(tc.ctx, payment, charge)
+	require.Error(t, err)
+	assert.Equal(t, "exact payment already exists", err.Error())
+}
+
+// TestRemoveOnDemandPayment tests the RemoveOnDemandPayment function
+func TestRemoveOnDemandPayment(t *testing.T) {
+	tc := setupTest(t)
+
+	// Create and add a payment first
+	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
+	cumulativePayment := big.NewInt(1000)
+	paymentCharged := big.NewInt(500)
+
+	paymentMetadata := core.PaymentMetadata{
+		AccountID:         accountID,
+		Timestamp:         time.Now().Unix(),
+		CumulativePayment: cumulativePayment,
+	}
+
+	err := tc.store.AddOnDemandPayment(tc.ctx, paymentMetadata, paymentCharged)
+	require.NoError(t, err)
+
+	// Verify the payment was added before removal
+	item, err := dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
+		"AccountID":          &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"CumulativePayments": &types.AttributeValueMemberN{Value: cumulativePayment.String()},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, item, "Item should exist before removal")
+
+	// Test removing the payment
+	err = tc.store.RemoveOnDemandPayment(tc.ctx, accountID, cumulativePayment)
+	require.NoError(t, err)
+
+	// Verify the payment was removed
+	item, err = dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
+		"AccountID":          &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"CumulativePayments": &types.AttributeValueMemberN{Value: cumulativePayment.String()},
+	})
+	require.NoError(t, err)
+	assert.Nil(t, item, "Item should be deleted")
+
+	// Removing non-existent payment should work (not error)
+	err = tc.store.RemoveOnDemandPayment(tc.ctx, accountID, big.NewInt(9999))
+	require.NoError(t, err)
+}
+
+// TestGetRelevantOnDemandRecords tests the GetRelevantOnDemandRecords function
+func TestGetRelevantOnDemandRecords(t *testing.T) {
+	tc := setupTest(t)
+
+	// Create and add multiple payments for the same account but with different cumulative payments
+	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
+
+	// Helper function to create payment metadata
+	createPayment := func(amount int64) (core.PaymentMetadata, *big.Int) {
+		return core.PaymentMetadata{
+			AccountID:         accountID,
+			Timestamp:         time.Now().Unix(),
+			CumulativePayment: big.NewInt(amount),
+		}, big.NewInt(amount)
+	}
+
+	// Add payments with cumulative values 100, 300, 600
+	payments := []int64{100, 300, 600}
+	for i, amt := range payments {
+		payment, charge := createPayment(amt)
+		if i > 0 {
+			// Each charge is the difference between this payment and the previous one
+			charge = big.NewInt(amt - payments[i-1])
 		}
+		err := tc.store.AddOnDemandPayment(tc.ctx, payment, charge)
+		require.NoError(t, err)
 	}
-	unprocessed, err := dynamoClient.PutItems(ctx, tableName, items)
-	assert.NoError(t, err)
-	assert.Len(t, unprocessed, 0)
 
-	// get item
-	item, err := dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
-		"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
-		"CumulativePayments": &types.AttributeValueMemberN{Value: "1"},
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, "1", item["CumulativePayments"].(*types.AttributeValueMemberN).Value)
-	assert.Equal(t, "1000", item["PaymentCharged"].(*types.AttributeValueMemberN).Value)
-
-	queryResult, err := dynamoClient.Query(ctx, tableName, "AccountID = :account", commondynamodb.ExpressionValues{
-		":account": &types.AttributeValueMemberS{
-			Value: "account1",
-		}})
-	assert.NoError(t, err)
-	assert.Len(t, queryResult, numItems/repetitions)
-	for _, item := range queryResult {
-		cumulativePayments, _ := strconv.Atoi(item["CumulativePayments"].(*types.AttributeValueMemberN).Value)
-		expectedCharge := fmt.Sprintf("%d", cumulativePayments*1000)
-		assert.Equal(t, expectedCharge, item["PaymentCharged"].(*types.AttributeValueMemberN).Value)
+	// Verify each payment was added correctly
+	for _, amt := range payments {
+		item, err := dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
+			"AccountID":          &types.AttributeValueMemberS{Value: accountID.Hex()},
+			"CumulativePayments": &types.AttributeValueMemberN{Value: strconv.FormatInt(amt, 10)},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, item, fmt.Sprintf("Payment with cumulative amount %d should exist", amt))
 	}
-	queryResult, err = dynamoClient.Query(ctx, tableName, "AccountID = :account_id", commondynamodb.ExpressionValues{
-		":account_id": &types.AttributeValueMemberS{
-			Value: fmt.Sprintf("account%d", numItems/repetitions+1),
-		}})
-	assert.NoError(t, err)
-	assert.Len(t, queryResult, 0)
 
-	newCharge := big.NewInt(5000)
-	updatedItem, err := dynamoClient.UpdateItem(ctx, tableName, commondynamodb.Key{
-		"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
-		"CumulativePayments": &types.AttributeValueMemberN{Value: "1"},
-		// "BinUsage": &types.AttributeValueMemberN{Value: "1000"},
-	}, commondynamodb.Item{
-		"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
-		"CumulativePayments": &types.AttributeValueMemberN{Value: "3"},
-		"PaymentCharged":     &types.AttributeValueMemberN{Value: newCharge.String()},
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, newCharge.String(), updatedItem["PaymentCharged"].(*types.AttributeValueMemberN).Value)
+	// Test getting relevant records for different cumulative payment values
+	testCases := []struct {
+		requestedPayment int64
+		expectedPrev     int64
+		expectedNext     int64
+		expectedCharge   int64
+	}{
+		{200, 100, 300, 200}, // Between 100 and 300
+		{400, 300, 600, 300}, // Between 300 and 600
+		{700, 600, 0, 0},     // Larger than any payment
+		{50, 0, 100, 100},    // Smaller than any payment
+	}
 
-	item, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
-		"AccountID":          &types.AttributeValueMemberS{Value: "account1"},
-		"CumulativePayments": &types.AttributeValueMemberN{Value: "1"},
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, newCharge.String(), item["PaymentCharged"].(*types.AttributeValueMemberN).Value)
+	for _, testCase := range testCases {
+		cumulativePayment := big.NewInt(testCase.requestedPayment)
+		prevPmt, nextPmt, chargeOfNextPmt, err := tc.store.GetRelevantOnDemandRecords(tc.ctx, accountID, cumulativePayment)
+		require.NoError(t, err)
+
+		assert.Equal(t, big.NewInt(testCase.expectedPrev), prevPmt)
+		assert.Equal(t, big.NewInt(testCase.expectedNext), nextPmt)
+		assert.Equal(t, big.NewInt(testCase.expectedCharge), chargeOfNextPmt)
+	}
 }

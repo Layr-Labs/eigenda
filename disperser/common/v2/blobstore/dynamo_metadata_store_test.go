@@ -32,20 +32,49 @@ func checkBlobKeyEqual(t *testing.T, blobKey corev2.BlobKey, blobHeader *corev2.
 	assert.Equal(t, blobKey, bk)
 }
 
-func checkAttestationsOrdered(t *testing.T, at []*corev2.Attestation) {
-	if len(at) > 1 {
-		for i := 1; i < len(at); i++ {
-			assert.True(t, at[i-1].AttestedAt < at[i].AttestedAt)
+func checkAttestationsAsc(t *testing.T, items []*corev2.Attestation) {
+	if len(items) > 1 {
+		for i := 1; i < len(items); i++ {
+			assert.Less(t,
+				items[i-1].AttestedAt, // previous should be less
+				items[i].AttestedAt,   // than current
+				"attestations should be in ascending order",
+			)
 		}
 	}
 }
 
-func checkAttestationsOrderedDesc(t *testing.T, attestations []*corev2.Attestation) {
-	for i := 1; i < len(attestations); i++ {
+func checkAttestationsDesc(t *testing.T, items []*corev2.Attestation) {
+	for i := 1; i < len(items); i++ {
 		assert.Greater(t,
-			attestations[i-1].AttestedAt, // previous should be greater
-			attestations[i].AttestedAt,   // than current
+			items[i-1].AttestedAt, // previous should be greater
+			items[i].AttestedAt,   // than current
 			"attestations should be in descending order",
+		)
+	}
+}
+
+func checkDispersalsAsc(t *testing.T, items []*corev2.DispersalRequest) {
+	if len(items) > 1 {
+		for i := 1; i < len(items); i++ {
+			assert.Less(
+				t,
+				items[i-1].DispersedAt, // previous should be less
+				items[i].DispersedAt,   // than current
+				"DispersalRequests should be in ascending order",
+			)
+
+		}
+	}
+}
+
+func checkDispersalsDesc(t *testing.T, items []*corev2.DispersalRequest) {
+	for i := 1; i < len(items); i++ {
+		assert.Greater(
+			t,
+			items[i-1].DispersedAt, // previous should be greater
+			items[i].DispersedAt,   // than current
+			"DispersalRequests should be in descending order",
 		)
 	}
 }
@@ -878,23 +907,23 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForward(t *testing.T) {
 		attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs-1, now, 0)
 		require.NoError(t, err)
 		require.Equal(t, numBatches, len(attestations))
-		checkAttestationsOrdered(t, attestations)
+		checkAttestationsAsc(t, attestations)
 
 		// Test with limit
 		attestations, err = blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs, now, 10)
 		require.NoError(t, err)
 		require.Equal(t, 10, len(attestations))
-		checkAttestationsOrdered(t, attestations)
+		checkAttestationsAsc(t, attestations)
 
 		// Test min/max timestamp range
 		attestations, err = blobMetadataStore.GetAttestationByAttestedAtForward(ctx, 0, now, 0)
 		require.NoError(t, err)
 		require.Equal(t, numBatches, len(attestations))
-		checkAttestationsOrdered(t, attestations)
+		checkAttestationsAsc(t, attestations)
 		attestations, err = blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs-1, math.MaxInt64, 0)
 		require.NoError(t, err)
 		require.Equal(t, numBatches, len(attestations))
-		checkAttestationsOrdered(t, attestations)
+		checkAttestationsAsc(t, attestations)
 	})
 
 	// Test range boundaries
@@ -903,7 +932,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForward(t *testing.T) {
 		attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs, now+1, 0)
 		require.NoError(t, err)
 		require.Equal(t, numBatches-1, len(attestations))
-		checkAttestationsOrdered(t, attestations)
+		checkAttestationsAsc(t, attestations)
 		assert.Equal(t, attestedAt[1], attestations[0].AttestedAt)
 		assert.Equal(t, batchHeaders[1].BatchRoot, attestations[0].BatchRoot)
 		assert.Equal(t, attestedAt[numBatches-1], attestations[numBatches-2].AttestedAt)
@@ -913,7 +942,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForward(t *testing.T) {
 		attestations, err = blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs-1, attestedAt[4], 0)
 		require.NoError(t, err)
 		require.Equal(t, 4, len(attestations))
-		checkAttestationsOrdered(t, attestations)
+		checkAttestationsAsc(t, attestations)
 		assert.Equal(t, attestedAt[0], attestations[0].AttestedAt)
 		assert.Equal(t, batchHeaders[0].BatchRoot, attestations[0].BatchRoot)
 		assert.Equal(t, attestedAt[3], attestations[3].AttestedAt)
@@ -1015,7 +1044,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtBackward(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.Equal(t, numBatches, len(attestations))
-		checkAttestationsOrderedDesc(t, attestations)
+		checkAttestationsDesc(t, attestations)
 
 		// Test with limit
 		attestations, err = blobMetadataStore.GetAttestationByAttestedAtBackward(
@@ -1026,7 +1055,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtBackward(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.Equal(t, 10, len(attestations))
-		checkAttestationsOrderedDesc(t, attestations)
+		checkAttestationsDesc(t, attestations)
 	})
 
 	t.Run("range boundaries", func(t *testing.T) {
@@ -1043,7 +1072,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtBackward(t *testing.T) {
 		assert.Equal(t, attestedAt[numBatches-2], attestations[0].AttestedAt)
 		// The last one returned is the second batch (as "after" is exclusive)
 		assert.Equal(t, attestedAt[1], attestations[numBatches-3].AttestedAt)
-		checkAttestationsOrderedDesc(t, attestations)
+		checkAttestationsDesc(t, attestations)
 
 		// Test exclusive after - should not include the oldest item
 		attestations, err = blobMetadataStore.GetAttestationByAttestedAtBackward(
@@ -1056,7 +1085,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtBackward(t *testing.T) {
 		require.Equal(t, 4, len(attestations))
 		assert.Equal(t, attestedAt[4], attestations[0].AttestedAt)
 		assert.Equal(t, attestedAt[1], attestations[3].AttestedAt)
-		checkAttestationsOrderedDesc(t, attestations)
+		checkAttestationsDesc(t, attestations)
 	})
 
 	t.Run("pagination", func(t *testing.T) {
@@ -1150,7 +1179,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForwardWithDynamoPagination(
 		attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs-1, now, 0)
 		require.NoError(t, err)
 		require.Equal(t, numBatches, len(attestations))
-		checkAttestationsOrdered(t, attestations)
+		checkAttestationsAsc(t, attestations)
 	})
 
 	// Test the query returns after getting desired num of attestations in a bucket
@@ -1158,7 +1187,7 @@ func TestBlobMetadataStoreGetAttestationByAttestedAtForwardWithDynamoPagination(
 		attestations, err := blobMetadataStore.GetAttestationByAttestedAtForward(ctx, firstBatchTs-1, now, 125)
 		require.NoError(t, err)
 		require.Equal(t, 125, len(attestations))
-		checkAttestationsOrdered(t, attestations)
+		checkAttestationsAsc(t, attestations)
 	})
 }
 
@@ -1461,6 +1490,165 @@ func TestBlobMetadataStoreDispersals(t *testing.T) {
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID2.Hex()},
 		},
+	})
+}
+
+func TestBlobMetadataStoreDispersalsByDispersedAt(t *testing.T) {
+	ctx := context.Background()
+
+	numRequests := 60
+	opID := core.OperatorID{16, 32}
+	now := uint64(time.Now().UnixNano())
+	firstRequestTs := now - uint64(int64(numRequests)*time.Second.Nanoseconds())
+	nanoSecsPerRequest := uint64(time.Second.Nanoseconds()) // 1 batch/s
+
+	dispersedAt := make([]uint64, numRequests)
+	dynamoKeys := make([]commondynamodb.Key, numRequests)
+	for i := 0; i < numRequests; i++ {
+		dispersedAt[i] = firstRequestTs + uint64(i)*nanoSecsPerRequest
+		dispersalRequest := &corev2.DispersalRequest{
+			OperatorID:      opID,
+			OperatorAddress: gethcommon.HexToAddress("0x1234567"),
+			Socket:          "socket",
+			DispersedAt:     dispersedAt[i],
+			BatchHeader: corev2.BatchHeader{
+				BatchRoot:            [32]byte{1, 2, 3},
+				ReferenceBlockNumber: uint64(i + 100),
+			},
+		}
+
+		err := blobMetadataStore.PutDispersalRequest(ctx, dispersalRequest)
+		require.NoError(t, err)
+
+		bhh, err := dispersalRequest.BatchHeader.Hash()
+		require.NoError(t, err)
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
+			"SK": &types.AttributeValueMemberS{Value: "DispersalRequest#" + opID.Hex()},
+		}
+	}
+	defer deleteItems(t, dynamoKeys)
+
+	// Test empty range
+	t.Run("empty range", func(t *testing.T) {
+		// Test invalid time range
+		_, err := blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, 1, 1, 0, true)
+		require.Error(t, err)
+		assert.Equal(t, "no time point in exclusive time range (1, 1)", err.Error())
+
+		_, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, 1, 2, 0, true)
+		require.Error(t, err)
+		assert.Equal(t, "no time point in exclusive time range (1, 2)", err.Error())
+
+		// Test empty range
+		dispersals, err := blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, now, now+1024, 0, true)
+		require.NoError(t, err)
+		assert.Equal(t, 0, len(dispersals))
+	})
+
+	// Test full range query
+	t.Run("ascending full range", func(t *testing.T) {
+		// Test without limit
+		dispersals, err := blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs-1, now, 0, true)
+		require.NoError(t, err)
+		require.Equal(t, numRequests, len(dispersals))
+		checkDispersalsAsc(t, dispersals)
+
+		// Test with limit
+		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs-1, now, 10, true)
+		require.NoError(t, err)
+		require.Equal(t, 10, len(dispersals))
+		checkDispersalsAsc(t, dispersals)
+
+		// Test min/max timestamp range
+		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, 0, now, 0, true)
+		require.NoError(t, err)
+		require.Equal(t, numRequests, len(dispersals))
+		checkDispersalsAsc(t, dispersals)
+		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs-1, math.MaxInt64, 0, true)
+		require.NoError(t, err)
+		require.Equal(t, numRequests, len(dispersals))
+		checkDispersalsAsc(t, dispersals)
+	})
+
+	// Test full range query
+	t.Run("descending full range", func(t *testing.T) {
+		// Test without limit
+		dispersals, err := blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs-1, now, 0, false)
+		require.NoError(t, err)
+		require.Equal(t, numRequests, len(dispersals))
+		checkDispersalsDesc(t, dispersals)
+
+		// Test with limit
+		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs, now, 10, false)
+		require.NoError(t, err)
+		require.Equal(t, 10, len(dispersals))
+		checkDispersalsDesc(t, dispersals)
+
+		// Test min/max timestamp range
+		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, 0, now, 0, false)
+		require.NoError(t, err)
+		require.Equal(t, numRequests, len(dispersals))
+		checkDispersalsDesc(t, dispersals)
+		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs-1, math.MaxInt64, 0, false)
+		require.NoError(t, err)
+		require.Equal(t, numRequests, len(dispersals))
+		checkDispersalsDesc(t, dispersals)
+	})
+
+	// Test range boundaries
+	t.Run("ascending range boundaries", func(t *testing.T) {
+		// Test exclusive start
+		dispersals, err := blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs, now, 0, true)
+		require.NoError(t, err)
+		require.Equal(t, numRequests-1, len(dispersals))
+		assert.Equal(t, dispersedAt[1], dispersals[0].DispersedAt)
+		assert.Equal(t, dispersedAt[numRequests-1], dispersals[numRequests-2].DispersedAt)
+		checkDispersalsAsc(t, dispersals)
+
+		// Test exclusive end
+		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs-1, dispersedAt[4], 0, true)
+		require.NoError(t, err)
+		require.Equal(t, 4, len(dispersals))
+		assert.Equal(t, dispersedAt[0], dispersals[0].DispersedAt)
+		assert.Equal(t, dispersedAt[3], dispersals[3].DispersedAt)
+		checkDispersalsAsc(t, dispersals)
+	})
+
+	// Test range boundaries
+	t.Run("descending range boundaries", func(t *testing.T) {
+		// Test exclusive start
+		dispersals, err := blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs, now, 0, false)
+		require.NoError(t, err)
+		require.Equal(t, numRequests-1, len(dispersals))
+		assert.Equal(t, dispersedAt[numRequests-1], dispersals[0].DispersedAt)
+		assert.Equal(t, dispersedAt[1], dispersals[numRequests-2].DispersedAt)
+		checkDispersalsDesc(t, dispersals)
+
+		// Test exclusive end
+		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs-1, dispersedAt[4], 0, false)
+		require.NoError(t, err)
+		require.Equal(t, 4, len(dispersals))
+		assert.Equal(t, dispersedAt[3], dispersals[0].DispersedAt)
+		assert.Equal(t, dispersedAt[0], dispersals[3].DispersedAt)
+		checkDispersalsDesc(t, dispersals)
+	})
+
+	// Test pagination
+	t.Run("pagination", func(t *testing.T) {
+		for i := 1; i < numRequests; i++ {
+			dispersals, err := blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, dispersedAt[i-1], dispersedAt[i]+1, 0, true)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(dispersals))
+			assert.Equal(t, dispersedAt[i], dispersals[0].DispersedAt)
+		}
+
+		for i := 1; i < numRequests; i++ {
+			dispersals, err := blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, dispersedAt[i-1], dispersedAt[i]+1, 0, false)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(dispersals))
+			assert.Equal(t, dispersedAt[i], dispersals[0].DispersedAt)
+		}
 	})
 }
 

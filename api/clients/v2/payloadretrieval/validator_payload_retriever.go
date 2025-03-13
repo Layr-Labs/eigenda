@@ -1,9 +1,10 @@
-package clients
+package payloadretrieval
 
 import (
 	"context"
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/core"
@@ -19,17 +20,17 @@ import (
 type ValidatorPayloadRetriever struct {
 	logger          logging.Logger
 	config          ValidatorPayloadRetrieverConfig
-	retrievalClient RetrievalClient
+	retrievalClient clients.RetrievalClient
 	g1Srs           []bn254.G1Affine
 }
 
-var _ PayloadRetriever = &ValidatorPayloadRetriever{}
+var _ clients.PayloadRetriever = &ValidatorPayloadRetriever{}
 
 // NewValidatorPayloadRetriever creates a new ValidatorPayloadRetriever from already constructed objects
 func NewValidatorPayloadRetriever(
 	logger logging.Logger,
 	config ValidatorPayloadRetrieverConfig,
-	retrievalClient RetrievalClient,
+	retrievalClient clients.RetrievalClient,
 	g1Srs []bn254.G1Affine,
 ) (*ValidatorPayloadRetriever, error) {
 	err := config.checkAndSetDefaults()
@@ -52,7 +53,7 @@ func NewValidatorPayloadRetriever(
 // payload is returned.
 func (pr *ValidatorPayloadRetriever) GetPayload(
 	ctx context.Context,
-	eigenDACert *verification.EigenDACert,
+	eigenDACert *coretypes.EigenDACert,
 ) (*coretypes.Payload, error) {
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
@@ -61,7 +62,7 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 	}
 
 	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := verification.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
+	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
 	if err != nil {
 		return nil, fmt.Errorf("convert commitments binding to internal: %w", err)
 	}

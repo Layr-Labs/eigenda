@@ -12,6 +12,7 @@ import (
 	pb "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
+	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/node"
@@ -19,7 +20,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/mem"
-	"google.golang.org/grpc/peer"
 )
 
 // ServerV2 implements the Node v2 proto APIs.
@@ -27,12 +27,13 @@ type ServerV2 struct {
 	pb.UnimplementedDispersalServer
 	pb.UnimplementedRetrievalServer
 
-	config        *node.Config
-	node          *node.Node
-	ratelimiter   common.RateLimiter
-	logger        logging.Logger
-	metrics       *MetricsV2
-	authenticator auth.RequestAuthenticator
+	config         *node.Config
+	node           *node.Node
+	ratelimiter    common.RateLimiter
+	logger         logging.Logger
+	metrics        *MetricsV2
+	authenticator  auth.RequestAuthenticator
+	replayGuardian replay.ReplayGuardian
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -57,7 +58,6 @@ func NewServerV2(
 			reader,
 			config.DispersalAuthenticationKeyCacheSize,
 			config.DisperserKeyTimeout,
-			config.DispersalAuthenticationTimeout,
 			func(id uint32) bool {
 				return id == api.EigenLabsDisperserID
 			},
@@ -67,13 +67,19 @@ func NewServerV2(
 		}
 	}
 
+	replayGuardian := replay.NewReplayGuardian(
+		time.Now,
+		config.StoreChunksRequestMaxPastAge,
+		config.StoreChunksRequestMaxFutureAge)
+
 	return &ServerV2{
-		config:        config,
-		node:          node,
-		ratelimiter:   ratelimiter,
-		logger:        logger,
-		metrics:       metrics,
-		authenticator: authenticator,
+		config:         config,
+		node:           node,
+		ratelimiter:    ratelimiter,
+		logger:         logger,
+		metrics:        metrics,
+		authenticator:  authenticator,
+		replayGuardian: replayGuardian,
 	}, nil
 }
 
@@ -125,15 +131,15 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	}
 
 	if s.authenticator != nil {
-		disperserPeer, ok := peer.FromContext(ctx)
-		if !ok {
-			return nil, api.NewErrorInvalidArg("could not get peer information from request context")
-		}
-		disperserAddress := disperserPeer.Addr.String()
-
-		err := s.authenticator.AuthenticateStoreChunksRequest(ctx, disperserAddress, in, time.Now())
+		hash, err := s.authenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
 		if err != nil {
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
+		}
+
+		timestamp := time.Unix(int64(in.Timestamp), 0)
+		err = s.replayGuardian.VerifyRequest(hash, timestamp)
+		if err != nil {
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
 		}
 	}
 

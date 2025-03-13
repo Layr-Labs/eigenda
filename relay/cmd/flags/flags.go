@@ -309,6 +309,20 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PPROF_PORT"),
 		Value:    6060,
 	}
+	GetChunksRequestMaxPastAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-request-max-past-age"),
+		Usage:    "Max age of a GetChunks request",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNKS_REQUEST_MAX_PAST_AGE"),
+		Value:    5 * time.Minute,
+	}
+	GetChunksRequestMaxFutureAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-request-max-future-age"),
+		Usage:    "Max future age of a GetChunks request",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNKS_REQUEST_MAX_FUTURE_AGE"),
+		Value:    5 * time.Minute,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -358,6 +372,8 @@ var optionalFlags = []cli.Flag{
 	MetricsPortFlag,
 	EnablePprofFlag,
 	PprofHttpPortFlag,
+	GetChunksRequestMaxPastAgeFlag,
+	GetChunksRequestMaxFutureAgeFlag,
 }
 
 var Flags []cli.Flag
