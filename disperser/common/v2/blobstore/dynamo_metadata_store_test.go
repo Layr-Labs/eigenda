@@ -1747,13 +1747,13 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 	return bk, bh
 }
 
-func TestDoesBlobExist(t *testing.T) {
+func TestCheckBlobExists(t *testing.T) {
 	ctx := context.Background()
 	// Create a test blob
 	blobKey, blobHeader := newBlob(t)
 
 	// Check that the blob does not exist initially
-	exists, err := blobMetadataStore.DoesBlobExist(ctx, blobKey)
+	exists, err := blobMetadataStore.CheckBlobExists(ctx, blobKey)
 	require.NoError(t, err)
 	require.False(t, exists, "Blob should not exist before being added")
 
@@ -1774,7 +1774,7 @@ func TestDoesBlobExist(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that the blob now exists
-	exists, err = blobMetadataStore.DoesBlobExist(ctx, blobKey)
+	exists, err = blobMetadataStore.CheckBlobExists(ctx, blobKey)
 	require.NoError(t, err)
 	require.True(t, exists, "Blob should exist after being added")
 
@@ -1783,7 +1783,7 @@ func TestDoesBlobExist(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that the blob no longer exists
-	exists, err = blobMetadataStore.DoesBlobExist(ctx, blobKey)
+	exists, err = blobMetadataStore.CheckBlobExists(ctx, blobKey)
 	require.NoError(t, err)
 	require.False(t, exists, "Blob should not exist after being deleted")
 
@@ -1792,7 +1792,7 @@ func TestDoesBlobExist(t *testing.T) {
 	_, err = rand.Read(randomKey[:])
 	require.NoError(t, err)
 
-	exists, err = blobMetadataStore.DoesBlobExist(ctx, randomKey)
+	exists, err = blobMetadataStore.CheckBlobExists(ctx, randomKey)
 	require.NoError(t, err)
 	require.False(t, exists, "Random blob key should not exist")
 }

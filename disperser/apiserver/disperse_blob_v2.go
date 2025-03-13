@@ -231,7 +231,7 @@ func (s *DispersalServerV2) checkBlobExistence(ctx context.Context, blobHeader *
 	}
 
 	// check if blob already exists
-	exists, err := s.blobMetadataStore.DoesBlobExist(ctx, blobKey)
+	exists, err := s.blobMetadataStore.CheckBlobExists(ctx, blobKey)
 	if err != nil {
 		return api.NewErrorInternal(fmt.Sprintf("failed to check blob existence: %v", err))
 	}
