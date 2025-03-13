@@ -556,7 +556,6 @@ func TestBadgerDB(t *testing.T) {
 
 	unflushedKeys := make([][]byte, 0, 100)
 	writeFunction := func(key []byte, value []byte) error {
-		fmt.Printf("objects in batch: %d\n", objectsInBatch) // TODO
 		if captureKeys {
 			unflushedKeys = append(unflushedKeys, key)
 		}
@@ -570,6 +569,24 @@ func TestBadgerDB(t *testing.T) {
 				if err != nil {
 					return err
 				}
+
+				if captureKeys {
+					// If the DB is ACID compliant, all of these keys should now be durable
+
+					for _, unflushedKey := range unflushedKeys {
+						_, err = keyCaptureWriter.WriteString(fmt.Sprintf("%s", unflushedKey))
+						if err != nil {
+							panic(err)
+						}
+					}
+					err = keyCaptureWriter.Flush()
+					fmt.Printf("\nwrote %d keys\n", len(unflushedKeys))
+					if err != nil {
+						panic(err)
+					}
+					unflushedKeys = make([][]byte, 0, 100)
+				}
+
 				transaction = db.NewTransaction(true)
 				objectsInBatch = 0
 				err = transaction.SetEntry(entry)
@@ -581,7 +598,6 @@ func TestBadgerDB(t *testing.T) {
 		objectsInBatch++
 
 		if objectsInBatch >= batchSize {
-			fmt.Printf("\nflushing batch\n")
 
 			//writeLimiter <- struct{}{}
 			transactionToCommit := transaction
@@ -593,7 +609,6 @@ func TestBadgerDB(t *testing.T) {
 			}
 
 			if captureKeys {
-
 				// If the DB is ACID compliant, all of these keys should now be durable
 
 				for _, unflushedKey := range unflushedKeys {
@@ -608,7 +623,6 @@ func TestBadgerDB(t *testing.T) {
 					panic(err)
 				}
 				unflushedKeys = make([][]byte, 0, 100)
-
 			}
 
 			//<-writeLimiter
