@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/rand"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -114,6 +115,10 @@ func runBenchmark(write writer, read reader) {
 	fmt.Printf("Write parallelism: %d\n", parallelWriters)
 
 	if pprofEnabled {
+
+		runtime.SetMutexProfileFraction(1)
+		runtime.SetBlockProfileRate(1)
+
 		logger, err := common.NewLogger(common.DefaultLoggerConfig())
 		if err != nil {
 			panic(err)
