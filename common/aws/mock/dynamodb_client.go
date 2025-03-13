@@ -59,7 +59,7 @@ func (c *MockDynamoDBClient) GetItem(ctx context.Context, tableName string, key 
 	return args.Get(0).(dynamodb.Item), args.Error(1)
 }
 
-func (c *MockDynamoDBClient) GetItemWithProjection(ctx context.Context, tableName string, key dynamodb.Key, projectionExpression string) (dynamodb.Item, error) {
+func (c *MockDynamoDBClient) GetItemWithInput(ctx context.Context, input *awsdynamodb.GetItemInput) (dynamodb.Item, error) {
 	args := c.Called()
 	return args.Get(0).(dynamodb.Item), args.Error(1)
 }
