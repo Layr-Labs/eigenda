@@ -122,125 +122,115 @@ func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod u
 	return binUsageValue, nil
 }
 
-func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, paymentCharged *big.Int) error {
+func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, paymentCharged *big.Int) (*big.Int, error) {
+	// Create new item with only AccountID and CumulativePayment
 	item := commondynamodb.Item{
-		"AccountID":          &types.AttributeValueMemberS{Value: paymentMetadata.AccountID.Hex()},
-		"CumulativePayments": &types.AttributeValueMemberN{Value: paymentMetadata.CumulativePayment.String()},
-		"PaymentCharged":     &types.AttributeValueMemberN{Value: paymentCharged.String()},
+		"AccountID":         &types.AttributeValueMemberS{Value: paymentMetadata.AccountID.Hex()},
+		"CumulativePayment": &types.AttributeValueMemberN{Value: paymentMetadata.CumulativePayment.String()},
 	}
 
-	// Use a conditional put with attribute_not_exists to ensure atomicity
-	// This ensures we don't overwrite an existing record with the same key
-	condition := "attribute_not_exists(AccountID) AND attribute_not_exists(CumulativePayments)"
-
-	err := s.dynamoClient.PutItemWithCondition(ctx, s.onDemandTableName, item, condition, nil, nil)
-	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return fmt.Errorf("exact payment already exists")
+	// Use conditional expression to ensure:
+	// 1. If no record exists, accept the payment
+	// 2. If record exists, the increment must be at least the payment charged
+	//    (which also ensures the new payment is larger than the existing one since paymentCharged > 0)
+	payment := big.NewInt(0).Sub(paymentMetadata.CumulativePayment, paymentCharged)
+	if payment.Sign() < 0 {
+		return nil, fmt.Errorf("payment validation failed: payment charged is greater than cumulative payment")
 	}
+	conditionExpression := "attribute_not_exists(CumulativePayment) OR " +
+		"CumulativePayment <= :payment"
+
+	expressionValues := map[string]types.AttributeValue{
+		":payment": &types.AttributeValueMemberN{Value: payment.String()},
+	}
+
+	// Use PutItemWithConditionAndReturn to get the old value
+	oldItem, err := s.dynamoClient.PutItemWithConditionAndReturn(ctx, s.onDemandTableName, item, conditionExpression, nil, expressionValues)
 	if err != nil {
-		return fmt.Errorf("failed to add on-demand payment: %w", err)
+		if errors.Is(err, commondynamodb.ErrConditionFailed) {
+			return nil, fmt.Errorf("insufficient cumulative payment increment")
+		}
+		return nil, fmt.Errorf("failed to add on-demand payment: %w", err)
 	}
 
-	return nil
+	// If there was no previous item, return zero
+	if len(oldItem) == 0 {
+		return big.NewInt(0), nil
+	}
+
+	// Extract the old CumulativePayment value
+	oldPaymentAttr, ok := oldItem["CumulativePayment"]
+	if !ok {
+		return big.NewInt(0), nil
+	}
+
+	// Type assertion with check
+	oldPaymentNum, ok := oldPaymentAttr.(*types.AttributeValueMemberN)
+	if !ok {
+		return big.NewInt(0), fmt.Errorf("CumulativePayment has invalid type: %T", oldPaymentAttr)
+	}
+
+	oldPayment := new(big.Int)
+	if _, success := oldPayment.SetString(oldPaymentNum.Value, 10); !success {
+		return big.NewInt(0), fmt.Errorf("failed to parse old payment value: %s", oldPaymentNum.Value)
+	}
+
+	return oldPayment, nil
 }
 
-// RemoveOnDemandPayment removes a specific payment from the list for a specific account
-func (s *OffchainStore) RemoveOnDemandPayment(ctx context.Context, accountID gethcommon.Address, payment *big.Int) error {
-	err := s.dynamoClient.DeleteItem(ctx, s.onDemandTableName,
-		commondynamodb.Key{
-			"AccountID":          &types.AttributeValueMemberS{Value: accountID.Hex()},
-			"CumulativePayments": &types.AttributeValueMemberN{Value: payment.String()},
-		},
+// RollbackOnDemandPayment rolls back a payment to the previous value
+// If oldPayment is 0, it writes a zero value instead of deleting the record
+// This method uses a conditional expression to ensure we only roll back if the current value matches newPayment
+func (s *OffchainStore) RollbackOnDemandPayment(ctx context.Context, accountID gethcommon.Address, newPayment, oldPayment *big.Int) error {
+	// Initialize oldPayment to zero if it's nil
+	if oldPayment == nil {
+		oldPayment = big.NewInt(0)
+	}
+
+	// Create the item with the old payment value (which might be zero)
+	item := commondynamodb.Item{
+		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"CumulativePayment": &types.AttributeValueMemberN{Value: oldPayment.String()},
+	}
+
+	// Construct a condition expression as a string
+	conditionExpression := "attribute_not_exists(CumulativePayment) OR CumulativePayment = :expectedPayment"
+
+	// Create the expression attribute values map
+	expressionValues := map[string]types.AttributeValue{
+		":expectedPayment": &types.AttributeValueMemberN{Value: newPayment.String()},
+	}
+
+	err := s.dynamoClient.PutItemWithCondition(
+		ctx,
+		s.onDemandTableName,
+		item,
+		conditionExpression,
+		nil, // No expression attribute names needed
+		expressionValues,
 	)
 
+	if errors.Is(err, commondynamodb.ErrConditionFailed) {
+		if s.logger != nil {
+			s.logger.Debug("Skipping rollback as current payment doesn't match the expected value",
+				"accountID", accountID.Hex(),
+				"expectedPayment", newPayment.String())
+		}
+		return nil
+	}
+
 	if err != nil {
-		return fmt.Errorf("failed to remove payment: %w", err)
+		return fmt.Errorf("failed to rollback payment: %w", err)
+	}
+
+	if s.logger != nil {
+		s.logger.Debug("Successfully rolled back payment to previous value",
+			"accountID", accountID.Hex(),
+			"rolledBackFrom", newPayment.String(),
+			"rolledBackTo", oldPayment.String())
 	}
 
 	return nil
-}
-
-// GetRelevantOnDemandRecords gets previous cumulative payment, next cumulative payment, and paymentCharged
-// The queries are done sequentially instead of one-go for efficient querying and would not cause race condition errors for honest requests
-func (s *OffchainStore) GetRelevantOnDemandRecords(ctx context.Context, accountID gethcommon.Address, cumulativePayment *big.Int) (*big.Int, *big.Int, *big.Int, error) {
-	// Fetch the largest entry smaller than the given cumulativePayment
-	queryInput := &dynamodb.QueryInput{
-		TableName:              aws.String(s.onDemandTableName),
-		KeyConditionExpression: aws.String("AccountID = :account AND CumulativePayments < :cumulativePayment"),
-		ExpressionAttributeValues: commondynamodb.ExpressionValues{
-			":account":           &types.AttributeValueMemberS{Value: accountID.Hex()},
-			":cumulativePayment": &types.AttributeValueMemberN{Value: cumulativePayment.String()},
-		},
-		ScanIndexForward: aws.Bool(false),
-		Limit:            aws.Int32(1),
-	}
-	smallerResult, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
-	if err != nil {
-		return nil, nil, big.NewInt(0), fmt.Errorf("failed to query smaller payments for account: %w", err)
-	}
-	prevPayment := big.NewInt(0)
-	if len(smallerResult) > 0 {
-		cumulativePaymentsAttr, ok := smallerResult[0]["CumulativePayments"]
-		if !ok {
-			return nil, nil, big.NewInt(0), fmt.Errorf("CumulativePayments field not found in result")
-		}
-		cumulativePaymentsNum, ok := cumulativePaymentsAttr.(*types.AttributeValueMemberN)
-		if !ok {
-			return nil, nil, big.NewInt(0), fmt.Errorf("CumulativePayments has invalid type")
-		}
-		setPrevPayment, success := prevPayment.SetString(cumulativePaymentsNum.Value, 10)
-		if !success {
-			return nil, nil, big.NewInt(0), fmt.Errorf("failed to parse previous payment: %w", err)
-		}
-		prevPayment = setPrevPayment
-	}
-
-	// Fetch the smallest entry larger than the given cumulativePayment
-	queryInput = &dynamodb.QueryInput{
-		TableName:              aws.String(s.onDemandTableName),
-		KeyConditionExpression: aws.String("AccountID = :account AND CumulativePayments > :cumulativePayment"),
-		ExpressionAttributeValues: commondynamodb.ExpressionValues{
-			":account":           &types.AttributeValueMemberS{Value: accountID.Hex()},
-			":cumulativePayment": &types.AttributeValueMemberN{Value: cumulativePayment.String()},
-		},
-		ScanIndexForward: aws.Bool(true),
-		Limit:            aws.Int32(1),
-	}
-	largerResult, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
-	if err != nil {
-		return nil, nil, big.NewInt(0), fmt.Errorf("failed to query the next payment for account: %w", err)
-	}
-	nextPayment := big.NewInt(0)
-	paymentCharged := big.NewInt(0)
-	if len(largerResult) > 0 {
-		cumulativePaymentsAttr, ok := largerResult[0]["CumulativePayments"]
-		if !ok {
-			return nil, nil, big.NewInt(0), fmt.Errorf("CumulativePayments field not found in result")
-		}
-		cumulativePaymentsNum, ok := cumulativePaymentsAttr.(*types.AttributeValueMemberN)
-		if !ok {
-			return nil, nil, big.NewInt(0), fmt.Errorf("CumulativePayments has invalid type")
-		}
-		setNextPayment, success := nextPayment.SetString(cumulativePaymentsNum.Value, 10)
-		if !success {
-			return nil, nil, big.NewInt(0), fmt.Errorf("failed to parse previous payment: %w", err)
-		}
-		nextPayment = setNextPayment
-
-		chargeAttr, ok := largerResult[0]["PaymentCharged"]
-		if !ok {
-			return nil, nil, big.NewInt(0), fmt.Errorf("PaymentCharged field not found in result")
-		}
-		chargeNum, ok := chargeAttr.(*types.AttributeValueMemberN)
-		if !ok {
-			return nil, nil, big.NewInt(0), fmt.Errorf("PaymentCharged has invalid type")
-		}
-		if _, success := paymentCharged.SetString(chargeNum.Value, 10); !success {
-			return nil, nil, big.NewInt(0), fmt.Errorf("failed to parse paymentCharged value: %w", err)
-		}
-	}
-
-	return prevPayment, nextPayment, paymentCharged, nil
 }
 
 func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error) {
@@ -273,40 +263,36 @@ func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID gethcomm
 }
 
 func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
-	// Fetch the largest cumulative payment
-	queryInput := &dynamodb.QueryInput{
-		TableName:              aws.String(s.onDemandTableName),
-		KeyConditionExpression: aws.String("AccountID = :account"),
-		ExpressionAttributeValues: commondynamodb.ExpressionValues{
-			":account": &types.AttributeValueMemberS{Value: accountID.Hex()},
-		},
-		ScanIndexForward: aws.Bool(false),
-		Limit:            aws.Int32(1),
-	}
-	payments, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query payments for account: %w", err)
+	// Get the single record for this account
+	key := commondynamodb.Key{
+		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
 	}
 
-	if len(payments) == 0 {
+	result, err := s.dynamoClient.GetItem(ctx, s.onDemandTableName, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get payment for account: %w", err)
+	}
+
+	// If no item found, return zero
+	if len(result) == 0 {
 		return big.NewInt(0), nil
 	}
 
-	// Safely extract CumulativePayments
-	cumulativePaymentsAttr, ok := payments[0]["CumulativePayments"]
+	// Extract CumulativePayment
+	largestPaymentAttr, ok := result["CumulativePayment"]
 	if !ok {
-		return nil, fmt.Errorf("CumulativePayments field not found in result")
+		return big.NewInt(0), nil
 	}
 
 	// Type assertion with check
-	cumulativePaymentsNum, ok := cumulativePaymentsAttr.(*types.AttributeValueMemberN)
+	largestPaymentNum, ok := largestPaymentAttr.(*types.AttributeValueMemberN)
 	if !ok {
-		return nil, fmt.Errorf("CumulativePayments has invalid type: %T", cumulativePaymentsAttr)
+		return nil, fmt.Errorf("CumulativePayment has invalid type: %T", largestPaymentAttr)
 	}
 
 	payment := new(big.Int)
-	if _, success := payment.SetString(cumulativePaymentsNum.Value, 10); !success {
-		return nil, fmt.Errorf("failed to parse payment value: %s", cumulativePaymentsNum.Value)
+	if _, success := payment.SetString(largestPaymentNum.Value, 10); !success {
+		return nil, fmt.Errorf("failed to parse payment value: %s", largestPaymentNum.Value)
 	}
 
 	return payment, nil

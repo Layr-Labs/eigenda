@@ -150,7 +150,7 @@ func TestV2DisperseBlob(t *testing.T) {
 		BlobHeader: blobHeaderProto2,
 	})
 	assert.Nil(t, reply)
-	assert.ErrorContains(t, err, "payment already exists")
+	assert.ErrorContains(t, err, "failed to update cumulative payment: insufficient cumulative payment increment")
 }
 
 func TestV2DisperseBlobRequestValidation(t *testing.T) {

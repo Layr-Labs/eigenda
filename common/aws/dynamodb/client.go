@@ -50,6 +50,7 @@ type Client interface {
 	DeleteTable(ctx context.Context, tableName string) error
 	PutItem(ctx context.Context, tableName string, item Item) error
 	PutItemWithCondition(ctx context.Context, tableName string, item Item, condition string, expressionAttributeNames map[string]string, expressionAttributeValues map[string]types.AttributeValue) error
+	PutItemWithConditionAndReturn(ctx context.Context, tableName string, item Item, condition string, expressionAttributeNames map[string]string, expressionAttributeValues map[string]types.AttributeValue) (Item, error)
 	PutItems(ctx context.Context, tableName string, items []Item) ([]Item, error)
 	UpdateItem(ctx context.Context, tableName string, key Key, item Item) (Item, error)
 	UpdateItemWithCondition(ctx context.Context, tableName string, key Key, item Item, condition expression.ConditionBuilder) (Item, error)
@@ -152,6 +153,33 @@ func (c *client) PutItemWithCondition(
 		return fmt.Errorf("failed to put item in table %s: %w", tableName, err)
 	}
 	return nil
+}
+
+// PutItemWithConditionAndReturn puts an item in the table with a condition and returns the old item if it exists
+func (c *client) PutItemWithConditionAndReturn(
+	ctx context.Context,
+	tableName string,
+	item Item,
+	condition string,
+	expressionAttributeNames map[string]string,
+	expressionAttributeValues map[string]types.AttributeValue,
+) (Item, error) {
+	result, err := c.dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(tableName), Item: item,
+		ConditionExpression:       aws.String(condition),
+		ExpressionAttributeNames:  expressionAttributeNames,
+		ExpressionAttributeValues: expressionAttributeValues,
+		ReturnValues:              types.ReturnValueAllOld,
+	})
+	var ccfe *types.ConditionalCheckFailedException
+	if errors.As(err, &ccfe) {
+		return nil, ErrConditionFailed
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to put item in table %s: %w", tableName, err)
+	}
+
+	return result.Attributes, nil
 }
 
 // PutItems puts items in batches of 25 items (which is a limit DynamoDB imposes)

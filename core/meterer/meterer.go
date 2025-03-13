@@ -212,58 +212,35 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 		return fmt.Errorf("invalid quorum for On-Demand Request: %w", err)
 	}
 
-	// Compute paymentCharged at payment time
-	paymentCharged := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol())
-
-	// Validate payments attached
-	err = m.ValidatePayment(ctx, header, onDemandPayment, paymentCharged)
-	if err != nil {
-		// No tolerance for incorrect payment amounts; no rollbacks
-		return fmt.Errorf("invalid on-demand payment: %w", err)
+	// Verify that the claimed cumulative payment doesn't exceed the on-chain deposit
+	fmt.Println("header.CumulativePayment", header.CumulativePayment, "onDemandPayment.CumulativePayment", onDemandPayment.CumulativePayment)
+	if header.CumulativePayment.Cmp(onDemandPayment.CumulativePayment) > 0 {
+		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
 	}
 
-	err = m.OffchainStore.AddOnDemandPayment(ctx, header, paymentCharged)
+	// Compute paymentCharged at payment time
+	paymentCharged := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol())
+	// Add the payment and get the old payment value
+	m.logger.Info("Adding on-demand payment", "header", header, "onDemandPayment", onDemandPayment, "paymentCharged", paymentCharged)
+	oldPayment, err := m.OffchainStore.AddOnDemandPayment(ctx, header, paymentCharged)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
 	}
 
+	m.logger.Info("Incrementing global bin usage", "header", header, "onDemandPayment", onDemandPayment, "oldPayment", oldPayment)
 	// Update bin usage atomically and check against bin capacity
 	if err := m.IncrementGlobalBinUsage(ctx, uint64(symbolsCharged), receivedAt); err != nil {
-		//TODO: conditionally remove the payment based on the error type (maybe if the error is store-op related)
-		dbErr := m.OffchainStore.RemoveOnDemandPayment(ctx, header.AccountID, header.CumulativePayment)
+		// If global bin usage update fails, roll back the payment to its previous value
+		// The rollback will only happen if the current payment value still matches what we just wrote
+		// This ensures we don't accidentally roll back a newer payment that might have been processed
+		dbErr := m.OffchainStore.RollbackOnDemandPayment(ctx, header.AccountID, header.CumulativePayment, oldPayment)
 		if dbErr != nil {
 			return dbErr
 		}
 		return fmt.Errorf("failed global rate limiting: %w", err)
 	}
+	m.logger.Info("Successfully incremented global bin usage", "header", header, "onDemandPayment", onDemandPayment, "oldPayment", oldPayment)
 
-	return nil
-}
-
-// ValidatePayment checks if the provided payment header is valid against the local accounting
-// prevPmt is the largest  cumulative payment strictly less    than PaymentMetadata.cumulativePayment if exists
-// nextPmt is the smallest cumulative payment strictly greater than PaymentMetadata.cumulativePayment if exists
-// chargeOfNextPmt is the charge associated with nextPmt if exists
-// prevPmt + currentPaymentCharge <= PaymentMetadata.CumulativePayment
-// <= nextPmt - chargeOfNextPmt > nextPmt
-func (m *Meterer) ValidatePayment(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, currentPaymentCharge *big.Int) error {
-	if header.CumulativePayment.Cmp(onDemandPayment.CumulativePayment) > 0 {
-		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
-	}
-
-	prevPmt, nextPmt, chargeOfNextPmt, err := m.OffchainStore.GetRelevantOnDemandRecords(ctx, header.AccountID, header.CumulativePayment) // zero if DNE
-	if err != nil {
-		return fmt.Errorf("failed to get relevant on-demand records: %w", err)
-	}
-	// the current request must increment cumulative payment by a magnitude sufficient to cover the blob size
-	if new(big.Int).Add(prevPmt, currentPaymentCharge).Cmp(header.CumulativePayment) > 0 {
-		return fmt.Errorf("insufficient cumulative payment increment")
-	}
-	// the current request must not break the payment magnitude for the next payment if the two requests were delivered out-of-order
-	if nextPmt.Cmp(big.NewInt(0)) != 0 && new(big.Int).Add(header.CumulativePayment, chargeOfNextPmt).Cmp(nextPmt) > 0 {
-		return fmt.Errorf("breaking cumulative payment invariants")
-	}
-	// check passed: blob can be safely inserted into the set of payments
 	return nil
 }
 

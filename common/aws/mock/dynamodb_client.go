@@ -31,6 +31,11 @@ func (c *MockDynamoDBClient) PutItemWithCondition(ctx context.Context, tableName
 	return args.Error(0)
 }
 
+func (c *MockDynamoDBClient) PutItemWithConditionAndReturn(ctx context.Context, tableName string, item dynamodb.Item, condition string, expressionAttributeNames map[string]string, expressionAttributeValues map[string]types.AttributeValue) (dynamodb.Item, error) {
+	args := c.Called()
+	return args.Get(0).(dynamodb.Item), args.Error(1)
+}
+
 func (c *MockDynamoDBClient) PutItems(ctx context.Context, tableName string, items []dynamodb.Item) ([]dynamodb.Item, error) {
 	args := c.Called(ctx, tableName, items)
 	if args.Get(0) == nil {
