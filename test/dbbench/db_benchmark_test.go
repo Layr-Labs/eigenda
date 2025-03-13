@@ -257,7 +257,7 @@ func runBenchmark(write writer, read reader) {
 					fmt.Printf("Current wall time: %v\n", time.Now())
 					lock.Unlock()
 
-					panic(fmt.Errorf("error reading key %s: %v", key, err))
+					panic(fmt.Errorf("error reading key '%s': %v", key, err))
 				}
 				if !bytes.Equal(expectedValue, value) {
 					lock.Lock()
@@ -540,7 +540,7 @@ func TestBadgerDB(t *testing.T) {
 				key := data[i : i+32]
 				_, err := transaction.Get(key)
 				if err != nil {
-					fmt.Printf("Error reading key: %v\n", err)
+					fmt.Printf("Error reading key %s: %v\n", key, err)
 				}
 			}
 
