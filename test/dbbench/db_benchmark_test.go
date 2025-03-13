@@ -120,6 +120,7 @@ func runBenchmark(write writer, read reader) {
 		}
 		pprofProfiler := pprof.NewPprofProfiler("6060", logger)
 		go pprofProfiler.Start()
+		fmt.Printf("Profiling enabled on port 6060\n")
 	}
 
 	start := time.Now()
