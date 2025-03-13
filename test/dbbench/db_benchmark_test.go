@@ -47,7 +47,7 @@ const dataGeneratorCount = 16
 const pprofEnabled = false
 const traceEnabled = false
 
-const captureKeys = true
+const captureKeys = false
 
 // Used to ensure that keys are truly unique
 var nextSeedSerialNumber = atomic.Uint32{}
@@ -499,6 +499,7 @@ func TestBadgerDB(t *testing.T) {
 	opts := badger.DefaultOptions(directory)
 	opts.Compression = options.None
 	opts.Logger = nil
+	opts.SyncWrites = true
 
 	opts.ValueThreshold = 0
 
