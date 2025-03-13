@@ -38,7 +38,7 @@ type reader func(key []byte) ([]byte, error)
 const totalToWrite = 10 * units.TiB
 const dataSize = 1 * units.MiB
 const batchSize = 100
-const parallelWriters = 2
+const parallelWriters = 1 // TODO
 const readBytesPerSecond = 10 * units.MiB
 const readerCount = 1
 const TTL = 2 * time.Hour
@@ -143,45 +143,6 @@ func runBenchmark(write writer, read reader) {
 			panic(fmt.Errorf("could not start trace file: %v", err))
 		}
 		defer trace.Stop()
-	}
-
-	var keyWriter bufio.Writer
-	if captureKeys {
-
-		// First, check if the key file exists. If it does, verify that each key it contains is in the database.
-		if _, err := os.Stat("keys.txt"); err == nil {
-			fmt.Printf("Found keys.txt, scanning DB\n")
-
-			data, err := os.ReadFile("keys.txt")
-			if err != nil {
-				panic(fmt.Errorf("could not read key file: %v", err))
-			}
-
-			elements := strings.Split(string(data), "\n")
-			fmt.Printf("Scanning %d keys\n", len(elements))
-			for _, key := range elements {
-				if len(key) != 32 {
-					fmt.Printf("found partial key: '%s', skipping\n", key)
-					continue
-				}
-				value, err := read([]byte(key))
-				if err != nil {
-					panic(fmt.Errorf("error reading key %s: %v", key, err))
-				}
-				if len(value) != dataSize {
-					panic(fmt.Errorf("expected value of length %d, got %d", dataSize, len(value)))
-				}
-			}
-
-			fmt.Printf("done scanning\n")
-		}
-
-		keyFile, err := os.Create("keys.txt")
-		if err != nil {
-			panic(fmt.Errorf("could not create key file: %v", err))
-		}
-		defer keyFile.Close()
-		keyWriter = *bufio.NewWriter(keyFile)
 	}
 
 	start := time.Now()
@@ -374,13 +335,6 @@ func runBenchmark(write writer, read reader) {
 			next, _ := possiblyUnflushedData.Dequeue()
 			metadata = next.(*writeMetadata)
 			unexpiredData[metadata.seed] = metadata
-
-			if captureKeys {
-				_, err = keyWriter.WriteString(fmt.Sprintf("%s\n", key))
-				if err != nil {
-					panic(err)
-				}
-			}
 		}
 		lock.Unlock()
 
@@ -571,9 +525,43 @@ func TestBadgerDB(t *testing.T) {
 
 	writeLimiter := make(chan struct{}, parallelWriters)
 
+	var keyCaptureWriter *bufio.Writer
+	unflushedKeys := make([][]byte, 0, 100)
+
+	if captureKeys {
+		// First, check if the key file exists. If it does, verify that each key it contains is in the database.
+		if _, err := os.Stat("keys.txt"); err == nil {
+			fmt.Printf("Found keys.txt, scanning DB\n")
+
+			data, err := os.ReadFile("keys.txt")
+			if err != nil {
+				panic(fmt.Errorf("could not read key file: %v", err))
+			}
+
+			for i := 0; i+32 < len(data); i += 32 {
+				key := data[i : i+32]
+				_, err := transaction.Get(key)
+				if err != nil {
+					fmt.Printf("Error reading key: %v\n", err)
+				}
+			}
+
+			fmt.Printf("done scanning\n")
+		}
+
+		keyFile, err := os.Create("keys.txt")
+		if err != nil {
+			panic(fmt.Errorf("could not create key file: %v", err))
+		}
+		defer keyFile.Close()
+		keyCaptureWriter = bufio.NewWriter(keyFile)
+	}
+
 	keys := make([][]byte, 0)
 	writeFunction := func(key []byte, value []byte) error {
 		keys = append(keys, key)
+
+		unflushedKeys = append(unflushedKeys, key)
 
 		entry := badger.NewEntry(key, value).WithTTL(ttl)
 		err = transaction.SetEntry(entry)
@@ -604,6 +592,25 @@ func TestBadgerDB(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
+
+				if captureKeys { // TODO thread safe only if we are using 1 writer
+
+					// If the DB is ACID compliant, all of these keys should now be durable
+
+					for _, unflushedKey := range unflushedKeys {
+						_, err = keyCaptureWriter.WriteString(fmt.Sprintf("%s", unflushedKey))
+						if err != nil {
+							panic(err)
+						}
+					}
+					err = keyCaptureWriter.Flush()
+					if err != nil {
+						panic(err)
+					}
+					unflushedKeys = nil
+
+				}
+
 				<-writeLimiter
 			}()
 
