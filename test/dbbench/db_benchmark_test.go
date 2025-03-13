@@ -522,7 +522,7 @@ func TestBadgerDB(t *testing.T) {
 
 	ttl := TTL
 
-	writeLimiter := make(chan struct{}, parallelWriters)
+	//writeLimiter := make(chan struct{}, parallelWriters)
 
 	var keyCaptureWriter *bufio.Writer
 	unflushedKeys := make([][]byte, 0, 100)
@@ -557,7 +557,9 @@ func TestBadgerDB(t *testing.T) {
 	}
 
 	writeFunction := func(key []byte, value []byte) error {
-		unflushedKeys = append(unflushedKeys, key)
+		if captureKeys {
+			unflushedKeys = append(unflushedKeys, key)
+		}
 
 		entry := badger.NewEntry(key, value).WithTTL(ttl)
 		err = transaction.SetEntry(entry)
@@ -580,36 +582,36 @@ func TestBadgerDB(t *testing.T) {
 
 		if objectsInBatch >= batchSize {
 
-			writeLimiter <- struct{}{}
+			//writeLimiter <- struct{}{}
 			transactionToCommit := transaction
 
-			go func() {
-				err = transactionToCommit.Commit()
-				if err != nil {
-					panic(err)
-				}
+			//go func() {
+			err = transactionToCommit.Commit()
+			if err != nil {
+				panic(err)
+			}
 
-				if captureKeys { // TODO thread safe only if we are using 1 writer
+			if captureKeys {
 
-					// If the DB is ACID compliant, all of these keys should now be durable
+				// If the DB is ACID compliant, all of these keys should now be durable
 
-					for _, unflushedKey := range unflushedKeys {
-						_, err = keyCaptureWriter.WriteString(fmt.Sprintf("%s", unflushedKey))
-						if err != nil {
-							panic(err)
-						}
-					}
-					err = keyCaptureWriter.Flush()
-					fmt.Printf("wrote %d keys\n", len(unflushedKeys))
+				for _, unflushedKey := range unflushedKeys {
+					_, err = keyCaptureWriter.WriteString(fmt.Sprintf("%s", unflushedKey))
 					if err != nil {
 						panic(err)
 					}
-					unflushedKeys = make([][]byte, 0, 100)
-
 				}
+				err = keyCaptureWriter.Flush()
+				fmt.Printf("\nwrote %d keys\n", len(unflushedKeys))
+				if err != nil {
+					panic(err)
+				}
+				unflushedKeys = make([][]byte, 0, 100)
 
-				<-writeLimiter
-			}()
+			}
+
+			//<-writeLimiter
+			//}()
 
 			transaction = db.NewTransaction(true)
 			objectsInBatch = 0
