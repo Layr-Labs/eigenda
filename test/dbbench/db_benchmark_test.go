@@ -557,6 +557,7 @@ func TestBadgerDB(t *testing.T) {
 
 	unflushedKeys := make([][]byte, 0, 100)
 	writeFunction := func(key []byte, value []byte) error {
+		fmt.Printf("objects in batch: %d\n", objectsInBatch) // TODO
 		if captureKeys {
 			unflushedKeys = append(unflushedKeys, key)
 		}
