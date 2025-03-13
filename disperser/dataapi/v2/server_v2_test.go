@@ -459,34 +459,34 @@ func TestFetchBlobFeed(t *testing.T) {
 			{
 				name:        "invalid direction",
 				queryParams: map[string]string{"direction": "abc"},
-				wantError:   "direction must be either 'forward' or 'backward', found: abc",
+				wantError:   "`direction` must be either \"forward\" or \"backward\", found: \"abc\"",
 			},
 
 			// Invalid time formats
 			{
 				name:        "invalid before format",
 				queryParams: map[string]string{"before": "2006-01-02T15:04:05"}, // missing Z
-				wantError:   "failed to parse before param",
+				wantError:   "failed to parse `before` param",
 			},
 			{
 				name:        "invalid before value",
 				queryParams: map[string]string{"before": "abc"},
-				wantError:   "failed to parse before param",
+				wantError:   "failed to parse `before` param",
 			},
 			{
 				name:        "invalid after format",
 				queryParams: map[string]string{"after": "2006-01-02T15:04:05"}, // missing Z
-				wantError:   "failed to parse after param",
+				wantError:   "failed to parse `after` param",
 			},
 			{
 				name:        "invalid after value",
 				queryParams: map[string]string{"after": "abc"},
-				wantError:   "failed to parse after param",
+				wantError:   "failed to parse `after` param",
 			},
 			{
 				name:        "after in future",
 				queryParams: map[string]string{"after": "3025-01-02T15:04:05Z"},
-				wantError:   "'after' must be before current time",
+				wantError:   "`after` must be before current time",
 			},
 
 			// Invalid time ranges
@@ -496,28 +496,28 @@ func TestFetchBlobFeed(t *testing.T) {
 					"after":  now.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05.999999999Z"),
 					"before": now.Add(-time.Hour).UTC().Format("2006-01-02T15:04:05.999999999Z"),
 				},
-				wantError: "after time must be before before time",
+				wantError: "must be earlier than `before` timestamp",
 			},
 			{
 				name: "before too old",
 				queryParams: map[string]string{
 					"before": "2020-01-02T15:04:05Z",
 				},
-				wantError: "before time cannot be more than 14 days in the past",
+				wantError: "`before` time cannot be more than 14 days in the past",
 			},
 
 			// Invalid cursor
 			{
 				name:        "invalid cursor format",
 				queryParams: map[string]string{"cursor": "not-a-valid-cursor"},
-				wantError:   "failed to parse the cursor",
+				wantError:   "failed to parse the `cursor`",
 			},
 
 			// Invalid limit
 			{
 				name:        "invalid limit format",
 				queryParams: map[string]string{"limit": "abc"},
-				wantError:   "failed to parse limit param",
+				wantError:   "failed to parse `limit` param",
 			},
 		}
 
@@ -1090,19 +1090,90 @@ func TestFetchBatchFeed(t *testing.T) {
 	r.GET("/v2/batches/feed", testDataApiServerV2.FetchBatchFeed)
 
 	t.Run("invalid params", func(t *testing.T) {
-		reqUrls := []string{
-			"/v2/batches/feed?limit=abc",
-			"/v2/batches/feed?interval=abc",
-			"/v2/batches/feed?interval=-1",
-			"/v2/batches/feed?end=2006-01-02T15:04:05",
-			"/v2/batches/feed?end=2006-01-02T15:04:05Z",
+		now := time.Now()
+
+		tests := []struct {
+			name        string
+			queryParams map[string]string
+			wantError   string // expected error message
+		}{
+			// Invalid direction
+			{
+				name:        "invalid direction",
+				queryParams: map[string]string{"direction": "abc"},
+				wantError:   "`direction` must be either \"forward\" or \"backward\", found: \"abc\"",
+			},
+
+			// Invalid time formats
+			{
+				name:        "invalid before format",
+				queryParams: map[string]string{"before": "2006-01-02T15:04:05"}, // missing Z
+				wantError:   "failed to parse `before` param",
+			},
+			{
+				name:        "invalid before value",
+				queryParams: map[string]string{"before": "abc"},
+				wantError:   "failed to parse `before` param",
+			},
+			{
+				name:        "invalid after format",
+				queryParams: map[string]string{"after": "2006-01-02T15:04:05"}, // missing Z
+				wantError:   "failed to parse `after` param",
+			},
+			{
+				name:        "invalid after value",
+				queryParams: map[string]string{"after": "abc"},
+				wantError:   "failed to parse `after` param",
+			},
+			{
+				name:        "after in future",
+				queryParams: map[string]string{"after": "3025-01-02T15:04:05Z"},
+				wantError:   "`after` must be before current time",
+			},
+
+			// Invalid time ranges
+			{
+				name: "after >= before",
+				queryParams: map[string]string{
+					"after":  now.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05.999999999Z"),
+					"before": now.Add(-time.Hour).UTC().Format("2006-01-02T15:04:05.999999999Z"),
+				},
+				wantError: "must be earlier than `before` timestamp",
+			},
+			{
+				name: "before too old",
+				queryParams: map[string]string{
+					"before": "2020-01-02T15:04:05Z",
+				},
+				wantError: "`before` time cannot be more than 14 days in the past",
+			},
+
+			// Invalid limit
+			{
+				name:        "invalid limit format",
+				queryParams: map[string]string{"limit": "abc"},
+				wantError:   "failed to parse `limit` param",
+			},
 		}
-		for _, url := range reqUrls {
+
+		for _, tt := range tests {
+			params := url.Values{}
+			for k, v := range tt.queryParams {
+				params.Add(k, v)
+			}
+			url := fmt.Sprintf("/v2/batches/feed?%s", params.Encode())
+
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, url, nil)
 			r.ServeHTTP(w, req)
+
 			require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+
+			var errResp serverv2.ErrorResponse
+			require.NoError(t, json.NewDecoder(w.Body).Decode(&errResp))
+			assert.Contains(t, errResp.Error, tt.wantError)
 		}
+
 	})
 
 	t.Run("default params", func(t *testing.T) {
@@ -1120,7 +1191,7 @@ func TestFetchBatchFeed(t *testing.T) {
 		}
 	})
 
-	t.Run("various query ranges and limits", func(t *testing.T) {
+	t.Run("forward iteration with various query ranges and limits", func(t *testing.T) {
 		// Test 1: Unlimited results in 1-hour window
 		// With 1h ending time at now, this retrieves batch[13] through batch[71] (59 batches)
 		w := executeRequest(t, r, http.MethodGet, "/v2/batches/feed?limit=0")
@@ -1133,7 +1204,9 @@ func TestFetchBatchFeed(t *testing.T) {
 		}
 
 		// Test 2: 2-hour window captures all test batches
-		w = executeRequest(t, r, http.MethodGet, "/v2/batches/feed?limit=-1&interval=7200")
+		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		reqUrl := fmt.Sprintf("/v2/batches/feed?limit=-1&after=%s", afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
 		require.Equal(t, 72, len(response.Batches))
 		for i := 0; i < 72; i++ {
@@ -1143,10 +1216,10 @@ func TestFetchBatchFeed(t *testing.T) {
 		}
 
 		// Test 3: Custom end time with 1-hour window
-		// With 1h ending time at attestedAt[66], this retrieves batch[7] throught batch[65] (59 batches, as the `end` is exclusive)
+		// With 1h ending time at attestedAt[66], this retrieves batch[7] throught batch[65] (59 batches, as the `before` is exclusive)
 		tm := time.Unix(0, int64(attestedAt[66])).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
-		reqUrl := fmt.Sprintf("/v2/batches/feed?end=%s&limit=-1", endTime)
+		beforeTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		reqUrl = fmt.Sprintf("/v2/batches/feed?before=%s&limit=-1", beforeTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
 		require.Equal(t, 59, len(response.Batches))
@@ -1156,6 +1229,47 @@ func TestFetchBatchFeed(t *testing.T) {
 			assert.Equal(t, batchHeaders[7+i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
 		}
 	})
+
+	t.Run("backward iteration with various query ranges and limits", func(t *testing.T) {
+		// Test 1: Unlimited results in 1-hour window
+		// With 1h ending time at now, this retrieves batch[71] through batch[13] (59 batches)
+		w := executeRequest(t, r, http.MethodGet, "/v2/batches/feed?direction=backward&limit=0")
+		response := decodeResponseBody[serverv2.BatchFeedResponse](t, w)
+		require.Equal(t, 59, len(response.Batches))
+		for i := 0; i < 59; i++ {
+			assert.Equal(t, attestedAt[71-i], response.Batches[i].AttestedAt)
+			assert.Equal(t, batchHeaders[71-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, batchHeaders[71-i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+		}
+
+		// Test 2: 2-hour window captures all test batches
+		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		reqUrl := fmt.Sprintf("/v2/batches/feed?direction=backward&limit=-1&after=%s", afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
+		require.Equal(t, 72, len(response.Batches))
+		for i := 0; i < 72; i++ {
+			assert.Equal(t, attestedAt[71-i], response.Batches[i].AttestedAt)
+			assert.Equal(t, batchHeaders[71-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, batchHeaders[71-i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+		}
+
+		// Test 3: Custom end time with 1-hour window
+		// With 1h ending time at attestedAt[66], this retrieves batch[65] throught batch[7] (59 batches,
+		// as the `before` is exclusive)
+		tm := time.Unix(0, int64(attestedAt[66])).UTC()
+		beforeTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		reqUrl = fmt.Sprintf("/v2/batches/feed?direction=backward&before=%s&limit=-1", beforeTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
+		require.Equal(t, 59, len(response.Batches))
+		for i := 0; i < 59; i++ {
+			assert.Equal(t, attestedAt[65-i], response.Batches[i].AttestedAt)
+			assert.Equal(t, batchHeaders[65-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, batchHeaders[65-i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+		}
+	})
+
 }
 
 func TestFetchOperatorSigningInfo(t *testing.T) {
