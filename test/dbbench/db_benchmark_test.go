@@ -6,7 +6,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/rand"
+	"os"
 	"runtime"
+	"runtime/trace"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -41,7 +43,8 @@ const readerCount = 1
 const TTL = 2 * time.Hour
 const dataGeneratorCount = 16
 
-const pprofEnabled = true
+const pprofEnabled = false
+const traceEnabled = true
 
 // Used to ensure that keys are truly unique
 var nextSeedSerialNumber = atomic.Uint32{}
@@ -126,6 +129,17 @@ func runBenchmark(write writer, read reader) {
 		pprofProfiler := pprof.NewPprofProfiler("6060", logger)
 		go pprofProfiler.Start()
 		fmt.Printf("Profiling enabled on port 6060\n")
+	}
+	if traceEnabled {
+		f, err := os.Create("trace.out")
+		if err != nil {
+			panic(fmt.Errorf("could not create trace file: %v", err))
+		}
+		defer f.Close()
+		if err := trace.Start(f); err != nil {
+			panic(fmt.Errorf("could not start trace file: %v", err))
+		}
+		defer trace.Stop()
 	}
 
 	start := time.Now()
