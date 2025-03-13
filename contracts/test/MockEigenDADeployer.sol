@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -103,16 +103,20 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             )
         );
 
-        eigenDAServiceManagerImplementation = new EigenDAServiceManager(
-            avsDirectory,
-            rewardsCoordinator,
-            registryCoordinator,
-            stakeRegistry,
-            eigenDAThresholdRegistry,
-            eigenDARelayRegistry,
-            paymentVault,
-            eigenDADisperserRegistry
-        );
+        IEigenDAServiceManager.EigenDASMConstructorParams memory params = IEigenDAServiceManager.EigenDASMConstructorParams({
+            rewardsCoordinator: rewardsCoordinator,
+            permissionController: permissionControllerMock,
+            allocationManager: allocationManager,
+            avsDirectory: avsDirectory,
+            pauserRegistry: pauserRegistry,
+            registryCoordinator: registryCoordinator,
+            stakeRegistry: stakeRegistry,
+            eigenDAThresholdRegistry: eigenDAThresholdRegistry,
+            eigenDARelayRegistry: eigenDARelayRegistry,
+            paymentVault: paymentVault,
+            eigenDADisperserRegistry: eigenDADisperserRegistry
+        });
+        eigenDAServiceManagerImplementation = new EigenDAServiceManager(params);
 
         address[] memory confirmers = new address[](1);
         confirmers[0] = confirmer;
@@ -123,7 +127,6 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             address(eigenDAServiceManagerImplementation),
             abi.encodeWithSelector(
                 EigenDAServiceManager.initialize.selector,
-                pauserRegistry,
                 0,
                 registryCoordinatorOwner,
                 confirmers,

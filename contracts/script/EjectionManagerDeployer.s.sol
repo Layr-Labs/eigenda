@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 import {EjectionManager} from "../lib/eigenlayer-middleware/src/EjectionManager.sol";
-import {IEjectionManager} from "../lib/eigenlayer-middleware/src/interfaces/IEjectionManager.sol";
+import {IEjectionManager, IEjectionManagerTypes} from "../lib/eigenlayer-middleware/src/interfaces/IEjectionManager.sol";
 import {RegistryCoordinator} from "../lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {IRegistryCoordinator} from "../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {StakeRegistry} from "../lib/eigenlayer-middleware/src/StakeRegistry.sol";
@@ -101,9 +101,9 @@ contract Deployer_EjectionManager is Script, Test {
         EjectionManager _ejectionManagerImplementation,
         string memory config_data
     ) internal {
-        require(address(_ejectionManager.registryCoordinator()) == address(registryCoordinator), "ejectionManager.registryCoordinator() != registryCoordinator");
+        require(address(_ejectionManager.slashingRegistryCoordinator()) == address(registryCoordinator), "ejectionManager.registryCoordinator() != registryCoordinator");
         require(address(_ejectionManager.stakeRegistry()) == address(stakeRegistry), "ejectionManager.stakeRegistry() != stakeRegistry");
-        require(address(_ejectionManagerImplementation.registryCoordinator()) == address(registryCoordinator), "ejectionManagerImplementation.registryCoordinator() != registryCoordinator");
+        require(address(_ejectionManagerImplementation.slashingRegistryCoordinator()) == address(registryCoordinator), "ejectionManagerImplementation.registryCoordinator() != registryCoordinator");
         require(address(_ejectionManagerImplementation.stakeRegistry()) == address(stakeRegistry), "ejectionManagerImplementation.stakeRegistry() != stakeRegistry");
 
         require(eigenDAProxyAdmin.getProxyImplementation(
@@ -114,10 +114,10 @@ contract Deployer_EjectionManager is Script, Test {
         require(_ejectionManager.owner() == ejectorOwner, "ejectionManager.owner() != ejectorOwner");
         require(_ejectionManager.isEjector(ejector) == true, "ejector != ejector");
 
-        IEjectionManager.QuorumEjectionParams[] memory quorumEjectionParams = _parseQuorumEjectionParams(config_data);
+        IEjectionManagerTypes.QuorumEjectionParams[] memory quorumEjectionParams = _parseQuorumEjectionParams(config_data);
         for (uint8 i = 0; i < quorumEjectionParams.length; ++i) {
             (uint32 rateLimitWindow, uint16 ejectableStakePercent) = _ejectionManager.quorumEjectionParams(i);
-            IEjectionManager.QuorumEjectionParams memory params = IEjectionManager.QuorumEjectionParams(
+            IEjectionManagerTypes.QuorumEjectionParams memory params = IEjectionManagerTypes.QuorumEjectionParams(
                 rateLimitWindow,
                 ejectableStakePercent
             );
@@ -128,8 +128,8 @@ contract Deployer_EjectionManager is Script, Test {
         }
     }
 
-    function _parseQuorumEjectionParams(string memory config_data) internal returns (IEjectionManager.QuorumEjectionParams[] memory quorumEjectionParams) {
+    function _parseQuorumEjectionParams(string memory config_data) internal returns (IEjectionManagerTypes.QuorumEjectionParams[] memory quorumEjectionParams) {
         bytes memory quorumEjectionParamsRaw = stdJson.parseRaw(config_data, ".quorumEjectionParams");
-        quorumEjectionParams = abi.decode(quorumEjectionParamsRaw, (IEjectionManager.QuorumEjectionParams[]));
+        quorumEjectionParams = abi.decode(quorumEjectionParamsRaw, (IEjectionManagerTypes.QuorumEjectionParams[]));
     }
 }
