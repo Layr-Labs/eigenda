@@ -3,7 +3,7 @@ package litt
 // DB is a highly specialized key-value store. It is intentionally very feature poor, sacrificing
 // unnecessary features for simplicity, high performance, and low memory usage.
 //
-// Litt: slang, a synonym for "cool" or "awesome". e.g. "Man, that database is litt, bro!".
+// Litt: adjective, slang, a synonym for "cool" or "awesome". e.g. "Man, that database is litt, bro!".
 //
 // Supported features:
 //   - writing values
