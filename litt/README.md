@@ -89,6 +89,8 @@ TODO explain different types of segment files
 
 ## Example Layout
 
+TODO perhaps generate a better view using tree on an example DB
+
 - `ROOT-0`
     - `TABLE-0`
         - `table.metadata`
@@ -173,5 +175,3 @@ TODO explain different types of segment files
             - `1-N.values`
             - ...
             - `N-N.values`
-
-

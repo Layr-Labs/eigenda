@@ -98,7 +98,7 @@ func (store *levelDBStore) DeleteBatch(keys [][]byte) error {
 	for _, key := range keys {
 		batch.Delete(key)
 	}
-	return store.db.Write(batch, store.writeOptions)
+	return store.db.Write(batch, &opt.WriteOptions{Sync: true}) // TODO don't merge with this enabled by default!!!
 }
 
 // WriteBatch adds multiple key-value pairs to the store.
