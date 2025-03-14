@@ -265,6 +265,30 @@ func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey corev2.
 	return metadata, nil
 }
 
+// CheckBlobExists checks if a blob exists without fetching the entire metadata.
+func (s *BlobMetadataStore) CheckBlobExists(ctx context.Context, blobKey corev2.BlobKey) (bool, error) {
+	input := &dynamodb.GetItemInput{
+		TableName: aws.String(s.tableName),
+		Key: map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{
+				Value: blobKeyPrefix + blobKey.Hex(),
+			},
+			"SK": &types.AttributeValueMemberS{
+				Value: blobMetadataSK,
+			},
+		},
+		ProjectionExpression: aws.String("PK"), // Only fetch the PK attribute
+	}
+
+	item, err := s.dynamoDBClient.GetItemWithInput(ctx, input)
+	if err != nil {
+		return false, fmt.Errorf("failed to check blob existence: %w", err)
+	}
+
+	// If the item is not nil, the blob exists
+	return item != nil, nil
+}
+
 // GetBlobMetadataByStatus returns all the metadata with the given status that were updated after lastUpdatedAt
 // Because this function scans the entire index, it should only be used for status with a limited number of items.
 // Results are ordered by UpdatedAt in ascending order.

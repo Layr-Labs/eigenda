@@ -1934,3 +1934,53 @@ func newBlob(t *testing.T) (corev2.BlobKey, *corev2.BlobHeader) {
 	require.NoError(t, err)
 	return bk, bh
 }
+
+func TestCheckBlobExists(t *testing.T) {
+	ctx := context.Background()
+	// Create a test blob
+	blobKey, blobHeader := newBlob(t)
+
+	// Check that the blob does not exist initially
+	exists, err := blobMetadataStore.CheckBlobExists(ctx, blobKey)
+	require.NoError(t, err)
+	require.False(t, exists, "Blob should not exist before being added")
+
+	// Create blob metadata
+	blobMetadata := &v2.BlobMetadata{
+		BlobHeader:  blobHeader,
+		Signature:   []byte("test-signature"),
+		BlobStatus:  v2.Queued,
+		Expiry:      uint64(time.Now().Add(time.Hour).Unix()),
+		NumRetries:  0,
+		BlobSize:    1024,
+		RequestedAt: uint64(time.Now().UnixNano()),
+		UpdatedAt:   uint64(time.Now().UnixNano()),
+	}
+
+	// Store the blob metadata
+	err = blobMetadataStore.PutBlobMetadata(ctx, blobMetadata)
+	require.NoError(t, err)
+
+	// Check that the blob now exists
+	exists, err = blobMetadataStore.CheckBlobExists(ctx, blobKey)
+	require.NoError(t, err)
+	require.True(t, exists, "Blob should exist after being added")
+
+	// Delete the blob metadata
+	err = blobMetadataStore.DeleteBlobMetadata(ctx, blobKey)
+	require.NoError(t, err)
+
+	// Check that the blob no longer exists
+	exists, err = blobMetadataStore.CheckBlobExists(ctx, blobKey)
+	require.NoError(t, err)
+	require.False(t, exists, "Blob should not exist after being deleted")
+
+	// Test with non-existent blob key
+	randomKey := corev2.BlobKey{}
+	_, err = rand.Read(randomKey[:])
+	require.NoError(t, err)
+
+	exists, err = blobMetadataStore.CheckBlobExists(ctx, randomKey)
+	require.NoError(t, err)
+	require.False(t, exists, "Random blob key should not exist")
+}
