@@ -191,7 +191,7 @@ func (cv *CertVerifier) GetRelayRegistryAddress(ctx context.Context) (*gethcommo
 
 	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, blockNumber)
 	if err != nil {
-		return nil, fmt.Errorf("get verifier caller form block number: %w", err)
+		return nil, fmt.Errorf("get verifier caller from block number: %w", err)
 	}
 
 	relayRegistryAddress, err := certVerifierCaller.EigenDARelayRegistry(&bind.CallOpts{Context: ctx})
