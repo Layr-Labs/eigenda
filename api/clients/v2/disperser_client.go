@@ -40,6 +40,7 @@ type disperserClient struct {
 	client             disperser_rpc.DisperserClient
 	prover             encoding.Prover
 	accountant         *Accountant
+	requestMutex       sync.Mutex // Mutex to ensure only one dispersal request is sent at a time
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -128,6 +129,9 @@ func (c *disperserClient) DisperseBlob(
 	blobVersion corev2.BlobVersion,
 	quorums []core.QuorumID,
 ) (*dispv2.BlobStatus, corev2.BlobKey, error) {
+	c.requestMutex.Lock()
+	defer c.requestMutex.Unlock()
+
 	err := c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, [32]byte{}, api.NewErrorFailover(err)
