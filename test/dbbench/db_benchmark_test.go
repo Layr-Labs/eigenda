@@ -34,13 +34,13 @@ type writer func(key []byte, value []byte) error
 // reader is a function that reads a key-value pair from a database.
 type reader func(key []byte) ([]byte, error)
 
-const totalToWrite = 100 * units.TiB
+const totalToWrite = 10 * units.TiB
 const dataSize = 1 * units.MiB
 const batchSize = 100
 const parallelWriters = 2
 const readBytesPerSecond = 10 * units.MiB
 const readerCount = 1
-const TTL = 12 * time.Hour
+const TTL = 2 * time.Hour
 const dataGeneratorCount = 16
 
 const pprofEnabled = false
