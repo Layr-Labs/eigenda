@@ -1,7 +1,6 @@
 package dbbench
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/binary"
@@ -41,13 +40,11 @@ const batchSize = 100
 const parallelWriters = 1 // TODO
 const readBytesPerSecond = 10 * units.MiB
 const readerCount = 1
-const TTL = 2 * time.Hour
+const TTL = 12 * time.Hour
 const dataGeneratorCount = 16
 
 const pprofEnabled = false
 const traceEnabled = false
-
-const captureKeys = false
 
 // Used to ensure that keys are truly unique
 var nextSeedSerialNumber = atomic.Uint32{}
@@ -524,43 +521,9 @@ func TestBadgerDB(t *testing.T) {
 
 	ttl := TTL
 
-	//writeLimiter := make(chan struct{}, parallelWriters)
+	writeLimiter := make(chan struct{}, parallelWriters)
 
-	var keyCaptureWriter *bufio.Writer
-	if captureKeys {
-		// First, check if the key file exists. If it does, verify that each key it contains is in the database.
-		if _, err := os.Stat("keys.txt"); err == nil {
-			fmt.Printf("Found keys.txt, scanning DB\n")
-
-			data, err := os.ReadFile("keys.txt")
-			if err != nil {
-				panic(fmt.Errorf("could not read key file: %v", err))
-			}
-
-			for i := 0; i+32 < len(data); i += 32 {
-				key := data[i : i+32]
-				_, err := transaction.Get(key)
-				if err != nil {
-					fmt.Printf("Error reading key %s: %v\n", key, err)
-				}
-			}
-
-			fmt.Printf("done scanning\n")
-		}
-
-		keyFile, err := os.Create("keys.txt")
-		if err != nil {
-			panic(fmt.Errorf("could not create key file: %v", err))
-		}
-		defer keyFile.Close()
-		keyCaptureWriter = bufio.NewWriter(keyFile)
-	}
-
-	unflushedKeys := make([][]byte, 0, 100)
 	writeFunction := func(key []byte, value []byte) error {
-		if captureKeys {
-			unflushedKeys = append(unflushedKeys, key)
-		}
 
 		entry := badger.NewEntry(key, value).WithTTL(ttl)
 		err = transaction.SetEntry(entry)
@@ -570,22 +533,6 @@ func TestBadgerDB(t *testing.T) {
 				err = transaction.Commit()
 				if err != nil {
 					return err
-				}
-
-				if captureKeys {
-					// If the DB is ACID compliant, all of these keys should now be durable
-
-					for _, unflushedKey := range unflushedKeys {
-						_, err = keyCaptureWriter.WriteString(fmt.Sprintf("%s", unflushedKey))
-						if err != nil {
-							panic(err)
-						}
-					}
-					err = keyCaptureWriter.Flush()
-					if err != nil {
-						panic(err)
-					}
-					unflushedKeys = make([][]byte, 0, 100)
 				}
 
 				transaction = db.NewTransaction(true)
@@ -600,34 +547,17 @@ func TestBadgerDB(t *testing.T) {
 
 		if objectsInBatch >= batchSize {
 
-			//writeLimiter <- struct{}{}
+			writeLimiter <- struct{}{}
 			transactionToCommit := transaction
 
-			//go func() {
-			err = transactionToCommit.Commit()
-			if err != nil {
-				panic(err)
-			}
-
-			if captureKeys {
-				// If the DB is ACID compliant, all of these keys should now be durable
-
-				for _, unflushedKey := range unflushedKeys {
-					_, err = keyCaptureWriter.WriteString(fmt.Sprintf("%s", unflushedKey))
-					if err != nil {
-						panic(err)
-					}
-				}
-				err = keyCaptureWriter.Flush()
-				fmt.Printf("\nwrote %d keys\n", len(unflushedKeys))
+			go func() {
+				err = transactionToCommit.Commit()
 				if err != nil {
 					panic(err)
 				}
-				unflushedKeys = make([][]byte, 0, 100)
-			}
 
-			//<-writeLimiter
-			//}()
+				<-writeLimiter
+			}()
 
 			transaction = db.NewTransaction(true)
 			objectsInBatch = 0
