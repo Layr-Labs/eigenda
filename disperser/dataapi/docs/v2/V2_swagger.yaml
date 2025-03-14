@@ -562,7 +562,7 @@ paths:
         name: before
         type: string
       - description: 'Fetch batches after this time, exclusive (ISO 8601 format, example:
-          2006-01-02T15:04:05Z); must be smaller than ''before'' [default: before-1h]'
+          2006-01-02T15:04:05Z); must be smaller than `before` [default: `before`-1h]'
         in: query
         name: after
         type: string
@@ -591,6 +591,51 @@ paths:
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Fetch batch feed in specified direction
+      tags:
+      - Batches
+  /batches/feed/{operator_id}:
+    get:
+      parameters:
+      - description: 'Direction to fetch: ''forward'' (oldest to newest, ASC order)
+          or ''backward'' (newest to oldest, DESC order) [default: forward]'
+        in: query
+        name: direction
+        type: string
+      - description: 'Fetch batches before this time, exclusive (ISO 8601 format,
+          example: 2006-01-02T15:04:05Z) [default: now]'
+        in: query
+        name: before
+        type: string
+      - description: 'Fetch batches after this time, exclusive (ISO 8601 format, example:
+          2006-01-02T15:04:05Z); must be smaller than `before` [default: `before`-1h]'
+        in: query
+        name: after
+        type: string
+      - description: 'Maximum number of batches to return; if limit <= 0 or >1000,
+          it''s treated as 1000 [default: 20; max: 1000]'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.BatchFeedResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch batch feed dispersed to an operator in specified direction
       tags:
       - Batches
   /blobs/{blob_key}:
