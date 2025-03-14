@@ -72,7 +72,7 @@ contract Deployer_EjectionManager is Script, Test {
         address[] memory ejectors = new address[](1);   
         ejectors[0] = ejector;
 
-        TransparentUpgradeableProxy(payable(address(ejectionManager))).upgradeToAndCall(
+        ITransparentUpgradeableProxy(payable(address(ejectionManager))).upgradeToAndCall(
             address(ejectionManagerImplementation),
             abi.encodeWithSelector(
                 EjectionManager.initialize.selector,
@@ -82,7 +82,7 @@ contract Deployer_EjectionManager is Script, Test {
             )
         );
 
-        TransparentUpgradeableProxy(payable(address(ejectionManager))).changeAdmin(address(eigenDAProxyAdmin));
+        ITransparentUpgradeableProxy(payable(address(ejectionManager))).changeAdmin(address(eigenDAProxyAdmin));
 
         vm.stopBroadcast();
 
@@ -107,7 +107,7 @@ contract Deployer_EjectionManager is Script, Test {
         require(address(_ejectionManagerImplementation.stakeRegistry()) == address(stakeRegistry), "ejectionManagerImplementation.stakeRegistry() != stakeRegistry");
 
         require(eigenDAProxyAdmin.getProxyImplementation(
-            TransparentUpgradeableProxy(payable(address(_ejectionManager)))) == address(_ejectionManagerImplementation),
+            ITransparentUpgradeableProxy(payable(address(_ejectionManager)))) == address(_ejectionManagerImplementation),
             "ejectionManager: implementation set incorrectly"
         );
 

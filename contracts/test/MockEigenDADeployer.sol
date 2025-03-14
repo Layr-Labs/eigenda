@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
@@ -123,7 +123,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
 
         cheats.prank(proxyAdminOwner);
         proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(eigenDAServiceManager))),
+            ITransparentUpgradeableProxy(payable(address(eigenDAServiceManager))),
             address(eigenDAServiceManagerImplementation),
             abi.encodeWithSelector(
                 EigenDAServiceManager.initialize.selector,
@@ -144,7 +144,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
 
         cheats.prank(proxyAdminOwner);
         proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(eigenDAThresholdRegistry))),
+            ITransparentUpgradeableProxy(payable(address(eigenDAThresholdRegistry))),
             address(eigenDAThresholdRegistryImplementation),
             abi.encodeWithSelector(
                 EigenDAThresholdRegistry.initialize.selector,
@@ -160,7 +160,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
 
         cheats.prank(proxyAdminOwner);
         proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(eigenDARelayRegistry))),
+            ITransparentUpgradeableProxy(payable(address(eigenDARelayRegistry))),
             address(eigenDARelayRegistryImplementation),
             abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, registryCoordinatorOwner)
         );
@@ -169,7 +169,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
 
         cheats.prank(proxyAdminOwner);
         proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(eigenDADisperserRegistry))),
+            ITransparentUpgradeableProxy(payable(address(eigenDADisperserRegistry))),
             address(eigenDADisperserRegistryImplementation),
             abi.encodeWithSelector(EigenDADisperserRegistry.initialize.selector, registryCoordinatorOwner)
         );
