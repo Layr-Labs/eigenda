@@ -136,7 +136,12 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 
 	err = cert.NoNilFields()
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify DA cert: %w", err)
+		return nil, fmt.Errorf("failed to verify DA cert due to nil fields: %w", err)
+	}
+
+	err = cert.ValidFieldLengths()
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify DA cert due to invalid field lengths: %w", err)
 	}
 
 	err = e.verifier.VerifyCommitment(cert.BlobHeader.GetCommitment(), encodedBlob)
