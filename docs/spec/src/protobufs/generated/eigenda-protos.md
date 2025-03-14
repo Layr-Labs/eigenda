@@ -248,15 +248,19 @@ https://github.com/Layr-Labs/eigenlayer-middleware/blob/master/src/interfaces/IB
 
 ### BlobCommitment
 BlobCommitment represents commitment of a specific blob, containing its
-KZG commitment, degree proof, the actual degree, and data length in number of symbols.
+KZG commitment, degree proof, the actual degree, and data length in number of symbols (field elements).
+It deserializes into https://github.com/Layr-Labs/eigenda/blob/ce89dab18d2f8f55004002e17dd3a18529277845/encoding/data.go#L27
+
+See https://github.com/Layr-Labs/eigenda/blob/e86fb8515eb606d0eebb92097dc60d7238363e77/docs/spec/src/protocol/architecture/encoding.md#validation-via-kzg
+to understand how this commitment is used to validate the blob.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| commitment | [bytes](#bytes) |  | A commitment to the blob data. |
+| commitment | [bytes](#bytes) |  | Concatenation of the x and y coordinates of `common.G1Commitment`. |
 | length_commitment | [bytes](#bytes) |  | A commitment to the blob data with G2 SRS, used to work with length_proof such that the claimed length below is verifiable. |
-| length_proof | [bytes](#bytes) |  | A proof that the degree of the polynomial used to generate the blob commitment is valid. It is computed such that the coefficient of the polynomial is committing with the G2 SRS at the end of the highest order. |
-| length | [uint32](#uint32) |  | The length specifies the degree of the polynomial used to generate the blob commitment. The length must equal to the degree &#43; 1, and it must be a power of 2. |
+| length_proof | [bytes](#bytes) |  | A proof that the degree of the polynomial used to generate the blob commitment is valid. It consists of the KZG commitment of x^(SRSOrder-n) * P(x), where P(x) is polynomial of degree n representing the blob. |
+| length | [uint32](#uint32) |  | The length of the blob in symbols (field elements), which must be a power of 2. This also specifies the degree of the polynomial used to generate the blob commitment, since length = degree &#43; 1. |
 
 
 
@@ -266,13 +270,15 @@ KZG commitment, degree proof, the actual degree, and data length in number of sy
 <a name="common-G1Commitment"></a>
 
 ### G1Commitment
-A KZG commitment
+G1Commitment represents the serialized coordinates of a G1 KZG commitment.
+We use gnark-crypto so adopt its serialization, which is big-endian. See:
+https://github.com/Consensys/gnark-crypto/blob/779e884dabb38b92e677f4891286637a3d2e5734/ecc/bn254/fp/element.go#L862
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| x | [bytes](#bytes) |  | The X coordinate of the KZG commitment. This is the raw byte representation of the field element. |
-| y | [bytes](#bytes) |  | The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. |
+| x | [bytes](#bytes) |  | The X coordinate of the KZG commitment. This is the raw byte representation of the field element. x should contain 32 bytes. |
+| y | [bytes](#bytes) |  | The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. y should contain 32 bytes. |
 
 
 
@@ -1039,8 +1045,12 @@ Disperser defines the public APIs for dispersing blobs.
 | ----------- | ------------ | ------------- | ------------|
 | DisperseBlob | [DisperseBlobRequest](#disperser-v2-DisperseBlobRequest) | [DisperseBlobReply](#disperser-v2-DisperseBlobReply) | DisperseBlob accepts blob to disperse from clients. This executes the dispersal asynchronously, i.e. it returns once the request is accepted. The client could use GetBlobStatus() API to poll the the processing status of the blob. |
 | GetBlobStatus | [BlobStatusRequest](#disperser-v2-BlobStatusRequest) | [BlobStatusReply](#disperser-v2-BlobStatusReply) | GetBlobStatus is meant to be polled for the blob status. |
-| GetBlobCommitment | [BlobCommitmentRequest](#disperser-v2-BlobCommitmentRequest) | [BlobCommitmentReply](#disperser-v2-BlobCommitmentReply) | GetBlobCommitment is a utility method that calculates commitment for a blob payload. |
-| GetPaymentState | [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest) | [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply) | GetPaymentState is a utility method to get the payment state of a given account. |
+| GetBlobCommitment | [BlobCommitmentRequest](#disperser-v2-BlobCommitmentRequest) | [BlobCommitmentReply](#disperser-v2-BlobCommitmentReply) | GetBlobCommitment is a utility method that calculates commitment for a blob payload. It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header and don&#39;t have the ability to calculate the commitment themselves (expensive operation which requires SRS points).
+
+For an example usage, see how our disperser_client makes a call to this endpoint when it doesn&#39;t have a local prover: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166 |
+| GetPaymentState | [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest) | [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply) | GetPaymentState is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting. A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser. That typically only needs to be done once, and the state can be updated locally as the client disperses blobs. The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
+
+For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298 |
 
  
 
