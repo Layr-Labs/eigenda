@@ -5,9 +5,36 @@ import {IServiceManager} from "../../lib/eigenlayer-middleware/src/interfaces/IS
 import {BLSSignatureChecker} from "../../lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
 import {BN254} from "../../lib/eigenlayer-middleware/src/libraries/BN254.sol";
 import {IEigenDAThresholdRegistry} from "./IEigenDAThresholdRegistry.sol";
+import {IRewardsCoordinator} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
+import {IPauserRegistry} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
+import {IPermissionController} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPermissionController.sol";
+import {IAllocationManager} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IAllocationManager.sol";
+import {IAVSDirectory} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
+import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {IStakeRegistry} from "../../lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
+import {IEigenDARelayRegistry} from "./IEigenDARelayRegistry.sol";
+import {IPaymentVault} from "./IPaymentVault.sol";
+import {IEigenDADisperserRegistry} from "./IEigenDADisperserRegistry.sol";
 import "./IEigenDAStructs.sol";
 
 interface IEigenDAServiceManager is IServiceManager, IEigenDAThresholdRegistry {
+    
+    // STRUCTS
+
+    struct EigenDASMConstructorParams {
+        IRewardsCoordinator rewardsCoordinator;
+        IPermissionController permissionController;
+        IAllocationManager allocationManager;
+        IAVSDirectory avsDirectory;
+        IPauserRegistry pauserRegistry;
+        IRegistryCoordinator registryCoordinator;
+        IStakeRegistry stakeRegistry;
+        IEigenDAThresholdRegistry eigenDAThresholdRegistry;
+        IEigenDARelayRegistry eigenDARelayRegistry;
+        IPaymentVault paymentVault;
+        IEigenDADisperserRegistry eigenDADisperserRegistry;
+    }
+
     // EVENTS
     
     /**

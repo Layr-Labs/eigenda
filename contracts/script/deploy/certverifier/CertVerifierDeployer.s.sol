@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import {EigenDACertVerifier} from "src/core/EigenDACertVerifier.sol";
 import {RegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";

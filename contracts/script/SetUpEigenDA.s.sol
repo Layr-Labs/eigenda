@@ -156,11 +156,10 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
         {
             IStrategy[] memory strategies = new IStrategy[](numStrategies);
-            bool[] memory transferLocks = new bool[](numStrategies);
             for (uint8 i = 0; i < numStrategies; i++) {
                 strategies[i] = deployedStrategyArray[i];
             }
-            strategyManager.addStrategiesToDepositWhitelist(strategies, transferLocks);
+            strategyManager.addStrategiesToDepositWhitelist(strategies);
         }
 
         vm.stopBroadcast();
@@ -168,11 +167,14 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         // Register operators with EigenLayer
         for (uint256 i = 0; i < operatorPrivateKeys.length; i++) {
             vm.broadcast(operatorPrivateKeys[i]);
-            address earningsReceiver = address(uint160(uint256(keccak256(abi.encodePacked(operatorPrivateKeys[i])))));
-            address delegationApprover = address(0); //address(uint160(uint256(keccak256(abi.encodePacked(earningsReceiver)))));
-            uint32 stakerOptOutWindowBlocks = 100;
+            address delegationApprover = address(0);
+            uint32 allocationDelay = 10;
             string memory metadataURI = string.concat("https://urmom.com/operator/", vm.toString(i));
-            delegation.registerAsOperator(IDelegationManager.OperatorDetails(earningsReceiver, delegationApprover, stakerOptOutWindowBlocks), metadataURI);
+            delegation.registerAsOperator(
+                delegationApprover,
+                allocationDelay,
+                metadataURI
+            );
         }
 
 

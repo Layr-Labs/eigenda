@@ -4,17 +4,32 @@ pragma solidity ^0.8.9;
 import {PauserRegistry} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
 import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
+import {IDelegationManager, IDelegationManagerTypes} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
+
 import {BLSApkRegistry} from "../lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
 import {RegistryCoordinator} from "../lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {OperatorStateRetriever} from "../lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {IRegistryCoordinator} from "../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {
+    ISlashingRegistryCoordinator,
+    ISlashingRegistryCoordinatorTypes
+} from "../lib/eigenlayer-middleware/src/interfaces/ISlashingRegistryCoordinator.sol";
+import {SlashingRegistryCoordinator} from "../lib/eigenlayer-middleware/src/SlashingRegistryCoordinator.sol";
 import {IndexRegistry} from "../lib/eigenlayer-middleware/src/IndexRegistry.sol";
 import {IIndexRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IIndexRegistry.sol";
 import {StakeRegistry, IStrategy} from "../lib/eigenlayer-middleware/src/StakeRegistry.sol";
-import {IStakeRegistry, IDelegationManager} from "../lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
+import {
+    IStakeRegistry,
+    IStakeRegistryTypes
+} from "../lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {IServiceManager} from "../lib/eigenlayer-middleware/src/interfaces/IServiceManager.sol";
 import {IBLSApkRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
-import {EigenDAServiceManager, IAVSDirectory, IRewardsCoordinator} from "../src/core/EigenDAServiceManager.sol";
+import {
+    EigenDAServiceManager,
+    IAVSDirectory,
+    IRewardsCoordinator
+} from "../src/core/EigenDAServiceManager.sol";
+import {IEigenDAServiceManager} from "../src/interfaces/IEigenDAServiceManager.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDAThresholdRegistry} from "../src/core/EigenDAThresholdRegistry.sol";
 import {EigenDACertVerifier} from "../src/core/EigenDACertVerifier.sol";
@@ -28,7 +43,14 @@ import {EigenDADisperserRegistry} from "../src/core/EigenDADisperserRegistry.sol
 import {IEigenDADisperserRegistry} from "../src/interfaces/IEigenDADisperserRegistry.sol";
 import {EigenDARelayRegistry} from "../src/core/EigenDARelayRegistry.sol";
 import {ISocketRegistry, SocketRegistry} from "../lib/eigenlayer-middleware/src/SocketRegistry.sol";
-import {DeployOpenEigenLayer, ProxyAdmin, ERC20PresetFixedSupply, TransparentUpgradeableProxy, IPauserRegistry} from "./DeployOpenEigenLayer.s.sol";
+import {
+    DeployOpenEigenLayer,
+    ProxyAdmin,
+    ERC20PresetFixedSupply,
+    TransparentUpgradeableProxy,
+    IPauserRegistry,
+    ITransparentUpgradeableProxy
+} from "./DeployOpenEigenLayer.s.sol";
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
@@ -161,7 +183,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         paymentVaultImplementation = new PaymentVault();
 
         eigenDAProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(paymentVault))),
+            ITransparentUpgradeableProxy(payable(address(paymentVault))),
             address(paymentVaultImplementation),
             abi.encodeWithSelector(
                 PaymentVault.initialize.selector,
@@ -179,7 +201,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         eigenDADisperserRegistryImplementation = new EigenDADisperserRegistry();
 
         eigenDAProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(eigenDADisperserRegistry))),
+            ITransparentUpgradeableProxy(payable(address(eigenDADisperserRegistry))),
             address(eigenDADisperserRegistryImplementation),
             abi.encodeWithSelector(
                 EigenDADisperserRegistry.initialize.selector,
@@ -192,17 +214,19 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         );
 
         eigenDAProxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(indexRegistry))),
+            ITransparentUpgradeableProxy(payable(address(indexRegistry))),
             address(indexRegistryImplementation)
         );
 
         stakeRegistryImplementation = new StakeRegistry(
             registryCoordinator,
-            IDelegationManager(address(delegation))
+            IDelegationManager(address(delegation)),
+            avsDirectory,
+            allocationManager
         );
 
         eigenDAProxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(stakeRegistry))),
+            ITransparentUpgradeableProxy(payable(address(stakeRegistry))),
             address(stakeRegistryImplementation)
         );
 
@@ -211,30 +235,32 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         );
 
         eigenDAProxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(apkRegistry))),
+            ITransparentUpgradeableProxy(payable(address(apkRegistry))),
             address(apkRegistryImplementation)
         );
 
         socketRegistryImplementation = new SocketRegistry(registryCoordinator);
 
         eigenDAProxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(socketRegistry))),
+            ITransparentUpgradeableProxy(payable(address(socketRegistry))),
             address(socketRegistryImplementation)
         );
 
         registryCoordinatorImplementation = new RegistryCoordinator(
-                IServiceManager(address(eigenDAServiceManager)),
-                stakeRegistry,
-                apkRegistry,
-                indexRegistry,
-                socketRegistry
-            );
+            IServiceManager(address(eigenDAServiceManager)),
+            stakeRegistry,
+            apkRegistry,
+            indexRegistry,
+            socketRegistry,
+            allocationManager,
+            eigenDAPauserReg
+        );
 
         {
-            IRegistryCoordinator.OperatorSetParam[] memory operatorSetParams = new IRegistryCoordinator.OperatorSetParam[](numStrategies);
+            ISlashingRegistryCoordinatorTypes.OperatorSetParam[] memory operatorSetParams = new ISlashingRegistryCoordinatorTypes.OperatorSetParam[](numStrategies);
             for (uint i = 0; i < numStrategies; i++) {
                 // hard code these for now
-                operatorSetParams[i] = IRegistryCoordinator.OperatorSetParam({
+                operatorSetParams[i] = ISlashingRegistryCoordinatorTypes.OperatorSetParam({
                     maxOperatorCount: uint32(maxOperatorCount),
                     kickBIPsOfOperatorStake: 11000, // an operator needs to have kickBIPsOfOperatorStake / 10000 times the stake of the operator with the least stake to kick them out
                     kickBIPsOfTotalStake: 1001 // an operator needs to have less than kickBIPsOfTotalStake / 10000 of the total stake to be kicked out
@@ -242,20 +268,20 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             }
 
             uint96[] memory minimumStakeForQuourm = new uint96[](numStrategies);
-            IStakeRegistry.StrategyParams[][] memory strategyAndWeightingMultipliers = new IStakeRegistry.StrategyParams[][](numStrategies);
+            IStakeRegistryTypes.StrategyParams[][] memory strategyAndWeightingMultipliers = new IStakeRegistryTypes.StrategyParams[][](numStrategies);
             for (uint i = 0; i < numStrategies; i++) {
-                strategyAndWeightingMultipliers[i] = new IStakeRegistry.StrategyParams[](1);
-                strategyAndWeightingMultipliers[i][0] = IStakeRegistry.StrategyParams({
+                strategyAndWeightingMultipliers[i] = new IStakeRegistryTypes.StrategyParams[](1);
+                strategyAndWeightingMultipliers[i][0] = IStakeRegistryTypes.StrategyParams({
                     strategy: IStrategy(address(deployedStrategyArray[i])),
                     multiplier: 1 ether
                 });
             }
 
             eigenDAProxyAdmin.upgradeAndCall(
-                TransparentUpgradeableProxy(payable(address(registryCoordinator))),
+                ITransparentUpgradeableProxy(payable(address(registryCoordinator))),
                 address(registryCoordinatorImplementation),
                 abi.encodeWithSelector(
-                    RegistryCoordinator.initialize.selector,
+                    SlashingRegistryCoordinator.initialize.selector,
                     addressConfig.eigenDACommunityMultisig,
                     addressConfig.churner,
                     addressConfig.ejector,
@@ -268,23 +294,29 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             );
         }
 
-        eigenDAServiceManagerImplementation = new EigenDAServiceManager(
-            avsDirectory,
-            rewardsCoordinator,
-            registryCoordinator,
-            stakeRegistry,
-            eigenDAThresholdRegistry,
-            eigenDARelayRegistry,
-            paymentVault,
-            eigenDADisperserRegistry
-        );
+        {
+            IEigenDAServiceManager.EigenDASMConstructorParams memory params = IEigenDAServiceManager.EigenDASMConstructorParams({
+                rewardsCoordinator: rewardsCoordinator,
+                permissionController: permissionController,
+                allocationManager: allocationManager,
+                avsDirectory: avsDirectory,
+                pauserRegistry: eigenDAPauserReg,
+                registryCoordinator: registryCoordinator,
+                stakeRegistry: stakeRegistry,
+                eigenDAThresholdRegistry: eigenDAThresholdRegistry,
+                eigenDARelayRegistry: eigenDARelayRegistry,
+                paymentVault: paymentVault,
+                eigenDADisperserRegistry: eigenDADisperserRegistry
+            });
+            eigenDAServiceManagerImplementation = new EigenDAServiceManager(params);
+        }
 
         address[] memory confirmers = new address[](1);
         confirmers[0] = addressConfig.eigenDACommunityMultisig;
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         eigenDAProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(eigenDAServiceManager))),
+            ITransparentUpgradeableProxy(payable(address(eigenDAServiceManager))),
             address(eigenDAServiceManagerImplementation),
             abi.encodeWithSelector(
                 EigenDAServiceManager.initialize.selector,
@@ -302,7 +334,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         SecurityThresholds memory defaultSecurityThresholds = SecurityThresholds(55, 33);
 
         eigenDAProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(eigenDAThresholdRegistry))),
+            ITransparentUpgradeableProxy(payable(address(eigenDAThresholdRegistry))),
             address(eigenDAThresholdRegistryImplementation),
             abi.encodeWithSelector(
                 EigenDAThresholdRegistry.initialize.selector,
@@ -330,7 +362,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         eigenDARelayRegistryImplementation = new EigenDARelayRegistry();
 
         eigenDAProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(eigenDARelayRegistry))),
+            ITransparentUpgradeableProxy(payable(address(eigenDARelayRegistry))),
             address(eigenDARelayRegistryImplementation),
             abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig)
         );

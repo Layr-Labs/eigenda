@@ -44,18 +44,6 @@ abstract contract EigenDAServiceManagerStorage is IEigenDAServiceManager {
     IPaymentVault public immutable paymentVault;
     IEigenDADisperserRegistry public immutable eigenDADisperserRegistry;
     
-    constructor(
-        IEigenDAThresholdRegistry _eigenDAThresholdRegistry,
-        IEigenDARelayRegistry _eigenDARelayRegistry,
-        IPaymentVault _paymentVault,
-        IEigenDADisperserRegistry _eigenDADisperserRegistry
-    ) {
-        eigenDAThresholdRegistry = _eigenDAThresholdRegistry;
-        eigenDARelayRegistry = _eigenDARelayRegistry;
-        paymentVault = _paymentVault;
-        eigenDADisperserRegistry = _eigenDADisperserRegistry;
-    }
-
     /// @notice The current batchId
     uint32 public batchId;
 
