@@ -158,42 +158,105 @@ func TestAddOnDemandPayment(t *testing.T) {
 	tc := setupTest(t)
 
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
-	payment := core.PaymentMetadata{
+	payment1 := core.PaymentMetadata{
 		AccountID:         accountID,
 		Timestamp:         time.Now().Unix(),
 		CumulativePayment: big.NewInt(100),
 	}
-	charge := big.NewInt(100)
+	charge1 := big.NewInt(100)
 
 	// Add the payment
-	err := tc.store.AddOnDemandPayment(tc.ctx, payment, charge)
+	oldPayment, err := tc.store.AddOnDemandPayment(tc.ctx, payment1, charge1)
 	require.NoError(t, err)
+	require.Equal(t, big.NewInt(0), oldPayment, "Old payment should be 0 for first payment")
 
-	// Verify the payment was added - using the exact key structure expected by DynamoDB
+	// Verify the payment was added with the correct structure
 	item, err := dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
-		"AccountID":          &types.AttributeValueMemberS{Value: accountID.Hex()},
-		"CumulativePayments": &types.AttributeValueMemberN{Value: payment.CumulativePayment.String()},
+		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, item, "Item should exist in the table")
 
-	// Verify the PaymentCharged field
-	paymentChargedStr := item["PaymentCharged"].(*types.AttributeValueMemberN).Value
-	paymentChargedVal, err := strconv.ParseInt(paymentChargedStr, 10, 64)
+	// Verify the CumulativePayment field
+	cumulativePaymentStr := item["CumulativePayment"].(*types.AttributeValueMemberN).Value
+	cumulativePaymentVal, err := strconv.ParseInt(cumulativePaymentStr, 10, 64)
 	require.NoError(t, err)
-	assert.Equal(t, charge.Int64(), paymentChargedVal)
+	assert.Equal(t, payment1.CumulativePayment.Int64(), cumulativePaymentVal)
 
-	// Attempt to add the same payment again, should return an error
-	err = tc.store.AddOnDemandPayment(tc.ctx, payment, charge)
-	require.Error(t, err)
-	assert.Equal(t, "exact payment already exists", err.Error())
+	// Test case: Add a larger payment with sufficient increment
+	payment2 := core.PaymentMetadata{
+		AccountID:         accountID,
+		Timestamp:         time.Now().Unix(),
+		CumulativePayment: big.NewInt(200),
+	}
+	charge2 := big.NewInt(100) // The same charge is fine because 200-100=100 >= 100
+
+	oldPayment, err = tc.store.AddOnDemandPayment(tc.ctx, payment2, charge2)
+	require.NoError(t, err)
+	require.Equal(t, big.NewInt(100), oldPayment, "Old payment should be 100")
+
+	// Verify the payment was updated
+	item, err = dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
+		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
+	})
+	require.NoError(t, err)
+	cumulativePaymentStr = item["CumulativePayment"].(*types.AttributeValueMemberN).Value
+	cumulativePaymentVal, err = strconv.ParseInt(cumulativePaymentStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, payment2.CumulativePayment.Int64(), cumulativePaymentVal)
+
+	// Test case: Add a larger payment but with insufficient increment
+	payment3 := core.PaymentMetadata{
+		AccountID:         accountID,
+		Timestamp:         time.Now().Unix(),
+		CumulativePayment: big.NewInt(250), // Only 50 more than previous 200
+	}
+	charge3 := big.NewInt(100) // But we need a minimum increment of 100
+
+	oldPayment, err = tc.store.AddOnDemandPayment(tc.ctx, payment3, charge3)
+	require.Error(t, err) // Should fail due to insufficient increment
+	assert.Contains(t, err.Error(), "insufficient cumulative payment increment")
+	require.Nil(t, oldPayment, "Old payment should be nil on error")
+
+	// Verify the payment wasn't updated
+	item, err = dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
+		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
+	})
+	require.NoError(t, err)
+	cumulativePaymentStr = item["CumulativePayment"].(*types.AttributeValueMemberN).Value
+	cumulativePaymentVal, err = strconv.ParseInt(cumulativePaymentStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, payment2.CumulativePayment.Int64(), cumulativePaymentVal, "Payment should not have been updated")
+
+	// Test case: Add a smaller payment (should fail)
+	payment4 := core.PaymentMetadata{
+		AccountID:         accountID,
+		Timestamp:         time.Now().Unix(),
+		CumulativePayment: big.NewInt(150),
+	}
+	charge4 := big.NewInt(50)
+
+	oldPayment, err = tc.store.AddOnDemandPayment(tc.ctx, payment4, charge4)
+	require.Error(t, err) // Should fail since payment is smaller than current
+	assert.Contains(t, err.Error(), "insufficient cumulative payment increment")
+	require.Nil(t, oldPayment, "Old payment should be nil on error")
+
+	// Verify the payment wasn't updated
+	item, err = dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
+		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
+	})
+	require.NoError(t, err)
+	cumulativePaymentStr = item["CumulativePayment"].(*types.AttributeValueMemberN).Value
+	cumulativePaymentVal, err = strconv.ParseInt(cumulativePaymentStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, payment2.CumulativePayment.Int64(), cumulativePaymentVal, "Payment should not have been updated")
 }
 
-// TestRemoveOnDemandPayment tests the RemoveOnDemandPayment function
-func TestRemoveOnDemandPayment(t *testing.T) {
+// TestRollbackOnDemandPayment tests the RollbackOnDemandPayment function
+func TestRollbackOnDemandPayment(t *testing.T) {
 	tc := setupTest(t)
 
-	// Create and add a payment first
+	// Create and add a payment
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 	cumulativePayment := big.NewInt(1000)
 	paymentCharged := big.NewInt(500)
@@ -204,92 +267,168 @@ func TestRemoveOnDemandPayment(t *testing.T) {
 		CumulativePayment: cumulativePayment,
 	}
 
-	err := tc.store.AddOnDemandPayment(tc.ctx, paymentMetadata, paymentCharged)
+	oldPayment, err := tc.store.AddOnDemandPayment(tc.ctx, paymentMetadata, paymentCharged)
 	require.NoError(t, err)
+	require.Equal(t, big.NewInt(0), oldPayment, "Old payment should be 0 for first payment")
 
-	// Verify the payment was added before removal
+	// Verify the payment was added
 	item, err := dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
-		"AccountID":          &types.AttributeValueMemberS{Value: accountID.Hex()},
-		"CumulativePayments": &types.AttributeValueMemberN{Value: cumulativePayment.String()},
+		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
 	})
 	require.NoError(t, err)
-	require.NotNil(t, item, "Item should exist before removal")
+	require.NotNil(t, item, "Item should exist in the table")
 
-	// Test removing the payment
-	err = tc.store.RemoveOnDemandPayment(tc.ctx, accountID, cumulativePayment)
+	// Add another payment
+	newCumulativePayment := big.NewInt(2000)
+	newPaymentMetadata := core.PaymentMetadata{
+		AccountID:         accountID,
+		Timestamp:         time.Now().Unix(),
+		CumulativePayment: newCumulativePayment,
+	}
+	newPaymentCharged := big.NewInt(1000)
+
+	oldPayment, err = tc.store.AddOnDemandPayment(tc.ctx, newPaymentMetadata, newPaymentCharged)
+	require.NoError(t, err)
+	require.Equal(t, cumulativePayment, oldPayment, "Old payment should be 1000 for second payment")
+
+	// Test case 1: Rollback to previous payment
+	err = tc.store.RollbackOnDemandPayment(tc.ctx, accountID, newCumulativePayment, oldPayment)
 	require.NoError(t, err)
 
-	// Verify the payment was removed
+	// Verify the payment was rolled back
 	item, err = dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
-		"AccountID":          &types.AttributeValueMemberS{Value: accountID.Hex()},
-		"CumulativePayments": &types.AttributeValueMemberN{Value: cumulativePayment.String()},
+		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
 	})
 	require.NoError(t, err)
-	assert.Nil(t, item, "Item should be deleted")
+	require.NotNil(t, item, "Item should still exist in the table")
 
-	// Removing non-existent payment should work (not error)
-	err = tc.store.RemoveOnDemandPayment(tc.ctx, accountID, big.NewInt(9999))
+	cumulativePaymentStr := item["CumulativePayment"].(*types.AttributeValueMemberN).Value
+	cumulativePaymentVal, err := strconv.ParseInt(cumulativePaymentStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, oldPayment.Int64(), cumulativePaymentVal, "Payment should be rolled back to 1000")
+
+	// Test case 2: Rollback to a different value directly
+	// The value will be updated regardless of what the current value is
+	err = tc.store.RollbackOnDemandPayment(tc.ctx, accountID, big.NewInt(1000), big.NewInt(500))
+	require.NoError(t, err)
+
+	// Verify the payment was updated to the new value
+	item, err = dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
+		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, item, "Item should still exist in the table")
+
+	cumulativePaymentStr = item["CumulativePayment"].(*types.AttributeValueMemberN).Value
+	cumulativePaymentVal, err = strconv.ParseInt(cumulativePaymentStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, int64(500), cumulativePaymentVal, "Payment should be set to 500 regardless of current value")
+
+	// Test case 3: Rollback to zero (should delete the record)
+	err = tc.store.RollbackOnDemandPayment(tc.ctx, accountID, big.NewInt(500), big.NewInt(0))
+	require.NoError(t, err)
+
+	// payment is set back to 0
+	largest, err := tc.store.GetLargestCumulativePayment(tc.ctx, accountID)
+	require.NoError(t, err)
+	assert.Equal(t, big.NewInt(0), largest, "Payment should be set to 0")
+
+	// Test case 4: Trying to rollback non-matching payment should not cause an error
+	err = tc.store.RollbackOnDemandPayment(tc.ctx, accountID, big.NewInt(9999), big.NewInt(500))
 	require.NoError(t, err)
 }
 
-// TestGetRelevantOnDemandRecords tests the GetRelevantOnDemandRecords function
-func TestGetRelevantOnDemandRecords(t *testing.T) {
+// TestGetLargestCumulativePayment tests the GetLargestCumulativePayment function
+func TestGetLargestCumulativePayment(t *testing.T) {
 	tc := setupTest(t)
 
-	// Create and add multiple payments for the same account but with different cumulative payments
+	// Create an account to test with
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 
-	// Helper function to create payment metadata
-	createPayment := func(amount int64) (core.PaymentMetadata, *big.Int) {
-		return core.PaymentMetadata{
-			AccountID:         accountID,
-			Timestamp:         time.Now().Unix(),
-			CumulativePayment: big.NewInt(amount),
-		}, big.NewInt(amount)
-	}
+	// Test case 1: No payment exists yet
+	largest, err := tc.store.GetLargestCumulativePayment(tc.ctx, accountID)
+	require.NoError(t, err)
+	require.Equal(t, big.NewInt(0), largest, "Initial largest payment should be 0")
 
-	// Add payments with cumulative values 100, 300, 600
-	payments := []int64{100, 300, 600}
-	for i, amt := range payments {
-		payment, charge := createPayment(amt)
-		if i > 0 {
-			// Each charge is the difference between this payment and the previous one
-			charge = big.NewInt(amt - payments[i-1])
-		}
-		err := tc.store.AddOnDemandPayment(tc.ctx, payment, charge)
-		require.NoError(t, err)
+	// Test case 2: Add first payment of 100 with charge of 100
+	payment1 := core.PaymentMetadata{
+		AccountID:         accountID,
+		Timestamp:         time.Now().Unix(),
+		CumulativePayment: big.NewInt(100),
 	}
+	oldPayment, err := tc.store.AddOnDemandPayment(tc.ctx, payment1, big.NewInt(100))
+	require.NoError(t, err)
+	require.Equal(t, big.NewInt(0), oldPayment, "Old payment should be 0 for first payment")
 
-	// Verify each payment was added correctly
-	for _, amt := range payments {
-		item, err := dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
-			"AccountID":          &types.AttributeValueMemberS{Value: accountID.Hex()},
-			"CumulativePayments": &types.AttributeValueMemberN{Value: strconv.FormatInt(amt, 10)},
-		})
-		require.NoError(t, err)
-		require.NotNil(t, item, fmt.Sprintf("Payment with cumulative amount %d should exist", amt))
+	largest, err = tc.store.GetLargestCumulativePayment(tc.ctx, accountID)
+	require.NoError(t, err)
+	require.Equal(t, big.NewInt(100), largest, "Largest payment should be 100")
+
+	// Test case 3: Add second payment of 300 with charge of 200 (cumulative)
+	payment2 := core.PaymentMetadata{
+		AccountID:         accountID,
+		Timestamp:         time.Now().Unix(),
+		CumulativePayment: big.NewInt(300),
 	}
+	oldPayment, err = tc.store.AddOnDemandPayment(tc.ctx, payment2, big.NewInt(200))
+	require.NoError(t, err)
+	require.Equal(t, big.NewInt(100), oldPayment, "Old payment should be 100")
 
-	// Test getting relevant records for different cumulative payment values
-	testCases := []struct {
-		requestedPayment int64
-		expectedPrev     int64
-		expectedNext     int64
-		expectedCharge   int64
-	}{
-		{200, 100, 300, 200}, // Between 100 and 300
-		{400, 300, 600, 300}, // Between 300 and 600
-		{700, 600, 0, 0},     // Larger than any payment
-		{50, 0, 100, 100},    // Smaller than any payment
+	largest, err = tc.store.GetLargestCumulativePayment(tc.ctx, accountID)
+	require.NoError(t, err)
+	require.Equal(t, big.NewInt(300), largest, "Largest payment should be 300")
+
+	// Test case 4: Try to add payment of 200 with charge of 100 - should fail since cumulative is less than previous
+	payment3 := core.PaymentMetadata{
+		AccountID:         accountID,
+		Timestamp:         time.Now().Unix(),
+		CumulativePayment: big.NewInt(200),
 	}
+	oldPayment, err = tc.store.AddOnDemandPayment(tc.ctx, payment3, big.NewInt(100))
+	require.Error(t, err)
+	require.Nil(t, oldPayment, "Old payment should be nil on error")
 
-	for _, testCase := range testCases {
-		cumulativePayment := big.NewInt(testCase.requestedPayment)
-		prevPmt, nextPmt, chargeOfNextPmt, err := tc.store.GetRelevantOnDemandRecords(tc.ctx, accountID, cumulativePayment)
-		require.NoError(t, err)
+	largest, err = tc.store.GetLargestCumulativePayment(tc.ctx, accountID)
+	require.NoError(t, err)
+	require.Equal(t, big.NewInt(300), largest, "Largest payment should still be 300")
 
-		assert.Equal(t, big.NewInt(testCase.expectedPrev), prevPmt)
-		assert.Equal(t, big.NewInt(testCase.expectedNext), nextPmt)
-		assert.Equal(t, big.NewInt(testCase.expectedCharge), chargeOfNextPmt)
+	// Test case 5: Add payment of 500 with insufficient charge (250) - should fail
+	payment4 := core.PaymentMetadata{
+		AccountID:         accountID,
+		Timestamp:         time.Now().Unix(),
+		CumulativePayment: big.NewInt(500),
 	}
+	oldPayment, err = tc.store.AddOnDemandPayment(tc.ctx, payment4, big.NewInt(250))
+	require.Error(t, err)
+	require.Nil(t, oldPayment, "Old payment should be nil on error")
+
+	largest, err = tc.store.GetLargestCumulativePayment(tc.ctx, accountID)
+	require.NoError(t, err)
+	require.Equal(t, big.NewInt(300), largest, "Largest payment should still be 300")
+
+	// Test case 6: Add valid payment of 500 with sufficient charge (200)
+	payment5 := core.PaymentMetadata{
+		AccountID:         accountID,
+		Timestamp:         time.Now().Unix(),
+		CumulativePayment: big.NewInt(500),
+	}
+	oldPayment, err = tc.store.AddOnDemandPayment(tc.ctx, payment5, big.NewInt(200))
+	require.NoError(t, err)
+	require.Equal(t, big.NewInt(300), oldPayment, "Old payment should be 300")
+
+	largest, err = tc.store.GetLargestCumulativePayment(tc.ctx, accountID)
+	require.NoError(t, err)
+	require.Equal(t, big.NewInt(500), largest, "Largest payment should be 500")
+
+	// Test case 7: Roll back the payment
+	err = tc.store.RollbackOnDemandPayment(tc.ctx, accountID, big.NewInt(500), big.NewInt(300))
+	require.NoError(t, err)
+
+	largest, err = tc.store.GetLargestCumulativePayment(tc.ctx, accountID)
+	require.NoError(t, err)
+	require.Equal(t, big.NewInt(300), largest, "After rollback, largest payment should be 300")
+
+	// Test case 8: Verify rolling back a non-existent payment has no effect
+	err = tc.store.RollbackOnDemandPayment(tc.ctx, accountID, big.NewInt(9999), big.NewInt(500))
+	require.NoError(t, err)
 }
