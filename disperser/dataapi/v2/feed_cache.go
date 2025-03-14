@@ -6,6 +6,8 @@ import (
 	"math"
 	"sync"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 )
 
 // FetchOrder defines the ordering of data returned by fetchFromDB.
@@ -28,18 +30,22 @@ type FeedCache[T any] struct {
 
 	fetchFromDB  func(ctx context.Context, start, end time.Time, order FetchOrder, limit int) ([]*T, error)
 	getTimestamp func(*T) time.Time
+
+	metrics *dataapi.FeedCacheMetrics
 }
 
 func NewFeedCache[T any](
 	maxItems int,
 	fetchFn func(ctx context.Context, start, end time.Time, order FetchOrder, limit int) ([]*T, error),
 	timestampFn func(*T) time.Time,
+	metrics *dataapi.FeedCacheMetrics,
 ) *FeedCache[T] {
 	return &FeedCache[T]{
 		segment:      NewCircularQueue[T](maxItems, timestampFn),
 		fetchFromDB:  fetchFn,
 		getTimestamp: timestampFn,
 		updateWg:     &sync.WaitGroup{},
+		metrics:      metrics,
 	}
 }
 
@@ -204,15 +210,18 @@ func (c *FeedCache[T]) executePlanAscending(ctx context.Context, plan executionP
 	beforeItems := min(numToReturn, len(beforeData))
 	result = append(result, beforeData[:beforeItems]...)
 
+	numHits := 0
 	if len(result) < numToReturn {
-		overlapItems := min(numToReturn-len(result), len(plan.cacheHit))
-		result = append(result, plan.cacheHit[:overlapItems]...)
+		numHits = min(numToReturn-len(result), len(plan.cacheHit))
+		result = append(result, plan.cacheHit[:numHits]...)
 	}
 
 	if len(result) < numToReturn {
 		afterItems := min(numToReturn-len(result), len(afterData))
 		result = append(result, afterData[:afterItems]...)
 	}
+
+	c.metrics.UpdateHitRate(numHits, len(result)-numHits)
 
 	return &executionResult[T]{
 		order:         Ascending,
@@ -267,15 +276,18 @@ func (c *FeedCache[T]) executePlanDescending(ctx context.Context, plan execution
 	afterItems := min(numToReturn, len(afterData))
 	result = append(result, afterData[:afterItems]...)
 
+	numHits := 0
 	if len(result) < numToReturn {
-		overlapItems := min(numToReturn-len(result), len(plan.cacheHit))
-		result = append(result, reverseOrder(plan.cacheHit)[:overlapItems]...)
+		numHits = min(numToReturn-len(result), len(plan.cacheHit))
+		result = append(result, reverseOrder(plan.cacheHit)[:numHits]...)
 	}
 
 	if len(result) < numToReturn {
 		beforeItems := min(numToReturn-len(result), len(beforeData))
 		result = append(result, beforeData[:beforeItems]...)
 	}
+
+	c.metrics.UpdateHitRate(numHits, len(result)-numHits)
 
 	return &executionResult[T]{
 		order:         Descending,
@@ -329,6 +341,8 @@ func (c *FeedCache[T]) updateCache(result *executionResult[T]) {
 		}
 		c.segment.MergeTimeRange(afterData, start, end)
 	}
+
+	c.metrics.RecordCacheUpdate(c.segment.start, c.segment.end)
 }
 
 func reverseOrder[T any](data []*T) []*T {

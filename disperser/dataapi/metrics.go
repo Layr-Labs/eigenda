@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/disperser"
+
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
@@ -30,6 +31,9 @@ type Metrics struct {
 	NumRequests    *prometheus.CounterVec
 	Latency        *prometheus.SummaryVec
 	OperatorsStake *prometheus.GaugeVec
+
+	// Cache metrics in v2
+	BatchFeedCacheMetrics *FeedCacheMetrics
 
 	Semvers                *prometheus.GaugeVec
 	SemversStakePctQuorum0 *prometheus.GaugeVec
@@ -110,9 +114,10 @@ func NewMetrics(serverVersion uint, blobMetadataStore interface{}, httpPort stri
 			// The "topn" can be: 1, 2, 3, 5, 8, 10
 			[]string{"quorum", "topn"},
 		),
-		registry: reg,
-		httpPort: httpPort,
-		logger:   logger.With("component", "DataAPIMetrics"),
+		BatchFeedCacheMetrics: NewFeedCacheMetrics("batch_feed", reg),
+		registry:              reg,
+		httpPort:              httpPort,
+		logger:                logger.With("component", "DataAPIMetrics"),
 	}
 	return metrics
 }
