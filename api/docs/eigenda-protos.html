@@ -912,7 +912,8 @@ such that the claimed length below is verifiable. </p></td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>A proof that the degree of the polynomial used to generate the blob commitment is valid.
-It is computed as x^(SRSOrder-n) * P(x), where P(x) is polynomial of degree n representing the blob. </p></td>
+It consists of the KZG commitment of x^(SRSOrder-n) * P(x), where
+P(x) is polynomial of degree n representing the blob. </p></td>
                 </tr>
               
                 <tr>

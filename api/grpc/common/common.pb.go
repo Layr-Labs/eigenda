@@ -99,7 +99,8 @@ type BlobCommitment struct {
 	// such that the claimed length below is verifiable.
 	LengthCommitment []byte `protobuf:"bytes,2,opt,name=length_commitment,json=lengthCommitment,proto3" json:"length_commitment,omitempty"`
 	// A proof that the degree of the polynomial used to generate the blob commitment is valid.
-	// It is computed as x^(SRSOrder-n) * P(x), where P(x) is polynomial of degree n representing the blob.
+	// It consists of the KZG commitment of x^(SRSOrder-n) * P(x), where
+	// P(x) is polynomial of degree n representing the blob.
 	LengthProof []byte `protobuf:"bytes,3,opt,name=length_proof,json=lengthProof,proto3" json:"length_proof,omitempty"`
 	// The length of the blob in symbols (field elements), which must be a power of 2.
 	// This also specifies the degree of the polynomial used to generate the blob commitment,

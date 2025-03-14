@@ -259,7 +259,7 @@ to understand how this commitment is used to validate the blob.
 | ----- | ---- | ----- | ----------- |
 | commitment | [bytes](#bytes) |  | Concatenation of the x and y coordinates of `common.G1Commitment`. |
 | length_commitment | [bytes](#bytes) |  | A commitment to the blob data with G2 SRS, used to work with length_proof such that the claimed length below is verifiable. |
-| length_proof | [bytes](#bytes) |  | A proof that the degree of the polynomial used to generate the blob commitment is valid. It is computed as x^(SRSOrder-n) * P(x), where P(x) is polynomial of degree n representing the blob. |
+| length_proof | [bytes](#bytes) |  | A proof that the degree of the polynomial used to generate the blob commitment is valid. It consists of the KZG commitment of x^(SRSOrder-n) * P(x), where P(x) is polynomial of degree n representing the blob. |
 | length | [uint32](#uint32) |  | The length of the blob in symbols (field elements), which must be a power of 2. This also specifies the degree of the polynomial used to generate the blob commitment, since length = degree &#43; 1. |
 
 
