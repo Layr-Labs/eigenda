@@ -5,6 +5,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
+
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/stretchr/testify/assert"
 )
