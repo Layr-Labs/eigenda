@@ -182,6 +182,26 @@ func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context) ([]uint8, 
 	return quorumNumbersRequired, nil
 }
 
+// GetRelayRegistryAddress returns the address of the EigenDARelayRegistry contract
+func (cv *CertVerifier) GetRelayRegistryAddress(ctx context.Context) (*gethcommon.Address, error) {
+	blockNumber, err := cv.ethClient.BlockNumber(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("fetch block number from eth client: %w", err)
+	}
+
+	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, blockNumber)
+	if err != nil {
+		return nil, fmt.Errorf("get verifier caller form block number: %w", err)
+	}
+
+	relayRegistryAddress, err := certVerifierCaller.EigenDARelayRegistry(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return nil, fmt.Errorf("get relay registry address: %w", err)
+	}
+
+	return &relayRegistryAddress, nil
+}
+
 // getVerifierCallerFromBlockNumber returns a ContractEigenDACertVerifierCaller that corresponds to the input reference
 // block number.
 //
