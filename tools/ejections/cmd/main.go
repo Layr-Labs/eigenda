@@ -329,7 +329,7 @@ func EvaluateOperators(config *ejections.Config) error {
 	})
 	// Create a new table writer for non-signing metrics
 	nonSigningTableV1 := table.NewWriter()
-	nonSigningTableV1.AppendHeader(table.Row{"Operator Address", "Quorum ID", "Unsigned Batches", "Non Signing %", "Stake %", "Perf Score", "Violating SLA", "Violating Threshold"}, table.RowConfig{AutoMerge: true})
+	nonSigningTableV1.AppendHeader(table.Row{"Operator Address", "Quorum ID", "Unsigned Batches", "Non Signing %", "Stake %", "Perf Score", "Violating SLA", "Violating Threshold", "Needs Ejection"}, table.RowConfig{AutoMerge: true})
 	// Set the column configuration to merge the Operator Address column
 	nonSigningTableV1.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 1, AutoMerge: true}, // Merging the Operator Address column
@@ -340,6 +340,7 @@ func EvaluateOperators(config *ejections.Config) error {
 		{Number: 6, AutoMerge: false},
 		{Number: 7, AutoMerge: false},
 		{Number: 8, AutoMerge: false},
+		{Number: 9, AutoMerge: false},
 	})
 	nonSigningTableV1.SetStyle(table.StyleLight)
 	nonSigningTableV1.Style().Options.SeparateRows = true
@@ -353,6 +354,7 @@ func EvaluateOperators(config *ejections.Config) error {
 			metric.PerfScore,
 			metric.IsViolatingSLA,
 			metric.IsViolatingThreshold,
+			metric.NeedsEjection,
 		})
 	}
 
@@ -388,7 +390,7 @@ func EvaluateOperators(config *ejections.Config) error {
 
 		// Create a new table writer for non-signing metrics
 		nonSigningTableV2 := table.NewWriter()
-		nonSigningTableV2.AppendHeader(table.Row{"Operator Address", "Quorum ID", "Unsigned Batches", "V2 Non Signing %", "Stake %", "Perf Score", "Violating SLA", "Violating Threshold"}, table.RowConfig{AutoMerge: true})
+		nonSigningTableV2.AppendHeader(table.Row{"Operator Address", "Quorum ID", "Unsigned Batches", "V2 Non Signing %", "Stake %", "Perf Score", "Violating SLA", "Violating Threshold", "Needs Ejection"}, table.RowConfig{AutoMerge: true})
 		// Set the column configuration to merge the Operator Address column
 		nonSigningTableV2.SetColumnConfigs([]table.ColumnConfig{
 			{Number: 1, AutoMerge: true}, // Merging the Operator Address column
@@ -399,6 +401,7 @@ func EvaluateOperators(config *ejections.Config) error {
 			{Number: 6, AutoMerge: false},
 			{Number: 7, AutoMerge: false},
 			{Number: 8, AutoMerge: false},
+			{Number: 9, AutoMerge: false},
 		})
 		nonSigningTableV2.SetStyle(table.StyleLight)
 		nonSigningTableV2.Style().Options.SeparateRows = true
@@ -412,6 +415,7 @@ func EvaluateOperators(config *ejections.Config) error {
 				metric.PerfScore,
 				metric.IsViolatingSLA,
 				metric.IsViolatingThreshold,
+				metric.NeedsEjection,
 			})
 		}
 
