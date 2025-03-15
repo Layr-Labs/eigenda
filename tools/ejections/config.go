@@ -18,6 +18,11 @@ type Config struct {
 	EthClientConfig               geth.EthClientConfig
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
+	DataAPIURL                    string
+	Eval                          bool
+	EvalV2                        bool
+	EvalInterval                  int64
+	NonsigningRateThreshold       int
 }
 
 func ReadConfig(ctx *cli.Context) *Config {
@@ -30,6 +35,11 @@ func ReadConfig(ctx *cli.Context) *Config {
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		DataAPIURL:                    ctx.String(flags.DataAPIURLFlag.Name),
+		Eval:                          ctx.Bool(flags.EvalFlag.Name),
+		EvalV2:                        ctx.Bool(flags.EvalV2Flag.Name),
+		EvalInterval:                  ctx.Int64(flags.EvalIntervalFlag.Name),
+		NonsigningRateThreshold:       ctx.Int(flags.NonsigningRateThresholdFlag.Name),
 	}
 }
 
