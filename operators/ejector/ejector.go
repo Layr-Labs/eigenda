@@ -38,6 +38,11 @@ type NonSignerMetric struct {
 	TotalUnsignedBatches int     `json:"total_unsigned_batches"`
 	Percentage           float64 `json:"percentage"`
 	StakePercentage      float64 `json:"stake_percentage"`
+	PerfScore            float64 `json:"perf_score"`
+	StakeWeightedSLA     float64 `json:"stake_weighted_sla"`
+	IsViolatingSLA       bool    `json:"is_violating_sla"`
+	IsViolatingThreshold bool    `json:"is_violating_threshold"`
+	NeedsEjection        bool    `json:"needs_ejection"`
 }
 
 type Mode string
@@ -102,19 +107,57 @@ func NewEjector(wallet walletsdk.Wallet, ethClient common.EthClient, logger logg
 	}
 }
 
+// EvaluateOperatorsForEjection evaluates the operators for ejection.
+// It updates the NonSignerMetric structs in place with the following fields:
+// - StakeWeightedSLA: the stake weighted SLA assigned to the operator.
+// - PerfScore: the performance score of the operator.
+// - IsViolatingThreshold: whether the operator violates the nonsigning rate threshold.
+// - IsViolatingSLA: whether the operator violates the stake weighted SLA.
+func (e *Ejector) EvaluateOperatorsForEjection(nonsignerMetrics []*NonSignerMetric) error {
+	for _, metric := range nonsignerMetrics {
+		// If nonsigningRateThreshold is set and valid, we will only eject operators with
+		// nonsigning rate >= nonsigningRateThreshold.
+		if e.nonsigningRateThreshold >= 10 && e.nonsigningRateThreshold <= 100 && metric.Percentage >= float64(e.nonsigningRateThreshold) {
+			metric.IsViolatingThreshold = true
+		} else {
+			metric.IsViolatingThreshold = false
+		}
+
+		// Score operators based on stake weighted SLA
+		metric.StakeWeightedSLA = stakeShareToSLA(metric.StakePercentage / 100.0)
+		metric.PerfScore = operatorPerfScore(metric.StakeWeightedSLA, metric.Percentage)
+		if metric.Percentage/100.0 > 1-metric.StakeWeightedSLA {
+			metric.IsViolatingSLA = true
+		} else {
+			metric.IsViolatingSLA = false
+		}
+
+		// If nonsigningRateThreshold ejections are enabled, we will only eject operators based on the threshold.
+		// Otherwise, we will only eject operators that violate the SLA.
+		thresholdEjectionsEnabled := e.nonsigningRateThreshold >= 10 && e.nonsigningRateThreshold <= 100
+		if thresholdEjectionsEnabled && metric.IsViolatingThreshold {
+			metric.NeedsEjection = true
+		} else if !thresholdEjectionsEnabled && metric.IsViolatingSLA {
+			metric.NeedsEjection = true
+		} else {
+			metric.NeedsEjection = false
+		}
+	}
+	return nil
+}
+
 func (e *Ejector) Eject(ctx context.Context, nonsignerMetrics []*NonSignerMetric, mode Mode) (*EjectionResponse, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	err := e.EvaluateOperatorsForEjection(nonsignerMetrics)
+	if err != nil {
+		return nil, err
+	}
+
 	nonsigners := make([]*NonSignerMetric, 0)
 	for _, metric := range nonsignerMetrics {
-		// If nonsigningRateThreshold is set and valid, we will only eject operators with
-		// nonsigning rate >= nonsigningRateThreshold.
-		if e.nonsigningRateThreshold >= 10 && e.nonsigningRateThreshold <= 100 && metric.Percentage < float64(e.nonsigningRateThreshold) {
-			continue
-		}
-		// Collect only the nonsigners who violate the SLA.
-		if metric.Percentage/100.0 > 1-stakeShareToSLA(metric.StakePercentage/100.0) {
+		if metric.NeedsEjection {
 			nonsigners = append(nonsigners, metric)
 		}
 	}
