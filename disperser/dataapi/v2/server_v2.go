@@ -118,6 +118,17 @@ type (
 		Batches []*BatchInfo `json:"batches"`
 	}
 
+	OperatorBatch struct {
+		BatchHeaderHash string              `json:"batch_header_hash"`
+		BatchHeader     *corev2.BatchHeader `json:"batch_header"`
+		DispersedAt     uint64
+	}
+	OperatorBatchFeedResponse struct {
+		OperatorIdentity OperatorIdentity `json:"operator_identity"`
+		OperatorSocket   string           `json:"operator_socket"`
+		Batches          []*OperatorBatch `json:"batches"`
+	}
+
 	MetricSummary struct {
 		AvgThroughput float64 `json:"avg_throughput"`
 	}
@@ -299,6 +310,7 @@ func (s *ServerV2) Start() error {
 		batches := v2.Group("/batches")
 		{
 			batches.GET("/feed", s.FetchBatchFeed)
+			batches.GET("/feed/:operator_id", s.FetchOperatorBatchFeed)
 			batches.GET("/:batch_header_hash", s.FetchBatch)
 		}
 		operators := v2.Group("/operators")
