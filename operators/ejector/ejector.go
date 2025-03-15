@@ -150,7 +150,10 @@ func (e *Ejector) Eject(ctx context.Context, nonsignerMetrics []*NonSignerMetric
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	e.EvaluateOperatorsForEjection(nonsignerMetrics)
+	err := e.EvaluateOperatorsForEjection(nonsignerMetrics)
+	if err != nil {
+		return nil, err
+	}
 
 	nonsigners := make([]*NonSignerMetric, 0)
 	for _, metric := range nonsignerMetrics {

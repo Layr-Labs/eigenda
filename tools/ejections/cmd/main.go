@@ -329,7 +329,7 @@ func EvaluateOperators(config *ejections.Config) error {
 	})
 	// Create a new table writer for non-signing metrics
 	nonSigningTableV1 := table.NewWriter()
-	nonSigningTableV1.AppendHeader(table.Row{"Operator Address", "Quorum ID", "Unsigned Batches", "Non Signing %", "Stake %", "Perf Score", "Violating SLA", "Violating Threshold", "Needs Ejection"}, table.RowConfig{AutoMerge: true})
+	nonSigningTableV1.AppendHeader(table.Row{"Operator Address", "Quorum ID", "Unsigned Batches", "V1 Non Signing %", "Stake %", "Perf Score", "Violating SLA", "Violating Threshold", "Needs Ejection"}, table.RowConfig{AutoMerge: true})
 	// Set the column configuration to merge the Operator Address column
 	nonSigningTableV1.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 1, AutoMerge: true}, // Merging the Operator Address column
@@ -418,12 +418,37 @@ func EvaluateOperators(config *ejections.Config) error {
 				metric.NeedsEjection,
 			})
 		}
-
-		// Print the non-signing metrics table
 		fmt.Println(nonSigningTableV2.Render())
-	}
 
-	//nonSigningMetricsCombined = GetNonSigningMetrics(nonsigningRateV1, nonsigningRateV2, quorumIDs, logger)
+		// Hybrid non-signing metrics (V1 and V2)
+		nonSigningMetricsCombined := GetNonSigningMetrics(nonsigningRateV1, nonsigningRateV2, quorumIDs, logger)
+		err = e.EvaluateOperatorsForEjection(nonSigningMetricsCombined)
+		if err != nil {
+			return fmt.Errorf("failed to evaluate operators for hybrid ejection: %w", err)
+		}
+		sort.Slice(nonSigningMetricsCombined, func(i, j int) bool {
+			return nonSigningMetricsCombined[i].OperatorAddress < nonSigningMetricsCombined[j].OperatorAddress
+		})
+		nonSigningTableCombined := table.NewWriter()
+		nonSigningTableCombined.AppendHeader(table.Row{"Operator Address", "Quorum ID", "Unsigned Batches", "Hybrid Non Signing %", "Stake %", "Perf Score", "Violating SLA", "Violating Threshold", "Needs Ejection"}, table.RowConfig{AutoMerge: true})
+		for _, metric := range nonSigningMetricsCombined {
+			nonSigningTableCombined.AppendRow(table.Row{metric.OperatorAddress, metric.QuorumId, metric.TotalUnsignedBatches, metric.Percentage, metric.StakePercentage, metric.PerfScore, metric.IsViolatingSLA, metric.IsViolatingThreshold, metric.NeedsEjection})
+		}
+		nonSigningTableCombined.SetStyle(table.StyleLight)
+		nonSigningTableCombined.Style().Options.SeparateRows = true
+		nonSigningTableCombined.SetColumnConfigs([]table.ColumnConfig{
+			{Number: 1, AutoMerge: true}, // Merging the Operator Address column
+			{Number: 2, AutoMerge: false},
+			{Number: 3, AutoMerge: false},
+			{Number: 4, AutoMerge: false},
+			{Number: 5, AutoMerge: false},
+			{Number: 6, AutoMerge: false},
+			{Number: 7, AutoMerge: false},
+			{Number: 8, AutoMerge: false},
+			{Number: 9, AutoMerge: false},
+		})
+		fmt.Println(nonSigningTableCombined.Render())
+	}
 
 	return nil
 }
