@@ -232,6 +232,7 @@ func NewServerV2(
 		maxNumBatchesToCache,
 		fetchBatchFn,
 		getBatchTimestampFn,
+		metrics.BatchFeedCacheMetrics,
 	)
 
 	return &ServerV2{
