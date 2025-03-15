@@ -42,6 +42,7 @@ type NonSignerMetric struct {
 	StakeWeightedSLA     float64 `json:"stake_weighted_sla"`
 	IsViolatingSLA       bool    `json:"is_violating_sla"`
 	IsViolatingThreshold bool    `json:"is_violating_threshold"`
+	NeedsEjection        bool    `json:"needs_ejection"`
 }
 
 type Mode string
@@ -130,6 +131,17 @@ func (e *Ejector) EvaluateOperatorsForEjection(nonsignerMetrics []*NonSignerMetr
 		} else {
 			metric.IsViolatingSLA = false
 		}
+
+		// If nonsigningRateThreshold ejections are enabled, we will only eject operators based on the threshold.
+		// Otherwise, we will only eject operators that violate the SLA.
+		thresholdEjectionsEnabled := e.nonsigningRateThreshold >= 10 && e.nonsigningRateThreshold <= 100
+		if thresholdEjectionsEnabled && metric.IsViolatingThreshold {
+			metric.NeedsEjection = true
+		} else if !thresholdEjectionsEnabled && metric.IsViolatingSLA {
+			metric.NeedsEjection = true
+		} else {
+			metric.NeedsEjection = false
+		}
 	}
 	return nil
 }
@@ -140,15 +152,9 @@ func (e *Ejector) Eject(ctx context.Context, nonsignerMetrics []*NonSignerMetric
 
 	e.EvaluateOperatorsForEjection(nonsignerMetrics)
 
-	thresholdEjectionsEnabled := e.nonsigningRateThreshold >= 10 && e.nonsigningRateThreshold <= 100
 	nonsigners := make([]*NonSignerMetric, 0)
 	for _, metric := range nonsignerMetrics {
-		// If nonsigningRateThreshold ejections are enabled, we will only eject operators based on the threshold.
-		if thresholdEjectionsEnabled {
-			if metric.IsViolatingThreshold {
-				nonsigners = append(nonsigners, metric)
-			}
-		} else if metric.IsViolatingSLA {
+		if metric.NeedsEjection {
 			nonsigners = append(nonsigners, metric)
 		}
 	}
