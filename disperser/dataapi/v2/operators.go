@@ -484,7 +484,7 @@ func (s *ServerV2) getOperatorsOfInterest(
 	operatorList := dataapi.NewOperatorList()
 
 	// The first part: active operators at startBlock
-	operatorsByQuorum, err := s.chainReader.GetOperatorStakesForQuorums(ctx, quorumIDs, uint32(startBlock))
+	operatorsByQuorum, err := s.chainReader.GetOperatorStakesForQuorums(ctx, quorumIDs, startBlock)
 	if err != nil {
 		return nil, err
 	}
