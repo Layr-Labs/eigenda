@@ -107,99 +107,99 @@ There are three tables, each with its own namespace. The tables are
 
 A little data has been written to the DB.
 
-- 'tableA' has enough data to have three segments
-- 'tableB' has enough data to have two segments
-- 'tableC' has enough data to have one segment
+- `tableA` has enough data to have three segments
+- `tableB` has enough data to have two segments
+- `tableC` has enough data to have one segment
 
 The keymap is implemented using levelDB.
 
 ```
 root
 ├── root0
-│   ├── tableA
-│   │   ├── keymap
-│   │   │   ├── data
-│   │   │   │   ├── 000001.log
-│   │   │   │   ├── CURRENT
-│   │   │   │   ├── LOCK
-│   │   │   │   ├── LOG
-│   │   │   │   └── MANIFEST-000000
-│   │   │   └── keymap-type.txt
-│   │   ├── segments
-│   │   │   ├── 0-2.values
-│   │   │   ├── 0.keys
-│   │   │   ├── 0.metadata
-│   │   │   ├── 1-2.values
-│   │   │   ├── 1.keys
-│   │   │   ├── 1.metadata
-│   │   │   ├── 2-2.values
-│   │   │   ├── 2.keys
-│   │   │   ├── 2.metadata
-│   │   │   ├── 3-2.values
-│   │   │   ├── 3.keys
-│   │   │   └── 3.metadata
-│   │   └── table.metadata
-│   ├── tableB
-│   │   ├── keymap
-│   │   │   ├── data
-│   │   │   │   ├── 000001.log
-│   │   │   │   ├── CURRENT
-│   │   │   │   ├── LOCK
-│   │   │   │   ├── LOG
-│   │   │   │   └── MANIFEST-000000
-│   │   │   └── keymap-type.txt
-│   │   ├── segments
-│   │   │   ├── 0-2.values
-│   │   │   ├── 0.keys
-│   │   │   ├── 0.metadata
-│   │   │   ├── 1-2.values
-│   │   │   ├── 1.keys
-│   │   │   ├── 1.metadata
-│   │   │   ├── 2-2.values
-│   │   │   ├── 2.keys
-│   │   │   └── 2.metadata
-│   │   └── table.metadata
-│   └── tableC
-│       ├── keymap
-│       │   ├── data
-│       │   │   ├── 000001.log
-│       │   │   ├── CURRENT
-│       │   │   ├── LOCK
-│       │   │   ├── LOG
-│       │   │   └── MANIFEST-000000
-│       │   └── keymap-type.txt
-│       ├── segments
-│       │   ├── 0-2.values
-│       │   ├── 0.keys
-│       │   └── 0.metadata
-│       └── table.metadata
+│     ├── tableA
+│     │     ├── keymap
+│     │     │     ├── data
+│     │     │     │     ├── 000001.log
+│     │     │     │     ├── CURRENT
+│     │     │     │     ├── LOCK
+│     │     │     │     ├── LOG
+│     │     │     │     └── MANIFEST-000000
+│     │     │     └── keymap-type.txt
+│     │     ├── segments
+│     │     │     ├── 0-2.values
+│     │     │     ├── 0.keys
+│     │     │     ├── 0.metadata
+│     │     │     ├── 1-2.values
+│     │     │     ├── 1.keys
+│     │     │     ├── 1.metadata
+│     │     │     ├── 2-2.values
+│     │     │     ├── 2.keys
+│     │     │     ├── 2.metadata
+│     │     │     ├── 3-2.values
+│     │     │     ├── 3.keys
+│     │     │     └── 3.metadata
+│     │     └── table.metadata
+│     ├── tableB
+│     │     ├── keymap
+│     │     │     ├── data
+│     │     │     │     ├── 000001.log
+│     │     │     │     ├── CURRENT
+│     │     │     │     ├── LOCK
+│     │     │     │     ├── LOG
+│     │     │     │     └── MANIFEST-000000
+│     │     │     └── keymap-type.txt
+│     │     ├── segments
+│     │     │     ├── 0-2.values
+│     │     │     ├── 0.keys
+│     │     │     ├── 0.metadata
+│     │     │     ├── 1-2.values
+│     │     │     ├── 1.keys
+│     │     │     ├── 1.metadata
+│     │     │     ├── 2-2.values
+│     │     │     ├── 2.keys
+│     │     │     └── 2.metadata
+│     │     └── table.metadata
+│     └── tableC
+│         ├── keymap
+│         │     ├── data
+│         │     │     ├── 000001.log
+│         │     │     ├── CURRENT
+│         │     │     ├── LOCK
+│         │     │     ├── LOG
+│         │     │     └── MANIFEST-000000
+│         │     └── keymap-type.txt
+│         ├── segments
+│         │     ├── 0-2.values
+│         │     ├── 0.keys
+│         │     └── 0.metadata
+│         └── table.metadata
 ├── root1
-│   ├── tableA
-│   │   └── segments
-│   │       ├── 0-0.values
-│   │       ├── 1-0.values
-│   │       ├── 2-0.values
-│   │       └── 3-0.values
-│   ├── tableB
-│   │   └── segments
-│   │       ├── 0-0.values
-│   │       ├── 1-0.values
-│   │       └── 2-0.values
-│   └── tableC
-│       └── segments
-│           └── 0-0.values
+│     ├── tableA
+│     │     └── segments
+│     │         ├── 0-0.values
+│     │         ├── 1-0.values
+│     │         ├── 2-0.values
+│     │         └── 3-0.values
+│     ├── tableB
+│     │     └── segments
+│     │         ├── 0-0.values
+│     │         ├── 1-0.values
+│     │         └── 2-0.values
+│     └── tableC
+│         └── segments
+│             └── 0-0.values
 └── root2
     ├── tableA
-    │   └── segments
-    │       ├── 0-1.values
-    │       ├── 1-1.values
-    │       ├── 2-1.values
-    │       └── 3-1.values
+    │     └── segments
+    │         ├── 0-1.values
+    │         ├── 1-1.values
+    │         ├── 2-1.values
+    │         └── 3-1.values
     ├── tableB
-    │   └── segments
-    │       ├── 0-1.values
-    │       ├── 1-1.values
-    │       └── 2-1.values
+    │     └── segments
+    │         ├── 0-1.values
+    │         ├── 1-1.values
+    │         └── 2-1.values
     └── tableC
         └── segments
             └── 0-1.values
