@@ -1,4 +1,4 @@
-package e2e
+package testutils
 
 import (
 	"context"
@@ -34,9 +34,9 @@ const (
 	privateKey         = "SIGNER_PRIVATE_KEY"
 	ethRPC             = "ETHEREUM_RPC"
 	transport          = "http"
-	svcName            = "eigenda_proxy"
 	host               = "127.0.0.1"
 	v1DisperserHolesky = "disperser-holesky.eigenda.xyz:443"
+	memstoreEnvVar     = "MEMSTORE"
 )
 
 var (
@@ -106,7 +106,11 @@ func startRedisContainer() error {
 	return nil
 }
 
-type Cfg struct {
+func UseMemstore() bool {
+	return os.Getenv(memstoreEnvVar) == "true" || os.Getenv(memstoreEnvVar) == "1"
+}
+
+type TestConfig struct {
 	UseV2            bool
 	UseMemory        bool
 	Expiration       time.Duration
@@ -118,8 +122,8 @@ type Cfg struct {
 	UseS3Fallback      bool
 }
 
-func TestConfig(useMemory bool, useV2 bool) Cfg {
-	return Cfg{
+func NewTestConfig(useMemory bool, useV2 bool) TestConfig {
+	return TestConfig{
 		UseV2:              useV2,
 		UseMemory:          useMemory,
 		Expiration:         14 * 24 * time.Hour,
@@ -162,7 +166,7 @@ func createS3Config(eigendaCfg config.ProxyConfig) config.AppConfig {
 	}
 }
 
-func TestSuiteConfig(testCfg Cfg) config.AppConfig {
+func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	// load signer key from environment
 	pk := os.Getenv(privateKey)
 	if pk == "" && !testCfg.UseMemory {
@@ -266,7 +270,7 @@ func TestSuiteConfig(testCfg Cfg) config.AppConfig {
 	return cfg
 }
 
-func TestSuiteSecretConfig(testCfg Cfg) common.SecretConfigV2 {
+func TestSuiteSecretConfig(testCfg TestConfig) common.SecretConfigV2 {
 	// load signer key from environment
 	signerPrivateKey := os.Getenv(privateKey)
 	if signerPrivateKey == "" && !testCfg.UseMemory {
@@ -281,15 +285,35 @@ func TestSuiteSecretConfig(testCfg Cfg) common.SecretConfigV2 {
 type TestSuite struct {
 	Ctx     context.Context
 	Log     logging.Logger
-	Server  *server.Server
 	Metrics *proxy_metrics.EmulatedMetricer
+	Server  *server.Server
 }
 
-func CreateTestSuite(testSuiteCfg config.AppConfig, secretConfigV2 common.SecretConfigV2) (TestSuite, func()) {
-	log := logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{})
+func TestSuiteWithLogger(log logging.Logger) func(*TestSuite) {
+	return func(ts *TestSuite) {
+		ts.Log = log
+	}
+}
 
-	metrics := proxy_metrics.NewEmulatedMetricer()
-	ctx := context.Background()
+func TestSuiteWithContext(ctx context.Context) func(*TestSuite) {
+	return func(ts *TestSuite) {
+		ts.Ctx = ctx
+	}
+}
+
+func CreateTestSuite(
+	testSuiteCfg config.AppConfig, secretConfigV2 common.SecretConfigV2, options ...func(*TestSuite),
+) (TestSuite, func()) {
+	ts := &TestSuite{
+		Ctx:     context.Background(),
+		Log:     logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{}),
+		Metrics: proxy_metrics.NewEmulatedMetricer(),
+	}
+	// Override the defaults with the provided options, if present.
+	for _, option := range options {
+		option(ts)
+	}
+	ctx, log, metrics := ts.Ctx, ts.Log, ts.Metrics
 
 	storageManager, err := store.NewStorageManagerBuilder(
 		ctx,
@@ -307,7 +331,6 @@ func CreateTestSuite(testSuiteCfg config.AppConfig, secretConfigV2 common.Secret
 	if err != nil {
 		panic(err)
 	}
-
 	proxySvr := server.NewServer(testSuiteCfg.EigenDAConfig.ServerConfig, storageManager, log, metrics)
 
 	log.Info("Starting proxy server...")
@@ -331,8 +354,8 @@ func CreateTestSuite(testSuiteCfg config.AppConfig, secretConfigV2 common.Secret
 	return TestSuite{
 		Ctx:     ctx,
 		Log:     log,
-		Server:  proxySvr,
 		Metrics: metrics,
+		Server:  proxySvr,
 	}, kill
 }
 

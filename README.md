@@ -280,18 +280,16 @@ Browse our [Makefile](./Makefile) for a list of available commands such as `make
 
 #### Unit
 
-Unit tests can be ran via invoking `make test-unit`.
+Unit tests can be run with `make test-unit`.
 
-#### Integration / E2E against local deployment
+#### Integration / E2E
 
-Integration tests against op framework can be ran via `make test-e2e-local`. These tests use the [op-e2e](https://github.com/ethereum-optimism/optimism/tree/develop/op-e2e) framework for asserting correct interaction behaviors with batch submission and state derivation.
+Integration tests against op framework can be run with `make test-e2e`. These tests use the [op-e2e](https://github.com/ethereum-optimism/optimism/tree/develop/op-e2e) framework for asserting correct interaction behaviors with batch
+submission and state derivation. Tests are run both in a local environment, and in a holesky testnet environment.
 
 These tests also assert E2E client <-> server interactions using simple/op clients.
 
-#### E2E against Holesky
+#### Fuzz
 
-A holesky integration test can be ran using `make test-e2e-holesky` to assert proper dispersal/retrieval against a public network. Please **note** that EigenDA Holesky network which is subject to rate-limiting and slow confirmation times *(i.e, >10 minutes per blob confirmation)*. Please advise EigenDA's [inabox](https://github.com/Layr-Labs/eigenda/tree/master/inabox#readme) if you'd like to spin-up a local DA network for faster iteration testing.
-
-#### E2E Fuzz
-
-This E2E test will fuzz the proxy client server integration and op client keccak256 with malformed inputs. This is never meant to be fuzzed with EigenDA. Run with `make test-e2e-fuzz`.
+Fuzz tests exercise the proxy client server integration and op client keccak256 with malformed inputs. This is
+never meant to be fuzzed with EigenDA. Run with `make test-fuzz`.

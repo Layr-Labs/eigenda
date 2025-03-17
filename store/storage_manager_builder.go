@@ -90,25 +90,23 @@ func (smb *StorageManagerBuilder) Build(ctx context.Context) (*Manager, error) {
 	var eigenDAV1Store, eigenDAV2Store common.GeneratedKeyStore
 
 	if smb.managerCfg.S3Config.Bucket != "" {
-		smb.log.Debug("Using S3 storage backend")
+		smb.log.Info("Using S3 storage backend")
 		s3Store, err = s3.NewStore(smb.managerCfg.S3Config)
-	}
-
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if smb.managerCfg.RedisConfig.Endpoint != "" {
-		smb.log.Debug("Using Redis storage backend")
+		smb.log.Info("Using Redis storage backend")
 		redisStore, err = redis.NewStore(&smb.managerCfg.RedisConfig)
-	}
-
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if smb.v2ClientCfg.Enabled {
-		smb.log.Debug("Using EigenDA V2 storage backend")
+		smb.log.Info("Using EigenDA V2 storage backend")
 		eigenDAV2Store, err = smb.buildEigenDAV2Backend(ctx)
 		if err != nil {
 			return nil, err
@@ -125,7 +123,7 @@ func (smb *StorageManagerBuilder) Build(ctx context.Context) (*Manager, error) {
 	secondary := NewSecondaryManager(smb.log, smb.metrics, caches, fallbacks)
 
 	if secondary.Enabled() { // only spin-up go routines if secondary storage is enabled
-		smb.log.Debug("Starting secondary write loop(s)", "count", smb.managerCfg.AsyncPutWorkers)
+		smb.log.Info("Starting secondary write loop(s)", "count", smb.managerCfg.AsyncPutWorkers)
 
 		for i := 0; i < smb.managerCfg.AsyncPutWorkers; i++ {
 			go secondary.WriteSubscriptionLoop(ctx)

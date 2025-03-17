@@ -1,6 +1,7 @@
-package e2e_test
+package e2e
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -9,71 +10,133 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/Layr-Labs/eigenda-proxy/e2e"
+	"github.com/Layr-Labs/eigenda-proxy/metrics"
+	"github.com/Layr-Labs/eigenda-proxy/store"
+	"github.com/Layr-Labs/eigenda-proxy/testutils"
+	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func useMemory() bool {
-	return !runTestnetIntegrationTests
+// requireDispersalRetrievalEigenDA ... ensure that blob was successfully dispersed/read to/from EigenDA
+func requireDispersalRetrievalEigenDA(t *testing.T, cm *metrics.CountMap, mode commitments.CommitmentMode) {
+	writeCount, err := cm.Get(string(mode), http.MethodPost)
+	require.NoError(t, err)
+	require.True(t, writeCount > 0)
+
+	readCount, err := cm.Get(string(mode), http.MethodGet)
+	require.NoError(t, err)
+	require.True(t, readCount > 0)
 }
 
-func TestOptimismClientWithKeccak256Commitment(t *testing.T) {
-	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
-		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
-	}
+// requireWriteReadSecondary ... ensure that secondary backend was successfully written/read to/from
+func requireWriteReadSecondary(t *testing.T, cm *metrics.CountMap, bt common.BackendType) {
+	writeCount, err := cm.Get(http.MethodPut, store.Success, bt.String())
+	require.NoError(t, err)
+	require.True(t, writeCount > 0)
 
+	readCount, err := cm.Get(http.MethodGet, store.Success, bt.String())
+	require.NoError(t, err)
+	require.True(t, readCount > 0)
+}
+
+// requireStandardClientSetGet ... ensures that std proxy client can disperse and read a blob
+func requireStandardClientSetGet(t *testing.T, ts testutils.TestSuite, blob []byte) {
+	cfg := &standard_client.Config{
+		URL: ts.Address(),
+	}
+	daClient := standard_client.New(cfg)
+
+	t.Log("Setting input data on proxy server...")
+	blobInfo, err := daClient.SetData(ts.Ctx, blob)
+	require.NoError(t, err)
+
+	t.Log("Getting input data from proxy server...")
+	preimage, err := daClient.GetData(ts.Ctx, blobInfo)
+	require.NoError(t, err)
+	require.Equal(t, blob, preimage)
+
+}
+
+// requireOPClientSetGet ... ensures that alt-da client can disperse and read a blob
+func requireOPClientSetGet(t *testing.T, ts testutils.TestSuite, blob []byte, precompute bool) {
+	daClient := altda.NewDAClient(ts.Address(), false, precompute)
+
+	commit, err := daClient.SetInput(ts.Ctx, blob)
+	require.NoError(t, err)
+
+	preimage, err := daClient.GetInput(ts.Ctx, commit)
+	require.NoError(t, err)
+	require.Equal(t, blob, preimage)
+}
+
+func TestOptimismClientWithKeccak256CommitmentV1(t *testing.T) {
+	testOptimismClientWithKeccak256Commitment(t, false)
+}
+
+func TestOptimismClientWithKeccak256CommitmentV2(t *testing.T) {
+	testOptimismClientWithKeccak256Commitment(t, true)
+}
+
+func testOptimismClientWithKeccak256Commitment(t *testing.T, v2Enabled bool) {
 	t.Parallel()
 
-	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
+	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
 	testCfg.UseKeccak256ModeS3 = true
 
-	tsConfig := e2e.TestSuiteConfig(testCfg)
-	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
-	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
-	requireOPClientSetGet(t, ts, e2e.RandBytes(100), true)
+	requireOPClientSetGet(t, ts, testutils.RandBytes(100), true)
+}
+
+func TestOptimismClientWithGenericCommitmentV1(t *testing.T) {
+	testOptimismClientWithGenericCommitment(t, false)
+}
+
+func TestOptimismClientWithGenericCommitmentV2(t *testing.T) {
+	testOptimismClientWithGenericCommitment(t, true)
 }
 
 /*
 this test asserts that the data can be posted/read to EigenDA
 with a concurrent S3 backend configured
 */
-func TestOptimismClientWithGenericCommitment(t *testing.T) {
-
-	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
-		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
-	}
-
+func testOptimismClientWithGenericCommitment(t *testing.T, v2Enabled bool) {
 	t.Parallel()
 
-	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
+	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
 
-	tsConfig := e2e.TestSuiteConfig(testCfg)
-	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
-	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
-	requireOPClientSetGet(t, ts, e2e.RandBytes(100), false)
+	requireOPClientSetGet(t, ts, testutils.RandBytes(100), false)
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.OptimismGeneric)
+}
+
+func TestProxyClientServerIntegrationV1(t *testing.T) {
+	testProxyClientServerIntegration(t, false)
+}
+
+func TestProxyClientServerIntegrationV2(t *testing.T) {
+	testProxyClientServerIntegration(t, true)
 }
 
 // TestProxyClientServerIntegration tests the proxy client and server integration by setting the data as a single byte,
 // many unicode characters, single unicode character and an empty preimage. It then tries to get the data from the
 // proxy server with empty byte, single byte and random string.
-func TestProxyClientServerIntegration(t *testing.T) {
+func testProxyClientServerIntegration(t *testing.T, v2Enabled bool) {
 	t.Parallel()
 
-	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
-		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
-	}
+	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
 
-	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
-
-	tsConfig := e2e.TestSuiteConfig(testCfg)
-	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
-	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
 	t.Cleanup(kill)
 
 	cfg := &standard_client.Config{
@@ -133,27 +196,29 @@ func TestProxyClientServerIntegration(t *testing.T) {
 					err.Error(),
 					"400") && !isNilPtrDerefPanic(err.Error()))
 
-			testCert = e2e.RandBytes(10000)
+			testCert = testutils.RandBytes(10000)
 			_, err = daClient.GetData(ts.Ctx, testCert)
 			require.Error(t, err)
 			assert.True(t, strings.Contains(err.Error(), "400") && !isNilPtrDerefPanic(err.Error()))
 		})
-
 }
 
-func TestProxyClient(t *testing.T) {
-	t.Log(runIntegrationTests)
-	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
-		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
-	}
+func TestProxyClientV1(t *testing.T) {
+	testProxyClient(t, false)
+}
 
+func TestProxyClientV2(t *testing.T) {
+	testProxyClient(t, true)
+}
+
+func testProxyClient(t *testing.T, v2Enabled bool) {
 	t.Parallel()
 
-	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
+	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
 
-	tsConfig := e2e.TestSuiteConfig(testCfg)
-	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
-	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
 	cfg := &standard_client.Config{
@@ -161,7 +226,7 @@ func TestProxyClient(t *testing.T) {
 	}
 	daClient := standard_client.New(cfg)
 
-	testPreimage := e2e.RandBytes(100)
+	testPreimage := testutils.RandBytes(100)
 
 	t.Log("Setting input data on proxy server...")
 	daCommitment, err := daClient.SetData(ts.Ctx, testPreimage)
@@ -173,115 +238,132 @@ func TestProxyClient(t *testing.T) {
 	require.Equal(t, testPreimage, preimage)
 }
 
-func TestProxyClientWriteRead(t *testing.T) {
-	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
-		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
-	}
+func TestProxyClientWriteReadV1(t *testing.T) {
+	testProxyClientWriteRead(t, false)
+}
 
+func TestProxyClientWriteReadV2(t *testing.T) {
+	testProxyClientWriteRead(t, true)
+}
+
+func testProxyClientWriteRead(t *testing.T, v2Enabled bool) {
 	t.Parallel()
 
-	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
+	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
 
-	tsConfig := e2e.TestSuiteConfig(testCfg)
-	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
-	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
-	requireStandardClientSetGet(t, ts, e2e.RandBytes(100))
+	requireStandardClientSetGet(t, ts, testutils.RandBytes(100))
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
 }
 
-func TestProxyWithMaximumSizedBlob(t *testing.T) {
-	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
-		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
-	}
+func TestProxyWithMaximumSizedBlobV1(t *testing.T) {
+	testProxyWithMaximumSizedBlob(t, false)
+}
 
+func TestProxyWithMaximumSizedBlobV2(t *testing.T) {
+	testProxyWithMaximumSizedBlob(t, true)
+}
+
+func testProxyWithMaximumSizedBlob(t *testing.T, v2Enabled bool) {
 	t.Parallel()
 
-	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
+	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
 
-	tsConfig := e2e.TestSuiteConfig(testCfg)
-	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
-	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
-	requireStandardClientSetGet(t, ts, e2e.RandBytes(16_000_000))
+	requireStandardClientSetGet(t, ts, testutils.RandBytes(16_000_000))
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
+}
+
+func TestProxyCachingV1(t *testing.T) {
+	testProxyCaching(t, false)
+}
+
+func TestProxyCachingV2(t *testing.T) {
+	testProxyCaching(t, true)
 }
 
 /*
 Ensure that proxy is able to write/read from a cache backend when enabled
 */
-func TestProxyCaching(t *testing.T) {
-	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
-		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
-	}
-
+func testProxyCaching(t *testing.T, v2Enabled bool) {
 	t.Parallel()
 
-	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
+	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
 	testCfg.UseS3Caching = true
 
-	tsConfig := e2e.TestSuiteConfig(testCfg)
-	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
-	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
-	requireStandardClientSetGet(t, ts, e2e.RandBytes(1_000_000))
+	requireStandardClientSetGet(t, ts, testutils.RandBytes(1_000_000))
 	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, common.S3BackendType)
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
 }
 
-func TestProxyCachingWithRedis(t *testing.T) {
-	if !runIntegrationTests && !runTestnetIntegrationTests && !runIntegrationTestsV2 {
-		t.Skip("Skipping test as INTEGRATION or TESTNET env var not set")
-	}
+func TestProxyCachingWithRedisV1(t *testing.T) {
+	testProxyCachingWithRedis(t, false)
+}
 
+func TestProxyCachingWithRedisV2(t *testing.T) {
+	testProxyCachingWithRedis(t, true)
+}
+
+func testProxyCachingWithRedis(t *testing.T, v2Enabled bool) {
 	t.Parallel()
 
-	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
+	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
 	testCfg.UseRedisCaching = true
 
-	tsConfig := e2e.TestSuiteConfig(testCfg)
-	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
-	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
-	requireStandardClientSetGet(t, ts, e2e.RandBytes(1_000_000))
+	requireStandardClientSetGet(t, ts, testutils.RandBytes(1_000_000))
 	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, common.RedisBackendType)
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
 }
 
+func TestProxyReadFallbackV1(t *testing.T) {
+	testProxyReadFallback(t, false)
+}
+
+func TestProxyReadFallbackV2(t *testing.T) {
+	testProxyReadFallback(t, true)
+}
+
 /*
-	Ensure that fallback location is read from when EigenDA blob is not available.
-	This is done by setting the memstore expiration time to 1ms and waiting for the blob to expire
-	before attempting to read it.
+Ensure that fallback location is read from when EigenDA blob is not available.
+This is done by setting the memstore expiration time to 1ms and waiting for the blob to expire
+before attempting to read it.
 */
-
-func TestProxyReadFallback(t *testing.T) {
-	// test can't be ran against holesky since read failure case can't be manually triggered
-	if !runIntegrationTests || runTestnetIntegrationTests {
-		t.Skip("Skipping test as INTEGRATION env var not set")
-	}
-
+func testProxyReadFallback(t *testing.T, v2Enabled bool) {
 	t.Parallel()
 
-	// setup server with S3 as a fallback option
-	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
+	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
 	testCfg.UseS3Fallback = true
 	// ensure that blob memstore eviction times result in near immediate activation
 	testCfg.Expiration = time.Millisecond * 1
 
-	tsConfig := e2e.TestSuiteConfig(testCfg)
-	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
-	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
 	cfg := &standard_client.Config{
 		URL: ts.Address(),
 	}
 	daClient := standard_client.New(cfg)
-	expectedBlob := e2e.RandBytes(1_000_000)
+	expectedBlob := testutils.RandBytes(1_000_000)
 	t.Log("Setting input data on proxy server...")
 	blobInfo, err := daClient.SetData(ts.Ctx, expectedBlob)
 	require.NoError(t, err)
@@ -292,23 +374,31 @@ func TestProxyReadFallback(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedBlob, actualBlob)
 
-	requireStandardClientSetGet(t, ts, e2e.RandBytes(1_000_000))
+	requireStandardClientSetGet(t, ts, testutils.RandBytes(1_000_000))
 	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, common.S3BackendType)
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
 }
 
-func TestProxyMemConfigClientCanGetAndPatch(t *testing.T) {
-	// test can't be ran against holesky since its specific to memstore
-	if !runIntegrationTests || runTestnetIntegrationTests {
-		t.Skip("Skipping test as INTEGRATION env var not set")
-	}
+func TestProxyMemConfigClientCanGetAndPatchV1(t *testing.T) {
+	testProxyMemConfigClientCanGetAndPatch(t, false)
+}
+
+func TestProxyMemConfigClientCanGetAndPatchV2(t *testing.T) {
+	testProxyMemConfigClientCanGetAndPatch(t, true)
+}
+
+func testProxyMemConfigClientCanGetAndPatch(t *testing.T, v2Enabled bool) {
 	t.Parallel()
 
-	testCfg := e2e.TestConfig(useMemory(), runIntegrationTestsV2)
+	useMemstore := testutils.UseMemstore()
+	if !useMemstore {
+		t.Skip("test can't be run against holesky since read failure case can't be manually triggered")
+	}
 
-	tsConfig := e2e.TestSuiteConfig(testCfg)
-	tsSecretConfig := e2e.TestSuiteSecretConfig(testCfg)
-	ts, kill := e2e.CreateTestSuite(tsConfig, tsSecretConfig)
+	testCfg := testutils.NewTestConfig(useMemstore, v2Enabled)
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
 	defer kill()
 
 	memClient := memconfig_client.New(
