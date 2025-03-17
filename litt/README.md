@@ -70,18 +70,21 @@ TODO
 ## Roots
 
 LittDB spreads its data across N root directories. In practice, each root directory will probably be on its
-own physical drive, but that's not a hard requirement. Below, the first root is represented as `ROOT-0`, the
-second as `ROOT-1`, and so on.
+own physical drive, but that's not a hard requirement.
+
+In the example below, the root directories are named `root0`, `root1`, and `root2`.
 
 ## Tables
 
-LittDB supports multiple tables, each with its own namespace. Each table is stored within its own subdirectories
-(each root may have a subdirectory for each table). Below, the first table is represented as `TABLE-0`, the second
-as `TABLE-1`, and so on.
+LittDB supports multiple tables, each with its own namespace. Each table is stored within its own subdirectory.
+
+In the example below, there are three tables: `tableA`, `tableB`, and `tableC`.
 
 ## Keymap
 
-TODO
+All keymap data appears in the directory named `keymap`. The file `keymap-type.txt` contains the name of the
+keymap implementation. If the keymap writes data to disk (e.g. levelDB, as pictured below), then the data will 
+be stored in the `keymap/data` directory.
 
 ## Segments
 
@@ -98,6 +101,9 @@ physical drives. Those directories are
 - `root/root0`
 - `root/root1`
 - `root/root2`
+
+The table is configured to have four shards. That's one more shard than root directory, meaning that one of the
+root directories will have two shards, and all the others will have one shard.
 
 There are three tables, each with its own namespace. The tables are
 
@@ -116,90 +122,98 @@ The keymap is implemented using levelDB.
 ```
 root
 ├── root0
-│     ├── tableA
-│     │     ├── keymap
-│     │     │     ├── data
-│     │     │     │     ├── 000001.log
-│     │     │     │     ├── CURRENT
-│     │     │     │     ├── LOCK
-│     │     │     │     ├── LOG
-│     │     │     │     └── MANIFEST-000000
-│     │     │     └── keymap-type.txt
-│     │     ├── segments
-│     │     │     ├── 0-2.values
-│     │     │     ├── 0.keys
-│     │     │     ├── 0.metadata
-│     │     │     ├── 1-2.values
-│     │     │     ├── 1.keys
-│     │     │     ├── 1.metadata
-│     │     │     ├── 2-2.values
-│     │     │     ├── 2.keys
-│     │     │     ├── 2.metadata
-│     │     │     ├── 3-2.values
-│     │     │     ├── 3.keys
-│     │     │     └── 3.metadata
-│     │     └── table.metadata
-│     ├── tableB
-│     │     ├── keymap
-│     │     │     ├── data
-│     │     │     │     ├── 000001.log
-│     │     │     │     ├── CURRENT
-│     │     │     │     ├── LOCK
-│     │     │     │     ├── LOG
-│     │     │     │     └── MANIFEST-000000
-│     │     │     └── keymap-type.txt
-│     │     ├── segments
-│     │     │     ├── 0-2.values
-│     │     │     ├── 0.keys
-│     │     │     ├── 0.metadata
-│     │     │     ├── 1-2.values
-│     │     │     ├── 1.keys
-│     │     │     ├── 1.metadata
-│     │     │     ├── 2-2.values
-│     │     │     ├── 2.keys
-│     │     │     └── 2.metadata
-│     │     └── table.metadata
-│     └── tableC
-│         ├── keymap
-│         │     ├── data
-│         │     │     ├── 000001.log
-│         │     │     ├── CURRENT
-│         │     │     ├── LOCK
-│         │     │     ├── LOG
-│         │     │     └── MANIFEST-000000
-│         │     └── keymap-type.txt
-│         ├── segments
-│         │     ├── 0-2.values
-│         │     ├── 0.keys
-│         │     └── 0.metadata
-│         └── table.metadata
+│   ├── tableA
+│   │   ├── keymap
+│   │   │   ├── data
+│   │   │   │   ├── 000001.log
+│   │   │   │   ├── CURRENT
+│   │   │   │   ├── LOCK
+│   │   │   │   ├── LOG
+│   │   │   │   └── MANIFEST-000000
+│   │   │   └── keymap-type.txt
+│   │   ├── segments
+│   │   │   ├── 0-2.values
+│   │   │   ├── 0.keys
+│   │   │   ├── 0.metadata
+│   │   │   ├── 1-2.values
+│   │   │   ├── 1.keys
+│   │   │   ├── 1.metadata
+│   │   │   ├── 2-2.values
+│   │   │   ├── 2.keys
+│   │   │   ├── 2.metadata
+│   │   │   ├── 3-2.values
+│   │   │   ├── 3.keys
+│   │   │   └── 3.metadata
+│   │   └── table.metadata
+│   ├── tableB
+│   │   ├── keymap
+│   │   │   ├── data
+│   │   │   │   ├── 000001.log
+│   │   │   │   ├── CURRENT
+│   │   │   │   ├── LOCK
+│   │   │   │   ├── LOG
+│   │   │   │   └── MANIFEST-000000
+│   │   │   └── keymap-type.txt
+│   │   ├── segments
+│   │   │   ├── 0-2.values
+│   │   │   ├── 0.keys
+│   │   │   ├── 0.metadata
+│   │   │   ├── 1-2.values
+│   │   │   ├── 1.keys
+│   │   │   ├── 1.metadata
+│   │   │   ├── 2-2.values
+│   │   │   ├── 2.keys
+│   │   │   └── 2.metadata
+│   │   └── table.metadata
+│   └── tableC
+│       ├── keymap
+│       │   ├── data
+│       │   │   ├── 000001.log
+│       │   │   ├── CURRENT
+│       │   │   ├── LOCK
+│       │   │   ├── LOG
+│       │   │   └── MANIFEST-000000
+│       │   └── keymap-type.txt
+│       ├── segments
+│       │   ├── 0-2.values
+│       │   ├── 0.keys
+│       │   └── 0.metadata
+│       └── table.metadata
 ├── root1
-│     ├── tableA
-│     │     └── segments
-│     │         ├── 0-0.values
-│     │         ├── 1-0.values
-│     │         ├── 2-0.values
-│     │         └── 3-0.values
-│     ├── tableB
-│     │     └── segments
-│     │         ├── 0-0.values
-│     │         ├── 1-0.values
-│     │         └── 2-0.values
-│     └── tableC
-│         └── segments
-│             └── 0-0.values
+│   ├── tableA
+│   │   └── segments
+│   │       ├── 0-0.values
+│   │       ├── 0-3.values
+│   │       ├── 1-0.values
+│   │       ├── 1-3.values
+│   │       ├── 2-0.values
+│   │       ├── 2-3.values
+│   │       ├── 3-0.values
+│   │       └── 3-3.values
+│   ├── tableB
+│   │   └── segments
+│   │       ├── 0-0.values
+│   │       ├── 0-3.values
+│   │       ├── 1-0.values
+│   │       ├── 1-3.values
+│   │       ├── 2-0.values
+│   │       └── 2-3.values
+│   └── tableC
+│       └── segments
+│           ├── 0-0.values
+│           └── 0-3.values
 └── root2
     ├── tableA
-    │     └── segments
-    │         ├── 0-1.values
-    │         ├── 1-1.values
-    │         ├── 2-1.values
-    │         └── 3-1.values
+    │   └── segments
+    │       ├── 0-1.values
+    │       ├── 1-1.values
+    │       ├── 2-1.values
+    │       └── 3-1.values
     ├── tableB
-    │     └── segments
-    │         ├── 0-1.values
-    │         ├── 1-1.values
-    │         └── 2-1.values
+    │   └── segments
+    │       ├── 0-1.values
+    │       ├── 1-1.values
+    │       └── 2-1.values
     └── tableC
         └── segments
             └── 0-1.values

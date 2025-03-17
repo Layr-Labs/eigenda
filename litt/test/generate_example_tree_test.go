@@ -25,7 +25,7 @@ func TestGenerateExampleTree(t *testing.T) {
 	rootDirectories := []string{path.Join(testDir, "root0"), path.Join(testDir, "root1"), path.Join(testDir, "root2")}
 
 	config, err := littbuilder.DefaultConfig(rootDirectories...)
-	config.ShardingFactor = 3
+	config.ShardingFactor = 4
 	config.TargetSegmentFileSize = 100 // use a small value to intentionally create several segments
 	require.NoError(t, err)
 
