@@ -73,8 +73,8 @@ type Segment struct {
 	nextSegment *Segment
 
 	// Used as a sanity checker. For each value written to the segment, the segment must eventually return
-	// a key to be written to the key map. This value tracks the number of values that have been written to the
-	// segment but have not yet been flushed to the key map. When the segment is eventually sealed, the code
+	// a key to be written to the keymap. This value tracks the number of values that have been written to the
+	// segment but have not yet been flushed to the keymap. When the segment is eventually sealed, the code
 	// asserts that this value is zero. This check should never fail, bit is a nice safety net.
 	unflushedKeyCount atomic.Int64
 }

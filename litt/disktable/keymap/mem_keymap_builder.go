@@ -4,25 +4,25 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-var _ KeyMapBuilder = &MemKeyMapBuilder{}
+var _ KeymapBuilder = &MemKeymapBuilder{}
 
-// MemKeyMapBuilder is a KeyMapBuilder that builds MemKeyMap instances.
-type MemKeyMapBuilder struct {
+// MemKeymapBuilder is a KeymapBuilder that builds MemKeymap instances.
+type MemKeymapBuilder struct {
 }
 
-// NewMemKeyMapBuilder creates a new LevelDBKeyMapBuilder.
-func NewMemKeyMapBuilder() *MemKeyMapBuilder {
-	return &MemKeyMapBuilder{}
+// NewMemKeymapBuilder creates a new LevelDBKeymapBuilder.
+func NewMemKeymapBuilder() *MemKeymapBuilder {
+	return &MemKeymapBuilder{}
 }
 
-func (b *MemKeyMapBuilder) Type() KeyMapType {
-	return MemKeyMapType
+func (b *MemKeymapBuilder) Type() KeymapType {
+	return MemKeymapType
 }
 
-func (b *MemKeyMapBuilder) Build(logger logging.Logger, paths []string) (KeyMap, bool, error) {
-	return NewMemKeyMap(logger), true, nil
+func (b *MemKeymapBuilder) Build(logger logging.Logger, paths []string) (Keymap, bool, error) {
+	return NewMemKeymap(logger), true, nil
 }
 
-func (b *MemKeyMapBuilder) DeleteFiles(logger logging.Logger, paths []string) error {
+func (b *MemKeymapBuilder) DeleteFiles(logger logging.Logger, paths []string) error {
 	return nil
 }

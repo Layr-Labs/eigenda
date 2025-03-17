@@ -8,25 +8,25 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// directoryName is the name of the directory where the LevelDBKeyMap stores its files.
-const directoryName = "ldb-keymap"
+// directoryName is the name of the directory where the LevelDBKeymap stores its files.
+const directoryName = "ldb"
 
-var _ KeyMapBuilder = &LevelDBKeyMapBuilder{}
+var _ KeymapBuilder = &LevelDBKeymapBuilder{}
 
-// LevelDBKeyMapBuilder is a KeyMapBuilder that builds LevelDBKeyMap instances.
-type LevelDBKeyMapBuilder struct {
+// LevelDBKeymapBuilder is a KeymapBuilder that builds LevelDBKeymap instances.
+type LevelDBKeymapBuilder struct {
 }
 
-// NewLevelDBKeyMapBuilder creates a new LevelDBKeyMapBuilder.
-func NewLevelDBKeyMapBuilder() *LevelDBKeyMapBuilder {
-	return &LevelDBKeyMapBuilder{}
+// NewLevelDBKeymapBuilder creates a new LevelDBKeymapBuilder.
+func NewLevelDBKeymapBuilder() *LevelDBKeymapBuilder {
+	return &LevelDBKeymapBuilder{}
 }
 
-func (b *LevelDBKeyMapBuilder) Type() KeyMapType {
-	return LevelDBKeyMapType
+func (b *LevelDBKeymapBuilder) Type() KeymapType {
+	return LevelDBKeymapType
 }
 
-func (b *LevelDBKeyMapBuilder) Build(logger logging.Logger, paths []string) (KeyMap, bool, error) {
+func (b *LevelDBKeymapBuilder) Build(logger logging.Logger, paths []string) (Keymap, bool, error) {
 	if len(paths) == 0 {
 		return nil, false, fmt.Errorf("no paths provided")
 	}
@@ -35,7 +35,7 @@ func (b *LevelDBKeyMapBuilder) Build(logger logging.Logger, paths []string) (Key
 	exists := false
 	targetPath := ""
 	for _, potentialRoot := range paths {
-		potentialPath := path.Join(potentialRoot, directoryName)
+		potentialPath := path.Join(potentialRoot, KeymapDirectoryName, directoryName)
 		_, err := os.Stat(potentialPath)
 		if err == nil {
 			exists = true
@@ -48,19 +48,19 @@ func (b *LevelDBKeyMapBuilder) Build(logger logging.Logger, paths []string) (Key
 
 	if !exists {
 		// if the keymap directory does not exist, create it in the first path.
-		targetPath = path.Join(paths[0], directoryName)
+		targetPath = path.Join(paths[0], KeymapDirectoryName, directoryName)
 	}
 
-	keymap, err := NewLevelDBKeyMap(logger, targetPath)
+	keymap, err := NewLevelDBKeymap(logger, targetPath)
 	if err != nil {
-		return nil, false, fmt.Errorf("error creating LevelDBKeyMap: %w", err)
+		return nil, false, fmt.Errorf("error creating LevelDBKeymap: %w", err)
 	}
 
 	requiresReload := !exists
 	return keymap, requiresReload, nil
 }
 
-func (b *LevelDBKeyMapBuilder) DeleteFiles(logger logging.Logger, paths []string) error {
+func (b *LevelDBKeymapBuilder) DeleteFiles(logger logging.Logger, paths []string) error {
 	for _, potentialRoot := range paths {
 		potentialPath := path.Join(potentialRoot, directoryName)
 		_, err := os.Stat(potentialPath)

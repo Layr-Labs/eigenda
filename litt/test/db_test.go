@@ -56,7 +56,7 @@ func buildMemDB(t *testing.T, path string) (litt.DB, error) {
 func buildMemKeyDiskDB(t *testing.T, path string) (litt.DB, error) {
 	config, err := littbuilder.DefaultConfig(path)
 	require.NoError(t, err)
-	config.KeyMapType = keymap.MemKeyMapType
+	config.KeymapType = keymap.MemKeymapType
 	config.CacheSize = 1000
 	config.TargetSegmentFileSize = 100
 	config.ShardingFactor = 4
@@ -67,7 +67,7 @@ func buildMemKeyDiskDB(t *testing.T, path string) (litt.DB, error) {
 func buildLevelDBDiskDB(t *testing.T, path string) (litt.DB, error) {
 	config, err := littbuilder.DefaultConfig(path)
 	require.NoError(t, err)
-	config.KeyMapType = keymap.LevelDBKeyMapType
+	config.KeymapType = keymap.LevelDBKeymapType
 	config.CacheSize = 1000
 	config.TargetSegmentFileSize = 100
 	config.ShardingFactor = 4

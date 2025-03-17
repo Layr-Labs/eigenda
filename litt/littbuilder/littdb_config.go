@@ -17,10 +17,10 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// keyMapBuilders contains a list of the supported key map builders.
-var keyMapBuilders = []keymap.KeyMapBuilder{
-	keymap.NewMemKeyMapBuilder(),
-	keymap.NewLevelDBKeyMapBuilder(),
+// keymapBuilders contains a list of the supported keymap builders.
+var keymapBuilders = []keymap.KeymapBuilder{
+	keymap.NewMemKeymapBuilder(),
+	keymap.NewLevelDBKeymapBuilder(),
 }
 
 // LittDBConfig is configuration for a litt.DB.
@@ -34,9 +34,9 @@ type LittDBConfig struct {
 	// The logger configuration for the database.
 	loggerConfig common.LoggerConfig
 
-	// The type of the key map. Choices are keymap.MemKeyMapType and keymap.LevelDBKeyMapType.
-	// Default is keymap.LevelDBKeyMapType.
-	KeyMapType keymap.KeyMapType
+	// The type of the keymap. Choices are keymap.MemKeymapType and keymap.LevelDBKeymapType.
+	// Default is keymap.LevelDBKeymapType.
+	KeymapType keymap.KeymapType
 
 	// The default TTL for newly created tables (either ones with data on disk or new tables).
 	// The default is 0 (no TTL). TTL can be set individually on each table by calling Table.SetTTL().
@@ -84,7 +84,7 @@ func DefaultConfig(paths ...string) (*LittDBConfig, error) {
 		GCPeriod:              5 * time.Minute,
 		ShardingFactor:        8,
 		SaltShaker:            saltShaker,
-		KeyMapType:            keymap.LevelDBKeyMapType,
+		KeymapType:            keymap.LevelDBKeymapType,
 		ControlChannelSize:    64,
 		TargetSegmentFileSize: math.MaxUint32,
 	}, nil
@@ -95,36 +95,36 @@ func cacheWeight(key string, value []byte) uint64 {
 	return uint64(len(key) + len(value))
 }
 
-// buildKeyMap creates a new key map based on the configuration.
-func (c *LittDBConfig) buildKeyMap(logger logging.Logger, tableName string) (keymap.KeyMap, bool, error) {
+// buildKeymap creates a new keymap based on the configuration.
+func (c *LittDBConfig) buildKeymap(logger logging.Logger, tableName string) (keymap.Keymap, bool, error) {
 
 	keymapDirectories := make([]string, len(c.Paths))
 	for i, p := range c.Paths {
 		keymapDirectories[i] = path.Join(p, tableName)
 	}
 
-	// For each KeyMap type we are not using, delete any files associated with it if they exist.
-	var chosenBuilder keymap.KeyMapBuilder
-	for _, builder := range keyMapBuilders {
-		if builder.Type() == c.KeyMapType {
+	// For each Keymap type we are not using, delete any files associated with it if they exist.
+	var chosenBuilder keymap.KeymapBuilder
+	for _, builder := range keymapBuilders {
+		if builder.Type() == c.KeymapType {
 			chosenBuilder = builder
 		} else {
 			err := builder.DeleteFiles(logger, keymapDirectories)
 			if err != nil {
-				return nil, false, fmt.Errorf("error deleting key map files: %w", err)
+				return nil, false, fmt.Errorf("error deleting keymap files: %w", err)
 			}
 		}
 	}
 	if chosenBuilder == nil {
-		return nil, false, fmt.Errorf("unsupported key map type: %v", c.KeyMapType)
+		return nil, false, fmt.Errorf("unsupported keymap type: %v", c.KeymapType)
 	}
 
-	keyMap, requiresReload, err := chosenBuilder.Build(logger, keymapDirectories)
+	keymap, requiresReload, err := chosenBuilder.Build(logger, keymapDirectories)
 	if err != nil {
-		return nil, false, fmt.Errorf("error building key map: %w", err)
+		return nil, false, fmt.Errorf("error building keymap: %w", err)
 	}
 
-	return keyMap, requiresReload, nil
+	return keymap, requiresReload, nil
 }
 
 // buildTable creates a new table based on the configuration.
@@ -141,9 +141,9 @@ func (c *LittDBConfig) buildTable(
 		return nil, fmt.Errorf("sharding factor must be at least 1")
 	}
 
-	keyMap, requiresReload, err := c.buildKeyMap(logger, name)
+	keymap, requiresReload, err := c.buildKeymap(logger, name)
 	if err != nil {
-		return nil, fmt.Errorf("error creating key map: %w", err)
+		return nil, fmt.Errorf("error creating keymap: %w", err)
 	}
 
 	tableRoots := make([]string, len(c.Paths))
@@ -156,7 +156,7 @@ func (c *LittDBConfig) buildTable(
 		logger,
 		timeSource,
 		name,
-		keyMap,
+		keymap,
 		tableRoots,
 		c.TargetSegmentFileSize,
 		c.ControlChannelSize,
