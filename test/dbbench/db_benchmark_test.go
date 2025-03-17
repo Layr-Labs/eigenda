@@ -437,7 +437,7 @@ func TestLittDB(t *testing.T) {
 	require.NoError(t, err)
 	config.ShardingFactor = 1
 	config.TTL = TTL
-	config.KeyMapType = keymap.LevelDBKeyMapType
+	config.KeymapType = keymap.LevelDBKeymapType
 
 	db, err := config.Build(context.Background())
 	require.NoError(t, err)

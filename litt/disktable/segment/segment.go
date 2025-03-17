@@ -367,6 +367,7 @@ func (s *Segment) Flush() (FlushWaitFunction, error) {
 // Seal flushes all data to disk and finalizes the metadata. Returns addresses that became durable as a result of
 // this method call. After this method is called, no more data can be written to this segment.
 func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
+
 	// Schedule a flush+seal for all shards.
 	shardResponseChannels := make([]chan struct{}, s.metadata.shardingFactor)
 	for shard, shardChannel := range s.shardChannels {
@@ -533,7 +534,6 @@ func (s *Segment) handleShardFlushRequest(shard uint32, request *shardFlushReque
 			s.panic.Panic(fmt.Errorf("failed to flush value file: %v", err))
 		}
 	}
-
 	request.completionChannel <- struct{}{}
 }
 
@@ -597,7 +597,6 @@ type valueToWrite struct {
 // shardControlLoop is the main loop for performing modifications to a particular shard. Each shard is managed
 // by its own goroutine, which is running this function.
 func (s *Segment) shardControlLoop(shard uint32) {
-
 	for {
 		select {
 		case <-s.panic.ImmediateShutdownRequired():

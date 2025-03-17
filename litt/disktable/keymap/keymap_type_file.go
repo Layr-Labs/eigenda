@@ -85,7 +85,7 @@ func (k *KeymapTypeFile) Write() error {
 
 	exists, _, err := util.VerifyFilePermissions(filePath)
 	if err != nil {
-		return fmt.Errorf("unable to write keymap type file: %v", err)
+		return fmt.Errorf("unable to open keymap type file: %v", err)
 	}
 
 	if exists {
@@ -112,5 +112,18 @@ func (k *KeymapTypeFile) Write() error {
 
 // Delete deletes the keymap type file.
 func (k *KeymapTypeFile) Delete() error {
+	_, err := os.Stat(path.Join(k.keymapPath, KeymapTypeFileName))
+	if err != nil {
+		if os.IsNotExist(err) {
+			// file is already deleted
+			return nil
+		}
+		return fmt.Errorf("error checking for keymap type file: %w", err)
+	}
+
+	err = os.Remove(path.Join(k.keymapPath, KeymapTypeFileName))
+	if err != nil {
+		return fmt.Errorf("unable to delete keymap type file: %v", err)
+	}
 	return nil
 }

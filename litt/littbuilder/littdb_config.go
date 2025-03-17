@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"os"
 	"path"
 	"time"
 
@@ -17,10 +18,10 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// keymapBuilders contains a list of the supported keymap builders.
-var keymapBuilders = []keymap.KeymapBuilder{
-	keymap.NewMemKeymapBuilder(),
-	keymap.NewLevelDBKeymapBuilder(),
+// keymapBuilders contains builders for all supported keymap types.
+var keymapBuilders = map[keymap.KeymapType]keymap.KeymapBuilder{
+	keymap.MemKeymapType:     keymap.NewMemKeymapBuilder(),
+	keymap.LevelDBKeymapType: keymap.NewLevelDBKeymapBuilder(),
 }
 
 // LittDBConfig is configuration for a litt.DB.
@@ -96,35 +97,112 @@ func cacheWeight(key string, value []byte) uint64 {
 }
 
 // buildKeymap creates a new keymap based on the configuration.
-func (c *LittDBConfig) buildKeymap(logger logging.Logger, tableName string) (keymap.Keymap, bool, error) {
+func (c *LittDBConfig) buildKeymap(
+	logger logging.Logger,
+	tableName string,
+) (kmap keymap.Keymap, keymapPath string, keymapTypeFile *keymap.KeymapTypeFile, requiresReload bool, err error) {
+
+	builderForConfiguredType, ok := keymapBuilders[c.KeymapType]
+	if !ok {
+		return nil, "", nil, false,
+			fmt.Errorf("unsupported keymap type: %v", c.KeymapType)
+	}
 
 	keymapDirectories := make([]string, len(c.Paths))
 	for i, p := range c.Paths {
-		keymapDirectories[i] = path.Join(p, tableName)
+		keymapDirectories[i] = path.Join(p, tableName, keymap.KeymapDirectoryName)
 	}
 
-	// For each Keymap type we are not using, delete any files associated with it if they exist.
-	var chosenBuilder keymap.KeymapBuilder
-	for _, builder := range keymapBuilders {
-		if builder.Type() == c.KeymapType {
-			chosenBuilder = builder
-		} else {
-			err := builder.DeleteFiles(logger, keymapDirectories)
+	var keymapDirectory string
+	for _, directory := range keymapDirectories {
+		exists, err := keymap.KeymapFileExists(directory)
+		if err != nil {
+			return nil, "", nil, false,
+				fmt.Errorf("error checking for keymap type file: %w", err)
+		}
+		if exists {
+			keymapDirectory = directory
+			keymapTypeFile, err = keymap.LoadKeymapTypeFile(directory)
 			if err != nil {
-				return nil, false, fmt.Errorf("error deleting keymap files: %w", err)
+				return nil, "", nil, false,
+					fmt.Errorf("error loading keymap type file: %w", err)
+			}
+			break
+		}
+	}
+
+	newKeymap := false
+	if keymapTypeFile == nil {
+		// No previous keymap exists. Either we are starting fresh or the keymap was deleted manually.
+		newKeymap = true
+
+		// by convention, always select the first path as the keymap directory
+		keymapDirectory = keymapDirectories[0]
+		keymapTypeFile = keymap.NewKeymapTypeFile(keymapDirectory, c.KeymapType)
+
+		// create the keymap directory
+		err := os.MkdirAll(keymapDirectory, 0755)
+		if err != nil {
+			return nil, "", nil, false,
+				fmt.Errorf("error creating keymap directory: %w", err)
+		}
+
+		// write the keymap type file
+		err = keymapTypeFile.Write()
+		if err != nil {
+			return nil, "", nil, false,
+				fmt.Errorf("error writing keymap type file: %w", err)
+		}
+
+	} else {
+		// A previous keymap exists. Check if the keymap type has changed.
+
+		builderForTypeOnDisk, ok := keymapBuilders[keymapTypeFile.Type()]
+		if !ok {
+			return nil, "", nil, false,
+				fmt.Errorf("unsupported keymap type: %v", keymapTypeFile.Type())
+		}
+
+		if c.KeymapType != keymapTypeFile.Type() {
+			// The previously used keymap type is different from the one in the configuration.
+
+			// delete the old keymap
+			err := builderForTypeOnDisk.DeleteFiles(logger, keymapDirectory)
+			if err != nil {
+				return nil, "", nil, false,
+					fmt.Errorf("error deleting keymap files: %w", err)
+			}
+
+			// delete the keymap type file
+			err = keymapTypeFile.Delete()
+			if err != nil {
+				return nil, "", nil, false,
+					fmt.Errorf("error deleting keymap type file: %w", err)
+			}
+
+			// finally, delete the keymap directory
+			_, err = os.Stat(keymapDirectory)
+			if err == nil {
+				err = os.Remove(keymapDirectory)
+				if err != nil {
+					return nil, "", nil, false,
+						fmt.Errorf("error deleting keymap directory: %w", err)
+				}
+			} else if !os.IsNotExist(err) {
+				return nil, "", nil, false,
+					fmt.Errorf("error checking for keymap directory: %w", err)
 			}
 		}
 	}
-	if chosenBuilder == nil {
-		return nil, false, fmt.Errorf("unsupported keymap type: %v", c.KeymapType)
-	}
 
-	keymap, requiresReload, err := chosenBuilder.Build(logger, keymapDirectories)
+	keymapDataDirectory := path.Join(keymapDirectory, keymap.KeymapDataDirectoryName)
+	kmap, requiresReload, err = builderForConfiguredType.Build(logger, keymapDataDirectory)
 	if err != nil {
-		return nil, false, fmt.Errorf("error building keymap: %w", err)
+		return nil, "", nil, false,
+			fmt.Errorf("error building keymap: %w", err)
 	}
 
-	return keymap, requiresReload, nil
+	return kmap, keymapDirectory, keymapTypeFile, requiresReload || newKeymap, nil
 }
 
 // buildTable creates a new table based on the configuration.
@@ -141,7 +219,7 @@ func (c *LittDBConfig) buildTable(
 		return nil, fmt.Errorf("sharding factor must be at least 1")
 	}
 
-	keymap, requiresReload, err := c.buildKeymap(logger, name)
+	kmap, keymapDirectory, keymapTypeFile, requiresReload, err := c.buildKeymap(logger, name)
 	if err != nil {
 		return nil, fmt.Errorf("error creating keymap: %w", err)
 	}
@@ -156,7 +234,9 @@ func (c *LittDBConfig) buildTable(
 		logger,
 		timeSource,
 		name,
-		keymap,
+		kmap,
+		keymapDirectory,
+		keymapTypeFile,
 		tableRoots,
 		c.TargetSegmentFileSize,
 		c.ControlChannelSize,

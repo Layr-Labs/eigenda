@@ -15,23 +15,26 @@ var _ Keymap = &LevelDBKeymap{}
 
 // LevelDBKeymap is a keymap that uses LevelDB as the underlying storage.
 type LevelDBKeymap struct {
-	logger logging.Logger
-	db     *leveldb.DB
-	path   string
-	alive  atomic.Bool
+	logger     logging.Logger
+	db         *leveldb.DB
+	keymapPath string
+	alive      atomic.Bool
 }
 
 // NewLevelDBKeymap creates a new LevelDBKeymap instance.
-func NewLevelDBKeymap(logger logging.Logger, path string) (*LevelDBKeymap, error) {
-	db, err := leveldb.OpenFile(path, nil)
+func NewLevelDBKeymap(
+	logger logging.Logger,
+	keymapPath string) (*LevelDBKeymap, error) {
+
+	db, err := leveldb.OpenFile(keymapPath, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open LevelDB: %w", err)
 	}
 
 	kmap := &LevelDBKeymap{
-		logger: logger,
-		db:     db,
-		path:   path,
+		logger:     logger,
+		db:         db,
+		keymapPath: keymapPath,
 	}
 	kmap.alive.Store(true)
 
@@ -101,10 +104,11 @@ func (l *LevelDBKeymap) Destroy() error {
 		return fmt.Errorf("failed to stop LevelDB: %w", err)
 	}
 
-	l.logger.Info(fmt.Sprintf("deleting LevelDB keymap at path: %s", l.path))
-	err = os.RemoveAll(l.path)
+	l.logger.Info(fmt.Sprintf("deleting LevelDB keymap at path: %s", l.keymapPath))
+	err = os.RemoveAll(l.keymapPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to remove LevelDB data directory: %w", err)
 	}
+
 	return nil
 }

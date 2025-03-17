@@ -56,6 +56,12 @@ type DiskTable struct {
 	// A map of keys to their addresses.
 	keymap keymap.Keymap
 
+	// The path to the keymap directory.
+	keymapPath string
+
+	// The type file for the keymap.
+	keymapTypeFile *keymap.KeymapTypeFile
+
 	// unflushedDataCache is a map of keys to their values that may not have been flushed to disk yet. This is used as a
 	// lookup table when data is requested from the table before it has been flushed to disk.
 	unflushedDataCache sync.Map
@@ -99,6 +105,8 @@ func NewDiskTable(
 	timeSource func() time.Time,
 	name string,
 	keymap keymap.Keymap,
+	keymapPath string,
+	keymapTypeFile *keymap.KeymapTypeFile,
 	roots []string,
 	targetFileSize uint32,
 	controlChannelSize int,
@@ -112,6 +120,7 @@ func NewDiskTable(
 		return nil, fmt.Errorf("garbage collection period must be greater than 0")
 	}
 
+	// If the root directories don't exist, create them.
 	for _, root := range roots {
 		_, err := os.Stat(root)
 		if os.IsNotExist(err) {
@@ -124,6 +133,7 @@ func NewDiskTable(
 		}
 	}
 
+	// For each root directory, create a segment directory if it doesn't exist.
 	segDirs := make([]string, 0, len(roots))
 	for _, root := range roots {
 		segDir := path.Join(root, segmentDirectory)
@@ -142,6 +152,7 @@ func NewDiskTable(
 	var metadataFilePath string
 	var metadata *tableMetadata
 
+	// Find the table metadata file or create a new one.
 	for _, root := range roots {
 		possibleMetadataPath := metadataPath(root)
 		_, err := os.Stat(possibleMetadataPath)
@@ -182,6 +193,8 @@ func NewDiskTable(
 		metadata:                metadata,
 		saltShaker:              saltShaker,
 		keymap:                  keymap,
+		keymapPath:              keymapPath,
+		keymapTypeFile:          keymapTypeFile,
 		targetFileSize:          targetFileSize,
 		segments:                make(map[uint32]*segment.Segment),
 		controllerChannel:       make(chan any, controlChannelSize),
@@ -203,8 +216,10 @@ func NewDiskTable(
 	}
 
 	// Create the mutable segment
+	creatingFirstSegment := len(table.segments) == 0
+
 	var nextSegmentIndex uint32
-	if table.highestSegmentIndex == 0 {
+	if creatingFirstSegment {
 		nextSegmentIndex = 0
 	} else {
 		nextSegmentIndex = table.highestSegmentIndex + 1
@@ -221,7 +236,7 @@ func NewDiskTable(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mutable segment: %v", err)
 	}
-	if table.highestSegmentIndex > 0 {
+	if !creatingFirstSegment {
 		table.segments[table.highestSegmentIndex].SetNextSegment(mutableSegment)
 		table.highestSegmentIndex++
 	}
@@ -295,11 +310,12 @@ func (d *DiskTable) reloadKeymap() error {
 			}
 		}
 
-		if len(batch) > 0 {
-			err = d.keymap.Put(batch)
-			if err != nil {
-				return fmt.Errorf("failed to put keys: %v", err)
-			}
+	}
+
+	if len(batch) > 0 {
+		err := d.keymap.Put(batch)
+		if err != nil {
+			return fmt.Errorf("failed to put keys: %v", err)
 		}
 	}
 
@@ -335,6 +351,8 @@ func (d *DiskTable) Stop() error {
 	return nil
 }
 
+// TODO make table destruction atomic
+
 // Destroy stops the disk table and delete all files.
 func (d *DiskTable) Destroy() error {
 	if ok, err := d.panic.IsOk(); !ok {
@@ -348,9 +366,11 @@ func (d *DiskTable) Destroy() error {
 
 	d.logger.Infof("deleting disk table at path(s): %v", d.roots)
 
+	// release all segments
 	for _, seg := range d.segments {
 		seg.Release()
 	}
+	// wait for segments to delete themselves
 	for _, seg := range d.segments {
 		err = seg.BlockUntilFullyDeleted()
 		if err != nil {
@@ -358,6 +378,7 @@ func (d *DiskTable) Destroy() error {
 		}
 	}
 
+	// delete all segment directories
 	for _, segDir := range d.segmentDirectories {
 		err = os.Remove(segDir)
 		if err != nil {
@@ -365,16 +386,32 @@ func (d *DiskTable) Destroy() error {
 		}
 	}
 
+	// destroy the keymap
 	err = d.keymap.Destroy()
 	if err != nil {
 		return fmt.Errorf("failed to destroy keymap: %v", err)
 	}
+	err = d.keymapTypeFile.Delete()
+	if err != nil {
+		return fmt.Errorf("failed to delete keymap type file: %v", err)
+	}
+	_, err = os.Stat(d.keymapPath)
+	if err == nil {
+		err = os.Remove(d.keymapPath)
+		if err != nil {
+			return fmt.Errorf("failed to remove keymap directory: %v", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to stat keymap directory: %v", err)
+	}
 
+	// delete the metadata file
 	err = d.metadata.delete()
 	if err != nil {
 		return fmt.Errorf("failed to delete metadata: %v", err)
 	}
 
+	// delete the root directories for the table
 	for _, root := range d.roots {
 		err = os.Remove(root)
 		if err != nil {

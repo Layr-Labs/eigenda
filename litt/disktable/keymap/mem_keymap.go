@@ -24,6 +24,7 @@ type memKeymap struct {
 
 // NewMemKeymap creates a new in-memory keymap.
 func NewMemKeymap(logger logging.Logger) Keymap {
+
 	return &memKeymap{
 		logger: logger,
 		data:   make(map[string]types.Address),
@@ -63,6 +64,7 @@ func (m *memKeymap) Delete(keys []*types.KAPair) error {
 	for _, key := range keys {
 		delete(m.data, string(key.Key))
 	}
+
 	return nil
 }
 

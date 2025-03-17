@@ -11,7 +11,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-var tableNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+var tableNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 var _ litt.DB = &db{}
 
@@ -84,7 +84,7 @@ func (d *db) GetTable(name string) (litt.Table, error) {
 		if !d.isTableNameValid(name) {
 			return nil, fmt.Errorf(
 				"table name %s is invalid, must be at least one character long and "+
-					"contain only letters, numbers, and underscores", name)
+					"contain only letters, numbers, and underscores, and dashes.", name)
 		}
 
 		var err error
