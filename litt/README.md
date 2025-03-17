@@ -89,89 +89,118 @@ TODO explain different types of segment files
 
 ## Example Layout
 
-TODO perhaps generate a better view using tree on an example DB
+The following is an example file tree for a simple littDB instance.
+(This example file tree was generated using generate_example_tree_test.go.)
 
-- `ROOT-0`
-    - `TABLE-0`
-        - `table.metadata`
-        - `ldb-keymap`
-        - `segments`
-            - `0.metadata`
-            - `0.keys`
-            - `0-0.values`
-            - `1.metadata`
-            - `1.keys`
-            - `1-0.values`
-            - ...
-            - `N.metadata`
-            - `N.keys`
-            - `N-0.values`
-    - `TABLE-1`
-        - `table.metadata`
-        - `ldb-keymap`
-        - `segments`
-            - `0.metadata`
-            - `0.keys`
-            - `0-0.values`
-            - `1.metadata`
-            - `1.keys`
-            - `1-0.values`
-            - ...
-            - `N.metadata`
-            - `N.keys`
-            - `N-0.values`
-    - ...
-    - `TABLE-N`
-        - `table.metadata`
-        - `ldb-keymap`
-        - `segments`
-            - `0.metadata`
-            - `0.keys`
-            - `0-0.values`
-            - `1.metadata`
-            - `1.keys`
-            - `1-0.values`
-            - ...
-            - `N.metadata`
-            - `N.keys`
-            - `N-0.values`
-- `ROOT-1`
-    - `TABLE-0`
-        - `segments`
-            - `0-1.values`
-            - `1-1.values`
-            - ...
-            - `N-1.values`
-    - `TABLE-1`
-        - `segments`
-            - `0-1.values`
-            - `1-1.values`
-            - ...
-            - `N-1.values`
-    - ...
-    - `TABLE-N`
-        - `segments`
-            - `0-1.values`
-            - `1-1.values`
-            - ...
-            - `N-1.values`
-- ...
-- `ROOT-N`
-    - `TABLE-0`
-        - `segments`
-            - `0-N.values`
-            - `1-N.values`
-            - ...
-            - `N-N.values`
-    - `TABLE-1`
-        - `segments`
-            - `0-N.values`
-            - `1-N.values`
-            - ...
-            - `N-N.values`
-    - `TABLE-N`
-        - `segments`
-            - `0-N.values`
-            - `1-N.values`
-            - ...
-            - `N-N.values`
+There are three directories into which data is written. In theory, these could be located on three separate
+physical drives. Those directories are
+
+- `root/root0`
+- `root/root1`
+- `root/root2`
+
+There are three tables, each with its own namespace. The tables are
+
+- `tableA`
+- `tableB`
+- `tableC`
+
+A little data has been written to the DB.
+
+- 'tableA' has enough data to have three segments
+- 'tableB' has enough data to have two segments
+- 'tableC' has enough data to have one segment
+
+The keymap is implemented using levelDB.
+
+```
+root
+├── root0
+│   ├── tableA
+│   │   ├── keymap
+│   │   │   ├── data
+│   │   │   │   ├── 000001.log
+│   │   │   │   ├── CURRENT
+│   │   │   │   ├── LOCK
+│   │   │   │   ├── LOG
+│   │   │   │   └── MANIFEST-000000
+│   │   │   └── keymap-type.txt
+│   │   ├── segments
+│   │   │   ├── 0-2.values
+│   │   │   ├── 0.keys
+│   │   │   ├── 0.metadata
+│   │   │   ├── 1-2.values
+│   │   │   ├── 1.keys
+│   │   │   ├── 1.metadata
+│   │   │   ├── 2-2.values
+│   │   │   ├── 2.keys
+│   │   │   ├── 2.metadata
+│   │   │   ├── 3-2.values
+│   │   │   ├── 3.keys
+│   │   │   └── 3.metadata
+│   │   └── table.metadata
+│   ├── tableB
+│   │   ├── keymap
+│   │   │   ├── data
+│   │   │   │   ├── 000001.log
+│   │   │   │   ├── CURRENT
+│   │   │   │   ├── LOCK
+│   │   │   │   ├── LOG
+│   │   │   │   └── MANIFEST-000000
+│   │   │   └── keymap-type.txt
+│   │   ├── segments
+│   │   │   ├── 0-2.values
+│   │   │   ├── 0.keys
+│   │   │   ├── 0.metadata
+│   │   │   ├── 1-2.values
+│   │   │   ├── 1.keys
+│   │   │   ├── 1.metadata
+│   │   │   ├── 2-2.values
+│   │   │   ├── 2.keys
+│   │   │   └── 2.metadata
+│   │   └── table.metadata
+│   └── tableC
+│       ├── keymap
+│       │   ├── data
+│       │   │   ├── 000001.log
+│       │   │   ├── CURRENT
+│       │   │   ├── LOCK
+│       │   │   ├── LOG
+│       │   │   └── MANIFEST-000000
+│       │   └── keymap-type.txt
+│       ├── segments
+│       │   ├── 0-2.values
+│       │   ├── 0.keys
+│       │   └── 0.metadata
+│       └── table.metadata
+├── root1
+│   ├── tableA
+│   │   └── segments
+│   │       ├── 0-0.values
+│   │       ├── 1-0.values
+│   │       ├── 2-0.values
+│   │       └── 3-0.values
+│   ├── tableB
+│   │   └── segments
+│   │       ├── 0-0.values
+│   │       ├── 1-0.values
+│   │       └── 2-0.values
+│   └── tableC
+│       └── segments
+│           └── 0-0.values
+└── root2
+    ├── tableA
+    │   └── segments
+    │       ├── 0-1.values
+    │       ├── 1-1.values
+    │       ├── 2-1.values
+    │       └── 3-1.values
+    ├── tableB
+    │   └── segments
+    │       ├── 0-1.values
+    │       ├── 1-1.values
+    │       └── 2-1.values
+    └── tableC
+        └── segments
+            └── 0-1.values
+```
