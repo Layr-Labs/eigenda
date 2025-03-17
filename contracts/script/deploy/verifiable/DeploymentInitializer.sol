@@ -24,14 +24,15 @@ import "./DeploymentTypes.sol";
  */
 contract DeploymentInitializer {
     bool public initialized;
-    /// Owner of the proxyAdmin should be this contract.
+    /// The ProxyAdmin contract that owns the proxies should be owned by this contract.
     ProxyAdmin public immutable PROXY_ADMIN;
 
-    IPauserRegistry public immutable PAUSER_REGISTRY;
+    /// The owner of all the contracts and proxies after this contract is called.
+    address public immutable INITIAL_OWNER;
 
     /// Initialization parameters that are shared between contracts
-    address public immutable INITIAL_OWNER;
     uint256 public immutable INITIAL_PAUSED_STATUS;
+    IPauserRegistry public immutable PAUSER_REGISTRY;
 
     /// Contracts that need to be upgraded and initialized.
     address public immutable INDEX_REGISTRY;
