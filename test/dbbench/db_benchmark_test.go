@@ -511,7 +511,7 @@ func TestBadgerDB(t *testing.T) {
 	opts.NumMemtables = 1
 	opts.NumLevelZeroTables = 1
 
-	opts.MaxLevels = 10
+	opts.MaxLevels = 16
 
 	db, err := badger.Open(opts)
 	require.NoError(t, err)
