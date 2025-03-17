@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os/exec"
@@ -9,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/stretchr/testify/require"
 )
@@ -24,12 +24,12 @@ func TestGenerateExampleTree(t *testing.T) {
 
 	rootDirectories := []string{path.Join(testDir, "root0"), path.Join(testDir, "root1"), path.Join(testDir, "root2")}
 
-	config, err := litt.DefaultConfig(rootDirectories...)
-	config.ShardingFactor = 4
+	config, err := littbuilder.DefaultConfig(rootDirectories...)
+	config.ShardingFactor = 3
 	config.TargetSegmentFileSize = 100 // use a small value to intentionally create several segments
 	require.NoError(t, err)
 
-	db, err := littbuilder.NewDB(config)
+	db, err := config.Build(context.Background())
 	require.NoError(t, err)
 
 	tableA, err := db.GetTable("tableA")
@@ -58,7 +58,7 @@ func TestGenerateExampleTree(t *testing.T) {
 	require.NoError(t, err)
 
 	// Shut down the database to ensure all data is flushed to disk
-	err = db.Close()
+	err = db.Stop()
 	require.NoError(t, err)
 
 	// Run the tree command on testDir
