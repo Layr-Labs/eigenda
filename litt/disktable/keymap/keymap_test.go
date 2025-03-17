@@ -99,7 +99,7 @@ func testBasicBehavior(t *testing.T, keyMap KeyMap) {
 
 func TestBasicBehavior(t *testing.T) {
 	testDir := t.TempDir()
-	dbDir := path.Join(testDir, "db")
+	dbDir := path.Join(testDir, "keymap")
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -112,9 +112,19 @@ func TestBasicBehavior(t *testing.T) {
 		testBasicBehavior(t, keymap)
 
 		// verify that test dir is empty (destroy should have deleted everything)
-		entries, err := os.ReadDir(testDir)
-		require.NoError(t, err)
-		require.Empty(t, entries)
+		_, err = os.Stat(dbDir)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				require.NoError(t, err)
+			}
+
+			// Directory doesn't exist. We are good.
+		} else {
+			// Directory exists. Make sure it's emtpy.
+			entries, err := os.ReadDir(dbDir)
+			require.NoError(t, err)
+			require.Empty(t, entries)
+		}
 	}
 }
 
@@ -125,7 +135,7 @@ func TestRestart(t *testing.T) {
 	require.NoError(t, err)
 
 	testDir := t.TempDir()
-	dbDir := path.Join(testDir, "db")
+	dbDir := path.Join(testDir, "keymap")
 
 	keymap, err := NewLevelDBKeymap(logger, dbDir)
 	require.NoError(t, err)

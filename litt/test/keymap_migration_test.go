@@ -99,9 +99,9 @@ func TestKeymapMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	// By default, the keymap will store its data inside directory 0
-	keymapPath := path.Join(shardDirectories[0], "test", "ldb-keymap")
+	keymapPath := path.Join(shardDirectories[0], "test", "keymap")
 	newKeymapPath := path.Join(shardDirectories[int(rand.Int64Range(1, int64(directoryCount)))],
-		"test", "ldb-keymap")
+		"test", "keymap")
 
 	err = os.Rename(keymapPath, newKeymapPath)
 	require.NoError(t, err)

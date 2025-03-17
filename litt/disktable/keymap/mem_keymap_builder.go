@@ -19,10 +19,10 @@ func (b *MemKeymapBuilder) Type() KeymapType {
 	return MemKeymapType
 }
 
-func (b *MemKeymapBuilder) Build(logger logging.Logger, paths []string) (Keymap, bool, error) {
+func (b *MemKeymapBuilder) Build(logger logging.Logger, keymapPath string) (Keymap, bool, error) {
 	return NewMemKeymap(logger), true, nil
 }
 
-func (b *MemKeymapBuilder) DeleteFiles(logger logging.Logger, paths []string) error {
+func (b *MemKeymapBuilder) DeleteFiles(logger logging.Logger, keymapPath string) error {
 	return nil
 }
