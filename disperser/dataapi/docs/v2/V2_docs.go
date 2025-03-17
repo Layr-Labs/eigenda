@@ -358,7 +358,7 @@ const docTemplateV2 = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/v2.Metric"
+                            "$ref": "#/definitions/v2.MetricSummary"
                         }
                     },
                     "400": {
@@ -1250,11 +1250,20 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "v2.Metric": {
+        "v2.MetricSummary": {
             "type": "object",
             "properties": {
-                "throughput": {
+                "average_bytes_per_second": {
                     "type": "number"
+                },
+                "end_timestamp_sec": {
+                    "type": "integer"
+                },
+                "start_timestamp_sec": {
+                    "type": "integer"
+                },
+                "total_bytes_posted": {
+                    "type": "integer"
                 }
             }
         },

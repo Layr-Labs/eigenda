@@ -119,7 +119,10 @@ type (
 	}
 
 	MetricSummary struct {
-		AvgThroughput float64 `json:"avg_throughput"`
+		TotalBytesPosted      uint64  `json:"total_bytes_posted"`
+		AverageBytesPerSecond float64 `json:"average_bytes_per_second"`
+		StartTimestampSec     int64   `json:"start_timestamp_sec"`
+		EndTimestampSec       int64   `json:"end_timestamp_sec"`
 	}
 
 	OperatorSigningInfo struct {
