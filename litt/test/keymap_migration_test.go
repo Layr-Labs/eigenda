@@ -14,9 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Tests migration from one type of KeyMap to another. This is not defined in the disktable package because this
+// Tests migration from one type of Keymap to another. This is not defined in the disktable package because this
 // migration requires a littbuilder.LittDBConfig, which is not available in the disktable package.
-func TestKeyMapMigration(t *testing.T) {
+func TestKeymapMigration(t *testing.T) {
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
@@ -26,11 +26,11 @@ func TestKeyMapMigration(t *testing.T) {
 		shardDirectories = append(shardDirectories, path.Join(directory, rand.String(32)))
 	}
 
-	// Build the table using LevelDBKeyMap.
+	// Build the table using LevelDBKeymap.
 	config, err := littbuilder.DefaultConfig(shardDirectories...)
 	require.NoError(t, err)
 	config.ShardingFactor = uint32(directoryCount)
-	config.KeyMapType = keymap.LevelDBKeyMapType
+	config.KeymapType = keymap.LevelDBKeymapType
 
 	db, err := config.Build(context.Background())
 	require.NoError(t, err)
@@ -119,10 +119,10 @@ func TestKeyMapMigration(t *testing.T) {
 		require.Equal(t, expectedValue, value)
 	}
 
-	// Close the table and reopen it using a MemKeyMap
+	// Close the table and reopen it using a MemKeymap
 	err = db.Stop()
 	require.NoError(t, err)
-	config.KeyMapType = keymap.MemKeyMapType
+	config.KeymapType = keymap.MemKeymapType
 
 	db, err = config.Build(context.Background())
 	require.NoError(t, err)
@@ -140,10 +140,10 @@ func TestKeyMapMigration(t *testing.T) {
 	_, err = os.Stat(newKeymapPath)
 	require.True(t, os.IsNotExist(err))
 
-	// Close the table and reopen it using a LevelDBKeyMap
+	// Close the table and reopen it using a LevelDBKeymap
 	err = db.Stop()
 	require.NoError(t, err)
-	config.KeyMapType = keymap.LevelDBKeyMapType
+	config.KeymapType = keymap.LevelDBKeymapType
 
 	db, err = config.Build(context.Background())
 	require.NoError(t, err)

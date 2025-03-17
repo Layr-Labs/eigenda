@@ -12,22 +12,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var builders = []keyMapBuilder{
-	buildMemKeyMap,
-	buildLevelDBKeyMap,
+var builders = []keymapBuilder{
+	buildMemKeymap,
+	buildLevelDBKeymap,
 }
 
-type keyMapBuilder func(logger logging.Logger, path string) (KeyMap, error)
+type keymapBuilder func(logger logging.Logger, path string) (Keymap, error)
 
-func buildMemKeyMap(logger logging.Logger, path string) (KeyMap, error) {
-	return NewMemKeyMap(logger), nil
+func buildMemKeymap(logger logging.Logger, path string) (Keymap, error) {
+	return NewMemKeymap(logger), nil
 }
 
-func buildLevelDBKeyMap(logger logging.Logger, path string) (KeyMap, error) {
-	return NewLevelDBKeyMap(logger, path)
+func buildLevelDBKeymap(logger logging.Logger, path string) (Keymap, error) {
+	return NewLevelDBKeymap(logger, path)
 }
 
-func testBasicBehavior(t *testing.T, keyMap KeyMap) {
+func testBasicBehavior(t *testing.T, keymap Keymap) {
 	rand := random.NewTestRandom()
 
 	expected := make(map[string]types.Address)
@@ -40,7 +40,7 @@ func testBasicBehavior(t *testing.T, keyMap KeyMap) {
 			key := []byte(rand.String(32))
 			address := types.Address(rand.Uint64())
 
-			err := keyMap.Put([]*types.KAPair{{Key: key, Address: address}})
+			err := keymap.Put([]*types.KAPair{{Key: key, Address: address}})
 			require.NoError(t, err)
 			expected[string(key)] = address
 		} else if choice < 0.75 {
@@ -56,7 +56,7 @@ func testBasicBehavior(t *testing.T, keyMap KeyMap) {
 				numberToDelete--
 			}
 
-			err := keyMap.Delete(keysToDelete)
+			err := keymap.Delete(keysToDelete)
 			require.NoError(t, err)
 			for _, key := range keysToDelete {
 				delete(expected, string(key.Key))
@@ -71,14 +71,14 @@ func testBasicBehavior(t *testing.T, keyMap KeyMap) {
 				pairs[i] = &types.KAPair{Key: key, Address: address}
 				expected[string(key)] = address
 			}
-			err := keyMap.Put(pairs)
+			err := keymap.Put(pairs)
 			require.NoError(t, err)
 		}
 
 		// Every once in a while, verify that the keymap is correct
 		if rand.BoolWithProbability(0.1) {
 			for key, expectedAddress := range expected {
-				address, ok, err := keyMap.Get([]byte(key))
+				address, ok, err := keymap.Get([]byte(key))
 				require.NoError(t, err)
 				require.True(t, ok)
 				require.Equal(t, expectedAddress, address)
@@ -87,13 +87,13 @@ func testBasicBehavior(t *testing.T, keyMap KeyMap) {
 	}
 
 	for key, expectedAddress := range expected {
-		address, ok, err := keyMap.Get([]byte(key))
+		address, ok, err := keymap.Get([]byte(key))
 		require.NoError(t, err)
 		require.True(t, ok)
 		require.Equal(t, expectedAddress, address)
 	}
 
-	err := keyMap.Destroy()
+	err := keymap.Destroy()
 	require.NoError(t, err)
 }
 
@@ -105,11 +105,11 @@ func TestBasicBehavior(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, builder := range builders {
-		keyMap, err := builder(logger, dbDir)
+		keymap, err := builder(logger, dbDir)
 		if err != nil {
 			t.Fatalf("Failed to create keymap: %v", err)
 		}
-		testBasicBehavior(t, keyMap)
+		testBasicBehavior(t, keymap)
 
 		// verify that test dir is empty (destroy should have deleted everything)
 		entries, err := os.ReadDir(testDir)
@@ -127,7 +127,7 @@ func TestRestart(t *testing.T) {
 	testDir := t.TempDir()
 	dbDir := path.Join(testDir, "db")
 
-	keyMap, err := NewLevelDBKeyMap(logger, dbDir)
+	keymap, err := NewLevelDBKeymap(logger, dbDir)
 	require.NoError(t, err)
 
 	expected := make(map[string]types.Address)
@@ -140,7 +140,7 @@ func TestRestart(t *testing.T) {
 			key := []byte(rand.String(32))
 			address := types.Address(rand.Uint64())
 
-			err := keyMap.Put([]*types.KAPair{{Key: key, Address: address}})
+			err := keymap.Put([]*types.KAPair{{Key: key, Address: address}})
 			require.NoError(t, err)
 			expected[string(key)] = address
 		} else if choice < 0.75 {
@@ -156,7 +156,7 @@ func TestRestart(t *testing.T) {
 				numberToDelete--
 			}
 
-			err := keyMap.Delete(keysToDelete)
+			err := keymap.Delete(keysToDelete)
 			require.NoError(t, err)
 			for _, key := range keysToDelete {
 				delete(expected, string(key.Key))
@@ -171,14 +171,14 @@ func TestRestart(t *testing.T) {
 				pairs[i] = &types.KAPair{Key: key, Address: address}
 				expected[string(key)] = address
 			}
-			err := keyMap.Put(pairs)
+			err := keymap.Put(pairs)
 			require.NoError(t, err)
 		}
 
 		// Every once in a while, verify that the keymap is correct
 		if rand.BoolWithProbability(0.1) {
 			for key, expectedAddress := range expected {
-				address, ok, err := keyMap.Get([]byte(key))
+				address, ok, err := keymap.Get([]byte(key))
 				require.NoError(t, err)
 				require.True(t, ok)
 				require.Equal(t, expectedAddress, address)
@@ -187,22 +187,22 @@ func TestRestart(t *testing.T) {
 	}
 
 	for key, expectedAddress := range expected {
-		address, ok, err := keyMap.Get([]byte(key))
+		address, ok, err := keymap.Get([]byte(key))
 		require.NoError(t, err)
 		require.True(t, ok)
 		require.Equal(t, expectedAddress, address)
 	}
 
 	// Shut down the keymap and reload it
-	err = keyMap.Stop()
+	err = keymap.Stop()
 	require.NoError(t, err)
 
-	keyMap, err = NewLevelDBKeyMap(logger, dbDir)
+	keymap, err = NewLevelDBKeymap(logger, dbDir)
 	require.NoError(t, err)
 
 	// Expected data should be present
 	for key, expectedAddress := range expected {
-		address, ok, err := keyMap.Get([]byte(key))
+		address, ok, err := keymap.Get([]byte(key))
 		require.NoError(t, err)
 		require.True(t, ok)
 		require.Equal(t, expectedAddress, address)
@@ -215,7 +215,7 @@ func TestRestart(t *testing.T) {
 			key := []byte(rand.String(32))
 			address := types.Address(rand.Uint64())
 
-			err := keyMap.Put([]*types.KAPair{{Key: key, Address: address}})
+			err := keymap.Put([]*types.KAPair{{Key: key, Address: address}})
 			require.NoError(t, err)
 			expected[string(key)] = address
 		} else if choice < 0.75 {
@@ -231,7 +231,7 @@ func TestRestart(t *testing.T) {
 				numberToDelete--
 			}
 
-			err := keyMap.Delete(keysToDelete)
+			err := keymap.Delete(keysToDelete)
 			require.NoError(t, err)
 			for _, key := range keysToDelete {
 				delete(expected, string(key.Key))
@@ -246,14 +246,14 @@ func TestRestart(t *testing.T) {
 				pairs[i] = &types.KAPair{Key: key, Address: address}
 				expected[string(key)] = address
 			}
-			err := keyMap.Put(pairs)
+			err := keymap.Put(pairs)
 			require.NoError(t, err)
 		}
 
 		// Every once in a while, verify that the keymap is correct
 		if rand.BoolWithProbability(0.1) {
 			for key, expectedAddress := range expected {
-				address, ok, err := keyMap.Get([]byte(key))
+				address, ok, err := keymap.Get([]byte(key))
 				require.NoError(t, err)
 				require.True(t, ok)
 				require.Equal(t, expectedAddress, address)
@@ -262,12 +262,12 @@ func TestRestart(t *testing.T) {
 	}
 
 	for key, expectedAddress := range expected {
-		address, ok, err := keyMap.Get([]byte(key))
+		address, ok, err := keymap.Get([]byte(key))
 		require.NoError(t, err)
 		require.True(t, ok)
 		require.Equal(t, expectedAddress, address)
 	}
 
-	err = keyMap.Destroy()
+	err = keymap.Destroy()
 	require.NoError(t, err)
 }

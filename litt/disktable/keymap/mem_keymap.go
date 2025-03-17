@@ -8,36 +8,36 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-var _ KeyMap = &memKeyMap{}
+var _ Keymap = &memKeymap{}
 
-// An in-memory keymap implementation. When a table using a memKeyMap is restarted, it loads all keys from
+// An in-memory keymap implementation. When a table using a memKeymap is restarted, it loads all keys from
 // the segment files.
 //
 // - potentially high memory usage for large keymaps
 // - potentially slow startup time for large keymaps
 // - very fast after startup
-type memKeyMap struct {
+type memKeymap struct {
 	logger logging.Logger
 	data   map[string]types.Address
 	lock   sync.RWMutex
 }
 
-// NewMemKeyMap creates a new in-memory keymap.
-func NewMemKeyMap(logger logging.Logger) KeyMap {
-	return &memKeyMap{
+// NewMemKeymap creates a new in-memory keymap.
+func NewMemKeymap(logger logging.Logger) Keymap {
+	return &memKeymap{
 		logger: logger,
 		data:   make(map[string]types.Address),
 	}
 }
 
-func (m *memKeyMap) Put(pairs []*types.KAPair) error {
+func (m *memKeymap) Put(pairs []*types.KAPair) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	for _, pair := range pairs {
 
 		// TODO make this check optional!!
-		// TODO: also add a similar but optional check to the LevelDBKeyMap
+		// TODO: also add a similar but optional check to the LevelDBKeymap
 		_, ok := m.data[string(pair.Key)]
 		if ok {
 			return fmt.Errorf("key %s already exists", pair.Key)
@@ -48,7 +48,7 @@ func (m *memKeyMap) Put(pairs []*types.KAPair) error {
 	return nil
 }
 
-func (m *memKeyMap) Get(key []byte) (types.Address, bool, error) {
+func (m *memKeymap) Get(key []byte) (types.Address, bool, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -56,7 +56,7 @@ func (m *memKeyMap) Get(key []byte) (types.Address, bool, error) {
 	return address, ok, nil
 }
 
-func (m *memKeyMap) Delete(keys []*types.KAPair) error {
+func (m *memKeymap) Delete(keys []*types.KAPair) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -66,12 +66,12 @@ func (m *memKeyMap) Delete(keys []*types.KAPair) error {
 	return nil
 }
 
-func (m *memKeyMap) Stop() error {
+func (m *memKeymap) Stop() error {
 	// nothing to do here
 	return nil
 }
 
-func (m *memKeyMap) Destroy() error {
+func (m *memKeymap) Destroy() error {
 	// nothing to do here
 	return nil
 }

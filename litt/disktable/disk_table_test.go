@@ -42,7 +42,7 @@ func buildMemKeyDiskTableSingleShard(
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
-	keys := keymap.NewMemKeyMap(logger)
+	keys := keymap.NewMemKeymap(logger)
 
 	roots := make([]string, 0, len(paths))
 	for _, p := range paths {
@@ -81,7 +81,7 @@ func buildMemKeyDiskTableMultiShard(
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
-	keys := keymap.NewMemKeyMap(logger)
+	keys := keymap.NewMemKeymap(logger)
 
 	roots := make([]string, 0, len(paths))
 	for _, p := range paths {
@@ -121,9 +121,9 @@ func buildLevelDBKeyDiskTableSingleShard(
 	}
 
 	keysPath := paths[0] + "/keys"
-	keys, err := keymap.NewLevelDBKeyMap(logger, keysPath)
+	keys, err := keymap.NewLevelDBKeymap(logger, keysPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create key map: %w", err)
+		return nil, fmt.Errorf("failed to create keymap: %w", err)
 	}
 
 	roots := make([]string, 0, len(paths))
@@ -164,9 +164,9 @@ func buildLevelDBKeyDiskTableMultiShard(
 	}
 
 	keysPath := paths[0] + "/keys"
-	keys, err := keymap.NewLevelDBKeyMap(logger, keysPath)
+	keys, err := keymap.NewLevelDBKeymap(logger, keysPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create key map: %w", err)
+		return nil, fmt.Errorf("failed to create keymap: %w", err)
 	}
 
 	roots := make([]string, 0, len(paths))
@@ -691,11 +691,11 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete s
 	table, err = tableBuilder(time.Now, tableName, []string{directory})
 	require.NoError(t, err)
 
-	// Manually remove the keys from the last segment from the key map. If this happens in reality (as opposed
-	// to the files being artificially deleted in this test), the key map will not hold any value that has not
+	// Manually remove the keys from the last segment from the keymap. If this happens in reality (as opposed
+	// to the files being artificially deleted in this test), the keymap will not hold any value that has not
 	// yet been durably flushed to disk.
 	for key := range missingKeys {
-		err = table.(*DiskTable).keyMap.Delete([]*types.KAPair{{Key: []byte(key)}})
+		err = table.(*DiskTable).keymap.Delete([]*types.KAPair{{Key: []byte(key)}})
 		require.NoError(t, err)
 	}
 
@@ -918,11 +918,11 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 	table, err = tableBuilder(time.Now, tableName, []string{directory})
 	require.NoError(t, err)
 
-	// Manually remove the keys from the last segment from the key map. If this happens in reality (as opposed
-	// to the files being artificially deleted in this test), the key map will not hold any value that has not
+	// Manually remove the keys from the last segment from the keymap. If this happens in reality (as opposed
+	// to the files being artificially deleted in this test), the keymap will not hold any value that has not
 	// yet been durably flushed to disk.
 	for key := range missingKeys {
-		err = table.(*DiskTable).keyMap.Delete([]*types.KAPair{{Key: []byte(key)}})
+		err = table.(*DiskTable).keymap.Delete([]*types.KAPair{{Key: []byte(key)}})
 		require.NoError(t, err)
 	}
 
@@ -1159,11 +1159,11 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 	table, err = tableBuilder(time.Now, tableName, []string{directory})
 	require.NoError(t, err)
 
-	// Manually remove the keys from the last segment from the key map. If this happens in reality (as opposed
-	// to the files being artificially deleted in this test), the key map will not hold any value that has not
+	// Manually remove the keys from the last segment from the keymap. If this happens in reality (as opposed
+	// to the files being artificially deleted in this test), the keymap will not hold any value that has not
 	// yet been durably flushed to disk.
 	for key := range missingKeys {
-		err = table.(*DiskTable).keyMap.Delete([]*types.KAPair{{Key: []byte(key)}})
+		err = table.(*DiskTable).keymap.Delete([]*types.KAPair{{Key: []byte(key)}})
 		require.NoError(t, err)
 	}
 
@@ -1340,7 +1340,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 		0)
 	require.NoError(t, err)
 
-	// Identify keys in the last file. These will be removed from the key map to simulate keys that have not
+	// Identify keys in the last file. These will be removed from the keymap to simulate keys that have not
 	// been flushed to the key store.
 	keysInLastFile, err := segments[highestSegmentIndex].GetKeys()
 	require.NoError(t, err)
@@ -1364,11 +1364,11 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 	table, err = tableBuilder(time.Now, tableName, []string{directory})
 	require.NoError(t, err)
 
-	// Manually remove the keys from the last segment from the key map. If this happens in reality (as opposed
-	// to the files being artificially deleted in this test), the key map will not hold any value that has not
+	// Manually remove the keys from the last segment from the keymap. If this happens in reality (as opposed
+	// to the files being artificially deleted in this test), the keymap will not hold any value that has not
 	// yet been durably flushed to disk.
 	for key := range missingKeys {
-		err = table.(*DiskTable).keyMap.Delete([]*types.KAPair{{Key: []byte(key)}})
+		err = table.(*DiskTable).keymap.Delete([]*types.KAPair{{Key: []byte(key)}})
 		require.NoError(t, err)
 	}
 
@@ -1445,7 +1445,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 		}
 	}
 
-	// Enable a TTL for the table. The goal is to force the keys that were removed from the key map artificially to
+	// Enable a TTL for the table. The goal is to force the keys that were removed from the keymap artificially to
 	// become eligible for garbage collection.
 	err = table.SetTTL(1 * time.Millisecond)
 	require.NoError(t, err)

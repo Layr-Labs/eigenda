@@ -11,24 +11,24 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-var _ KeyMap = &LevelDBKeyMap{}
+var _ Keymap = &LevelDBKeymap{}
 
-// LevelDBKeyMap is a key map that uses LevelDB as the underlying storage.
-type LevelDBKeyMap struct {
+// LevelDBKeymap is a keymap that uses LevelDB as the underlying storage.
+type LevelDBKeymap struct {
 	logger logging.Logger
 	db     *leveldb.DB
 	path   string
 	alive  atomic.Bool
 }
 
-// NewLevelDBKeyMap creates a new LevelDBKeyMap instance.
-func NewLevelDBKeyMap(logger logging.Logger, path string) (*LevelDBKeyMap, error) {
+// NewLevelDBKeymap creates a new LevelDBKeymap instance.
+func NewLevelDBKeymap(logger logging.Logger, path string) (*LevelDBKeymap, error) {
 	db, err := leveldb.OpenFile(path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open LevelDB: %w", err)
 	}
 
-	kmap := &LevelDBKeyMap{
+	kmap := &LevelDBKeymap{
 		logger: logger,
 		db:     db,
 		path:   path,
@@ -38,7 +38,7 @@ func NewLevelDBKeyMap(logger logging.Logger, path string) (*LevelDBKeyMap, error
 	return kmap, nil
 }
 
-func (l *LevelDBKeyMap) Put(pairs []*types.KAPair) error {
+func (l *LevelDBKeymap) Put(pairs []*types.KAPair) error {
 	batch := new(leveldb.Batch)
 	for _, pair := range pairs {
 		batch.Put(pair.Key, pair.Address.Serialize())
@@ -51,7 +51,7 @@ func (l *LevelDBKeyMap) Put(pairs []*types.KAPair) error {
 	return nil
 }
 
-func (l *LevelDBKeyMap) Get(key []byte) (types.Address, bool, error) {
+func (l *LevelDBKeymap) Get(key []byte) (types.Address, bool, error) {
 	addressBytes, err := l.db.Get(key, nil)
 	if err != nil {
 		if errors.Is(err, leveldb.ErrNotFound) {
@@ -68,7 +68,7 @@ func (l *LevelDBKeyMap) Get(key []byte) (types.Address, bool, error) {
 	return address, true, nil
 }
 
-func (l *LevelDBKeyMap) Delete(keys []*types.KAPair) error {
+func (l *LevelDBKeymap) Delete(keys []*types.KAPair) error {
 	batch := new(leveldb.Batch)
 	for _, key := range keys {
 		batch.Delete(key.Key)
@@ -82,7 +82,7 @@ func (l *LevelDBKeyMap) Delete(keys []*types.KAPair) error {
 	return nil
 }
 
-func (l *LevelDBKeyMap) Stop() error {
+func (l *LevelDBKeymap) Stop() error {
 	alive := l.alive.Swap(false)
 	if !alive {
 		return nil
@@ -95,13 +95,13 @@ func (l *LevelDBKeyMap) Stop() error {
 	return nil
 }
 
-func (l *LevelDBKeyMap) Destroy() error {
+func (l *LevelDBKeymap) Destroy() error {
 	err := l.Stop()
 	if err != nil {
 		return fmt.Errorf("failed to stop LevelDB: %w", err)
 	}
 
-	l.logger.Info(fmt.Sprintf("deleting LevelDB key map at path: %s", l.path))
+	l.logger.Info(fmt.Sprintf("deleting LevelDB keymap at path: %s", l.path))
 	err = os.RemoveAll(l.path)
 	if err != nil {
 		return err

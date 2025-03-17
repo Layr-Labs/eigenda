@@ -62,7 +62,7 @@ func buildMemKeyDiskTable(
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
-	keys := keymap.NewMemKeyMap(logger)
+	keys := keymap.NewMemKeymap(logger)
 
 	segmentsPath := path + "/segments"
 	table, err := disktable.NewDiskTable(
@@ -98,9 +98,9 @@ func buildLevelDBKeyDiskTable(
 	}
 
 	keysPath := path + "/keys"
-	keys, err := keymap.NewLevelDBKeyMap(logger, keysPath)
+	keys, err := keymap.NewLevelDBKeymap(logger, keysPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create key map: %w", err)
+		return nil, fmt.Errorf("failed to create keymap: %w", err)
 	}
 
 	segmentsPath := path + "/segments"

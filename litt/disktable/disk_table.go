@@ -22,8 +22,8 @@ var _ litt.ManagedTable = (*DiskTable)(nil)
 // segmentDirectory is the directory where segment files are stored, relative to the root directory.
 const segmentDirectory = "segments"
 
-// keyMapReloadBatchSize is the size of the batch used for reloading keys from segments into the key map.
-const keyMapReloadBatchSize = 1024
+// keymapReloadBatchSize is the size of the batch used for reloading keys from segments into the keymap.
+const keymapReloadBatchSize = 1024
 
 const tableFlushChannelCapacity = 8
 
@@ -54,7 +54,7 @@ type DiskTable struct {
 	saltShaker *rand.Rand
 
 	// A map of keys to their addresses.
-	keyMap keymap.KeyMap
+	keymap keymap.Keymap
 
 	// unflushedDataCache is a map of keys to their values that may not have been flushed to disk yet. This is used as a
 	// lookup table when data is requested from the table before it has been flushed to disk.
@@ -98,7 +98,7 @@ func NewDiskTable(
 	logger logging.Logger,
 	timeSource func() time.Time,
 	name string,
-	keyMap keymap.KeyMap,
+	keymap keymap.Keymap,
 	roots []string,
 	targetFileSize uint32,
 	controlChannelSize int,
@@ -106,7 +106,7 @@ func NewDiskTable(
 	saltShaker *rand.Rand,
 	ttl time.Duration,
 	gcPeriod time.Duration,
-	reloadKeyMap bool) (litt.ManagedTable, error) {
+	reloadKeymap bool) (litt.ManagedTable, error) {
 
 	if gcPeriod <= 0 {
 		return nil, fmt.Errorf("garbage collection period must be greater than 0")
@@ -181,7 +181,7 @@ func NewDiskTable(
 		name:                    name,
 		metadata:                metadata,
 		saltShaker:              saltShaker,
-		keyMap:                  keyMap,
+		keymap:                  keymap,
 		targetFileSize:          targetFileSize,
 		segments:                make(map[uint32]*segment.Segment),
 		controllerChannel:       make(chan any, controlChannelSize),
@@ -227,11 +227,11 @@ func NewDiskTable(
 	}
 	table.segments[nextSegmentIndex] = mutableSegment
 
-	if reloadKeyMap {
-		logger.Infof("reloading key map from segments")
-		err = table.reloadKeyMap()
+	if reloadKeymap {
+		logger.Infof("reloading keymap from segments")
+		err = table.reloadKeymap()
 		if err != nil {
-			return nil, fmt.Errorf("failed to load key map from segments: %v", err)
+			return nil, fmt.Errorf("failed to load keymap from segments: %v", err)
 		}
 	}
 
@@ -241,20 +241,20 @@ func NewDiskTable(
 	return table, nil
 }
 
-// reloadKeyMap reloads the key map from the segments. This is necessary when the key map is lost, the key map doesn't
-// save its data on disk, or we are migrating from one key map type to another.
-func (d *DiskTable) reloadKeyMap() error {
+// reloadKeymap reloads the keymap from the segments. This is necessary when the keymap is lost, the keymap doesn't
+// save its data on disk, or we are migrating from one keymap type to another.
+func (d *DiskTable) reloadKeymap() error {
 
 	start := d.timeSource()
 	defer func() {
-		d.logger.Infof("spent %v reloading key map", d.timeSource().Sub(start))
+		d.logger.Infof("spent %v reloading keymap", d.timeSource().Sub(start))
 	}()
 
 	// It's possible that some of the data written near the end of the previous session was corrupted.
 	// Read data from the end until the first valid key/value pair is found.
 	isValid := false
 
-	batch := make([]*types.KAPair, 0, keyMapReloadBatchSize)
+	batch := make([]*types.KAPair, 0, keymapReloadBatchSize)
 
 	for i := d.highestSegmentIndex; i >= d.lowestSegmentIndex && i+1 != 0; i-- {
 		if !d.segments[i].IsSealed() {
@@ -285,18 +285,18 @@ func (d *DiskTable) reloadKeyMap() error {
 
 			if isValid {
 				batch = append(batch, key)
-				if len(batch) == keyMapReloadBatchSize {
-					err = d.keyMap.Put(batch)
+				if len(batch) == keymapReloadBatchSize {
+					err = d.keymap.Put(batch)
 					if err != nil {
 						return fmt.Errorf("failed to put keys: %v", err)
 					}
-					batch = make([]*types.KAPair, 0, keyMapReloadBatchSize)
+					batch = make([]*types.KAPair, 0, keymapReloadBatchSize)
 				}
 			}
 		}
 
 		if len(batch) > 0 {
-			err = d.keyMap.Put(batch)
+			err = d.keymap.Put(batch)
 			if err != nil {
 				return fmt.Errorf("failed to put keys: %v", err)
 			}
@@ -365,9 +365,9 @@ func (d *DiskTable) Destroy() error {
 		}
 	}
 
-	err = d.keyMap.Destroy()
+	err = d.keymap.Destroy()
 	if err != nil {
-		return fmt.Errorf("failed to destroy key map: %v", err)
+		return fmt.Errorf("failed to destroy keymap: %v", err)
 	}
 
 	err = d.metadata.delete()
@@ -451,7 +451,7 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 	}
 
 	// Look up the address of the data.
-	address, ok, err := d.keyMap.Get(key)
+	address, ok, err := d.keymap.Get(key)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to get address: %v", err)
 	}
@@ -587,15 +587,15 @@ func (d *DiskTable) handleControlLoopShutdownRequest(req *controlLoopShutdownReq
 	}
 
 	// Flush the keys that are now durable in the segment.
-	err = d.writeKeysToKeyMap(durableKeys)
+	err = d.writeKeysToKeymap(durableKeys)
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to flush keys: %v", err))
 	}
 
-	// Stop the key map
-	err = d.keyMap.Stop()
+	// Stop the keymap
+	err = d.keymap.Stop()
 	if err != nil {
-		d.panic.Panic(fmt.Errorf("failed to stop key map: %v", err))
+		d.panic.Panic(fmt.Errorf("failed to stop keymap: %v", err))
 	}
 
 	req.shutdownCompleteChan <- struct{}{}
@@ -631,7 +631,7 @@ func (d *DiskTable) doGarbageCollection() {
 			return
 		}
 
-		err = d.keyMap.Delete(keys)
+		err = d.keymap.Delete(keys)
 		if err != nil {
 			d.panic.Panic(fmt.Errorf("failed to delete keys: %v", err))
 			return
@@ -717,7 +717,7 @@ func (d *DiskTable) handleFlushLoopSealRequest(req *flushLoopSealRequest) {
 	}
 
 	// Flush the keys that are now durable in the segment.
-	err = d.writeKeysToKeyMap(durableKeys)
+	err = d.writeKeysToKeymap(durableKeys)
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to flush keys: %v", err))
 		return
@@ -756,7 +756,7 @@ func (d *DiskTable) handleFlushLoopFlushRequest(req *flushLoopFlushRequest) {
 		d.panic.Panic(fmt.Errorf("failed to flush mutable segment: %v", err))
 	}
 
-	err = d.writeKeysToKeyMap(durableKeys)
+	err = d.writeKeysToKeymap(durableKeys)
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to flush keys: %v", err))
 	}
@@ -764,20 +764,20 @@ func (d *DiskTable) handleFlushLoopFlushRequest(req *flushLoopFlushRequest) {
 	req.responseChan <- struct{}{}
 }
 
-// writeKeysToKeyMap flushes all keys to the key map. Once they are flushed, it also removes the keys from the
+// writeKeysToKeymap flushes all keys to the keymap. Once they are flushed, it also removes the keys from the
 // unflushedDataCache.
-func (d *DiskTable) writeKeysToKeyMap(keys []*types.KAPair) error {
+func (d *DiskTable) writeKeysToKeymap(keys []*types.KAPair) error {
 	if len(keys) == 0 {
 		// Nothing to flush.
 		return nil
 	}
 
-	err := d.keyMap.Put(keys)
+	err := d.keymap.Put(keys)
 	if err != nil {
 		return fmt.Errorf("failed to flush keys: %v", err)
 	}
 
-	// Keys are now durably written to both the segment and the key map. It is therefore safe to remove them from the
+	// Keys are now durably written to both the segment and the keymap. It is therefore safe to remove them from the
 	// unflushed data cache.
 	for _, ka := range keys {
 		d.unflushedDataCache.Delete(string(ka.Key))
