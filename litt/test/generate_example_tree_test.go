@@ -17,7 +17,7 @@ import (
 // TestGenerateExampleTree will generate the example file tree displayed in the readme.
 func TestGenerateExampleTree(t *testing.T) {
 
-	t.Skip("this should only be run manually")
+	//t.Skip("this should only be run manually")
 
 	rand := random.NewTestRandom()
 	testDir := t.TempDir()
