@@ -97,6 +97,7 @@ func (a *Accountant) BlobPaymentInfo(
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return big.NewInt(0), err
 		}
+		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
 		return big.NewInt(0), nil
 	}
 
@@ -114,8 +115,6 @@ func (a *Accountant) BlobPaymentInfo(
 		return a.cumulativePayment, nil
 	}
 
-	// Now that we have passed all checks, update payment state.
-	overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
 	a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 
 	return big.NewInt(0), fmt.Errorf("neither reservation nor on-demand payment is available")
