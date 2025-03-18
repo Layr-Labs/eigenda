@@ -55,6 +55,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 		time.Now(),
 		1,
 		salt,
+		false,
 		false)
 
 	require.NoError(t, err)
@@ -143,6 +144,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 		time.Now(),
 		1,
 		salt,
+		false,
 		false)
 	require.NoError(t, err)
 	require.True(t, seg2.IsSealed())
@@ -200,6 +202,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 		time.Now(),
 		shardCount,
 		salt,
+		false,
 		false)
 
 	require.NoError(t, err)
@@ -293,6 +296,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 		time.Now(),
 		1,
 		salt,
+		false,
 		false)
 	require.NoError(t, err)
 	require.True(t, seg2.IsSealed())
@@ -354,6 +358,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 		time.Now(),
 		shardCount,
 		salt,
+		false,
 		false)
 
 	require.NoError(t, err)
@@ -413,6 +418,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 		time.Now(),
 		1,
 		salt,
+		false,
 		false)
 	require.NoError(t, err)
 	require.True(t, seg2.IsSealed())

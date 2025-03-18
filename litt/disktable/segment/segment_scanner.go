@@ -359,7 +359,8 @@ func GatherSegmentFiles(
 	rootDirectories []string,
 	now time.Time,
 	shardingFactor uint32,
-	salt uint32) (lowestSegmentIndex uint32, highestSegmentIndex uint32, segments map[uint32]*Segment, err error) {
+	salt uint32,
+	fsync bool) (lowestSegmentIndex uint32, highestSegmentIndex uint32, segments map[uint32]*Segment, err error) {
 
 	// Scan the root directories for segment files.
 	metadataFiles, keyFiles, valueFiles, garbageFiles, highestSegmentIndex, lowestSegmentIndex, isEmpty, err :=
@@ -413,7 +414,7 @@ func GatherSegmentFiles(
 		// Load all healthy segments.
 		for i := lowestSegmentIndex; i <= highestSegmentIndex; i++ {
 			segment, err := NewSegment(
-				logger, panic, i, rootDirectories, now, shardingFactor, salt, true)
+				logger, panic, i, rootDirectories, now, shardingFactor, salt, true, fsync)
 			if err != nil {
 				return 0, 0, nil,
 					fmt.Errorf("failed to create segment %d: %v", i, err)

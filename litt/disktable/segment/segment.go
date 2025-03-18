@@ -91,7 +91,8 @@ func NewSegment(
 	now time.Time,
 	shardingFactor uint32,
 	salt uint32,
-	sealIfUnsealed bool) (*Segment, error) {
+	sealIfUnsealed bool,
+	fsync bool) (*Segment, error) {
 
 	// look for the metadata file
 	metadataPath, err := lookForFile(parentDirectories, fmt.Sprintf("%d.metadata", index))
@@ -149,7 +150,7 @@ func NewSegment(
 			// use it for value files too.
 			parentDirectory = parentDirectories[int(shard+1)%len(parentDirectories)]
 		}
-		values, err := newValueFile(logger, index, shard, parentDirectory, metadata.sealed)
+		values, err := newValueFile(logger, index, shard, parentDirectory, metadata.sealed, fsync)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open value file: %v", err)
 		}

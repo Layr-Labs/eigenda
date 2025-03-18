@@ -113,7 +113,8 @@ func buildMemKeyDiskTable(
 		random.NewTestRandom().Rand,
 		0,
 		1*time.Millisecond,
-		true)
+		true,
+		false)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -159,6 +160,7 @@ func buildLevelDBKeyDiskTable(
 		random.NewTestRandom().Rand,
 		0,
 		1*time.Millisecond,
+		false,
 		false)
 
 	if err != nil {
