@@ -68,11 +68,25 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 
 		hasG2TrailingFile := len(kzgConfig.G2TrailingPath) != 0
 		if hasG2TrailingFile {
+			fileStat, err := os.Stat(kzgConfig.G2TrailingPath)
+			if err != nil {
+				return nil, err
+			}
+			fileSizeByte := fileStat.Size()
+			if fileSizeByte%64 != 0 {
+				return nil, errors.New("corrupted g2 points from G2TrailingPath.")
+			}
+			// get the size
+			numG2point := uint64(fileSizeByte / kzg.G2PointBytes)
+			if numG2point < kzgConfig.SRSNumberToLoad {
+				return nil, errors.New("Insufficent number of g2 points from G2TrailingPath")
+			}
+
 			// use g2 trailing file
 			g2Trailing, err = kzg.ReadG2PointSection(
 				kzgConfig.G2TrailingPath,
-				0,
-				kzgConfig.SRSNumberToLoad, // last exclusive
+				numG2point-kzgConfig.SRSNumberToLoad,
+				numG2point, // last exclusive
 				kzgConfig.NumWorker,
 			)
 		} else {
