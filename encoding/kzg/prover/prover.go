@@ -66,12 +66,39 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 			return nil, err
 		}
 
-		g2Trailing, err = kzg.ReadG2PointSection(
-			kzgConfig.G2Path,
-			kzgConfig.SRSOrder-kzgConfig.SRSNumberToLoad,
-			kzgConfig.SRSOrder, // last exclusive
-			kzgConfig.NumWorker,
-		)
+		hasG2TrailingFile := len(kzgConfig.G2TrailingPath) != 0
+		if hasG2TrailingFile {
+			fileStat, errStat := os.Stat(kzgConfig.G2TrailingPath)
+			if errStat != nil {
+				return nil, err
+			}
+			fileSizeByte := fileStat.Size()
+			if fileSizeByte%64 != 0 {
+				return nil, fmt.Errorf("corrupted g2 point from the G2TrailingPath. The size of the file on the provided path has size that is not multiple of 64, which is %v. It indicates there is an incomplete g2 point.", fileSizeByte)
+			}
+			// get the size
+			numG2point := uint64(fileSizeByte / kzg.G2PointBytes)
+			if numG2point < kzgConfig.SRSNumberToLoad {
+				return nil, fmt.Errorf("insufficent number of g2 points from G2TrailingPath. Requested %v, Actual %v", kzgConfig.SRSNumberToLoad, numG2point)
+			}
+
+			// use g2 trailing file
+			g2Trailing, err = kzg.ReadG2PointSection(
+				kzgConfig.G2TrailingPath,
+				numG2point-kzgConfig.SRSNumberToLoad,
+				numG2point, // last exclusive
+				kzgConfig.NumWorker,
+			)
+		} else {
+			// require entire g2 srs be available on disk
+			g2Trailing, err = kzg.ReadG2PointSection(
+				kzgConfig.G2Path,
+				kzgConfig.SRSOrder-kzgConfig.SRSNumberToLoad,
+				kzgConfig.SRSOrder, // last exclusive
+				kzgConfig.NumWorker,
+			)
+		}
+
 		if err != nil {
 			return nil, err
 		}
