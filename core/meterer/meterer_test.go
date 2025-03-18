@@ -312,8 +312,8 @@ func TestMetererOnDemand(t *testing.T) {
 	// test insufficient cumulative payment
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(1), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers, now)
-	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
-	// Not record for invalid payment
+	assert.ErrorContains(t, err, "payment validation failed: payment charged is greater than cumulative payment")
+	// No record for invalid payment
 	result, err := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID1.Hex(),
@@ -332,11 +332,11 @@ func TestMetererOnDemand(t *testing.T) {
 	assert.Equal(t, uint64(102), symbolsCharged)
 	header = createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
 	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
-	assert.ErrorContains(t, err, "exact payment already exists")
+	// Doesn't check for exact payment, checks for increment
+	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
 
 	// test valid payments
-	numValidPayments := 9
-	for i := 1; i < numValidPayments; i++ {
+	for i := 1; i < 9; i++ {
 		header = createPaymentHeader(now.UnixNano(), new(big.Int).Mul(priceCharged, big.NewInt(int64(i+1))), accountID2)
 		symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
 		assert.NoError(t, err)
@@ -346,7 +346,7 @@ func TestMetererOnDemand(t *testing.T) {
 	// test cumulative payment on-chain constraint
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(2023), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 1, quorumNumbers, now)
-	assert.ErrorContains(t, err, "invalid on-demand payment: request claims a cumulative payment greater than the on-chain deposit")
+	assert.ErrorContains(t, err, "invalid on-demand request: request claims a cumulative payment greater than the on-chain deposit")
 
 	// test insufficient increment in cumulative payment
 	previousCumulativePayment := priceCharged.Mul(priceCharged, big.NewInt(9))
@@ -355,21 +355,28 @@ func TestMetererOnDemand(t *testing.T) {
 	priceCharged = meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol())
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, big.NewInt(0).Sub(priceCharged, big.NewInt(1))), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
-	assert.ErrorContains(t, err, "invalid on-demand payment: insufficient cumulative payment increment")
+	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
 	previousCumulativePayment = big.NewInt(0).Add(previousCumulativePayment, priceCharged)
 
 	// test cannot insert cumulative payment in out of order
 	symbolsCharged = mt.SymbolsCharged(uint64(50))
 	header = createPaymentHeader(now.UnixNano(), meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol()), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 50, quorumNumbers, now)
-	assert.ErrorContains(t, err, "invalid on-demand payment: breaking cumulative payment invariants")
+	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
 
 	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
 		":account": &types.AttributeValueMemberS{
 			Value: accountID2.Hex(),
 		}})
 	assert.NoError(t, err)
-	assert.Equal(t, numValidPayments, len(result))
+	assert.Equal(t, 1, len(result))
+
+	// with rollback of invalid payments, users cannot cheat by inserting an invalid cumulative payment
+	symbolsCharged = mt.SymbolsCharged(uint64(30))
+	header = createPaymentHeader(now.UnixNano(), meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol()), accountID2)
+	_, err = mt.MeterRequest(ctx, *header, 30, quorumNumbers, now)
+	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
+
 	// test failed global rate limit (previously payment recorded: 2, global limit: 1009)
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, meterer.PaymentCharged(1010, mt.ChainPaymentState.GetPricePerSymbol())), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1010, quorumNumbers, now)
@@ -380,7 +387,7 @@ func TestMetererOnDemand(t *testing.T) {
 			Value: accountID2.Hex(),
 		}})
 	assert.NoError(t, err)
-	assert.Equal(t, numValidPayments, len(result))
+	assert.Equal(t, 1, len(result))
 }
 
 func TestPaymentCharged(t *testing.T) {
