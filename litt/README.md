@@ -1,5 +1,3 @@
-Note: this document is a work in progress.
-
 ![](resources/littdb-logo.png)
 
 # Contents
