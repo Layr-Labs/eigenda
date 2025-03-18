@@ -3,7 +3,8 @@ pragma solidity ^0.8.9;
 
 import {Pausable} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/Pausable.sol";
 import {IPauserRegistry} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
-
+import {IPermissionController} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPermissionController.sol";
+import {IAllocationManager} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IAllocationManager.sol";
 import {ServiceManagerBase, IAVSDirectory, IRewardsCoordinator, IServiceManager} from "../../lib/eigenlayer-middleware/src/ServiceManagerBase.sol";
 import {BLSSignatureChecker} from "../../lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
 import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
@@ -36,26 +37,26 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         _;
     }
 
-    constructor(
-        IAVSDirectory __avsDirectory,
-        IRewardsCoordinator __rewardsCoordinator,
-        IRegistryCoordinator __registryCoordinator,
-        IStakeRegistry __stakeRegistry,
-        IEigenDAThresholdRegistry __eigenDAThresholdRegistry,
-        IEigenDARelayRegistry __eigenDARelayRegistry,
-        IPaymentVault __paymentVault,
-        IEigenDADisperserRegistry __eigenDADisperserRegistry
-    )
-        BLSSignatureChecker(__registryCoordinator)
-        ServiceManagerBase(__avsDirectory, __rewardsCoordinator, __registryCoordinator, __stakeRegistry)
-        EigenDAServiceManagerStorage(__eigenDAThresholdRegistry, __eigenDARelayRegistry, __paymentVault, __eigenDADisperserRegistry)
+    constructor(EigenDASMConstructorParams memory params)
+        BLSSignatureChecker(params.registryCoordinator)
+        Pausable(params.pauserRegistry)
+        ServiceManagerBase(
+            params.avsDirectory,
+            params.rewardsCoordinator,
+            params.registryCoordinator,
+            params.stakeRegistry,
+            params.permissionController,
+            params.allocationManager
+        )
     {
+        eigenDAThresholdRegistry = params.eigenDAThresholdRegistry;
+        eigenDARelayRegistry = params.eigenDARelayRegistry;
+        paymentVault = params.paymentVault;
+        eigenDADisperserRegistry = params.eigenDADisperserRegistry;
         _disableInitializers();
     }
 
     function initialize(
-        IPauserRegistry _pauserRegistry,
-        uint256 _initialPausedStatus,
         address _initialOwner,
         address[] memory _batchConfirmers,
         address _rewardsInitiator
@@ -63,7 +64,6 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         public
         initializer
     {
-        _initializePauser(_pauserRegistry, _initialPausedStatus);
         _transferOwnership(_initialOwner);
         _setRewardsInitiator(_rewardsInitiator);
         for (uint i = 0; i < _batchConfirmers.length; ++i) {

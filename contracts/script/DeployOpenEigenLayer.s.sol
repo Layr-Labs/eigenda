@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-pragma solidity =0.8.12;
+pragma solidity ^0.8.12;
 
 import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetFixedSupply.sol";
 import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
@@ -8,8 +8,9 @@ import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IETHPOSDeposit.sol";
 
+import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PermissionController.sol";
 import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/core/StrategyManager.sol";
-import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/core/Slasher.sol";
+import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/core/AllocationManager.sol";
 import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/core/DelegationManager.sol";
 import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/core/AVSDirectory.sol";
 import "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/core/RewardsCoordinator.sol";
@@ -54,8 +55,9 @@ contract DeployOpenEigenLayer is Script, Test {
     // EigenLayer Contracts
     ProxyAdmin public eigenLayerProxyAdmin;
     PauserRegistry public eigenLayerPauserReg;
-    Slasher public slasher;
-    Slasher public slasherImplementation;
+    PermissionController public permissionController;
+    AllocationManager public allocationManager;
+    AllocationManager public allocationManagerImplementation;
     DelegationManager public delegation;
     DelegationManager public delegationImplementation;
     StrategyManager public strategyManager;
@@ -89,7 +91,7 @@ contract DeployOpenEigenLayer is Script, Test {
 
         // deploy proxy admin for the ability to upgrade proxy contracts
         eigenLayerProxyAdmin = new ProxyAdmin();
-
+        permissionController = new PermissionController();
         //deploy pauser registry
         {
             address[] memory pausers = new address[](3);
@@ -104,6 +106,9 @@ contract DeployOpenEigenLayer is Script, Test {
          * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
          */
         emptyContract = new EmptyContract();
+        allocationManager = AllocationManager(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), ""))
+        );
         delegation = DelegationManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), ""))
         );
@@ -111,9 +116,6 @@ contract DeployOpenEigenLayer is Script, Test {
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), ""))
         );
         strategyManager = StrategyManager(
-            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), ""))
-        );
-        slasher = Slasher(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenLayerProxyAdmin), ""))
         );
         eigenPodManager = EigenPodManager(
@@ -133,42 +135,53 @@ contract DeployOpenEigenLayer is Script, Test {
         eigenPodBeacon = new UpgradeableBeacon(address(eigenPodImplementation));
 
         // Second, deploy the *implementation* contracts, using the *proxy contracts* as inputs
-        delegationImplementation = new DelegationManager(strategyManager, slasher, eigenPodManager);
-        avsDirectoryImplementation = new AVSDirectory(delegation);
+        delegationImplementation = new DelegationManager(
+            strategyManager,
+            eigenPodManager,
+            allocationManager,
+            eigenLayerPauserReg,
+            permissionController,
+            14 days /* minWithdrawalDelay */
+        );
+        avsDirectoryImplementation = new AVSDirectory(
+            delegation,
+            eigenLayerPauserReg
+        );
         rewardsCoordinatorImplementation = new RewardsCoordinator(
             delegation,
             strategyManager,
+            allocationManager,
+            eigenLayerPauserReg,
+            permissionController,
             CALCULATION_INTERVAL_SECONDS,
             MAX_REWARDS_DURATION,
             MAX_RETROACTIVE_LENGTH,
             MAX_FUTURE_LENGTH,
             GENESIS_REWARDS_TIMESTAMP
         );
-        strategyManagerImplementation = new StrategyManager(delegation, eigenPodManager, slasher);
-        slasherImplementation = new Slasher(strategyManager, delegation);
+        strategyManagerImplementation = new StrategyManager(delegation, eigenLayerPauserReg);
         eigenPodManagerImplementation = new EigenPodManager(
             ethPOSDeposit,
             eigenPodBeacon,
-            strategyManager,
-            slasher,
-            delegation
+            delegation,
+            eigenLayerPauserReg
         );
 
         // Third, upgrade the proxy contracts to use the correct implementation contracts and initialize them.
         IStrategy[] memory _strategies;
         uint256[] memory _withdrawalDelayBlocks;
         eigenLayerProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(delegation))),
+            ITransparentUpgradeableProxy(payable(address(delegation))),
             address(delegationImplementation),
             abi.encodeWithSelector(DelegationManager.initialize.selector, executorMultisig, eigenLayerPauserReg, 0, 0, _strategies, _withdrawalDelayBlocks)
         );
         eigenLayerProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(avsDirectory))),
+            ITransparentUpgradeableProxy(payable(address(avsDirectory))),
             address(avsDirectoryImplementation),
             abi.encodeWithSelector(AVSDirectory.initialize.selector, executorMultisig, eigenLayerPauserReg, 0)
         );
         eigenLayerProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(strategyManager))),
+            ITransparentUpgradeableProxy(payable(address(strategyManager))),
             address(strategyManagerImplementation),
             abi.encodeWithSelector(
                 StrategyManager.initialize.selector,
@@ -180,7 +193,7 @@ contract DeployOpenEigenLayer is Script, Test {
             )
         );
         eigenLayerProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(rewardsCoordinator))),
+            ITransparentUpgradeableProxy(payable(address(rewardsCoordinator))),
             address(rewardsCoordinatorImplementation),
             abi.encodeWithSelector(
                 RewardsCoordinator.initialize.selector,
@@ -193,12 +206,7 @@ contract DeployOpenEigenLayer is Script, Test {
             )
         );
         eigenLayerProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(slasher))),
-            address(slasherImplementation),
-            abi.encodeWithSelector(Slasher.initialize.selector, executorMultisig, eigenLayerPauserReg, 0)
-        );
-        eigenLayerProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(eigenPodManager))),
+            ITransparentUpgradeableProxy(payable(address(eigenPodManager))),
             address(eigenPodManagerImplementation),
             abi.encodeWithSelector(
                 EigenPodManager.initialize.selector,
@@ -209,7 +217,7 @@ contract DeployOpenEigenLayer is Script, Test {
         );
 
         // deploy StrategyBaseTVLLimits contract implementation
-        baseStrategyImplementation = new StrategyBaseTVLLimits(strategyManager);
+        baseStrategyImplementation = new StrategyBaseTVLLimits(strategyManager, eigenLayerPauserReg);
         // create upgradeable proxies that each point to the implementation and initialize them
         for (uint256 i = 0; i < strategyConfigs.length; ++i) {
             deployedStrategyArray.push(

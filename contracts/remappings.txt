@@ -1,1 +1,2 @@
-@openzeppelin/=node_modules/@openzeppelin/
+@openzeppelin/=lib/eigenlayer-middleware/lib/openzeppelin-contracts
+@openzeppelin-upgrades/=lib/eigenlayer-middleware/lib/openzeppelin-contracts-upgradeable
