@@ -79,7 +79,7 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 			// get the size
 			numG2point := uint64(fileSizeByte / kzg.G2PointBytes)
 			if numG2point < kzgConfig.SRSNumberToLoad {
-				return nil, fmt.Errorf("insufficent number of g2 points from G2TrailingPath. Requested %v, Acutal %v", kzgConfig.SRSNumberToLoad, numG2point)
+				return nil, fmt.Errorf("insufficent number of g2 points from G2TrailingPath. Requested %v, Actual %v", kzgConfig.SRSNumberToLoad, numG2point)
 			}
 
 			// use g2 trailing file
