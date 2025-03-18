@@ -51,29 +51,35 @@ import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 
 contract DeployVerifiable is Script {
+    // The intended owner of all the contracts after the full deployment process is completed.
     address initialOwner;
 
+    // All proxies and implementations to upgrade them to, namespaced in structs.
     ProxyAdmin proxyAdmin;
+    DeployedAddresses proxies;
+    DeployedAddresses implementations;
 
+    // Contracts deployed without a proxy
+    IPauserRegistry pauserRegistry;
+
+    // Configuration parameters for construction of implementations
     address rewardsCoordinator;
     address avsDirectory;
     address delegationManager;
     address churnApprover;
     address ejector;
 
-    DeployedAddresses proxies;
-    DeployedAddresses implementations;
-
-    IPauserRegistry pauserRegistry;
-
     uint256 initialPausedStatus;
 
+    // Inert implementation contracts used as initial implementations before the proxies are initialized
     address emptyContract;
     address mockStakeRegistry;
     address mockRegistryCoordinator;
 
+    // A contract that would be called after this deployment by the initialOwner to initialize the contracts.
     DeploymentInitializer deploymentInitializer;
 
+    // Script config
     string configData;
 
     /// @dev override this if you don't want to use the environment to get the config path
@@ -82,7 +88,7 @@ contract DeployVerifiable is Script {
     }
 
     function run() public {
-        // READ JSON CONFIG DATA
+        // Read JSON config
         configData = vm.readFile(_configPath());
         initialOwner = stdJson.readAddress(configData, ".initialOwner");
         rewardsCoordinator = stdJson.readAddress(configData, ".initParams.shared.rewardsCoordinator");
@@ -93,6 +99,7 @@ contract DeployVerifiable is Script {
         vm.startBroadcast();
         proxyAdmin = new ProxyAdmin();
         emptyContract = address(new EmptyContract());
+        mockStakeRegistry = address(new MockStakeRegistry(IDelegationManager(delegationManager)));
         pauserRegistry = IPauserRegistry(
             new PauserRegistry(
                 stdJson.readAddressArray(configData, ".initParams.core.pauserRegistry.pausers"),
@@ -100,16 +107,42 @@ contract DeployVerifiable is Script {
             )
         );
 
+        _deployInertProxies();
+        _deployImplementations();
+
+        // Deploy deployment initializer
+        deploymentInitializer = new DeploymentInitializer(_immutableInitParams());
+
+        // Transfer ownership of proxy admin to deployment initializer
+        proxyAdmin.transferOwnership(address(deploymentInitializer));
+
+        vm.stopBroadcast();
+
+        _doTests(configData);
+    }
+
+    function _doTests(string memory cfg) internal {
+        vm.startPrank(initialOwner);
+        CalldataInitParams memory params = CalldataInitParamsLib.getCalldataInitParams(cfg);
+        deploymentInitializer.initializeDeployment(params);
+
+        // TODO: Add more tests
+
+        vm.stopPrank();
+    }
+    function _deployInertProxies() internal virtual {
+        proxyAdmin = new ProxyAdmin();
+        emptyContract = address(new EmptyContract());
+        mockStakeRegistry = address(new MockStakeRegistry(IDelegationManager(delegationManager)));
+
         // Deploy empty contracts to get addresses
         proxies.indexRegistry = address(new TransparentUpgradeableProxy(emptyContract, address(proxyAdmin), ""));
-
         // The mock stake registry is needed by the service manager contract's constructor
-        mockStakeRegistry = address(new MockStakeRegistry(IDelegationManager(delegationManager)));
         proxies.stakeRegistry = address(new TransparentUpgradeableProxy(mockStakeRegistry, address(proxyAdmin), ""));
         proxies.socketRegistry = address(new TransparentUpgradeableProxy(emptyContract, address(proxyAdmin), ""));
         proxies.blsApkRegistry = address(new TransparentUpgradeableProxy(emptyContract, address(proxyAdmin), ""));
-
-        // The mock registry coordinator is needed by the service manager contract's constructor
+        // The mock registry coordinator is needed by the service manager contract's constructor.
+        // It is deployed here after the needed proxy addresses are known.
         mockRegistryCoordinator = address(
             new MockRegistryCoordinator(IStakeRegistry(proxies.stakeRegistry), IBLSApkRegistry(proxies.blsApkRegistry))
         );
@@ -120,8 +153,9 @@ contract DeployVerifiable is Script {
         proxies.paymentVault = address(new TransparentUpgradeableProxy(emptyContract, address(proxyAdmin), ""));
         proxies.disperserRegistry = address(new TransparentUpgradeableProxy(emptyContract, address(proxyAdmin), ""));
         proxies.serviceManager = address(new TransparentUpgradeableProxy(emptyContract, address(proxyAdmin), ""));
+    }
 
-        // Deploy implementations
+    function _deployImplementations() internal virtual {
         implementations.indexRegistry = address(new IndexRegistry(IRegistryCoordinator(proxies.registryCoordinator)));
         implementations.stakeRegistry = address(
             new StakeRegistry(IRegistryCoordinator(proxies.registryCoordinator), IDelegationManager(delegationManager))
@@ -153,29 +187,9 @@ contract DeployVerifiable is Script {
                 IEigenDADisperserRegistry(proxies.disperserRegistry)
             )
         );
-
-        // Deploy deployment initializer
-        deploymentInitializer = new DeploymentInitializer(initParams());
-
-        // Transfer ownership of proxy admin to deployment initializer
-        proxyAdmin.transferOwnership(address(deploymentInitializer));
-
-        vm.stopBroadcast();
-
-        doTests(configData);
     }
 
-    function doTests(string memory cfg) internal {
-        vm.startPrank(initialOwner);
-        CalldataInitParams memory params = CalldataInitParamsLib.getCalldataInitParams(cfg);
-        deploymentInitializer.initializeDeployment(params);
-
-        // TODO: Add more tests
-
-        vm.stopPrank();
-    }
-
-    function initParams() internal view returns (ImmutableInitParams memory) {
+    function _immutableInitParams() internal view returns (ImmutableInitParams memory) {
         ImmutableRegistryCoordinatorParams memory registryCoordinatorParams = ImmutableRegistryCoordinatorParams({
             churnApprover: stdJson.readAddress(configData, ".initParams.middleware.registryCoordinator.churnApprover"),
             ejector: stdJson.readAddress(configData, ".initParams.middleware.registryCoordinator.ejector")
