@@ -276,8 +276,6 @@ data in internal buffers before writing it to disk, and do not necessarily write
 only as robust as the OS/hardware it is running on. This is true for any database, but it is worth mentioning here
 for the sake of completeness.
 
-TODO fsync
-
 ## Flushing
 
 Calling `Flush()` causes all data previously written to be written [durably](#durability) to disk. A call to `Flush()`
