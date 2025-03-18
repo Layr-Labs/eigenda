@@ -19,7 +19,7 @@ import "./DeploymentTypes.sol";
  * @title DeploymentInitializer
  * @author Layr Labs, Inc.
  * @notice This contract is intended to be used by a multisig to verify a deployment.
- * It accomplishes this by storing all the parameters needed to initialize the contracts that are not dynamically sized.
+ * It accomplishes this by storing all the statically-sized parameters needed to initialize the contracts.
  * The dynamically sized parameters are passed in as calldata by the multisig to avoid using storage and save deployment costs.
  */
 contract DeploymentInitializer {
