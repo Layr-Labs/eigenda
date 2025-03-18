@@ -14,7 +14,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-const namespace = "eigenda_dataapi"
+const namespace = "eigenda"
+const subsystem = "dataapi"
 
 type FeedCacheMetrics struct {
 	// Time range metrics
@@ -30,6 +31,7 @@ func NewFeedCacheMetrics(name string, registry *prometheus.Registry) *FeedCacheM
 	cacheTimeRangeSeconds := promauto.With(registry).NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
+			Subsystem: subsystem,
 			Name:      fmt.Sprintf("%s_cache_time_range_seconds", name),
 			Help:      "Time range in seconds currently covered by the cache",
 		},
@@ -38,6 +40,7 @@ func NewFeedCacheMetrics(name string, registry *prometheus.Registry) *FeedCacheM
 	cacheSegmentStartTimestamp := promauto.With(registry).NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
+			Subsystem: subsystem,
 			Name:      fmt.Sprintf("%s_cache_segment_start_timestamp_seconds", name),
 			Help:      "Unix timestamp of the earliest item in the cache",
 		},
@@ -46,6 +49,7 @@ func NewFeedCacheMetrics(name string, registry *prometheus.Registry) *FeedCacheM
 	cacheSegmentEndTimestamp := promauto.With(registry).NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
+			Subsystem: subsystem,
 			Name:      fmt.Sprintf("%s_cache_segment_end_timestamp_seconds", name),
 			Help:      "Unix timestamp of the latest item in the cache",
 		},
@@ -54,6 +58,7 @@ func NewFeedCacheMetrics(name string, registry *prometheus.Registry) *FeedCacheM
 	cacheHitRatePercent := promauto.With(registry).NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
+			Subsystem: subsystem,
 			Name:      fmt.Sprintf("%s_cache_hit_rate_percent", name),
 			Help:      "Percentage of items served from cache vs total items requested",
 		},

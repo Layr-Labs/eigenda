@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/disperser"
-
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
