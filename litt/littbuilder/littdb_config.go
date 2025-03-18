@@ -33,7 +33,7 @@ type LittDBConfig struct {
 	Paths []string
 
 	// The logger configuration for the database.
-	loggerConfig common.LoggerConfig
+	LoggerConfig common.LoggerConfig
 
 	// The type of the keymap. Choices are keymap.MemKeymapType and keymap.LevelDBKeymapType.
 	// Default is keymap.LevelDBKeymapType.
@@ -80,7 +80,7 @@ func DefaultConfig(paths ...string) (*LittDBConfig, error) {
 
 	return &LittDBConfig{
 		Paths:                 paths,
-		loggerConfig:          common.DefaultLoggerConfig(),
+		LoggerConfig:          common.DefaultLoggerConfig(),
 		TimeSource:            time.Now,
 		GCPeriod:              5 * time.Minute,
 		ShardingFactor:        8,
@@ -260,7 +260,7 @@ func (c *LittDBConfig) buildTable(
 // Build creates a new litt.DB from the configuration. After calling Build, the configuration should not be
 // modified.
 func (c *LittDBConfig) Build(ctx context.Context) (litt.DB, error) {
-	logger, err := common.NewLogger(c.loggerConfig)
+	logger, err := common.NewLogger(c.LoggerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error creating logger: %w", err)
 	}
