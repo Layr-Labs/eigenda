@@ -15,6 +15,7 @@ Note: this document is a work in progress.
     - [Configuration Options](#configuration-options)
 - [Definitions](#definitions)
 - [Architecture](#architecture)
+    - [Big Picture Diagram](#putting-it-all-together-littdb) 
 - [File Layout](#file-layout)
 
 # What is LittDB?
@@ -485,7 +486,7 @@ of data as a single large value is more efficient than writing X bytes of data a
 
 This section explains the high level architecture of LittDB. It starts out by describing a simple (but inefficient) 
 storage solution, and incrementally adds complexity in order to solve various problems. For the full picture, skip to 
-[Final Iteration: LittDB](#final-iteration-littdb).
+[Putting it all together: LittDB](#putting-it-all-together-littdb).
 
 For each iteration, the database is must fulfill the following requirements:
 - must support `put(key, value)`/`get(key)` operations
