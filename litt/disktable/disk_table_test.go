@@ -96,7 +96,8 @@ func buildMemKeyDiskTableSingleShard(
 		random.NewTestRandom().Rand,
 		0,
 		1*time.Millisecond,
-		true)
+		true,
+		false)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -143,7 +144,8 @@ func buildMemKeyDiskTableMultiShard(
 		random.NewTestRandom().Rand,
 		0,
 		1*time.Millisecond,
-		true)
+		true,
+		false)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -193,6 +195,7 @@ func buildLevelDBKeyDiskTableSingleShard(
 		random.NewTestRandom().Rand,
 		0,
 		1*time.Millisecond,
+		false,
 		false)
 
 	if err != nil {
@@ -243,6 +246,7 @@ func buildLevelDBKeyDiskTableMultiShard(
 		random.NewTestRandom().Rand,
 		0,
 		1*time.Millisecond,
+		false,
 		false)
 
 	if err != nil {
@@ -423,7 +427,8 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0)
+		0,
+		false)
 	require.NoError(t, err)
 
 	middleIndex := lowestSegmentIndex + (highestSegmentIndex-lowestSegmentIndex)/2
@@ -531,7 +536,8 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelet
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0)
+		0,
+		false)
 	require.NoError(t, err)
 
 	// All keys in the initial segment are expected to be missing after the restart.
@@ -714,7 +720,8 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete s
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0)
+		0,
+		false)
 	require.NoError(t, err)
 
 	// All keys in the final segment are expected to be missing after the restart.
@@ -900,7 +907,8 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0)
+		0,
+		false)
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
 		directory, highestSegmentIndex, segment.KeysFileExtension)
@@ -927,7 +935,8 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0)
+		0,
+		false)
 	require.NoError(t, err)
 
 	// Truncate the last key file.
@@ -1123,7 +1132,8 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0)
+		0,
+		false)
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
 		directory, highestSegmentIndex, segment.KeysFileExtension)
@@ -1150,7 +1160,8 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0)
+		0,
+		false)
 	require.NoError(t, err)
 
 	// Truncate a random shard of the last value file.
@@ -1367,7 +1378,8 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0)
+		0,
+		false)
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
 		directory, highestSegmentIndex, segment.KeysFileExtension)
@@ -1393,7 +1405,8 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 		[]string{directory + "/table/segments"},
 		time.Now(),
 		0,
-		0)
+		0,
+		false)
 	require.NoError(t, err)
 
 	// Identify keys in the last file. These will be removed from the keymap to simulate keys that have not

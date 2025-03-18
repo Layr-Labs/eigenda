@@ -39,6 +39,9 @@ type valueFile struct {
 
 	// The current size of the file in bytes. Includes both flushed and unflushed data.
 	currentSize uint64
+
+	// Whether fsync mode is enabled.
+	fsync bool
 }
 
 // newValueFile creates a new value file.
@@ -47,13 +50,15 @@ func newValueFile(
 	index uint32,
 	shard uint32,
 	parentDirectory string,
-	sealed bool) (*valueFile, error) {
+	sealed bool,
+	fsync bool) (*valueFile, error) {
 
 	values := &valueFile{
 		logger:          logger,
 		index:           index,
 		shard:           shard,
 		parentDirectory: parentDirectory,
+		fsync:           fsync,
 	}
 
 	filePath := values.path()
@@ -180,9 +185,11 @@ func (v *valueFile) flush() error {
 		return fmt.Errorf("failed to flush value file: %v", err)
 	}
 
-	err = v.file.Sync()
-	if err != nil {
-		return fmt.Errorf("failed to sync value file: %v", err)
+	if v.fsync {
+		err = v.file.Sync()
+		if err != nil {
+			return fmt.Errorf("failed to sync value file: %v", err)
+		}
 	}
 
 	return nil

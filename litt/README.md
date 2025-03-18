@@ -210,6 +210,9 @@ are present to support testing.
   PRNG seeded with the current time.
 - `CacheSize`: the size of the [in-memory cache](#cache), in bytes. The default 1GB.
 - `TimeSource`*: a function that returns the current time. The default is `time.Now()`.
+- `Fsync`: if true, then each flush operation performs an fsync operation. Ensures the data is durable even if the
+  OS crashes. Otherwise, there may be data in the OS's internal buffers. This may cause significant performance
+  overhead. The default is `false`.
 
 # Definitions
 

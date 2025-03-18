@@ -96,6 +96,9 @@ type DiskTable struct {
 
 	// timeSource is the time source used by the disk table.
 	timeSource func() time.Time
+
+	// whether fsync mode is enabled.
+	fsync bool
 }
 
 // NewDiskTable creates a new DiskTable.
@@ -114,7 +117,8 @@ func NewDiskTable(
 	saltShaker *rand.Rand,
 	ttl time.Duration,
 	gcPeriod time.Duration,
-	reloadKeymap bool) (litt.ManagedTable, error) {
+	reloadKeymap bool,
+	fsync bool) (litt.ManagedTable, error) {
 
 	if gcPeriod <= 0 {
 		return nil, fmt.Errorf("garbage collection period must be greater than 0")
@@ -200,6 +204,7 @@ func NewDiskTable(
 		controllerChannel:       make(chan any, controlChannelSize),
 		flushChannel:            make(chan any, tableFlushChannelCapacity),
 		garbageCollectionPeriod: gcPeriod,
+		fsync:                   fsync,
 	}
 
 	var err error
@@ -210,7 +215,8 @@ func NewDiskTable(
 			table.segmentDirectories,
 			timeSource(),
 			shardingFactor,
-			saltShaker.Uint32())
+			saltShaker.Uint32(),
+			fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather segment files: %v", err)
 	}
@@ -232,7 +238,8 @@ func NewDiskTable(
 		timeSource(),
 		metadata.GetShardingFactor(),
 		saltShaker.Uint32(),
-		false)
+		false,
+		fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mutable segment: %v", err)
 	}
@@ -725,7 +732,8 @@ func (d *DiskTable) expandSegments() error {
 		now,
 		d.metadata.GetShardingFactor(),
 		d.saltShaker.Uint32(),
-		false)
+		false,
+		d.fsync)
 	if err != nil {
 		return err
 	}

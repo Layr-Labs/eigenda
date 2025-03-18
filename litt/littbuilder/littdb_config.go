@@ -67,6 +67,10 @@ type LittDBConfig struct {
 	// The time source used by the database. This can be substituted for an artificial time source
 	// for testing purposes. The default is time.Now.
 	TimeSource func() time.Time
+
+	// If true, then flush operations will call fsync on the underlying file to ensure data is flushed out of the
+	// operating system's buffer and onto disk. This may have performance implications. The default is false.
+	Fsync bool
 }
 
 // DefaultConfig returns a Config with default values.
@@ -88,6 +92,7 @@ func DefaultConfig(paths ...string) (*LittDBConfig, error) {
 		KeymapType:            keymap.LevelDBKeymapType,
 		ControlChannelSize:    64,
 		TargetSegmentFileSize: math.MaxUint32,
+		Fsync:                 false,
 	}, nil
 }
 
@@ -244,7 +249,8 @@ func (c *LittDBConfig) buildTable(
 		c.SaltShaker,
 		ttl,
 		c.GCPeriod,
-		requiresReload)
+		requiresReload,
+		c.Fsync)
 
 	if err != nil {
 		return nil, fmt.Errorf("error creating table: %w", err)
