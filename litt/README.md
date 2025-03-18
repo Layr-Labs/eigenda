@@ -694,7 +694,7 @@ data in one table would not conflict with data in another table.
 
 This is simple! Let's just run a different DB instance for each table.
 
-![iterationX](./resources/iterationX.png)
+![](./resources/iteration9.png)
 
 Since each table might want to have its own configuration, we can store that configuration in a metadata file for each
 table.
