@@ -112,11 +112,11 @@ func (c *StdAssignmentCoordinator) GetAssignments(state *OperatorState, blobLeng
 
 	// Get NumPar
 	numChunks := uint(0)
-	totalStakes := state.Totals[quorum].Stake
+	totalStakes := state.Totals[quorum].EffectiveStake
 	for _, r := range state.Operators[quorum] {
 
 		// m_i = ceil( B*S_i / C \gamma \sum_{j=1}^N S_j )
-		num := new(big.Int).Mul(big.NewInt(int64(blobLength*percentMultiplier)), r.Stake)
+		num := new(big.Int).Mul(big.NewInt(int64(blobLength*percentMultiplier)), r.EffectiveStake)
 
 		gammaChunkLength := big.NewInt(int64(info.ChunkLength) * int64((info.ConfirmationThreshold - info.AdversaryThreshold)))
 		if gammaChunkLength.Cmp(big.NewInt(0)) <= 0 {
@@ -189,14 +189,14 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, blo
 	}
 
 	// Get minimum stake amount
-	minStake := state.Totals[info.QuorumID].Stake
+	minStake := state.Totals[info.QuorumID].EffectiveStake
 	for _, r := range state.Operators[info.QuorumID] {
-		if r.Stake.Cmp(minStake) < 0 {
-			minStake = r.Stake
+		if r.EffectiveStake.Cmp(minStake) < 0 {
+			minStake = r.EffectiveStake
 		}
 	}
 
-	totalStake := state.Totals[info.QuorumID].Stake
+	totalStake := state.Totals[info.QuorumID].EffectiveStake
 	if info.ChunkLength != MinChunkLength {
 		if totalStake.Cmp(big.NewInt(0)) == 0 {
 			return false, fmt.Errorf("total stake in quorum %d must be greater than 0", info.QuorumID)

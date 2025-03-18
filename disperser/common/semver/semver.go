@@ -53,16 +53,23 @@ func ScanOperators(operators map[core.OperatorID]*core.IndexedOperatorInfo, oper
 			// Calculate stake percentage for each quorum
 			for quorum, totalOperatorInfo := range operatorState.Totals {
 				stakePercentage := float64(0)
+				effectiveStakePercentage := float64(0)
 				if stake, ok := operatorState.Operators[quorum][operatorId]; ok {
 					totalStake := new(big.Float).SetInt(totalOperatorInfo.Stake)
+					totalEffectiveStake := new(big.Float).SetInt(totalOperatorInfo.EffectiveStake)
 					operatorStake := new(big.Float).SetInt(stake.Stake)
+					operatorEffectiveStake := new(big.Float).SetInt(stake.EffectiveStake)
 					stakePercentage, _ = new(big.Float).Mul(big.NewFloat(100), new(big.Float).Quo(operatorStake, totalStake)).Float64()
+					effectiveStakePercentage, _ = new(big.Float).Mul(big.NewFloat(100), new(big.Float).Quo(operatorEffectiveStake, totalEffectiveStake)).Float64()
 				}
+				logger.Info("operator", "operatorId", operatorId.Hex(), "quorum", quorum, "stakePercentage", stakePercentage, "effectiveStakePercentage", effectiveStakePercentage)
 
 				if _, exists := semvers[semver].QuorumStakePercentage[quorum]; !exists {
 					semvers[semver].QuorumStakePercentage[quorum] = stakePercentage
+					// semvers[semver].QuorumEffectiveStakePercentage[quorum] = effectiveStakePercentage
 				} else {
 					semvers[semver].QuorumStakePercentage[quorum] += stakePercentage
+					// semvers[semver].QuorumEffectiveStakePercentage[quorum] += effectiveStakePercentage
 				}
 			}
 			mu.Unlock()

@@ -190,7 +190,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 			signerMap[r.Operator] = true
 
 			// Add to stake signed
-			stakeSigned[quorumID].Add(stakeSigned[quorumID], opInfo.Stake)
+			stakeSigned[quorumID].Add(stakeSigned[quorumID], opInfo.EffectiveStake)
 
 			// Add to agg signature
 			if aggSigs[quorumID] == nil {
@@ -355,14 +355,14 @@ func GetStakeThreshold(state *OperatorState, quorum QuorumID, quorumThreshold ui
 	// Get stake threshold
 	quorumThresholdBig := new(big.Int).SetUint64(uint64(quorumThreshold))
 	stakeThreshold := new(big.Int)
-	stakeThreshold.Mul(quorumThresholdBig, state.Totals[quorum].Stake)
+	stakeThreshold.Mul(quorumThresholdBig, state.Totals[quorum].EffectiveStake)
 	stakeThreshold = RoundUpDivideBig(stakeThreshold, new(big.Int).SetUint64(percentMultiplier))
 
 	return stakeThreshold
 }
 
 func GetSignedPercentage(state *OperatorState, quorum QuorumID, stakeAmount *big.Int) uint8 {
-	totalStake := state.Totals[quorum].Stake
+	totalStake := state.Totals[quorum].EffectiveStake
 	if totalStake.Cmp(big.NewInt(0)) == 0 {
 		return 0
 	}

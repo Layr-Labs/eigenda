@@ -184,9 +184,11 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 				continue
 			}
 
+			stakeAmount := big.NewInt(int64(stake))
 			storedOperators[quorumID][opID] = &core.OperatorInfo{
-				Stake: big.NewInt(int64(stake)),
-				Index: index,
+				Stake:          stakeAmount,
+				EffectiveStake: new(big.Int).Set(stakeAmount), // Initialize as same as stake, will be capped later
+				Index:          index,
 			}
 			index++
 		}
@@ -195,9 +197,11 @@ func (d *ChainDataMock) GetTotalOperatorStateWithQuorums(ctx context.Context, bl
 		for _, stake := range d.Stakes[quorumID] {
 			quorumStake += stake
 		}
+		totalStake := big.NewInt(int64(quorumStake))
 		totals[quorumID] = &core.OperatorInfo{
-			Stake: big.NewInt(int64(quorumStake)),
-			Index: uint(len(d.Stakes[quorumID])),
+			Stake:          totalStake,
+			EffectiveStake: new(big.Int).Set(totalStake), // Initialize as same as total stake
+			Index:          uint(len(d.Stakes[quorumID])),
 		}
 	}
 

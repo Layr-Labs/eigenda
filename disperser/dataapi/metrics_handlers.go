@@ -32,12 +32,18 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64) 
 		return nil, fmt.Errorf("Requesting for %d quorums (quorumID=%v), but got %v", quorumCount, quorumIDs, operatorState.Operators)
 	}
 	totalStakePerQuorum := map[core.QuorumID]*big.Int{}
+	totalEffectiveStakePerQuorum := map[core.QuorumID]*big.Int{}
 	for quorumID, opInfoByID := range operatorState.Operators {
 		for _, opInfo := range opInfoByID {
 			if s, ok := totalStakePerQuorum[quorumID]; !ok {
 				totalStakePerQuorum[quorumID] = new(big.Int).Set(opInfo.Stake)
 			} else {
 				s.Add(s, opInfo.Stake)
+			}
+			if s, ok := totalEffectiveStakePerQuorum[quorumID]; !ok {
+				totalEffectiveStakePerQuorum[quorumID] = new(big.Int).Set(opInfo.EffectiveStake)
+			} else {
+				s.Add(s, opInfo.EffectiveStake)
 			}
 		}
 	}
@@ -53,10 +59,11 @@ func (s *server) getMetric(ctx context.Context, startTime int64, endTime int64) 
 	}
 
 	return &Metric{
-		Throughput:          throughput,
-		CostInGas:           costInGas,
-		TotalStake:          totalStakePerQuorum[0],
-		TotalStakePerQuorum: totalStakePerQuorum,
+		Throughput:                   throughput,
+		CostInGas:                    costInGas,
+		TotalStake:                   totalStakePerQuorum[0],
+		TotalStakePerQuorum:          totalStakePerQuorum,
+		TotalEffectiveStakePerQuorum: totalEffectiveStakePerQuorum,
 	}, nil
 }
 
