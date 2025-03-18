@@ -341,10 +341,10 @@ does not hurt performance, and so the complexity of its implementation is justif
 
 ## Segment
 
-Data in LittDB [table](#table) can be visualized as a linked list. Each element in that linked is called a "segment". 
-A segment can hold many individual [values](#value). Old data is near the beginning of the list, and new data is near 
-the end. Old, [expired](#ttl) data is always deleted from the first segment currently in the list. New data is always 
-written to the last segment currently in the list.
+Data in LittDB [table](#table) can be visualized as a linked list. Each element in that linked list is called a 
+"segment". A segment can hold many individual [values](#value). Old data is near the beginning of the list, and new 
+data is near the end. Old, [expired](#ttl) data is always deleted from the first segment currently in the list. New 
+data is always written to the last segment currently in the list.
 
 Segments are deleted as a whole. That is, when a segment is deleted, all data in that segment is deleted at the same
 time. Segments are only deleted when all data contained within them has [expired](#ttl).
