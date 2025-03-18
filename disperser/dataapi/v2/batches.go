@@ -102,6 +102,7 @@ func ParseFeedParams(c *gin.Context, metrics *dataapi.Metrics, handlerName strin
 //	@Summary	Fetch batch feed dispersed to an operator in specified direction
 //	@Tags		Batches
 //	@Produce	json
+//	@Param		operator_id path		string	true	"The operator ID to fetch batch feed for"
 //	@Param		direction	query		string	false	"Direction to fetch: 'forward' (oldest to newest, ASC order) or 'backward' (newest to oldest, DESC order) [default: forward]"
 //	@Param		before		query		string	false	"Fetch batches before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]"
 //	@Param		after		query		string	false	"Fetch batches after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than `before` [default: `before`-1h]"
