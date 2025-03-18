@@ -10,6 +10,7 @@ import (
 const (
 	G1PathFlagName            = "kzg.g1-path"
 	G2PathFlagName            = "kzg.g2-path"
+	G2TrailingPathFlagName    = "kzg.g2-trailing-path"
 	CachePathFlagName         = "kzg.cache-path"
 	SRSOrderFlagName          = "kzg.srs-order"
 	NumWorkerFlagName         = "kzg.num-workers"
@@ -33,6 +34,12 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:    "Path to G2 SRS. Either this flag or G2_POWER_OF_2_PATH needs to be specified. For operator node, if both are specified, the node uses G2_POWER_OF_2_PATH first, if failed then tries to G2_PATH",
 			Required: false,
 			EnvVar:   common.PrefixEnvVar(envPrefix, "G2_PATH"),
+		},
+		cli.StringFlag{
+			Name:     G2TrailingPathFlagName,
+			Usage:    "Path to trailing G2 SRS file. User can specify a file that contains the trailing end of the G2 SRS points. Using this flag has the advantage to download less G2 SRS file in order to compute the length proof. If you already downloaded the entire G2 SRS file, feel free to ignore this option.",
+			Required: false,
+			EnvVar:   common.PrefixEnvVar(envPrefix, "G2_TRAILING_PATH"),
 		},
 		cli.StringFlag{
 			Name:     CachePathFlagName,
@@ -90,6 +97,7 @@ func ReadCLIConfig(ctx *cli.Context) KzgConfig {
 	cfg := KzgConfig{}
 	cfg.G1Path = ctx.GlobalString(G1PathFlagName)
 	cfg.G2Path = ctx.GlobalString(G2PathFlagName)
+	cfg.G2TrailingPath = ctx.GlobalString(G2TrailingPathFlagName)
 	cfg.CacheDir = ctx.GlobalString(CachePathFlagName)
 	cfg.SRSOrder = ctx.GlobalUint64(SRSOrderFlagName)
 	cfg.SRSNumberToLoad = ctx.GlobalUint64(SRSLoadingNumberFlagName)

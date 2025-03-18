@@ -66,12 +66,25 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 			return nil, err
 		}
 
-		g2Trailing, err = kzg.ReadG2PointSection(
-			kzgConfig.G2Path,
-			kzgConfig.SRSOrder-kzgConfig.SRSNumberToLoad,
-			kzgConfig.SRSOrder, // last exclusive
-			kzgConfig.NumWorker,
-		)
+		hasG2TrailingFile := len(kzgConfig.G2TrailingPath) != 0
+		if hasG2TrailingFile {
+			// use g2 trailing file
+			g2Trailing, err = kzg.ReadG2PointSection(
+				kzgConfig.G2TrailingPath,
+				0,
+				kzgConfig.SRSNumberToLoad, // last exclusive
+				kzgConfig.NumWorker,
+			)
+		} else {
+			// require entire g2 srs be available on disk
+			g2Trailing, err = kzg.ReadG2PointSection(
+				kzgConfig.G2Path,
+				kzgConfig.SRSOrder-kzgConfig.SRSNumberToLoad,
+				kzgConfig.SRSOrder, // last exclusive
+				kzgConfig.NumWorker,
+			)
+		}
+
 		if err != nil {
 			return nil, err
 		}

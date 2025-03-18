@@ -3,6 +3,7 @@ package kzg
 type KzgConfig struct {
 	G1Path          string
 	G2Path          string
+	G2TrailingPath  string
 	G1PowerOf2Path  string
 	G2PowerOf2Path  string
 	CacheDir        string
