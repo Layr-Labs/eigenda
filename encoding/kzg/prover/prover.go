@@ -68,8 +68,8 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 
 		hasG2TrailingFile := len(kzgConfig.G2TrailingPath) != 0
 		if hasG2TrailingFile {
-			fileStat, err := os.Stat(kzgConfig.G2TrailingPath)
-			if err != nil {
+			fileStat, errStat := os.Stat(kzgConfig.G2TrailingPath)
+			if errStat != nil {
 				return nil, err
 			}
 			fileSizeByte := fileStat.Size()
