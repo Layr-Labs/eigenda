@@ -85,18 +85,19 @@ contract DeployVerifiable is Script {
     function run() public {
         // READ JSON CONFIG DATA
         configData = vm.readFile(_configPath());
-        rewardsCoordinator = stdJson.readAddress(configData, ".rewardsCoordinator");
-        avsDirectory = stdJson.readAddress(configData, ".avsDirectory");
-        delegationManager = stdJson.readAddress(configData, ".delegationManager");
         initialOwner = stdJson.readAddress(configData, ".initialOwner");
+        rewardsCoordinator = stdJson.readAddress(configData, ".initParams.shared.rewardsCoordinator");
+        avsDirectory = stdJson.readAddress(configData, ".initParams.shared.avsDirectory");
+        delegationManager = stdJson.readAddress(configData, ".initParams.shared.delegationManager");
+        initialPausedStatus = stdJson.readUint(configData, ".initParams.shared.initialPausedStatus");
 
         vm.startBroadcast();
         proxyAdmin = new ProxyAdmin();
         emptyContract = address(new EmptyContract());
         pauserRegistry = IPauserRegistry(
             new PauserRegistry(
-                stdJson.readAddressArray(configData, ".pauserRegistry.pausers"),
-                stdJson.readAddress(configData, ".pauserRegistry.unpauser")
+                stdJson.readAddressArray(configData, ".initParams.core.pauserRegistry.pausers"),
+                stdJson.readAddress(configData, ".initParams.core.pauserRegistry.unpauser")
             )
         );
 
@@ -177,19 +178,27 @@ contract DeployVerifiable is Script {
 
     function initParams() internal view returns (ImmutableInitParams memory) {
         ImmutableRegistryCoordinatorParams memory registryCoordinatorParams = ImmutableRegistryCoordinatorParams({
-            churnApprover: stdJson.readAddress(configData, ".registryCoordinator.churnApprover"),
-            ejector: stdJson.readAddress(configData, ".registryCoordinator.ejector")
+            churnApprover: stdJson.readAddress(configData, ".initParams.middleware.registryCoordinator.churnApprover"),
+            ejector: stdJson.readAddress(configData, ".initParams.middleware.registryCoordinator.ejector")
         });
         ImmutablePaymentVaultParams memory paymentVaultParams = ImmutablePaymentVaultParams({
-            minNumSymbols: uint64(stdJson.readUint(configData, ".paymentVault.minNumSymbols")),
-            pricePerSymbol: uint64(stdJson.readUint(configData, ".paymentVault.pricePerSymbol")),
-            priceUpdateCooldown: uint64(stdJson.readUint(configData, ".paymentVault.priceUpdateCooldown")),
-            globalSymbolsPerPeriod: uint64(stdJson.readUint(configData, ".paymentVault.globalSymbolsPerPeriod")),
-            reservationPeriodInterval: uint64(stdJson.readUint(configData, ".paymentVault.reservationPeriodInterval")),
-            globalRatePeriodInterval: uint64(stdJson.readUint(configData, ".paymentVault.globalRatePeriodInterval"))
+            minNumSymbols: uint64(stdJson.readUint(configData, ".initParams.eigenDA.paymentVault.minNumSymbols")),
+            pricePerSymbol: uint64(stdJson.readUint(configData, ".initParams.eigenDA.paymentVault.pricePerSymbol")),
+            priceUpdateCooldown: uint64(
+                stdJson.readUint(configData, ".initParams.eigenDA.paymentVault.priceUpdateCooldown")
+            ),
+            globalSymbolsPerPeriod: uint64(
+                stdJson.readUint(configData, ".initParams.eigenDA.paymentVault.globalSymbolsPerPeriod")
+            ),
+            reservationPeriodInterval: uint64(
+                stdJson.readUint(configData, ".initParams.eigenDA.paymentVault.reservationPeriodInterval")
+            ),
+            globalRatePeriodInterval: uint64(
+                stdJson.readUint(configData, ".initParams.eigenDA.paymentVault.globalRatePeriodInterval")
+            )
         });
         ImmutableServiceManagerParams memory serviceManagerParams = ImmutableServiceManagerParams({
-            rewardsInitiator: stdJson.readAddress(configData, ".serviceManager.rewardsInitiator")
+            rewardsInitiator: stdJson.readAddress(configData, ".initParams.eigenDA.serviceManager.rewardsInitiator")
         });
 
         return ImmutableInitParams({
@@ -212,12 +221,14 @@ library CalldataInitParamsLib {
         pure
         returns (IRegistryCoordinator.OperatorSetParam[] memory)
     {
-        bytes memory operatorConfigsRaw = stdJson.parseRaw(configData, ".registryCoordinator.operatorSetParams");
+        bytes memory operatorConfigsRaw =
+            stdJson.parseRaw(configData, ".initParams.middleware.registryCoordinator.operatorSetParams");
         return abi.decode(operatorConfigsRaw, (IRegistryCoordinator.OperatorSetParam[]));
     }
 
     function minimumStakes(string memory configData) internal pure returns (uint96[] memory) {
-        bytes memory stakesConfigsRaw = stdJson.parseRaw(configData, ".registryCoordinator.minimumStakes");
+        bytes memory stakesConfigsRaw =
+            stdJson.parseRaw(configData, ".initParams.middleware.registryCoordinator.minimumStakes");
         return abi.decode(stakesConfigsRaw, (uint96[]));
     }
 
@@ -226,29 +237,34 @@ library CalldataInitParamsLib {
         pure
         returns (IStakeRegistry.StrategyParams[][] memory)
     {
-        bytes memory strategyConfigsRaw = stdJson.parseRaw(configData, ".registryCoordinator.strategyParams");
+        bytes memory strategyConfigsRaw =
+            stdJson.parseRaw(configData, ".initParams.middleware.registryCoordinator.strategyParams");
         return abi.decode(strategyConfigsRaw, (IStakeRegistry.StrategyParams[][]));
     }
 
     function quorumAdversaryThresholdPercentages(string memory configData) internal pure returns (bytes memory) {
-        return stdJson.readBytes(configData, ".thresholdRegistry.quorumAdversaryThresholdPercentages");
+        return
+            stdJson.readBytes(configData, ".initParams.eigenDA.thresholdRegistry.quorumAdversaryThresholdPercentages");
     }
 
     function quorumConfirmationThresholdPercentages(string memory configData) internal pure returns (bytes memory) {
-        return stdJson.readBytes(configData, ".thresholdRegistry.quorumConfirmationThresholdPercentages");
+        return stdJson.readBytes(
+            configData, ".initParams.eigenDA.thresholdRegistry.quorumConfirmationThresholdPercentages"
+        );
     }
 
     function quorumNumbersRequired(string memory configData) internal pure returns (bytes memory) {
-        return stdJson.readBytes(configData, ".thresholdRegistry.quorumNumbersRequired");
+        return stdJson.readBytes(configData, ".initParams.eigenDA.thresholdRegistry.quorumNumbersRequired");
     }
 
     function versionedBlobParams(string memory configData) internal pure returns (VersionedBlobParams[] memory) {
-        bytes memory versionedBlobParamsRaw = stdJson.parseRaw(configData, ".thresholdRegistry.versionedBlobParams");
+        bytes memory versionedBlobParamsRaw =
+            stdJson.parseRaw(configData, ".initParams.eigenDA.thresholdRegistry.versionedBlobParams");
         return abi.decode(versionedBlobParamsRaw, (VersionedBlobParams[]));
     }
 
     function batchConfirmers(string memory configData) internal pure returns (address[] memory) {
-        return stdJson.readAddressArray(configData, ".serviceManager.batchConfirmers");
+        return stdJson.readAddressArray(configData, ".initParams.eigenDA.serviceManager.batchConfirmers");
     }
 
     function getCalldataInitParams(string memory configData) internal pure returns (CalldataInitParams memory) {
