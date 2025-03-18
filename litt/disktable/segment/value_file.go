@@ -31,6 +31,9 @@ type valueFile struct {
 	// The parent directory containing this file.
 	parentDirectory string
 
+	// The file wrapped by the writer. If the file is sealed, this value is nil.
+	file *os.File
+
 	// The writer for the file. If the file is sealed, this value is nil.
 	writer *bufio.Writer
 
@@ -77,6 +80,7 @@ func newValueFile(
 			return nil, fmt.Errorf("failed to open value file %s: %v", filePath, err)
 		}
 
+		values.file = file
 		values.writer = bufio.NewWriter(file)
 	}
 
@@ -176,6 +180,11 @@ func (v *valueFile) flush() error {
 		return fmt.Errorf("failed to flush value file: %v", err)
 	}
 
+	err = v.file.Sync()
+	if err != nil {
+		return fmt.Errorf("failed to sync value file: %v", err)
+	}
+
 	return nil
 }
 
@@ -190,7 +199,13 @@ func (v *valueFile) seal() error {
 		return fmt.Errorf("failed to flush value file: %v", err)
 	}
 
+	err = v.file.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close value file: %v", err)
+	}
+
 	v.writer = nil
+	v.file = nil
 	return nil
 }
 
