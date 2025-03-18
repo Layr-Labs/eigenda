@@ -438,6 +438,7 @@ func TestLittDB(t *testing.T) {
 	config.ShardingFactor = 1
 	config.TTL = TTL
 	config.KeymapType = keymap.LevelDBKeymapType
+	config.Fsync = true
 
 	db, err := config.Build(context.Background())
 	require.NoError(t, err)
