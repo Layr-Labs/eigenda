@@ -112,9 +112,9 @@ func (a *Accountant) BlobPaymentInfo(
 		if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
 			return big.NewInt(0), err
 		}
+		a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 		return a.cumulativePayment, nil
 	}
-
 	a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 
 	return big.NewInt(0), fmt.Errorf("neither reservation nor on-demand payment is available")
