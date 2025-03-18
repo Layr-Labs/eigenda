@@ -51,7 +51,6 @@ import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 
 contract DeployVerifiable is Script {
-    string deployConfigPath = string(bytes("./script/deploy/verifiable/config/placeholder.config.json"));
     address initialOwner;
 
     ProxyAdmin proxyAdmin;
