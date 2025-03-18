@@ -24,6 +24,10 @@ import {IAVSDirectory} from
     "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
 import {IRewardsCoordinator} from
     "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
+import {
+    IPauserRegistry,
+    PauserRegistry
+} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
 import {IServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {VersionedBlobParams} from "src/interfaces/IEigenDAStructs.sol";
 
@@ -55,12 +59,13 @@ contract DeployVerifiable is Script {
     address rewardsCoordinator;
     address avsDirectory;
     address delegationManager;
-    address pauserRegistry;
     address churnApprover;
     address ejector;
 
     DeployedAddresses proxies;
     DeployedAddresses implementations;
+
+    IPauserRegistry pauserRegistry;
 
     uint256 initialPausedStatus;
 
@@ -84,11 +89,16 @@ contract DeployVerifiable is Script {
         avsDirectory = stdJson.readAddress(configData, ".avsDirectory");
         delegationManager = stdJson.readAddress(configData, ".delegationManager");
         initialOwner = stdJson.readAddress(configData, ".initialOwner");
-        pauserRegistry = stdJson.readAddress(configData, ".pauserRegistry");
 
         vm.startBroadcast();
         proxyAdmin = new ProxyAdmin();
         emptyContract = address(new EmptyContract());
+        pauserRegistry = IPauserRegistry(
+            new PauserRegistry(
+                stdJson.readAddressArray(configData, ".pauserRegistry.pausers"),
+                stdJson.readAddress(configData, ".pauserRegistry.unpauser")
+            )
+        );
 
         // Deploy empty contracts to get addresses
         proxies.indexRegistry = address(new TransparentUpgradeableProxy(emptyContract, address(proxyAdmin), ""));

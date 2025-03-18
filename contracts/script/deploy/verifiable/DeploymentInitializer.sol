@@ -27,9 +27,10 @@ contract DeploymentInitializer {
     /// Owner of the proxyAdmin should be this contract.
     ProxyAdmin public immutable PROXY_ADMIN;
 
+    IPauserRegistry public immutable PAUSER_REGISTRY;
+
     /// Initialization parameters that are shared between contracts
     address public immutable INITIAL_OWNER;
-    address public immutable PAUSER_REGISTRY;
     uint256 public immutable INITIAL_PAUSED_STATUS;
 
     /// Contracts that need to be upgraded and initialized.
@@ -189,7 +190,7 @@ contract DeploymentInitializer {
 
         upgrade(SERVICE_MANAGER, SERVICE_MANAGER_IMPL);
         EigenDAServiceManager(SERVICE_MANAGER).initialize(
-            IPauserRegistry(PAUSER_REGISTRY),
+            PAUSER_REGISTRY,
             INITIAL_PAUSED_STATUS,
             INITIAL_OWNER,
             initParams.serviceManagerParams.batchConfirmers,

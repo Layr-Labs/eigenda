@@ -3,7 +3,13 @@
     "rewardsCoordinator" : "0xfC4C575ea3f8316D38F83076Cf765f7B8DeaFC58",
     "avsDirectory" : "0xF2d1511E53AeAE16213EcA7963A103cB5CEc2b18",
     "delegationManager" : "0xB4D5cABA07826838AcA633E7a6055Ae38f9F5b95",
-    "pauserRegistry" : "0xa95b39aD02d540fbc1f7c81546adf20e80011617",
+    "pauserRegistry" : 
+    {
+      "pausers" : [
+        "0x33225d93b93C32FF7AD9bd644C956beA315b4042"
+      ],
+      "unpauser" : "0xA0810EdE1B4A58872d733F11ad004A3bf201308e"
+    },
     "registryCoordinator" : {
       "operatorSetParams": [
         {

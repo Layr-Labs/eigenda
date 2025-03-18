@@ -5,6 +5,8 @@ import {IRegistryCoordinator, RegistryCoordinator} from "lib/eigenlayer-middlewa
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {VersionedBlobParams} from "src/interfaces/IEigenDAStructs.sol";
+import {IPauserRegistry} from
+    "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
 
 /// @dev This is the struct needed by the multisig to initialize the contracts.
 struct CalldataInitParams {
@@ -33,7 +35,7 @@ struct CalldataServiceManagerParams {
 struct ImmutableInitParams {
     ProxyAdmin proxyAdmin;
     address initialOwner;
-    address pauserRegistry;
+    IPauserRegistry pauserRegistry;
     uint256 initialPausedStatus;
     DeployedAddresses proxies;
     DeployedAddresses implementations;
