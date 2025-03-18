@@ -46,8 +46,8 @@ import {
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 
-contract DeploySepolia is Script {
-    string deployConfigPath = string(bytes("./script/deploy/sepolia/config/placeholder.config.json"));
+contract DeployVerifiable is Script {
+    string deployConfigPath = string(bytes("./script/deploy/verifiable/config/placeholder.config.json"));
     address initialOwner;
 
     ProxyAdmin proxyAdmin;
@@ -72,9 +72,14 @@ contract DeploySepolia is Script {
 
     string configData;
 
+    /// @dev override this if you don't want to use the environment to get the config path
+    function _configPath() internal view virtual returns (string memory) {
+        return vm.envString("DEPLOY_CONFIG_PATH");
+    }
+
     function run() public {
         // READ JSON CONFIG DATA
-        configData = vm.readFile(deployConfigPath);
+        configData = vm.readFile(_configPath());
         rewardsCoordinator = stdJson.readAddress(configData, ".rewardsCoordinator");
         avsDirectory = stdJson.readAddress(configData, ".avsDirectory");
         delegationManager = stdJson.readAddress(configData, ".delegationManager");
