@@ -115,8 +115,6 @@ func (a *Accountant) BlobPaymentInfo(
 		a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 		return a.cumulativePayment, nil
 	}
-	a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
-
 	return big.NewInt(0), fmt.Errorf("neither reservation nor on-demand payment is available")
 }
 
