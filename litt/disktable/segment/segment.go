@@ -13,8 +13,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// TODO include a writeup of thread safety somewhere
-
 // unflushedKeysInitialCapacity is the initial capacity of the unflushedKeys slice. This slice is used to store keys
 // that have been written to the segment but have not yet been flushed to disk.
 const unflushedKeysInitialCapacity = 128

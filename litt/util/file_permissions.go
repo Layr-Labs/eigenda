@@ -6,9 +6,6 @@ import (
 	"path/filepath"
 )
 
-// TODO ensure this is used in all places where files are created
-// TODO unit test this
-
 // VerifyFilePermissions checks if a file has read/write permissions and is a regular file (if it exists),
 // returning an error if it does not if the file permissions or file type is not as expected.
 // Also returns a boolean indicating if the file exists and its size (to save on additional os.Stat calls).
