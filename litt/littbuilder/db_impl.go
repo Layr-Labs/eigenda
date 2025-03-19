@@ -144,27 +144,3 @@ func (d *db) Destroy() error {
 
 	return nil
 }
-
-func (d *db) UpdateTopology(shardingFactor uint32, paths []string) (chan struct{}, error) {
-	return nil, fmt.Errorf("This is not yet implemented, and serves as a placeholder for planned work")
-}
-
-func (d *db) SetGlobalReservedDriveCapacity(reservedBytes uint64) error {
-	return fmt.Errorf("This is not yet implemented, and serves as a placeholder for planned work")
-}
-
-func (d *db) SetReservedDriveCapacity(path string, reservedBytes uint64) error {
-	return fmt.Errorf("This is not yet implemented, and serves as a placeholder for planned work")
-}
-
-func (d *db) HardlinkBackup(path string) error {
-	return fmt.Errorf("This is not yet implemented, and serves as a placeholder for planned work")
-}
-
-func (d *db) LocalBackup(paths []string, maxBytesPerSecond uint64) error {
-	return fmt.Errorf("This is not yet implemented, and serves as a placeholder for planned work")
-}
-
-func (d *db) RemoteBackup(socket string, maxBytesPerSecond uint64) error {
-	return fmt.Errorf("This is not yet implemented, and serves as a placeholder for planned work")
-}
