@@ -343,7 +343,7 @@ func (s *ServerV2) FetchOperatorsNodeInfo(c *gin.Context) {
 //	@Failure	400					{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404					{object}	ErrorResponse	"error: Not found"
 //	@Failure	500					{object}	ErrorResponse	"error: Server error"
-//	@Router		/operators/{operator_id}/dispersals/{batch_header_hash} [get]
+//	@Router		/operators/{operator_id}/dispersals/{batch_header_hash}/response [get]
 func (s *ServerV2) FetchOperatorDispersalResponse(c *gin.Context) {
 	handlerStart := time.Now()
 

@@ -684,7 +684,7 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "/operators/{operator_id}/dispersals/{batch_header_hash}": {
+        "/operators/{operator_id}/dispersals/{batch_header_hash}/response": {
             "get": {
                 "produces": [
                     "application/json"

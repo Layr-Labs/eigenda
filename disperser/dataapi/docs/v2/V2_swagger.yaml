@@ -872,7 +872,7 @@ paths:
         direction
       tags:
       - Operators
-  /operators/{operator_id}/dispersals/{batch_header_hash}:
+  /operators/{operator_id}/dispersals/{batch_header_hash}/response:
     get:
       parameters:
       - description: The operator ID to fetch batch feed for

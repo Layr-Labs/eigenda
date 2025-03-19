@@ -316,7 +316,7 @@ func (s *ServerV2) Start() error {
 		operators := v2.Group("/operators")
 		{
 			operators.GET("/:operator_id/dispersals", s.FetchOperatorDispersalFeed)
-			operators.GET("/:operator_id/dispersals/:batch_header_hash", s.FetchOperatorDispersalResponse)
+			operators.GET("/:operator_id/dispersals/:batch_header_hash/response", s.FetchOperatorDispersalResponse)
 			operators.GET("/signing-info", s.FetchOperatorSigningInfo)
 			operators.GET("/stake", s.FetchOperatorsStake)
 			operators.GET("/node-info", s.FetchOperatorsNodeInfo)

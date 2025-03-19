@@ -2138,10 +2138,10 @@ func TestFetchOperatorDispersalResponse(t *testing.T) {
 	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse2)
 	assert.NoError(t, err)
 
-	r.GET("/v2/operators/:operator_id/dispersals/:batch_header_hash", testDataApiServerV2.FetchOperatorDispersalResponse)
+	r.GET("/v2/operators/:operator_id/dispersals/:batch_header_hash/response", testDataApiServerV2.FetchOperatorDispersalResponse)
 
 	// Fetch response of a specific operator
-	reqStr := fmt.Sprintf("/v2/operators/%s/dispersals/%s", operatorId.Hex(), batchHeaderHash)
+	reqStr := fmt.Sprintf("/v2/operators/%s/dispersals/%s/response", operatorId.Hex(), batchHeaderHash)
 	w := executeRequest(t, r, http.MethodGet, reqStr)
 	response := decodeResponseBody[serverv2.OperatorDispersalResponse](t, w)
 	require.Equal(t, dispersalResponse, response.Response)
