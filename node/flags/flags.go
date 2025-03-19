@@ -379,6 +379,30 @@ var (
 		Value:    5 * time.Minute,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_REQUEST_MAX_FUTURE_AGE"),
 	}
+	LevelDBEnableSeeksCompactionV1Flag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "leveldb-enable-seeks-compaction-v1"),
+		Usage:    "Enable seeks compaction for LevelDB for v1",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_ENABLE_SEEKS_COMPACTION_V1"),
+	}
+	LevelDBDisableSyncWritesV1Flag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "leveldb-disable-sync-writes-v1"),
+		Usage:    "Disable sync writes for LevelDB for v1",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_DISABLE_SYNC_WRITES_V1"),
+	}
+	LevelDBEnableSeeksCompactionV2Flag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "leveldb-enable-seeks-compaction-v2"),
+		Usage:    "Enable seeks compaction for LevelDB for v2",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_ENABLE_SEEKS_COMPACTION_V2"),
+	}
+	LevelDBDisableSyncWritesV2Flag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "leveldb-disable-sync-writes-v2"),
+		Usage:    "Disable sync writes for LevelDB for v2",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_DISABLE_SYNC_WRITES_V2"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -499,6 +523,10 @@ var optionalFlags = []cli.Flag{
 	RuntimeModeFlag,
 	StoreChunksRequestMaxPastAgeFlag,
 	StoreChunksRequestMaxFutureAgeFlag,
+	LevelDBEnableSeeksCompactionV1Flag,
+	LevelDBDisableSyncWritesV1Flag,
+	LevelDBEnableSeeksCompactionV2Flag,
+	LevelDBDisableSyncWritesV2Flag,
 }
 
 func init() {
