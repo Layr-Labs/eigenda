@@ -9,8 +9,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// TODO also close context
-
 // DBPanic is a struct that permits the DB to "panic". There are many goroutines that function under the hood, and
 // many of these threads could, in theory, encounter errors which are unrecoverable. In such situations, the desirable
 // outcome is for the DB to report the error and then refuse to do additional work. If the DB is in a broken state,
