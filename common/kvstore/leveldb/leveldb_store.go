@@ -60,7 +60,7 @@ func (store *levelDBStore) Put(key []byte, value []byte) error {
 	if value == nil {
 		value = []byte{}
 	}
-	return store.db.Put(key, value, &opt.WriteOptions{Sync: true}) // TODO don't merge with this enabled by default!!!
+	return store.db.Put(key, value, nil)
 }
 
 // Get retrieves data from the store. Returns kvstore.ErrNotFound if the data is not found.
@@ -91,7 +91,7 @@ func (store *levelDBStore) DeleteBatch(keys [][]byte) error {
 	for _, key := range keys {
 		batch.Delete(key)
 	}
-	return store.db.Write(batch, &opt.WriteOptions{Sync: true}) // TODO don't merge with this enabled by default!!!
+	return store.db.Write(batch, nil)
 }
 
 // WriteBatch adds multiple key-value pairs to the store.
@@ -100,7 +100,7 @@ func (store *levelDBStore) WriteBatch(keys [][]byte, values [][]byte) error {
 	for i, key := range keys {
 		batch.Put(key, values[i])
 	}
-	return store.db.Write(batch, &opt.WriteOptions{Sync: true}) // TODO don't merge with this enabled by default!!!
+	return store.db.Write(batch, nil)
 }
 
 // NewBatch creates a new batch for the store.
@@ -128,7 +128,7 @@ func (m *levelDBBatch) Delete(key []byte) {
 }
 
 func (m *levelDBBatch) Apply() error {
-	return m.store.db.Write(m.batch, &opt.WriteOptions{Sync: true}) // TODO don't merge with this enabled by default!!!
+	return m.store.db.Write(m.batch, nil)
 }
 
 // Size returns the number of operations in the batch.
