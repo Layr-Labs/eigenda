@@ -22,7 +22,11 @@ func (b *LevelDBKeymapBuilder) Type() KeymapType {
 	return LevelDBKeymapType
 }
 
-func (b *LevelDBKeymapBuilder) Build(logger logging.Logger, keymapPath string) (Keymap, bool, error) {
+func (b *LevelDBKeymapBuilder) Build(
+	logger logging.Logger,
+	keymapPath string,
+	doubleWriteProtection bool) (Keymap, bool, error) {
+
 	// check to see if the keymap directory exists in one of the provided paths
 	exists := false
 	_, err := os.Stat(keymapPath)
@@ -37,7 +41,7 @@ func (b *LevelDBKeymapBuilder) Build(logger logging.Logger, keymapPath string) (
 		return nil, false, fmt.Errorf("error checking for keymap directory: %w", err)
 	}
 
-	keymap, err := NewLevelDBKeymap(logger, keymapPath)
+	keymap, err := NewLevelDBKeymap(logger, keymapPath, doubleWriteProtection)
 	if err != nil {
 		return nil, false, fmt.Errorf("error creating LevelDBKeymap: %w", err)
 	}
