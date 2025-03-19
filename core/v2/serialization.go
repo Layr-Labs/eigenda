@@ -36,6 +36,9 @@ type abiBlobCommitments struct {
 // This function exists so that the BlobKey can be computed without first constructing a BlobHeader object. Since
 // the BlobHeader contains the full payment metadata, and payment metadata isn't stored on chain, it isn't always
 // possible to reconstruct from the data available.
+//
+// The hashing structure here must ALWAYS match the hashing structure that we perform onchain:
+// https://github.com/Layr-Labs/eigenda/blob/a6dd724acdf732af483fd2d9a86325febe7ebdcd/contracts/src/libraries/EigenDAHasher.sol#L119
 func ComputeBlobKey(
 	blobVersion BlobVersion,
 	blobCommitments encoding.BlobCommitments,

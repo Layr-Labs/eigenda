@@ -23,23 +23,99 @@ const docTemplateV2 = `{
                 "tags": [
                     "Batches"
                 ],
-                "summary": "Fetch batch feed",
+                "summary": "Fetch batch feed in specified direction",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Fetch batches up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]",
-                        "name": "end",
+                        "description": "Direction to fetch: 'forward' (oldest to newest, ASC order) or 'backward' (newest to oldest, DESC order) [default: forward]",
+                        "name": "direction",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fetch batches before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]",
+                        "name": "before",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fetch batches after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than ` + "`" + `before` + "`" + ` [default: ` + "`" + `before` + "`" + `-1h]",
+                        "name": "after",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Fetch batches starting from an interval (in seconds) before the end time [default: 3600]",
-                        "name": "interval",
+                        "description": "Maximum number of batches to return; if limit \u003c= 0 or \u003e1000, it's treated as 1000 [default: 20; max: 1000]",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.BatchFeedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/batches/feed/{operator_id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Batches"
+                ],
+                "summary": "Fetch batch feed dispersed to an operator in specified direction",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "The operator ID to fetch batch feed for",
+                        "name": "operator_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Direction to fetch: 'forward' (oldest to newest, ASC order) or 'backward' (newest to oldest, DESC order) [default: forward]",
+                        "name": "direction",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fetch batches before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]",
+                        "name": "before",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fetch batches after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than ` + "`" + `before` + "`" + ` [default: ` + "`" + `before` + "`" + `-1h]",
+                        "name": "after",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "The maximum number of batches to fetch. System max (1000) if limit \u003c= 0 [default: 20; max: 1000]",
+                        "description": "Maximum number of batches to return; if limit \u003c= 0 or \u003e1000, it's treated as 1000 [default: 20; max: 1000]",
                         "name": "limit",
                         "in": "query"
                     }
@@ -689,7 +765,10 @@ const docTemplateV2 = `{
             "properties": {
                 "account_id": {
                     "description": "AccountID is the ETH account address for the payer",
-                    "type": "string"
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 },
                 "cumulative_payment": {
                     "description": "CumulativePayment represents the total amount of payment (in wei) made by the user up to this point",
@@ -723,6 +802,7 @@ const docTemplateV2 = `{
                     "$ref": "#/definitions/encoding.G1Commitment"
                 },
                 "length": {
+                    "description": "this is the length in SYMBOLS (32 byte field elements) of the blob. it must be a power of 2",
                     "type": "integer"
                 },
                 "length_commitment": {

@@ -50,11 +50,13 @@ type Client interface {
 	DeleteTable(ctx context.Context, tableName string) error
 	PutItem(ctx context.Context, tableName string, item Item) error
 	PutItemWithCondition(ctx context.Context, tableName string, item Item, condition string, expressionAttributeNames map[string]string, expressionAttributeValues map[string]types.AttributeValue) error
+	PutItemWithConditionAndReturn(ctx context.Context, tableName string, item Item, condition string, expressionAttributeNames map[string]string, expressionAttributeValues map[string]types.AttributeValue) (Item, error)
 	PutItems(ctx context.Context, tableName string, items []Item) ([]Item, error)
 	UpdateItem(ctx context.Context, tableName string, key Key, item Item) (Item, error)
 	UpdateItemWithCondition(ctx context.Context, tableName string, key Key, item Item, condition expression.ConditionBuilder) (Item, error)
 	IncrementBy(ctx context.Context, tableName string, key Key, attr string, value uint64) (Item, error)
 	GetItem(ctx context.Context, tableName string, key Key) (Item, error)
+	GetItemWithInput(ctx context.Context, input *dynamodb.GetItemInput) (Item, error)
 	GetItems(ctx context.Context, tableName string, keys []Key, consistentRead bool) ([]Item, error)
 	QueryIndex(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues ExpressionValues) ([]Item, error)
 	Query(ctx context.Context, tableName string, keyCondition string, expAttributeValues ExpressionValues) ([]Item, error)
@@ -152,6 +154,33 @@ func (c *client) PutItemWithCondition(
 		return fmt.Errorf("failed to put item in table %s: %w", tableName, err)
 	}
 	return nil
+}
+
+// PutItemWithConditionAndReturn puts an item in the table with a condition and returns the old item if it exists
+func (c *client) PutItemWithConditionAndReturn(
+	ctx context.Context,
+	tableName string,
+	item Item,
+	condition string,
+	expressionAttributeNames map[string]string,
+	expressionAttributeValues map[string]types.AttributeValue,
+) (Item, error) {
+	result, err := c.dynamoClient.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(tableName), Item: item,
+		ConditionExpression:       aws.String(condition),
+		ExpressionAttributeNames:  expressionAttributeNames,
+		ExpressionAttributeValues: expressionAttributeValues,
+		ReturnValues:              types.ReturnValueAllOld,
+	})
+	var ccfe *types.ConditionalCheckFailedException
+	if errors.As(err, &ccfe) {
+		return nil, ErrConditionFailed
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to put item in table %s: %w", tableName, err)
+	}
+
+	return result.Attributes, nil
 }
 
 // PutItems puts items in batches of 25 items (which is a limit DynamoDB imposes)
@@ -262,6 +291,16 @@ func (c *client) IncrementBy(ctx context.Context, tableName string, key Key, att
 
 func (c *client) GetItem(ctx context.Context, tableName string, key Key) (Item, error) {
 	resp, err := c.dynamoClient.GetItem(ctx, &dynamodb.GetItemInput{Key: key, TableName: aws.String(tableName)})
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Item, nil
+}
+
+// GetItemWithInput is a wrapper for the GetItem function that allows for a custom GetItemInput
+func (c *client) GetItemWithInput(ctx context.Context, input *dynamodb.GetItemInput) (Item, error) {
+	resp, err := c.dynamoClient.GetItem(ctx, input)
 	if err != nil {
 		return nil, err
 	}

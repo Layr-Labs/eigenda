@@ -883,7 +883,7 @@ concat(&#34;churn&#34;, time.Now(), operatorToChurn&#39;s OperatorID, Churner&#3
 
       
         <h3 id="common.BlobCommitment">BlobCommitment</h3>
-        <p>BlobCommitment represents commitment of a specific blob, containing its</p><p>KZG commitment, degree proof, the actual degree, and data length in number of symbols.</p>
+        <p>BlobCommitment represents commitment of a specific blob, containing its</p><p>KZG commitment, degree proof, the actual degree, and data length in number of symbols (field elements).</p><p>It deserializes into https://github.com/Layr-Labs/eigenda/blob/ce89dab18d2f8f55004002e17dd3a18529277845/encoding/data.go#L27</p><p>See https://github.com/Layr-Labs/eigenda/blob/e86fb8515eb606d0eebb92097dc60d7238363e77/docs/spec/src/protocol/architecture/encoding.md#validation-via-kzg</p><p>to understand how this commitment is used to validate the blob.</p>
 
         
           <table class="field-table">
@@ -896,7 +896,7 @@ concat(&#34;churn&#34;, time.Now(), operatorToChurn&#39;s OperatorID, Churner&#3
                   <td>commitment</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>A commitment to the blob data. </p></td>
+                  <td><p>Concatenation of the x and y coordinates of `common.G1Commitment`. </p></td>
                 </tr>
               
                 <tr>
@@ -912,16 +912,17 @@ such that the claimed length below is verifiable. </p></td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>A proof that the degree of the polynomial used to generate the blob commitment is valid.
-It is computed such that the coefficient of the polynomial is committing with the G2 SRS
-at the end of the highest order. </p></td>
+It consists of the KZG commitment of x^(SRSOrder-n) * P(x), where
+P(x) is polynomial of degree n representing the blob. </p></td>
                 </tr>
               
                 <tr>
                   <td>length</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p>The length specifies the degree of the polynomial used to generate the blob commitment. The length
-must equal to the degree &#43; 1, and it must be a power of 2. </p></td>
+                  <td><p>The length of the blob in symbols (field elements), which must be a power of 2.
+This also specifies the degree of the polynomial used to generate the blob commitment,
+since length = degree &#43; 1. </p></td>
                 </tr>
               
             </tbody>
@@ -932,7 +933,7 @@ must equal to the degree &#43; 1, and it must be a power of 2. </p></td>
         
       
         <h3 id="common.G1Commitment">G1Commitment</h3>
-        <p>A KZG commitment</p>
+        <p>G1Commitment represents the serialized coordinates of a G1 KZG commitment.</p><p>We use gnark-crypto so adopt its serialization, which is big-endian. See:</p><p>https://github.com/Consensys/gnark-crypto/blob/779e884dabb38b92e677f4891286637a3d2e5734/ecc/bn254/fp/element.go#L862</p>
 
         
           <table class="field-table">
@@ -945,14 +946,16 @@ must equal to the degree &#43; 1, and it must be a power of 2. </p></td>
                   <td>x</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>The X coordinate of the KZG commitment. This is the raw byte representation of the field element. </p></td>
+                  <td><p>The X coordinate of the KZG commitment. This is the raw byte representation of the field element.
+x should contain 32 bytes. </p></td>
                 </tr>
               
                 <tr>
                   <td>y</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. </p></td>
+                  <td><p>The Y coordinate of the KZG commitment. This is the raw byte representation of the field element.
+y should contain 32 bytes. </p></td>
                 </tr>
               
             </tbody>
@@ -1166,9 +1169,10 @@ If the timestamp is not set or is not part of the previous or current reservatio
 The reservation period of the dispersal request is used for rate-limiting the user&#39;s account against their dedicated 
 bandwidth. This method requires users to set up reservation accounts with EigenDA team, and the team will set up an 
 on-chain record of reserved bandwidth for the user for some period of time. The dispersal client&#39;s accountant will set 
-this value to the current timestamp divided by the on-chain configured reservation period interval, mapping each request 
+this value to the current timestamp in nanoseconds. The disperser server will find the corresponding reservation period by 
+taking the nearest lower multiple of the on-chain configured reservation period interval, mapping each request 
 to a time-based window and is serialized and parsed as a uint32. The disperser server then validates that it matches 
-either the current or the previous period.
+either the current or the previous period, and check against the user&#39;s reserved bandwidth.
 
 Example Usage Flow:
   1. The user sets up a reservation with the EigenDA team, including throughput (symbolsPerSecond), startTimestamp,
@@ -1178,7 +1182,7 @@ Example Usage Flow:
       - If the reservation is active (t &gt;= startTimestamp and t &lt; endTimestamp).
       - After rounding up to the nearest multiple of `minNumSymbols` defined by the payment vault contract, the user still has enough bandwidth capacity
         (hasn’t exceeded symbolsPerSecond * reservationPeriodInterval).
-      - The request is ratelimited against the current reservation period, and calculated as reservation_period = t / reservationPeriodInterval.
+      - The request is ratelimited against the current reservation period, and calculated as reservation_period = floor(t / reservationPeriodInterval) * reservationPeriodInterval.
         the request&#39;s reservation period must either be the disperser server&#39;s current reservation period or the previous reservation period. 
   4. Server always go ahead with recording the received request in the current reservation period, and then categorize the scenarios 
       - If the remaining bandwidth is sufficient for the request, the dispersal request proceeds.
@@ -2629,14 +2633,26 @@ processing status of the blob.</p></td>
                 <td>GetBlobCommitment</td>
                 <td><a href="#disperser.v2.BlobCommitmentRequest">BlobCommitmentRequest</a></td>
                 <td><a href="#disperser.v2.BlobCommitmentReply">BlobCommitmentReply</a></td>
-                <td><p>GetBlobCommitment is a utility method that calculates commitment for a blob payload.</p></td>
+                <td><p>GetBlobCommitment is a utility method that calculates commitment for a blob payload.
+It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header
+and don&#39;t have the ability to calculate the commitment themselves (expensive operation which requires SRS points).
+
+For an example usage, see how our disperser_client makes a call to this endpoint when it doesn&#39;t have a local prover:
+https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166</p></td>
               </tr>
             
               <tr>
                 <td>GetPaymentState</td>
                 <td><a href="#disperser.v2.GetPaymentStateRequest">GetPaymentStateRequest</a></td>
                 <td><a href="#disperser.v2.GetPaymentStateReply">GetPaymentStateReply</a></td>
-                <td><p>GetPaymentState is a utility method to get the payment state of a given account.</p></td>
+                <td><p>GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
+EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
+A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
+That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
+The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
+
+For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
+https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298</p></td>
               </tr>
             
           </tbody>
