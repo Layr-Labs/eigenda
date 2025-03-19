@@ -120,6 +120,9 @@ message GetPaymentStateRequest {
   string account_id = 1;
   // Signature over the account ID
   bytes signature = 2;
+  // Timestamp of the request in seconds since the Unix epoch. If too far out of sync with the server's clock,
+  // request may be rejected.
+  uint32 timestamp = 3;
 }
 
 // GetPaymentStateReply contains the payment state of an account.
