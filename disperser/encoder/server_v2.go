@@ -127,13 +127,23 @@ func (s *EncoderServerV2) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequ
 		s.queueLock.Unlock()
 	default:
 		s.metrics.IncrementRateLimitedBlobRequestNum(int(blobSize))
-		s.logger.Warn("rate limiting as request queue is full", "requestQueueSize", s.config.RequestQueueSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
-		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("request queue is full, max queue size: %d", s.config.RequestQueueSize))
+		s.logger.Warn("rate limiting as request queue is full",
+			"requestQueueSize", s.config.RequestQueueSize,
+			"maxConcurrentRequests", s.config.MaxConcurrentRequests)
+		return nil, api.NewErrorResourceExhausted(fmt.Sprintf(
+			"request queue is full, max queue size: %d", s.config.RequestQueueSize))
 	}
 
 	// Limit the number of concurrent requests
-	s.runningRequests <- struct{}{}
-	defer s.popRequest()
+
+	select {
+	case s.runningRequests <- struct{}{}:
+		defer s.popRequest()
+	case <-ctx.Done():
+		s.metrics.IncrementCanceledBlobRequestNum(int(blobSize))
+		return nil, status.Error(codes.Canceled, "request was canceled")
+	}
+
 	if ctx.Err() != nil {
 		s.metrics.IncrementCanceledBlobRequestNum(int(blobSize))
 		return nil, status.Error(codes.Canceled, "request was canceled")

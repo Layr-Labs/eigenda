@@ -187,12 +187,13 @@ func (s *DispersalServerV2) GetBlobCommitment(ctx context.Context, req *pb.BlobC
 	if s.prover == nil {
 		return nil, api.NewErrorUnimplemented()
 	}
-	blobSize := len(req.GetBlob())
+	blobSize := uint(len(req.GetBlob()))
 	if blobSize == 0 {
 		return nil, api.NewErrorInvalidArg("data is empty")
 	}
-	if uint64(blobSize) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("blob size cannot exceed %v bytes", s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL))
+	if uint64(encoding.GetBlobLengthPowerOf2(blobSize)) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("blob size cannot exceed %v bytes",
+			s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL))
 	}
 	c, err := s.prover.GetCommitmentsForPaddedLength(req.GetBlob())
 	if err != nil {
