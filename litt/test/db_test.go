@@ -60,6 +60,7 @@ func buildMemKeyDiskDB(t *testing.T, path string) (litt.DB, error) {
 	config.CacheSize = 1000
 	config.TargetSegmentFileSize = 100
 	config.ShardingFactor = 4
+	config.Fsync = false // fsync is too slow for unit test workloads
 
 	return config.Build(context.Background())
 }
@@ -71,6 +72,7 @@ func buildLevelDBDiskDB(t *testing.T, path string) (litt.DB, error) {
 	config.CacheSize = 1000
 	config.TargetSegmentFileSize = 100
 	config.ShardingFactor = 4
+	config.Fsync = false // fsync is too slow for unit test workloads
 
 	return config.Build(context.Background())
 }
