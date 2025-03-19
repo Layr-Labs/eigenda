@@ -13,7 +13,7 @@
     - [Configuration Options](#configuration-options)
 - [Definitions](#definitions)
 - [Architecture](#architecture)
-    - [Big Picture Diagram](#putting-it-all-together-littdb) 
+    - [Big Picture Diagram](#putting-it-all-together-littdb)
 - [File Layout](#file-layout)
 
 # What is LittDB?
@@ -106,10 +106,10 @@ Source: [db.go](db.go)
 
 ```go
 type DB interface {
-    GetTable(name string) (Table, error)
-    DropTable(name string) error
-    Stop() error
-    Destroy() error
+GetTable(name string) (Table, error)
+DropTable(name string) error
+Stop() error
+Destroy() error
 }
 ```
 
@@ -117,13 +117,13 @@ Source: [table.go](table.go)
 
 ```go
 type Table interface {
-    Name() string
-    Put(key []byte, value []byte) error
-    PutBatch(batch []*types.KVPair) error
-    Get(key []byte) ([]byte, bool, error)
-    Flush() error
-    SetTTL(ttl time.Duration) error
-    SetCacheSize(size uint64) error
+Name() string
+Put(key []byte, value []byte) error
+PutBatch(batch []*types.KVPair) error
+Get(key []byte) ([]byte, bool, error)
+Flush() error
+SetTTL(ttl time.Duration) error
+SetCacheSize(size uint64) error
 }
 ```
 
@@ -144,17 +144,17 @@ Below is a functional example showing how to use LittDB.
 // Configure and build the database.
 config, err := littbuilder.DefaultConfig("path/to/where/data/is/stored")
 if err != nil {
-    return err
+return err
 }
 
 db, err := config.Build(context.Background())
 if err != nil {
-    return err
+return err
 }
 
 myTable, err := db.GetTable("my-table") // this code works if the table is new or if the table already exists
 if err != nil {
-    return err
+return err
 }
 
 // Write a key-value pair to the table.
@@ -163,13 +163,13 @@ value := []byte("this is a value")
 
 err = myTable.Put(key, value)
 if err != nil {
-    return err
+return err
 }
 
 // Flush the data to disk.
 err = myTable.Flush()
 if err != nil {
-    return err
+return err
 }
 
 // Congratulations! Your data is now durable on disk.
@@ -177,7 +177,7 @@ if err != nil {
 // Read the value back. This works before or after a flush.
 val, ok, err := myTable.Get(key)
 if err != nil {
-    return err
+return err
 }
 ```
 
@@ -212,6 +212,9 @@ are present to support testing.
 - `Fsync`: if true, then each flush operation performs an fsync operation. Ensures the data is durable even if the
   OS crashes. Otherwise, there may be data in the OS's internal buffers. This may cause significant performance
   overhead, especially if there are lots of frequent small flushes. The default is `true`.
+- `DoubleWriteProtection`: if true, then the database will return an error if a write operation is performed against
+  a key that already exists in the database. This is illegal behavior, but the check is not always enforced due to
+  the performance overhead if using anything other than an in-memory keymap. The default is `false`.
 
 # Definitions
 
@@ -341,9 +344,9 @@ does not hurt performance, and so the complexity of its implementation is justif
 
 ## Segment
 
-Data in LittDB [table](#table) can be visualized as a linked list. Each element in that linked list is called a 
-"segment". A segment can hold many individual [values](#value). Old data is near the beginning of the list, and new 
-data is near the end. Old, [expired](#ttl) data is always deleted from the first segment currently in the list. New 
+Data in LittDB [table](#table) can be visualized as a linked list. Each element in that linked list is called a
+"segment". A segment can hold many individual [values](#value). Old data is near the beginning of the list, and new
+data is near the end. Old, [expired](#ttl) data is always deleted from the first segment currently in the list. New
 data is always written to the last segment currently in the list.
 
 Segments are deleted as a whole. That is, when a segment is deleted, all data in that segment is deleted at the same
@@ -422,16 +425,16 @@ multiple locations.
 
 In order to determine the shard that a particular [key](#key) is in, a hash function is used. The data that goes
 into the hash function is the [key](#key) itself, as well as a [sharding salt](#sharding-salt) that is unique to
-each [segment](#segment). 
+each [segment](#segment).
 
-The [sharding salt](#sharding-salt) is chosen randomly. Its purpose is to make the mapping between [keys](#key) and 
-shards unpredictable to an outside attacker. Without this sort of randomness, an attacker could intentionally craft 
+The [sharding salt](#sharding-salt) is chosen randomly. Its purpose is to make the mapping between [keys](#key) and
+shards unpredictable to an outside attacker. Without this sort of randomness, an attacker could intentionally craft
 keys that all map to the same shard, causing a hot spot in the database and potentially degrading performance.
 
 ### Sharding Factor
 
 The number of [shards](#shard) in a [segment](#segment) is called the "sharding factor". The sharding factor must be
-a positive, non-zero integer. The sharding factor can be changed at runtime without restarting the database or 
+a positive, non-zero integer. The sharding factor can be changed at runtime without restarting the database or
 performing a data migration.
 
 ### Sharding Salt
@@ -445,11 +448,11 @@ known.
 A table in LittDB is a unique namespace. Two [keys](#key) with identical values do not conflict with each other as
 long as they are in different tables.
 
-Each table has its own [TTL](#ttl), and all data in the table is subject to that [TTL](#ttl). Each table has its 
-own [keymap](#keymap) and its own set of [segments](#segment). [Flushing](#flushing) one table does not affect 
+Each table has its own [TTL](#ttl), and all data in the table is subject to that [TTL](#ttl). Each table has its
+own [keymap](#keymap) and its own set of [segments](#segment). [Flushing](#flushing) one table does not affect
 any other table. Aside from hardware, tables do not share any resources.
 
-In many ways, a table is a stand-alone database. The higher level [API](#api) that works with multiple tables is 
+In many ways, a table is a stand-alone database. The higher level [API](#api) that works with multiple tables is
 provided as a convenience, but does not enhance the performance of the DB in any way.
 
 ### Table Metadata File
@@ -482,11 +485,12 @@ of data as a single large value is more efficient than writing X bytes of data a
 
 # Architecture
 
-This section explains the high level architecture of LittDB. It starts out by describing a simple (but inefficient) 
-storage solution, and incrementally adds complexity in order to solve various problems. For the full picture, skip to 
+This section explains the high level architecture of LittDB. It starts out by describing a simple (but inefficient)
+storage solution, and incrementally adds complexity in order to solve various problems. For the full picture, skip to
 [Putting it all together: LittDB](#putting-it-all-together-littdb).
 
 For each iteration, the database is must fulfill the following requirements:
+
 - must support `put(key, value)`/`get(key)` operations
 - must be thread safe
 - must support a TTL
@@ -500,14 +504,14 @@ slow. Ok, fine. We want simple.
 ![](./resources/iteration1.png)
 
 When the user writes a key-value pair to the database, append the key and the value to the end of the file, along
-with a timestamp. When the user reads a key, scan the file from the beginning until you find the key and 
+with a timestamp. When the user reads a key, scan the file from the beginning until you find the key and
 return the value.
 
-Periodically, scan the data in the file to check for expired data. If a key has expired, remove it from the file 
+Periodically, scan the data in the file to check for expired data. If a key has expired, remove it from the file
 (will require the file to be rewritten).
 
-This needs to be thread safe. Keep a global read-write lock around the file. When a write or GC operation is in 
-progress, no reads are allowed. GC operations and writes are not permitted to happen in parallel. Allow multiple 
+This needs to be thread safe. Keep a global read-write lock around the file. When a write or GC operation is in
+progress, no reads are allowed. GC operations and writes are not permitted to happen in parallel. Allow multiple
 reads to happen concurrently.
 
 In order to provide durability, ensure the file is fully flushed to disk before releasing a write lock.
@@ -518,7 +522,7 @@ Congratulations! You've written your very own database!
 
 ## Iteration 2: Add a cache
 
-Reads against the database in 1 are slow. If there is any way we could reduce the number of times we have to iterate 
+Reads against the database in 1 are slow. If there is any way we could reduce the number of times we have to iterate
 over the file, that would be great. Let's add an in-memory cache.
 
 ![](./resources/iteration2.png)
@@ -573,10 +577,10 @@ uninterrupted while writes are happening in the background.
 
 Create another key->value map called the "unflushed data map". Use a thread safe map implementation.
 
-When the user writes data to the database, immediately add it to the unflushed data map, but not the key map. 
-After that is completed, write it to file. The write doesn't need to be synchronous. For example, you can use file 
-stream APIs that buffer data in memory before writing it to disk in larger chunks. The write operation doesn't need 
-to block until the data is written to disk, it can return as soon as the data is in the unflushed data map and written 
+When the user writes data to the database, immediately add it to the unflushed data map, but not the key map.
+After that is completed, write it to file. The write doesn't need to be synchronous. For example, you can use file
+stream APIs that buffer data in memory before writing it to disk in larger chunks. The write operation doesn't need
+to block until the data is written to disk, it can return as soon as the data is in the unflushed data map and written
 to the buffer.
 
 Expose a new method in the database called `Flush()`. When `Flush()` is called, first flush all data in buffers to disk,
@@ -584,6 +588,7 @@ then empty out the unflushed data map. Before each entry is removed, write the k
 This flush operation should block until all of this work is done.
 
 When reading data, look for it in the following places, in order:
+
 - the cache
 - the unflushed data map
 - on disk (via the keymap and data file)
@@ -617,10 +622,10 @@ Previously, the address stored in the key map told us the offset in the file whe
 address will also need to keep track of the segment index, as well as the offset.
 
 Deletion of data is now super easy. When all data in the oldest segment file exceeds its TTL, we can delete just that
-segment without modifying any of the other segment files. Iterate over the segment file to delete values from the key 
+segment without modifying any of the other segment files. Iterate over the segment file to delete values from the key
 map.
 
-In order to avoid the race condition where a reader is reading data from a segment that is in the process of being 
+In order to avoid the race condition where a reader is reading data from a segment that is in the process of being
 deleted, use reference counters for each segment. When a reader goes to read data, it first finds the address in the
 keymap, than increments the reference counter for the segment. When the reader is done reading, it decrements the
 reference counter. When the garbage collector goes to delete a segment, it waits to actually delete the file on disk
@@ -656,7 +661,7 @@ to avoid having to read the values when we don't need them.
 ![](./resources/iteration7.png)
 
 Everything works the same way as before. But instead of iterating huge segment files when deleting a segment
-or rebuilding the key map at startup, we only have to iterate over the key file. The key file is going to be 
+or rebuilding the key map at startup, we only have to iterate over the key file. The key file is going to be
 significantly smaller than the value file (for sane key-value size ratios), and so this will be much faster.
 
 ## Iteration 8: Sharding
@@ -715,7 +720,8 @@ In the example below, the root directories are named `root0`, `root1`, and `root
 
 ## Table Directories
 
-LittDB supports multiple [tables](#table), each with its own namespace. Each table is stored within its own subdirectory.
+LittDB supports multiple [tables](#table), each with its own namespace. Each table is stored within its own
+subdirectory.
 
 In the example below, there are three tables: `tableA`, `tableB`, and `tableC`.
 

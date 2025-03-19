@@ -19,15 +19,18 @@ var _ Keymap = &memKeymap{}
 type memKeymap struct {
 	logger logging.Logger
 	data   map[string]types.Address
-	lock   sync.RWMutex
+	// if true, then return an error if an update would overwrite an existing key
+	doubleWriteProtection bool
+	lock                  sync.RWMutex
 }
 
 // NewMemKeymap creates a new in-memory keymap.
-func NewMemKeymap(logger logging.Logger) Keymap {
+func NewMemKeymap(logger logging.Logger, doubleWriteProtection bool) Keymap {
 
 	return &memKeymap{
-		logger: logger,
-		data:   make(map[string]types.Address),
+		logger:                logger,
+		data:                  make(map[string]types.Address),
+		doubleWriteProtection: doubleWriteProtection,
 	}
 }
 
@@ -36,12 +39,11 @@ func (m *memKeymap) Put(pairs []*types.KAPair) error {
 	defer m.lock.Unlock()
 
 	for _, pair := range pairs {
-
-		// TODO make this check optional!!
-		// TODO: also add a similar but optional check to the LevelDBKeymap
-		_, ok := m.data[string(pair.Key)]
-		if ok {
-			return fmt.Errorf("key %s already exists", pair.Key)
+		if m.doubleWriteProtection {
+			_, ok := m.data[string(pair.Key)]
+			if ok {
+				return fmt.Errorf("key %s already exists", pair.Key)
+			}
 		}
 
 		m.data[string(pair.Key)] = pair.Address

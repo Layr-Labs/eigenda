@@ -14,7 +14,7 @@ type KeymapBuilder interface {
 	// If the returned boolean is true, then the keymap requires a reload of key/address pairs. For in-memory
 	// implementations, this will always return true. For disk-based implementations, this will return true if the
 	// Keymap's files are present on disk, and false otherwise.
-	Build(logger logging.Logger, keymapPath string) (Keymap, bool, error)
+	Build(logger logging.Logger, keymapPath string, doubleWriteProtection bool) (Keymap, bool, error)
 
 	// DeleteFiles deletes all files associated with the keymap that are located in any of the provided path.
 	DeleteFiles(logger logging.Logger, keymapPath string) error

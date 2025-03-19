@@ -20,11 +20,11 @@ var builders = []keymapBuilder{
 type keymapBuilder func(logger logging.Logger, path string) (Keymap, error)
 
 func buildMemKeymap(logger logging.Logger, path string) (Keymap, error) {
-	return NewMemKeymap(logger), nil
+	return NewMemKeymap(logger, true), nil
 }
 
 func buildLevelDBKeymap(logger logging.Logger, path string) (Keymap, error) {
-	return NewLevelDBKeymap(logger, path)
+	return NewLevelDBKeymap(logger, path, true)
 }
 
 func testBasicBehavior(t *testing.T, keyMap KeyMap) {
@@ -137,7 +137,7 @@ func TestRestart(t *testing.T) {
 	testDir := t.TempDir()
 	dbDir := path.Join(testDir, "keymap")
 
-	keymap, err := NewLevelDBKeymap(logger, dbDir)
+	keymap, err := NewLevelDBKeymap(logger, dbDir, true)
 	require.NoError(t, err)
 
 	expected := make(map[string]types.Address)
@@ -207,7 +207,7 @@ func TestRestart(t *testing.T) {
 	err = keymap.Stop()
 	require.NoError(t, err)
 
-	keymap, err = NewLevelDBKeymap(logger, dbDir)
+	keymap, err = NewLevelDBKeymap(logger, dbDir, true)
 	require.NoError(t, err)
 
 	// Expected data should be present

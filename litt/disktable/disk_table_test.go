@@ -74,7 +74,7 @@ func buildMemKeyDiskTableSingleShard(
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
 	}
 
-	keys := keymap.NewMemKeymap(logger)
+	keys := keymap.NewMemKeymap(logger, true)
 
 	roots := make([]string, 0, len(paths))
 	for _, p := range paths {
@@ -122,7 +122,7 @@ func buildMemKeyDiskTableMultiShard(
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
 	}
 
-	keys := keymap.NewMemKeymap(logger)
+	keys := keymap.NewMemKeymap(logger, true)
 
 	roots := make([]string, 0, len(paths))
 	for _, p := range paths {
@@ -170,7 +170,7 @@ func buildLevelDBKeyDiskTableSingleShard(
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
 	}
 
-	keys, err := keymap.NewLevelDBKeymap(logger, keymapPath)
+	keys, err := keymap.NewLevelDBKeymap(logger, keymapPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create keymap: %w", err)
 	}
@@ -221,7 +221,7 @@ func buildLevelDBKeyDiskTableMultiShard(
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
 	}
 
-	keys, err := keymap.NewLevelDBKeymap(logger, keymapPath)
+	keys, err := keymap.NewLevelDBKeymap(logger, keymapPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create keymap: %w", err)
 	}

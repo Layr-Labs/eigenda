@@ -19,8 +19,11 @@ func (b *MemKeymapBuilder) Type() KeymapType {
 	return MemKeymapType
 }
 
-func (b *MemKeymapBuilder) Build(logger logging.Logger, keymapPath string) (Keymap, bool, error) {
-	return NewMemKeymap(logger), true, nil
+func (b *MemKeymapBuilder) Build(
+	logger logging.Logger,
+	keymapPath string,
+	doubleWriteProtection bool) (Keymap, bool, error) {
+	return NewMemKeymap(logger, doubleWriteProtection), true, nil
 }
 
 func (b *MemKeymapBuilder) DeleteFiles(logger logging.Logger, keymapPath string) error {
