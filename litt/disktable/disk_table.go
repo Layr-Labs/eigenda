@@ -358,8 +358,6 @@ func (d *DiskTable) Stop() error {
 	return nil
 }
 
-// TODO make table destruction atomic
-
 // Destroy stops the disk table and delete all files.
 func (d *DiskTable) Destroy() error {
 	if ok, err := d.panic.IsOk(); !ok {
