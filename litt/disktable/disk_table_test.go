@@ -1692,6 +1692,16 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder tableB
 				require.NoError(t, err)
 			}
 
+			// Shuffle the table metadata location. This should not cause problems.
+			metadataDir := path.Join(directories[0], "table")
+			mPath := path.Join(metadataDir, tableMetadataFileName)
+			newMetadataDir := path.Join(directories[rand.Uint32Range(1, uint32(len(directories)))], "table")
+			newMPath := path.Join(newMetadataDir, tableMetadataFileName)
+			err = os.MkdirAll(newMetadataDir, 0755)
+			require.NoError(t, err)
+			err = os.Rename(mPath, newMPath)
+			require.NoError(t, err)
+
 			table, err = tableBuilder(time.Now, tableName, directories)
 			require.NoError(t, err)
 
@@ -1699,8 +1709,6 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder tableB
 			shardingFactor := rand.Uint32Range(1, 10)
 			err = table.SetShardingFactor(shardingFactor)
 			require.NoError(t, err)
-
-			// TODO shuffle table metadata location
 
 			// Do a full scan of the table to verify that all expected values are still present.
 			for expectedKey, expectedValue := range expectedValues {
