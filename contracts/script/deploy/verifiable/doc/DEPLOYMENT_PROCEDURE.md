@@ -4,14 +4,14 @@ This document details the deployment procedure using the `DeployVerifiable.sol` 
 
 ## Deployment
 
-* Use [placeholder.config.json](../../config/placeholder.config.json) as a template to create a configuration file with all parameters that the contracts need to be initialized with. The `initialOwner` field will be designated as the owner of all the contracts and proxies at the end of the deployment process.
+* Use [placeholder.config.json](../../config/placeholder.config.json) as a template to create a configuration file with all parameters that the contracts need to be initialized with. The `initialOwner` field will be designated as the owner of all the contracts and proxies at the end of the deployment process, which should be a multisig contract or an EOA.
 * Any deployer can run the deployment script with `forge script DeployVerifiable` with the DEPLOY_CONFIG_PATH env variable pointing to the config file, and other deployer related parameters that can be found in [foundry's documentation](https://book.getfoundry.sh/reference/forge/forge-script). The contracts should be verified on etherscan
     * A full example command using a private key on Holesky would be `forge script DeployVerifiable --private-key $PRIVATE_KEY --rpc-url $HOLESKY_RPC_URL --etherscan-api-key $ETHERSCAN_API_KEY --verify --verifier etherscan --chain holesky --broadcast`
-* After the script is run, a `DeploymentInitializer` contract will be deployed. The contract's address, github commit, and configuration file (if not in the commit) is to be sent to the `initialOwner` for verification, which may be yourself or a multisig.
+* After the script is run, a `DeploymentInitializer` contract will be deployed. The contract's address, github commit, and configuration file (if not in the commit) is to be sent to the `initialOwner` for verification.
 
 ## Verification
 
-The intended owner of the contract should verify the following:
+The `initialOwner` should verify the following:
 
 * The DeploymentInitializer contract received from the deployer is verified on etherscan. This contract contains getters for all contract addresses involved in the deployment, as well as all initialization variables that are statically sized. Any initialization parameters that are dynamically sized are to be submitted as calldata by the owner.
 * For all contracts, verify:
@@ -28,4 +28,4 @@ The intended owner of the contract should verify the following:
     * All proxies should be initialized properly. What needs to be checked is specific to each contract, so refer to the specific contracts.
     * The proxy admin should be changed to the intended owner
 
-After these checks, the intended owner can proceed to initialize the deployment using the calldata detailed above.
+After these checks, the `initialOwner` can proceed to initialize the deployment using the calldata detailed above.
