@@ -1984,5 +1984,3 @@ func TestChangingShardingFactor(t *testing.T) {
 		changingShardingFactorTest(t, tb)
 	}
 }
-
-// TODO add a check to ensure there is no data outside of the provided root directories!
