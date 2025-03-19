@@ -69,7 +69,15 @@ type LittDBConfig struct {
 	TimeSource func() time.Time
 
 	// If true, then flush operations will call fsync on the underlying file to ensure data is flushed out of the
-	// operating system's buffer and onto disk. This may have performance implications. The default is false.
+	// operating system's buffer and onto disk. Setting this to false means that even after flushing data,
+	// there may be data loss in the advent of an OS/hardware crash.
+	//
+	// The default is true.
+	//
+	// Enabling fsync may have performance implications, although this strongly depends on the workload. For large
+	// batches that are flushed infrequently, benchmark data suggests that the impact is minimal. For small batches
+	// that are flushed frequently, the difference can be severe. For example, when enabled in unit tests that do
+	// super tiny and frequent flushes, the difference in performance was an order of magnitude.
 	Fsync bool
 }
 
@@ -92,7 +100,7 @@ func DefaultConfig(paths ...string) (*LittDBConfig, error) {
 		KeymapType:            keymap.LevelDBKeymapType,
 		ControlChannelSize:    64,
 		TargetSegmentFileSize: math.MaxUint32,
-		Fsync:                 false,
+		Fsync:                 true,
 	}, nil
 }
 

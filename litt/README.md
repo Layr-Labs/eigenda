@@ -211,7 +211,7 @@ are present to support testing.
 - `TimeSource`*: a function that returns the current time. The default is `time.Now()`.
 - `Fsync`: if true, then each flush operation performs an fsync operation. Ensures the data is durable even if the
   OS crashes. Otherwise, there may be data in the OS's internal buffers. This may cause significant performance
-  overhead. The default is `false`.
+  overhead, especially if there are lots of frequent small flushes. The default is `true`.
 
 # Definitions
 
