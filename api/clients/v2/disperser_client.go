@@ -2,11 +2,10 @@ package clients
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"sync"
 	"time"
-
-	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
@@ -15,6 +14,7 @@ import (
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/docker/go-units"
 	"google.golang.org/grpc"
 )
 
@@ -246,9 +246,9 @@ func (c *disperserClient) DisperseBlob(
 //
 // This function returns nil if the verification succeeds, and otherwise returns an error describing the failure
 func verifyReceivedBlobKey(
-	// the blob header which was constructed locally and sent to the disperser
+// the blob header which was constructed locally and sent to the disperser
 	blobHeader *corev2.BlobHeader,
-	// the reply received back from the disperser
+// the reply received back from the disperser
 	disperserReply *disperser_rpc.DisperseBlobReply,
 ) error {
 
@@ -297,7 +297,12 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		return nil, fmt.Errorf("error getting signer's account ID: %w", err)
 	}
 
-	signature, err := c.signer.SignPaymentStateRequest()
+	nonce, err := GenerateNonce(32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate nonce: %v", err)
+	}
+
+	signature, err := c.signer.SignPaymentStateRequest(nonce)
 	if err != nil {
 		return nil, fmt.Errorf("error signing payment state request: %w", err)
 	}
@@ -363,4 +368,14 @@ func (c *disperserClient) initOncePopulateAccountant(ctx context.Context) error 
 		return fmt.Errorf("populating accountant: %w", initErr)
 	}
 	return nil
+}
+
+// GenerateNonce creates a random nonce of the specified length.
+func GenerateNonce(length int) ([]byte, error) {
+	nonce := make([]byte, length)
+	_, err := rand.Read(nonce)
+	if err != nil {
+		return nil, err
+	}
+	return nonce, nil
 }

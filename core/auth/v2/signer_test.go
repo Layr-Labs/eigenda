@@ -2,6 +2,7 @@ package v2
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"math/big"
 	"testing"
 
@@ -107,13 +108,18 @@ func TestSignPaymentStateRequest(t *testing.T) {
 	expectedAddr := "0x1aa8226f6d354380dDE75eE6B634875c4203e522"
 	accountID, err := signer.GetAccountID()
 	require.NoError(t, err)
-	hash := sha256.Sum256(accountID.Bytes())
 
-	// Sign payment state request
-	signature, err := signer.SignPaymentStateRequest()
+	// Create a 32-byte nonce
+	nonce, err := hex.DecodeString("3132333435363738393031323334353637383930313233343536373839303132")
+	require.NoError(t, err)
+
+	// Sign payment state request using a nonce
+	signature, err := signer.SignPaymentStateRequest(nonce)
 	require.NoError(t, err)
 	require.NotNil(t, signature)
 
+	accountIDWithNonce := append(accountID.Bytes(), nonce...)
+	hash := sha256.Sum256(accountIDWithNonce)
 	// Recover the public key from the signature
 	pubKey, err := crypto.SigToPub(hash[:], signature)
 	require.NoError(t, err)
@@ -134,7 +140,10 @@ func TestNoopSigner(t *testing.T) {
 	})
 
 	t.Run("SignPaymentStateRequest", func(t *testing.T) {
-		sig, err := signer.SignPaymentStateRequest()
+		// Create a 32-byte nonce
+		nonce, err := hex.DecodeString("3132333435363738393031323334353637383930313233343536373839303132")
+		require.NoError(t, err)
+		sig, err := signer.SignPaymentStateRequest(nonce)
 		assert.Error(t, err)
 		assert.Nil(t, sig)
 		assert.Equal(t, "noop signer cannot sign payment state request", err.Error())

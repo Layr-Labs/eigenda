@@ -2,8 +2,10 @@ package v2_test
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
@@ -17,12 +19,15 @@ import (
 
 var (
 	privateKeyHex = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	nonce, _      = hex.DecodeString("3132333435363738393031323334353637383930313233343536373839303132")
+	maxPastAge    = 30 * time.Second
+	maxFutureAge  = 30 * time.Second
 )
 
 func TestAuthentication(t *testing.T) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	assert.NoError(t, err)
-	authenticator := auth.NewAuthenticator()
+	authenticator := auth.NewAuthenticator(maxPastAge, maxFutureAge)
 
 	accountId, err := signer.GetAccountID()
 	assert.NoError(t, err)
@@ -40,7 +45,7 @@ func TestAuthentication(t *testing.T) {
 func TestAuthenticationFail(t *testing.T) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	assert.NoError(t, err)
-	authenticator := auth.NewAuthenticator()
+	authenticator := auth.NewAuthenticator(maxPastAge, maxFutureAge)
 
 	accountId, err := signer.GetAccountID()
 	assert.NoError(t, err)
@@ -119,30 +124,30 @@ func testHeader(t *testing.T, accountID gethcommon.Address) *corev2.BlobHeader {
 func TestAuthenticatePaymentStateRequestValid(t *testing.T) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	assert.NoError(t, err)
-	authenticator := auth.NewAuthenticator()
+	authenticator := auth.NewAuthenticator(maxPastAge, maxFutureAge)
 
-	signature, err := signer.SignPaymentStateRequest()
+	signature, err := signer.SignPaymentStateRequest(nonce)
 	assert.NoError(t, err)
 
 	accountId, err := signer.GetAccountID()
 	assert.NoError(t, err)
 
-	err = authenticator.AuthenticatePaymentStateRequest(signature, accountId)
+	err = authenticator.AuthenticatePaymentStateRequest(signature, accountId, nonce)
 	assert.NoError(t, err)
 }
 
 func TestAuthenticatePaymentStateRequestInvalidSignatureLength(t *testing.T) {
-	authenticator := auth.NewAuthenticator()
+	authenticator := auth.NewAuthenticator(maxPastAge, maxFutureAge)
 
-	err := authenticator.AuthenticatePaymentStateRequest([]byte{1, 2, 3}, gethcommon.HexToAddress("0x123"))
+	err := authenticator.AuthenticatePaymentStateRequest([]byte{1, 2, 3}, gethcommon.HexToAddress("0x123"), nonce)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "signature length is unexpected")
 }
 
 func TestAuthenticatePaymentStateRequestInvalidPublicKey(t *testing.T) {
-	authenticator := auth.NewAuthenticator()
+	authenticator := auth.NewAuthenticator(maxPastAge, maxFutureAge)
 
-	err := authenticator.AuthenticatePaymentStateRequest(make([]byte, 65), gethcommon.Address{})
+	err := authenticator.AuthenticatePaymentStateRequest(make([]byte, 65), gethcommon.Address{}, nonce)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to recover public key from signature")
 }
@@ -150,7 +155,7 @@ func TestAuthenticatePaymentStateRequestInvalidPublicKey(t *testing.T) {
 func TestAuthenticatePaymentStateRequestSignatureMismatch(t *testing.T) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	assert.NoError(t, err)
-	authenticator := auth.NewAuthenticator()
+	authenticator := auth.NewAuthenticator(maxPastAge, maxFutureAge)
 
 	// Create a different signer with wrong private key
 	wrongSigner, err := auth.NewLocalBlobRequestSigner("0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded")
@@ -160,10 +165,10 @@ func TestAuthenticatePaymentStateRequestSignatureMismatch(t *testing.T) {
 	accountId, err := signer.GetAccountID()
 	assert.NoError(t, err)
 
-	signature, err := wrongSigner.SignPaymentStateRequest()
+	signature, err := wrongSigner.SignPaymentStateRequest(nonce)
 	assert.NoError(t, err)
 
-	err = authenticator.AuthenticatePaymentStateRequest(signature, accountId)
+	err = authenticator.AuthenticatePaymentStateRequest(signature, accountId, nonce)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "signature doesn't match with provided public key")
 }
@@ -171,7 +176,7 @@ func TestAuthenticatePaymentStateRequestSignatureMismatch(t *testing.T) {
 func TestAuthenticatePaymentStateRequestCorruptedSignature(t *testing.T) {
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	assert.NoError(t, err)
-	authenticator := auth.NewAuthenticator()
+	authenticator := auth.NewAuthenticator(maxPastAge, maxFutureAge)
 
 	accountId, err := signer.GetAccountID()
 	assert.NoError(t, err)
@@ -183,6 +188,6 @@ func TestAuthenticatePaymentStateRequestCorruptedSignature(t *testing.T) {
 	// Corrupt the signature
 	signature[0] ^= 0x01
 
-	err = authenticator.AuthenticatePaymentStateRequest(signature, accountId)
+	err = authenticator.AuthenticatePaymentStateRequest(signature, accountId, nonce)
 	assert.Error(t, err)
 }

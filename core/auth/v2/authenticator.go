@@ -4,16 +4,22 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"time"
 
+	"github.com/Layr-Labs/eigenda/common/replay"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-type authenticator struct{}
+type authenticator struct {
+	replayGuardian replay.ReplayGuardian
+}
 
-func NewAuthenticator() *authenticator {
-	return &authenticator{}
+func NewAuthenticator(maxTimeInPast, maxTimeInFuture time.Duration) *authenticator {
+	return &authenticator{
+		replayGuardian: replay.NewReplayGuardian(time.Now, maxTimeInPast, maxTimeInFuture),
+	}
 }
 
 var _ core.BlobRequestAuthenticator = &authenticator{}
@@ -46,16 +52,17 @@ func (*authenticator) AuthenticateBlobRequest(header *core.BlobHeader, signature
 }
 
 // AuthenticatePaymentStateRequest verifies the signature of the payment state request
-// The signature is signed over the byte representation of the account ID
+// The signature is signed over the byte representation of the account ID and nonce
 // See implementation of BlobRequestSigner.SignPaymentStateRequest for more details
-func (*authenticator) AuthenticatePaymentStateRequest(sig []byte, accountAddr common.Address) error {
+func (a *authenticator) AuthenticatePaymentStateRequest(sig []byte, accountAddr common.Address, nonce []byte) error {
 	// Ensure the signature is 65 bytes (Recovery ID is the last byte)
 	if len(sig) != 65 {
 		return fmt.Errorf("signature length is unexpected: %d", len(sig))
 	}
 
 	// Verify the signature
-	hash := sha256.Sum256(accountAddr.Bytes())
+	accountAddrWithNonce := append(accountAddr.Bytes(), nonce...)
+	hash := sha256.Sum256(accountAddrWithNonce)
 	sigPublicKeyECDSA, err := crypto.SigToPub(hash[:], sig)
 	if err != nil {
 		return fmt.Errorf("failed to recover public key from signature: %v", err)
@@ -65,6 +72,10 @@ func (*authenticator) AuthenticatePaymentStateRequest(sig []byte, accountAddr co
 
 	if accountAddr.Cmp(pubKeyAddr) != 0 {
 		return errors.New("signature doesn't match with provided public key")
+	}
+
+	if err := a.replayGuardian.VerifyRequest(nonce, time.Now()); err != nil {
+		return fmt.Errorf("invalid nonce: the provided nonce has already been used or is expired (%v)", err)
 	}
 
 	return nil

@@ -161,6 +161,20 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_PPROF"),
 	}
+	AuthPmtStateRequestMaxPastAge = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "auth-pmt-state-request-max-past-age"),
+		Usage:    "The maximum age of an AuthPaymentState request in the past that the disperser accepts",
+		Required: false,
+		Value:    30 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTH_PMT_REQUEST_MAX_PAST_AGE"),
+	}
+	AuthPmtStateRequestMaxFutureAge = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "auth-pmt-state-request-max-future-age"),
+		Usage:    "The maximum age of an AuthPaymentState request in the future that the disperser accepts",
+		Required: false,
+		Value:    30 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTH_PMT_REQUEST_MAX_FUTURE_AGE"),
+	}
 )
 
 var kzgFlags = []cli.Flag{
@@ -255,6 +269,8 @@ var optionalFlags = []cli.Flag{
 	MaxNumSymbolsPerBlob,
 	PprofHttpPort,
 	EnablePprof,
+	AuthPmtStateRequestMaxPastAge,
+	AuthPmtStateRequestMaxFutureAge,
 }
 
 // Flags contains the list of configuration options available to the binary.

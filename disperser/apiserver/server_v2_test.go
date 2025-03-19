@@ -553,7 +553,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		blobMetadataStore,
 		chainReader,
 		meterer,
-		auth.NewAuthenticator(),
+		auth.NewAuthenticator(30*time.Second, 30*time.Second),
 		prover,
 		10,
 		time.Hour,
@@ -685,4 +685,21 @@ func TestTooShortCommitment(t *testing.T) {
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "invalid commitment length") ||
 		strings.Contains(err.Error(), "is less than blob length"))
+}
+
+func TestGenerateNonce(t *testing.T) {
+	nonce, err := apiserver.GenerateNonce(32)
+	require.NoError(t, err)
+	require.Len(t, nonce, 32, "nonce should be 32 bytes")
+
+	// Test multiple calls to ensure nonces are unique.
+	nonceMap := make(map[string]struct{})
+	for i := 0; i < 100; i++ {
+		n, err := apiserver.GenerateNonce(32)
+		require.NoError(t, err)
+		require.Len(t, n, 32, "nonce should be 32 bytes")
+		key := string(n)
+		require.NotContains(t, nonceMap, key, "nonce should be unique")
+		nonceMap[key] = struct{}{}
+	}
 }
