@@ -79,6 +79,12 @@ type LittDBConfig struct {
 	// that are flushed frequently, the difference can be severe. For example, when enabled in unit tests that do
 	// super tiny and frequent flushes, the difference in performance was an order of magnitude.
 	Fsync bool
+
+	// If enabled, the database will return an error if a key is written but that key is already present in
+	// the database. Updating existing keys is illegal and may result in unexpected behavior, and so this check
+	// acts as a safety mechanism against this sort of illegal operation. Unfortunately, if using a keymap other
+	// than keymap.MemKeymapType, performing this check may be very expensive. By default, this is false.
+	DoubleWriteProtection bool
 }
 
 // DefaultConfig returns a Config with default values.
@@ -101,6 +107,7 @@ func DefaultConfig(paths ...string) (*LittDBConfig, error) {
 		ControlChannelSize:    64,
 		TargetSegmentFileSize: math.MaxUint32,
 		Fsync:                 true,
+		DoubleWriteProtection: false,
 	}, nil
 }
 
@@ -209,7 +216,7 @@ func (c *LittDBConfig) buildKeymap(
 	}
 
 	keymapDataDirectory := path.Join(keymapDirectory, keymap.KeymapDataDirectoryName)
-	kmap, requiresReload, err = builderForConfiguredType.Build(logger, keymapDataDirectory)
+	kmap, requiresReload, err = builderForConfiguredType.Build(logger, keymapDataDirectory, c.DoubleWriteProtection)
 	if err != nil {
 		return nil, "", nil, false,
 			fmt.Errorf("error building keymap: %w", err)

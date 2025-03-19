@@ -32,6 +32,7 @@ func TestKeymapMigration(t *testing.T) {
 	config.ShardingFactor = uint32(directoryCount)
 	config.KeymapType = keymap.LevelDBKeymapType
 	config.Fsync = false // fsync is too slow for unit test workloads
+	config.DoubleWriteProtection = true
 
 	db, err := config.Build(context.Background())
 	require.NoError(t, err)

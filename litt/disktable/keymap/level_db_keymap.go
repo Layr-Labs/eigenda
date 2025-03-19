@@ -9,22 +9,26 @@ import (
 	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
 var _ Keymap = &LevelDBKeymap{}
 
 // LevelDBKeymap is a keymap that uses LevelDB as the underlying storage.
 type LevelDBKeymap struct {
-	logger     logging.Logger
-	db         *leveldb.DB
-	keymapPath string
-	alive      atomic.Bool
+	logger logging.Logger
+	db     *leveldb.DB
+	// if true, then return an error if an update would overwrite an existing key
+	doubleWriteProtection bool
+	keymapPath            string
+	alive                 atomic.Bool
 }
 
 // NewLevelDBKeymap creates a new LevelDBKeymap instance.
 func NewLevelDBKeymap(
 	logger logging.Logger,
-	keymapPath string) (*LevelDBKeymap, error) {
+	keymapPath string,
+	doubleWriteProtection bool) (*LevelDBKeymap, error) {
 
 	db, err := leveldb.OpenFile(keymapPath, nil)
 	if err != nil {
@@ -42,12 +46,29 @@ func NewLevelDBKeymap(
 }
 
 func (l *LevelDBKeymap) Put(pairs []*types.KAPair) error {
+
+	if l.doubleWriteProtection {
+		for _, pair := range pairs {
+			_, ok, err := l.Get(pair.Key)
+			if err != nil {
+				return fmt.Errorf("failed to get key: %w", err)
+			}
+			if ok {
+				return fmt.Errorf("key %s already exists", pair.Key)
+			}
+		}
+	}
+
 	batch := new(leveldb.Batch)
 	for _, pair := range pairs {
 		batch.Put(pair.Key, pair.Address.Serialize())
 	}
 
-	err := l.db.Write(batch, nil)
+	writeOptions := &opt.WriteOptions{
+		Sync: true,
+	}
+
+	err := l.db.Write(batch, writeOptions)
 	if err != nil {
 		return fmt.Errorf("failed to put batch to LevelDB: %w", err)
 	}
