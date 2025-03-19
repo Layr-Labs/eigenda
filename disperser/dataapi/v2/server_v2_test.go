@@ -361,7 +361,7 @@ func TestFetchBlob(t *testing.T) {
 	assert.Equal(t, blobHeader.PaymentMetadata.CumulativePayment, response.BlobHeader.PaymentMetadata.CumulativePayment)
 }
 
-func TestFetchOperatorBatchFeed(t *testing.T) {
+func TestFetchOperatorDispersalFeed(t *testing.T) {
 	r := setUpRouter()
 	ctx := context.Background()
 
@@ -400,8 +400,8 @@ func TestFetchOperatorBatchFeed(t *testing.T) {
 	}
 	defer deleteItems(t, dynamoKeys)
 
-	r.GET("/v2/batches/feed/:operator_id", testDataApiServerV2.FetchOperatorBatchFeed)
-	baseUrl := fmt.Sprintf("/v2/batches/feed/%s", opID.Hex())
+	r.GET("/v2/operators/:operator_id/dispersals", testDataApiServerV2.FetchOperatorDispersalFeed)
+	baseUrl := fmt.Sprintf("/v2/operators/%s/dispersals", opID.Hex())
 
 	t.Run("invalid params", func(t *testing.T) {
 		now := time.Now()
@@ -491,10 +491,10 @@ func TestFetchOperatorBatchFeed(t *testing.T) {
 
 	t.Run("nonexistent operatorid", func(t *testing.T) {
 		otherID := core.OperatorID{4, 16}
-		url := fmt.Sprintf("/v2/batches/feed/%s", otherID.Hex())
+		url := fmt.Sprintf("/v2/operators/%s/dispersals", otherID.Hex())
 		w := executeRequest(t, r, http.MethodGet, url)
-		response := decodeResponseBody[serverv2.OperatorBatchFeedResponse](t, w)
-		require.Equal(t, 0, len(response.Batches))
+		response := decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
+		require.Equal(t, 0, len(response.Dispersals))
 	})
 
 	t.Run("default params", func(t *testing.T) {
@@ -503,12 +503,12 @@ func TestFetchOperatorBatchFeed(t *testing.T) {
 		// - Limited to 20 results (the default "limit")
 		// - Result will first 20 dispersals
 		w := executeRequest(t, r, http.MethodGet, baseUrl)
-		response := decodeResponseBody[serverv2.OperatorBatchFeedResponse](t, w)
-		require.Equal(t, 20, len(response.Batches))
+		response := decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
+		require.Equal(t, 20, len(response.Dispersals))
 		for i := 0; i < 20; i++ {
-			assert.Equal(t, dispersedAt[1+i], response.Batches[i].DispersedAt)
-			assert.Equal(t, batchHeaders[1+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[1+i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, dispersedAt[1+i], response.Dispersals[i].DispersedAt)
+			assert.Equal(t, batchHeaders[1+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, batchHeaders[1+i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 	})
 
@@ -516,24 +516,24 @@ func TestFetchOperatorBatchFeed(t *testing.T) {
 		// Test 1: Unlimited results in 1-hour window
 		// With 1h ending time at now, this retrieves dispersals[1] through batch[59] (59 batches)
 		w := executeRequest(t, r, http.MethodGet, baseUrl+"?limit=0")
-		response := decodeResponseBody[serverv2.OperatorBatchFeedResponse](t, w)
-		require.Equal(t, 59, len(response.Batches))
+		response := decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
+		require.Equal(t, 59, len(response.Dispersals))
 		for i := 0; i < 59; i++ {
-			assert.Equal(t, dispersedAt[1+i], response.Batches[i].DispersedAt)
-			assert.Equal(t, batchHeaders[1+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[1+i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, dispersedAt[1+i], response.Dispersals[i].DispersedAt)
+			assert.Equal(t, batchHeaders[1+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, batchHeaders[1+i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 
 		// Test 2: 2-hour window captures all test batches
 		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
 		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s", baseUrl, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
-		response = decodeResponseBody[serverv2.OperatorBatchFeedResponse](t, w)
-		require.Equal(t, 60, len(response.Batches))
+		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
+		require.Equal(t, 60, len(response.Dispersals))
 		for i := 0; i < 60; i++ {
-			assert.Equal(t, dispersedAt[i], response.Batches[i].DispersedAt)
-			assert.Equal(t, batchHeaders[i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, dispersedAt[i], response.Dispersals[i].DispersedAt)
+			assert.Equal(t, batchHeaders[i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, batchHeaders[i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 
 		// Teste 3: custom end time
@@ -543,12 +543,12 @@ func TestFetchOperatorBatchFeed(t *testing.T) {
 		beforeTime := before.Format("2006-01-02T15:04:05.999999999Z")
 		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1", baseUrl, beforeTime, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
-		response = decodeResponseBody[serverv2.OperatorBatchFeedResponse](t, w)
-		require.Equal(t, 29, len(response.Batches))
+		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
+		require.Equal(t, 29, len(response.Dispersals))
 		for i := 0; i < 29; i++ {
-			assert.Equal(t, dispersedAt[21+i], response.Batches[i].DispersedAt)
-			assert.Equal(t, batchHeaders[21+i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[21+i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, dispersedAt[21+i], response.Dispersals[i].DispersedAt)
+			assert.Equal(t, batchHeaders[21+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, batchHeaders[21+i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 	})
 
@@ -556,24 +556,24 @@ func TestFetchOperatorBatchFeed(t *testing.T) {
 		// Test 1: Unlimited results in 1-hour window
 		// With 1h ending time at now, this retrieves dispersals[59] through batch[1] (59 batches)
 		w := executeRequest(t, r, http.MethodGet, baseUrl+"?limit=0&direction=backward")
-		response := decodeResponseBody[serverv2.OperatorBatchFeedResponse](t, w)
-		require.Equal(t, 59, len(response.Batches))
+		response := decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
+		require.Equal(t, 59, len(response.Dispersals))
 		for i := 0; i < 59; i++ {
-			assert.Equal(t, dispersedAt[59-i], response.Batches[i].DispersedAt)
-			assert.Equal(t, batchHeaders[59-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[59-i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, dispersedAt[59-i], response.Dispersals[i].DispersedAt)
+			assert.Equal(t, batchHeaders[59-i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, batchHeaders[59-i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 
 		// Test 2: 2-hour window captures all test batches
 		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
 		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s&direction=backward", baseUrl, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
-		response = decodeResponseBody[serverv2.OperatorBatchFeedResponse](t, w)
-		require.Equal(t, 60, len(response.Batches))
+		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
+		require.Equal(t, 60, len(response.Dispersals))
 		for i := 0; i < 60; i++ {
-			assert.Equal(t, dispersedAt[59-i], response.Batches[i].DispersedAt)
-			assert.Equal(t, batchHeaders[59-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[59-i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, dispersedAt[59-i], response.Dispersals[i].DispersedAt)
+			assert.Equal(t, batchHeaders[59-i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, batchHeaders[59-i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 
 		// Teste 3: custom end time
@@ -583,12 +583,12 @@ func TestFetchOperatorBatchFeed(t *testing.T) {
 		beforeTime := before.Format("2006-01-02T15:04:05.999999999Z")
 		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1&direction=backward", baseUrl, beforeTime, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
-		response = decodeResponseBody[serverv2.OperatorBatchFeedResponse](t, w)
-		require.Equal(t, 29, len(response.Batches))
+		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
+		require.Equal(t, 29, len(response.Dispersals))
 		for i := 0; i < 29; i++ {
-			assert.Equal(t, dispersedAt[49-i], response.Batches[i].DispersedAt)
-			assert.Equal(t, batchHeaders[49-i].ReferenceBlockNumber, response.Batches[i].BatchHeader.ReferenceBlockNumber)
-			assert.Equal(t, batchHeaders[49-i].BatchRoot, response.Batches[i].BatchHeader.BatchRoot)
+			assert.Equal(t, dispersedAt[49-i], response.Dispersals[i].DispersedAt)
+			assert.Equal(t, batchHeaders[49-i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
+			assert.Equal(t, batchHeaders[49-i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
 		}
 	})
 
@@ -2090,7 +2090,7 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 	mockSubgraphApi.Calls = nil
 }
 
-func TestFetchOperatorResponses(t *testing.T) {
+func TestFetchOperatorDispersalResponse(t *testing.T) {
 	r := setUpRouter()
 	ctx := context.Background()
 	// Set up batch header in metadata store
@@ -2138,23 +2138,13 @@ func TestFetchOperatorResponses(t *testing.T) {
 	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse2)
 	assert.NoError(t, err)
 
-	r.GET("/v2/operators/response/:batch_header_hash", testDataApiServerV2.FetchOperatorsResponses)
+	r.GET("/v2/operators/:operator_id/dispersals/:batch_header_hash", testDataApiServerV2.FetchOperatorDispersalResponse)
 
 	// Fetch response of a specific operator
-	reqStr := fmt.Sprintf("/v2/operators/response/%s?operator_id=%v", batchHeaderHash, operatorId.Hex())
+	reqStr := fmt.Sprintf("/v2/operators/%s/dispersals/%s", operatorId.Hex(), batchHeaderHash)
 	w := executeRequest(t, r, http.MethodGet, reqStr)
-	response := decodeResponseBody[serverv2.OperatorDispersalResponses](t, w)
-	require.Equal(t, 1, len(response.Responses))
-	require.Equal(t, dispersalResponse, response.Responses[0])
-
-	// Fetch all operators' responses for a batch
-	reqStr2 := fmt.Sprintf("/v2/operators/response/%s", batchHeaderHash)
-	w2 := executeRequest(t, r, http.MethodGet, reqStr2)
-	response2 := decodeResponseBody[serverv2.OperatorDispersalResponses](t, w2)
-
-	require.Equal(t, 2, len(response2.Responses))
-	require.Equal(t, response2.Responses[0], dispersalResponse)
-	require.Equal(t, response2.Responses[1], dispersalResponse2)
+	response := decodeResponseBody[serverv2.OperatorDispersalResponse](t, w)
+	require.Equal(t, dispersalResponse, response.Response)
 }
 
 func TestFetchOperatorsStake(t *testing.T) {

@@ -75,69 +75,6 @@
                 }
             }
         },
-        "/batches/feed/{operator_id}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Batches"
-                ],
-                "summary": "Fetch batch feed dispersed to an operator in specified direction",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Direction to fetch: 'forward' (oldest to newest, ASC order) or 'backward' (newest to oldest, DESC order) [default: forward]",
-                        "name": "direction",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Fetch batches before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]",
-                        "name": "before",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Fetch batches after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than `before` [default: `before`-1h]",
-                        "name": "after",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Maximum number of batches to return; if limit \u003c= 0 or \u003e1000, it's treated as 1000 [default: 20; max: 1000]",
-                        "name": "limit",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/v2.BatchFeedResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "error: Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/v2.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "error: Not found",
-                        "schema": {
-                            "$ref": "#/definitions/v2.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "error: Server error",
-                        "schema": {
-                            "$ref": "#/definitions/v2.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/batches/{batch_header_hash}": {
             "get": {
                 "produces": [
@@ -674,7 +611,77 @@
                 }
             }
         },
-        "/operators/{batch_header_hash}": {
+        "/operators/{operator_id}/dispersals": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Operators"
+                ],
+                "summary": "Fetch batches dispersed to an operator in a time window by specific direction",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "The operator ID to fetch batch feed for",
+                        "name": "operator_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Direction to fetch: 'forward' (oldest to newest, ASC order) or 'backward' (newest to oldest, DESC order) [default: forward]",
+                        "name": "direction",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fetch batches before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]",
+                        "name": "before",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fetch batches after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than `before` [default: `before`-1h]",
+                        "name": "after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of batches to return; if limit \u003c= 0 or \u003e1000, it's treated as 1000 [default: 20; max: 1000]",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.OperatorDispersalFeedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/operators/{operator_id}/dispersals/{batch_header_hash}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -686,23 +693,24 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Batch header hash in hex string",
-                        "name": "batch_header_hash",
+                        "description": "The operator ID to fetch batch feed for",
+                        "name": "operator_id",
                         "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "Operator ID in hex string [default: all operators if unspecified]",
-                        "name": "operator_id",
-                        "in": "query"
+                        "description": "Batch header hash in hex string",
+                        "name": "batch_header_hash",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/v2.OperatorDispersalResponses"
+                            "$ref": "#/definitions/v2.OperatorDispersalResponse"
                         }
                     },
                     "400": {
@@ -1318,14 +1326,42 @@
                 }
             }
         },
-        "v2.OperatorDispersalResponses": {
+        "v2.OperatorDispersal": {
             "type": "object",
             "properties": {
-                "operator_dispersal_responses": {
+                "batch_header": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader"
+                },
+                "batch_header_hash": {
+                    "type": "string"
+                },
+                "dispersedAt": {
+                    "type": "integer"
+                }
+            }
+        },
+        "v2.OperatorDispersalFeedResponse": {
+            "type": "object",
+            "properties": {
+                "dispersals": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/v2.DispersalResponse"
+                        "$ref": "#/definitions/v2.OperatorDispersal"
                     }
+                },
+                "operator_identity": {
+                    "$ref": "#/definitions/v2.OperatorIdentity"
+                },
+                "operator_socket": {
+                    "type": "string"
+                }
+            }
+        },
+        "v2.OperatorDispersalResponse": {
+            "type": "object",
+            "properties": {
+                "operator_dispersal_response": {
+                    "$ref": "#/definitions/v2.DispersalResponse"
                 }
             }
         },
