@@ -4,10 +4,10 @@ This document details the deployment procedure using the `DeployVerifiable.sol` 
 
 ## Deployment
 
-* Use [placeholder.config.json](../../config/placeholder.config.json) as a template to create a configuration file with all parameters that the contracts need to be initialized with. 
+* Use [placeholder.config.json](../../config/placeholder.config.json) as a template to create a configuration file with all parameters that the contracts need to be initialized with. The `initialOwner` field will be designated as the owner of all the contracts and proxies at the end of the deployment process.
 * Any deployer can run the deployment script with `forge script DeployVerifiable` with the DEPLOY_CONFIG_PATH env variable pointing to the config file, and other deployer related parameters that can be found in [foundry's documentation](https://book.getfoundry.sh/reference/forge/forge-script). The contracts should be verified on etherscan
     * A full example command using a private key on Holesky would be `forge script DeployVerifiable --private-key $PRIVATE_KEY --rpc-url $HOLESKY_RPC_URL --etherscan-api-key $ETHERSCAN_API_KEY --verify --verifier etherscan --chain holesky --broadcast`
-* After the script is run, a `DeploymentInitializer` contract will be deployed. The contract's address, github commit, and configuration file (if not in the commit) is to be sent over to the intended contract owner for verification.
+* After the script is run, a `DeploymentInitializer` contract will be deployed. The contract's address, github commit, and configuration file (if not in the commit) is to be sent to the `initialOwner` for verification, which may be yourself or a multisig.
 
 ## Verification
 
