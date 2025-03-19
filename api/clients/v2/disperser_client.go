@@ -246,9 +246,9 @@ func (c *disperserClient) DisperseBlob(
 //
 // This function returns nil if the verification succeeds, and otherwise returns an error describing the failure
 func verifyReceivedBlobKey(
-// the blob header which was constructed locally and sent to the disperser
+	// the blob header which was constructed locally and sent to the disperser
 	blobHeader *corev2.BlobHeader,
-// the reply received back from the disperser
+	// the reply received back from the disperser
 	disperserReply *disperser_rpc.DisperseBlobReply,
 ) error {
 
@@ -310,6 +310,8 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 	request := &disperser_rpc.GetPaymentStateRequest{
 		AccountId: accountID.Hex(),
 		Signature: signature,
+		Timestamp: uint32(time.Now().Unix()),
+		Nonce:     nonce,
 	}
 	return c.client.GetPaymentState(ctx, request)
 }

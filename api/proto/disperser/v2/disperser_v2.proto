@@ -123,6 +123,8 @@ message GetPaymentStateRequest {
   // Timestamp of the request in seconds since the Unix epoch. If too far out of sync with the server's clock,
   // request may be rejected.
   uint32 timestamp = 3;
+  // A client-generated nonce to ensure the request is unique.
+  bytes nonce = 4;
 }
 
 // GetPaymentStateReply contains the payment state of an account.

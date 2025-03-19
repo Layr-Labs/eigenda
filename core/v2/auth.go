@@ -1,10 +1,13 @@
 package v2
 
-import gethcommon "github.com/ethereum/go-ethereum/common"
+import (
+	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+)
 
 type BlobRequestAuthenticator interface {
 	AuthenticateBlobRequest(header *BlobHeader, signature []byte) error
-	AuthenticatePaymentStateRequest(signature []byte, accountId gethcommon.Address, nonce []byte) error
+	AuthenticatePaymentStateRequest(accountId gethcommon.Address, request *pb.GetPaymentStateRequest) error
 }
 
 type BlobRequestSigner interface {

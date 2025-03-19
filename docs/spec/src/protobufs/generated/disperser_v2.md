@@ -207,6 +207,7 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 | account_id | [string](#string) |  | The ID of the account being queried. This account ID is an eth wallet address of the user. |
 | signature | [bytes](#bytes) |  | Signature over the account ID |
 | timestamp | [uint32](#uint32) |  | Timestamp of the request in seconds since the Unix epoch. If too far out of sync with the server&#39;s clock, request may be rejected. |
+| nonce | [bytes](#bytes) |  | A client-generated nonce to ensure the request is unique. |
 
 
 

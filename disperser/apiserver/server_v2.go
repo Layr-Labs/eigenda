@@ -2,7 +2,6 @@ package apiserver
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"net"
@@ -280,13 +279,8 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 
 	accountID := gethcommon.HexToAddress(req.AccountId)
 
-	nonce, err := GenerateNonce(32)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate nonce: %v", err)
-	}
-
 	// validate the signature
-	if err := s.authenticator.AuthenticatePaymentStateRequest(req.GetSignature(), accountID, nonce); err != nil {
+	if err := s.authenticator.AuthenticatePaymentStateRequest(accountID, req); err != nil {
 		s.logger.Debug("failed to validate signature", "err", err, "accountID", accountID)
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
@@ -359,14 +353,4 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		OnchainCumulativePayment: onchainCumulativePaymentBytes,
 	}
 	return reply, nil
-}
-
-// GenerateNonce creates a random nonce of the specified length.
-func GenerateNonce(length int) ([]byte, error) {
-	nonce := make([]byte, length)
-	_, err := rand.Read(nonce)
-	if err != nil {
-		return nil, err
-	}
-	return nonce, nil
 }
