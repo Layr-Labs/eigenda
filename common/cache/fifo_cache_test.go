@@ -135,6 +135,3 @@ func TestWeightedValues(t *testing.T) {
 		require.Equal(t, v, value)
 	}
 }
-
-// TODO add unit test for changing cache capacity
-// TODO test thread safe wrapper
