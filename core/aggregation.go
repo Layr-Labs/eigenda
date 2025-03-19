@@ -162,7 +162,7 @@ func (a *StdSignatureAggregator) getOperatorAddress(
 }
 
 // collectSignatureInfoForQuorum collects the signature information for the operator in the quorum, updating the
-// attestation and stake signed.
+// attestation and stake signed. Returns the updated operatorQuorums.
 func (a *StdSignatureAggregator) collectSignatureInfoForQuorum(
 	state *IndexedOperatorState,
 	operator *IndexedOperatorInfo,
@@ -171,14 +171,14 @@ func (a *StdSignatureAggregator) collectSignatureInfoForQuorum(
 	attestation *QuorumAttestation,
 	stakeSigned map[QuorumID]*big.Int,
 	sig *Signature,
-	operatorQuorums []uint8) {
+	operatorQuorums []uint8) []uint8 {
 
 	// Get stake amounts for operator
 	ops := state.Operators[quorumID]
 	opInfo, ok := ops[signingMessage.Operator]
 	// If operator is not in quorum, skip
 	if !ok {
-		return
+		return operatorQuorums
 	}
 	operatorQuorums = append(operatorQuorums, quorumID)
 
@@ -195,6 +195,8 @@ func (a *StdSignatureAggregator) collectSignatureInfoForQuorum(
 		attestation.AggSignature[quorumID].Add(sig.G1Point)
 		attestation.SignersAggPubKey[quorumID].Add(operator.PubkeyG2)
 	}
+
+	return operatorQuorums
 }
 
 // processNextSignature is used to collect the next signature from the message channel and aggregate it into the
@@ -255,10 +257,10 @@ func (a *StdSignatureAggregator) processNextSignature(
 		return
 	}
 
-	// Collect signature information for eqch quorum
+	// Collect signature information for each quorum
 	operatorQuorums := make([]uint8, 0, len(quorumIDs))
 	for _, quorumID := range quorumIDs {
-		a.collectSignatureInfoForQuorum(
+		operatorQuorums = a.collectSignatureInfoForQuorum(
 			state, operator, quorumID, signingMessage, attestation, stakeSigned, sig, operatorQuorums)
 	}
 	a.Logger.Info("received signature from operator",
