@@ -4,7 +4,7 @@ This document details the deployment procedure using the `DeployVerifiable.sol` 
 
 ## Deployment
 
-* Use placeholder.config.json as a template to create a configuration file with all parameters that the contracts need to be initialized with. 
+* Use [placeholder.config.json](../../config/placeholder.config.json) as a template to create a configuration file with all parameters that the contracts need to be initialized with. 
 * Any deployer can run the deployment script with `forge script DeployVerifiable` with the DEPLOY_CONFIG_PATH env variable pointing to the config file. Make sure to use the `--verify` flag to verify the contracts on etherscan.
 * After the script is run, a `DeploymentInitializer` contract will be deployed. The contract's address, github commit, and configuration file (if not in the commit) is to be sent over to the intended contract owner for verification.
 
