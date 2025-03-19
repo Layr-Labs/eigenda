@@ -90,6 +90,13 @@ const docTemplateV2 = `{
                 "parameters": [
                     {
                         "type": "string",
+                        "description": "The operator ID to fetch batch feed for",
+                        "name": "operator_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
                         "description": "Direction to fetch: 'forward' (oldest to newest, ASC order) or 'backward' (newest to oldest, DESC order) [default: forward]",
                         "name": "direction",
                         "in": "query"

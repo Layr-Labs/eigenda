@@ -596,6 +596,11 @@ paths:
   /batches/feed/{operator_id}:
     get:
       parameters:
+      - description: The operator ID to fetch batch feed for
+        in: path
+        name: operator_id
+        required: true
+        type: string
       - description: 'Direction to fetch: ''forward'' (oldest to newest, ASC order)
           or ''backward'' (newest to oldest, DESC order) [default: forward]'
         in: query
