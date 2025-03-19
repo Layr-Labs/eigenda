@@ -26,6 +26,6 @@ The `initialOwner` should verify the following:
 * Generate calldata with the dynamically sized initialization parameters to call the initializeDeployment(params) DeploymentInitializer, and simulate the behavior of this transaction on the tool of your choice. (e.g. Tenderly, foundry tests)
     * All proxies should be upgraded to their respective implementations
     * All proxies should be initialized properly. What needs to be checked is specific to each contract, so refer to the specific contracts.
-    * The proxy admin should be changed to the intended owner
+    * The proxy admin should be changed to the `initialOwner`
 
 After these checks, the `initialOwner` can proceed to initialize the deployment using the calldata detailed above.
