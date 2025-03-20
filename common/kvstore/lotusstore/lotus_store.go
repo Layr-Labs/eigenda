@@ -3,6 +3,7 @@ package lotusstore
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/docker/go-units"
@@ -20,6 +21,9 @@ type lotusStore struct {
 }
 
 func NewStore(dataDir string) (kvstore.Store[[]byte], error) {
+
+	fmt.Printf("starting lotus store at %s\n", dataDir) // TODO
+
 	opts := lotus.DefaultOptions
 	opts.DirPath = dataDir
 	opts.Sync = true
@@ -59,7 +63,14 @@ func (l *lotusStore) Put(k []byte, value []byte) error {
 }
 
 func (l *lotusStore) Get(k []byte) ([]byte, error) {
-	return l.db.Get(k)
+	data, err := l.db.Get(k)
+	if err != nil {
+		if strings.Contains(err.Error(), "key not found in database") {
+			return nil, kvstore.ErrNotFound
+		}
+	}
+
+	return data, nil
 }
 
 func (l *lotusStore) Delete(k []byte) error {
