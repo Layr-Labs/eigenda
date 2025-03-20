@@ -7,7 +7,7 @@ ARG SEMVER=""
 ARG GITCOMMIT=""
 ARG GITDATE=""
 
-FROM golang:1.21.13-alpine3.20 AS base-builder
+FROM golang:1.24.1-alpine3.20 AS base-builder
 RUN apk add --no-cache make musl-dev linux-headers gcc git jq bash
 
 # Common build stage
