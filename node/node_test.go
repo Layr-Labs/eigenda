@@ -81,7 +81,14 @@ func newComponents(t *testing.T, operatorID [32]byte) *components {
 		2: 3,
 	})
 
-	store, err := node.NewLevelDBStore(dbPath, logger, nil, 1e9, 1e9)
+	store, err := node.NewLevelDBStore(
+		dbPath,
+		logger,
+		nil,
+		1e9,
+		true,
+		false,
+		1e9)
 	if err != nil {
 		panic("failed to create a new levelDB store")
 	}
