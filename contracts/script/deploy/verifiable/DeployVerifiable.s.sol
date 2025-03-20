@@ -34,6 +34,8 @@ import {VersionedBlobParams} from "src/interfaces/IEigenDAStructs.sol";
 import {MockStakeRegistry} from "./mocks/MockStakeRegistry.sol";
 import {MockRegistryCoordinator} from "./mocks/MockRegistryCoordinator.sol";
 
+import {BeforeInitialization} from "./test/BeforeInitialization.t.sol";
+
 import {
     DeploymentInitializer,
     ImmutableInitParams,
@@ -50,6 +52,7 @@ import {
 
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract DeployVerifiable is Script {
     using InitParamsLib for string;
@@ -92,6 +95,8 @@ contract DeployVerifiable is Script {
         // Transfer ownership of proxy admin to deployment initializer
         proxyAdmin.transferOwnership(address(deploymentInitializer));
 
+        _logs();
+
         vm.stopBroadcast();
 
         _doTests();
@@ -102,7 +107,24 @@ contract DeployVerifiable is Script {
         cfg = vm.readFile(vm.envString("DEPLOY_CONFIG_PATH"));
     }
 
+    function _logs() internal virtual {
+        console2.log("Deployment addresses:");
+        console2.log("Deployment Initializer: ", address(deploymentInitializer));
+        console2.log("Empty Contract Implementation", emptyContract);
+        console2.log("Mock Stake Registry Implementation", mockStakeRegistry);
+        console2.log("Mock Registry Coordinator Implementation", mockRegistryCoordinator);
+
+        console2.log(
+            "\n\nAll other relevant deployment addresses should be queried from the DeploymentInitializer contract."
+        );
+    }
+
     function _doTests() internal {
+        BeforeInitialization beforeTest = new BeforeInitialization();
+        beforeTest.doBeforeInitializationTests(
+            cfg, deploymentInitializer, emptyContract, mockStakeRegistry, mockRegistryCoordinator
+        );
+
         vm.startPrank(cfg.initialOwner());
         CalldataInitParams memory params = InitParamsLib.calldataInitParams(cfg);
         deploymentInitializer.initializeDeployment(params);
