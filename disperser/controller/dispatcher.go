@@ -606,6 +606,13 @@ func (d *Dispatcher) sendChunks(ctx context.Context, client clients.NodeClient, 
 	return sig, nil
 }
 
+// updateBatchStatus updates the status of the blobs in the batch based on the quorum results
+// If a blob is not included in the quorum results or runs into any unexpected errors, it is marked as failed
+// If a blob is included in the quorum results, it is marked as complete
+// This function also removes the blobs from the blob set indicating that this blob has been processed
+// If the blob is removed from the blob set after the time it is retrieved as part of a batch
+// for processing by `NewBatch` (when it's in `ENCODED` state) and before the time the batch
+// is deduplicated against the blobSet, it will be dispatched again in a different batch.
 func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, quorumResults map[core.QuorumID]uint8) error {
 	var multierr error
 	for i, cert := range batch.Batch.BlobCertificates {
@@ -615,6 +622,8 @@ func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, qu
 			err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
 			if err != nil {
 				multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
+			} else {
+				d.blobSet.RemoveBlob(blobKey)
 			}
 			if metadata, ok := batch.Metadata[blobKey]; ok {
 				d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
@@ -635,6 +644,8 @@ func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, qu
 			err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Failed)
 			if err != nil {
 				multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to failed: %w", blobKey.Hex(), err))
+			} else {
+				d.blobSet.RemoveBlob(blobKey)
 			}
 			if metadata, ok := batch.Metadata[blobKey]; ok {
 				d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Failed)
@@ -645,18 +656,14 @@ func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData, qu
 		err := d.blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Complete)
 		if err != nil {
 			multierr = multierror.Append(multierr, fmt.Errorf("failed to update blob status for blob %s to complete: %w", blobKey.Hex(), err))
+		} else {
+			d.blobSet.RemoveBlob(blobKey)
 		}
 		if metadata, ok := batch.Metadata[blobKey]; ok {
 			requestedAt := time.Unix(0, int64(metadata.RequestedAt))
 			d.metrics.reportE2EDispersalLatency(time.Since(requestedAt))
 			d.metrics.reportCompletedBlob(int(metadata.BlobSize), v2.Complete)
 		}
-
-		// Remove blob from the blob set indicating that this blob has been processed.
-		// If the blob is removed from the blob set after the time it is retrieved as part of a batch
-		// for processing by `NewBatch` (when it's in `ENCODED` state) and before the time the batch
-		// is deduplicated against the blobSet, it will be dispatched again in a different batch.
-		d.blobSet.RemoveBlob(blobKey)
 	}
 
 	return multierr
