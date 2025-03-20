@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/Layr-Labs/eigenda/common/kvstore"
+	"github.com/docker/go-units"
 	lotus "github.com/lotusdblabs/lotusdb/v2"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"
@@ -19,10 +20,10 @@ type lotusStore struct {
 }
 
 func NewStore(dataDir string) (kvstore.Store[[]byte], error) {
-	opts := lotus.Options{
-		DirPath: dataDir,
-		Sync:    true,
-	}
+	opts := lotus.DefaultOptions
+	opts.DirPath = dataDir
+	opts.Sync = true
+	opts.MemtableSize = 512 * units.MiB
 
 	db, err := lotus.Open(opts)
 	if err != nil {

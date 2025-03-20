@@ -67,8 +67,9 @@ func DefaultMapStoreConfig() *Config {
 	return config
 }
 
-func DefaultLotusDBConfig() *Config {
+func DefaultLotusDBConfig(path string) *Config {
 	config := DefaultConfig()
 	config.Type = LotusDB
+	config.Path = &path
 	return config
 }

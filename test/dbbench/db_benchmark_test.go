@@ -627,7 +627,7 @@ func TestLotusDB(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
 
-	config := tablestore.DefaultLotusDBConfig()
+	config := tablestore.DefaultLotusDBConfig(directory)
 	config.Schema = []string{"test"}
 	db, err := tablestore.Start(logger, config)
 	require.NoError(t, err)
