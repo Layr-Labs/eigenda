@@ -110,10 +110,6 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInvalidArg("v2 API is disabled")
 	}
 
-	if s.node.StoreV2 == nil {
-		return nil, api.NewErrorInternal("v2 store not initialized")
-	}
-
 	if s.node.BLSSigner == nil {
 		return nil, api.NewErrorInternal("missing bls signer")
 	}
@@ -156,6 +152,46 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	}
 	s.metrics.ReportStoreChunksLatency("download", time.Since(stageTimer))
 
+	err = s.validateAndStoreV2Chunks(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash)
+	if err != nil {
+		return nil, err
+	}
+
+	sig, err := s.node.BLSSigner.Sign(ctx, batchHeaderHash[:])
+	if err != nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to sign batch: %v", err))
+	}
+
+	s.metrics.ReportStoreChunksLatency("total", time.Since(start))
+
+	return &pb.StoreChunksReply{
+		Signature: sig,
+	}, nil
+}
+
+func (s *ServerV2) validateAndStoreV2Chunks(
+	ctx context.Context,
+	batch *corev2.Batch,
+	blobShards []*corev2.BlobShard,
+	rawBundles []*node.RawBundles,
+	operatorState *core.OperatorState,
+	batchHeaderHash [32]byte) error {
+
+	if true { // TODO setting
+		return s.validateAndStoreV2ChunksLittDB(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash)
+	} else {
+		return s.validateAndStoreV2ChunksLevelDB(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash)
+	}
+}
+
+func (s *ServerV2) validateAndStoreV2ChunksLevelDB(
+	ctx context.Context,
+	batch *corev2.Batch,
+	blobShards []*corev2.BlobShard,
+	rawBundles []*node.RawBundles,
+	operatorState *core.OperatorState,
+	batchHeaderHash [32]byte) error {
+
 	type storeResult struct {
 		keys []kvstore.Key
 		err  error
@@ -180,34 +216,55 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		}
 	}()
 
-	stageTimer = time.Now()
-	err = s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
+	stageTimer := time.Now()
+	err := s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
 	if err != nil {
 		res := <-storeChan
 		if len(res.keys) > 0 {
 			if deleteErr := s.node.StoreV2.DeleteKeys(res.keys); deleteErr != nil {
-				s.logger.Error("failed to delete keys", "err", deleteErr, "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]))
+				s.logger.Error(
+					"failed to delete keys",
+					"err", deleteErr,
+					"batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]))
 			}
 		}
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to validate batch: %v", err))
+		return api.NewErrorInternal(fmt.Sprintf("failed to validate batch: %v", err))
 	}
 	s.metrics.ReportStoreChunksLatency("validation", time.Since(stageTimer))
 
 	res := <-storeChan
 	if res.err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to store batch: %v", res.err))
+		return api.NewErrorInternal(fmt.Sprintf("failed to store batch: %v", res.err))
 	}
 
-	sig, err := s.node.BLSSigner.Sign(ctx, batchHeaderHash[:])
+	return nil
+}
+
+func (s *ServerV2) validateAndStoreV2ChunksLittDB(
+	ctx context.Context,
+	batch *corev2.Batch,
+	blobShards []*corev2.BlobShard,
+	rawBundles []*node.RawBundles,
+	operatorState *core.OperatorState,
+	batchHeaderHash [32]byte) error {
+
+	stageTimer := time.Now()
+	err := s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to sign batch: %v", err))
+		return api.NewErrorInternal(fmt.Sprintf("failed to validate batch %s: %v", batchHeaderHash, err))
+	}
+	s.metrics.ReportStoreChunksLatency("validation", time.Since(stageTimer))
+
+	storageStart := time.Now()
+	_, size, err := s.node.StoreV2.StoreBatch(batch, rawBundles)
+	if err != nil {
+		return fmt.Errorf("failed to store batch %s: %v", batchHeaderHash, err)
 	}
 
-	s.metrics.ReportStoreChunksLatency("total", time.Since(start))
+	s.metrics.ReportStoreChunksRequestSize(size)
+	s.metrics.ReportStoreChunksLatency("storage", time.Since(storageStart))
 
-	return &pb.StoreChunksReply{
-		Signature: sig,
-	}, nil
+	return nil
 }
 
 // validateStoreChunksRequest validates the StoreChunksRequest and returns deserialized batch in the request
@@ -236,10 +293,6 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 
 	if !s.config.EnableV2 {
 		return nil, api.NewErrorInvalidArg("v2 API is disabled")
-	}
-
-	if s.node.StoreV2 == nil {
-		return nil, api.NewErrorInternal("v2 store not initialized")
 	}
 
 	blobKey, err := corev2.BytesToBlobKey(in.GetBlobKey())
