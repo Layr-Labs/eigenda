@@ -71,6 +71,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.28.6 // indirect
 	github.com/aws/smithy-go v1.20.2 // indirect
 	github.com/bits-and-blooms/bitset v1.13.0 // indirect
+	github.com/bwmarrin/snowflake v0.3.0 // indirect
 	github.com/bytedance/sonic v1.9.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
@@ -128,6 +129,7 @@ require (
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
 	github.com/lmittmann/tint v1.0.4 // indirect
+	github.com/lotusdblabs/lotusdb/v2 v2.1.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
@@ -141,19 +143,24 @@ require (
 	github.com/opencontainers/runc v1.1.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/rosedblabs/diskhash v0.0.0-20230910084041-289755737e2a // indirect
+	github.com/rosedblabs/wal v1.3.6 // indirect
 	github.com/rs/cors v1.7.0 // indirect
 	github.com/rs/zerolog v1.29.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
+	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/status-im/keycard-go v0.2.0 // indirect
 	github.com/supranational/blst v0.3.11 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
+	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
+	go.etcd.io/bbolt v1.3.8 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect

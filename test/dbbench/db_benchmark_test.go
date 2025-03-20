@@ -25,6 +25,7 @@ import (
 	"github.com/dgraph-io/badger/v4/options"
 	"github.com/docker/go-units"
 	"github.com/emirpasic/gods/queues/linkedlistqueue"
+	lotus "github.com/lotusdblabs/lotusdb/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -617,6 +618,72 @@ func TestBadgerDB(t *testing.T) {
 	runBenchmark(writeFunction, readFunction)
 	alive.Store(false)
 	<-compactionDone
+
+	err = db.Close()
+	require.NoError(t, err)
+}
+
+func TestLotusDB(t *testing.T) {
+	directory := "./test-data"
+
+	opts := lotus.DefaultOptions
+	opts.Sync = true
+	opts.DirPath = directory
+	opts.MemtableSize = 1 * units.GiB
+
+	db, err := lotus.Open(opts)
+	require.NoError(t, err)
+
+	batchOptions := lotus.BatchOptions{
+		WriteOptions: lotus.WriteOptions{
+			Sync: true,
+		},
+	}
+
+	batch := db.NewBatch(batchOptions)
+	objectsInBatch := 0
+
+	//writeLimiter := make(chan struct{}, parallelWriters)
+
+	writeFunction := func(key []byte, value []byte) error {
+
+		err = batch.Put(key, value)
+		require.NoError(t, err)
+
+		objectsInBatch++
+
+		if objectsInBatch >= batchSize {
+
+			//writeLimiter <- struct{}{}
+
+			//batchToCommit := batch
+			err = batch.Commit()
+			if err != nil {
+				return err
+			}
+			batch = db.NewBatch(batchOptions)
+			objectsInBatch = 0
+
+			//go func() {
+			//	err := batchToCommit.Commit()
+			//	if err != nil {
+			//		panic(err)
+			//	}
+			//
+			//	<-writeLimiter
+			//}()
+
+			objectsInBatch = 0
+		}
+
+		return nil
+	}
+
+	readFunction := func(key []byte) ([]byte, error) {
+		return db.Get(key)
+	}
+
+	runBenchmark(writeFunction, readFunction)
 
 	err = db.Close()
 	require.NoError(t, err)
