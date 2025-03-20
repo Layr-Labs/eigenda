@@ -661,6 +661,12 @@ func TestLotusDB(t *testing.T) {
 			if err != nil {
 				return err
 			}
+
+			err = db.Sync()
+			if err != nil {
+				return err
+			}
+
 			batch = db.NewBatch(batchOptions)
 			objectsInBatch = 0
 
