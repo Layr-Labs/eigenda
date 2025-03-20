@@ -1,0 +1,31 @@
+name: PR Title Linting
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  lint-pr-title:
+    runs-on: ubuntu-latest
+    name: Validate PR Title
+    steps:
+      - name: Fetch PR Title
+        run: |
+          PR_TITLE=$(jq -r '.pull_request.title' "$GITHUB_EVENT_PATH")
+          echo "PR title: $PR_TITLE"
+          
+          # Define the valid pattern (supports conventional commit format with breaking changes)
+          if [[ ! "$PR_TITLE" =~ ^(feat|fix|chore|docs|refactor|test|style|ci|perf)(\([a-z0-9-]+\))?(!)?:\ .* ]]; then
+            echo "❌ Invalid PR title: '$PR_TITLE'"
+            echo "Expected format: 'type[(scope)][!]: description'"
+            echo "Allowed types: feat, fix, chore, docs, refactor, test, style, ci, perf."
+            echo ""
+            echo "Examples of valid PR titles:"
+            echo "- feat: add user authentication"
+            echo "- fix(auth): resolve login timeout issue"
+            echo "- feat(api)!: change user API response format"
+            echo "- docs: update README with new instructions"
+            exit 1
+          fi
+          
+          echo "✅ PR title is valid"
