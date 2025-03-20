@@ -385,7 +385,7 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_DISABLE_SEEKS_COMPACTION_V1"),
 	}
-	LevelDBEnableSyncWritesV1Flag = cli.BoolTFlag{
+	LevelDBEnableSyncWritesV1Flag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "leveldb-enable-sync-writes-v1"),
 		Usage:    "Enable sync writes for LevelDB for v1",
 		Required: false,
