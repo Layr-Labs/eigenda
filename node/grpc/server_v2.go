@@ -229,6 +229,46 @@ func (s *ServerV2) validateAndStoreChunksLevelDB(
 	operatorState *core.OperatorState,
 	batchHeaderHash [32]byte) error {
 
+	err = s.validateAndStoreV2Chunks(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash)
+	if err != nil {
+		return nil, err
+	}
+
+	sig, err := s.node.BLSSigner.Sign(ctx, batchHeaderHash[:])
+	if err != nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to sign batch: %v", err))
+	}
+
+	s.metrics.ReportStoreChunksLatency("total", time.Since(start))
+
+	return &pb.StoreChunksReply{
+		Signature: sig,
+	}, nil
+}
+
+func (s *ServerV2) validateAndStoreV2Chunks(
+	ctx context.Context,
+	batch *corev2.Batch,
+	blobShards []*corev2.BlobShard,
+	rawBundles []*node.RawBundles,
+	operatorState *core.OperatorState,
+	batchHeaderHash [32]byte) error {
+
+	if true { // TODO setting
+		return s.validateAndStoreV2ChunksLittDB(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash)
+	} else {
+		return s.validateAndStoreV2ChunksLevelDB(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash)
+	}
+}
+
+func (s *ServerV2) validateAndStoreV2ChunksLevelDB(
+	ctx context.Context,
+	batch *corev2.Batch,
+	blobShards []*corev2.BlobShard,
+	rawBundles []*node.RawBundles,
+	operatorState *core.OperatorState,
+	batchHeaderHash [32]byte) error {
+
 	type storeResult struct {
 		keys []kvstore.Key
 		err  error
@@ -251,11 +291,12 @@ func (s *ServerV2) validateAndStoreChunksLevelDB(
 		}
 	}()
 
+	stageTimer := time.Now()
 	err := s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
 	if err != nil {
 		res := <-storeChan
 		if len(res.keys) > 0 {
-			if deleteErr := s.node.ValidatorStore.DeleteKeys(res.keys); deleteErr != nil {
+			if deleteErr := s.node.StoreV2.DeleteKeys(res.keys); deleteErr != nil {
 				s.logger.Error(
 					"failed to delete keys",
 					"err", deleteErr,
@@ -273,30 +314,29 @@ func (s *ServerV2) validateAndStoreChunksLevelDB(
 	return nil
 }
 
-func (s *ServerV2) validateAndStoreChunksLittDB(
+func (s *ServerV2) validateAndStoreV2ChunksLittDB(
 	ctx context.Context,
 	batch *corev2.Batch,
 	blobShards []*corev2.BlobShard,
-	batchData []*node.BundleToStore,
+	rawBundles []*node.RawBundles,
 	operatorState *core.OperatorState,
-	batchHeaderHash [32]byte,
-	probe *common.SequenceProbe,
-) error {
-	probe.SetStage("validate")
+	batchHeaderHash [32]byte) error {
+
+	stageTimer := time.Now()
 	err := s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
 	if err != nil {
-		return api.NewErrorInternal(
-			fmt.Sprintf("failed to validate batch %s: %v", hex.EncodeToString(batchHeaderHash[:]), err))
+		return api.NewErrorInternal(fmt.Sprintf("failed to validate batch %s: %v", batchHeaderHash, err))
 	}
+	s.metrics.ReportStoreChunksLatency("validation", time.Since(stageTimer))
 
-	probe.SetStage("store")
-	_, size, err := s.node.ValidatorStore.StoreBatch(batchHeaderHash[:], batchData)
+	storageStart := time.Now()
+	_, size, err := s.node.StoreV2.StoreBatch(batch, rawBundles)
 	if err != nil {
-		return api.NewErrorInternal(
-			fmt.Sprintf("failed to store batch %s: %v", hex.EncodeToString(batchHeaderHash[:]), err))
+		return fmt.Errorf("failed to store batch %s: %v", batchHeaderHash, err)
 	}
 
 	s.metrics.ReportStoreChunksRequestSize(size)
+	s.metrics.ReportStoreChunksLatency("storage", time.Since(storageStart))
 
 	return nil
 }
