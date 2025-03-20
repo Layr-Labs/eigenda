@@ -25,7 +25,6 @@ import (
 	"github.com/dgraph-io/badger/v4/options"
 	"github.com/docker/go-units"
 	"github.com/emirpasic/gods/queues/linkedlistqueue"
-	lotus "github.com/lotusdblabs/lotusdb/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -625,72 +624,48 @@ func TestBadgerDB(t *testing.T) {
 
 func TestLotusDB(t *testing.T) {
 	directory := "./test-data"
-
-	opts := lotus.DefaultOptions
-	opts.Sync = true
-	opts.DirPath = directory
-	opts.MemtableSize = 512 * units.MiB
-
-	db, err := lotus.Open(opts)
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
 
-	batchOptions := lotus.BatchOptions{
-		WriteOptions: lotus.WriteOptions{
-			Sync: true,
-		},
-	}
+	config := tablestore.DefaultLotusDBConfig()
+	config.Schema = []string{"test"}
+	db, err := tablestore.Start(logger, config)
+	require.NoError(t, err)
 
-	batch := db.NewBatch(batchOptions)
-	objectsInBatch := 0
+	keyBuilder, err := db.GetKeyBuilder("test")
+	require.NoError(t, err)
 
-	//writeLimiter := make(chan struct{}, parallelWriters)
+	batch := db.NewTTLBatch()
+
+	writeLimiter := make(chan struct{}, parallelWriters)
 
 	writeFunction := func(key []byte, value []byte) error {
+		batch.PutWithTTL(keyBuilder.Key(key), value, TTL)
+		if batch.Size() >= batchSize {
 
-		err = batch.Put(key, value)
-		require.NoError(t, err)
+			writeLimiter <- struct{}{}
 
-		objectsInBatch++
+			batchToFlush := batch
+			go func() {
+				err = batchToFlush.Apply()
+				if err != nil {
+					panic(err)
+				}
+				<-writeLimiter
+			}()
 
-		if objectsInBatch >= batchSize {
-
-			//writeLimiter <- struct{}{}
-
-			//batchToCommit := batch
-			err = batch.Commit()
-			if err != nil {
-				return err
-			}
-
-			err = db.Sync()
-			if err != nil {
-				return err
-			}
-
-			batch = db.NewBatch(batchOptions)
-			objectsInBatch = 0
-
-			//go func() {
-			//	err := batchToCommit.Commit()
-			//	if err != nil {
-			//		panic(err)
-			//	}
-			//
-			//	<-writeLimiter
-			//}()
-
-			objectsInBatch = 0
+			batch = db.NewTTLBatch()
 		}
 
 		return nil
 	}
 
 	readFunction := func(key []byte) ([]byte, error) {
-		return db.Get(key)
+		return db.Get(keyBuilder.Key(key))
 	}
 
 	runBenchmark(writeFunction, readFunction)
 
-	err = db.Close()
+	err = db.Shutdown()
 	require.NoError(t, err)
 }
