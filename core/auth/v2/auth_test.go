@@ -2,7 +2,6 @@ package v2_test
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"math/big"
 	"testing"
@@ -20,9 +19,8 @@ import (
 
 var (
 	privateKeyHex = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	nonce, _      = hex.DecodeString("3132333435363738393031323334353637383930313233343536373839303132")
-	maxPastAge    = 30 * time.Second
-	maxFutureAge  = 30 * time.Second
+	maxPastAge    = 5 * time.Minute
+	maxFutureAge  = 5 * time.Minute
 )
 
 func TestAuthentication(t *testing.T) {
@@ -126,7 +124,7 @@ func TestAuthenticatePaymentStateRequestValid(t *testing.T) {
 	assert.NoError(t, err)
 	authenticator := auth.NewAuthenticator(maxPastAge, maxFutureAge)
 
-	signature, err := signer.SignPaymentStateRequest(nonce)
+	signature, err := signer.SignPaymentStateRequest()
 	assert.NoError(t, err)
 
 	accountId, err := signer.GetAccountID()
@@ -169,7 +167,7 @@ func TestAuthenticatePaymentStateRequestSignatureMismatch(t *testing.T) {
 	accountId, err := signer.GetAccountID()
 	assert.NoError(t, err)
 
-	signature, err := wrongSigner.SignPaymentStateRequest(nonce)
+	signature, err := wrongSigner.SignPaymentStateRequest()
 	assert.NoError(t, err)
 
 	request := mockGetPaymentStateRequest(accountId, signature)
@@ -203,7 +201,6 @@ func mockGetPaymentStateRequest(accountId gethcommon.Address, signature []byte) 
 	return &disperser_rpc.GetPaymentStateRequest{
 		AccountId: accountId.Hex(),
 		Signature: signature,
-		Timestamp: uint32(time.Now().Unix()),
-		Nonce:     nonce,
+		Timestamp: uint64(time.Now().UnixNano()),
 	}
 }

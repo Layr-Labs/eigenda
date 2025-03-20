@@ -44,14 +44,13 @@ func (s *LocalBlobRequestSigner) SignBlobRequest(header *core.BlobHeader) ([]byt
 	return sig, nil
 }
 
-func (s *LocalBlobRequestSigner) SignPaymentStateRequest(nonce []byte) ([]byte, error) {
+func (s *LocalBlobRequestSigner) SignPaymentStateRequest() ([]byte, error) {
 	accountId, err := s.GetAccountID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account ID: %v", err)
 	}
 
-	accountAddrWithNonce := append(accountId.Bytes(), nonce...)
-	hash := sha256.Sum256(accountAddrWithNonce)
+	hash := sha256.Sum256(accountId.Bytes())
 	// Sign the account ID using the private key
 	sig, err := crypto.Sign(hash[:], s.PrivateKey)
 	if err != nil {
@@ -78,7 +77,7 @@ func (s *LocalNoopSigner) SignBlobRequest(header *core.BlobHeader) ([]byte, erro
 	return nil, fmt.Errorf("noop signer cannot sign blob request")
 }
 
-func (s *LocalNoopSigner) SignPaymentStateRequest(nonce []byte) ([]byte, error) {
+func (s *LocalNoopSigner) SignPaymentStateRequest() ([]byte, error) {
 	return nil, fmt.Errorf("noop signer cannot sign payment state request")
 }
 

@@ -116,20 +116,3 @@ func TestMutexPreventsSimultaneousRequests(t *testing.T) {
 	require.GreaterOrEqual(t, totalTime.Milliseconds(), expectedMinTime.Milliseconds()-10, // allow small timing variations
 		"Total execution time was less than expected, suggesting concurrent execution")
 }
-
-func TestGenerateNonce(t *testing.T) {
-	nonce, err := GenerateNonce(32)
-	require.NoError(t, err)
-	require.Len(t, nonce, 32, "nonce should be 32 bytes")
-
-	// Test multiple calls to ensure nonces are unique.
-	nonceMap := make(map[string]struct{})
-	for i := 0; i < 100; i++ {
-		n, err := GenerateNonce(32)
-		require.NoError(t, err)
-		require.Len(t, n, 32, "nonce should be 32 bytes")
-		key := string(n)
-		require.NotContains(t, nonceMap, key, "nonce should be unique")
-		nonceMap[key] = struct{}{}
-	}
-}

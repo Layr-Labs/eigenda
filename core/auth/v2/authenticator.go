@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/replay"
@@ -53,7 +54,7 @@ func (*authenticator) AuthenticateBlobRequest(header *core.BlobHeader, signature
 }
 
 // AuthenticatePaymentStateRequest verifies the signature of the payment state request
-// The signature is signed over the byte representation of the account ID and nonce
+// The signature is signed over the byte representation of the account ID
 // See implementation of BlobRequestSigner.SignPaymentStateRequest for more details
 func (a *authenticator) AuthenticatePaymentStateRequest(accountAddr common.Address, request *pb.GetPaymentStateRequest) error {
 	sig := request.GetSignature()
@@ -63,11 +64,9 @@ func (a *authenticator) AuthenticatePaymentStateRequest(accountAddr common.Addre
 	}
 
 	timestamp := request.GetTimestamp()
-	nonce := request.GetNonce()
 
 	// Verify the signature
-	accountAddrWithNonce := append(accountAddr.Bytes(), nonce...)
-	hash := sha256.Sum256(accountAddrWithNonce)
+	hash := sha256.Sum256(accountAddr.Bytes())
 	sigPublicKeyECDSA, err := crypto.SigToPub(hash[:], sig)
 	if err != nil {
 		return fmt.Errorf("failed to recover public key from signature: %v", err)
@@ -79,8 +78,13 @@ func (a *authenticator) AuthenticatePaymentStateRequest(accountAddr common.Addre
 		return errors.New("signature doesn't match with provided public key")
 	}
 
-	if err := a.replayGuardian.VerifyRequest(nonce, time.Unix(int64(timestamp), 0)); err != nil {
-		return fmt.Errorf("invalid request: the provided nonce has already been used or the request has expired (%v)", err)
+	requestHash, err := hashing.HashGetPaymentStateRequest(request)
+	if err != nil {
+		return fmt.Errorf("failed to hash request: %w", err)
+	}
+
+	if err := a.replayGuardian.VerifyRequest(requestHash, time.Unix(0, int64(timestamp))); err != nil {
+		return fmt.Errorf("failed to verify request: %v", err)
 	}
 
 	return nil

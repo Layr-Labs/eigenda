@@ -2,7 +2,6 @@ package clients
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"sync"
 	"time"
@@ -297,12 +296,7 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		return nil, fmt.Errorf("error getting signer's account ID: %w", err)
 	}
 
-	nonce, err := GenerateNonce(32)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate nonce: %v", err)
-	}
-
-	signature, err := c.signer.SignPaymentStateRequest(nonce)
+	signature, err := c.signer.SignPaymentStateRequest()
 	if err != nil {
 		return nil, fmt.Errorf("error signing payment state request: %w", err)
 	}
@@ -310,8 +304,7 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 	request := &disperser_rpc.GetPaymentStateRequest{
 		AccountId: accountID.Hex(),
 		Signature: signature,
-		Timestamp: uint32(time.Now().Unix()),
-		Nonce:     nonce,
+		Timestamp: uint64(time.Now().UnixNano()),
 	}
 	return c.client.GetPaymentState(ctx, request)
 }
@@ -370,14 +363,4 @@ func (c *disperserClient) initOncePopulateAccountant(ctx context.Context) error 
 		return fmt.Errorf("populating accountant: %w", initErr)
 	}
 	return nil
-}
-
-// GenerateNonce creates a random nonce of the specified length.
-func GenerateNonce(length int) ([]byte, error) {
-	nonce := make([]byte, length)
-	_, err := rand.Read(nonce)
-	if err != nil {
-		return nil, err
-	}
-	return nonce, nil
 }
