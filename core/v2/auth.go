@@ -12,6 +12,6 @@ type BlobRequestAuthenticator interface {
 
 type BlobRequestSigner interface {
 	SignBlobRequest(header *BlobHeader) ([]byte, error)
-	SignPaymentStateRequest() ([]byte, error)
+	SignPaymentStateRequest(timestamp uint64) ([]byte, error)
 	GetAccountID() (gethcommon.Address, error)
 }

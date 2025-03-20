@@ -177,7 +177,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			blobMetadataStore,
 			transactor,
 			meterer,
-			authv2.NewAuthenticator(config.AuthPmtStateRequestMaxPastAge, config.AuthPmtStateRequestMaxFutureAge),
+			authv2.NewPaymentStateAuthenticator(config.AuthPmtStateRequestMaxPastAge, config.AuthPmtStateRequestMaxFutureAge),
 			prover,
 			uint64(config.MaxNumSymbolsPerBlob),
 			config.OnchainStateRefreshInterval,

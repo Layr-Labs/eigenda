@@ -296,7 +296,9 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		return nil, fmt.Errorf("error getting signer's account ID: %w", err)
 	}
 
-	signature, err := c.signer.SignPaymentStateRequest()
+	timestamp := uint64(time.Now().UnixNano())
+
+	signature, err := c.signer.SignPaymentStateRequest(timestamp)
 	if err != nil {
 		return nil, fmt.Errorf("error signing payment state request: %w", err)
 	}
@@ -304,7 +306,7 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 	request := &disperser_rpc.GetPaymentStateRequest{
 		AccountId: accountID.Hex(),
 		Signature: signature,
-		Timestamp: uint64(time.Now().UnixNano()),
+		Timestamp: timestamp,
 	}
 	return c.client.GetPaymentState(ctx, request)
 }

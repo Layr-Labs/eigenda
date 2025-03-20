@@ -15,12 +15,22 @@ import (
 )
 
 type authenticator struct {
-	replayGuardian replay.ReplayGuardian
+	ReplayGuardian replay.ReplayGuardian
 }
 
-func NewAuthenticator(maxTimeInPast, maxTimeInFuture time.Duration) *authenticator {
+// NewBlobRequestAuthenticator creates an authenticator for blob requests.
+// ReplayGuardian is not used for blob requests.
+func NewBlobRequestAuthenticator() *authenticator {
 	return &authenticator{
-		replayGuardian: replay.NewReplayGuardian(time.Now, maxTimeInPast, maxTimeInFuture),
+		ReplayGuardian: nil, // Not needed for blob requests
+	}
+}
+
+// NewPaymentStateAuthenticator creates an authenticator for payment state requests,
+// which requires replay protection.
+func NewPaymentStateAuthenticator(maxTimeInPast, maxTimeInFuture time.Duration) *authenticator {
+	return &authenticator{
+		ReplayGuardian: replay.NewReplayGuardian(time.Now, maxTimeInPast, maxTimeInFuture),
 	}
 }
 
@@ -54,7 +64,7 @@ func (*authenticator) AuthenticateBlobRequest(header *core.BlobHeader, signature
 }
 
 // AuthenticatePaymentStateRequest verifies the signature of the payment state request
-// The signature is signed over the byte representation of the account ID
+// The signature is signed over the byte representation of the account ID and requestHash
 // See implementation of BlobRequestSigner.SignPaymentStateRequest for more details
 func (a *authenticator) AuthenticatePaymentStateRequest(accountAddr common.Address, request *pb.GetPaymentStateRequest) error {
 	sig := request.GetSignature()
@@ -63,10 +73,14 @@ func (a *authenticator) AuthenticatePaymentStateRequest(accountAddr common.Addre
 		return fmt.Errorf("signature length is unexpected: %d", len(sig))
 	}
 
-	timestamp := request.GetTimestamp()
+	requestHash, err := hashing.HashGetPaymentStateRequestFromRequest(request)
+	if err != nil {
+		return fmt.Errorf("failed to hash request: %w", err)
+	}
+	accountAddrWithHash := append(accountAddr.Bytes(), requestHash...)
+	hash := sha256.Sum256(accountAddrWithHash)
 
 	// Verify the signature
-	hash := sha256.Sum256(accountAddr.Bytes())
 	sigPublicKeyECDSA, err := crypto.SigToPub(hash[:], sig)
 	if err != nil {
 		return fmt.Errorf("failed to recover public key from signature: %v", err)
@@ -78,12 +92,8 @@ func (a *authenticator) AuthenticatePaymentStateRequest(accountAddr common.Addre
 		return errors.New("signature doesn't match with provided public key")
 	}
 
-	requestHash, err := hashing.HashGetPaymentStateRequest(request)
-	if err != nil {
-		return fmt.Errorf("failed to hash request: %w", err)
-	}
-
-	if err := a.replayGuardian.VerifyRequest(requestHash, time.Unix(0, int64(timestamp))); err != nil {
+	timestamp := request.GetTimestamp()
+	if err := a.ReplayGuardian.VerifyRequest(requestHash, time.Unix(0, int64(timestamp))); err != nil {
 		return fmt.Errorf("failed to verify request: %v", err)
 	}
 
