@@ -14,6 +14,7 @@ const (
 	LevelDB StoreType = iota
 	// MapStore is an in-memory store. This store does not preserve data across restarts.
 	MapStore
+	LotusDB
 )
 
 // Config is the configuration for a TableStore.
@@ -63,5 +64,11 @@ func DefaultLevelDBConfig(path string) *Config {
 func DefaultMapStoreConfig() *Config {
 	config := DefaultConfig()
 	config.Type = MapStore
+	return config
+}
+
+func DefaultLotusDBConfig() *Config {
+	config := DefaultConfig()
+	config.Type = LotusDB
 	return config
 }

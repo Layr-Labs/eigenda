@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
+	"github.com/Layr-Labs/eigenda/common/kvstore/lotusstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/mapstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
@@ -128,6 +129,11 @@ func buildBaseStore(
 		return leveldb.NewStore(logger, *path, reg)
 	case MapStore:
 		return mapstore.NewStore(), nil
+	case LotusDB:
+		if path == nil {
+			return nil, errors.New("path is required for LotusDB store")
+		}
+		return lotusstore.NewStore(*path)
 	default:
 		return nil, fmt.Errorf("unknown store type: %d", storeType)
 	}
