@@ -20,7 +20,7 @@ import {BLSApkRegistry} from "lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
 import {RegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 
-contract BeforeInitialization is Test {
+contract BeforeVerifiableDeploymentInitialization is Test {
     using InitParamsLib for string;
 
     string cfg;

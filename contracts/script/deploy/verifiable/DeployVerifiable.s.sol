@@ -34,7 +34,7 @@ import {VersionedBlobParams} from "src/interfaces/IEigenDAStructs.sol";
 import {MockStakeRegistry} from "./mocks/MockStakeRegistry.sol";
 import {MockRegistryCoordinator} from "./mocks/MockRegistryCoordinator.sol";
 
-import {BeforeInitialization} from "./test/BeforeInitialization.t.sol";
+import {BeforeVerifiableDeploymentInitialization} from "./test/BeforeVerifiableDeploymentInitialization.t.sol";
 
 import {
     DeploymentInitializer,
@@ -120,7 +120,7 @@ contract DeployVerifiable is Script {
     }
 
     function _doTests() internal {
-        BeforeInitialization beforeTest = new BeforeInitialization();
+        BeforeVerifiableDeploymentInitialization beforeTest = new BeforeVerifiableDeploymentInitialization();
         beforeTest.doBeforeInitializationTests(
             cfg, deploymentInitializer, emptyContract, mockStakeRegistry, mockRegistryCoordinator
         );

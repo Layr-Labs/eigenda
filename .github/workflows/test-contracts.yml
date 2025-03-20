@@ -47,7 +47,7 @@ jobs:
         working-directory: ./contracts
 
       - name: Run tests
-        run: forge test -vvv
+        run: forge test --no-match-path script/**/*.sol -vvv
         working-directory: ./contracts
 
       - name: Run snapshot
