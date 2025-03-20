@@ -629,7 +629,7 @@ func TestLotusDB(t *testing.T) {
 	opts := lotus.DefaultOptions
 	opts.Sync = true
 	opts.DirPath = directory
-	opts.MemtableSize = 128 * units.MiB
+	opts.MemtableSize = 512 * units.MiB
 
 	db, err := lotus.Open(opts)
 	require.NoError(t, err)
