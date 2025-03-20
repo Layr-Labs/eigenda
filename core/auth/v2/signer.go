@@ -51,13 +51,12 @@ func (s *LocalBlobRequestSigner) SignPaymentStateRequest(timestamp uint64) ([]by
 		return nil, fmt.Errorf("failed to get account ID: %v", err)
 	}
 
-	requestHash, err := hashing.HashGetPaymentStateRequestFromFields(accountId, timestamp)
+	requestHash, err := hashing.HashGetPaymentStateRequest(accountId, timestamp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash request: %w", err)
 	}
 
-	accountIdWithHash := append(accountId.Bytes(), requestHash...)
-	hash := sha256.Sum256(accountIdWithHash)
+	hash := sha256.Sum256(requestHash)
 	// Sign the account ID using the private key
 	sig, err := crypto.Sign(hash[:], s.PrivateKey)
 	if err != nil {

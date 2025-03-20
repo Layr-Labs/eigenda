@@ -73,12 +73,11 @@ func (a *authenticator) AuthenticatePaymentStateRequest(accountAddr common.Addre
 		return fmt.Errorf("signature length is unexpected: %d", len(sig))
 	}
 
-	requestHash, err := hashing.HashGetPaymentStateRequestFromRequest(request)
+	requestHash, err := hashing.HashGetPaymentStateRequest(accountAddr, request.GetTimestamp())
 	if err != nil {
 		return fmt.Errorf("failed to hash request: %w", err)
 	}
-	accountAddrWithHash := append(accountAddr.Bytes(), requestHash...)
-	hash := sha256.Sum256(accountAddrWithHash)
+	hash := sha256.Sum256(requestHash)
 
 	// Verify the signature
 	sigPublicKeyECDSA, err := crypto.SigToPub(hash[:], sig)
@@ -90,6 +89,10 @@ func (a *authenticator) AuthenticatePaymentStateRequest(accountAddr common.Addre
 
 	if accountAddr.Cmp(pubKeyAddr) != 0 {
 		return errors.New("signature doesn't match with provided public key")
+	}
+
+	if a.ReplayGuardian == nil {
+		return errors.New("replay guardian is not configured for payment state requests")
 	}
 
 	timestamp := request.GetTimestamp()

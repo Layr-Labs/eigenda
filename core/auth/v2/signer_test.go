@@ -115,12 +115,10 @@ func TestSignPaymentStateRequest(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, signature)
 
-	requestHash, err := hashing.HashGetPaymentStateRequestFromFields(accountID, fixedTimestamp)
+	requestHash, err := hashing.HashGetPaymentStateRequest(accountID, fixedTimestamp)
 	require.NoError(t, err)
 
-	accountIdWithHash := append(accountID.Bytes(), requestHash...)
-	hash := sha256.Sum256(accountIdWithHash)
-
+	hash := sha256.Sum256(requestHash)
 	pubKey, err := crypto.SigToPub(hash[:], signature)
 	require.NoError(t, err)
 

@@ -3,6 +3,7 @@ package v2_test
 import (
 	"crypto/sha256"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/common/replay"
 	"math/big"
 	"testing"
@@ -188,7 +189,10 @@ func TestAuthenticatePaymentStateRequestCorruptedSignature(t *testing.T) {
 	accountId, err := signer.GetAccountID()
 	assert.NoError(t, err)
 
-	hash := sha256.Sum256(accountId.Bytes())
+	requestHash, err := hashing.HashGetPaymentStateRequest(accountId, fixedTimestamp)
+	assert.NoError(t, err)
+	
+	hash := sha256.Sum256(requestHash)
 	signature, err := crypto.Sign(hash[:], signer.PrivateKey)
 	assert.NoError(t, err)
 
