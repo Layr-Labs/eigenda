@@ -897,7 +897,7 @@ func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
 			OperatorDispersalIndexName,
 			"OperatorID = :pk AND DispersedAt BETWEEN :start AND :end",
 			commondynamodb.ExpressionValues{
-				":pk":    &types.AttributeValueMemberS{Value: operatorId.Hex()},
+				":pk":    &types.AttributeValueMemberS{Value: dispersalRequestSKPrefix + operatorId.Hex()},
 				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedStart), 10)},
 				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedEnd), 10)},
 			},
