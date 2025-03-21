@@ -221,13 +221,13 @@ type ServerV2 struct {
 	// Feed cache
 	batchFeedCache *FeedCache[corev2.Attestation]
 
-	// KV cache
-	// The blob caches are keyed by blobkey
+	// KV caches for blobs, keyed by blobkey
 	blobMetadataCache                *lru.Cache[string, *commonv2.BlobMetadata]
 	blobAttestationInfoCache         *lru.Cache[string, *commonv2.BlobAttestationInfo]
 	blobCertificateCache             *lru.Cache[string, *corev2.BlobCertificate]
 	blobAttestationInfoResponseCache *lru.Cache[string, *BlobAttestationInfoResponse]
-	// The batch caches are keyed by batch header hash
+
+	// KV caches for batches, keyed by batch header hash
 	signedBatchCache *lru.Cache[string, *SignedBatch]
 }
 
