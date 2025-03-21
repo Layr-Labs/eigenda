@@ -109,7 +109,7 @@ func NewEjector(wallet walletsdk.Wallet, ethClient common.EthClient, logger logg
 	}
 }
 
-// MergeNigningMetrics returns the non-signing metrics for the given nonsigningRateV1 and nonsigningRateV2
+// MergeNonSigningMetrics returns the non-signing metrics for the given nonsigningRateV1 and nonsigningRateV2
 // It compares the metrics from both versions and returns the one with the worse signing rate
 func (e *Ejector) MergeNonSigningMetrics(
 	nonsigningRateV1 *dataapi.OperatorsNonsigningPercentage,
@@ -234,6 +234,7 @@ func (e *Ejector) MergeNonSigningMetrics(
 // - PerfScore: the performance score of the operator.
 // - IsViolatingThreshold: whether the operator violates the nonsigning rate threshold.
 // - IsViolatingSLA: whether the operator violates the stake weighted SLA.
+// - NeedsEjection: whether the operator should be ejected.
 func (e *Ejector) EvaluateOperatorsForEjection(nonsignerMetrics []*NonSignerMetric) error {
 	for _, metric := range nonsignerMetrics {
 		// If nonsigningRateThreshold is set and valid, we will only eject operators with
