@@ -42,7 +42,7 @@ const readBytesPerSecond = 10 * units.MiB
 
 var readerCount = 0
 
-const TTL = 5 * time.Minute // 2 * time.Hour
+const TTL = 2 * time.Hour
 const dataGeneratorCount = 16
 
 const pprofEnabled = false
