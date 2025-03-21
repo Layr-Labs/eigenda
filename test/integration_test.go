@@ -464,14 +464,14 @@ type TestRetriever struct {
 	Server *retriever.Server
 }
 
-func mustMakeRetriever(cst core.IndexedChainState, logger logging.Logger) (*commonmock.MockEthClient, TestRetriever) {
+func mustMakeRetriever(logger logging.Logger) (*commonmock.MockEthClient, TestRetriever) {
 	config := &retriever.Config{
 		Timeout: 5 * time.Second,
 	}
 	gethClient := &commonmock.MockEthClient{}
 	retrievalClient := &clientsmock.MockRetrievalClient{}
 	chainClient := retrievermock.NewMockChainClient()
-	server := retriever.NewServer(config, logger, retrievalClient, cst, chainClient)
+	server := retriever.NewServer(config, logger, retrievalClient, chainClient)
 
 	return gethClient, TestRetriever{
 		Server: server,
@@ -514,7 +514,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		dis.encoderServer.Close()
 	})
 	ops := mustMakeOperators(t, cst, logger)
-	gethClient, _ := mustMakeRetriever(cst, logger)
+	gethClient, _ := mustMakeRetriever(logger)
 
 	for _, op := range ops {
 		idStr := hexutil.Encode(op.Node.Config.ID[:])
