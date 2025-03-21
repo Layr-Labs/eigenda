@@ -155,11 +155,16 @@ func RunScan(ctx *cli.Context) error {
 		}
 
 		stakePercentage := float64(0)
+		effectiveStakePercentage := float64(0)
 		if stake, ok := state.Operators[ejection.Quorum][opID]; ok {
 			totalStake := new(big.Float).SetInt(state.Totals[ejection.Quorum].Stake)
+			totalEffectiveStake := new(big.Float).SetInt(state.Totals[ejection.Quorum].EffectiveStake)
 			operatorStake := new(big.Float).SetInt(stake.Stake)
+			operatorEffectiveStake := new(big.Float).SetInt(stake.EffectiveStake)
 			stakePercentage, _ = new(big.Float).Mul(big.NewFloat(100), new(big.Float).Quo(operatorStake, totalStake)).Float64()
+			effectiveStakePercentage, _ = new(big.Float).Mul(big.NewFloat(100), new(big.Float).Quo(operatorEffectiveStake, totalEffectiveStake)).Float64()
 		}
+		fmt.Println("effectiveStakePercentage", effectiveStakePercentage)
 
 		if _, exists := ejectionTransactions[ejection.TransactionHash]; !exists {
 			ejectionTransactions[ejection.TransactionHash] = &EjectionTransaction{
@@ -178,6 +183,7 @@ func RunScan(ctx *cli.Context) error {
 
 		operatorAddress := operatorIdToAddress[ejection.OperatorId]
 		operators.AppendRow(table.Row{operatorAddress, ejection.Quorum, stakePercentage, ejection.BlockTimestamp, ejection.TransactionHash}, rowConfigAutoMerge)
+		// operators.AppendRow(table.Row{operatorAddress, ejection.Quorum, effectiveStakePercentage, ejection.BlockTimestamp, ejection.TransactionHash}, rowConfigAutoMerge)
 		txns.AppendRow(table.Row{ejection.TransactionHash, ejection.BlockTimestamp, operatorAddress, ejection.Quorum, stakePercentage}, rowConfigAutoMerge)
 	}
 

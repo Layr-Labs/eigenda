@@ -88,8 +88,9 @@ type (
 		Throughput float64 `json:"throughput"`
 		CostInGas  float64 `json:"cost_in_gas"`
 		// deprecated: use TotalStakePerQuorum instead. Remove when the frontend is updated.
-		TotalStake          *big.Int                   `json:"total_stake"`
-		TotalStakePerQuorum map[core.QuorumID]*big.Int `json:"total_stake_per_quorum"`
+		TotalStake                   *big.Int                   `json:"total_stake"`
+		TotalStakePerQuorum          map[core.QuorumID]*big.Int `json:"total_stake_per_quorum"`
+		TotalEffectiveStakePerQuorum map[core.QuorumID]*big.Int `json:"total_effective_stake_per_quorum"`
 	}
 
 	Throughput struct {
@@ -108,13 +109,14 @@ type (
 	}
 
 	OperatorNonsigningPercentageMetrics struct {
-		OperatorId           string  `json:"operator_id"`
-		OperatorAddress      string  `json:"operator_address"`
-		QuorumId             uint8   `json:"quorum_id"`
-		TotalUnsignedBatches int     `json:"total_unsigned_batches"`
-		TotalBatches         int     `json:"total_batches"`
-		Percentage           float64 `json:"percentage"`
-		StakePercentage      float64 `json:"stake_percentage"`
+		OperatorId               string  `json:"operator_id"`
+		OperatorAddress          string  `json:"operator_address"`
+		QuorumId                 uint8   `json:"quorum_id"`
+		TotalUnsignedBatches     int     `json:"total_unsigned_batches"`
+		TotalBatches             int     `json:"total_batches"`
+		Percentage               float64 `json:"percentage"`
+		StakePercentage          float64 `json:"stake_percentage"`
+		EffectiveStakePercentage float64 `json:"effective_stake_percentage"`
 	}
 
 	OperatorsNonsigningPercentage struct {

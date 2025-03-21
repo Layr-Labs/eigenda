@@ -66,6 +66,7 @@ func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32)
 		totalStake := big.NewInt(0)
 		operators[quorumID] = make(map[core.OperatorID]*core.OperatorInfo)
 
+		// First pass: calculate total stake
 		for ind, op := range quorum {
 			operators[quorumID][op.OperatorID] = &core.OperatorInfo{
 				Stake: op.Stake,
@@ -74,9 +75,20 @@ func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32)
 			totalStake.Add(totalStake, op.Stake)
 		}
 
+		// Second pass: calculate effective stake based on the cap
+		// Note: this is a placeholder and will be calculated with proper cap in GetAssignments
+		totalEffectiveStake := big.NewInt(0)
+		for _, opInfo := range operators[quorumID] {
+			// Initialize EffectiveStake equal to Stake
+			// The actual capping will happen in GetAssignments based on blobParams
+			opInfo.EffectiveStake = new(big.Int).Set(opInfo.Stake)
+			totalEffectiveStake.Add(totalEffectiveStake, opInfo.EffectiveStake)
+		}
+
 		totals[quorumID] = &core.OperatorInfo{
-			Stake: totalStake,
-			Index: core.OperatorIndex(len(quorum)),
+			Stake:          totalStake,
+			EffectiveStake: totalEffectiveStake,
+			Index:          core.OperatorIndex(len(quorum)),
 		}
 	}
 

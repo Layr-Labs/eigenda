@@ -94,6 +94,9 @@ func ParseOperatorSocket(socket string) (host, v1DispersalPort, v1RetrievalPort,
 type OperatorInfo struct {
 	// Stake is the amount of stake held by the operator in the quorum
 	Stake StakeAmount
+	// EffectiveStake is the capped stake used for assignments and rewards
+	// It equals min(Stake, capPercentage * TotalStake)
+	EffectiveStake StakeAmount
 	// Index is the index of the operator within the quorum
 	Index OperatorIndex
 }
@@ -103,7 +106,8 @@ type OperatorState struct {
 	// Operators is a map from quorum ID to a map from the operators in that quourm to their StoredOperatorInfo. Membership
 	// in the map implies membership in the quorum.
 	Operators map[QuorumID]map[OperatorID]*OperatorInfo
-	// Totals is a map from quorum ID to the total stake (Stake) and total count (Index) of all operators in that quorum
+	// Totals is a map from quorum ID to the total stake (Stake), total effective stake (EffectiveStake),
+	// and total count (Index) of all operators in that quorum
 	Totals map[QuorumID]*OperatorInfo
 	// BlockNumber is the block number at which this state was retrieved
 	BlockNumber uint
@@ -112,9 +116,10 @@ type OperatorState struct {
 func (s *OperatorState) Hash() (map[QuorumID][16]byte, error) {
 	res := make(map[QuorumID][16]byte)
 	type operatorInfoWithID struct {
-		OperatorID string
-		Stake      string
-		Index      uint
+		OperatorID     string
+		Stake          string
+		EffectiveStake string
+		Index          uint
 	}
 	for quorumID, opInfos := range s.Operators {
 		marshalable := struct {
@@ -129,9 +134,10 @@ func (s *OperatorState) Hash() (map[QuorumID][16]byte, error) {
 
 		for opID, opInfo := range opInfos {
 			marshalable.Operators = append(marshalable.Operators, operatorInfoWithID{
-				OperatorID: opID.Hex(),
-				Stake:      opInfo.Stake.String(),
-				Index:      uint(opInfo.Index),
+				OperatorID:     opID.Hex(),
+				Stake:          opInfo.Stake.String(),
+				EffectiveStake: opInfo.EffectiveStake.String(),
+				Index:          uint(opInfo.Index),
 			})
 		}
 		slices.SortStableFunc(marshalable.Operators, func(a, b operatorInfoWithID) int {
