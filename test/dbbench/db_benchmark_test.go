@@ -40,7 +40,7 @@ const batchSize = 100
 const parallelWriters = 2
 const readBytesPerSecond = 10 * units.MiB
 const readerCount = 0
-const TTL = 2 * time.Hour
+const TTL = 5 * time.Minute // 2 * time.Hour
 const dataGeneratorCount = 16
 
 const pprofEnabled = false
