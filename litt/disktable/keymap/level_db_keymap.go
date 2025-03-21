@@ -1,0 +1,135 @@
+package keymap
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"sync/atomic"
+
+	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/opt"
+)
+
+var _ Keymap = &LevelDBKeymap{}
+
+// LevelDBKeymap is a keymap that uses LevelDB as the underlying storage.
+type LevelDBKeymap struct {
+	logger logging.Logger
+	db     *leveldb.DB
+	// if true, then return an error if an update would overwrite an existing key
+	doubleWriteProtection bool
+	keymapPath            string
+	alive                 atomic.Bool
+}
+
+// NewLevelDBKeymap creates a new LevelDBKeymap instance.
+func NewLevelDBKeymap(
+	logger logging.Logger,
+	keymapPath string,
+	doubleWriteProtection bool) (*LevelDBKeymap, error) {
+
+	db, err := leveldb.OpenFile(keymapPath, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open LevelDB: %w", err)
+	}
+
+	kmap := &LevelDBKeymap{
+		logger:     logger,
+		db:         db,
+		keymapPath: keymapPath,
+	}
+	kmap.alive.Store(true)
+
+	return kmap, nil
+}
+
+func (l *LevelDBKeymap) Put(pairs []*types.KAPair) error {
+
+	if l.doubleWriteProtection {
+		for _, pair := range pairs {
+			_, ok, err := l.Get(pair.Key)
+			if err != nil {
+				return fmt.Errorf("failed to get key: %w", err)
+			}
+			if ok {
+				return fmt.Errorf("key %s already exists", pair.Key)
+			}
+		}
+	}
+
+	batch := new(leveldb.Batch)
+	for _, pair := range pairs {
+		batch.Put(pair.Key, pair.Address.Serialize())
+	}
+
+	writeOptions := &opt.WriteOptions{
+		Sync: true,
+	}
+
+	err := l.db.Write(batch, writeOptions)
+	if err != nil {
+		return fmt.Errorf("failed to put batch to LevelDB: %w", err)
+	}
+	return nil
+}
+
+func (l *LevelDBKeymap) Get(key []byte) (types.Address, bool, error) {
+	addressBytes, err := l.db.Get(key, nil)
+	if err != nil {
+		if errors.Is(err, leveldb.ErrNotFound) {
+			return 0, false, nil
+		}
+		return 0, false, fmt.Errorf("failed to get key from LevelDB: %w", err)
+	}
+
+	address, err := types.DeserializeAddress(addressBytes)
+	if err != nil {
+		return 0, false, fmt.Errorf("failed to deserialize address: %w", err)
+	}
+
+	return address, true, nil
+}
+
+func (l *LevelDBKeymap) Delete(keys []*types.KAPair) error {
+	batch := new(leveldb.Batch)
+	for _, key := range keys {
+		batch.Delete(key.Key)
+	}
+
+	err := l.db.Write(batch, nil)
+	if err != nil {
+		return fmt.Errorf("failed to delete keys from LevelDB: %w", err)
+	}
+
+	return nil
+}
+
+func (l *LevelDBKeymap) Stop() error {
+	alive := l.alive.Swap(false)
+	if !alive {
+		return nil
+	}
+
+	err := l.db.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close LevelDB: %w", err)
+	}
+	return nil
+}
+
+func (l *LevelDBKeymap) Destroy() error {
+	err := l.Stop()
+	if err != nil {
+		return fmt.Errorf("failed to stop LevelDB: %w", err)
+	}
+
+	l.logger.Info(fmt.Sprintf("deleting LevelDB keymap at path: %s", l.keymapPath))
+	err = os.RemoveAll(l.keymapPath)
+	if err != nil {
+		return fmt.Errorf("failed to remove LevelDB data directory: %w", err)
+	}
+
+	return nil
+}
