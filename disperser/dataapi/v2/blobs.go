@@ -185,11 +185,15 @@ func (s *ServerV2) FetchBlob(c *gin.Context) {
 		errorResponse(c, err)
 		return
 	}
-	metadata, err := s.blobMetadataStore.GetBlobMetadata(c.Request.Context(), blobKey)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlob")
-		errorResponse(c, err)
-		return
+	metadata, ok := s.blobMetadataCache.Get(blobKey.Hex())
+	if !ok {
+		metadata, err = s.blobMetadataStore.GetBlobMetadata(c.Request.Context(), blobKey)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBlob")
+			errorResponse(c, err)
+			return
+		}
+		s.blobMetadataCache.Add(blobKey.Hex(), metadata)
 	}
 	bk, err := metadata.BlobHeader.BlobKey()
 	if err != nil || bk != blobKey {
@@ -212,7 +216,7 @@ func (s *ServerV2) FetchBlob(c *gin.Context) {
 
 // FetchBlobCertificate godoc
 //
-//	@Summary	Fetch blob certificate by blob key v2
+//	@Summary	Fetch blob certificate by blob key
 //	@Tags		Blobs
 //	@Produce	json
 //	@Param		blob_key	path		string	true	"Blob key in hex string"
@@ -230,11 +234,15 @@ func (s *ServerV2) FetchBlobCertificate(c *gin.Context) {
 		errorResponse(c, err)
 		return
 	}
-	cert, _, err := s.blobMetadataStore.GetBlobCertificate(c.Request.Context(), blobKey)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobCertificate")
-		errorResponse(c, err)
-		return
+	cert, ok := s.blobCertificateCache.Get(blobKey.Hex())
+	if !ok {
+		cert, _, err = s.blobMetadataStore.GetBlobCertificate(c.Request.Context(), blobKey)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBlobCertificate")
+			errorResponse(c, err)
+			return
+		}
+		s.blobCertificateCache.Add(blobKey.Hex(), cert)
 	}
 	response := &BlobCertificateResponse{
 		Certificate: cert,
@@ -267,11 +275,15 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 		return
 	}
 
-	attestationInfo, err := s.blobMetadataStore.GetBlobAttestationInfo(c.Request.Context(), blobKey)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
-		errorResponse(c, fmt.Errorf("failed to fetch blob attestation info: %w", err))
-		return
+	attestationInfo, ok := s.blobAttestationInfoCache.Get(blobKey.Hex())
+	if !ok {
+		attestationInfo, err = s.blobMetadataStore.GetBlobAttestationInfo(c.Request.Context(), blobKey)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
+			errorResponse(c, fmt.Errorf("failed to fetch blob attestation info: %w", err))
+			return
+		}
+		s.blobAttestationInfoCache.Add(blobKey.Hex(), attestationInfo)
 	}
 
 	batchHeaderHash, err := attestationInfo.InclusionInfo.BatchHeader.Hash()

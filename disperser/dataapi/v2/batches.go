@@ -194,18 +194,26 @@ func (s *ServerV2) FetchBatch(c *gin.Context) {
 		errorResponse(c, errors.New("invalid batch header hash"))
 		return
 	}
-	batchHeader, attestation, err := s.blobMetadataStore.GetSignedBatch(c.Request.Context(), batchHeaderHash)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBatch")
-		errorResponse(c, err)
-		return
+	signedBatch, ok := s.signedBatchCache.Get(batchHeaderHashHex)
+	if !ok {
+		batchHeader, attestation, err := s.blobMetadataStore.GetSignedBatch(c.Request.Context(), batchHeaderHash)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBatch")
+			errorResponse(c, err)
+			return
+		}
+		signedBatch = &SignedBatch{
+			BatchHeader: batchHeader,
+			Attestation: attestation,
+		}
+		s.signedBatchCache.Add(batchHeaderHashHex, signedBatch)
 	}
 	// TODO: support fetch of blob inclusion info
 	batchResponse := &BatchResponse{
 		BatchHeaderHash: batchHeaderHashHex,
 		SignedBatch: &SignedBatch{
-			BatchHeader: batchHeader,
-			Attestation: attestation,
+			BatchHeader: signedBatch.BatchHeader,
+			Attestation: signedBatch.Attestation,
 		},
 	}
 	s.metrics.IncrementSuccessfulRequestNum("FetchBatch")
