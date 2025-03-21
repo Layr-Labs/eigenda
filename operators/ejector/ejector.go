@@ -247,7 +247,7 @@ func (e *Ejector) EvaluateOperatorsForEjection(nonsignerMetrics []*NonSignerMetr
 
 		// Score operators based on stake weighted SLA
 		metric.StakeWeightedSLA = stakeShareToSLA(metric.StakePercentage / 100.0)
-		metric.PerfScore = operatorPerfScore(metric.StakeWeightedSLA, metric.Percentage)
+		metric.PerfScore = operatorPerfScore(metric.StakePercentage, metric.Percentage)
 		if metric.Percentage/100.0 > 1-metric.StakeWeightedSLA {
 			metric.IsViolatingSLA = true
 		} else {
