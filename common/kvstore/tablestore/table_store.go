@@ -2,6 +2,7 @@ package tablestore
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -178,6 +179,9 @@ func (t *tableStore) expireKeysInBackground(gcPeriod time.Duration, gcBatchSize 
 
 // Delete all keys with a TTL that has expired.
 func (t *tableStore) expireKeys(now time.Time, gcBatchSize uint32) error {
+
+	fmt.Printf("\nexpireKeys()\n")
+
 	it, err := t.NewTableIterator(t.expirationKeyBuilder)
 	if err != nil {
 		return err
@@ -199,6 +203,8 @@ func (t *tableStore) expireKeys(now time.Time, gcBatchSize uint32) error {
 	}
 	it.Release()
 
+	fmt.Printf("\nfound %d keys to delete\n", len(keysToDelete))
+
 	if len(keysToDelete) > 0 {
 		batch := t.base.NewBatch()
 		for i := 0; i < len(keysToDelete); i++ {
@@ -209,6 +215,8 @@ func (t *tableStore) expireKeys(now time.Time, gcBatchSize uint32) error {
 			return err
 		}
 	}
+
+	fmt.Printf("\nexpireKeys() done\n")
 	return nil
 }
 
