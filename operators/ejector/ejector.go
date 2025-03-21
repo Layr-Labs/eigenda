@@ -12,6 +12,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/disperser/dataapi"
+	dataapiv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
 	walletsdk "github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum"
@@ -105,6 +107,125 @@ func NewEjector(wallet walletsdk.Wallet, ethClient common.EthClient, logger logg
 		txnTimeout:              txnTimeout,
 		nonsigningRateThreshold: nonsigningRateThreshold,
 	}
+}
+
+// MergeNigningMetrics returns the non-signing metrics for the given nonsigningRateV1 and nonsigningRateV2
+// It compares the metrics from both versions and returns the one with the worse signing rate
+func (e *Ejector) MergeNonSigningMetrics(
+	nonsigningRateV1 *dataapi.OperatorsNonsigningPercentage,
+	nonsigningRateV2 *dataapiv2.OperatorsSigningInfoResponse,
+	quorumIDs map[core.QuorumID]struct{},
+	logger logging.Logger,
+) []*NonSignerMetric {
+	v1NonSignerMetrics := make(map[core.QuorumID]map[core.OperatorID]*dataapi.OperatorNonsigningPercentageMetrics, 0)
+	for _, metric := range nonsigningRateV1.Data {
+		metric := metric
+		quorumID := core.QuorumID(metric.QuorumId)
+		_, ok := quorumIDs[quorumID]
+		if !ok {
+			continue
+		}
+
+		operatorID, err := core.OperatorIDFromHex(metric.OperatorId)
+		if err != nil {
+			logger.Error("failed to parse operator ID", "operatorId", metric.OperatorId, "error", err)
+			continue
+		}
+
+		if _, ok := v1NonSignerMetrics[quorumID]; !ok {
+			v1NonSignerMetrics[quorumID] = make(map[core.OperatorID]*dataapi.OperatorNonsigningPercentageMetrics)
+			v1NonSignerMetrics[quorumID][operatorID] = metric
+		} else {
+			v1NonSignerMetrics[quorumID][operatorID] = metric
+		}
+	}
+
+	nonSigningMetrics := make([]*NonSignerMetric, 0)
+	for _, metric := range nonsigningRateV2.OperatorSigningInfo {
+		quorumID := metric.QuorumId
+		_, ok := quorumIDs[quorumID]
+		if !ok {
+			continue
+		}
+
+		operatorID, err := core.OperatorIDFromHex(metric.OperatorId)
+		if err != nil {
+			logger.Error("failed to parse operator ID", "operatorId", metric.OperatorId, "error", err)
+			continue
+		}
+
+		v1MetricsForQuorum, ok := v1NonSignerMetrics[quorumID]
+		v2NonSigningPercentage := 100 - metric.SigningPercentage
+		if !ok {
+			// If v1 hasn't seen this quorum, just use the v2 metric
+			nonSigningMetrics = append(nonSigningMetrics, &NonSignerMetric{
+				OperatorId:           metric.OperatorId,
+				OperatorAddress:      metric.OperatorAddress,
+				QuorumId:             metric.QuorumId,
+				TotalUnsignedBatches: metric.TotalUnsignedBatches,
+				Percentage:           v2NonSigningPercentage,
+				StakePercentage:      metric.StakePercentage,
+			})
+			logger.Info("v2 nonsigner", "metric", metric)
+			continue
+		}
+
+		v1Metric, ok := v1MetricsForQuorum[operatorID]
+		if !ok {
+			// If the operator is not in v1, just use the v2 metric
+			nonSigningMetrics = append(nonSigningMetrics, &NonSignerMetric{
+				OperatorId:           metric.OperatorId,
+				OperatorAddress:      metric.OperatorAddress,
+				QuorumId:             metric.QuorumId,
+				TotalUnsignedBatches: metric.TotalUnsignedBatches,
+				Percentage:           v2NonSigningPercentage,
+				StakePercentage:      metric.StakePercentage,
+			})
+			continue
+		}
+
+		// If the operator is in v1, compare the metrics and use the one with the worse signing rate
+		if v1Metric.Percentage < v2NonSigningPercentage {
+			nonSigningMetrics = append(nonSigningMetrics, &NonSignerMetric{
+				OperatorId:           metric.OperatorId,
+				OperatorAddress:      metric.OperatorAddress,
+				QuorumId:             metric.QuorumId,
+				TotalUnsignedBatches: metric.TotalUnsignedBatches,
+				Percentage:           v2NonSigningPercentage,
+				StakePercentage:      metric.StakePercentage,
+			})
+			logger.Info("nonsigner using v1 signing rate", "v1Metric", v1Metric, "v2Metric", metric)
+		} else {
+			nonSigningMetrics = append(nonSigningMetrics, &NonSignerMetric{
+				OperatorId:           v1Metric.OperatorId,
+				OperatorAddress:      v1Metric.OperatorAddress,
+				QuorumId:             v1Metric.QuorumId,
+				TotalUnsignedBatches: v1Metric.TotalUnsignedBatches,
+				Percentage:           v1Metric.Percentage,
+				StakePercentage:      v1Metric.StakePercentage,
+			})
+			logger.Info("nonsigner using v2 signing rate", "v1Metric", v1Metric, "v2Metric", metric)
+		}
+
+		// Remove the operator from v1 metrics
+		delete(v1NonSignerMetrics[quorumID], operatorID)
+	}
+
+	// Add any remaining v1 metrics that were not in v2
+	for _, v1MetricsForQuorum := range v1NonSignerMetrics {
+		for _, v1Metric := range v1MetricsForQuorum {
+			nonSigningMetrics = append(nonSigningMetrics, &NonSignerMetric{
+				OperatorId:           v1Metric.OperatorId,
+				OperatorAddress:      v1Metric.OperatorAddress,
+				QuorumId:             v1Metric.QuorumId,
+				TotalUnsignedBatches: v1Metric.TotalUnsignedBatches,
+				Percentage:           v1Metric.Percentage,
+				StakePercentage:      v1Metric.StakePercentage,
+			})
+		}
+	}
+
+	return nonSigningMetrics
 }
 
 // EvaluateOperatorsForEjection evaluates the operators for ejection.

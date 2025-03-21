@@ -375,7 +375,7 @@ func EvaluateOperators(config *ejections.Config) error {
 					OperatorAddress:      metric.OperatorAddress,
 					QuorumId:             metric.QuorumId,
 					TotalUnsignedBatches: metric.TotalUnsignedBatches,
-					Percentage:           metric.SigningPercentage,
+					Percentage:           100 - metric.SigningPercentage,
 					StakePercentage:      metric.StakePercentage,
 				})
 			}
@@ -420,23 +420,23 @@ func EvaluateOperators(config *ejections.Config) error {
 		}
 		fmt.Println(nonSigningTableV2.Render())
 
-		// Hybrid non-signing metrics (V1 and V2)
-		nonSigningMetricsCombined := GetNonSigningMetrics(nonsigningRateV1, nonsigningRateV2, quorumIDs, logger)
-		err = e.EvaluateOperatorsForEjection(nonSigningMetricsCombined)
+		// Merge non-signing metrics from V1 and V2
+		nonSigningMetricsMerged := e.MergeNonSigningMetrics(nonsigningRateV1, nonsigningRateV2, quorumIDs, logger)
+		err = e.EvaluateOperatorsForEjection(nonSigningMetricsMerged)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate operators for hybrid ejection: %w", err)
 		}
-		sort.Slice(nonSigningMetricsCombined, func(i, j int) bool {
-			return nonSigningMetricsCombined[i].OperatorAddress < nonSigningMetricsCombined[j].OperatorAddress
+		sort.Slice(nonSigningMetricsMerged, func(i, j int) bool {
+			return nonSigningMetricsMerged[i].OperatorAddress < nonSigningMetricsMerged[j].OperatorAddress
 		})
-		nonSigningTableCombined := table.NewWriter()
-		nonSigningTableCombined.AppendHeader(table.Row{"Operator Address", "Quorum ID", "Unsigned Batches", "Hybrid Non Signing %", "Stake %", "Perf Score", "Violating SLA", "Violating Threshold", "Needs Ejection"}, table.RowConfig{AutoMerge: true})
-		for _, metric := range nonSigningMetricsCombined {
-			nonSigningTableCombined.AppendRow(table.Row{metric.OperatorAddress, metric.QuorumId, metric.TotalUnsignedBatches, metric.Percentage, metric.StakePercentage, metric.PerfScore, metric.IsViolatingSLA, metric.IsViolatingThreshold, metric.NeedsEjection})
+		nonSigningTableMerged := table.NewWriter()
+		nonSigningTableMerged.AppendHeader(table.Row{"Operator Address", "Quorum ID", "Unsigned Batches", "Hybrid Non Signing %", "Stake %", "Perf Score", "Violating SLA", "Violating Threshold", "Needs Ejection"}, table.RowConfig{AutoMerge: true})
+		for _, metric := range nonSigningMetricsMerged {
+			nonSigningTableMerged.AppendRow(table.Row{metric.OperatorAddress, metric.QuorumId, metric.TotalUnsignedBatches, metric.Percentage, metric.StakePercentage, metric.PerfScore, metric.IsViolatingSLA, metric.IsViolatingThreshold, metric.NeedsEjection})
 		}
-		nonSigningTableCombined.SetStyle(table.StyleLight)
-		nonSigningTableCombined.Style().Options.SeparateRows = true
-		nonSigningTableCombined.SetColumnConfigs([]table.ColumnConfig{
+		nonSigningTableMerged.SetStyle(table.StyleLight)
+		nonSigningTableMerged.Style().Options.SeparateRows = true
+		nonSigningTableMerged.SetColumnConfigs([]table.ColumnConfig{
 			{Number: 1, AutoMerge: true}, // Merging the Operator Address column
 			{Number: 2, AutoMerge: false},
 			{Number: 3, AutoMerge: false},
@@ -447,129 +447,10 @@ func EvaluateOperators(config *ejections.Config) error {
 			{Number: 8, AutoMerge: false},
 			{Number: 9, AutoMerge: false},
 		})
-		fmt.Println(nonSigningTableCombined.Render())
+		fmt.Println(nonSigningTableMerged.Render())
 	}
 
 	return nil
-}
-
-// getNonSigningMetrics returns the non-signing metrics for the given nonsigningRateV1 and nonsigningRateV2
-// It compares the metrics from both versions and returns the one with the worse signing rate
-func GetNonSigningMetrics(
-	nonsigningRateV1 *dataapi.OperatorsNonsigningPercentage,
-	nonsigningRateV2 *dataapiv2.OperatorsSigningInfoResponse,
-	quorumIDs map[core.QuorumID]struct{},
-	logger logging.Logger,
-) []*ejector.NonSignerMetric {
-	v1NonSignerMetrics := make(map[core.QuorumID]map[core.OperatorID]*dataapi.OperatorNonsigningPercentageMetrics, 0)
-	for _, metric := range nonsigningRateV1.Data {
-		metric := metric
-		quorumID := core.QuorumID(metric.QuorumId)
-		_, ok := quorumIDs[quorumID]
-		if !ok {
-			continue
-		}
-
-		operatorID, err := core.OperatorIDFromHex(metric.OperatorId)
-		if err != nil {
-			logger.Error("failed to parse operator ID", "operatorId", metric.OperatorId, "error", err)
-			continue
-		}
-
-		if _, ok := v1NonSignerMetrics[quorumID]; !ok {
-			v1NonSignerMetrics[quorumID] = make(map[core.OperatorID]*dataapi.OperatorNonsigningPercentageMetrics)
-			v1NonSignerMetrics[quorumID][operatorID] = metric
-		} else {
-			v1NonSignerMetrics[quorumID][operatorID] = metric
-		}
-	}
-
-	nonSigningMetrics := make([]*ejector.NonSignerMetric, 0)
-	for _, metric := range nonsigningRateV2.OperatorSigningInfo {
-		quorumID := metric.QuorumId
-		_, ok := quorumIDs[quorumID]
-		if !ok {
-			continue
-		}
-
-		operatorID, err := core.OperatorIDFromHex(metric.OperatorId)
-		if err != nil {
-			logger.Error("failed to parse operator ID", "operatorId", metric.OperatorId, "error", err)
-			continue
-		}
-
-		v1MetricsForQuorum, ok := v1NonSignerMetrics[quorumID]
-		v2NonSigningPercentage := 100 - metric.SigningPercentage
-		if !ok {
-			// If v1 hasn't seen this quorum, just use the v2 metric
-			nonSigningMetrics = append(nonSigningMetrics, &ejector.NonSignerMetric{
-				OperatorId:           metric.OperatorId,
-				OperatorAddress:      metric.OperatorAddress,
-				QuorumId:             metric.QuorumId,
-				TotalUnsignedBatches: metric.TotalUnsignedBatches,
-				Percentage:           v2NonSigningPercentage,
-				StakePercentage:      metric.StakePercentage,
-			})
-			logger.Info("v2 nonsigner", "metric", metric)
-			continue
-		}
-
-		v1Metric, ok := v1MetricsForQuorum[operatorID]
-		if !ok {
-			// If the operator is not in v1, just use the v2 metric
-			nonSigningMetrics = append(nonSigningMetrics, &ejector.NonSignerMetric{
-				OperatorId:           metric.OperatorId,
-				OperatorAddress:      metric.OperatorAddress,
-				QuorumId:             metric.QuorumId,
-				TotalUnsignedBatches: metric.TotalUnsignedBatches,
-				Percentage:           v2NonSigningPercentage,
-				StakePercentage:      metric.StakePercentage,
-			})
-			continue
-		}
-
-		// If the operator is in v1, compare the metrics and use the one with the worse signing rate
-		if v1Metric.Percentage < v2NonSigningPercentage {
-			nonSigningMetrics = append(nonSigningMetrics, &ejector.NonSignerMetric{
-				OperatorId:           metric.OperatorId,
-				OperatorAddress:      metric.OperatorAddress,
-				QuorumId:             metric.QuorumId,
-				TotalUnsignedBatches: metric.TotalUnsignedBatches,
-				Percentage:           v2NonSigningPercentage,
-				StakePercentage:      metric.StakePercentage,
-			})
-			logger.Info("nonsigner using v1 signing rate", "v1Metric", v1Metric, "v2Metric", metric)
-		} else {
-			nonSigningMetrics = append(nonSigningMetrics, &ejector.NonSignerMetric{
-				OperatorId:           v1Metric.OperatorId,
-				OperatorAddress:      v1Metric.OperatorAddress,
-				QuorumId:             v1Metric.QuorumId,
-				TotalUnsignedBatches: v1Metric.TotalUnsignedBatches,
-				Percentage:           v1Metric.Percentage,
-				StakePercentage:      v1Metric.StakePercentage,
-			})
-			logger.Info("nonsigner using v2 signing rate", "v1Metric", v1Metric, "v2Metric", metric)
-		}
-
-		// Remove the operator from v1 metrics
-		delete(v1NonSignerMetrics[quorumID], operatorID)
-	}
-
-	// Add any remaining v1 metrics that were not in v2
-	for _, v1MetricsForQuorum := range v1NonSignerMetrics {
-		for _, v1Metric := range v1MetricsForQuorum {
-			nonSigningMetrics = append(nonSigningMetrics, &ejector.NonSignerMetric{
-				OperatorId:           v1Metric.OperatorId,
-				OperatorAddress:      v1Metric.OperatorAddress,
-				QuorumId:             v1Metric.QuorumId,
-				TotalUnsignedBatches: v1Metric.TotalUnsignedBatches,
-				Percentage:           v1Metric.Percentage,
-				StakePercentage:      v1Metric.StakePercentage,
-			})
-		}
-	}
-
-	return nonSigningMetrics
 }
 
 func (c *dataapiClient) GetNonSigningRateV1(endTime time.Time, interval int64) (*dataapi.OperatorsNonsigningPercentage, error) {
