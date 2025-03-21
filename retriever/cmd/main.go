@@ -108,9 +108,7 @@ func RetrieverMain(ctx *cli.Context) error {
 
 		chainClient := retrivereth.NewChainClient(gethClient, logger)
 		retrieverServiceServer := retriever.NewServer(config, logger, retrievalClient, chainClient)
-		if err = retrieverServiceServer.Start(context.Background()); err != nil {
-			log.Fatalln("failed to start retriever service server", err)
-		}
+		retrieverServiceServer.Start(context.Background())
 
 		// Register reflection service on gRPC server
 		// This makes "grpcurl -plaintext localhost:9000 list" command work
@@ -129,9 +127,7 @@ func RetrieverMain(ctx *cli.Context) error {
 	if config.EigenDAVersion == 2 {
 		retrievalClient := clientsv2.NewRetrievalClient(logger, tx, cs, v, config.NumConnections)
 		retrieverServiceServer := retrieverv2.NewServer(config, logger, retrievalClient, cs)
-		if err = retrieverServiceServer.Start(context.Background()); err != nil {
-			log.Fatalln("failed to start retriever service server", err)
-		}
+		retrieverServiceServer.Start(context.Background())
 
 		// Register reflection service on gRPC server
 		// This makes "grpcurl -plaintext localhost:9000 list" command work
