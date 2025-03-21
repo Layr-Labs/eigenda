@@ -39,7 +39,7 @@ const dataSize = 1 * units.MiB
 const batchSize = 100
 const parallelWriters = 2
 const readBytesPerSecond = 10 * units.MiB
-const readerCount = 1
+const readerCount = 0
 const TTL = 2 * time.Hour
 const dataGeneratorCount = 16
 
@@ -214,7 +214,10 @@ func runBenchmark(write writer, read reader) {
 		<-gcDone
 	}()
 
-	readRatePerGoroutine := readBytesPerSecond / readerCount
+	var readRatePerGoroutine uint64
+	if readerCount > 0 {
+		readRatePerGoroutine = readBytesPerSecond / uint64(readerCount)
+	}
 	readsPerSecond := readRatePerGoroutine / dataSize
 	readerDoneChannels := make([]chan struct{}, readerCount)
 	totalReadsPerformed := atomic.Uint64{}
