@@ -207,6 +207,8 @@ func (s *ServerV2) FetchBatch(c *gin.Context) {
 			Attestation: attestation,
 		}
 		s.signedBatchCache.Add(batchHeaderHashHex, signedBatch)
+	} else {
+		s.metrics.IncrementCacheHit("FetchBatch")
 	}
 	// TODO: support fetch of blob inclusion info
 	batchResponse := &BatchResponse{

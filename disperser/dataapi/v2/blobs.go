@@ -194,6 +194,8 @@ func (s *ServerV2) FetchBlob(c *gin.Context) {
 			return
 		}
 		s.blobMetadataCache.Add(blobKey.Hex(), metadata)
+	} else {
+		s.metrics.IncrementCacheHit("FetchBlob")
 	}
 	bk, err := metadata.BlobHeader.BlobKey()
 	if err != nil || bk != blobKey {
@@ -243,6 +245,8 @@ func (s *ServerV2) FetchBlobCertificate(c *gin.Context) {
 			return
 		}
 		s.blobCertificateCache.Add(blobKey.Hex(), cert)
+	} else {
+		s.metrics.IncrementCacheHit("FetchBlobCertificate")
 	}
 	response := &BlobCertificateResponse{
 		Certificate: cert,
@@ -275,90 +279,101 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 		return
 	}
 
-	attestationInfo, ok := s.blobAttestationInfoCache.Get(blobKey.Hex())
+	response, ok := s.blobAttestationInfoResponseCache.Get(blobKey.Hex())
 	if !ok {
-		attestationInfo, err = s.blobMetadataStore.GetBlobAttestationInfo(c.Request.Context(), blobKey)
+
+		attestationInfo, ok := s.blobAttestationInfoCache.Get(blobKey.Hex())
+		if !ok {
+			attestationInfo, err = s.blobMetadataStore.GetBlobAttestationInfo(c.Request.Context(), blobKey)
+			if err != nil {
+				s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
+				errorResponse(c, fmt.Errorf("failed to fetch blob attestation info: %w", err))
+				return
+			}
+			s.blobAttestationInfoCache.Add(blobKey.Hex(), attestationInfo)
+		}
+
+		batchHeaderHash, err := attestationInfo.InclusionInfo.BatchHeader.Hash()
 		if err != nil {
 			s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
-			errorResponse(c, fmt.Errorf("failed to fetch blob attestation info: %w", err))
+			errorResponse(c, fmt.Errorf("failed to get batch header hash from blob inclusion info: %w", err))
 			return
 		}
-		s.blobAttestationInfoCache.Add(blobKey.Hex(), attestationInfo)
-	}
 
-	batchHeaderHash, err := attestationInfo.InclusionInfo.BatchHeader.Hash()
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
-		errorResponse(c, fmt.Errorf("failed to get batch header hash from blob inclusion info: %w", err))
-		return
-	}
-
-	// Get quorums that this blob was dispersed to
-	metadata, err := s.blobMetadataStore.GetBlobMetadata(ctx, blobKey)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
-		errorResponse(c, fmt.Errorf("failed to fetch blob metadata: %w", err))
-		return
-	}
-	blobQuorums := make(map[uint8]struct{}, 0)
-	for _, q := range metadata.BlobHeader.QuorumNumbers {
-		blobQuorums[q] = struct{}{}
-	}
-
-	// Get all operators for the attestation
-	operatorList, operatorsByQuorum, err := s.getAllOperatorsForAttestation(ctx, attestationInfo.Attestation)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
-		errorResponse(c, fmt.Errorf("failed to fetch operators at reference block number: %w", err))
-		return
-	}
-
-	// Get all nonsigners (of the batch that this blob is part of)
-	nonsigners := make(map[core.OperatorID]struct{}, 0)
-	for i := 0; i < len(attestationInfo.Attestation.NonSignerPubKeys); i++ {
-		opId := attestationInfo.Attestation.NonSignerPubKeys[i].GetOperatorID()
-		nonsigners[opId] = struct{}{}
-	}
-
-	// Compute the signers and nonsigners for the blob, for each quorum that the blob was dispersed to
-	blobSigners := make(map[uint8][]OperatorIdentity, 0)
-	blobNonsigners := make(map[uint8][]OperatorIdentity, 0)
-	for q, innerMap := range operatorsByQuorum {
-		// Make sure the blob was dispersed to the quorum
-		if _, exist := blobQuorums[q]; !exist {
-			continue
-		}
-		for _, op := range innerMap {
-			id := op.OperatorID.Hex()
-			addr, exist := operatorList.GetAddress(id)
-			// This should never happen becuase OperatorList ensures the 1:1 mapping
-			if !exist {
-				addr = "Unexpected internal error"
-				s.logger.Error("Internal error: failed to find address for operatorId", "operatorId", op.OperatorID.Hex())
-			}
-			if _, exist := nonsigners[op.OperatorID]; exist {
-				blobNonsigners[q] = append(blobNonsigners[q], OperatorIdentity{
-					OperatorId:      id,
-					OperatorAddress: addr,
-				})
-			} else {
-				blobSigners[q] = append(blobSigners[q], OperatorIdentity{
-					OperatorId:      id,
-					OperatorAddress: addr,
-				})
+		// Get quorums that this blob was dispersed to
+		metadata, ok := s.blobMetadataCache.Get(blobKey.Hex())
+		if !ok {
+			metadata, err = s.blobMetadataStore.GetBlobMetadata(ctx, blobKey)
+			if err != nil {
+				s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
+				errorResponse(c, fmt.Errorf("failed to fetch blob metadata: %w", err))
+				return
 			}
 		}
-	}
+		blobQuorums := make(map[uint8]struct{}, 0)
+		for _, q := range metadata.BlobHeader.QuorumNumbers {
+			blobQuorums[q] = struct{}{}
+		}
 
-	response := &BlobAttestationInfoResponse{
-		BlobKey:         blobKey.Hex(),
-		BatchHeaderHash: hex.EncodeToString(batchHeaderHash[:]),
-		InclusionInfo:   attestationInfo.InclusionInfo,
-		AttestationInfo: &AttestationInfo{
-			Attestation: attestationInfo.Attestation,
-			Signers:     blobSigners,
-			Nonsigners:  blobNonsigners,
-		},
+		// Get all operators for the attestation
+		operatorList, operatorsByQuorum, err := s.getAllOperatorsForAttestation(ctx, attestationInfo.Attestation)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
+			errorResponse(c, fmt.Errorf("failed to fetch operators at reference block number: %w", err))
+			return
+		}
+
+		// Get all nonsigners (of the batch that this blob is part of)
+		nonsigners := make(map[core.OperatorID]struct{}, 0)
+		for i := 0; i < len(attestationInfo.Attestation.NonSignerPubKeys); i++ {
+			opId := attestationInfo.Attestation.NonSignerPubKeys[i].GetOperatorID()
+			nonsigners[opId] = struct{}{}
+		}
+
+		// Compute the signers and nonsigners for the blob, for each quorum that the blob was dispersed to
+		blobSigners := make(map[uint8][]OperatorIdentity, 0)
+		blobNonsigners := make(map[uint8][]OperatorIdentity, 0)
+		for q, innerMap := range operatorsByQuorum {
+			// Make sure the blob was dispersed to the quorum
+			if _, exist := blobQuorums[q]; !exist {
+				continue
+			}
+			for _, op := range innerMap {
+				id := op.OperatorID.Hex()
+				addr, exist := operatorList.GetAddress(id)
+				// This should never happen becuase OperatorList ensures the 1:1 mapping
+				if !exist {
+					addr = "Unexpected internal error"
+					s.logger.Error("Internal error: failed to find address for operatorId", "operatorId", op.OperatorID.Hex())
+				}
+				if _, exist := nonsigners[op.OperatorID]; exist {
+					blobNonsigners[q] = append(blobNonsigners[q], OperatorIdentity{
+						OperatorId:      id,
+						OperatorAddress: addr,
+					})
+				} else {
+					blobSigners[q] = append(blobSigners[q], OperatorIdentity{
+						OperatorId:      id,
+						OperatorAddress: addr,
+					})
+				}
+			}
+		}
+
+		response = &BlobAttestationInfoResponse{
+			BlobKey:         blobKey.Hex(),
+			BatchHeaderHash: hex.EncodeToString(batchHeaderHash[:]),
+			InclusionInfo:   attestationInfo.InclusionInfo,
+			AttestationInfo: &AttestationInfo{
+				Attestation: attestationInfo.Attestation,
+				Signers:     blobSigners,
+				Nonsigners:  blobNonsigners,
+			},
+		}
+
+		s.blobAttestationInfoResponseCache.Add(blobKey.Hex(), response)
+	} else {
+		s.metrics.IncrementCacheHit("FetchBlobAttestationInfo")
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlobAttestationInfo")

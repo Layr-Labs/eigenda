@@ -47,8 +47,9 @@ const (
 	// Suppose 1KB for each attestation, this will be 173MB memory.
 	maxNumBatchesToCache = 3600 * 24 * 2
 
-	// Cache ~1h worth of blobs and batches for KV lookups
-	maxNumKVBlobsToCache   = 100 * 3600
+	// Cache ~10mins worth of blobs for KV lookups
+	maxNumKVBlobsToCache = 100 * 600
+	// Cache ~1h worth of batches for KV lookups
 	maxNumKVBatchesToCache = 3600
 
 	cacheControlParam       = "Cache-Control"
@@ -222,9 +223,10 @@ type ServerV2 struct {
 
 	// KV cache
 	// The blob caches are keyed by blobkey
-	blobMetadataCache        *lru.Cache[string, *commonv2.BlobMetadata]
-	blobAttestationInfoCache *lru.Cache[string, *commonv2.BlobAttestationInfo]
-	blobCertificateCache     *lru.Cache[string, *corev2.BlobCertificate]
+	blobMetadataCache                *lru.Cache[string, *commonv2.BlobMetadata]
+	blobAttestationInfoCache         *lru.Cache[string, *commonv2.BlobAttestationInfo]
+	blobCertificateCache             *lru.Cache[string, *corev2.BlobCertificate]
+	blobAttestationInfoResponseCache *lru.Cache[string, *BlobAttestationInfoResponse]
 	// The batch caches are keyed by batch header hash
 	signedBatchCache *lru.Cache[string, *SignedBatch]
 }
@@ -274,6 +276,10 @@ func NewServerV2(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blobCertificateCache: %w", err)
 	}
+	blobAttestationInfoResponseCache, err := lru.New[string, *BlobAttestationInfoResponse](maxNumKVBlobsToCache)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create blobAttestationInfoResponseCache: %w", err)
+	}
 
 	signedBatchCache, err := lru.New[string, *SignedBatch](maxNumKVBatchesToCache)
 	if err != nil {
@@ -281,24 +287,25 @@ func NewServerV2(
 	}
 
 	return &ServerV2{
-		logger:                   l,
-		serverMode:               config.ServerMode,
-		socketAddr:               config.SocketAddr,
-		allowOrigins:             config.AllowOrigins,
-		blobMetadataStore:        blobMetadataStore,
-		promClient:               promClient,
-		subgraphClient:           subgraphClient,
-		chainReader:              chainReader,
-		chainState:               chainState,
-		indexedChainState:        indexedChainState,
-		metrics:                  metrics,
-		operatorHandler:          dataapi.NewOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient),
-		metricsHandler:           dataapi.NewMetricsHandler(promClient, dataapi.V2),
-		batchFeedCache:           batchFeedCache,
-		blobMetadataCache:        blobMetadataCache,
-		blobAttestationInfoCache: blobAttestationInfoCache,
-		blobCertificateCache:     blobCertificateCache,
-		signedBatchCache:         signedBatchCache,
+		logger:                           l,
+		serverMode:                       config.ServerMode,
+		socketAddr:                       config.SocketAddr,
+		allowOrigins:                     config.AllowOrigins,
+		blobMetadataStore:                blobMetadataStore,
+		promClient:                       promClient,
+		subgraphClient:                   subgraphClient,
+		chainReader:                      chainReader,
+		chainState:                       chainState,
+		indexedChainState:                indexedChainState,
+		metrics:                          metrics,
+		operatorHandler:                  dataapi.NewOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient),
+		metricsHandler:                   dataapi.NewMetricsHandler(promClient, dataapi.V2),
+		batchFeedCache:                   batchFeedCache,
+		blobMetadataCache:                blobMetadataCache,
+		blobAttestationInfoCache:         blobAttestationInfoCache,
+		blobCertificateCache:             blobCertificateCache,
+		blobAttestationInfoResponseCache: blobAttestationInfoResponseCache,
+		signedBatchCache:                 signedBatchCache,
 	}, nil
 }
 
