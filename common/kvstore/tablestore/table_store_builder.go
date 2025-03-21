@@ -52,10 +52,14 @@ func Start(logger logging.Logger, config *Config) (kvstore.TableStore, error) {
 		return nil, errors.New("config is required")
 	}
 
+	fmt.Printf("building base store\n")
+
 	base, err := buildBaseStore(config.Type, logger, config.Path, config.MetricsRegistry)
 	if err != nil {
 		return nil, fmt.Errorf("error building base store: %w", err)
 	}
+
+	fmt.Printf("calling start()\n")
 
 	return start(logger, base, config)
 }
@@ -75,22 +79,31 @@ func start(
 	namespaceKeyBuilder := newKeyBuilder("namespace", namespaceTableID)
 	expirationKeyBuilder := newKeyBuilder("expiration", expirationTableID)
 
+	fmt.Printf("validating schema\n")
+
 	err := validateSchema(base, metadataKeyBuilder)
 	if err != nil {
 		return nil, fmt.Errorf("error validating schema: %w", err)
 	}
+
+	fmt.Printf("handling incomplete deletion\n")
 
 	err = handleIncompleteDeletion(logger, base, metadataKeyBuilder, namespaceKeyBuilder)
 	if err != nil {
 		return nil, fmt.Errorf("error handling incomplete deletion: %w", err)
 	}
 
+	fmt.Printf("loading namespace table\n")
+
 	tableIDMap, err := loadNamespaceTable(base, namespaceKeyBuilder)
 	if err != nil {
 		return nil, fmt.Errorf("error loading namespace table: %w", err)
 	}
 
+	fmt.Printf("done loading namespace table\n")
+
 	if config.Schema != nil {
+		fmt.Printf("about to call addAndRemoveTables()\n")
 		err = addAndRemoveTables(
 			base,
 			metadataKeyBuilder,
@@ -101,6 +114,8 @@ func start(
 			return nil, fmt.Errorf("error adding and removing tables: %w", err)
 		}
 	}
+
+	fmt.Printf("about to call newTableStore()\n")
 
 	store := newTableStore(
 		logger,
@@ -185,17 +200,25 @@ func addAndRemoveTables(
 	tableIDMap map[uint32]string,
 	currentTables []string) error {
 
+	fmt.Printf("add/remove tables\n")
+
 	tablesToAdd, tablesToDrop := computeSchemaChange(tableIDMap, currentTables)
+
+	fmt.Printf("dropping tables\n")
 
 	err := dropTables(base, metadataKeyBuilder, namespaceKeyBuilder, tableIDMap, tablesToDrop)
 	if err != nil {
 		return fmt.Errorf("error dropping tables: %w", err)
 	}
 
+	fmt.Printf("adding tables\n")
+
 	err = addTables(base, metadataKeyBuilder, namespaceKeyBuilder, tableIDMap, tablesToAdd)
 	if err != nil {
 		return fmt.Errorf("error adding tables: %w", err)
 	}
+
+	fmt.Printf("sanity checking namespace table\n")
 
 	err = sanityCheckNamespaceTable(base, namespaceKeyBuilder, tableIDMap, currentTables)
 	if err != nil {
@@ -244,6 +267,7 @@ func dropTables(
 	tablesToDrop []string) error {
 
 	if len(tablesToDrop) == 0 {
+		fmt.Printf("no tables to drop\n")
 		// bail out early
 		return nil
 	}
@@ -253,12 +277,15 @@ func dropTables(
 		reverseTableIDMap[tableID] = tableName
 	}
 	for _, tableName := range tablesToDrop {
+		fmt.Printf("dropping table %s\n", tableName)
 		err := dropTable(base, metadataKeyBuilder, namespaceKeyBuilder, tableName, reverseTableIDMap[tableName])
+		fmt.Printf("done dropping table %s\n", tableName)
 		if err != nil {
 			return fmt.Errorf("error dropping table %s: %w", tableName, err)
 		}
 		delete(tableIDMap, reverseTableIDMap[tableName])
 	}
+	fmt.Printf("returning from dropTables()\n")
 
 	return nil
 }
@@ -273,6 +300,7 @@ func addTables(
 
 	if len(tablesToAdd) == 0 {
 		// bail out early
+		fmt.Printf("no tables to add\n")
 		return nil
 	}
 
@@ -281,12 +309,16 @@ func addTables(
 
 	// Add new tables.
 	for _, tableName := range tablesToAdd {
+		fmt.Printf("adding table %s\n", tableName)
 		tableID, err := createTable(base, metadataKeyBuilder, namespaceKeyBuilder, tableName)
+		fmt.Printf("done adding table %s\n", tableName)
 		if err != nil {
 			return fmt.Errorf("error creating table %s: %w", tableName, err)
 		}
 		tableIDMap[tableID] = tableName
 	}
+
+	fmt.Printf("returning from addTables()\n")
 
 	return nil
 }
@@ -395,8 +427,6 @@ func createTable(
 	namespaceKeyBuilder kvstore.KeyBuilder,
 	name string) (uint32, error) {
 
-	batch := base.NewBatch()
-
 	var tableID uint32
 	tableIDBytes, err := base.Get(metadataKeyBuilder.Key([]byte(nextTableIDKey)).Raw())
 	if err != nil {
@@ -418,10 +448,13 @@ func createTable(
 
 	keyBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(keyBytes, tableID)
+
+	batch := base.NewBatch()
 	batch.Put(namespaceKeyBuilder.Key(keyBytes).Raw(), []byte(name))
 	batch.Put(metadataKeyBuilder.Key([]byte(nextTableIDKey)).Raw(), nextTableIDBytes)
 
 	err = batch.Apply()
+
 	if err != nil {
 		return 0, fmt.Errorf("error updating namespace table: %w", err)
 	}

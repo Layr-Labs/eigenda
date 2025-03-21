@@ -18,12 +18,10 @@ type lotusStore struct {
 	db           *lotus.DB
 	dataDir      string
 	batchOptions lotus.BatchOptions
+	isShutdown   bool
 }
 
 func NewStore(dataDir string) (kvstore.Store[[]byte], error) {
-
-	fmt.Printf("starting lotus store at %s\n", dataDir) // TODO
-
 	opts := lotus.DefaultOptions
 	opts.DirPath = dataDir
 	opts.Sync = true
@@ -38,6 +36,7 @@ func NewStore(dataDir string) (kvstore.Store[[]byte], error) {
 		WriteOptions: lotus.WriteOptions{
 			Sync: true,
 		},
+		ReadOnly: false,
 	}
 
 	return &lotusStore{
@@ -80,6 +79,7 @@ func (l *lotusStore) Delete(k []byte) error {
 func (l *lotusStore) NewBatch() kvstore.Batch[[]byte] {
 	return &lotusBatch{
 		batch: l.db.NewBatch(l.batchOptions),
+		db:    l.db,
 	}
 }
 
@@ -97,6 +97,10 @@ func (l *lotusStore) NewIterator(prefix []byte) (iterator.Iterator, error) {
 }
 
 func (l *lotusStore) Shutdown() error {
+	if l.isShutdown {
+		return nil
+	}
+	l.isShutdown = true
 	return l.db.Close()
 }
 
@@ -119,6 +123,7 @@ var _ kvstore.Batch[[]byte] = &lotusBatch{}
 type lotusBatch struct {
 	batch     *lotus.Batch
 	batchSize uint32
+	db        *lotus.DB
 }
 
 func (b *lotusBatch) Put(key []byte, value []byte) {
@@ -138,7 +143,16 @@ func (b *lotusBatch) Delete(key []byte) {
 }
 
 func (b *lotusBatch) Apply() error {
-	return b.batch.Commit()
+	err := b.batch.Commit()
+	if err != nil {
+		return fmt.Errorf("unable to commit: %w", err)
+	}
+	err = b.db.Sync()
+	if err != nil {
+		return fmt.Errorf("unable to sync: %w", err)
+	}
+
+	return nil
 }
 
 func (b *lotusBatch) Size() uint32 {
@@ -149,6 +163,8 @@ var _ iterator.Iterator = &lotusIterator{}
 
 type lotusIterator struct {
 	iterator *lotus.Iterator
+	key      []byte
+	value    []byte
 }
 
 func (i *lotusIterator) First() bool {
@@ -167,8 +183,17 @@ func (i *lotusIterator) Seek(key []byte) bool {
 }
 
 func (i *lotusIterator) Next() bool { // TODO
+
+	valid := i.iterator.Valid()
+	if !valid {
+		return false
+	}
+
+	i.key = i.iterator.Key()
+	i.value = i.iterator.Value()
+
 	i.iterator.Next()
-	return i.iterator.Valid()
+	return true
 }
 
 func (i *lotusIterator) Prev() bool {
@@ -198,11 +223,10 @@ func (i *lotusIterator) Error() error {
 	panic("implement me")
 }
 
-func (i *lotusIterator) Key() []byte { // TODO
-	return i.iterator.Key()
+func (i *lotusIterator) Key() []byte {
+	return i.key
 }
 
 func (i *lotusIterator) Value() []byte {
-	//TODO implement me
-	panic("implement me")
+	return i.value
 }

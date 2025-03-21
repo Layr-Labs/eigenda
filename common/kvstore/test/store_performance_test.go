@@ -112,6 +112,7 @@ func BenchmarkLevelDB(b *testing.B) {
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	assert.NoError(b, err)
 
+	dbPath := b.TempDir()
 	store, err := leveldb.NewStore(logger, dbPath, nil)
 	assert.NoError(b, err)
 
