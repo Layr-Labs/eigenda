@@ -182,9 +182,8 @@ func (t *tableStore) expireKeys(now time.Time, gcBatchSize uint32) error {
 	if err != nil {
 		return err
 	}
-	defer it.Release()
 
-	batch := t.base.NewBatch()
+	keysToDelete := make([][]byte, 0)
 
 	for it.Next() {
 		expiryKey := it.Key()
@@ -195,20 +194,20 @@ func (t *tableStore) expireKeys(now time.Time, gcBatchSize uint32) error {
 			break
 		}
 
-		batch.Delete(baseKey)
-		batch.Delete(expiryKey)
-
-		if batch.Size() >= gcBatchSize {
-			err = batch.Apply()
-			if err != nil {
-				return err
-			}
-			batch = t.base.NewBatch()
-		}
+		keysToDelete = append(keysToDelete, baseKey)
+		keysToDelete = append(keysToDelete, expiryKey)
 	}
+	it.Release()
 
-	if batch.Size() > 0 {
-		return batch.Apply()
+	if len(keysToDelete) > 0 {
+		batch := t.base.NewBatch()
+		for i := 0; i < len(keysToDelete); i++ {
+			batch.Delete(keysToDelete[i])
+		}
+		err = batch.Apply()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
