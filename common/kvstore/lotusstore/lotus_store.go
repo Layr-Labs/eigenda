@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/docker/go-units"
@@ -18,7 +20,7 @@ type lotusStore struct {
 	db           *lotus.DB
 	dataDir      string
 	batchOptions lotus.BatchOptions
-	isShutdown   bool
+	isShutdown   atomic.Bool
 }
 
 func NewStore(dataDir string) (kvstore.Store[[]byte], error) {
@@ -39,11 +41,25 @@ func NewStore(dataDir string) (kvstore.Store[[]byte], error) {
 		ReadOnly: false,
 	}
 
-	return &lotusStore{
+	store := &lotusStore{
 		db:           db,
 		dataDir:      dataDir,
 		batchOptions: batchOptions,
-	}, nil
+	}
+
+	go store.doCompaction()
+	return store, nil
+}
+
+func (l *lotusStore) doCompaction() {
+	ticker := time.NewTicker(5 * time.Minute)
+	for !l.isShutdown.Load() {
+		<-ticker.C
+		err := l.db.Compact()
+		if err != nil {
+			panic(fmt.Errorf("unable to compact: %w", err)) // TODO handle this better if we actually release this
+		}
+	}
 }
 
 func (l *lotusStore) Put(k []byte, value []byte) error {
@@ -97,10 +113,10 @@ func (l *lotusStore) NewIterator(prefix []byte) (iterator.Iterator, error) {
 }
 
 func (l *lotusStore) Shutdown() error {
-	if l.isShutdown {
+	if l.isShutdown.Load() {
 		return nil
 	}
-	l.isShutdown = true
+	l.isShutdown.Store(true)
 	return l.db.Close()
 }
 
