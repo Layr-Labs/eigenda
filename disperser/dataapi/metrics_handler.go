@@ -24,6 +24,20 @@ func NewMetricsHandler(promClient PrometheusClient, version DataApiVersion) *Met
 	}
 }
 
+func (mh *MetricsHandler) GetCompleteBlobSize(ctx context.Context, startTime int64, endTime int64) (*PrometheusResult, error) {
+	var result *PrometheusResult
+	var err error
+	if mh.version == V1 {
+		result, err = mh.promClient.QueryDisperserBlobSizeBytesPerSecond(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0))
+	} else {
+		result, err = mh.promClient.QueryDisperserBlobSizeBytesPerSecondV2(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0))
+	}
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (mh *MetricsHandler) GetAvgThroughput(ctx context.Context, startTime int64, endTime int64) (float64, error) {
 	var result *PrometheusResult
 	var err error

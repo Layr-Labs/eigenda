@@ -16,7 +16,7 @@ import (
 //	@Produce	json
 //	@Param		start	query		int	false	"Start unix timestamp [default: 1 hour ago]"
 //	@Param		end		query		int	false	"End unix timestamp [default: unix time now]"
-//	@Success	200		{object}	Metric
+//	@Success	200		{object}	MetricSummary
 //	@Failure	400		{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404		{object}	ErrorResponse	"error: Not found"
 //	@Failure	500		{object}	ErrorResponse	"error: Server error"
@@ -35,15 +35,21 @@ func (s *ServerV2) FetchMetricsSummary(c *gin.Context) {
 		end = now.Unix()
 	}
 
-	avgThroughput, err := s.metricsHandler.GetAvgThroughput(c.Request.Context(), start, end)
-	if err != nil {
+	result, err := s.metricsHandler.GetCompleteBlobSize(c.Request.Context(), start, end)
+	if err != nil || len(result.Values) == 0 {
 		s.metrics.IncrementFailedRequestNum("FetchMetricsSummary")
 		errorResponse(c, err)
 		return
 	}
 
+	size := len(result.Values)
+	totalBytes := result.Values[size-1].Value - result.Values[0].Value
+	timeDuration := result.Values[size-1].Timestamp.Sub(result.Values[0].Timestamp).Seconds()
 	metricSummary := &MetricSummary{
-		AvgThroughput: avgThroughput,
+		TotalBytesPosted:      uint64(totalBytes),
+		AverageBytesPerSecond: totalBytes / timeDuration,
+		StartTimestampSec:     result.Values[0].Timestamp.Unix(),
+		EndTimestampSec:       result.Values[size-1].Timestamp.Unix(),
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchMetricsSummary")
