@@ -18,6 +18,12 @@ import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 import "src/interfaces/IEigenDAStructs.sol";
 
+/**
+    TODO Add precursor checks using casted interfaces to ensure addreses actually map to what
+     *       the cert verifier expects! This is especially critical since rollups will be using
+     *       this for individual deployments in the future. This may not make sense to add until
+     *       EigenDA V2 contracts are deployed on mainnet.
+ */
 //forge script script/deploy/certverifier/CertVerifierDeployer.s.sol:CertVerifierDeployer --sig "run(string, string)" <config.json> <output.json> --rpc-url $RPC --private-key $PRIVATE_KEY -vvvv --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast
 contract CertVerifierDeployer is Script, Test {
 
@@ -35,10 +41,6 @@ contract CertVerifierDeployer is Script, Test {
 
 
     /**
-     * @TODO Add precursor checks using casted interfaces to ensure addreses actually map to what
-     *       the cert verifier expects! This is especially critical since rollups will be using
-     *       this for individual deployments in the future. This may not make sense to add until
-     *       EigenDA V2 contracts are deployed on mainnet.
      * @dev loads addreses from json env to deploy new EigenDACertVerifier contract
      * @param json json file used for extracting deployment address context
      * @param outputPath target destination for outputing deployment results
