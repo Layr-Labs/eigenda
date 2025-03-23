@@ -108,7 +108,7 @@ contract DeployVerifiable is Script {
     }
 
     function _logs() internal virtual {
-        console2.log("Deployment addresses:");
+        console2.log("Deployment addresses: ");
         console2.log("Deployment Initializer: ", address(deploymentInitializer));
         console2.log("Empty Contract Implementation", emptyContract);
         console2.log("Mock Stake Registry Implementation", mockStakeRegistry);
@@ -119,6 +119,7 @@ contract DeployVerifiable is Script {
         );
     }
 
+    /// @dev This function does the same tests that a verifier of the deployment should be doing after the deployment.
     function _doTests() internal {
         BeforeVerifiableDeploymentInitialization beforeTest = new BeforeVerifiableDeploymentInitialization();
         beforeTest.doBeforeInitializationTests(
