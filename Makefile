@@ -72,6 +72,12 @@ format:
 	@go fmt ./...
 	@golines --write-output --shorten-comments --max-len 120 .
 
+## calls --help on binary and routes output to file while ignoring dynamic fields specific
+## to indivdual builds (e.g, version)
+gen-static-help-output: eigenda-proxy
+	@echo "Storing binary output to docs/help_out.txt"
+	@./bin/eigenda-proxy --help | sed '/^VERSION:/ {N;d;}' > docs/help_out.txt
+
 go-gen-mocks:
 	@echo "generating go mocks..."
 	@GO111MODULE=on go generate --run "mockgen*" ./...

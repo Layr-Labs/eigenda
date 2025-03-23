@@ -37,6 +37,17 @@ jobs:
       - name: Run flag test
         run: ${{ github.workspace }}/scripts/test-proxy-startup-with-env-vars.sh
 
+  # This ensures that std output generated when running binary with `--help` is reflected in
+  # in docs/help_out.txt
+  help-output-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - run: make gen-static-help-output && git diff --exit-code
+
   unit-tests:
     runs-on: ubuntu-latest
     steps:
