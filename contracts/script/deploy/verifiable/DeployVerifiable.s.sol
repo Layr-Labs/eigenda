@@ -34,7 +34,7 @@ import {VersionedBlobParams} from "src/interfaces/IEigenDAStructs.sol";
 import {MockStakeRegistry} from "./mocks/MockStakeRegistry.sol";
 import {MockRegistryCoordinator} from "./mocks/MockRegistryCoordinator.sol";
 
-import {BeforeVerifiableDeploymentInitialization} from "./test/BeforeVerifiableDeploymentInitialization.t.sol";
+import {BeforeVerifiableDeploymentInitialization} from "./test/BeforeVerifiableDeploymentInitialization.s.sol";
 
 import {
     DeploymentInitializer,

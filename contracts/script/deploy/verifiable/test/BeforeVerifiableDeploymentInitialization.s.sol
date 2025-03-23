@@ -6,10 +6,6 @@ import {DeploymentInitializer, InitParamsLib} from "../DeploymentInitializer.sol
 import {ProxyAdmin, TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {IPauserRegistry} from
     "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
-
-import "forge-std/Test.sol";
-import "forge-std/StdJson.sol";
-
 import {MockStakeRegistry} from "../mocks/MockStakeRegistry.sol";
 import {MockRegistryCoordinator} from "../mocks/MockRegistryCoordinator.sol";
 import {EmptyContract} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
@@ -20,7 +16,15 @@ import {BLSApkRegistry} from "lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
 import {RegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 
-contract BeforeVerifiableDeploymentInitialization is Test {
+import "forge-std/Script.sol";
+import "forge-std/StdJson.sol";
+import "forge-std/Test.sol";
+
+
+/// @dev This script is used to test the state of the contracts after the deployment initializer is deployed.
+/// It is written as a script so that it does not run with this repo's test suite because of the dependency on env variables
+/// (May be integrated into the test suite in the future)
+contract BeforeVerifiableDeploymentInitialization is Script, Test {
     using InitParamsLib for string;
 
     string cfg;
@@ -29,8 +33,24 @@ contract BeforeVerifiableDeploymentInitialization is Test {
     address mockStakeRegistry;
     address mockRegistryCoordinator;
 
-    function setUp() external {
-        _initConfig();
+    function run() external virtual {
+        _initConfigEnv();
+        _testExpectedState();
+    }
+
+    function runWithConfig(
+        string memory _cfg,
+        DeploymentInitializer _deploymentInitializer,
+        address _emptyContract,
+        address _mockStakeRegistry,
+        address _mockRegistryCoordinator
+    ) external virtual {
+        cfg = _cfg;
+        deploymentInitializer = _deploymentInitializer;
+        emptyContract = _emptyContract;
+        mockStakeRegistry = _mockStakeRegistry;
+        mockRegistryCoordinator = _mockRegistryCoordinator;
+        _testExpectedState();
     }
 
     // For usage by the deployment script without needing to provide the deployment initializer in env.
@@ -46,39 +66,38 @@ contract BeforeVerifiableDeploymentInitialization is Test {
         emptyContract = _emptyContract;
         mockStakeRegistry = _mockStakeRegistry;
         mockRegistryCoordinator = _mockRegistryCoordinator;
-        _testExpectedState();
     }
 
     function _testExpectedState() internal view {
-        testProxyAdmin();
-        testInitialOwner();
-        testInitialPauseStatus();
-        testPauserRegistry();
-        testIndexRegistry();
-        testStakeRegistry();
-        testSocketRegistry();
-        testBlsApkRegistry();
-        testRegistryCoordinator();
-        testThresholdRegistry();
-        testRelayRegistry();
-        testPaymentVault();
-        testDisperserRegistry();
-        testServiceManager();
+        _testProxyAdmin();
+        _testInitialOwner();
+        _testInitialPauseStatus();
+        _testPauserRegistry();
+        _testIndexRegistry();
+        _testStakeRegistry();
+        _testSocketRegistry();
+        _testBlsApkRegistry();
+        _testRegistryCoordinator();
+        _testThresholdRegistry();
+        _testRelayRegistry();
+        _testPaymentVault();
+        _testDisperserRegistry();
+        _testServiceManager();
     }
 
-    function testProxyAdmin() public view {
+    function _testProxyAdmin() internal view {
         assertEq(deploymentInitializer.PROXY_ADMIN().owner(), address(deploymentInitializer));
     }
 
-    function testInitialOwner() public view {
+    function _testInitialOwner() internal view {
         assertEq(deploymentInitializer.INITIAL_OWNER(), cfg.initialOwner());
     }
 
-    function testInitialPauseStatus() public view {
+    function _testInitialPauseStatus() internal view {
         assertEq(deploymentInitializer.INITIAL_PAUSED_STATUS(), cfg.initialPausedStatus());
     }
 
-    function testPauserRegistry() public view {
+    function _testPauserRegistry() internal view {
         IPauserRegistry pauserRegistry = deploymentInitializer.PAUSER_REGISTRY();
         address[] memory pausers = cfg.pausers();
         for (uint256 i; i < pausers.length; i++) {
@@ -88,32 +107,32 @@ contract BeforeVerifiableDeploymentInitialization is Test {
         assertEq(pauserRegistry.unpauser(), cfg.unpauser());
     }
 
-    function testIndexRegistry() public view {
+    function _testIndexRegistry() internal view {
         assertTrue(_proxyHasImplementation(deploymentInitializer.INDEX_REGISTRY(), emptyContract));
         IndexRegistry impl = IndexRegistry(deploymentInitializer.INDEX_REGISTRY_IMPL());
         assertEq(impl.registryCoordinator(), deploymentInitializer.REGISTRY_COORDINATOR());
     }
 
-    function testStakeRegistry() public view {
+    function _testStakeRegistry() internal view {
         assertTrue(_proxyHasImplementation(deploymentInitializer.STAKE_REGISTRY(), mockStakeRegistry));
         StakeRegistry impl = StakeRegistry(deploymentInitializer.STAKE_REGISTRY_IMPL());
         assertEq(impl.registryCoordinator(), deploymentInitializer.REGISTRY_COORDINATOR());
         assertEq(address(impl.delegation()), cfg.delegationManager());
     }
 
-    function testSocketRegistry() public view {
+    function _testSocketRegistry() internal view {
         assertTrue(_proxyHasImplementation(deploymentInitializer.SOCKET_REGISTRY(), emptyContract));
         SocketRegistry impl = SocketRegistry(deploymentInitializer.SOCKET_REGISTRY_IMPL());
         assertEq(impl.registryCoordinator(), deploymentInitializer.REGISTRY_COORDINATOR());
     }
 
-    function testBlsApkRegistry() public view {
+    function _testBlsApkRegistry() internal view {
         assertTrue(_proxyHasImplementation(deploymentInitializer.BLS_APK_REGISTRY(), emptyContract));
         BLSApkRegistry impl = BLSApkRegistry(deploymentInitializer.BLS_APK_REGISTRY_IMPL());
         assertEq(impl.registryCoordinator(), deploymentInitializer.REGISTRY_COORDINATOR());
     }
 
-    function testRegistryCoordinator() public view {
+    function _testRegistryCoordinator() internal view {
         assertTrue(_proxyHasImplementation(deploymentInitializer.REGISTRY_COORDINATOR(), mockRegistryCoordinator));
         RegistryCoordinator impl = RegistryCoordinator(deploymentInitializer.REGISTRY_COORDINATOR_IMPL());
         assertEq(address(impl.serviceManager()), deploymentInitializer.SERVICE_MANAGER());
@@ -123,23 +142,23 @@ contract BeforeVerifiableDeploymentInitialization is Test {
         assertEq(address(impl.socketRegistry()), deploymentInitializer.SOCKET_REGISTRY());
     }
 
-    function testThresholdRegistry() public view {
+    function _testThresholdRegistry() internal view {
         assertTrue(_proxyHasImplementation(deploymentInitializer.THRESHOLD_REGISTRY(), emptyContract));
     }
 
-    function testRelayRegistry() public view {
+    function _testRelayRegistry() internal view {
         assertTrue(_proxyHasImplementation(deploymentInitializer.RELAY_REGISTRY(), emptyContract));
     }
 
-    function testPaymentVault() public view {
+    function _testPaymentVault() internal view {
         assertTrue(_proxyHasImplementation(deploymentInitializer.PAYMENT_VAULT(), emptyContract));
     }
 
-    function testDisperserRegistry() public view {
+    function _testDisperserRegistry() internal view {
         assertTrue(_proxyHasImplementation(deploymentInitializer.DISPERSER_REGISTRY(), emptyContract));
     }
 
-    function testServiceManager() public view {
+    function _testServiceManager() internal view {
         assertTrue(_proxyHasImplementation(deploymentInitializer.SERVICE_MANAGER(), emptyContract));
         EigenDAServiceManager impl = EigenDAServiceManager(deploymentInitializer.SERVICE_MANAGER_IMPL());
         assertEq(address(impl.avsDirectory()), cfg.avsDirectory());
@@ -160,7 +179,7 @@ contract BeforeVerifiableDeploymentInitialization is Test {
     }
 
     /// @dev override this if you don't want to use the environment
-    function _initConfig() internal virtual {
+    function _initConfigEnv() internal virtual {
         deploymentInitializer = DeploymentInitializer(vm.envAddress("DEPLOYMENT_INITIALIZER"));
         emptyContract = vm.envAddress("EMPTY_CONTRACT");
         mockStakeRegistry = vm.envAddress("MOCK_STAKE_REGISTRY");

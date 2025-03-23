@@ -47,11 +47,11 @@ jobs:
         working-directory: ./contracts
 
       - name: Run tests
-        run: forge test --no-match-path script/**/*.sol -vvv
+        run: forge test -vvv
         working-directory: ./contracts
 
       - name: Run snapshot
-        run: forge snapshot --no-match-path script/**/*.sol
+        run: forge snapshot
         working-directory: ./contracts
 
   binding-verify:
