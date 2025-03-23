@@ -553,7 +553,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		blobMetadataStore,
 		chainReader,
 		meterer,
-		auth.NewAuthenticator(),
+		auth.NewBlobRequestAuthenticator(),
 		prover,
 		10,
 		time.Hour,

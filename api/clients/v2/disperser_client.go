@@ -6,8 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/go-units"
-
 	"github.com/Layr-Labs/eigenda/api"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
@@ -15,6 +13,7 @@ import (
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/docker/go-units"
 	"google.golang.org/grpc"
 )
 
@@ -297,7 +296,9 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		return nil, fmt.Errorf("error getting signer's account ID: %w", err)
 	}
 
-	signature, err := c.signer.SignPaymentStateRequest()
+	timestamp := uint64(time.Now().UnixNano())
+
+	signature, err := c.signer.SignPaymentStateRequest(timestamp)
 	if err != nil {
 		return nil, fmt.Errorf("error signing payment state request: %w", err)
 	}
@@ -305,6 +306,7 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 	request := &disperser_rpc.GetPaymentStateRequest{
 		AccountId: accountID.Hex(),
 		Signature: signature,
+		Timestamp: timestamp,
 	}
 	return c.client.GetPaymentState(ctx, request)
 }

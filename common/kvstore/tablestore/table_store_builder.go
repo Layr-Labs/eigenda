@@ -11,7 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
 	"github.com/Layr-Labs/eigenda/common/kvstore/mapstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // The table ID reserved for the metadata table. The metadata table is used for internal bookkeeping.
@@ -51,7 +50,7 @@ func Start(logger logging.Logger, config *Config) (kvstore.TableStore, error) {
 		return nil, errors.New("config is required")
 	}
 
-	base, err := buildBaseStore(config.Type, logger, config.Path, config.MetricsRegistry)
+	base, err := buildBaseStore(config, logger)
 	if err != nil {
 		return nil, fmt.Errorf("error building base store: %w", err)
 	}
@@ -115,21 +114,24 @@ func start(
 
 // buildBaseStore creates a new base store of the given type.
 func buildBaseStore(
-	storeType StoreType,
-	logger logging.Logger,
-	path *string,
-	reg *prometheus.Registry) (kvstore.Store[[]byte], error) {
+	config *Config,
+	logger logging.Logger) (kvstore.Store[[]byte], error) {
 
-	switch storeType {
+	switch config.Type {
 	case LevelDB:
-		if path == nil {
+		if config.Path == nil {
 			return nil, errors.New("path is required for LevelDB store")
 		}
-		return leveldb.NewStore(logger, *path, reg)
+		return leveldb.NewStore(
+			logger,
+			*config.Path,
+			config.LevelDBDisableSeeksCompaction,
+			config.LevelDBSyncWrites,
+			config.MetricsRegistry)
 	case MapStore:
 		return mapstore.NewStore(), nil
 	default:
-		return nil, fmt.Errorf("unknown store type: %d", storeType)
+		return nil, fmt.Errorf("unknown store type: %d", config.Type)
 	}
 }
 
