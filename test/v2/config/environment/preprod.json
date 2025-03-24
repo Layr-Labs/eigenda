@@ -6,7 +6,7 @@
   "EthRPCURLs": [
     "https://ethereum-holesky-rpc.publicnode.com"
   ],
-  "BLSOperatorStateRetrieverAddr":          "0x93545e3b9013CcaBc31E80898fef7569a4024C0C",
+  "BLSOperatorStateRetrieverAddr":          "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7",
   "EigenDAServiceManagerAddr":              "0x54A03db2784E3D0aCC08344D05385d0b62d4F432",
   "EigenDACertVerifierAddressQuorums0_1":   "0xd973fA62E22BC2779F8489258F040C0344B03C21",
   "EigenDACertVerifierAddressQuorums0_1_2": "0xEA38b3bB0DE20E04CF052fD97137AdD3AE0aec1E",
