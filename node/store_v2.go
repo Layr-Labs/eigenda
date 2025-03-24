@@ -117,6 +117,7 @@ func (s *storeV2) storeBatchLevelDB(batch *corev2.Batch, rawBundles []*RawBundle
 	}
 
 	dbBatch.PutWithTTL(batchHeaderKey, batchHeaderBytes, s.ttl)
+	keys = append(keys, batchHeaderKey)
 	size += uint64(len(batchHeaderBytes))
 
 	// Store blob shards
