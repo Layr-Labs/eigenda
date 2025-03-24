@@ -38,6 +38,7 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 					DeprecatedFallbackTargetsFlagName, withDeprecatedEnvPrefix(envPrefix, "FALLBACK_TARGETS"),
 					FallbackTargetsFlagName, withEnvPrefix(envPrefix, "FALLBACK_TARGETS"))
 			},
+			Hidden: true,
 		},
 		&cli.StringSliceFlag{
 			Name:     DeprecatedCacheTargetsFlagName,
@@ -50,6 +51,7 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 					DeprecatedCacheTargetsFlagName, withDeprecatedEnvPrefix(envPrefix, "CACHE_TARGETS"),
 					CacheTargetsFlagName, withEnvPrefix(envPrefix, "CACHE_TARGETS"))
 			},
+			Hidden: true,
 		},
 		&cli.IntFlag{
 			Name:     DeprecatedConcurrentWriteThreads,
@@ -62,6 +64,7 @@ func DeprecatedCLIFlags(envPrefix, category string) []cli.Flag {
 					DeprecatedCacheTargetsFlagName, withDeprecatedEnvPrefix(envPrefix, "CONCURRENT_WRITE_THREADS"),
 					CacheTargetsFlagName, withEnvPrefix(envPrefix, "CONCURRENT_WRITE_THREADS"))
 			},
+			Hidden: true,
 		},
 	}
 }

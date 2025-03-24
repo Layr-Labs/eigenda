@@ -12,7 +12,6 @@ var (
 	AccessKeySecretFlagName = withFlagPrefix("access-key-secret") // #nosec G101
 	BucketFlagName          = withFlagPrefix("bucket")
 	PathFlagName            = withFlagPrefix("path")
-	TimeoutFlagName         = withFlagPrefix("timeout")
 )
 
 func withFlagPrefix(s string) string {
@@ -70,13 +69,6 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			EnvVars:  withEnvPrefix(envPrefix, "PATH"),
 			Category: category,
 		},
-		// &cli.DurationFlag{
-		// 	Name:     TimeoutFlagName,
-		// 	Usage:    "timeout for S3 storage operations (e.g. get, put)",
-		// 	Value:    5 * time.Second,
-		// 	EnvVars:  withEnvPrefix(envPrefix, "TIMEOUT"),
-		// 	Category: category,
-		// },
 	}
 }
 
@@ -89,6 +81,5 @@ func ReadConfig(ctx *cli.Context) Config {
 		AccessKeySecret: ctx.String(AccessKeySecretFlagName),
 		Bucket:          ctx.String(BucketFlagName),
 		Path:            ctx.String(PathFlagName),
-		// Timeout:         ctx.Duration(TimeoutFlagName),
 	}
 }

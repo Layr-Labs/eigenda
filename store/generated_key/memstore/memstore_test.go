@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
-	"github.com/Layr-Labs/eigenda-proxy/verify/v1"
+	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
@@ -30,25 +30,25 @@ func getDefaultMemStoreTestConfig() *memconfig.SafeConfig {
 	})
 }
 
-func getDefaultVerifierTestConfig() *verify.Config {
-	return &verify.Config{
-		VerifyCerts: false,
-		KzgConfig: &kzg.KzgConfig{
-			G1Path:          "../../../resources/g1.point",
-			G2PowerOf2Path:  "../../../resources/g2.point.powerOf2",
-			CacheDir:        "../../../resources/SRSTables",
-			SRSOrder:        3000,
-			SRSNumberToLoad: 3000,
-			NumWorker:       uint64(runtime.GOMAXPROCS(0)),
-		},
-	}
-}
-
 func TestGetSet(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	verifier, err := verify.NewVerifier(getDefaultVerifierTestConfig(), nil)
+	verifierConfig := &verify.Config{
+		VerifyCerts: false,
+	}
+
+	kzgConfig := kzg.KzgConfig{
+		G1Path:          "../../../resources/g1.point",
+		G2Path:          "../../../resources/g2.point",
+		G2TrailingPath:  "../../../resources/g2.trailing.point",
+		CacheDir:        "../../../resources/SRSTables",
+		SRSOrder:        3000,
+		SRSNumberToLoad: 3000,
+		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+	}
+
+	verifier, err := verify.NewVerifier(verifierConfig, kzgConfig, nil)
 	require.NoError(t, err)
 
 	ms, err := New(

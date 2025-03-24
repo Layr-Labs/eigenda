@@ -78,15 +78,15 @@ func TestOptimismClientWithKeccak256CommitmentV2(t *testing.T) {
 	testOptimismClientWithKeccak256Commitment(t, true)
 }
 
-func testOptimismClientWithKeccak256Commitment(t *testing.T, v2Enabled bool) {
+func testOptimismClientWithKeccak256Commitment(t *testing.T, disperseToV2 bool) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
 	testCfg.UseKeccak256ModeS3 = true
 
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
+
+	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
 
 	requireOPClientSetGet(t, ts, testutils.RandBytes(100), true)
@@ -104,14 +104,12 @@ func TestOptimismClientWithGenericCommitmentV2(t *testing.T) {
 this test asserts that the data can be posted/read to EigenDA
 with a concurrent S3 backend configured
 */
-func testOptimismClientWithGenericCommitment(t *testing.T, v2Enabled bool) {
+func testOptimismClientWithGenericCommitment(t *testing.T, disperseToV2 bool) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
-
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
 
 	requireOPClientSetGet(t, ts, testutils.RandBytes(100), false)
@@ -129,14 +127,13 @@ func TestProxyClientServerIntegrationV2(t *testing.T) {
 // TestProxyClientServerIntegration tests the proxy client and server integration by setting the data as a single byte,
 // many unicode characters, single unicode character and an empty preimage. It then tries to get the data from the
 // proxy server with empty byte, single byte and random string.
-func testProxyClientServerIntegration(t *testing.T, v2Enabled bool) {
+func testProxyClientServerIntegration(t *testing.T, disperseToV2 bool) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
-
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
+
+	ts, kill := testutils.CreateTestSuite(tsConfig)
 	t.Cleanup(kill)
 
 	cfg := &standard_client.Config{
@@ -211,14 +208,13 @@ func TestProxyClientV2(t *testing.T) {
 	testProxyClient(t, true)
 }
 
-func testProxyClient(t *testing.T, v2Enabled bool) {
+func testProxyClient(t *testing.T, disperseToV2 bool) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
-
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
+
+	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
 
 	cfg := &standard_client.Config{
@@ -246,39 +242,15 @@ func TestProxyClientWriteReadV2(t *testing.T) {
 	testProxyClientWriteRead(t, true)
 }
 
-func testProxyClientWriteRead(t *testing.T, v2Enabled bool) {
+func testProxyClientWriteRead(t *testing.T, disperseToV2 bool) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
-
+	testCfg := testutils.NewTestConfig(testutils.MemstoreBackend, disperseToV2)
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
 
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(100))
-	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
-}
-
-func TestProxyWithMaximumSizedBlobV1(t *testing.T) {
-	testProxyWithMaximumSizedBlob(t, false)
-}
-
-func TestProxyWithMaximumSizedBlobV2(t *testing.T) {
-	testProxyWithMaximumSizedBlob(t, true)
-}
-
-func testProxyWithMaximumSizedBlob(t *testing.T, v2Enabled bool) {
-	t.Parallel()
-
-	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
-
-	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
-	defer kill()
-
-	requireStandardClientSetGet(t, ts, testutils.RandBytes(16_000_000))
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
 }
 
@@ -293,15 +265,14 @@ func TestProxyCachingV2(t *testing.T) {
 /*
 Ensure that proxy is able to write/read from a cache backend when enabled
 */
-func testProxyCaching(t *testing.T, v2Enabled bool) {
+func testProxyCaching(t *testing.T, disperseToV2 bool) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
 	testCfg.UseS3Caching = true
 
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
 
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(1_000_000))
@@ -317,15 +288,14 @@ func TestProxyCachingWithRedisV2(t *testing.T) {
 	testProxyCachingWithRedis(t, true)
 }
 
-func testProxyCachingWithRedis(t *testing.T, v2Enabled bool) {
+func testProxyCachingWithRedis(t *testing.T, disperseToV2 bool) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
 	testCfg.UseRedisCaching = true
 
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
 
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(1_000_000))
@@ -346,17 +316,16 @@ Ensure that fallback location is read from when EigenDA blob is not available.
 This is done by setting the memstore expiration time to 1ms and waiting for the blob to expire
 before attempting to read it.
 */
-func testProxyReadFallback(t *testing.T, v2Enabled bool) {
+func testProxyReadFallback(t *testing.T, disperseToV2 bool) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
 	testCfg.UseS3Fallback = true
 	// ensure that blob memstore eviction times result in near immediate activation
 	testCfg.Expiration = time.Millisecond * 1
 
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
 
 	cfg := &standard_client.Config{
@@ -387,18 +356,18 @@ func TestProxyMemConfigClientCanGetAndPatchV2(t *testing.T) {
 	testProxyMemConfigClientCanGetAndPatch(t, true)
 }
 
-func testProxyMemConfigClientCanGetAndPatch(t *testing.T, v2Enabled bool) {
+func testProxyMemConfigClientCanGetAndPatch(t *testing.T, disperseToV2 bool) {
 	t.Parallel()
 
-	useMemstore := testutils.UseMemstore()
+	useMemstore := testutils.GetBackend() == testutils.MemstoreBackend
 	if !useMemstore {
 		t.Skip("test can't be run against holesky since read failure case can't be manually triggered")
 	}
 
-	testCfg := testutils.NewTestConfig(useMemstore, v2Enabled)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
+
+	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
 
 	memClient := memconfig_client.New(

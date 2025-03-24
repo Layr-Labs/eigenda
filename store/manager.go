@@ -39,11 +39,11 @@ func NewManager(
 	s3 common.PrecomputedKeyStore,
 	l logging.Logger,
 	secondary ISecondary,
-	useV2 bool,
+	disperseToV2 bool,
 ) (*Manager, error) {
 	// 1 - Determine where to disperse blobs
 	var writeV2 = true
-	if eigenda != nil && !useV2 {
+	if eigenda != nil && !disperseToV2 {
 		writeV2 = false
 	}
 

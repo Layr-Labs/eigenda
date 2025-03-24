@@ -29,15 +29,14 @@ func TestOpClientKeccak256MalformedInputsV2(t *testing.T) {
 
 // TestOpClientKeccak256MalformedInputs tests the NewDAClient from altda by setting and getting against []byte("")
 // preimage. It sets the precompute option to false on the NewDAClient.
-func testOpClientKeccak256MalformedInputs(t *testing.T, v2Enabled bool) {
+func testOpClientKeccak256MalformedInputs(t *testing.T, disperseToV2 bool) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
 
 	testCfg.UseKeccak256ModeS3 = true
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
 
 	// nil commitment. Should return an error but currently is not. This needs to be fixed by OP
@@ -85,15 +84,13 @@ func TestProxyClientMalformedInputCasesV2(t *testing.T) {
 }
 
 // TestProxyClientMalformedInputCases tests the proxy client and server integration by setting the data as a single
-// byte,
-// many unicode characters, single unicode character and an empty preimage. It then tries to get the data from the
+// byte, many unicode characters, single unicode character and an empty preimage. It then tries to get the data from the
 // proxy server with empty byte, single byte and random string.
-func testProxyClientMalformedInputCases(t *testing.T, v2Enabled bool) {
-	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
+func testProxyClientMalformedInputCases(t *testing.T, disperseToV2 bool) {
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
 
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
 
 	cfg := &standard_client.Config{
@@ -170,16 +167,16 @@ func TestKeccak256CommitmentRequestErrorsWhenS3NotSetV2(t *testing.T) {
 
 // TestKeccak256CommitmentRequestErrorsWhenS3NotSet ensures that the proxy returns a client error in the event
 // that an OP Keccak commitment mode is provided when S3 is non-configured server side
-func testKeccak256CommitmentRequestErrorsWhenS3NotSet(t *testing.T, v2Enabled bool) {
+func testKeccak256CommitmentRequestErrorsWhenS3NotSet(t *testing.T, disperseToV2 bool) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
 	testCfg.UseKeccak256ModeS3 = true
 
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 	tsConfig.EigenDAConfig.StorageConfig.S3Config.Endpoint = "localhost:1234"
-	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
+
+	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
 
 	daClient := altda.NewDAClient(ts.Address(), false, true)
@@ -199,14 +196,13 @@ func TestOversizedBlobRequestErrorsV2(t *testing.T) {
 	testOversizedBlobRequestErrors(t, true)
 }
 
-func testOversizedBlobRequestErrors(t *testing.T, v2Enabled bool) {
+func testOversizedBlobRequestErrors(t *testing.T, disperseToV2 bool) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.UseMemstore(), v2Enabled)
-
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
+
+	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
 
 	cfg := &standard_client.Config{

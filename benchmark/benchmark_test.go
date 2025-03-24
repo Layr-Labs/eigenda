@@ -14,14 +14,14 @@ import (
 // BenchmarkPutsWithSecondaryV1  ... Takes in an async worker count and profiles blob insertions using
 // constant blob sizes in parallel. Exercises V1 code pathways
 func BenchmarkPutsWithSecondaryV1(b *testing.B) {
-	testCfg := testutils.NewTestConfig(true, false)
+	testCfg := testutils.NewTestConfig(testutils.MemstoreBackend, false)
 	putsWithSecondary(b, testCfg)
 }
 
 // BenchmarkPutsWithSecondaryV2  ... Takes in an async worker count and profiles blob insertions using
 // constant blob sizes in parallel. Exercises V2 code pathways
 func BenchmarkPutsWithSecondaryV2(b *testing.B) {
-	testCfg := testutils.NewTestConfig(true, true)
+	testCfg := testutils.NewTestConfig(testutils.MemstoreBackend, true)
 	putsWithSecondary(b, testCfg)
 }
 
@@ -35,8 +35,7 @@ func putsWithSecondary(b *testing.B, testCfg testutils.TestConfig) {
 	testCfg.WriteThreadCount = threadInt
 
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	tsSecretConfig := testutils.TestSuiteSecretConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig, tsSecretConfig)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
 
 	cfg := &standard_client.Config{

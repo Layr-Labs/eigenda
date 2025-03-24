@@ -17,23 +17,10 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-type Config struct {
-	// cert verifier address used for verifying DA certificates
-	// TODO: Support dynamic client injection https://github.com/Layr-Labs/eigenda-proxy/issues/307
-	CertVerifierAddress string
-
-	// maximum allowed blob size for dispersal. this is irrespective of the disperser's limits and could result in
-	// failed payload submissions if set incorrectly
-	MaxBlobSizeBytes uint64
-
-	// number of times to retry an eigenda blob dispersal before yielding an error to the handler
-	PutRetries uint
-}
-
 // Store does storage interactions and verifications for blobs with the EigenDA V2 protocol.
 type Store struct {
-	cfg Config
-	log logging.Logger
+	putRetries uint
+	log        logging.Logger
 
 	disperser *payloaddispersal.PayloadDisperser
 	retriever clients.PayloadRetriever
@@ -44,17 +31,17 @@ var _ common.GeneratedKeyStore = (*Store)(nil)
 
 func NewStore(
 	log logging.Logger,
-	cfg Config,
+	putRetries uint,
 	disperser *payloaddispersal.PayloadDisperser,
 	retriever clients.PayloadRetriever,
 	verifier clients.ICertVerifier,
 ) (*Store, error) {
 	return &Store{
-		log:       log,
-		cfg:       cfg,
-		disperser: disperser,
-		retriever: retriever,
-		verifier:  verifier,
+		log:        log,
+		putRetries: putRetries,
+		disperser:  disperser,
+		retriever:  retriever,
+		verifier:   verifier,
 	}, nil
 }
 
@@ -116,7 +103,7 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 		// only return the last error. If it is an api.ErrorFailover, then the handler will convert
 		// it to an http 503 to signify to the client (batcher) to failover to ethda b/c eigenda is temporarily down.
 		retry.LastErrorOnly(true),
-		retry.Attempts(e.cfg.PutRetries),
+		retry.Attempts(e.putRetries),
 	)
 	if err != nil {
 		// TODO: we will want to filter for errors here and return a 503 when needed, i.e. when dispersal itself failed,
@@ -138,7 +125,7 @@ func (e Store) BackendType() common.BackendType {
 // this Verify method only needs to check the cert on chain. That is why the third parameter is ignored.
 func (e Store) Verify(ctx context.Context, certBytes []byte, _ []byte) error {
 	var eigenDACert coretypes.EigenDACert
-	err := rlp.DecodeBytes(certBytes, eigenDACert)
+	err := rlp.DecodeBytes(certBytes, &eigenDACert)
 	if err != nil {
 		return fmt.Errorf("RLP decoding EigenDA v2 cert: %w", err)
 	}

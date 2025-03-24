@@ -2,22 +2,22 @@ package config
 
 import (
 	"github.com/Layr-Labs/eigenda-proxy/config/eigendaflags"
-	eigenda_v2_flags "github.com/Layr-Labs/eigenda-proxy/config/eigendaflags/v2"
+	eigenda_v2_flags "github.com/Layr-Labs/eigenda-proxy/config/v2/eigendaflags"
 	"github.com/Layr-Labs/eigenda-proxy/store"
+	"github.com/Layr-Labs/eigenda-proxy/verify"
 
 	"github.com/Layr-Labs/eigenda-proxy/logging"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore"
 	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/redis"
 	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/s3"
-	"github.com/Layr-Labs/eigenda-proxy/verify/v1"
 	"github.com/urfave/cli/v2"
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
 )
 
 const (
-	EigenDAClientCategory   = "EigenDA Client"
+	EigenDAClientCategory   = "EigenDA V1 Client"
 	EigenDAV2ClientCategory = "EigenDA V2 Client"
 	LoggingFlagsCategory    = "Logging"
 	MetricsFlagCategory     = "Metrics"
@@ -25,7 +25,8 @@ const (
 	StorageFlagsCategory    = "Storage"
 	RedisCategory           = "Redis Cache/Fallback"
 	S3Category              = "S3 Cache/Fallback"
-	VerifierCategory        = "KZG and Cert Verifier"
+	VerifierCategory        = "Cert Verifier (V1 only)"
+	KZGCategory             = "KZG"
 )
 
 const (
@@ -66,5 +67,10 @@ func init() {
 	Flags = append(Flags, redis.CLIFlags(common.GlobalPrefix, RedisCategory)...)
 	Flags = append(Flags, s3.CLIFlags(common.GlobalPrefix, S3Category)...)
 	Flags = append(Flags, memstore.CLIFlags(common.GlobalPrefix, MemstoreFlagsCategory)...)
-	Flags = append(Flags, verify.CLIFlags(common.GlobalPrefix, VerifierCategory)...)
+	Flags = append(Flags, verify.VerifierCLIFlags(common.GlobalPrefix, VerifierCategory)...)
+	Flags = append(Flags, verify.KZGCLIFlags(common.GlobalPrefix, KZGCategory)...)
+
+	Flags = append(Flags, eigendaflags.DeprecatedCLIFlags(common.GlobalPrefix, EigenDAClientCategory)...)
+	Flags = append(Flags, verify.DeprecatedCLIFlags(common.GlobalPrefix, VerifierCategory)...)
+	Flags = append(Flags, store.DeprecatedCLIFlags(common.GlobalPrefix, StorageFlagsCategory)...)
 }

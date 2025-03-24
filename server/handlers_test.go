@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/config"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/mocks"
 	"github.com/Layr-Labs/eigenda/api"
@@ -26,7 +27,7 @@ import (
 
 var (
 	testLogger = logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{})
-	testCfg    = Config{
+	testCfg    = config.ServerConfig{
 		Host: "localhost",
 		Port: 0,
 	}

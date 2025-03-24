@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
+	"github.com/Layr-Labs/eigenda-proxy/config"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/store"
+	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
 )
@@ -21,14 +23,8 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
-const (
-	Put = "put"
-
-	CommitmentModeKey = "commitment_mode"
-)
-
 type Server struct {
-	cfg        Config
+	cfg        config.ServerConfig
 	log        logging.Logger
 	endpoint   string
 	sm         store.IManager
@@ -38,7 +34,7 @@ type Server struct {
 }
 
 func NewServer(
-	cfg Config,
+	cfg config.ServerConfig,
 	sm store.IManager,
 	log logging.Logger,
 	m metrics.Metricer,
@@ -57,6 +53,46 @@ func NewServer(
 			WriteTimeout: 40 * time.Minute,
 		},
 	}
+}
+
+// BuildAndStartProxyServer constructs a new proxy server, and starts it
+func BuildAndStartProxyServer(
+	ctx context.Context,
+	logger logging.Logger,
+	metrics metrics.Metricer,
+	appConfig config.AppConfig,
+) (*Server, error) {
+	storageManager, err := store.NewStorageManagerBuilder(
+		ctx,
+		logger,
+		metrics,
+		appConfig.EigenDAConfig.StorageConfig,
+		appConfig.EigenDAConfig.MemstoreConfig,
+		appConfig.EigenDAConfig.MemstoreEnabled,
+		appConfig.EigenDAConfig.KzgConfig,
+		appConfig.EigenDAConfig.ClientConfigV1,
+		appConfig.EigenDAConfig.VerifierConfigV1,
+		appConfig.EigenDAConfig.ClientConfigV2,
+		appConfig.SecretConfig,
+	).Build(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create store: %w", err)
+	}
+
+	proxyServer := NewServer(appConfig.EigenDAConfig.ServerConfig, storageManager, logger, metrics)
+	router := mux.NewRouter()
+	proxyServer.RegisterRoutes(router)
+	if appConfig.EigenDAConfig.MemstoreEnabled {
+		memconfig.NewHandlerHTTP(logger, appConfig.EigenDAConfig.MemstoreConfig).RegisterMemstoreConfigHandlers(router)
+	}
+
+	if err := proxyServer.Start(router); err != nil {
+		return nil, fmt.Errorf("failed to start the DA server: %w", err)
+	}
+
+	logger.Info("Started EigenDA proxy server")
+
+	return proxyServer, nil
 }
 
 func (svr *Server) Start(r *mux.Router) error {
