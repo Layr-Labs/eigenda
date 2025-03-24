@@ -118,15 +118,15 @@ type (
 		Batches []*BatchInfo `json:"batches"`
 	}
 
-	OperatorBatch struct {
+	OperatorDispersal struct {
 		BatchHeaderHash string              `json:"batch_header_hash"`
 		BatchHeader     *corev2.BatchHeader `json:"batch_header"`
 		DispersedAt     uint64
 	}
-	OperatorBatchFeedResponse struct {
-		OperatorIdentity OperatorIdentity `json:"operator_identity"`
-		OperatorSocket   string           `json:"operator_socket"`
-		Batches          []*OperatorBatch `json:"batches"`
+	OperatorDispersalFeedResponse struct {
+		OperatorIdentity OperatorIdentity     `json:"operator_identity"`
+		OperatorSocket   string               `json:"operator_socket"`
+		Dispersals       []*OperatorDispersal `json:"dispersals"`
 	}
 
 	MetricSummary struct {
@@ -164,9 +164,9 @@ type (
 		StakeRankedOperators map[string][]*OperatorStake `json:"stake_ranked_operators"`
 	}
 
-	// Operators' responses for a batch
-	OperatorDispersalResponses struct {
-		Responses []*corev2.DispersalResponse `json:"operator_dispersal_responses"`
+	// Operator's response for a batch
+	OperatorDispersalResponse struct {
+		Response *corev2.DispersalResponse `json:"operator_dispersal_response"`
 	}
 
 	OperatorLivenessResponse struct {
@@ -311,16 +311,16 @@ func (s *ServerV2) Start() error {
 		batches := v2.Group("/batches")
 		{
 			batches.GET("/feed", s.FetchBatchFeed)
-			batches.GET("/feed/:operator_id", s.FetchOperatorBatchFeed)
 			batches.GET("/:batch_header_hash", s.FetchBatch)
 		}
 		operators := v2.Group("/operators")
 		{
+			operators.GET("/:operator_id/dispersals", s.FetchOperatorDispersalFeed)
+			operators.GET("/:operator_id/dispersals/:batch_header_hash/response", s.FetchOperatorDispersalResponse)
 			operators.GET("/signing-info", s.FetchOperatorSigningInfo)
 			operators.GET("/stake", s.FetchOperatorsStake)
 			operators.GET("/node-info", s.FetchOperatorsNodeInfo)
 			operators.GET("/liveness", s.CheckOperatorsLiveness)
-			operators.GET("/response/:batch_header_hash", s.FetchOperatorsResponses)
 		}
 		metrics := v2.Group("/metrics")
 		{

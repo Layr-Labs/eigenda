@@ -48,10 +48,10 @@ type DispersalServerV2 struct {
 	blobMetadataStore *blobstore.BlobMetadataStore
 	meterer           *meterer.Meterer
 
-	chainReader   core.Reader
-	authenticator corev2.BlobRequestAuthenticator
-	prover        encoding.Prover
-	logger        logging.Logger
+	chainReader              core.Reader
+	blobRequestAuthenticator corev2.BlobRequestAuthenticator
+	prover                   encoding.Prover
+	logger                   logging.Logger
 
 	// state
 	onchainState                atomic.Pointer[OnchainState]
@@ -69,7 +69,7 @@ func NewDispersalServerV2(
 	blobMetadataStore *blobstore.BlobMetadataStore,
 	chainReader core.Reader,
 	meterer *meterer.Meterer,
-	authenticator corev2.BlobRequestAuthenticator,
+	blobRequestAuthenticator corev2.BlobRequestAuthenticator,
 	prover encoding.Prover,
 	maxNumSymbolsPerBlob uint64,
 	onchainStateRefreshInterval time.Duration,
@@ -89,8 +89,8 @@ func NewDispersalServerV2(
 	if chainReader == nil {
 		return nil, errors.New("chain reader is required")
 	}
-	if authenticator == nil {
-		return nil, errors.New("authenticator is required")
+	if blobRequestAuthenticator == nil {
+		return nil, errors.New("blobRequestAuthenticator is required")
 	}
 	if prover == nil {
 		return nil, errors.New("prover is required")
@@ -109,11 +109,11 @@ func NewDispersalServerV2(
 		blobStore:         blobStore,
 		blobMetadataStore: blobMetadataStore,
 
-		chainReader:   chainReader,
-		authenticator: authenticator,
-		meterer:       meterer,
-		prover:        prover,
-		logger:        logger,
+		chainReader:              chainReader,
+		blobRequestAuthenticator: blobRequestAuthenticator,
+		meterer:                  meterer,
+		prover:                   prover,
+		logger:                   logger,
 
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
@@ -187,12 +187,13 @@ func (s *DispersalServerV2) GetBlobCommitment(ctx context.Context, req *pb.BlobC
 	if s.prover == nil {
 		return nil, api.NewErrorUnimplemented()
 	}
-	blobSize := len(req.GetBlob())
+	blobSize := uint(len(req.GetBlob()))
 	if blobSize == 0 {
 		return nil, api.NewErrorInvalidArg("data is empty")
 	}
-	if uint64(blobSize) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("blob size cannot exceed %v bytes", s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL))
+	if uint64(encoding.GetBlobLengthPowerOf2(blobSize)) > s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("blob size cannot exceed %v bytes",
+			s.maxNumSymbolsPerBlob*encoding.BYTES_PER_SYMBOL))
 	}
 	c, err := s.prover.GetCommitmentsForPaddedLength(req.GetBlob())
 	if err != nil {
@@ -280,7 +281,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	accountID := gethcommon.HexToAddress(req.AccountId)
 
 	// validate the signature
-	if err := s.authenticator.AuthenticatePaymentStateRequest(req.GetSignature(), accountID); err != nil {
+	if err := s.blobRequestAuthenticator.AuthenticatePaymentStateRequest(accountID, req); err != nil {
 		s.logger.Debug("failed to validate signature", "err", err, "accountID", accountID)
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}

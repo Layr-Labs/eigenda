@@ -147,7 +147,7 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 	oldItem, err := s.dynamoClient.PutItemWithConditionAndReturn(ctx, s.onDemandTableName, item, conditionExpression, nil, expressionValues)
 	if err != nil {
 		if errors.Is(err, commondynamodb.ErrConditionFailed) {
-			return nil, fmt.Errorf("insufficient cumulative payment increment")
+			return nil, fmt.Errorf("insufficient cumulative payment increment: %w", err)
 		}
 		return nil, fmt.Errorf("failed to add on-demand payment: %w", err)
 	}

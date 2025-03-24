@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/gin-gonic/gin"
@@ -95,98 +94,6 @@ func ParseFeedParams(c *gin.Context, metrics *dataapi.Metrics, handlerName strin
 	params.limit = limit
 
 	return params, nil
-}
-
-// FetchOperatorBatchFeed godoc
-//
-//	@Summary	Fetch batch feed dispersed to an operator in specified direction
-//	@Tags		Batches
-//	@Produce	json
-//	@Param		operator_id path		string	true	"The operator ID to fetch batch feed for"
-//	@Param		direction	query		string	false	"Direction to fetch: 'forward' (oldest to newest, ASC order) or 'backward' (newest to oldest, DESC order) [default: forward]"
-//	@Param		before		query		string	false	"Fetch batches before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]"
-//	@Param		after		query		string	false	"Fetch batches after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than `before` [default: `before`-1h]"
-//	@Param		limit		query		int		false	"Maximum number of batches to return; if limit <= 0 or >1000, it's treated as 1000 [default: 20; max: 1000]"
-//	@Success	200			{object}	BatchFeedResponse
-//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404			{object}	ErrorResponse	"error: Not found"
-//	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/batches/feed/{operator_id} [get]
-func (s *ServerV2) FetchOperatorBatchFeed(c *gin.Context) {
-	handlerStart := time.Now()
-	var err error
-
-	params, err := ParseFeedParams(c, s.metrics, "FetchOperatorBatchFeed")
-	if err != nil {
-		invalidParamsErrorResponse(c, err)
-		return
-	}
-
-	operatorId, err := core.OperatorIDFromHex(c.Param("operator_id"))
-	if err != nil {
-		s.metrics.IncrementInvalidArgRequestNum("FetchOperatorBatchFeed")
-		errorResponse(c, errors.New("invalid operator id"))
-		return
-	}
-
-	var dispersals []*corev2.DispersalRequest
-
-	if params.direction == "forward" {
-		dispersals, err = s.blobMetadataStore.GetDispersalRequestByDispersedAt(
-			c.Request.Context(),
-			operatorId,
-			uint64(params.afterTime.UnixNano()),
-			uint64(params.beforeTime.UnixNano()),
-			params.limit,
-			true, // ascending=true
-		)
-	} else {
-		dispersals, err = s.blobMetadataStore.GetDispersalRequestByDispersedAt(
-			c.Request.Context(),
-			operatorId,
-			uint64(params.afterTime.UnixNano()),
-			uint64(params.beforeTime.UnixNano()),
-			params.limit,
-			false, // ascending=false
-		)
-	}
-
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchOperatorBatchFeed")
-		errorResponse(c, fmt.Errorf("failed to fetch dispersals from blob metadata store: %w", err))
-		return
-	}
-
-	batches := make([]*OperatorBatch, len(dispersals))
-	for i, d := range dispersals {
-		batchHeaderHash, err := d.BatchHeader.Hash()
-		if err != nil {
-			s.metrics.IncrementFailedRequestNum("FetchOperatorBatchFeed")
-			errorResponse(c, fmt.Errorf("failed to compute batch header hash from batch header: %w", err))
-			return
-		}
-		batches[i] = &OperatorBatch{
-			BatchHeaderHash: hex.EncodeToString(batchHeaderHash[:]),
-			BatchHeader:     &d.BatchHeader,
-			DispersedAt:     d.DispersedAt,
-		}
-	}
-
-	response := &OperatorBatchFeedResponse{
-		OperatorIdentity: OperatorIdentity{
-			OperatorId: operatorId.Hex(),
-		},
-		Batches: batches,
-	}
-	if len(batches) > 0 {
-		response.OperatorSocket = dispersals[0].Socket
-		response.OperatorIdentity.OperatorAddress = dispersals[0].OperatorAddress.Hex()
-	}
-
-	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorBatchFeed")
-	s.metrics.ObserveLatency("FetchOperatorBatchFeed", time.Since(handlerStart))
-	c.JSON(http.StatusOK, response)
-
 }
 
 // FetchBatchFeed godoc

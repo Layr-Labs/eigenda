@@ -897,7 +897,7 @@ func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
 			OperatorDispersalIndexName,
 			"OperatorID = :pk AND DispersedAt BETWEEN :start AND :end",
 			commondynamodb.ExpressionValues{
-				":pk":    &types.AttributeValueMemberS{Value: operatorId.Hex()},
+				":pk":    &types.AttributeValueMemberS{Value: dispersalRequestSKPrefix + operatorId.Hex()},
 				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedStart), 10)},
 				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedEnd), 10)},
 			},
@@ -1584,7 +1584,15 @@ func UnmarshalOperatorID(item commondynamodb.Item) (*core.OperatorID, error) {
 		return nil, err
 	}
 
-	operatorID, err := core.OperatorIDFromHex(obj.OperatorID)
+	// Remove prefix if it exists
+	operatorIDStr := obj.OperatorID
+	if strings.HasPrefix(operatorIDStr, dispersalRequestSKPrefix) {
+		operatorIDStr = strings.TrimPrefix(operatorIDStr, dispersalRequestSKPrefix)
+	} else if strings.HasPrefix(operatorIDStr, dispersalResponseSKPrefix) {
+		operatorIDStr = strings.TrimPrefix(operatorIDStr, dispersalResponseSKPrefix)
+	}
+
+	operatorID, err := core.OperatorIDFromHex(operatorIDStr)
 	if err != nil {
 		return nil, err
 	}
@@ -1606,7 +1614,7 @@ func MarshalDispersalRequest(req *corev2.DispersalRequest) (commondynamodb.Item,
 
 	fields["PK"] = &types.AttributeValueMemberS{Value: dispersalKeyPrefix + hashstr}
 	fields["SK"] = &types.AttributeValueMemberS{Value: fmt.Sprintf("%s%s", dispersalRequestSKPrefix, req.OperatorID.Hex())}
-	fields["OperatorID"] = &types.AttributeValueMemberS{Value: req.OperatorID.Hex()}
+	fields["OperatorID"] = &types.AttributeValueMemberS{Value: fmt.Sprintf("%s%s", dispersalRequestSKPrefix, req.OperatorID.Hex())}
 
 	return fields, nil
 }
@@ -1641,7 +1649,7 @@ func MarshalDispersalResponse(res *corev2.DispersalResponse) (commondynamodb.Ite
 
 	fields["PK"] = &types.AttributeValueMemberS{Value: dispersalKeyPrefix + hashstr}
 	fields["SK"] = &types.AttributeValueMemberS{Value: fmt.Sprintf("%s%s", dispersalResponseSKPrefix, res.OperatorID.Hex())}
-	fields["OperatorID"] = &types.AttributeValueMemberS{Value: res.OperatorID.Hex()}
+	fields["OperatorID"] = &types.AttributeValueMemberS{Value: fmt.Sprintf("%s%s", dispersalResponseSKPrefix, res.OperatorID.Hex())}
 
 	return fields, nil
 }

@@ -209,7 +209,7 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		return nil, fmt.Errorf("invalid blob version %d; valid blob versions are: %v", blobHeaderProto.GetVersion(), onchainState.BlobVersionParameters.Keys())
 	}
 
-	if err = s.authenticator.AuthenticateBlobRequest(blobHeader, signature); err != nil {
+	if err = s.blobRequestAuthenticator.AuthenticateBlobRequest(blobHeader, signature); err != nil {
 		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
 
