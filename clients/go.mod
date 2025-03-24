@@ -63,3 +63,12 @@ require (
 	golang.org/x/sys v0.28.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// See https://go.dev/ref/mod#go-mod-file-retract for more information about the retract directive.
+retract (
+	// We published a `clients/v1.0.1` tag by mistake, which got picked up by pkg.go.dev, and now
+	// the latest version of the docs (pointed to in our README) leads to https://pkg.go.dev/github.com/Layr-Labs/eigenda-proxy/clients@v1.0.1/standard_client.
+	// This directive retracts that version, such that the docs (and go commands) no longer point to this version (at this point v0.2.0 is the latest).
+	// Once we reach semver v1.0.1, we can possibly remove this retract directive (??), or just skip this number and go to v1.0.2.
+    v1.0.1
+)
