@@ -157,8 +157,8 @@ func runBenchmark(write writer, read reader) {
 	// manually track expiration to maintain the unexpiredData map, which is needed by the reader threads.
 	expirationQueue := linkedlistqueue.New()
 
-	maxTrackedValueCount := uint64(1_000_000)
-	trackedValueCount := atomic.Uint64{}
+	maxTrackedValueCount := int64(1_000_000)
+	trackedValueCount := atomic.Int64{}
 
 	// Each write is assigned a serial number, used for debugging
 	nextSerialNumber := atomic.Uint64{}
