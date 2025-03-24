@@ -334,6 +334,10 @@ func (s *BlobMetadataStore) queryBucketBlobMetadata(
 ) ([]*v2.BlobMetadata, error) {
 	var lastEvaledKey map[string]types.AttributeValue
 	for {
+		remaining := math.MaxInt
+		if limit > 0 {
+			remaining = limit - len(result)
+		}
 		res, err := s.dynamoDBClient.QueryIndexWithPagination(
 			ctx,
 			s.tableName,
@@ -344,7 +348,7 @@ func (s *BlobMetadataStore) queryBucketBlobMetadata(
 				":start": &types.AttributeValueMemberS{Value: startKey},
 				":end":   &types.AttributeValueMemberS{Value: endKey},
 			},
-			0, // no limit within a bucket
+			remaining,
 			lastEvaledKey,
 			ascending,
 		)
@@ -505,7 +509,7 @@ func (s *BlobMetadataStore) queryBucketAttestation(
 				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(start), 10)},
 				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(end), 10)},
 			},
-			0, // no limit within a bucket
+			numToReturn,
 			lastEvaledKey,
 			ascending,
 		)
@@ -891,6 +895,10 @@ func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
 	// This needs to be processed in a loop because DynamoDb has a limit on the response
 	// size of a query (1MB) and we may have more data than that.
 	for {
+		remaining := math.MaxInt
+		if limit > 0 {
+			remaining = limit - len(result)
+		}
 		res, err := s.dynamoDBClient.QueryIndexWithPagination(
 			ctx,
 			s.tableName,
@@ -901,7 +909,7 @@ func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
 				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedStart), 10)},
 				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedEnd), 10)},
 			},
-			0, // no limit within one try
+			remaining,
 			lastEvaledKey,
 			ascending,
 		)
