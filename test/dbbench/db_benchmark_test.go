@@ -47,7 +47,7 @@ const dataGeneratorCount = 16
 const pprofEnabled = false
 const traceEnabled = false
 
-var batchSize = batchSizeInBytes / dataSize
+var batchSize = int(batchSizeInBytes / dataSize)
 
 // Used to ensure that keys are truly unique
 var nextSeedSerialNumber = atomic.Uint32{}
@@ -404,7 +404,7 @@ func TestLevelDB(t *testing.T) {
 
 	writeFunction := func(key []byte, value []byte) error {
 		batch.PutWithTTL(keyBuilder.Key(key), value, TTL)
-		if batch.Size() >= batchSize {
+		if int(batch.Size()) >= batchSize {
 
 			writeLimiter <- struct{}{}
 
@@ -459,7 +459,7 @@ func TestLittDB(t *testing.T) {
 		}
 
 		unflushedCount++
-		if unflushedCount >= batchSize {
+		if int(unflushedCount) >= batchSize {
 
 			writeLimiter <- struct{}{}
 			go func() {
