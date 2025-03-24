@@ -417,6 +417,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DOWNLOAD_POOL_SIZE"),
 	}
 
+	LittDBEnabledFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-enabled"),
+		Usage:    "Enable LittDB instead of LevelDB",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_ENABLED"),
+	}
+
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
 	//
@@ -536,12 +543,7 @@ var optionalFlags = []cli.Flag{
 	RuntimeModeFlag,
 	StoreChunksRequestMaxPastAgeFlag,
 	StoreChunksRequestMaxFutureAgeFlag,
-	LevelDBDisableSeeksCompactionV1Flag,
-	LevelDBEnableSyncWritesV1Flag,
-	LevelDBDisableSeeksCompactionV2Flag,
-	LevelDBEnableSyncWritesV2Flag,
 	LittDBEnabledFlag,
-	DownloadPoolSizeFlag,
 }
 
 func init() {
