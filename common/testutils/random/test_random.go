@@ -122,15 +122,9 @@ func (r *TestRandom) Gaussian(mean float64, stddev float64) float64 {
 
 // BoundedGaussian generates a random float64 from a Gaussian distribution with the given mean and standard deviation,
 // but bounded by the given min and max values. If a generated value exceeds the bounds, the bound is returned instead.
-func (r *TestRandom) BoundedGaussian(mean float64, stddev float64, min float64, max float64) float64 {
+func (r *TestRandom) BoundedGaussian(mean float64, stddev float64, minFloat float64, maxFloat float64) float64 {
 	val := r.Gaussian(mean, stddev)
-	if val < min {
-		return min
-	}
-	if val > max {
-		return max
-	}
-	return val
+	return min(max(val, minFloat), maxFloat)
 }
 
 var _ io.Reader = &randIOReader{}
