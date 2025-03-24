@@ -38,12 +38,9 @@ operatorSetParams = [
 quorumAdversaryThresholdPercentages = "0x"
 quorumConfirmationThresholdPercentages = "0x"
 quorumNumbersRequired = "0x"
-
-# Parameters for the versioned blob parameters
-[[initParams.eigenDA.thresholdRegistry.versionedBlobParams]]
-maxNumOperators = 0
-numChunks = 0
-codingRate = 0
+versionedBlobParams = [
+    { 0_maxNumOperators = 0, 1_numChunks = 0, 2_codingRate = 0 }
+]
 
 # Parameters for the payment vault contract
 [initParams.eigenDA.paymentVault]
