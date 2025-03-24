@@ -348,7 +348,7 @@ func (s *BlobMetadataStore) queryBucketBlobMetadata(
 				":start": &types.AttributeValueMemberS{Value: startKey},
 				":end":   &types.AttributeValueMemberS{Value: endKey},
 			},
-			remaining,
+			int32(remaining),
 			lastEvaledKey,
 			ascending,
 		)
@@ -509,7 +509,7 @@ func (s *BlobMetadataStore) queryBucketAttestation(
 				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(start), 10)},
 				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(end), 10)},
 			},
-			numToReturn,
+			int32(numToReturn),
 			lastEvaledKey,
 			ascending,
 		)
@@ -909,7 +909,7 @@ func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
 				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedStart), 10)},
 				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedEnd), 10)},
 			},
-			remaining,
+			int32(remaining),
 			lastEvaledKey,
 			ascending,
 		)
