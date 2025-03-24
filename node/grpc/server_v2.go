@@ -258,7 +258,7 @@ func (s *ServerV2) validateAndStoreV2ChunksLittDB(
 	storageStart := time.Now()
 	_, size, err := s.node.StoreV2.StoreBatch(batch, rawBundles)
 	if err != nil {
-		return fmt.Errorf("failed to store batch %s: %v", batchHeaderHash, err)
+		return api.NewErrorInternal(fmt.Sprintf("failed to store batch %s: %v", batchHeaderHash, err))
 	}
 
 	s.metrics.ReportStoreChunksRequestSize(size)

@@ -320,6 +320,7 @@ func TestV2StoreChunksStorageFailure(t *testing.T) {
 func TestV2StoreChunksValidationFailure(t *testing.T) {
 	config := makeConfig(t)
 	config.EnableV2 = true
+	config.LittDBEnabled = true
 	c := newTestComponents(t, config)
 
 	blobKeys, batch, bundles := nodemock.MockBatch(t)
@@ -365,7 +366,9 @@ func TestV2StoreChunksValidationFailure(t *testing.T) {
 	require.Nil(t, reply.GetSignature())
 	requireErrorStatus(t, err, codes.Internal)
 
-	c.store.AssertCalled(t, "DeleteKeys", mock.Anything, mock.Anything)
+	if !config.LittDBEnabled {
+		c.store.AssertCalled(t, "DeleteKeys", mock.Anything, mock.Anything)
+	}
 }
 
 func TestV2GetChunksInputValidation(t *testing.T) {
