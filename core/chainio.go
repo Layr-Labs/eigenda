@@ -16,6 +16,12 @@ type OperatorStake struct {
 	Stake      *big.Int
 }
 
+type OperatorStakeWithSocket struct {
+	OperatorID OperatorID
+	Stake      *big.Int
+	Socket     OperatorSocket
+}
+
 type OperatorToChurn struct {
 	QuorumId QuorumID
 	Operator gethcommon.Address
@@ -29,6 +35,7 @@ type OperatorSetParam struct {
 }
 
 type OperatorStakes map[QuorumID]map[OperatorIndex]OperatorStake
+type OperatorStakesWithSocket map[QuorumID]map[OperatorIndex]OperatorStakeWithSocket
 
 type Reader interface {
 
@@ -43,6 +50,10 @@ type Reader interface {
 	// GetOperatorStakesForQuorums returns the stakes of all operators within the supplied quorums. The returned stakes are for the block number supplied.
 	// The indices of the operators within each quorum are also returned.
 	GetOperatorStakesForQuorums(ctx context.Context, quorums []QuorumID, blockNumber uint32) (OperatorStakes, error)
+
+	// GetOperatorStakesWithSocketForQuorums returns the stakes of all operators within the supplied quorums. The returned stakes are for the block number supplied.
+	// The indices of the operators within each quorum are also returned.
+	GetOperatorStakesWithSocketForQuorums(ctx context.Context, quorums []QuorumID, blockNumber uint32) (OperatorStakesWithSocket, error)
 
 	// GetBlockStaleMeasure returns the BLOCK_STALE_MEASURE defined onchain.
 	GetBlockStaleMeasure(ctx context.Context) (uint32, error)

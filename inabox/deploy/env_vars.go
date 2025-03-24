@@ -544,12 +544,6 @@ type RetrieverVars struct {
 	RETRIEVER_LOG_PATH string
 
 	RETRIEVER_LOG_FORMAT string
-
-	RETRIEVER_GRAPH_URL string
-
-	RETRIEVER_GRAPH_BACKOFF string
-
-	RETRIEVER_GRAPH_MAX_RETRIES string
 }
 
 func (vars RetrieverVars) getEnvMap() map[string]string {

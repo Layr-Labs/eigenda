@@ -100,12 +100,7 @@ func setup(t *testing.T) {
 	indexer = &indexermock.MockIndexer{}
 	indexer.On("Index").Return(nil).Once()
 
-	ics, err := coreindexer.NewIndexedChainState(chainState, indexer)
-	if err != nil {
-		panic("failed to create a new indexed chain state")
-	}
-
-	retrievalClient, err = clients.NewRetrievalClient(logger, ics, coordinator, nodeClient, v, 2)
+	retrievalClient, err = clients.NewRetrievalClient(logger, chainState, coordinator, nodeClient, v, 2)
 	if err != nil {
 		panic("failed to create a new retrieval client")
 	}

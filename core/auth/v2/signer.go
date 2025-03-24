@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/ethereum/go-ethereum/common"
@@ -44,13 +45,18 @@ func (s *LocalBlobRequestSigner) SignBlobRequest(header *core.BlobHeader) ([]byt
 	return sig, nil
 }
 
-func (s *LocalBlobRequestSigner) SignPaymentStateRequest() ([]byte, error) {
+func (s *LocalBlobRequestSigner) SignPaymentStateRequest(timestamp uint64) ([]byte, error) {
 	accountId, err := s.GetAccountID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account ID: %v", err)
 	}
 
-	hash := sha256.Sum256(accountId.Bytes())
+	requestHash, err := hashing.HashGetPaymentStateRequest(accountId, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash request: %w", err)
+	}
+
+	hash := sha256.Sum256(requestHash)
 	// Sign the account ID using the private key
 	sig, err := crypto.Sign(hash[:], s.PrivateKey)
 	if err != nil {
@@ -77,7 +83,7 @@ func (s *LocalNoopSigner) SignBlobRequest(header *core.BlobHeader) ([]byte, erro
 	return nil, fmt.Errorf("noop signer cannot sign blob request")
 }
 
-func (s *LocalNoopSigner) SignPaymentStateRequest() ([]byte, error) {
+func (s *LocalNoopSigner) SignPaymentStateRequest(timestamp uint64) ([]byte, error) {
 	return nil, fmt.Errorf("noop signer cannot sign payment state request")
 }
 

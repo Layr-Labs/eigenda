@@ -20,19 +20,26 @@ var _ kvstore.Store[[]byte] = &levelDBStore{}
 
 // levelDBStore implements kvstore.Store interfaces with levelDB as the backend engine.
 type levelDBStore struct {
-	db       *leveldb.DB
-	path     string
-	shutdown bool
-	mu       sync.Mutex
-	logger   logging.Logger
-	metrics  *MetricsCollector
+	logger       logging.Logger
+	db           *leveldb.DB
+	path         string
+	shutdown     bool
+	writeOptions *opt.WriteOptions
+	mu           sync.Mutex
+	metrics      *MetricsCollector
 }
 
 // NewStore returns a new levelDBStore built using LevelDB.
 // If reg is nil, metrics will not be collected.
-func NewStore(logger logging.Logger, path string, reg *prometheus.Registry) (kvstore.Store[[]byte], error) {
+func NewStore(
+	logger logging.Logger,
+	path string,
+	disableSeeksCompaction bool,
+	syncWrites bool,
+	reg *prometheus.Registry) (kvstore.Store[[]byte], error) {
+
 	opts := &opt.Options{
-		DisableSeeksCompaction: true, // Default is false (seeks trigger compaction)
+		DisableSeeksCompaction: disableSeeksCompaction,
 	}
 	levelDB, err := leveldb.OpenFile(path, opts)
 
@@ -40,10 +47,16 @@ func NewStore(logger logging.Logger, path string, reg *prometheus.Registry) (kvs
 		return nil, err
 	}
 
+	var writeOptions *opt.WriteOptions
+	if syncWrites {
+		writeOptions = &opt.WriteOptions{Sync: true}
+	}
+
 	store := &levelDBStore{
-		db:     levelDB,
-		path:   path,
-		logger: logger,
+		logger:       logger,
+		db:           levelDB,
+		path:         path,
+		writeOptions: writeOptions,
 	}
 
 	if reg != nil {
@@ -60,7 +73,7 @@ func (store *levelDBStore) Put(key []byte, value []byte) error {
 	if value == nil {
 		value = []byte{}
 	}
-	return store.db.Put(key, value, nil)
+	return store.db.Put(key, value, store.writeOptions)
 }
 
 // Get retrieves data from the store. Returns kvstore.ErrNotFound if the data is not found.
@@ -91,7 +104,7 @@ func (store *levelDBStore) DeleteBatch(keys [][]byte) error {
 	for _, key := range keys {
 		batch.Delete(key)
 	}
-	return store.db.Write(batch, nil)
+	return store.db.Write(batch, store.writeOptions)
 }
 
 // WriteBatch adds multiple key-value pairs to the store.
@@ -100,20 +113,22 @@ func (store *levelDBStore) WriteBatch(keys [][]byte, values [][]byte) error {
 	for i, key := range keys {
 		batch.Put(key, values[i])
 	}
-	return store.db.Write(batch, nil)
+	return store.db.Write(batch, store.writeOptions)
 }
 
 // NewBatch creates a new batch for the store.
 func (store *levelDBStore) NewBatch() kvstore.Batch[[]byte] {
 	return &levelDBBatch{
-		store: store,
-		batch: new(leveldb.Batch),
+		store:        store,
+		batch:        new(leveldb.Batch),
+		writeOptions: store.writeOptions,
 	}
 }
 
 type levelDBBatch struct {
-	store *levelDBStore
-	batch *leveldb.Batch
+	store        *levelDBStore
+	batch        *leveldb.Batch
+	writeOptions *opt.WriteOptions
 }
 
 func (m *levelDBBatch) Put(key []byte, value []byte) {
@@ -128,7 +143,7 @@ func (m *levelDBBatch) Delete(key []byte) {
 }
 
 func (m *levelDBBatch) Apply() error {
-	return m.store.db.Write(m.batch, nil)
+	return m.store.db.Write(m.batch, m.writeOptions)
 }
 
 // Size returns the number of operations in the batch.

@@ -43,44 +43,48 @@ var (
 
 // Config contains all of the configuration information for a DA node.
 type Config struct {
-	Hostname                       string
-	RetrievalPort                  string
-	DispersalPort                  string
-	InternalRetrievalPort          string
-	InternalDispersalPort          string
-	V2DispersalPort                string
-	V2RetrievalPort                string
-	EnableNodeApi                  bool
-	NodeApiPort                    string
-	EnableMetrics                  bool
-	MetricsPort                    int
-	OnchainMetricsInterval         int64
-	Timeout                        time.Duration
-	RegisterNodeAtStart            bool
-	ExpirationPollIntervalSec      uint64
-	EnableTestMode                 bool
-	OverrideBlockStaleMeasure      uint64
-	OverrideStoreDurationBlocks    uint64
-	QuorumIDList                   []core.QuorumID
-	DbPath                         string
-	LogPath                        string
-	ID                             core.OperatorID
-	BLSOperatorStateRetrieverAddr  string
-	EigenDAServiceManagerAddr      string
-	PubIPProviders                 []string
-	PubIPCheckInterval             time.Duration
-	ChurnerUrl                     string
-	DataApiUrl                     string
-	NumBatchValidators             int
-	NumBatchDeserializationWorkers int
-	EnableGnarkBundleEncoding      bool
-	ClientIPHeader                 string
-	UseSecureGrpc                  bool
-	RelayMaxMessageSize            uint
-	ReachabilityPollIntervalSec    uint64
-	DisableNodeInfoResources       bool
-	StoreChunksRequestMaxPastAge   time.Duration
-	StoreChunksRequestMaxFutureAge time.Duration
+	Hostname                        string
+	RetrievalPort                   string
+	DispersalPort                   string
+	InternalRetrievalPort           string
+	InternalDispersalPort           string
+	V2DispersalPort                 string
+	V2RetrievalPort                 string
+	EnableNodeApi                   bool
+	NodeApiPort                     string
+	EnableMetrics                   bool
+	MetricsPort                     int
+	OnchainMetricsInterval          int64
+	Timeout                         time.Duration
+	RegisterNodeAtStart             bool
+	ExpirationPollIntervalSec       uint64
+	LevelDBDisableSeeksCompactionV1 bool
+	LevelDBSyncWritesV1             bool
+	LevelDBDisableSeeksCompactionV2 bool
+	LevelDBSyncWritesV2             bool
+	EnableTestMode                  bool
+	OverrideBlockStaleMeasure       uint64
+	OverrideStoreDurationBlocks     uint64
+	QuorumIDList                    []core.QuorumID
+	DbPath                          string
+	LogPath                         string
+	ID                              core.OperatorID
+	BLSOperatorStateRetrieverAddr   string
+	EigenDAServiceManagerAddr       string
+	PubIPProviders                  []string
+	PubIPCheckInterval              time.Duration
+	ChurnerUrl                      string
+	DataApiUrl                      string
+	NumBatchValidators              int
+	NumBatchDeserializationWorkers  int
+	EnableGnarkBundleEncoding       bool
+	ClientIPHeader                  string
+	UseSecureGrpc                   bool
+	RelayMaxMessageSize             uint
+	ReachabilityPollIntervalSec     uint64
+	DisableNodeInfoResources        bool
+	StoreChunksRequestMaxPastAge    time.Duration
+	StoreChunksRequestMaxFutureAge  time.Duration
 
 	BlsSignerConfig blssignerTypes.SignerConfig
 
@@ -293,6 +297,10 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		ReachabilityPollIntervalSec:         reachabilityPollIntervalSec,
 		EnableTestMode:                      testMode,
 		OverrideBlockStaleMeasure:           ctx.GlobalUint64(flags.OverrideBlockStaleMeasureFlag.Name),
+		LevelDBDisableSeeksCompactionV1:     ctx.GlobalBool(flags.LevelDBDisableSeeksCompactionV1Flag.Name),
+		LevelDBSyncWritesV1:                 ctx.GlobalBool(flags.LevelDBEnableSyncWritesV1Flag.Name),
+		LevelDBDisableSeeksCompactionV2:     ctx.GlobalBool(flags.LevelDBDisableSeeksCompactionV2Flag.Name),
+		LevelDBSyncWritesV2:                 ctx.GlobalBool(flags.LevelDBEnableSyncWritesV2Flag.Name),
 		OverrideStoreDurationBlocks:         ctx.GlobalUint64(flags.OverrideStoreDurationBlocksFlag.Name),
 		QuorumIDList:                        ids,
 		DbPath:                              ctx.GlobalString(flags.DbPathFlag.Name),

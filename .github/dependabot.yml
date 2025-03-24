@@ -31,3 +31,20 @@ updates:
           - "minor"
           - "patch"
           - "major"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "08:00"
+      timezone: "America/Los_Angeles"
+    target-branch: "master"
+    commit-message:
+      prefix: "[docker-security]"
+      include: "scope"
+    pull-request-branch-name:
+      separator: "-"
+    reviewers:
+      - "Layr-Labs/eigenda"
+    labels:
+      - "security"
