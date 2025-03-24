@@ -897,7 +897,7 @@ func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
 	for {
 		remaining := math.MaxInt
 		if limit > 0 {
-			remaining = limit - len(result)
+			remaining = limit - len(dispersals)
 		}
 		res, err := s.dynamoDBClient.QueryIndexWithPagination(
 			ctx,
