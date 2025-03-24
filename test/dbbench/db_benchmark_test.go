@@ -157,6 +157,9 @@ func runBenchmark(write writer, read reader) {
 	// manually track expiration to maintain the unexpiredData map, which is needed by the reader threads.
 	expirationQueue := linkedlistqueue.New()
 
+	maxTrackedValueCount := uint64(1_000_000)
+	trackedValueCount := atomic.Uint64{}
+
 	// Each write is assigned a serial number, used for debugging
 	nextSerialNumber := atomic.Uint64{}
 
@@ -205,6 +208,7 @@ func runBenchmark(write writer, read reader) {
 				if time.Now().After(data.expiration) {
 					expirationQueue.Dequeue()
 					delete(unexpiredData, data.seed)
+					trackedValueCount.Add(-1)
 				} else {
 					break
 				}
@@ -322,21 +326,29 @@ func runBenchmark(write writer, read reader) {
 			serialNumber: nextSerialNumber.Add(1),
 			creationTime: time.Now(),
 		}
-		possiblyUnflushedData.Enqueue(metadata)
-		lock.Lock()
-		// Subtract 10 minutes from the actual expiration time to avoid race conditions with the reader threads.
-		// This means that the reader threads will stop making attempts to read a key/value pair 10 minutes before
-		// that key/value pair is actually scheduled to be deleted.
-		expirationQueue.Enqueue(dataWithExpiration{seed: seed, expiration: time.Now().Add(TTL).Add(-10 * time.Minute)})
 
-		if possiblyUnflushedData.Size() > batchSize*parallelWriters {
-			// Data that has had a number of writes afterward that exceeds the maximum batchSize
-			// it is guaranteed to be flushed if the DB respects batch sizes.
-			next, _ := possiblyUnflushedData.Dequeue()
-			metadata = next.(*writeMetadata)
-			unexpiredData[metadata.seed] = metadata
+		if trackedValueCount.Load() < maxTrackedValueCount {
+			trackedValueCount.Add(1)
+
+			possiblyUnflushedData.Enqueue(metadata)
+			lock.Lock()
+			// Subtract 10 minutes from the actual expiration time to avoid race conditions with the reader threads.
+			// This means that the reader threads will stop making attempts to read a key/value pair 10 minutes before
+			// that key/value pair is actually scheduled to be deleted.
+			expirationQueue.Enqueue(dataWithExpiration{
+				seed:       seed,
+				expiration: time.Now().Add(TTL).Add(-10 * time.Minute),
+			})
+
+			if possiblyUnflushedData.Size() > batchSize*parallelWriters {
+				// Data that has had a number of writes afterward that exceeds the maximum batchSize
+				// it is guaranteed to be flushed if the DB respects batch sizes.
+				next, _ := possiblyUnflushedData.Dequeue()
+				metadata = next.(*writeMetadata)
+				unexpiredData[metadata.seed] = metadata
+			}
+			lock.Unlock()
 		}
-		lock.Unlock()
 
 		// Do some console logging
 		newInterval := int(dataWritten / uint64(reportInterval))
