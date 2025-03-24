@@ -22,6 +22,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
+	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -213,24 +214,45 @@ func NewNode(
 		return n, nil
 	}
 
-	var storeV2 StoreV2
 	var blobVersionParams *corev2.BlobVersionParameterMap
 	if config.EnableV2 {
-		v2Path := config.DbPath + "/chunk_v2"
-		dbV2, err := tablestore.Start(logger, &tablestore.Config{
-			Type:                       tablestore.LevelDB,
-			Path:                       &v2Path,
-			GarbageCollectionEnabled:   true,
-			GarbageCollectionInterval:  time.Duration(config.ExpirationPollIntervalSec) * time.Second,
-			GarbageCollectionBatchSize: 1024,
-			Schema:                     []string{BatchHeaderTableName, BlobCertificateTableName, BundleTableName},
-			MetricsRegistry:            reg,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create new tablestore: %w", err)
+
+		timeToExpire := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second // 12s per block
+
+		if config.LittDBEnabled {
+			v2LittPath := config.DbPath + "/chunk_v2_litt"
+			littConfig, err := littbuilder.DefaultConfig(v2LittPath)
+			littConfig.ShardingFactor = 1
+			if err != nil {
+				return nil, fmt.Errorf("failed to create new litt config: %w", err)
+			}
+
+			littStore, err := littConfig.Build(context.Background())
+			if err != nil {
+				return nil, fmt.Errorf("failed to create new litt store: %w", err)
+			}
+
+			n.StoreV2, err = NewLittDBStoreV2(littStore, logger, timeToExpire)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create new litt store: %w", err)
+			}
+		} else {
+			v2Path := config.DbPath + "/chunk_v2"
+			dbV2, err := tablestore.Start(logger, &tablestore.Config{
+				Type:                       tablestore.LevelDB,
+				Path:                       &v2Path,
+				GarbageCollectionEnabled:   true,
+				GarbageCollectionInterval:  time.Duration(config.ExpirationPollIntervalSec) * time.Second,
+				GarbageCollectionBatchSize: 1024,
+				Schema:                     []string{BatchHeaderTableName, BlobCertificateTableName, BundleTableName},
+				MetricsRegistry:            reg,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to create new tablestore: %w", err)
+			}
+
+			n.StoreV2 = NewLevelDBStoreV2(dbV2, logger, timeToExpire)
 		}
-		timeToExpire := (blockStaleMeasure + storeDurationBlocks) * 12 // 12s per block
-		storeV2 = NewLevelDBStoreV2(dbV2, logger, time.Duration(timeToExpire)*time.Second)
 
 		blobParams, err := tx.GetAllVersionedBlobParams(context.Background())
 		if err != nil {
@@ -258,7 +280,6 @@ func NewNode(
 		n.RelayClient.Store(relayClient)
 	}
 
-	n.StoreV2 = storeV2
 	n.BlobVersionParams.Store(blobVersionParams)
 	return n, nil
 }

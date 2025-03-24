@@ -380,6 +380,13 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "STORE_CHUNKS_REQUEST_MAX_FUTURE_AGE"),
 	}
 
+	LittDBEnabledFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-enabled"),
+		Usage:    "Enable LittDB instead of LevelDB",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_ENABLED"),
+	}
+
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
 	//
@@ -499,6 +506,7 @@ var optionalFlags = []cli.Flag{
 	RuntimeModeFlag,
 	StoreChunksRequestMaxPastAgeFlag,
 	StoreChunksRequestMaxFutureAgeFlag,
+	LittDBEnabledFlag,
 }
 
 func init() {

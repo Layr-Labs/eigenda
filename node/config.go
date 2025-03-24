@@ -104,6 +104,10 @@ type Config struct {
 	DispersalAuthenticationKeyCacheSize int
 	// the timeout for disperser keys (after which the disperser key is reloaded from the chain)
 	DisperserKeyTimeout time.Duration
+
+	// If true, use littDB instead of levelDB for v2 storage. Note than in its current form, no data migration is
+	// performed when this setting is enabled. (Migration is a feature we will need prior to deployment to mainnet.)
+	LittDBEnabled bool
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -321,5 +325,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DisperserKeyTimeout:                 ctx.GlobalDuration(flags.DisperserKeyTimeoutFlag.Name),
 		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),
 		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
+		LittDBEnabled:                       ctx.GlobalBool(flags.LittDBEnabledFlag.Name),
 	}, nil
 }
