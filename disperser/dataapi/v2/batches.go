@@ -194,8 +194,8 @@ func (s *ServerV2) FetchBatch(c *gin.Context) {
 		errorResponse(c, errors.New("invalid batch header hash"))
 		return
 	}
-	signedBatch, ok := s.signedBatchCache.Get(batchHeaderHashHex)
-	if !ok {
+	signedBatch, cached := s.signedBatchCache.Get(batchHeaderHashHex)
+	if !cached {
 		batchHeader, attestation, err := s.blobMetadataStore.GetSignedBatch(c.Request.Context(), batchHeaderHash)
 		if err != nil {
 			s.metrics.IncrementFailedRequestNum("FetchBatch")
