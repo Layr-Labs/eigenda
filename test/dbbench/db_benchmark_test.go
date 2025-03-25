@@ -36,7 +36,7 @@ type writer func(key []byte, value []byte) error
 type reader func(key []byte) ([]byte, error)
 
 const totalToWrite = 10 * units.TiB
-const dataSize = 8 * units.KiB
+const dataSize = 1 * units.MiB
 const batchSizeInBytes = 100 * units.MiB
 const parallelWriters = 2
 const writeThrottle = 40 * units.MiB
