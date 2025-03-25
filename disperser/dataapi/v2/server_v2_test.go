@@ -2229,7 +2229,7 @@ func TestFetchMetricsSummary(t *testing.T) {
 	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/summary")
 	response := decodeResponseBody[serverv2.MetricSummary](t, w)
 
-	assert.Equal(t, 16555.555555555555, response.AvgThroughput)
+	assert.Equal(t, 16555.555555555555, response.AverageBytesPerSecond)
 }
 
 func TestFetchMetricsThroughputTimeseries(t *testing.T) {
