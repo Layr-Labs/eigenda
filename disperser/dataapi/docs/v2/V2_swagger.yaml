@@ -698,7 +698,7 @@ paths:
           description: 'error: Server error'
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
-      summary: Fetch blob certificate by blob key v2
+      summary: Fetch blob certificate by blob key
       tags:
       - Blobs
   /blobs/feed:
