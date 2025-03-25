@@ -262,7 +262,7 @@ configurable.
 
 ## Batched Writes
 
-LittDB supports bated write operations. Multiple write operations can be grouped together and passed to the database
+LittDB supports batched write operations. Multiple write operations can be grouped together and passed to the database
 as a single operation. This may have positive performance implications, but is semantically equivalent to writing each
 value individually. A batch of writes is not [atomic](#atomicity) as a whole, but each individual write within the
 batch is [atomic](#atomicity). That is to say, if there is a crash after a batch of writes has been written but before
@@ -290,10 +290,34 @@ It is ok to never call `Flush()`. As internal buffers fill, data is written to d
 `Flush()` can be useful in some cases, such as when you want to ensure that data is written to disk before proceeding
 with other operations.
 
+If `Flush()` is never called, data becomes durable through two mechanisms:
+
+- When a [segment](#segment) becomes full, it is made immutable and a new segment is created. As part of the process
+  of making a segment immutable, all data in the segment is fully written to disk.
+- When the database is cleanly stopped via a call to `Stop()`, all unflushed data is written to disk. `Stop()` blocks
+  this has been completed.
+
 `Flush()` makes no guarantees about the [durability](#durability) of data written concurrently with the call to
 `Flush()` or after the call to `Flush()` has returned. It's not harmful to write data concurrently with a call to
 `Flush()` as long as it is understood that this data may or may not be [durable](#durability) on disk when the call
 to `Flush()` returns.
+
+The following example demonstrates the consistency guarantees provided by the `Flush()` operation:
+
+![](./resources/flush-visual.png)
+
+In this example there are two threads performing operations, `Thread 1` and `Thread 2`. `Thread 1` writes `A`, `B`,
+and `C`, calls `Flush()`, and then writes `D`. `Thread 2` writes `W`, `X`, `Y`, and `Z`. `Time α` is the moment
+when the flush operation is invoked, and `Time β` is the moment when the flush operation returns.
+
+All write operations that have completed at `Time α` before the flush operation is invoked are [durable](#durability)
+when the flush operation returns at `Time β`. These are `A`, `B`, `C`, and `W`. Although writing `X` begins prior to
+`Time α`, since it is not complete at `Time α`, the flush operation does not guarantee that `X` is
+[durable](#durability) when it returns at `Time β`. The same is true for `Y`, `Z`, and `D`.
+
+Note that just because an operation is not guaranteed to be [durable](#durability) when `Flush()` returns does not mean
+that is guaranteed to be not [durable](#durability). If the computer crashes after `Time β` but before the next call
+to `Flush()`, then `X`, `Y`, `Z`, and `D` may or may not be lost as a result.
 
 ## Key
 
@@ -334,13 +358,16 @@ to the database and then turns around and attempts to read that [value](#value) 
 1. read the [value](#value) that was just written, or
 2. read an updated [value](#value) that was written AFTER the [value](#value) that was just written
 
-Note that in LittDB, values are never updated. In this context, an "updated" value the absence of a value
-when it eventually outlives its [TTL](#ttl) and is deleted by the garbage collector.
+Note that in LittDB, values are never permitted to be mutated. But when values grow older than their [TTL](#ttl),
+the value can be deleted. From a consistency point of view, the garbage collection process is equivalent to an update.
+That is to say, if a thread writes a [value](#value), waits a very long time, then reads that same [value](#value)
+back again, it is not a violation of read-your-writes consistency if the [value](#value) is not present because the
+[garbage collector](#garbage-collection) has deleted it.
 
 An "eventual consistent" database does not necessarily provide read-your-writes consistency. In the author's experience,
 such systems can be very difficult to reason about, and can lead to subtle bugs that are difficult to track down.
 Read-your-writes consistency is simple, yet powerful and intuitive. Since providing this level of consistency
-does not hurt performance, and so the complexity of its implementation is justified.
+does not hurt performance, the complexity of its implementation is justified.
 
 ## Segment
 
@@ -352,8 +379,17 @@ data is always written to the last segment currently in the list.
 Segments are deleted as a whole. That is, when a segment is deleted, all data in that segment is deleted at the same
 time. Segments are only deleted when all data contained within them has [expired](#ttl).
 
-Segments have a maximum data size. When a segment is full, that segment is made immutable, and a new segment is created
+Segments have a target data size. When a segment is full, that segment is made immutable, and a new segment is created
 and added to the end of the list.
+
+Note that the maximum size of a segment file is not a hard limit. As long as the first byte of a [value](#value) is
+written to a segment file before the segment is full, the segment is permitted to hold it. An [address](#address)
+points to that first byte of a value. Since there are 32 bits in an [address](#address) used to store the offset
+within the file, the maximum offset for the first byte of a value is 2^32 bytes (4GB).
+
+A natural side effect of only requiring the first byte of a [value](#value) to be written before the segment is full is
+that LittDB can support arbitrarily large [values](#value). Doing so may result in a large amount of data in a single
+segment, but this does not violate any correctness invariants.
 
 Each segment may split its data into multiple [shards](#shard). The number of shards in a segment is called the
 [sharding factor](#sharding-factor). The [sharding factor](#sharding-factor) is configurable, and different segments
@@ -489,7 +525,7 @@ This section explains the high level architecture of LittDB. It starts out by de
 storage solution, and incrementally adds complexity in order to solve various problems. For the full picture, skip to
 [Putting it all together: LittDB](#putting-it-all-together-littdb).
 
-For each iteration, the database is must fulfill the following requirements:
+For each iteration, the database must fulfill the following requirements:
 
 - must support `put(key, value)`/`get(key)` operations
 - must be thread safe
