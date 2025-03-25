@@ -25,8 +25,8 @@ import (
 	"github.com/dgraph-io/badger/v4/options"
 	"github.com/docker/go-units"
 	"github.com/emirpasic/gods/queues/linkedlistqueue"
-	lotus "github.com/lotusdblabs/lotusdb/v2"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/time/rate"
 )
 
 // writer is a function that writes a key-value pair to a database.
@@ -39,12 +39,14 @@ const totalToWrite = 10 * units.TiB
 const dataSize = 8 * units.KiB
 const batchSizeInBytes = 100 * units.MiB
 const parallelWriters = 2
+const writeThrottle = 40 * units.MiB
+const writeBucketSize = 200 * units.MiB
 const readBytesPerSecond = 10 * units.MiB
-const readerCount = 1
+const readerCount = 0 // TODO
 const TTL = 2 * time.Hour
 const dataGeneratorCount = 16
 
-const pprofEnabled = false
+const pprofEnabled = true // TODO
 const traceEnabled = false
 
 var batchSize = int(batchSizeInBytes / dataSize)
@@ -221,7 +223,10 @@ func runBenchmark(write writer, read reader) {
 		<-gcDone
 	}()
 
-	readRatePerGoroutine := readBytesPerSecond / readerCount
+	var readRatePerGoroutine int
+	if readerCount > 0 {
+		readRatePerGoroutine = readBytesPerSecond / readerCount
+	}
 	readsPerSecond := readRatePerGoroutine / dataSize
 	readerDoneChannels := make([]chan struct{}, readerCount)
 	totalReadsPerformed := atomic.Uint64{}
@@ -300,8 +305,15 @@ func runBenchmark(write writer, read reader) {
 	defaultLongestWrite := time.Duration(0)
 	longestWrite.Store(&defaultLongestWrite)
 
+	writeRateLimiter := rate.NewLimiter(rate.Limit(writeThrottle), writeBucketSize)
+
 	// Write data to the database
 	for dataWritten < totalToWrite {
+		if !writeRateLimiter.AllowN(time.Now(), dataSize) {
+			time.Sleep(1 * time.Millisecond)
+			continue
+		}
+
 		dataToWrite := <-dataToBeWritten
 		seed, key, value := dataToWrite.seed, dataToWrite.key, dataToWrite.value
 
@@ -451,6 +463,7 @@ func TestLittDB(t *testing.T) {
 	config, err := littbuilder.DefaultConfig(directory)
 	require.NoError(t, err)
 	config.ShardingFactor = 1
+	config.CacheSize = 10 * units.MiB // TODO revert when not benchmarking memory performance
 	config.TTL = TTL
 	config.KeymapType = keymap.LevelDBKeymapType
 
@@ -632,78 +645,6 @@ func TestBadgerDB(t *testing.T) {
 	runBenchmark(writeFunction, readFunction)
 	alive.Store(false)
 	<-compactionDone
-
-	err = db.Close()
-	require.NoError(t, err)
-}
-
-func TestLotusDB(t *testing.T) {
-	directory := "./test-data"
-
-	opts := lotus.DefaultOptions
-	opts.Sync = true
-	opts.DirPath = directory
-	opts.MemtableSize = 512 * units.MiB
-
-	db, err := lotus.Open(opts)
-	require.NoError(t, err)
-
-	batchOptions := lotus.BatchOptions{
-		WriteOptions: lotus.WriteOptions{
-			Sync: true,
-		},
-	}
-
-	batch := db.NewBatch(batchOptions)
-	objectsInBatch := 0
-
-	//writeLimiter := make(chan struct{}, parallelWriters)
-
-	writeFunction := func(key []byte, value []byte) error {
-
-		err = batch.Put(key, value)
-		require.NoError(t, err)
-
-		objectsInBatch++
-
-		if objectsInBatch >= batchSize {
-
-			//writeLimiter <- struct{}{}
-
-			//batchToCommit := batch
-			err = batch.Commit()
-			if err != nil {
-				return err
-			}
-
-			err = db.Sync()
-			if err != nil {
-				return err
-			}
-
-			batch = db.NewBatch(batchOptions)
-			objectsInBatch = 0
-
-			//go func() {
-			//	err := batchToCommit.Commit()
-			//	if err != nil {
-			//		panic(err)
-			//	}
-			//
-			//	<-writeLimiter
-			//}()
-
-			objectsInBatch = 0
-		}
-
-		return nil
-	}
-
-	readFunction := func(key []byte) ([]byte, error) {
-		return db.Get(key)
-	}
-
-	runBenchmark(writeFunction, readFunction)
 
 	err = db.Close()
 	require.NoError(t, err)
