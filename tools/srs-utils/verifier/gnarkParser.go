@@ -2,6 +2,7 @@ package verifier
 
 import (
 	"bufio"
+	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -12,18 +13,20 @@ import (
 const G1ByteNum = 32
 const G2ByteNum = 64
 
-// from is inclusive, to is exclusive
+// ReadG1PointSection reads a section of G1 points from a file.
+// filepath is the path to the file containing G1 points
+// from is the starting index (inclusive)
+// to is the ending index (exclusive)
+// numWorker is the number of parallel workers to use for reading
 func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]bn254.G1Affine, error) {
 	g1f, err := os.Open(filepath)
 	if err != nil {
-		log.Println("ReadG1PointSection.ERR.0", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to open G1 points file: %w", err)
 	}
 
-	//todo: how to handle?
 	defer func() {
-		if err := g1f.Close(); err != nil {
-			panic(err)
+		if cerr := g1f.Close(); cerr != nil {
+			log.Printf("warning: failed to close G1 points file: %v", cerr)
 		}
 	}()
 
@@ -77,60 +80,65 @@ func ReadG1PointSection(filepath string, from, to uint64, numWorker uint64) ([]b
 
 	return s1Outs, nil
 }
+
 func readG1WorkeGnark(
 	buf []byte,
 	outs []bn254.G1Affine,
-	start uint64, // in element, not in byte
+	start uint64,
 	end uint64,
 	step uint64,
 	wg *sync.WaitGroup,
-) {
+) error {
+	defer wg.Done()
 	for i := start; i < end; i++ {
 		g1 := buf[i*step : (i+1)*step]
 		n, err := outs[i].SetBytes(g1[:])
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("failed to set G1 point bytes at index %d: %w", i, err)
 		}
 		if n != G1ByteNum {
-			panic("cannot read 32 bytes")
+			return fmt.Errorf("invalid G1 point size at index %d: got %d bytes, want %d", i, n, G1ByteNum)
 		}
 	}
-	wg.Done()
+	return nil
 }
 
 func readG2WorkerGnark(
 	buf []byte,
 	outs []bn254.G2Affine,
-	start uint64, // in element, not in byte
+	start uint64,
 	end uint64,
 	step uint64,
 	wg *sync.WaitGroup,
-) {
+) error {
+	defer wg.Done()
 	for i := start; i < end; i++ {
 		g2 := buf[i*step : (i+1)*step]
 		n, err := outs[i].SetBytes(g2[:])
 		if err != nil {
-			log.Println("Unmarshalling error:", err)
-			panic("error")
+			return fmt.Errorf("failed to set G2 point bytes at index %d: %w", i, err)
 		}
 		if n != G2ByteNum {
-			panic("Cannot read 128 bytes")
+			return fmt.Errorf("invalid G2 point size at index %d: got %d bytes, want %d", i, n, G2ByteNum)
 		}
 	}
-	wg.Done()
+	return nil
 }
 
+// ReadG2PointSection reads a section of G2 points from a file.
+// filepath is the path to the file containing G2 points
+// from is the starting index (inclusive)
+// to is the ending index (exclusive)
+// numWorker is the number of parallel workers to use for reading
 func ReadG2PointSection(filepath string, from, to uint64, numWorker uint64) ([]bn254.G2Affine, error) {
 	g2f, err := os.Open(filepath)
 	if err != nil {
-		log.Println("ReadG2PointSection.ERR.0", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to open G2 points file: %w", err)
 	}
 
-	//todo: how to handle?
 	defer func() {
-		if err := g2f.Close(); err != nil {
-			panic(err)
+		if cerr := g2f.Close(); cerr != nil {
+			log.Printf("warning: failed to close G2 points file: %v", cerr)
 		}
 	}()
 
