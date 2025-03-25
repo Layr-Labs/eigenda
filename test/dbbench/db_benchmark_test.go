@@ -42,7 +42,8 @@ const parallelWriters = 2
 const writeThrottle = 40 * units.MiB
 const writeBucketSize = 200 * units.MiB
 const readBytesPerSecond = 10 * units.MiB
-const readerCount = 0 // TODO
+
+var readerCount = 0 // TODO
 const TTL = 2 * time.Hour
 const dataGeneratorCount = 16
 
