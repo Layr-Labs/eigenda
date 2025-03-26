@@ -250,11 +250,14 @@ func NewNode(
 			v2LittPath := config.DbPath + "/chunk_v2_litt"
 			littConfig, err := littbuilder.DefaultConfig(v2LittPath)
 			littConfig.ShardingFactor = 1
+			littConfig.MetricsEnabled = true
+			littConfig.MetricsRegistry = reg
+			littConfig.MetricsNamespace = "node_littdb"
 			if err != nil {
 				return nil, fmt.Errorf("failed to create new litt config: %w", err)
 			}
 
-			littStore, err := littConfig.Build(context.Background())
+			littStore, err := littConfig.Build()
 			if err != nil {
 				return nil, fmt.Errorf("failed to create new litt store: %w", err)
 			}
