@@ -18,17 +18,37 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type dbBuilder func(t *testing.T, tableDirectory string) (litt.DB, error)
-
-var builders = []dbBuilder{
-	buildMemDB,
-	buildMemKeyDiskDB,
-	buildLevelDBDiskDB,
+type dbBuilder struct {
+	name    string
+	builder func(t *testing.T, tableDirectory string) (litt.DB, error)
 }
 
-var restartableBuilders = []dbBuilder{
-	buildMemKeyDiskDB,
-	buildLevelDBDiskDB,
+// TODO break each out into a separate run
+
+var builders = []*dbBuilder{
+	{
+		name:    "mem",
+		builder: buildMemDB,
+	},
+	{
+		name:    "mem keymap disk table",
+		builder: buildMemKeyDiskDB,
+	},
+	{
+		name:    "levelDB keymap disk table",
+		builder: buildLevelDBDiskDB,
+	},
+}
+
+var restartableBuilders = []*dbBuilder{
+	{
+		name:    "mem keymap disk table",
+		builder: buildMemKeyDiskDB,
+	},
+	{
+		name:    "levelDB keymap disk table",
+		builder: buildLevelDBDiskDB,
+	},
 }
 
 func buildMemDB(t *testing.T, path string) (litt.DB, error) {
@@ -66,7 +86,7 @@ func buildMemKeyDiskDB(t *testing.T, path string) (litt.DB, error) {
 func buildLevelDBDiskDB(t *testing.T, path string) (litt.DB, error) {
 	config, err := littbuilder.DefaultConfig(path)
 	require.NoError(t, err)
-	config.KeymapType = keymap.LevelDBKeymapType
+	config.KeymapType = keymap.UnsafeLevelDBKeymapType
 	config.CacheSize = 1000
 	config.TargetSegmentFileSize = 100
 	config.ShardingFactor = 4
@@ -76,12 +96,12 @@ func buildLevelDBDiskDB(t *testing.T, path string) (litt.DB, error) {
 	return config.Build()
 }
 
-func randomDBOperationsTest(t *testing.T, builder dbBuilder) {
+func randomDBOperationsTest(t *testing.T, builder *dbBuilder) {
 	rand := random.NewTestRandom()
 
 	directory := t.TempDir()
 
-	db, err := builder(t, directory)
+	db, err := builder.builder(t, directory)
 	require.NoError(t, err)
 
 	tableCount := rand.Int32Range(8, 16)
@@ -170,16 +190,18 @@ func randomDBOperationsTest(t *testing.T, builder dbBuilder) {
 func TestRandomDBOperations(t *testing.T) {
 	t.Parallel()
 	for _, builder := range builders {
-		randomDBOperationsTest(t, builder)
+		t.Run(builder.name, func(t *testing.T) {
+			randomDBOperationsTest(t, builder)
+		})
 	}
 }
 
-func dbRestartTest(t *testing.T, builder dbBuilder) {
+func dbRestartTest(t *testing.T, builder *dbBuilder) {
 	rand := random.NewTestRandom()
 
 	directory := t.TempDir()
 
-	db, err := builder(t, directory)
+	db, err := builder.builder(t, directory)
 	require.NoError(t, err)
 
 	tableCount := rand.Int32Range(8, 16)
@@ -203,7 +225,7 @@ func dbRestartTest(t *testing.T, builder dbBuilder) {
 			err = db.Stop()
 			require.NoError(t, err)
 
-			db, err = builder(t, directory)
+			db, err = builder.builder(t, directory)
 			require.NoError(t, err)
 
 			// Do a full scan of the table to verify that all expected values are still present.
@@ -288,9 +310,11 @@ func dbRestartTest(t *testing.T, builder dbBuilder) {
 	require.Empty(t, entries)
 }
 
-func TestDBRestart(t *testing.T) {
+func TestDBRestart(t *testing.T) { // TODO this hangs...
 	t.Parallel()
 	for _, builder := range restartableBuilders {
-		dbRestartTest(t, builder)
+		t.Run(builder.name, func(t *testing.T) {
+			dbRestartTest(t, builder)
+		})
 	}
 }

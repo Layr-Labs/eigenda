@@ -64,6 +64,8 @@ func LoadKeymapTypeFile(keymapPath string) (*KeymapTypeFile, error) {
 		keymapType = MemKeymapType
 	case LevelDBKeymapType:
 		keymapType = LevelDBKeymapType
+	case UnsafeLevelDBKeymapType:
+		keymapType = UnsafeLevelDBKeymapType
 	default:
 		return nil, fmt.Errorf("unknown keymap type: %s", string(fileContents))
 	}

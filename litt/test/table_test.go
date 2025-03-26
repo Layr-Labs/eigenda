@@ -23,26 +23,52 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// This file contains tests that are applicable to all implementations of the ManagedTable interface.
-
-type tableBuilder func(timeSource func() time.Time, name string, path string) (litt.ManagedTable, error)
-
-// This test executes against different table implementations.
-var tableBuilders = []tableBuilder{
-	buildMemTable,
-	buildCachedMemTable,
-
-	buildMemKeyDiskTable,
-	buildCachedMemKeyDiskTable,
-
-	buildLevelDBKeyDiskTable,
-	buildCachedLevelDBKeyDiskTable,
+type tableBuilder struct {
+	name    string
+	builder func(timeSource func() time.Time, name string, path string) (litt.ManagedTable, error)
 }
 
-var noCacheTableBuilders = []tableBuilder{
-	buildMemTable,
-	buildMemKeyDiskTable,
-	buildLevelDBKeyDiskTable,
+// This test executes against different table implementations.
+var tableBuilders = []*tableBuilder{
+	{
+		"memtable",
+		buildMemTable,
+	},
+	{
+		"cached memtable",
+		buildCachedMemTable,
+	},
+	{
+		"mem keymap disk table",
+		buildMemKeyDiskTable,
+	},
+	{
+		"cached cached mem keymap disk table",
+		buildCachedMemKeyDiskTable,
+	},
+	{
+		"leveldb keymap disk table",
+		buildLevelDBKeyDiskTable,
+	},
+	{
+		"cached leveldb keymap disk table",
+		buildCachedLevelDBKeyDiskTable,
+	},
+}
+
+var noCacheTableBuilders = []*tableBuilder{
+	{
+		"memtable",
+		buildMemTable,
+	},
+	{
+		"mem keymap disk table",
+		buildMemKeyDiskTable,
+	},
+	{
+		"leveldb keymap disk table",
+		buildLevelDBKeyDiskTable,
+	},
 }
 
 func buildMemTable(
@@ -223,13 +249,13 @@ func buildCachedLevelDBKeyDiskTable(
 	return tablecache.NewCachedTable(baseTable, c), nil
 }
 
-func randomOperationsTest(t *testing.T, tableBuilder tableBuilder) {
+func randomTableOperationsTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
 	directory := t.TempDir()
 
 	tableName := rand.String(8)
-	table, err := tableBuilder(time.Now, tableName, directory)
+	table, err := tableBuilder.builder(time.Now, tableName, directory)
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -301,14 +327,16 @@ func randomOperationsTest(t *testing.T, tableBuilder tableBuilder) {
 	require.Empty(t, entries)
 }
 
-func TestRandomOperations(t *testing.T) {
+func TestRandomTableOperations(t *testing.T) {
 	t.Parallel()
 	for _, tb := range tableBuilders {
-		randomOperationsTest(t, tb)
+		t.Run(tb.name, func(t *testing.T) {
+			randomTableOperationsTest(t, tb)
+		})
 	}
 }
 
-func garbageCollectionTest(t *testing.T, tableBuilder tableBuilder) {
+func garbageCollectionTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
 	directory := t.TempDir()
@@ -323,7 +351,7 @@ func garbageCollectionTest(t *testing.T, tableBuilder tableBuilder) {
 	}
 
 	tableName := rand.String(8)
-	table, err := tableBuilder(timeSource, tableName, directory)
+	table, err := tableBuilder.builder(timeSource, tableName, directory)
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -470,7 +498,9 @@ func garbageCollectionTest(t *testing.T, tableBuilder tableBuilder) {
 func TestGarbageCollection(t *testing.T) {
 	t.Parallel()
 	for _, tb := range noCacheTableBuilders {
-		garbageCollectionTest(t, tb)
+		t.Run(tb.name, func(t *testing.T) {
+			garbageCollectionTest(t, tb)
+		})
 	}
 }
 

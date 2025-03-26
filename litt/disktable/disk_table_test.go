@@ -185,12 +185,12 @@ func buildLevelDBKeyDiskTableSingleShard(
 	}
 
 	keymapPath := filepath.Join(paths[0], keymap.KeymapDirectoryName)
-	keymapTypeFile, err := setupKeymapTypeFile(keymapPath, keymap.LevelDBKeymapType)
+	keymapTypeFile, err := setupKeymapTypeFile(keymapPath, keymap.UnsafeLevelDBKeymapType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
 	}
 
-	keys, err := keymap.NewLevelDBKeymap(logger, keymapPath, true, false)
+	keys, err := keymap.NewLevelDBKeymap(logger, keymapPath, false, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create keymap: %w", err)
 	}
@@ -237,7 +237,7 @@ func buildLevelDBKeyDiskTableMultiShard(
 	}
 
 	keymapPath := filepath.Join(paths[0], keymap.KeymapDirectoryName)
-	keymapTypeFile, err := setupKeymapTypeFile(keymapPath, keymap.LevelDBKeymapType)
+	keymapTypeFile, err := setupKeymapTypeFile(keymapPath, keymap.UnsafeLevelDBKeymapType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
 	}
@@ -2234,7 +2234,7 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 	require.Equal(t, actualSize, reportedSize, "delta: %d", int(actualSize)-int(reportedSize))
 }
 
-func TestTableSize(t *testing.T) {
+func TestTableSize(t *testing.T) { // TODO this test is flaky
 	t.Parallel()
 	for _, tb := range tableBuilders {
 		t.Run(tb.name, func(t *testing.T) {
