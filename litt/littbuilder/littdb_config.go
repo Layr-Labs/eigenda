@@ -26,8 +26,9 @@ import (
 
 // keymapBuilders contains builders for all supported keymap types.
 var keymapBuilders = map[keymap.KeymapType]keymap.KeymapBuilder{
-	keymap.MemKeymapType:     keymap.NewMemKeymapBuilder(),
-	keymap.LevelDBKeymapType: keymap.NewLevelDBKeymapBuilder(),
+	keymap.MemKeymapType:           keymap.NewMemKeymapBuilder(),
+	keymap.LevelDBKeymapType:       keymap.NewLevelDBKeymapBuilder(),
+	keymap.UnsafeLevelDBKeymapType: keymap.NewUnsafeLevelDBKeymapBuilder(),
 }
 
 // LittDBConfig is configuration for a litt.DB.
