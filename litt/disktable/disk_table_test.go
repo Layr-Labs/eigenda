@@ -6,10 +6,13 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
@@ -1982,5 +1985,190 @@ func changingShardingFactorTest(t *testing.T, tableBuilder tableBuilder) {
 func TestChangingShardingFactor(t *testing.T) {
 	for _, tb := range tableBuilders {
 		changingShardingFactorTest(t, tb)
+	}
+}
+
+// verifies that the size reported by the table matches the actual size of the table on disk
+func tableSizeTest(t *testing.T, tableBuilder tableBuilder) {
+	rand := random.NewTestRandom()
+
+	directory := t.TempDir()
+
+	startTime := rand.Time()
+
+	var fakeTime atomic.Pointer[time.Time]
+	fakeTime.Store(&startTime)
+
+	timeSource := func() time.Time {
+		return *fakeTime.Load()
+	}
+
+	tableName := rand.String(8)
+	table, err := tableBuilder(timeSource, tableName, []string{directory})
+	if err != nil {
+		t.Fatalf("failed to create table: %v", err)
+	}
+
+	ttlSeconds := rand.Int32Range(20, 30)
+	ttl := time.Duration(ttlSeconds) * time.Second
+	err = table.SetTTL(ttl)
+	require.NoError(t, err)
+
+	require.Equal(t, tableName, table.Name())
+
+	expectedValues := make(map[string][]byte)
+	creationTimes := make(map[string]time.Time)
+	expiredValues := make(map[string][]byte)
+
+	iterations := 1000
+	for i := 0; i < iterations; i++ {
+
+		// Advance the clock.
+		now := *fakeTime.Load()
+		secondsToAdvance := rand.Float64Range(0.0, 1.0)
+		newTime := now.Add(time.Duration(secondsToAdvance * float64(time.Second)))
+		fakeTime.Store(&newTime)
+
+		// Write some data.
+		batchSize := rand.Int32Range(1, 10)
+
+		if batchSize == 1 {
+			key := rand.PrintableVariableBytes(32, 64)
+			value := rand.PrintableVariableBytes(1, 128)
+			err = table.Put(key, value)
+			require.NoError(t, err)
+			expectedValues[string(key)] = value
+			creationTimes[string(key)] = newTime
+		} else {
+			batch := make([]*types.KVPair, 0, batchSize)
+			for j := int32(0); j < batchSize; j++ {
+				key := rand.PrintableVariableBytes(32, 64)
+				value := rand.PrintableVariableBytes(1, 128)
+				batch = append(batch, &types.KVPair{Key: key, Value: value})
+				expectedValues[string(key)] = value
+				creationTimes[string(key)] = newTime
+			}
+			err = table.PutBatch(batch)
+			require.NoError(t, err)
+		}
+
+		// Once in a while, flush the table.
+		if rand.BoolWithProbability(0.1) {
+			err = table.Flush()
+			require.NoError(t, err)
+		}
+
+		// Once in a while, change the TTL. To avoid introducing test flakiness, only decrease the TTL
+		// (increasing the TTL risks causing the expected deletions as tracked by this test to get out
+		// of sync with what the table is doing)
+		if rand.BoolWithProbability(0.01) {
+			ttlSeconds -= 1
+			ttl = time.Duration(ttlSeconds) * time.Second
+			err = table.SetTTL(ttl)
+			require.NoError(t, err)
+		}
+
+		// Once in a while, pause for a brief moment to give the garbage collector a chance to do work in the
+		// background. This is not required for the test to pass.
+		if rand.BoolWithProbability(0.01) {
+			time.Sleep(5 * time.Millisecond)
+		}
+
+		// Once in a while, scan the table and verify that all expected values are present.
+		// Don't do this every time for the sake of test runtime.
+		if rand.BoolWithProbability(0.01) || i == iterations-1 /* always check on the last iteration */ {
+			// Remove expired values from the expected values.
+			newlyExpiredKeys := make([]string, 0)
+			for key, creationTime := range creationTimes {
+				if newTime.Sub(creationTime) > ttl {
+					newlyExpiredKeys = append(newlyExpiredKeys, key)
+				}
+			}
+			for _, key := range newlyExpiredKeys {
+				expiredValues[key] = expectedValues[key]
+				delete(expectedValues, key)
+				delete(creationTimes, key)
+			}
+
+			// Check the keys that are expected to still be in the table
+			for expectedKey, expectedValue := range expectedValues {
+				value, ok, err := table.Get([]byte(expectedKey))
+				require.NoError(t, err)
+				require.True(t, ok, "key %s not found in table", expectedKey)
+				require.Equal(t, expectedValue, value)
+			}
+
+			// Try fetching a value that isn't in the table.
+			_, ok, err := table.Get(rand.PrintableVariableBytes(32, 64))
+			require.NoError(t, err)
+			require.False(t, ok)
+
+			// Check the values that are expected to have been removed from the table
+			// Garbage collection happens asynchronously, so we may need to wait for it to complete.
+			testutils.AssertEventuallyTrue(t, func() bool {
+				// keep a running sum of the unexpired data size. Some data may be unable to expire
+				// due to sharing a file with data that is not yet ready to expire. At the most,
+				// we expect so see no more than 232 bytes of unexpired data.
+				//
+				// Math:
+				// - 100 bytes in each segment                   (test configuration)
+				// - max value size of 128 bytes                 (test configuration)
+				// - 4 bytes to store the length of the value    (default property)
+				// 100+128+4 = 232
+				unexpiredDataSize := 0
+
+				for key, expectedValue := range expiredValues {
+					value, ok, err := table.Get([]byte(key))
+					require.NoError(t, err)
+					if !ok {
+						// value is not present in the table
+						continue
+					}
+
+					// If the value has not yet been deleted, it should at least return the expected value.
+					require.Equal(t, expectedValue, value, "unexpected value for key %s", key)
+
+					unexpiredDataSize += len(value) + 4 // 4 bytes stores the length of the value
+				}
+
+				// This check passes if the unexpired data size is less than or equal to the maximum plausible
+				// size of unexpired data. If working as expected, this should always happen within a reasonable
+				// amount of time.
+				return unexpiredDataSize <= 232
+			}, time.Second)
+		}
+	}
+
+	err = table.Flush()
+	require.NoError(t, err)
+
+	reportedSize := table.Size()
+
+	err = table.Stop()
+	require.NoError(t, err)
+
+	// Walk the "directory" file tree and calculate the actual size of the table.
+	actualSize := uint64(0)
+	err = filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			// directory sizes are not factored into the table size
+			return nil
+		}
+		if strings.Contains(path, "keymap") {
+			// table size does not currently include the keymap size
+			return nil
+		}
+
+		actualSize += uint64(info.Size())
+		return nil
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, int(actualSize), int(reportedSize), "delta: %d", actualSize-reportedSize)
+}
+
+func TestTableSize(t *testing.T) {
+	for _, tb := range tableBuilders {
+		tableSizeTest(t, tb)
 	}
 }

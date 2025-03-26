@@ -106,10 +106,10 @@ Source: [db.go](db.go)
 
 ```go
 type DB interface {
-GetTable(name string) (Table, error)
-DropTable(name string) error
-Stop() error
-Destroy() error
+    GetTable(name string) (Table, error)
+    DropTable(name string) error
+    Stop() error
+    Destroy() error
 }
 ```
 
@@ -117,13 +117,14 @@ Source: [table.go](table.go)
 
 ```go
 type Table interface {
-Name() string
-Put(key []byte, value []byte) error
-PutBatch(batch []*types.KVPair) error
-Get(key []byte) ([]byte, bool, error)
-Flush() error
-SetTTL(ttl time.Duration) error
-SetCacheSize(size uint64) error
+    Name() string
+    Put(key []byte, value []byte) error
+    PutBatch(batch []*types.KVPair) error
+    Get(key []byte) ([]byte, bool, error)
+    Flush() error
+    Size() uint64
+    SetTTL(ttl time.Duration) error
+    SetCacheSize(size uint64) error
 }
 ```
 

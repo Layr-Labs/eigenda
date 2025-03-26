@@ -38,6 +38,16 @@ type Table interface {
 	// in the event of a crash, though.
 	Flush() error
 
+	// Size returns the disk size of the table in bytes. Does not include the size of any data stored only in memory.
+	//
+	// Note that the value returned by this method may lag slightly behind the actual size of the table due to the
+	// pipelined implementation of the database. If an exact size is needed, first call Flush(), then call Size().
+	//
+	// Due to technical limitations, this size may or may not accurately reflect the size of the keymap. This is
+	// because some third party libraries used for certain keymap implementations do not provide an accurate way to
+	// measure size.
+	Size() uint64
+
 	// SetTTL sets the time to live for data in this table. This TTL is immediately applied to data already in
 	// the table. Note that deletion is lazy. That is, when the data expires, it may not be deleted immediately.
 	SetTTL(ttl time.Duration) error

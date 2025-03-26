@@ -67,6 +67,18 @@ func NewDB(
 	}
 }
 
+func (d *db) Size() uint64 {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	size := uint64(0)
+	for _, table := range d.tables {
+		size += table.Size()
+	}
+
+	return size
+}
+
 // isTableNameValid returns true if the table name is valid.
 func (d *db) isTableNameValid(name string) bool {
 	if name == "" {

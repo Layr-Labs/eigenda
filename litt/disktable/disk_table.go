@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/litt"
@@ -99,6 +100,15 @@ type DiskTable struct {
 
 	// whether fsync mode is enabled.
 	fsync bool
+
+	// The number of bytes contained within the immutable segments. This tracks the number of bytes that are
+	// on disk, not bytes in memory. For thread safety, this variable may only be read/written in the constructor
+	// and in the control loop.
+	immutableSegmentSize uint64
+
+	// The number of bytes contained within all segments, including the mutable segment. This tracks the number of
+	// bytes that are on disk, not bytes in memory.
+	size atomic.Uint64
 }
 
 // NewDiskTable creates a new DiskTable.
@@ -221,6 +231,10 @@ func NewDiskTable(
 		return nil, fmt.Errorf("failed to gather segment files: %v", err)
 	}
 
+	for _, seg := range table.segments {
+		table.immutableSegmentSize += seg.Size()
+	}
+
 	// Create the mutable segment
 	creatingFirstSegment := len(table.segments) == 0
 
@@ -249,6 +263,8 @@ func NewDiskTable(
 	}
 	table.segments[nextSegmentIndex] = mutableSegment
 
+	table.updateCurrentSize()
+
 	if reloadKeymap {
 		logger.Infof("reloading keymap from segments")
 		err = table.reloadKeymap()
@@ -261,6 +277,16 @@ func NewDiskTable(
 	go table.flushLoop()
 
 	return table, nil
+}
+
+func (d *DiskTable) Size() uint64 {
+	return d.size.Load()
+}
+
+// updateCurrentSize updates the size of the table.
+func (d *DiskTable) updateCurrentSize() {
+	size := d.immutableSegmentSize + d.segments[d.highestSegmentIndex].Size() + d.metadata.Size()
+	d.size.Store(size)
 }
 
 // reloadKeymap reloads the keymap from the segments. This is necessary when the keymap is lost, the keymap doesn't
@@ -579,6 +605,8 @@ func (d *DiskTable) handleControlLoopWriteRequest(req *controlLoopWriteRequest) 
 			}
 		}
 	}
+
+	d.updateCurrentSize()
 }
 
 // Flush flushes all data to disk. Blocks until all data previously submitted to Put has been written to disk.
@@ -679,6 +707,8 @@ func (d *DiskTable) doGarbageCollection() {
 			return
 		}
 
+		d.immutableSegmentSize -= seg.Size()
+
 		// Deletion of segment files will happen when the segment is released by all reservation holders.
 		seg.Release()
 		d.segmentLock.Lock()
@@ -687,6 +717,8 @@ func (d *DiskTable) doGarbageCollection() {
 
 		d.lowestSegmentIndex++
 	}
+
+	d.updateCurrentSize()
 }
 
 func (d *DiskTable) SetCacheSize(_ uint64) error {
@@ -701,6 +733,8 @@ func (d *DiskTable) SetCacheSize(_ uint64) error {
 // expandSegments checks if the highest segment is full, and if so, creates a new segment.
 func (d *DiskTable) expandSegments() error {
 	now := d.timeSource()
+
+	d.immutableSegmentSize += d.segments[d.highestSegmentIndex].Size()
 
 	// Seal the previous segment.
 	flushLoopResponseChan := make(chan struct{}, 1)
@@ -741,6 +775,8 @@ func (d *DiskTable) expandSegments() error {
 	d.segmentLock.Lock()
 	d.segments[d.highestSegmentIndex] = newSegment
 	d.segmentLock.Unlock()
+
+	d.updateCurrentSize()
 
 	return nil
 }

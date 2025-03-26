@@ -18,6 +18,8 @@ const tableMetadataFileName = "table" + tableMetadataFileExtension
 const tableMetadataSwapFileExtension = ".mswap"
 const tableMetadataSwapFileName = "table" + tableMetadataSwapFileExtension
 
+const tableMetadataSize = 16
+
 // tableMetadata contains table data that is preserved across restarts.
 type tableMetadata struct {
 	logger logging.Logger
@@ -83,6 +85,11 @@ func loadTableMetadata(logger logging.Logger, tableDirectory string) (*tableMeta
 	}
 
 	return metadata, nil
+}
+
+// Size returns the size of the table metadata file in bytes.
+func (t *tableMetadata) Size() uint64 {
+	return tableMetadataSize
 }
 
 // GetTTL returns the time-to-live for the table.
@@ -168,7 +175,7 @@ func deserialize(data []byte) (*tableMetadata, error) {
 	// 4 bytes for version
 	// 8 bytes for TTL
 	// 4 bytes for sharding factor
-	if len(data) != 16 {
+	if len(data) != tableMetadataSize {
 		return nil, fmt.Errorf("metadata file is not the correct size, expected 16 bytes, got %d", len(data))
 	}
 

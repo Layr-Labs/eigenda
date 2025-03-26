@@ -42,10 +42,28 @@ func TestReadWriteKeys(t *testing.T) {
 	err = file.seal()
 	require.NoError(t, err)
 
+	// Verify that file size is correctly reported.
+	reportedSize := file.Size()
+	stat, err := os.Stat(file.path())
+	require.NoError(t, err)
+	actualSize := uint64(stat.Size())
+	require.Equal(t, actualSize, reportedSize)
+
 	// Reading the file after sealing it is allowed.
 	readKeys, err := file.readKeys()
 	require.NoError(t, err)
 
+	for i, key := range keys {
+		assert.Equal(t, key, readKeys[i])
+	}
+
+	// Create a new in-memory instance from the on-disk file and verify that it behaves the same.
+	file2, err := newKeyFile(logger, index, directory, true)
+	require.NoError(t, err)
+	require.Equal(t, file.Size(), file2.Size())
+
+	readKeys, err = file2.readKeys()
+	require.NoError(t, err)
 	for i, key := range keys {
 		assert.Equal(t, key, readKeys[i])
 	}

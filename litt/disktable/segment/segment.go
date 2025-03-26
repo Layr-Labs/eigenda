@@ -43,8 +43,14 @@ type Segment struct {
 	// The value files, one for each shard in the segment. Indexed by shard number.
 	shards []*valueFile
 
-	// shardSizes is a list of the current sizes of each shard in the segment. Indexed by shard number.
+	// shardSizes is a list of the current sizes of each shard in the segment. Indexed by shard number. This
+	// value is only tracked for mutable segments, meaning that if this segment was loaded from disk, the values
+	// in this slice will be zero.
 	shardSizes []uint64
+
+	// The current size of the key file in bytes. This is only tracked for mutable segments, meaning that if this
+	// segment was loaded from disk, this value will be zero.
+	keyFileSize uint64
 
 	// The maximum size of all shards in this segment.
 	maxShardSize uint64
@@ -132,6 +138,8 @@ func NewSegment(
 		return nil, fmt.Errorf("failed to open key file: %v", err)
 	}
 
+	keyFileSize := keys.Size()
+
 	shards := make([]*valueFile, metadata.shardingFactor)
 	for shard := uint32(0); shard < metadata.shardingFactor; shard++ {
 		valuesPath, err := lookForFile(parentDirectories, fmt.Sprintf("%d-%d.values", index, shard))
@@ -172,6 +180,7 @@ func NewSegment(
 		keys:            keys,
 		shards:          shards,
 		shardSizes:      shardSizes,
+		keyFileSize:     keyFileSize,
 		shardChannels:   shardChannels,
 		keyFileChannel:  keyFileChannel,
 		deletionChannel: make(chan struct{}, 1),
@@ -191,6 +200,28 @@ func NewSegment(
 	}
 
 	return segment, nil
+}
+
+// Size returns the size of the segment in bytes. Counts bytes that are on disk or that will eventually end up on disk.
+// This method is not thread safe, and should not be called concurrently with methods that modify the segment.
+func (s *Segment) Size() uint64 {
+	size := s.metadata.Size()
+
+	if s.IsSealed() {
+		// This segment is immutable, so it's thread safe to query the files directly.
+		size += s.keys.Size()
+		for _, shard := range s.shards {
+			size += shard.Size()
+		}
+	} else {
+		// This segment is mutable. We must use our local reckoning of the sizes of the files.
+		size += s.keyFileSize
+		for _, shardSize := range s.shardSizes {
+			size += shardSize
+		}
+	}
+
+	return size
 }
 
 // lookForFile looks for a file in a list of directories. It returns an error if the file appears
@@ -259,6 +290,8 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 	if s.shardSizes[shard] > s.maxShardSize {
 		s.maxShardSize = s.shardSizes[shard]
 	}
+
+	s.keyFileSize += uint64(len(data.Key)) + 4 /* uint32 length */ + 8 /* uint64 Address */
 
 	// Forward the value to the shard control loop, which asynchronously writes it to the value file.
 	shardRequest := &valueToWrite{
