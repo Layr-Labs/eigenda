@@ -48,6 +48,9 @@ type Table interface {
 	// measure size.
 	Size() uint64
 
+	// KeyCount returns the number of keys in the table.
+	KeyCount() uint64
+
 	// SetTTL sets the time to live for data in this table. This TTL is immediately applied to data already in
 	// the table. Note that deletion is lazy. That is, when the data expires, it may not be deleted immediately.
 	SetTTL(ttl time.Duration) error

@@ -25,6 +25,10 @@ func NewCachedTable(base litt.ManagedTable, cache cache.Cache[string, []byte]) l
 	}
 }
 
+func (c *cachedTable) KeyCount() uint64 {
+	return c.base.KeyCount()
+}
+
 func (c *cachedTable) Size() uint64 {
 	return c.base.Size()
 }

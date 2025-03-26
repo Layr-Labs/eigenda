@@ -43,6 +43,9 @@ type DB interface {
 	// libraries used for certain keymap implementations do not provide an accurate way to measure size.
 	Size() uint64
 
+	// KeyCount returns the number of keys in the database.
+	KeyCount() uint64
+
 	// Stop stops the database. This method must be called when the database is no longer needed.
 	// Stop ensures that all non-flushed data is crash durable on disk before returning. Calls to
 	// Put() concurrent with Stop() may not be crash durable after Stop() returns.

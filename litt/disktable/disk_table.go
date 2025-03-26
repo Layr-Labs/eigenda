@@ -109,6 +109,9 @@ type DiskTable struct {
 	// The number of bytes contained within all segments, including the mutable segment. This tracks the number of
 	// bytes that are on disk, not bytes in memory.
 	size atomic.Uint64
+
+	// The number of keys in the table.
+	keyCount atomic.Int64
 }
 
 // NewDiskTable creates a new DiskTable.
@@ -277,6 +280,10 @@ func NewDiskTable(
 	go table.flushLoop()
 
 	return table, nil
+}
+
+func (d *DiskTable) KeyCount() uint64 {
+	return uint64(d.keyCount.Load())
 }
 
 func (d *DiskTable) Size() uint64 {
@@ -564,6 +571,8 @@ func (d *DiskTable) Put(key []byte, value []byte) error {
 		return fmt.Errorf("failed to send write request: %v", err)
 	}
 
+	d.keyCount.Add(1)
+
 	return nil
 }
 
@@ -583,6 +592,9 @@ func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 	if err != nil {
 		return fmt.Errorf("failed to send write request: %v", err)
 	}
+
+	d.keyCount.Add(int64(len(batch)))
+
 	return nil
 }
 
@@ -708,6 +720,7 @@ func (d *DiskTable) doGarbageCollection() {
 		}
 
 		d.immutableSegmentSize -= seg.Size()
+		d.keyCount.Add(-1 * int64(len(keys)))
 
 		// Deletion of segment files will happen when the segment is released by all reservation holders.
 		seg.Release()
