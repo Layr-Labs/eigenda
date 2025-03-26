@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path"
+	"sync/atomic"
 
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -38,7 +39,10 @@ type valueFile struct {
 	writer *bufio.Writer
 
 	// The current size of the file in bytes. Includes both flushed and unflushed data.
-	currentSize uint64
+	size uint64
+
+	// The current size of the file, only including flushed data. Protects against reads of partially written values.
+	flushedSize atomic.Uint64
 
 	// Whether fsync mode is enabled.
 	fsync bool
@@ -67,7 +71,10 @@ func newValueFile(
 		return nil, fmt.Errorf("file %s has incorrect permissions: %v", filePath, err)
 	}
 
-	values.currentSize = uint64(size)
+	if exists {
+		values.size = uint64(size)
+		values.flushedSize.Store(values.size)
+	}
 
 	if sealed {
 		if !exists {
@@ -92,6 +99,11 @@ func newValueFile(
 	return values, nil
 }
 
+// Size returns the size of the value file in bytes.
+func (v *valueFile) Size() uint64 {
+	return v.size
+}
+
 // name returns the name of the value file.
 func (v *valueFile) name() string {
 	return fmt.Sprintf("%d-%d%s", v.index, v.shard, ValuesFileExtension)
@@ -104,8 +116,10 @@ func (v *valueFile) path() string {
 
 // read reads a value from the value file.
 func (v *valueFile) read(firstByteIndex uint32) ([]byte, error) {
-	if uint64(firstByteIndex) >= v.currentSize {
-		return nil, fmt.Errorf("index %d is out of bounds (current size is %d)", firstByteIndex, v.currentSize)
+	flushedSize := v.flushedSize.Load()
+	if uint64(firstByteIndex) >= flushedSize {
+		return nil, fmt.Errorf("index %d is out of bounds (current flushed size is %d)",
+			firstByteIndex, flushedSize)
 	}
 
 	file, err := os.OpenFile(v.path(), os.O_RDONLY, 0644)
@@ -149,13 +163,13 @@ func (v *valueFile) write(value []byte) (uint32, error) {
 		return 0, fmt.Errorf("value file is sealed")
 	}
 
-	if v.currentSize > math.MaxUint32 {
+	if v.size > math.MaxUint32 {
 		// No matter what, we can't start a new value if its first byte would be beyond position 2^32.
 		// This is because we only have 32 bits in an address to store the position of a value's first byte.
-		return 0, fmt.Errorf("value file already contains %d bytes, cannot add a new value", v.currentSize)
+		return 0, fmt.Errorf("value file already contains %d bytes, cannot add a new value", v.size)
 	}
 
-	firstByteIndex := uint32(v.currentSize)
+	firstByteIndex := uint32(v.size)
 
 	// First, write the length of the value.
 	err := binary.Write(v.writer, binary.BigEndian, uint32(len(value)))
@@ -169,7 +183,7 @@ func (v *valueFile) write(value []byte) (uint32, error) {
 		return 0, fmt.Errorf("failed to write value to value file: %v", err)
 	}
 
-	v.currentSize += uint64(len(value)) + 4
+	v.size += uint64(len(value) + 4)
 
 	return firstByteIndex, nil
 }
@@ -191,6 +205,9 @@ func (v *valueFile) flush() error {
 			return fmt.Errorf("failed to sync value file: %v", err)
 		}
 	}
+
+	// It is now safe to read the flushed bytes directly from the file.
+	v.flushedSize.Store(v.size)
 
 	return nil
 }
@@ -218,6 +235,9 @@ func (v *valueFile) seal() error {
 
 // delete deletes the value file.
 func (v *valueFile) delete() error {
+	// As an extra safety check, make it so that all future reads fail before they do I/O.
+	v.flushedSize.Store(0)
+
 	if v.writer != nil {
 		return fmt.Errorf("value file is not sealed")
 	}

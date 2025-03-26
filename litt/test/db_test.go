@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/memtable"
+	"github.com/Layr-Labs/eigenda/litt/metrics"
 	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
@@ -37,20 +37,17 @@ func buildMemDB(t *testing.T, path string) (litt.DB, error) {
 		logger logging.Logger,
 		timeSource func() time.Time,
 		name string,
-		ttl time.Duration) (litt.ManagedTable, error) {
+		ttl time.Duration,
+		metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
 		return memtable.NewMemTable(timeSource, name, ttl), nil
 	}
 
-	logger, err := common.NewLogger(common.DefaultLoggerConfig())
+	config, err := littbuilder.DefaultConfig(path)
 	require.NoError(t, err)
 
-	return littbuilder.NewDB(
-		context.Background(),
-		logger,
-		time.Now,
-		0,
-		50*time.Millisecond,
-		tb), nil
+	config.GCPeriod = 50 * time.Millisecond
+
+	return littbuilder.NewDBWithTableBuilder(config, tb)
 }
 
 func buildMemKeyDiskDB(t *testing.T, path string) (litt.DB, error) {
@@ -63,7 +60,7 @@ func buildMemKeyDiskDB(t *testing.T, path string) (litt.DB, error) {
 	config.Fsync = false // fsync is too slow for unit test workloads
 	config.DoubleWriteProtection = true
 
-	return config.Build(context.Background())
+	return config.Build()
 }
 
 func buildLevelDBDiskDB(t *testing.T, path string) (litt.DB, error) {
@@ -76,7 +73,7 @@ func buildLevelDBDiskDB(t *testing.T, path string) (litt.DB, error) {
 	config.Fsync = false // fsync is too slow for unit test workloads
 	config.DoubleWriteProtection = true
 
-	return config.Build(context.Background())
+	return config.Build()
 }
 
 func randomDBOperationsTest(t *testing.T, builder dbBuilder) {

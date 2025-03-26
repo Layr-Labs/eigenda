@@ -37,6 +37,15 @@ type DB interface {
 	// The table returned by GetTable() before DropTable() is called must not be used once DropTable() is called.
 	DropTable(name string) error
 
+	// Size returns the on-disk size of the database in bytes.
+	//
+	// Note that this size may not accurately reflect the size of the keymap. This is because some third party
+	// libraries used for certain keymap implementations do not provide an accurate way to measure size.
+	Size() uint64
+
+	// KeyCount returns the number of keys in the database.
+	KeyCount() uint64
+
 	// Stop stops the database. This method must be called when the database is no longer needed.
 	// Stop ensures that all non-flushed data is crash durable on disk before returning. Calls to
 	// Put() concurrent with Stop() may not be crash durable after Stop() returns.

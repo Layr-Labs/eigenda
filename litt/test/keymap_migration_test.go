@@ -1,7 +1,6 @@
 package test
 
 import (
-	"context"
 	"os"
 	"path"
 	"testing"
@@ -34,7 +33,7 @@ func TestKeymapMigration(t *testing.T) {
 	config.Fsync = false // fsync is too slow for unit test workloads
 	config.DoubleWriteProtection = true
 
-	db, err := config.Build(context.Background())
+	db, err := config.Build()
 	require.NoError(t, err)
 	table, err := db.GetTable("test")
 	require.NoError(t, err)
@@ -109,7 +108,7 @@ func TestKeymapMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Reload the table and check the data
-	db, err = config.Build(context.Background())
+	db, err = config.Build()
 	require.NoError(t, err)
 	table, err = db.GetTable("test")
 	require.NoError(t, err)
@@ -126,7 +125,7 @@ func TestKeymapMigration(t *testing.T) {
 	require.NoError(t, err)
 	config.KeymapType = keymap.MemKeymapType
 
-	db, err = config.Build(context.Background())
+	db, err = config.Build()
 	require.NoError(t, err)
 	table, err = db.GetTable("test")
 	require.NoError(t, err)
@@ -147,7 +146,7 @@ func TestKeymapMigration(t *testing.T) {
 	require.NoError(t, err)
 	config.KeymapType = keymap.LevelDBKeymapType
 
-	db, err = config.Build(context.Background())
+	db, err = config.Build()
 	require.NoError(t, err)
 	table, err = db.GetTable("test")
 	require.NoError(t, err)

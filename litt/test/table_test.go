@@ -114,7 +114,8 @@ func buildMemKeyDiskTable(
 		0,
 		1*time.Millisecond,
 		true,
-		false)
+		false,
+		nil)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -161,7 +162,8 @@ func buildLevelDBKeyDiskTable(
 		0,
 		1*time.Millisecond,
 		false,
-		false)
+		false,
+		nil)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -476,7 +478,7 @@ func TestInvalidTableName(t *testing.T) {
 	config, err := littbuilder.DefaultConfig(directory)
 	require.NoError(t, err)
 
-	db, err := config.Build(context.Background())
+	db, err := config.Build()
 	require.NoError(t, err)
 
 	tableName := "invalid name"
