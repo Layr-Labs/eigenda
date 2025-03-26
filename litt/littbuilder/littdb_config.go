@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"net/http"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -15,7 +17,11 @@ import (
 	tablecache "github.com/Layr-Labs/eigenda/litt/cache"
 	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
+	"github.com/Layr-Labs/eigenda/litt/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // keymapBuilders contains builders for all supported keymap types.
@@ -24,15 +30,23 @@ var keymapBuilders = map[keymap.KeymapType]keymap.KeymapBuilder{
 	keymap.LevelDBKeymapType: keymap.NewLevelDBKeymapBuilder(),
 }
 
+// TODO update readme
+
 // LittDBConfig is configuration for a litt.DB.
 type LittDBConfig struct {
+	// The context for the database. If nil, context.Background() is used.
+	CTX context.Context
+
 	// The paths where the database will store its files. If the path does not exist, it will be created.
 	// If more than one path is provided, then the database will do its best to spread out the data across
 	// the paths. If the database is restarted, it will attempt to load data from all paths. Note: the number
 	// of paths should not exceed the sharding factor, or else data may not be split across all paths.
 	Paths []string
 
-	// The logger configuration for the database.
+	// The logger for the database. If nil, a logger is built using the LoggerConfig.
+	Logger logging.Logger
+
+	// The logger configuration for the database. Ignored if Logger is not nil.
 	LoggerConfig common.LoggerConfig
 
 	// The type of the keymap. Choices are keymap.MemKeymapType and keymap.LevelDBKeymapType.
@@ -85,6 +99,21 @@ type LittDBConfig struct {
 	// acts as a safety mechanism against this sort of illegal operation. Unfortunately, if using a keymap other
 	// than keymap.MemKeymapType, performing this check may be very expensive. By default, this is false.
 	DoubleWriteProtection bool
+
+	// If enabled, collect DB metrics and export them to prometheus. By default, this is false.
+	MetricsEnabled bool
+
+	// The namespace to use for metrics. If empty, the default namespace "litt" is used.
+	MetricsNamespace string
+
+	// The prometheus registry to use for metrics. If nil and metrics are enabled, a new registry is created.
+	MetricsRegistry *prometheus.Registry
+
+	// The port to use for the metrics server. Ignored if MetricsEnabled is false or MetricsRegistry is not nil.
+	MetricsPort int
+
+	// The interval at which various DB metrics are updated. The default is 1 second.
+	MetricsUpdateInterval time.Duration
 }
 
 // DefaultConfig returns a Config with default values.
@@ -97,6 +126,7 @@ func DefaultConfig(paths ...string) (*LittDBConfig, error) {
 	saltShaker := rand.New(rand.NewSource(seed))
 
 	return &LittDBConfig{
+		CTX:                   context.Background(),
 		Paths:                 paths,
 		LoggerConfig:          common.DefaultLoggerConfig(),
 		TimeSource:            time.Now,
@@ -108,6 +138,10 @@ func DefaultConfig(paths ...string) (*LittDBConfig, error) {
 		TargetSegmentFileSize: math.MaxUint32,
 		Fsync:                 true,
 		DoubleWriteProtection: false,
+		MetricsEnabled:        false,
+		MetricsNamespace:      "litt",
+		MetricsPort:           8080,
+		MetricsUpdateInterval: time.Second,
 	}, nil
 }
 
@@ -278,13 +312,55 @@ func (c *LittDBConfig) buildTable(
 	return cachedTable, nil
 }
 
-// Build creates a new litt.DB from the configuration. After calling Build, the configuration should not be
-// modified.
-func (c *LittDBConfig) Build(ctx context.Context) (litt.DB, error) {
-	logger, err := common.NewLogger(c.LoggerConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error creating logger: %w", err)
+// buildLogger creates a new logger based on the configuration.
+func (c *LittDBConfig) buildLogger() (logging.Logger, error) {
+	if c.Logger != nil {
+		return c.Logger, nil
 	}
 
-	return NewDB(ctx, logger, c.TimeSource, c.TTL, c.GCPeriod, c.buildTable), nil
+	return common.NewLogger(c.LoggerConfig)
+}
+
+// buildMetrics creates a new metrics object based on the configuration. If the returned server is not nil,
+// then it is the responsibility of the caller to eventually call server.Shutdown().
+func (c *LittDBConfig) buildMetrics(logger logging.Logger) (*metrics.LittDBMetrics, *http.Server) {
+	if !c.MetricsEnabled {
+		return nil, nil
+	}
+
+	var registry *prometheus.Registry
+	var server *http.Server
+
+	if c.MetricsRegistry != nil {
+		registry = prometheus.NewRegistry()
+		registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+		registry.MustRegister(collectors.NewGoCollector())
+
+		logger.Infof("Starting metrics server at port %d", c.MetricsPort)
+		addr := fmt.Sprintf(":%d", c.MetricsPort)
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.HandlerFor(
+			registry,
+			promhttp.HandlerOpts{},
+		))
+		server = &http.Server{
+			Addr:    addr,
+			Handler: mux,
+		}
+
+		go func() {
+			err := server.ListenAndServe()
+			if err != nil && !strings.Contains(err.Error(), "http: Server closed") {
+				logger.Errorf("metrics server error: %v", err)
+			}
+		}()
+	}
+
+	return metrics.NewLittDBMetrics(registry, c.MetricsNamespace), server
+}
+
+// Build creates a new litt.DB from the configuration. After calling Build, the configuration should not be
+// modified. This method is syntactic equivalent to NewDB(config).
+func (c *LittDBConfig) Build() (litt.DB, error) {
+	return NewDB(c)
 }

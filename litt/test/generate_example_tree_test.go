@@ -1,7 +1,6 @@
 package test
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os/exec"
@@ -29,7 +28,7 @@ func TestGenerateExampleTree(t *testing.T) {
 	config.TargetSegmentFileSize = 100 // use a small value to intentionally create several segments
 	require.NoError(t, err)
 
-	db, err := config.Build(context.Background())
+	db, err := config.Build()
 	require.NoError(t, err)
 
 	tableA, err := db.GetTable("tableA")
