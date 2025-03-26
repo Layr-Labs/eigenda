@@ -24,7 +24,7 @@ func buildMemKeymap(logger logging.Logger, path string) (Keymap, error) {
 }
 
 func buildLevelDBKeymap(logger logging.Logger, path string) (Keymap, error) {
-	return NewLevelDBKeymap(logger, path, true)
+	return NewLevelDBKeymap(logger, path, true, false)
 }
 
 func testBasicBehavior(t *testing.T, keymap Keymap) {
@@ -98,6 +98,7 @@ func testBasicBehavior(t *testing.T, keymap Keymap) {
 }
 
 func TestBasicBehavior(t *testing.T) {
+	t.Parallel()
 	testDir := t.TempDir()
 	dbDir := path.Join(testDir, "keymap")
 
@@ -129,6 +130,7 @@ func TestBasicBehavior(t *testing.T) {
 }
 
 func TestRestart(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
@@ -137,7 +139,7 @@ func TestRestart(t *testing.T) {
 	testDir := t.TempDir()
 	dbDir := path.Join(testDir, "keymap")
 
-	keymap, err := NewLevelDBKeymap(logger, dbDir, true)
+	keymap, err := NewLevelDBKeymap(logger, dbDir, true, false)
 	require.NoError(t, err)
 
 	expected := make(map[string]types.Address)
@@ -207,7 +209,7 @@ func TestRestart(t *testing.T) {
 	err = keymap.Stop()
 	require.NoError(t, err)
 
-	keymap, err = NewLevelDBKeymap(logger, dbDir, true)
+	keymap, err = NewLevelDBKeymap(logger, dbDir, true, false)
 	require.NoError(t, err)
 
 	// Expected data should be present

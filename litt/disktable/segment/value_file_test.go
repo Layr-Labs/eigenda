@@ -10,6 +10,7 @@ import (
 )
 
 func TestWriteThenReadValues(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
@@ -92,6 +93,7 @@ func TestWriteThenReadValues(t *testing.T) {
 }
 
 func TestReadingTruncatedValueFile(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)

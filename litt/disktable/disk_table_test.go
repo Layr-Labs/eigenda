@@ -24,15 +24,30 @@ import (
 // This file contains tests that are specific to the disk table implementation. Other more general test scenarios
 // are defined in litt/test/table_test.go.
 
-type tableBuilder func(timeSource func() time.Time, name string, paths []string) (litt.ManagedTable, error)
+type tableBuilder struct {
+	name    string
+	builder func(timeSource func() time.Time, name string, paths []string) (litt.ManagedTable, error)
+}
 
 // This test executes against different table implementations. This is useful for distinguishing between bugs that
 // are present in an implementation, and bugs that are present in the test scenario itself.
-var tableBuilders = []tableBuilder{
-	buildMemKeyDiskTableSingleShard,
-	buildMemKeyDiskTableMultiShard,
-	buildLevelDBKeyDiskTableSingleShard,
-	buildLevelDBKeyDiskTableMultiShard,
+var tableBuilders = []*tableBuilder{
+	{
+		name:    "MemKeyDiskTableSingleShard",
+		builder: buildMemKeyDiskTableSingleShard,
+	},
+	{
+		name:    "MemKeyDiskTableMultiShard",
+		builder: buildMemKeyDiskTableMultiShard,
+	},
+	{
+		name:    "LevelDBKeyDiskTableSingleShard",
+		builder: buildLevelDBKeyDiskTableSingleShard,
+	},
+	{
+		name:    "LevelDBKeyDiskTableMultiShard",
+		builder: buildLevelDBKeyDiskTableMultiShard,
+	},
 }
 
 func setupKeymapTypeFile(keymapPath string, keymapType keymap.KeymapType) (*keymap.KeymapTypeFile, error) {
@@ -175,7 +190,7 @@ func buildLevelDBKeyDiskTableSingleShard(
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
 	}
 
-	keys, err := keymap.NewLevelDBKeymap(logger, keymapPath, true)
+	keys, err := keymap.NewLevelDBKeymap(logger, keymapPath, true, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create keymap: %w", err)
 	}
@@ -227,7 +242,7 @@ func buildLevelDBKeyDiskTableMultiShard(
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
 	}
 
-	keys, err := keymap.NewLevelDBKeymap(logger, keymapPath, true)
+	keys, err := keymap.NewLevelDBKeymap(logger, keymapPath, true, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create keymap: %w", err)
 	}
@@ -263,13 +278,13 @@ func buildLevelDBKeyDiskTableMultiShard(
 	return table, nil
 }
 
-func restartTest(t *testing.T, tableBuilder tableBuilder) {
+func restartTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
 	directory := t.TempDir()
 
 	tableName := rand.String(8)
-	table, err := tableBuilder(time.Now, tableName, []string{directory})
+	table, err := tableBuilder.builder(time.Now, tableName, []string{directory})
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -290,7 +305,7 @@ func restartTest(t *testing.T, tableBuilder tableBuilder) {
 			err = table.Stop()
 			require.NoError(t, err)
 
-			table, err = tableBuilder(time.Now, tableName, []string{directory})
+			table, err = tableBuilder.builder(time.Now, tableName, []string{directory})
 			require.NoError(t, err)
 
 			// Do a full scan of the table to verify that all expected values are still present.
@@ -371,14 +386,17 @@ func restartTest(t *testing.T, tableBuilder tableBuilder) {
 }
 
 func TestRestart(t *testing.T) {
+	t.Parallel()
 	for _, tb := range tableBuilders {
-		restartTest(t, tb)
+		t.Run(tb.name, func(t *testing.T) {
+			restartTest(t, tb)
+		})
 	}
 }
 
 // This test deletes a random file from a middle segment. This is considered unrecoverable corruption, and should
 // cause the table to fail to restart.
-func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete string) {
+func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete string) {
 	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
@@ -387,7 +405,7 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete
 	directory := t.TempDir()
 
 	tableName := rand.String(8)
-	table, err := tableBuilder(time.Now, tableName, []string{directory})
+	table, err := tableBuilder.builder(time.Now, tableName, []string{directory})
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -463,7 +481,7 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete
 	require.NoError(t, err)
 
 	// Restart the table. This should fail.
-	table, err = tableBuilder(time.Now, tableName, []string{directory})
+	table, err = tableBuilder.builder(time.Now, tableName, []string{directory})
 	require.Error(t, err)
 	require.Nil(t, table)
 
@@ -481,16 +499,23 @@ func middleFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete
 }
 
 func TestMiddleFileMissing(t *testing.T) {
+	t.Parallel()
 	for _, tb := range tableBuilders {
-		middleFileMissingTest(t, tb, "key")
-		middleFileMissingTest(t, tb, "value")
-		middleFileMissingTest(t, tb, "metadata")
+		t.Run("key-"+tb.name, func(t *testing.T) {
+			middleFileMissingTest(t, tb, "key")
+		})
+		t.Run("value-"+tb.name, func(t *testing.T) {
+			middleFileMissingTest(t, tb, "value")
+		})
+		t.Run("metadata-"+tb.name, func(t *testing.T) {
+			middleFileMissingTest(t, tb, "metadata")
+		})
 	}
 }
 
 // This test deletes a random file from the first segment. This is considered recoverable, since it can happen
 // if the table crashes during garbage collection.
-func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete string) {
+func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete string) {
 	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
@@ -499,7 +524,7 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelet
 	directory := t.TempDir()
 
 	tableName := rand.String(8)
-	table, err := tableBuilder(time.Now, tableName, []string{directory})
+	table, err := tableBuilder.builder(time.Now, tableName, []string{directory})
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -577,7 +602,7 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelet
 	require.NoError(t, err)
 
 	// Restart the table.
-	table, err = tableBuilder(time.Now, tableName, []string{directory})
+	table, err = tableBuilder.builder(time.Now, tableName, []string{directory})
 	require.NoError(t, err)
 
 	// Check the data in the table.
@@ -665,16 +690,23 @@ func initialFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelet
 }
 
 func TestInitialFileMissing(t *testing.T) {
+	t.Parallel()
 	for _, tb := range tableBuilders {
-		initialFileMissingTest(t, tb, "key")
-		initialFileMissingTest(t, tb, "value")
-		initialFileMissingTest(t, tb, "metadata")
+		t.Run("key-"+tb.name, func(t *testing.T) {
+			initialFileMissingTest(t, tb, "key")
+		})
+		t.Run("value-"+tb.name, func(t *testing.T) {
+			initialFileMissingTest(t, tb, "value")
+		})
+		t.Run("metadata-"+tb.name, func(t *testing.T) {
+			initialFileMissingTest(t, tb, "metadata")
+		})
 	}
 }
 
 // This test deletes a random file from the last segment. This can happen if the table crashes prior to the
 // last segment being flushed.
-func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete string) {
+func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete string) {
 	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
@@ -683,7 +715,7 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete s
 	directory := t.TempDir()
 
 	tableName := rand.String(8)
-	table, err := tableBuilder(time.Now, tableName, []string{directory})
+	table, err := tableBuilder.builder(time.Now, tableName, []string{directory})
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -758,7 +790,7 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete s
 	require.NoError(t, err)
 
 	// Restart the table.
-	table, err = tableBuilder(time.Now, tableName, []string{directory})
+	table, err = tableBuilder.builder(time.Now, tableName, []string{directory})
 	require.NoError(t, err)
 
 	// Manually remove the keys from the last segment from the keymap. If this happens in reality (as opposed
@@ -854,15 +886,22 @@ func lastFileMissingTest(t *testing.T, tableBuilder tableBuilder, typeToDelete s
 }
 
 func TestLastFileMissing(t *testing.T) {
+	t.Parallel()
 	for _, tb := range tableBuilders {
-		lastFileMissingTest(t, tb, "key")
-		lastFileMissingTest(t, tb, "value")
-		lastFileMissingTest(t, tb, "metadata")
+		t.Run("key-"+tb.name, func(t *testing.T) {
+			lastFileMissingTest(t, tb, "key")
+		})
+		t.Run("value-"+tb.name, func(t *testing.T) {
+			lastFileMissingTest(t, tb, "value")
+		})
+		t.Run("metadata-"+tb.name, func(t *testing.T) {
+			lastFileMissingTest(t, tb, "metadata")
+		})
 	}
 }
 
 // This test simulates the scenario where a key file is truncated.
-func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
+func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
@@ -871,7 +910,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 	directory := t.TempDir()
 
 	tableName := rand.String(8)
-	table, err := tableBuilder(time.Now, tableName, []string{directory})
+	table, err := tableBuilder.builder(time.Now, tableName, []string{directory})
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -987,7 +1026,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 	require.NoError(t, err)
 
 	// Restart the table.
-	table, err = tableBuilder(time.Now, tableName, []string{directory})
+	table, err = tableBuilder.builder(time.Now, tableName, []string{directory})
 	require.NoError(t, err)
 
 	// Manually remove the keys from the last segment from the keymap. If this happens in reality (as opposed
@@ -1083,13 +1122,16 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder tableBuilder) {
 }
 
 func TestTruncatedKeyFile(t *testing.T) {
+	t.Parallel()
 	for _, tb := range tableBuilders {
-		truncatedKeyFileTest(t, tb)
+		t.Run(tb.name, func(t *testing.T) {
+			truncatedKeyFileTest(t, tb)
+		})
 	}
 }
 
 // This test simulates the scenario where a value file is truncated.
-func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
+func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
@@ -1098,7 +1140,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 	directory := t.TempDir()
 
 	tableName := rand.String(8)
-	table, err := tableBuilder(time.Now, tableName, []string{directory})
+	table, err := tableBuilder.builder(time.Now, tableName, []string{directory})
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -1230,7 +1272,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 	require.NoError(t, err)
 
 	// Restart the table.
-	table, err = tableBuilder(time.Now, tableName, []string{directory})
+	table, err = tableBuilder.builder(time.Now, tableName, []string{directory})
 	require.NoError(t, err)
 
 	// Manually remove the keys from the last segment from the keymap. If this happens in reality (as opposed
@@ -1326,14 +1368,17 @@ func truncatedValueFileTest(t *testing.T, tableBuilder tableBuilder) {
 }
 
 func TestTruncatedValueFile(t *testing.T) {
+	t.Parallel()
 	for _, tb := range tableBuilders {
-		truncatedValueFileTest(t, tb)
+		t.Run(tb.name, func(t *testing.T) {
+			truncatedValueFileTest(t, tb)
+		})
 	}
 }
 
 // This test simulates the scenario where keys have not been flushed to the key store. The important thing
 // is to ensure that garbage collection doesn't explode when it encounters keys that are not in the key store.
-func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
+func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
@@ -1342,7 +1387,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 	directory := t.TempDir()
 
 	tableName := rand.String(8)
-	table, err := tableBuilder(time.Now, tableName, []string{directory})
+	table, err := tableBuilder.builder(time.Now, tableName, []string{directory})
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -1437,7 +1482,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 	require.NoError(t, err)
 
 	// Restart the table.
-	table, err = tableBuilder(time.Now, tableName, []string{directory})
+	table, err = tableBuilder.builder(time.Now, tableName, []string{directory})
 	require.NoError(t, err)
 
 	// Manually remove the keys from the last segment from the keymap. If this happens in reality (as opposed
@@ -1542,18 +1587,21 @@ func unflushedKeysTest(t *testing.T, tableBuilder tableBuilder) {
 }
 
 func TestUnflushedKeys(t *testing.T) {
+	t.Parallel()
 	for _, tb := range tableBuilders {
-		unflushedKeysTest(t, tb)
+		t.Run(tb.name, func(t *testing.T) {
+			unflushedKeysTest(t, tb)
+		})
 	}
 }
 
-func metadataPreservedOnRestartTest(t *testing.T, tableBuilder tableBuilder) {
+func metadataPreservedOnRestartTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
 	directory := t.TempDir()
 
 	tableName := rand.String(8)
-	table, err := tableBuilder(time.Now, tableName, []string{directory})
+	table, err := tableBuilder.builder(time.Now, tableName, []string{directory})
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -1573,7 +1621,7 @@ func metadataPreservedOnRestartTest(t *testing.T, tableBuilder tableBuilder) {
 	require.NoError(t, err)
 
 	// Restart the table.
-	table, err = tableBuilder(time.Now, tableName, []string{directory})
+	table, err = tableBuilder.builder(time.Now, tableName, []string{directory})
 	require.NoError(t, err)
 
 	// Check the table metadata.
@@ -1588,18 +1636,21 @@ func metadataPreservedOnRestartTest(t *testing.T, tableBuilder tableBuilder) {
 }
 
 func TestMetadataPreservedOnRestart(t *testing.T) {
+	t.Parallel()
 	for _, tb := range tableBuilders {
-		metadataPreservedOnRestartTest(t, tb)
+		t.Run(tb.name, func(t *testing.T) {
+			metadataPreservedOnRestartTest(t, tb)
+		})
 	}
 }
 
-func orphanedMetadataTest(t *testing.T, tableBuilder tableBuilder) {
+func orphanedMetadataTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
 	directory := t.TempDir()
 
 	tableName := rand.String(8)
-	table, err := tableBuilder(time.Now, tableName, []string{directory})
+	table, err := tableBuilder.builder(time.Now, tableName, []string{directory})
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -1625,7 +1676,7 @@ func orphanedMetadataTest(t *testing.T, tableBuilder tableBuilder) {
 	require.NoError(t, err)
 
 	// Restart the table.
-	table, err = tableBuilder(time.Now, tableName, []string{directory})
+	table, err = tableBuilder.builder(time.Now, tableName, []string{directory})
 	require.NoError(t, err)
 
 	// Check the table metadata.
@@ -1640,12 +1691,15 @@ func orphanedMetadataTest(t *testing.T, tableBuilder tableBuilder) {
 }
 
 func TestOrphanedMetadata(t *testing.T) {
+	t.Parallel()
 	for _, tb := range tableBuilders {
-		orphanedMetadataTest(t, tb)
+		t.Run(tb.name, func(t *testing.T) {
+			orphanedMetadataTest(t, tb)
+		})
 	}
 }
 
-func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder tableBuilder) {
+func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
 	directoryCount := rand.Uint32Range(5, 10)
@@ -1657,7 +1711,7 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder tableB
 	}
 
 	tableName := rand.String(8)
-	table, err := tableBuilder(time.Now, tableName, directories)
+	table, err := tableBuilder.builder(time.Now, tableName, directories)
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -1709,7 +1763,7 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder tableB
 			err = os.Rename(mPath, newMPath)
 			require.NoError(t, err)
 
-			table, err = tableBuilder(time.Now, tableName, directories)
+			table, err = tableBuilder.builder(time.Now, tableName, directories)
 			require.NoError(t, err)
 
 			// Change the sharding factor. This should not cause problems.
@@ -1797,8 +1851,11 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder tableB
 }
 
 func TestRestartWithMultipleStorageDirectories(t *testing.T) {
+	t.Parallel()
 	for _, tb := range tableBuilders {
-		restartWithMultipleStorageDirectoriesTest(t, tb)
+		t.Run(tb.name, func(t *testing.T) {
+			restartWithMultipleStorageDirectoriesTest(t, tb)
+		})
 	}
 }
 
@@ -1848,7 +1905,7 @@ func getLatestSegmentIndex(table litt.Table) uint32 {
 	return (table.(*DiskTable)).highestSegmentIndex
 }
 
-func changingShardingFactorTest(t *testing.T, tableBuilder tableBuilder) {
+func changingShardingFactorTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
 	directory := t.TempDir()
@@ -1859,7 +1916,7 @@ func changingShardingFactorTest(t *testing.T, tableBuilder tableBuilder) {
 	}
 
 	tableName := rand.String(8)
-	table, err := tableBuilder(time.Now, tableName, roots)
+	table, err := tableBuilder.builder(time.Now, tableName, roots)
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -1895,7 +1952,7 @@ func changingShardingFactorTest(t *testing.T, tableBuilder tableBuilder) {
 			err = table.Stop()
 			require.NoError(t, err)
 
-			table, err = tableBuilder(time.Now, tableName, roots)
+			table, err = tableBuilder.builder(time.Now, tableName, roots)
 			require.NoError(t, err)
 
 			expectedShardCounts[getLatestSegmentIndex(table)] = shardingFactor
@@ -1987,13 +2044,16 @@ func changingShardingFactorTest(t *testing.T, tableBuilder tableBuilder) {
 }
 
 func TestChangingShardingFactor(t *testing.T) {
+	t.Parallel()
 	for _, tb := range tableBuilders {
-		changingShardingFactorTest(t, tb)
+		t.Run(tb.name, func(t *testing.T) {
+			changingShardingFactorTest(t, tb)
+		})
 	}
 }
 
 // verifies that the size reported by the table matches the actual size of the table on disk
-func tableSizeTest(t *testing.T, tableBuilder tableBuilder) {
+func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
 	directory := t.TempDir()
@@ -2008,7 +2068,7 @@ func tableSizeTest(t *testing.T, tableBuilder tableBuilder) {
 	}
 
 	tableName := rand.String(8)
-	table, err := tableBuilder(timeSource, tableName, []string{directory})
+	table, err := tableBuilder.builder(timeSource, tableName, []string{directory})
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -2171,11 +2231,14 @@ func tableSizeTest(t *testing.T, tableBuilder tableBuilder) {
 		return nil
 	})
 	require.NoError(t, err)
-	require.Equal(t, actualSize, reportedSize)
+	require.Equal(t, actualSize, reportedSize, "delta: %d", int(actualSize)-int(reportedSize))
 }
 
 func TestTableSize(t *testing.T) {
+	t.Parallel()
 	for _, tb := range tableBuilders {
-		tableSizeTest(t, tb)
+		t.Run(tb.name, func(t *testing.T) {
+			tableSizeTest(t, tb)
+		})
 	}
 }

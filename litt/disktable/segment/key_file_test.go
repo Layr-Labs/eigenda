@@ -12,6 +12,7 @@ import (
 )
 
 func TestReadWriteKeys(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
@@ -81,6 +82,7 @@ func TestReadWriteKeys(t *testing.T) {
 }
 
 func TestReadingTruncatedKeyFile(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)

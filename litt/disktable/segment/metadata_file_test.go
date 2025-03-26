@@ -9,6 +9,7 @@ import (
 )
 
 func TestUnsealedSerialization(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
@@ -51,6 +52,7 @@ func TestUnsealedSerialization(t *testing.T) {
 }
 
 func TestSealedSerialization(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
@@ -93,6 +95,7 @@ func TestSealedSerialization(t *testing.T) {
 }
 
 func TestFreshFileSerialization(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
@@ -129,6 +132,7 @@ func TestFreshFileSerialization(t *testing.T) {
 }
 
 func TestSealing(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
