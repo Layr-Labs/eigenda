@@ -48,7 +48,7 @@ import {
 } from "./DeploymentInitializer.sol";
 
 import "forge-std/Script.sol";
-import "forge-std/StdJson.sol";
+import "forge-std/StdToml.sol";
 
 contract DeployVerifiable is Script {
     // The intended owner of all the contracts after the full deployment process is completed.
@@ -90,11 +90,11 @@ contract DeployVerifiable is Script {
     function run() public {
         // Read JSON config
         configData = vm.readFile(_configPath());
-        initialOwner = stdJson.readAddress(configData, ".initialOwner");
-        rewardsCoordinator = stdJson.readAddress(configData, ".initParams.shared.rewardsCoordinator");
-        avsDirectory = stdJson.readAddress(configData, ".initParams.shared.avsDirectory");
-        delegationManager = stdJson.readAddress(configData, ".initParams.shared.delegationManager");
-        initialPausedStatus = stdJson.readUint(configData, ".initParams.shared.initialPausedStatus");
+        initialOwner = stdToml.readAddress(configData, ".initialOwner");
+        rewardsCoordinator = stdToml.readAddress(configData, ".initParams.shared.rewardsCoordinator");
+        avsDirectory = stdToml.readAddress(configData, ".initParams.shared.avsDirectory");
+        delegationManager = stdToml.readAddress(configData, ".initParams.shared.delegationManager");
+        initialPausedStatus = stdToml.readUint(configData, ".initParams.shared.initialPausedStatus");
 
         vm.startBroadcast();
         proxyAdmin = new ProxyAdmin();
@@ -102,8 +102,8 @@ contract DeployVerifiable is Script {
         mockStakeRegistry = address(new MockStakeRegistry(IDelegationManager(delegationManager)));
         pauserRegistry = IPauserRegistry(
             new PauserRegistry(
-                stdJson.readAddressArray(configData, ".initParams.core.pauserRegistry.pausers"),
-                stdJson.readAddress(configData, ".initParams.core.pauserRegistry.unpauser")
+                stdToml.readAddressArray(configData, ".initParams.core.pauserRegistry.pausers"),
+                stdToml.readAddress(configData, ".initParams.core.pauserRegistry.unpauser")
             )
         );
 
@@ -191,27 +191,27 @@ contract DeployVerifiable is Script {
 
     function _immutableInitParams() internal view returns (ImmutableInitParams memory) {
         ImmutableRegistryCoordinatorParams memory registryCoordinatorParams = ImmutableRegistryCoordinatorParams({
-            churnApprover: stdJson.readAddress(configData, ".initParams.middleware.registryCoordinator.churnApprover"),
-            ejector: stdJson.readAddress(configData, ".initParams.middleware.registryCoordinator.ejector")
+            churnApprover: stdToml.readAddress(configData, ".initParams.middleware.registryCoordinator.churnApprover"),
+            ejector: stdToml.readAddress(configData, ".initParams.middleware.registryCoordinator.ejector")
         });
         ImmutablePaymentVaultParams memory paymentVaultParams = ImmutablePaymentVaultParams({
-            minNumSymbols: uint64(stdJson.readUint(configData, ".initParams.eigenDA.paymentVault.minNumSymbols")),
-            pricePerSymbol: uint64(stdJson.readUint(configData, ".initParams.eigenDA.paymentVault.pricePerSymbol")),
+            minNumSymbols: uint64(stdToml.readUint(configData, ".initParams.eigenDA.paymentVault.minNumSymbols")),
+            pricePerSymbol: uint64(stdToml.readUint(configData, ".initParams.eigenDA.paymentVault.pricePerSymbol")),
             priceUpdateCooldown: uint64(
-                stdJson.readUint(configData, ".initParams.eigenDA.paymentVault.priceUpdateCooldown")
+                stdToml.readUint(configData, ".initParams.eigenDA.paymentVault.priceUpdateCooldown")
             ),
             globalSymbolsPerPeriod: uint64(
-                stdJson.readUint(configData, ".initParams.eigenDA.paymentVault.globalSymbolsPerPeriod")
+                stdToml.readUint(configData, ".initParams.eigenDA.paymentVault.globalSymbolsPerPeriod")
             ),
             reservationPeriodInterval: uint64(
-                stdJson.readUint(configData, ".initParams.eigenDA.paymentVault.reservationPeriodInterval")
+                stdToml.readUint(configData, ".initParams.eigenDA.paymentVault.reservationPeriodInterval")
             ),
             globalRatePeriodInterval: uint64(
-                stdJson.readUint(configData, ".initParams.eigenDA.paymentVault.globalRatePeriodInterval")
+                stdToml.readUint(configData, ".initParams.eigenDA.paymentVault.globalRatePeriodInterval")
             )
         });
         ImmutableServiceManagerParams memory serviceManagerParams = ImmutableServiceManagerParams({
-            rewardsInitiator: stdJson.readAddress(configData, ".initParams.eigenDA.serviceManager.rewardsInitiator")
+            rewardsInitiator: stdToml.readAddress(configData, ".initParams.eigenDA.serviceManager.rewardsInitiator")
         });
 
         return ImmutableInitParams({
@@ -235,14 +235,18 @@ library CalldataInitParamsLib {
         returns (IRegistryCoordinator.OperatorSetParam[] memory)
     {
         bytes memory operatorConfigsRaw =
-            stdJson.parseRaw(configData, ".initParams.middleware.registryCoordinator.operatorSetParams");
+            stdToml.parseRaw(configData, ".initParams.middleware.registryCoordinator.operatorSetParams");
         return abi.decode(operatorConfigsRaw, (IRegistryCoordinator.OperatorSetParam[]));
     }
 
     function minimumStakes(string memory configData) internal pure returns (uint96[] memory) {
-        bytes memory stakesConfigsRaw =
-            stdJson.parseRaw(configData, ".initParams.middleware.registryCoordinator.minimumStakes");
-        return abi.decode(stakesConfigsRaw, (uint96[]));
+        uint256[] memory stakesConfigs256 =
+            stdToml.readUintArray(configData, ".initParams.middleware.registryCoordinator.minimumStakes");
+        uint96[] memory stakesConfigs = new uint96[](stakesConfigs256.length);
+        for (uint256 i; i < stakesConfigs.length; i++) {
+            stakesConfigs[i] = uint96(stakesConfigs[i]);
+        }
+        return stakesConfigs;
     }
 
     function strategyParams(string memory configData)
@@ -251,33 +255,33 @@ library CalldataInitParamsLib {
         returns (IStakeRegistry.StrategyParams[][] memory)
     {
         bytes memory strategyConfigsRaw =
-            stdJson.parseRaw(configData, ".initParams.middleware.registryCoordinator.strategyParams");
+            stdToml.parseRaw(configData, ".initParams.middleware.registryCoordinator.strategyParams");
         return abi.decode(strategyConfigsRaw, (IStakeRegistry.StrategyParams[][]));
     }
 
     function quorumAdversaryThresholdPercentages(string memory configData) internal pure returns (bytes memory) {
         return
-            stdJson.readBytes(configData, ".initParams.eigenDA.thresholdRegistry.quorumAdversaryThresholdPercentages");
+            stdToml.readBytes(configData, ".initParams.eigenDA.thresholdRegistry.quorumAdversaryThresholdPercentages");
     }
 
     function quorumConfirmationThresholdPercentages(string memory configData) internal pure returns (bytes memory) {
-        return stdJson.readBytes(
+        return stdToml.readBytes(
             configData, ".initParams.eigenDA.thresholdRegistry.quorumConfirmationThresholdPercentages"
         );
     }
 
     function quorumNumbersRequired(string memory configData) internal pure returns (bytes memory) {
-        return stdJson.readBytes(configData, ".initParams.eigenDA.thresholdRegistry.quorumNumbersRequired");
+        return stdToml.readBytes(configData, ".initParams.eigenDA.thresholdRegistry.quorumNumbersRequired");
     }
 
     function versionedBlobParams(string memory configData) internal pure returns (VersionedBlobParams[] memory) {
         bytes memory versionedBlobParamsRaw =
-            stdJson.parseRaw(configData, ".initParams.eigenDA.thresholdRegistry.versionedBlobParams");
+            stdToml.parseRaw(configData, ".initParams.eigenDA.thresholdRegistry.versionedBlobParams");
         return abi.decode(versionedBlobParamsRaw, (VersionedBlobParams[]));
     }
 
     function batchConfirmers(string memory configData) internal pure returns (address[] memory) {
-        return stdJson.readAddressArray(configData, ".initParams.eigenDA.serviceManager.batchConfirmers");
+        return stdToml.readAddressArray(configData, ".initParams.eigenDA.serviceManager.batchConfirmers");
     }
 
     function getCalldataInitParams(string memory configData) internal pure returns (CalldataInitParams memory) {
