@@ -42,6 +42,12 @@ type LittDBMetrics struct {
 
 	// The size of individual tables in the database.
 	tableSizeInBytes *prometheus.GaugeVec
+
+	// The number of keys in the database.
+	keyCount *prometheus.GaugeVec
+
+	// The number of keys in individual tables in the database.
+	tableKeyCount *prometheus.GaugeVec
 }
 
 // NewLittDBMetrics creates a new LittDBMetrics instance.
@@ -65,9 +71,29 @@ func NewLittDBMetrics(registry *prometheus.Registry, namespace string) *LittDBMe
 		[]string{"table"},
 	)
 
+	keyCount := promauto.With(registry).NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "key_count",
+			Help:      "The total number of keys in the database.",
+		},
+		[]string{},
+	)
+
+	tableKeyCount := promauto.With(registry).NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "table_key_count",
+			Help:      "The number of keys in individual tables in the database.",
+		},
+		[]string{"table"},
+	)
+
 	return &LittDBMetrics{
 		sizeInBytes:      sizeInBytes,
 		tableSizeInBytes: tableSizeInBytes,
+		keyCount:         keyCount,
+		tableKeyCount:    tableKeyCount,
 	}
 }
 
@@ -78,13 +104,22 @@ func (m *LittDBMetrics) CollectPeriodicMetrics(db litt.DB, tables map[string]lit
 		return
 	}
 
-	totalSize := db.Size()
-	m.sizeInBytes.WithLabelValues().Set(float64(totalSize))
+	totalSize := uint64(0)
+	totalKeyCount := uint64(0)
 
 	for _, table := range tables {
-		tableSize := table.Size()
 		tableName := table.Name()
+
+		tableSize := table.Size()
+		totalSize += tableSize
 		m.tableSizeInBytes.WithLabelValues(tableName).Set(float64(tableSize))
+
+		tableKeyCount := table.KeyCount()
+		totalKeyCount += tableKeyCount
+		m.tableKeyCount.WithLabelValues(tableName).Set(float64(tableKeyCount))
 	}
+
+	m.sizeInBytes.WithLabelValues().Set(float64(totalSize))
+	m.keyCount.WithLabelValues().Set(float64(totalKeyCount))
 
 }

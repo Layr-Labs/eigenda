@@ -67,6 +67,12 @@ func (m *memTable) Name() string {
 	return m.name
 }
 
+func (m *memTable) KeyCount() uint64 {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	return uint64(len(m.data))
+}
+
 func (m *memTable) Put(key []byte, value []byte) error {
 	stringKey := string(key)
 	expiration := &expirationRecord{

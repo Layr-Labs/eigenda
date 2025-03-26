@@ -99,6 +99,18 @@ func NewDBWithTableBuilder(config *LittDBConfig, tableBuilder TableBuilder) (lit
 	return database, nil
 }
 
+func (d *db) KeyCount() uint64 {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	count := uint64(0)
+	for _, table := range d.tables {
+		count += table.KeyCount()
+	}
+
+	return count
+}
+
 func (d *db) Size() uint64 {
 	d.lock.Lock()
 	defer d.lock.Unlock()

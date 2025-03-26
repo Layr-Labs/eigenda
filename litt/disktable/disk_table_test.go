@@ -2131,6 +2131,10 @@ func tableSizeTest(t *testing.T, tableBuilder tableBuilder) {
 					unexpiredDataSize += len(value) + 4 // 4 bytes stores the length of the value
 				}
 
+				if int(table.KeyCount()) != len(expectedValues) {
+					return false
+				}
+
 				// This check passes if the unexpired data size is less than or equal to the maximum plausible
 				// size of unexpired data. If working as expected, this should always happen within a reasonable
 				// amount of time.
@@ -2163,8 +2167,7 @@ func tableSizeTest(t *testing.T, tableBuilder tableBuilder) {
 		return nil
 	})
 	require.NoError(t, err)
-
-	require.Equal(t, int(actualSize), int(reportedSize), "delta: %d", actualSize-reportedSize)
+	require.Equal(t, actualSize, reportedSize)
 }
 
 func TestTableSize(t *testing.T) {
