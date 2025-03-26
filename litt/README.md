@@ -192,6 +192,8 @@ are present to support testing.
 
 - `Paths`: a list of directories. LittDB will do its best to spread data across these directories.
   Directories may or may not be on the same physical drive.
+- `Logger`: the logger to be used. If set to `nil` (the default), then the `LoggerConfig` field is used to
+  create a logger. If the `Logger` field is set, then the `LoggerConfig` field is ignored.
 - `LoggerConfig`: a struct containing configuration options for the logger. A sane default is provided.
 - `KeymapType`: the type of [keymap](#keymap) to use. The default is `keymap.LevelDBKeymapType`. An in-memory
   is also supported: `keymap.MemKeymapType`. It will be faster, but may have longer startup times and higher
@@ -216,6 +218,12 @@ are present to support testing.
 - `DoubleWriteProtection`: if true, then the database will return an error if a write operation is performed against
   a key that already exists in the database. This is illegal behavior, but the check is not always enforced due to
   the performance overhead if using anything other than an in-memory keymap. The default is `false`.
+- `MetricsEnabled`: if true, then the database will emit prometheus metrics. The default is `false`.
+- `MetricsRegistry`: if `MetricsEnabled` is true, then metrics are registered with this registry. If nil, then
+  a new registry is created. The default is `nil`.
+- `MetricsPort`: the port to expose metrics on. The default is `8080`. Ignored if `MetricsEnabled` is false or if
+  `MetricsRegistry` is not nil
+- `MetricsUpdateInterval`: the frequency at which metrics are updated. The default is `1s`.
 
 # Definitions
 

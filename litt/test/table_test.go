@@ -476,7 +476,7 @@ func TestInvalidTableName(t *testing.T) {
 	config, err := littbuilder.DefaultConfig(directory)
 	require.NoError(t, err)
 
-	db, err := config.Build(context.Background())
+	db, err := config.Build()
 	require.NoError(t, err)
 
 	tableName := "invalid name"

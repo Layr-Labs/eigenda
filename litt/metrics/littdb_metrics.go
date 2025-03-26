@@ -36,23 +36,12 @@ import (
 
 // LittDBMetrics encapsulates metrics for a LittDB.
 type LittDBMetrics struct {
-
-	// Whether metrics are enabled.
-	enabled bool
-
 	// The total disk used by the database.
 	sizeInBytes *prometheus.GaugeVec
 }
 
-// NewLittDBMetrics creates a new LittDBMetrics instance. If a nil registry is provided, all method calls on this
-// instance will be no-ops.
+// NewLittDBMetrics creates a new LittDBMetrics instance.
 func NewLittDBMetrics(registry *prometheus.Registry, namespace string) *LittDBMetrics {
-
-	if registry == nil {
-		return &LittDBMetrics{
-			enabled: false,
-		}
-	}
 
 	sizeInBytes := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -64,14 +53,13 @@ func NewLittDBMetrics(registry *prometheus.Registry, namespace string) *LittDBMe
 	)
 
 	return &LittDBMetrics{
-		enabled:     true,
 		sizeInBytes: sizeInBytes,
 	}
 }
 
 // ReportSizeInBytes reports the total disk used by the database.
 func (m *LittDBMetrics) ReportSizeInBytes(sizeInBytes uint64) {
-	if !m.enabled {
+	if m == nil {
 		return
 	}
 	m.sizeInBytes.WithLabelValues().Set(float64(sizeInBytes))
