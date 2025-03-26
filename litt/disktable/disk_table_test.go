@@ -100,7 +100,8 @@ func buildMemKeyDiskTableSingleShard(
 		0,
 		1*time.Millisecond,
 		true,
-		false)
+		false,
+		nil)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -148,7 +149,8 @@ func buildMemKeyDiskTableMultiShard(
 		0,
 		1*time.Millisecond,
 		true,
-		false)
+		false,
+		nil)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -199,7 +201,8 @@ func buildLevelDBKeyDiskTableSingleShard(
 		0,
 		1*time.Millisecond,
 		false,
-		false)
+		false,
+		nil)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -250,7 +253,8 @@ func buildLevelDBKeyDiskTableMultiShard(
 		0,
 		1*time.Millisecond,
 		false,
-		false)
+		false,
+		nil)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)

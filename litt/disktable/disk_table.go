@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
+	"github.com/Layr-Labs/eigenda/litt/metrics"
 	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -112,6 +113,9 @@ type DiskTable struct {
 
 	// The number of keys in the table.
 	keyCount atomic.Int64
+
+	// Encapsulates metrics for the database.
+	metrics *metrics.LittDBMetrics
 }
 
 // NewDiskTable creates a new DiskTable.
@@ -131,7 +135,8 @@ func NewDiskTable(
 	ttl time.Duration,
 	gcPeriod time.Duration,
 	reloadKeymap bool,
-	fsync bool) (litt.ManagedTable, error) {
+	fsync bool,
+	metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
 
 	if gcPeriod <= 0 {
 		return nil, fmt.Errorf("garbage collection period must be greater than 0")
@@ -218,6 +223,7 @@ func NewDiskTable(
 		flushChannel:            make(chan any, tableFlushChannelCapacity),
 		garbageCollectionPeriod: gcPeriod,
 		fsync:                   fsync,
+		metrics:                 metrics,
 	}
 
 	var err error
@@ -519,10 +525,24 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 		return nil, false, fmt.Errorf("Cannot process Get() request: %v", err)
 	}
 
+	var cacheHit bool
+	var dataSize uint64
+	if d.metrics != nil {
+		start := d.timeSource()
+		defer func() {
+			end := d.timeSource()
+			delta := end.Sub(start)
+			d.metrics.ReportReadOperation(d.name, delta, dataSize, cacheHit)
+		}()
+	}
+
 	// First, check if the key is in the unflushed data map.
 	// If so, return it from there.
 	if value, ok := d.unflushedDataCache.Load(string(key)); ok {
-		return value.([]byte), true, nil
+		bytes := value.([]byte)
+		cacheHit = true
+		dataSize = uint64(len(bytes))
+		return bytes, true, nil
 	}
 
 	// Look up the address of the data.
@@ -543,10 +563,11 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 
 	// Read the data from disk.
 	data, err := seg.Read(key, address)
-
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to read data: %v", err)
 	}
+
+	dataSize += uint64(len(data))
 
 	return data, true, nil
 }
@@ -554,6 +575,15 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 func (d *DiskTable) Put(key []byte, value []byte) error {
 	if ok, err := d.panic.IsOk(); !ok {
 		return fmt.Errorf("Cannot process Put() request: %v", err)
+	}
+
+	if d.metrics != nil {
+		start := d.timeSource()
+		defer func() {
+			end := d.timeSource()
+			delta := end.Sub(start)
+			d.metrics.ReportWriteOperation(d.name, delta, 1, uint64(len(value)))
+		}()
 	}
 
 	d.unflushedDataCache.Store(string(key), value)
@@ -579,6 +609,19 @@ func (d *DiskTable) Put(key []byte, value []byte) error {
 func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 	if ok, err := d.panic.IsOk(); !ok {
 		return fmt.Errorf("Cannot process PutBatch() request: %v", err)
+	}
+
+	if d.metrics != nil {
+		start := d.timeSource()
+		totalSize := uint64(0)
+		for _, kv := range batch {
+			totalSize += uint64(len(kv.Value))
+		}
+		defer func() {
+			end := d.timeSource()
+			delta := end.Sub(start)
+			d.metrics.ReportWriteOperation(d.name, delta, uint64(len(batch)), totalSize)
+		}()
 	}
 
 	for _, kv := range batch {
@@ -625,6 +668,15 @@ func (d *DiskTable) handleControlLoopWriteRequest(req *controlLoopWriteRequest) 
 func (d *DiskTable) Flush() error {
 	if ok, err := d.panic.IsOk(); !ok {
 		return fmt.Errorf("Cannot process Flush() request: %v", err)
+	}
+
+	if d.metrics != nil {
+		start := d.timeSource()
+		defer func() {
+			end := d.timeSource()
+			delta := end.Sub(start)
+			d.metrics.ReportFlushOperation(d.name, delta)
+		}()
 	}
 
 	flushReq := &controlLoopFlushRequest{
@@ -690,6 +742,15 @@ func (d *DiskTable) doGarbageCollection() {
 	if ttl.Nanoseconds() == 0 {
 		// No TTL set, so nothing to do.
 		return
+	}
+
+	if d.metrics != nil {
+		start := d.timeSource()
+		defer func() {
+			end := d.timeSource()
+			delta := end.Sub(start)
+			d.metrics.ReportGarbageCollectionLatency(d.name, delta)
+		}()
 	}
 
 	for index := d.lowestSegmentIndex; index <= d.highestSegmentIndex; index++ {
@@ -843,9 +904,21 @@ func (d *DiskTable) handleControlLoopFlushRequest(req *controlLoopFlushRequest) 
 
 // handleFlushLoopFlushRequest handles the part of the flush that is performed on the flush loop.
 func (d *DiskTable) handleFlushLoopFlushRequest(req *flushLoopFlushRequest) {
+
+	var segmentFlushStart time.Time
+	if d.metrics != nil {
+		segmentFlushStart = d.timeSource()
+	}
+
 	durableKeys, err := req.flushWaitFunction()
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to flush mutable segment: %v", err))
+	}
+
+	if d.metrics != nil {
+		segmentFlushEnd := d.timeSource()
+		delta := segmentFlushEnd.Sub(segmentFlushStart)
+		d.metrics.ReportSegmentFlushLatency(d.name, delta)
 	}
 
 	err = d.writeKeysToKeymap(durableKeys)
@@ -862,6 +935,15 @@ func (d *DiskTable) writeKeysToKeymap(keys []*types.KAPair) error {
 	if len(keys) == 0 {
 		// Nothing to flush.
 		return nil
+	}
+
+	if d.metrics != nil {
+		start := d.timeSource()
+		defer func() {
+			end := d.timeSource()
+			delta := end.Sub(start)
+			d.metrics.ReportKeymapFlushLatency(d.name, delta)
+		}()
 	}
 
 	err := d.keymap.Put(keys)
