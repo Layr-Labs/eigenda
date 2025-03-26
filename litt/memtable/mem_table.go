@@ -57,6 +57,12 @@ func NewMemTable(timeSource func() time.Time, name string, ttl time.Duration) li
 	}
 }
 
+func (m *memTable) Size() uint64 {
+	// Technically speaking, this table stores zero bytes on disk, and this method
+	// is contractually obligated to return only the size of the data on disk.
+	return 0
+}
+
 func (m *memTable) Name() string {
 	return m.name
 }

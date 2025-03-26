@@ -29,6 +29,9 @@ type keyFile struct {
 
 	// The writer for the file. If the file is sealed, this value is nil.
 	writer *bufio.Writer
+
+	// The size of the key file in bytes.
+	size uint64
 }
 
 // newKeyFile creates a new key file.
@@ -46,9 +49,13 @@ func newKeyFile(
 
 	filePath := keys.path()
 
-	exists, _, err := util.VerifyFilePermissions(filePath)
+	exists, size, err := util.VerifyFilePermissions(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("file is not writeable: %v", err)
+	}
+
+	if exists {
+		keys.size = uint64(size)
 	}
 
 	if sealed {
@@ -71,6 +78,11 @@ func newKeyFile(
 	}
 
 	return keys, nil
+}
+
+// Size returns the size of the key file in bytes.
+func (k *keyFile) Size() uint64 {
+	return k.size
 }
 
 // name returns the name of the key file.
@@ -106,6 +118,8 @@ func (k *keyFile) write(key []byte, address types.Address) error {
 	if err != nil {
 		return fmt.Errorf("failed to write address to key file: %v", err)
 	}
+
+	k.size += uint64(4 + len(key) + 8)
 
 	return nil
 }

@@ -19,8 +19,10 @@ func TestWriteThenReadValues(t *testing.T) {
 	shard := rand.Uint32()
 	valueCount := rand.Int32Range(100, 200)
 	values := make([][]byte, valueCount)
+	expectedFileSize := uint64(0)
 	for i := 0; i < int(valueCount); i++ {
 		values[i] = rand.VariableBytes(1, 100)
+		expectedFileSize += uint64(len(values[i])) + 4 /* length uint32 */
 	}
 
 	// A map from the first byte index of the value to the value itself.
@@ -57,6 +59,22 @@ func TestWriteThenReadValues(t *testing.T) {
 	require.NoError(t, err)
 	for key, val := range addressMap {
 		readValue, err := file.read(key)
+		require.NoError(t, err)
+		require.Equal(t, val, readValue)
+	}
+
+	reportedFileSize := file.size
+	stat, err := os.Stat(file.path())
+	require.NoError(t, err)
+	actualFileSize := uint64(stat.Size())
+	require.Equal(t, actualFileSize, reportedFileSize)
+
+	// Create a new in-memory instance from the on-disk file and verify that it behaves the same.
+	file2, err := newValueFile(logger, index, shard, directory, true, false)
+	require.NoError(t, err)
+	require.Equal(t, file.size, file2.size)
+	for key, val := range addressMap {
+		readValue, err := file2.read(key)
 		require.NoError(t, err)
 		require.Equal(t, val, readValue)
 	}
