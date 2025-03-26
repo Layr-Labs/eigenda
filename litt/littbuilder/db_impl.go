@@ -84,7 +84,7 @@ func NewDBWithTableBuilder(config *LittDBConfig, tableBuilder TableBuilder) (lit
 		timeSource:    config.TimeSource,
 		ttl:           config.TTL,
 		gcPeriod:      config.GCPeriod,
-		tableBuilder:  config.buildTable,
+		tableBuilder:  tableBuilder,
 		tables:        make(map[string]litt.ManagedTable),
 		metrics:       dbMetrics,
 		metricsServer: metricsServer,
@@ -93,6 +93,8 @@ func NewDBWithTableBuilder(config *LittDBConfig, tableBuilder TableBuilder) (lit
 	if config.MetricsEnabled {
 		go database.gatherMetrics(config.MetricsUpdateInterval)
 	}
+
+	logger.Infof("LittDB started, current data size: %d", database.Size())
 
 	return database, nil
 }
@@ -163,6 +165,8 @@ func (d *db) Stop() error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
+	d.logger.Infof("Stopping LittDB, estimated data size: %d", d.Size())
+
 	d.stopped.Store(true)
 
 	for name, table := range d.tables {
@@ -191,6 +195,7 @@ func (d *db) Destroy() error {
 	return nil
 }
 
+// gatherMetrics is a method that periodically collects metrics.
 func (d *db) gatherMetrics(interval time.Duration) {
 	if d.metricsServer != nil {
 		defer func() {
@@ -208,7 +213,7 @@ func (d *db) gatherMetrics(interval time.Duration) {
 		case <-d.ctx.Done():
 			return
 		case <-ticker.C:
-			d.metrics.ReportSizeInBytes(d.Size())
+			d.metrics.CollectPeriodicMetrics(d, d.tables)
 		}
 	}
 }
