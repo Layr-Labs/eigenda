@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -38,6 +39,9 @@ import (
 type LittDBMetrics struct {
 	// The total disk used by the database.
 	sizeInBytes *prometheus.GaugeVec
+
+	// The size of individual tables in the database.
+	tableSizeInBytes *prometheus.GaugeVec
 }
 
 // NewLittDBMetrics creates a new LittDBMetrics instance.
@@ -52,15 +56,35 @@ func NewLittDBMetrics(registry *prometheus.Registry, namespace string) *LittDBMe
 		[]string{},
 	)
 
+	tableSizeInBytes := promauto.With(registry).NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: namespace,
+			Name:      "table_size_bytes",
+			Help:      "The size of individual tables in the database in bytes.",
+		},
+		[]string{"table"},
+	)
+
 	return &LittDBMetrics{
-		sizeInBytes: sizeInBytes,
+		sizeInBytes:      sizeInBytes,
+		tableSizeInBytes: tableSizeInBytes,
 	}
 }
 
-// ReportSizeInBytes reports the total disk used by the database.
-func (m *LittDBMetrics) ReportSizeInBytes(sizeInBytes uint64) {
+// CollectPeriodicMetrics is a method that is periodically called to collect metrics. Tables are not permitted to be
+// added or dropped while this method is running.
+func (m *LittDBMetrics) CollectPeriodicMetrics(db litt.DB, tables map[string]litt.ManagedTable) {
 	if m == nil {
 		return
 	}
-	m.sizeInBytes.WithLabelValues().Set(float64(sizeInBytes))
+
+	totalSize := db.Size()
+	m.sizeInBytes.WithLabelValues().Set(float64(totalSize))
+
+	for _, table := range tables {
+		tableSize := table.Size()
+		tableName := table.Name()
+		m.tableSizeInBytes.WithLabelValues(tableName).Set(float64(tableSize))
+	}
+
 }
