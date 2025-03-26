@@ -30,8 +30,6 @@ var keymapBuilders = map[keymap.KeymapType]keymap.KeymapBuilder{
 	keymap.LevelDBKeymapType: keymap.NewLevelDBKeymapBuilder(),
 }
 
-// TODO update readme
-
 // LittDBConfig is configuration for a litt.DB.
 type LittDBConfig struct {
 	// The context for the database. If nil, context.Background() is used.
@@ -265,7 +263,8 @@ func (c *LittDBConfig) buildTable(
 	logger logging.Logger,
 	timeSource func() time.Time,
 	name string,
-	ttl time.Duration) (litt.ManagedTable, error) {
+	ttl time.Duration,
+	metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
 
 	var table litt.ManagedTable
 
@@ -299,7 +298,8 @@ func (c *LittDBConfig) buildTable(
 		ttl,
 		c.GCPeriod,
 		requiresReload,
-		c.Fsync)
+		c.Fsync,
+		metrics)
 
 	if err != nil {
 		return nil, fmt.Errorf("error creating table: %w", err)

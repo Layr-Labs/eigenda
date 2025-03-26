@@ -24,7 +24,8 @@ type TableBuilder func(
 	logger logging.Logger,
 	timeSource func() time.Time,
 	name string,
-	ttl time.Duration) (litt.ManagedTable, error)
+	ttl time.Duration,
+	metrics *metrics.LittDBMetrics) (litt.ManagedTable, error)
 
 // db is an implementation of DB.
 type db struct {
@@ -144,7 +145,7 @@ func (d *db) GetTable(name string) (litt.Table, error) {
 		}
 
 		var err error
-		table, err = d.tableBuilder(d.ctx, d.logger, d.timeSource, name, d.ttl)
+		table, err = d.tableBuilder(d.ctx, d.logger, d.timeSource, name, d.ttl, d.metrics)
 		if err != nil {
 			return nil, fmt.Errorf("error creating table: %w", err)
 		}

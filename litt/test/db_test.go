@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/memtable"
+	"github.com/Layr-Labs/eigenda/litt/metrics"
 	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
@@ -36,7 +37,8 @@ func buildMemDB(t *testing.T, path string) (litt.DB, error) {
 		logger logging.Logger,
 		timeSource func() time.Time,
 		name string,
-		ttl time.Duration) (litt.ManagedTable, error) {
+		ttl time.Duration,
+		metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
 		return memtable.NewMemTable(timeSource, name, ttl), nil
 	}
 
