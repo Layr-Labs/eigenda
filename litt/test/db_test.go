@@ -168,6 +168,7 @@ func randomDBOperationsTest(t *testing.T, builder dbBuilder) {
 }
 
 func TestRandomDBOperations(t *testing.T) {
+	t.Parallel()
 	for _, builder := range builders {
 		randomDBOperationsTest(t, builder)
 	}
@@ -288,6 +289,7 @@ func dbRestartTest(t *testing.T, builder dbBuilder) {
 }
 
 func TestDBRestart(t *testing.T) {
+	t.Parallel()
 	for _, builder := range restartableBuilders {
 		dbRestartTest(t, builder)
 	}

@@ -140,7 +140,7 @@ func buildLevelDBKeyDiskTable(
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
 	}
 
-	keys, err := keymap.NewLevelDBKeymap(logger, keymapPath, true)
+	keys, err := keymap.NewLevelDBKeymap(logger, keymapPath, true, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create keymap: %w", err)
 	}
@@ -302,6 +302,7 @@ func randomOperationsTest(t *testing.T, tableBuilder tableBuilder) {
 }
 
 func TestRandomOperations(t *testing.T) {
+	t.Parallel()
 	for _, tb := range tableBuilders {
 		randomOperationsTest(t, tb)
 	}
@@ -467,12 +468,14 @@ func garbageCollectionTest(t *testing.T, tableBuilder tableBuilder) {
 }
 
 func TestGarbageCollection(t *testing.T) {
+	t.Parallel()
 	for _, tb := range noCacheTableBuilders {
 		garbageCollectionTest(t, tb)
 	}
 }
 
 func TestInvalidTableName(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 
 	config, err := littbuilder.DefaultConfig(directory)
