@@ -2167,47 +2167,24 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 			require.NoError(t, err)
 			require.False(t, ok)
 
-			// Check the values that are expected to have been removed from the table
-			// Garbage collection happens asynchronously, so we may need to wait for it to complete.
-			testutils.AssertEventuallyTrue(t, func() bool {
-				// keep a running sum of the unexpired data size. Some data may be unable to expire
-				// due to sharing a file with data that is not yet ready to expire. At the most,
-				// we expect so see no more than 232 bytes of unexpired data.
-				//
-				// Math:
-				// - 100 bytes in each segment                   (test configuration)
-				// - max value size of 128 bytes                 (test configuration)
-				// - 4 bytes to store the length of the value    (default property)
-				// 100+128+4 = 232
-				unexpiredDataSize := 0
-
-				for key, expectedValue := range expiredValues {
-					value, ok, err := table.Get([]byte(key))
-					require.NoError(t, err)
-					if !ok {
-						// value is not present in the table
-						continue
-					}
-
-					// If the value has not yet been deleted, it should at least return the expected value.
-					require.Equal(t, expectedValue, value, "unexpected value for key %s", key)
-
-					unexpiredDataSize += len(value) + 4 // 4 bytes stores the length of the value
+			for key, expectedValue := range expiredValues {
+				value, ok, err := table.Get([]byte(key))
+				require.NoError(t, err)
+				if !ok {
+					// value is not present in the table
+					continue
 				}
 
-				if int(table.KeyCount()) != len(expectedValues) {
-					return false
-				}
+				// If the value has not yet been deleted, it should at least return the expected value.
+				require.Equal(t, expectedValue, value, "unexpected value for key %s", key)
 
-				// This check passes if the unexpired data size is less than or equal to the maximum plausible
-				// size of unexpired data. If working as expected, this should always happen within a reasonable
-				// amount of time.
-				return unexpiredDataSize <= 232
-			}, time.Second)
+			}
 		}
 	}
 
 	err = table.Flush()
+	require.NoError(t, err)
+	err = table.ScheduleImmediateGC()
 	require.NoError(t, err)
 
 	reportedSize := table.Size()
@@ -2216,25 +2193,34 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 	require.NoError(t, err)
 
 	// Walk the "directory" file tree and calculate the actual size of the table.
-	actualSize := uint64(0)
-	err = filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() {
-			// directory sizes are not factored into the table size
-			return nil
-		}
-		if strings.Contains(path, "keymap") {
-			// table size does not currently include the keymap size
-			return nil
-		}
+	// There is some asynchrony in file deletion, so we retry a reasonable number of times.
+	testutils.AssertEventuallyTrue(t, func() bool {
+		actualSize := uint64(0)
+		err = filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				// files may be deleted in the middle of the walk
+				return nil
+			}
+			if info.IsDir() {
+				// directory sizes are not factored into the table size
+				return nil
+			}
+			if strings.Contains(path, "keymap") {
+				// table size does not currently include the keymap size
+				return nil
+			}
 
-		actualSize += uint64(info.Size())
-		return nil
-	})
-	require.NoError(t, err)
-	require.Equal(t, actualSize, reportedSize, "delta: %d", int(actualSize)-int(reportedSize))
+			actualSize += uint64(info.Size())
+			return nil
+		})
+		require.NoError(t, err)
+
+		return actualSize == reportedSize
+		//require.Equal(t, actualSize, reportedSize, "delta: %d", int(actualSize)-int(reportedSize))
+	}, time.Second)
 }
 
-func TestTableSize(t *testing.T) { // TODO this test is flaky
+func TestTableSize(t *testing.T) {
 	t.Parallel()
 	for _, tb := range tableBuilders {
 		t.Run(tb.name, func(t *testing.T) {

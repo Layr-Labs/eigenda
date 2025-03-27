@@ -76,4 +76,9 @@ type ManagedTable interface {
 
 	// Destroy cleans up resources used by the table. Table will not be usable after this method is called.
 	Destroy() error
+
+	// ScheduleImmediateGC schedules an immediate garbage collection run. This method blocks until that run is complete.
+	// This method is intended for use in tests, where it can be useful to force a garbage collection run to occur
+	// at a specific time.
+	ScheduleImmediateGC() error
 }
