@@ -384,6 +384,7 @@ func (d *DiskTable) Stop() error {
 	request := &controlLoopShutdownRequest{
 		shutdownCompleteChan: shutdownCompleteChan,
 	}
+
 	err := util.SendAny(d.panic, d.controllerChannel, request)
 	if err != nil {
 		return fmt.Errorf("failed to send shutdown request: %v", err)
@@ -393,7 +394,7 @@ func (d *DiskTable) Stop() error {
 	if err != nil {
 		return fmt.Errorf("failed to shutdown: %v", err)
 	}
-
+	
 	return nil
 }
 

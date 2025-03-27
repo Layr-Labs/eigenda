@@ -23,8 +23,6 @@ type dbBuilder struct {
 	builder func(t *testing.T, tableDirectory string) (litt.DB, error)
 }
 
-// TODO break each out into a separate run
-
 var builders = []*dbBuilder{
 	{
 		name:    "mem",
