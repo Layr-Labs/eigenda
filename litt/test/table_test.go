@@ -43,7 +43,7 @@ var tableBuilders = []*tableBuilder{
 		buildMemKeyDiskTable,
 	},
 	{
-		"cached cached mem keymap disk table",
+		"cached mem keymap disk table",
 		buildCachedMemKeyDiskTable,
 	},
 	{

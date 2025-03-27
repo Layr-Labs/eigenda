@@ -15,7 +15,7 @@ import (
 
 // Tests migration from one type of Keymap to another. This is not defined in the disktable package because this
 // migration requires a littbuilder.LittDBConfig, which is not available in the disktable package.
-func TestKeymapMigration(t *testing.T) { // TODO this now hangs...
+func TestKeymapMigration(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
