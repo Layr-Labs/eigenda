@@ -219,6 +219,7 @@ are present to support testing.
   a key that already exists in the database. This is illegal behavior, but the check is not always enforced due to
   the performance overhead if using anything other than an in-memory keymap. The default is `false`.
 - `MetricsEnabled`: if true, then the database will emit prometheus metrics. The default is `false`.
+- `MetricsNamespace`: the namespace to use for prometheus metrics. The default is `litt`.
 - `MetricsRegistry`: if `MetricsEnabled` is true, then metrics are registered with this registry. If nil, then
   a new registry is created. The default is `nil`.
 - `MetricsPort`: the port to expose metrics on. The default is `8080`. Ignored if `MetricsEnabled` is false or if

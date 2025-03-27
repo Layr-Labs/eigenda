@@ -22,13 +22,16 @@ type LevelDBKeymap struct {
 	doubleWriteProtection bool
 	keymapPath            string
 	alive                 atomic.Bool
+	// This is a "test mode only" flag. Unit tests write lots of little values, and syncing each one is slow.
+	syncWrites bool
 }
 
 // NewLevelDBKeymap creates a new LevelDBKeymap instance.
 func NewLevelDBKeymap(
 	logger logging.Logger,
 	keymapPath string,
-	doubleWriteProtection bool) (*LevelDBKeymap, error) {
+	doubleWriteProtection bool,
+	syncWrites bool) (*LevelDBKeymap, error) {
 
 	db, err := leveldb.OpenFile(keymapPath, nil)
 	if err != nil {
@@ -36,9 +39,11 @@ func NewLevelDBKeymap(
 	}
 
 	kmap := &LevelDBKeymap{
-		logger:     logger,
-		db:         db,
-		keymapPath: keymapPath,
+		logger:                logger,
+		db:                    db,
+		keymapPath:            keymapPath,
+		doubleWriteProtection: doubleWriteProtection,
+		syncWrites:            syncWrites,
 	}
 	kmap.alive.Store(true)
 
@@ -65,7 +70,7 @@ func (l *LevelDBKeymap) Put(pairs []*types.KAPair) error {
 	}
 
 	writeOptions := &opt.WriteOptions{
-		Sync: true,
+		Sync: l.syncWrites,
 	}
 
 	err := l.db.Write(batch, writeOptions)

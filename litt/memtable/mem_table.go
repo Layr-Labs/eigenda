@@ -3,6 +3,7 @@ package memtable
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/litt"
@@ -44,17 +45,39 @@ type memTable struct {
 	// at the cost of code complexity. But since this implementation is primary intended for use in tests,
 	// such optimization is not necessary.
 	lock sync.RWMutex
+
+	shutdown atomic.Bool
 }
 
 // NewMemTable creates a new in-memory table.
-func NewMemTable(timeSource func() time.Time, name string, ttl time.Duration) litt.ManagedTable {
-	return &memTable{
+func NewMemTable(
+	timeSource func() time.Time,
+	name string,
+	ttl time.Duration,
+	gcPeriod time.Duration) litt.ManagedTable {
+
+	table := &memTable{
 		timeSource:      timeSource,
 		name:            name,
 		ttl:             ttl,
 		data:            make(map[string][]byte),
 		expirationQueue: linkedlistqueue.New(),
 	}
+
+	if gcPeriod > 0 {
+		ticker := time.NewTicker(gcPeriod)
+		go func() {
+			for !table.shutdown.Load() {
+				<-ticker.C
+				err := table.ScheduleImmediateGC()
+				if err != nil {
+					panic(err) // this is a class designed for use in testing, not worth properly handling errors
+				}
+			}
+		}()
+	}
+
+	return table
 }
 
 func (m *memTable) Size() uint64 {
@@ -127,7 +150,32 @@ func (m *memTable) SetTTL(ttl time.Duration) error {
 	return nil
 }
 
-func (m *memTable) DoGarbageCollection() error {
+func (m *memTable) Destroy() error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.data = make(map[string][]byte)
+	m.expirationQueue.Clear()
+
+	return nil
+}
+
+func (m *memTable) Stop() error {
+	m.shutdown.Store(true)
+	return nil
+}
+
+func (m *memTable) SetCacheSize(size uint64) error {
+	// The memory table doesn't have a cache... it's already one giant cache.
+	return nil
+}
+
+func (m *memTable) SetShardingFactor(shardingFactor uint32) error {
+	// the memory table has no concept of sharding
+	return nil
+}
+
+func (m *memTable) ScheduleImmediateGC() error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -147,30 +195,5 @@ func (m *memTable) DoGarbageCollection() error {
 		delete(m.data, expiration.key)
 	}
 
-	return nil
-}
-
-func (m *memTable) Destroy() error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.data = make(map[string][]byte)
-	m.expirationQueue.Clear()
-
-	return nil
-}
-
-func (m *memTable) Stop() error {
-	// no-op
-	return nil
-}
-
-func (m *memTable) SetCacheSize(size uint64) error {
-	// The memory table doesn't have a cache... it's already one giant cache.
-	return nil
-}
-
-func (m *memTable) SetShardingFactor(shardingFactor uint32) error {
-	// the memory table has no concept of sharding
 	return nil
 }

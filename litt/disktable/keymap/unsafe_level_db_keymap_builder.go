@@ -9,20 +9,22 @@ import (
 
 var _ KeymapBuilder = &LevelDBKeymapBuilder{}
 
-// LevelDBKeymapBuilder is a KeymapBuilder that builds LevelDBKeymap instances.
-type LevelDBKeymapBuilder struct {
+// UnsafeLevelDBKeymapBuilder is a KeymapBuilder that builds LevelDBKeymap instances. It runs with sync writes disabled.
+// This is much faster than the default LevelDBKeymapBuilder, but it is not safe to use in production. This is only
+// intended for use in tests.
+type UnsafeLevelDBKeymapBuilder struct {
 }
 
-// NewLevelDBKeymapBuilder creates a new LevelDBKeymapBuilder.
-func NewLevelDBKeymapBuilder() *LevelDBKeymapBuilder {
+// NewUnsafeLevelDBKeymapBuilder creates a new UnsafeLevelDBKeymapBuilder.
+func NewUnsafeLevelDBKeymapBuilder() *LevelDBKeymapBuilder {
 	return &LevelDBKeymapBuilder{}
 }
 
-func (b *LevelDBKeymapBuilder) Type() KeymapType {
-	return LevelDBKeymapType
+func (b *UnsafeLevelDBKeymapBuilder) Type() KeymapType {
+	return UnsafeLevelDBKeymapType
 }
 
-func (b *LevelDBKeymapBuilder) Build(
+func (b *UnsafeLevelDBKeymapBuilder) Build(
 	logger logging.Logger,
 	keymapPath string,
 	doubleWriteProtection bool) (Keymap, bool, error) {
@@ -50,7 +52,7 @@ func (b *LevelDBKeymapBuilder) Build(
 	return keymap, requiresReload, nil
 }
 
-func (b *LevelDBKeymapBuilder) DeleteFiles(logger logging.Logger, keymapPath string) error {
+func (b *UnsafeLevelDBKeymapBuilder) DeleteFiles(logger logging.Logger, keymapPath string) error {
 	_, err := os.Stat(keymapPath)
 	if err == nil {
 		logger.Infof("deleting keymap directory: %s", keymapPath)

@@ -116,6 +116,10 @@ func (d *db) Size() uint64 {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
+	return d.lockFreeSize()
+}
+
+func (d *db) lockFreeSize() uint64 {
 	size := uint64(0)
 	for _, table := range d.tables {
 		size += table.Size()
@@ -178,8 +182,7 @@ func (d *db) Stop() error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
-	d.logger.Infof("Stopping LittDB, estimated data size: %d", d.Size())
-
+	d.logger.Infof("Stopping LittDB, estimated data size: %d", d.lockFreeSize())
 	d.stopped.Store(true)
 
 	for name, table := range d.tables {

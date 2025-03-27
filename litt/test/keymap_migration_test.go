@@ -16,6 +16,7 @@ import (
 // Tests migration from one type of Keymap to another. This is not defined in the disktable package because this
 // migration requires a littbuilder.LittDBConfig, which is not available in the disktable package.
 func TestKeymapMigration(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
@@ -29,7 +30,7 @@ func TestKeymapMigration(t *testing.T) {
 	config, err := littbuilder.DefaultConfig(shardDirectories...)
 	require.NoError(t, err)
 	config.ShardingFactor = uint32(directoryCount)
-	config.KeymapType = keymap.LevelDBKeymapType
+	config.KeymapType = keymap.UnsafeLevelDBKeymapType
 	config.Fsync = false // fsync is too slow for unit test workloads
 	config.DoubleWriteProtection = true
 
@@ -144,7 +145,7 @@ func TestKeymapMigration(t *testing.T) {
 	// Close the table and reopen it using a LevelDBKeymap
 	err = db.Stop()
 	require.NoError(t, err)
-	config.KeymapType = keymap.LevelDBKeymapType
+	config.KeymapType = keymap.UnsafeLevelDBKeymapType
 
 	db, err = config.Build()
 	require.NoError(t, err)
