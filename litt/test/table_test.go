@@ -76,7 +76,7 @@ func buildMemTable(
 	name string,
 	path string) (litt.ManagedTable, error) {
 
-	return memtable.NewMemTable(timeSource, name, 0), nil
+	return memtable.NewMemTable(timeSource, name, 0, 0), nil
 }
 
 func setupKeymapTypeFile(keymapPath string, keymapType keymap.KeymapType) (*keymap.KeymapTypeFile, error) {
