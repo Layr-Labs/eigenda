@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
 
 import "forge-std/console2.sol";
 
-contract DeployNitroCertVerifier is Script {
+contract DeployNitroV2Point1Point3CertVerifier is Script {
 
     address constant INITIAL_OWNER = 0x85C2AE9B88baDf751228e307Ae9ab76B74d84f5c;
 
