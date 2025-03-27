@@ -57,7 +57,7 @@ func buildMemDB(t *testing.T, path string) (litt.DB, error) {
 		name string,
 		ttl time.Duration,
 		metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
-		return memtable.NewMemTable(timeSource, name, ttl), nil
+		return memtable.NewMemTable(timeSource, name, ttl, 0), nil
 	}
 
 	config, err := littbuilder.DefaultConfig(path)

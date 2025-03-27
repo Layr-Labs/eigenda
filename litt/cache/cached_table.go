@@ -104,3 +104,7 @@ func (c *cachedTable) Destroy() error {
 func (c *cachedTable) SetShardingFactor(shardingFactor uint32) error {
 	return c.base.SetShardingFactor(shardingFactor)
 }
+
+func (c *cachedTable) ScheduleImmediateGC() error {
+	return c.base.ScheduleImmediateGC()
+}
