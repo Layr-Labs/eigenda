@@ -394,7 +394,7 @@ func (d *DiskTable) Stop() error {
 	if err != nil {
 		return fmt.Errorf("failed to shutdown: %v", err)
 	}
-	
+
 	return nil
 }
 
@@ -856,6 +856,24 @@ func (d *DiskTable) expandSegments() error {
 	return nil
 }
 
+func (d *DiskTable) ScheduleImmediateGC() error {
+	request := &controlLoopGCRequest{
+		completionChan: make(chan struct{}, 1),
+	}
+
+	err := util.SendAny(d.panic, d.controllerChannel, request)
+	if err != nil {
+		return fmt.Errorf("failed to send GC request: %v", err)
+	}
+
+	_, err = util.Await(d.panic, request.completionChan)
+	if err != nil {
+		return fmt.Errorf("failed to await GC completion: %v", err)
+	}
+
+	return nil
+}
+
 // handleFlushLoopSealRequest handles the part of the seal operation that is performed on the flush loop.
 // We don't want to send a flush request to a segment that has already been sealed. By performing the sealing
 // on the flush loop, we ensure that this can never happen. Any previously scheduled flush requests against the
@@ -1007,6 +1025,11 @@ type controlLoopShutdownRequest struct {
 	shutdownCompleteChan chan struct{}
 }
 
+// controlLoopGCRequest is a request to run garbage collection that is sent to the control loop.
+type controlLoopGCRequest struct {
+	completionChan chan struct{}
+}
+
 // controlLoop is the main loop for the disk table. It has sole responsibility for mutating data managed by the
 // disk table (this vastly simplifies locking and thread safety).
 func (d *DiskTable) controlLoop() {
@@ -1026,6 +1049,9 @@ func (d *DiskTable) controlLoop() {
 			} else if req, ok := message.(*controlLoopShutdownRequest); ok {
 				d.handleControlLoopShutdownRequest(req)
 				return
+			} else if req, ok := message.(*controlLoopGCRequest); ok {
+				d.doGarbageCollection()
+				req.completionChan <- struct{}{}
 			} else {
 				d.panic.Panic(fmt.Errorf("Unknown control message type %T", message))
 			}

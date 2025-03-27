@@ -127,7 +127,7 @@ func (m *memTable) SetTTL(ttl time.Duration) error {
 	return nil
 }
 
-func (m *memTable) DoGarbageCollection() error {
+func (m *memTable) doGarbageCollection() error { // TODO this is never called
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -173,4 +173,8 @@ func (m *memTable) SetCacheSize(size uint64) error {
 func (m *memTable) SetShardingFactor(shardingFactor uint32) error {
 	// the memory table has no concept of sharding
 	return nil
+}
+
+func (m *memTable) ScheduleImmediateGC() error {
+	return m.doGarbageCollection()
 }

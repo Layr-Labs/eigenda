@@ -308,7 +308,7 @@ func dbRestartTest(t *testing.T, builder *dbBuilder) {
 	require.Empty(t, entries)
 }
 
-func TestDBRestart(t *testing.T) { // TODO this hangs...
+func TestDBRestart(t *testing.T) {
 	t.Parallel()
 	for _, builder := range restartableBuilders {
 		t.Run(builder.name, func(t *testing.T) {
