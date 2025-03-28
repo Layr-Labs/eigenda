@@ -5,17 +5,20 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"math/rand"
 	"os"
 	"path"
 	"sync"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -85,6 +88,12 @@ type storeV2 struct {
 
 	// Used to make migration thread safe.
 	migrationLock sync.RWMutex
+
+	// A lock used to prevent concurrent requests from storing the same data multiple times.
+	duplicateRequestLock *common.IndexLock
+
+	// The salt used to prevent an attacker from causing hash collisions in the duplicate request lock.
+	duplicateRequestSalt uint32
 }
 
 var _ StoreV2 = &storeV2{}
@@ -262,6 +271,8 @@ func NewStoreV2(
 		chunkTable:            chunkTable,
 		ttl:                   ttl,
 		migrationCompleteTime: migrationComplete,
+		duplicateRequestLock:  common.NewIndexLock(128),
+		duplicateRequestSalt:  rand.Uint32(),
 	}
 
 	if config.LittDBEnabled && levelDBExists {
@@ -371,14 +382,17 @@ func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles
 		return 0, fmt.Errorf("failed to hash batch header: %v", err)
 	}
 
-	// TODO protect against concurrent requests...
-
 	// Check to see if the data is already present.
+	lockIndex := uint64(util.HashKey(batchHeaderHash[:], s.duplicateRequestSalt))
+	s.duplicateRequestLock.Lock(lockIndex)
+
 	_, ok, err := s.headerTable.Get(batchHeaderHash[:])
 	if err != nil {
+		s.duplicateRequestLock.Unlock(lockIndex)
 		return 0, fmt.Errorf("failed to check batch header: %v", err)
 	}
 	if ok {
+		s.duplicateRequestLock.Unlock(lockIndex)
 		return 0, ErrBatchAlreadyExist
 	}
 
@@ -388,18 +402,15 @@ func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles
 		return 0, fmt.Errorf("failed to serialize batch header: %v", err)
 	}
 	err = s.headerTable.Put(batchHeaderHash[:], batchHeaderBytes)
+	s.duplicateRequestLock.Unlock(lockIndex)
 	if err != nil {
 		return 0, fmt.Errorf("failed to put batch header: %v", err)
 	}
+	err = s.headerTable.Flush()
+	if err != nil {
+		return 0, fmt.Errorf("failed to flush header table: %v", err)
+	}
 	size += uint64(len(batchHeaderBytes))
-	batchHeaderFlushed := make(chan struct{}, 1)
-	go func() {
-		err := s.headerTable.Flush()
-		if err != nil {
-			s.logger.Errorf("failed to flush header table: %v", err)
-		}
-		batchHeaderFlushed <- struct{}{}
-	}()
 
 	// Store chunk data.
 	for _, bundles := range rawBundles {
