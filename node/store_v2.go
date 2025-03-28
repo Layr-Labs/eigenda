@@ -374,43 +374,64 @@ func (s *storeV2) storeBatchLevelDB(batch *corev2.Batch, rawBundles []*RawBundle
 
 // TODO do we really need to be returning size?
 
-func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles) (uint64, error) {
-	var size uint64
+// storeBatchHeader stores the batch header in the database, returning an error if it is already present.
+// This method is guaranteed to only return nil exactly once if called multiple times with the same batch header hash.
+func (s *storeV2) storeBatchHeader(batchHeader *corev2.BatchHeader) (uint64, error) {
 
-	batchHeaderHash, err := batch.BatchHeader.Hash()
+	batchHeaderHash, err := batchHeader.Hash()
 	if err != nil {
 		return 0, fmt.Errorf("failed to hash batch header: %v", err)
 	}
+	batchHeaderBytes, err := batchHeader.Serialize()
+	if err != nil {
+		return 0, fmt.Errorf("failed to serialize batch header: %v", err)
+	}
 
-	// Check to see if the data is already present.
+	// Grab a lock that is mutually exclusive for this batch header hash. This prevents us from storing
+	// data twice if we receive concurrent requests to store the same batch.
 	lockIndex := uint64(util.HashKey(batchHeaderHash[:], s.duplicateRequestSalt))
 	s.duplicateRequestLock.Lock(lockIndex)
+	defer s.duplicateRequestLock.Unlock(lockIndex)
 
 	ok, err := s.headerTable.Exists(batchHeaderHash[:])
 	if err != nil {
-		s.duplicateRequestLock.Unlock(lockIndex)
 		return 0, fmt.Errorf("failed to check batch header existence: %v", err)
 	}
 	if ok {
-		s.duplicateRequestLock.Unlock(lockIndex)
 		return 0, ErrBatchAlreadyExist
 	}
 
 	// Store batch header.
-	batchHeaderBytes, err := batch.BatchHeader.Serialize()
-	if err != nil {
-		return 0, fmt.Errorf("failed to serialize batch header: %v", err)
-	}
 	err = s.headerTable.Put(batchHeaderHash[:], batchHeaderBytes)
-	s.duplicateRequestLock.Unlock(lockIndex)
 	if err != nil {
 		return 0, fmt.Errorf("failed to put batch header: %v", err)
 	}
+
+	return uint64(len(batchHeaderBytes)), nil
+}
+
+func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles) (uint64, error) {
+	var size uint64
+
+	// Store the batch header to prevent duplicate insertions.
+	batchHeaderSize, err := s.storeBatchHeader(batch.BatchHeader)
+	if err != nil {
+		return 0, fmt.Errorf("failed to store batch header: %v", err)
+	}
+	size += batchHeaderSize
 	err = s.headerTable.Flush()
 	if err != nil {
 		return 0, fmt.Errorf("failed to flush header table: %v", err)
 	}
-	size += uint64(len(batchHeaderBytes))
+
+	// Now that the batch header is durable on disk, this validator will reject all future requests to store this batch.
+	// If the validator crashes between now and when it returns the availability signature, it will never
+	// return the availability signature for this batch. Although the validator could, in theory, reprocess this
+	// batch after starting back up, the performance and complexity overhead of doing so is cost prohibitive.
+	// Even if the validator was capable of reprocessing the batch after a crash, it's highly likely that the time
+	// window for returning the availability signature for this batch would have already passed -- thus negating
+	// any potential benefit of being able to reprocess the batch. It is, after all, not unreasonable to expect that
+	// a validator may not sign for some batches if it crashes.
 
 	// Store chunk data.
 	for _, bundles := range rawBundles {
