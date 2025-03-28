@@ -18,11 +18,9 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
-	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -109,7 +107,7 @@ func NewNode(
 	// Make sure config folder exists.
 	err := os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
-		return nil, fmt.Errorf("could not create db directory at %s: %w", config.DbPath, err)
+		return nil, fmt.Errorf("could not create levelDB directory at %s: %w", config.DbPath, err)
 	}
 
 	chainID, err := client.ChainID(context.Background())
@@ -220,26 +218,13 @@ func NewNode(
 		return n, nil
 	}
 
-	var storeV2 StoreV2
 	var blobVersionParams *corev2.BlobVersionParameterMap
 	if config.EnableV2 {
-		v2Path := config.DbPath + "/chunk_v2"
-		dbV2, err := tablestore.Start(logger, &tablestore.Config{
-			Type:                          tablestore.LevelDB,
-			Path:                          &v2Path,
-			GarbageCollectionEnabled:      true,
-			GarbageCollectionInterval:     time.Duration(config.ExpirationPollIntervalSec) * time.Second,
-			GarbageCollectionBatchSize:    1024,
-			Schema:                        []string{BatchHeaderTableName, BlobCertificateTableName, BundleTableName},
-			MetricsRegistry:               reg,
-			LevelDBDisableSeeksCompaction: config.LevelDBDisableSeeksCompactionV2,
-			LevelDBSyncWrites:             config.LevelDBSyncWritesV2,
-		})
+		ttl := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second // 12s per block
+		n.StoreV2, err = NewStoreV2(context.Background(), logger, config, time.Now, ttl, reg)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create new tablestore: %w", err)
+			return nil, fmt.Errorf("failed to create new store v2: %w", err)
 		}
-		timeToExpire := (blockStaleMeasure + storeDurationBlocks) * 12 // 12s per block
-		storeV2 = NewLevelDBStoreV2(dbV2, logger, time.Duration(timeToExpire)*time.Second)
 
 		blobParams, err := tx.GetAllVersionedBlobParams(context.Background())
 		if err != nil {
@@ -267,7 +252,6 @@ func NewNode(
 		n.RelayClient.Store(relayClient)
 	}
 
-	n.StoreV2 = storeV2
 	n.BlobVersionParams.Store(blobVersionParams)
 	return n, nil
 }

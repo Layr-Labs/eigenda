@@ -403,6 +403,12 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_ENABLE_SYNC_WRITES_V2"),
 	}
+	LittDBEnabledFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-enabled"),
+		Usage:    "Enable LittDB instead of LevelDB",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_ENABLED"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -527,6 +533,7 @@ var optionalFlags = []cli.Flag{
 	LevelDBEnableSyncWritesV1Flag,
 	LevelDBDisableSeeksCompactionV2Flag,
 	LevelDBEnableSyncWritesV2Flag,
+	LittDBEnabledFlag,
 }
 
 func init() {

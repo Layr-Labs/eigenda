@@ -15,6 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TODO test littdb
+// TODO test migration
+
 func TestStoreBatchV2(t *testing.T) {
 	_, batch, bundles := nodemock.MockBatch(t)
 
