@@ -356,6 +356,9 @@ func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles
 		return 0, fmt.Errorf("failed to hash batch header: %v", err)
 	}
 
+	// TODO can we ensure concurrent requests can't store the same data?
+	//  use PutIfAbsent()
+
 	// Don't store duplicate requests
 	_, ok, err := s.chunkTable.Get(batchHeaderHash[:])
 	if err != nil {
@@ -364,17 +367,6 @@ func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles
 	if ok {
 		return 0, ErrBatchAlreadyExist
 	}
-
-	// Store batch header
-	batchHeaderBytes, err := batch.BatchHeader.Serialize()
-	if err != nil {
-		return 0, fmt.Errorf("failed to serialize batch header: %v", err)
-	}
-	err = s.chunkTable.Put(batchHeaderHash[:], batchHeaderBytes)
-	if err != nil {
-		return 0, fmt.Errorf("failed to put batch header: %v", err)
-	}
-	size += uint64(len(batchHeaderBytes))
 
 	// Store blob shards
 	for _, bundles := range rawBundles {
@@ -398,6 +390,18 @@ func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles
 			size += uint64(len(bundle))
 		}
 	}
+
+	// Store batch header. It's important to do this last in order to ensure
+	// that it is always GC'd after the chunk data.
+	batchHeaderBytes, err := batch.BatchHeader.Serialize()
+	if err != nil {
+		return 0, fmt.Errorf("failed to serialize batch header: %v", err)
+	}
+	err = s.chunkTable.Put(batchHeaderHash[:], batchHeaderBytes)
+	if err != nil {
+		return 0, fmt.Errorf("failed to put batch header: %v", err)
+	}
+	size += uint64(len(batchHeaderBytes))
 
 	err = s.chunkTable.Flush()
 	if err != nil {
