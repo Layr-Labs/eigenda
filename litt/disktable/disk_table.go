@@ -665,6 +665,20 @@ func (d *DiskTable) handleControlLoopWriteRequest(req *controlLoopWriteRequest) 
 	d.updateCurrentSize()
 }
 
+func (d *DiskTable) Exists(key []byte) (bool, error) {
+	_, ok := d.unflushedDataCache.Load(string(key))
+	if ok {
+		return true, nil
+	}
+
+	_, ok, err := d.keymap.Get(key)
+	if err != nil {
+		return false, fmt.Errorf("failed to get address: %v", err)
+	}
+
+	return ok, nil
+}
+
 // Flush flushes all data to disk. Blocks until all data previously submitted to Put has been written to disk.
 func (d *DiskTable) Flush() error {
 	if ok, err := d.panic.IsOk(); !ok {

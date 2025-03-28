@@ -121,6 +121,7 @@ type Table interface {
     Put(key []byte, value []byte) error
     PutBatch(batch []*types.KVPair) error
     Get(key []byte) ([]byte, bool, error)
+    Exists(key []byte) (bool, error)
     Flush() error
     Size() uint64
     SetTTL(ttl time.Duration) error

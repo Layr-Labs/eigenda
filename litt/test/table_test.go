@@ -305,6 +305,9 @@ func randomTableOperationsTest(t *testing.T, tableBuilder *tableBuilder) {
 		// Don't do this every time for the sake of test runtime.
 		if rand.BoolWithProbability(0.01) || i == iterations-1 /* always check on the last iteration */ {
 			for expectedKey, expectedValue := range expectedValues {
+				ok, err := table.Exists([]byte(expectedKey))
+				require.NoError(t, err)
+				require.True(t, ok)
 				value, ok, err := table.Get([]byte(expectedKey))
 				require.NoError(t, err)
 				require.True(t, ok)
@@ -312,7 +315,11 @@ func randomTableOperationsTest(t *testing.T, tableBuilder *tableBuilder) {
 			}
 
 			// Try fetching a value that isn't in the table.
-			_, ok, err := table.Get(rand.PrintableVariableBytes(32, 64))
+			nonExistentKey := rand.PrintableVariableBytes(32, 64)
+			ok, err := table.Exists(nonExistentKey)
+			require.NoError(t, err)
+			require.False(t, ok)
+			_, ok, err = table.Get(nonExistentKey)
 			require.NoError(t, err)
 			require.False(t, ok)
 		}
