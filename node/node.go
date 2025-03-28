@@ -21,8 +21,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
-	"github.com/Layr-Labs/eigenda/litt/littbuilder"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -112,7 +110,7 @@ func NewNode(
 	// Make sure config folder exists.
 	err := os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
-		return nil, fmt.Errorf("could not create DB directory at %s: %w", config.DbPath, err)
+		return nil, fmt.Errorf("could not create levelDB directory at %s: %w", config.DbPath, err)
 	}
 
 	chainID, err := client.ChainID(context.Background())
@@ -243,45 +241,10 @@ func NewNode(
 
 	var blobVersionParams *corev2.BlobVersionParameterMap
 	if config.EnableV2 {
-
-		timeToExpire := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second // 12s per block
-
-		if config.LittDBEnabled {
-			v2LittPath := config.DbPath + "/chunk_v2_litt"
-			littConfig, err := littbuilder.DefaultConfig(v2LittPath)
-			littConfig.ShardingFactor = 1
-			littConfig.MetricsEnabled = true
-			littConfig.MetricsRegistry = reg
-			littConfig.MetricsNamespace = "node_littdb"
-			if err != nil {
-				return nil, fmt.Errorf("failed to create new litt config: %w", err)
-			}
-
-			littStore, err := littConfig.Build()
-			if err != nil {
-				return nil, fmt.Errorf("failed to create new litt store: %w", err)
-			}
-
-			n.StoreV2, err = NewLittDBStoreV2(littStore, logger, timeToExpire)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create new litt store: %w", err)
-			}
-		} else {
-			v2Path := config.DbPath + "/chunk_v2"
-			dbV2, err := tablestore.Start(logger, &tablestore.Config{
-				Type:                       tablestore.LevelDB,
-				Path:                       &v2Path,
-				GarbageCollectionEnabled:   true,
-				GarbageCollectionInterval:  time.Duration(config.ExpirationPollIntervalSec) * time.Second,
-				GarbageCollectionBatchSize: 1024,
-				Schema:                     []string{BatchHeaderTableName, BlobCertificateTableName, BundleTableName},
-				MetricsRegistry:            reg,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("failed to create new tablestore: %w", err)
-			}
-
-			n.StoreV2 = NewLevelDBStoreV2(dbV2, logger, timeToExpire)
+		ttl := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second // 12s per block
+		n.StoreV2, err = NewStoreV2(config, ttl, logger, reg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new store v2: %w", err)
 		}
 
 		blobParams, err := tx.GetAllVersionedBlobParams(context.Background())

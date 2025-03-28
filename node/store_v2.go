@@ -7,10 +7,13 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/kvstore"
+	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/litt"
+	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -37,7 +40,8 @@ type StoreV2 interface {
 }
 
 type storeV2 struct {
-	db         kvstore.TableStore
+	levelDB    kvstore.TableStore
+	littDB     litt.DB
 	chunkTable litt.Table
 	logger     logging.Logger
 	ttl        time.Duration
@@ -45,11 +49,76 @@ type storeV2 struct {
 
 var _ StoreV2 = &storeV2{}
 
+func NewStoreV2(
+	config *Config,
+	ttl time.Duration,
+	logger logging.Logger,
+	registry *prometheus.Registry) (StoreV2, error) {
+
+	if config.LittDBEnabled {
+		littDBPath := config.DbPath + "/chunk_v2_litt"
+		littConfig, err := littbuilder.DefaultConfig(littDBPath)
+		littConfig.ShardingFactor = 1
+		littConfig.MetricsEnabled = true
+		littConfig.MetricsRegistry = registry
+		littConfig.MetricsNamespace = "node_littdb"
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new litt config: %w", err)
+		}
+
+		littDB, err := littConfig.Build()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new litt store: %w", err)
+		}
+
+		chunkTable, err := littDB.GetTable("chunks")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get chunks table: %w", err)
+		}
+
+		err = chunkTable.SetTTL(ttl)
+		if err != nil {
+			return nil, fmt.Errorf("failed to set TTL for chunks table: %w", err)
+		}
+
+		return &storeV2{
+			littDB:     littDB,
+			chunkTable: chunkTable,
+			logger:     logger,
+			ttl:        ttl,
+		}, nil
+	} else {
+		levelDBPath := config.DbPath + "/chunk_v2"
+		levelDB, err := tablestore.Start(logger, &tablestore.Config{
+			Type:                          tablestore.LevelDB,
+			Path:                          &levelDBPath,
+			GarbageCollectionEnabled:      true,
+			GarbageCollectionInterval:     time.Duration(config.ExpirationPollIntervalSec) * time.Second,
+			GarbageCollectionBatchSize:    1024,
+			Schema:                        []string{BatchHeaderTableName, BlobCertificateTableName, BundleTableName},
+			MetricsRegistry:               registry,
+			LevelDBDisableSeeksCompaction: config.LevelDBDisableSeeksCompactionV2,
+			LevelDBSyncWrites:             config.LevelDBSyncWritesV2,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new tablestore: %w", err)
+		}
+
+		return &storeV2{
+			levelDB: levelDB,
+			logger:  logger,
+
+			ttl: ttl,
+		}, nil
+	}
+
+}
+
 // NewLevelDBStoreV2 creates a new StoreV2 backed by a LevelDB database.
 func NewLevelDBStoreV2(db kvstore.TableStore, logger logging.Logger, ttl time.Duration) StoreV2 {
 	return &storeV2{
-		db:     db,
-		logger: logger,
+		levelDB: db,
+		logger:  logger,
 
 		ttl: ttl,
 	}
@@ -82,7 +151,7 @@ func (s *storeV2) StoreBatch(batch *corev2.Batch, rawBundles []*RawBundles) ([]k
 		return nil, 0, fmt.Errorf("mismatch between raw bundles (%d) and blob certificates (%d)", len(rawBundles), len(batch.BlobCertificates))
 	}
 
-	if s.db != nil {
+	if s.levelDB != nil {
 		return s.storeBatchLevelDB(batch, rawBundles)
 	} else {
 		size, err := s.storeBatchLittDB(batch, rawBundles)
@@ -91,12 +160,12 @@ func (s *storeV2) StoreBatch(batch *corev2.Batch, rawBundles []*RawBundles) ([]k
 }
 
 func (s *storeV2) storeBatchLevelDB(batch *corev2.Batch, rawBundles []*RawBundles) ([]kvstore.Key, uint64, error) {
-	dbBatch := s.db.NewTTLBatch()
+	dbBatch := s.levelDB.NewTTLBatch()
 	var size uint64
 
 	keys := make([]kvstore.Key, 0)
 
-	batchHeaderKeyBuilder, err := s.db.GetKeyBuilder(BatchHeaderTableName)
+	batchHeaderKeyBuilder, err := s.levelDB.GetKeyBuilder(BatchHeaderTableName)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get key builder for batch header: %v", err)
 	}
@@ -108,7 +177,7 @@ func (s *storeV2) storeBatchLevelDB(batch *corev2.Batch, rawBundles []*RawBundle
 
 	// Store batch header
 	batchHeaderKey := batchHeaderKeyBuilder.Key(batchHeaderHash[:])
-	if _, err = s.db.Get(batchHeaderKey); err == nil {
+	if _, err = s.levelDB.Get(batchHeaderKey); err == nil {
 		return nil, 0, ErrBatchAlreadyExist
 	}
 	batchHeaderBytes, err := batch.BatchHeader.Serialize()
@@ -129,7 +198,7 @@ func (s *storeV2) storeBatchLevelDB(batch *corev2.Batch, rawBundles []*RawBundle
 
 		// Store bundles
 		for quorum, bundle := range bundles.Bundles {
-			bundlesKeyBuilder, err := s.db.GetKeyBuilder(BundleTableName)
+			bundlesKeyBuilder, err := s.levelDB.GetKeyBuilder(BundleTableName)
 			if err != nil {
 				return nil, 0, fmt.Errorf("failed to get key builder for bundles: %v", err)
 			}
@@ -212,11 +281,11 @@ func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles
 }
 
 func (s *storeV2) DeleteKeys(keys []kvstore.Key) error {
-	if s.db == nil {
+	if s.levelDB == nil {
 		return fmt.Errorf("littDB does not support deletion")
 	}
 
-	dbBatch := s.db.NewTTLBatch()
+	dbBatch := s.levelDB.NewTTLBatch()
 	for _, key := range keys {
 		dbBatch.Delete(key)
 	}
@@ -224,7 +293,7 @@ func (s *storeV2) DeleteKeys(keys []kvstore.Key) error {
 }
 
 func (s *storeV2) GetChunks(blobKey corev2.BlobKey, quorum core.QuorumID) ([][]byte, error) {
-	if s.db != nil {
+	if s.levelDB != nil {
 		return s.getChunksLevelDB(blobKey, quorum)
 	} else {
 		return s.getChunksLittDB(blobKey, quorum)
@@ -232,7 +301,7 @@ func (s *storeV2) GetChunks(blobKey corev2.BlobKey, quorum core.QuorumID) ([][]b
 }
 
 func (s *storeV2) getChunksLevelDB(blobKey corev2.BlobKey, quorum core.QuorumID) ([][]byte, error) {
-	bundlesKeyBuilder, err := s.db.GetKeyBuilder(BundleTableName)
+	bundlesKeyBuilder, err := s.levelDB.GetKeyBuilder(BundleTableName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get key builder for bundles: %v", err)
 	}
@@ -242,7 +311,7 @@ func (s *storeV2) getChunksLevelDB(blobKey corev2.BlobKey, quorum core.QuorumID)
 		return nil, fmt.Errorf("failed to get key for bundles: %v", err)
 	}
 
-	bundle, err := s.db.Get(bundlesKeyBuilder.Key(k))
+	bundle, err := s.levelDB.Get(bundlesKeyBuilder.Key(k))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get bundle: %v", err)
 	}
