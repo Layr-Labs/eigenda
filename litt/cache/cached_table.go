@@ -76,6 +76,15 @@ func (c *cachedTable) Get(key []byte) ([]byte, bool, error) {
 	return value, ok, nil
 }
 
+func (c *cachedTable) Exists(key []byte) (bool, error) {
+	_, ok := c.cache.Get(string(key))
+	if ok {
+		return true, nil
+	}
+
+	return c.base.Exists(key)
+}
+
 func (c *cachedTable) Flush() error {
 	return c.base.Flush()
 }
