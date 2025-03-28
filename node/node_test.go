@@ -68,7 +68,7 @@ func newComponents(t *testing.T, operatorID [32]byte) *components {
 
 	err = os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
-		panic("failed to create a directory for db")
+		panic("failed to create a directory for levelDB")
 	}
 	tx := &coremock.MockWriter{}
 
