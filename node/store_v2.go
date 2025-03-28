@@ -73,6 +73,9 @@ type storeV2 struct {
 	// The table where chunks are stored in the littDB database.
 	chunkTable litt.Table
 
+	// The table where batch headers are stored in the littDB database.
+	headerTable litt.Table
+
 	// The length of time to store data in the database.
 	ttl time.Duration
 
@@ -135,6 +138,7 @@ func NewStoreV2(
 
 	var littDB litt.DB
 	var chunkTable litt.Table
+	var headerTable litt.Table
 	var levelDB kvstore.TableStore
 
 	// If we are still running with levelDB, start it up.
@@ -231,9 +235,20 @@ func NewStoreV2(
 			return nil, fmt.Errorf("failed to get chunks table: %w", err)
 		}
 
+		headerTable, err = littDB.GetTable("headers")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get headers table: %w", err)
+		}
+
 		err = chunkTable.SetTTL(ttl)
 		if err != nil {
 			return nil, fmt.Errorf("failed to set TTL for chunks table: %w", err)
+		}
+		// We store headers to prevent duplicate insertions. Store the headers for 2x the TTL to ensure that
+		// we don't delete the headers before the corresponding chunks.
+		err = headerTable.SetTTL(2 * ttl)
+		if err != nil {
+			return nil, fmt.Errorf("failed to set TTL for headers table: %w", err)
 		}
 	}
 
@@ -356,11 +371,10 @@ func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles
 		return 0, fmt.Errorf("failed to hash batch header: %v", err)
 	}
 
-	// TODO can we ensure concurrent requests can't store the same data?
-	//  use PutIfAbsent()
+	// TODO protect against concurrent requests...
 
-	// Don't store duplicate requests
-	_, ok, err := s.chunkTable.Get(batchHeaderHash[:])
+	// Check to see if the data is already present.
+	_, ok, err := s.headerTable.Get(batchHeaderHash[:])
 	if err != nil {
 		return 0, fmt.Errorf("failed to check batch header: %v", err)
 	}
@@ -368,7 +382,26 @@ func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles
 		return 0, ErrBatchAlreadyExist
 	}
 
-	// Store blob shards
+	// Store batch header.
+	batchHeaderBytes, err := batch.BatchHeader.Serialize()
+	if err != nil {
+		return 0, fmt.Errorf("failed to serialize batch header: %v", err)
+	}
+	err = s.headerTable.Put(batchHeaderHash[:], batchHeaderBytes)
+	if err != nil {
+		return 0, fmt.Errorf("failed to put batch header: %v", err)
+	}
+	size += uint64(len(batchHeaderBytes))
+	batchHeaderFlushed := make(chan struct{}, 1)
+	go func() {
+		err := s.headerTable.Flush()
+		if err != nil {
+			s.logger.Errorf("failed to flush header table: %v", err)
+		}
+		batchHeaderFlushed <- struct{}{}
+	}()
+
+	// Store chunk data.
 	for _, bundles := range rawBundles {
 		blobKey, err := bundles.BlobCertificate.BlobHeader.BlobKey()
 		if err != nil {
@@ -390,18 +423,6 @@ func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles
 			size += uint64(len(bundle))
 		}
 	}
-
-	// Store batch header. It's important to do this last in order to ensure
-	// that it is always GC'd after the chunk data.
-	batchHeaderBytes, err := batch.BatchHeader.Serialize()
-	if err != nil {
-		return 0, fmt.Errorf("failed to serialize batch header: %v", err)
-	}
-	err = s.chunkTable.Put(batchHeaderHash[:], batchHeaderBytes)
-	if err != nil {
-		return 0, fmt.Errorf("failed to put batch header: %v", err)
-	}
-	size += uint64(len(batchHeaderBytes))
 
 	err = s.chunkTable.Flush()
 	if err != nil {
