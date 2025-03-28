@@ -47,7 +47,7 @@ func Perm64Bytes(b []byte) uint64 {
 			copy(nextBytes, b[i:])
 			next = binary.BigEndian.Uint64(nextBytes)
 		}
-		x ^= Perm64(next)
+		x = Perm64(next ^ x)
 	}
 
 	return x
@@ -55,5 +55,5 @@ func Perm64Bytes(b []byte) uint64 {
 
 // HashKey hashes a key using perm64 and a salt.
 func HashKey(key []byte, salt uint32) uint32 {
-	return uint32(Perm64Bytes(key) ^ uint64(salt))
+	return uint32(Perm64(Perm64Bytes(key) ^ uint64(salt)))
 }
