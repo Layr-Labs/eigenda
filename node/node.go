@@ -221,7 +221,7 @@ func NewNode(
 	var blobVersionParams *corev2.BlobVersionParameterMap
 	if config.EnableV2 {
 		ttl := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second // 12s per block
-		n.StoreV2, err = NewStoreV2(config, ttl, logger, reg)
+		n.StoreV2, err = NewStoreV2(context.Background(), logger, config, time.Now, ttl, reg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new store v2: %w", err)
 		}

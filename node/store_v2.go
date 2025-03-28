@@ -2,8 +2,12 @@ package node
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
+	"os"
+	"path"
+	"sync"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/kvstore"
@@ -20,8 +24,19 @@ const (
 	BatchHeaderTableName     = "batch_headers"
 	BlobCertificateTableName = "blob_certificates"
 	BundleTableName          = "bundles"
+	MigrationTableName       = "migration"
+
+	// LevelDBPath is he path where the levelDB database is stored.
+	LevelDBPath = "chunk_v2"
+	// LevelDBDeletionPath is the path where the levelDB database is stored while it is being deleted (for atomicity).
+	LevelDBDeletionPath = "chunk_v2_deleted"
+	// LittDBPath is the path where the littDB database is stored.
+	LittDBPath = "chunk_v2_litt"
 )
 
+// TODO consider renaming to ValidatorStore
+
+// StoreV2 encapsulates the database for storing batches of chunk data for the V2 validator node.
 type StoreV2 interface {
 
 	// StoreBatch stores a batch and its raw bundles in the database. Returns the keys of the stored data
@@ -40,23 +55,163 @@ type StoreV2 interface {
 }
 
 type storeV2 struct {
-	levelDB    kvstore.TableStore
-	littDB     litt.DB
-	chunkTable litt.Table
 	logger     logging.Logger
-	ttl        time.Duration
+	timeSource func() time.Time
+
+	// The levelDB database for storing chunk data. If nil, then the store is backed by a littDB database.
+	levelDB kvstore.TableStore
+
+	// The path to the levelDB database.
+	levelDBPath string
+
+	// The path to the levelDB database while it is being deleted.
+	levelDBDeletionPath string
+
+	// The littDB database for storing chunk data. If nil, then the store has not yet been migrated to littDB.
+	littDB litt.DB
+
+	// The table where chunks are stored in the littDB database.
+	chunkTable litt.Table
+
+	// The length of time to store data in the database.
+	ttl time.Duration
+
+	// If a migration is in progress, this is the timestamp when the migration is considered to be complete.
+	// The migration is completed once all data in levelDB has outlived its TTL.
+	migrationCompleteTime time.Time
+
+	// Used to make migration thread safe.
+	migrationLock sync.RWMutex
 }
 
 var _ StoreV2 = &storeV2{}
 
 func NewStoreV2(
-	config *Config,
-	ttl time.Duration,
+	ctx context.Context,
 	logger logging.Logger,
+	config *Config,
+	timeSource func() time.Time,
+	ttl time.Duration,
 	registry *prometheus.Registry) (StoreV2, error) {
 
+	if !config.LittDBEnabled {
+		logger.Warn("WARNING: This node is running with littDB disabled. " +
+			"This is a deprecated mode of operation, and will not be supported in future versions.")
+	}
+
+	littDBPath := path.Join(config.DbPath, LittDBPath)
+	levelDBPath := path.Join(config.DbPath, LevelDBPath)
+	levelDBDeletionPath := path.Join(config.DbPath, LevelDBDeletionPath)
+
+	// If we previously made an attempt at deleting the levelDB database but it was interrupted, delete it now.
+	_, err := os.Stat(levelDBDeletionPath)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("failed to stat path %s: %v", levelDBDeletionPath, err)
+	}
+	if err == nil {
+		// The previous attempt at deleting the levelDB database was interrupted.
+		logger.Warnf("partial deletion of levelDB database detected at %s. Deleting.", levelDBDeletionPath)
+		err = os.RemoveAll(levelDBDeletionPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to delete path %s: %v", levelDBDeletionPath, err)
+		}
+	}
+
+	// Check to see which DBs currently have data on disk.
+	_, err = os.Stat(levelDBPath)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("failed to stat path %s: %v", levelDBPath, err)
+	}
+	levelDBExists := err == nil
+
+	_, err = os.Stat(littDBPath)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("failed to stat path %s: %v", littDBPath, err)
+	}
+	littDBExists := err == nil
+	if littDBExists && !config.LittDBEnabled {
+		return nil, fmt.Errorf("Unable to do backwards migration. Once enabled, littDB cannot be disabled.")
+	}
+
+	var littDB litt.DB
+	var chunkTable litt.Table
+	var levelDB kvstore.TableStore
+
+	// If we are still running with levelDB, start it up.
+	if !config.LittDBEnabled || levelDBExists {
+		logger.Infof("Using levelDB at %s", levelDBPath)
+
+		levelDB, err = tablestore.Start(logger, &tablestore.Config{
+			Type:                       tablestore.LevelDB,
+			Path:                       &levelDBPath,
+			GarbageCollectionEnabled:   true,
+			GarbageCollectionInterval:  time.Duration(config.ExpirationPollIntervalSec) * time.Second,
+			GarbageCollectionBatchSize: 1024,
+			Schema: []string{
+				BatchHeaderTableName,
+				BlobCertificateTableName,
+				BundleTableName,
+				MigrationTableName},
+			MetricsRegistry:               registry,
+			LevelDBDisableSeeksCompaction: config.LevelDBDisableSeeksCompactionV2,
+			LevelDBSyncWrites:             config.LevelDBSyncWritesV2,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new tablestore: %w", err)
+		}
+	}
+
+	// Set up migration if necessary.
+	var migrationComplete time.Time
+	if config.LittDBEnabled && levelDBExists {
+		// Both DBs are in play, meaning we are either about to start a migration or already in the middle of one.
+
+		migrationKeyBuilder, err := levelDB.GetKeyBuilder(MigrationTableName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get key builder for migration: %v", err)
+		}
+		migrationKey := migrationKeyBuilder.Key([]byte("migrationCompleteTime"))
+
+		if littDBExists {
+			// This is the first time we are starting up with littDB enabled and there is potentially data still
+			// in the levelDB. Start the data migration from levelDB to littDB.
+
+			migrationComplete = timeSource().Add(ttl)
+			logger.Infof("Begining data migration from levelDB to littDB. Migration will be completed at %s",
+				migrationComplete)
+
+			err = levelDB.Put(migrationKey, []byte(fmt.Sprintf("%d", migrationComplete.Unix())))
+			if err != nil {
+				return nil, fmt.Errorf("failed to put migration key: %v", err)
+			}
+
+		} else {
+			// A data migration from levelDB to littDB is currently in progress.
+
+			migrationCompleteString, err := levelDB.Get(migrationKey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get migration complete time: %v", err)
+			}
+			migrationCompleteUnix, err := binary.ReadVarint(bytes.NewReader(migrationCompleteString))
+			if err != nil {
+				return nil, fmt.Errorf("failed to read migration complete time: %v", err)
+			}
+			migrationComplete = time.Unix(migrationCompleteUnix, 0)
+
+			logger.Infof(
+				"Data migration from levelDB to littDB is in progress. Migration will be completed at %s",
+				migrationComplete)
+		}
+	}
+
+	// Start littDB.
+	// The ordering of this step is important. By starting littDB, we will create the littDB directory, which
+	// will cause the littDBExists variable to be true for all future runs. It's important to have written the
+	// migration complete timestamp prior to this happening so that a crash during startup does not leave the
+	// migration in a broken state.
 	if config.LittDBEnabled {
-		littDBPath := config.DbPath + "/chunk_v2_litt"
+		logger.Infof("Using littDB at %s", littDBPath)
+
 		littConfig, err := littbuilder.DefaultConfig(littDBPath)
 		littConfig.ShardingFactor = 1
 		littConfig.MetricsEnabled = true
@@ -66,12 +221,12 @@ func NewStoreV2(
 			return nil, fmt.Errorf("failed to create new litt config: %w", err)
 		}
 
-		littDB, err := littConfig.Build()
+		littDB, err = littConfig.Build()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new litt store: %w", err)
 		}
 
-		chunkTable, err := littDB.GetTable("chunks")
+		chunkTable, err = littDB.GetTable("chunks")
 		if err != nil {
 			return nil, fmt.Errorf("failed to get chunks table: %w", err)
 		}
@@ -80,39 +235,29 @@ func NewStoreV2(
 		if err != nil {
 			return nil, fmt.Errorf("failed to set TTL for chunks table: %w", err)
 		}
-
-		return &storeV2{
-			littDB:     littDB,
-			chunkTable: chunkTable,
-			logger:     logger,
-			ttl:        ttl,
-		}, nil
-	} else {
-		levelDBPath := config.DbPath + "/chunk_v2"
-		levelDB, err := tablestore.Start(logger, &tablestore.Config{
-			Type:                          tablestore.LevelDB,
-			Path:                          &levelDBPath,
-			GarbageCollectionEnabled:      true,
-			GarbageCollectionInterval:     time.Duration(config.ExpirationPollIntervalSec) * time.Second,
-			GarbageCollectionBatchSize:    1024,
-			Schema:                        []string{BatchHeaderTableName, BlobCertificateTableName, BundleTableName},
-			MetricsRegistry:               registry,
-			LevelDBDisableSeeksCompaction: config.LevelDBDisableSeeksCompactionV2,
-			LevelDBSyncWrites:             config.LevelDBSyncWritesV2,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create new tablestore: %w", err)
-		}
-
-		return &storeV2{
-			levelDB: levelDB,
-			logger:  logger,
-
-			ttl: ttl,
-		}, nil
 	}
 
+	store := &storeV2{
+		logger:                logger,
+		timeSource:            timeSource,
+		levelDB:               levelDB,
+		levelDBPath:           levelDBPath,
+		levelDBDeletionPath:   levelDBDeletionPath,
+		littDB:                littDB,
+		chunkTable:            chunkTable,
+		ttl:                   ttl,
+		migrationCompleteTime: migrationComplete,
+	}
+
+	if config.LittDBEnabled && levelDBExists {
+		// This sleeps until the migration is complete then deletes the levelDB database.
+		go store.finalizeMigration(ctx)
+	}
+
+	return store, nil
 }
+
+// TODO get rid of this constructor
 
 // NewLevelDBStoreV2 creates a new StoreV2 backed by a LevelDB database.
 func NewLevelDBStoreV2(db kvstore.TableStore, logger logging.Logger, ttl time.Duration) StoreV2 {
@@ -124,38 +269,20 @@ func NewLevelDBStoreV2(db kvstore.TableStore, logger logging.Logger, ttl time.Du
 	}
 }
 
-// NewLittDBStoreV2 creates a new StoreV2 backed by a Litt database.
-func NewLittDBStoreV2(db litt.DB, logger logging.Logger, ttl time.Duration) (StoreV2, error) {
-	chunkTable, err := db.GetTable("chunks")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get chunks table: %w", err)
-	}
-
-	err = chunkTable.SetTTL(ttl)
-	if err != nil {
-		return nil, fmt.Errorf("failed to set TTL for chunks table: %w", err)
-	}
-
-	return &storeV2{
-		chunkTable: chunkTable,
-		logger:     logger,
-		ttl:        ttl,
-	}, nil
-}
-
 func (s *storeV2) StoreBatch(batch *corev2.Batch, rawBundles []*RawBundles) ([]kvstore.Key, uint64, error) {
 	if len(rawBundles) == 0 {
 		return nil, 0, fmt.Errorf("no raw bundles")
 	}
 	if len(rawBundles) != len(batch.BlobCertificates) {
-		return nil, 0, fmt.Errorf("mismatch between raw bundles (%d) and blob certificates (%d)", len(rawBundles), len(batch.BlobCertificates))
+		return nil, 0, fmt.Errorf("mismatch between raw bundles (%d) and blob certificates (%d)",
+			len(rawBundles), len(batch.BlobCertificates))
 	}
 
-	if s.levelDB != nil {
-		return s.storeBatchLevelDB(batch, rawBundles)
-	} else {
+	if s.littDB != nil {
 		size, err := s.storeBatchLittDB(batch, rawBundles)
 		return nil, size, err
+	} else {
+		return s.storeBatchLevelDB(batch, rawBundles)
 	}
 }
 
@@ -280,6 +407,7 @@ func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles
 	return size, nil
 }
 
+// TODO this should not be a public method!!
 func (s *storeV2) DeleteKeys(keys []kvstore.Key) error {
 	if s.levelDB == nil {
 		return fmt.Errorf("littDB does not support deletion")
@@ -293,11 +421,37 @@ func (s *storeV2) DeleteKeys(keys []kvstore.Key) error {
 }
 
 func (s *storeV2) GetChunks(blobKey corev2.BlobKey, quorum core.QuorumID) ([][]byte, error) {
-	if s.levelDB != nil {
+	if s.littDB == nil {
+		// We haven't thrown the switch for littDB yet. Just look in levelDB.
 		return s.getChunksLevelDB(blobKey, quorum)
-	} else {
-		return s.getChunksLittDB(blobKey, quorum)
 	}
+
+	// Regardless of migration status, always check littDB first.
+	data, ok, err := s.getChunksLittDB(blobKey, quorum)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chunks: %v", err)
+	}
+
+	if !ok {
+		// The data wasn't found in littDB.
+
+		if s.levelDB == nil {
+			// There is no data in levelDB.
+			return nil, fmt.Errorf("failed to get chunks: not found")
+		}
+
+		s.migrationLock.RLock()
+		defer s.migrationLock.RUnlock()
+
+		if s.levelDB == nil {
+			// The migration completed while we were waiting for the lock.
+			return nil, fmt.Errorf("failed to get chunks: not found")
+		}
+
+		return s.getChunksLevelDB(blobKey, quorum)
+	}
+
+	return data, nil
 }
 
 func (s *storeV2) getChunksLevelDB(blobKey corev2.BlobKey, quorum core.QuorumID) ([][]byte, error) {
@@ -324,26 +478,64 @@ func (s *storeV2) getChunksLevelDB(blobKey corev2.BlobKey, quorum core.QuorumID)
 	return chunks, nil
 }
 
-func (s *storeV2) getChunksLittDB(blobKey corev2.BlobKey, quorum core.QuorumID) ([][]byte, error) {
+func (s *storeV2) getChunksLittDB(blobKey corev2.BlobKey, quorum core.QuorumID) ([][]byte, bool, error) {
 	k, err := BundleKey(blobKey, quorum)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get key for bundles: %v", err)
+		return nil, false, fmt.Errorf("failed to get key for bundles: %v", err)
 	}
 
 	bundle, ok, err := s.chunkTable.Get(k)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get bundle: %v", err)
+		return nil, false, fmt.Errorf("failed to get bundle: %v", err)
 	}
 	if !ok {
-		return nil, fmt.Errorf("bundle not found")
+		return nil, false, nil
 	}
 
 	chunks, _, err := DecodeChunks(bundle)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode chunks: %v", err)
+		return nil, false, fmt.Errorf("failed to decode chunks: %v", err)
 	}
 
-	return chunks, nil
+	return chunks, true, nil
+}
+
+// finalizeMigration sleeps until the migration is complete, then deletes the levelDB database.
+func (s *storeV2) finalizeMigration(ctx context.Context) {
+	timeUntilMigrationComplete := s.migrationCompleteTime.Sub(s.timeSource())
+
+	select {
+	case <-ctx.Done():
+		s.logger.Info("context cancelled, migration finalization aborted")
+		return
+	case <-time.After(timeUntilMigrationComplete):
+		s.migrationLock.Lock()
+		defer s.migrationLock.Unlock()
+
+		s.logger.Infof("migration to littDB complete, deleting levelDB at %s", s.levelDBPath)
+
+		err := s.levelDB.Shutdown()
+		if err != nil {
+			s.logger.Errorf("failed to stop levelDB: %v", err)
+			return
+		}
+
+		// In order to make levelDB deletion atomic, first rename it.
+		err = os.Rename(s.levelDBPath, s.levelDBDeletionPath)
+		if err != nil {
+			s.logger.Errorf("failed to rename levelDB: %v", err)
+		}
+
+		// Now, delete the levelDB database.
+		err = os.RemoveAll(s.levelDBDeletionPath)
+		if err != nil {
+			s.logger.Errorf("failed to delete levelDB: %v", err)
+			return
+		}
+
+		s.levelDB = nil
+		s.logger.Infof("levelDB has been deleted")
+	}
 }
 
 func BundleKey(blobKey corev2.BlobKey, quorumID core.QuorumID) ([]byte, error) {
