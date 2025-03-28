@@ -44,8 +44,6 @@ type StoreV2 interface {
 
 	// StoreBatch stores a batch and its raw bundles in the database. Returns the keys of the stored data
 	// and the size of the stored data, in bytes.
-	//
-	// All modifications to the database within this method are performed atomically.
 	StoreBatch(batch *corev2.Batch, rawBundles []*RawBundles) ([]kvstore.Key, uint64, error)
 
 	// DeleteKeys deletes the keys from local storage.
@@ -374,6 +372,8 @@ func (s *storeV2) storeBatchLevelDB(batch *corev2.Batch, rawBundles []*RawBundle
 	return keys, size, nil
 }
 
+// TODO do we really need to be returning size?
+
 func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles) (uint64, error) {
 	var size uint64
 
@@ -386,10 +386,10 @@ func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles
 	lockIndex := uint64(util.HashKey(batchHeaderHash[:], s.duplicateRequestSalt))
 	s.duplicateRequestLock.Lock(lockIndex)
 
-	_, ok, err := s.headerTable.Get(batchHeaderHash[:])
+	ok, err := s.headerTable.Exists(batchHeaderHash[:])
 	if err != nil {
 		s.duplicateRequestLock.Unlock(lockIndex)
-		return 0, fmt.Errorf("failed to check batch header: %v", err)
+		return 0, fmt.Errorf("failed to check batch header existence: %v", err)
 	}
 	if ok {
 		s.duplicateRequestLock.Unlock(lockIndex)
