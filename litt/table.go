@@ -29,6 +29,9 @@ type Table interface {
 	// make a copy of it first. Better to avoid a copy if it's not necessary, though.
 	Get(key []byte) ([]byte, bool, error)
 
+	// Exists returns true if the key exists in the database, and false otherwise. This is faster than calling Get.
+	Exists(key []byte) (bool, error)
+
 	// Flush ensures that all data written to the database is crash durable on disk. When this method returns,
 	// all data written by Put() operations is guaranteed to be crash durable. Put() operations called synchronously
 	// with this method may not be crash durable after this method returns.

@@ -138,6 +138,13 @@ func (m *memTable) Get(key []byte) ([]byte, bool, error) {
 	return value, true, nil
 }
 
+func (m *memTable) Exists(key []byte) (bool, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	_, ok := m.data[string(key)]
+	return ok, nil
+}
+
 func (m *memTable) Flush() error {
 	// This is a no-op for a memory table. Memory tables are ephemeral by nature.
 	return nil
