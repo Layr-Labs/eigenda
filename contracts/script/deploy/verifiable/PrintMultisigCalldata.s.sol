@@ -12,7 +12,6 @@ import {
 } from "./DeploymentInitializer.sol";
 
 import "forge-std/Script.sol";
-import "forge-std/StdJson.sol";
 
 import {console2} from "forge-std/console2.sol";
 
@@ -20,7 +19,6 @@ contract PrintMultisigCalldata is Script {
     using InitParamsLib for string;
 
     string cfg;
-    address deploymentInitializer;
 
     function run() external {
         _initConfig();
@@ -36,7 +34,6 @@ contract PrintMultisigCalldata is Script {
 
     /// @dev override this if you don't want to use the environment to get the config path
     function _initConfig() internal virtual {
-        deploymentInitializer = vm.envAddress("DEPLOYMENT_INITIALIZER");
         cfg = vm.readFile(vm.envString("DEPLOY_CONFIG_PATH"));
     }
 }
