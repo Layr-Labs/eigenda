@@ -23,9 +23,6 @@ contract CertVerifierRouter is IEigenDACertVerifierBase, Ownable {
             referenceBlockNumber > certVerifierRBNs[certVerifierRBNs.length - 1],
             "Reference block number must be greater than the last registered RBN"
         );
-        require(
-            certVerifiers[referenceBlockNumber] == IEigenDACertVerifierBase(address(0)), "Cert verifier already exists"
-        );
         certVerifiers[referenceBlockNumber] = IEigenDACertVerifierBase(certVerifier);
         certVerifierRBNs.push(referenceBlockNumber);
         emit CertVerifierAdded(referenceBlockNumber, certVerifier);
