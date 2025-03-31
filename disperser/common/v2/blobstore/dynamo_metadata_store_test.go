@@ -872,8 +872,10 @@ func TestBlobMetadataStoreGetBlobMetadataByAccountID(t *testing.T) {
 	requestedAt := make([]uint64, numBlobs)
 	dynamoKeys := make([]commondynamodb.Key, numBlobs)
 	for i := 0; i < numBlobs; i++ {
-		blobKey, blobHeader := newBlob(t)
+		_, blobHeader := newBlob(t)
 		blobHeader.PaymentMetadata.AccountID = accountId
+		blobKey, err := blobHeader.BlobKey()
+		require.NoError(t, err)
 		requestedAt[i] = firstBlobTime + nanoSecsPerBlob*uint64(i)
 		now := time.Now()
 		metadata := &v2.BlobMetadata{
@@ -885,7 +887,7 @@ func TestBlobMetadataStoreGetBlobMetadataByAccountID(t *testing.T) {
 			UpdatedAt:   uint64(now.UnixNano()),
 			RequestedAt: requestedAt[i],
 		}
-		err := blobMetadataStore.PutBlobMetadata(ctx, metadata)
+		err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
 		keys[i] = blobKey
 		dynamoKeys[i] = commondynamodb.Key{
