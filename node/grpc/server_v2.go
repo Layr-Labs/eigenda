@@ -219,7 +219,7 @@ func (s *ServerV2) validateAndStoreV2ChunksLevelDB(
 	storeChan := make(chan storeResult)
 	go func() {
 		storageStart := time.Now()
-		keys, size, err := s.node.StoreV2.StoreBatch(batchHeaderHash[:], batchData)
+		keys, size, err := s.node.ValidatorStore.StoreBatch(batchHeaderHash[:], batchData)
 		if err != nil {
 			storeChan <- storeResult{
 				keys: nil,
@@ -241,7 +241,7 @@ func (s *ServerV2) validateAndStoreV2ChunksLevelDB(
 	if err != nil {
 		res := <-storeChan
 		if len(res.keys) > 0 {
-			if deleteErr := s.node.StoreV2.DeleteKeys(res.keys); deleteErr != nil {
+			if deleteErr := s.node.ValidatorStore.DeleteKeys(res.keys); deleteErr != nil {
 				s.logger.Error(
 					"failed to delete keys",
 					"err", deleteErr,
@@ -276,7 +276,7 @@ func (s *ServerV2) validateAndStoreV2ChunksLittDB(
 	s.metrics.ReportStoreChunksLatency("validation", time.Since(stageTimer))
 
 	storageStart := time.Now()
-	_, size, err := s.node.StoreV2.StoreBatch(batchHeaderHash[:], batchData)
+	_, size, err := s.node.ValidatorStore.StoreBatch(batchHeaderHash[:], batchData)
 	if err != nil {
 		return api.NewErrorInternal(fmt.Sprintf("failed to store batch %s: %v", batchHeaderHash, err))
 	}
@@ -330,7 +330,7 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to get bundle key: %v", err))
 	}
 
-	bundleData, err := s.node.StoreV2.GetBundleData(bundleKey)
+	bundleData, err := s.node.ValidatorStore.GetBundleData(bundleKey)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get chunks: %v", err))
 	}

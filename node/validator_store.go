@@ -48,8 +48,8 @@ type BundleToStore struct {
 	BundleBytes []byte
 }
 
-// StoreV2 encapsulates the database for storing batches of chunk data for the V2 validator node.
-type StoreV2 interface {
+// ValidatorStore encapsulates the database for storing batches of chunk data for the V2 validator node.
+type ValidatorStore interface {
 
 	// StoreBatch stores a batch and its raw bundles in the database. Returns the keys of the stored data
 	// and the size of the stored data, in bytes.
@@ -65,7 +65,7 @@ type StoreV2 interface {
 	GetBundleData(bundleKey []byte) ([]byte, error)
 }
 
-type storeV2 struct {
+type validatorStore struct {
 	logger     logging.Logger
 	timeSource func() time.Time
 
@@ -104,7 +104,7 @@ type storeV2 struct {
 	duplicateRequestSalt uint32
 }
 
-var _ StoreV2 = &storeV2{}
+var _ ValidatorStore = &validatorStore{}
 
 func NewStoreV2(
 	ctx context.Context,
@@ -112,7 +112,7 @@ func NewStoreV2(
 	config *Config,
 	timeSource func() time.Time,
 	ttl time.Duration,
-	registry *prometheus.Registry) (StoreV2, error) {
+	registry *prometheus.Registry) (ValidatorStore, error) {
 
 	if !config.LittDBEnabled {
 		logger.Warn("WARNING: This node is running with littDB disabled. " +
@@ -269,7 +269,7 @@ func NewStoreV2(
 		}
 	}
 
-	store := &storeV2{
+	store := &validatorStore{
 		logger:                logger,
 		timeSource:            timeSource,
 		levelDB:               levelDB,
@@ -292,7 +292,7 @@ func NewStoreV2(
 	return store, nil
 }
 
-func (s *storeV2) StoreBatch(batchHeaderHash []byte, batchData []*BundleToStore) ([]kvstore.Key, uint64, error) {
+func (s *validatorStore) StoreBatch(batchHeaderHash []byte, batchData []*BundleToStore) ([]kvstore.Key, uint64, error) {
 	if len(batchData) == 0 {
 		return nil, 0, fmt.Errorf("no batch data")
 	}
@@ -305,7 +305,7 @@ func (s *storeV2) StoreBatch(batchHeaderHash []byte, batchData []*BundleToStore)
 	}
 }
 
-func (s *storeV2) storeBatchLevelDB(batchHeaderHash []byte, batchData []*BundleToStore) ([]kvstore.Key, uint64, error) {
+func (s *validatorStore) storeBatchLevelDB(batchHeaderHash []byte, batchData []*BundleToStore) ([]kvstore.Key, uint64, error) {
 	dbBatch := s.levelDB.NewTTLBatch()
 	var size uint64
 
@@ -353,7 +353,7 @@ func (s *storeV2) storeBatchLevelDB(batchHeaderHash []byte, batchData []*BundleT
 
 // storeBatchHeader stores the batch header hash in the database, returning an error if it is already present.
 // This method is guaranteed to only return nil exactly once if called multiple times with the same batch header hash.
-func (s *storeV2) storeBatchHeaderHash(batchHeaderHash []byte) error {
+func (s *validatorStore) storeBatchHeaderHash(batchHeaderHash []byte) error {
 
 	// Grab a lock that is mutually exclusive for this batch header hash. This prevents us from storing
 	// data twice if we receive concurrent requests to store the same batch.
@@ -378,7 +378,7 @@ func (s *storeV2) storeBatchHeaderHash(batchHeaderHash []byte) error {
 	return nil
 }
 
-func (s *storeV2) storeBatchLittDB(batchHeaderHash []byte, batchData []*BundleToStore) (uint64, error) {
+func (s *validatorStore) storeBatchLittDB(batchHeaderHash []byte, batchData []*BundleToStore) (uint64, error) {
 	var size uint64
 
 	// Store the batch header to prevent duplicate insertions.
@@ -427,7 +427,7 @@ func (s *storeV2) storeBatchLittDB(batchHeaderHash []byte, batchData []*BundleTo
 	return size, nil
 }
 
-func (s *storeV2) DeleteKeys(keys []kvstore.Key) error {
+func (s *validatorStore) DeleteKeys(keys []kvstore.Key) error {
 	if s.littDB != nil {
 		return fmt.Errorf("littDB does not support deletion")
 	}
@@ -439,7 +439,7 @@ func (s *storeV2) DeleteKeys(keys []kvstore.Key) error {
 	return dbBatch.Apply()
 }
 
-func (s *storeV2) GetBundleData(bundleKey []byte) ([]byte, error) {
+func (s *validatorStore) GetBundleData(bundleKey []byte) ([]byte, error) {
 	if s.littDB == nil {
 		// We haven't thrown the switch for littDB yet. Just look in levelDB.
 		return s.getChunksLevelDB(bundleKey)
@@ -473,7 +473,7 @@ func (s *storeV2) GetBundleData(bundleKey []byte) ([]byte, error) {
 	return data, nil
 }
 
-func (s *storeV2) getChunksLevelDB(bundleKey []byte) ([]byte, error) {
+func (s *validatorStore) getChunksLevelDB(bundleKey []byte) ([]byte, error) {
 	bundlesKeyBuilder, err := s.levelDB.GetKeyBuilder(BundleTableName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get key builder for bundles: %v", err)
@@ -487,7 +487,7 @@ func (s *storeV2) getChunksLevelDB(bundleKey []byte) ([]byte, error) {
 	return bundle, nil
 }
 
-func (s *storeV2) getChunksLittDB(bundleKey []byte) ([]byte, bool, error) {
+func (s *validatorStore) getChunksLittDB(bundleKey []byte) ([]byte, bool, error) {
 	bundle, ok, err := s.chunkTable.Get(bundleKey)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to get bundle: %v", err)
@@ -500,7 +500,7 @@ func (s *storeV2) getChunksLittDB(bundleKey []byte) ([]byte, bool, error) {
 }
 
 // finalizeMigration sleeps until the migration is complete, then deletes the levelDB database.
-func (s *storeV2) finalizeMigration(ctx context.Context) {
+func (s *validatorStore) finalizeMigration(ctx context.Context) {
 	timeUntilMigrationComplete := s.migrationCompleteTime.Sub(s.timeSource())
 
 	select {

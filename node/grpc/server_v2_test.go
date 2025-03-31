@@ -94,15 +94,15 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 	var atomicRelayClient atomic.Value
 	atomicRelayClient.Store(relay)
 	node := &node.Node{
-		Config:      config,
-		Logger:      logger,
-		KeyPair:     keyPair,
-		BLSSigner:   signer,
-		Metrics:     metrics,
-		StoreV2:     s,
-		ChainState:  chainState,
-		ValidatorV2: val,
-		RelayClient: atomicRelayClient,
+		Config:         config,
+		Logger:         logger,
+		KeyPair:        keyPair,
+		BLSSigner:      signer,
+		Metrics:        metrics,
+		ValidatorStore: s,
+		ChainState:     chainState,
+		ValidatorV2:    val,
+		RelayClient:    atomicRelayClient,
 	}
 	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 

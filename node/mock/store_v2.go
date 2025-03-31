@@ -11,7 +11,7 @@ type MockStoreV2 struct {
 	mock.Mock
 }
 
-var _ node.StoreV2 = (*MockStoreV2)(nil)
+var _ node.ValidatorStore = (*MockStoreV2)(nil)
 
 func NewMockStoreV2() *MockStoreV2 {
 	return &MockStoreV2{}

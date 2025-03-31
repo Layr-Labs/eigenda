@@ -172,7 +172,7 @@ package node_test
 //	require.Error(t, err)
 //}
 //
-//func createStoreV2(t *testing.T) (node.StoreV2, kvstore.TableStore) {
+//func createStoreV2(t *testing.T) (node.ValidatorStore, kvstore.TableStore) {
 //	logger := testutils.GetLogger()
 //	config := tablestore.DefaultLevelDBConfig(t.TempDir())
 //	config.LevelDBSyncWrites = false
