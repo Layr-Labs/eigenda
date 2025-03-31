@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"strconv"
 	"sync"
 	"time"
 
@@ -38,13 +39,11 @@ const (
 	LittDBPath = "chunk_v2_litt"
 )
 
-// TODO consider renaming to ValidatorStore
-
 // BundleToStore is a struct that holds the bundle key and the bundle bytes.
 type BundleToStore struct {
 	// A bundle key, as encoded by BundleKey()
 	BundleKey []byte
-	// The bundle bytes, as encoded by TODO.
+	// The binary bundle bytes.
 	BundleBytes []byte
 }
 
@@ -63,6 +62,9 @@ type ValidatorStore interface {
 	// GetBundleData returns the chunks of a blob with the given bundle key.
 	// The returned chunks are encoded in bundle format.
 	GetBundleData(bundleKey []byte) ([]byte, error)
+
+	// Stop stops the store.
+	Stop() error
 }
 
 type validatorStore struct {
@@ -106,7 +108,7 @@ type validatorStore struct {
 
 var _ ValidatorStore = &validatorStore{}
 
-func NewStoreV2(
+func NewValidatorStore(
 	ctx context.Context,
 	logger logging.Logger,
 	config *Config,
@@ -193,7 +195,7 @@ func NewStoreV2(
 		}
 		migrationKey := migrationKeyBuilder.Key([]byte("migrationCompleteTime"))
 
-		if littDBExists {
+		if !littDBExists {
 			// This is the first time we are starting up with littDB enabled and there is potentially data still
 			// in the levelDB. Start the data migration from levelDB to littDB.
 
@@ -201,7 +203,8 @@ func NewStoreV2(
 			logger.Infof("Begining data migration from levelDB to littDB. Migration will be completed at %s",
 				migrationComplete)
 
-			err = levelDB.Put(migrationKey, []byte(fmt.Sprintf("%d", migrationComplete.Unix())))
+			migrationCompleteUnix := migrationComplete.Unix()
+			err = levelDB.Put(migrationKey, []byte(fmt.Sprintf("%d", migrationCompleteUnix)))
 			if err != nil {
 				return nil, fmt.Errorf("failed to put migration key: %v", err)
 			}
@@ -213,11 +216,11 @@ func NewStoreV2(
 			if err != nil {
 				return nil, fmt.Errorf("failed to get migration complete time: %v", err)
 			}
-			migrationCompleteUnix, err := binary.ReadVarint(bytes.NewReader(migrationCompleteString))
+			migrationCompleteUnix, err := strconv.ParseUint(string(migrationCompleteString), 10, 64)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read migration complete time: %v", err)
 			}
-			migrationComplete = time.Unix(migrationCompleteUnix, 0)
+			migrationComplete = time.Unix(int64(migrationCompleteUnix), 0)
 
 			logger.Infof(
 				"Data migration from levelDB to littDB is in progress. Migration will be completed at %s",
@@ -238,6 +241,7 @@ func NewStoreV2(
 		littConfig.MetricsEnabled = true
 		littConfig.MetricsRegistry = registry
 		littConfig.MetricsNamespace = "node_littdb"
+		littConfig.Logger = logger
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new litt config: %w", err)
 		}
@@ -544,4 +548,21 @@ func BundleKey(blobKey corev2.BlobKey, quorumID core.QuorumID) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func (s *validatorStore) Stop() error {
+	if s.littDB != nil {
+		err := s.littDB.Stop()
+		if err != nil {
+			return fmt.Errorf("failed to close littDB: %v", err)
+		}
+	}
+	if s.levelDB != nil {
+		err := s.levelDB.Shutdown()
+		if err != nil {
+			return fmt.Errorf("failed to close levelDB: %v", err)
+		}
+	}
+
+	return nil
 }

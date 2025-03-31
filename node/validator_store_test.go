@@ -1,184 +1,385 @@
-package node_test
+package node
 
-//import (
-//	"testing"
-//	"time"
-//
-//	"github.com/Layr-Labs/eigenda/common/kvstore"
-//	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
-//	"github.com/Layr-Labs/eigenda/common/testutils"
-//	"github.com/Layr-Labs/eigenda/core"
-//	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-//	"github.com/Layr-Labs/eigenda/node"
-//	nodemock "github.com/Layr-Labs/eigenda/node/mock"
-//	"github.com/stretchr/testify/assert"
-//	"github.com/stretchr/testify/require"
-//)
-//
-//// TODO
-////  - running in levelDB mode
-////  - restarting in levelDB mode
-////  - running in littDB mode
-////  - restarting in littDB mode
-////  - restarting and starting a migration
-////  - restarting and continuing a migration
-////  - finishing a migration
-////  - restarting after a migration has completed
-////  - simulate a crash during a migration
-//
-//func TestStoreBatchV2(t *testing.T) {
-//	_, batch, bundles := nodemock.MockBatch(t)
-//
-//	blobShards := make([]*corev2.BlobShard, len(batch.BlobCertificates))
-//	rawBundles := make([]*node.RawBundles, len(batch.BlobCertificates))
-//	for i, cert := range batch.BlobCertificates {
-//		blobShards[i] = &corev2.BlobShard{
-//			BlobCertificate: cert,
-//			Bundles:         make(map[core.QuorumID]core.Bundle),
-//		}
-//		rawBundles[i] = &node.RawBundles{
-//			BlobCertificate: cert,
-//			Bundles:         make(map[core.QuorumID][]byte),
-//		}
-//
-//		for quorum, bundle := range bundles[i] {
-//			blobShards[i].Bundles[quorum] = bundle
-//			bundleBytes, err := bundle.Serialize()
-//			assert.NoError(t, err)
-//			rawBundles[i].Bundles[quorum] = bundleBytes
-//		}
-//	}
-//
-//	s, db := createStoreV2(t)
-//	defer func() {
-//		_ = db.Shutdown()
-//	}()
-//	keys, _, err := s.StoreBatch(batch, rawBundles)
-//	require.NoError(t, err)
-//	require.Len(t, keys, 7)
-//
-//	tables := db.GetTables()
-//	require.ElementsMatch(t, []string{node.BatchHeaderTableName, node.BlobCertificateTableName, node.BundleTableName}, tables)
-//
-//	// Check batch header
-//	bhh, err := batch.BatchHeader.Hash()
-//	require.NoError(t, err)
-//	batchHeaderKeyBuilder, err := db.GetKeyBuilder(node.BatchHeaderTableName)
-//	require.NoError(t, err)
-//	bhhBytes, err := db.Get(batchHeaderKeyBuilder.Key(bhh[:]))
-//	require.NoError(t, err)
-//	assert.NotNil(t, bhhBytes)
-//	deserializedBatchHeader, err := corev2.DeserializeBatchHeader(bhhBytes)
-//	require.NoError(t, err)
-//	assert.Equal(t, batch.BatchHeader, deserializedBatchHeader)
-//
-//	// Check bundles
-//	bundleKeyBuilder, err := db.GetKeyBuilder(node.BundleTableName)
-//	require.NoError(t, err)
-//	for _, bundles := range rawBundles {
-//		blobKey, err := bundles.BlobCertificate.BlobHeader.BlobKey()
-//		require.NoError(t, err)
-//		for quorum, bundle := range bundles.Bundles {
-//			k, err := node.BundleKey(blobKey, quorum)
-//			require.NoError(t, err)
-//			bundleBytes, err := db.Get(bundleKeyBuilder.Key(k))
-//			require.NoError(t, err)
-//			assert.NotNil(t, bundleBytes)
-//			require.Equal(t, bundle, bundleBytes)
-//		}
-//	}
-//
-//	// Try to store the same batch again
-//	_, _, err = s.StoreBatch(batch, rawBundles)
-//	require.ErrorIs(t, err, node.ErrBatchAlreadyExist)
-//
-//	// Check deletion
-//	err = s.DeleteKeys(keys)
-//	require.NoError(t, err)
-//
-//	bhhBytes, err = db.Get(batchHeaderKeyBuilder.Key(bhh[:]))
-//	require.Error(t, err)
-//	require.Empty(t, bhhBytes)
-//
-//	for _, bundles := range rawBundles {
-//		blobKey, err := bundles.BlobCertificate.BlobHeader.BlobKey()
-//		require.NoError(t, err)
-//		for quorum := range bundles.Bundles {
-//			k, err := node.BundleKey(blobKey, quorum)
-//			require.NoError(t, err)
-//			bundleBytes, err := db.Get(bundleKeyBuilder.Key(k))
-//			require.Error(t, err)
-//			require.Empty(t, bundleBytes)
-//		}
-//	}
-//}
-//
-//func TestGetChunks(t *testing.T) {
-//	blobKeys, batch, bundles := nodemock.MockBatch(t)
-//
-//	blobShards := make([]*corev2.BlobShard, len(batch.BlobCertificates))
-//	rawBundles := make([]*node.RawBundles, len(batch.BlobCertificates))
-//	for i, cert := range batch.BlobCertificates {
-//		blobShards[i] = &corev2.BlobShard{
-//			BlobCertificate: cert,
-//			Bundles:         make(map[core.QuorumID]core.Bundle),
-//		}
-//		rawBundles[i] = &node.RawBundles{
-//			BlobCertificate: cert,
-//			Bundles:         make(map[core.QuorumID][]byte),
-//		}
-//
-//		for quorum, bundle := range bundles[i] {
-//			blobShards[i].Bundles[quorum] = bundle
-//			bundleBytes, err := bundle.Serialize()
-//			assert.NoError(t, err)
-//			rawBundles[i].Bundles[quorum] = bundleBytes
-//		}
-//	}
-//
-//	s, db := createStoreV2(t)
-//	defer func() {
-//		_ = db.Shutdown()
-//	}()
-//	_, _, err := s.StoreBatch(batch, rawBundles)
-//	require.NoError(t, err)
-//
-//	chunks, err := s.GetBundleData(blobKeys[0], 0)
-//	require.NoError(t, err)
-//	require.Len(t, chunks, len(bundles[0][0]))
-//
-//	chunks, err = s.GetBundleData(blobKeys[0], 1)
-//	require.NoError(t, err)
-//	require.Len(t, chunks, len(bundles[0][1]))
-//
-//	chunks, err = s.GetBundleData(blobKeys[1], 0)
-//	require.NoError(t, err)
-//	require.Len(t, chunks, len(bundles[1][0]))
-//
-//	chunks, err = s.GetBundleData(blobKeys[1], 1)
-//	require.NoError(t, err)
-//	require.Len(t, chunks, len(bundles[1][1]))
-//
-//	chunks, err = s.GetBundleData(blobKeys[2], 1)
-//	require.NoError(t, err)
-//	require.Len(t, chunks, len(bundles[2][1]))
-//
-//	chunks, err = s.GetBundleData(blobKeys[2], 2)
-//	require.NoError(t, err)
-//	require.Len(t, chunks, len(bundles[2][2]))
-//
-//	// wrong quorum
-//	_, err = s.GetBundleData(blobKeys[0], 2)
-//	require.Error(t, err)
-//}
-//
-//func createStoreV2(t *testing.T) (node.ValidatorStore, kvstore.TableStore) {
-//	logger := testutils.GetLogger()
-//	config := tablestore.DefaultLevelDBConfig(t.TempDir())
-//	config.LevelDBSyncWrites = false
-//	config.Schema = []string{node.BatchHeaderTableName, node.BlobCertificateTableName, node.BundleTableName}
-//	tStore, err := tablestore.Start(logger, config)
-//	require.NoError(t, err)
-//	s := node.NewLevelDBStoreV2(tStore, logger, 10*time.Second)
-//	return s, tStore
-//}
+import (
+	"context"
+	"os"
+	"path"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/stretchr/testify/require"
+)
+
+func randomInsertionsTest(t *testing.T, config *Config) {
+	rand := random.NewTestRandom()
+	testDir := t.TempDir()
+
+	iterations := 10
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
+	config.DbPath = testDir
+
+	store, err := NewValidatorStore(context.Background(), logger, config, time.Now, 2*time.Hour, nil)
+	require.NoError(t, err)
+
+	// A map from bundle key to bundle bytes
+	expectedData := make(map[string][]byte)
+
+	// Write data to the store
+	for i := 0; i < iterations; i++ {
+		bundleCount := rand.Int32Range(1, 10)
+		bundles := make([]*BundleToStore, 0, bundleCount)
+		for j := 0; j < int(bundleCount); j++ {
+			bundleKey := rand.PrintableBytes(32)
+			bundleBytes := rand.PrintableVariableBytes(1, 64)
+			bundles = append(bundles, &BundleToStore{
+				BundleKey:   bundleKey,
+				BundleBytes: bundleBytes,
+			})
+			expectedData[string(bundleKey)] = bundleBytes
+		}
+
+		batchHeaderHash := rand.PrintableBytes(32)
+
+		_, _, err = store.StoreBatch(batchHeaderHash, bundles)
+		require.NoError(t, err)
+	}
+
+	// Read data back from the store
+	for bundleKey, expectedBundleBytes := range expectedData {
+		bundleBytes, err := store.GetBundleData([]byte(bundleKey))
+		require.NoError(t, err)
+		require.Equal(t, expectedBundleBytes, bundleBytes)
+	}
+
+	err = store.Stop()
+	require.NoError(t, err)
+}
+
+func TestRandomInsertions(t *testing.T) {
+	t.Run("levelDB", func(t *testing.T) {
+		config := &Config{
+			LittDBEnabled:             false,
+			ExpirationPollIntervalSec: 1,
+		}
+		randomInsertionsTest(t, config)
+	})
+	t.Run("littDB", func(t *testing.T) {
+		config := &Config{
+			LittDBEnabled: true,
+		}
+		randomInsertionsTest(t, config)
+	})
+}
+
+func restartTest(t *testing.T, config *Config) {
+	rand := random.NewTestRandom()
+	testDir := t.TempDir()
+
+	iterations := 10
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
+	config.DbPath = testDir
+
+	store, err := NewValidatorStore(context.Background(), logger, config, time.Now, 2*time.Hour, nil)
+	require.NoError(t, err)
+
+	// A map from bundle key to bundle bytes
+	expectedData := make(map[string][]byte)
+
+	// Write data to the store
+	for i := 0; i < iterations; i++ {
+		bundleCount := rand.Int32Range(1, 10)
+		bundles := make([]*BundleToStore, 0, bundleCount)
+		for j := 0; j < int(bundleCount); j++ {
+			bundleKey := rand.PrintableBytes(32)
+			bundleBytes := rand.PrintableVariableBytes(1, 64)
+			bundles = append(bundles, &BundleToStore{
+				BundleKey:   bundleKey,
+				BundleBytes: bundleBytes,
+			})
+			expectedData[string(bundleKey)] = bundleBytes
+		}
+
+		batchHeaderHash := rand.PrintableBytes(32)
+
+		_, _, err = store.StoreBatch(batchHeaderHash, bundles)
+		require.NoError(t, err)
+	}
+
+	// Read data back from the store
+	for bundleKey, expectedBundleBytes := range expectedData {
+		bundleBytes, err := store.GetBundleData([]byte(bundleKey))
+		require.NoError(t, err)
+		require.Equal(t, expectedBundleBytes, bundleBytes)
+	}
+
+	err = store.Stop()
+	require.NoError(t, err)
+
+	// Restart the store
+	store, err = NewValidatorStore(context.Background(), logger, config, time.Now, 2*time.Hour, nil)
+	require.NoError(t, err)
+
+	// Read data back from the store
+	for bundleKey, expectedBundleBytes := range expectedData {
+		bundleBytes, err := store.GetBundleData([]byte(bundleKey))
+		require.NoError(t, err)
+		require.Equal(t, expectedBundleBytes, bundleBytes)
+	}
+
+	err = store.Stop()
+	require.NoError(t, err)
+}
+
+func TestRestart(t *testing.T) {
+	t.Run("levelDB", func(t *testing.T) {
+		config := &Config{
+			LittDBEnabled:             false,
+			ExpirationPollIntervalSec: 1,
+		}
+		restartTest(t, config)
+	})
+	t.Run("littDB", func(t *testing.T) {
+		config := &Config{
+			LittDBEnabled: true,
+		}
+		restartTest(t, config)
+	})
+}
+
+func doubleInsertionTest(t *testing.T, config *Config) {
+	rand := random.NewTestRandom()
+	testDir := t.TempDir()
+
+	iterations := 10
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
+	config.DbPath = testDir
+
+	store, err := NewValidatorStore(context.Background(), logger, config, time.Now, 2*time.Hour, nil)
+	require.NoError(t, err)
+
+	// A map from bundle key to bundle bytes
+	expectedData := make(map[string][]byte)
+
+	batchHeaderHashes := make([][]byte, 0, iterations)
+
+	// Write data to the store
+	for i := 0; i < iterations; i++ {
+		bundleCount := rand.Int32Range(1, 10)
+		bundles := make([]*BundleToStore, 0, bundleCount)
+		for j := 0; j < int(bundleCount); j++ {
+			bundleKey := rand.PrintableBytes(32)
+			bundleBytes := rand.PrintableVariableBytes(1, 64)
+			bundles = append(bundles, &BundleToStore{
+				BundleKey:   bundleKey,
+				BundleBytes: bundleBytes,
+			})
+			expectedData[string(bundleKey)] = bundleBytes
+		}
+
+		batchHeaderHash := rand.PrintableBytes(32)
+		batchHeaderHashes = append(batchHeaderHashes, batchHeaderHash)
+
+		_, _, err = store.StoreBatch(batchHeaderHash, bundles)
+		require.NoError(t, err)
+	}
+
+	// Read data back from the store
+	for bundleKey, expectedBundleBytes := range expectedData {
+		bundleBytes, err := store.GetBundleData([]byte(bundleKey))
+		require.NoError(t, err)
+		require.Equal(t, expectedBundleBytes, bundleBytes)
+	}
+
+	// Attempt to insert data with the same batch header hash
+	for _, batchHeaderHash := range batchHeaderHashes {
+		bundles := make([]*BundleToStore, 0, 1)
+		bundleKey := rand.PrintableBytes(32)
+		bundleBytes := rand.PrintableVariableBytes(1, 64)
+		bundles = append(bundles, &BundleToStore{
+			BundleKey:   bundleKey,
+			BundleBytes: bundleBytes,
+		})
+		_, _, err = store.StoreBatch(batchHeaderHash, bundles)
+		require.Error(t, err)
+	}
+
+	// Restarting should not permit double insertion.
+	err = store.Stop()
+	require.NoError(t, err)
+
+	store, err = NewValidatorStore(context.Background(), logger, config, time.Now, 2*time.Hour, nil)
+	require.NoError(t, err)
+
+	// Read data back from the store
+	for bundleKey, expectedBundleBytes := range expectedData {
+		bundleBytes, err := store.GetBundleData([]byte(bundleKey))
+		require.NoError(t, err)
+		require.Equal(t, expectedBundleBytes, bundleBytes)
+	}
+
+	// Attempt to insert data with the same batch header hash
+	for _, batchHeaderHash := range batchHeaderHashes {
+		bundles := make([]*BundleToStore, 0, 1)
+		bundleKey := rand.PrintableBytes(32)
+		bundleBytes := rand.PrintableVariableBytes(1, 64)
+		bundles = append(bundles, &BundleToStore{
+			BundleKey:   bundleKey,
+			BundleBytes: bundleBytes,
+		})
+		_, _, err = store.StoreBatch(batchHeaderHash, bundles)
+		require.Error(t, err)
+	}
+
+	err = store.Stop()
+	require.NoError(t, err)
+}
+
+func TestDoubleInsertion(t *testing.T) {
+	t.Run("levelDB", func(t *testing.T) {
+		config := &Config{
+			LittDBEnabled:             false,
+			ExpirationPollIntervalSec: 1,
+		}
+		doubleInsertionTest(t, config)
+	})
+	t.Run("littDB", func(t *testing.T) {
+		config := &Config{
+			LittDBEnabled: true,
+		}
+		doubleInsertionTest(t, config)
+	})
+}
+
+func TestMigration(t *testing.T) {
+	rand := random.NewTestRandom()
+	testDir := t.TempDir()
+
+	iterations := 10
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
+	config := &Config{
+		LittDBEnabled:             false,
+		ExpirationPollIntervalSec: 1,
+		DbPath:                    testDir,
+	}
+
+	ttl := 2 * time.Hour
+
+	store, err := NewValidatorStore(context.Background(), logger, config, time.Now, ttl, nil)
+	require.NoError(t, err)
+
+	// A map from bundle key to bundle bytes
+	expectedData := make(map[string][]byte)
+
+	// Write data to the store
+	for i := 0; i < iterations; i++ {
+		bundleCount := rand.Int32Range(1, 10)
+		bundles := make([]*BundleToStore, 0, bundleCount)
+		for j := 0; j < int(bundleCount); j++ {
+			bundleKey := rand.PrintableBytes(32)
+			bundleBytes := rand.PrintableVariableBytes(1, 64)
+			bundles = append(bundles, &BundleToStore{
+				BundleKey:   bundleKey,
+				BundleBytes: bundleBytes,
+			})
+			expectedData[string(bundleKey)] = bundleBytes
+		}
+
+		batchHeaderHash := rand.PrintableBytes(32)
+
+		_, _, err = store.StoreBatch(batchHeaderHash, bundles)
+		require.NoError(t, err)
+	}
+
+	// Read data back from the store
+	for bundleKey, expectedBundleBytes := range expectedData {
+		bundleBytes, err := store.GetBundleData([]byte(bundleKey))
+		require.NoError(t, err)
+		require.Equal(t, expectedBundleBytes, bundleBytes)
+	}
+
+	err = store.Stop()
+	require.NoError(t, err)
+
+	// Restart the store in migration mode.
+	config.LittDBEnabled = true
+
+	store, err = NewValidatorStore(context.Background(), logger, config, time.Now, ttl, nil)
+	require.NoError(t, err)
+
+	// Write some new data.
+	for i := 0; i < iterations; i++ {
+		bundleCount := rand.Int32Range(1, 10)
+		bundles := make([]*BundleToStore, 0, bundleCount)
+		for j := 0; j < int(bundleCount); j++ {
+			bundleKey := rand.PrintableBytes(32)
+			bundleBytes := rand.PrintableVariableBytes(1, 64)
+			bundles = append(bundles, &BundleToStore{
+				BundleKey:   bundleKey,
+				BundleBytes: bundleBytes,
+			})
+			expectedData[string(bundleKey)] = bundleBytes
+		}
+
+		batchHeaderHash := rand.PrintableBytes(32)
+
+		_, _, err = store.StoreBatch(batchHeaderHash, bundles)
+		require.NoError(t, err)
+	}
+
+	// Verify all data is present. Some data will be in littDB, other data will be in levelDB.
+	for bundleKey, expectedBundleBytes := range expectedData {
+		bundleBytes, err := store.GetBundleData([]byte(bundleKey))
+		require.NoError(t, err)
+		require.Equal(t, expectedBundleBytes, bundleBytes)
+	}
+
+	// Restart the store while still in migration mode.
+	// This invokes a different code pathway than the initial migration.
+	err = store.Stop()
+	require.NoError(t, err)
+
+	timeSourceDelta := atomic.Uint64{}
+	timeSource := func() time.Time {
+		return time.Now().Add(time.Duration(timeSourceDelta.Load()) * time.Second)
+	}
+
+	store, err = NewValidatorStore(context.Background(), logger, config, timeSource, ttl, nil)
+	require.NoError(t, err)
+
+	// Verify all data is present. Some data will be in littDB, other data will be in levelDB.
+	for bundleKey, expectedBundleBytes := range expectedData {
+		bundleBytes, err := store.GetBundleData([]byte(bundleKey))
+		require.NoError(t, err)
+		require.Equal(t, expectedBundleBytes, bundleBytes)
+	}
+
+	// At this point in time, the levelDB directory should still be present.
+	_, err = os.Stat(path.Join(testDir, LevelDBPath))
+	require.NoError(t, err)
+
+	// Simulate time moving forward by a few hours and manually trigger the step to clean up levelDB data.
+	timeSourceDelta.Store(3 * 60 * 60)
+	store.(*validatorStore).finalizeMigration(context.Background())
+
+	// The levelDB directory should now be gone.
+	_, err = os.Stat(path.Join(testDir, LevelDBPath))
+	require.True(t, os.IsNotExist(err))
+
+	err = store.Stop()
+	require.NoError(t, err)
+}
