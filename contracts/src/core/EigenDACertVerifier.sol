@@ -9,6 +9,7 @@ import {EigenDACertVerificationUtils} from "../libraries/EigenDACertVerification
 import {OperatorStateRetriever} from "../../lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
+import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
 /**
@@ -16,7 +17,8 @@ import "../interfaces/IEigenDAStructs.sol";
  * @notice For V2 verification this contract is deployed with immutable security thresholds and required quorum numbers,
  *         to change these values or verification behavior a new CertVerifier must be deployed
  */
-contract EigenDACertVerifier is IEigenDACertVerifier {
+contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDAThresholdRegistry {
+
     /// @notice The EigenDAThresholdRegistry contract address
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
 

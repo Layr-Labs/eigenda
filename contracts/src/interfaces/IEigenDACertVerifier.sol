@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDAThresholdRegistry} from "./IEigenDAThresholdRegistry.sol";
 import "./IEigenDAStructs.sol";
 
-interface IEigenDACertVerifier is IEigenDAThresholdRegistry {
+interface IEigenDACertVerifierBase {
+
     /**
      * @notice Verifies a the blob cert is valid for the required quorums
      * @param blobHeader The blob header to verify
@@ -73,6 +73,9 @@ interface IEigenDACertVerifier is IEigenDAThresholdRegistry {
         view
         returns (NonSignerStakesAndSignature memory);
 
+}
+
+interface IEigenDACertVerifier is IEigenDACertVerifierBase {
     /**
      * @notice Verifies the security parameters for a blob cert
      * @param blobParams The blob params to verify
@@ -88,5 +91,12 @@ interface IEigenDACertVerifier is IEigenDAThresholdRegistry {
      * @param version The version of the blob to verify
      * @param securityThresholds The security thresholds to verify against
      */
+<<<<<<< HEAD
     function verifyDACertSecurityParams(uint16 version, SecurityThresholds memory securityThresholds) external view;
+=======
+    function verifyDACertSecurityParams(
+        uint16 version,
+        SecurityThresholds memory securityThresholds
+    ) external view;
+>>>>>>> de14d145 (feat: cert verifier router)
 }
