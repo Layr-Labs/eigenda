@@ -372,8 +372,6 @@ func (s *storeV2) storeBatchLevelDB(batch *corev2.Batch, rawBundles []*RawBundle
 	return keys, size, nil
 }
 
-// TODO do we really need to be returning size?
-
 // storeBatchHeader stores the batch header in the database, returning an error if it is already present.
 // This method is guaranteed to only return nil exactly once if called multiple times with the same batch header hash.
 func (s *storeV2) storeBatchHeader(batchHeader *corev2.BatchHeader) (uint64, error) {
@@ -464,9 +462,8 @@ func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles
 	return size, nil
 }
 
-// TODO this should not be a public method!!
 func (s *storeV2) DeleteKeys(keys []kvstore.Key) error {
-	if s.levelDB == nil {
+	if s.littDB != nil {
 		return fmt.Errorf("littDB does not support deletion")
 	}
 

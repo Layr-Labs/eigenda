@@ -15,8 +15,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TODO test littdb
-// TODO test migration
+// TODO
+//  - running in levelDB mode
+//  - restarting in levelDB mode
+//  - running in littDB mode
+//  - restarting in littDB mode
+//  - restarting and starting a migration
+//  - restarting and continuing a migration
+//  - finishing a migration
+//  - restarting after a migration has completed
+//  - simulate a crash during a migration
 
 func TestStoreBatchV2(t *testing.T) {
 	_, batch, bundles := nodemock.MockBatch(t)
