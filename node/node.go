@@ -104,8 +104,9 @@ func NewNode(
 
 	nodeLogger := logger.With("component", "Node")
 
-	socketAddr := fmt.Sprintf(":%d", config.MetricsPort)
-	eigenMetrics := metrics.NewEigenMetrics(AppName, socketAddr, reg, logger.With("component", "EigenMetrics"))
+	nodeLogger.Info("Daniel, if you don't see this log, then your node is not running the correct commit.")
+
+	eigenMetrics := metrics.NewEigenMetrics(AppName, fmt.Sprintf(":%d", config.MetricsPort), reg, logger.With("component", "EigenMetrics"))
 
 	// Make sure config folder exists.
 	err := os.MkdirAll(config.DbPath, os.ModePerm)
