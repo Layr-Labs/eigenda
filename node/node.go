@@ -102,8 +102,6 @@ func NewNode(
 
 	nodeLogger := logger.With("component", "Node")
 
-	nodeLogger.Info("Daniel, if you don't see this log, then your node is not running the correct commit.")
-
 	eigenMetrics := metrics.NewEigenMetrics(AppName, fmt.Sprintf(":%d", config.MetricsPort), reg, logger.With("component", "EigenMetrics"))
 
 	// Make sure config folder exists.
