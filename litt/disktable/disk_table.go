@@ -385,7 +385,7 @@ func (d *DiskTable) Stop() error {
 		shutdownCompleteChan: shutdownCompleteChan,
 	}
 
-	err := util.SendAny(d.panic, d.controllerChannel, request)
+	err := util.Send(d.panic, d.controllerChannel, request)
 	if err != nil {
 		return fmt.Errorf("failed to send shutdown request: %v", err)
 	}
@@ -493,7 +493,7 @@ func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
 	request := &controlLoopSetShardingFactorRequest{
 		shardingFactor: shardingFactor,
 	}
-	err := util.SendAny(d.panic, d.controllerChannel, request)
+	err := util.Send(d.panic, d.controllerChannel, request)
 	if err != nil {
 		return fmt.Errorf("failed to send sharding factor request: %v", err)
 	}
@@ -597,7 +597,7 @@ func (d *DiskTable) Put(key []byte, value []byte) error {
 		Value: value,
 	}
 
-	err := util.SendAny(d.panic, d.controllerChannel, writeReq)
+	err := util.Send(d.panic, d.controllerChannel, writeReq)
 	if err != nil {
 		return fmt.Errorf("failed to send write request: %v", err)
 	}
@@ -632,7 +632,7 @@ func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 	request := &controlLoopWriteRequest{
 		values: batch,
 	}
-	err := util.SendAny(d.panic, d.controllerChannel, request)
+	err := util.Send(d.panic, d.controllerChannel, request)
 	if err != nil {
 		return fmt.Errorf("failed to send write request: %v", err)
 	}
@@ -697,7 +697,7 @@ func (d *DiskTable) Flush() error {
 	flushReq := &controlLoopFlushRequest{
 		responseChan: make(chan struct{}, 1),
 	}
-	err := util.SendAny(d.panic, d.controllerChannel, flushReq)
+	err := util.Send(d.panic, d.controllerChannel, flushReq)
 	if err != nil {
 		return fmt.Errorf("failed to send flush request: %v", err)
 	}
@@ -717,7 +717,7 @@ func (d *DiskTable) handleControlLoopShutdownRequest(req *controlLoopShutdownReq
 	request := &flushLoopShutdownRequest{
 		shutdownCompleteChan: shutdownCompleteChan,
 	}
-	err := util.SendAny(d.panic, d.flushChannel, request)
+	err := util.Send(d.panic, d.flushChannel, request)
 	if err != nil {
 		d.logger.Errorf("failed to send shutdown request to flush loop: %v", err)
 		return
@@ -831,7 +831,7 @@ func (d *DiskTable) expandSegments() error {
 		now:          now,
 		responseChan: flushLoopResponseChan,
 	}
-	err := util.SendAny(d.panic, d.flushChannel, request)
+	err := util.Send(d.panic, d.flushChannel, request)
 	if err != nil {
 		return fmt.Errorf("failed to send seal request: %v", err)
 	}
@@ -875,7 +875,7 @@ func (d *DiskTable) ScheduleImmediateGC() error {
 		completionChan: make(chan struct{}, 1),
 	}
 
-	err := util.SendAny(d.panic, d.controllerChannel, request)
+	err := util.Send(d.panic, d.controllerChannel, request)
 	if err != nil {
 		return fmt.Errorf("failed to send GC request: %v", err)
 	}
@@ -929,7 +929,7 @@ func (d *DiskTable) handleControlLoopFlushRequest(req *controlLoopFlushRequest) 
 		flushWaitFunction: flushWaitFunction,
 		responseChan:      req.responseChan,
 	}
-	err = util.SendAny(d.panic, d.flushChannel, request)
+	err = util.Send(d.panic, d.flushChannel, request)
 	if err != nil {
 		d.logger.Errorf("failed to send flush request to flush loop: %v", err)
 	}

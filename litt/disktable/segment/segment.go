@@ -298,7 +298,7 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 		value:                  data.Value,
 		expectedFirstByteIndex: firstByteIndex,
 	}
-	err = util.SendAny(s.panic, s.shardChannels[shard], shardRequest)
+	err = util.Send(s.panic, s.shardChannels[shard], shardRequest)
 	if err != nil {
 		return 0, fmt.Errorf("failed to send value to shard control loop: %v", err)
 	}
@@ -308,7 +308,7 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 		Key:     data.Key,
 		Address: types.NewAddress(s.index, firstByteIndex),
 	}
-	err = util.SendAny(s.panic, s.keyFileChannel, keyRequest)
+	err = util.Send(s.panic, s.keyFileChannel, keyRequest)
 	if err != nil {
 		return 0, fmt.Errorf("failed to send key to key file control loop: %v", err)
 	}
@@ -359,7 +359,7 @@ func (s *Segment) Flush() (FlushWaitFunction, error) {
 		request := &shardFlushRequest{
 			completionChannel: shardResponseChannels[shard],
 		}
-		err := util.SendAny(s.panic, shardChannel, request)
+		err := util.Send(s.panic, shardChannel, request)
 		if err != nil {
 			return nil, fmt.Errorf("failed to send flush request to shard %d: %v", shard, err)
 		}
@@ -372,7 +372,7 @@ func (s *Segment) Flush() (FlushWaitFunction, error) {
 		seal:              false,
 		completionChannel: keyResponseChannel,
 	}
-	err := util.SendAny(s.panic, s.keyFileChannel, request)
+	err := util.Send(s.panic, s.keyFileChannel, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send flush request to key file: %v", err)
 	}
@@ -408,7 +408,7 @@ func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
 			seal:              true,
 			completionChannel: shardResponseChannels[shard],
 		}
-		err := util.SendAny(s.panic, shardChannel, request)
+		err := util.Send(s.panic, shardChannel, request)
 		if err != nil {
 			return nil, fmt.Errorf("failed to send flush request to shard %d: %v", shard, err)
 		}
@@ -420,7 +420,7 @@ func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
 		seal:              true,
 		completionChannel: keyResponseChannel,
 	}
-	err := util.SendAny(s.panic, s.keyFileChannel, request)
+	err := util.Send(s.panic, s.keyFileChannel, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send flush request to key file: %v", err)
 	}

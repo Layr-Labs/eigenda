@@ -18,7 +18,7 @@ var tableNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 var _ litt.DB = &db{}
 
-// tableBuilder is a function that creates a new table.
+// TableBuilder is a function that creates a new table.
 type TableBuilder func(
 	ctx context.Context,
 	logger logging.Logger,
