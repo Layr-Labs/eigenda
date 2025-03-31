@@ -37,7 +37,3 @@ func (m *MockStoreV2) GetBundleData(bundleKey []byte) ([]byte, error) {
 	}
 	return args.Get(0).([]byte), args.Error(1)
 }
-
-func (m *MockStoreV2) Stop() error {
-	return nil
-}
