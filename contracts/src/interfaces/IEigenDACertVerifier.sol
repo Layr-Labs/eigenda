@@ -4,7 +4,6 @@ pragma solidity ^0.8.9;
 import "./IEigenDAStructs.sol";
 
 interface IEigenDACertVerifierBase {
-
     /**
      * @notice Verifies a the blob cert is valid for the required quorums
      * @param blobHeader The blob header to verify
@@ -72,7 +71,6 @@ interface IEigenDACertVerifierBase {
         external
         view
         returns (NonSignerStakesAndSignature memory);
-
 }
 
 interface IEigenDACertVerifier is IEigenDACertVerifierBase {
@@ -92,6 +90,7 @@ interface IEigenDACertVerifier is IEigenDACertVerifierBase {
      * @param securityThresholds The security thresholds to verify against
      */
 <<<<<<< HEAD
+<<<<<<< HEAD
     function verifyDACertSecurityParams(uint16 version, SecurityThresholds memory securityThresholds) external view;
 =======
     function verifyDACertSecurityParams(
@@ -99,4 +98,7 @@ interface IEigenDACertVerifier is IEigenDACertVerifierBase {
         SecurityThresholds memory securityThresholds
     ) external view;
 >>>>>>> de14d145 (feat: cert verifier router)
+=======
+    function verifyDACertSecurityParams(uint16 version, SecurityThresholds memory securityThresholds) external view;
+>>>>>>> d72f87a1 (chore: forge fmt)
 }
