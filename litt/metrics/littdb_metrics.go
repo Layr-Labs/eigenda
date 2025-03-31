@@ -79,6 +79,9 @@ type LittDBMetrics struct {
 
 // NewLittDBMetrics creates a new LittDBMetrics instance.
 func NewLittDBMetrics(registry *prometheus.Registry, namespace string) *LittDBMetrics {
+	if registry == nil {
+		return nil
+	}
 
 	objectives := map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
 
