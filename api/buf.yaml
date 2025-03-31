@@ -1,0 +1,15 @@
+# We currently only push the eigenda proto files to the buf registry
+# in order for it to generate rust prost/tonic bindings for us.
+# We also get nice documentation and versioning: see https://buf.build/layrlabs/eigenda.
+
+# For details on buf.yaml configuration, visit https://buf.build/docs/configuration/v2/buf-yaml
+version: v2
+modules:
+  - path: proto
+    name: buf.build/layrlabs/eigenda
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE
