@@ -267,6 +267,7 @@ func NewStoreV2(
 		levelDBDeletionPath:   levelDBDeletionPath,
 		littDB:                littDB,
 		chunkTable:            chunkTable,
+		headerTable:           headerTable,
 		ttl:                   ttl,
 		migrationCompleteTime: migrationComplete,
 		duplicateRequestLock:  common.NewIndexLock(128),
