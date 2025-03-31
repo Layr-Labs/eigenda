@@ -177,10 +177,30 @@ func (s *ServerV2) validateAndStoreV2Chunks(
 	operatorState *core.OperatorState,
 	batchHeaderHash [32]byte) error {
 
-	if true { // TODO setting
-		return s.validateAndStoreV2ChunksLittDB(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash)
+	batchData := make([]*node.BundleToStore, 0, len(rawBundles))
+	for _, bundles := range rawBundles {
+		blobKey, err := bundles.BlobCertificate.BlobHeader.BlobKey()
+		if err != nil {
+			return api.NewErrorInternal("failed to get blob key")
+		}
+
+		for quorum, bundle := range bundles.Bundles {
+			bundleKey, err := node.BundleKey(blobKey, quorum)
+			if err != nil {
+				return api.NewErrorInternal("failed to get bundle key")
+			}
+
+			batchData = append(batchData, &node.BundleToStore{
+				BundleKey:   bundleKey,
+				BundleBytes: bundle,
+			})
+		}
+	}
+
+	if s.config.LittDBEnabled {
+		return s.validateAndStoreV2ChunksLittDB(ctx, batch, blobShards, batchData, operatorState, batchHeaderHash)
 	} else {
-		return s.validateAndStoreV2ChunksLevelDB(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash)
+		return s.validateAndStoreV2ChunksLevelDB(ctx, batch, blobShards, batchData, operatorState, batchHeaderHash)
 	}
 }
 
@@ -188,7 +208,7 @@ func (s *ServerV2) validateAndStoreV2ChunksLevelDB(
 	ctx context.Context,
 	batch *corev2.Batch,
 	blobShards []*corev2.BlobShard,
-	rawBundles []*node.RawBundles,
+	batchData []*node.BundleToStore,
 	operatorState *core.OperatorState,
 	batchHeaderHash [32]byte) error {
 
@@ -199,7 +219,7 @@ func (s *ServerV2) validateAndStoreV2ChunksLevelDB(
 	storeChan := make(chan storeResult)
 	go func() {
 		storageStart := time.Now()
-		keys, size, err := s.node.StoreV2.StoreBatch(batch, rawBundles)
+		keys, size, err := s.node.StoreV2.StoreBatch(batchHeaderHash[:], batchData)
 		if err != nil {
 			storeChan <- storeResult{
 				keys: nil,
@@ -244,7 +264,7 @@ func (s *ServerV2) validateAndStoreV2ChunksLittDB(
 	ctx context.Context,
 	batch *corev2.Batch,
 	blobShards []*corev2.BlobShard,
-	rawBundles []*node.RawBundles,
+	batchData []*node.BundleToStore,
 	operatorState *core.OperatorState,
 	batchHeaderHash [32]byte) error {
 
@@ -256,7 +276,7 @@ func (s *ServerV2) validateAndStoreV2ChunksLittDB(
 	s.metrics.ReportStoreChunksLatency("validation", time.Since(stageTimer))
 
 	storageStart := time.Now()
-	_, size, err := s.node.StoreV2.StoreBatch(batch, rawBundles)
+	_, size, err := s.node.StoreV2.StoreBatch(batchHeaderHash[:], batchData)
 	if err != nil {
 		return api.NewErrorInternal(fmt.Sprintf("failed to store batch %s: %v", batchHeaderHash, err))
 	}
@@ -304,9 +324,20 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 		return nil, api.NewErrorInvalidArg("invalid quorum ID")
 	}
 	quorumID := core.QuorumID(in.GetQuorumId())
-	chunks, err := s.node.StoreV2.GetChunks(blobKey, quorumID)
+
+	bundleKey, err := node.BundleKey(blobKey, quorumID)
+	if err != nil {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to get bundle key: %v", err))
+	}
+
+	bundleData, err := s.node.StoreV2.GetBundleData(bundleKey)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get chunks: %v", err))
+	}
+
+	chunks, _, err := node.DecodeChunks(bundleData)
+	if err != nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to decode chunks: %v", err))
 	}
 
 	size := 0

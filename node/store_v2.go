@@ -18,6 +18,7 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
+	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
@@ -39,20 +40,29 @@ const (
 
 // TODO consider renaming to ValidatorStore
 
+// BundleToStore is a struct that holds the bundle key and the bundle bytes.
+type BundleToStore struct {
+	// A bundle key, as encoded by BundleKey()
+	BundleKey []byte
+	// The bundle bytes, as encoded by TODO.
+	BundleBytes []byte
+}
+
 // StoreV2 encapsulates the database for storing batches of chunk data for the V2 validator node.
 type StoreV2 interface {
 
 	// StoreBatch stores a batch and its raw bundles in the database. Returns the keys of the stored data
 	// and the size of the stored data, in bytes.
-	StoreBatch(batch *corev2.Batch, rawBundles []*RawBundles) ([]kvstore.Key, uint64, error)
+	StoreBatch(batchHeaderHash []byte, batchData []*BundleToStore) ([]kvstore.Key, uint64, error)
 
 	// DeleteKeys deletes the keys from local storage.
 	//
 	// All modifications to the database within this method are performed atomically.
 	DeleteKeys(keys []kvstore.Key) error
 
-	// GetChunks returns the chunks of a blob with the given blob key and quorum.
-	GetChunks(blobKey corev2.BlobKey, quorum core.QuorumID) ([][]byte, error)
+	// GetBundleData returns the chunks of a blob with the given bundle key.
+	// The returned chunks are encoded in bundle format.
+	GetBundleData(bundleKey []byte) ([]byte, error)
 }
 
 type storeV2 struct {
@@ -282,49 +292,28 @@ func NewStoreV2(
 	return store, nil
 }
 
-// TODO get rid of this constructor
-
-// NewLevelDBStoreV2 creates a new StoreV2 backed by a LevelDB database.
-func NewLevelDBStoreV2(db kvstore.TableStore, logger logging.Logger, ttl time.Duration) StoreV2 {
-	return &storeV2{
-		levelDB: db,
-		logger:  logger,
-
-		ttl: ttl,
-	}
-}
-
-func (s *storeV2) StoreBatch(batch *corev2.Batch, rawBundles []*RawBundles) ([]kvstore.Key, uint64, error) {
-	if len(rawBundles) == 0 {
-		return nil, 0, fmt.Errorf("no raw bundles")
-	}
-	if len(rawBundles) != len(batch.BlobCertificates) {
-		return nil, 0, fmt.Errorf("mismatch between raw bundles (%d) and blob certificates (%d)",
-			len(rawBundles), len(batch.BlobCertificates))
+func (s *storeV2) StoreBatch(batchHeaderHash []byte, batchData []*BundleToStore) ([]kvstore.Key, uint64, error) {
+	if len(batchData) == 0 {
+		return nil, 0, fmt.Errorf("no batch data")
 	}
 
 	if s.littDB != nil {
-		size, err := s.storeBatchLittDB(batch, rawBundles)
+		size, err := s.storeBatchLittDB(batchHeaderHash, batchData)
 		return nil, size, err
 	} else {
-		return s.storeBatchLevelDB(batch, rawBundles)
+		return s.storeBatchLevelDB(batchHeaderHash, batchData)
 	}
 }
 
-func (s *storeV2) storeBatchLevelDB(batch *corev2.Batch, rawBundles []*RawBundles) ([]kvstore.Key, uint64, error) {
+func (s *storeV2) storeBatchLevelDB(batchHeaderHash []byte, batchData []*BundleToStore) ([]kvstore.Key, uint64, error) {
 	dbBatch := s.levelDB.NewTTLBatch()
 	var size uint64
 
-	keys := make([]kvstore.Key, 0)
+	keys := make([]kvstore.Key, 0, len(batchData))
 
 	batchHeaderKeyBuilder, err := s.levelDB.GetKeyBuilder(BatchHeaderTableName)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get key builder for batch header: %v", err)
-	}
-
-	batchHeaderHash, err := batch.BatchHeader.Hash()
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to hash batch header: %v", err)
 	}
 
 	// Store batch header
@@ -332,38 +321,27 @@ func (s *storeV2) storeBatchLevelDB(batch *corev2.Batch, rawBundles []*RawBundle
 	if _, err = s.levelDB.Get(batchHeaderKey); err == nil {
 		return nil, 0, ErrBatchAlreadyExist
 	}
-	batchHeaderBytes, err := batch.BatchHeader.Serialize()
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to serialize batch header: %v", err)
-	}
 
-	dbBatch.PutWithTTL(batchHeaderKey, batchHeaderBytes, s.ttl)
+	dbBatch.PutWithTTL(batchHeaderKey, []byte{}, s.ttl)
 	keys = append(keys, batchHeaderKey)
-	size += uint64(len(batchHeaderBytes))
+	size += uint64(len(batchHeaderKey.Raw()))
 
 	// Store blob shards
-	for _, bundles := range rawBundles {
-		blobKey, err := bundles.BlobCertificate.BlobHeader.BlobKey()
+	for _, batchDatum := range batchData {
+
+		bundleKeyBytes := batchDatum.BundleKey
+		bundleData := batchDatum.BundleBytes
+
+		bundleKeyBuilder, err := s.levelDB.GetKeyBuilder(BundleTableName)
 		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get blob key: %v", err)
+			return nil, 0, fmt.Errorf("failed to get key builder for bundles: %v", err)
 		}
+		bundleKey := bundleKeyBuilder.Key(bundleKeyBytes)
 
-		// Store bundles
-		for quorum, bundle := range bundles.Bundles {
-			bundlesKeyBuilder, err := s.levelDB.GetKeyBuilder(BundleTableName)
-			if err != nil {
-				return nil, 0, fmt.Errorf("failed to get key builder for bundles: %v", err)
-			}
+		keys = append(keys, bundleKey)
+		dbBatch.PutWithTTL(bundleKey, bundleData, s.ttl)
+		size += uint64(len(bundleData) + len(bundleKey.Raw()))
 
-			k, err := BundleKey(blobKey, quorum)
-			if err != nil {
-				return nil, 0, fmt.Errorf("failed to get key for bundles: %v", err)
-			}
-
-			keys = append(keys, bundlesKeyBuilder.Key(k))
-			dbBatch.PutWithTTL(bundlesKeyBuilder.Key(k), bundle, s.ttl)
-			size += uint64(len(bundle))
-		}
 	}
 
 	if err := dbBatch.Apply(); err != nil {
@@ -373,18 +351,9 @@ func (s *storeV2) storeBatchLevelDB(batch *corev2.Batch, rawBundles []*RawBundle
 	return keys, size, nil
 }
 
-// storeBatchHeader stores the batch header in the database, returning an error if it is already present.
+// storeBatchHeader stores the batch header hash in the database, returning an error if it is already present.
 // This method is guaranteed to only return nil exactly once if called multiple times with the same batch header hash.
-func (s *storeV2) storeBatchHeader(batchHeader *corev2.BatchHeader) (uint64, error) {
-
-	batchHeaderHash, err := batchHeader.Hash()
-	if err != nil {
-		return 0, fmt.Errorf("failed to hash batch header: %v", err)
-	}
-	batchHeaderBytes, err := batchHeader.Serialize()
-	if err != nil {
-		return 0, fmt.Errorf("failed to serialize batch header: %v", err)
-	}
+func (s *storeV2) storeBatchHeaderHash(batchHeaderHash []byte) error {
 
 	// Grab a lock that is mutually exclusive for this batch header hash. This prevents us from storing
 	// data twice if we receive concurrent requests to store the same batch.
@@ -394,30 +363,30 @@ func (s *storeV2) storeBatchHeader(batchHeader *corev2.BatchHeader) (uint64, err
 
 	ok, err := s.headerTable.Exists(batchHeaderHash[:])
 	if err != nil {
-		return 0, fmt.Errorf("failed to check batch header existence: %v", err)
+		return fmt.Errorf("failed to check batch header existence: %v", err)
 	}
 	if ok {
-		return 0, ErrBatchAlreadyExist
+		return ErrBatchAlreadyExist
 	}
 
 	// Store batch header.
-	err = s.headerTable.Put(batchHeaderHash[:], batchHeaderBytes)
+	err = s.headerTable.Put(batchHeaderHash[:], []byte{})
 	if err != nil {
-		return 0, fmt.Errorf("failed to put batch header: %v", err)
+		return fmt.Errorf("failed to put batch header: %v", err)
 	}
 
-	return uint64(len(batchHeaderBytes)), nil
+	return nil
 }
 
-func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles) (uint64, error) {
+func (s *storeV2) storeBatchLittDB(batchHeaderHash []byte, batchData []*BundleToStore) (uint64, error) {
 	var size uint64
 
 	// Store the batch header to prevent duplicate insertions.
-	batchHeaderSize, err := s.storeBatchHeader(batch.BatchHeader)
+	err := s.storeBatchHeaderHash(batchHeaderHash)
 	if err != nil {
-		return 0, fmt.Errorf("failed to store batch header: %v", err)
+		return 0, fmt.Errorf("failed to store batch header hash: %v", err)
 	}
-	size += batchHeaderSize
+	size += uint64(len(batchHeaderHash))
 	err = s.headerTable.Flush()
 	if err != nil {
 		return 0, fmt.Errorf("failed to flush header table: %v", err)
@@ -433,26 +402,21 @@ func (s *storeV2) storeBatchLittDB(batch *corev2.Batch, rawBundles []*RawBundles
 	// a validator may not sign for some batches if it crashes.
 
 	// Store chunk data.
-	for _, bundles := range rawBundles {
-		blobKey, err := bundles.BlobCertificate.BlobHeader.BlobKey()
-		if err != nil {
-			return 0, fmt.Errorf("failed to get blob key: %v", err)
-		}
+	batch := make([]*types.KVPair, 0, len(batchData))
+	for _, batchDatum := range batchData {
+		bundleKeyBytes := batchDatum.BundleKey
+		bundleData := batchDatum.BundleBytes
+		size += uint64(len(bundleKeyBytes) + len(bundleData))
 
-		// Store bundles
-		for quorum, bundle := range bundles.Bundles {
-			k, err := BundleKey(blobKey, quorum)
-			if err != nil {
-				return 0, fmt.Errorf("failed to get key for bundles: %v", err)
-			}
+		batch = append(batch, &types.KVPair{
+			Key:   bundleKeyBytes,
+			Value: bundleData,
+		})
+	}
 
-			err = s.chunkTable.Put(k, bundle)
-			if err != nil {
-				return 0, fmt.Errorf("failed to put bundle: %v", err)
-			}
-
-			size += uint64(len(bundle))
-		}
+	err = s.chunkTable.PutBatch(batch)
+	if err != nil {
+		return 0, fmt.Errorf("failed to put batch: %v", err)
 	}
 
 	err = s.chunkTable.Flush()
@@ -475,14 +439,14 @@ func (s *storeV2) DeleteKeys(keys []kvstore.Key) error {
 	return dbBatch.Apply()
 }
 
-func (s *storeV2) GetChunks(blobKey corev2.BlobKey, quorum core.QuorumID) ([][]byte, error) {
+func (s *storeV2) GetBundleData(bundleKey []byte) ([]byte, error) {
 	if s.littDB == nil {
 		// We haven't thrown the switch for littDB yet. Just look in levelDB.
-		return s.getChunksLevelDB(blobKey, quorum)
+		return s.getChunksLevelDB(bundleKey)
 	}
 
 	// Regardless of migration status, always check littDB first.
-	data, ok, err := s.getChunksLittDB(blobKey, quorum)
+	data, ok, err := s.getChunksLittDB(bundleKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chunks: %v", err)
 	}
@@ -503,43 +467,28 @@ func (s *storeV2) GetChunks(blobKey corev2.BlobKey, quorum core.QuorumID) ([][]b
 			return nil, fmt.Errorf("failed to get chunks: not found")
 		}
 
-		return s.getChunksLevelDB(blobKey, quorum)
+		return s.getChunksLevelDB(bundleKey)
 	}
 
 	return data, nil
 }
 
-func (s *storeV2) getChunksLevelDB(blobKey corev2.BlobKey, quorum core.QuorumID) ([][]byte, error) {
+func (s *storeV2) getChunksLevelDB(bundleKey []byte) ([]byte, error) {
 	bundlesKeyBuilder, err := s.levelDB.GetKeyBuilder(BundleTableName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get key builder for bundles: %v", err)
 	}
 
-	k, err := BundleKey(blobKey, quorum)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get key for bundles: %v", err)
-	}
-
-	bundle, err := s.levelDB.Get(bundlesKeyBuilder.Key(k))
+	bundle, err := s.levelDB.Get(bundlesKeyBuilder.Key(bundleKey))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get bundle: %v", err)
 	}
 
-	chunks, _, err := DecodeChunks(bundle)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode chunks: %v", err)
-	}
-
-	return chunks, nil
+	return bundle, nil
 }
 
-func (s *storeV2) getChunksLittDB(blobKey corev2.BlobKey, quorum core.QuorumID) ([][]byte, bool, error) {
-	k, err := BundleKey(blobKey, quorum)
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to get key for bundles: %v", err)
-	}
-
-	bundle, ok, err := s.chunkTable.Get(k)
+func (s *storeV2) getChunksLittDB(bundleKey []byte) ([]byte, bool, error) {
+	bundle, ok, err := s.chunkTable.Get(bundleKey)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to get bundle: %v", err)
 	}
@@ -547,12 +496,7 @@ func (s *storeV2) getChunksLittDB(blobKey corev2.BlobKey, quorum core.QuorumID) 
 		return nil, false, nil
 	}
 
-	chunks, _, err := DecodeChunks(bundle)
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to decode chunks: %v", err)
-	}
-
-	return chunks, true, nil
+	return bundle, true, nil
 }
 
 // finalizeMigration sleeps until the migration is complete, then deletes the levelDB database.
