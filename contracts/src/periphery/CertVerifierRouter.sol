@@ -6,9 +6,14 @@ import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import "src/interfaces/IEigenDAStructs.sol";
 
 contract CertVerifierRouter is IEigenDACertVerifierBase, Ownable {
+    /// @notice The mapping of reference block numbers to cert verifiers.
     mapping(uint64 => IEigenDACertVerifierBase) public certVerifiers;
+
+    /// @dev This array should only be appended to in increasing order, and thus should be sorted.
+    ///      These values contain all added indexes for the certVerifiers mapping.
     uint64[] public certVerifierRBNs;
 
+    /// @notice The number of blocks the reference block number must be in the future for a cert verifier to be added.
     uint256 public immutable DELAY_BLOCKS;
 
     event CertVerifierAdded(uint64 indexed referenceBlockNumber, address indexed certVerifier);
@@ -29,7 +34,7 @@ contract CertVerifierRouter is IEigenDACertVerifierBase, Ownable {
     }
 
     function verifyDACertV1(BlobHeader calldata blobHeader, BlobVerificationProof calldata blobVerificationProof)
-        external
+        public
         view
     {
         uint64 referenceBlockNumber = blobVerificationProof.batchMetadata.batchHeader.referenceBlockNumber;
@@ -42,9 +47,9 @@ contract CertVerifierRouter is IEigenDACertVerifierBase, Ownable {
         view
     {
         require(blobHeaders.length == blobVerificationProofs.length, "Blob headers and proofs length mismatch");
-        uint64 referenceBlockNumber = blobVerificationProofs[0].batchMetadata.batchHeader.referenceBlockNumber;
-        uint64 closestRBN = _findClosestRegisteredRBN(referenceBlockNumber);
-        certVerifiers[closestRBN].verifyDACertsV1(blobHeaders, blobVerificationProofs);
+        for (uint256 i; i < blobHeaders.length; i++) {
+            verifyDACertV1(blobHeaders[i], blobVerificationProofs[i]);
+        }
     }
 
     function verifyDACertV2(
