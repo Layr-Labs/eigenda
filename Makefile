@@ -32,11 +32,6 @@ protoc: clean
 	./api/builder/protoc-docker.sh
 	./api/builder/generate-docs.sh
 
-# Serves the mdbook docs located in ./docs/spec.
-# Will open a browser window to view the docs.
-mdbook-serve:
-	mdbook serve ./docs/spec --open
-
 # Builds the protobuf files locally (i.e. without docker).
 protoc-local: clean
 	./api/builder/protoc.sh
@@ -95,3 +90,7 @@ docker-release-build:
 
 semver:
 	echo "${SEMVER}"
+
+##### Proxies to other local Makefiles #####
+mdbook-serve:
+	$(MAKE) -C docs/spec serve

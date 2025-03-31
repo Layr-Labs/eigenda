@@ -34,6 +34,8 @@ import {VersionedBlobParams} from "src/interfaces/IEigenDAStructs.sol";
 import {MockStakeRegistry} from "./mocks/MockStakeRegistry.sol";
 import {MockRegistryCoordinator} from "./mocks/MockRegistryCoordinator.sol";
 
+import {BeforeVerifiableDeploymentInitialization} from "./test/BeforeVerifiableDeploymentInitialization.s.sol";
+
 import {
     DeploymentInitializer,
     ImmutableInitParams,
@@ -44,15 +46,15 @@ import {
     CalldataInitParams,
     CalldataRegistryCoordinatorParams,
     CalldataThresholdRegistryParams,
-    CalldataServiceManagerParams
+    CalldataServiceManagerParams,
+    InitParamsLib
 } from "./DeploymentInitializer.sol";
 
 import "forge-std/Script.sol";
-import "forge-std/StdToml.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract DeployVerifiable is Script {
-    // The intended owner of all the contracts after the full deployment process is completed.
-    address initialOwner;
+    using InitParamsLib for string;
 
     // All proxies and implementations to upgrade them to, namespaced in structs.
     ProxyAdmin proxyAdmin;
@@ -61,15 +63,6 @@ contract DeployVerifiable is Script {
 
     // Contracts deployed without a proxy
     IPauserRegistry pauserRegistry;
-
-    // Configuration parameters for construction of implementations
-    address rewardsCoordinator;
-    address avsDirectory;
-    address delegationManager;
-    address churnApprover;
-    address ejector;
-
-    uint256 initialPausedStatus;
 
     // Inert implementation contracts used as initial implementations before the proxies are initialized
     address emptyContract;
@@ -80,32 +73,17 @@ contract DeployVerifiable is Script {
     DeploymentInitializer deploymentInitializer;
 
     // Script config
-    string configData;
-
-    /// @dev override this if you don't want to use the environment to get the config path
-    function _configPath() internal view virtual returns (string memory) {
-        return vm.envString("DEPLOY_CONFIG_PATH");
-    }
+    string cfg;
 
     function run() public {
         // Read JSON config
-        configData = vm.readFile(_configPath());
-        initialOwner = stdToml.readAddress(configData, ".initialOwner");
-        rewardsCoordinator = stdToml.readAddress(configData, ".initParams.shared.rewardsCoordinator");
-        avsDirectory = stdToml.readAddress(configData, ".initParams.shared.avsDirectory");
-        delegationManager = stdToml.readAddress(configData, ".initParams.shared.delegationManager");
-        initialPausedStatus = stdToml.readUint(configData, ".initParams.shared.initialPausedStatus");
+        _initConfig();
 
         vm.startBroadcast();
         proxyAdmin = new ProxyAdmin();
         emptyContract = address(new EmptyContract());
-        mockStakeRegistry = address(new MockStakeRegistry(IDelegationManager(delegationManager)));
-        pauserRegistry = IPauserRegistry(
-            new PauserRegistry(
-                stdToml.readAddressArray(configData, ".initParams.core.pauserRegistry.pausers"),
-                stdToml.readAddress(configData, ".initParams.core.pauserRegistry.unpauser")
-            )
-        );
+        mockStakeRegistry = address(new MockStakeRegistry(IDelegationManager(cfg.delegationManager())));
+        pauserRegistry = IPauserRegistry(new PauserRegistry(cfg.pausers(), cfg.unpauser()));
 
         _deployInertProxies();
         _deployImplementations();
@@ -116,24 +94,50 @@ contract DeployVerifiable is Script {
         // Transfer ownership of proxy admin to deployment initializer
         proxyAdmin.transferOwnership(address(deploymentInitializer));
 
+        _logs();
+
         vm.stopBroadcast();
 
-        _doTests(configData);
+        _doTests();
     }
 
-    function _doTests(string memory cfg) internal {
-        vm.startPrank(initialOwner);
-        CalldataInitParams memory params = CalldataInitParamsLib.getCalldataInitParams(cfg);
+    /// @dev override this if you don't want to use the environment to get the config path
+    function _initConfig() internal virtual {
+        cfg = vm.readFile(vm.envString("DEPLOY_CONFIG_PATH"));
+    }
+
+    function _logs() internal virtual {
+        console2.log("Deployment addresses: ");
+        console2.log("Deployment Initializer: ", address(deploymentInitializer));
+        console2.log("Empty Contract Implementation", emptyContract);
+        console2.log("Mock Stake Registry Implementation", mockStakeRegistry);
+        console2.log("Mock Registry Coordinator Implementation", mockRegistryCoordinator);
+
+        console2.log(
+            "\n\nAll other relevant deployment addresses should be queried from the DeploymentInitializer contract."
+        );
+    }
+
+    /// @dev This function does the same tests that a verifier of the deployment should be doing after the deployment.
+    function _doTests() internal {
+        BeforeVerifiableDeploymentInitialization beforeTest = new BeforeVerifiableDeploymentInitialization();
+        beforeTest.doBeforeInitializationTests(
+            cfg, deploymentInitializer, emptyContract, mockStakeRegistry, mockRegistryCoordinator
+        );
+
+        vm.startPrank(cfg.initialOwner());
+        CalldataInitParams memory params = InitParamsLib.calldataInitParams(cfg);
         deploymentInitializer.initializeDeployment(params);
 
         // TODO: Add more tests
 
         vm.stopPrank();
     }
+
     function _deployInertProxies() internal virtual {
         proxyAdmin = new ProxyAdmin();
         emptyContract = address(new EmptyContract());
-        mockStakeRegistry = address(new MockStakeRegistry(IDelegationManager(delegationManager)));
+        mockStakeRegistry = address(new MockStakeRegistry(IDelegationManager(cfg.delegationManager())));
 
         // Deploy empty contracts to get addresses
         proxies.indexRegistry = address(new TransparentUpgradeableProxy(emptyContract, address(proxyAdmin), ""));
@@ -158,7 +162,9 @@ contract DeployVerifiable is Script {
     function _deployImplementations() internal virtual {
         implementations.indexRegistry = address(new IndexRegistry(IRegistryCoordinator(proxies.registryCoordinator)));
         implementations.stakeRegistry = address(
-            new StakeRegistry(IRegistryCoordinator(proxies.registryCoordinator), IDelegationManager(delegationManager))
+            new StakeRegistry(
+                IRegistryCoordinator(proxies.registryCoordinator), IDelegationManager(cfg.delegationManager())
+            )
         );
         implementations.socketRegistry = address(new SocketRegistry(IRegistryCoordinator(proxies.registryCoordinator)));
         implementations.blsApkRegistry = address(new BLSApkRegistry(IRegistryCoordinator(proxies.registryCoordinator)));
@@ -177,8 +183,8 @@ contract DeployVerifiable is Script {
         implementations.disperserRegistry = address(new EigenDADisperserRegistry());
         implementations.serviceManager = address(
             new EigenDAServiceManager(
-                IAVSDirectory(avsDirectory),
-                IRewardsCoordinator(rewardsCoordinator),
+                IAVSDirectory(cfg.avsDirectory()),
+                IRewardsCoordinator(cfg.rewardsCoordinator()),
                 IRegistryCoordinator(proxies.registryCoordinator),
                 IStakeRegistry(proxies.stakeRegistry),
                 IEigenDAThresholdRegistry(proxies.thresholdRegistry),
@@ -190,114 +196,16 @@ contract DeployVerifiable is Script {
     }
 
     function _immutableInitParams() internal view returns (ImmutableInitParams memory) {
-        ImmutableRegistryCoordinatorParams memory registryCoordinatorParams = ImmutableRegistryCoordinatorParams({
-            churnApprover: stdToml.readAddress(configData, ".initParams.middleware.registryCoordinator.churnApprover"),
-            ejector: stdToml.readAddress(configData, ".initParams.middleware.registryCoordinator.ejector")
-        });
-        ImmutablePaymentVaultParams memory paymentVaultParams = ImmutablePaymentVaultParams({
-            minNumSymbols: uint64(stdToml.readUint(configData, ".initParams.eigenDA.paymentVault.minNumSymbols")),
-            pricePerSymbol: uint64(stdToml.readUint(configData, ".initParams.eigenDA.paymentVault.pricePerSymbol")),
-            priceUpdateCooldown: uint64(
-                stdToml.readUint(configData, ".initParams.eigenDA.paymentVault.priceUpdateCooldown")
-            ),
-            globalSymbolsPerPeriod: uint64(
-                stdToml.readUint(configData, ".initParams.eigenDA.paymentVault.globalSymbolsPerPeriod")
-            ),
-            reservationPeriodInterval: uint64(
-                stdToml.readUint(configData, ".initParams.eigenDA.paymentVault.reservationPeriodInterval")
-            ),
-            globalRatePeriodInterval: uint64(
-                stdToml.readUint(configData, ".initParams.eigenDA.paymentVault.globalRatePeriodInterval")
-            )
-        });
-        ImmutableServiceManagerParams memory serviceManagerParams = ImmutableServiceManagerParams({
-            rewardsInitiator: stdToml.readAddress(configData, ".initParams.eigenDA.serviceManager.rewardsInitiator")
-        });
-
         return ImmutableInitParams({
             proxyAdmin: proxyAdmin,
-            initialOwner: initialOwner,
+            initialOwner: cfg.initialOwner(),
             pauserRegistry: pauserRegistry,
-            initialPausedStatus: initialPausedStatus,
+            initialPausedStatus: cfg.initialPausedStatus(),
             proxies: proxies,
             implementations: implementations,
-            registryCoordinatorParams: registryCoordinatorParams,
-            paymentVaultParams: paymentVaultParams,
-            serviceManagerParams: serviceManagerParams
-        });
-    }
-}
-
-library CalldataInitParamsLib {
-    function operatorSetParams(string memory configData)
-        internal
-        pure
-        returns (IRegistryCoordinator.OperatorSetParam[] memory)
-    {
-        bytes memory operatorConfigsRaw =
-            stdToml.parseRaw(configData, ".initParams.middleware.registryCoordinator.operatorSetParams");
-        return abi.decode(operatorConfigsRaw, (IRegistryCoordinator.OperatorSetParam[]));
-    }
-
-    function minimumStakes(string memory configData) internal pure returns (uint96[] memory) {
-        uint256[] memory stakesConfigs256 =
-            stdToml.readUintArray(configData, ".initParams.middleware.registryCoordinator.minimumStakes");
-        uint96[] memory stakesConfigs = new uint96[](stakesConfigs256.length);
-        for (uint256 i; i < stakesConfigs.length; i++) {
-            stakesConfigs[i] = uint96(stakesConfigs[i]);
-        }
-        return stakesConfigs;
-    }
-
-    function strategyParams(string memory configData)
-        internal
-        pure
-        returns (IStakeRegistry.StrategyParams[][] memory)
-    {
-        bytes memory strategyConfigsRaw =
-            stdToml.parseRaw(configData, ".initParams.middleware.registryCoordinator.strategyParams");
-        return abi.decode(strategyConfigsRaw, (IStakeRegistry.StrategyParams[][]));
-    }
-
-    function quorumAdversaryThresholdPercentages(string memory configData) internal pure returns (bytes memory) {
-        return
-            stdToml.readBytes(configData, ".initParams.eigenDA.thresholdRegistry.quorumAdversaryThresholdPercentages");
-    }
-
-    function quorumConfirmationThresholdPercentages(string memory configData) internal pure returns (bytes memory) {
-        return stdToml.readBytes(
-            configData, ".initParams.eigenDA.thresholdRegistry.quorumConfirmationThresholdPercentages"
-        );
-    }
-
-    function quorumNumbersRequired(string memory configData) internal pure returns (bytes memory) {
-        return stdToml.readBytes(configData, ".initParams.eigenDA.thresholdRegistry.quorumNumbersRequired");
-    }
-
-    function versionedBlobParams(string memory configData) internal pure returns (VersionedBlobParams[] memory) {
-        bytes memory versionedBlobParamsRaw =
-            stdToml.parseRaw(configData, ".initParams.eigenDA.thresholdRegistry.versionedBlobParams");
-        return abi.decode(versionedBlobParamsRaw, (VersionedBlobParams[]));
-    }
-
-    function batchConfirmers(string memory configData) internal pure returns (address[] memory) {
-        return stdToml.readAddressArray(configData, ".initParams.eigenDA.serviceManager.batchConfirmers");
-    }
-
-    function getCalldataInitParams(string memory configData) internal pure returns (CalldataInitParams memory) {
-        return CalldataInitParams({
-            registryCoordinatorParams: CalldataRegistryCoordinatorParams({
-                operatorSetParams: operatorSetParams(configData),
-                minimumStakes: minimumStakes(configData),
-                strategyParams: strategyParams(configData)
-            }),
-            thresholdRegistryParams: CalldataThresholdRegistryParams({
-                quorumAdversaryThresholdPercentages: quorumAdversaryThresholdPercentages(configData),
-                quorumConfirmationThresholdPercentages: quorumConfirmationThresholdPercentages(configData),
-                quorumNumbersRequired: quorumNumbersRequired(configData),
-                versionedBlobParams: versionedBlobParams(configData)
-            }),
-            serviceManagerParams: CalldataServiceManagerParams({batchConfirmers: batchConfirmers(configData)})
+            registryCoordinatorParams: cfg.registryCoordinatorParams(),
+            paymentVaultParams: cfg.paymentVaultParams(),
+            serviceManagerParams: cfg.serviceManagerParams()
         });
     }
 }
