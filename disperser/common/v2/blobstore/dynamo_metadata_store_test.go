@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"strings"
@@ -75,6 +76,28 @@ func checkDispersalsDesc(t *testing.T, items []*corev2.DispersalRequest) {
 			items[i-1].DispersedAt, // previous should be greater
 			items[i].DispersedAt,   // than current
 			"DispersalRequests should be in descending order",
+		)
+	}
+}
+
+func checkBlobsAsc(t *testing.T, items []*v2.BlobMetadata) {
+	if len(items) > 1 {
+		for i := 1; i < len(items); i++ {
+			assert.Less(t,
+				items[i-1].RequestedAt, // previous should be less
+				items[i].RequestedAt,   // than current
+				"blobs should be in ascending order",
+			)
+		}
+	}
+}
+
+func checkBlobsDesc(t *testing.T, items []*v2.BlobMetadata) {
+	for i := 1; i < len(items); i++ {
+		assert.Greater(t,
+			items[i-1].RequestedAt, // previous should be greater
+			items[i].RequestedAt,   // than current
+			"blobs should be in descending order",
 		)
 	}
 }
@@ -828,6 +851,169 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtBackward(t *testing.T) {
 			require.NotNil(t, lastProcessedCursor)
 			assert.Equal(t, keys[i], *lastProcessedCursor.BlobKey)
 			beforeCursor = *lastProcessedCursor
+		}
+	})
+}
+
+func TestBlobMetadataStoreGetBlobMetadataByAccountID(t *testing.T) {
+	ctx := context.Background()
+
+	// Make all blobs happen in 12s
+	numBlobs := 120
+	nanoSecsPerBlob := uint64(1e8) // 10 blobs per second
+
+	now := uint64(time.Now().UnixNano())
+	firstBlobTime := now - uint64(10*time.Minute.Nanoseconds())
+
+	accountId := gethcommon.HexToAddress(fmt.Sprintf("0x000000000000000000000000000000000000000%d", 5))
+
+	// Create blobs for testing
+	keys := make([]corev2.BlobKey, numBlobs)
+	requestedAt := make([]uint64, numBlobs)
+	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	for i := 0; i < numBlobs; i++ {
+		blobKey, blobHeader := newBlob(t)
+		blobHeader.PaymentMetadata.AccountID = accountId
+		requestedAt[i] = firstBlobTime + nanoSecsPerBlob*uint64(i)
+		now := time.Now()
+		metadata := &v2.BlobMetadata{
+			BlobHeader:  blobHeader,
+			Signature:   []byte{1, 2, 3},
+			BlobStatus:  v2.Encoded,
+			Expiry:      uint64(now.Add(time.Hour).Unix()),
+			NumRetries:  0,
+			UpdatedAt:   uint64(now.UnixNano()),
+			RequestedAt: requestedAt[i],
+		}
+		err := blobMetadataStore.PutBlobMetadata(ctx, metadata)
+		require.NoError(t, err)
+		keys[i] = blobKey
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
+		}
+	}
+	defer deleteItems(t, dynamoKeys)
+
+	// Test empty range
+	t.Run("empty range", func(t *testing.T) {
+		// Test invalid time range
+		_, err := blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, 1, 1, 0, true)
+		require.Error(t, err)
+		assert.Equal(t, "no time point in exclusive time range (1, 1)", err.Error())
+
+		_, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, 1, 2, 0, true)
+		require.Error(t, err)
+		assert.Equal(t, "no time point in exclusive time range (1, 2)", err.Error())
+
+		// Test empty range
+		blobs, err := blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, now, now+1024, 0, true)
+		require.NoError(t, err)
+		assert.Equal(t, 0, len(blobs))
+	})
+
+	// Test full range query
+	t.Run("ascending full range", func(t *testing.T) {
+		// Test without limit
+		blobs, err := blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime-1, now, 0, true)
+		require.NoError(t, err)
+		require.Equal(t, numBlobs, len(blobs))
+		checkBlobsAsc(t, blobs)
+
+		// Test with limit
+		blobs, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime-1, now, 10, true)
+		require.NoError(t, err)
+		require.Equal(t, 10, len(blobs))
+		checkBlobsAsc(t, blobs)
+
+		// Test min/max timestamp range
+		blobs, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, 0, now, 0, true)
+		require.NoError(t, err)
+		require.Equal(t, numBlobs, len(blobs))
+		checkBlobsAsc(t, blobs)
+		blobs, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime-1, math.MaxInt64, 0, true)
+		require.NoError(t, err)
+		require.Equal(t, numBlobs, len(blobs))
+		checkBlobsAsc(t, blobs)
+	})
+
+	// Test full range query
+	t.Run("descending full range", func(t *testing.T) {
+		// Test without limit
+		blobs, err := blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime-1, now, 0, false)
+		require.NoError(t, err)
+		require.Equal(t, numBlobs, len(blobs))
+		checkBlobsDesc(t, blobs)
+
+		// Test with limit
+		blobs, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime-1, now, 10, false)
+		require.NoError(t, err)
+		require.Equal(t, 10, len(blobs))
+		checkBlobsDesc(t, blobs)
+
+		// Test min/max timestamp range
+		blobs, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, 0, now, 0, false)
+		require.NoError(t, err)
+		require.Equal(t, numBlobs, len(blobs))
+		checkBlobsDesc(t, blobs)
+		blobs, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime-1, math.MaxInt64, 0, false)
+		require.NoError(t, err)
+		require.Equal(t, numBlobs, len(blobs))
+		checkBlobsDesc(t, blobs)
+	})
+
+	// Test range boundaries
+	t.Run("ascending range boundaries", func(t *testing.T) {
+		// Test exclusive start
+		blobs, err := blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime, now, 0, true)
+		require.NoError(t, err)
+		require.Equal(t, numBlobs-1, len(blobs))
+		assert.Equal(t, requestedAt[1], blobs[0].RequestedAt)
+		assert.Equal(t, requestedAt[numBlobs-1], blobs[numBlobs-2].RequestedAt)
+		checkBlobsAsc(t, blobs)
+
+		// Test exclusive end
+		blobs, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime-1, requestedAt[4], 0, true)
+		require.NoError(t, err)
+		require.Equal(t, 4, len(blobs))
+		assert.Equal(t, requestedAt[0], blobs[0].RequestedAt)
+		assert.Equal(t, requestedAt[3], blobs[3].RequestedAt)
+		checkBlobsAsc(t, blobs)
+	})
+
+	// Test range boundaries
+	t.Run("descending range boundaries", func(t *testing.T) {
+		// Test exclusive start
+		blobs, err := blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime, now, 0, false)
+		require.NoError(t, err)
+		require.Equal(t, numBlobs-1, len(blobs))
+		assert.Equal(t, requestedAt[numBlobs-1], blobs[0].RequestedAt)
+		assert.Equal(t, requestedAt[1], blobs[numBlobs-2].RequestedAt)
+		checkBlobsDesc(t, blobs)
+
+		// Test exclusive end
+		blobs, err = blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, firstBlobTime-1, requestedAt[4], 0, false)
+		require.NoError(t, err)
+		require.Equal(t, 4, len(blobs))
+		assert.Equal(t, requestedAt[3], blobs[0].RequestedAt)
+		assert.Equal(t, requestedAt[0], blobs[3].RequestedAt)
+		checkBlobsDesc(t, blobs)
+	})
+
+	// Test pagination
+	t.Run("pagination", func(t *testing.T) {
+		for i := 1; i < numBlobs; i++ {
+			blobs, err := blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, requestedAt[i-1], requestedAt[i]+1, 0, true)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(blobs))
+			assert.Equal(t, requestedAt[i], blobs[0].RequestedAt)
+		}
+
+		for i := 1; i < numBlobs; i++ {
+			blobs, err := blobMetadataStore.GetBlobMetadataByAccountID(ctx, accountId, requestedAt[i-1], requestedAt[i]+1, 0, false)
+			require.NoError(t, err)
+			require.Equal(t, 1, len(blobs))
+			assert.Equal(t, requestedAt[i], blobs[0].RequestedAt)
 		}
 	})
 }
