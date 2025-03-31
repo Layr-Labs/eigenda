@@ -31,3 +31,4 @@ jobs:
           setup_only: false
           # Optional GitHub token for API requests. Ensures requests aren't rate limited.
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          input: ./api
