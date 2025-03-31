@@ -104,7 +104,6 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		ChainState:     chainState,
 		ValidatorV2:    val,
 		RelayClient:    atomicRelayClient,
-		DownloadPool:   workerpool.New(1),
 	}
 	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 
