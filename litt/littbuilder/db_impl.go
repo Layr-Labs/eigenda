@@ -22,9 +22,7 @@ var _ litt.DB = &db{}
 type TableBuilder func(
 	ctx context.Context,
 	logger logging.Logger,
-	timeSource func() time.Time,
 	name string,
-	ttl time.Duration,
 	metrics *metrics.LittDBMetrics) (litt.ManagedTable, error)
 
 // db is an implementation of DB.
@@ -61,16 +59,25 @@ type db struct {
 }
 
 // NewDB creates a new DB instance. After this method is called, the config object should not be modified.
-func NewDB(config *LittDBConfig) (litt.DB, error) {
+func NewDB(config *litt.Config) (litt.DB, error) {
+	var err error
+	config.Logger, err = buildLogger(config)
+	if err != nil {
+		return nil, fmt.Errorf("error building logger: %w", err)
+	}
+
+	err = config.SanityCheck()
+	if err != nil {
+		return nil, fmt.Errorf("error checking config: %w", err)
+	}
+
 	tableBuilder := func(
 		ctx context.Context,
 		logger logging.Logger,
-		timeSource func() time.Time,
 		name string,
-		ttl time.Duration,
 		metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
 
-		return buildTable(config, ctx, logger, timeSource, name, ttl, metrics)
+		return buildTable(config, ctx, logger, name, metrics)
 	}
 
 	return NewDBWithTableBuilder(config, tableBuilder)
@@ -78,7 +85,7 @@ func NewDB(config *LittDBConfig) (litt.DB, error) {
 
 // NewDBWithTableBuilder creates a new DB instance with a custom table builder. This is intended for unit test use,
 // and should not be considered a stable API.
-func NewDBWithTableBuilder(config *LittDBConfig, tableBuilder TableBuilder) (litt.DB, error) {
+func NewDBWithTableBuilder(config *litt.Config, tableBuilder TableBuilder) (litt.DB, error) {
 	logger, err := buildLogger(config)
 	if err != nil {
 		return nil, fmt.Errorf("error building logger: %w", err)
@@ -160,7 +167,7 @@ func (d *db) GetTable(name string) (litt.Table, error) {
 		}
 
 		var err error
-		table, err = d.tableBuilder(d.ctx, d.logger, d.timeSource, name, d.ttl, d.metrics)
+		table, err = d.tableBuilder(d.ctx, d.logger, name, d.metrics)
 		if err != nil {
 			return nil, fmt.Errorf("error creating table: %w", err)
 		}
