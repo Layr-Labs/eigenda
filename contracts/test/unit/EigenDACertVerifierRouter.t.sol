@@ -115,6 +115,22 @@ contract TestEigenDACertVerifierRouter is Test {
         certVerifierRouter.verifyDACertsV1(blobHeaders, blobVerificationProofs);
     }
 
+    function testVerifyDACertsV1RevertsForSingleRouteFailure(uint256 x) public {
+        BlobHeader[] memory blobHeaders = new BlobHeader[](2);
+        BlobVerificationProof[] memory blobVerificationProofs = new BlobVerificationProof[](2);
+        blobVerificationProofs[0].batchMetadata.batchHeader.referenceBlockNumber = uint32(block.number + 1);
+        blobVerificationProofs[1].batchMetadata.batchHeader.referenceBlockNumber = uint32(block.number + 2);
+        certVerifierRouter.addCertVerifier(
+            blobVerificationProofs[0].batchMetadata.batchHeader.referenceBlockNumber, address(certVerifierMocks[0])
+        );
+        certVerifierRouter.addCertVerifier(
+            blobVerificationProofs[1].batchMetadata.batchHeader.referenceBlockNumber, address(certVerifierMocks[1])
+        );
+        certVerifierMocks[x % 2].setRevertOnCall(true);
+        vm.expectRevert("Mock: verifyDACertV1 reverted");
+        certVerifierRouter.verifyDACertsV1(blobHeaders, blobVerificationProofs);
+    }
+
     function testVerifyDACertV2() public {
         BatchHeaderV2 memory batchHeader;
         BlobInclusionInfo memory blobInclusionInfo;
