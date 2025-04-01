@@ -87,19 +87,21 @@ func TestProxyClientMalformedInputCasesV2(t *testing.T) {
 // byte, many unicode characters, single unicode character and an empty preimage. It then tries to get the data from the
 // proxy server with empty byte, single byte and random string.
 func testProxyClientMalformedInputCases(t *testing.T, disperseToV2 bool) {
+	t.Parallel()
 	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
 
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig)
-	defer kill()
-
-	cfg := &standard_client.Config{
-		URL: ts.Address(),
-	}
-	daClient := standard_client.New(cfg)
 
 	t.Run(
 		"single byte preimage set data case", func(t *testing.T) {
+			t.Parallel()
+			ts, kill := testutils.CreateTestSuite(tsConfig)
+			defer kill()
+
+			cfg := &standard_client.Config{
+				URL: ts.Address(),
+			}
+			daClient := standard_client.New(cfg)
 			testPreimage := []byte{1} // single byte preimage
 			t.Log("Setting input data on proxy server...")
 			_, err := daClient.SetData(ts.Ctx, testPreimage)
@@ -108,6 +110,14 @@ func testProxyClientMalformedInputCases(t *testing.T, disperseToV2 bool) {
 
 	t.Run(
 		"unicode preimage set data case", func(t *testing.T) {
+			t.Parallel()
+			ts, kill := testutils.CreateTestSuite(tsConfig)
+			defer kill()
+
+			cfg := &standard_client.Config{
+				URL: ts.Address(),
+			}
+			daClient := standard_client.New(cfg)
 			testPreimage := []byte("§§©ˆªªˆ˙√ç®∂§∞¶§ƒ¥√¨¥√¨¥ƒƒ©˙˜ø˜˜˜∫˙∫¥∫√†®®√ç¨ˆ¨˙ï") // many unicode characters
 			t.Log("Setting input data on proxy server...")
 			_, err := daClient.SetData(ts.Ctx, testPreimage)
@@ -121,6 +131,14 @@ func testProxyClientMalformedInputCases(t *testing.T, disperseToV2 bool) {
 
 	t.Run(
 		"empty preimage set data case", func(t *testing.T) {
+			t.Parallel()
+			ts, kill := testutils.CreateTestSuite(tsConfig)
+			defer kill()
+
+			cfg := &standard_client.Config{
+				URL: ts.Address(),
+			}
+			daClient := standard_client.New(cfg)
 			testPreimage := []byte("") // Empty preimage
 			t.Log("Setting input data on proxy server...")
 			_, err := daClient.SetData(ts.Ctx, testPreimage)
@@ -129,6 +147,14 @@ func testProxyClientMalformedInputCases(t *testing.T, disperseToV2 bool) {
 
 	t.Run(
 		"get data edge cases - unsupported version byte 02", func(t *testing.T) {
+			t.Parallel()
+			ts, kill := testutils.CreateTestSuite(tsConfig)
+			defer kill()
+
+			cfg := &standard_client.Config{
+				URL: ts.Address(),
+			}
+			daClient := standard_client.New(cfg)
 			testCert := []byte{2}
 			_, err := daClient.GetData(ts.Ctx, testCert)
 			require.Error(t, err)
@@ -143,6 +169,14 @@ func testProxyClientMalformedInputCases(t *testing.T, disperseToV2 bool) {
 	// Error tested doesn't seem related to the cert being huge.
 	t.Run(
 		"get data edge cases - huge cert", func(t *testing.T) {
+			t.Parallel()
+			ts, kill := testutils.CreateTestSuite(tsConfig)
+			defer kill()
+
+			cfg := &standard_client.Config{
+				URL: ts.Address(),
+			}
+			daClient := standard_client.New(cfg)
 			// TODO: we need to add the 0 version byte at the beginning.
 			// should this not be done automatically by the std_commitment client?
 			testCert := append([]byte{0}, testutils.RandBytes(10000)...)

@@ -319,6 +319,11 @@ before attempting to read it.
 func testProxyReadFallback(t *testing.T, disperseToV2 bool) {
 	t.Parallel()
 
+	if testutils.GetBackend() != testutils.MemstoreBackend {
+		t.Skip(`test only runs with memstore, since fallback relies on blob fetch failing, and it won't fail
+						against actual eigen DA`)
+	}
+
 	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
 	testCfg.UseS3Fallback = true
 	// ensure that blob memstore eviction times result in near immediate activation

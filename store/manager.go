@@ -94,13 +94,15 @@ func (m *Manager) Get(ctx context.Context, key []byte, cm commitments.Commitment
 			return nil, errors.New("expected EigenDA backend for DA commitment type, but none configured")
 		}
 
-		var err error
-		var data []byte
+		verifyMethod, err := m.getVerifyMethod(cm.Version)
+		if err != nil {
+			return nil, fmt.Errorf("get verify method: %w", err)
+		}
 
 		// 1 - read blob from cache if enabled
 		if m.secondary.CachingEnabled() {
 			m.log.Debug("Retrieving data from cached backends")
-			data, err := m.secondary.MultiSourceRead(ctx, key, false, m.eigenda.Verify)
+			data, err := m.secondary.MultiSourceRead(ctx, key, false, verifyMethod)
 			if err == nil {
 				return data, nil
 			}
@@ -109,7 +111,7 @@ func (m *Manager) Get(ctx context.Context, key []byte, cm commitments.Commitment
 		}
 
 		// 2 - read blob from EigenDA
-		data, err = m.getEigenDAMode(ctx, cm.Version, key)
+		data, err := m.getEigenDAMode(ctx, cm.Version, key)
 		if err == nil {
 			return data, nil
 		}
@@ -118,7 +120,7 @@ func (m *Manager) Get(ctx context.Context, key []byte, cm commitments.Commitment
 
 		// 3 - read blob from fallbacks if enabled and data is non-retrievable from EigenDA
 		if m.secondary.FallbackEnabled() {
-			data, err = m.secondary.MultiSourceRead(ctx, key, true, m.eigenda.Verify)
+			data, err = m.secondary.MultiSourceRead(ctx, key, true, verifyMethod)
 			if err != nil {
 				m.log.Error("Failed to read from fallback targets", "err", err)
 				return nil, err
@@ -170,6 +172,21 @@ func (m *Manager) Put(ctx context.Context, cm commitments.CommitmentMode, key, v
 	}
 
 	return commit, nil
+}
+
+// getVerifyMethod returns the correct verify method based on commitment type
+func (m *Manager) getVerifyMethod(commitmentType commitments.EigenDACommitmentType) (
+	func(context.Context, []byte, []byte) error,
+	error,
+) {
+	switch commitmentType {
+	case commitments.CertV0:
+		return m.eigenda.Verify, nil
+	case commitments.CertV1:
+		return m.eigendaV2.Verify, nil
+	default:
+		return nil, fmt.Errorf("commitment version unknown: %b", commitmentType)
+	}
 }
 
 // putEigenDAMode ... disperses blob to EigenDA backend
