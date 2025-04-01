@@ -1,11 +1,13 @@
 package littbuilder
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/cache"
@@ -14,19 +16,11 @@ import (
 	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/metrics"
-	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
-
-// keymapBuilders contains builders for all supported keymap types.
-var keymapBuilders = map[keymap.KeymapType]keymap.BuildKeymap{
-	keymap.MemKeymapType:           keymap.NewMemKeymap,
-	keymap.LevelDBKeymapType:       keymap.NewLevelDBKeymap,
-	keymap.UnsafeLevelDBKeymapType: keymap.NewUnsafeLevelDBKeymap,
-}
 
 // cacheWeight is a function that calculates the weight of a cache entry.
 func cacheWeight(key string, value []byte) uint64 {
@@ -35,7 +29,7 @@ func cacheWeight(key string, value []byte) uint64 {
 
 // buildKeymap creates a new keymap based on the configuration.
 func buildKeymap(
-	config *litt.Config,
+	config *LittDBConfig,
 	logger logging.Logger,
 	tableName string,
 ) (kmap keymap.Keymap, keymapPath string, keymapTypeFile *keymap.KeymapTypeFile, requiresReload bool, err error) {
@@ -46,71 +40,36 @@ func buildKeymap(
 			fmt.Errorf("unsupported keymap type: %v", config.KeymapType)
 	}
 
-	potentialKeymapDirectories := make([]string, len(config.Paths))
+	keymapDirectories := make([]string, len(config.Paths))
 	for i, p := range config.Paths {
-		potentialKeymapDirectories[i] = path.Join(p, tableName, keymap.KeymapDirectoryName)
+		keymapDirectories[i] = path.Join(p, tableName, keymap.KeymapDirectoryName)
 	}
 
-	// The directory where the keymap data is stored. There are multiple plausible directories, but there
-	// should only be keymap data that exists in at most one of them.
 	var keymapDirectory string
-
-	// If there is no keymap on disk or if the prior keymap was not fully initialized, this will be false. If false,
-	// the keymap will need to be reloaded as a part of the table initialization.
-	var keymapInitialized bool
-
-	for _, directory := range potentialKeymapDirectories {
-		exists, err := util.Exists(directory)
+	for _, directory := range keymapDirectories {
+		exists, err := keymap.KeymapFileExists(directory)
 		if err != nil {
 			return nil, "", nil, false,
 				fmt.Errorf("error checking for keymap type file: %w", err)
 		}
 		if exists {
-			if keymapDirectory != "" {
-				return nil, "", nil, false,
-					fmt.Errorf("multiple keymap directories found: %s and %s", keymapDirectory, directory)
-			}
-
 			keymapDirectory = directory
 			keymapTypeFile, err = keymap.LoadKeymapTypeFile(directory)
 			if err != nil {
 				return nil, "", nil, false,
 					fmt.Errorf("error loading keymap type file: %w", err)
 			}
-
-			initializedExists, err := util.Exists(path.Join(keymapDirectory, keymap.KeymapInitializedFileName))
-			if err != nil {
-				return nil, "", nil, false,
-					fmt.Errorf("error checking for keymap initialized file: %w", err)
-			}
-			if initializedExists {
-				keymapInitialized = true
-			}
+			break
 		}
-	}
-
-	if keymapTypeFile != nil && !keymapInitialized {
-		// The keymap has not been fully initialized. This is likely due to a crash during the keymap reloading process.
-		logger.Warnf("incomplete keymap initialization detected. Deleting keymap directory: %s",
-			keymapDirectory)
-
-		err := os.RemoveAll(keymapDirectory)
-		if err != nil {
-			return nil, "", nil, false,
-				fmt.Errorf("error deleting keymap directory: %w", err)
-		}
-
-		keymapTypeFile = nil
-		keymapDirectory = ""
 	}
 
 	newKeymap := false
 	if keymapTypeFile == nil {
-		// No previous keymap exists. Either we are starting fresh or the keymap was deleted.
+		// No previous keymap exists. Either we are starting fresh or the keymap was deleted manually.
 		newKeymap = true
 
 		// by convention, always select the first path as the keymap directory
-		keymapDirectory = potentialKeymapDirectories[0]
+		keymapDirectory = keymapDirectories[0]
 		keymapTypeFile = keymap.NewKeymapTypeFile(keymapDirectory, config.KeymapType)
 
 		// create the keymap directory
@@ -129,53 +88,50 @@ func buildKeymap(
 
 	} else {
 		// A previous keymap exists. Check if the keymap type has changed.
+
+		builderForTypeOnDisk, ok := keymapBuilders[keymapTypeFile.Type()]
+		if !ok {
+			return nil, "", nil, false,
+				fmt.Errorf("unsupported keymap type: %v", keymapTypeFile.Type())
+		}
+
 		if config.KeymapType != keymapTypeFile.Type() {
 			// The previously used keymap type is different from the one in the configuration.
 
-			keymapTypeFile = nil
-
 			// delete the old keymap
-			err = os.RemoveAll(keymapDirectory)
+			err := builderForTypeOnDisk.DeleteFiles(logger, keymapDirectory)
 			if err != nil {
 				return nil, "", nil, false,
 					fmt.Errorf("error deleting keymap files: %w", err)
 			}
 
-			// write the new keymap type file
-			err = os.MkdirAll(keymapDirectory, 0755)
+			// delete the keymap type file
+			err = keymapTypeFile.Delete()
 			if err != nil {
 				return nil, "", nil, false,
-					fmt.Errorf("error creating keymap directory: %w", err)
+					fmt.Errorf("error deleting keymap type file: %w", err)
 			}
-			keymapTypeFile = keymap.NewKeymapTypeFile(keymapDirectory, config.KeymapType)
-			err = keymapTypeFile.Write()
-			if err != nil {
+
+			// finally, delete the keymap directory
+			_, err = os.Stat(keymapDirectory)
+			if err == nil {
+				err = os.Remove(keymapDirectory)
+				if err != nil {
+					return nil, "", nil, false,
+						fmt.Errorf("error deleting keymap directory: %w", err)
+				}
+			} else if !os.IsNotExist(err) {
 				return nil, "", nil, false,
-					fmt.Errorf("error writing keymap type file: %w", err)
+					fmt.Errorf("error checking for keymap directory: %w", err)
 			}
 		}
 	}
 
 	keymapDataDirectory := path.Join(keymapDirectory, keymap.KeymapDataDirectoryName)
-	kmap, requiresReload, err = builderForConfiguredType(logger, keymapDataDirectory, config.DoubleWriteProtection)
+	kmap, requiresReload, err = builderForConfiguredType.Build(logger, keymapDataDirectory, config.DoubleWriteProtection)
 	if err != nil {
 		return nil, "", nil, false,
 			fmt.Errorf("error building keymap: %w", err)
-	}
-
-	if !requiresReload {
-		// If the keymap does not need to be reloaded, then it is already fully initialized.
-		keymapInitializedFile := path.Join(keymapDirectory, keymap.KeymapInitializedFileName)
-		f, err := os.Create(keymapInitializedFile)
-		if err != nil {
-			return nil, "", nil, false,
-				fmt.Errorf("failed to create keymap initialized file: %v", err)
-		}
-		err = f.Close()
-		if err != nil {
-			return nil, "", nil, false,
-				fmt.Errorf("failed to close keymap initialized file: %v", err)
-		}
 	}
 
 	return kmap, keymapDirectory, keymapTypeFile, requiresReload || newKeymap, nil
@@ -183,9 +139,12 @@ func buildKeymap(
 
 // buildTable creates a new table based on the configuration.
 func buildTable(
-	config *litt.Config,
+	config *LittDBConfig,
+	ctx context.Context,
 	logger logging.Logger,
+	timeSource func() time.Time,
 	name string,
+	ttl time.Duration,
 	metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
 
 	var table litt.ManagedTable
@@ -205,13 +164,22 @@ func buildTable(
 	}
 
 	table, err = disktable.NewDiskTable(
-		config,
+		ctx,
+		logger,
+		timeSource,
 		name,
 		kmap,
 		keymapDirectory,
 		keymapTypeFile,
 		tableRoots,
+		config.TargetSegmentFileSize,
+		config.ControlChannelSize,
+		config.ShardingFactor,
+		config.SaltShaker,
+		ttl,
+		config.GCPeriod,
 		requiresReload,
+		config.Fsync,
 		metrics)
 
 	if err != nil {
@@ -226,17 +194,17 @@ func buildTable(
 }
 
 // buildLogger creates a new logger based on the configuration.
-func buildLogger(config *litt.Config) (logging.Logger, error) {
+func buildLogger(config *LittDBConfig) (logging.Logger, error) {
 	if config.Logger != nil {
 		return config.Logger, nil
 	}
 
-	return common.NewLogger(*config.LoggerConfig)
+	return common.NewLogger(config.LoggerConfig)
 }
 
 // buildMetrics creates a new metrics object based on the configuration. If the returned server is not nil,
 // then it is the responsibility of the caller to eventually call server.Shutdown().
-func buildMetrics(config *litt.Config, logger logging.Logger) (*metrics.LittDBMetrics, *http.Server) {
+func buildMetrics(config *LittDBConfig, logger logging.Logger) (*metrics.LittDBMetrics, *http.Server) {
 	if !config.MetricsEnabled {
 		return nil, nil
 	}
@@ -244,33 +212,29 @@ func buildMetrics(config *litt.Config, logger logging.Logger) (*metrics.LittDBMe
 	var registry *prometheus.Registry
 	var server *http.Server
 
-	if config.MetricsEnabled {
-		if config.MetricsRegistry == nil {
-			registry = prometheus.NewRegistry()
-			registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
-			registry.MustRegister(collectors.NewGoCollector())
+	if config.MetricsRegistry != nil {
+		registry = prometheus.NewRegistry()
+		registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
+		registry.MustRegister(collectors.NewGoCollector())
 
-			logger.Infof("Starting metrics server at port %d", config.MetricsPort)
-			addr := fmt.Sprintf(":%d", config.MetricsPort)
-			mux := http.NewServeMux()
-			mux.Handle("/metrics", promhttp.HandlerFor(
-				registry,
-				promhttp.HandlerOpts{},
-			))
-			server = &http.Server{
-				Addr:    addr,
-				Handler: mux,
-			}
-
-			go func() {
-				err := server.ListenAndServe()
-				if err != nil && !strings.Contains(err.Error(), "http: Server closed") {
-					logger.Errorf("metrics server error: %v", err)
-				}
-			}()
-		} else {
-			registry = config.MetricsRegistry
+		logger.Infof("Starting metrics server at port %d", config.MetricsPort)
+		addr := fmt.Sprintf(":%d", config.MetricsPort)
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.HandlerFor(
+			registry,
+			promhttp.HandlerOpts{},
+		))
+		server = &http.Server{
+			Addr:    addr,
+			Handler: mux,
 		}
+
+		go func() {
+			err := server.ListenAndServe()
+			if err != nil && !strings.Contains(err.Error(), "http: Server closed") {
+				logger.Errorf("metrics server error: %v", err)
+			}
+		}()
 	}
 
 	return metrics.NewLittDBMetrics(registry, config.MetricsNamespace), server

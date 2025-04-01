@@ -62,13 +62,24 @@ type db struct {
 
 // NewDB creates a new DB instance. After this method is called, the config object should not be modified.
 func NewDB(config *LittDBConfig) (litt.DB, error) {
-	return NewDBWithTableBuilder(config, config.buildTable)
+	tableBuilder := func(
+		ctx context.Context,
+		logger logging.Logger,
+		timeSource func() time.Time,
+		name string,
+		ttl time.Duration,
+		metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
+
+		return buildTable(config, ctx, logger, timeSource, name, ttl, metrics)
+	}
+
+	return NewDBWithTableBuilder(config, tableBuilder)
 }
 
 // NewDBWithTableBuilder creates a new DB instance with a custom table builder. This is intended for unit test use,
 // and should not be considered a stable API.
 func NewDBWithTableBuilder(config *LittDBConfig, tableBuilder TableBuilder) (litt.DB, error) {
-	logger, err := config.buildLogger()
+	logger, err := buildLogger(config)
 	if err != nil {
 		return nil, fmt.Errorf("error building logger: %w", err)
 	}
@@ -76,7 +87,7 @@ func NewDBWithTableBuilder(config *LittDBConfig, tableBuilder TableBuilder) (lit
 	var dbMetrics *metrics.LittDBMetrics
 	var metricsServer *http.Server
 	if config.MetricsEnabled {
-		dbMetrics, metricsServer = config.buildMetrics(logger)
+		dbMetrics, metricsServer = buildMetrics(config, logger)
 	}
 
 	database := &db{

@@ -185,47 +185,7 @@ return err
 
 ## Configuration Options
 
-The "source of truth" for LittDB configuration documentation is the `Config` struct in
-[littdb_config.go](littbuilder/littdb_config.go), although an overview is provided here.
-
-Options marked with a `*` are options that are safe to ignore in most cases. In many cases, these options
-are present to support testing.
-
-- `Paths`: a list of directories. LittDB will do its best to spread data across these directories.
-  Directories may or may not be on the same physical drive.
-- `Logger`: the logger to be used. If set to `nil` (the default), then the `LoggerConfig` field is used to
-  create a logger. If the `Logger` field is set, then the `LoggerConfig` field is ignored.
-- `LoggerConfig`: a struct containing configuration options for the logger. A sane default is provided.
-- `KeymapType`: the type of [keymap](#keymap) to use. The default is `keymap.LevelDBKeymapType`. An in-memory
-  is also supported: `keymap.MemKeymapType`. It will be faster, but may have longer startup times and higher
-  memory usage.
-- `TTL`: the [time-to-live](#ttl) for data in the database. If set to `0`, data will never expire. The default
-  is `0`. Changing the [TTL](#ttl) for a table effects all data currently in the table, as well as all data
-  written to the table in the future. Lowering the [TTL](#ttl) may cause some data to immediately become eligible
-  for deletion.
-- `ControlChannelSize`*: the size of an internal channel used for controlling the database. The default is `64`.
-- `TargetSegmentFileSize`*: the target size for segment files. The default is `2^32` (4GB).
-- `GCPeriod`*: the frequency at which the garbage collector runs. The default is `1m`.
-- `ShardingFactor`: the number of shards to use for each segment. The default is `1`. If more than one path is provided
-  in the `Paths` field, then shards will be spread out across the available paths. If there are more shards than paths,
-  some paths will have more than one shard. If there are more paths than shards, some paths will have no shards.
-- `SaltShaker`*: a random number generator used to generate [sharding salt](#sharding-salt). Default is a standard
-  PRNG seeded with the current time.
-- `CacheSize`: the size of the [in-memory cache](#cache), in bytes. The default 1GB.
-- `TimeSource`*: a function that returns the current time. The default is `time.Now()`.
-- `Fsync`: if true, then each flush operation performs an fsync operation. Ensures the data is durable even if the
-  OS crashes. Otherwise, there may be data in the OS's internal buffers. This may cause significant performance
-  overhead, especially if there are lots of frequent small flushes. The default is `true`.
-- `DoubleWriteProtection`: if true, then the database will return an error if a write operation is performed against
-  a key that already exists in the database. This is illegal behavior, but the check is not always enforced due to
-  the performance overhead if using anything other than an in-memory keymap. The default is `false`.
-- `MetricsEnabled`: if true, then the database will emit prometheus metrics. The default is `false`.
-- `MetricsNamespace`: the namespace to use for prometheus metrics. The default is `litt`.
-- `MetricsRegistry`: if `MetricsEnabled` is true, then metrics are registered with this registry. If nil, then
-  a new registry is created. The default is `nil`.
-- `MetricsPort`: the port to expose metrics on. The default is `8080`. Ignored if `MetricsEnabled` is false or if
-  `MetricsRegistry` is not nil
-- `MetricsUpdateInterval`: the frequency at which metrics are updated. The default is `1s`.
+For more information about configuration, see [littdb_config.go](littbuilder/littdb_config.go).
 
 # Definitions
 
