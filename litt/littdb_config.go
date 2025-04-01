@@ -63,7 +63,7 @@ type Config struct {
 	GCPeriod time.Duration
 
 	// The size of the keymap deletion batch for garbage collection. The default is 10,000.
-	GCBatchSize uint32
+	GCBatchSize uint64
 
 	// The sharding factor for the database. The default is 8. Must be at least 1.
 	ShardingFactor uint32

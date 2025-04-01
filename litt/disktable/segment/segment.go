@@ -638,6 +638,7 @@ func (s *Segment) shardControlLoop(shard uint32) {
 		select {
 		case <-s.panic.ImmediateShutdownRequired():
 			s.logger.Infof("segment %d shard %d control loop exiting, context cancelled", s.index, shard)
+			return
 		case operation := <-s.shardChannels[shard]:
 			if flushRequest, ok := operation.(*shardFlushRequest); ok {
 				s.handleShardFlushRequest(shard, flushRequest)

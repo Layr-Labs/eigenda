@@ -218,6 +218,7 @@ func NewDiskTable(
 		keymapTypeFile:          keymapTypeFile,
 		targetFileSize:          config.TargetSegmentFileSize,
 		targetKeyFileSize:       config.TargetSegmentKeyFileSize,
+		gcBatchSize:             config.GCBatchSize,
 		maxKeyCount:             config.MaxSegmentKeyCount,
 		segments:                make(map[uint32]*segment.Segment),
 		controllerChannel:       make(chan any, config.ControlChannelSize),
@@ -950,7 +951,6 @@ func (d *DiskTable) handleControlLoopFlushRequest(req *controlLoopFlushRequest) 
 
 // handleFlushLoopFlushRequest handles the part of the flush that is performed on the flush loop.
 func (d *DiskTable) handleFlushLoopFlushRequest(req *flushLoopFlushRequest) {
-
 	var segmentFlushStart time.Time
 	if d.metrics != nil {
 		segmentFlushStart = d.timeSource()
@@ -1070,6 +1070,7 @@ func (d *DiskTable) controlLoop() {
 		select {
 		case <-d.panic.ImmediateShutdownRequired():
 			d.logger.Infof("context done, shutting down disk table control loop")
+			return
 		case message := <-d.controllerChannel:
 			if req, ok := message.(*controlLoopWriteRequest); ok {
 				d.handleControlLoopWriteRequest(req)
@@ -1125,6 +1126,7 @@ func (d *DiskTable) flushLoop() {
 		select {
 		case <-d.panic.ImmediateShutdownRequired():
 			d.logger.Infof("context done, shutting down disk table flush loop")
+			return
 		case message := <-d.flushChannel:
 			if req, ok := message.(*flushLoopFlushRequest); ok {
 				d.handleFlushLoopFlushRequest(req)
