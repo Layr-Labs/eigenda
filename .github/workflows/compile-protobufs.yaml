@@ -14,6 +14,9 @@ jobs:
     steps:
       - name: Checkout EigenDA
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true #only install buf -- needed by `make protoc` command
       - name: Recompile Protobufs
         run: |
           make clean
