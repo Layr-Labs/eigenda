@@ -54,7 +54,7 @@ func buildMemDB(t *testing.T, path string) (litt.DB, error) {
 	require.NoError(t, err)
 
 	config.GCPeriod = 50 * time.Millisecond
-	
+
 	tb := func(
 		ctx context.Context,
 		logger logging.Logger,
@@ -167,9 +167,6 @@ func randomDBOperationsTest(t *testing.T, builder *dbBuilder) {
 				for expectedKey, expectedValue := range tableValues {
 					value, ok, err := table.Get([]byte(expectedKey))
 					require.NoError(t, err)
-					if !ok {
-						value, ok, err = table.Get([]byte(expectedKey))
-					}
 					require.True(t, ok)
 					require.Equal(t, expectedValue, value)
 				}

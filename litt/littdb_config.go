@@ -45,14 +45,14 @@ type Config struct {
 	// The target size for segments. The default is math.MaxUint32.
 	TargetSegmentFileSize uint32
 
-	// The maximum number of keys in a segment. The default is 32,000. For workloads with moderately large values
+	// The maximum number of keys in a segment. The default is 50,000. For workloads with moderately large values
 	// (i.e. in the kb+ range), this threshold is unlikely to be relevant. For workloads with very small values,
 	// this constant prevents a segment from accumulating too many keys. A segment with too many keys may have
 	// undesirable properties such as a very large key file and very slow garbage collection (since no kv-pair in
 	// a segment can be deleted until the entire segment is deleted).
 	MaxSegmentKeyCount uint64
 
-	// The desired maximum size for a key file. The default is 1 MB. When a key file exceeds this size, the segment
+	// The desired maximum size for a key file. The default is 2 MB. When a key file exceeds this size, the segment
 	// will close the current segment and begin writing to a new one. For workloads with moderately large values,
 	// this threshold is unlikely to be relevant. For workloads with very small values, this constant prevents a key
 	// file from growing too large. A key file with too many keys may have undesirable properties such as very slow
@@ -61,6 +61,9 @@ type Config struct {
 
 	// The period between garbage collection runs. The default is 5 minutes.
 	GCPeriod time.Duration
+
+	// The size of the keymap deletion batch for garbage collection. The default is 10,000.
+	GCBatchSize uint32
 
 	// The sharding factor for the database. The default is 8. Must be at least 1.
 	ShardingFactor uint32
@@ -129,13 +132,14 @@ func DefaultConfig(paths ...string) (*Config, error) {
 		LoggerConfig:             &loggerConfig,
 		TimeSource:               time.Now,
 		GCPeriod:                 5 * time.Minute,
+		GCBatchSize:              10_000,
 		ShardingFactor:           8,
 		SaltShaker:               saltShaker,
 		KeymapType:               keymap.LevelDBKeymapType,
 		ControlChannelSize:       64,
 		TargetSegmentFileSize:    math.MaxUint32,
-		MaxSegmentKeyCount:       32_000,
-		TargetSegmentKeyFileSize: units.MiB,
+		MaxSegmentKeyCount:       50_000,
+		TargetSegmentKeyFileSize: 2 * units.MiB,
 		Fsync:                    true,
 		DoubleWriteProtection:    false,
 		MetricsEnabled:           false,
@@ -159,6 +163,9 @@ func (c *Config) SanityCheck() error {
 	}
 	if c.TimeSource == nil {
 		return fmt.Errorf("time source cannot be nil")
+	}
+	if c.GCBatchSize == 0 {
+		return fmt.Errorf("gc batch size must be at least 1")
 	}
 	if c.ShardingFactor == 0 {
 		return fmt.Errorf("sharding factor must be at least 1")

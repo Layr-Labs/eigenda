@@ -119,6 +119,9 @@ type DiskTable struct {
 	// The number of keys in the table.
 	keyCount atomic.Int64
 
+	// The maximum number of keys that can be garbage collected in a single batch.
+	gcBatchSize uint64
+
 	// Encapsulates metrics for the database.
 	metrics *metrics.LittDBMetrics
 }
@@ -792,10 +795,16 @@ func (d *DiskTable) doGarbageCollection() {
 			return
 		}
 
-		err = d.keymap.Delete(keys)
-		if err != nil {
-			d.panic.Panic(fmt.Errorf("failed to delete keys: %v", err))
-			return
+		for keyIndex := uint64(0); keyIndex < uint64(len(keys)); keyIndex += d.gcBatchSize {
+			lastIndex := keyIndex + d.gcBatchSize
+			if lastIndex >= uint64(len(keys)) {
+				lastIndex = uint64(len(keys))
+			}
+			err = d.keymap.Delete(keys[keyIndex:lastIndex])
+			if err != nil {
+				d.panic.Panic(fmt.Errorf("failed to delete keys: %v", err))
+				return
+			}
 		}
 
 		d.immutableSegmentSize -= seg.Size()
