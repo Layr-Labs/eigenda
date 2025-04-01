@@ -3,6 +3,9 @@ pragma solidity =0.8.12;
 
 import {EigenDACertVerifierRouter} from "src/periphery/EigenDACertVerifierRouter.sol";
 import {IEigenDACertVerifierBase} from "src/interfaces/IEigenDACertVerifier.sol";
+import {TransparentUpgradeableProxy} from
+    "openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
 
 import {
     BlobHeader,
@@ -17,6 +20,7 @@ import "forge-std/Test.sol";
 
 contract TestEigenDACertVerifierRouter is Test {
     EigenDACertVerifierRouter certVerifierRouter;
+    address routerImpl;
     EigenDACertVerifierMock[] certVerifierMocks;
 
     uint256 numCertVerifiers = 3;
@@ -26,7 +30,12 @@ contract TestEigenDACertVerifierRouter is Test {
 
     function setUp() public {
         vm.roll(startBlockNumber);
-        certVerifierRouter = new EigenDACertVerifierRouter();
+        routerImpl = address(new EigenDACertVerifierRouter());
+        ProxyAdmin proxyAdmin = new ProxyAdmin();
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            routerImpl, address(proxyAdmin), abi.encodeCall(EigenDACertVerifierRouter.initialize, address(this))
+        );
+        certVerifierRouter = EigenDACertVerifierRouter(address(proxy));
         for (uint256 i; i < numCertVerifiers; i++) {
             certVerifierMocks.push(new EigenDACertVerifierMock());
         }

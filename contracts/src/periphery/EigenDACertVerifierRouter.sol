@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
+import {IEigenDACertVerifierRouter} from "src/interfaces/IEigenDACertVerifierRouter.sol";
 import {IEigenDACertVerifierBase} from "src/interfaces/IEigenDACertVerifier.sol";
-import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
 import "src/interfaces/IEigenDAStructs.sol";
 
-contract EigenDACertVerifierRouter is IEigenDACertVerifierBase, Ownable {
+contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgradeable {
     /// @notice The mapping of reference block numbers to cert verifiers.
     mapping(uint32 => IEigenDACertVerifierBase) public certVerifiers;
 
@@ -14,6 +15,14 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierBase, Ownable {
     uint32[] public certVerifierRBNs;
 
     event CertVerifierAdded(uint32 indexed referenceBlockNumber, address indexed certVerifier);
+
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address _initialOwner) external initializer {
+        _transferOwnership(_initialOwner);
+    }
 
     function addCertVerifier(uint32 referenceBlockNumber, address certVerifier) external onlyOwner {
         require(referenceBlockNumber > block.number, "Reference block number must be in the future");
@@ -24,6 +33,10 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierBase, Ownable {
         certVerifiers[referenceBlockNumber] = IEigenDACertVerifierBase(certVerifier);
         certVerifierRBNs.push(referenceBlockNumber);
         emit CertVerifierAdded(referenceBlockNumber, certVerifier);
+    }
+
+    function getCertVerifierAt(uint32 rbn) external view returns (IEigenDACertVerifierBase) {
+        return certVerifiers[rbn];
     }
 
     function verifyDACertV1(BlobHeader calldata blobHeader, BlobVerificationProof calldata blobVerificationProof)
