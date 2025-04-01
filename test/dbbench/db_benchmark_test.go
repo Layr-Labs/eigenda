@@ -2,7 +2,6 @@ package dbbench
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"fmt"
 	"math/rand"
@@ -19,6 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/docker/go-units"
@@ -460,14 +460,14 @@ func TestLevelDB(t *testing.T) {
 func TestLittDB(t *testing.T) {
 	directory := "./test-data"
 
-	config, err := littbuilder.DefaultConfig(directory)
+	config, err := litt.DefaultConfig(directory)
 	require.NoError(t, err)
 	config.ShardingFactor = 1
 	config.CacheSize = 10 * units.MiB // TODO revert when not benchmarking memory performance
 	config.TTL = TTL
 	config.KeymapType = keymap.LevelDBKeymapType
 
-	db, err := config.Build(context.Background())
+	db, err := littbuilder.NewDB(config)
 	require.NoError(t, err)
 
 	table, err := db.GetTable("test")
