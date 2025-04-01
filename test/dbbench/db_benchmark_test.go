@@ -34,14 +34,15 @@ type writer func(key []byte, value []byte) error
 type reader func(key []byte) ([]byte, error)
 
 const totalToWrite = 10 * units.TiB
-const dataSize = 1 * units.MiB
+const dataSize = 4 * units.KiB
 const batchSizeInBytes = 100 * units.MiB
 const parallelWriters = 2
-const writeThrottle = 40 * units.MiB
+const writeThrottle = 200 * units.MiB
 const writeBucketSize = 200 * units.MiB
-const readBytesPerSecond = 10 * units.MiB
+const readBytesPerSecond = 1 * units.MiB
 
-var readerCount = 0 // TODO
+var readerCount = 1
+
 const TTL = 2 * time.Hour
 const dataGeneratorCount = 16
 
@@ -647,4 +648,4 @@ func TestLittDB(t *testing.T) {
 //
 //	err = db.Close()
 //	require.NoError(t, err)
-}
+//}
