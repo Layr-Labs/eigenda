@@ -81,6 +81,9 @@ type DiskTable struct {
 	// The target size for value files.
 	targetFileSize uint32
 
+	// The maximum number of keys in a segment.
+	maxKeyCount uint64
+
 	// segmentLock protects access to the segments map and highestSegmentIndex.
 	// Does not protect the segments themselves.
 	segmentLock sync.RWMutex
@@ -647,17 +650,19 @@ func (d *DiskTable) handleControlLoopWriteRequest(req *controlLoopWriteRequest) 
 	for _, kv := range req.values {
 		// Do the write.
 		seg := d.segments[d.highestSegmentIndex]
-		shardSize, err := seg.Write(kv)
+		keyCount, shardSize, err := seg.Write(kv)
 		if err != nil {
 			d.panic.Panic(fmt.Errorf("failed to write to segment %d: %v", d.highestSegmentIndex, err))
+			return
 		}
 
 		// Check to see if the write caused the mutable segment to become full.
-		if shardSize > uint64(d.targetFileSize) {
+		if shardSize > uint64(d.targetFileSize) || keyCount >= d.maxKeyCount {
 			// Mutable segment is full. Before continuing, we need to expand the segments.
 			err = d.expandSegments()
 			if err != nil {
 				d.panic.Panic(fmt.Errorf("failed to expand segments: %v", err))
+				return
 			}
 		}
 	}
@@ -733,18 +738,21 @@ func (d *DiskTable) handleControlLoopShutdownRequest(req *controlLoopShutdownReq
 	durableKeys, err := d.segments[d.highestSegmentIndex].Seal(d.timeSource())
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to seal mutable segment: %v", err))
+		return
 	}
 
 	// Flush the keys that are now durable in the segment.
 	err = d.writeKeysToKeymap(durableKeys)
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to flush keys: %v", err))
+		return
 	}
 
 	// Stop the keymap
 	err = d.keymap.Stop()
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to stop keymap: %v", err))
+		return
 	}
 
 	req.shutdownCompleteChan <- struct{}{}
@@ -922,6 +930,7 @@ func (d *DiskTable) handleControlLoopFlushRequest(req *controlLoopFlushRequest) 
 	flushWaitFunction, err := d.segments[d.highestSegmentIndex].Flush()
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to flush segment %d: %v", d.highestSegmentIndex, err))
+		return
 	}
 
 	// The flush loop is responsible for the remaining parts of the flush.
@@ -946,6 +955,7 @@ func (d *DiskTable) handleFlushLoopFlushRequest(req *flushLoopFlushRequest) {
 	durableKeys, err := req.flushWaitFunction()
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to flush mutable segment: %v", err))
+		return
 	}
 
 	if d.metrics != nil {
@@ -957,6 +967,7 @@ func (d *DiskTable) handleFlushLoopFlushRequest(req *flushLoopFlushRequest) {
 	err = d.writeKeysToKeymap(durableKeys)
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to flush keys: %v", err))
+		return
 	}
 
 	req.responseChan <- struct{}{}
@@ -1005,12 +1016,14 @@ func (d *DiskTable) handleControlLoopSetShardingFactorRequest(req *controlLoopSe
 	err := d.metadata.SetShardingFactor(req.shardingFactor)
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to set sharding factor: %v", err))
+		return
 	}
 
 	// This seals the current mutable segment and creates a new one. The new segment will have the new sharding factor.
 	err = d.expandSegments()
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to expand segments: %v", err))
+		return
 	}
 }
 
@@ -1068,6 +1081,7 @@ func (d *DiskTable) controlLoop() {
 				req.completionChan <- struct{}{}
 			} else {
 				d.panic.Panic(fmt.Errorf("Unknown control message type %T", message))
+				return
 			}
 		case <-ticker.C:
 			d.doGarbageCollection()
@@ -1117,6 +1131,7 @@ func (d *DiskTable) flushLoop() {
 				return
 			} else {
 				d.panic.Panic(fmt.Errorf("Unknown flush message type %T", message))
+				return
 			}
 		}
 	}
