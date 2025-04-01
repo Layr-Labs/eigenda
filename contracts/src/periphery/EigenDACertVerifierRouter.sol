@@ -5,20 +5,20 @@ import {IEigenDACertVerifierBase} from "src/interfaces/IEigenDACertVerifier.sol"
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import "src/interfaces/IEigenDAStructs.sol";
 
-contract CertVerifierRouter is IEigenDACertVerifierBase, Ownable {
+contract EigenDACertVerifierRouter is IEigenDACertVerifierBase, Ownable {
     /// @notice The mapping of reference block numbers to cert verifiers.
-    mapping(uint64 => IEigenDACertVerifierBase) public certVerifiers;
+    mapping(uint32 => IEigenDACertVerifierBase) public certVerifiers;
 
     /// @dev This array should only be appended to in increasing order, and thus should be sorted.
     ///      These values contain all added indexes for the certVerifiers mapping.
-    uint64[] public certVerifierRBNs;
+    uint32[] public certVerifierRBNs;
 
-    event CertVerifierAdded(uint64 indexed referenceBlockNumber, address indexed certVerifier);
+    event CertVerifierAdded(uint32 indexed referenceBlockNumber, address indexed certVerifier);
 
-    function addCertVerifier(uint64 referenceBlockNumber, address certVerifier) external onlyOwner {
+    function addCertVerifier(uint32 referenceBlockNumber, address certVerifier) external onlyOwner {
         require(referenceBlockNumber > block.number, "Reference block number must be in the future");
         require(
-            referenceBlockNumber > certVerifierRBNs[certVerifierRBNs.length - 1],
+            certVerifierRBNs.length == 0 || referenceBlockNumber > certVerifierRBNs[certVerifierRBNs.length - 1],
             "Reference block number must be greater than the last registered RBN"
         );
         certVerifiers[referenceBlockNumber] = IEigenDACertVerifierBase(certVerifier);
@@ -30,8 +30,8 @@ contract CertVerifierRouter is IEigenDACertVerifierBase, Ownable {
         public
         view
     {
-        uint64 referenceBlockNumber = blobVerificationProof.batchMetadata.batchHeader.referenceBlockNumber;
-        uint64 closestRBN = _findClosestRegisteredRBN(referenceBlockNumber);
+        uint32 referenceBlockNumber = blobVerificationProof.batchMetadata.batchHeader.referenceBlockNumber;
+        uint32 closestRBN = _findClosestRegisteredRBN(referenceBlockNumber);
         certVerifiers[closestRBN].verifyDACertV1(blobHeader, blobVerificationProof);
     }
 
@@ -51,8 +51,8 @@ contract CertVerifierRouter is IEigenDACertVerifierBase, Ownable {
         NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
         bytes memory signedQuorumNumbers
     ) external view {
-        uint64 referenceBlockNumber = batchHeader.referenceBlockNumber;
-        uint64 closestRBN = _findClosestRegisteredRBN(referenceBlockNumber);
+        uint32 referenceBlockNumber = batchHeader.referenceBlockNumber;
+        uint32 closestRBN = _findClosestRegisteredRBN(referenceBlockNumber);
         certVerifiers[closestRBN].verifyDACertV2(
             batchHeader, blobInclusionInfo, nonSignerStakesAndSignature, signedQuorumNumbers
         );
@@ -62,8 +62,8 @@ contract CertVerifierRouter is IEigenDACertVerifierBase, Ownable {
         SignedBatch calldata signedBatch,
         BlobInclusionInfo calldata blobInclusionInfo
     ) external view {
-        uint64 referenceBlockNumber = signedBatch.batchHeader.referenceBlockNumber;
-        uint64 closestRBN = _findClosestRegisteredRBN(referenceBlockNumber);
+        uint32 referenceBlockNumber = signedBatch.batchHeader.referenceBlockNumber;
+        uint32 closestRBN = _findClosestRegisteredRBN(referenceBlockNumber);
         certVerifiers[closestRBN].verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
     }
 
@@ -73,8 +73,8 @@ contract CertVerifierRouter is IEigenDACertVerifierBase, Ownable {
         NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
         bytes memory signedQuorumNumbers
     ) external view returns (bool) {
-        uint64 referenceBlockNumber = batchHeader.referenceBlockNumber;
-        uint64 closestRBN = _findClosestRegisteredRBN(referenceBlockNumber);
+        uint32 referenceBlockNumber = batchHeader.referenceBlockNumber;
+        uint32 closestRBN = _findClosestRegisteredRBN(referenceBlockNumber);
         return certVerifiers[closestRBN].verifyDACertV2ForZKProof(
             batchHeader, blobInclusionInfo, nonSignerStakesAndSignature, signedQuorumNumbers
         );
@@ -85,20 +85,21 @@ contract CertVerifierRouter is IEigenDACertVerifierBase, Ownable {
         view
         returns (NonSignerStakesAndSignature memory)
     {
-        uint64 referenceBlockNumber = signedBatch.batchHeader.referenceBlockNumber;
-        uint64 closestRBN = _findClosestRegisteredRBN(referenceBlockNumber);
+        uint32 referenceBlockNumber = signedBatch.batchHeader.referenceBlockNumber;
+        uint32 closestRBN = _findClosestRegisteredRBN(referenceBlockNumber);
         return certVerifiers[closestRBN].getNonSignerStakesAndSignature(signedBatch);
     }
 
     /// @notice Given an RBN, find the closest RBN registered in this contract that is less than or equal to the given RBN.
     /// @param referenceBlockNumber The reference block number to find the closest RBN for
     /// @return closestRBN The closest RBN registered in this contract that is less than or equal to the given RBN.
-    function _findClosestRegisteredRBN(uint64 referenceBlockNumber) internal view returns (uint64) {
+    function _findClosestRegisteredRBN(uint32 referenceBlockNumber) internal view returns (uint32) {
         // It is assumed that the latest RBNs are the most likely to be used.
         require(certVerifierRBNs.length > 0, "No cert verifiers available");
 
-        for (uint256 i = certVerifierRBNs.length - 1; i >= 0; i--) {
-            uint64 certVerifierRBNMem = certVerifierRBNs[i];
+        uint256 rbnMaxIndex = certVerifierRBNs.length - 1; // cache to memory
+        for (uint256 i; i < certVerifierRBNs.length; i++) {
+            uint32 certVerifierRBNMem = certVerifierRBNs[rbnMaxIndex - i];
             if (certVerifierRBNMem <= referenceBlockNumber) {
                 return certVerifierRBNMem;
             }
