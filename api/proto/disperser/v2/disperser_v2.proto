@@ -16,9 +16,21 @@ service Disperser {
   rpc GetBlobStatus(BlobStatusRequest) returns (BlobStatusReply) {}
 
   // GetBlobCommitment is a utility method that calculates commitment for a blob payload.
+  // It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header
+  // and don't have the ability to calculate the commitment themselves (expensive operation which requires SRS points).
+  //
+  // For an example usage, see how our disperser_client makes a call to this endpoint when it doesn't have a local prover:
+  // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166
   rpc GetBlobCommitment(BlobCommitmentRequest) returns (BlobCommitmentReply) {}
 
-  // GetPaymentState is a utility method to get the payment state of a given account.
+  // GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
+  // EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
+  // A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
+  // That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
+  // The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
+  //
+  // For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
+  // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
   rpc GetPaymentState(GetPaymentStateRequest) returns (GetPaymentStateReply) {}
 }
 
@@ -29,7 +41,9 @@ message DisperseBlobRequest {
   // The blob to be dispersed.
   //
   // The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB.
-  // (In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
+  // While the data being dispersed is only required to be greater than 0 bytes, the blob size charged against the 
+  // payment method will be rounded up to the nearest multiple of `minNumSymbols` defined by the payment vault contract 
+  // (https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/payments/PaymentVaultStorage.sol#L9).
   //
   // Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more
   // significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve.
@@ -73,10 +87,17 @@ message BlobStatusRequest {
 message BlobStatusReply {
   // The status of the blob.
   BlobStatus status = 1;
-  // The signed batch. Unset if the status is not CERTIFIED.
+  // The signed batch. Only set if the blob status is GATHERING_SIGNATURES or COMPLETE.
+  // signed_batch and blob_inclusion_info are only set if the blob status is GATHERING_SIGNATURES or COMPLETE.
+  // When blob is in GATHERING_SIGNATURES status, the attestation object in signed_batch contains attestation information
+  // at the point in time. As it gathers more signatures, attestation object will be updated according to the latest attestation status.
+  // The client can use this intermediate attestation to verify a blob if it has gathered enough signatures. 
+  // Otherwise, it should should poll the GetBlobStatus API until the desired level of attestation has been gathered or status is COMPLETE.
+  // When blob is in COMPLETE status, the attestation object in signed_batch contains the final attestation information.
+  // If the final attestation does not meet the client's requirement, the client should try a new dispersal.
   SignedBatch signed_batch = 2;
   // BlobInclusionInfo is the information needed to verify the inclusion of a blob in a batch.
-  // Unset if the status is not CERTIFIED.
+  // Only set if the blob status is GATHERING_SIGNATURES or COMPLETE.
   BlobInclusionInfo blob_inclusion_info = 3;
 }
 
@@ -99,6 +120,9 @@ message GetPaymentStateRequest {
   string account_id = 1;
   // Signature over the account ID
   bytes signature = 2;
+  // Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server's clock,
+  // request may be rejected.
+  uint64 timestamp = 3;
 }
 
 // GetPaymentStateReply contains the payment state of an account.
@@ -123,11 +147,11 @@ message GetPaymentStateReply {
 // Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:
 // - QUEUED
 // - ENCODED
+// - GATHERING_SIGNATURES
 // Terminal states are states that will not be updated to a different state:
 // - UNKNOWN
-// - CERTIFIED
+// - COMPLETE
 // - FAILED
-// - INSUFFICIENT_SIGNATURES
 enum BlobStatus {
   // UNKNOWN means that the status of the blob is unknown.
   // This is a catch all and should not be encountered absent a bug.
@@ -144,18 +168,20 @@ enum BlobStatus {
   // ENCODED means that the blob has been Reed-Solomon encoded into chunks and is ready to be dispersed to DA Nodes.
   ENCODED = 2;
 
-  // CERTIFIED means the blob has been dispersed and attested by the DA nodes.
-  CERTIFIED = 3;
+  // GATHERING_SIGNATURES means that the blob chunks are currently actively being transmitted to validators,
+  // and in doing so requesting that the validators sign to acknowledge receipt of the blob.
+  // Requests that timeout or receive errors are resubmitted to DA nodes for some period of time set by the disperser,
+  // after which the BlobStatus becomes COMPLETE.
+  GATHERING_SIGNATURES = 3;
+
+  // COMPLETE means the blob has been dispersed to DA nodes, and the GATHERING_SIGNATURES period of time has completed.
+  // This status does not guarantee any signer percentage, so a client should check that the signature has met
+  // its required threshold, and resubmit a new blob dispersal request if not.
+  COMPLETE = 4;
 
   // FAILED means that the blob has failed permanently. Note that this is a terminal state, and in order to
-  // retry the blob, the client must submit the blob again with different salt (blob key is required to be unique).
-  FAILED = 4;
-
-  // INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation.
-  //
-  // This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an
-  // an inability to gather sufficient signatures.
-  INSUFFICIENT_SIGNATURES = 5;
+  // retry the blob, the client must submit the blob again (blob key is required to be unique).
+  FAILED = 5;
 }
 
 // SignedBatch is a batch of blobs with a signature.
@@ -187,8 +213,11 @@ message Attestation {
   bytes sigma = 4;
   // Relevant quorum numbers for the attestation
   repeated uint32 quorum_numbers = 5;
-  // The attestation rate for each quorum.
-  // The order of the quorum_signed_percentages should match the order of the quorum_numbers
+  // The attestation rate for each quorum. Each quorum's signing percentage is represented by
+  // an 8 bit unsigned integer. The integer is the fraction of the quorum that has signed, with
+  // 100 representing 100% of the quorum signing, and 0 representing 0% of the quorum signing. The first
+  // byte in the byte array corresponds to the first quorum in the quorum_numbers array, the second byte
+  // corresponds to the second quorum, and so on.
   bytes quorum_signed_percentages = 6;
 }
 
@@ -197,11 +226,11 @@ message PaymentGlobalParams {
   // Global ratelimit for on-demand dispersals
   uint64 global_symbols_per_second = 1;
   // Minimum number of symbols accounted for all dispersals
-  uint32 min_num_symbols = 2;
+  uint64 min_num_symbols = 2;
   // Price charged per symbol for on-demand dispersals
-  uint32 price_per_symbol = 3;
+  uint64 price_per_symbol = 3;
   // Reservation window for all reservations
-  uint32 reservation_window = 4;
+  uint64 reservation_window = 4;
   // quorums allowed to make on-demand dispersals
   repeated uint32 on_demand_quorum_numbers = 5;
 }

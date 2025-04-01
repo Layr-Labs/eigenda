@@ -2,6 +2,7 @@ package meterer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -21,16 +23,17 @@ type OnchainPayment interface {
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error)
 	GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error)
 	GetGlobalSymbolsPerSecond() uint64
-	GetGlobalRatePeriodInterval() uint32
-	GetMinNumSymbols() uint32
-	GetPricePerSymbol() uint32
-	GetReservationWindow() uint32
+	GetGlobalRatePeriodInterval() uint64
+	GetMinNumSymbols() uint64
+	GetPricePerSymbol() uint64
+	GetReservationWindow() uint64
 }
 
 var _ OnchainPayment = (*OnchainPaymentState)(nil)
 
 type OnchainPaymentState struct {
-	tx *eth.Reader
+	tx     *eth.Reader
+	logger logging.Logger
 
 	ReservedPayments map[gethcommon.Address]*core.ReservedPayment
 	OnDemandPayments map[gethcommon.Address]*core.OnDemandPayment
@@ -43,16 +46,17 @@ type OnchainPaymentState struct {
 
 type PaymentVaultParams struct {
 	GlobalSymbolsPerSecond   uint64
-	GlobalRatePeriodInterval uint32
-	MinNumSymbols            uint32
-	PricePerSymbol           uint32
-	ReservationWindow        uint32
+	GlobalRatePeriodInterval uint64
+	MinNumSymbols            uint64
+	PricePerSymbol           uint64
+	ReservationWindow        uint64
 	OnDemandQuorumNumbers    []uint8
 }
 
-func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader) (*OnchainPaymentState, error) {
+func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader, logger logging.Logger) (*OnchainPaymentState, error) {
 	state := OnchainPaymentState{
 		tx:                 tx,
+		logger:             logger.With("component", "OnchainPaymentState"),
 		ReservedPayments:   make(map[gethcommon.Address]*core.ReservedPayment),
 		OnDemandPayments:   make(map[gethcommon.Address]*core.OnDemandPayment),
 		PaymentVaultParams: atomic.Pointer[PaymentVaultParams]{},
@@ -78,27 +82,27 @@ func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*Pay
 		return nil, err
 	}
 
-	globalSymbolsPerSecond, err := pcs.tx.GetGlobalSymbolsPerSecond(ctx)
+	globalSymbolsPerSecond, err := pcs.tx.GetGlobalSymbolsPerSecond(ctx, blockNumber)
 	if err != nil {
 		return nil, err
 	}
 
-	globalRatePeriodInterval, err := pcs.tx.GetGlobalRatePeriodInterval(ctx)
+	globalRatePeriodInterval, err := pcs.tx.GetGlobalRatePeriodInterval(ctx, blockNumber)
 	if err != nil {
 		return nil, err
 	}
 
-	minNumSymbols, err := pcs.tx.GetMinNumSymbols(ctx)
+	minNumSymbols, err := pcs.tx.GetMinNumSymbols(ctx, blockNumber)
 	if err != nil {
 		return nil, err
 	}
 
-	pricePerSymbol, err := pcs.tx.GetPricePerSymbol(ctx)
+	pricePerSymbol, err := pcs.tx.GetPricePerSymbol(ctx, blockNumber)
 	if err != nil {
 		return nil, err
 	}
 
-	reservationWindow, err := pcs.tx.GetReservationWindow(ctx)
+	reservationWindow, err := pcs.tx.GetReservationWindow(ctx, blockNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +126,29 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context) 
 	// These parameters should be rarely updated, but we refresh them anyway
 	pcs.PaymentVaultParams.Store(paymentVaultParams)
 
+	var refreshErr error
+	if reservedPaymentsErr := pcs.refreshReservedPayments(ctx); reservedPaymentsErr != nil {
+		pcs.logger.Error("failed to refresh reserved payments", "error", reservedPaymentsErr)
+		refreshErr = errors.Join(refreshErr, reservedPaymentsErr)
+	}
+
+	if ondemandPaymentsErr := pcs.refreshOnDemandPayments(ctx); ondemandPaymentsErr != nil {
+		pcs.logger.Error("failed to refresh on-demand payments", "error", ondemandPaymentsErr)
+		refreshErr = errors.Join(refreshErr, ondemandPaymentsErr)
+	}
+
+	return refreshErr
+}
+
+func (pcs *OnchainPaymentState) refreshReservedPayments(ctx context.Context) error {
 	pcs.ReservationsLock.Lock()
+	defer pcs.ReservationsLock.Unlock()
+
+	if len(pcs.ReservedPayments) == 0 {
+		pcs.logger.Info("No reserved payments to refresh")
+		return nil
+	}
+
 	accountIDs := make([]gethcommon.Address, 0, len(pcs.ReservedPayments))
 	for accountID := range pcs.ReservedPayments {
 		accountIDs = append(accountIDs, accountID)
@@ -133,10 +159,19 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context) 
 		return err
 	}
 	pcs.ReservedPayments = reservedPayments
-	pcs.ReservationsLock.Unlock()
+	return nil
+}
 
+func (pcs *OnchainPaymentState) refreshOnDemandPayments(ctx context.Context) error {
 	pcs.OnDemandLocks.Lock()
-	accountIDs = make([]gethcommon.Address, 0, len(pcs.OnDemandPayments))
+	defer pcs.OnDemandLocks.Unlock()
+
+	if len(pcs.OnDemandPayments) == 0 {
+		pcs.logger.Info("No on-demand payments to refresh")
+		return nil
+	}
+
+	accountIDs := make([]gethcommon.Address, 0, len(pcs.OnDemandPayments))
 	for accountID := range pcs.OnDemandPayments {
 		accountIDs = append(accountIDs, accountID)
 	}
@@ -146,8 +181,6 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context) 
 		return err
 	}
 	pcs.OnDemandPayments = onDemandPayments
-	pcs.OnDemandLocks.Unlock()
-
 	return nil
 }
 
@@ -219,18 +252,18 @@ func (pcs *OnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
 	return pcs.PaymentVaultParams.Load().GlobalSymbolsPerSecond
 }
 
-func (pcs *OnchainPaymentState) GetGlobalRatePeriodInterval() uint32 {
+func (pcs *OnchainPaymentState) GetGlobalRatePeriodInterval() uint64 {
 	return pcs.PaymentVaultParams.Load().GlobalRatePeriodInterval
 }
 
-func (pcs *OnchainPaymentState) GetMinNumSymbols() uint32 {
+func (pcs *OnchainPaymentState) GetMinNumSymbols() uint64 {
 	return pcs.PaymentVaultParams.Load().MinNumSymbols
 }
 
-func (pcs *OnchainPaymentState) GetPricePerSymbol() uint32 {
+func (pcs *OnchainPaymentState) GetPricePerSymbol() uint64 {
 	return pcs.PaymentVaultParams.Load().PricePerSymbol
 }
 
-func (pcs *OnchainPaymentState) GetReservationWindow() uint32 {
+func (pcs *OnchainPaymentState) GetReservationWindow() uint64 {
 	return pcs.PaymentVaultParams.Load().ReservationWindow
 }

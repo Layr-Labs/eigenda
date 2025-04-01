@@ -60,6 +60,10 @@ type EncodingManager struct {
 	// state
 	cursor                *blobstore.StatusIndexCursor
 	blobVersionParameters atomic.Pointer[corev2.BlobVersionParameterMap]
+	// blobSet keeps track of blobs that are currently being encoded
+	// This is used to deduplicate blobs to prevent the same blob from being encoded multiple times
+	// blobSet is shared with Dispatcher which removes blobs from this queue as they are packaged for dispersal
+	blobSet BlobSet
 
 	metrics         *encodingManagerMetrics
 	signalHeartbeat func()
@@ -73,6 +77,7 @@ func NewEncodingManager(
 	chainReader core.Reader,
 	logger logging.Logger,
 	registry *prometheus.Registry,
+	blobSet BlobSet,
 	signalHeartbeat func(),
 ) (*EncodingManager, error) {
 	if config.NumRelayAssignment < 1 ||
@@ -92,6 +97,7 @@ func NewEncodingManager(
 		logger:                logger.With("component", "EncodingManager"),
 		cursor:                nil,
 		metrics:               newEncodingManagerMetrics(registry),
+		blobSet:               blobSet,
 		signalHeartbeat:       signalHeartbeat,
 	}, nil
 }
@@ -144,16 +150,35 @@ func (e *EncodingManager) Start(ctx context.Context) error {
 	return nil
 }
 
-func (e *EncodingManager) HandleBatch(ctx context.Context) error {
-	// Signal Liveness to indicate no stall
-	e.signalHeartbeat()
+func (e *EncodingManager) dedupBlobs(blobMetadatas []*v2.BlobMetadata) []*v2.BlobMetadata {
+	dedupedBlobs := make([]*v2.BlobMetadata, 0)
+	for _, blob := range blobMetadatas {
+		key, err := blob.BlobHeader.BlobKey()
+		if err != nil {
+			e.logger.Error("failed to get blob key", "err", err, "requestedAt", blob.RequestedAt)
+			continue
+		}
+		if !e.blobSet.Contains(key) {
+			dedupedBlobs = append(dedupedBlobs, blob)
+		}
+	}
+	return dedupedBlobs
+}
 
+// HandleBatch handles a batch of blobs to encode
+// It retrieves a batch of blobs from the blob metadata store, encodes them, and updates their status
+// It also creates BlobCertificates and stores them in the blob metadata store
+//
+// WARNING: This method is not thread-safe. It should only be called from a single goroutine.
+func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 	// Get a batch of blobs to encode
 	blobMetadatas, cursor, err := e.blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Queued, e.cursor, e.MaxNumBlobsPerIteration)
 	if err != nil {
 		return err
 	}
 
+	blobMetadatas = e.dedupBlobs(blobMetadatas)
+	e.metrics.reportBlobSetSize(e.blobSet.Size())
 	if len(blobMetadatas) == 0 {
 		return errNoBlobsToEncode
 	}
@@ -273,8 +298,15 @@ func (e *EncodingManager) HandleBatch(ctx context.Context) error {
 
 	e.metrics.reportBatchSubmissionLatency(time.Since(submissionStart))
 
-	if cursor != nil {
-		e.cursor = cursor
+	e.cursor = cursor
+
+	for _, blob := range blobMetadatas {
+		key, err := blob.BlobHeader.BlobKey()
+		if err != nil {
+			e.logger.Error("failed to get blob key", "err", err, "requestedAt", blob.RequestedAt)
+			continue
+		}
+		e.blobSet.AddBlob(key)
 	}
 
 	e.logger.Debug("successfully submitted encoding requests", "numBlobs", len(blobMetadatas))
@@ -289,7 +321,7 @@ func (e *EncodingManager) encodeBlob(ctx context.Context, blobKey corev2.BlobKey
 	})
 	ctx = metadata.NewOutgoingContext(ctx, md)
 
-	encodingParams, err := blob.BlobHeader.GetEncodingParams(blobParams)
+	encodingParams, err := corev2.GetEncodingParams(blob.BlobHeader.BlobCommitments.Length, blobParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get encoding params: %w", err)
 	}

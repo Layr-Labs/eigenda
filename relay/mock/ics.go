@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/stretchr/testify/mock"
 )
@@ -13,12 +14,21 @@ type IndexedChainState struct {
 	Mock mock.Mock
 }
 
-func (m *IndexedChainState) GetCurrentBlockNumber() (uint, error) {
+func (m *IndexedChainState) GetCurrentBlockNumber(ctx context.Context) (uint, error) {
 	args := m.Mock.Called()
 	return args.Get(0).(uint), args.Error(1)
 }
 
 func (m *IndexedChainState) GetOperatorState(
+	ctx context.Context,
+	blockNumber uint,
+	quorums []core.QuorumID) (*core.OperatorState, error) {
+
+	args := m.Mock.Called(blockNumber, quorums)
+	return args.Get(0).(*core.OperatorState), args.Error(1)
+}
+
+func (m *IndexedChainState) GetOperatorStateWithSocket(
 	ctx context.Context,
 	blockNumber uint,
 	quorums []core.QuorumID) (*core.OperatorState, error) {

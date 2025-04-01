@@ -344,10 +344,6 @@ type OperatorVars struct {
 
 	NODE_RETRIEVAL_PORT string
 
-	NODE_V2_DISPERSAL_PORT string
-
-	NODE_V2_RETRIEVAL_PORT string
-
 	NODE_ENABLE_METRICS string
 
 	NODE_METRICS_PORT string
@@ -424,11 +420,15 @@ type OperatorVars struct {
 
 	NODE_BLS_SIGNER_API_KEY string
 
-	NODE_ENABLE_V2 string
+	NODE_V2_DISPERSAL_PORT string
+
+	NODE_V2_RETRIEVAL_PORT string
 
 	NODE_ONCHAIN_STATE_REFRESH_INTERVAL string
 
 	NODE_CHUNK_DOWNLOAD_TIMEOUT string
+
+	NODE_GRPC_MSG_SIZE_LIMIT_V2 string
 
 	NODE_PPROF_HTTP_PORT string
 
@@ -441,6 +441,10 @@ type OperatorVars struct {
 	NODE_DISPERSER_KEY_TIMEOUT string
 
 	NODE_DISPERSAL_AUTHENTICATION_TIMEOUT string
+
+	NODE_RELAY_MAX_GRPC_MESSAGE_SIZE string
+
+	NODE_RUNTIME_MODE string
 
 	NODE_G1_PATH string
 
@@ -540,12 +544,6 @@ type RetrieverVars struct {
 	RETRIEVER_LOG_PATH string
 
 	RETRIEVER_LOG_FORMAT string
-
-	RETRIEVER_GRAPH_URL string
-
-	RETRIEVER_GRAPH_BACKOFF string
-
-	RETRIEVER_GRAPH_MAX_RETRIES string
 }
 
 func (vars RetrieverVars) getEnvMap() map[string]string {
@@ -626,8 +624,6 @@ type ControllerVars struct {
 	CONTROLLER_DISPATCHER_PULL_INTERVAL string
 
 	CONTROLLER_NODE_REQUEST_TIMEOUT string
-
-	CONTROLLER_NUM_CONNECTIONS_TO_NODES string
 
 	CONTROLLER_INDEXER_DATA_DIR string
 
@@ -726,6 +722,8 @@ type RelayVars struct {
 
 	RELAY_EIGEN_DA_SERVICE_MANAGER_ADDR string
 
+	RELAY_ENABLE_METRICS string
+
 	RELAY_MAX_GRPC_MESSAGE_SIZE string
 
 	RELAY_METADATA_CACHE_SIZE string
@@ -736,7 +734,7 @@ type RelayVars struct {
 
 	RELAY_BLOB_MAX_CONCURRENCY string
 
-	RELAY_CHUNK_CACHE_SIZE string
+	RELAY_CHUNK_CACHE_BYTES string
 
 	RELAY_CHUNK_MAX_CONCURRENCY string
 
@@ -793,6 +791,10 @@ type RelayVars struct {
 	RELAY_ONCHAIN_STATE_REFRESH_INTERVAL string
 
 	RELAY_METRICS_PORT string
+
+	RELAY_ENABLE_PPROF string
+
+	RELAY_PPROF_PORT string
 
 	RELAY_LOG_LEVEL string
 

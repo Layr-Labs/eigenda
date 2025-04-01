@@ -4,10 +4,11 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"fmt"
-	"log"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/ethereum/go-ethereum/common"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -17,16 +18,16 @@ type LocalBlobRequestSigner struct {
 
 var _ core.BlobRequestSigner = &LocalBlobRequestSigner{}
 
-func NewLocalBlobRequestSigner(privateKeyHex string) *LocalBlobRequestSigner {
+func NewLocalBlobRequestSigner(privateKeyHex string) (*LocalBlobRequestSigner, error) {
 	privateKeyBytes := common.FromHex(privateKeyHex)
 	privateKey, err := crypto.ToECDSA(privateKeyBytes)
 	if err != nil {
-		log.Fatalf("Failed to parse private key: %v", err)
+		return nil, fmt.Errorf("create ECDSA private key: %w", err)
 	}
 
 	return &LocalBlobRequestSigner{
 		PrivateKey: privateKey,
-	}
+	}, nil
 }
 
 func (s *LocalBlobRequestSigner) SignBlobRequest(header *core.BlobHeader) ([]byte, error) {
@@ -44,13 +45,18 @@ func (s *LocalBlobRequestSigner) SignBlobRequest(header *core.BlobHeader) ([]byt
 	return sig, nil
 }
 
-func (s *LocalBlobRequestSigner) SignPaymentStateRequest() ([]byte, error) {
+func (s *LocalBlobRequestSigner) SignPaymentStateRequest(timestamp uint64) ([]byte, error) {
 	accountId, err := s.GetAccountID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account ID: %v", err)
 	}
 
-	hash := sha256.Sum256([]byte(accountId))
+	requestHash, err := hashing.HashGetPaymentStateRequest(accountId, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash request: %w", err)
+	}
+
+	hash := sha256.Sum256(requestHash)
 	// Sign the account ID using the private key
 	sig, err := crypto.Sign(hash[:], s.PrivateKey)
 	if err != nil {
@@ -60,9 +66,8 @@ func (s *LocalBlobRequestSigner) SignPaymentStateRequest() ([]byte, error) {
 	return sig, nil
 }
 
-func (s *LocalBlobRequestSigner) GetAccountID() (string, error) {
-
-	accountId := crypto.PubkeyToAddress(s.PrivateKey.PublicKey).Hex()
+func (s *LocalBlobRequestSigner) GetAccountID() (gethcommon.Address, error) {
+	accountId := crypto.PubkeyToAddress(s.PrivateKey.PublicKey)
 	return accountId, nil
 }
 
@@ -78,10 +83,10 @@ func (s *LocalNoopSigner) SignBlobRequest(header *core.BlobHeader) ([]byte, erro
 	return nil, fmt.Errorf("noop signer cannot sign blob request")
 }
 
-func (s *LocalNoopSigner) SignPaymentStateRequest() ([]byte, error) {
+func (s *LocalNoopSigner) SignPaymentStateRequest(timestamp uint64) ([]byte, error) {
 	return nil, fmt.Errorf("noop signer cannot sign payment state request")
 }
 
-func (s *LocalNoopSigner) GetAccountID() (string, error) {
-	return "", fmt.Errorf("noop signer cannot get accountID")
+func (s *LocalNoopSigner) GetAccountID() (gethcommon.Address, error) {
+	return gethcommon.Address{}, fmt.Errorf("noop signer cannot get accountID")
 }

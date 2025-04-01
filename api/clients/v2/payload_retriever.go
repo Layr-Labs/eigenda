@@ -3,7 +3,7 @@ package clients
 import (
 	"context"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 )
 
 // PayloadRetriever represents something that knows how to retrieve a payload from some backend using a verification.EigenDACert
@@ -12,5 +12,5 @@ import (
 // bucket instead of from EigenDA relays or nodes.
 type PayloadRetriever interface {
 	// GetPayload retrieves a payload from some backend, using the provided certificate
-	GetPayload(ctx context.Context, eigenDACert *verification.EigenDACert) ([]byte, error)
+	GetPayload(ctx context.Context, eigenDACert *coretypes.EigenDACert) (*coretypes.Payload, error)
 }

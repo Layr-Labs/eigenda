@@ -1,13 +1,14 @@
 package grpc
 
 import (
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"google.golang.org/grpc"
-	"time"
 )
 
 const namespace = "eigenda_node"
@@ -47,7 +48,7 @@ func NewV2Metrics(logger logging.Logger, registry *prometheus.Registry) (*Metric
 			Help:       "The latency of a StoreChunks() RPC call.",
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		},
-		[]string{},
+		[]string{"stage"},
 	)
 
 	storeChunksRequestSize := promauto.With(registry).NewGaugeVec(
@@ -94,8 +95,8 @@ func (m *MetricsV2) GetGRPCServerOption() grpc.ServerOption {
 	return m.grpcServerOption
 }
 
-func (m *MetricsV2) ReportStoreChunksLatency(latency time.Duration) {
-	m.storeChunksLatency.WithLabelValues().Observe(common.ToMilliseconds(latency))
+func (m *MetricsV2) ReportStoreChunksLatency(stage string, latency time.Duration) {
+	m.storeChunksLatency.WithLabelValues(stage).Observe(common.ToMilliseconds(latency))
 }
 
 func (m *MetricsV2) ReportStoreChunksRequestSize(size uint64) {

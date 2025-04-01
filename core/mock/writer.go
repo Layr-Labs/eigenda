@@ -89,7 +89,19 @@ func (t *MockWriter) GetOperatorStakes(ctx context.Context, operatorId core.Oper
 func (t *MockWriter) GetOperatorStakesForQuorums(ctx context.Context, quorums []core.QuorumID, blockNumber uint32) (core.OperatorStakes, error) {
 	args := t.Called()
 	result := args.Get(0)
+	if fn, ok := result.(func([]core.QuorumID, uint32) core.OperatorStakes); ok {
+		return fn(quorums, blockNumber), args.Error(1)
+	}
 	return result.(core.OperatorStakes), args.Error(1)
+}
+
+func (t *MockWriter) GetOperatorStakesWithSocketForQuorums(ctx context.Context, quorums []core.QuorumID, blockNumber uint32) (core.OperatorStakesWithSocket, error) {
+	args := t.Called()
+	result := args.Get(0)
+	if fn, ok := result.(func([]core.QuorumID, uint32) core.OperatorStakesWithSocket); ok {
+		return fn(quorums, blockNumber), args.Error(1)
+	}
+	return result.(core.OperatorStakesWithSocket), args.Error(1)
 }
 
 func (t *MockWriter) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core.BatchHeader, quorums map[core.QuorumID]*core.QuorumResult, signatureAggregation *core.SignatureAggregation) (*types.Transaction, error) {
@@ -128,18 +140,27 @@ func (t *MockWriter) OperatorAddressToID(ctx context.Context, address gethcommon
 func (t *MockWriter) BatchOperatorIDToAddress(ctx context.Context, operatorIds []core.OperatorID) ([]gethcommon.Address, error) {
 	args := t.Called()
 	result := args.Get(0)
+	if fn, ok := result.(func([]core.OperatorID) []gethcommon.Address); ok {
+		return fn(operatorIds), args.Error(1)
+	}
 	return result.([]gethcommon.Address), args.Error(1)
 }
 
 func (t *MockWriter) BatchOperatorAddressToID(ctx context.Context, addresses []gethcommon.Address) ([]core.OperatorID, error) {
 	args := t.Called()
 	result := args.Get(0)
+	if fn, ok := result.(func([]gethcommon.Address) []core.OperatorID); ok {
+		return fn(addresses), args.Error(1)
+	}
 	return result.([]core.OperatorID), args.Error(1)
 }
 
 func (t *MockWriter) GetQuorumBitmapForOperatorsAtBlockNumber(ctx context.Context, operatorIds []core.OperatorID, blockNumber uint32) ([]*big.Int, error) {
 	args := t.Called()
 	result := args.Get(0)
+	if fn, ok := result.(func([]core.OperatorID, uint32) []*big.Int); ok {
+		return fn(operatorIds, blockNumber), args.Error(1)
+	}
 	return result.([]*big.Int), args.Error(1)
 }
 
@@ -270,28 +291,6 @@ func (t *MockWriter) GetNumRelays(ctx context.Context) (uint32, error) {
 	return result.(uint32), args.Error(1)
 }
 
-func (t *MockWriter) GetRelayURL(ctx context.Context, key uint32) (string, error) {
-	args := t.Called()
-	if args.Get(0) == nil {
-		return "", args.Error(1)
-	}
-	result := args.Get(0)
-	return result.(string), args.Error(1)
-}
-
-func (t *MockWriter) GetRelayURLs(ctx context.Context) (map[uint32]string, error) {
-	args := t.Called()
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	result := args.Get(0)
-	if result == nil {
-		return nil, args.Error(1)
-	}
-
-	return result.(map[uint32]string), args.Error(1)
-}
-
 func (t *MockWriter) GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error) {
 	args := t.Called(disperserID)
 	result := args.Get(0)
@@ -301,4 +300,10 @@ func (t *MockWriter) GetDisperserAddress(ctx context.Context, disperserID uint32
 	}
 
 	return result.(gethcommon.Address), args.Error(1)
+}
+
+func (t *MockWriter) GetRelayRegistryAddress() gethcommon.Address {
+	args := t.Called()
+	result := args.Get(0)
+	return result.(gethcommon.Address)
 }

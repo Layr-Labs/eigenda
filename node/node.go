@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"math"
 	"math/big"
 	"net/http"
@@ -18,6 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
@@ -47,6 +47,9 @@ import (
 const (
 	// The percentage of time in garbage collection in a GC cycle.
 	gcPercentageTime = 0.1
+
+	v1CheckPath = "api/v1/operators-info/port-check"
+	v2CheckPath = "api/v2/operators/liveness"
 )
 
 var (
@@ -155,6 +158,7 @@ func NewNode(
 	var blockStaleMeasure, storeDurationBlocks uint32
 	if config.EnableTestMode && config.OverrideBlockStaleMeasure > 0 {
 		blockStaleMeasure = uint32(config.OverrideBlockStaleMeasure)
+		logger.Info("Test Mode Override!", "blockStaleMeasure", blockStaleMeasure)
 	} else {
 		staleMeasure, err := tx.GetBlockStaleMeasure(context.Background())
 		if err != nil {
@@ -164,6 +168,7 @@ func NewNode(
 	}
 	if config.EnableTestMode && config.OverrideStoreDurationBlocks > 0 {
 		storeDurationBlocks = uint32(config.OverrideStoreDurationBlocks)
+		logger.Info("Test Mode Override!", "storeDurationBlocks", storeDurationBlocks)
 	} else {
 		storeDuration, err := tx.GetStoreDurationBlocks(context.Background())
 		if err != nil {
@@ -172,7 +177,14 @@ func NewNode(
 		storeDurationBlocks = storeDuration
 	}
 	// Create new store
-	store, err := NewLevelDBStore(config.DbPath+"/chunk", logger, metrics, blockStaleMeasure, storeDurationBlocks)
+	store, err := NewLevelDBStore(
+		config.DbPath+"/chunk",
+		logger,
+		metrics,
+		blockStaleMeasure,
+		config.LevelDBDisableSeeksCompactionV1,
+		config.LevelDBSyncWritesV1,
+		storeDurationBlocks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new store: %w", err)
 	}
@@ -213,12 +225,15 @@ func NewNode(
 	if config.EnableV2 {
 		v2Path := config.DbPath + "/chunk_v2"
 		dbV2, err := tablestore.Start(logger, &tablestore.Config{
-			Type:                       tablestore.LevelDB,
-			Path:                       &v2Path,
-			GarbageCollectionEnabled:   true,
-			GarbageCollectionInterval:  time.Duration(config.ExpirationPollIntervalSec) * time.Second,
-			GarbageCollectionBatchSize: 1024,
-			Schema:                     []string{BatchHeaderTableName, BlobCertificateTableName, BundleTableName},
+			Type:                          tablestore.LevelDB,
+			Path:                          &v2Path,
+			GarbageCollectionEnabled:      true,
+			GarbageCollectionInterval:     time.Duration(config.ExpirationPollIntervalSec) * time.Second,
+			GarbageCollectionBatchSize:    1024,
+			Schema:                        []string{BatchHeaderTableName, BlobCertificateTableName, BundleTableName},
+			MetricsRegistry:               reg,
+			LevelDBDisableSeeksCompaction: config.LevelDBDisableSeeksCompactionV2,
+			LevelDBSyncWrites:             config.LevelDBSyncWritesV2,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new tablestore: %w", err)
@@ -232,21 +247,19 @@ func NewNode(
 		}
 		blobVersionParams = corev2.NewBlobVersionParameterMap(blobParams)
 
-		var relayClient clients.RelayClient
-		relayURLs, err := tx.GetRelayURLs(context.Background())
-		if err != nil {
-			return nil, fmt.Errorf("failed to get relay URLs: %w", err)
-		}
-
-		logger.Info("Creating relay client", "relayURLs", relayURLs)
-		relayClient, err = clients.NewRelayClient(&clients.RelayClientConfig{
-			Sockets:            relayURLs,
+		relayClientConfig := &clients.RelayClientConfig{
 			UseSecureGrpcFlag:  config.UseSecureGrpc,
 			OperatorID:         &config.ID,
 			MessageSigner:      n.SignMessage,
 			MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
-		}, logger)
+		}
 
+		relayUrlProvider, err := relay.NewRelayUrlProvider(client, tx.GetRelayRegistryAddress())
+		if err != nil {
+			return nil, fmt.Errorf("create relay url provider: %w", err)
+		}
+
+		relayClient, err := clients.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new relay client: %w", err)
 		}
@@ -276,13 +289,16 @@ func (n *Node) Start(ctx context.Context) error {
 		n.Logger.Info("Enabled node api", "port", n.Config.NodeApiPort)
 	}
 
-	go n.expireLoop()
-	go n.checkNodeReachability()
+	if n.Config.EnableV1 {
+		go n.expireLoop()
+		go n.checkNodeReachability(v1CheckPath)
+	}
 
 	if n.Config.EnableV2 {
 		go func() {
 			_ = n.RefreshOnchainState(ctx)
 		}()
+		go n.checkNodeReachability(v2CheckPath)
 	}
 
 	// Build the socket based on the hostname/IP provided in the CLI
@@ -341,7 +357,7 @@ func (n *Node) Start(ctx context.Context) error {
 
 	n.CurrentSocket = socket
 	// Start the Node IP updater only if the PUBLIC_IP_PROVIDER is greater than 0.
-	if n.Config.PubIPCheckInterval > 0 {
+	if n.Config.PubIPCheckInterval > 0 && n.Config.EnableV1 && n.Config.EnableV2 {
 		go n.checkRegisteredNodeIpOnChain(ctx)
 		go n.checkCurrentNodeIp(ctx)
 	}
@@ -400,41 +416,6 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 			} else {
 				n.Logger.Error("error fetching blob params", "err", err)
 			}
-
-			existingRelayClient, ok := n.RelayClient.Load().(clients.RelayClient)
-			if !ok {
-				n.Logger.Error("error fetching relay client")
-				continue
-			}
-
-			existingURLs := map[corev2.RelayKey]string{}
-			if existingRelayClient != nil {
-				existingURLs = existingRelayClient.GetSockets()
-			}
-			relayURLs, err := n.Transactor.GetRelayURLs(ctx)
-			if err != nil {
-				n.Logger.Error("error fetching relay URLs", "err", err)
-				continue
-			}
-
-			if maps.Equal(existingURLs, relayURLs) {
-				n.Logger.Info("No change in relay URLs")
-				continue
-			}
-
-			relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-				Sockets:            relayURLs,
-				UseSecureGrpcFlag:  n.Config.UseSecureGrpc,
-				OperatorID:         &n.Config.ID,
-				MessageSigner:      n.SignMessage,
-				MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
-			}, n.Logger)
-			if err != nil {
-				n.Logger.Error("error creating relay client", "err", err)
-				continue
-			}
-
-			n.RelayClient.Store(clients.RelayClient(relayClient))
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -666,11 +647,13 @@ type OperatorReachabilityResponse struct {
 	RetrievalSocket string `json:"retrieval_socket"`
 	DispersalOnline bool   `json:"dispersal_online"`
 	RetrievalOnline bool   `json:"retrieval_online"`
+	DispersalStatus string `json:"dispersal_status"`
+	RetrievalStatus string `json:"retrieval_status"`
 }
 
-func (n *Node) checkNodeReachability() {
+func (n *Node) checkNodeReachability(checkPath string) {
 	if n.Config.ReachabilityPollIntervalSec == 0 {
-		n.Logger.Warn("Node reachability checks disabled!!! ReachabilityPollIntervalSec set to 0")
+		n.Logger.Warn("Node reachability checks disabled!")
 		return
 	}
 
@@ -679,7 +662,12 @@ func (n *Node) checkNodeReachability() {
 		return
 	}
 
-	checkURL, err := GetReachabilityURL(n.Config.DataApiUrl, n.Config.ID.Hex())
+	version := "v1"
+	if strings.Contains(checkPath, "v2") {
+		version = "v2"
+	}
+
+	checkURL, err := GetReachabilityURL(n.Config.DataApiUrl, checkPath, n.Config.ID.Hex())
 	if err != nil {
 		n.Logger.Error("Failed to get reachability check URL", err)
 		return
@@ -692,11 +680,11 @@ func (n *Node) checkNodeReachability() {
 	for {
 		<-ticker.C
 
-		n.Logger.Debug("Calling reachability check", "url", checkURL)
+		n.Logger.Debug(fmt.Sprintf("Calling %s reachability check", version), "url", checkURL)
 
 		resp, err := http.Get(checkURL)
 		if err != nil {
-			n.Logger.Error("Reachability check request failed", err)
+			n.Logger.Error(fmt.Sprintf("Reachability check %s - request failed", version), err)
 			continue
 		} else if resp.StatusCode == 404 {
 			body, _ := io.ReadAll(resp.Body)
@@ -707,13 +695,13 @@ func (n *Node) checkNodeReachability() {
 			}
 			continue
 		} else if resp.StatusCode != 200 {
-			n.Logger.Error("Reachability check request failed", "status", resp.StatusCode)
+			n.Logger.Error(fmt.Sprintf("Reachability check %s - request failed", version), "status", resp.StatusCode)
 			continue
 		}
 
 		data, err := io.ReadAll(resp.Body)
 		if err != nil {
-			n.Logger.Error("Failed to read reachability check response", err)
+			n.Logger.Error(fmt.Sprintf("Failed to read %s reachability check response", version), err)
 			continue
 		}
 
@@ -725,24 +713,24 @@ func (n *Node) checkNodeReachability() {
 		}
 
 		if responseObject.DispersalOnline {
-			n.Logger.Info("Reachability check - dispersal socket is ONLINE", "socket", responseObject.DispersalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues("dispersal").Set(1.0)
+			n.Logger.Info(fmt.Sprintf("Reachability check %s - dispersal socket ONLINE", version), "status", responseObject.DispersalStatus, "socket", responseObject.DispersalSocket)
+			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("dispersal-%s", version)).Set(1.0)
 		} else {
-			n.Logger.Error("Reachability check - dispersal socket is UNREACHABLE", "socket", responseObject.DispersalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues("dispersal").Set(0.0)
+			n.Logger.Error(fmt.Sprintf("Reachability check %s - dispersal socket UNREACHABLE", version), "status", responseObject.DispersalStatus, "socket", responseObject.DispersalSocket)
+			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("dispersal-%s", version)).Set(0.0)
 		}
 		if responseObject.RetrievalOnline {
-			n.Logger.Info("Reachability check - retrieval socket is ONLINE", "socket", responseObject.RetrievalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues("retrieval").Set(1.0)
+			n.Logger.Info(fmt.Sprintf("Reachability check %s - retrieval socket ONLINE", version), "status", responseObject.RetrievalStatus, "socket", responseObject.RetrievalSocket)
+			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("retrieval-%s", version)).Set(1.0)
 		} else {
-			n.Logger.Error("Reachability check - retrieval socket is UNREACHABLE", "socket", responseObject.RetrievalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues("retrieval").Set(0.0)
+			n.Logger.Error(fmt.Sprintf("Reachability check %s - retrieval socket UNREACHABLE", version), "status", responseObject.RetrievalStatus, "socket", responseObject.RetrievalSocket)
+			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("retrieval-%s", version)).Set(0.0)
 		}
 	}
 }
 
-func GetReachabilityURL(dataApiUrl, operatorID string) (string, error) {
-	checkURLString, err := url.JoinPath(dataApiUrl, "/api/v1/operators-info/port-check")
+func GetReachabilityURL(dataApiUrl, path, operatorID string) (string, error) {
+	checkURLString, err := url.JoinPath(dataApiUrl, path)
 	if err != nil {
 		return "", err
 	}

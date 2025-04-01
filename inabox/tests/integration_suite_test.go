@@ -18,8 +18,6 @@ import (
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
-	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -53,7 +51,7 @@ var (
 	retrievalClientV2   clientsv2.RetrievalClient
 	numConfirmations    int = 3
 	numRetries              = 0
-	relays                  = map[corev2.RelayKey]string{}
+	chainReader         core.Reader
 
 	cancel context.CancelFunc
 )
@@ -133,7 +131,7 @@ var _ = BeforeSuite(func() {
 		Expect(err).To(BeNil())
 
 		fmt.Println("Registering blob versions and relays")
-		relays = testConfig.RegisterBlobVersionAndRelays(ethClient)
+		testConfig.RegisterBlobVersionAndRelays(ethClient)
 
 		fmt.Println("Registering disperser keypair")
 		err = testConfig.RegisterDisperserKeypair(ethClient)
@@ -202,31 +200,21 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		return err
 	}
 
-	graphBackoff, err := time.ParseDuration(testConfig.Retriever.RETRIEVER_GRAPH_BACKOFF)
+	retrievalClient, err = clients.NewRetrievalClient(logger, cs, agn, nodeClient, v, 10)
 	if err != nil {
 		return err
 	}
-	maxRetries, err := strconv.Atoi(testConfig.Retriever.RETRIEVER_GRAPH_MAX_RETRIES)
+	chainReader, err = eth.NewReader(
+		logger,
+		ethClient,
+		testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER,
+		testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
 	if err != nil {
 		return err
 	}
-	ics := thegraph.MakeIndexedChainState(thegraph.Config{
-		Endpoint:     testConfig.Retriever.RETRIEVER_GRAPH_URL,
-		PullInterval: graphBackoff,
-		MaxRetries:   maxRetries,
-	}, cs, logger)
+	retrievalClientV2 = clientsv2.NewRetrievalClient(logger, chainReader, cs, v, 10)
 
-	retrievalClient, err = clients.NewRetrievalClient(logger, ics, agn, nodeClient, v, 10)
-	if err != nil {
-		return err
-	}
-	chainReader, err := eth.NewReader(logger, ethClient, testConfig.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER, testConfig.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
-	if err != nil {
-		return err
-	}
-	retrievalClientV2 = clientsv2.NewRetrievalClient(logger, chainReader, ics, v, 10)
-
-	return ics.Start(context.Background())
+	return nil
 }
 
 var _ = AfterSuite(func() {

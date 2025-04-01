@@ -205,7 +205,7 @@
 
       
         <h3 id="common.BlobCommitment">BlobCommitment</h3>
-        <p>BlobCommitment represents commitment of a specific blob, containing its</p><p>KZG commitment, degree proof, the actual degree, and data length in number of symbols.</p>
+        <p>BlobCommitment represents commitment of a specific blob, containing its</p><p>KZG commitment, degree proof, the actual degree, and data length in number of symbols (field elements).</p><p>It deserializes into https://github.com/Layr-Labs/eigenda/blob/ce89dab18d2f8f55004002e17dd3a18529277845/encoding/data.go#L27</p><p>See https://github.com/Layr-Labs/eigenda/blob/e86fb8515eb606d0eebb92097dc60d7238363e77/docs/spec/src/protocol/architecture/encoding.md#validation-via-kzg</p><p>to understand how this commitment is used to validate the blob.</p>
 
         
           <table class="field-table">
@@ -218,7 +218,7 @@
                   <td>commitment</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>A commitment to the blob data. </p></td>
+                  <td><p>Concatenation of the x and y coordinates of `common.G1Commitment`. </p></td>
                 </tr>
               
                 <tr>
@@ -234,16 +234,17 @@ such that the claimed length below is verifiable. </p></td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>A proof that the degree of the polynomial used to generate the blob commitment is valid.
-It is computed such that the coefficient of the polynomial is committing with the G2 SRS
-at the end of the highest order. </p></td>
+It consists of the KZG commitment of x^(SRSOrder-n) * P(x), where
+P(x) is polynomial of degree n representing the blob. </p></td>
                 </tr>
               
                 <tr>
                   <td>length</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p>The length specifies the degree of the polynomial used to generate the blob commitment. The length
-must equal to the degree &#43; 1, and it must be a power of 2. </p></td>
+                  <td><p>The length of the blob in symbols (field elements), which must be a power of 2.
+This also specifies the degree of the polynomial used to generate the blob commitment,
+since length = degree &#43; 1. </p></td>
                 </tr>
               
             </tbody>
@@ -254,7 +255,7 @@ must equal to the degree &#43; 1, and it must be a power of 2. </p></td>
         
       
         <h3 id="common.G1Commitment">G1Commitment</h3>
-        <p>A KZG commitment</p>
+        <p>G1Commitment represents the serialized coordinates of a G1 KZG commitment.</p><p>We use gnark-crypto so adopt its serialization, which is big-endian. See:</p><p>https://github.com/Consensys/gnark-crypto/blob/779e884dabb38b92e677f4891286637a3d2e5734/ecc/bn254/fp/element.go#L862</p>
 
         
           <table class="field-table">
@@ -267,14 +268,16 @@ must equal to the degree &#43; 1, and it must be a power of 2. </p></td>
                   <td>x</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>The X coordinate of the KZG commitment. This is the raw byte representation of the field element. </p></td>
+                  <td><p>The X coordinate of the KZG commitment. This is the raw byte representation of the field element.
+x should contain 32 bytes. </p></td>
                 </tr>
               
                 <tr>
                   <td>y</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. </p></td>
+                  <td><p>The Y coordinate of the KZG commitment. This is the raw byte representation of the field element.
+y should contain 32 bytes. </p></td>
                 </tr>
               
             </tbody>

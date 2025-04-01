@@ -1,13 +1,13 @@
 package flags
 
 import (
-	"github.com/docker/go-units"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
+	"github.com/docker/go-units"
 	"github.com/urfave/cli"
 )
 
@@ -81,7 +81,7 @@ var (
 		Usage:    "Size of the chunk cache, in bytes.",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHUNK_CACHE_BYTES"),
-		Value:    8 * units.GiB,
+		Value:    units.GiB,
 	}
 	ChunkMaxConcurrencyFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "chunk-max-concurrency"),
@@ -226,7 +226,7 @@ var (
 		Usage:    "Duration to keep authentication results",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "AUTHENTICATION_TIMEOUT"),
-		Value:    5 * time.Minute,
+		Value:    0, // TODO(cody-littley) remove this feature
 	}
 	AuthenticationDisabledFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "authentication-disabled"),
@@ -290,6 +290,39 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "METRICS_PORT"),
 		Value:    9101,
 	}
+	EnableMetricsFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-metrics"),
+		Usage:    "Enable prometheus metrics collection",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_METRICS"),
+	}
+	EnablePprofFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "enable-pprof"),
+		Usage:    "Enable pprof profiling",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENABLE_PPROF"),
+	}
+	PprofHttpPortFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "pprof-port"),
+		Usage:    "Port to listen on for pprof",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "PPROF_PORT"),
+		Value:    6060,
+	}
+	GetChunksRequestMaxPastAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-request-max-past-age"),
+		Usage:    "Max age of a GetChunks request",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNKS_REQUEST_MAX_PAST_AGE"),
+		Value:    5 * time.Minute,
+	}
+	GetChunksRequestMaxFutureAgeFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-request-max-future-age"),
+		Usage:    "Max future age of a GetChunks request",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNKS_REQUEST_MAX_FUTURE_AGE"),
+		Value:    5 * time.Minute,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -299,6 +332,7 @@ var requiredFlags = []cli.Flag{
 	RelayKeysFlag,
 	BlsOperatorStateRetrieverAddrFlag,
 	EigenDAServiceManagerAddrFlag,
+	EnableMetricsFlag,
 }
 
 var optionalFlags = []cli.Flag{
@@ -336,6 +370,10 @@ var optionalFlags = []cli.Flag{
 	InternalGetCoefficientsTimeoutFlag,
 	OnchainStateRefreshIntervalFlag,
 	MetricsPortFlag,
+	EnablePprofFlag,
+	PprofHttpPortFlag,
+	GetChunksRequestMaxPastAgeFlag,
+	GetChunksRequestMaxFutureAgeFlag,
 }
 
 var Flags []cli.Flag

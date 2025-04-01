@@ -101,7 +101,7 @@ func (ics *IndexedChainState) GetIndexedOperators(ctx context.Context, blockNumb
 	return ops, nil
 }
 
-func (ics *IndexedChainState) GetCurrentBlockNumber() (uint, error) {
+func (ics *IndexedChainState) GetCurrentBlockNumber(ctx context.Context) (uint, error) {
 	header, err := ics.Indexer.GetLatestHeader(false)
 	if err != nil {
 		return 0, err

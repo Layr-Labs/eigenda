@@ -1,9 +1,10 @@
 package relay
 
 import (
+	"time"
+
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
-	"time"
 )
 
 // Config is the configuration for the relay Server.
@@ -48,13 +49,14 @@ type Config struct {
 	// AuthenticationKeyCacheSize is the maximum number of operator public keys that can be cached.
 	AuthenticationKeyCacheSize int
 
-	// AuthenticationTimeout is the duration for which an authentication is "cached". A request from the same client
-	// within this duration will not trigger a new authentication in order to save resources. If zero, then each request
-	// will be authenticated independently, regardless of timing.
-	AuthenticationTimeout time.Duration
-
 	// AuthenticationDisabled will disable authentication if set to true.
 	AuthenticationDisabled bool
+
+	// GetChunksRequestMaxPastAge is the maximum age of a GetChunks request that the server will accept.
+	GetChunksRequestMaxPastAge time.Duration
+
+	// GetChunksRequestMaxFutureAge is the maximum future age of a GetChunks request that the server will accept.
+	GetChunksRequestMaxFutureAge time.Duration
 
 	// Timeouts contains configuration for relay timeouts.
 	Timeouts TimeoutConfig
@@ -64,4 +66,13 @@ type Config struct {
 
 	// MetricsPort is the port that the relay metrics server listens on.
 	MetricsPort int
+
+	// EnableMetrics enables the metrics HTTP server for prometheus metrics collection
+	EnableMetrics bool
+
+	// EnablePprof enables the pprof HTTP server for profiling
+	EnablePprof bool
+
+	// PprofHttpPort is the port that the pprof HTTP server listens on
+	PprofHttpPort int
 }

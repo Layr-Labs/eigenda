@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
@@ -31,6 +32,17 @@ func (c *Assignment) GetIndices() []uint32 {
 	return indices
 }
 
+// BlobKey is the unique identifier for a blob dispersal.
+//
+// It is computed as the Keccak256 hash of some serialization of the blob header
+// where the PaymentHeader has been replaced with Hash(PaymentHeader), in order
+// to be easily verifiable onchain. See the BlobKey method of BlobHeader for more
+// details.
+//
+// It can be used to retrieve a blob from relays.
+//
+// Note that two blobs can have the same content but different headers,
+// so they are allowed to both exist in the system.
 type BlobKey [32]byte
 
 func (b BlobKey) Hex() string {
@@ -69,9 +81,6 @@ type BlobHeader struct {
 
 	// PaymentMetadata contains the payment information for the blob
 	PaymentMetadata core.PaymentMetadata
-
-	// Salt is used to make blob intentionally unique when everything else is the same
-	Salt uint32
 }
 
 func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
@@ -107,8 +116,13 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 		}
 		quorumNumbers[i] = core.QuorumID(q)
 	}
+	slices.Sort(quorumNumbers)
 
-	paymentMetadata := core.ConvertToPaymentMetadata(proto.GetPaymentHeader())
+	paymentMetadata, err := core.ConvertToPaymentMetadata(proto.GetPaymentHeader())
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert payment metadata: %v", err)
+	}
+
 	if paymentMetadata == nil {
 		return nil, errors.New("payment metadata is nil")
 	}
@@ -123,7 +137,6 @@ func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 		},
 		QuorumNumbers:   quorumNumbers,
 		PaymentMetadata: *paymentMetadata,
-		Salt:            proto.GetSalt(),
 	}, nil
 }
 
@@ -143,12 +156,11 @@ func (b *BlobHeader) ToProtobuf() (*commonpb.BlobHeader, error) {
 		QuorumNumbers: quorums,
 		Commitment:    commitments,
 		PaymentHeader: b.PaymentMetadata.ToProtobuf(),
-		Salt:          b.Salt,
 	}, nil
 }
 
-func (b *BlobHeader) GetEncodingParams(blobParams *core.BlobVersionParameters) (encoding.EncodingParams, error) {
-	length, err := GetChunkLength(uint32(b.BlobCommitments.Length), blobParams)
+func GetEncodingParams(blobLength uint, blobParams *core.BlobVersionParameters) (encoding.EncodingParams, error) {
+	length, err := GetChunkLength(uint32(blobLength), blobParams)
 	if err != nil {
 		return encoding.EncodingParams{}, err
 	}
@@ -348,14 +360,22 @@ func (a *Attestation) ToProtobuf() (*disperserpb.Attestation, error) {
 		quorumResults[i] = a.QuorumResults[q]
 	}
 
-	apkG2Bytes := a.APKG2.Bytes()
-	sigmaBytes := a.Sigma.Bytes()
+	var apkG2Bytes []byte
+	var sigmaBytes []byte
+	if a.APKG2 != nil {
+		b := a.APKG2.Bytes()
+		apkG2Bytes = b[:]
+	}
+	if a.Sigma != nil {
+		b := a.Sigma.Bytes()
+		sigmaBytes = b[:]
+	}
 
 	return &disperserpb.Attestation{
 		NonSignerPubkeys:        nonSignerPubKeys,
-		ApkG2:                   apkG2Bytes[:],
+		ApkG2:                   apkG2Bytes,
 		QuorumApks:              quorumAPKs,
-		Sigma:                   sigmaBytes[:],
+		Sigma:                   sigmaBytes,
 		QuorumNumbers:           quorumNumbers,
 		QuorumSignedPercentages: quorumResults,
 	}, nil

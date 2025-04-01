@@ -630,6 +630,10 @@
                 </li>
               
               
+                <li>
+                  <a href="#validator.ChunkEncodingFormat"><span class="badge">E</span>ChunkEncodingFormat</a>
+                </li>
+              
               
               
                 <li>
@@ -879,7 +883,7 @@ concat(&#34;churn&#34;, time.Now(), operatorToChurn&#39;s OperatorID, Churner&#3
 
       
         <h3 id="common.BlobCommitment">BlobCommitment</h3>
-        <p>BlobCommitment represents commitment of a specific blob, containing its</p><p>KZG commitment, degree proof, the actual degree, and data length in number of symbols.</p>
+        <p>BlobCommitment represents commitment of a specific blob, containing its</p><p>KZG commitment, degree proof, the actual degree, and data length in number of symbols (field elements).</p><p>It deserializes into https://github.com/Layr-Labs/eigenda/blob/ce89dab18d2f8f55004002e17dd3a18529277845/encoding/data.go#L27</p><p>See https://github.com/Layr-Labs/eigenda/blob/e86fb8515eb606d0eebb92097dc60d7238363e77/docs/spec/src/protocol/architecture/encoding.md#validation-via-kzg</p><p>to understand how this commitment is used to validate the blob.</p>
 
         
           <table class="field-table">
@@ -892,7 +896,7 @@ concat(&#34;churn&#34;, time.Now(), operatorToChurn&#39;s OperatorID, Churner&#3
                   <td>commitment</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>A commitment to the blob data. </p></td>
+                  <td><p>Concatenation of the x and y coordinates of `common.G1Commitment`. </p></td>
                 </tr>
               
                 <tr>
@@ -908,16 +912,17 @@ such that the claimed length below is verifiable. </p></td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>A proof that the degree of the polynomial used to generate the blob commitment is valid.
-It is computed such that the coefficient of the polynomial is committing with the G2 SRS
-at the end of the highest order. </p></td>
+It consists of the KZG commitment of x^(SRSOrder-n) * P(x), where
+P(x) is polynomial of degree n representing the blob. </p></td>
                 </tr>
               
                 <tr>
                   <td>length</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p>The length specifies the degree of the polynomial used to generate the blob commitment. The length
-must equal to the degree &#43; 1, and it must be a power of 2. </p></td>
+                  <td><p>The length of the blob in symbols (field elements), which must be a power of 2.
+This also specifies the degree of the polynomial used to generate the blob commitment,
+since length = degree &#43; 1. </p></td>
                 </tr>
               
             </tbody>
@@ -928,7 +933,7 @@ must equal to the degree &#43; 1, and it must be a power of 2. </p></td>
         
       
         <h3 id="common.G1Commitment">G1Commitment</h3>
-        <p>A KZG commitment</p>
+        <p>G1Commitment represents the serialized coordinates of a G1 KZG commitment.</p><p>We use gnark-crypto so adopt its serialization, which is big-endian. See:</p><p>https://github.com/Consensys/gnark-crypto/blob/779e884dabb38b92e677f4891286637a3d2e5734/ecc/bn254/fp/element.go#L862</p>
 
         
           <table class="field-table">
@@ -941,14 +946,16 @@ must equal to the degree &#43; 1, and it must be a power of 2. </p></td>
                   <td>x</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>The X coordinate of the KZG commitment. This is the raw byte representation of the field element. </p></td>
+                  <td><p>The X coordinate of the KZG commitment. This is the raw byte representation of the field element.
+x should contain 32 bytes. </p></td>
                 </tr>
               
                 <tr>
                   <td>y</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>The Y coordinate of the KZG commitment. This is the raw byte representation of the field element. </p></td>
+                  <td><p>The Y coordinate of the KZG commitment. This is the raw byte representation of the field element.
+y should contain 32 bytes. </p></td>
                 </tr>
               
             </tbody>
@@ -1102,11 +1109,14 @@ blob&#39;s availability. </p></td>
                   <td><a href="#uint32">uint32</a></td>
                   <td>repeated</td>
                   <td><p>quorum_numbers is the list of quorum numbers that the blob is part of.
-All quorums must be specified (including required quorums).
+Each quorum will store the data, hence adding quorum numbers adds redundancy, making the blob more likely to be retrievable. Each quorum requires separate payment.
 
-The following quorums are currently required:
+On-demand dispersal is currently limited to using a subset of the following quorums:
 - 0: ETH
-- 1: EIGEN </p></td>
+- 1: EIGEN
+
+Reserved-bandwidth dispersal is free to use multiple quorums, however those must be reserved ahead of time. The quorum_numbers specified here must be a subset of the ones allowed by the on-chain reservation. 
+Check the allowed quorum numbers by looking up reservation struct: https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/interfaces/IPaymentVault.sol#L10 </p></td>
                 </tr>
               
                 <tr>
@@ -1123,15 +1133,6 @@ The following quorums are currently required:
                   <td><p>payment_header contains payment information for the blob </p></td>
                 </tr>
               
-                <tr>
-                  <td>salt</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p>salt is used to ensure that the dispersal request is intentionally unique. This is currently only useful for
-reserved payments when the same blob is submitted multiple times within the same reservation period. On-demand
-payments already have unique cumulative_payment values for intentionally unique dispersal requests. </p></td>
-                </tr>
-              
             </tbody>
           </table>
 
@@ -1140,7 +1141,7 @@ payments already have unique cumulative_payment values for intentionally unique 
         
       
         <h3 id="common.v2.PaymentHeader">PaymentHeader</h3>
-        <p>PaymentHeader contains payment information for a blob.</p><p>At least one of reservation_period or cumulative_payment must be set, and reservation_period </p><p>is always considered before cumulative_payment. If reservation_period is set but not valid, </p><p>the server will reject the request and not proceed with dispersal. If reservation_period is not set </p><p>and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.</p><p>Once the server has accepted the payment header, a client cannot cancel or rollback the payment.</p>
+        <p>PaymentHeader contains payment information for a blob.</p><p>At least one of reservation_period or cumulative_payment must be set, and reservation_period </p><p>is always considered before cumulative_payment. If reservation_period is set but not valid, </p><p>the server will reject the request and not proceed with dispersal. If reservation_period is not set </p><p>and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.</p><p>Once the server has accepted the payment header, a client cannot cancel or rollback the payment.</p><p>Every dispersal request will be charged by a multiple of `minNumSymbols` field defined by the payment vault contract.</p><p>If the request blob size is smaller or not a multiple of `minNumSymbols`, the server will charge the user for the next </p><p>multiple of `minNumSymbols` (https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/payments/PaymentVaultStorage.sol#L9).</p>
 
         
           <table class="field-table">
@@ -1158,24 +1159,32 @@ corresponding to the key used by the client to sign the BlobHeader. </p></td>
                 </tr>
               
                 <tr>
-                  <td>reservation_period</td>
-                  <td><a href="#uint32">uint32</a></td>
+                  <td>timestamp</td>
+                  <td><a href="#int64">int64</a></td>
                   <td></td>
-                  <td><p>The reservation period of the dispersal request is used for rate-limiting the user&#39;s account against their dedicated 
+                  <td><p>The timestamp should be set as the UNIX timestamp in units of nanoseconds at the time of the dispersal request, 
+and will be used to determine the reservation period, and compared against the reservation active start and end timestamps 
+On-chain reservation timestamps are in units of seconds, while the payment header timestamp is in nanoseconds for greater precision.
+If the timestamp is not set or is not part of the previous or current reservation period, the request will be rejected.
+The reservation period of the dispersal request is used for rate-limiting the user&#39;s account against their dedicated 
 bandwidth. This method requires users to set up reservation accounts with EigenDA team, and the team will set up an 
 on-chain record of reserved bandwidth for the user for some period of time. The dispersal client&#39;s accountant will set 
-this value to the current timestamp divided by the on-chain configured reservation period interval, mapping each request 
+this value to the current timestamp in nanoseconds. The disperser server will find the corresponding reservation period by 
+taking the nearest lower multiple of the on-chain configured reservation period interval, mapping each request 
 to a time-based window and is serialized and parsed as a uint32. The disperser server then validates that it matches 
-either the current or the previous period.
+either the current or the previous period, and check against the user&#39;s reserved bandwidth.
 
 Example Usage Flow:
   1. The user sets up a reservation with the EigenDA team, including throughput (symbolsPerSecond), startTimestamp,
      endTimestamp, and reservationPeriodInterval.
-  2. When sending a dispersal request at time t, the client computes reservation_period = floor(t / reservationPeriodInterval).
-  3. The request includes this reservation_period index. The disperser checks:
+  2. When sending a dispersal request at time t, the client fill in the timestamp field with t.
+  3. The disperser take timestamp t and checks the reservation period and the user&#39;s bandwidth capacity:
       - If the reservation is active (t &gt;= startTimestamp and t &lt; endTimestamp).
-      - Whether the user still has bandwidth capacity (hasn’t exceeded symbolsPerSecond * reservationPeriodInterval).
-  4. Server always go ahead with recording the received request, and then categorize the scenarios 
+      - After rounding up to the nearest multiple of `minNumSymbols` defined by the payment vault contract, the user still has enough bandwidth capacity
+        (hasn’t exceeded symbolsPerSecond * reservationPeriodInterval).
+      - The request is ratelimited against the current reservation period, and calculated as reservation_period = floor(t / reservationPeriodInterval) * reservationPeriodInterval.
+        the request&#39;s reservation period must either be the disperser server&#39;s current reservation period or the previous reservation period. 
+  4. Server always go ahead with recording the received request in the current reservation period, and then categorize the scenarios 
       - If the remaining bandwidth is sufficient for the request, the dispersal request proceeds.
       - If the remaining bandwidth is not enough for the request, server fills up the current bin and overflowing the extra to a future bin.
       - If the bandwidth has already been exhausted, the request is rejected. 
@@ -1201,7 +1210,9 @@ Example Decision Flow:
    out of on-chain balance, the server will reject the request and not proceed with dispersal. When a user top up on-chain, 
    the server will only refresh every few minutes for the top-up to take effect.
   2. The disperser client accounts how many tokens they’ve already paid (previousCumPmt).
-  3. They calculate the incremental amount of tokens needed for the current request needs based on protocol defined pricing.
+  3. They should calculate the payment by rounding up blob size to the nearest multiple of `minNumSymbols` defined by the 
+   payment vault contract, and calculate the incremental amount of tokens needed for the current request needs based on 
+   protocol defined pricing.
   4. They take the sum of previousCumPmt &#43; new incremental payment and place it in the “cumulative_payment” field.
   5. The disperser checks this new cumulative total against on-chain deposits and prior records (largest previous payment 
    and smallest later payment if exists).
@@ -1605,7 +1616,10 @@ the dispersal is successful. </p></td>
                   <td>request_id</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>Refer to the documentation for `DisperseBlobReply.request_id`.
+Note that because the request_id depends on the timestamp at which the disperser received the request,
+it is not possible to compute it locally from the cert and blob.
+Clients should thus store this request_id if they plan on requerying the status of the blob in the future. </p></td>
                 </tr>
               
             </tbody>
@@ -1705,13 +1719,16 @@ Then, quorum_indexes = [0, 2, 1] =&gt; 0x000201 </p></td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>The request ID generated by the disperser.
-Once a request is accepted (although not processed), a unique request ID will be
-generated.
-Two different DisperseBlobRequests (determined by the hash of the DisperseBlobRequest)
-will have different IDs, and the same DisperseBlobRequest sent repeatedly at different
-times will also have different IDs.
-The client should use this ID to query the processing status of the request (via
-the GetBlobStatus API). </p></td>
+
+Once a request is accepted, a unique request ID is generated.
+request_id = string(blob_key) = (hash(blob), hash(metadata))
+where metadata contains a requestedAt timestamp and the requested quorum numbers and their adversarial thresholds.
+BlobKey definition: https://github.com/Layr-Labs/eigenda/blob/6b02bf966afa2b9bf2385db8dd01f66f17334e17/disperser/disperser.go#L87
+BlobKey computation: https://github.com/Layr-Labs/eigenda/blob/6b02bf966afa2b9bf2385db8dd01f66f17334e17/disperser/common/blobstore/shared_storage.go#L83-L84
+
+Different DisperseBlobRequests have different IDs, including two identical DisperseBlobRequests 
+sent at different times. Clients should thus store this ID and use it to query the processing
+status of the request via the GetBlobStatus API. </p></td>
                 </tr>
               
             </tbody>
@@ -1826,7 +1843,7 @@ corresponding to the key used by the client to sign the BlobAuthHeader. </p></td
 
       
         <h3 id="disperser.BlobStatus">BlobStatus</h3>
-        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a differet state:</p><p>- PROCESSING</p><p>- DISPERSING</p><p>- CONFIRMED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- FAILED</p><p>- FINALIZED</p><p>- INSUFFICIENT_SIGNATURES</p>
+        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:</p><p>- PROCESSING</p><p>- DISPERSING</p><p>- CONFIRMED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- FAILED</p><p>- FINALIZED</p><p>- INSUFFICIENT_SIGNATURES</p>
         <table class="enum-table">
           <thead>
             <tr><td>Name</td><td>Number</td><td>Description</td></tr>
@@ -1857,7 +1874,7 @@ batch containing the blob has been confirmed onchain</p></td>
                 <td>3</td>
                 <td><p>FAILED means that the blob has failed permanently (for reasons other than insufficient
 signatures, which is a separate state). This status is somewhat of a catch-all category,
-containg (but not necessarily exclusively as errors can be added in the future):
+containing (but not necessarily exclusively as errors can be added in the future):
  - blob has expired
  - internal logic error while requesting encoding
  - blob retry has exceeded its limit while waiting for blob finalization after confirmation.
@@ -2011,8 +2028,11 @@ The order of the quorum_apks should match the order of the quorum_numbers </p></
                   <td>quorum_signed_percentages</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>The attestation rate for each quorum.
-The order of the quorum_signed_percentages should match the order of the quorum_numbers </p></td>
+                  <td><p>The attestation rate for each quorum. Each quorum&#39;s signing percentage is represented by
+an 8 bit unsigned integer. The integer is the fraction of the quorum that has signed, with
+100 representing 100% of the quorum signing, and 0 representing 0% of the quorum signing. The first
+byte in the byte array corresponds to the first quorum in the quorum_numbers array, the second byte
+corresponds to the second quorum, and so on. </p></td>
                 </tr>
               
             </tbody>
@@ -2129,7 +2149,14 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                   <td>signed_batch</td>
                   <td><a href="#disperser.v2.SignedBatch">SignedBatch</a></td>
                   <td></td>
-                  <td><p>The signed batch. Unset if the status is not CERTIFIED. </p></td>
+                  <td><p>The signed batch. Only set if the blob status is GATHERING_SIGNATURES or COMPLETE.
+signed_batch and blob_inclusion_info are only set if the blob status is GATHERING_SIGNATURES or COMPLETE.
+When blob is in GATHERING_SIGNATURES status, the attestation object in signed_batch contains attestation information
+at the point in time. As it gathers more signatures, attestation object will be updated according to the latest attestation status.
+The client can use this intermediate attestation to verify a blob if it has gathered enough signatures. 
+Otherwise, it should should poll the GetBlobStatus API until the desired level of attestation has been gathered or status is COMPLETE.
+When blob is in COMPLETE status, the attestation object in signed_batch contains the final attestation information.
+If the final attestation does not meet the client&#39;s requirement, the client should try a new dispersal. </p></td>
                 </tr>
               
                 <tr>
@@ -2137,7 +2164,7 @@ The order of the quorum_signed_percentages should match the order of the quorum_
                   <td><a href="#disperser.v2.BlobInclusionInfo">BlobInclusionInfo</a></td>
                   <td></td>
                   <td><p>BlobInclusionInfo is the information needed to verify the inclusion of a blob in a batch.
-Unset if the status is not CERTIFIED. </p></td>
+Only set if the blob status is GATHERING_SIGNATURES or COMPLETE. </p></td>
                 </tr>
               
             </tbody>
@@ -2227,7 +2254,9 @@ the disperser to reject the blob (DisperseBlob() RPC will return an error). </p>
                   <td><p>The blob to be dispersed.
 
 The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB.
-(In the future, the 16MiB limit may be increased, but this is not guaranteed to happen.)
+While the data being dispersed is only required to be greater than 0 bytes, the blob size charged against the 
+payment method will be rounded up to the nearest multiple of `minNumSymbols` defined by the payment vault contract 
+(https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/payments/PaymentVaultStorage.sol#L9).
 
 Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more
 significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve.
@@ -2337,6 +2366,14 @@ which is dispersed separately. </p></td>
                   <td><p>Signature over the account ID </p></td>
                 </tr>
               
+                <tr>
+                  <td>timestamp</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server&#39;s clock,
+request may be rejected. </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -2363,21 +2400,21 @@ which is dispersed separately. </p></td>
               
                 <tr>
                   <td>min_num_symbols</td>
-                  <td><a href="#uint32">uint32</a></td>
+                  <td><a href="#uint64">uint64</a></td>
                   <td></td>
                   <td><p>Minimum number of symbols accounted for all dispersals </p></td>
                 </tr>
               
                 <tr>
                   <td>price_per_symbol</td>
-                  <td><a href="#uint32">uint32</a></td>
+                  <td><a href="#uint64">uint64</a></td>
                   <td></td>
                   <td><p>Price charged per symbol for on-demand dispersals </p></td>
                 </tr>
               
                 <tr>
                   <td>reservation_window</td>
-                  <td><a href="#uint32">uint32</a></td>
+                  <td><a href="#uint64">uint64</a></td>
                   <td></td>
                   <td><p>Reservation window for all reservations </p></td>
                 </tr>
@@ -2513,7 +2550,7 @@ which is dispersed separately. </p></td>
 
       
         <h3 id="disperser.v2.BlobStatus">BlobStatus</h3>
-        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:</p><p>- QUEUED</p><p>- ENCODED</p><p>Terminal states are states that will not be updated to a different state:</p><p>- UNKNOWN</p><p>- CERTIFIED</p><p>- FAILED</p><p>- INSUFFICIENT_SIGNATURES</p>
+        <p>BlobStatus represents the status of a blob.</p><p>The status of a blob is updated as the blob is processed by the disperser.</p><p>The status of a blob can be queried by the client using the GetBlobStatus API.</p><p>Intermediate states are states that the blob can be in while being processed, and it can be updated to a different state:</p><p>- QUEUED</p><p>- ENCODED</p><p>- GATHERING_SIGNATURES</p><p>Terminal states are states that will not be updated to a different state:</p><p>- UNKNOWN</p><p>- COMPLETE</p><p>- FAILED</p>
         <table class="enum-table">
           <thead>
             <tr><td>Name</td><td>Number</td><td>Description</td></tr>
@@ -2545,25 +2582,27 @@ the blob is stored in a queue of some sort, and a response immediately returned 
               </tr>
             
               <tr>
-                <td>CERTIFIED</td>
+                <td>GATHERING_SIGNATURES</td>
                 <td>3</td>
-                <td><p>CERTIFIED means the blob has been dispersed and attested by the DA nodes.</p></td>
+                <td><p>GATHERING_SIGNATURES means that the blob chunks are currently actively being transmitted to validators,
+and in doing so requesting that the validators sign to acknowledge receipt of the blob.
+Requests that timeout or receive errors are resubmitted to DA nodes for some period of time set by the disperser,
+after which the BlobStatus becomes COMPLETE.</p></td>
+              </tr>
+            
+              <tr>
+                <td>COMPLETE</td>
+                <td>4</td>
+                <td><p>COMPLETE means the blob has been dispersed to DA nodes, and the GATHERING_SIGNATURES period of time has completed.
+This status does not guarantee any signer percentage, so a client should check that the signature has met
+its required threshold, and resubmit a new blob dispersal request if not.</p></td>
               </tr>
             
               <tr>
                 <td>FAILED</td>
-                <td>4</td>
-                <td><p>FAILED means that the blob has failed permanently. Note that this is a terminal state, and in order to
-retry the blob, the client must submit the blob again with different salt (blob key is required to be unique).</p></td>
-              </tr>
-            
-              <tr>
-                <td>INSUFFICIENT_SIGNATURES</td>
                 <td>5</td>
-                <td><p>INSUFFICIENT_SIGNATURES means that the blob has failed to gather sufficient attestation.
-
-This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an
-an inability to gather sufficient signatures.</p></td>
+                <td><p>FAILED means that the blob has failed permanently. Note that this is a terminal state, and in order to
+retry the blob, the client must submit the blob again (blob key is required to be unique).</p></td>
               </tr>
             
           </tbody>
@@ -2602,14 +2641,26 @@ processing status of the blob.</p></td>
                 <td>GetBlobCommitment</td>
                 <td><a href="#disperser.v2.BlobCommitmentRequest">BlobCommitmentRequest</a></td>
                 <td><a href="#disperser.v2.BlobCommitmentReply">BlobCommitmentReply</a></td>
-                <td><p>GetBlobCommitment is a utility method that calculates commitment for a blob payload.</p></td>
+                <td><p>GetBlobCommitment is a utility method that calculates commitment for a blob payload.
+It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header
+and don&#39;t have the ability to calculate the commitment themselves (expensive operation which requires SRS points).
+
+For an example usage, see how our disperser_client makes a call to this endpoint when it doesn&#39;t have a local prover:
+https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166</p></td>
               </tr>
             
               <tr>
                 <td>GetPaymentState</td>
                 <td><a href="#disperser.v2.GetPaymentStateRequest">GetPaymentStateRequest</a></td>
                 <td><a href="#disperser.v2.GetPaymentStateReply">GetPaymentStateReply</a></td>
-                <td><p>GetPaymentState is a utility method to get the payment state of a given account.</p></td>
+                <td><p>GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
+EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
+A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
+That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
+The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
+
+For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
+https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298</p></td>
               </tr>
             
           </tbody>
@@ -3349,7 +3400,7 @@ end to attest to the data in this request it has processed.</p></td>
                 <td>StoreBlobs</td>
                 <td><a href="#node.StoreBlobsRequest">StoreBlobsRequest</a></td>
                 <td><a href="#node.StoreBlobsReply">StoreBlobsReply</a></td>
-                <td><p>StoreBlobs is simiar to StoreChunks, but it stores the blobs using a different storage schema
+                <td><p>StoreBlobs is similar to StoreChunks, but it stores the blobs using a different storage schema
 so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
 StoreBlobs &#43; AttestBatch will eventually replace and deprecate StoreChunks method.
 DEPRECATED: StoreBlobs method is not used</p></td>
@@ -3616,6 +3667,14 @@ unauthenticated requests. </p></td>
                 </tr>
               
                 <tr>
+                  <td>timestamp</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Timestamp of the request in seconds since the Unix epoch. If too far out of sync with the server&#39;s clock,
+request may be rejected. </p></td>
+                </tr>
+              
+                <tr>
                   <td>operator_signature</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
@@ -3628,17 +3687,22 @@ This algorithm is implemented in golang using relay.auth.HashGetChunksRequest().
 All integers are encoded as unsigned 4 byte big endian values.
 
 Perform a keccak256 hash on the following data in the following order:
-1. the operator id
-2. for each chunk request:
+1. the length of the operator ID in bytes
+2. the operator id
+3. the number of chunk requests
+4. for each chunk request:
    a. if the chunk request is a request by index:
       i.   a one byte ASCII representation of the character &#34;i&#34; (aka Ox69)
-      ii.  the blob key
-      iii. the start index
-      iv.  the end index
+      ii.  the length blob key in bytes
+      iii. the blob key
+      iv.  the start index
+      v.   the end index
    b. if the chunk request is a request by range:
       i.   a one byte ASCII representation of the character &#34;r&#34; (aka Ox72)
-      ii.  the blob key
-      iii. each requested chunk index, in order </p></td>
+      ii.  the length of the blob key in bytes
+      iii. the blob key
+      iv.  each requested chunk index, in order
+5. the timestamp (seconds since the Unix epoch encoded as a 4 byte big endian value) </p></td>
                 </tr>
               
             </tbody>
@@ -3906,7 +3970,14 @@ reconstructed original blob in response.</p></td>
                   <td>chunks</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td>repeated</td>
-                  <td><p>All chunks the Node is storing for the requested blob per RetrieveChunksRequest. </p></td>
+                  <td><p>All chunks the Node is storing for the requested blob per GetChunksRequest. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>chunk_encoding_format</td>
+                  <td><a href="#validator.ChunkEncodingFormat">ChunkEncodingFormat</a></td>
+                  <td></td>
+                  <td><p>The format how the above chunks are encoded. </p></td>
                 </tr>
               
             </tbody>
@@ -4024,7 +4095,7 @@ The ID must be in range [0, 254]. </p></td>
                   <td>signature</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>a custody signature of the received chunks </p></td>
+                  <td><p>The validator&#39;s BSL signature signed on the batch header hash. </p></td>
                 </tr>
               
             </tbody>
@@ -4059,6 +4130,14 @@ The ID must be in range [0, 254]. </p></td>
                 </tr>
               
                 <tr>
+                  <td>timestamp</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Timestamp of the request in seconds since the Unix epoch. If too far out of sync with the server&#39;s clock,
+request may be rejected. </p></td>
+                </tr>
+              
+                <tr>
                   <td>signature</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
@@ -4069,24 +4148,34 @@ Algorithm for computing the hash is as follows. All integer values are serialize
 A reference implementation (golang) can be found at
 https://github.com/Layr-Labs/eigenda/blob/master/disperser/auth/request_signing.go
 
-1. digest batch.BatchHeader.BatchRoot
-2. digest batch.BatchHeader.ReferenceBlockNumber (8 bytes, unsigned big endian)
-3. for each certificate in batch.BlobCertificates:
+1. digest len(batch.BatchHeader.BatchRoot) (4 bytes, unsigned big endian)
+2. digest batch.BatchHeader.BatchRoot
+3. digest batch.BatchHeader.ReferenceBlockNumber (8 bytes, unsigned big endian)
+4. digest len(batch.BlobCertificates) (4 bytes, unsigned big endian)
+5. for each certificate in batch.BlobCertificates:
   a. digest certificate.BlobHeader.Version (4 bytes, unsigned big endian)
-  b. for each quorum_number in certificate.BlobHeader.QuorumNumbers:
+  b. digest len(certificate.BlobHeader.QuorumNumbers) (4 bytes, unsigned big endian)
+  c. for each quorum_number in certificate.BlobHeader.QuorumNumbers:
     i. digest quorum_number (4 bytes, unsigned big endian)
-  c. digest certificate.BlobHeader.Commitment.Commitment
-  d. digest certificate.BlobHeader.Commitment.LengthCommitment
-  e. digest certificate.BlobHeader.Commitment.LengthProof
-  f. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian)
-  g. digest certificate.BlobHeader.PaymentHeader.AccountId
-  h. digest certificate.BlobHeader.PaymentHeader.ReservationPeriod (4 bytes, unsigned big endian)
-  i. digest certificate.BlobHeader.PaymentHeader.CumulativePayment
-  j. digest certificate.BlobHeader.PaymentHeader.Salt (4 bytes, unsigned big endian)
-  k. digest certificate.BlobHeader.Signature
-  l. for each relay in certificate.Relays:
+  d. digest len(certificate.BlobHeader.Commitment.Commitment) (4 bytes, unsigned big endian)
+  e. digest certificate.BlobHeader.Commitment.Commitment
+  f  digest len(certificate.BlobHeader.Commitment.LengthCommitment) (4 bytes, unsigned big endian)
+  g. digest certificate.BlobHeader.Commitment.LengthCommitment
+  h. digest len(certificate.BlobHeader.Commitment.LengthProof) (4 bytes, unsigned big endian)
+  i. digest certificate.BlobHeader.Commitment.LengthProof
+  j. digest certificate.BlobHeader.Commitment.Length (4 bytes, unsigned big endian)
+  k. digest len(certificate.BlobHeader.PaymentHeader.AccountId) (4 bytes, unsigned big endian)
+  l. digest certificate.BlobHeader.PaymentHeader.AccountId
+  m. digest certificate.BlobHeader.PaymentHeader.Timestamp (4 bytes, signed big endian)
+  n  digest len(certificate.BlobHeader.PaymentHeader.CumulativePayment) (4 bytes, unsigned big endian)
+  o. digest certificate.BlobHeader.PaymentHeader.CumulativePayment
+  p  digest len(certificate.BlobHeader.Signature) (4 bytes, unsigned big endian)
+  q. digest certificate.BlobHeader.Signature
+  r. digest len(certificate.Relays) (4 bytes, unsigned big endian)
+  s. for each relay in certificate.Relays:
     i. digest relay (4 bytes, unsigned big endian)
-4. digest disperserID (4 bytes, unsigned big endian)
+6. digest disperserID (4 bytes, unsigned big endian)
+7. digest timestamp (4 bytes, unsigned big endian)
 
 Note that this signature is not included in the hash for obvious reasons. </p></td>
                 </tr>
@@ -4099,6 +4188,48 @@ Note that this signature is not included in the hash for obvious reasons. </p></
         
       
 
+      
+        <h3 id="validator.ChunkEncodingFormat">ChunkEncodingFormat</h3>
+        <p>This describes how the chunks returned in GetChunksReply are encoded.</p><p>Used to facilitate the decoding of chunks.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>UNKNOWN</td>
+                <td>0</td>
+                <td><p>A valid response should never use this value.
+If encountered, the client should treat it as an error.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GNARK</td>
+                <td>1</td>
+                <td><p>A chunk encoded in GNARK has the following format:
+
+[KZG proof: 32 bytes]
+[Coeff 1:   32 bytes]
+[Coeff 2:   32 bytes]
+...
+[Coeff n:   32 bytes]
+
+The KZG proof is a point on G1 and is serialized with bn254.G1Affine.Bytes().
+The coefficients are field elements in bn254 and serialized with fr.Element.Marshal().
+
+References:
+- bn254.G1Affine: github.com/consensys/gnark-crypto/ecc/bn254
+- fr.Element: github.com/consensys/gnark-crypto/ecc/bn254/fr
+
+Golang serialization and deserialization can be found in:
+- Frame.SerializeGnark()
+- Frame.DeserializeGnark()
+Package: github.com/Layr-Labs/eigenda/encoding</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
       
 
       

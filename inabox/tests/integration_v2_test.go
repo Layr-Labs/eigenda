@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -32,7 +33,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 		defer cancel()
 
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
+		signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+		Expect(err).To(BeNil())
 
 		disp, err := clients.NewDisperserClient(&clients.DisperserClientConfig{
 			Hostname: "localhost",
@@ -51,13 +53,13 @@ var _ = Describe("Inabox v2 Integration", func() {
 		paddedData1 := codec.ConvertByPaddingEmptyByte(data1)
 		paddedData2 := codec.ConvertByPaddingEmptyByte(data2)
 
-		blobStatus1, key1, err := disp.DisperseBlob(ctx, paddedData1, 0, []uint8{0, 1}, 0)
+		blobStatus1, key1, err := disp.DisperseBlob(ctx, paddedData1, 0, []uint8{0, 1})
 		Expect(err).To(BeNil())
 		Expect(key1).To(Not(BeNil()))
 		Expect(blobStatus1).To(Not(BeNil()))
 		Expect(*blobStatus1).To(Equal(dispv2.Queued))
 
-		blobStatus2, key2, err := disp.DisperseBlob(ctx, paddedData2, 0, []uint8{0, 1}, 0)
+		blobStatus2, key2, err := disp.DisperseBlob(ctx, paddedData2, 0, []uint8{0, 1})
 		Expect(err).To(BeNil())
 		Expect(key2).To(Not(BeNil()))
 		Expect(blobStatus2).To(Not(BeNil()))
@@ -93,7 +95,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 				status2, err := dispv2.BlobStatusFromProtobuf(reply2.GetStatus())
 				Expect(err).To(BeNil())
 
-				if status1 != dispv2.Certified || status2 != dispv2.Certified {
+				if status1 != dispv2.Complete || status2 != dispv2.Complete {
 					continue
 				}
 
@@ -207,24 +209,32 @@ var _ = Describe("Inabox v2 Integration", func() {
 		)
 		Expect(err).To(BeNil())
 
-		// Test retrieval from relay
-		relayClient, err := clients.NewRelayClient(&clients.RelayClientConfig{
-			Sockets:            relays,
+		relayClientConfig := &clients.RelayClientConfig{
 			MaxGRPCMessageSize: units.GiB,
-		}, logger)
+		}
+
+		relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, chainReader.GetRelayRegistryAddress())
+		Expect(err).To(BeNil())
+
+		// Test retrieval from relay
+		relayClient, err := clients.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
 		Expect(err).To(BeNil())
 
 		blob1Relays := make(map[corev2.RelayKey]struct{}, 0)
 		blob2Relays := make(map[corev2.RelayKey]struct{}, 0)
 		for _, k := range blobCert1.RelayKeys {
-			blob1Relays[corev2.RelayKey(k)] = struct{}{}
+			blob1Relays[k] = struct{}{}
 		}
 		for _, k := range blobCert2.RelayKeys {
-			blob2Relays[corev2.RelayKey(k)] = struct{}{}
+			blob2Relays[k] = struct{}{}
 		}
-		for relayKey := range relays {
+
+		relayCount, err := relayUrlProvider.GetRelayCount(ctx)
+		Expect(err).To(BeNil())
+
+		for relayKey := uint32(0); relayKey < relayCount; relayKey++ {
 			blob1, err := relayClient.GetBlob(ctx, relayKey, key1)
-			if _, ok := blob1Relays[corev2.RelayKey(relayKey)]; ok {
+			if _, ok := blob1Relays[relayKey]; ok {
 				Expect(err).To(BeNil())
 				Expect(blob1).To(Equal(paddedData1))
 			} else {
@@ -232,7 +242,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 			}
 
 			blob2, err := relayClient.GetBlob(ctx, relayKey, key2)
-			if _, ok := blob2Relays[corev2.RelayKey(relayKey)]; ok {
+			if _, ok := blob2Relays[relayKey]; ok {
 				Expect(err).To(BeNil())
 				Expect(blob2).To(Equal(paddedData2))
 			} else {
@@ -240,20 +250,50 @@ var _ = Describe("Inabox v2 Integration", func() {
 			}
 		}
 
+		blob1Key, err := blobCert1.BlobHeader.BlobKey()
+		Expect(err).To(BeNil())
+
+		blob2Key, err := blobCert2.BlobHeader.BlobKey()
+		Expect(err).To(BeNil())
+
 		// Test retrieval from DA network
-		b, err := retrievalClientV2.GetBlob(ctx, blobCert1.BlobHeader, batchHeader1.ReferenceBlockNumber, 0)
+		b, err := retrievalClientV2.GetBlob(
+			ctx,
+			blob1Key,
+			blobCert1.BlobHeader.BlobVersion,
+			blobCert1.BlobHeader.BlobCommitments,
+			batchHeader1.ReferenceBlockNumber,
+			0)
 		Expect(err).To(BeNil())
 		restored := bytes.TrimRight(b, "\x00")
 		Expect(restored).To(Equal(paddedData1))
-		b, err = retrievalClientV2.GetBlob(ctx, blobCert1.BlobHeader, batchHeader1.ReferenceBlockNumber, 1)
+		b, err = retrievalClientV2.GetBlob(
+			ctx,
+			blob1Key,
+			blobCert1.BlobHeader.BlobVersion,
+			blobCert1.BlobHeader.BlobCommitments,
+			batchHeader1.ReferenceBlockNumber,
+			1)
 		restored = bytes.TrimRight(b, "\x00")
 		Expect(err).To(BeNil())
 		Expect(restored).To(Equal(paddedData1))
-		b, err = retrievalClientV2.GetBlob(ctx, blobCert2.BlobHeader, batchHeader2.ReferenceBlockNumber, 0)
+		b, err = retrievalClientV2.GetBlob(
+			ctx,
+			blob2Key,
+			blobCert2.BlobHeader.BlobVersion,
+			blobCert2.BlobHeader.BlobCommitments,
+			batchHeader2.ReferenceBlockNumber,
+			0)
 		restored = bytes.TrimRight(b, "\x00")
 		Expect(err).To(BeNil())
 		Expect(restored).To(Equal(paddedData2))
-		b, err = retrievalClientV2.GetBlob(ctx, blobCert2.BlobHeader, batchHeader2.ReferenceBlockNumber, 1)
+		b, err = retrievalClientV2.GetBlob(
+			ctx,
+			blob2Key,
+			blobCert2.BlobHeader.BlobVersion,
+			blobCert2.BlobHeader.BlobCommitments,
+			batchHeader2.ReferenceBlockNumber,
+			1)
 		restored = bytes.TrimRight(b, "\x00")
 		Expect(err).To(BeNil())
 		Expect(restored).To(Equal(paddedData2))
@@ -320,7 +360,6 @@ func convertBlobInclusionInfo(inclusionInfo *disperserpb.BlobInclusionInfo) (*ve
 					Length: uint32(blobCertificate.BlobHeader.BlobCommitments.Length),
 				},
 				PaymentHeaderHash: paymentHeaderHash,
-				Salt:              blobCertificate.BlobHeader.Salt,
 			},
 			Signature: blobCertificate.Signature,
 			RelayKeys: blobCertificate.RelayKeys,

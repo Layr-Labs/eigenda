@@ -10,6 +10,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,8 +21,8 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x123",
-			ReservationPeriod: 5,
+			AccountID:         gethcommon.Address{0},
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100),
 		},
 	}
@@ -30,8 +31,8 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{0, 1},
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x456",
-			ReservationPeriod: 6,
+			AccountID:         gethcommon.Address{1},
+			Timestamp:         6,
 			CumulativePayment: big.NewInt(200),
 		},
 	}
@@ -40,8 +41,8 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		BlobCommitments: commitments,
 		QuorumNumbers:   []core.QuorumID{1, 2},
 		PaymentMetadata: core.PaymentMetadata{
-			AccountID:         "0x789",
-			ReservationPeriod: 7,
+			AccountID:         gethcommon.Address{2},
+			Timestamp:         7,
 			CumulativePayment: big.NewInt(300),
 		},
 	}

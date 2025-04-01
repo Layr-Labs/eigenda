@@ -3,6 +3,7 @@ package encoding
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"golang.org/x/exp/constraints"
 )
@@ -61,6 +62,16 @@ func GetNumSys(dataSize uint64, chunkLen uint64) uint64 {
 
 // ValidateEncodingParams takes in the encoding parameters and returns an error if they are invalid.
 func ValidateEncodingParams(params EncodingParams, SRSOrder uint64) error {
+	if params.NumChunks == 0 {
+		return errors.New("number of chunks must be greater than 0")
+	}
+	if params.ChunkLength == 0 {
+		return errors.New("chunk length must be greater than 0")
+	}
+
+	if params.NumChunks > math.MaxUint64/params.ChunkLength {
+		return fmt.Errorf("multiplication overflow: ChunkLength: %d, NumChunks: %d", params.ChunkLength, params.NumChunks)
+	}
 
 	// Check that the parameters are valid with respect to the SRS. The precomputed terms of the amortized KZG
 	// prover use up to order params.ChunkLen*params.NumChunks-1 for the SRS, so we must have

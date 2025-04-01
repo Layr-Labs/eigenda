@@ -57,24 +57,6 @@ func CreateGlobalReservationTable(clientConfig commonaws.ClientConfig, tableName
 				KeyType:       types.KeyTypeHash,
 			},
 		},
-		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
-			{
-				IndexName: aws.String("ReservationPeriodIndex"),
-				KeySchema: []types.KeySchemaElement{
-					{
-						AttributeName: aws.String("ReservationPeriod"),
-						KeyType:       types.KeyTypeHash,
-					},
-				},
-				Projection: &types.Projection{
-					ProjectionType: types.ProjectionTypeAll,
-				},
-				ProvisionedThroughput: &types.ProvisionedThroughput{
-					ReadCapacityUnits:  aws.Int64(10),
-					WriteCapacityUnits: aws.Int64(10),
-				},
-			},
-		},
 		TableName: aws.String(tableName),
 		ProvisionedThroughput: &types.ProvisionedThroughput{
 			ReadCapacityUnits:  aws.Int64(10),
@@ -92,19 +74,11 @@ func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) 
 				AttributeName: aws.String("AccountID"),
 				AttributeType: types.ScalarAttributeTypeS,
 			},
-			{
-				AttributeName: aws.String("CumulativePayments"),
-				AttributeType: types.ScalarAttributeTypeN,
-			},
 		},
 		KeySchema: []types.KeySchemaElement{
 			{
 				AttributeName: aws.String("AccountID"),
 				KeyType:       types.KeyTypeHash,
-			},
-			{
-				AttributeName: aws.String("CumulativePayments"),
-				KeyType:       types.KeyTypeRange,
 			},
 		},
 		TableName: aws.String(tableName),
@@ -113,5 +87,11 @@ func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) 
 			WriteCapacityUnits: aws.Int64(10),
 		},
 	})
-	return err
+	if err != nil {
+		if err.Error() == "ResourceInUseException: Table already exists" {
+			return nil
+		}
+		return err
+	}
+	return nil
 }

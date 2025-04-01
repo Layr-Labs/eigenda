@@ -22,7 +22,7 @@ func (v DefaultBlobCodec) EncodeBlob(rawData []byte) ([]byte, error) {
 	codecBlobHeader := make([]byte, 32)
 	// first byte is always 0 to ensure the codecBlobHeader is a valid bn254 element
 	// encode version byte
-	codecBlobHeader[1] = byte(DefaultBlobEncoding)
+	codecBlobHeader[1] = byte(PayloadEncodingVersion0)
 
 	// encode length as uint32
 	binary.BigEndian.PutUint32(codecBlobHeader[2:6], uint32(len(rawData))) // uint32 should be more than enough to store the length (approx 4gb)

@@ -3,16 +3,17 @@ package tablestore
 import (
 	"encoding/binary"
 	"fmt"
+	"math/rand"
+	"os"
+	"sort"
+	"testing"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
-	"math/rand"
-	"os"
-	"sort"
-	"testing"
 )
 
 var dbPath = "test-store"
@@ -34,6 +35,8 @@ func TestTableList(t *testing.T) {
 	assert.NoError(t, err)
 
 	config := DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
+	config.LevelDBSyncWrites = false
 	tStore, err := Start(logger, config)
 	assert.NoError(t, err)
 
@@ -46,6 +49,7 @@ func TestTableList(t *testing.T) {
 	// Add some tables
 
 	config = DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{"table1"}
 	tStore, err = Start(logger, config)
 	assert.NoError(t, err)
@@ -58,6 +62,7 @@ func TestTableList(t *testing.T) {
 	assert.NoError(t, err)
 
 	config = DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{"table1", "table2"}
 	tStore, err = Start(logger, config)
 	assert.NoError(t, err)
@@ -73,6 +78,7 @@ func TestTableList(t *testing.T) {
 	assert.NoError(t, err)
 
 	config = DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{"table1", "table2", "table3"}
 	tStore, err = Start(logger, config)
 	assert.NoError(t, err)
@@ -90,6 +96,7 @@ func TestTableList(t *testing.T) {
 
 	// Restarting with the same tables should work.
 	config = DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{"table1", "table2", "table3"}
 	tStore, err = Start(logger, config)
 	assert.NoError(t, err)
@@ -107,6 +114,7 @@ func TestTableList(t *testing.T) {
 
 	// Delete a table
 	config = DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{"table1", "table3"}
 	tStore, err = Start(logger, config)
 	assert.NoError(t, err)
@@ -122,6 +130,7 @@ func TestTableList(t *testing.T) {
 
 	// Add a table back in (this uses a different code path)
 	config = DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{"table1", "table3", "table4"}
 	tStore, err = Start(logger, config)
 	assert.NoError(t, err)
@@ -139,6 +148,7 @@ func TestTableList(t *testing.T) {
 
 	// Delete the rest of the tables
 	config = DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{}
 	tStore, err = Start(logger, config)
 	assert.NoError(t, err)
@@ -381,6 +391,7 @@ func TestDropTable(t *testing.T) {
 	assert.NoError(t, err)
 
 	config := DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{"table1", "table2", "table3"}
 	store, err := Start(logger, config)
 	assert.NoError(t, err)
@@ -437,6 +448,7 @@ func TestDropTable(t *testing.T) {
 	assert.NoError(t, err)
 
 	config = DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{"table1", "table3"}
 	store, err = Start(logger, config)
 	assert.NoError(t, err)
@@ -471,6 +483,7 @@ func TestDropTable(t *testing.T) {
 	assert.NoError(t, err)
 
 	config = DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{"table3"}
 	store, err = Start(logger, config)
 	assert.NoError(t, err)
@@ -501,6 +514,7 @@ func TestDropTable(t *testing.T) {
 	assert.NoError(t, err)
 
 	config = DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{}
 	store, err = Start(logger, config)
 	assert.NoError(t, err)
@@ -527,6 +541,7 @@ func TestSimultaneousAddAndDrop(t *testing.T) {
 	assert.NoError(t, err)
 
 	config := DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{"table1", "table2", "table3", "table4", "table5"}
 	store, err := Start(logger, config)
 	assert.NoError(t, err)
@@ -604,6 +619,7 @@ func TestSimultaneousAddAndDrop(t *testing.T) {
 	assert.NoError(t, err)
 
 	config = DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{"table1", "table5", "table6", "table7", "table8", "table9"}
 	store, err = Start(logger, config)
 	assert.NoError(t, err)
@@ -831,6 +847,7 @@ func TestRestart(t *testing.T) {
 	assert.NoError(t, err)
 
 	config := DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{"table1", "table2"}
 	store, err := Start(logger, config)
 	assert.NoError(t, err)
@@ -919,6 +936,7 @@ func TestRandomOperations(t *testing.T) {
 	assert.NoError(t, err)
 
 	config := DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	store, err := Start(logger, config)
 	assert.NoError(t, err)
 
@@ -935,6 +953,7 @@ func TestRandomOperations(t *testing.T) {
 			assert.NoError(t, err)
 
 			config = DefaultLevelDBConfig(dbPath)
+			config.LevelDBSyncWrites = false
 			config.Schema = getTableNameList(tables)
 			store, err = Start(logger, config)
 			assert.NoError(t, err)
@@ -955,6 +974,7 @@ func TestRandomOperations(t *testing.T) {
 			tableNames = append(tableNames, name)
 
 			config = DefaultLevelDBConfig(dbPath)
+			config.LevelDBSyncWrites = false
 			config.Schema = tableNames
 			store, err = Start(logger, config)
 			assert.NoError(t, err)
@@ -982,6 +1002,7 @@ func TestRandomOperations(t *testing.T) {
 			delete(tables, name)
 
 			config = DefaultLevelDBConfig(dbPath)
+			config.LevelDBSyncWrites = false
 			config.Schema = getTableNameList(tables)
 			store, err = Start(logger, config)
 			assert.NoError(t, err)
@@ -1104,6 +1125,7 @@ func TestInterruptedTableDeletion(t *testing.T) {
 	assert.NoError(t, err)
 
 	config := DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{"table1", "table2"}
 	store, err := Start(logger, config)
 	assert.NoError(t, err)
@@ -1133,7 +1155,7 @@ func TestInterruptedTableDeletion(t *testing.T) {
 	err = store.Shutdown()
 	assert.NoError(t, err)
 
-	base, err := leveldb.NewStore(logger, dbPath)
+	base, err := leveldb.NewStore(logger, dbPath, true, false, nil)
 	assert.NoError(t, err)
 
 	explodingBase := &explodingStore{
@@ -1142,6 +1164,7 @@ func TestInterruptedTableDeletion(t *testing.T) {
 	}
 
 	config = DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{"table2"}
 	_, err = start(logger, explodingBase, config)
 	assert.Error(t, err)
@@ -1151,6 +1174,7 @@ func TestInterruptedTableDeletion(t *testing.T) {
 
 	// Restart the store. The table should be gone by the time the method returns.
 	config = DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{"table2"}
 	store, err = Start(logger, config)
 	assert.NoError(t, err)
@@ -1183,6 +1207,7 @@ func TestLoadWithoutModifiedSchema(t *testing.T) {
 	assert.NoError(t, err)
 
 	config := DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{"table1", "table2"}
 	store, err := Start(logger, config)
 	assert.NoError(t, err)
@@ -1215,6 +1240,7 @@ func TestLoadWithoutModifiedSchema(t *testing.T) {
 
 	// Load the store without the schema
 	config = DefaultLevelDBConfig(dbPath)
+	config.LevelDBSyncWrites = false
 	store, err = Start(logger, config)
 	assert.NoError(t, err)
 

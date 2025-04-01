@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"math/big"
+	"slices"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -35,23 +36,20 @@ type abiBlobCommitments struct {
 // This function exists so that the BlobKey can be computed without first constructing a BlobHeader object. Since
 // the BlobHeader contains the full payment metadata, and payment metadata isn't stored on chain, it isn't always
 // possible to reconstruct from the data available.
+//
+// The hashing structure here must ALWAYS match the hashing structure that we perform onchain:
+// https://github.com/Layr-Labs/eigenda/blob/a6dd724acdf732af483fd2d9a86325febe7ebdcd/contracts/src/libraries/EigenDAHasher.sol#L119
 func ComputeBlobKey(
 	blobVersion BlobVersion,
 	blobCommitments encoding.BlobCommitments,
 	quorumNumbers []core.QuorumID,
 	paymentMetadataHash [32]byte,
-	salt uint32,
 ) ([32]byte, error) {
-
 	versionType, err := abi.NewType("uint16", "", nil)
 	if err != nil {
 		return [32]byte{}, err
 	}
 	quorumNumbersType, err := abi.NewType("bytes", "", nil)
-	if err != nil {
-		return [32]byte{}, err
-	}
-	saltType, err := abi.NewType("uint32", "", nil)
 	if err != nil {
 		return [32]byte{}, err
 	}
@@ -117,14 +115,14 @@ func ComputeBlobKey(
 		{
 			Type: commitmentType,
 		},
-		{
-			Type: saltType,
-		},
 	}
-
+	// Sort the quorum numbers to ensure the hash is consistent
+	sortedQuorums := make([]core.QuorumID, len(quorumNumbers))
+	copy(sortedQuorums, quorumNumbers)
+	slices.Sort(sortedQuorums)
 	packedBytes, err := arguments.Pack(
 		blobVersion,
-		quorumNumbers,
+		sortedQuorums,
 		abiBlobCommitments{
 			Commitment: abiG1Commit{
 				X: blobCommitments.Commitment.X.BigInt(new(big.Int)),
@@ -159,7 +157,6 @@ func ComputeBlobKey(
 			},
 			DataLength: uint32(blobCommitments.Length),
 		},
-		salt,
 	)
 	if err != nil {
 		return [32]byte{}, err
@@ -225,7 +222,7 @@ func (b *BlobHeader) BlobKey() (BlobKey, error) {
 		b.BlobCommitments,
 		b.QuorumNumbers,
 		paymentMetadataHash,
-		b.Salt)
+	)
 }
 
 func (c *BlobCertificate) Hash() ([32]byte, error) {

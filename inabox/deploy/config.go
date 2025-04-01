@@ -344,7 +344,6 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_AVAILABLE_RELAYS:                        "0,1,2,3",
 		CONTROLLER_DISPATCHER_PULL_INTERVAL:                "3s",
 		CONTROLLER_NODE_REQUEST_TIMEOUT:                    "5s",
-		CONTROLLER_NUM_CONNECTIONS_TO_NODES:                "10",
 		CONTROLLER_CHAIN_RPC:                               "",
 		CONTROLLER_PRIVATE_KEY:                             "123",
 		CONTROLLER_NUM_CONFIRMATIONS:                       "0",
@@ -378,6 +377,7 @@ func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVa
 		RELAY_MAX_CONCURRENT_GET_CHUNK_OPS_CLIENT:   "10",
 		RELAY_MAX_GET_CHUNK_BYTES_PER_SECOND_CLIENT: "100000000",
 		RELAY_AUTHENTICATION_DISABLED:               "false",
+		RELAY_ENABLE_METRICS:                        "true",
 	}
 	env.applyDefaults(&v, "RELAY", "relay", ind)
 
@@ -447,7 +447,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_PUBLIC_IP_CHECK_INTERVAL:         "10s",
 		NODE_NUM_CONFIRMATIONS:                "0",
 		NODE_ONCHAIN_METRICS_INTERVAL:         "-1",
-		NODE_ENABLE_V2:                        "true",
+		NODE_RUNTIME_MODE:                     "v1-and-v2",
 		NODE_DISABLE_DISPERSAL_AUTHENTICATION: "false",
 	}
 
@@ -480,9 +480,6 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 		RETRIEVER_NUM_WORKERS:         fmt.Sprint(runtime.GOMAXPROCS(0)),
 		RETRIEVER_VERBOSE:             "true",
 		RETRIEVER_CACHE_ENCODED_BLOBS: "false",
-		RETRIEVER_GRAPH_URL:           graphUrl,
-		RETRIEVER_GRAPH_BACKOFF:       "1s",
-		RETRIEVER_GRAPH_MAX_RETRIES:   "3",
 	}
 
 	v.RETRIEVER_G2_PATH = ""

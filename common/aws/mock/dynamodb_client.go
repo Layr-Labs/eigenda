@@ -31,6 +31,11 @@ func (c *MockDynamoDBClient) PutItemWithCondition(ctx context.Context, tableName
 	return args.Error(0)
 }
 
+func (c *MockDynamoDBClient) PutItemWithConditionAndReturn(ctx context.Context, tableName string, item dynamodb.Item, condition string, expressionAttributeNames map[string]string, expressionAttributeValues map[string]types.AttributeValue) (dynamodb.Item, error) {
+	args := c.Called()
+	return args.Get(0).(dynamodb.Item), args.Error(1)
+}
+
 func (c *MockDynamoDBClient) PutItems(ctx context.Context, tableName string, items []dynamodb.Item) ([]dynamodb.Item, error) {
 	args := c.Called(ctx, tableName, items)
 	if args.Get(0) == nil {
@@ -59,7 +64,12 @@ func (c *MockDynamoDBClient) GetItem(ctx context.Context, tableName string, key 
 	return args.Get(0).(dynamodb.Item), args.Error(1)
 }
 
-func (c *MockDynamoDBClient) GetItems(ctx context.Context, tableName string, keys []dynamodb.Key) ([]dynamodb.Item, error) {
+func (c *MockDynamoDBClient) GetItemWithInput(ctx context.Context, input *awsdynamodb.GetItemInput) (dynamodb.Item, error) {
+	args := c.Called()
+	return args.Get(0).(dynamodb.Item), args.Error(1)
+}
+
+func (c *MockDynamoDBClient) GetItems(ctx context.Context, tableName string, keys []dynamodb.Key, consistentRead bool) ([]dynamodb.Item, error) {
 	args := c.Called()
 	return args.Get(0).([]dynamodb.Item), args.Error(1)
 }
@@ -84,7 +94,7 @@ func (c *MockDynamoDBClient) QueryIndexCount(ctx context.Context, tableName stri
 	return args.Get(0).(int32), args.Error(1)
 }
 
-func (c *MockDynamoDBClient) QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues dynamodb.ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue) (dynamodb.QueryResult, error) {
+func (c *MockDynamoDBClient) QueryIndexWithPagination(ctx context.Context, tableName string, indexName string, keyCondition string, expAttributeValues dynamodb.ExpressionValues, limit int32, exclusiveStartKey map[string]types.AttributeValue, ascending bool) (dynamodb.QueryResult, error) {
 	args := c.Called()
 	return args.Get(0).(dynamodb.QueryResult), args.Error(1)
 }

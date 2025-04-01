@@ -105,7 +105,7 @@ func pluginOps(ctx *cli.Context) {
 
 	sk, privateKey, err := plugin.GetECDSAPrivateKey(config.EcdsaKeyFile, config.EcdsaKeyPassword)
 	if err != nil {
-		log.Printf("Error: failed to read or decrypt the ECDSA private key: %v", err)
+		log.Printf("Error: failed to read or decrypt the ECDSA from file (%s) for private key: %v", config.EcdsaKeyFile, err)
 		return
 	}
 	log.Printf("Info: ECDSA key read and decrypted from %s", config.EcdsaKeyFile)

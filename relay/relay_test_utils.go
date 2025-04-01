@@ -30,6 +30,7 @@ import (
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/mock"
@@ -210,8 +211,8 @@ func randomBlob(t *testing.T) (*v2.BlobHeader, []byte) {
 		QuorumNumbers: []uint32{0, 1},
 		Commitment:    commitmentProto,
 		PaymentHeader: &pbcommonv2.PaymentHeader{
-			AccountId:         tu.RandomString(10),
-			ReservationPeriod: 5,
+			AccountId:         gethcommon.BytesToAddress(tu.RandomBytes(20)).Hex(),
+			Timestamp:         5,
 			CumulativePayment: big.NewInt(100).Bytes(),
 		},
 	}
@@ -231,14 +232,12 @@ func randomBlobChunks(t *testing.T) (*v2.BlobHeader, []byte, []*encoding.Frame) 
 	return header, data, frames
 }
 
-func disassembleFrames(frames []*encoding.Frame) ([]*rs.Frame, []*encoding.Proof) {
-	rsFrames := make([]*rs.Frame, len(frames))
+func disassembleFrames(frames []*encoding.Frame) ([]rs.FrameCoeffs, []*encoding.Proof) {
+	rsFrames := make([]rs.FrameCoeffs, len(frames))
 	proofs := make([]*encoding.Proof, len(frames))
 
 	for i, frame := range frames {
-		rsFrames[i] = &rs.Frame{
-			Coeffs: frame.Coeffs,
-		}
+		rsFrames[i] = frame.Coeffs
 		proofs[i] = &frame.Proof
 	}
 

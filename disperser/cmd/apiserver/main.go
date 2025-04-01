@@ -103,7 +103,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			UpdateInterval:   config.OnchainStateRefreshInterval,
 		}
 
-		paymentChainState, err := mt.NewOnchainPaymentState(context.Background(), transactor)
+		paymentChainState, err := mt.NewOnchainPaymentState(context.Background(), transactor, logger)
 		if err != nil {
 			return fmt.Errorf("failed to create onchain payment state: %w", err)
 		}
@@ -177,7 +177,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			blobMetadataStore,
 			transactor,
 			meterer,
-			authv2.NewAuthenticator(),
+			authv2.NewPaymentStateAuthenticator(config.AuthPmtStateRequestMaxPastAge, config.AuthPmtStateRequestMaxFutureAge),
 			prover,
 			uint64(config.MaxNumSymbolsPerBlob),
 			config.OnchainStateRefreshInterval,

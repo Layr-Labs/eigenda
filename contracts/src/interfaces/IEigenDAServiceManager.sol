@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IServiceManager} from "eigenlayer-middleware/interfaces/IServiceManager.sol";
-import {BLSSignatureChecker} from "eigenlayer-middleware/BLSSignatureChecker.sol";
-import {BN254} from "eigenlayer-middleware/libraries/BN254.sol";
+import {IServiceManager} from "../../lib/eigenlayer-middleware/src/interfaces/IServiceManager.sol";
+import {BLSSignatureChecker} from "../../lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
+import {BN254} from "../../lib/eigenlayer-middleware/src/libraries/BN254.sol";
 import {IEigenDAThresholdRegistry} from "./IEigenDAThresholdRegistry.sol";
 import "./IEigenDAStructs.sol";
 

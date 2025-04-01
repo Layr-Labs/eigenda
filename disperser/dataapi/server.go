@@ -27,7 +27,6 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus"
 	swaggerfiles "github.com/swaggo/files"     // swagger embed files
 	ginswagger "github.com/swaggo/gin-swagger" // gin-swagger middleware
 )
@@ -126,11 +125,13 @@ type (
 	OperatorStake struct {
 		QuorumId        string  `json:"quorum_id"`
 		OperatorId      string  `json:"operator_id"`
+		OperatorAddress string  `json:"operator_address"`
 		StakePercentage float64 `json:"stake_percentage"`
 		Rank            int     `json:"rank"`
 	}
 
 	OperatorsStakeResponse struct {
+		CurrentBlock         uint32                      `json:"current_block"`
 		StakeRankedOperators map[string][]*OperatorStake `json:"stake_ranked_operators"`
 	}
 
@@ -175,19 +176,13 @@ type (
 	}
 
 	OperatorPortCheckResponse struct {
-		OperatorId        string `json:"operator_id"`
-		DispersalSocket   string `json:"dispersal_socket"`
-		DispersalOnline   bool   `json:"dispersal_online"`
-		DispersalStatus   string `json:"dispersal_status"`
-		RetrievalSocket   string `json:"retrieval_socket"`
-		RetrievalOnline   bool   `json:"retrieval_online"`
-		RetrievalStatus   string `json:"retrieval_status"`
-		V2DispersalSocket string `json:"v2_dispersal_socket"`
-		V2DispersalOnline bool   `json:"v2_dispersal_online"`
-		V2DispersalStatus string `json:"v2_dispersal_status"`
-		V2RetrievalSocket string `json:"v2_retrieval_socket"`
-		V2RetrievalOnline bool   `json:"v2_retrieval_online"`
-		V2RetrievalStatus string `json:"v2_retrieval_status"`
+		OperatorId      string `json:"operator_id"`
+		DispersalSocket string `json:"dispersal_socket"`
+		DispersalOnline bool   `json:"dispersal_online"`
+		DispersalStatus string `json:"dispersal_status"`
+		RetrievalSocket string `json:"retrieval_socket"`
+		RetrievalOnline bool   `json:"retrieval_online"`
+		RetrievalStatus string `json:"retrieval_status"`
 	}
 	SemverReportResponse struct {
 		Semver map[string]*semver.SemverMetrics `json:"semver"`
@@ -274,7 +269,7 @@ func NewServer(
 		eigenDAGRPCServiceChecker: eigenDAGRPCServiceChecker,
 		eigenDAHttpServiceChecker: eigenDAHttpServiceChecker,
 		operatorHandler:           NewOperatorHandler(logger, metrics, transactor, chainState, indexedChainState, subgraphClient),
-		metricsHandler:            NewMetricsHandler(promClient),
+		metricsHandler:            NewMetricsHandler(promClient, V1),
 	}
 }
 
@@ -378,10 +373,10 @@ func (s *server) Shutdown() error {
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/feed/blobs/{blob_key} [get]
 func (s *server) FetchBlobHandler(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchBlob", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("FetchBlob", time.Since(handlerStart))
+	}()
 
 	blobKey := c.Param("blob_key")
 
@@ -411,10 +406,10 @@ func (s *server) FetchBlobHandler(c *gin.Context) {
 //	@Failure	500					{object}	ErrorResponse	"error: Server error"
 //	@Router		/feed/batches/{batch_header_hash}/blobs [get]
 func (s *server) FetchBlobsFromBatchHeaderHash(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchBlobsFromBatchHeaderHash", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("FetchBlobsFromBatchHeaderHash", time.Since(handlerStart))
+	}()
 
 	batchHeaderHash := c.Param("batch_header_hash")
 	batchHeaderHashBytes, err := ConvertHexadecimalToBytes([]byte(batchHeaderHash))
@@ -517,10 +512,10 @@ func encodeNextToken(key *disperser.BatchIndexExclusiveStartKey) (string, error)
 //	@Failure	500		{object}	ErrorResponse	"error: Server error"
 //	@Router		/feed/blobs [get]
 func (s *server) FetchBlobsHandler(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchBlobs", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("FetchBlobs", time.Since(handlerStart))
+	}()
 
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	if err != nil {
@@ -565,10 +560,10 @@ func (s *server) FetchBlobsHandler(c *gin.Context) {
 //	@Failure	500		{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics  [get]
 func (s *server) FetchMetricsHandler(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchMetrics", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("FetchMetrics", time.Since(handlerStart))
+	}()
 
 	now := time.Now()
 	start, err := strconv.ParseInt(c.DefaultQuery("start", "0"), 10, 64)
@@ -606,10 +601,10 @@ func (s *server) FetchMetricsHandler(c *gin.Context) {
 //	@Failure	500		{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/throughput  [get]
 func (s *server) FetchMetricsThroughputHandler(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchMetricsTroughput", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("FetchMetricsTroughput", time.Since(handlerStart))
+	}()
 
 	now := time.Now()
 	start, err := strconv.ParseInt(c.DefaultQuery("start", "0"), 10, 64)
@@ -646,10 +641,10 @@ func (s *server) FetchMetricsThroughputHandler(c *gin.Context) {
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/non-signers  [get]
 func (s *server) FetchNonSigners(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchNonSigners", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("FetchNonSigners", time.Since(handlerStart))
+	}()
 
 	interval, err := strconv.ParseInt(c.DefaultQuery("interval", "3600"), 10, 64)
 	if err != nil || interval == 0 {
@@ -681,10 +676,10 @@ func (s *server) FetchNonSigners(c *gin.Context) {
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/operator-nonsigning-percentage  [get]
 func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchOperatorsNonsigningPercentageHandler", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("FetchOperatorsNonsigningPercentageHandler", time.Since(handlerStart))
+	}()
 
 	endTime := time.Now()
 	if c.Query("end") != "" {
@@ -737,10 +732,10 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators-info/operators-stake [get]
 func (s *server) OperatorsStake(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("OperatorsStake", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("OperatorsStake", time.Since(handlerStart))
+	}()
 
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("getting operators stake distribution", "operatorId", operatorId)
@@ -768,10 +763,10 @@ func (s *server) OperatorsStake(c *gin.Context) {
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators-info/deregistered-operators [get]
 func (s *server) FetchDeregisteredOperators(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchDeregisteredOperators", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("FetchDeregisteredOperators", time.Since(handlerStart))
+	}()
 
 	// Get query parameters
 	// Default Value 14 days
@@ -818,10 +813,10 @@ func (s *server) FetchDeregisteredOperators(c *gin.Context) {
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators-info/registered-operators [get]
 func (s *server) FetchRegisteredOperators(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchRegisteredOperators", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("FetchRegisteredOperators", time.Since(handlerStart))
+	}()
 
 	// Get query parameters
 	// Default Value 14 days
@@ -871,10 +866,10 @@ func (s *server) FetchRegisteredOperators(c *gin.Context) {
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators-info/operator-ejections [get]
 func (s *server) FetchOperatorEjections(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchOperatorEjections", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("FetchOperatorEjections", time.Since(handlerStart))
+	}()
 
 	operatorId := c.DefaultQuery("operator_id", "") // If not specified, defaults to all operators
 
@@ -919,7 +914,7 @@ func (s *server) FetchOperatorEjections(c *gin.Context) {
 
 // OperatorPortCheck godoc
 //
-//	@Summary	Operator node reachability port check
+//	@Summary	Operator v1 node reachability port check
 //	@Tags		OperatorsInfo
 //	@Produce	json
 //	@Param		operator_id	query		string	true	"Operator ID"
@@ -929,14 +924,14 @@ func (s *server) FetchOperatorEjections(c *gin.Context) {
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators-info/port-check [get]
 func (s *server) OperatorPortCheck(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("OperatorPortCheck", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("OperatorPortCheck", time.Since(handlerStart))
+	}()
 
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("checking operator ports", "operatorId", operatorId)
-	portCheckResponse, err := s.operatorHandler.ProbeOperatorHosts(c.Request.Context(), operatorId)
+	portCheckResponse, err := s.operatorHandler.ProbeV1OperatorPorts(c.Request.Context(), operatorId)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			err = errNotFound
@@ -963,10 +958,10 @@ func (s *server) OperatorPortCheck(c *gin.Context) {
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/operators-info/semver-scan [get]
 func (s *server) SemverScan(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("SemverScan", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("SemverScan", time.Since(handlerStart))
+	}()
 
 	report, err := s.operatorHandler.ScanOperatorsHostInfo(c.Request.Context())
 	if err != nil {
@@ -989,10 +984,10 @@ func (s *server) SemverScan(c *gin.Context) {
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/disperser-service-availability [get]
 func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchDisperserServiceAvailability", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("FetchDisperserServiceAvailability", time.Since(handlerStart))
+	}()
 
 	// Check Disperser
 	services := []string{"Disperser"}
@@ -1043,10 +1038,10 @@ func (s *server) FetchDisperserServiceAvailability(c *gin.Context) {
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/churner-service-availability [get]
 func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchChurnerServiceAvailability", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("FetchChurnerServiceAvailability", time.Since(handlerStart))
+	}()
 
 	// Check Disperser
 	services := []string{"Churner"}
@@ -1097,10 +1092,10 @@ func (s *server) FetchChurnerServiceAvailability(c *gin.Context) {
 //	@Failure	500	{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/batcher-service-availability [get]
 func (s *server) FetchBatcherAvailability(c *gin.Context) {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(f float64) {
-		s.metrics.ObserveLatency("FetchBatcherAvailability", f*1000) // make milliseconds
-	}))
-	defer timer.ObserveDuration()
+	handlerStart := time.Now()
+	defer func() {
+		s.metrics.ObserveLatency("FetchBatcherAvailability", time.Since(handlerStart))
+	}()
 
 	// Check Batcher
 	services := []HttpServiceAvailabilityCheck{{"Batcher", s.batcherHealthEndpt}}

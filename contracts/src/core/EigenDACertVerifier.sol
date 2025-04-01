@@ -6,20 +6,40 @@ import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry
 import {IEigenDABatchMetadataStorage} from "../interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../interfaces/IEigenDASignatureVerifier.sol";
 import {EigenDACertVerificationUtils} from "../libraries/EigenDACertVerificationUtils.sol";
-import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
-import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {OperatorStateRetriever} from "../../lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
+import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
+/**
+ * @title A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates 
+ * @notice For V2 verification this contract is deployed with immutable security thresholds and required quorum numbers,
+ *         to change these values or verification behavior a new CertVerifier must be deployed
+ */
 contract EigenDACertVerifier is IEigenDACertVerifier {
 
+    /// @notice The EigenDAThresholdRegistry contract address
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
+
+    /// @notice The EigenDABatchMetadataStorage contract address
+    /// @dev On L1 this contract is the EigenDA Service Manager contract
     IEigenDABatchMetadataStorage public immutable eigenDABatchMetadataStorage;
+
+    /// @notice The EigenDASignatureVerifier contract address
+    /// @dev On L1 this contract is the EigenDA Service Manager contract
     IEigenDASignatureVerifier public immutable eigenDASignatureVerifier;
+
+    /// @notice The EigenDARelayRegistry contract address
     IEigenDARelayRegistry public immutable eigenDARelayRegistry;
 
+    /// @notice The EigenDA middleware OperatorStateRetriever contract address
     OperatorStateRetriever public immutable operatorStateRetriever;
+
+    /// @notice The EigenDA middleware RegistryCoordinator contract address
     IRegistryCoordinator public immutable registryCoordinator;
+
+    SecurityThresholds public securityThresholdsV2;
+    bytes public quorumNumbersRequiredV2;
 
     constructor(
         IEigenDAThresholdRegistry _eigenDAThresholdRegistry,
@@ -27,7 +47,9 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         IEigenDASignatureVerifier _eigenDASignatureVerifier,
         IEigenDARelayRegistry _eigenDARelayRegistry,
         OperatorStateRetriever _operatorStateRetriever,
-        IRegistryCoordinator _registryCoordinator
+        IRegistryCoordinator _registryCoordinator,
+        SecurityThresholds memory _securityThresholdsV2,
+        bytes memory _quorumNumbersRequiredV2
     ) {
         eigenDAThresholdRegistry = _eigenDAThresholdRegistry;
         eigenDABatchMetadataStorage = _eigenDABatchMetadataStorage;
@@ -35,6 +57,12 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         eigenDARelayRegistry = _eigenDARelayRegistry;
         operatorStateRetriever = _operatorStateRetriever;
         registryCoordinator = _registryCoordinator;
+
+        // confirmation and adversary signing thresholds that must be met for all quorums in a V2 certificate
+        securityThresholdsV2 = _securityThresholdsV2;
+
+        // quorum numbers that must be validated in a V2 certificate
+        quorumNumbersRequiredV2 = _quorumNumbersRequiredV2;
     }
 
     ///////////////////////// V1 ///////////////////////////////
@@ -78,15 +106,17 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     ///////////////////////// V2 ///////////////////////////////
 
     /**
-     * @notice Verifies a blob cert for the specified quorums with the default security thresholds
+     * @notice Verifies a blob cert using the immutable required quorums and security thresholds set in the constructor
      * @param batchHeader The batch header of the blob 
      * @param blobInclusionInfo The inclusion proof for the blob cert
      * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob cert against
+     * @param signedQuorumNumbers The signed quorum numbers corresponding to the nonSignerStakesAndSignature
      */
     function verifyDACertV2(
         BatchHeaderV2 calldata batchHeader,
         BlobInclusionInfo calldata blobInclusionInfo,
-        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature
+        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
+        bytes memory signedQuorumNumbers
     ) external view {
         EigenDACertVerificationUtils._verifyDACertV2ForQuorums(
             eigenDAThresholdRegistry,
@@ -95,13 +125,14 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
             batchHeader,
             blobInclusionInfo,
             nonSignerStakesAndSignature,
-            getDefaultSecurityThresholdsV2(),
-            blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers
+            securityThresholdsV2,
+            quorumNumbersRequiredV2,
+            signedQuorumNumbers
         );
     }
 
     /**
-     * @notice Verifies a blob cert for the specified quorums with the default security thresholds
+     * @notice Verifies a blob cert using the immutable required quorums and security thresholds set in the constructor
      * @param signedBatch The signed batch to verify the blob cert against
      * @param blobInclusionInfo The inclusion proof for the blob cert
      */
@@ -117,9 +148,41 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
             registryCoordinator,
             signedBatch,
             blobInclusionInfo,
-            getDefaultSecurityThresholdsV2(),
-            blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers
+            securityThresholdsV2,
+            quorumNumbersRequiredV2
         );
+    }
+
+    /**
+     * @notice Thin try/catch wrapper around verifyDACertV2 that returns false instead of panicing
+     * @dev The Steel library (https://github.com/risc0/risc0-ethereum/tree/main/crates/steel) 
+     *      currently has a limitation that it can only create zk proofs for functions that return a value
+     * @param batchHeader The batch header of the blob 
+     * @param blobInclusionInfo The inclusion proof for the blob cert
+     * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob cert against
+     * @param signedQuorumNumbers The signed quorum numbers corresponding to the nonSignerStakesAndSignature
+     */
+    function verifyDACertV2ForZKProof(
+        BatchHeaderV2 calldata batchHeader,
+        BlobInclusionInfo calldata blobInclusionInfo,
+        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
+        bytes memory signedQuorumNumbers
+    ) external view returns (bool) {
+        try EigenDACertVerificationUtils.verifyDACertV2ForQuorumsExternal(
+            eigenDAThresholdRegistry,
+            eigenDASignatureVerifier,
+            eigenDARelayRegistry,
+            batchHeader,
+            blobInclusionInfo,
+            nonSignerStakesAndSignature,
+            securityThresholdsV2,
+            quorumNumbersRequiredV2,
+            signedQuorumNumbers
+        ) {
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     ///////////////////////// HELPER FUNCTIONS ///////////////////////////////
@@ -127,15 +190,17 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     /**
      * @notice Returns the nonSignerStakesAndSignature for a given blob cert and signed batch
      * @param signedBatch The signed batch to get the nonSignerStakesAndSignature for
+     * @return nonSignerStakesAndSignature The nonSignerStakesAndSignature for the given signed batch attestation
      */
     function getNonSignerStakesAndSignature(
         SignedBatch calldata signedBatch
     ) external view returns (NonSignerStakesAndSignature memory) {
-        return EigenDACertVerificationUtils._getNonSignerStakesAndSignature(
-            operatorStateRetriever, 
-            registryCoordinator, 
+        (NonSignerStakesAndSignature memory nonSignerStakesAndSignature,) = EigenDACertVerificationUtils._getNonSignerStakesAndSignature(
+            operatorStateRetriever,
+            registryCoordinator,
             signedBatch
         );
+        return nonSignerStakesAndSignature;
     }
 
     /**
@@ -200,10 +265,5 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     /// @notice Returns the blob params for a given blob version
     function getBlobParams(uint16 version) public view returns (VersionedBlobParams memory) {
         return eigenDAThresholdRegistry.getBlobParams(version);
-    }
-
-    /// @notice Gets the default security thresholds for V2
-    function getDefaultSecurityThresholdsV2() public view returns (SecurityThresholds memory) {
-        return eigenDAThresholdRegistry.getDefaultSecurityThresholdsV2();
     }
 }

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -38,8 +39,14 @@ type EncoderServerV2 struct {
 	grpcMetrics *grpcprom.ServerMetrics
 	close       func()
 
-	runningRequests chan struct{}
-	requestQueue    chan blobRequest
+	// This channel is used to limit the number of concurrent requests executed by the server. If its capacity
+	// is smaller than the capacity of the backlogLimiter, then the server will process all enqueued requests
+	// in parallel.
+	concurrencyLimiter chan struct{}
+
+	// This channel is used to limit the number of requests that can be enqueued. If this channel is at its limit
+	// and new work is submitted, the server will immediately reject the new request.
+	backlogLimiter chan struct{}
 
 	queueStats map[string]int
 	queueLock  sync.Mutex
@@ -57,16 +64,16 @@ func NewEncoderServerV2(
 	metrics.SetQueueCapacity(config.RequestQueueSize)
 
 	return &EncoderServerV2{
-		config:          config,
-		blobStore:       blobStore,
-		chunkWriter:     chunkWriter,
-		logger:          logger.With("component", "EncoderServerV2"),
-		prover:          prover,
-		metrics:         metrics,
-		grpcMetrics:     grpcMetrics,
-		runningRequests: make(chan struct{}, config.MaxConcurrentRequests),
-		requestQueue:    make(chan blobRequest, config.RequestQueueSize),
-		queueStats:      make(map[string]int),
+		config:             config,
+		blobStore:          blobStore,
+		chunkWriter:        chunkWriter,
+		logger:             logger.With("component", "EncoderServerV2"),
+		prover:             prover,
+		metrics:            metrics,
+		grpcMetrics:        grpcMetrics,
+		concurrencyLimiter: make(chan struct{}, config.MaxConcurrentRequests),
+		backlogLimiter:     make(chan struct{}, config.RequestQueueSize),
+		queueStats:         make(map[string]int),
 	}
 }
 
@@ -109,48 +116,39 @@ func (s *EncoderServerV2) EncodeBlob(ctx context.Context, req *pb.EncodeBlobRequ
 		s.metrics.ObserveLatency("total", time.Since(totalStart))
 	}()
 
-	blobSize := req.GetBlobSize()
-	sizeBucket := common.BlobSizeBucket(int(blobSize))
-
-	// Rate limit
-	select {
-	case s.requestQueue <- blobRequest{blobSizeByte: int(blobSize)}:
-		s.queueLock.Lock()
-		s.queueStats[sizeBucket]++
-		s.metrics.ObserveQueue(s.queueStats)
-		s.queueLock.Unlock()
-	default:
-		s.metrics.IncrementRateLimitedBlobRequestNum(int(blobSize))
-		s.logger.Warn("rate limiting as request queue is full", "requestQueueSize", s.config.RequestQueueSize, "maxConcurrentRequests", s.config.MaxConcurrentRequests)
-		return nil, errors.New("too many requests")
+	// Validate the request.
+	blobKey, encodingParams, err := s.validateAndParseRequest(req)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
+	blobSize := int(req.GetBlobSize())
 
-	// Limit the number of concurrent requests
-	s.runningRequests <- struct{}{}
-	defer s.popRequest()
-	if ctx.Err() != nil {
-		s.metrics.IncrementCanceledBlobRequestNum(int(blobSize))
-		return nil, status.Error(codes.Canceled, "request was canceled")
+	// If we have too large of a backlog, refuse to accept new work.
+	err = s.pushBacklogLimiter(blobSize)
+	if err != nil {
+		return nil, err
 	}
+	defer s.popBacklogLimiter(blobSize)
+
+	// Limit the number of concurrent requests.
+	err = s.pushConcurrencyLimiter(ctx, blobSize)
+	if err != nil {
+		return nil, err
+	}
+	defer s.popConcurrencyLimiter()
 
 	s.metrics.ObserveLatency("queuing", time.Since(totalStart))
-	reply, err := s.handleEncodingToChunkStore(ctx, req)
+	reply, err := s.handleEncodingToChunkStore(ctx, blobKey, encodingParams)
 	if err != nil {
-		s.metrics.IncrementFailedBlobRequestNum(int(blobSize))
+		s.metrics.IncrementFailedBlobRequestNum(blobSize)
 	} else {
-		s.metrics.IncrementSuccessfulBlobRequestNum(int(blobSize))
+		s.metrics.IncrementSuccessfulBlobRequestNum(blobSize)
 	}
 
 	return reply, err
 }
 
-func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, req *pb.EncodeBlobRequest) (*pb.EncodeBlobReply, error) {
-	// Validate request first
-	blobKey, encodingParams, err := s.validateAndParseRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, blobKey corev2.BlobKey, encodingParams encoding.EncodingParams) (*pb.EncodeBlobReply, error) {
 	s.logger.Info("Preparing to encode", "blobKey", blobKey.Hex(), "encodingParams", encodingParams)
 
 	// Check if the blob has already been encoded
@@ -192,13 +190,52 @@ func (s *EncoderServerV2) handleEncodingToChunkStore(ctx context.Context, req *p
 	return s.processAndStoreResults(ctx, blobKey, frames)
 }
 
-func (s *EncoderServerV2) popRequest() {
-	blobRequest := <-s.requestQueue
-	<-s.runningRequests
+// pushBacklogLimiter pushes a token to the backlog limiter and increments the queue stats accordingly.
+// If there is no capacity in the backlog limiter, an error is returned.
+func (s *EncoderServerV2) pushBacklogLimiter(blobSizeBytes int) error {
+	sizeBucket := common.BlobSizeBucket(blobSizeBytes)
+
+	select {
+	case s.backlogLimiter <- struct{}{}:
+		s.queueLock.Lock()
+		s.queueStats[sizeBucket]++
+		s.metrics.ObserveQueue(s.queueStats)
+		s.queueLock.Unlock()
+
+		return nil
+	default:
+		s.metrics.IncrementRateLimitedBlobRequestNum(blobSizeBytes)
+		s.logger.Warn("rate limiting as request queue is full",
+			"requestQueueSize", s.config.RequestQueueSize,
+			"maxConcurrentRequests", s.config.MaxConcurrentRequests)
+		return api.NewErrorResourceExhausted(fmt.Sprintf(
+			"request queue is full, max queue size: %d", s.config.RequestQueueSize))
+	}
+}
+
+// popBacklogLimiter pops a token from the backlog limiter and decrements the queue stats accordingly.
+func (s *EncoderServerV2) popBacklogLimiter(blobSizeBytes int) {
+	<-s.backlogLimiter
 	s.queueLock.Lock()
-	s.queueStats[common.BlobSizeBucket(blobRequest.blobSizeByte)]--
+	s.queueStats[common.BlobSizeBucket(blobSizeBytes)]--
 	s.metrics.ObserveQueue(s.queueStats)
 	s.queueLock.Unlock()
+}
+
+// pushConcurrencyLimiter pushes a token to the concurrency limiter.
+func (s *EncoderServerV2) pushConcurrencyLimiter(ctx context.Context, blobSizeBytes int) error {
+	select {
+	case s.concurrencyLimiter <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		s.metrics.IncrementCanceledBlobRequestNum(blobSizeBytes)
+		return status.Error(codes.Canceled, "request was canceled")
+	}
+}
+
+// popConcurrencyLimiter pops a token from the concurrency limiter.
+func (s *EncoderServerV2) popConcurrencyLimiter() {
+	<-s.concurrencyLimiter
 }
 
 func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (corev2.BlobKey, encoding.EncodingParams, error) {
@@ -209,29 +246,36 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (co
 	)
 
 	if req == nil {
-		return blobKey, params, status.Error(codes.InvalidArgument, "request cannot be nil")
+		return blobKey, params, errors.New("request cannot be nil")
 	}
 
 	if req.BlobKey == nil {
-		return blobKey, params, status.Error(codes.InvalidArgument, "blob key cannot be nil")
+		return blobKey, params, errors.New("blob key cannot be nil")
 	}
 
 	if req.EncodingParams == nil {
-		return blobKey, params, status.Error(codes.InvalidArgument, "encoding parameters cannot be nil")
+		return blobKey, params, errors.New("encoding parameters cannot be nil")
 	}
 
 	// Since these are uint32 in the proto, we only need to check for positive values
 	if req.EncodingParams.ChunkLength == 0 {
-		return blobKey, params, status.Error(codes.InvalidArgument, "chunk length must be greater than zero")
+		return blobKey, params, errors.New("chunk length must be greater than zero")
+	}
+	if req.EncodingParams.ChunkLength&(req.EncodingParams.ChunkLength-1) != 0 {
+		return blobKey, params, errors.New("chunk length must be power of 2")
 	}
 
 	if req.EncodingParams.NumChunks == 0 {
-		return blobKey, params, status.Error(codes.InvalidArgument, "number of chunks must be greater than zero")
+		return blobKey, params, errors.New("number of chunks must be greater than zero")
+	}
+
+	if req.BlobSize == 0 || uint64(encoding.GetBlobLength(uint(req.BlobSize))) > req.EncodingParams.ChunkLength*req.EncodingParams.NumChunks {
+		return blobKey, params, errors.New("blob size is invalid")
 	}
 
 	blobKey, err := corev2.BytesToBlobKey(req.BlobKey)
 	if err != nil {
-		return blobKey, params, status.Errorf(codes.InvalidArgument, "invalid blob key: %v", err)
+		return blobKey, params, fmt.Errorf("invalid blob key: %v", err)
 	}
 
 	// Convert proto EncodingParams to our domain type
@@ -242,7 +286,7 @@ func (s *EncoderServerV2) validateAndParseRequest(req *pb.EncodeBlobRequest) (co
 
 	err = encoding.ValidateEncodingParams(params, s.prover.GetSRSOrder())
 	if err != nil {
-		return blobKey, params, status.Errorf(codes.InvalidArgument, "invalid encoding parameters: %v", err)
+		return blobKey, params, fmt.Errorf("invalid encoding parameters: %v", err)
 	}
 
 	return blobKey, params, nil
@@ -256,7 +300,7 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 	}()
 
 	proofs, coeffs := extractProofsAndCoeffs(frames)
-	if err := s.chunkWriter.PutChunkProofs(ctx, blobKey, proofs); err != nil {
+	if err := s.chunkWriter.PutFrameProofs(ctx, blobKey, proofs); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to upload chunk proofs: %v", err)
 	}
 	s.metrics.ObserveLatency("s3_upload_proofs", time.Since(storeStart))
@@ -264,7 +308,7 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 
 	// Store coefficients
 	coeffStart := time.Now()
-	fragmentInfo, err := s.chunkWriter.PutChunkCoefficients(ctx, blobKey, coeffs)
+	fragmentInfo, err := s.chunkWriter.PutFrameCoefficients(ctx, blobKey, coeffs)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to upload chunk coefficients: %v", err)
 	}
@@ -279,13 +323,13 @@ func (s *EncoderServerV2) processAndStoreResults(ctx context.Context, blobKey co
 	}, nil
 }
 
-func extractProofsAndCoeffs(frames []*encoding.Frame) ([]*encoding.Proof, []*rs.Frame) {
+func extractProofsAndCoeffs(frames []*encoding.Frame) ([]*encoding.Proof, []rs.FrameCoeffs) {
 	proofs := make([]*encoding.Proof, len(frames))
-	coeffs := make([]*rs.Frame, len(frames))
+	coeffs := make([]rs.FrameCoeffs, len(frames))
 
 	for i, frame := range frames {
 		proofs[i] = &frame.Proof
-		coeffs[i] = &rs.Frame{Coeffs: frame.Coeffs}
+		coeffs[i] = frame.Coeffs
 	}
 	return proofs, coeffs
 }

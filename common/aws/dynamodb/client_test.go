@@ -296,7 +296,7 @@ func TestBatchOperations(t *testing.T) {
 		}
 	}
 
-	fetchedItems, err := dynamoClient.GetItems(ctx, tableName, keys)
+	fetchedItems, err := dynamoClient.GetItems(ctx, tableName, keys, true)
 	assert.NoError(t, err)
 	assert.Len(t, fetchedItems, numItems)
 	blobKeys := make([]string, numItems)
@@ -427,7 +427,7 @@ func TestQueryIndexPaginationSingleItem(t *testing.T) {
 	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 1, nil)
+		}}, 1, nil, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 1)
 	assert.Equal(t, "key0", queryResult.Items[0]["MetadataKey"].(*types.AttributeValueMemberS).Value)
@@ -442,7 +442,7 @@ func TestQueryIndexPaginationSingleItem(t *testing.T) {
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 1, lastEvaluatedKey)
+		}}, 1, lastEvaluatedKey, true)
 	assert.NoError(t, err)
 	assert.Nil(t, queryResult.Items)
 	assert.Nil(t, queryResult.LastEvaluatedKey)
@@ -473,7 +473,7 @@ func TestQueryIndexPaginationItemNoLimit(t *testing.T) {
 	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 0, nil)
+		}}, 0, nil, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 30)
 	assert.Equal(t, "key29", queryResult.Items[0]["MetadataKey"].(*types.AttributeValueMemberS).Value)
@@ -486,7 +486,7 @@ func TestQueryIndexPaginationItemNoLimit(t *testing.T) {
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 2, lastEvaluatedKey)
+		}}, 2, lastEvaluatedKey, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 2)
 	assert.Equal(t, "key29", queryResult.Items[0]["MetadataKey"].(*types.AttributeValueMemberS).Value)
@@ -502,7 +502,7 @@ func TestQueryIndexPaginationNoStoredItems(t *testing.T) {
 	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 1, nil)
+		}}, 1, nil, true)
 	assert.NoError(t, err)
 	assert.Nil(t, queryResult.Items)
 	assert.Nil(t, queryResult.LastEvaluatedKey)
@@ -542,7 +542,7 @@ func TestQueryIndexPagination(t *testing.T) {
 	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 10, nil)
+		}}, 10, nil, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 10)
 	assert.Equal(t, "key29", queryResult.Items[0]["MetadataKey"].(*types.AttributeValueMemberS).Value)
@@ -554,7 +554,7 @@ func TestQueryIndexPagination(t *testing.T) {
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 10, queryResult.LastEvaluatedKey)
+		}}, 10, queryResult.LastEvaluatedKey, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 10)
 	assert.Equal(t, "key10", queryResult.LastEvaluatedKey["MetadataKey"].(*types.AttributeValueMemberS).Value)
@@ -563,7 +563,7 @@ func TestQueryIndexPagination(t *testing.T) {
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 10, queryResult.LastEvaluatedKey)
+		}}, 10, queryResult.LastEvaluatedKey, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 10)
 	assert.Equal(t, "key0", queryResult.LastEvaluatedKey["MetadataKey"].(*types.AttributeValueMemberS).Value)
@@ -572,7 +572,7 @@ func TestQueryIndexPagination(t *testing.T) {
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 10, queryResult.LastEvaluatedKey)
+		}}, 10, queryResult.LastEvaluatedKey, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 0)
 	assert.Nil(t, queryResult.LastEvaluatedKey)
@@ -603,7 +603,7 @@ func TestQueryIndexWithPaginationForBatch(t *testing.T) {
 	queryResult, err := dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 10, nil)
+		}}, 10, nil, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 10)
 
@@ -611,7 +611,7 @@ func TestQueryIndexWithPaginationForBatch(t *testing.T) {
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 10, queryResult.LastEvaluatedKey)
+		}}, 10, queryResult.LastEvaluatedKey, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 10)
 
@@ -619,7 +619,7 @@ func TestQueryIndexWithPaginationForBatch(t *testing.T) {
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 10, queryResult.LastEvaluatedKey)
+		}}, 10, queryResult.LastEvaluatedKey, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 10)
 
@@ -627,7 +627,7 @@ func TestQueryIndexWithPaginationForBatch(t *testing.T) {
 	queryResult, err = dynamoClient.QueryIndexWithPagination(ctx, tableName, indexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: "0",
-		}}, 10, queryResult.LastEvaluatedKey)
+		}}, 10, queryResult.LastEvaluatedKey, true)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult.Items, 0)
 	assert.Nil(t, queryResult.LastEvaluatedKey)
@@ -719,4 +719,105 @@ func TestQueryWithInput(t *testing.T) {
 	queryResult, err = dynamoClient.QueryWithInput(ctx, queryInput)
 	assert.NoError(t, err)
 	assert.Len(t, queryResult, 30) // Should return all items
+}
+
+func TestPutItemWithConditionAndReturn(t *testing.T) {
+	tableName := "PutItemWithConditionAndReturn"
+	createTable(t, tableName)
+
+	ctx := context.Background()
+
+	// Create an initial item
+	initialItem := commondynamodb.Item{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key1"},
+		"BlobKey":     &types.AttributeValueMemberS{Value: "blob1"},
+		"BlobSize":    &types.AttributeValueMemberN{Value: "123"},
+		"BlobStatus":  &types.AttributeValueMemberN{Value: "0"},
+		"Status":      &types.AttributeValueMemberS{Value: "Processing"},
+	}
+	err := dynamoClient.PutItem(ctx, tableName, initialItem)
+	assert.NoError(t, err)
+
+	// Case 1: Condition succeeds, should return old item
+	updatedItem := commondynamodb.Item{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key1"},
+		"BlobKey":     &types.AttributeValueMemberS{Value: "blob1-updated"},
+		"BlobSize":    &types.AttributeValueMemberN{Value: "456"},
+		"BlobStatus":  &types.AttributeValueMemberN{Value: "1"},
+		"Status":      &types.AttributeValueMemberS{Value: "Updated"},
+	}
+
+	// Condition that should succeed (Status = Processing)
+	oldItem, err := dynamoClient.PutItemWithConditionAndReturn(
+		ctx,
+		tableName,
+		updatedItem,
+		"#status = :status",
+		map[string]string{"#status": "Status"},
+		map[string]types.AttributeValue{":status": &types.AttributeValueMemberS{Value: "Processing"}},
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, oldItem)
+	assert.Equal(t, "key1", oldItem["MetadataKey"].(*types.AttributeValueMemberS).Value)
+	assert.Equal(t, "blob1", oldItem["BlobKey"].(*types.AttributeValueMemberS).Value)
+	assert.Equal(t, "123", oldItem["BlobSize"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "Processing", oldItem["Status"].(*types.AttributeValueMemberS).Value)
+
+	// Verify the update was applied
+	fetchedItem, err := dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key1"},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "blob1-updated", fetchedItem["BlobKey"].(*types.AttributeValueMemberS).Value)
+	assert.Equal(t, "456", fetchedItem["BlobSize"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, "Updated", fetchedItem["Status"].(*types.AttributeValueMemberS).Value)
+
+	// Case 2: Condition fails, should return ErrConditionFailed
+	newItem := commondynamodb.Item{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key1"},
+		"BlobKey":     &types.AttributeValueMemberS{Value: "blob1-newer"},
+		"Status":      &types.AttributeValueMemberS{Value: "Newer"},
+	}
+
+	// Condition that should fail (Status = Processing, but it's now "Updated")
+	oldItem, err = dynamoClient.PutItemWithConditionAndReturn(
+		ctx,
+		tableName,
+		newItem,
+		"#status = :status",
+		map[string]string{"#status": "Status"},
+		map[string]types.AttributeValue{":status": &types.AttributeValueMemberS{Value: "Processing"}},
+	)
+	assert.ErrorIs(t, err, commondynamodb.ErrConditionFailed)
+	assert.Nil(t, oldItem)
+
+	// Case 3: Put item that doesn't exist yet, with condition
+	nonExistingItem := commondynamodb.Item{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key2"},
+		"BlobKey":     &types.AttributeValueMemberS{Value: "blob2"},
+		"Status":      &types.AttributeValueMemberS{Value: "New"},
+	}
+
+	// Condition: attribute_not_exists(MetadataKey)
+	oldItem, err = dynamoClient.PutItemWithConditionAndReturn(
+		ctx,
+		tableName,
+		nonExistingItem,
+		"attribute_not_exists(MetadataKey)",
+		nil,
+		nil,
+	)
+	assert.NoError(t, err)
+	assert.Empty(t, oldItem)
+
+	// Verify the new item was created
+	fetchedItem, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key2"},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "blob2", fetchedItem["BlobKey"].(*types.AttributeValueMemberS).Value)
+	assert.Equal(t, "New", fetchedItem["Status"].(*types.AttributeValueMemberS).Value)
+
+	err = dynamoClient.DeleteTable(ctx, tableName)
+	assert.NoError(t, err)
 }

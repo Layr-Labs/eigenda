@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/docker/go-units"
+
 	"github.com/Layr-Labs/eigenda/api/clients"
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/core"
@@ -21,55 +23,63 @@ import (
 // To retrieve a blob from the relay, use RelayClient instead.
 type RetrievalClient interface {
 	// GetBlob downloads chunks of a blob from operator network and reconstructs the blob.
-	GetBlob(ctx context.Context, blobHeader *corev2.BlobHeader, referenceBlockNumber uint64, quorumID core.QuorumID) ([]byte, error)
+	GetBlob(
+		ctx context.Context,
+		blobKey corev2.BlobKey,
+		blobVersion corev2.BlobVersion,
+		blobCommitments encoding.BlobCommitments,
+		referenceBlockNumber uint64,
+		quorumID core.QuorumID,
+	) ([]byte, error)
 }
 
 type retrievalClient struct {
-	logger            logging.Logger
-	ethClient         core.Reader
-	indexedChainState core.IndexedChainState
-	verifier          encoding.Verifier
-	numConnections    int
+	logger         logging.Logger
+	ethClient      core.Reader
+	chainState     core.ChainState
+	verifier       encoding.Verifier
+	numConnections int
 }
+
+var _ RetrievalClient = &retrievalClient{}
 
 // NewRetrievalClient creates a new retrieval client.
 func NewRetrievalClient(
 	logger logging.Logger,
 	ethClient core.Reader,
-	chainState core.IndexedChainState,
+	chainState core.ChainState,
 	verifier encoding.Verifier,
 	numConnections int,
 ) RetrievalClient {
 	return &retrievalClient{
-		logger:            logger.With("component", "RetrievalClient"),
-		ethClient:         ethClient,
-		indexedChainState: chainState,
-		verifier:          verifier,
-		numConnections:    numConnections,
+		logger:         logger.With("component", "RetrievalClient"),
+		ethClient:      ethClient,
+		chainState:     chainState,
+		verifier:       verifier,
+		numConnections: numConnections,
 	}
 }
 
-func (r *retrievalClient) GetBlob(ctx context.Context, blobHeader *corev2.BlobHeader, referenceBlockNumber uint64, quorumID core.QuorumID) ([]byte, error) {
-	if blobHeader == nil {
-		return nil, errors.New("blob header is nil")
-	}
+func (r *retrievalClient) GetBlob(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+	blobVersion corev2.BlobVersion,
+	blobCommitments encoding.BlobCommitments,
+	referenceBlockNumber uint64,
+	quorumID core.QuorumID,
+) ([]byte, error) {
 
-	blobKey, err := blobHeader.BlobKey()
+	commitmentBatch := []encoding.BlobCommitments{blobCommitments}
+	err := r.verifier.VerifyCommitEquivalenceBatch(commitmentBatch)
 	if err != nil {
 		return nil, err
 	}
 
-	commitmentBatch := []encoding.BlobCommitments{blobHeader.BlobCommitments}
-	err = r.verifier.VerifyCommitEquivalenceBatch(commitmentBatch)
+	operatorState, err := r.chainState.GetOperatorStateWithSocket(ctx, uint(referenceBlockNumber), []core.QuorumID{quorumID})
 	if err != nil {
 		return nil, err
 	}
-
-	indexedOperatorState, err := r.indexedChainState.GetIndexedOperatorState(ctx, uint(referenceBlockNumber), []core.QuorumID{quorumID})
-	if err != nil {
-		return nil, err
-	}
-	operators, ok := indexedOperatorState.Operators[quorumID]
+	operators, ok := operatorState.Operators[quorumID]
 	if !ok {
 		return nil, fmt.Errorf("no quorum with ID: %d", quorumID)
 	}
@@ -79,17 +89,17 @@ func (r *retrievalClient) GetBlob(ctx context.Context, blobHeader *corev2.BlobHe
 		return nil, err
 	}
 
-	blobParam, ok := blobVersions[blobHeader.BlobVersion]
+	blobParam, ok := blobVersions[blobVersion]
 	if !ok {
-		return nil, fmt.Errorf("invalid blob version %d", blobHeader.BlobVersion)
+		return nil, fmt.Errorf("invalid blob version %d", blobVersion)
 	}
 
-	encodingParams, err := blobHeader.GetEncodingParams(blobParam)
+	encodingParams, err := corev2.GetEncodingParams(blobCommitments.Length, blobParam)
 	if err != nil {
 		return nil, err
 	}
 
-	assignments, err := corev2.GetAssignments(indexedOperatorState.OperatorState, blobParam, quorumID)
+	assignments, err := corev2.GetAssignments(operatorState, blobParam, quorumID)
 	if err != nil {
 		return nil, errors.New("failed to get assignments")
 	}
@@ -98,8 +108,7 @@ func (r *retrievalClient) GetBlob(ctx context.Context, blobHeader *corev2.BlobHe
 	chunksChan := make(chan clients.RetrievedChunks, len(operators))
 	pool := workerpool.New(r.numConnections)
 	for opID := range operators {
-		opID := opID
-		opInfo := indexedOperatorState.IndexedOperators[opID]
+		opInfo := operatorState.Operators[quorumID][opID]
 		pool.Submit(func() {
 			r.getChunksFromOperator(ctx, opID, opInfo, blobKey, quorumID, chunksChan)
 		})
@@ -124,7 +133,7 @@ func (r *retrievalClient) GetBlob(ctx context.Context, blobHeader *corev2.BlobHe
 			assignmentIndices[i] = uint(index)
 		}
 
-		err = r.verifier.VerifyFrames(reply.Chunks, assignmentIndices, blobHeader.BlobCommitments, encodingParams)
+		err = r.verifier.VerifyFrames(reply.Chunks, assignmentIndices, blobCommitments, encodingParams)
 		if err != nil {
 			r.logger.Warn("failed to verify chunks from operator", "operator", reply.OperatorID.Hex(), "err", err)
 			continue
@@ -144,21 +153,32 @@ func (r *retrievalClient) GetBlob(ctx context.Context, blobHeader *corev2.BlobHe
 		chunks,
 		indices,
 		encodingParams,
-		uint64(blobHeader.BlobCommitments.Length)*encoding.BYTES_PER_SYMBOL,
+		uint64(blobCommitments.Length)*encoding.BYTES_PER_SYMBOL,
 	)
 }
 
 func (r *retrievalClient) getChunksFromOperator(
 	ctx context.Context,
 	opID core.OperatorID,
-	opInfo *core.IndexedOperatorInfo,
+	opInfo *core.OperatorInfo,
 	blobKey corev2.BlobKey,
 	quorumID core.QuorumID,
 	chunksChan chan clients.RetrievedChunks,
 ) {
+
+	// TODO (cody-littley): this client should be refactored to make requests for smaller quantities of data
+	//  in order to avoid hitting the max message size limit. This will allow us to have much smaller
+	//  message size limits.
+
+	maxBlobSize := 16 * units.MiB // maximum size of the original blob
+	encodingRate := 8             // worst case scenario if one validator has 100% stake
+	fudgeFactor := units.MiB      // to allow for some overhead from things like protobuf encoding
+	maxMessageSize := maxBlobSize*encodingRate + fudgeFactor
+
 	conn, err := grpc.NewClient(
 		core.OperatorSocket(opInfo.Socket).GetV2RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMessageSize)),
 	)
 	defer func() {
 		err := conn.Close()
