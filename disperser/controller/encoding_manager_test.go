@@ -2,6 +2,7 @@ package controller_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,6 +29,11 @@ var (
 	blockNumber = uint64(100)
 )
 
+type HeartbeatMessage struct {
+	Component string    // e.g., "encodingManager" or "dispatcher"
+	Timestamp time.Time // when the heartbeat was sent
+}
+
 type testComponents struct {
 	EncodingManager *controller.EncodingManager
 	Pool            common.WorkerPool
@@ -35,6 +41,7 @@ type testComponents struct {
 	ChainReader     *coremock.MockWriter
 	MockPool        *commonmock.MockWorkerpool
 	BlobSet         *controller.MockBlobSet
+	GetHeartbeats   func() []HeartbeatMessage
 }
 
 func TestGetRelayKeys(t *testing.T) {
@@ -130,6 +137,23 @@ func TestEncodingManagerHandleBatch(t *testing.T) {
 		FragmentSizeBytes:   1024 * 1024 * 4,
 	}, nil)
 
+	defer func() {
+		heartbeats := c.GetHeartbeats()
+		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+
+		// Verify that the heartbeat messages have the correct component identifier.
+		for _, hb := range heartbeats {
+			require.Equal(t, "encodingManager", hb.Component, "Expected heartbeat from encodingManager")
+		}
+
+		// Check that timestamps are increasing
+		for i := 1; i < len(heartbeats); i++ {
+			require.True(t, heartbeats[i].Timestamp.After(heartbeats[i-1].Timestamp) ||
+				heartbeats[i].Timestamp.Equal(heartbeats[i-1].Timestamp),
+				"Heartbeat timestamps should be increasing")
+		}
+	}()
+
 	err = c.EncodingManager.HandleBatch(ctx)
 	require.NoError(t, err)
 	c.Pool.StopWait()
@@ -174,6 +198,23 @@ func TestEncodingManagerHandleBatchDedup(t *testing.T) {
 		FragmentSizeBytes:   1024 * 1024 * 4,
 	}, nil)
 
+	defer func() {
+		heartbeats := c.GetHeartbeats()
+		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+
+		// Verify that the heartbeat messages have the correct component identifier.
+		for _, hb := range heartbeats {
+			require.Equal(t, "encodingManager", hb.Component, "Expected heartbeat from encodingManager")
+		}
+
+		// Check that timestamps are increasing
+		for i := 1; i < len(heartbeats); i++ {
+			require.True(t, heartbeats[i].Timestamp.After(heartbeats[i-1].Timestamp) ||
+				heartbeats[i].Timestamp.Equal(heartbeats[i-1].Timestamp),
+				"Heartbeat timestamps should be increasing")
+		}
+	}()
+
 	err = c.EncodingManager.HandleBatch(ctx)
 	require.ErrorContains(t, err, "no blobs to encode")
 	c.Pool.StopWait()
@@ -209,6 +250,7 @@ func TestEncodingManagerHandleManyBatches(t *testing.T) {
 	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	numIterations := (numBlobs + int(c.EncodingManager.MaxNumBlobsPerIteration) - 1) / int(c.EncodingManager.MaxNumBlobsPerIteration)
 	c.MockPool.On("Submit", mock.Anything).Return(nil).Times(numBlobs + numIterations)
+
 	expectedNumTasks := 0
 	for i := 0; i < numIterations; i++ {
 		err := c.EncodingManager.HandleBatch(ctx)
@@ -252,6 +294,23 @@ func TestEncodingManagerHandleManyBatches(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	defer func() {
+		heartbeats := c.GetHeartbeats()
+		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+
+		// Verify that the heartbeat messages have the correct component identifier.
+		for _, hb := range heartbeats {
+			require.Equal(t, "encodingManager", hb.Component, "Expected heartbeat from encodingManager")
+		}
+
+		// Check that timestamps are increasing
+		for i := 1; i < len(heartbeats); i++ {
+			require.True(t, heartbeats[i].Timestamp.After(heartbeats[i-1].Timestamp) ||
+				heartbeats[i].Timestamp.Equal(heartbeats[i-1].Timestamp),
+				"Heartbeat timestamps should be increasing")
+		}
+	}()
+
 	// no more blobs to encode
 	err = c.EncodingManager.HandleBatch(ctx)
 	require.ErrorContains(t, err, "no blobs to encode")
@@ -263,6 +322,24 @@ func TestEncodingManagerHandleBatchNoBlobs(t *testing.T) {
 	ctx := context.Background()
 	c := newTestComponents(t, false)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+
+	defer func() {
+		heartbeats := c.GetHeartbeats()
+		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+
+		// Verify that the heartbeat messages have the correct component identifier.
+		for _, hb := range heartbeats {
+			require.Equal(t, "encodingManager", hb.Component, "Expected heartbeat from encodingManager")
+		}
+
+		// Check that timestamps are increasing
+		for i := 1; i < len(heartbeats); i++ {
+			require.True(t, heartbeats[i].Timestamp.After(heartbeats[i-1].Timestamp) ||
+				heartbeats[i].Timestamp.Equal(heartbeats[i-1].Timestamp),
+				"Heartbeat timestamps should be increasing")
+		}
+	}()
+
 	err := c.EncodingManager.HandleBatch(ctx)
 	require.ErrorContains(t, err, "no blobs to encode")
 }
@@ -289,6 +366,23 @@ func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 		TotalChunkSizeBytes: 100,
 		FragmentSizeBytes:   1024 * 1024 * 4,
 	}, nil)
+
+	defer func() {
+		heartbeats := c.GetHeartbeats()
+		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+
+		// Verify that the heartbeat messages have the correct component identifier.
+		for _, hb := range heartbeats {
+			require.Equal(t, "encodingManager", hb.Component, "Expected heartbeat from encodingManager")
+		}
+
+		// Check that timestamps are increasing
+		for i := 1; i < len(heartbeats); i++ {
+			require.True(t, heartbeats[i].Timestamp.After(heartbeats[i-1].Timestamp) ||
+				heartbeats[i].Timestamp.Equal(heartbeats[i-1].Timestamp),
+				"Heartbeat timestamps should be increasing")
+		}
+	}()
 
 	err = c.EncodingManager.HandleBatch(ctx)
 	require.NoError(t, err)
@@ -330,6 +424,23 @@ func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 	c.BlobSet.On("Contains", mock.Anything).Return(false)
 	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError).Twice()
+
+	defer func() {
+		heartbeats := c.GetHeartbeats()
+		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+
+		// Verify that the heartbeat messages have the correct component identifier.
+		for _, hb := range heartbeats {
+			require.Equal(t, "encodingManager", hb.Component, "Expected heartbeat from encodingManager")
+		}
+
+		// Check that timestamps are increasing
+		for i := 1; i < len(heartbeats); i++ {
+			require.True(t, heartbeats[i].Timestamp.After(heartbeats[i-1].Timestamp) ||
+				heartbeats[i].Timestamp.Equal(heartbeats[i-1].Timestamp),
+				"Heartbeat timestamps should be increasing")
+		}
+	}()
 
 	err = c.EncodingManager.HandleBatch(ctx)
 	require.NoError(t, err)
@@ -375,6 +486,22 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 	onchainRefreshInterval := 1 * time.Millisecond
 	blobSet := &controller.MockBlobSet{}
 	blobSet.On("Size", mock.Anything).Return(0)
+
+	// Heartbeat tracking variables
+	var mu sync.Mutex
+	var heartbeatsReceived []HeartbeatMessage
+	doneListening := make(chan bool)
+
+	// Mocked signalHeartbeat function
+	mockSignalHeartbeat := func() {
+		mu.Lock()
+		defer mu.Unlock()
+		heartbeatsReceived = append(heartbeatsReceived, HeartbeatMessage{
+			Component: "encodingManager",
+			Timestamp: time.Now(),
+		})
+	}
+
 	em, err := controller.NewEncodingManager(&controller.EncodingManagerConfig{
 		PullInterval:                1 * time.Second,
 		EncodingRequestTimeout:      5 * time.Second,
@@ -384,7 +511,7 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		AvailableRelays:             []corev2.RelayKey{0, 1, 2, 3},
 		MaxNumBlobsPerIteration:     5,
 		OnchainStateRefreshInterval: onchainRefreshInterval,
-	}, blobMetadataStore, pool, encodingClient, chainReader, logger, prometheus.NewRegistry(), blobSet)
+	}, blobMetadataStore, pool, encodingClient, chainReader, logger, prometheus.NewRegistry(), blobSet, mockSignalHeartbeat)
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*onchainRefreshInterval)
@@ -398,5 +525,11 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		ChainReader:     chainReader,
 		MockPool:        mockP,
 		BlobSet:         blobSet,
+		GetHeartbeats: func() []HeartbeatMessage {
+			close(doneListening) // Stop tracking
+			mu.Lock()
+			defer mu.Unlock()
+			return heartbeatsReceived
+		},
 	}
 }

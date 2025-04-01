@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
@@ -58,6 +59,7 @@ type dispatcherComponents struct {
 	// CallbackBlobSet is a mock queue used to test the BeforeDispatch callback function
 	CallbackBlobSet *controller.MockBlobSet
 	BlobSet         *controller.MockBlobSet
+	GetHeartbeats   func() []HeartbeatMessage
 }
 
 func TestDispatcherHandleBatch(t *testing.T) {
@@ -68,6 +70,23 @@ func TestDispatcherHandleBatch(t *testing.T) {
 	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
 	ctx := context.Background()
+
+	defer func() {
+		heartbeats := components.GetHeartbeats()
+		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+
+		// Verify that the heartbeat messages have the correct component identifier.
+		for _, hb := range heartbeats {
+			require.Equal(t, "dispatcher", hb.Component, "Expected heartbeat from encodingManager")
+		}
+
+		// Check that timestamps are increasing
+		for i := 1; i < len(heartbeats); i++ {
+			require.True(t, heartbeats[i].Timestamp.After(heartbeats[i-1].Timestamp) ||
+				heartbeats[i].Timestamp.Equal(heartbeats[i-1].Timestamp),
+				"Heartbeat timestamps should be increasing")
+		}
+	}()
 
 	// Get batch header hash to mock signatures
 	merkleTree, err := corev2.BuildMerkleTree(objs.blobCerts)
@@ -156,6 +175,23 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 	successfulObjs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{1}, 1)
 	ctx := context.Background()
 
+	defer func() {
+		heartbeats := components.GetHeartbeats()
+		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+
+		// Verify that the heartbeat messages have the correct component identifier.
+		for _, hb := range heartbeats {
+			require.Equal(t, "dispatcher", hb.Component, "Expected heartbeat from encodingManager")
+		}
+
+		// Check that timestamps are increasing
+		for i := 1; i < len(heartbeats); i++ {
+			require.True(t, heartbeats[i].Timestamp.After(heartbeats[i-1].Timestamp) ||
+				heartbeats[i].Timestamp.Equal(heartbeats[i-1].Timestamp),
+				"Heartbeat timestamps should be increasing")
+		}
+	}()
+
 	// Get batch header hash to mock signatures
 	certs := make([]*corev2.BlobCertificate, 0, len(failedObjs.blobCerts)+len(successfulObjs.blobCerts))
 	certs = append(certs, failedObjs.blobCerts...)
@@ -239,6 +275,23 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 	objsInBothQuorum := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 2)
 	objsInQuorum1 := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{1}, 1)
 	ctx := context.Background()
+
+	defer func() {
+		heartbeats := components.GetHeartbeats()
+		require.NotEmpty(t, heartbeats, "Expected heartbeats, but none were received")
+
+		// Verify that the heartbeat messages have the correct component identifier.
+		for _, hb := range heartbeats {
+			require.Equal(t, "dispatcher", hb.Component, "Expected heartbeat from encodingManager")
+		}
+
+		// Check that timestamps are increasing
+		for i := 1; i < len(heartbeats); i++ {
+			require.True(t, heartbeats[i].Timestamp.After(heartbeats[i-1].Timestamp) ||
+				heartbeats[i].Timestamp.Equal(heartbeats[i-1].Timestamp),
+				"Heartbeat timestamps should be increasing")
+		}
+	}()
 
 	// Get batch header hash to mock signatures
 	certs := make([]*corev2.BlobCertificate, 0, len(objsInBothQuorum.blobCerts)+len(objsInQuorum1.blobCerts))
@@ -607,13 +660,29 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 	}
 	blobSet := &controller.MockBlobSet{}
 	blobSet.On("Size", mock.Anything).Return(0)
+
+	// Heartbeat tracking variables
+	var mu sync.Mutex
+	var heartbeatsReceived []HeartbeatMessage
+	doneListening := make(chan bool)
+
+	// Mocked signalHeartbeat function
+	mockSignalHeartbeat := func() {
+		mu.Lock()
+		defer mu.Unlock()
+		heartbeatsReceived = append(heartbeatsReceived, HeartbeatMessage{
+			Component: "dispatcher",
+			Timestamp: time.Now(),
+		})
+	}
+
 	d, err := controller.NewDispatcher(&controller.DispatcherConfig{
 		PullInterval:           1 * time.Second,
 		FinalizationBlockDelay: finalizationBlockDelay,
 		NodeRequestTimeout:     1 * time.Second,
 		NumRequestRetries:      3,
 		MaxBatchSize:           maxBatchSize,
-	}, blobMetadataStore, pool, mockChainState, agg, nodeClientManager, logger, prometheus.NewRegistry(), beforeDispatch, blobSet)
+	}, blobMetadataStore, pool, mockChainState, agg, nodeClientManager, logger, prometheus.NewRegistry(), beforeDispatch, blobSet, mockSignalHeartbeat)
 	require.NoError(t, err)
 	return &dispatcherComponents{
 		Dispatcher:        d,
@@ -626,5 +695,11 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 		BeforeDispatch:    beforeDispatch,
 		CallbackBlobSet:   callBackBlobSet,
 		BlobSet:           blobSet,
+		GetHeartbeats: func() []HeartbeatMessage {
+			close(doneListening) // Stop tracking
+			mu.Lock()
+			defer mu.Unlock()
+			return heartbeatsReceived
+		},
 	}
 }

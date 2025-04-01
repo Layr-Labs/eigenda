@@ -65,7 +65,8 @@ type EncodingManager struct {
 	// blobSet is shared with Dispatcher which removes blobs from this queue as they are packaged for dispersal
 	blobSet BlobSet
 
-	metrics *encodingManagerMetrics
+	metrics         *encodingManagerMetrics
+	signalHeartbeat func()
 }
 
 func NewEncodingManager(
@@ -77,6 +78,7 @@ func NewEncodingManager(
 	logger logging.Logger,
 	registry *prometheus.Registry,
 	blobSet BlobSet,
+	signalHeartbeat func(),
 ) (*EncodingManager, error) {
 	if config.NumRelayAssignment < 1 ||
 		len(config.AvailableRelays) == 0 ||
@@ -96,6 +98,7 @@ func NewEncodingManager(
 		cursor:                nil,
 		metrics:               newEncodingManagerMetrics(registry),
 		blobSet:               blobSet,
+		signalHeartbeat:       signalHeartbeat,
 	}, nil
 }
 
@@ -168,6 +171,9 @@ func (e *EncodingManager) dedupBlobs(blobMetadatas []*v2.BlobMetadata) []*v2.Blo
 //
 // WARNING: This method is not thread-safe. It should only be called from a single goroutine.
 func (e *EncodingManager) HandleBatch(ctx context.Context) error {
+	// Signal Liveness to indicate no stall
+	e.signalHeartbeat()
+
 	// Get a batch of blobs to encode
 	blobMetadatas, cursor, err := e.blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Queued, e.cursor, e.MaxNumBlobsPerIteration)
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -25,16 +26,26 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gammazero/workerpool"
 	"github.com/urfave/cli"
 )
 
+type HeartbeatMessage struct {
+	Component string    // e.g., "encodingManager" or "dispatcher"
+	Timestamp time.Time // when the heartbeat was sent
+}
+
 var (
 	version   string
 	gitCommit string
 	gitDate   string
+
+	controllerReadinessProbePath string        = "/tmp/controller-ready"
+	controllerHealthProbePath    string        = "/tmp/controller-health"
+	controllerMaxStallDuration   time.Duration = 240 * time.Second
 )
 
 func main() {
@@ -50,6 +61,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("application failed: %v", err)
 	}
+
+	if _, err := os.Create(controllerHealthProbePath); err != nil {
+		log.Printf("Failed to create healthProbe file: %v", err)
+	}
+
+	controllerLivenessChan := make(chan HeartbeatMessage, 10)
+	// Start heartbeat monitor
+	go heartbeatMonitor(controllerHealthProbePath, controllerMaxStallDuration, controllerLivenessChan)
+
 	select {}
 }
 
@@ -62,6 +82,11 @@ func RunController(ctx *cli.Context) error {
 	logger, err := common.NewLogger(config.LoggerConfig)
 	if err != nil {
 		return err
+	}
+
+	// Reset readiness probe upon start-up
+	if err := os.Remove(controllerReadinessProbePath); err != nil {
+		logger.Warn("Failed to clean up readiness file", "error", err, "path", controllerReadinessProbePath)
 	}
 
 	dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
@@ -100,6 +125,8 @@ func RunController(ctx *cli.Context) error {
 		Handler: mux,
 	}
 
+	controllerLivenessChan := make(chan HeartbeatMessage, 10)
+
 	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManagerConfig.EncoderAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
@@ -115,6 +142,7 @@ func RunController(ctx *cli.Context) error {
 		logger,
 		metricsRegistry,
 		encodingManagerBlobSet,
+		func() { signalHeartbeat("encodingManager", controllerLivenessChan, logger) },
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create encoding manager: %v", err)
@@ -188,6 +216,7 @@ func RunController(ctx *cli.Context) error {
 		metricsRegistry,
 		beforeDispatch,
 		dispatcherBlobSet,
+		func() { signalHeartbeat("dispatcher", controllerLivenessChan, logger) },
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)
@@ -217,5 +246,71 @@ func RunController(ctx *cli.Context) error {
 		}
 	}()
 
+	// Create readiness probe file once the controller starts successfully
+	if _, err := os.Create(controllerReadinessProbePath); err != nil {
+		logger.Warn("Failed to create readiness file", "error", err, "path", controllerReadinessProbePath)
+	}
+
 	return nil
+}
+
+// heartbeatMonitor listens for heartbeat messages from different components, updates their last seen timestamps,
+// writes a summary to the specified file, and logs warnings if any component stalls.
+func heartbeatMonitor(filePath string, maxStallDuration time.Duration, controllerLivenessChan <-chan HeartbeatMessage) {
+	// Map to keep track of last heartbeat per component
+	lastHeartbeats := make(map[string]time.Time)
+	// Create a timer that periodically checks for stalls
+	stallTimer := time.NewTimer(maxStallDuration)
+
+	for {
+		select {
+		case hb, ok := <-controllerLivenessChan:
+			if !ok {
+				log.Println("controllerLivenessChan closed, stopping health probe.")
+				return
+			}
+			log.Printf("Received heartbeat from %s: %v\n", hb.Component, hb.Timestamp)
+			// Update the last heartbeat for this component
+			lastHeartbeats[hb.Component] = hb.Timestamp
+
+			// Optionally, write a summary of all components to the health file:
+			summary := ""
+			for comp, ts := range lastHeartbeats {
+				summary += fmt.Sprintf("%s: %v\n", comp, ts)
+			}
+			if err := os.WriteFile(filePath, []byte(summary), 0666); err != nil {
+				log.Printf("Failed to update heartbeat file: %v", err)
+			} else {
+				log.Printf("Updated heartbeat file: %v with summary:\n%s", filePath, summary)
+			}
+
+			stallTimer.Reset(maxStallDuration)
+
+		case <-stallTimer.C:
+			// Check for components that haven't sent a heartbeat recently
+			log.Println("Warning: No heartbeat received within max stall duration.")
+			// Optionally, list components that are stale:
+			now := time.Now()
+			for comp, ts := range lastHeartbeats {
+				if now.Sub(ts) > maxStallDuration {
+					log.Printf("Component %s has stalled. Last heartbeat at %v", comp, ts)
+				}
+			}
+			stallTimer.Reset(maxStallDuration)
+		}
+	}
+}
+
+// signalHeartbeat sends a non-blocking heartbeat message (with component identifier and timestamp) on the given channel.
+func signalHeartbeat(component string, controllerLivenessChan chan HeartbeatMessage, logger logging.Logger) {
+	hb := HeartbeatMessage{
+		Component: component,
+		Timestamp: time.Now(),
+	}
+	select {
+	case controllerLivenessChan <- hb:
+		logger.Info("Heartbeat signal sent", "component", component)
+	default:
+		logger.Warn("Heartbeat signal skipped, no receiver on the channel", "component", component)
+	}
 }
