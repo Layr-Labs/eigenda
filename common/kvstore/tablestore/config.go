@@ -36,18 +36,27 @@ type Config struct {
 	Schema []string
 	// Optional Prometheus registry for metrics collection. If nil, metrics collection is disabled.
 	MetricsRegistry *prometheus.Registry
+
+	// If true, levelDB will disable seeks compaction. Default is true. This setting is ignored if the base store is
+	// not LevelDB.
+	LevelDBDisableSeeksCompaction bool
+	// If true, levelDB will perform sync writes. Default is true. This setting is ignored if the base store is not
+	// LevelDB.
+	LevelDBSyncWrites bool
 }
 
 // DefaultConfig returns a Config with default values.
 func DefaultConfig() *Config {
 	return &Config{
-		Type:                       LevelDB,
-		Path:                       nil,
-		GarbageCollectionEnabled:   true,
-		GarbageCollectionInterval:  5 * time.Minute,
-		GarbageCollectionBatchSize: 1024,
-		Schema:                     nil,
-		MetricsRegistry:            nil,
+		Type:                          LevelDB,
+		Path:                          nil,
+		GarbageCollectionEnabled:      true,
+		GarbageCollectionInterval:     5 * time.Minute,
+		GarbageCollectionBatchSize:    1024,
+		Schema:                        nil,
+		MetricsRegistry:               nil,
+		LevelDBDisableSeeksCompaction: true,
+		LevelDBSyncWrites:             true,
 	}
 }
 

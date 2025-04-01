@@ -9,6 +9,7 @@ import (
 )
 
 func TestAddress(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 
 	index := rand.Uint32()

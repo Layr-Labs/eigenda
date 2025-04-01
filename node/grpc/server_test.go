@@ -3,13 +3,14 @@ package grpc_test
 import (
 	"context"
 	"fmt"
-	"github.com/docker/go-units"
 	"net"
 	"os"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/docker/go-units"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -157,7 +158,14 @@ func newTestServerWithConfig(t *testing.T, mockValidator bool, config *node.Conf
 	}
 
 	metrics := node.NewMetrics(noopMetrics, reg, logger, ":9090", opID, -1, tx, chainState)
-	store, err := node.NewLevelDBStore(config.DbPath, logger, metrics, 1e9, 1e9)
+	store, err := node.NewLevelDBStore(
+		config.DbPath,
+		logger,
+		metrics,
+		1e9,
+		true,
+		false,
+		1e9)
 	if err != nil {
 		panic("failed to create a new levelDB store")
 	}

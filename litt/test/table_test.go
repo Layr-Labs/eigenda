@@ -1,7 +1,6 @@
 package test
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,26 +22,52 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// This file contains tests that are applicable to all implementations of the ManagedTable interface.
-
-type tableBuilder func(timeSource func() time.Time, name string, path string) (litt.ManagedTable, error)
-
-// This test executes against different table implementations.
-var tableBuilders = []tableBuilder{
-	buildMemTable,
-	buildCachedMemTable,
-
-	buildMemKeyDiskTable,
-	buildCachedMemKeyDiskTable,
-
-	buildLevelDBKeyDiskTable,
-	buildCachedLevelDBKeyDiskTable,
+type tableBuilder struct {
+	name    string
+	builder func(timeSource func() time.Time, name string, path string) (litt.ManagedTable, error)
 }
 
-var noCacheTableBuilders = []tableBuilder{
-	buildMemTable,
-	buildMemKeyDiskTable,
-	buildLevelDBKeyDiskTable,
+// This test executes against different table implementations.
+var tableBuilders = []*tableBuilder{
+	{
+		"memtable",
+		buildMemTable,
+	},
+	{
+		"cached memtable",
+		buildCachedMemTable,
+	},
+	{
+		"mem keymap disk table",
+		buildMemKeyDiskTable,
+	},
+	{
+		"cached mem keymap disk table",
+		buildCachedMemKeyDiskTable,
+	},
+	{
+		"leveldb keymap disk table",
+		buildLevelDBKeyDiskTable,
+	},
+	{
+		"cached leveldb keymap disk table",
+		buildCachedLevelDBKeyDiskTable,
+	},
+}
+
+var noCacheTableBuilders = []*tableBuilder{
+	{
+		"memtable",
+		buildMemTable,
+	},
+	{
+		"mem keymap disk table",
+		buildMemKeyDiskTable,
+	},
+	{
+		"leveldb keymap disk table",
+		buildLevelDBKeyDiskTable,
+	},
 }
 
 func buildMemTable(
@@ -50,7 +75,15 @@ func buildMemTable(
 	name string,
 	path string) (litt.ManagedTable, error) {
 
-	return memtable.NewMemTable(timeSource, name, 0), nil
+	config, err := litt.DefaultConfig(path)
+	config.TimeSource = timeSource
+	config.GCPeriod = 0
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
+
+	return memtable.NewMemTable(config, name), nil
 }
 
 func setupKeymapTypeFile(keymapPath string, keymapType keymap.KeymapType) (*keymap.KeymapTypeFile, error) {
@@ -97,24 +130,28 @@ func buildMemKeyDiskTable(
 
 	keys := keymap.NewMemKeymap(logger, true)
 
+	config, err := litt.DefaultConfig(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
+	config.GCPeriod = time.Millisecond
+	config.TimeSource = timeSource
+	config.Fsync = false
+	config.DoubleWriteProtection = true
+	config.SaltShaker = random.NewTestRandom().Rand
+	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
+	config.Logger = logger
+
 	segmentsPath := path + "/segments"
 	table, err := disktable.NewDiskTable(
-		context.Background(),
-		logger,
-		timeSource,
+		config,
 		name,
 		keys,
 		keymapPath,
 		keymapTypeFile,
 		[]string{segmentsPath},
-		uint32(100), // intentionally use a very small segment size
-		10,
-		4,
-		random.NewTestRandom().Rand,
-		0,
-		1*time.Millisecond,
 		true,
-		false)
+		nil)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -139,29 +176,33 @@ func buildLevelDBKeyDiskTable(
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
 	}
 
-	keys, err := keymap.NewLevelDBKeymap(logger, keymapPath, true)
+	keys, err := keymap.NewLevelDBKeymap(logger, keymapPath, true, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create keymap: %w", err)
 	}
 
+	config, err := litt.DefaultConfig(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
+	config.GCPeriod = time.Millisecond
+	config.TimeSource = timeSource
+	config.Fsync = false
+	config.DoubleWriteProtection = true
+	config.SaltShaker = random.NewTestRandom().Rand
+	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
+	config.Logger = logger
+
 	segmentsPath := path + "/segments"
 	table, err := disktable.NewDiskTable(
-		context.Background(),
-		logger,
-		timeSource,
+		config,
 		name,
 		keys,
 		keymapPath,
 		keymapTypeFile,
 		[]string{segmentsPath},
-		uint32(100), // intentionally use a very small segment size
-		10,
-		4,
-		random.NewTestRandom().Rand,
-		0,
-		1*time.Millisecond,
-		false,
-		false)
+		true,
+		nil)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk table: %w", err)
@@ -221,13 +262,13 @@ func buildCachedLevelDBKeyDiskTable(
 	return tablecache.NewCachedTable(baseTable, c), nil
 }
 
-func randomOperationsTest(t *testing.T, tableBuilder tableBuilder) {
+func randomTableOperationsTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
 	directory := t.TempDir()
 
 	tableName := rand.String(8)
-	table, err := tableBuilder(time.Now, tableName, directory)
+	table, err := tableBuilder.builder(time.Now, tableName, directory)
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -277,6 +318,9 @@ func randomOperationsTest(t *testing.T, tableBuilder tableBuilder) {
 		// Don't do this every time for the sake of test runtime.
 		if rand.BoolWithProbability(0.01) || i == iterations-1 /* always check on the last iteration */ {
 			for expectedKey, expectedValue := range expectedValues {
+				ok, err := table.Exists([]byte(expectedKey))
+				require.NoError(t, err)
+				require.True(t, ok)
 				value, ok, err := table.Get([]byte(expectedKey))
 				require.NoError(t, err)
 				require.True(t, ok)
@@ -284,7 +328,11 @@ func randomOperationsTest(t *testing.T, tableBuilder tableBuilder) {
 			}
 
 			// Try fetching a value that isn't in the table.
-			_, ok, err := table.Get(rand.PrintableVariableBytes(32, 64))
+			nonExistentKey := rand.PrintableVariableBytes(32, 64)
+			ok, err := table.Exists(nonExistentKey)
+			require.NoError(t, err)
+			require.False(t, ok)
+			_, ok, err = table.Get(nonExistentKey)
 			require.NoError(t, err)
 			require.False(t, ok)
 		}
@@ -299,13 +347,16 @@ func randomOperationsTest(t *testing.T, tableBuilder tableBuilder) {
 	require.Empty(t, entries)
 }
 
-func TestRandomOperations(t *testing.T) {
+func TestRandomTableOperations(t *testing.T) {
+	t.Parallel()
 	for _, tb := range tableBuilders {
-		randomOperationsTest(t, tb)
+		t.Run(tb.name, func(t *testing.T) {
+			randomTableOperationsTest(t, tb)
+		})
 	}
 }
 
-func garbageCollectionTest(t *testing.T, tableBuilder tableBuilder) {
+func garbageCollectionTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
 	directory := t.TempDir()
@@ -320,7 +371,7 @@ func garbageCollectionTest(t *testing.T, tableBuilder tableBuilder) {
 	}
 
 	tableName := rand.String(8)
-	table, err := tableBuilder(timeSource, tableName, directory)
+	table, err := tableBuilder.builder(timeSource, tableName, directory)
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -465,18 +516,22 @@ func garbageCollectionTest(t *testing.T, tableBuilder tableBuilder) {
 }
 
 func TestGarbageCollection(t *testing.T) {
+	t.Parallel()
 	for _, tb := range noCacheTableBuilders {
-		garbageCollectionTest(t, tb)
+		t.Run(tb.name, func(t *testing.T) {
+			garbageCollectionTest(t, tb)
+		})
 	}
 }
 
 func TestInvalidTableName(t *testing.T) {
+	t.Parallel()
 	directory := t.TempDir()
 
-	config, err := littbuilder.DefaultConfig(directory)
+	config, err := litt.DefaultConfig(directory)
 	require.NoError(t, err)
 
-	db, err := config.Build(context.Background())
+	db, err := littbuilder.NewDB(config)
 	require.NoError(t, err)
 
 	tableName := "invalid name"

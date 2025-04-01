@@ -3,6 +3,7 @@ package memtable
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/litt"
@@ -44,21 +45,51 @@ type memTable struct {
 	// at the cost of code complexity. But since this implementation is primary intended for use in tests,
 	// such optimization is not necessary.
 	lock sync.RWMutex
+
+	shutdown atomic.Bool
 }
 
 // NewMemTable creates a new in-memory table.
-func NewMemTable(timeSource func() time.Time, name string, ttl time.Duration) litt.ManagedTable {
-	return &memTable{
-		timeSource:      timeSource,
+func NewMemTable(config *litt.Config, name string) litt.ManagedTable {
+
+	table := &memTable{
+		timeSource:      config.TimeSource,
 		name:            name,
-		ttl:             ttl,
+		ttl:             config.TTL,
 		data:            make(map[string][]byte),
 		expirationQueue: linkedlistqueue.New(),
 	}
+
+	if config.GCPeriod > 0 {
+		ticker := time.NewTicker(config.GCPeriod)
+		go func() {
+			for !table.shutdown.Load() {
+				<-ticker.C
+				err := table.ScheduleImmediateGC()
+				if err != nil {
+					panic(err) // this is a class designed for use in testing, not worth properly handling errors
+				}
+			}
+		}()
+	}
+
+	return table
+}
+
+func (m *memTable) Size() uint64 {
+	// Technically speaking, this table stores zero bytes on disk, and this method
+	// is contractually obligated to return only the size of the data on disk.
+	return 0
 }
 
 func (m *memTable) Name() string {
 	return m.name
+}
+
+func (m *memTable) KeyCount() uint64 {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	return uint64(len(m.data))
 }
 
 func (m *memTable) Put(key []byte, value []byte) error {
@@ -103,6 +134,13 @@ func (m *memTable) Get(key []byte) ([]byte, bool, error) {
 	return value, true, nil
 }
 
+func (m *memTable) Exists(key []byte) (bool, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	_, ok := m.data[string(key)]
+	return ok, nil
+}
+
 func (m *memTable) Flush() error {
 	// This is a no-op for a memory table. Memory tables are ephemeral by nature.
 	return nil
@@ -115,9 +153,38 @@ func (m *memTable) SetTTL(ttl time.Duration) error {
 	return nil
 }
 
-func (m *memTable) DoGarbageCollection() error {
+func (m *memTable) Destroy() error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+
+	m.data = make(map[string][]byte)
+	m.expirationQueue.Clear()
+
+	return nil
+}
+
+func (m *memTable) Stop() error {
+	m.shutdown.Store(true)
+	return nil
+}
+
+func (m *memTable) SetCacheSize(size uint64) error {
+	// The memory table doesn't have a cache... it's already one giant cache.
+	return nil
+}
+
+func (m *memTable) SetShardingFactor(shardingFactor uint32) error {
+	// the memory table has no concept of sharding
+	return nil
+}
+
+func (m *memTable) ScheduleImmediateGC() error {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	if m.ttl == 0 {
+		return nil
+	}
 
 	now := m.timeSource()
 	earliestPermittedCreationTime := now.Add(-m.ttl)
@@ -135,30 +202,5 @@ func (m *memTable) DoGarbageCollection() error {
 		delete(m.data, expiration.key)
 	}
 
-	return nil
-}
-
-func (m *memTable) Destroy() error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.data = make(map[string][]byte)
-	m.expirationQueue.Clear()
-
-	return nil
-}
-
-func (m *memTable) Stop() error {
-	// no-op
-	return nil
-}
-
-func (m *memTable) SetCacheSize(size uint64) error {
-	// The memory table doesn't have a cache... it's already one giant cache.
-	return nil
-}
-
-func (m *memTable) SetShardingFactor(shardingFactor uint32) error {
-	// the memory table has no concept of sharding
 	return nil
 }

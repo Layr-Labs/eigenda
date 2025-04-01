@@ -2,27 +2,36 @@ syntax = "proto3";
 package common;
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/common";
 
-// A KZG commitment
+// G1Commitment represents the serialized coordinates of a G1 KZG commitment.
+// We use gnark-crypto so adopt its serialization, which is big-endian. See:
+// https://github.com/Consensys/gnark-crypto/blob/779e884dabb38b92e677f4891286637a3d2e5734/ecc/bn254/fp/element.go#L862
 message G1Commitment {
   // The X coordinate of the KZG commitment. This is the raw byte representation of the field element.
+  // x should contain 32 bytes.
   bytes x = 1;
   // The Y coordinate of the KZG commitment. This is the raw byte representation of the field element.
+  // y should contain 32 bytes.
   bytes y = 2;
 }
 
 // BlobCommitment represents commitment of a specific blob, containing its
-// KZG commitment, degree proof, the actual degree, and data length in number of symbols.
+// KZG commitment, degree proof, the actual degree, and data length in number of symbols (field elements).
+// It deserializes into https://github.com/Layr-Labs/eigenda/blob/ce89dab18d2f8f55004002e17dd3a18529277845/encoding/data.go#L27
+//
+// See https://github.com/Layr-Labs/eigenda/blob/e86fb8515eb606d0eebb92097dc60d7238363e77/docs/spec/src/protocol/architecture/encoding.md#validation-via-kzg
+// to understand how this commitment is used to validate the blob.
 message BlobCommitment {
-  // A commitment to the blob data.
+  // Concatenation of the x and y coordinates of `common.G1Commitment`.
   bytes commitment = 1;
   // A commitment to the blob data with G2 SRS, used to work with length_proof
   // such that the claimed length below is verifiable.
   bytes length_commitment = 2;
   // A proof that the degree of the polynomial used to generate the blob commitment is valid.
-  // It is computed such that the coefficient of the polynomial is committing with the G2 SRS
-  // at the end of the highest order.
+  // It consists of the KZG commitment of x^(SRSOrder-n) * P(x), where
+  // P(x) is polynomial of degree n representing the blob.
   bytes length_proof = 3;
-  // The length specifies the degree of the polynomial used to generate the blob commitment. The length
-  // must equal to the degree + 1, and it must be a power of 2.
+  // The length of the blob in symbols (field elements), which must be a power of 2.
+  // This also specifies the degree of the polynomial used to generate the blob commitment,
+  // since length = degree + 1.
   uint32 length = 4;
 }

@@ -177,7 +177,14 @@ func NewNode(
 		storeDurationBlocks = storeDuration
 	}
 	// Create new store
-	store, err := NewLevelDBStore(config.DbPath+"/chunk", logger, metrics, blockStaleMeasure, storeDurationBlocks)
+	store, err := NewLevelDBStore(
+		config.DbPath+"/chunk",
+		logger,
+		metrics,
+		blockStaleMeasure,
+		config.LevelDBDisableSeeksCompactionV1,
+		config.LevelDBSyncWritesV1,
+		storeDurationBlocks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new store: %w", err)
 	}
@@ -218,13 +225,15 @@ func NewNode(
 	if config.EnableV2 {
 		v2Path := config.DbPath + "/chunk_v2"
 		dbV2, err := tablestore.Start(logger, &tablestore.Config{
-			Type:                       tablestore.LevelDB,
-			Path:                       &v2Path,
-			GarbageCollectionEnabled:   true,
-			GarbageCollectionInterval:  time.Duration(config.ExpirationPollIntervalSec) * time.Second,
-			GarbageCollectionBatchSize: 1024,
-			Schema:                     []string{BatchHeaderTableName, BlobCertificateTableName, BundleTableName},
-			MetricsRegistry:            reg,
+			Type:                          tablestore.LevelDB,
+			Path:                          &v2Path,
+			GarbageCollectionEnabled:      true,
+			GarbageCollectionInterval:     time.Duration(config.ExpirationPollIntervalSec) * time.Second,
+			GarbageCollectionBatchSize:    1024,
+			Schema:                        []string{BatchHeaderTableName, BlobCertificateTableName, BundleTableName},
+			MetricsRegistry:               reg,
+			LevelDBDisableSeeksCompaction: config.LevelDBDisableSeeksCompactionV2,
+			LevelDBSyncWrites:             config.LevelDBSyncWritesV2,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new tablestore: %w", err)

@@ -480,9 +480,6 @@ func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath,
 		RETRIEVER_NUM_WORKERS:         fmt.Sprint(runtime.GOMAXPROCS(0)),
 		RETRIEVER_VERBOSE:             "true",
 		RETRIEVER_CACHE_ENCODED_BLOBS: "false",
-		RETRIEVER_GRAPH_URL:           graphUrl,
-		RETRIEVER_GRAPH_BACKOFF:       "1s",
-		RETRIEVER_GRAPH_MAX_RETRIES:   "3",
 	}
 
 	v.RETRIEVER_G2_PATH = ""

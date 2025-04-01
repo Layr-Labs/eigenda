@@ -9,6 +9,7 @@ import (
 )
 
 func TestUnsealedSerialization(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
@@ -32,6 +33,12 @@ func TestUnsealedSerialization(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
+	reportedSize := m.Size()
+	stat, err := os.Stat(m.path())
+	require.NoError(t, err)
+	actualSize := uint64(stat.Size())
+	require.Equal(t, actualSize, reportedSize)
+
 	// delete the file
 	filePath := m.path()
 	_, err = os.Stat(filePath)
@@ -45,6 +52,7 @@ func TestUnsealedSerialization(t *testing.T) {
 }
 
 func TestSealedSerialization(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
@@ -64,6 +72,12 @@ func TestSealedSerialization(t *testing.T) {
 	err := m.write()
 	require.NoError(t, err)
 
+	reportedSize := m.Size()
+	stat, err := os.Stat(m.path())
+	require.NoError(t, err)
+	actualSize := uint64(stat.Size())
+	require.Equal(t, actualSize, reportedSize)
+
 	deserialized, err := newMetadataFile(index, 1234, 5678, m.parentDirectory)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
@@ -81,6 +95,7 @@ func TestSealedSerialization(t *testing.T) {
 }
 
 func TestFreshFileSerialization(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
@@ -93,6 +108,12 @@ func TestFreshFileSerialization(t *testing.T) {
 	require.False(t, m.sealed)
 	require.Zero(t, m.timestamp)
 	require.Equal(t, directory, m.parentDirectory)
+
+	reportedSize := m.Size()
+	stat, err := os.Stat(m.path())
+	require.NoError(t, err)
+	actualSize := uint64(stat.Size())
+	require.Equal(t, actualSize, reportedSize)
 
 	deserialized, err := newMetadataFile(index, 42, 42, m.parentDirectory)
 	require.NoError(t, err)
@@ -111,6 +132,7 @@ func TestFreshFileSerialization(t *testing.T) {
 }
 
 func TestSealing(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 

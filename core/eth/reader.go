@@ -483,6 +483,43 @@ func (t *Reader) GetOperatorStakesForQuorums(ctx context.Context, quorums []core
 	return state, nil
 }
 
+// GetOperatorStakesForQuorums returns the stakes of all operators within the supplied quorums. The returned stakes are for the block number supplied.
+// The indices of the operators within each quorum are also returned.
+func (t *Reader) GetOperatorStakesWithSocketForQuorums(ctx context.Context, quorums []core.QuorumID, blockNumber uint32) (core.OperatorStakesWithSocket, error) {
+	quorumBytes := make([]byte, len(quorums))
+	for ind, quorum := range quorums {
+		quorumBytes[ind] = byte(uint8(quorum))
+	}
+
+	// result is a struct{Operators [][]opstateretriever.OperatorStateRetrieverOperator; Sockets [][]string}
+	// Operators is a [][]*opstateretriever.OperatorStake with the same length and order as quorumBytes, and then indexed by operator index
+	// Sockets is a [][]string with the same length and order as quorumBytes, and then indexed by operator index
+	// By contract definition, Operators and Sockets are parallel arrays
+	result, err := t.bindings.OpStateRetriever.GetOperatorStateWithSocket(&bind.CallOpts{
+		Context: ctx,
+	}, t.bindings.RegCoordinatorAddr, quorumBytes, blockNumber)
+	if err != nil {
+		t.logger.Errorf("Failed to fetch operator state: %s", err)
+		return nil, fmt.Errorf("failed to fetch operator state: %w", err)
+	}
+
+	state := make(core.OperatorStakesWithSocket, len(result.Operators))
+	for i := range result.Operators {
+		quorumID := quorums[i]
+		state[quorumID] = make(map[core.OperatorIndex]core.OperatorStakeWithSocket, len(result.Operators[i]))
+		for j, op := range result.Operators[i] {
+			operatorIndex := core.OperatorIndex(j)
+			state[quorumID][operatorIndex] = core.OperatorStakeWithSocket{
+				Stake:      op.Stake,
+				OperatorID: op.OperatorId,
+				Socket:     core.OperatorSocket(result.Sockets[i][j]),
+			}
+		}
+	}
+
+	return state, nil
+}
+
 func (t *Reader) StakeRegistry(ctx context.Context) (gethcommon.Address, error) {
 	return t.bindings.RegistryCoordinator.StakeRegistry(&bind.CallOpts{
 		Context: ctx,

@@ -43,11 +43,20 @@ type Segment struct {
 	// The value files, one for each shard in the segment. Indexed by shard number.
 	shards []*valueFile
 
-	// shardSizes is a list of the current sizes of each shard in the segment. Indexed by shard number.
+	// shardSizes is a list of the current sizes of each shard in the segment. Indexed by shard number. This
+	// value is only tracked for mutable segments, meaning that if this segment was loaded from disk, the values
+	// in this slice will be zero.
 	shardSizes []uint64
+
+	// The current size of the key file in bytes. This is only tracked for mutable segments, meaning that if this
+	// segment was loaded from disk, this value will be zero.
+	keyFileSize uint64
 
 	// The maximum size of all shards in this segment.
 	maxShardSize uint64
+
+	// The number of keys written to this segment.
+	keyCount uint64
 
 	// shardChannels is a list of channels used to send messages to the goroutine responsible for writing to
 	// each shard. Indexed by shard number.
@@ -132,6 +141,8 @@ func NewSegment(
 		return nil, fmt.Errorf("failed to open key file: %v", err)
 	}
 
+	keyFileSize := keys.Size()
+
 	shards := make([]*valueFile, metadata.shardingFactor)
 	for shard := uint32(0); shard < metadata.shardingFactor; shard++ {
 		valuesPath, err := lookForFile(parentDirectories, fmt.Sprintf("%d-%d.values", index, shard))
@@ -172,6 +183,7 @@ func NewSegment(
 		keys:            keys,
 		shards:          shards,
 		shardSizes:      shardSizes,
+		keyFileSize:     keyFileSize,
 		shardChannels:   shardChannels,
 		keyFileChannel:  keyFileChannel,
 		deletionChannel: make(chan struct{}, 1),
@@ -191,6 +203,28 @@ func NewSegment(
 	}
 
 	return segment, nil
+}
+
+// Size returns the size of the segment in bytes. Counts bytes that are on disk or that will eventually end up on disk.
+// This method is not thread safe, and should not be called concurrently with methods that modify the segment.
+func (s *Segment) Size() uint64 {
+	size := s.metadata.Size()
+
+	if s.IsSealed() {
+		// This segment is immutable, so it's thread safe to query the files directly.
+		size += s.keys.Size()
+		for _, shard := range s.shards {
+			size += shard.Size()
+		}
+	} else {
+		// This segment is mutable. We must use our local reckoning of the sizes of the files.
+		size += s.keyFileSize
+		for _, shardSize := range s.shardSizes {
+			size += shardSize
+		}
+	}
+
+	return size
 }
 
 // lookForFile looks for a file in a list of directories. It returns an error if the file appears
@@ -237,9 +271,9 @@ func (s *Segment) GetShard(key []byte) uint32 {
 //
 // This method does not ensure that the key-value pair is actually written to disk, only that it will eventually be
 // written to disk. Flush must be called to ensure that all data previously passed to Put is written to disk.
-func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
+func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64, maxShardSize uint64, err error) {
 	if s.metadata.sealed {
-		return 0, fmt.Errorf("segment is sealed, cannot write data")
+		return 0, 0, 0, fmt.Errorf("segment is sealed, cannot write data")
 	}
 
 	shard := s.GetShard(data.Key)
@@ -249,7 +283,7 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 		// No mater the configuration, we absolutely cannot permit a value to be written if the first byte of the
 		// value would be beyond position 2^32. This is because we only have 32 bits in an address to store the
 		// position of a value's first byte.
-		return 0,
+		return 0, 0, 0,
 			fmt.Errorf("value file already contains %d bytes, cannot add a new value", newSize)
 	}
 	s.unflushedKeyCount.Add(1)
@@ -259,15 +293,18 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 	if s.shardSizes[shard] > s.maxShardSize {
 		s.maxShardSize = s.shardSizes[shard]
 	}
+	s.keyCount++
+	s.keyFileSize += uint64(len(data.Key)) + 4 /* uint32 length */ + 8 /* uint64 Address */
 
 	// Forward the value to the shard control loop, which asynchronously writes it to the value file.
 	shardRequest := &valueToWrite{
 		value:                  data.Value,
 		expectedFirstByteIndex: firstByteIndex,
 	}
-	err = util.SendAny(s.panic, s.shardChannels[shard], shardRequest)
+	err = util.Send(s.panic, s.shardChannels[shard], shardRequest)
 	if err != nil {
-		return 0, fmt.Errorf("failed to send value to shard control loop: %v", err)
+		return 0, 0, 0,
+			fmt.Errorf("failed to send value to shard control loop: %v", err)
 	}
 
 	// Forward the value to the key and its address file control loop, which asynchronously writes it to the key file.
@@ -275,12 +312,13 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 		Key:     data.Key,
 		Address: types.NewAddress(s.index, firstByteIndex),
 	}
-	err = util.SendAny(s.panic, s.keyFileChannel, keyRequest)
+	err = util.Send(s.panic, s.keyFileChannel, keyRequest)
 	if err != nil {
-		return 0, fmt.Errorf("failed to send key to key file control loop: %v", err)
+		return 0, 0, 0,
+			fmt.Errorf("failed to send key to key file control loop: %v", err)
 	}
 
-	return s.maxShardSize, nil
+	return s.keyCount, s.keyFileSize, s.maxShardSize, nil
 }
 
 // Read fetches the data for a key from the data segment.
@@ -326,7 +364,7 @@ func (s *Segment) Flush() (FlushWaitFunction, error) {
 		request := &shardFlushRequest{
 			completionChannel: shardResponseChannels[shard],
 		}
-		err := util.SendAny(s.panic, shardChannel, request)
+		err := util.Send(s.panic, shardChannel, request)
 		if err != nil {
 			return nil, fmt.Errorf("failed to send flush request to shard %d: %v", shard, err)
 		}
@@ -339,7 +377,7 @@ func (s *Segment) Flush() (FlushWaitFunction, error) {
 		seal:              false,
 		completionChannel: keyResponseChannel,
 	}
-	err := util.SendAny(s.panic, s.keyFileChannel, request)
+	err := util.Send(s.panic, s.keyFileChannel, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send flush request to key file: %v", err)
 	}
@@ -375,7 +413,7 @@ func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
 			seal:              true,
 			completionChannel: shardResponseChannels[shard],
 		}
-		err := util.SendAny(s.panic, shardChannel, request)
+		err := util.Send(s.panic, shardChannel, request)
 		if err != nil {
 			return nil, fmt.Errorf("failed to send flush request to shard %d: %v", shard, err)
 		}
@@ -387,7 +425,7 @@ func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
 		seal:              true,
 		completionChannel: keyResponseChannel,
 	}
-	err := util.SendAny(s.panic, s.keyFileChannel, request)
+	err := util.Send(s.panic, s.keyFileChannel, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send flush request to key file: %v", err)
 	}
@@ -600,6 +638,7 @@ func (s *Segment) shardControlLoop(shard uint32) {
 		select {
 		case <-s.panic.ImmediateShutdownRequired():
 			s.logger.Infof("segment %d shard %d control loop exiting, context cancelled", s.index, shard)
+			return
 		case operation := <-s.shardChannels[shard]:
 			if flushRequest, ok := operation.(*shardFlushRequest); ok {
 				s.handleShardFlushRequest(shard, flushRequest)

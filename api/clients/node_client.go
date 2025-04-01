@@ -20,8 +20,8 @@ type RetrievedChunks struct {
 }
 
 type NodeClient interface {
-	GetBlobHeader(ctx context.Context, socket string, batchHeaderHash [32]byte, blobIndex uint32) (*core.BlobHeader, *merkletree.Proof, error)
-	GetChunks(ctx context.Context, opID core.OperatorID, opInfo *core.IndexedOperatorInfo, batchHeaderHash [32]byte, blobIndex uint32, quorumID core.QuorumID, chunksChan chan RetrievedChunks)
+	GetBlobHeader(ctx context.Context, socket core.OperatorSocket, batchHeaderHash [32]byte, blobIndex uint32) (*core.BlobHeader, *merkletree.Proof, error)
+	GetChunks(ctx context.Context, opID core.OperatorID, opInfo *core.OperatorInfo, batchHeaderHash [32]byte, blobIndex uint32, quorumID core.QuorumID, chunksChan chan RetrievedChunks)
 }
 
 type client struct {
@@ -36,12 +36,12 @@ func NewNodeClient(timeout time.Duration) NodeClient {
 
 func (c client) GetBlobHeader(
 	ctx context.Context,
-	socket string,
+	socket core.OperatorSocket,
 	batchHeaderHash [32]byte,
 	blobIndex uint32,
 ) (*core.BlobHeader, *merkletree.Proof, error) {
 	conn, err := grpc.NewClient(
-		core.OperatorSocket(socket).GetV1RetrievalSocket(),
+		socket.GetV1RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -79,7 +79,7 @@ func (c client) GetBlobHeader(
 func (c client) GetChunks(
 	ctx context.Context,
 	opID core.OperatorID,
-	opInfo *core.IndexedOperatorInfo,
+	opInfo *core.OperatorInfo,
 	batchHeaderHash [32]byte,
 	blobIndex uint32,
 	quorumID core.QuorumID,

@@ -40,7 +40,7 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 	if dirStr := c.Query("direction"); dirStr != "" {
 		if dirStr != "forward" && dirStr != "backward" {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("direction must be either 'forward' or 'backward', found: %s", dirStr))
+			invalidParamsErrorResponse(c, fmt.Errorf("`direction` must be either \"forward\" or \"backward\", found: %q", dirStr))
 			return
 		}
 		direction = dirStr
@@ -55,12 +55,12 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 		beforeTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("before"))
 		if err != nil {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse before param: %w", err))
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse `before` param: %w", err))
 			return
 		}
 		if beforeTime.Before(oldestTime) {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("before time cannot be more than 14 days in the past, found: %s", c.Query("before")))
+			invalidParamsErrorResponse(c, fmt.Errorf("`before` time cannot be more than 14 days in the past, found: %q", c.Query("before")))
 			return
 		}
 		if now.Before(beforeTime) {
@@ -74,12 +74,12 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 		afterTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("after"))
 		if err != nil {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse after param: %w", err))
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse `after` param: %w", err))
 			return
 		}
 		if now.Before(afterTime) {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("'after' must be before current time, found: %s", c.Query("after")))
+			invalidParamsErrorResponse(c, fmt.Errorf("`after` must be before current time, found: %q", c.Query("after")))
 			return
 		}
 		if afterTime.Before(oldestTime) {
@@ -90,14 +90,15 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 	// Validate time range
 	if !afterTime.Before(beforeTime) {
 		s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-		invalidParamsErrorResponse(c, fmt.Errorf("after time must be before before time"))
+		invalidParamsErrorResponse(c, fmt.Errorf("`after` timestamp (%q) must be earlier than `before` timestamp (%q)",
+			afterTime.Format(time.RFC3339), beforeTime.Format(time.RFC3339)))
 		return
 	}
 
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	if err != nil {
 		s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-		invalidParamsErrorResponse(c, fmt.Errorf("failed to parse limit param: %w", err))
+		invalidParamsErrorResponse(c, fmt.Errorf("failed to parse `limit` param: %w", err))
 		return
 	}
 	if limit <= 0 || limit > maxNumBlobsPerBlobFeedResponse {
@@ -120,7 +121,7 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 		cursor, err := new(blobstore.BlobFeedCursor).FromCursorKey(cursorStr)
 		if err != nil {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
-			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse the cursor: %w", err))
+			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse the `cursor`: %w", err))
 			return
 		}
 		current = *cursor
@@ -184,11 +185,17 @@ func (s *ServerV2) FetchBlob(c *gin.Context) {
 		errorResponse(c, err)
 		return
 	}
-	metadata, err := s.blobMetadataStore.GetBlobMetadata(c.Request.Context(), blobKey)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlob")
-		errorResponse(c, err)
-		return
+	metadata, cached := s.blobMetadataCache.Get(blobKey.Hex())
+	if !cached {
+		metadata, err = s.blobMetadataStore.GetBlobMetadata(c.Request.Context(), blobKey)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBlob")
+			errorResponse(c, err)
+			return
+		}
+		s.blobMetadataCache.Add(blobKey.Hex(), metadata)
+	} else {
+		s.metrics.IncrementCacheHit("FetchBlob")
 	}
 	bk, err := metadata.BlobHeader.BlobKey()
 	if err != nil || bk != blobKey {
@@ -211,7 +218,7 @@ func (s *ServerV2) FetchBlob(c *gin.Context) {
 
 // FetchBlobCertificate godoc
 //
-//	@Summary	Fetch blob certificate by blob key v2
+//	@Summary	Fetch blob certificate by blob key
 //	@Tags		Blobs
 //	@Produce	json
 //	@Param		blob_key	path		string	true	"Blob key in hex string"
@@ -229,11 +236,17 @@ func (s *ServerV2) FetchBlobCertificate(c *gin.Context) {
 		errorResponse(c, err)
 		return
 	}
-	cert, _, err := s.blobMetadataStore.GetBlobCertificate(c.Request.Context(), blobKey)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobCertificate")
-		errorResponse(c, err)
-		return
+	cert, cached := s.blobCertificateCache.Get(blobKey.Hex())
+	if !cached {
+		cert, _, err = s.blobMetadataStore.GetBlobCertificate(c.Request.Context(), blobKey)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBlobCertificate")
+			errorResponse(c, err)
+			return
+		}
+		s.blobCertificateCache.Add(blobKey.Hex(), cert)
+	} else {
+		s.metrics.IncrementCacheHit("FetchBlobCertificate")
 	}
 	response := &BlobCertificateResponse{
 		Certificate: cert,
@@ -266,27 +279,51 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 		return
 	}
 
-	attestationInfo, err := s.blobMetadataStore.GetBlobAttestationInfo(c.Request.Context(), blobKey)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
-		errorResponse(c, fmt.Errorf("failed to fetch blob attestation info: %w", err))
-		return
+	response, cached := s.blobAttestationInfoResponseCache.Get(blobKey.Hex())
+	if !cached {
+		response, err = s.getBlobAttestationInfoResponse(ctx, blobKey)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
+			errorResponse(c, err)
+			return
+		}
+		s.blobAttestationInfoResponseCache.Add(blobKey.Hex(), response)
+	} else {
+		s.metrics.IncrementCacheHit("FetchBlobAttestationInfo")
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchBlobAttestationInfo")
+	s.metrics.ObserveLatency("FetchBlobAttestationInfo", time.Since(handlerStart))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	c.JSON(http.StatusOK, response)
+}
+
+func (s *ServerV2) getBlobAttestationInfoResponse(ctx context.Context, blobKey corev2.BlobKey) (*BlobAttestationInfoResponse, error) {
+	var err error
+	attestationInfo, cached := s.blobAttestationInfoCache.Get(blobKey.Hex())
+	if !cached {
+		attestationInfo, err = s.blobMetadataStore.GetBlobAttestationInfo(ctx, blobKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch blob attestation info: %w", err)
+		}
+		s.blobAttestationInfoCache.Add(blobKey.Hex(), attestationInfo)
 	}
 
 	batchHeaderHash, err := attestationInfo.InclusionInfo.BatchHeader.Hash()
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
-		errorResponse(c, fmt.Errorf("failed to get batch header hash from blob inclusion info: %w", err))
-		return
+		return nil, fmt.Errorf("failed to get batch header hash from blob inclusion info:        %w", err)
 	}
 
 	// Get quorums that this blob was dispersed to
-	metadata, err := s.blobMetadataStore.GetBlobMetadata(ctx, blobKey)
-	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
-		errorResponse(c, fmt.Errorf("failed to fetch blob metadata: %w", err))
-		return
+	metadata, cached := s.blobMetadataCache.Get(blobKey.Hex())
+	if !cached {
+		metadata, err = s.blobMetadataStore.GetBlobMetadata(ctx, blobKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch blob metadata: %w", err)
+		}
+		s.blobMetadataCache.Add(blobKey.Hex(), metadata)
 	}
+
 	blobQuorums := make(map[uint8]struct{}, 0)
 	for _, q := range metadata.BlobHeader.QuorumNumbers {
 		blobQuorums[q] = struct{}{}
@@ -295,9 +332,7 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 	// Get all operators for the attestation
 	operatorList, operatorsByQuorum, err := s.getAllOperatorsForAttestation(ctx, attestationInfo.Attestation)
 	if err != nil {
-		s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
-		errorResponse(c, fmt.Errorf("failed to fetch operators at reference block number: %w", err))
-		return
+		return nil, fmt.Errorf("failed to fetch operators at reference block number: %w", err)
 	}
 
 	// Get all nonsigners (of the batch that this blob is part of)
@@ -337,7 +372,7 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 		}
 	}
 
-	response := &BlobAttestationInfoResponse{
+	return &BlobAttestationInfoResponse{
 		BlobKey:         blobKey.Hex(),
 		BatchHeaderHash: hex.EncodeToString(batchHeaderHash[:]),
 		InclusionInfo:   attestationInfo.InclusionInfo,
@@ -346,12 +381,7 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 			Signers:     blobSigners,
 			Nonsigners:  blobNonsigners,
 		},
-	}
-
-	s.metrics.IncrementSuccessfulRequestNum("FetchBlobAttestationInfo")
-	s.metrics.ObserveLatency("FetchBlobAttestationInfo", time.Since(handlerStart))
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
-	c.JSON(http.StatusOK, response)
+	}, nil
 }
 
 func (s *ServerV2) getAllOperatorsForAttestation(ctx context.Context, attestation *corev2.Attestation) (*dataapi.OperatorList, core.OperatorStakes, error) {

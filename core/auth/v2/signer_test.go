@@ -2,8 +2,10 @@ package v2
 
 import (
 	"crypto/sha256"
+	"github.com/Layr-Labs/eigenda/api/hashing"
 	"math/big"
 	"testing"
+	"time"
 
 	corev1 "github.com/Layr-Labs/eigenda/core"
 	core "github.com/Layr-Labs/eigenda/core/v2"
@@ -107,18 +109,19 @@ func TestSignPaymentStateRequest(t *testing.T) {
 	expectedAddr := "0x1aa8226f6d354380dDE75eE6B634875c4203e522"
 	accountID, err := signer.GetAccountID()
 	require.NoError(t, err)
-	hash := sha256.Sum256(accountID.Bytes())
 
-	// Sign payment state request
-	signature, err := signer.SignPaymentStateRequest()
+	fixedTimestamp := uint64(1609459200000000000)
+	signature, err := signer.SignPaymentStateRequest(fixedTimestamp)
 	require.NoError(t, err)
 	require.NotNil(t, signature)
 
-	// Recover the public key from the signature
+	requestHash, err := hashing.HashGetPaymentStateRequest(accountID, fixedTimestamp)
+	require.NoError(t, err)
+
+	hash := sha256.Sum256(requestHash)
 	pubKey, err := crypto.SigToPub(hash[:], signature)
 	require.NoError(t, err)
 
-	// Verify that the recovered address matches the signer's address
 	recoveredAddr := crypto.PubkeyToAddress(*pubKey).Hex()
 	assert.Equal(t, expectedAddr, recoveredAddr)
 }
@@ -134,7 +137,7 @@ func TestNoopSigner(t *testing.T) {
 	})
 
 	t.Run("SignPaymentStateRequest", func(t *testing.T) {
-		sig, err := signer.SignPaymentStateRequest()
+		sig, err := signer.SignPaymentStateRequest(uint64(time.Now().UnixNano()))
 		assert.Error(t, err)
 		assert.Nil(t, sig)
 		assert.Equal(t, "noop signer cannot sign payment state request", err.Error())

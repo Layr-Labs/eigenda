@@ -51,17 +51,7 @@ func Await[T any](panic *DBPanic, channel <-chan T) (T, error) {
 
 // Send sends a value on a channel. If the value is sent, nil is returned. If the DB panics before the value is sent,
 // an error is returned.
-func Send[T any](panic *DBPanic, channel chan<- T, value T) error {
-	select {
-	case channel <- value:
-		return nil
-	case <-panic.ImmediateShutdownRequired():
-		return fmt.Errorf("DB context cancelled")
-	}
-}
-
-// SendAny is identical to Send, but works with channels of type `chan<- any`.
-func SendAny[T any](panic *DBPanic, channel chan<- any, value T) error {
+func Send[T any](panic *DBPanic, channel chan<- any, value T) error {
 	select {
 	case channel <- value:
 		return nil

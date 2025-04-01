@@ -220,7 +220,14 @@ func createStore(t *testing.T) *node.Store {
 		0: 6,
 		1: 3,
 	})
-	s, _ := node.NewLevelDBStore(t.TempDir(), logger, node.NewMetrics(noopMetrics, reg, logger, ":9090", operatorId, -1, tx, dat), staleMeasure, storeDuration)
+	s, _ := node.NewLevelDBStore(
+		t.TempDir(),
+		logger,
+		node.NewMetrics(noopMetrics, reg, logger, ":9090", operatorId, -1, tx, dat),
+		staleMeasure,
+		true,
+		false,
+		storeDuration)
 	return s
 }
 

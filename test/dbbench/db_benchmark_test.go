@@ -21,8 +21,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
-	"github.com/dgraph-io/badger/v4"
-	"github.com/dgraph-io/badger/v4/options"
 	"github.com/docker/go-units"
 	"github.com/emirpasic/gods/queues/linkedlistqueue"
 	"github.com/stretchr/testify/require"
@@ -519,134 +517,134 @@ func TestLittDB(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestBadgerDB(t *testing.T) {
-	directory := "./test-data"
-	opts := badger.DefaultOptions(directory)
-	opts.Compression = options.None
-	opts.Logger = nil
-	opts.SyncWrites = true
-
-	opts.ValueThreshold = 0
-
-	opts.BaseTableSize = 10 * units.KiB
-	opts.TableSizeMultiplier = 2
-
-	opts.BaseLevelSize = 10 * units.KiB
-	opts.LevelSizeMultiplier = 2
-
-	opts.MemTableSize = 10 * units.KiB
-
-	opts.NumMemtables = 1
-	opts.NumLevelZeroTables = 1
-
-	opts.MaxLevels = 16
-
-	db, err := badger.Open(opts)
-	require.NoError(t, err)
-
-	transaction := db.NewTransaction(true)
-	objectsInBatch := 0
-
-	ttl := TTL
-
-	writeLimiter := make(chan struct{}, parallelWriters)
-
-	writeFunction := func(key []byte, value []byte) error {
-
-		entry := badger.NewEntry(key, value).WithTTL(ttl)
-		err = transaction.SetEntry(entry)
-
-		if err != nil {
-			if strings.Contains(err.Error(), "Txn is too big to fit into one request") {
-				err = transaction.Commit()
-				if err != nil {
-					return err
-				}
-
-				transaction = db.NewTransaction(true)
-				objectsInBatch = 0
-				err = transaction.SetEntry(entry)
-			} else {
-				return err
-			}
-			return err
-		}
-		objectsInBatch++
-
-		if objectsInBatch >= batchSize {
-
-			writeLimiter <- struct{}{}
-			transactionToCommit := transaction
-
-			go func() {
-				err = transactionToCommit.Commit()
-				if err != nil {
-					panic(err)
-				}
-
-				<-writeLimiter
-			}()
-
-			transaction = db.NewTransaction(true)
-			objectsInBatch = 0
-		}
-
-		return nil
-	}
-
-	alive := atomic.Bool{}
-	alive.Store(true)
-	compactionDone := make(chan struct{})
-	ticker := time.NewTicker(1 * time.Minute)
-	go func() {
-		defer func() {
-			compactionDone <- struct{}{}
-		}()
-		for alive.Load() {
-			<-ticker.C
-
-			fmt.Printf("\nRunning GC\n")
-			startTime := time.Now()
-
-			err = db.Flatten(8)
-			if err != nil {
-				fmt.Printf("\nError flattening DB: %v\n", err)
-			}
-
-			gcIterations := 0
-			for alive.Load() {
-				gcIterations++
-				err = db.RunValueLogGC(0.125)
-				if err != nil {
-					if !strings.Contains(err.Error(), "Value log GC attempt didn't result in any cleanup") {
-						fmt.Printf("\nError running GC: %v\n", err)
-					}
-					break
-				}
-			}
-
-			fmt.Printf("\nGC took %v, did %d iterations\n", time.Since(startTime), gcIterations)
-		}
-	}()
-
-	readFunction := func(key []byte) ([]byte, error) {
-		txn := db.NewTransaction(false)
-		defer txn.Discard()
-		item, err := txn.Get(key)
-		if err != nil {
-			return nil, err
-		}
-		value, err := item.ValueCopy(nil)
-		if err != nil {
-			return nil, err
-		}
-		return value, nil
-	}
-
-	runBenchmark(writeFunction, readFunction)
-	alive.Store(false)
-	<-compactionDone
-
-	err = db.Close()
-	require.NoError(t, err)
+//func TestBadgerDB(t *testing.T) {
+//	directory := "./test-data"
+//	opts := badger.DefaultOptions(directory)
+//	opts.Compression = options.None
+//	opts.Logger = nil
+//	opts.SyncWrites = true
+//
+//	opts.ValueThreshold = 0
+//
+//	opts.BaseTableSize = 10 * units.KiB
+//	opts.TableSizeMultiplier = 2
+//
+//	opts.BaseLevelSize = 10 * units.KiB
+//	opts.LevelSizeMultiplier = 2
+//
+//	opts.MemTableSize = 10 * units.KiB
+//
+//	opts.NumMemtables = 1
+//	opts.NumLevelZeroTables = 1
+//
+//	opts.MaxLevels = 16
+//
+//	db, err := badger.Open(opts)
+//	require.NoError(t, err)
+//
+//	transaction := db.NewTransaction(true)
+//	objectsInBatch := 0
+//
+//	ttl := TTL
+//
+//	writeLimiter := make(chan struct{}, parallelWriters)
+//
+//	writeFunction := func(key []byte, value []byte) error {
+//
+//		entry := badger.NewEntry(key, value).WithTTL(ttl)
+//		err = transaction.SetEntry(entry)
+//
+//		if err != nil {
+//			if strings.Contains(err.Error(), "Txn is too big to fit into one request") {
+//				err = transaction.Commit()
+//				if err != nil {
+//					return err
+//				}
+//
+//				transaction = db.NewTransaction(true)
+//				objectsInBatch = 0
+//				err = transaction.SetEntry(entry)
+//			} else {
+//				return err
+//			}
+//			return err
+//		}
+//		objectsInBatch++
+//
+//		if objectsInBatch >= batchSize {
+//
+//			writeLimiter <- struct{}{}
+//			transactionToCommit := transaction
+//
+//			go func() {
+//				err = transactionToCommit.Commit()
+//				if err != nil {
+//					panic(err)
+//				}
+//
+//				<-writeLimiter
+//			}()
+//
+//			transaction = db.NewTransaction(true)
+//			objectsInBatch = 0
+//		}
+//
+//		return nil
+//	}
+//
+//	alive := atomic.Bool{}
+//	alive.Store(true)
+//	compactionDone := make(chan struct{})
+//	ticker := time.NewTicker(1 * time.Minute)
+//	go func() {
+//		defer func() {
+//			compactionDone <- struct{}{}
+//		}()
+//		for alive.Load() {
+//			<-ticker.C
+//
+//			fmt.Printf("\nRunning GC\n")
+//			startTime := time.Now()
+//
+//			err = db.Flatten(8)
+//			if err != nil {
+//				fmt.Printf("\nError flattening DB: %v\n", err)
+//			}
+//
+//			gcIterations := 0
+//			for alive.Load() {
+//				gcIterations++
+//				err = db.RunValueLogGC(0.125)
+//				if err != nil {
+//					if !strings.Contains(err.Error(), "Value log GC attempt didn't result in any cleanup") {
+//						fmt.Printf("\nError running GC: %v\n", err)
+//					}
+//					break
+//				}
+//			}
+//
+//			fmt.Printf("\nGC took %v, did %d iterations\n", time.Since(startTime), gcIterations)
+//		}
+//	}()
+//
+//	readFunction := func(key []byte) ([]byte, error) {
+//		txn := db.NewTransaction(false)
+//		defer txn.Discard()
+//		item, err := txn.Get(key)
+//		if err != nil {
+//			return nil, err
+//		}
+//		value, err := item.ValueCopy(nil)
+//		if err != nil {
+//			return nil, err
+//		}
+//		return value, nil
+//	}
+//
+//	runBenchmark(writeFunction, readFunction)
+//	alive.Store(false)
+//	<-compactionDone
+//
+//	err = db.Close()
+//	require.NoError(t, err)
 }

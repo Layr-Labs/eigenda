@@ -204,6 +204,7 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, v2.Complete, bm.BlobStatus)
 	}
+	components.BlobSet.AssertNumberOfCalls(t, "RemoveBlob", len(failedObjs.blobKeys)+len(successfulObjs.blobKeys))
 
 	// Get batch header
 	vis, err := components.BlobMetadataStore.GetBlobInclusionInfos(ctx, failedObjs.blobKeys[0])

@@ -23,6 +23,7 @@ func countFilesInDirectory(t *testing.T, directory string) int {
 }
 
 func TestWriteAndReadSegmentSingleShard(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
@@ -68,7 +69,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 
 		expectedLargestShardSize += uint64(len(value)) + 4 /* uint32 length */
 
-		largestShardSize, err := seg.Write(&types.KVPair{Key: key, Value: value})
+		_, _, largestShardSize, err := seg.Write(&types.KVPair{Key: key, Value: value})
 		require.NoError(t, err)
 		require.Equal(t, expectedLargestShardSize, largestShardSize)
 
@@ -171,6 +172,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 }
 
 func TestWriteAndReadSegmentMultiShard(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
@@ -213,7 +215,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 		value := values[i]
 		expectedValues[string(key)] = value
 
-		largestShardSize, err := seg.Write(&types.KVPair{Key: key, Value: value})
+		_, _, largestShardSize, err := seg.Write(&types.KVPair{Key: key, Value: value})
 		require.NoError(t, err)
 		require.True(t, largestShardSize >= uint64(len(value)+4))
 
@@ -327,6 +329,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 
 // Tests writing and reading, but allocates more shards than values written to force some shards to be empty.
 func TestWriteAndReadColdShard(t *testing.T) {
+	t.Parallel()
 	rand := random.NewTestRandom()
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
@@ -369,7 +372,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 		value := values[i]
 		expectedValues[string(key)] = value
 
-		largestShardSize, err := seg.Write(&types.KVPair{Key: key, Value: value})
+		_, _, largestShardSize, err := seg.Write(&types.KVPair{Key: key, Value: value})
 		require.NoError(t, err)
 		require.True(t, largestShardSize >= uint64(len(value)+4))
 	}

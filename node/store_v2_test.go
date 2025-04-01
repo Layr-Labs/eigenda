@@ -164,6 +164,7 @@ func TestGetChunks(t *testing.T) {
 func createStoreV2(t *testing.T) (node.StoreV2, kvstore.TableStore) {
 	logger := testutils.GetLogger()
 	config := tablestore.DefaultLevelDBConfig(t.TempDir())
+	config.LevelDBSyncWrites = false
 	config.Schema = []string{node.BatchHeaderTableName, node.BlobCertificateTableName, node.BundleTableName}
 	tStore, err := tablestore.Start(logger, config)
 	require.NoError(t, err)

@@ -18,7 +18,6 @@ import (
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
@@ -201,21 +200,7 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		return err
 	}
 
-	graphBackoff, err := time.ParseDuration(testConfig.Retriever.RETRIEVER_GRAPH_BACKOFF)
-	if err != nil {
-		return err
-	}
-	maxRetries, err := strconv.Atoi(testConfig.Retriever.RETRIEVER_GRAPH_MAX_RETRIES)
-	if err != nil {
-		return err
-	}
-	ics := thegraph.MakeIndexedChainState(thegraph.Config{
-		Endpoint:     testConfig.Retriever.RETRIEVER_GRAPH_URL,
-		PullInterval: graphBackoff,
-		MaxRetries:   maxRetries,
-	}, cs, logger)
-
-	retrievalClient, err = clients.NewRetrievalClient(logger, ics, agn, nodeClient, v, 10)
+	retrievalClient, err = clients.NewRetrievalClient(logger, cs, agn, nodeClient, v, 10)
 	if err != nil {
 		return err
 	}
@@ -227,9 +212,9 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	if err != nil {
 		return err
 	}
-	retrievalClientV2 = clientsv2.NewRetrievalClient(logger, chainReader, ics, v, 10)
+	retrievalClientV2 = clientsv2.NewRetrievalClient(logger, chainReader, cs, v, 10)
 
-	return ics.Start(context.Background())
+	return nil
 }
 
 var _ = AfterSuite(func() {

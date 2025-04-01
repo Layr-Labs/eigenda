@@ -1,7 +1,6 @@
 package test
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os/exec"
@@ -10,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/stretchr/testify/require"
 )
@@ -17,19 +17,19 @@ import (
 // TestGenerateExampleTree will generate the example file tree displayed in the readme.
 func TestGenerateExampleTree(t *testing.T) {
 
-	//t.Skip("this should only be run manually")
+	t.Skip("this should only be run manually")
 
 	rand := random.NewTestRandom()
 	testDir := t.TempDir()
 
 	rootDirectories := []string{path.Join(testDir, "root0"), path.Join(testDir, "root1"), path.Join(testDir, "root2")}
 
-	config, err := littbuilder.DefaultConfig(rootDirectories...)
+	config, err := litt.DefaultConfig(rootDirectories...)
 	config.ShardingFactor = 4
 	config.TargetSegmentFileSize = 100 // use a small value to intentionally create several segments
 	require.NoError(t, err)
 
-	db, err := config.Build(context.Background())
+	db, err := littbuilder.NewDB(config)
 	require.NoError(t, err)
 
 	tableA, err := db.GetTable("tableA")

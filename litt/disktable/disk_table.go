@@ -1,17 +1,18 @@
 package disktable
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"os"
 	"path"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
+	"github.com/Layr-Labs/eigenda/litt/metrics"
 	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -79,6 +80,12 @@ type DiskTable struct {
 	// The target size for value files.
 	targetFileSize uint32
 
+	// The maximum number of keys in a segment.
+	maxKeyCount uint64
+
+	// The target size for key files.
+	targetKeyFileSize uint64
+
 	// segmentLock protects access to the segments map and highestSegmentIndex.
 	// Does not protect the segments themselves.
 	segmentLock sync.RWMutex
@@ -99,28 +106,38 @@ type DiskTable struct {
 
 	// whether fsync mode is enabled.
 	fsync bool
+
+	// The number of bytes contained within the immutable segments. This tracks the number of bytes that are
+	// on disk, not bytes in memory. For thread safety, this variable may only be read/written in the constructor
+	// and in the control loop.
+	immutableSegmentSize uint64
+
+	// The number of bytes contained within all segments, including the mutable segment. This tracks the number of
+	// bytes that are on disk, not bytes in memory.
+	size atomic.Uint64
+
+	// The number of keys in the table.
+	keyCount atomic.Int64
+
+	// The maximum number of keys that can be garbage collected in a single batch.
+	gcBatchSize uint64
+
+	// Encapsulates metrics for the database.
+	metrics *metrics.LittDBMetrics
 }
 
 // NewDiskTable creates a new DiskTable.
 func NewDiskTable(
-	ctx context.Context,
-	logger logging.Logger,
-	timeSource func() time.Time,
+	config *litt.Config,
 	name string,
 	keymap keymap.Keymap,
 	keymapPath string,
 	keymapTypeFile *keymap.KeymapTypeFile,
 	roots []string,
-	targetFileSize uint32,
-	controlChannelSize int,
-	shardingFactor uint32,
-	saltShaker *rand.Rand,
-	ttl time.Duration,
-	gcPeriod time.Duration,
 	reloadKeymap bool,
-	fsync bool) (litt.ManagedTable, error) {
+	metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
 
-	if gcPeriod <= 0 {
+	if config.GCPeriod <= 0 {
 		return nil, fmt.Errorf("garbage collection period must be greater than 0")
 	}
 
@@ -171,7 +188,7 @@ func NewDiskTable(
 		// No metadata file exists yet. Create a new one in the first root.
 		var err error
 		metadataDir := roots[0]
-		metadata, err = newTableMetadata(logger, metadataDir, ttl, shardingFactor)
+		metadata, err = newTableMetadata(config.Logger, metadataDir, config.TTL, config.ShardingFactor)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create table metadata: %v", err)
 		}
@@ -179,46 +196,54 @@ func NewDiskTable(
 		// Metadata file exists, so we need to load it.
 		var err error
 		metadataDir := path.Dir(metadataFilePath)
-		metadata, err = loadTableMetadata(logger, metadataDir)
+		metadata, err = loadTableMetadata(config.Logger, metadataDir)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load table metadata: %v", err)
 		}
 	}
 
-	dbPanic := util.NewDBPanic(ctx, logger)
+	dbPanic := util.NewDBPanic(config.CTX, config.Logger)
 
 	table := &DiskTable{
-		logger:                  logger,
+		logger:                  config.Logger,
 		panic:                   dbPanic,
-		timeSource:              timeSource,
+		timeSource:              config.TimeSource,
 		roots:                   roots,
 		segmentDirectories:      segDirs,
 		name:                    name,
 		metadata:                metadata,
-		saltShaker:              saltShaker,
+		saltShaker:              config.SaltShaker,
 		keymap:                  keymap,
 		keymapPath:              keymapPath,
 		keymapTypeFile:          keymapTypeFile,
-		targetFileSize:          targetFileSize,
+		targetFileSize:          config.TargetSegmentFileSize,
+		targetKeyFileSize:       config.TargetSegmentKeyFileSize,
+		gcBatchSize:             config.GCBatchSize,
+		maxKeyCount:             config.MaxSegmentKeyCount,
 		segments:                make(map[uint32]*segment.Segment),
-		controllerChannel:       make(chan any, controlChannelSize),
+		controllerChannel:       make(chan any, config.ControlChannelSize),
 		flushChannel:            make(chan any, tableFlushChannelCapacity),
-		garbageCollectionPeriod: gcPeriod,
-		fsync:                   fsync,
+		garbageCollectionPeriod: config.GCPeriod,
+		fsync:                   config.Fsync,
+		metrics:                 metrics,
 	}
 
 	var err error
 	table.lowestSegmentIndex, table.highestSegmentIndex, table.segments, err =
 		segment.GatherSegmentFiles(
-			logger,
+			config.Logger,
 			dbPanic,
 			table.segmentDirectories,
-			timeSource(),
-			shardingFactor,
-			saltShaker.Uint32(),
-			fsync)
+			config.TimeSource(),
+			config.ShardingFactor,
+			config.SaltShaker.Uint32(),
+			config.Fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather segment files: %v", err)
+	}
+
+	for _, seg := range table.segments {
+		table.immutableSegmentSize += seg.Size()
 	}
 
 	// Create the mutable segment
@@ -231,15 +256,15 @@ func NewDiskTable(
 		nextSegmentIndex = table.highestSegmentIndex + 1
 	}
 	mutableSegment, err := segment.NewSegment(
-		logger,
+		config.Logger,
 		dbPanic,
 		nextSegmentIndex,
 		segDirs,
-		timeSource(),
+		config.TimeSource(),
 		metadata.GetShardingFactor(),
-		saltShaker.Uint32(),
+		config.SaltShaker.Uint32(),
 		false,
-		fsync)
+		config.Fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mutable segment: %v", err)
 	}
@@ -249,8 +274,10 @@ func NewDiskTable(
 	}
 	table.segments[nextSegmentIndex] = mutableSegment
 
+	table.updateCurrentSize()
+
 	if reloadKeymap {
-		logger.Infof("reloading keymap from segments")
+		config.Logger.Infof("reloading keymap from segments")
 		err = table.reloadKeymap()
 		if err != nil {
 			return nil, fmt.Errorf("failed to load keymap from segments: %v", err)
@@ -261,6 +288,20 @@ func NewDiskTable(
 	go table.flushLoop()
 
 	return table, nil
+}
+
+func (d *DiskTable) KeyCount() uint64 {
+	return uint64(d.keyCount.Load())
+}
+
+func (d *DiskTable) Size() uint64 {
+	return d.size.Load()
+}
+
+// updateCurrentSize updates the size of the table.
+func (d *DiskTable) updateCurrentSize() {
+	size := d.immutableSegmentSize + d.segments[d.highestSegmentIndex].Size() + d.metadata.Size()
+	d.size.Store(size)
 }
 
 // reloadKeymap reloads the keymap from the segments. This is necessary when the keymap is lost, the keymap doesn't
@@ -345,7 +386,8 @@ func (d *DiskTable) Stop() error {
 	request := &controlLoopShutdownRequest{
 		shutdownCompleteChan: shutdownCompleteChan,
 	}
-	err := util.SendAny(d.panic, d.controllerChannel, request)
+
+	err := util.Send(d.panic, d.controllerChannel, request)
 	if err != nil {
 		return fmt.Errorf("failed to send shutdown request: %v", err)
 	}
@@ -453,7 +495,7 @@ func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
 	request := &controlLoopSetShardingFactorRequest{
 		shardingFactor: shardingFactor,
 	}
-	err := util.SendAny(d.panic, d.controllerChannel, request)
+	err := util.Send(d.panic, d.controllerChannel, request)
 	if err != nil {
 		return fmt.Errorf("failed to send sharding factor request: %v", err)
 	}
@@ -486,10 +528,24 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 		return nil, false, fmt.Errorf("Cannot process Get() request: %v", err)
 	}
 
+	var cacheHit bool
+	var dataSize uint64
+	if d.metrics != nil {
+		start := d.timeSource()
+		defer func() {
+			end := d.timeSource()
+			delta := end.Sub(start)
+			d.metrics.ReportReadOperation(d.name, delta, dataSize, cacheHit)
+		}()
+	}
+
 	// First, check if the key is in the unflushed data map.
 	// If so, return it from there.
 	if value, ok := d.unflushedDataCache.Load(string(key)); ok {
-		return value.([]byte), true, nil
+		bytes := value.([]byte)
+		cacheHit = true
+		dataSize = uint64(len(bytes))
+		return bytes, true, nil
 	}
 
 	// Look up the address of the data.
@@ -510,10 +566,11 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 
 	// Read the data from disk.
 	data, err := seg.Read(key, address)
-
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to read data: %v", err)
 	}
+
+	dataSize += uint64(len(data))
 
 	return data, true, nil
 }
@@ -521,6 +578,15 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 func (d *DiskTable) Put(key []byte, value []byte) error {
 	if ok, err := d.panic.IsOk(); !ok {
 		return fmt.Errorf("Cannot process Put() request: %v", err)
+	}
+
+	if d.metrics != nil {
+		start := d.timeSource()
+		defer func() {
+			end := d.timeSource()
+			delta := end.Sub(start)
+			d.metrics.ReportWriteOperation(d.name, delta, 1, uint64(len(value)))
+		}()
 	}
 
 	d.unflushedDataCache.Store(string(key), value)
@@ -533,10 +599,12 @@ func (d *DiskTable) Put(key []byte, value []byte) error {
 		Value: value,
 	}
 
-	err := util.SendAny(d.panic, d.controllerChannel, writeReq)
+	err := util.Send(d.panic, d.controllerChannel, writeReq)
 	if err != nil {
 		return fmt.Errorf("failed to send write request: %v", err)
 	}
+
+	d.keyCount.Add(1)
 
 	return nil
 }
@@ -546,6 +614,19 @@ func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 		return fmt.Errorf("Cannot process PutBatch() request: %v", err)
 	}
 
+	if d.metrics != nil {
+		start := d.timeSource()
+		totalSize := uint64(0)
+		for _, kv := range batch {
+			totalSize += uint64(len(kv.Value))
+		}
+		defer func() {
+			end := d.timeSource()
+			delta := end.Sub(start)
+			d.metrics.ReportWriteOperation(d.name, delta, uint64(len(batch)), totalSize)
+		}()
+	}
+
 	for _, kv := range batch {
 		d.unflushedDataCache.Store(string(kv.Key), kv.Value)
 	}
@@ -553,10 +634,13 @@ func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 	request := &controlLoopWriteRequest{
 		values: batch,
 	}
-	err := util.SendAny(d.panic, d.controllerChannel, request)
+	err := util.Send(d.panic, d.controllerChannel, request)
 	if err != nil {
 		return fmt.Errorf("failed to send write request: %v", err)
 	}
+
+	d.keyCount.Add(int64(len(batch)))
+
 	return nil
 }
 
@@ -565,20 +649,38 @@ func (d *DiskTable) handleControlLoopWriteRequest(req *controlLoopWriteRequest) 
 	for _, kv := range req.values {
 		// Do the write.
 		seg := d.segments[d.highestSegmentIndex]
-		shardSize, err := seg.Write(kv)
+		keyCount, keyFileSize, shardSize, err := seg.Write(kv)
 		if err != nil {
 			d.panic.Panic(fmt.Errorf("failed to write to segment %d: %v", d.highestSegmentIndex, err))
+			return
 		}
 
 		// Check to see if the write caused the mutable segment to become full.
-		if shardSize > uint64(d.targetFileSize) {
+		if shardSize > uint64(d.targetFileSize) || keyCount >= d.maxKeyCount || keyFileSize >= d.targetKeyFileSize {
 			// Mutable segment is full. Before continuing, we need to expand the segments.
 			err = d.expandSegments()
 			if err != nil {
 				d.panic.Panic(fmt.Errorf("failed to expand segments: %v", err))
+				return
 			}
 		}
 	}
+
+	d.updateCurrentSize()
+}
+
+func (d *DiskTable) Exists(key []byte) (bool, error) {
+	_, ok := d.unflushedDataCache.Load(string(key))
+	if ok {
+		return true, nil
+	}
+
+	_, ok, err := d.keymap.Get(key)
+	if err != nil {
+		return false, fmt.Errorf("failed to get address: %v", err)
+	}
+
+	return ok, nil
 }
 
 // Flush flushes all data to disk. Blocks until all data previously submitted to Put has been written to disk.
@@ -587,10 +689,19 @@ func (d *DiskTable) Flush() error {
 		return fmt.Errorf("Cannot process Flush() request: %v", err)
 	}
 
+	if d.metrics != nil {
+		start := d.timeSource()
+		defer func() {
+			end := d.timeSource()
+			delta := end.Sub(start)
+			d.metrics.ReportFlushOperation(d.name, delta)
+		}()
+	}
+
 	flushReq := &controlLoopFlushRequest{
 		responseChan: make(chan struct{}, 1),
 	}
-	err := util.SendAny(d.panic, d.controllerChannel, flushReq)
+	err := util.Send(d.panic, d.controllerChannel, flushReq)
 	if err != nil {
 		return fmt.Errorf("failed to send flush request: %v", err)
 	}
@@ -610,7 +721,7 @@ func (d *DiskTable) handleControlLoopShutdownRequest(req *controlLoopShutdownReq
 	request := &flushLoopShutdownRequest{
 		shutdownCompleteChan: shutdownCompleteChan,
 	}
-	err := util.SendAny(d.panic, d.flushChannel, request)
+	err := util.Send(d.panic, d.flushChannel, request)
 	if err != nil {
 		d.logger.Errorf("failed to send shutdown request to flush loop: %v", err)
 		return
@@ -626,18 +737,21 @@ func (d *DiskTable) handleControlLoopShutdownRequest(req *controlLoopShutdownReq
 	durableKeys, err := d.segments[d.highestSegmentIndex].Seal(d.timeSource())
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to seal mutable segment: %v", err))
+		return
 	}
 
 	// Flush the keys that are now durable in the segment.
 	err = d.writeKeysToKeymap(durableKeys)
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to flush keys: %v", err))
+		return
 	}
 
 	// Stop the keymap
 	err = d.keymap.Stop()
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to stop keymap: %v", err))
+		return
 	}
 
 	req.shutdownCompleteChan <- struct{}{}
@@ -650,6 +764,15 @@ func (d *DiskTable) doGarbageCollection() {
 	if ttl.Nanoseconds() == 0 {
 		// No TTL set, so nothing to do.
 		return
+	}
+
+	if d.metrics != nil {
+		start := d.timeSource()
+		defer func() {
+			end := d.timeSource()
+			delta := end.Sub(start)
+			d.metrics.ReportGarbageCollectionLatency(d.name, delta)
+		}()
 	}
 
 	for index := d.lowestSegmentIndex; index <= d.highestSegmentIndex; index++ {
@@ -673,11 +796,20 @@ func (d *DiskTable) doGarbageCollection() {
 			return
 		}
 
-		err = d.keymap.Delete(keys)
-		if err != nil {
-			d.panic.Panic(fmt.Errorf("failed to delete keys: %v", err))
-			return
+		for keyIndex := uint64(0); keyIndex < uint64(len(keys)); keyIndex += d.gcBatchSize {
+			lastIndex := keyIndex + d.gcBatchSize
+			if lastIndex >= uint64(len(keys)) {
+				lastIndex = uint64(len(keys))
+			}
+			err = d.keymap.Delete(keys[keyIndex:lastIndex])
+			if err != nil {
+				d.panic.Panic(fmt.Errorf("failed to delete keys: %v", err))
+				return
+			}
 		}
+
+		d.immutableSegmentSize -= seg.Size()
+		d.keyCount.Add(-1 * int64(len(keys)))
 
 		// Deletion of segment files will happen when the segment is released by all reservation holders.
 		seg.Release()
@@ -687,6 +819,8 @@ func (d *DiskTable) doGarbageCollection() {
 
 		d.lowestSegmentIndex++
 	}
+
+	d.updateCurrentSize()
 }
 
 func (d *DiskTable) SetCacheSize(_ uint64) error {
@@ -702,13 +836,15 @@ func (d *DiskTable) SetCacheSize(_ uint64) error {
 func (d *DiskTable) expandSegments() error {
 	now := d.timeSource()
 
+	d.immutableSegmentSize += d.segments[d.highestSegmentIndex].Size()
+
 	// Seal the previous segment.
 	flushLoopResponseChan := make(chan struct{}, 1)
 	request := &flushLoopSealRequest{
 		now:          now,
 		responseChan: flushLoopResponseChan,
 	}
-	err := util.SendAny(d.panic, d.flushChannel, request)
+	err := util.Send(d.panic, d.flushChannel, request)
 	if err != nil {
 		return fmt.Errorf("failed to send seal request: %v", err)
 	}
@@ -741,6 +877,26 @@ func (d *DiskTable) expandSegments() error {
 	d.segmentLock.Lock()
 	d.segments[d.highestSegmentIndex] = newSegment
 	d.segmentLock.Unlock()
+
+	d.updateCurrentSize()
+
+	return nil
+}
+
+func (d *DiskTable) ScheduleImmediateGC() error {
+	request := &controlLoopGCRequest{
+		completionChan: make(chan struct{}, 1),
+	}
+
+	err := util.Send(d.panic, d.controllerChannel, request)
+	if err != nil {
+		return fmt.Errorf("failed to send GC request: %v", err)
+	}
+
+	_, err = util.Await(d.panic, request.completionChan)
+	if err != nil {
+		return fmt.Errorf("failed to await GC completion: %v", err)
+	}
 
 	return nil
 }
@@ -779,6 +935,7 @@ func (d *DiskTable) handleControlLoopFlushRequest(req *controlLoopFlushRequest) 
 	flushWaitFunction, err := d.segments[d.highestSegmentIndex].Flush()
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to flush segment %d: %v", d.highestSegmentIndex, err))
+		return
 	}
 
 	// The flush loop is responsible for the remaining parts of the flush.
@@ -786,7 +943,7 @@ func (d *DiskTable) handleControlLoopFlushRequest(req *controlLoopFlushRequest) 
 		flushWaitFunction: flushWaitFunction,
 		responseChan:      req.responseChan,
 	}
-	err = util.SendAny(d.panic, d.flushChannel, request)
+	err = util.Send(d.panic, d.flushChannel, request)
 	if err != nil {
 		d.logger.Errorf("failed to send flush request to flush loop: %v", err)
 	}
@@ -794,14 +951,27 @@ func (d *DiskTable) handleControlLoopFlushRequest(req *controlLoopFlushRequest) 
 
 // handleFlushLoopFlushRequest handles the part of the flush that is performed on the flush loop.
 func (d *DiskTable) handleFlushLoopFlushRequest(req *flushLoopFlushRequest) {
+	var segmentFlushStart time.Time
+	if d.metrics != nil {
+		segmentFlushStart = d.timeSource()
+	}
+
 	durableKeys, err := req.flushWaitFunction()
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to flush mutable segment: %v", err))
+		return
+	}
+
+	if d.metrics != nil {
+		segmentFlushEnd := d.timeSource()
+		delta := segmentFlushEnd.Sub(segmentFlushStart)
+		d.metrics.ReportSegmentFlushLatency(d.name, delta)
 	}
 
 	err = d.writeKeysToKeymap(durableKeys)
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to flush keys: %v", err))
+		return
 	}
 
 	req.responseChan <- struct{}{}
@@ -813,6 +983,15 @@ func (d *DiskTable) writeKeysToKeymap(keys []*types.KAPair) error {
 	if len(keys) == 0 {
 		// Nothing to flush.
 		return nil
+	}
+
+	if d.metrics != nil {
+		start := d.timeSource()
+		defer func() {
+			end := d.timeSource()
+			delta := end.Sub(start)
+			d.metrics.ReportKeymapFlushLatency(d.name, delta)
+		}()
 	}
 
 	err := d.keymap.Put(keys)
@@ -841,12 +1020,14 @@ func (d *DiskTable) handleControlLoopSetShardingFactorRequest(req *controlLoopSe
 	err := d.metadata.SetShardingFactor(req.shardingFactor)
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to set sharding factor: %v", err))
+		return
 	}
 
 	// This seals the current mutable segment and creates a new one. The new segment will have the new sharding factor.
 	err = d.expandSegments()
 	if err != nil {
 		d.panic.Panic(fmt.Errorf("failed to expand segments: %v", err))
+		return
 	}
 }
 
@@ -875,6 +1056,11 @@ type controlLoopShutdownRequest struct {
 	shutdownCompleteChan chan struct{}
 }
 
+// controlLoopGCRequest is a request to run garbage collection that is sent to the control loop.
+type controlLoopGCRequest struct {
+	completionChan chan struct{}
+}
+
 // controlLoop is the main loop for the disk table. It has sole responsibility for mutating data managed by the
 // disk table (this vastly simplifies locking and thread safety).
 func (d *DiskTable) controlLoop() {
@@ -884,6 +1070,7 @@ func (d *DiskTable) controlLoop() {
 		select {
 		case <-d.panic.ImmediateShutdownRequired():
 			d.logger.Infof("context done, shutting down disk table control loop")
+			return
 		case message := <-d.controllerChannel:
 			if req, ok := message.(*controlLoopWriteRequest); ok {
 				d.handleControlLoopWriteRequest(req)
@@ -894,8 +1081,12 @@ func (d *DiskTable) controlLoop() {
 			} else if req, ok := message.(*controlLoopShutdownRequest); ok {
 				d.handleControlLoopShutdownRequest(req)
 				return
+			} else if req, ok := message.(*controlLoopGCRequest); ok {
+				d.doGarbageCollection()
+				req.completionChan <- struct{}{}
 			} else {
 				d.panic.Panic(fmt.Errorf("Unknown control message type %T", message))
+				return
 			}
 		case <-ticker.C:
 			d.doGarbageCollection()
@@ -935,6 +1126,7 @@ func (d *DiskTable) flushLoop() {
 		select {
 		case <-d.panic.ImmediateShutdownRequired():
 			d.logger.Infof("context done, shutting down disk table flush loop")
+			return
 		case message := <-d.flushChannel:
 			if req, ok := message.(*flushLoopFlushRequest); ok {
 				d.handleFlushLoopFlushRequest(req)
@@ -945,6 +1137,7 @@ func (d *DiskTable) flushLoop() {
 				return
 			} else {
 				d.panic.Panic(fmt.Errorf("Unknown flush message type %T", message))
+				return
 			}
 		}
 	}

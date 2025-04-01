@@ -53,7 +53,7 @@ type BlobChunks struct {
 
 type retrievalClient struct {
 	logger                logging.Logger
-	indexedChainState     core.IndexedChainState
+	chainState            core.ChainState
 	assignmentCoordinator core.AssignmentCoordinator
 	nodeClient            NodeClient
 	verifier              encoding.Verifier
@@ -63,7 +63,7 @@ type retrievalClient struct {
 // NewRetrievalClient creates a new retrieval client.
 func NewRetrievalClient(
 	logger logging.Logger,
-	chainState core.IndexedChainState,
+	chainState core.ChainState,
 	assignmentCoordinator core.AssignmentCoordinator,
 	nodeClient NodeClient,
 	verifier encoding.Verifier,
@@ -71,7 +71,7 @@ func NewRetrievalClient(
 
 	return &retrievalClient{
 		logger:                logger.With("component", "RetrievalClient"),
-		indexedChainState:     chainState,
+		chainState:            chainState,
 		assignmentCoordinator: assignmentCoordinator,
 		nodeClient:            nodeClient,
 		verifier:              verifier,
@@ -104,11 +104,12 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 	batchRoot [32]byte,
 	quorumID core.QuorumID) (*BlobChunks, error) {
 
-	indexedOperatorState, err := r.indexedChainState.GetIndexedOperatorState(ctx, referenceBlockNumber, []core.QuorumID{quorumID})
+	operatorState, err := r.chainState.GetOperatorStateWithSocket(ctx, referenceBlockNumber, []core.QuorumID{quorumID})
 	if err != nil {
+		r.logger.Error("failed to get operator state", "err", err)
 		return nil, err
 	}
-	operators, ok := indexedOperatorState.Operators[quorumID]
+	operators, ok := operatorState.Operators[quorumID]
 	if !ok {
 		return nil, fmt.Errorf("no quorum with ID: %d", quorumID)
 	}
@@ -118,7 +119,7 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 	var proof *merkletree.Proof
 	var proofVerified bool
 	for opID := range operators {
-		opInfo := indexedOperatorState.IndexedOperators[opID]
+		opInfo := operators[opID]
 		blobHeader, proof, err = r.nodeClient.GetBlobHeader(ctx, opInfo.Socket, batchHeaderHash, blobIndex)
 		if err != nil {
 			// try another operator
@@ -172,7 +173,7 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 		return nil, err
 	}
 
-	assignments, info, err := r.assignmentCoordinator.GetAssignments(indexedOperatorState.OperatorState, blobHeader.Length, quorumHeader)
+	assignments, info, err := r.assignmentCoordinator.GetAssignments(operatorState, blobHeader.Length, quorumHeader)
 	if err != nil {
 		return nil, errors.New("failed to get assignments")
 	}
@@ -181,8 +182,7 @@ func (r *retrievalClient) RetrieveBlobChunks(ctx context.Context,
 	chunksChan := make(chan RetrievedChunks, len(operators))
 	pool := workerpool.New(r.numConnections)
 	for opID := range operators {
-		opID := opID
-		opInfo := indexedOperatorState.IndexedOperators[opID]
+		opInfo := operators[opID]
 		pool.Submit(func() {
 			r.nodeClient.GetChunks(ctx, opID, opInfo, batchHeaderHash, blobIndex, quorumID, chunksChan)
 		})

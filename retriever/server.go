@@ -19,7 +19,6 @@ type Server struct {
 	config          *Config
 	retrievalClient clients.RetrievalClient
 	chainClient     eth.ChainClient
-	indexedState    core.IndexedChainState
 	logger          logging.Logger
 	metrics         *Metrics
 }
@@ -28,7 +27,6 @@ func NewServer(
 	config *Config,
 	logger logging.Logger,
 	retrievalClient clients.RetrievalClient,
-	indexedState core.IndexedChainState,
 	chainClient eth.ChainClient,
 ) *Server {
 	metrics := NewMetrics(config.MetricsConfig.HTTPPort, logger)
@@ -37,15 +35,13 @@ func NewServer(
 		config:          config,
 		retrievalClient: retrievalClient,
 		chainClient:     chainClient,
-		indexedState:    indexedState,
 		logger:          logger.With("component", "RetrieverServer"),
 		metrics:         metrics,
 	}
 }
 
-func (s *Server) Start(ctx context.Context) error {
+func (s *Server) Start(ctx context.Context) {
 	s.metrics.Start(ctx)
-	return s.indexedState.Start(ctx)
 }
 
 func (s *Server) RetrieveBlob(ctx context.Context, req *pb.BlobRequest) (*pb.BlobReply, error) {

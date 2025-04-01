@@ -28,6 +28,15 @@ func (m *IndexedChainState) GetOperatorState(
 	return args.Get(0).(*core.OperatorState), args.Error(1)
 }
 
+func (m *IndexedChainState) GetOperatorStateWithSocket(
+	ctx context.Context,
+	blockNumber uint,
+	quorums []core.QuorumID) (*core.OperatorState, error) {
+
+	args := m.Mock.Called(blockNumber, quorums)
+	return args.Get(0).(*core.OperatorState), args.Error(1)
+}
+
 func (m *IndexedChainState) GetOperatorStateByOperator(
 	ctx context.Context,
 	blockNumber uint,

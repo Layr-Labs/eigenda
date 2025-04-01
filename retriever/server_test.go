@@ -79,7 +79,7 @@ func newTestServer(t *testing.T) *retriever.Server {
 
 	retrievalClient = &clientsmock.MockRetrievalClient{}
 	chainClient = mock.NewMockChainClient()
-	return retriever.NewServer(config, logger, retrievalClient, indexedChainState, chainClient)
+	return retriever.NewServer(config, logger, retrievalClient, chainClient)
 }
 
 func TestRetrieveBlob(t *testing.T) {

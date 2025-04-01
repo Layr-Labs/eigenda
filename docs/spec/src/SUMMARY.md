@@ -26,5 +26,5 @@
   - [Contracts](./integration/contracts.md)
   - [Optimism](./integration/optimism.md)
   - [Arbitrum](./integration/arbitrum.md)
-  - [zkSync](./integration/zkSync.md)
+  - [ZKsync](./integration/ZKsync.md)
 - [V1](./v1.md)

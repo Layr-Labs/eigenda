@@ -22,7 +22,12 @@ func NewEncoderClientV2(addr string) (disperser.EncoderClientV2, error) {
 	}, nil
 }
 
-func (c *clientV2) EncodeBlob(ctx context.Context, blobKey corev2.BlobKey, encodingParams encoding.EncodingParams, blobSize uint64) (*encoding.FragmentInfo, error) {
+func (c *clientV2) EncodeBlob(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+	encodingParams encoding.EncodingParams,
+	blobSize uint64) (*encoding.FragmentInfo, error) {
+
 	// Establish connection
 	conn, err := grpc.NewClient(
 		c.addr,
@@ -54,7 +59,7 @@ func (c *clientV2) EncodeBlob(ctx context.Context, blobKey corev2.BlobKey, encod
 
 	// Extract and return fragment info
 	return &encoding.FragmentInfo{
-		TotalChunkSizeBytes: reply.FragmentInfo.TotalChunkSizeBytes,
-		FragmentSizeBytes:   reply.FragmentInfo.FragmentSizeBytes,
+		TotalChunkSizeBytes: reply.GetFragmentInfo().GetTotalChunkSizeBytes(),
+		FragmentSizeBytes:   reply.GetFragmentInfo().GetFragmentSizeBytes(),
 	}, nil
 }

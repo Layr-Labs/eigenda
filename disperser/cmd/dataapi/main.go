@@ -126,7 +126,7 @@ func RunDataApi(ctx *cli.Context) error {
 	if config.ServerVersion == 2 {
 		blobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
 		metrics = dataapi.NewMetrics(config.ServerVersion, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)
-		serverv2 := serverv2.NewServerV2(
+		serverv2, err := serverv2.NewServerV2(
 			dataapi.Config{
 				ServerMode:         config.ServerMode,
 				SocketAddr:         config.SocketAddr,
@@ -144,6 +144,9 @@ func RunDataApi(ctx *cli.Context) error {
 			logger,
 			metrics,
 		)
+		if err != nil {
+			return err
+		}
 
 		// Enable Metrics Block
 		if config.MetricsConfig.EnableMetrics {

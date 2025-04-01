@@ -25,6 +25,14 @@ func NewCachedTable(base litt.ManagedTable, cache cache.Cache[string, []byte]) l
 	}
 }
 
+func (c *cachedTable) KeyCount() uint64 {
+	return c.base.KeyCount()
+}
+
+func (c *cachedTable) Size() uint64 {
+	return c.base.Size()
+}
+
 func (c *cachedTable) Name() string {
 	return c.base.Name()
 }
@@ -68,6 +76,15 @@ func (c *cachedTable) Get(key []byte) ([]byte, bool, error) {
 	return value, ok, nil
 }
 
+func (c *cachedTable) Exists(key []byte) (bool, error) {
+	_, ok := c.cache.Get(string(key))
+	if ok {
+		return true, nil
+	}
+
+	return c.base.Exists(key)
+}
+
 func (c *cachedTable) Flush() error {
 	return c.base.Flush()
 }
@@ -95,4 +112,8 @@ func (c *cachedTable) Destroy() error {
 
 func (c *cachedTable) SetShardingFactor(shardingFactor uint32) error {
 	return c.base.SetShardingFactor(shardingFactor)
+}
+
+func (c *cachedTable) ScheduleImmediateGC() error {
+	return c.base.ScheduleImmediateGC()
 }

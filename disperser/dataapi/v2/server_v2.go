@@ -3,6 +3,7 @@ package v2
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
+	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	disperserv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
@@ -20,6 +22,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
 	"github.com/gin-gonic/gin"
+	lru "github.com/hashicorp/golang-lru/v2"
 	swaggerfiles "github.com/swaggo/files"
 	ginswagger "github.com/swaggo/gin-swagger"
 )
@@ -43,6 +46,11 @@ const (
 	// Suppose 1 batch/s, we cache 2 days worth of batch attestations.
 	// Suppose 1KB for each attestation, this will be 173MB memory.
 	maxNumBatchesToCache = 3600 * 24 * 2
+
+	// Cache ~10mins worth of blobs for KV lookups
+	maxNumKVBlobsToCache = 100 * 600
+	// Cache ~1h worth of batches for KV lookups
+	maxNumKVBatchesToCache = 3600
 
 	cacheControlParam       = "Cache-Control"
 	maxFeedBlobAge          = 300 // this is completely static
@@ -118,6 +126,17 @@ type (
 		Batches []*BatchInfo `json:"batches"`
 	}
 
+	OperatorDispersal struct {
+		BatchHeaderHash string              `json:"batch_header_hash"`
+		BatchHeader     *corev2.BatchHeader `json:"batch_header"`
+		DispersedAt     uint64
+	}
+	OperatorDispersalFeedResponse struct {
+		OperatorIdentity OperatorIdentity     `json:"operator_identity"`
+		OperatorSocket   string               `json:"operator_socket"`
+		Dispersals       []*OperatorDispersal `json:"dispersals"`
+	}
+
 	MetricSummary struct {
 		AvgThroughput float64 `json:"avg_throughput"`
 	}
@@ -153,9 +172,9 @@ type (
 		StakeRankedOperators map[string][]*OperatorStake `json:"stake_ranked_operators"`
 	}
 
-	// Operators' responses for a batch
-	OperatorDispersalResponses struct {
-		Responses []*corev2.DispersalResponse `json:"operator_dispersal_responses"`
+	// Operator's response for a batch
+	OperatorDispersalResponse struct {
+		Response *corev2.DispersalResponse `json:"operator_dispersal_response"`
 	}
 
 	OperatorLivenessResponse struct {
@@ -199,7 +218,17 @@ type ServerV2 struct {
 	operatorHandler *dataapi.OperatorHandler
 	metricsHandler  *dataapi.MetricsHandler
 
+	// Feed cache
 	batchFeedCache *FeedCache[corev2.Attestation]
+
+	// KV caches for blobs, keyed by blobkey
+	blobMetadataCache                *lru.Cache[string, *commonv2.BlobMetadata]
+	blobAttestationInfoCache         *lru.Cache[string, *commonv2.BlobAttestationInfo]
+	blobCertificateCache             *lru.Cache[string, *corev2.BlobCertificate]
+	blobAttestationInfoResponseCache *lru.Cache[string, *BlobAttestationInfoResponse]
+
+	// KV caches for batches, keyed by batch header hash
+	signedBatchCache *lru.Cache[string, *SignedBatch]
 }
 
 func NewServerV2(
@@ -212,7 +241,7 @@ func NewServerV2(
 	indexedChainState core.IndexedChainState,
 	logger logging.Logger,
 	metrics *dataapi.Metrics,
-) *ServerV2 {
+) (*ServerV2, error) {
 	l := logger.With("component", "DataAPIServerV2")
 
 	getBatchTimestampFn := func(item *corev2.Attestation) time.Time {
@@ -232,24 +261,52 @@ func NewServerV2(
 		maxNumBatchesToCache,
 		fetchBatchFn,
 		getBatchTimestampFn,
+		metrics.BatchFeedCacheMetrics,
 	)
 
-	return &ServerV2{
-		logger:            l,
-		serverMode:        config.ServerMode,
-		socketAddr:        config.SocketAddr,
-		allowOrigins:      config.AllowOrigins,
-		blobMetadataStore: blobMetadataStore,
-		promClient:        promClient,
-		subgraphClient:    subgraphClient,
-		chainReader:       chainReader,
-		chainState:        chainState,
-		indexedChainState: indexedChainState,
-		metrics:           metrics,
-		operatorHandler:   dataapi.NewOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient),
-		metricsHandler:    dataapi.NewMetricsHandler(promClient, dataapi.V2),
-		batchFeedCache:    batchFeedCache,
+	blobMetadataCache, err := lru.New[string, *commonv2.BlobMetadata](maxNumKVBlobsToCache)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create blobMetadataCache: %w", err)
 	}
+	blobAttestationInfoCache, err := lru.New[string, *commonv2.BlobAttestationInfo](maxNumKVBlobsToCache)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create blobAttestationInfoCache: %w", err)
+	}
+	blobCertificateCache, err := lru.New[string, *corev2.BlobCertificate](maxNumKVBlobsToCache)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create blobCertificateCache: %w", err)
+	}
+	blobAttestationInfoResponseCache, err := lru.New[string, *BlobAttestationInfoResponse](maxNumKVBlobsToCache)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create blobAttestationInfoResponseCache: %w", err)
+	}
+
+	signedBatchCache, err := lru.New[string, *SignedBatch](maxNumKVBatchesToCache)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signedBatchCache: %w", err)
+	}
+
+	return &ServerV2{
+		logger:                           l,
+		serverMode:                       config.ServerMode,
+		socketAddr:                       config.SocketAddr,
+		allowOrigins:                     config.AllowOrigins,
+		blobMetadataStore:                blobMetadataStore,
+		promClient:                       promClient,
+		subgraphClient:                   subgraphClient,
+		chainReader:                      chainReader,
+		chainState:                       chainState,
+		indexedChainState:                indexedChainState,
+		metrics:                          metrics,
+		operatorHandler:                  dataapi.NewOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient),
+		metricsHandler:                   dataapi.NewMetricsHandler(promClient, dataapi.V2),
+		batchFeedCache:                   batchFeedCache,
+		blobMetadataCache:                blobMetadataCache,
+		blobAttestationInfoCache:         blobAttestationInfoCache,
+		blobCertificateCache:             blobCertificateCache,
+		blobAttestationInfoResponseCache: blobAttestationInfoResponseCache,
+		signedBatchCache:                 signedBatchCache,
+	}, nil
 }
 
 func (s *ServerV2) Start() error {
@@ -303,11 +360,12 @@ func (s *ServerV2) Start() error {
 		}
 		operators := v2.Group("/operators")
 		{
+			operators.GET("/:operator_id/dispersals", s.FetchOperatorDispersalFeed)
+			operators.GET("/:operator_id/dispersals/:batch_header_hash/response", s.FetchOperatorDispersalResponse)
 			operators.GET("/signing-info", s.FetchOperatorSigningInfo)
 			operators.GET("/stake", s.FetchOperatorsStake)
 			operators.GET("/node-info", s.FetchOperatorsNodeInfo)
 			operators.GET("/liveness", s.CheckOperatorsLiveness)
-			operators.GET("/response/:batch_header_hash", s.FetchOperatorsResponses)
 		}
 		metrics := v2.Group("/metrics")
 		{

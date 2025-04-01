@@ -29,6 +29,9 @@ type Table interface {
 	// make a copy of it first. Better to avoid a copy if it's not necessary, though.
 	Get(key []byte) ([]byte, bool, error)
 
+	// Exists returns true if the key exists in the database, and false otherwise. This is faster than calling Get.
+	Exists(key []byte) (bool, error)
+
 	// Flush ensures that all data written to the database is crash durable on disk. When this method returns,
 	// all data written by Put() operations is guaranteed to be crash durable. Put() operations called synchronously
 	// with this method may not be crash durable after this method returns.
@@ -37,6 +40,19 @@ type Table interface {
 	// being flushed may become persistent, while some may not. Each individual key-value pair is atomic
 	// in the event of a crash, though.
 	Flush() error
+
+	// Size returns the disk size of the table in bytes. Does not include the size of any data stored only in memory.
+	//
+	// Note that the value returned by this method may lag slightly behind the actual size of the table due to the
+	// pipelined implementation of the database. If an exact size is needed, first call Flush(), then call Size().
+	//
+	// Due to technical limitations, this size may or may not accurately reflect the size of the keymap. This is
+	// because some third party libraries used for certain keymap implementations do not provide an accurate way to
+	// measure size.
+	Size() uint64
+
+	// KeyCount returns the number of keys in the table.
+	KeyCount() uint64
 
 	// SetTTL sets the time to live for data in this table. This TTL is immediately applied to data already in
 	// the table. Note that deletion is lazy. That is, when the data expires, it may not be deleted immediately.
@@ -63,4 +79,9 @@ type ManagedTable interface {
 
 	// Destroy cleans up resources used by the table. Table will not be usable after this method is called.
 	Destroy() error
+
+	// ScheduleImmediateGC schedules an immediate garbage collection run. This method blocks until that run is complete.
+	// This method is intended for use in tests, where it can be useful to force a garbage collection run to occur
+	// at a specific time.
+	ScheduleImmediateGC() error
 }

@@ -110,6 +110,11 @@ func newMetadataFile(
 	return file, nil
 }
 
+// Size returns the size of the metadata file in bytes.
+func (m *metadataFile) Size() uint64 {
+	return metadataSize
+}
+
 // Name returns the file name for this metadata file.
 func (m *metadataFile) name() string {
 	return fmt.Sprintf("%d%s", m.index, MetadataFileExtension)

@@ -28,8 +28,12 @@ type Metrics struct {
 	registry *prometheus.Registry
 
 	NumRequests    *prometheus.CounterVec
+	CacheHitsTotal *prometheus.CounterVec
 	Latency        *prometheus.SummaryVec
 	OperatorsStake *prometheus.GaugeVec
+
+	// Cache metrics in v2
+	BatchFeedCacheMetrics *FeedCacheMetrics
 
 	Semvers                *prometheus.GaugeVec
 	SemversStakePctQuorum0 *prometheus.GaugeVec
@@ -62,6 +66,15 @@ func NewMetrics(serverVersion uint, blobMetadataStore interface{}, httpPort stri
 				Help:      "the number of requests",
 			},
 			[]string{"status", "method"},
+		),
+		// Cache hit rate for an API is CacheHitsTotal["method_foo"] / NumRequests["success"]["method_foo"]
+		CacheHitsTotal: promauto.With(reg).NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Name:      "cache_hits_total",
+				Help:      "the number of requests that hit the cache",
+			},
+			[]string{"method"},
 		),
 		Latency: promauto.With(reg).NewSummaryVec(
 			prometheus.SummaryOpts{
@@ -110,9 +123,10 @@ func NewMetrics(serverVersion uint, blobMetadataStore interface{}, httpPort stri
 			// The "topn" can be: 1, 2, 3, 5, 8, 10
 			[]string{"quorum", "topn"},
 		),
-		registry: reg,
-		httpPort: httpPort,
-		logger:   logger.With("component", "DataAPIMetrics"),
+		BatchFeedCacheMetrics: NewFeedCacheMetrics("batch_feed", reg),
+		registry:              reg,
+		httpPort:              httpPort,
+		logger:                logger.With("component", "DataAPIMetrics"),
 	}
 	return metrics
 }
@@ -120,6 +134,13 @@ func NewMetrics(serverVersion uint, blobMetadataStore interface{}, httpPort stri
 // ObserveLatency observes the latency of a stage in 'stage
 func (g *Metrics) ObserveLatency(method string, duration time.Duration) {
 	g.Latency.WithLabelValues(method).Observe(float64(duration.Milliseconds()))
+}
+
+// IncrementCacheHit increments the number of requests that hit cache
+func (g *Metrics) IncrementCacheHit(method string) {
+	g.CacheHitsTotal.With(prometheus.Labels{
+		"method": method,
+	}).Inc()
 }
 
 // IncrementSuccessfulRequestNum increments the number of successful requests

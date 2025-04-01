@@ -12,6 +12,9 @@ type Prover interface {
 	// reconstruct the blob.
 	EncodeAndProve(data []byte, params EncodingParams) (BlobCommitments, []*Frame, error)
 
+	// GetCommitmentsForPaddedLength takes in a byte slice representing a list of bn254 
+	// field elements (32 bytes each, except potentially the last element),
+	// pads the (potentially incomplete) last element with zeroes, and returns the commitments for the padded list.
 	GetCommitmentsForPaddedLength(data []byte) (BlobCommitments, error)
 
 	GetFrames(data []byte, params EncodingParams) ([]*Frame, error)
