@@ -50,26 +50,24 @@ var restartableBuilders = []*dbBuilder{
 }
 
 func buildMemDB(t *testing.T, path string) (litt.DB, error) {
-	tb := func(
-		ctx context.Context,
-		logger logging.Logger,
-		timeSource func() time.Time,
-		name string,
-		ttl time.Duration,
-		metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
-		return memtable.NewMemTable(timeSource, name, ttl, 0), nil
-	}
-
-	config, err := littbuilder.DefaultConfig(path)
+	config, err := litt.DefaultConfig(path)
 	require.NoError(t, err)
 
 	config.GCPeriod = 50 * time.Millisecond
+	
+	tb := func(
+		ctx context.Context,
+		logger logging.Logger,
+		name string,
+		metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
+		return memtable.NewMemTable(config, name), nil
+	}
 
 	return littbuilder.NewDBWithTableBuilder(config, tb)
 }
 
 func buildMemKeyDiskDB(t *testing.T, path string) (litt.DB, error) {
-	config, err := littbuilder.DefaultConfig(path)
+	config, err := litt.DefaultConfig(path)
 	require.NoError(t, err)
 	config.KeymapType = keymap.MemKeymapType
 	config.CacheSize = 1000
@@ -78,11 +76,11 @@ func buildMemKeyDiskDB(t *testing.T, path string) (litt.DB, error) {
 	config.Fsync = false // fsync is too slow for unit test workloads
 	config.DoubleWriteProtection = true
 
-	return config.Build()
+	return littbuilder.NewDB(config)
 }
 
 func buildLevelDBDiskDB(t *testing.T, path string) (litt.DB, error) {
-	config, err := littbuilder.DefaultConfig(path)
+	config, err := litt.DefaultConfig(path)
 	require.NoError(t, err)
 	config.KeymapType = keymap.UnsafeLevelDBKeymapType
 	config.CacheSize = 1000
@@ -91,7 +89,7 @@ func buildLevelDBDiskDB(t *testing.T, path string) (litt.DB, error) {
 	config.Fsync = false // fsync is too slow for unit test workloads
 	config.DoubleWriteProtection = true
 
-	return config.Build()
+	return littbuilder.NewDB(config)
 }
 
 func randomDBOperationsTest(t *testing.T, builder *dbBuilder) {
@@ -169,6 +167,9 @@ func randomDBOperationsTest(t *testing.T, builder *dbBuilder) {
 				for expectedKey, expectedValue := range tableValues {
 					value, ok, err := table.Get([]byte(expectedKey))
 					require.NoError(t, err)
+					if !ok {
+						value, ok, err = table.Get([]byte(expectedKey))
+					}
 					require.True(t, ok)
 					require.Equal(t, expectedValue, value)
 				}

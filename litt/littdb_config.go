@@ -1,4 +1,4 @@
-package littbuilder
+package litt
 
 import (
 	"context"
@@ -8,21 +8,14 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/docker/go-units"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// keymapBuilders contains builders for all supported keymap types.
-var keymapBuilders = map[keymap.KeymapType]keymap.KeymapBuilder{
-	keymap.MemKeymapType:           keymap.NewMemKeymapBuilder(),
-	keymap.LevelDBKeymapType:       keymap.NewLevelDBKeymapBuilder(),
-	keymap.UnsafeLevelDBKeymapType: keymap.NewUnsafeLevelDBKeymapBuilder(),
-}
-
-// LittDBConfig is configuration for a litt.DB.
-type LittDBConfig struct {
+// Config is configuration for a litt.DB.
+type Config struct {
 	// The context for the database. If nil, context.Background() is used.
 	CTX context.Context
 
@@ -36,7 +29,7 @@ type LittDBConfig struct {
 	Logger logging.Logger
 
 	// The logger configuration for the database. Ignored if Logger is not nil.
-	LoggerConfig common.LoggerConfig
+	LoggerConfig *common.LoggerConfig
 
 	// The type of the keymap. Choices are keymap.MemKeymapType and keymap.LevelDBKeymapType.
 	// Default is keymap.LevelDBKeymapType.
@@ -52,12 +45,19 @@ type LittDBConfig struct {
 	// The target size for segments. The default is math.MaxUint32.
 	TargetSegmentFileSize uint32
 
-	// The maximum number of keys in a segment. The default is 1,000,000. For workloads with moderately large values
+	// The maximum number of keys in a segment. The default is 32,000. For workloads with moderately large values
 	// (i.e. in the kb+ range), this threshold is unlikely to be relevant. For workloads with very small values,
 	// this constant prevents a segment from accumulating too many keys. A segment with too many keys may have
 	// undesirable properties such as a very large key file and very slow garbage collection (since no kv-pair in
 	// a segment can be deleted until the entire segment is deleted).
 	MaxSegmentKeyCount uint64
+
+	// The desired maximum size for a key file. The default is 1 MB. When a key file exceeds this size, the segment
+	// will close the current segment and begin writing to a new one. For workloads with moderately large values,
+	// this threshold is unlikely to be relevant. For workloads with very small values, this constant prevents a key
+	// file from growing too large. A key file with too many keys may have undesirable properties such as very slow
+	// garbage collection (since no kv-pair in a segment can be deleted until the entire segment is deleted).
+	TargetSegmentKeyFileSize uint64
 
 	// The period between garbage collection runs. The default is 5 minutes.
 	GCPeriod time.Duration
@@ -113,7 +113,7 @@ type LittDBConfig struct {
 }
 
 // DefaultConfig returns a Config with default values.
-func DefaultConfig(paths ...string) (*LittDBConfig, error) {
+func DefaultConfig(paths ...string) (*Config, error) {
 	if len(paths) == 0 {
 		return nil, fmt.Errorf("at least one path must be provided")
 	}
@@ -121,29 +121,69 @@ func DefaultConfig(paths ...string) (*LittDBConfig, error) {
 	seed := time.Now().UnixNano()
 	saltShaker := rand.New(rand.NewSource(seed))
 
-	return &LittDBConfig{
-		CTX:                   context.Background(),
-		Paths:                 paths,
-		LoggerConfig:          common.DefaultLoggerConfig(),
-		TimeSource:            time.Now,
-		GCPeriod:              5 * time.Minute,
-		ShardingFactor:        8,
-		SaltShaker:            saltShaker,
-		KeymapType:            keymap.LevelDBKeymapType,
-		ControlChannelSize:    64,
-		TargetSegmentFileSize: math.MaxUint32,
-		MaxSegmentKeyCount:    1_000_000,
-		Fsync:                 true,
-		DoubleWriteProtection: false,
-		MetricsEnabled:        false,
-		MetricsNamespace:      "litt",
-		MetricsPort:           8080,
-		MetricsUpdateInterval: time.Second,
+	loggerConfig := common.DefaultLoggerConfig()
+
+	return &Config{
+		CTX:                      context.Background(),
+		Paths:                    paths,
+		LoggerConfig:             &loggerConfig,
+		TimeSource:               time.Now,
+		GCPeriod:                 5 * time.Minute,
+		ShardingFactor:           8,
+		SaltShaker:               saltShaker,
+		KeymapType:               keymap.LevelDBKeymapType,
+		ControlChannelSize:       64,
+		TargetSegmentFileSize:    math.MaxUint32,
+		MaxSegmentKeyCount:       32_000,
+		TargetSegmentKeyFileSize: units.MiB,
+		Fsync:                    true,
+		DoubleWriteProtection:    false,
+		MetricsEnabled:           false,
+		MetricsNamespace:         "litt",
+		MetricsPort:              8080,
+		MetricsUpdateInterval:    time.Second,
 	}, nil
 }
 
-// Build creates a new litt.DB from the configuration. After calling Build, the configuration should not be
-// modified. This method is syntactic equivalent to NewDB(config).
-func (c *LittDBConfig) Build() (litt.DB, error) {
-	return NewDB(c)
+// SanityCheck performs a sanity check on the configuration, returning an error if any of the configuration
+// settings are invalid. The config returned by DefaultConfig() is guaranteed to pass this check if unmodified.
+func (c *Config) SanityCheck() error {
+	if c.CTX == nil {
+		return fmt.Errorf("context cannot be nil")
+	}
+	if c.Paths == nil || len(c.Paths) == 0 {
+		return fmt.Errorf("at least one path must be provided")
+	}
+	if c.Logger == nil && c.LoggerConfig == nil {
+		return fmt.Errorf("logger or logger config must be provided")
+	}
+	if c.TimeSource == nil {
+		return fmt.Errorf("time source cannot be nil")
+	}
+	if c.ShardingFactor == 0 {
+		return fmt.Errorf("sharding factor must be at least 1")
+	}
+	if c.ControlChannelSize == 0 {
+		return fmt.Errorf("control channel size must be at least 1")
+	}
+	if c.TargetSegmentFileSize == 0 {
+		return fmt.Errorf("target segment file size must be at least 1")
+	}
+	if c.MaxSegmentKeyCount == 0 {
+		return fmt.Errorf("max segment key count must be at least 1")
+	}
+	if c.TargetSegmentKeyFileSize == 0 {
+		return fmt.Errorf("target segment key file size must be at least 1")
+	}
+	if c.GCPeriod == 0 {
+		return fmt.Errorf("gc period must be at least 1")
+	}
+	if c.SaltShaker == nil {
+		return fmt.Errorf("salt shaker cannot be nil")
+	}
+	if (c.MetricsEnabled || c.MetricsRegistry != nil) && c.MetricsUpdateInterval == 0 {
+		return fmt.Errorf("metrics update interval must be at least 1 if metrics are enabled")
+	}
+
+	return nil
 }

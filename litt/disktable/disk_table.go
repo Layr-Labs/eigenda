@@ -1,7 +1,6 @@
 package disktable
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -84,6 +83,9 @@ type DiskTable struct {
 	// The maximum number of keys in a segment.
 	maxKeyCount uint64
 
+	// The target size for key files.
+	targetKeyFileSize uint64
+
 	// segmentLock protects access to the segments map and highestSegmentIndex.
 	// Does not protect the segments themselves.
 	segmentLock sync.RWMutex
@@ -123,25 +125,16 @@ type DiskTable struct {
 
 // NewDiskTable creates a new DiskTable.
 func NewDiskTable(
-	ctx context.Context,
-	logger logging.Logger,
-	timeSource func() time.Time,
+	config *litt.Config,
 	name string,
 	keymap keymap.Keymap,
 	keymapPath string,
 	keymapTypeFile *keymap.KeymapTypeFile,
 	roots []string,
-	targetFileSize uint32,
-	controlChannelSize int,
-	shardingFactor uint32,
-	saltShaker *rand.Rand,
-	ttl time.Duration,
-	gcPeriod time.Duration,
 	reloadKeymap bool,
-	fsync bool,
 	metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
 
-	if gcPeriod <= 0 {
+	if config.GCPeriod <= 0 {
 		return nil, fmt.Errorf("garbage collection period must be greater than 0")
 	}
 
@@ -192,7 +185,7 @@ func NewDiskTable(
 		// No metadata file exists yet. Create a new one in the first root.
 		var err error
 		metadataDir := roots[0]
-		metadata, err = newTableMetadata(logger, metadataDir, ttl, shardingFactor)
+		metadata, err = newTableMetadata(config.Logger, metadataDir, config.TTL, config.ShardingFactor)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create table metadata: %v", err)
 		}
@@ -200,45 +193,47 @@ func NewDiskTable(
 		// Metadata file exists, so we need to load it.
 		var err error
 		metadataDir := path.Dir(metadataFilePath)
-		metadata, err = loadTableMetadata(logger, metadataDir)
+		metadata, err = loadTableMetadata(config.Logger, metadataDir)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load table metadata: %v", err)
 		}
 	}
 
-	dbPanic := util.NewDBPanic(ctx, logger)
+	dbPanic := util.NewDBPanic(config.CTX, config.Logger)
 
 	table := &DiskTable{
-		logger:                  logger,
+		logger:                  config.Logger,
 		panic:                   dbPanic,
-		timeSource:              timeSource,
+		timeSource:              config.TimeSource,
 		roots:                   roots,
 		segmentDirectories:      segDirs,
 		name:                    name,
 		metadata:                metadata,
-		saltShaker:              saltShaker,
+		saltShaker:              config.SaltShaker,
 		keymap:                  keymap,
 		keymapPath:              keymapPath,
 		keymapTypeFile:          keymapTypeFile,
-		targetFileSize:          targetFileSize,
+		targetFileSize:          config.TargetSegmentFileSize,
+		targetKeyFileSize:       config.TargetSegmentKeyFileSize,
+		maxKeyCount:             config.MaxSegmentKeyCount,
 		segments:                make(map[uint32]*segment.Segment),
-		controllerChannel:       make(chan any, controlChannelSize),
+		controllerChannel:       make(chan any, config.ControlChannelSize),
 		flushChannel:            make(chan any, tableFlushChannelCapacity),
-		garbageCollectionPeriod: gcPeriod,
-		fsync:                   fsync,
+		garbageCollectionPeriod: config.GCPeriod,
+		fsync:                   config.Fsync,
 		metrics:                 metrics,
 	}
 
 	var err error
 	table.lowestSegmentIndex, table.highestSegmentIndex, table.segments, err =
 		segment.GatherSegmentFiles(
-			logger,
+			config.Logger,
 			dbPanic,
 			table.segmentDirectories,
-			timeSource(),
-			shardingFactor,
-			saltShaker.Uint32(),
-			fsync)
+			config.TimeSource(),
+			config.ShardingFactor,
+			config.SaltShaker.Uint32(),
+			config.Fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather segment files: %v", err)
 	}
@@ -257,15 +252,15 @@ func NewDiskTable(
 		nextSegmentIndex = table.highestSegmentIndex + 1
 	}
 	mutableSegment, err := segment.NewSegment(
-		logger,
+		config.Logger,
 		dbPanic,
 		nextSegmentIndex,
 		segDirs,
-		timeSource(),
+		config.TimeSource(),
 		metadata.GetShardingFactor(),
-		saltShaker.Uint32(),
+		config.SaltShaker.Uint32(),
 		false,
-		fsync)
+		config.Fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mutable segment: %v", err)
 	}
@@ -278,7 +273,7 @@ func NewDiskTable(
 	table.updateCurrentSize()
 
 	if reloadKeymap {
-		logger.Infof("reloading keymap from segments")
+		config.Logger.Infof("reloading keymap from segments")
 		err = table.reloadKeymap()
 		if err != nil {
 			return nil, fmt.Errorf("failed to load keymap from segments: %v", err)
@@ -650,14 +645,14 @@ func (d *DiskTable) handleControlLoopWriteRequest(req *controlLoopWriteRequest) 
 	for _, kv := range req.values {
 		// Do the write.
 		seg := d.segments[d.highestSegmentIndex]
-		keyCount, shardSize, err := seg.Write(kv)
+		keyCount, keyFileSize, shardSize, err := seg.Write(kv)
 		if err != nil {
 			d.panic.Panic(fmt.Errorf("failed to write to segment %d: %v", d.highestSegmentIndex, err))
 			return
 		}
 
 		// Check to see if the write caused the mutable segment to become full.
-		if shardSize > uint64(d.targetFileSize) || keyCount >= d.maxKeyCount {
+		if shardSize > uint64(d.targetFileSize) || keyCount >= d.maxKeyCount || keyFileSize >= d.targetKeyFileSize {
 			// Mutable segment is full. Before continuing, we need to expand the segments.
 			err = d.expandSegments()
 			if err != nil {

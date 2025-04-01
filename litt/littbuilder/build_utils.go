@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/cache"
@@ -22,6 +21,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// keymapBuilders contains builders for all supported keymap types.
+var keymapBuilders = map[keymap.KeymapType]keymap.KeymapBuilder{
+	keymap.MemKeymapType:           keymap.NewMemKeymapBuilder(),
+	keymap.LevelDBKeymapType:       keymap.NewLevelDBKeymapBuilder(),
+	keymap.UnsafeLevelDBKeymapType: keymap.NewUnsafeLevelDBKeymapBuilder(),
+}
+
 // cacheWeight is a function that calculates the weight of a cache entry.
 func cacheWeight(key string, value []byte) uint64 {
 	return uint64(len(key) + len(value))
@@ -29,7 +35,7 @@ func cacheWeight(key string, value []byte) uint64 {
 
 // buildKeymap creates a new keymap based on the configuration.
 func buildKeymap(
-	config *LittDBConfig,
+	config *litt.Config,
 	logger logging.Logger,
 	tableName string,
 ) (kmap keymap.Keymap, keymapPath string, keymapTypeFile *keymap.KeymapTypeFile, requiresReload bool, err error) {
@@ -139,12 +145,10 @@ func buildKeymap(
 
 // buildTable creates a new table based on the configuration.
 func buildTable(
-	config *LittDBConfig,
+	config *litt.Config,
 	ctx context.Context,
 	logger logging.Logger,
-	timeSource func() time.Time,
 	name string,
-	ttl time.Duration,
 	metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
 
 	var table litt.ManagedTable
@@ -164,22 +168,13 @@ func buildTable(
 	}
 
 	table, err = disktable.NewDiskTable(
-		ctx,
-		logger,
-		timeSource,
+		config,
 		name,
 		kmap,
 		keymapDirectory,
 		keymapTypeFile,
 		tableRoots,
-		config.TargetSegmentFileSize,
-		config.ControlChannelSize,
-		config.ShardingFactor,
-		config.SaltShaker,
-		ttl,
-		config.GCPeriod,
 		requiresReload,
-		config.Fsync,
 		metrics)
 
 	if err != nil {
@@ -194,17 +189,17 @@ func buildTable(
 }
 
 // buildLogger creates a new logger based on the configuration.
-func buildLogger(config *LittDBConfig) (logging.Logger, error) {
+func buildLogger(config *litt.Config) (logging.Logger, error) {
 	if config.Logger != nil {
 		return config.Logger, nil
 	}
 
-	return common.NewLogger(config.LoggerConfig)
+	return common.NewLogger(*config.LoggerConfig)
 }
 
 // buildMetrics creates a new metrics object based on the configuration. If the returned server is not nil,
 // then it is the responsibility of the caller to eventually call server.Shutdown().
-func buildMetrics(config *LittDBConfig, logger logging.Logger) (*metrics.LittDBMetrics, *http.Server) {
+func buildMetrics(config *litt.Config, logger logging.Logger) (*metrics.LittDBMetrics, *http.Server) {
 	if !config.MetricsEnabled {
 		return nil, nil
 	}

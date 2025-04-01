@@ -1,7 +1,6 @@
 package disktable
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path"
@@ -99,23 +98,26 @@ func buildMemKeyDiskTableSingleShard(
 		roots = append(roots, path.Join(p, "table"))
 	}
 
+	config, err := litt.DefaultConfig(paths...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
+
+	config.TimeSource = timeSource
+	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
+	config.GCPeriod = time.Millisecond
+	config.Fsync = false
+	config.SaltShaker = random.NewTestRandom().Rand
+	config.Logger = logger
+
 	table, err := NewDiskTable(
-		context.Background(),
-		logger,
-		timeSource,
+		config,
 		name,
 		keys,
 		keymapPath,
 		keymapTypeFile,
 		roots,
-		uint32(100), // intentionally use a very small segment size
-		10,
-		1,
-		random.NewTestRandom().Rand,
-		0,
-		1*time.Millisecond,
 		true,
-		false,
 		nil)
 
 	if err != nil {
@@ -148,23 +150,27 @@ func buildMemKeyDiskTableMultiShard(
 		roots = append(roots, path.Join(p, "table"))
 	}
 
+	config, err := litt.DefaultConfig(paths...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
+
+	config.TimeSource = timeSource
+	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
+	config.GCPeriod = time.Millisecond
+	config.Fsync = false
+	config.SaltShaker = random.NewTestRandom().Rand
+	config.ShardingFactor = 4
+	config.Logger = logger
+
 	table, err := NewDiskTable(
-		context.Background(),
-		logger,
-		timeSource,
+		config,
 		name,
 		keys,
 		keymapPath,
 		keymapTypeFile,
 		roots,
-		uint32(100), // intentionally use a very small segment size
-		10,
-		4,
-		random.NewTestRandom().Rand,
-		0,
-		1*time.Millisecond,
 		true,
-		false,
 		nil)
 
 	if err != nil {
@@ -200,22 +206,25 @@ func buildLevelDBKeyDiskTableSingleShard(
 		roots = append(roots, path.Join(p, "table"))
 	}
 
+	config, err := litt.DefaultConfig(paths...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
+
+	config.TimeSource = timeSource
+	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
+	config.GCPeriod = time.Millisecond
+	config.Fsync = false
+	config.SaltShaker = random.NewTestRandom().Rand
+	config.Logger = logger
+
 	table, err := NewDiskTable(
-		context.Background(),
-		logger,
-		timeSource,
+		config,
 		name,
 		keys,
 		keymapPath,
 		keymapTypeFile,
 		roots,
-		uint32(100), // intentionally use a very small segment size
-		10,
-		1,
-		random.NewTestRandom().Rand,
-		0,
-		1*time.Millisecond,
-		false,
 		false,
 		nil)
 
@@ -252,22 +261,26 @@ func buildLevelDBKeyDiskTableMultiShard(
 		roots = append(roots, path.Join(p, "table"))
 	}
 
+	config, err := litt.DefaultConfig(paths...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
+
+	config.TimeSource = timeSource
+	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
+	config.GCPeriod = time.Millisecond
+	config.Fsync = false
+	config.SaltShaker = random.NewTestRandom().Rand
+	config.ShardingFactor = 4
+	config.Logger = logger
+
 	table, err := NewDiskTable(
-		context.Background(),
-		logger,
-		timeSource,
+		config,
 		name,
 		keys,
 		keymapPath,
 		keymapTypeFile,
 		roots,
-		uint32(100), // intentionally use a very small segment size
-		10,
-		4,
-		random.NewTestRandom().Rand,
-		0,
-		1*time.Millisecond,
-		false,
 		false,
 		nil)
 

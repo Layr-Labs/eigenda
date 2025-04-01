@@ -185,7 +185,7 @@ return err
 
 ## Configuration Options
 
-For more information about configuration, see [littdb_config.go](littbuilder/littdb_config.go).
+For more information about configuration, see [littdb_config.go](littdb_config.go).
 
 # Definitions
 
