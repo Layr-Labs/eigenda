@@ -50,22 +50,18 @@ type memTable struct {
 }
 
 // NewMemTable creates a new in-memory table.
-func NewMemTable(
-	timeSource func() time.Time,
-	name string,
-	ttl time.Duration,
-	gcPeriod time.Duration) litt.ManagedTable {
+func NewMemTable(config *litt.Config, name string) litt.ManagedTable {
 
 	table := &memTable{
-		timeSource:      timeSource,
+		timeSource:      config.TimeSource,
 		name:            name,
-		ttl:             ttl,
+		ttl:             config.TTL,
 		data:            make(map[string][]byte),
 		expirationQueue: linkedlistqueue.New(),
 	}
 
-	if gcPeriod > 0 {
-		ticker := time.NewTicker(gcPeriod)
+	if config.GCPeriod > 0 {
+		ticker := time.NewTicker(config.GCPeriod)
 		go func() {
 			for !table.shutdown.Load() {
 				<-ticker.C
@@ -185,6 +181,10 @@ func (m *memTable) SetShardingFactor(shardingFactor uint32) error {
 func (m *memTable) ScheduleImmediateGC() error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+
+	if m.ttl == 0 {
+		return nil
+	}
 
 	now := m.timeSource()
 	earliestPermittedCreationTime := now.Add(-m.ttl)

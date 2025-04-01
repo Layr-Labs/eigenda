@@ -1,7 +1,6 @@
 package test
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -76,7 +75,15 @@ func buildMemTable(
 	name string,
 	path string) (litt.ManagedTable, error) {
 
-	return memtable.NewMemTable(timeSource, name, 0, 0), nil
+	config, err := litt.DefaultConfig(path)
+	config.TimeSource = timeSource
+	config.GCPeriod = 0
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
+
+	return memtable.NewMemTable(config, name), nil
 }
 
 func setupKeymapTypeFile(keymapPath string, keymapType keymap.KeymapType) (*keymap.KeymapTypeFile, error) {
@@ -123,24 +130,27 @@ func buildMemKeyDiskTable(
 
 	keys := keymap.NewMemKeymap(logger, true)
 
+	config, err := litt.DefaultConfig(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
+	config.GCPeriod = time.Millisecond
+	config.TimeSource = timeSource
+	config.Fsync = false
+	config.DoubleWriteProtection = true
+	config.SaltShaker = random.NewTestRandom().Rand
+	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
+	config.Logger = logger
+
 	segmentsPath := path + "/segments"
 	table, err := disktable.NewDiskTable(
-		context.Background(),
-		logger,
-		timeSource,
+		config,
 		name,
 		keys,
 		keymapPath,
 		keymapTypeFile,
 		[]string{segmentsPath},
-		uint32(100), // intentionally use a very small segment size
-		10,
-		4,
-		random.NewTestRandom().Rand,
-		0,
-		1*time.Millisecond,
 		true,
-		false,
 		nil)
 
 	if err != nil {
@@ -171,24 +181,27 @@ func buildLevelDBKeyDiskTable(
 		return nil, fmt.Errorf("failed to create keymap: %w", err)
 	}
 
+	config, err := litt.DefaultConfig(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
+	config.GCPeriod = time.Millisecond
+	config.TimeSource = timeSource
+	config.Fsync = false
+	config.DoubleWriteProtection = true
+	config.SaltShaker = random.NewTestRandom().Rand
+	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
+	config.Logger = logger
+
 	segmentsPath := path + "/segments"
 	table, err := disktable.NewDiskTable(
-		context.Background(),
-		logger,
-		timeSource,
+		config,
 		name,
 		keys,
 		keymapPath,
 		keymapTypeFile,
 		[]string{segmentsPath},
-		uint32(100), // intentionally use a very small segment size
-		10,
-		4,
-		random.NewTestRandom().Rand,
-		0,
-		1*time.Millisecond,
-		false,
-		false,
+		true,
 		nil)
 
 	if err != nil {
@@ -515,10 +528,10 @@ func TestInvalidTableName(t *testing.T) {
 	t.Parallel()
 	directory := t.TempDir()
 
-	config, err := littbuilder.DefaultConfig(directory)
+	config, err := litt.DefaultConfig(directory)
 	require.NoError(t, err)
 
-	db, err := config.Build()
+	db, err := littbuilder.NewDB(config)
 	require.NoError(t, err)
 
 	tableName := "invalid name"

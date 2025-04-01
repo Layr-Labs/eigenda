@@ -23,12 +23,6 @@ type Config struct {
 	// If more than one path is provided, then the database will do its best to spread out the data across
 	// the paths. If the database is restarted, it will attempt to load data from all paths. Note: the number
 	// of paths should not exceed the sharding factor, or else data may not be split across all paths.
-	//
-	// Most of the time, providing exactly one path is sufficient. If the data should be spread across multiple
-	// drives, then providing multiple permits that. The number of provided paths should be a small number, perhaps
-	// a few dozen paths at most. Providing an excessive number of paths may lead to degraded performance.
-	//
-	// Providing zero paths will cause the DB to return an error at startup.
 	Paths []string
 
 	// The logger for the database. If nil, a logger is built using the LoggerConfig.
@@ -51,14 +45,14 @@ type Config struct {
 	// The target size for segments. The default is math.MaxUint32.
 	TargetSegmentFileSize uint32
 
-	// The maximum number of keys in a segment. The default is 50,000. For workloads with moderately large values
+	// The maximum number of keys in a segment. The default is 32,000. For workloads with moderately large values
 	// (i.e. in the kb+ range), this threshold is unlikely to be relevant. For workloads with very small values,
 	// this constant prevents a segment from accumulating too many keys. A segment with too many keys may have
 	// undesirable properties such as a very large key file and very slow garbage collection (since no kv-pair in
 	// a segment can be deleted until the entire segment is deleted).
 	MaxSegmentKeyCount uint64
 
-	// The desired maximum size for a key file. The default is 2 MB. When a key file exceeds this size, the segment
+	// The desired maximum size for a key file. The default is 1 MB. When a key file exceeds this size, the segment
 	// will close the current segment and begin writing to a new one. For workloads with moderately large values,
 	// this threshold is unlikely to be relevant. For workloads with very small values, this constant prevents a key
 	// file from growing too large. A key file with too many keys may have undesirable properties such as very slow
@@ -68,17 +62,7 @@ type Config struct {
 	// The period between garbage collection runs. The default is 5 minutes.
 	GCPeriod time.Duration
 
-	// The size of the keymap deletion batch for garbage collection. The default is 10,000.
-	GCBatchSize uint64
-
-	// The sharding factor for the database. If the sharding factor is greater than 1, then values will be spread
-	// out across multiple files. (Note that individual values will always be written to a single file, but two
-	// different values may be written to different files.) These shard files are spead evenly across the paths
-	// provided in the Paths field. If the sharding factor is larger than the number of paths, then some paths will
-	// have multiple shard files. If the sharding factor is smaller than the number of paths, then some paths may not
-	// always have an actively written shard file.
-	//
-	// The default is 8. Must be at least 1.
+	// The sharding factor for the database. The default is 8. Must be at least 1.
 	ShardingFactor uint32
 
 	// The random number generator used for generating sharding salts. The default is a standard rand.New()
@@ -92,7 +76,7 @@ type Config struct {
 
 	// The time source used by the database. This can be substituted for an artificial time source
 	// for testing purposes. The default is time.Now.
-	Clock func() time.Time
+	TimeSource func() time.Time
 
 	// If true, then flush operations will call fsync on the underlying file to ensure data is flushed out of the
 	// operating system's buffer and onto disk. Setting this to false means that even after flushing data,
@@ -122,16 +106,10 @@ type Config struct {
 	MetricsRegistry *prometheus.Registry
 
 	// The port to use for the metrics server. Ignored if MetricsEnabled is false or MetricsRegistry is not nil.
-	// The default is 9101.
 	MetricsPort int
 
 	// The interval at which various DB metrics are updated. The default is 1 second.
 	MetricsUpdateInterval time.Duration
-
-	// A function that is called if the database experiences a non-recoverable error (e.g. data corruption,
-	// a crashed goroutine, a full disk, etc.). If nil (the default), no callback is called. If called at all,
-	// this method is called exactly once.
-	FatalErrorCallback func(error)
 }
 
 // DefaultConfig returns a Config with default values.
@@ -149,21 +127,20 @@ func DefaultConfig(paths ...string) (*Config, error) {
 		CTX:                      context.Background(),
 		Paths:                    paths,
 		LoggerConfig:             &loggerConfig,
-		Clock:                    time.Now,
+		TimeSource:               time.Now,
 		GCPeriod:                 5 * time.Minute,
-		GCBatchSize:              10_000,
 		ShardingFactor:           8,
 		SaltShaker:               saltShaker,
 		KeymapType:               keymap.LevelDBKeymapType,
 		ControlChannelSize:       64,
 		TargetSegmentFileSize:    math.MaxUint32,
-		MaxSegmentKeyCount:       50_000,
-		TargetSegmentKeyFileSize: 2 * units.MiB,
+		MaxSegmentKeyCount:       32_000,
+		TargetSegmentKeyFileSize: units.MiB,
 		Fsync:                    true,
 		DoubleWriteProtection:    false,
 		MetricsEnabled:           false,
 		MetricsNamespace:         "litt",
-		MetricsPort:              9101,
+		MetricsPort:              8080,
 		MetricsUpdateInterval:    time.Second,
 	}, nil
 }
@@ -174,17 +151,14 @@ func (c *Config) SanityCheck() error {
 	if c.CTX == nil {
 		return fmt.Errorf("context cannot be nil")
 	}
-	if len(c.Paths) == 0 {
+	if c.Paths == nil || len(c.Paths) == 0 {
 		return fmt.Errorf("at least one path must be provided")
 	}
 	if c.Logger == nil && c.LoggerConfig == nil {
 		return fmt.Errorf("logger or logger config must be provided")
 	}
-	if c.Clock == nil {
+	if c.TimeSource == nil {
 		return fmt.Errorf("time source cannot be nil")
-	}
-	if c.GCBatchSize == 0 {
-		return fmt.Errorf("gc batch size must be at least 1")
 	}
 	if c.ShardingFactor == 0 {
 		return fmt.Errorf("sharding factor must be at least 1")

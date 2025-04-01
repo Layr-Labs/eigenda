@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/types"
@@ -14,7 +15,7 @@ import (
 )
 
 // Tests migration from one type of Keymap to another. This is not defined in the disktable package because this
-// migration requires a littbuilder.LittDBConfig, which is not available in the disktable package.
+// migration requires a littbuilder.Config, which is not available in the disktable package.
 func TestKeymapMigration(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
@@ -27,14 +28,14 @@ func TestKeymapMigration(t *testing.T) {
 	}
 
 	// Build the table using LevelDBKeymap.
-	config, err := littbuilder.DefaultConfig(shardDirectories...)
+	config, err := litt.DefaultConfig(shardDirectories...)
 	require.NoError(t, err)
 	config.ShardingFactor = uint32(directoryCount)
 	config.KeymapType = keymap.UnsafeLevelDBKeymapType
 	config.Fsync = false // fsync is too slow for unit test workloads
 	config.DoubleWriteProtection = true
 
-	db, err := config.Build()
+	db, err := littbuilder.NewDB(config)
 	require.NoError(t, err)
 	table, err := db.GetTable("test")
 	require.NoError(t, err)
@@ -109,7 +110,7 @@ func TestKeymapMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Reload the table and check the data
-	db, err = config.Build()
+	db, err = littbuilder.NewDB(config)
 	require.NoError(t, err)
 	table, err = db.GetTable("test")
 	require.NoError(t, err)
@@ -126,7 +127,7 @@ func TestKeymapMigration(t *testing.T) {
 	require.NoError(t, err)
 	config.KeymapType = keymap.MemKeymapType
 
-	db, err = config.Build()
+	db, err = littbuilder.NewDB(config)
 	require.NoError(t, err)
 	table, err = db.GetTable("test")
 	require.NoError(t, err)
@@ -147,7 +148,7 @@ func TestKeymapMigration(t *testing.T) {
 	require.NoError(t, err)
 	config.KeymapType = keymap.UnsafeLevelDBKeymapType
 
-	db, err = config.Build()
+	db, err = littbuilder.NewDB(config)
 	require.NoError(t, err)
 	table, err = db.GetTable("test")
 	require.NoError(t, err)
