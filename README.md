@@ -54,7 +54,7 @@ Features:
     - [Unit](#unit)
     - [Integration / E2E](#integration--e2e)
     - [Fuzz](#fuzz)
-
+- [Repo Structure and Releases](#repo-structure-and-releases)
 
 ## User Guide
 
@@ -294,3 +294,13 @@ These tests also assert E2E client <-> server interactions using simple/op clien
 
 Fuzz tests exercise the proxy client server integration and op client keccak256 with malformed inputs. This is
 never meant to be fuzzed with EigenDA. Run with `make test-fuzz`.
+
+## Repo Structure and Releases
+
+This repo is a fairly standard Go [workspace](https://go.dev/ref/mod#workspaces), which consists of 2 separate modules:
+1. [eigenda-proxy](./go.mod) - the main module, which contains the proxy server and all the business logic
+2. [clients](./clients/go.mod) - a module containing client implementations for interacting with the proxy server
+
+Both modules follow their own independent [release](https://go.dev/doc/modules/release-workflow) cadence, with independent semantic versioning:
+1. `eigenda-proxy` releases are made from `vX.Y.Z` tags, with release titles of the [same form](https://github.com/Layr-Labs/eigenda-proxy/releases/tag/v1.6.5).
+2. `clients` releases are made from `clients/vX.Y.Z` tags, with release titles of the [same form](https://github.com/Layr-Labs/eigenda-proxy/releases/tag/clients%2Fv0.2.0)
