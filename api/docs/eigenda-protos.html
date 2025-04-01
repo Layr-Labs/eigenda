@@ -1115,7 +1115,7 @@ On-demand dispersal is currently limited to using a subset of the following quor
 - 0: ETH
 - 1: EIGEN
 
-Reserved-bandwidth dispersal is free to use multiple quorums, however those must be reserved ahead of time. The quorum_numbers specified here must be a subset of the ones allowed by the on-chain reservation. 
+Reserved-bandwidth dispersal is free to use multiple quorums, however those must be reserved ahead of time. The quorum_numbers specified here must be a subset of the ones allowed by the on-chain reservation.
 Check the allowed quorum numbers by looking up reservation struct: https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/interfaces/IPaymentVault.sol#L10 </p></td>
                 </tr>
               
@@ -1141,7 +1141,7 @@ Check the allowed quorum numbers by looking up reservation struct: https://githu
         
       
         <h3 id="common.v2.PaymentHeader">PaymentHeader</h3>
-        <p>PaymentHeader contains payment information for a blob.</p><p>At least one of reservation_period or cumulative_payment must be set, and reservation_period </p><p>is always considered before cumulative_payment. If reservation_period is set but not valid, </p><p>the server will reject the request and not proceed with dispersal. If reservation_period is not set </p><p>and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.</p><p>Once the server has accepted the payment header, a client cannot cancel or rollback the payment.</p><p>Every dispersal request will be charged by a multiple of `minNumSymbols` field defined by the payment vault contract.</p><p>If the request blob size is smaller or not a multiple of `minNumSymbols`, the server will charge the user for the next </p><p>multiple of `minNumSymbols` (https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/payments/PaymentVaultStorage.sol#L9).</p>
+        <p>PaymentHeader contains payment information for a blob.</p><p>At least one of reservation_period or cumulative_payment must be set, and reservation_period</p><p>is always considered before cumulative_payment. If reservation_period is set but not valid,</p><p>the server will reject the request and not proceed with dispersal. If reservation_period is not set</p><p>and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.</p><p>Once the server has accepted the payment header, a client cannot cancel or rollback the payment.</p><p>Every dispersal request will be charged by a multiple of `minNumSymbols` field defined by the payment vault contract.</p><p>If the request blob size is smaller or not a multiple of `minNumSymbols`, the server will charge the user for the next</p><p>multiple of `minNumSymbols` (https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/payments/PaymentVaultStorage.sol#L9).</p>
 
         
           <table class="field-table">
@@ -1162,16 +1162,16 @@ corresponding to the key used by the client to sign the BlobHeader. </p></td>
                   <td>timestamp</td>
                   <td><a href="#int64">int64</a></td>
                   <td></td>
-                  <td><p>The timestamp should be set as the UNIX timestamp in units of nanoseconds at the time of the dispersal request, 
-and will be used to determine the reservation period, and compared against the reservation active start and end timestamps 
+                  <td><p>The timestamp should be set as the UNIX timestamp in units of nanoseconds at the time of the dispersal request,
+and will be used to determine the reservation period, and compared against the reservation active start and end timestamps
 On-chain reservation timestamps are in units of seconds, while the payment header timestamp is in nanoseconds for greater precision.
 If the timestamp is not set or is not part of the previous or current reservation period, the request will be rejected.
-The reservation period of the dispersal request is used for rate-limiting the user&#39;s account against their dedicated 
-bandwidth. This method requires users to set up reservation accounts with EigenDA team, and the team will set up an 
-on-chain record of reserved bandwidth for the user for some period of time. The dispersal client&#39;s accountant will set 
-this value to the current timestamp in nanoseconds. The disperser server will find the corresponding reservation period by 
-taking the nearest lower multiple of the on-chain configured reservation period interval, mapping each request 
-to a time-based window and is serialized and parsed as a uint32. The disperser server then validates that it matches 
+The reservation period of the dispersal request is used for rate-limiting the user&#39;s account against their dedicated
+bandwidth. This method requires users to set up reservation accounts with EigenDA team, and the team will set up an
+on-chain record of reserved bandwidth for the user for some period of time. The dispersal client&#39;s accountant will set
+this value to the current timestamp in nanoseconds. The disperser server will find the corresponding reservation period by
+taking the nearest lower multiple of the on-chain configured reservation period interval, mapping each request
+to a time-based window and is serialized and parsed as a uint32. The disperser server then validates that it matches
 either the current or the previous period, and check against the user&#39;s reserved bandwidth.
 
 Example Usage Flow:
@@ -1183,13 +1183,13 @@ Example Usage Flow:
       - After rounding up to the nearest multiple of `minNumSymbols` defined by the payment vault contract, the user still has enough bandwidth capacity
         (hasn’t exceeded symbolsPerSecond * reservationPeriodInterval).
       - The request is ratelimited against the current reservation period, and calculated as reservation_period = floor(t / reservationPeriodInterval) * reservationPeriodInterval.
-        the request&#39;s reservation period must either be the disperser server&#39;s current reservation period or the previous reservation period. 
-  4. Server always go ahead with recording the received request in the current reservation period, and then categorize the scenarios 
+        the request&#39;s reservation period must either be the disperser server&#39;s current reservation period or the previous reservation period.
+  4. Server always go ahead with recording the received request in the current reservation period, and then categorize the scenarios
       - If the remaining bandwidth is sufficient for the request, the dispersal request proceeds.
       - If the remaining bandwidth is not enough for the request, server fills up the current bin and overflowing the extra to a future bin.
-      - If the bandwidth has already been exhausted, the request is rejected. 
+      - If the bandwidth has already been exhausted, the request is rejected.
   5. Once the dispersal request signature has been verified, the server will not roll back the payment or the usage records.
-     Users should be aware of this when planning their usage. The dispersal client written by EigenDA team takes account of this. 
+     Users should be aware of this when planning their usage. The dispersal client written by EigenDA team takes account of this.
   6. When the reservation ends or usage is exhausted, the client must wait for the next reservation period or switch to on-demand. </p></td>
                 </tr>
               
@@ -1199,22 +1199,22 @@ Example Usage Flow:
                   <td></td>
                   <td><p>Cumulative payment is the total amount of tokens paid by the requesting account, including the current request.
 This value is serialized as an uint256 and parsed as a big integer, and must match the user’s on-chain deposit limits
-as well as the recorded payments for all previous requests. Because it is a cumulative (not incremental) total, 
+as well as the recorded payments for all previous requests. Because it is a cumulative (not incremental) total,
 requests can arrive out of order and still unambiguously declare how much of the on-chain deposit can be deducted.
 
 Example Decision Flow:
   1. In the set up phase, the user must deposit tokens into the EigenDA PaymentVault contract. The payment vault contract
-   specifies the minimum number of symbols charged per dispersal, the pricing per symbol, and the maximum global rate for 
-   on-demand dispersals. The user should calculate the amount of tokens they would like to deposit based on their usage. 
-   The first time a user make a request, server will immediate read the contract for the on-chain balance. When user runs 
-   out of on-chain balance, the server will reject the request and not proceed with dispersal. When a user top up on-chain, 
+   specifies the minimum number of symbols charged per dispersal, the pricing per symbol, and the maximum global rate for
+   on-demand dispersals. The user should calculate the amount of tokens they would like to deposit based on their usage.
+   The first time a user make a request, server will immediate read the contract for the on-chain balance. When user runs
+   out of on-chain balance, the server will reject the request and not proceed with dispersal. When a user top up on-chain,
    the server will only refresh every few minutes for the top-up to take effect.
   2. The disperser client accounts how many tokens they’ve already paid (previousCumPmt).
-  3. They should calculate the payment by rounding up blob size to the nearest multiple of `minNumSymbols` defined by the 
-   payment vault contract, and calculate the incremental amount of tokens needed for the current request needs based on 
+  3. They should calculate the payment by rounding up blob size to the nearest multiple of `minNumSymbols` defined by the
+   payment vault contract, and calculate the incremental amount of tokens needed for the current request needs based on
    protocol defined pricing.
   4. They take the sum of previousCumPmt &#43; new incremental payment and place it in the “cumulative_payment” field.
-  5. The disperser checks this new cumulative total against on-chain deposits and prior records (largest previous payment 
+  5. The disperser checks this new cumulative total against on-chain deposits and prior records (largest previous payment
    and smallest later payment if exists).
   6. If the payment number is valid, the request is confirmed and disperser proceeds with dispersal; otherwise it’s rejected. </p></td>
                 </tr>
@@ -1726,7 +1726,7 @@ where metadata contains a requestedAt timestamp and the requested quorum numbers
 BlobKey definition: https://github.com/Layr-Labs/eigenda/blob/6b02bf966afa2b9bf2385db8dd01f66f17334e17/disperser/disperser.go#L87
 BlobKey computation: https://github.com/Layr-Labs/eigenda/blob/6b02bf966afa2b9bf2385db8dd01f66f17334e17/disperser/common/blobstore/shared_storage.go#L83-L84
 
-Different DisperseBlobRequests have different IDs, including two identical DisperseBlobRequests 
+Different DisperseBlobRequests have different IDs, including two identical DisperseBlobRequests
 sent at different times. Clients should thus store this ID and use it to query the processing
 status of the request via the GetBlobStatus API. </p></td>
                 </tr>
@@ -2153,7 +2153,7 @@ corresponds to the second quorum, and so on. </p></td>
 signed_batch and blob_inclusion_info are only set if the blob status is GATHERING_SIGNATURES or COMPLETE.
 When blob is in GATHERING_SIGNATURES status, the attestation object in signed_batch contains attestation information
 at the point in time. As it gathers more signatures, attestation object will be updated according to the latest attestation status.
-The client can use this intermediate attestation to verify a blob if it has gathered enough signatures. 
+The client can use this intermediate attestation to verify a blob if it has gathered enough signatures.
 Otherwise, it should should poll the GetBlobStatus API until the desired level of attestation has been gathered or status is COMPLETE.
 When blob is in COMPLETE status, the attestation object in signed_batch contains the final attestation information.
 If the final attestation does not meet the client&#39;s requirement, the client should try a new dispersal. </p></td>
@@ -2254,8 +2254,8 @@ the disperser to reject the blob (DisperseBlob() RPC will return an error). </p>
                   <td><p>The blob to be dispersed.
 
 The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB.
-While the data being dispersed is only required to be greater than 0 bytes, the blob size charged against the 
-payment method will be rounded up to the nearest multiple of `minNumSymbols` defined by the payment vault contract 
+While the data being dispersed is only required to be greater than 0 bytes, the blob size charged against the
+payment method will be rounded up to the nearest multiple of `minNumSymbols` defined by the payment vault contract
 (https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/payments/PaymentVaultStorage.sol#L9).
 
 Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more
