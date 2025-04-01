@@ -55,6 +55,9 @@ type Segment struct {
 	// The maximum size of all shards in this segment.
 	maxShardSize uint64
 
+	// The number of keys written to this segment.
+	keyCount uint64
+
 	// shardChannels is a list of channels used to send messages to the goroutine responsible for writing to
 	// each shard. Indexed by shard number.
 	shardChannels []chan any
@@ -268,9 +271,9 @@ func (s *Segment) GetShard(key []byte) uint32 {
 //
 // This method does not ensure that the key-value pair is actually written to disk, only that it will eventually be
 // written to disk. Flush must be called to ensure that all data previously passed to Put is written to disk.
-func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
+func (s *Segment) Write(data *types.KVPair) (keyCount uint64, maxShardSize uint64, err error) {
 	if s.metadata.sealed {
-		return 0, fmt.Errorf("segment is sealed, cannot write data")
+		return 0, 0, fmt.Errorf("segment is sealed, cannot write data")
 	}
 
 	shard := s.GetShard(data.Key)
@@ -280,7 +283,7 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 		// No mater the configuration, we absolutely cannot permit a value to be written if the first byte of the
 		// value would be beyond position 2^32. This is because we only have 32 bits in an address to store the
 		// position of a value's first byte.
-		return 0,
+		return 0, 0,
 			fmt.Errorf("value file already contains %d bytes, cannot add a new value", newSize)
 	}
 	s.unflushedKeyCount.Add(1)
@@ -290,6 +293,7 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 	if s.shardSizes[shard] > s.maxShardSize {
 		s.maxShardSize = s.shardSizes[shard]
 	}
+	s.keyCount++
 
 	s.keyFileSize += uint64(len(data.Key)) + 4 /* uint32 length */ + 8 /* uint64 Address */
 
@@ -300,7 +304,7 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 	}
 	err = util.Send(s.panic, s.shardChannels[shard], shardRequest)
 	if err != nil {
-		return 0, fmt.Errorf("failed to send value to shard control loop: %v", err)
+		return 0, 0, fmt.Errorf("failed to send value to shard control loop: %v", err)
 	}
 
 	// Forward the value to the key and its address file control loop, which asynchronously writes it to the key file.
@@ -310,10 +314,10 @@ func (s *Segment) Write(data *types.KVPair) (maxShardSize uint64, err error) {
 	}
 	err = util.Send(s.panic, s.keyFileChannel, keyRequest)
 	if err != nil {
-		return 0, fmt.Errorf("failed to send key to key file control loop: %v", err)
+		return 0, 0, fmt.Errorf("failed to send key to key file control loop: %v", err)
 	}
 
-	return s.maxShardSize, nil
+	return s.keyCount, s.maxShardSize, nil
 }
 
 // Read fetches the data for a key from the data segment.

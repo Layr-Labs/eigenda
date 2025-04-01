@@ -69,7 +69,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 
 		expectedLargestShardSize += uint64(len(value)) + 4 /* uint32 length */
 
-		largestShardSize, err := seg.Write(&types.KVPair{Key: key, Value: value})
+		_, largestShardSize, err := seg.Write(&types.KVPair{Key: key, Value: value})
 		require.NoError(t, err)
 		require.Equal(t, expectedLargestShardSize, largestShardSize)
 
@@ -215,7 +215,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 		value := values[i]
 		expectedValues[string(key)] = value
 
-		largestShardSize, err := seg.Write(&types.KVPair{Key: key, Value: value})
+		_, largestShardSize, err := seg.Write(&types.KVPair{Key: key, Value: value})
 		require.NoError(t, err)
 		require.True(t, largestShardSize >= uint64(len(value)+4))
 
@@ -372,7 +372,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 		value := values[i]
 		expectedValues[string(key)] = value
 
-		largestShardSize, err := seg.Write(&types.KVPair{Key: key, Value: value})
+		_, largestShardSize, err := seg.Write(&types.KVPair{Key: key, Value: value})
 		require.NoError(t, err)
 		require.True(t, largestShardSize >= uint64(len(value)+4))
 	}
