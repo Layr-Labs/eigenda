@@ -13,17 +13,10 @@ contract CertVerifierRouter is IEigenDACertVerifierBase, Ownable {
     ///      These values contain all added indexes for the certVerifiers mapping.
     uint64[] public certVerifierRBNs;
 
-    /// @notice The number of blocks the reference block number must be in the future for a cert verifier to be added.
-    uint256 public immutable DELAY_BLOCKS;
-
     event CertVerifierAdded(uint64 indexed referenceBlockNumber, address indexed certVerifier);
 
-    constructor(uint256 delayBlocks) Ownable() {
-        DELAY_BLOCKS = delayBlocks;
-    }
-
     function addCertVerifier(uint64 referenceBlockNumber, address certVerifier) external onlyOwner {
-        require(referenceBlockNumber > block.number + DELAY_BLOCKS, "Reference block number must be in the future");
+        require(referenceBlockNumber > block.number, "Reference block number must be in the future");
         require(
             referenceBlockNumber > certVerifierRBNs[certVerifierRBNs.length - 1],
             "Reference block number must be greater than the last registered RBN"
@@ -106,7 +99,7 @@ contract CertVerifierRouter is IEigenDACertVerifierBase, Ownable {
 
         for (uint256 i = certVerifierRBNs.length - 1; i >= 0; i--) {
             uint64 certVerifierRBNMem = certVerifierRBNs[i];
-            if (certVerifierRBNMem == referenceBlockNumber) {
+            if (certVerifierRBNMem <= referenceBlockNumber) {
                 return certVerifierRBNMem;
             }
         }

@@ -3,6 +3,7 @@ pragma solidity ^0.8.9;
 
 import "./IEigenDAStructs.sol";
 
+/// @dev It is impossible to implement all of IEigenDACertVerifier in the CertVerifierRouter, and so a subset of the interface is defined here.
 interface IEigenDACertVerifierBase {
     /**
      * @notice Verifies a the blob cert is valid for the required quorums
