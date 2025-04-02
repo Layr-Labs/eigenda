@@ -171,6 +171,9 @@ func (e *EncodingManager) dedupBlobs(blobMetadatas []*v2.BlobMetadata) []*v2.Blo
 //
 // WARNING: This method is not thread-safe. It should only be called from a single goroutine.
 func (e *EncodingManager) HandleBatch(ctx context.Context) error {
+	// Signal Liveness to indicate no stall
+	e.signalHeartbeat()
+
 	// Get a batch of blobs to encode
 	blobMetadatas, cursor, err := e.blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx, v2.Queued, e.cursor, e.MaxNumBlobsPerIteration)
 	if err != nil {
