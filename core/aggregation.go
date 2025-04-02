@@ -19,10 +19,11 @@ import (
 const maxNumOperatorAddresses = 300
 
 var (
-	ErrPubKeysNotEqual     = errors.New("public keys are not equal")
-	ErrInsufficientEthSigs = errors.New("insufficient eth signatures")
-	ErrAggPubKeyNotValid   = errors.New("aggregated public key is not valid")
-	ErrAggSigNotValid      = errors.New("aggregated signature is not valid")
+	ErrPubKeysNotEqual         = errors.New("public keys are not equal")
+	ErrInsufficientEthSigs     = errors.New("insufficient eth signatures")
+	ErrAggPubKeyNotValid       = errors.New("aggregated public key is not valid")
+	ErrAggSigNotValid          = errors.New("aggregated signature is not valid")
+	ErrPercentSignedExceedsMax = errors.New("percent signed exceeds 100")
 )
 
 type SigningMessage struct {
@@ -223,7 +224,12 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 
 	for _, quorumID := range quorumIDs {
 		// Check that quorum has sufficient stake
-		percent := GetSignedPercentage(state.OperatorState, quorumID, stakeSigned[quorumID])
+		percent, err := GetSignedPercentage(state.OperatorState, quorumID, stakeSigned[quorumID])
+		if err != nil {
+			a.Logger.Error("error calculating signed percentage", "quorumID", quorumID, "err", err)
+			continue
+		}
+
 		quorumResults[quorumID] = &QuorumResult{
 			QuorumID:      quorumID,
 			PercentSigned: percent,
@@ -361,16 +367,18 @@ func GetStakeThreshold(state *OperatorState, quorum QuorumID, quorumThreshold ui
 	return stakeThreshold
 }
 
-func GetSignedPercentage(state *OperatorState, quorum QuorumID, stakeAmount *big.Int) uint8 {
+func GetSignedPercentage(state *OperatorState, quorum QuorumID, stakeAmount *big.Int) (uint8, error) {
 	totalStake := state.Totals[quorum].Stake
 	if totalStake.Cmp(big.NewInt(0)) == 0 {
-		return 0
+		return 0, nil
 	}
 
 	stakeAmount = stakeAmount.Mul(stakeAmount, new(big.Int).SetUint64(percentMultiplier))
 	quorumThresholdBig := stakeAmount.Div(stakeAmount, totalStake)
 
 	quorumThreshold := uint8(quorumThresholdBig.Uint64())
-
-	return quorumThreshold
+	if quorumThreshold > 100 {
+		return 0, fmt.Errorf("%w: %d", ErrPercentSignedExceedsMax, quorumThreshold)
+	}
+	return quorumThreshold, nil
 }

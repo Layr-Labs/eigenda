@@ -328,3 +328,59 @@ func TestFilterQuorums(t *testing.T) {
 	assert.Equal(t, sigAgg.QuorumResults[1].QuorumID, core.QuorumID(1))
 	assert.Equal(t, sigAgg.QuorumResults[1].PercentSigned, core.QuorumID(50))
 }
+
+func TestGetSignedPercentage(t *testing.T) {
+	tests := []struct {
+		name        string
+		quorum      core.QuorumID
+		stakeAmount uint64
+		expected    uint8
+		expectedErr error
+	}{
+		{
+			name:        "Returns 0 when no signers",
+			quorum:      0,
+			stakeAmount: 0,
+			expected:    0,
+			expectedErr: nil,
+		},
+		{
+			name:        "Returns 100 when all signers",
+			quorum:      0,
+			stakeAmount: 21,
+			expected:    100,
+			expectedErr: nil,
+		},
+		{
+			name:        "Returns 50 when half signers",
+			quorum:      0,
+			stakeAmount: 10,
+			expected:    47,
+			expectedErr: nil,
+		},
+		{
+			name:        "Returns 33 when 1/3 signers",
+			quorum:      0,
+			stakeAmount: 7,
+			expected:    33,
+			expectedErr: nil,
+		},
+		{
+			name:        "Returns error when stake amount exceeds total",
+			quorum:      0,
+			stakeAmount: 22,
+			expected:    0,
+			expectedErr: core.ErrPercentSignedExceedsMax,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			state := dat.GetTotalOperatorState(context.Background(), 0)
+			stakeAmount := new(big.Int).SetUint64(tt.stakeAmount)
+			percent, err := core.GetSignedPercentage(state.OperatorState, tt.quorum, stakeAmount)
+			assert.ErrorIs(t, err, tt.expectedErr)
+			assert.Equal(t, tt.expected, percent)
+		})
+	}
+}
