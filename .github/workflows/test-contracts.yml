@@ -16,14 +16,26 @@ concurrency:
 ##       - changes that affect storage are caught by CI
 ##       - (stretch) yarn fmt
 ##       - some level of security through automated static analysis (e.g, slither)
+
+permissions:
+  contents: read
+
 jobs:
   forge-tests:
     name: Foundry Project
     runs-on: ubuntu-24.04
     steps:
-      - uses: step-security/harden-runner@446798f8213ac2e75931c1b0769676d927801858 # v2.10.3
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
         with:
-          egress-policy: audit
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            binaries.soliditylang.org:443
+            github.com:443
+            objects.githubusercontent.com:443
+            registry.yarnpkg.com:443
           
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
         with:
@@ -62,9 +74,19 @@ jobs:
     name: Verify bindings are updated
     runs-on: ubuntu-24.04
     steps:
-      - uses: step-security/harden-runner@446798f8213ac2e75931c1b0769676d927801858 # v2.10.3
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
         with:
-          egress-policy: audit
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+            proxy.golang.org:443
+            registry.yarnpkg.com:443
+            storage.googleapis.com:443
+            sum.golang.org:443
           
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
