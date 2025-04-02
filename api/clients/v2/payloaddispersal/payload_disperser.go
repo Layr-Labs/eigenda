@@ -9,7 +9,9 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	core "github.com/Layr-Labs/eigenda/core/v2"
+	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // PayloadDisperser provides the ability to disperse payloads to EigenDA via a Disperser grpc service.
@@ -20,24 +22,24 @@ type PayloadDisperser struct {
 	config          PayloadDisperserConfig
 	disperserClient clients.DisperserClient
 	certVerifier    clients.ICertVerifier
-	metrics         *PayloadDisperserMetrics
+	stageTimer      *stageTimer
 }
 
 // NewPayloadDisperser creates a PayloadDisperser from subcomponents that have already been constructed and initialized.
-// If metrics is nil, then no metrics will be reported.
+// If the registry is nil then no metrics will be collected.
 func NewPayloadDisperser(
 	logger logging.Logger,
 	payloadDisperserConfig PayloadDisperserConfig,
-	// IMPORTANT: it is permissible for the disperserClient to be configured without a prover, but operating with this
-	// configuration puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for computing
-	// the commitments to a blob, and the PayloadDisperser doesn't have a mechanism to verify these commitments.
-	//
-	// TODO: In the future, an optimized method of commitment verification using fiat shamir transformation will
-	//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
-	//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
+// IMPORTANT: it is permissible for the disperserClient to be configured without a prover, but operating with this
+// configuration puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for computing
+// the commitments to a blob, and the PayloadDisperser doesn't have a mechanism to verify these commitments.
+//
+// TODO: In the future, an optimized method of commitment verification using fiat shamir transformation will
+//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
+//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
 	disperserClient clients.DisperserClient,
 	certVerifier clients.ICertVerifier,
-	metrics *PayloadDisperserMetrics,
+	registry *prometheus.Registry,
 ) (*PayloadDisperser, error) {
 
 	err := payloadDisperserConfig.checkAndSetDefaults()
@@ -50,7 +52,7 @@ func NewPayloadDisperser(
 		config:          payloadDisperserConfig,
 		disperserClient: disperserClient,
 		certVerifier:    certVerifier,
-		metrics:         metrics,
+		stageTimer:      newStageTimer(registry, "PayloadDisperser", "SendPayload"),
 	}, nil
 }
 
@@ -64,13 +66,19 @@ func NewPayloadDisperser(
 //  6. Return the valid cert
 func (pd *PayloadDisperser) SendPayload(
 	ctx context.Context,
-	// payload is the raw data to be stored on eigenDA
+// payload is the raw data to be stored on eigenDA
 	payload *coretypes.Payload,
 ) (*coretypes.EigenDACert, error) {
+
+	probe := pd.stageTimer.NewSequence("convert_to_blob")
+	defer probe.end()
+
 	blob, err := payload.ToBlob(pd.config.PayloadPolynomialForm)
 	if err != nil {
 		return nil, fmt.Errorf("convert payload to blob: %w", err)
 	}
+
+	probe.SetStage("get_quorums")
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
@@ -81,6 +89,8 @@ func (pd *PayloadDisperser) SendPayload(
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.DisperseBlobTimeout)
 	defer cancel()
+
+	probe.SetStage("send_to_disperser")
 
 	// TODO (litt3): eventually, we should consider making DisperseBlob accept an actual blob object, instead of the
 	//  serialized bytes. The operations taking place in DisperseBlob require the bytes to be converted into field
@@ -97,19 +107,25 @@ func (pd *PayloadDisperser) SendPayload(
 	}
 	pd.logger.Debug("Successful DisperseBlob", "blobStatus", blobStatus.String(), "blobKey", blobKey.Hex())
 
+	probe.SetStage(v2.Queued.String())
+
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCertifiedTimeout)
 	defer cancel()
-	blobStatusReply, err := pd.pollBlobStatusUntilCertified(timeoutCtx, blobKey, blobStatus.ToProfobuf())
+	blobStatusReply, err := pd.pollBlobStatusUntilCertified(timeoutCtx, blobKey, blobStatus.ToProfobuf(), probe)
 	if err != nil {
 		return nil, fmt.Errorf("poll blob status until certified: %w", err)
 	}
 	pd.logger.Debug("Blob status CERTIFIED", "blobKey", blobKey.Hex())
+
+	probe.SetStage("build_cert")
 
 	eigenDACert, err := pd.buildEigenDACert(ctx, blobKey, blobStatusReply)
 	if err != nil {
 		// error returned from method is sufficiently descriptive
 		return nil, err
 	}
+
+	probe.SetStage("verify_cert")
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
@@ -145,11 +161,10 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 	ctx context.Context,
 	blobKey core.BlobKey,
 	initialStatus dispgrpc.BlobStatus,
+	probe *sequenceProbe,
 ) (*dispgrpc.BlobStatusReply, error) {
 
 	previousStatus := initialStatus
-	previousStatusTimestamp := time.Now()
-	pd.metrics.reportBlobStatusChange(nil, &previousStatus, 0)
 
 	ticker := time.NewTicker(pd.config.BlobStatusPollInterval)
 	defer ticker.Stop()
@@ -157,10 +172,6 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 	for {
 		select {
 		case <-ctx.Done():
-			pd.metrics.reportBlobStatusChange(
-				&previousStatus,
-				nil,
-				time.Since(previousStatusTimestamp))
 			return nil, fmt.Errorf(
 				"timed out waiting for %v blob status, final status was %v: %w",
 				dispgrpc.BlobStatus_COMPLETE.String(),
@@ -177,17 +188,11 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 
 			newStatus := blobStatusReply.Status
 			if newStatus != previousStatus {
-				newStatusTimestamp := time.Now()
-				timeInPreviousStatus := newStatusTimestamp.Sub(previousStatusTimestamp)
-				previousStatusTimestamp = newStatusTimestamp
-				pd.metrics.reportBlobStatusChange(&previousStatus, &newStatus, timeInPreviousStatus)
-
 				pd.logger.Debug(
 					"Blob status changed",
 					"blob key", blobKey.Hex(),
 					"previous status", previousStatus.String(),
-					"new status", newStatus.String(),
-					"time in previous status", timeInPreviousStatus)
+					"new status", newStatus.String())
 				previousStatus = newStatus
 			}
 
@@ -198,6 +203,9 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED, dispgrpc.BlobStatus_GATHERING_SIGNATURES:
 				// TODO (litt): check signing percentage when we are gathering signatures, potentially break
 				//  out of this loop early if we have enough signatures
+
+				// Report all non-terminal statuses to the probe. Repeat reports are no-ops.
+				probe.SetStage(newStatus.String())
 				continue
 			default:
 				return nil, fmt.Errorf(
