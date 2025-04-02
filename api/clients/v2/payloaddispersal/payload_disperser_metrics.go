@@ -37,7 +37,7 @@ func NewPayloadDisperserMetrics(namespace string, registry *prometheus.Registry)
 			Name:      "blob_status_count",
 			Help:      "The number of blobs with a given status.",
 		},
-		[]string{},
+		[]string{"status"},
 	)
 
 	return &PayloadDisperserMetrics{
