@@ -5,6 +5,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 // It may be helpful to generalize this utility to be used in other parts of the codebase. For a future PR, perhaps.
@@ -28,7 +29,7 @@ func newStageTimer(registry *prometheus.Registry, prefix, name string) *stageTim
 		return nil
 	}
 
-	statusLatency := prometheus.NewSummaryVec(
+	statusLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  prefix,
 			Name:       name + "stage_latency_ms",
@@ -38,7 +39,7 @@ func newStageTimer(registry *prometheus.Registry, prefix, name string) *stageTim
 		[]string{"stage"},
 	)
 
-	statusCount := prometheus.NewGaugeVec(
+	statusCount := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: prefix,
 			Name:      name + "_stage_count",
