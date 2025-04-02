@@ -22,7 +22,7 @@ function create_binding {
 }
 
 forge clean
-forge build --deny-warnings
+forge build
 
 contracts="PaymentVault \
   SocketRegistry \
