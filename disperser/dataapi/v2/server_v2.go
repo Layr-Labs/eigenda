@@ -190,6 +190,11 @@ type (
 		RetrievalStatus string `json:"retrieval_status"`
 	}
 
+	AccountBlobFeedResponse struct {
+		AccountId string     `json:"account_id"`
+		Blobs     []BlobInfo `json:"blobs"`
+	}
+
 	SemverReportResponse struct {
 		Semver map[string]*semver.SemverMetrics `json:"semver"`
 	}
