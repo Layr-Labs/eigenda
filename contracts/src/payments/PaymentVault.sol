@@ -2,15 +2,17 @@
 pragma solidity ^0.8.9;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {PaymentVaultStorage} from "./PaymentVaultStorage.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
 
 
 /**
  * @title Entrypoint for making reservations and on demand payments for EigenDA.
  * @author Layr Labs, Inc.
 **/
-contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
+contract PaymentVault is OwnableUpgradeable, ReentrancyGuardUpgradeable, PaymentVaultStorage, IPaymentVault {
  
     constructor() {
         _disableInitializers();
@@ -50,6 +52,8 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
         require(_globalRatePeriodInterval > 0, "Global rate period interval must be positive");
         require(_globalRatePeriodInterval <= 1 days, "Global rate period interval too large");
         
+        __Ownable_init();
+        __ReentrancyGuard_init();
         _transferOwnership(_initialOwner);
         
         minNumSymbols = _minNumSymbols;
@@ -77,14 +81,19 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
      */
     function setReservation(
         address _account, 
-        Reservation memory _reservation
+        IPaymentVault.Reservation memory _reservation
     ) external payable { 
         require(newReservationsEnabled, "New reservations are currently disabled");
         require(_reservation.symbolsPerSecond > 0, "Symbols per second must be positive");
         require(quorumOwner[_reservation.quorumNumber].length > 0, "Quorum does not exist");
         
         // Ensure the sender is the designated owner for the quorum
-        require(msg.sender == address(uint160(uint256(quorumOwner[_reservation.quorumNumber]))), "Not authorized");
+        bytes memory ownerBytes = quorumOwner[_reservation.quorumNumber];
+        address owner;
+        assembly {
+            owner := mload(add(ownerBytes, 20))
+        }
+        require(msg.sender == owner, "Not authorized");
 
         require(_reservation.endTimestamp > _reservation.startTimestamp, "End timestamp must be greater than start timestamp");
 
@@ -103,7 +112,7 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
         require(msg.value == payment, "Incorrect payment amount");
 
         // Retrieve the existing reservation (if any)
-        Reservation storage existingReservation = reservations[_reservation.quorumNumber][_account];
+        IPaymentVault.Reservation storage existingReservation = reservations[_reservation.quorumNumber][_account];
 
         // Calculate the new reservation periods *before* modifying anything
         uint64 startPeriod = _reservation.startTimestamp / reservationSchedulePeriod * reservationSchedulePeriod;
@@ -272,7 +281,7 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
         require(_token.transfer(owner(), _amount), "Transfer failed");
     }
 
-    function _checkQuorumSplit(bytes memory _quorumNumbers, bytes memory _quorumSplits) internal pure {
+    function _checkQuorumSplit(bytes memory _quorumNumbers, bytes memory _quorumSplits) public pure {
         require(_quorumNumbers.length == _quorumSplits.length, "arrays must have the same length");
         uint8 total;
         for(uint256 i; i < _quorumSplits.length; ++i) total += uint8(_quorumSplits[i]);
@@ -287,15 +296,15 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
     }
 
     /// @notice Fetches the current reservation for a quorum and account
-    function getReservation(uint64 _quorumNumber, address _account) external view returns (Reservation memory) {
+    function getReservation(uint64 _quorumNumber, address _account) external view returns (IPaymentVault.Reservation memory) {
         return reservations[_quorumNumber][_account];
     }
 
     /// @notice Fetches the current reservations for a set of quorums and accounts
-    function getReservations(uint64[] memory _quorums, address[] memory _accounts) external view returns (Reservation[][] memory _reservations) {
-        _reservations = new Reservation[][](_quorums.length);
+    function getReservations(uint64[] memory _quorums, address[] memory _accounts) external view returns (IPaymentVault.Reservation[][] memory _reservations) {
+        _reservations = new IPaymentVault.Reservation[][](_quorums.length);
         for(uint256 i; i < _quorums.length; ++i) {
-            _reservations[i] = new Reservation[](_accounts.length);
+            _reservations[i] = new IPaymentVault.Reservation[](_accounts.length);
             for(uint256 j; j < _accounts.length; ++j) {
                 _reservations[i][j] = reservations[_quorums[i]][_accounts[j]];
             }
