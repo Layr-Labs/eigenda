@@ -156,7 +156,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
     }
 
     /// @notice Given a reference block number, returns the block until which operators must serve.
-    function latestServeUntilBlock(uint32 referenceBlockNumber) external view returns (uint32) {
+    function latestServeUntilBlock(uint32 referenceBlockNumber) external pure returns (uint32) {
         return referenceBlockNumber + STORE_DURATION_BLOCKS + BLOCK_STALE_MEASURE;
     }
 

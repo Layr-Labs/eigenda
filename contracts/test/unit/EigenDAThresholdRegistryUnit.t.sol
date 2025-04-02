@@ -76,21 +76,21 @@ contract EigenDAThresholdRegistryUnit is MockEigenDADeployer {
         );
     }
 
-    function test_getQuorumAdversaryThresholdPercentage() public {
+    function test_getQuorumAdversaryThresholdPercentage() public view {
         uint8 quorumNumber = 1;
         uint8 adversaryThresholdPercentage =
             eigenDAThresholdRegistry.getQuorumAdversaryThresholdPercentage(quorumNumber);
         assertEq(adversaryThresholdPercentage, uint8(quorumAdversaryThresholdPercentages[quorumNumber]));
     }
 
-    function test_getQuorumConfirmationThresholdPercentage() public {
+    function test_getQuorumConfirmationThresholdPercentage() public view {
         uint8 quorumNumber = 1;
         uint8 confirmationThresholdPercentage =
             eigenDAThresholdRegistry.getQuorumConfirmationThresholdPercentage(quorumNumber);
         assertEq(confirmationThresholdPercentage, uint8(quorumConfirmationThresholdPercentages[quorumNumber]));
     }
 
-    function test_getIsQuorumRequired() public {
+    function test_getIsQuorumRequired() public view {
         uint8 quorumNumber = 0;
         bool isQuorumRequired = eigenDAThresholdRegistry.getIsQuorumRequired(quorumNumber);
         assertEq(isQuorumRequired, true);

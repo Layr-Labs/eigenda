@@ -52,6 +52,7 @@ contract MockRollup {
      */
     function challengeCommitment(uint256 timestamp, uint256 point, BN254.G2Point memory proof, uint256 challengeValue)
         external
+        view
         returns (bool)
     {
         Commitment memory commitment = commitments[timestamp];

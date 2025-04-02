@@ -82,7 +82,7 @@ contract Deployer_EjectionManager is Script, Test {
         EjectionManager _ejectionManager,
         EjectionManager _ejectionManagerImplementation,
         string memory config_data
-    ) internal {
+    ) internal view {
         require(
             address(_ejectionManager.registryCoordinator()) == address(registryCoordinator),
             "ejectionManager.registryCoordinator() != registryCoordinator"
@@ -123,6 +123,7 @@ contract Deployer_EjectionManager is Script, Test {
 
     function _parseQuorumEjectionParams(string memory config_data)
         internal
+        pure
         returns (IEjectionManager.QuorumEjectionParams[] memory quorumEjectionParams)
     {
         bytes memory quorumEjectionParamsRaw = stdJson.parseRaw(config_data, ".quorumEjectionParams");

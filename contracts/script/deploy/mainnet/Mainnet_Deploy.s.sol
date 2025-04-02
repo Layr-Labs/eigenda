@@ -1,6 +1,6 @@
+pragma solidity =0.8.12;
 // SPDX-License-Identifier: BUSL-1.1
 /*
-pragma solidity =0.8.12;
 
 import {PauserRegistry} from "../lib/eigenlayer-middleware/src/contracts/permissions/PauserRegistry.sol";
 import {EmptyContract} from "../lib/eigenlayer-middleware/src/test/mocks/EmptyContract.sol";

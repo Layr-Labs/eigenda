@@ -196,7 +196,7 @@ library EigenDACertVerificationUtils {
         );
 
         // check BLS signature and get stake signed for batch quorums
-        (QuorumStakeTotals memory quorumStakeTotals, bytes32 signatoryRecordHash) = signatureVerifier.checkSignatures(
+        (QuorumStakeTotals memory quorumStakeTotals,) = signatureVerifier.checkSignatures(
             EigenDAHasher.hashBatchHeaderV2(batchHeader),
             signedQuorumNumbers,
             batchHeader.referenceBlockNumber,

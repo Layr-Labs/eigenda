@@ -288,7 +288,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
-    function testThresholds() public {
+    function testThresholds() public view {
         require(
             eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(0) == 33,
             "getQuorumAdversaryThresholdPercentage failed"

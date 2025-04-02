@@ -136,7 +136,6 @@ contract PaymentVaultUnit is MockEigenDADeployer {
 
     function test_depositOnDemand_forOtherUser() public {
         vm.deal(user, 100 ether);
-        address otherUser = address(uint160(420));
 
         vm.expectEmit(address(paymentVault));
         emit OnDemandPaymentUpdated(user2, 100 ether, 100 ether);
@@ -152,7 +151,8 @@ contract PaymentVaultUnit is MockEigenDADeployer {
         vm.expectEmit(address(paymentVault));
         emit OnDemandPaymentUpdated(user, 100 ether, 100 ether);
         vm.prank(user);
-        payable(paymentVault).call{value: 100 ether}(hex"69");
+        (bool success,) = payable(paymentVault).call{value: 100 ether}(hex"69");
+        require(success, "ETH transfer failed");
         assertEq(paymentVault.getOnDemandTotalDeposit(user), 100 ether);
     }
 
@@ -162,7 +162,8 @@ contract PaymentVaultUnit is MockEigenDADeployer {
         vm.expectEmit(address(paymentVault));
         emit OnDemandPaymentUpdated(user, 100 ether, 100 ether);
         vm.prank(user);
-        payable(paymentVault).call{value: 100 ether}("");
+        (bool success,) = payable(paymentVault).call{value: 100 ether}("");
+        require(success, "ETH transfer failed");
         assertEq(paymentVault.getOnDemandTotalDeposit(user), 100 ether);
     }
 

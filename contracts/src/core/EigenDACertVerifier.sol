@@ -209,7 +209,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     function verifyDACertSecurityParams(
         VersionedBlobParams memory blobParams,
         SecurityThresholds memory securityThresholds
-    ) external view {
+    ) external pure {
         EigenDACertVerificationUtils._verifyDACertSecurityParams(blobParams, securityThresholds);
     }
 
