@@ -12,6 +12,10 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     steps:
+      - uses: step-security/harden-runner@446798f8213ac2e75931c1b0769676d927801858 # v2.10.3
+        with:
+          egress-policy: audit
+          
       - name: Add LocalStack AWS Credentials
         run: |
           mkdir -p ~/.aws
@@ -49,7 +53,7 @@ jobs:
       #   run: geth version
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: foundry-rs/foundry-toolchain@de808b1eea699e761c404bda44ba8f21aba30b2c
         with:
           version: nightly-293fad73670b7b59ca901c7f2105bf7a29165a90
 
