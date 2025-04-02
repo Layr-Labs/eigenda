@@ -18,7 +18,6 @@ import "../interfaces/IEigenDAStructs.sol";
  *         to change these values or verification behavior a new CertVerifier must be deployed
  */
 contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDAThresholdRegistry {
-
     /// @notice The EigenDAThresholdRegistry contract address
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
 

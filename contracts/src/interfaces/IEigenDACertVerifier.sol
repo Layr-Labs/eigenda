@@ -90,16 +90,5 @@ interface IEigenDACertVerifier is IEigenDACertVerifierBase {
      * @param version The version of the blob to verify
      * @param securityThresholds The security thresholds to verify against
      */
-<<<<<<< HEAD
-<<<<<<< HEAD
     function verifyDACertSecurityParams(uint16 version, SecurityThresholds memory securityThresholds) external view;
-=======
-    function verifyDACertSecurityParams(
-        uint16 version,
-        SecurityThresholds memory securityThresholds
-    ) external view;
->>>>>>> de14d145 (feat: cert verifier router)
-=======
-    function verifyDACertSecurityParams(uint16 version, SecurityThresholds memory securityThresholds) external view;
->>>>>>> d72f87a1 (chore: forge fmt)
 }
