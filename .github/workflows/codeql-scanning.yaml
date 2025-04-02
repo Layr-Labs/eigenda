@@ -47,7 +47,7 @@ jobs:
     - name: Install Foundry
       uses: foundry-rs/foundry-toolchain@v1
       with:
-          version: nightly-293fad73670b7b59ca901c7f2105bf7a29165a90
+          version: nightly
 
     - name: Install golang
       uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 #5.3.0
