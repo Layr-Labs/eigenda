@@ -61,7 +61,6 @@ GLOBAL OPTIONS:
    --eigenda.v2.disable-point-evaluation         Disables IFFT transformation done during payload encoding. Using this mode results in blobs that can't be proven. (default: false) [$EIGENDA_PROXY_EIGENDA_V2_DISABLE_POINT_EVALUATION]
    --eigenda.v2.disable-tls                      Disable TLS for gRPC communication with the EigenDA disperser and retrieval subnet. (default: false) [$EIGENDA_PROXY_EIGENDA_V2_GRPC_DISABLE_TLS]
    --eigenda.v2.disperse-blob-timeout value      Maximum amount of time to wait for a blob to disperse against v2 protocol. (default: 2m0s) [$EIGENDA_PROXY_EIGENDA_V2_DISPERSE_BLOB_TIMEOUT]
-   --eigenda.v2.disperse-to-v2                   Enable blob dispersal and retrieval against EigenDA V2 protocol. (default: false) [$EIGENDA_PROXY_EIGENDA_V2_DISPERSE_TO_V2]
    --eigenda.v2.disperser-rpc value              RPC endpoint of the EigenDA disperser. [$EIGENDA_PROXY_EIGENDA_V2_DISPERSER_RPC]
    --eigenda.v2.eth-rpc value                    URL of the Ethereum RPC endpoint. [$EIGENDA_PROXY_EIGENDA_V2_ETH_RPC]
    --eigenda.v2.max-blob-length value            Maximum blob length to be written or read from EigenDA. Determines the number of SRS points
@@ -118,7 +117,9 @@ GLOBAL OPTIONS:
 
    Storage
 
-   --storage.cache-targets value [ --storage.cache-targets value ]        List of caching targets to use fast reads from EigenDA. [$EIGENDA_PROXY_STORAGE_CACHE_TARGETS]
-   --storage.concurrent-write-routines value                              Number of threads spun-up for async secondary storage insertions. (<=0) denotes single threaded insertions where (>0) indicates decoupled writes. (default: 0) [$EIGENDA_PROXY_STORAGE_CONCURRENT_WRITE_THREADS]
-   --storage.fallback-targets value [ --storage.fallback-targets value ]  List of read fallback targets to rollover to if cert can't be read from EigenDA. [$EIGENDA_PROXY_STORAGE_FALLBACK_TARGETS]
+   --storage.backends-to-enable value [ --storage.backends-to-enable value ]  Comma separated list of eigenDA backends to enable (e.g. V1,V2) (default: "V1") [$EIGENDA_PROXY_STORAGE_BACKENDS_TO_ENABLE]
+   --storage.cache-targets value [ --storage.cache-targets value ]            List of caching targets to use fast reads from EigenDA. [$EIGENDA_PROXY_STORAGE_CACHE_TARGETS]
+   --storage.concurrent-write-routines value                                  Number of threads spun-up for async secondary storage insertions. (<=0) denotes single threaded insertions where (>0) indicates decoupled writes. (default: 0) [$EIGENDA_PROXY_STORAGE_CONCURRENT_WRITE_THREADS]
+   --storage.disperse-to-v2                                                   Enable blob dispersal to EigenDA V2 protocol. (default: false) [$EIGENDA_PROXY_STORAGE_DISPERSE_TO_V2]
+   --storage.fallback-targets value [ --storage.fallback-targets value ]      List of read fallback targets to rollover to if cert can't be read from EigenDA. [$EIGENDA_PROXY_STORAGE_FALLBACK_TARGETS]
 

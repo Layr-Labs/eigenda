@@ -135,7 +135,7 @@ func (svr *Server) handlePostStdCommitment(w http.ResponseWriter, r *http.Reques
 		Version: commitments.CertV0,
 	}
 
-	if svr.cfg.DisperseToV2 {
+	if svr.sm.DisperseToV2() {
 		commitmentMeta.Version = commitments.CertV1
 	}
 
@@ -175,7 +175,7 @@ func (svr *Server) handlePostOPGenericCommitment(w http.ResponseWriter, r *http.
 		Version: commitments.CertV0,
 	}
 
-	if svr.cfg.DisperseToV2 {
+	if svr.sm.DisperseToV2() {
 		commitmentMeta.Version = commitments.CertV1
 	}
 

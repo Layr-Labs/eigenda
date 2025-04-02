@@ -15,10 +15,6 @@ import (
 )
 
 var (
-	// DisperseToV2FlagName is a temporary feature flag that will be deprecated once all client
-	// dependencies migrate to using EigenDA V2 network
-	DisperseToV2FlagName = withFlagPrefix("disperse-to-v2")
-
 	DisperserFlagName               = withFlagPrefix("disperser-rpc")
 	DisableTLSFlagName              = withFlagPrefix("disable-tls")
 	BlobStatusPollIntervalFlagName  = withFlagPrefix("blob-status-poll-interval")
@@ -45,13 +41,6 @@ func withEnvPrefix(envPrefix, s string) string {
 }
 func CLIFlags(envPrefix, category string) []cli.Flag {
 	return []cli.Flag{
-		&cli.BoolFlag{
-			Name:     DisperseToV2FlagName,
-			Usage:    "Enable blob dispersal and retrieval against EigenDA V2 protocol.",
-			EnvVars:  []string{withEnvPrefix(envPrefix, "DISPERSE_TO_V2")},
-			Category: category,
-			Required: false,
-		},
 		&cli.StringFlag{
 			Name:     DisperserFlagName,
 			Usage:    "RPC endpoint of the EigenDA disperser.",
@@ -165,11 +154,6 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 }
 
 func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
-	disperseToV2 := ctx.Bool(DisperseToV2FlagName)
-	if !disperseToV2 {
-		return common.ClientConfigV2{}, nil
-	}
-
 	disperserConfig, err := readDisperserCfg(ctx)
 	if err != nil {
 		return common.ClientConfigV2{}, fmt.Errorf("read disperser config: %w", err)
@@ -183,7 +167,6 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 	}
 
 	return common.ClientConfigV2{
-		DisperseToV2:               disperseToV2,
 		DisperserClientCfg:         disperserConfig,
 		PayloadDisperserCfg:        readPayloadDisperserCfg(ctx),
 		RelayPayloadRetrieverCfg:   readRetrievalConfig(ctx),

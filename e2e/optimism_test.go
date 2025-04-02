@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
+	proxycommon "github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/testutils"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	e2econfig "github.com/ethereum-optimism/optimism/op-e2e/config"
@@ -208,6 +209,20 @@ func testOptimismGenericCommitment(t *testing.T, disperseToV2 bool) {
 	ot := actions.NewDefaultTesting(t)
 
 	optimism := NewL2AltDA(ot, proxyTS.Address(), true)
+	exerciseGenericCommitments(t, ot, optimism)
+
+	requireDispersalRetrievalEigenDA(
+		t,
+		proxyTS.Metrics.HTTPServerRequestsTotal,
+		commitments.OptimismGeneric)
+}
+
+func exerciseGenericCommitments(
+	t *testing.T,
+	ot actions.StatefulTesting,
+	optimism *L2AltDA,
+) {
+	expectedBlockNumber := optimism.sequencer.SyncStatus().SafeL1.Number
 
 	// build L1 block #1
 	optimism.ActL1Blocks(ot, 1)
@@ -219,7 +234,9 @@ func testOptimismGenericCommitment(t *testing.T, disperseToV2 bool) {
 
 	optimism.sequencer.ActL2PipelineFull(ot)
 	optimism.sequencer.ActL1SafeSignal(ot)
-	require.Equal(t, uint64(1), optimism.sequencer.SyncStatus().SafeL1.Number)
+
+	expectedBlockNumber++
+	require.Equal(t, expectedBlockNumber, optimism.sequencer.SyncStatus().SafeL1.Number)
 
 	// add L1 block #2
 	optimism.ActL1Blocks(ot, 1)
@@ -233,6 +250,9 @@ func testOptimismGenericCommitment(t *testing.T, disperseToV2 bool) {
 	optimism.sequencer.ActL1FinalizedSignal(ot)
 	optimism.sequencer.ActL1SafeSignal(ot)
 
+	expectedBlockNumber++
+	require.Equal(t, expectedBlockNumber, optimism.sequencer.SyncStatus().SafeL1.Number)
+
 	// commit all the l2 blocks to L1
 	optimism.batcher.ActSubmitAll(ot)
 	optimism.miner.ActL1StartBlock(12)(ot)
@@ -242,9 +262,43 @@ func testOptimismGenericCommitment(t *testing.T, disperseToV2 bool) {
 	// verify
 	optimism.sequencer.ActL2PipelineFull(ot)
 	optimism.ActL1Finalized(ot)
+}
 
-	requireDispersalRetrievalEigenDA(
+func TestOptimismGenericCommitmentMigration(t *testing.T) {
+	testCfg := testutils.NewTestConfig(
+		testutils.GetBackend(),
+		false,
+		proxycommon.V1EigenDABackend,
+		proxycommon.V2EigenDABackend)
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	proxyTS, shutDown := testutils.CreateTestSuite(tsConfig)
+	defer shutDown()
+
+	expectedWriteCount := uint64(0)
+	expectedReadCount := uint64(0)
+
+	ot := actions.NewDefaultTesting(t)
+
+	optimism := NewL2AltDA(ot, proxyTS.Address(), true)
+	exerciseGenericCommitments(t, ot, optimism)
+	expectedWriteCount++
+	expectedReadCount++
+	requireDispersalRetrievalEigenDACounts(
 		t,
 		proxyTS.Metrics.HTTPServerRequestsTotal,
-		commitments.OptimismGeneric)
+		commitments.OptimismGeneric,
+		expectedWriteCount,
+		expectedReadCount)
+
+	// turn on v2 dispersal
+	proxyTS.Server.SetDisperseToV2(true)
+	exerciseGenericCommitments(t, ot, optimism)
+	expectedWriteCount++
+	expectedReadCount++
+	requireDispersalRetrievalEigenDACounts(
+		t,
+		proxyTS.Metrics.HTTPServerRequestsTotal,
+		commitments.OptimismGeneric,
+		expectedWriteCount,
+		expectedReadCount)
 }

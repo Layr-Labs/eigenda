@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/common"
@@ -16,6 +17,8 @@ import (
 type IManager interface {
 	Get(ctx context.Context, key []byte, cm commitments.CommitmentMeta) ([]byte, error)
 	Put(ctx context.Context, cm commitments.CommitmentMode, key, value []byte) ([]byte, error)
+	SetDisperseToV2(disperseToV2 bool)
+	DisperseToV2() bool
 }
 
 // Manager ... storage backend routing layer
@@ -24,12 +27,26 @@ type Manager struct {
 
 	s3 common.PrecomputedKeyStore // for op keccak256 commitment
 	// For op generic commitments & standard commitments
-	eigenda   common.GeneratedKeyStore // v0 da commitment version
-	eigendaV2 common.GeneratedKeyStore // v1 da commitment version
-	writeV2   bool                     // write blobs to EigenDAV2 backend
+	eigenda      common.GeneratedKeyStore // v0 da commitment version
+	eigendaV2    common.GeneratedKeyStore // v1 da commitment version
+	disperseToV2 *atomic.Bool             // write blobs to EigenDAV2 backend
 
 	// secondary storage backends (caching and fallbacks)
 	secondary ISecondary
+}
+
+var _ IManager = &Manager{}
+
+// DisperseToV2 returns whether v2 dispersal is enabled
+func (m *Manager) DisperseToV2() bool {
+	return m.disperseToV2.Load()
+}
+
+// SetDisperseToV2 sets whether v2 dispersal is enabled.
+//
+// If set to true, the manager will disperse to eigenDA v2. If false, it will disperse to eigenDA v1
+func (m *Manager) SetDisperseToV2(disperseToV2 bool) {
+	m.disperseToV2.Store(disperseToV2)
 }
 
 // NewManager ... Init
@@ -41,28 +58,25 @@ func NewManager(
 	secondary ISecondary,
 	disperseToV2 bool,
 ) (*Manager, error) {
-	// 1 - Determine where to disperse blobs
-	var writeV2 = true
-	if eigenda != nil && !disperseToV2 {
-		writeV2 = false
-	}
-
-	// 2 - Enforce invariants
-	if writeV2 && eigenDAV2 == nil {
+	// Enforce invariants
+	if disperseToV2 && eigenDAV2 == nil {
 		return nil, fmt.Errorf("EigenDA V2 dispersal enabled but no v2 store provided")
 	}
 
-	if !writeV2 && eigenda == nil {
+	if !disperseToV2 && eigenda == nil {
 		return nil, fmt.Errorf("EigenDA dispersal enabled but no store provided")
 	}
 
+	disperseToV2Atomic := &atomic.Bool{}
+	disperseToV2Atomic.Store(disperseToV2)
+
 	return &Manager{
-		log:       l,
-		eigenda:   eigenda,
-		eigendaV2: eigenDAV2,
-		s3:        s3,
-		secondary: secondary,
-		writeV2:   writeV2,
+		log:          l,
+		eigenda:      eigenda,
+		eigendaV2:    eigenDAV2,
+		s3:           s3,
+		secondary:    secondary,
+		disperseToV2: disperseToV2Atomic,
 	}, nil
 }
 
@@ -90,8 +104,11 @@ func (m *Manager) Get(ctx context.Context, key []byte, cm commitments.Commitment
 		return value, nil
 
 	case commitments.Standard, commitments.OptimismGeneric:
-		if m.eigenda == nil {
-			return nil, errors.New("expected EigenDA backend for DA commitment type, but none configured")
+		if cm.Version == commitments.CertV0 && m.eigenda == nil {
+			return nil, errors.New("expected EigenDA V1 backend for DA commitment type with CertV0")
+		}
+		if cm.Version == commitments.CertV1 && m.eigendaV2 == nil {
+			return nil, errors.New("expected EigenDA V2 backend for DA commitment type with CertV1")
 		}
 
 		verifyMethod, err := m.getVerifyMethod(cm.Version)
@@ -191,7 +208,7 @@ func (m *Manager) getVerifyMethod(commitmentType commitments.EigenDACommitmentTy
 
 // putEigenDAMode ... disperses blob to EigenDA backend
 func (m *Manager) putEigenDAMode(ctx context.Context, value []byte) ([]byte, error) {
-	if !m.writeV2 { // disperse v1
+	if !m.disperseToV2.Load() { // disperse v1
 		m.log.Info("Storing data to EigenDA V1 backend")
 		return m.eigenda.Put(ctx, value)
 	}

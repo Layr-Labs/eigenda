@@ -50,6 +50,20 @@ func (mr *MockIManagerMockRecorder) Get(arg0, arg1, arg2 interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockIManager)(nil).Get), arg0, arg1, arg2)
 }
 
+// DisperseToV2 mocks base method.
+func (m *MockIManager) DisperseToV2() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DisperseToV2")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// DisperseToV2 indicates an expected call of DisperseToV2.
+func (mr *MockIManagerMockRecorder) DisperseToV2() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DisperseToV2", reflect.TypeOf((*MockIManager)(nil).DisperseToV2))
+}
+
 // Put mocks base method.
 func (m *MockIManager) Put(arg0 context.Context, arg1 commitments.CommitmentMode, arg2, arg3 []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
@@ -63,4 +77,16 @@ func (m *MockIManager) Put(arg0 context.Context, arg1 commitments.CommitmentMode
 func (mr *MockIManagerMockRecorder) Put(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockIManager)(nil).Put), arg0, arg1, arg2, arg3)
+}
+
+// SetDisperseToV2 mocks base method.
+func (m *MockIManager) SetDisperseToV2(arg0 bool) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetDisperseToV2", arg0)
+}
+
+// SetDisperseToV2 indicates an expected call of SetDisperseToV2.
+func (mr *MockIManagerMockRecorder) SetDisperseToV2(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDisperseToV2", reflect.TypeOf((*MockIManager)(nil).SetDisperseToV2), arg0)
 }

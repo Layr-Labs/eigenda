@@ -9,6 +9,9 @@ import (
 )
 
 type Config struct {
+	BackendsToEnable []common.EigenDABackend
+	DisperseToV2     bool
+
 	AsyncPutWorkers int
 	FallbackTargets []string
 	CacheTargets    []string

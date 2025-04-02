@@ -148,6 +148,7 @@ func GetBackend() Backend {
 }
 
 type TestConfig struct {
+	BackendsToEnable []common.EigenDABackend
 	DisperseToV2     bool
 	Backend          Backend
 	Expiration       time.Duration
@@ -159,8 +160,19 @@ type TestConfig struct {
 	UseS3Fallback      bool
 }
 
-func NewTestConfig(backend Backend, disperseToV2 bool) TestConfig {
+// NewTestConfig returns a new TestConfig
+func NewTestConfig(backend Backend, disperseToV2 bool, backendsToEnable ...common.EigenDABackend) TestConfig {
+	// if the caller doesn't specify which backends to enable, enable whichever eigenda backend is being dispersed to
+	if len(backendsToEnable) == 0 {
+		if disperseToV2 {
+			backendsToEnable = []common.EigenDABackend{common.V2EigenDABackend}
+		} else {
+			backendsToEnable = []common.EigenDABackend{common.V1EigenDABackend}
+		}
+	}
+
 	return TestConfig{
+		BackendsToEnable:   backendsToEnable,
 		DisperseToV2:       disperseToV2,
 		Backend:            backend,
 		Expiration:         14 * 24 * time.Hour,
@@ -252,9 +264,8 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 
 	proxyConfig := config.ProxyConfig{
 		ServerConfig: config.ServerConfig{
-			DisperseToV2: testCfg.DisperseToV2,
-			Host:         host,
-			Port:         0,
+			Host: host,
+			Port: 0,
 		},
 		ClientConfigV1: common.ClientConfigV1{
 			EdaClientCfg: clients.EigenDAClientConfig{
@@ -293,7 +304,6 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			}),
 		MemstoreEnabled: useMemory,
 		ClientConfigV2: common.ClientConfigV2{
-			DisperseToV2: testCfg.DisperseToV2,
 			DisperserClientCfg: clientsv2.DisperserClientConfig{
 				Hostname:          disperserHostname,
 				Port:              disperserPort,
@@ -315,7 +325,9 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			EigenDACertVerifierAddress: certVerifierAddress,
 		},
 		StorageConfig: store.Config{
-			AsyncPutWorkers: testCfg.WriteThreadCount,
+			AsyncPutWorkers:  testCfg.WriteThreadCount,
+			BackendsToEnable: testCfg.BackendsToEnable,
+			DisperseToV2:     testCfg.DisperseToV2,
 		},
 	}
 

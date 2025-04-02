@@ -10,7 +10,6 @@ import (
 
 // ClientConfigV2 contains all non-sensitive configuration to construct V2 clients
 type ClientConfigV2 struct {
-	DisperseToV2             bool
 	DisperserClientCfg       clients_v2.DisperserClientConfig
 	PayloadDisperserCfg      payloaddispersal.PayloadDisperserConfig
 	RelayPayloadRetrieverCfg payloadretrieval.RelayPayloadRetrieverConfig

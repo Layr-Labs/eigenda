@@ -80,3 +80,25 @@ func ParseBytesAmount(s string) (uint64, error) {
 		return 0, fmt.Errorf("unsupported unit: %s", unit)
 	}
 }
+
+// EigenDABackend is an enum representing various eigenDA backends
+type EigenDABackend uint8
+
+const (
+	V1EigenDABackend EigenDABackend = iota + 1
+	V2EigenDABackend
+)
+
+// StringToEigenDABackend converts a string to EigenDABackend enum
+func StringToEigenDABackend(inputString string) (EigenDABackend, error) {
+	inputString = strings.ToLower(strings.TrimSpace(inputString))
+
+	switch inputString {
+	case "v1":
+		return V1EigenDABackend, nil
+	case "v2":
+		return V2EigenDABackend, nil
+	default:
+		return 0, fmt.Errorf("invalid backend option: %s", inputString)
+	}
+}

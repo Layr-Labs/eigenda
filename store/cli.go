@@ -1,15 +1,21 @@
 package store
 
 import (
+	"errors"
+	"fmt"
+
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/redis"
 	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/s3"
 	"github.com/urfave/cli/v2"
 )
 
 var (
-	FallbackTargetsFlagName = withFlagPrefix("fallback-targets")
-	CacheTargetsFlagName    = withFlagPrefix("cache-targets")
-	ConcurrentWriteThreads  = withFlagPrefix("concurrent-write-routines")
+	BackendsToEnableFlagName = withFlagPrefix("backends-to-enable")
+	DisperseToV2FlagName     = withFlagPrefix("disperse-to-v2")
+	FallbackTargetsFlagName  = withFlagPrefix("fallback-targets")
+	CacheTargetsFlagName     = withFlagPrefix("cache-targets")
+	ConcurrentWriteThreads   = withFlagPrefix("concurrent-write-routines")
 )
 
 func withFlagPrefix(s string) string {
@@ -24,6 +30,21 @@ func withEnvPrefix(envPrefix, s string) []string {
 // category is used to group the flags in the help output (see https://cli.urfave.org/v2/examples/flags/#grouping)
 func CLIFlags(envPrefix, category string) []cli.Flag {
 	return []cli.Flag{
+		&cli.StringSliceFlag{
+			Name:     BackendsToEnableFlagName,
+			Usage:    "Comma separated list of eigenDA backends to enable (e.g. V1,V2)",
+			EnvVars:  withEnvPrefix(envPrefix, "BACKENDS_TO_ENABLE"),
+			Value:    cli.NewStringSlice("V1"),
+			Category: category,
+			Required: false,
+		},
+		&cli.BoolFlag{
+			Name:     DisperseToV2FlagName,
+			Usage:    "Enable blob dispersal to EigenDA V2 protocol.",
+			EnvVars:  withEnvPrefix(envPrefix, "DISPERSE_TO_V2"),
+			Category: category,
+			Required: false,
+		},
 		&cli.StringSliceFlag{
 			Name:     FallbackTargetsFlagName,
 			Usage:    "List of read fallback targets to rollover to if cert can't be read from EigenDA.",
@@ -48,12 +69,28 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 	}
 }
 
-func ReadConfig(ctx *cli.Context) Config {
-	return Config{
-		AsyncPutWorkers: ctx.Int(ConcurrentWriteThreads),
-		FallbackTargets: ctx.StringSlice(FallbackTargetsFlagName),
-		CacheTargets:    ctx.StringSlice(CacheTargetsFlagName),
-		RedisConfig:     redis.ReadConfig(ctx),
-		S3Config:        s3.ReadConfig(ctx),
+func ReadConfig(ctx *cli.Context) (Config, error) {
+	backendStrings := ctx.StringSlice(BackendsToEnableFlagName)
+	if len(backendStrings) == 0 {
+		return Config{}, errors.New("backends must not be empty")
 	}
+
+	backends := make([]common.EigenDABackend, 0, len(backendStrings))
+	for _, backendString := range backendStrings {
+		backend, err := common.StringToEigenDABackend(backendString)
+		if err != nil {
+			return Config{}, fmt.Errorf("string to eigenDA backend: %w", err)
+		}
+		backends = append(backends, backend)
+	}
+
+	return Config{
+		BackendsToEnable: backends,
+		DisperseToV2:     ctx.Bool(DisperseToV2FlagName),
+		AsyncPutWorkers:  ctx.Int(ConcurrentWriteThreads),
+		FallbackTargets:  ctx.StringSlice(FallbackTargetsFlagName),
+		CacheTargets:     ctx.StringSlice(CacheTargetsFlagName),
+		RedisConfig:      redis.ReadConfig(ctx),
+		S3Config:         s3.ReadConfig(ctx),
+	}, nil
 }
