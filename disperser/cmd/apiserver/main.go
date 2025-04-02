@@ -175,12 +175,20 @@ func RunDisperserServer(ctx *cli.Context) error {
 
 		instanceID := config.InstanceID
 		if instanceID < 0 {
+			// Generate random ID within valid range for DefaultInstanceIDBits
 			id := uuid.New()
-			instanceID = int(binary.BigEndian.Uint16(id[:2]))
+			maxID := (1 << apiserver.DefaultInstanceIDBits) - 1
+			instanceID = int(binary.BigEndian.Uint16(id[:2]) & maxID)
+
+			logger.Warn("Using randomly generated instance ID. This increases risk of ID collisions between service replicas (if more than one), which may then increase risk of having same requestedAt timestamp for different blobs",
+				"instanceID", instanceID,
+				"maxAllowedID", maxID,
+				"recommendation", "Configure unique instance IDs for each replica to ensure timestamp uniqueness")
 		}
+
 		timeOracle, err := apiserver.NewTimestampOracle(uint64(instanceID), apiserver.DefaultInstanceIDBits)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to initialize timestamp oracle: %w", err)
 		}
 
 		server, err := apiserver.NewDispersalServerV2(
