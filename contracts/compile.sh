@@ -1,4 +1,7 @@
 #!/bin/bash
+set -o errexit -o nounset -o pipefail
+
+# This script compiles the Solidity contracts and generates Go bindings using abigen.
 
 function create_binding {
     contract_dir=$1
@@ -19,7 +22,7 @@ function create_binding {
 }
 
 forge clean
-forge build
+forge build --deny-warnings
 
 contracts="PaymentVault \
   SocketRegistry \
