@@ -177,8 +177,9 @@ func RunDisperserServer(ctx *cli.Context) error {
 		if instanceID < 0 {
 			// Generate random ID within valid range for DefaultInstanceIDBits
 			id := uuid.New()
-			maxID := (1 << apiserver.DefaultInstanceIDBits) - 1
-			instanceID = int(binary.BigEndian.Uint16(id[:2]) & maxID)
+			maxID := uint16((1 << apiserver.DefaultInstanceIDBits) - 1)
+			randomID := binary.BigEndian.Uint16(id[:2]) & maxID
+			instanceID = int(randomID)
 
 			logger.Warn("Using randomly generated instance ID. This increases risk of ID collisions between service replicas (if more than one), which may then increase risk of having same requestedAt timestamp for different blobs",
 				"instanceID", instanceID,
