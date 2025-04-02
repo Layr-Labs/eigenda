@@ -56,7 +56,7 @@ type disperserClient struct {
 	client             disperser_rpc.DisperserClient
 	prover             encoding.Prover
 	accountant         *Accountant
-	requestMutex       sync.Mutex // Mutex to ensure only one dispersal request is sent at a time
+	accountantLock     sync.Mutex
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -158,14 +158,31 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	probe *common.SequenceProbe,
 ) (*dispv2.BlobStatus, corev2.BlobKey, error) {
 
-	probe.SetStage("acquire_request_mutex")
+	if len(quorums) == 0 {
+		return nil, [32]byte{}, api.NewErrorInvalidArg("quorum numbers must be provided")
+	}
 
-	c.requestMutex.Lock()
-	defer c.requestMutex.Unlock()
+	probe.SetStage("acquire_accountant_lock")
+	c.accountantLock.Lock()
 
-	probe.SetStage("init_grpc_connection")
+	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
+	payment, err := c.accountant.AccountBlob(ctx, time.Now().UnixNano(), uint64(symbolLength), quorums)
+	if err != nil {
+		c.accountantLock.Unlock()
+		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
+	}
 
-	err := c.initOnceGrpcConnection()
+	if payment.CumulativePayment.Sign() == 0 {
+		// This request is using reserved bandwidth, no need to prevent parallel dispersal.
+		c.accountantLock.Unlock()
+	} else {
+		// This request is using on-demand bandwidth, current implementation requires sequential dispersal.
+		defer c.accountantLock.Unlock()
+	}
+
+	probe.SetStage("prepare_for_dispersal")
+
+	err = c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, [32]byte{}, api.NewErrorFailover(err)
 	}
@@ -176,18 +193,6 @@ func (c *disperserClient) DisperseBlobWithProbe(
 
 	if c.signer == nil {
 		return nil, [32]byte{}, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
-	}
-
-	probe.SetStage("prepare_for_dispersal")
-
-	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(ctx, time.Now().UnixNano(), uint64(symbolLength), quorums)
-	if err != nil {
-		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
-	}
-
-	if len(quorums) == 0 {
-		return nil, [32]byte{}, api.NewErrorInvalidArg("quorum numbers must be provided")
 	}
 
 	for _, q := range quorums {

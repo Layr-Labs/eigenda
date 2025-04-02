@@ -5,6 +5,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
@@ -26,6 +27,16 @@ func (m *MockDisperserClient) DisperseBlob(
 
 	args := m.mock.Called(ctx, data, blobVersion, quorums)
 	return args.Get(0).(*dispv2.BlobStatus), args.Get(1).(corev2.BlobKey), args.Error(2)
+}
+
+func (m *MockDisperserClient) DisperseBlobWithProbe(
+	ctx context.Context,
+	data []byte,
+	blobVersion corev2.BlobVersion,
+	quorums []core.QuorumID,
+	probe *common.SequenceProbe) (*dispv2.BlobStatus, corev2.BlobKey, error) {
+
+	return m.DisperseBlob(ctx, data, blobVersion, quorums)
 }
 
 func (m *MockDisperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.BlobKey) (*disperser_rpc.BlobStatusReply, error) {
