@@ -1,30 +1,29 @@
-package payloaddispersal
+package common
 
 import (
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 // It may be helpful to generalize this utility to be used in other parts of the codebase. For a future PR, perhaps.
 
-// stageTimer encapsulates metrics to help track the time spent in each stage of the payload dispersal process.
-type stageTimer struct {
+// StageTimer encapsulates metrics to help track the time spent in each stage of the payload dispersal process.
+type StageTimer struct {
 	stageCount   *prometheus.GaugeVec
 	stageLatency *prometheus.SummaryVec
 }
 
-// sequenceProbe tracks the timing of a single sequence of operations. Multiple sequences can be tracked concurrently.
-type sequenceProbe struct {
-	stageTimer        *stageTimer
+// SequenceProbe tracks the timing of a single sequence of operations. Multiple sequences can be tracked concurrently.
+type SequenceProbe struct {
+	stageTimer        *StageTimer
 	currentStage      string
 	currentStageStart time.Time
 }
 
-// newStageTimer creates a new stageTimer with the given prefix and name.
-func newStageTimer(registry *prometheus.Registry, prefix, name string) *stageTimer {
+// NewStageTimer creates a new stageTimer with the given prefix and name.
+func NewStageTimer(registry *prometheus.Registry, prefix, name string) *StageTimer {
 	if registry == nil {
 		return nil
 	}
@@ -32,7 +31,7 @@ func newStageTimer(registry *prometheus.Registry, prefix, name string) *stageTim
 	statusLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  prefix,
-			Name:       name + "stage_latency_ms",
+			Name:       name + "_stage_latency_ms",
 			Help:       "the latency of each type of operation",
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		},
@@ -48,20 +47,20 @@ func newStageTimer(registry *prometheus.Registry, prefix, name string) *stageTim
 		[]string{"stage"},
 	)
 
-	return &stageTimer{
+	return &StageTimer{
 		stageLatency: statusLatency,
 		stageCount:   statusCount,
 	}
 }
 
 // NewSequence creates a new sequenceProbe with the given initial status.
-func (s *stageTimer) NewSequence(initialStatus string) *sequenceProbe {
+func (s *StageTimer) NewSequence(initialStatus string) *SequenceProbe {
 	if s == nil {
 		return nil
 	}
 
 	s.stageCount.WithLabelValues(initialStatus).Inc()
-	return &sequenceProbe{
+	return &SequenceProbe{
 		stageTimer:        s,
 		currentStage:      initialStatus,
 		currentStageStart: time.Now(),
@@ -69,7 +68,7 @@ func (s *stageTimer) NewSequence(initialStatus string) *sequenceProbe {
 }
 
 // SetStage updates the status of the current sequence.
-func (p *sequenceProbe) SetStage(stage string) {
+func (p *SequenceProbe) SetStage(stage string) {
 	if p == nil {
 		return
 	}
@@ -79,7 +78,7 @@ func (p *sequenceProbe) SetStage(stage string) {
 
 	now := time.Now()
 	elapsed := now.Sub(p.currentStageStart)
-	p.stageTimer.stageLatency.WithLabelValues(p.currentStage).Observe(common.ToMilliseconds(elapsed))
+	p.stageTimer.stageLatency.WithLabelValues(p.currentStage).Observe(ToMilliseconds(elapsed))
 	p.currentStageStart = now
 
 	p.stageTimer.stageCount.WithLabelValues(p.currentStage).Dec()
@@ -87,15 +86,15 @@ func (p *sequenceProbe) SetStage(stage string) {
 	p.currentStage = stage
 }
 
-// end completes the current sequence. It is important to call this before discarding the sequenceProbe.
-func (p *sequenceProbe) end() {
+// End completes the current sequence. It is important to call this before discarding the sequenceProbe.
+func (p *SequenceProbe) End() {
 	if p == nil {
 		return
 	}
 
 	now := time.Now()
 	elapsed := now.Sub(p.currentStageStart)
-	p.stageTimer.stageLatency.WithLabelValues(p.currentStage).Observe(common.ToMilliseconds(elapsed))
+	p.stageTimer.stageLatency.WithLabelValues(p.currentStage).Observe(ToMilliseconds(elapsed))
 
 	p.stageTimer.stageCount.WithLabelValues(p.currentStage).Dec()
 }

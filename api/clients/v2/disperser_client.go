@@ -8,6 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api"
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
@@ -23,13 +24,29 @@ type DisperserClientConfig struct {
 	UseSecureGrpcFlag bool
 }
 
+// DisperserClient manages communication with the disperser server.
 type DisperserClient interface {
+	// Close closes the grpc connection to the disperser server.
 	Close() error
-	DisperseBlob(ctx context.Context, data []byte, blobVersion corev2.BlobVersion, quorums []core.QuorumID) (*dispv2.BlobStatus, corev2.BlobKey, error)
+	// DisperseBlob disperses a blob with the given data, blob version, and quorums.
+	DisperseBlob(
+		ctx context.Context,
+		data []byte,
+		blobVersion corev2.BlobVersion,
+		quorums []core.QuorumID) (*dispv2.BlobStatus, corev2.BlobKey, error)
+	// DisperseBlobWithProbe is similar to DisperseBlob, but also takes a SequenceProbe to capture metrics.
+	// If the probe is nil, no metrics are captured.
+	DisperseBlobWithProbe(
+		ctx context.Context,
+		data []byte,
+		blobVersion corev2.BlobVersion,
+		quorums []core.QuorumID,
+		probe *common.SequenceProbe) (*dispv2.BlobStatus, corev2.BlobKey, error)
+	// GetBlobStatus returns the status of a blob with the given blob key.
 	GetBlobStatus(ctx context.Context, blobKey corev2.BlobKey) (*disperser_rpc.BlobStatusReply, error)
+	// GetBlobCommitment returns the blob commitment for a given blob payload.
 	GetBlobCommitment(ctx context.Context, data []byte) (*disperser_rpc.BlobCommitmentReply, error)
 }
-
 type disperserClient struct {
 	config             *DisperserClientConfig
 	signer             corev2.BlobRequestSigner
@@ -128,8 +145,25 @@ func (c *disperserClient) DisperseBlob(
 	blobVersion corev2.BlobVersion,
 	quorums []core.QuorumID,
 ) (*dispv2.BlobStatus, corev2.BlobKey, error) {
+	return c.DisperseBlobWithProbe(ctx, data, blobVersion, quorums, nil)
+}
+
+// DisperseBlobWithProbe disperses a blob with the given data, blob version, and quorums. If sequenceProbe is not nil,
+// the probe is used to capture metrics during the dispersal process.
+func (c *disperserClient) DisperseBlobWithProbe(
+	ctx context.Context,
+	data []byte,
+	blobVersion corev2.BlobVersion,
+	quorums []core.QuorumID,
+	probe *common.SequenceProbe,
+) (*dispv2.BlobStatus, corev2.BlobKey, error) {
+
+	probe.SetStage("acquire_request_mutex")
+
 	c.requestMutex.Lock()
 	defer c.requestMutex.Unlock()
+
+	probe.SetStage("init_grpc_connection")
 
 	err := c.initOnceGrpcConnection()
 	if err != nil {
@@ -143,6 +177,8 @@ func (c *disperserClient) DisperseBlob(
 	if c.signer == nil {
 		return nil, [32]byte{}, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
 	}
+
+	probe.SetStage("prepare_for_dispersal")
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
 	payment, err := c.accountant.AccountBlob(ctx, time.Now().UnixNano(), uint64(symbolLength), quorums)
@@ -163,7 +199,10 @@ func (c *disperserClient) DisperseBlob(
 	// check every 32 bytes of data are within the valid range for a bn254 field element
 	_, err = rs.ToFrArray(data)
 	if err != nil {
-		return nil, [32]byte{}, fmt.Errorf("encountered an error to convert a 32-bytes into a valid field element, please use the correct format where every 32bytes(big-endian) is less than 21888242871839275222246405745257275088548364400416034343698204186575808495617 %w", err)
+		return nil, [32]byte{}, fmt.Errorf(
+			"encountered an error to convert a 32-bytes into a valid field element, "+
+				"please use the correct format where every 32bytes(big-endian) is less than "+
+				"21888242871839275222246405745257275088548364400416034343698204186575808495617 %w", err)
 	}
 
 	var blobCommitments encoding.BlobCommitments
@@ -220,6 +259,8 @@ func (c *disperserClient) DisperseBlob(
 		BlobHeader: blobHeaderProto,
 	}
 
+	probe.SetStage("send_to_disperser")
+
 	reply, err := c.client.DisperseBlob(ctx, request)
 	if err != nil {
 		return nil, [32]byte{}, fmt.Errorf("error while calling DisperseBlob: %w", err)
@@ -229,6 +270,8 @@ func (c *disperserClient) DisperseBlob(
 	if err != nil {
 		return nil, [32]byte{}, err
 	}
+
+	probe.SetStage("verify_blob_key")
 
 	if verifyReceivedBlobKey(blobHeader, reply) != nil {
 		return nil, [32]byte{}, fmt.Errorf("verify received blob key: %w", err)
@@ -245,9 +288,9 @@ func (c *disperserClient) DisperseBlob(
 //
 // This function returns nil if the verification succeeds, and otherwise returns an error describing the failure
 func verifyReceivedBlobKey(
-	// the blob header which was constructed locally and sent to the disperser
+// the blob header which was constructed locally and sent to the disperser
 	blobHeader *corev2.BlobHeader,
-	// the reply received back from the disperser
+// the reply received back from the disperser
 	disperserReply *disperser_rpc.DisperseBlobReply,
 ) error {
 

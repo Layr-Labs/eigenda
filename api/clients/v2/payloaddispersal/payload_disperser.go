@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/common"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -22,7 +23,7 @@ type PayloadDisperser struct {
 	config          PayloadDisperserConfig
 	disperserClient clients.DisperserClient
 	certVerifier    clients.ICertVerifier
-	stageTimer      *stageTimer
+	stageTimer      *common.StageTimer
 }
 
 // NewPayloadDisperser creates a PayloadDisperser from subcomponents that have already been constructed and initialized.
@@ -52,7 +53,7 @@ func NewPayloadDisperser(
 		config:          payloadDisperserConfig,
 		disperserClient: disperserClient,
 		certVerifier:    certVerifier,
-		stageTimer:      newStageTimer(registry, "PayloadDisperser", "SendPayload"),
+		stageTimer:      common.NewStageTimer(registry, "PayloadDisperser", "SendPayload"),
 	}, nil
 }
 
@@ -71,7 +72,7 @@ func (pd *PayloadDisperser) SendPayload(
 ) (*coretypes.EigenDACert, error) {
 
 	probe := pd.stageTimer.NewSequence("convert_to_blob")
-	defer probe.end()
+	defer probe.End()
 
 	blob, err := payload.ToBlob(pd.config.PayloadPolynomialForm)
 	if err != nil {
@@ -90,18 +91,16 @@ func (pd *PayloadDisperser) SendPayload(
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.DisperseBlobTimeout)
 	defer cancel()
 
-	probe.SetStage("send_to_disperser")
-
 	// TODO (litt3): eventually, we should consider making DisperseBlob accept an actual blob object, instead of the
 	//  serialized bytes. The operations taking place in DisperseBlob require the bytes to be converted into field
 	//  elements anyway, so serializing the blob here is unnecessary work. This will be a larger change that affects
 	//  many areas of code, though.
-	blobStatus, blobKey, err := pd.disperserClient.DisperseBlob(
+	blobStatus, blobKey, err := pd.disperserClient.DisperseBlobWithProbe(
 		timeoutCtx,
 		blob.Serialize(),
 		pd.config.BlobVersion,
 		requiredQuorums,
-	)
+		probe)
 	if err != nil {
 		return nil, fmt.Errorf("disperse blob: %w", err)
 	}
@@ -161,7 +160,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 	ctx context.Context,
 	blobKey core.BlobKey,
 	initialStatus dispgrpc.BlobStatus,
-	probe *sequenceProbe,
+	probe *common.SequenceProbe,
 ) (*dispgrpc.BlobStatusReply, error) {
 
 	previousStatus := initialStatus
