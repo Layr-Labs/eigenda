@@ -1,52 +1,76 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
+import "../interfaces/IEigenDAStructs.sol";
 
-abstract contract PaymentVaultStorage is IPaymentVault {
+/**
+ * @title Storage variables for the `PaymentVault` contract.
+ * @author Layr Labs, Inc.
+ * @notice This storage contract is separate from the logic to simplify the upgrade process.
+ */
+abstract contract PaymentVaultStorage {
+    // Quorum-specific reservation data
+    mapping(uint64 => mapping(address => Reservation)) public reservations;
+    mapping(uint64 => mapping(uint64 => uint64)) public quorumPeriodUsage;
+    mapping(uint64 => uint64) public quorumReservationSymbolsPerPeriod;
+    mapping(uint64 => bytes) public quorumOwner;
+    mapping(uint256 => address) public QuorumOwner;
 
-    /// @notice minimum chargeable size for on-demand payments
-    uint64 public minNumSymbols; 
-    /// @notice price per symbol in wei
-    uint64 public pricePerSymbol; 
-    /// @notice cooldown period before the price can be updated again
-    uint64 public priceUpdateCooldown;    
-    /// @notice timestamp of the last price update
-    uint64 public lastPriceUpdateTime; 
+    // General config
+    uint64 public reservationAdvanceWindow;
+    uint64 public reservationSchedulePeriod;
+    bool public newReservationsEnabled;
+    bool private _locked; // Reentrancy guard
 
-    /// @notice maximum number of symbols to disperse per second network-wide for on-demand payments (applied to only ETH and EIGEN)
-    uint64 public globalSymbolsPerPeriod;  
-    /// @notice reservation period interval 
-    uint64 public reservationPeriodInterval;  
-    /// @notice global rate period interval
-    uint64 public globalRatePeriodInterval;
-
-
-    /// @notice Maximum number of future periods users can schedule
-    uint256 public maxAdvanceWindow;
-    /// @notice Maximum symbols per second for the network
-    uint256 public maxPermissionlessReservationSymbolsPerSecond;
-    /// @notice Price per symbol per second for reservations
-    uint256 public reservationPricePerSymbol;    
-
-
-    /// @notice Tracks total symbols per second reserved for each period
-    mapping(uint256 => uint256) public scheduledSymbolsPerPeriod;
-
-    /// @notice Emitted when symbols per second are scheduled
-    event SymbolsScheduled(
-        address indexed user,
-        uint256 period,
-        uint256 symbolsPerSecond,
-        uint256 payment
-    );
-
-    /// @notice mapping from user address to current reservation  for governance approved users
-    mapping(address => Reservation) public reservations;
-    /// @notice Tracks all permissionless reservations
-    mapping(uint256 => Reservation) public permissionlessReservations;
-    /// @notice mapping from user address to current on-demand payment
+    // On-demand payment data
+    struct OnDemandPayment {
+        uint80 totalDeposit;
+    }
     mapping(address => OnDemandPayment) public onDemandPayments;
 
-    uint256[46] private __GAP;
+    // Reservation parameters
+    uint64 public minNumSymbols;
+    uint64 public pricePerSymbol;
+    uint64 public priceUpdateCooldown;
+    uint64 public lastPriceUpdateTime;
+    uint64 public globalSymbolsPerPeriod;
+    uint64 public reservationPeriodInterval;
+    uint64 public globalRatePeriodInterval;
+    uint256 public maxAdvanceWindow;
+    uint256 public maxPermissionlessReservationSymbolsPerSecond;
+    uint256 public reservationPricePerSymbol;
+
+    // Events
+    event ReservationUpdated(
+        address indexed account,
+        uint64 indexed quorumNumber,
+        Reservation reservation,
+        uint64 startPeriod,
+        uint64 endPeriod
+    );
+    event PriceParamsUpdated(
+        uint64 oldMinNumSymbols, uint64 newMinNumSymbols,
+        uint64 oldPricePerSymbol, uint64 newPricePerSymbol,
+        uint64 oldPriceUpdateCooldown, uint64 newPriceUpdateCooldown
+    );
+    event GlobalSymbolsPerPeriodUpdated(uint64 oldValue, uint64 newValue);
+    event ReservationPeriodIntervalUpdated(uint64 oldValue, uint64 newValue);
+    event GlobalRatePeriodIntervalUpdated(uint64 oldValue, uint64 newValue);
+    event OnDemandPaymentUpdated(address indexed account, uint80 amount, uint80 totalDeposit);
+    event ReservationPricePerSymbolUpdated(uint256 oldValue, uint256 newValue);
+    event MaxAdvanceWindowUpdated(uint256 oldValue, uint256 newValue);
+    event MaxSymbolsPerSecondUpdated(uint256 oldValue, uint256 newValue);
+    event NewReservationsStatusChange(bool newStatus);
+
+    // storage gap for upgradeability
+    // slither-disable-next-line shadowing-state
+    uint256[39] private __GAP;
+
+    // Reentrancy guard modifiers
+    modifier nonReentrant() {
+        require(!_locked, "Reentrant call");
+        _locked = true;
+        _;
+        _locked = false;
+    }
 }
