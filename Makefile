@@ -22,7 +22,7 @@ endif
 RELEASE_TAG := $(or $(RELEASE_TAG),latest)
 
 compile-contracts:
-	cd contracts && ./compile.sh
+	$(MAKE) -C contracts compile
 
 clean:
 	./api/builder/clean.sh
