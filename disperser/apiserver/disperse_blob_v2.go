@@ -50,6 +50,9 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	s.metrics.reportDisperseBlobSize(len(blob))
 	s.logger.Debug("received a new blob dispersal request", "blobSizeBytes", len(blob), "quorums", req.GetBlobHeader().GetQuorumNumbers())
 
+	// For the same apiserver replica, the requestedAt is guaranteed to be unique.
+	// Across replicas (if any), the uniqueness is ensured by the different InstanceID
+	// for each replica.
 	requestedAt := time.Unix(0, int64(s.timeOracle.GetUniqueTimestamp()))
 	blobKey, err := s.StoreBlob(ctx, blob, blobHeader, req.GetSignature(), requestedAt, onchainState.TTL)
 	if err != nil {
