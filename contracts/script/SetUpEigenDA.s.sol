@@ -1,7 +1,8 @@
-// SPDX-License-Identifier: UNLICENSED 
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import {PauserRegistry} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
+import {PauserRegistry} from
+    "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
 import {EmptyContract} from "../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
 import {RegistryCoordinator} from "../lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
@@ -18,12 +19,10 @@ import {EigenLayerUtils} from "./EigenLayerUtils.s.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-
 import "./DeployOpenEigenLayer.s.sol";
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
-
 
 // Helper function to create single-element arrays
 function toArray(address element) pure returns (address[] memory) {
@@ -38,23 +37,18 @@ function toArray(uint256 element) pure returns (uint256[] memory) {
     return arr;
 }
 
-
 // # To load the variables in the .env file
 // source .env
 // # To deploy and verify our contract
 // forge script script/Deployer.s.sol:SetupEigenDA --rpc-url $RPC_URL  --private-key $PRIVATE_KEY --broadcast -vvvv
 contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
-
     string deployConfigPath = "script/input/eigenda_deploy_config.json";
 
     // deploy all the EigenDA contracts. Relies on many EL contracts having already been deployed.
     function run() external {
-        
-
         // READ JSON CONFIG DATA
         string memory config_data = vm.readFile(deployConfigPath);
 
-        
         uint8 numStrategies = uint8(stdJson.readUint(config_data, ".numStrategies"));
         {
             AddressConfig memory addressConfig;
@@ -72,9 +66,11 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             uint256 maxOperatorCount = 3;
             // bytes memory parsedData = vm.parseJson(config_data);
             bool useDefaults = stdJson.readBool(config_data, ".useDefaults");
-            if(!useDefaults) {
-                addressConfig.eigenLayerCommunityMultisig = stdJson.readAddress(config_data, ".eigenLayerCommunityMultisig");
-                addressConfig.eigenLayerOperationsMultisig = stdJson.readAddress(config_data, ".eigenLayerOperationsMultisig");
+            if (!useDefaults) {
+                addressConfig.eigenLayerCommunityMultisig =
+                    stdJson.readAddress(config_data, ".eigenLayerCommunityMultisig");
+                addressConfig.eigenLayerOperationsMultisig =
+                    stdJson.readAddress(config_data, ".eigenLayerOperationsMultisig");
                 addressConfig.eigenLayerPauserMultisig = stdJson.readAddress(config_data, ".eigenLayerPauserMultisig");
                 addressConfig.eigenDACommunityMultisig = stdJson.readAddress(config_data, ".eigenDACommunityMultisig");
                 addressConfig.eigenDAPauser = stdJson.readAddress(config_data, ".eigenDAPauser");
@@ -86,20 +82,14 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
                 maxOperatorCount = stdJson.readUint(config_data, ".maxOperatorCount");
             }
 
-            
             addressConfig.confirmer = vm.addr(stdJson.readUint(config_data, ".confirmerPrivateKey"));
-
 
             vm.startBroadcast();
 
             _deployEigenDAAndEigenLayerContracts(
-                addressConfig,
-                numStrategies,
-                initialSupply,
-                tokenOwner,
-                maxOperatorCount
+                addressConfig, numStrategies, initialSupply, tokenOwner, maxOperatorCount
             );
-            
+
             eigenDAServiceManager.setBatchConfirmer(addressConfig.confirmer);
 
             vm.stopBroadcast();
@@ -107,12 +97,12 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
         uint256[] memory stakerPrivateKeys = stdJson.readUintArray(config_data, ".stakerPrivateKeys");
         address[] memory stakers = new address[](stakerPrivateKeys.length);
-        for (uint i = 0; i < stakers.length; i++) {
+        for (uint256 i = 0; i < stakers.length; i++) {
             stakers[i] = vm.addr(stakerPrivateKeys[i]);
         }
         uint256[] memory stakerETHAmounts = new uint256[](stakers.length);
         // 0.1 eth each
-        for (uint i = 0; i < stakerETHAmounts.length; i++) {
+        for (uint256 i = 0; i < stakerETHAmounts.length; i++) {
             stakerETHAmounts[i] = 0.1 ether;
         }
 
@@ -122,36 +112,24 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
 
         uint256[] memory operatorPrivateKeys = stdJson.readUintArray(config_data, ".operatorPrivateKeys");
         address[] memory operators = new address[](operatorPrivateKeys.length);
-        for (uint i = 0; i < operators.length; i++) {
+        for (uint256 i = 0; i < operators.length; i++) {
             operators[i] = vm.addr(operatorPrivateKeys[i]);
         }
         uint256[] memory operatorETHAmounts = new uint256[](operators.length);
         // 5 eth each
-        for (uint i = 0; i < operatorETHAmounts.length; i++) {
+        for (uint256 i = 0; i < operatorETHAmounts.length; i++) {
             operatorETHAmounts[i] = 5 ether;
         }
 
         vm.startBroadcast();
         // Allocate eth to stakers, operators, dispserser clients
-        _allocate(
-            IERC20(address(0)),
-            stakers,
-            stakerETHAmounts
-        );
+        _allocate(IERC20(address(0)), stakers, stakerETHAmounts);
 
-        _allocate(
-            IERC20(address(0)),
-            operators,
-            operatorETHAmounts
-        );
+        _allocate(IERC20(address(0)), operators, operatorETHAmounts);
 
         // Allocate tokens to stakers
         for (uint8 i = 0; i < numStrategies; i++) {
-            _allocate(
-                IERC20(deployedStrategyArray[i].underlyingToken()),
-                stakers,
-                stakerTokenAmounts[i]
-            );
+            _allocate(IERC20(deployedStrategyArray[i].underlyingToken()), stakers, stakerTokenAmounts[i]);
         }
 
         {
@@ -172,9 +150,11 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             address delegationApprover = address(0); //address(uint160(uint256(keccak256(abi.encodePacked(earningsReceiver)))));
             uint32 stakerOptOutWindowBlocks = 100;
             string memory metadataURI = string.concat("https://urmom.com/operator/", vm.toString(i));
-            delegation.registerAsOperator(IDelegationManager.OperatorDetails(earningsReceiver, delegationApprover, stakerOptOutWindowBlocks), metadataURI);
+            delegation.registerAsOperator(
+                IDelegationManager.OperatorDetails(earningsReceiver, delegationApprover, stakerOptOutWindowBlocks),
+                metadataURI
+            );
         }
-
 
         // Register Reservations for client as the eigenDACommunityMultisig
         IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
@@ -187,20 +167,20 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
         vm.startBroadcast(msg.sender);
         paymentVault.setReservation(clientAddress, reservation);
-        // Deposit OnDemand 
+        // Deposit OnDemand
         paymentVault.depositOnDemand{value: 0.1 ether}(clientAddress);
         vm.stopBroadcast();
 
         // Deposit stakers into EigenLayer and delegate to operators
         for (uint256 i = 0; i < stakerPrivateKeys.length; i++) {
             vm.startBroadcast(stakerPrivateKeys[i]);
-            for (uint j = 0; j < numStrategies; j++) {
-                if(stakerTokenAmounts[j][i] > 0) {
-                    deployedStrategyArray[j].underlyingToken().approve(address(strategyManager), stakerTokenAmounts[j][i]);
+            for (uint256 j = 0; j < numStrategies; j++) {
+                if (stakerTokenAmounts[j][i] > 0) {
+                    deployedStrategyArray[j].underlyingToken().approve(
+                        address(strategyManager), stakerTokenAmounts[j][i]
+                    );
                     strategyManager.depositIntoStrategy(
-                        deployedStrategyArray[j],
-                        deployedStrategyArray[j].underlyingToken(),
-                        stakerTokenAmounts[j][i]
+                        deployedStrategyArray[j], deployedStrategyArray[j].underlyingToken(), stakerTokenAmounts[j][i]
                     );
                 }
             }
@@ -212,13 +192,13 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         string memory output = "eigenDA deployment output";
         vm.serializeAddress(output, "eigenDAServiceManager", address(eigenDAServiceManager));
         vm.serializeAddress(output, "operatorStateRetriever", address(operatorStateRetriever));
-        vm.serializeAddress(output, "blsApkRegistry" , address(apkRegistry));
+        vm.serializeAddress(output, "blsApkRegistry", address(apkRegistry));
         vm.serializeAddress(output, "registryCoordinator", address(registryCoordinator));
         vm.serializeAddress(output, "certVerifier", address(eigenDACertVerifier));
 
         string memory finalJson = vm.serializeString(output, "object", output);
 
         vm.createDir("./script/output", true);
-        vm.writeJson(finalJson, "./script/output/eigenda_deploy_output.json");        
+        vm.writeJson(finalJson, "./script/output/eigenda_deploy_output.json");
     }
 }

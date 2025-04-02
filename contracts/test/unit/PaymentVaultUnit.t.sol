@@ -12,11 +12,11 @@ contract PaymentVaultUnit is MockEigenDADeployer {
     event ReservationPeriodIntervalUpdated(uint64 previousValue, uint64 newValue);
     event GlobalRatePeriodIntervalUpdated(uint64 previousValue, uint64 newValue);
     event PriceParamsUpdated(
-        uint64 previousMinNumSymbols, 
-        uint64 newMinNumSymbols, 
-        uint64 previousPricePerSymbol, 
-        uint64 newPricePerSymbol, 
-        uint64 previousPriceUpdateCooldown, 
+        uint64 previousMinNumSymbols,
+        uint64 newMinNumSymbols,
+        uint64 previousPricePerSymbol,
+        uint64 newPricePerSymbol,
+        uint64 previousPriceUpdateCooldown,
         uint64 newPriceUpdateCooldown
     );
 
@@ -26,7 +26,7 @@ contract PaymentVaultUnit is MockEigenDADeployer {
     bytes quorumNumbers = hex"0001";
     bytes quorumSplits = hex"3232";
 
-    function setUp() virtual public {
+    function setUp() public virtual {
         _deployDA();
     }
 
@@ -177,7 +177,14 @@ contract PaymentVaultUnit is MockEigenDADeployer {
         vm.warp(block.timestamp + priceUpdateCooldown);
 
         vm.expectEmit(address(paymentVault));
-        emit PriceParamsUpdated(minNumSymbols, minNumSymbols + 1, pricePerSymbol, pricePerSymbol + 1, priceUpdateCooldown, priceUpdateCooldown + 1);
+        emit PriceParamsUpdated(
+            minNumSymbols,
+            minNumSymbols + 1,
+            pricePerSymbol,
+            pricePerSymbol + 1,
+            priceUpdateCooldown,
+            priceUpdateCooldown + 1
+        );
         vm.prank(registryCoordinatorOwner);
         paymentVault.setPriceParams(minNumSymbols + 1, pricePerSymbol + 1, priceUpdateCooldown + 1);
 
