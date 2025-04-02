@@ -178,7 +178,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			id := uuid.New()
 			instanceID = int(binary.BigEndian.Uint16(id[:2]))
 		}
-		timeOracle, err := apiserver.NewTimestampOralce(uint64(instanceID), apiserver.DefaultInstanceIDBits)
+		timeOracle, err := apiserver.NewTimestampOracle(uint64(instanceID), apiserver.DefaultInstanceIDBits)
 		if err != nil {
 			return err
 		}
