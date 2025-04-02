@@ -1,5 +1,6 @@
 syntax = "proto3";
 package common;
+
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/common";
 
 // G1Commitment represents the serialized coordinates of a G1 KZG commitment.

@@ -1,5 +1,6 @@
 syntax = "proto3";
 package relay;
+
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/relay";
 
 // Relay is a service that provides access to public relay functionality.

@@ -1,131 +1,133 @@
 syntax = "proto3";
 package node;
-import "google/protobuf/wrappers.proto";
+
 import "common/common.proto";
+import "google/protobuf/wrappers.proto";
+
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/node";
 
 // The EigenDA Node implements two services, Dispersal and Retrieval, as defined below,
 // for better security and separation of concerns.
 
 service Dispersal {
-	// StoreChunks validates that the chunks match what the Node is supposed to receive (
-	// different Nodes are responsible for different chunks, as EigenDA is horizontally
-	// sharded) and is correctly coded (e.g. each chunk must be a valid KZG multiproof)
-	// according to the EigenDA protocol. It also stores the chunks along with metadata
-	// for the protocol-defined length of custody. It will return a signature at the
-	// end to attest to the data in this request it has processed.
-	rpc StoreChunks(StoreChunksRequest) returns (StoreChunksReply) {}
-	// StoreBlobs is similar to StoreChunks, but it stores the blobs using a different storage schema
-	// so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
-	// StoreBlobs + AttestBatch will eventually replace and deprecate StoreChunks method.
-	// DEPRECATED: StoreBlobs method is not used
-	rpc StoreBlobs(StoreBlobsRequest) returns (StoreBlobsReply) {}
-	// AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch.
-	// It will return a signature at the end to attest to the aggregated batch.
-	// DEPRECATED: AttestBatch method is not used
-	rpc AttestBatch(AttestBatchRequest) returns (AttestBatchReply) {}
-	// Retrieve node info metadata
-	rpc NodeInfo(NodeInfoRequest) returns (NodeInfoReply) {}
+  // StoreChunks validates that the chunks match what the Node is supposed to receive (
+  // different Nodes are responsible for different chunks, as EigenDA is horizontally
+  // sharded) and is correctly coded (e.g. each chunk must be a valid KZG multiproof)
+  // according to the EigenDA protocol. It also stores the chunks along with metadata
+  // for the protocol-defined length of custody. It will return a signature at the
+  // end to attest to the data in this request it has processed.
+  rpc StoreChunks(StoreChunksRequest) returns (StoreChunksReply) {}
+  // StoreBlobs is similar to StoreChunks, but it stores the blobs using a different storage schema
+  // so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
+  // StoreBlobs + AttestBatch will eventually replace and deprecate StoreChunks method.
+  // DEPRECATED: StoreBlobs method is not used
+  rpc StoreBlobs(StoreBlobsRequest) returns (StoreBlobsReply) {}
+  // AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch.
+  // It will return a signature at the end to attest to the aggregated batch.
+  // DEPRECATED: AttestBatch method is not used
+  rpc AttestBatch(AttestBatchRequest) returns (AttestBatchReply) {}
+  // Retrieve node info metadata
+  rpc NodeInfo(NodeInfoRequest) returns (NodeInfoReply) {}
 }
 
 service Retrieval {
-	// RetrieveChunks retrieves the chunks for a blob custodied at the Node.
-	rpc RetrieveChunks(RetrieveChunksRequest) returns (RetrieveChunksReply) {}
-	// GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
-	rpc GetBlobHeader(GetBlobHeaderRequest) returns (GetBlobHeaderReply) {}
-	// Retrieve node info metadata
-	rpc NodeInfo(NodeInfoRequest) returns (NodeInfoReply) {}
+  // RetrieveChunks retrieves the chunks for a blob custodied at the Node.
+  rpc RetrieveChunks(RetrieveChunksRequest) returns (RetrieveChunksReply) {}
+  // GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
+  rpc GetBlobHeader(GetBlobHeaderRequest) returns (GetBlobHeaderReply) {}
+  // Retrieve node info metadata
+  rpc NodeInfo(NodeInfoRequest) returns (NodeInfoReply) {}
 }
 
 // Requests and replies
 
 message StoreChunksRequest {
-	// Which batch this request is for.
-	BatchHeader batch_header = 1;
-	// The chunks for each blob in the batch to be stored in an EigenDA Node.
-	repeated Blob blobs = 2;
+  // Which batch this request is for.
+  BatchHeader batch_header = 1;
+  // The chunks for each blob in the batch to be stored in an EigenDA Node.
+  repeated Blob blobs = 2;
 }
 
 message StoreChunksReply {
-	// The operator's BLS signature signed on the batch header hash.
-	bytes signature = 1;
+  // The operator's BLS signature signed on the batch header hash.
+  bytes signature = 1;
 }
 
 message StoreBlobsRequest {
-	// Blobs to store
-	repeated Blob blobs = 1;
-	// The reference block number whose state is used to encode the blobs
-	uint32 reference_block_number = 2;
+  // Blobs to store
+  repeated Blob blobs = 1;
+  // The reference block number whose state is used to encode the blobs
+  uint32 reference_block_number = 2;
 }
 
 message StoreBlobsReply {
-	// The operator's BLS sgnature signed on the blob header hashes.
-	// The ordering of the signatures must match the ordering of the blobs sent
-	// in the request, with empty signatures in the places for discarded blobs.
-	repeated google.protobuf.BytesValue signatures = 1;
+  // The operator's BLS sgnature signed on the blob header hashes.
+  // The ordering of the signatures must match the ordering of the blobs sent
+  // in the request, with empty signatures in the places for discarded blobs.
+  repeated google.protobuf.BytesValue signatures = 1;
 }
 
 message AttestBatchRequest {
-	// header of the batch
-	BatchHeader batch_header = 1;
-	// the header hashes of all blobs in the batch
-	repeated bytes blob_header_hashes = 2;
+  // header of the batch
+  BatchHeader batch_header = 1;
+  // the header hashes of all blobs in the batch
+  repeated bytes blob_header_hashes = 2;
 }
 
 message AttestBatchReply {
-	bytes signature = 1;
+  bytes signature = 1;
 }
 
 message RetrieveChunksRequest {
-	// The hash of the ReducedBatchHeader defined onchain, see:
-	// https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
-	// This identifies which batch to retrieve for.
-	bytes batch_header_hash = 1;
-	// Which blob in the batch to retrieve for (note: a batch is logically an ordered
-	// list of blobs).
-	uint32 blob_index = 2;
-	// Which quorum of the blob to retrieve for (note: a blob can have multiple
-	// quorums and the chunks for different quorums at a Node can be different).
-	// The ID must be in range [0, 254].
-	uint32 quorum_id = 3;
+  // The hash of the ReducedBatchHeader defined onchain, see:
+  // https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/interfaces/IEigenDAServiceManager.sol#L43
+  // This identifies which batch to retrieve for.
+  bytes batch_header_hash = 1;
+  // Which blob in the batch to retrieve for (note: a batch is logically an ordered
+  // list of blobs).
+  uint32 blob_index = 2;
+  // Which quorum of the blob to retrieve for (note: a blob can have multiple
+  // quorums and the chunks for different quorums at a Node can be different).
+  // The ID must be in range [0, 254].
+  uint32 quorum_id = 3;
 }
 
 // This describes how the chunks returned in RetrieveChunksReply are encoded.
 // Used to facilitate the decoding of chunks.
 enum ChunkEncodingFormat {
-	UNKNOWN = 0;
-	GNARK = 1;
-	GOB = 2;
+  UNKNOWN = 0;
+  GNARK = 1;
+  GOB = 2;
 }
 
 message RetrieveChunksReply {
-	// All chunks the Node is storing for the requested blob per RetrieveChunksRequest.
-	repeated bytes chunks = 1;
-	// How the above chunks are encoded.
-	ChunkEncodingFormat chunk_encoding_format = 2;
+  // All chunks the Node is storing for the requested blob per RetrieveChunksRequest.
+  repeated bytes chunks = 1;
+  // How the above chunks are encoded.
+  ChunkEncodingFormat chunk_encoding_format = 2;
 }
 
 // See RetrieveChunksRequest for documentation of each parameter of GetBlobHeaderRequest.
 message GetBlobHeaderRequest {
-	bytes batch_header_hash = 1;
-	uint32 blob_index = 2;
-	uint32 quorum_id = 3;
+  bytes batch_header_hash = 1;
+  uint32 blob_index = 2;
+  uint32 quorum_id = 3;
 }
 
 message GetBlobHeaderReply {
-	// The header of the blob requested per GetBlobHeaderRequest.
-	BlobHeader blob_header = 1;
-	// Merkle proof that returned blob header belongs to the batch and is
-	// the batch's MerkleProof.index-th blob.
-	// This can be checked against the batch root on chain.
-	MerkleProof proof = 2;
+  // The header of the blob requested per GetBlobHeaderRequest.
+  BlobHeader blob_header = 1;
+  // Merkle proof that returned blob header belongs to the batch and is
+  // the batch's MerkleProof.index-th blob.
+  // This can be checked against the batch root on chain.
+  MerkleProof proof = 2;
 }
 
 message MerkleProof {
-	// The proof itself.
-	repeated bytes hashes = 1;
-	// Which index (the leaf of the Merkle tree) this proof is for.
-	uint32 index = 2;
+  // The proof itself.
+  repeated bytes hashes = 1;
+  // Which index (the leaf of the Merkle tree) this proof is for.
+  uint32 index = 2;
 }
 
 // Types
@@ -137,84 +139,83 @@ message MerkleProof {
 // The data in this message is a subset of these points that are assigned to a
 // single operator node.
 message Blob {
-	// Which (original) blob this is for.
-	BlobHeader header = 1;
-	// Each bundle contains all chunks for a single quorum of the blob.
-	// The number of bundles must be equal to the total number of quorums associated
-	// with the blob, and the ordering must be the same as BlobHeader.quorum_headers.
-	// Note: an operator may be in some but not all of the quorums; in that case the
-	// bundle corresponding to that quorum will be empty.
-	repeated Bundle bundles = 2;
+  // Which (original) blob this is for.
+  BlobHeader header = 1;
+  // Each bundle contains all chunks for a single quorum of the blob.
+  // The number of bundles must be equal to the total number of quorums associated
+  // with the blob, and the ordering must be the same as BlobHeader.quorum_headers.
+  // Note: an operator may be in some but not all of the quorums; in that case the
+  // bundle corresponding to that quorum will be empty.
+  repeated Bundle bundles = 2;
 }
 
 // A Bundle is the collection of chunks associated with a single blob, for a single
 // operator and a single quorum.
 message Bundle {
-	// Each chunk corresponds to a collection of points on the polynomial.
-	// Each chunk has same number of points.
-	repeated bytes chunks = 1;
-	// All chunks of the bundle encoded in a byte array.
-	bytes bundle = 2;
+  // Each chunk corresponds to a collection of points on the polynomial.
+  // Each chunk has same number of points.
+  repeated bytes chunks = 1;
+  // All chunks of the bundle encoded in a byte array.
+  bytes bundle = 2;
 }
 
 message G2Commitment {
-	// The A0 element of the X coordinate of G2 point.
-	bytes x_a0 = 1;
-	// The A1 element of the X coordinate of G2 point.
-	bytes x_a1 = 2;
-	// The A0 element of the Y coordinate of G2 point.
-	bytes y_a0 = 3;
-	// The A1 element of the Y coordinate of G2 point.
-	bytes y_a1 = 4;
+  // The A0 element of the X coordinate of G2 point.
+  bytes x_a0 = 1;
+  // The A1 element of the X coordinate of G2 point.
+  bytes x_a1 = 2;
+  // The A0 element of the Y coordinate of G2 point.
+  bytes y_a0 = 3;
+  // The A1 element of the Y coordinate of G2 point.
+  bytes y_a1 = 4;
 }
 
 message BlobHeader {
-	// The KZG commitment to the polynomial representing the blob.
-	common.G1Commitment commitment = 1;
-	// The KZG commitment to the polynomial representing the blob on G2, it is used
-	// for proving the degree of the polynomial
-	G2Commitment length_commitment = 2;
-	// The low degree proof. It's the KZG commitment to the polynomial shifted to
-	// the largest SRS degree.
-	G2Commitment length_proof = 3;
-	// The length of the original blob in number of symbols (in the field where
-	// the polynomial is defined).
-	uint32 length = 4;
-	// The params of the quorums that this blob participates in.
-	repeated BlobQuorumInfo quorum_headers = 5;
-	// The ID of the user who is dispersing this blob to EigenDA.
-	string account_id = 6;
-	// The reference block number whose state is used to encode the blob
-	uint32 reference_block_number = 7;
+  // The KZG commitment to the polynomial representing the blob.
+  common.G1Commitment commitment = 1;
+  // The KZG commitment to the polynomial representing the blob on G2, it is used
+  // for proving the degree of the polynomial
+  G2Commitment length_commitment = 2;
+  // The low degree proof. It's the KZG commitment to the polynomial shifted to
+  // the largest SRS degree.
+  G2Commitment length_proof = 3;
+  // The length of the original blob in number of symbols (in the field where
+  // the polynomial is defined).
+  uint32 length = 4;
+  // The params of the quorums that this blob participates in.
+  repeated BlobQuorumInfo quorum_headers = 5;
+  // The ID of the user who is dispersing this blob to EigenDA.
+  string account_id = 6;
+  // The reference block number whose state is used to encode the blob
+  uint32 reference_block_number = 7;
 }
 
 // See BlobQuorumParam as defined in
 // api/proto/disperser/disperser.proto
 message BlobQuorumInfo {
-	uint32 quorum_id = 1;
-	uint32 adversary_threshold = 2;
-	uint32 confirmation_threshold = 3;
-	uint32 chunk_length = 4;
-	uint32 ratelimit = 5;
+  uint32 quorum_id = 1;
+  uint32 adversary_threshold = 2;
+  uint32 confirmation_threshold = 3;
+  uint32 chunk_length = 4;
+  uint32 ratelimit = 5;
 }
 
 // BatchHeader (see core/data.go#BatchHeader)
 message BatchHeader {
-	// The root of the merkle tree with hashes of blob headers as leaves.
-	bytes batch_root = 1;
-	// The Ethereum block number at which the batch is dispersed.
-	uint32 reference_block_number = 3;
+  // The root of the merkle tree with hashes of blob headers as leaves.
+  bytes batch_root = 1;
+  // The Ethereum block number at which the batch is dispersed.
+  uint32 reference_block_number = 3;
 }
 
 // Node info request
-message NodeInfoRequest {
-}
+message NodeInfoRequest {}
 
 // Node info reply
 message NodeInfoReply {
-	string semver = 1;
-	string arch = 2;
-	string os = 3;
-	uint32 num_cpu = 4;
-	uint64 mem_bytes = 5;
+  string semver = 1;
+  string arch = 2;
+  string os = 3;
+  uint32 num_cpu = 4;
+  uint64 mem_bytes = 5;
 }
