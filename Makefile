@@ -41,6 +41,10 @@ lint:
 	go tool fix ./..
 	golangci-lint run
 
+# TODO: this should also format go code, github workflows, etc.
+fmt:
+	$(MAKE) -C contracts fmt
+
 build:
 	cd operators/churner && make build
 	cd disperser && make build
