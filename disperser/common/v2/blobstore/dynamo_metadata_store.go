@@ -1596,7 +1596,7 @@ func UnmarshalOperatorID(item commondynamodb.Item) (*core.OperatorID, error) {
 	operatorIDStr := obj.OperatorID
 	if strings.HasPrefix(operatorIDStr, dispersalRequestSKPrefix) {
 		operatorIDStr = strings.TrimPrefix(operatorIDStr, dispersalRequestSKPrefix)
-	} else if strings.HasPrefix(operatorIDStr, dispersalResponseSKPrefix) {
+	} else {
 		operatorIDStr = strings.TrimPrefix(operatorIDStr, dispersalResponseSKPrefix)
 	}
 

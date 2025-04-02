@@ -20,9 +20,11 @@ type PayloadDisperser struct {
 	config          PayloadDisperserConfig
 	disperserClient clients.DisperserClient
 	certVerifier    clients.ICertVerifier
+	metrics         *PayloadDisperserMetrics
 }
 
 // NewPayloadDisperser creates a PayloadDisperser from subcomponents that have already been constructed and initialized.
+// If metrics is nil, then no metrics will be reported.
 func NewPayloadDisperser(
 	logger logging.Logger,
 	payloadDisperserConfig PayloadDisperserConfig,
@@ -35,6 +37,7 @@ func NewPayloadDisperser(
 	//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
 	disperserClient clients.DisperserClient,
 	certVerifier clients.ICertVerifier,
+	metrics *PayloadDisperserMetrics,
 ) (*PayloadDisperser, error) {
 
 	err := payloadDisperserConfig.checkAndSetDefaults()
@@ -47,6 +50,7 @@ func NewPayloadDisperser(
 		config:          payloadDisperserConfig,
 		disperserClient: disperserClient,
 		certVerifier:    certVerifier,
+		metrics:         metrics,
 	}, nil
 }
 
@@ -144,6 +148,8 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 ) (*dispgrpc.BlobStatusReply, error) {
 
 	previousStatus := initialStatus
+	previousStatusTimestamp := time.Now()
+	pd.metrics.reportBlobStatusChange(nil, &previousStatus, 0)
 
 	ticker := time.NewTicker(pd.config.BlobStatusPollInterval)
 	defer ticker.Stop()
@@ -151,6 +157,10 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 	for {
 		select {
 		case <-ctx.Done():
+			pd.metrics.reportBlobStatusChange(
+				&previousStatus,
+				nil,
+				time.Since(previousStatusTimestamp))
 			return nil, fmt.Errorf(
 				"timed out waiting for %v blob status, final status was %v: %w",
 				dispgrpc.BlobStatus_COMPLETE.String(),
@@ -167,11 +177,17 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 
 			newStatus := blobStatusReply.Status
 			if newStatus != previousStatus {
+				newStatusTimestamp := time.Now()
+				timeInPreviousStatus := newStatusTimestamp.Sub(previousStatusTimestamp)
+				previousStatusTimestamp = newStatusTimestamp
+				pd.metrics.reportBlobStatusChange(&previousStatus, &newStatus, timeInPreviousStatus)
+
 				pd.logger.Debug(
 					"Blob status changed",
 					"blob key", blobKey.Hex(),
 					"previous status", previousStatus.String(),
-					"new status", newStatus.String())
+					"new status", newStatus.String(),
+					"time in previous status", timeInPreviousStatus)
 				previousStatus = newStatus
 			}
 

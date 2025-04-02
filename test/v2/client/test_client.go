@@ -167,11 +167,13 @@ func NewTestClient(
 		DisperseBlobTimeout:  1337 * time.Hour, // this suite enforces its own timeouts
 		BlobCertifiedTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 	}
+	payloadDisperserMetrics := payloaddispersal.NewPayloadDisperserMetrics(namespace, metrics.registry)
 	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
 		disperserClient,
-		certVerifier)
+		certVerifier,
+		payloadDisperserMetrics)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload disperser: %w", err)
 	}
