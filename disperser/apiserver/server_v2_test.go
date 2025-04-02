@@ -531,6 +531,12 @@ func newTestServerV2(t *testing.T) *testComponents {
 	}
 	meterer := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
 
+	timeOracle, err := apiserver.NewTimestampOracle(1, 10)
+	if err != nil {
+		teardown()
+		panic("failed to create timestamp oracle")
+	}
+
 	chainReader.On("GetCurrentBlockNumber").Return(uint32(100), nil)
 	chainReader.On("GetQuorumCount").Return(uint8(2), nil)
 	chainReader.On("GetRequiredQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
@@ -557,6 +563,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		prover,
 		10,
 		time.Hour,
+		timeOracle,
 		logger,
 		prometheus.NewRegistry(),
 		disperser.MetricsConfig{

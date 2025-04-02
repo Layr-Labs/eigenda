@@ -58,6 +58,8 @@ type DispersalServerV2 struct {
 	maxNumSymbolsPerBlob        uint64
 	onchainStateRefreshInterval time.Duration
 
+	timeOracle *TimestampOracle
+
 	metricsConfig disperser.MetricsConfig
 	metrics       *metricsV2
 }
@@ -73,6 +75,7 @@ func NewDispersalServerV2(
 	prover encoding.Prover,
 	maxNumSymbolsPerBlob uint64,
 	onchainStateRefreshInterval time.Duration,
+	timeOracle *TimestampOracle,
 	_logger logging.Logger,
 	registry *prometheus.Registry,
 	metricsConfig disperser.MetricsConfig,
@@ -101,6 +104,9 @@ func NewDispersalServerV2(
 	if _logger == nil {
 		return nil, errors.New("logger is required")
 	}
+	if timeOracle == nil {
+		return nil, errors.New("timeOracle is required")
+	}
 
 	logger := _logger.With("component", "DispersalServerV2")
 
@@ -117,6 +123,8 @@ func NewDispersalServerV2(
 
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
+
+		timeOracle: timeOracle,
 
 		metricsConfig: metricsConfig,
 		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),

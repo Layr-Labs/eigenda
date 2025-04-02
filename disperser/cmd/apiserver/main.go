@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"os"
@@ -14,6 +15,7 @@ import (
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -171,6 +173,16 @@ func RunDisperserServer(ctx *cli.Context) error {
 		blobMetadataStore := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
 		blobStore := blobstorev2.NewBlobStore(bucketName, s3Client, logger)
 
+		instanceID := config.InstanceID
+		if instanceID < 0 {
+			id := uuid.New()
+			instanceID = int(binary.BigEndian.Uint16(id[:2]))
+		}
+		timeOracle, err := apiserver.NewTimestampOralce(uint64(instanceID), apiserver.DefaultInstanceIDBits)
+		if err != nil {
+			return err
+		}
+
 		server, err := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
 			blobStore,
@@ -181,6 +193,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			prover,
 			uint64(config.MaxNumSymbolsPerBlob),
 			config.OnchainStateRefreshInterval,
+			timeOracle,
 			logger,
 			reg,
 			config.MetricsConfig,
