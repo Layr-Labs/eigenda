@@ -39,6 +39,9 @@ jobs:
       pull-requests: read
 
     steps:
+    - uses: step-security/harden-runner@446798f8213ac2e75931c1b0769676d927801858 # v2.10.3
+      with:
+        egress-policy: audit
     - name: Checkout repository
       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
       with:
