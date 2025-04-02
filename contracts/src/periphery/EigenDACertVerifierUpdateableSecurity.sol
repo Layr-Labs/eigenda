@@ -55,7 +55,7 @@ contract EigenDACertVerifierUpdateableSecurity is IEigenDACertVerifier, OwnableU
         OperatorStateRetriever _operatorStateRetriever,
         IRegistryCoordinator _registryCoordinator
     ) {
-        _disableInitializers;
+        _disableInitializers();
         eigenDAThresholdRegistry = _eigenDAThresholdRegistry;
         eigenDABatchMetadataStorage = _eigenDABatchMetadataStorage;
         eigenDASignatureVerifier = _eigenDASignatureVerifier;
