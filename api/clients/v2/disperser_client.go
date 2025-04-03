@@ -172,7 +172,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
 	}
 
-	if payment.CumulativePayment.Sign() == 0 {
+	if payment.CumulativePayment == nil || payment.CumulativePayment.Sign() == 0 {
 		// This request is using reserved bandwidth, no need to prevent parallel dispersal.
 		c.accountantLock.Unlock()
 	} else {
