@@ -32,7 +32,7 @@ type NonSigning @entity(immutable: true) {
   batch: Batch!
 }
 
-type Operator @entity {
+type Operator @entity(immutable:true) {
   id: Bytes!
   operatorId: Bytes!
   nonSignings: [NonSigning!]! @derivedFrom(field: "nonSigners")
