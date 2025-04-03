@@ -131,6 +131,8 @@ func getOperatorStateWithSocket(operatorsByQuorum core.OperatorStakesWithSocket,
 	}
 
 	return state, nil
+}
+
 type OnchainState struct {
 	QuorumCount           uint8
 	RequiredQuorums       []core.QuorumID
