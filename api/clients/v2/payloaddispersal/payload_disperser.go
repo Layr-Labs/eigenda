@@ -105,7 +105,7 @@ func (pd *PayloadDisperser) SendPayload(
 	}
 	pd.logger.Debug("Successful DisperseBlob", "blobStatus", blobStatus.String(), "blobKey", blobKey.Hex())
 
-	probe.SetStage(blobStatus.String())
+	probe.SetStage("QUEUED")
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCertifiedTimeout)
 	defer cancel()
