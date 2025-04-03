@@ -273,3 +273,45 @@ func (s *OffchainStore) GetGlobalBinUsage(ctx context.Context, reservationPeriod
 
 	return binary.BigEndian.Uint64(value), nil
 }
+
+func (s *OffchainStore) GetReservationBin(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64) (uint64, error) {
+	key := buildReservationKey(accountID, reservationPeriod)
+
+	value, err := s.db.Get(key)
+	if err != nil {
+		if errors.Is(err, kvstore.ErrNotFound) {
+			return 0, nil // Return 0 for non-existent keys
+		}
+		return 0, fmt.Errorf("failed to get reservation bin: %w", err)
+	}
+
+	return binary.BigEndian.Uint64(value), nil
+}
+
+func (s *OffchainStore) GetOnDemandPayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
+	key := buildOnDemandKey(accountID)
+
+	value, err := s.db.Get(key)
+	if err != nil {
+		if errors.Is(err, kvstore.ErrNotFound) {
+			return big.NewInt(0), nil // Return 0 for non-existent keys
+		}
+		return nil, fmt.Errorf("failed to get on-demand payment: %w", err)
+	}
+
+	return new(big.Int).SetBytes(value), nil
+}
+
+func (s *OffchainStore) GetGlobalBin(ctx context.Context, reservationPeriod uint64) (uint64, error) {
+	key := buildGlobalBinKey(reservationPeriod)
+
+	value, err := s.db.Get(key)
+	if err != nil {
+		if errors.Is(err, kvstore.ErrNotFound) {
+			return 0, nil // Return 0 for non-existent keys
+		}
+		return 0, fmt.Errorf("failed to get global bin: %w", err)
+	}
+
+	return binary.BigEndian.Uint64(value), nil
+}
