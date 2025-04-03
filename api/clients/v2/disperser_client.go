@@ -161,6 +161,14 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	if len(quorums) == 0 {
 		return nil, [32]byte{}, api.NewErrorInvalidArg("quorum numbers must be provided")
 	}
+	if c.signer == nil {
+		return nil, [32]byte{}, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
+	}
+	for _, q := range quorums {
+		if q > corev2.MaxQuorumID {
+			return nil, [32]byte{}, api.NewErrorInvalidArg("quorum number must be less than 256")
+		}
+	}
 
 	probe.SetStage("acquire_accountant_lock")
 	c.accountantLock.Lock()
@@ -172,33 +180,23 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
 	}
 
+	probe.SetStage("prepare_for_dispersal")
+
+	err = c.initOncePopulateAccountant(ctx)
+	if err != nil {
+		return nil, [32]byte{}, api.NewErrorFailover(err)
+	}
+	err = c.initOnceGrpcConnection()
+	if err != nil {
+		return nil, [32]byte{}, api.NewErrorFailover(err)
+	}
+
 	if payment.CumulativePayment == nil || payment.CumulativePayment.Sign() == 0 {
 		// This request is using reserved bandwidth, no need to prevent parallel dispersal.
 		c.accountantLock.Unlock()
 	} else {
 		// This request is using on-demand bandwidth, current implementation requires sequential dispersal.
 		defer c.accountantLock.Unlock()
-	}
-
-	probe.SetStage("prepare_for_dispersal")
-
-	err = c.initOnceGrpcConnection()
-	if err != nil {
-		return nil, [32]byte{}, api.NewErrorFailover(err)
-	}
-	err = c.initOncePopulateAccountant(ctx)
-	if err != nil {
-		return nil, [32]byte{}, api.NewErrorFailover(err)
-	}
-
-	if c.signer == nil {
-		return nil, [32]byte{}, api.NewErrorInternal("uninitialized signer for authenticated dispersal")
-	}
-
-	for _, q := range quorums {
-		if q > corev2.MaxQuorumID {
-			return nil, [32]byte{}, api.NewErrorInvalidArg("quorum number must be less than 256")
-		}
 	}
 
 	// check every 32 bytes of data are within the valid range for a bn254 field element
