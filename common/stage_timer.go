@@ -7,15 +7,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// It may be helpful to generalize this utility to be used in other parts of the codebase. For a future PR, perhaps.
-
 // StageTimer encapsulates metrics to help track the time spent in each stage of the payload dispersal process.
 type StageTimer struct {
 	stageCount   *prometheus.GaugeVec
 	stageLatency *prometheus.SummaryVec
 }
 
-// SequenceProbe tracks the timing of a single sequence of operations. Multiple sequences can be tracked concurrently.
+// SequenceProbe can be used to track the amount of time that a particular operation spends doing particular
+// sub-operations (i.e. stages). Multiple instances of a particular operation can be tracked concurrently by the same
+// StageTimer. For each operation, the StageTimer builds a SequenceProbe. Each SequenceProbe the lifecycle of a single
+// iteration of an operation.
 type SequenceProbe struct {
 	stageTimer        *StageTimer
 	currentStage      string
@@ -28,7 +29,7 @@ func NewStageTimer(registry *prometheus.Registry, prefix, name string) *StageTim
 		return nil
 	}
 
-	statusLatency := promauto.With(registry).NewSummaryVec(
+	stageLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  prefix,
 			Name:       name + "_stage_latency_ms",
@@ -38,36 +39,36 @@ func NewStageTimer(registry *prometheus.Registry, prefix, name string) *StageTim
 		[]string{"stage"},
 	)
 
-	statusCount := promauto.With(registry).NewGaugeVec(
+	stageCount := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: prefix,
 			Name:      name + "_stage_count",
-			Help:      "the number of operations with a specific status",
+			Help:      "the number of operations with a specific stage",
 		},
 		[]string{"stage"},
 	)
 
 	return &StageTimer{
-		stageLatency: statusLatency,
-		stageCount:   statusCount,
+		stageLatency: stageLatency,
+		stageCount:   stageCount,
 	}
 }
 
-// NewSequence creates a new sequenceProbe with the given initial status.
-func (s *StageTimer) NewSequence(initialStatus string) *SequenceProbe {
+// NewSequence creates a new sequenceProbe with the given initial stage.
+func (s *StageTimer) NewSequence(initialStage string) *SequenceProbe {
 	if s == nil {
 		return nil
 	}
 
-	s.stageCount.WithLabelValues(initialStatus).Inc()
+	s.stageCount.WithLabelValues(initialStage).Inc()
 	return &SequenceProbe{
 		stageTimer:        s,
-		currentStage:      initialStatus,
+		currentStage:      initialStage,
 		currentStageStart: time.Now(),
 	}
 }
 
-// SetStage updates the status of the current sequence.
+// SetStage updates the stage of the current sequence.
 func (p *SequenceProbe) SetStage(stage string) {
 	if p == nil {
 		return

@@ -30,15 +30,16 @@ type PayloadDisperser struct {
 func NewPayloadDisperser(
 	logger logging.Logger,
 	payloadDisperserConfig PayloadDisperserConfig,
-// IMPORTANT: it is permissible for the disperserClient to be configured without a prover, but operating with this
-// configuration puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for computing
-// the commitments to a blob, and the PayloadDisperser doesn't have a mechanism to verify these commitments.
-//
-// TODO: In the future, an optimized method of commitment verification using fiat shamir transformation will
-//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
-//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
+	// IMPORTANT: it is permissible for the disperserClient to be configured without a prover, but operating with this
+	// configuration puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for computing
+	// the commitments to a blob, and the PayloadDisperser doesn't have a mechanism to verify these commitments.
+	//
+	// TODO: In the future, an optimized method of commitment verification using fiat shamir transformation will
+	//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
+	//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
 	disperserClient clients.DisperserClient,
 	certVerifier clients.ICertVerifier,
+	// if nil, then no metrics will be collected
 	registry *prometheus.Registry,
 ) (*PayloadDisperser, error) {
 
@@ -66,7 +67,7 @@ func NewPayloadDisperser(
 //  6. Return the valid cert
 func (pd *PayloadDisperser) SendPayload(
 	ctx context.Context,
-// payload is the raw data to be stored on eigenDA
+	// payload is the raw data to be stored on eigenDA
 	payload *coretypes.Payload,
 ) (*coretypes.EigenDACert, error) {
 
