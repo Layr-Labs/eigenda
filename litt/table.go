@@ -15,21 +15,30 @@ type Table interface {
 	// Put stores a value in the database. May not be used to overwrite an existing value.
 	// Note that when this method returns, data written may not be crash durable on disk
 	// (although the write does have atomicity). In order to ensure crash durability, call Flush().
+	//
+	// It is not thread safe to modify the byte slices passed to this function after the call
+	// (both the key and the value).
 	Put(key []byte, value []byte) error
 
 	// PutBatch stores multiple values in the database. Similar to Put, but allows for multiple values to be written
 	// at once. This may improve performance, but is otherwise has identical properties to a sequence of Put calls
 	// (i.e. this method does not atomically write the entire batch).
+	//
+	// It is not thread safe to modify the byte slices passed to this function after the call
+	// (including the key byte slices and the value byte slices).
 	PutBatch(batch []*types.KVPair) error
 
 	// Get retrieves a value from the database. The returned boolean indicates whether the key exists in the database
 	// (returns false if the key does not exist).
 	//
 	// For the sake of performance, the returned data is NOT safe to mutate. If you need to modify the data,
-	// make a copy of it first. Better to avoid a copy if it's not necessary, though.
+	// make a copy of it first. It is also not thread safe to modify the key byte slice after it is passed to this
+	// method.
 	Get(key []byte) ([]byte, bool, error)
 
 	// Exists returns true if the key exists in the database, and false otherwise. This is faster than calling Get.
+	//
+	// It is not thread safe to modify the key byte slice after it is passed to this method.
 	Exists(key []byte) (bool, error)
 
 	// Flush ensures that all data written to the database is crash durable on disk. When this method returns,
