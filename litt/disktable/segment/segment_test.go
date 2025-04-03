@@ -50,7 +50,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	salt := rand.Uint32()
 	seg, err := NewSegment(
 		logger,
-		util.NewDBPanic(context.Background(), logger),
+		util.NewFatalErrorHandler(context.Background(), logger),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -139,7 +139,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	// Reopen the segment and read all keys and values.
 	seg2, err := NewSegment(
 		logger,
-		util.NewDBPanic(context.Background(), logger),
+		util.NewFatalErrorHandler(context.Background(), logger),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -198,7 +198,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	salt := rand.Uint32()
 	seg, err := NewSegment(
 		logger,
-		util.NewDBPanic(context.Background(), logger),
+		util.NewFatalErrorHandler(context.Background(), logger),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -292,7 +292,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	// Reopen the segment and read all keys and values.
 	seg2, err := NewSegment(
 		logger,
-		util.NewDBPanic(context.Background(), logger),
+		util.NewFatalErrorHandler(context.Background(), logger),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -355,7 +355,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	salt := rand.Uint32()
 	seg, err := NewSegment(
 		logger,
-		util.NewDBPanic(context.Background(), logger),
+		util.NewFatalErrorHandler(context.Background(), logger),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -415,7 +415,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	// Reopen the segment and read all keys and values.
 	seg2, err := NewSegment(
 		logger,
-		util.NewDBPanic(context.Background(), logger),
+		util.NewFatalErrorHandler(context.Background(), logger),
 		index,
 		[]string{directory},
 		time.Now(),

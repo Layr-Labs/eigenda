@@ -1,6 +1,7 @@
 package disktable
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -33,11 +34,11 @@ type DiskTable struct {
 	// The logger for the disk table.
 	logger logging.Logger
 
-	// panic is a struct that permits the DB to "panic". There are many goroutines that function under the hood, and
-	// many of these threads could, in theory, encounter errors which are unrecoverable. In such situations, the
-	// desirable outcome is for the DB to report the error and then refuse to do additional work. If the DB is in a
+	// fatalErrorHandler is a struct that permits the DB to "panic". There are many goroutines that function under the
+	// hood, and many of these threads could, in theory, encounter errors which are unrecoverable. In such situations,
+	// the desirable outcome is for the DB to report the error and then refuse to do additional work. If the DB is in a
 	// broken state, it is much better to refuse to do work than to continue to do work and potentially corrupt data.
-	panic *util.DBPanic
+	fatalErrorHandler *util.FatalErrorHandler
 
 	// The root directories for the disk table.
 	roots []string
@@ -138,7 +139,7 @@ func NewDiskTable(
 	metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
 
 	if config.GCPeriod <= 0 {
-		return nil, fmt.Errorf("garbage collection period must be greater than 0")
+		return nil, errors.New("garbage collection period must be greater than 0")
 	}
 
 	// If the root directories don't exist, create them.
@@ -202,17 +203,18 @@ func NewDiskTable(
 		}
 	}
 
-	dbPanic := util.NewDBPanic(config.CTX, config.Logger)
+	fatalErrorHandler := util.NewFatalErrorHandler(config.CTX, config.Logger)
 
+	tableSaltShaker := rand.New(rand.NewSource(config.SaltShaker.Int63()))
 	table := &DiskTable{
 		logger:                  config.Logger,
-		panic:                   dbPanic,
+		fatalErrorHandler:       fatalErrorHandler,
 		timeSource:              config.TimeSource,
 		roots:                   roots,
 		segmentDirectories:      segDirs,
 		name:                    name,
 		metadata:                metadata,
-		saltShaker:              config.SaltShaker,
+		saltShaker:              tableSaltShaker,
 		keymap:                  keymap,
 		keymapPath:              keymapPath,
 		keymapTypeFile:          keymapTypeFile,
@@ -232,7 +234,7 @@ func NewDiskTable(
 	table.lowestSegmentIndex, table.highestSegmentIndex, table.segments, err =
 		segment.GatherSegmentFiles(
 			config.Logger,
-			dbPanic,
+			fatalErrorHandler,
 			table.segmentDirectories,
 			config.TimeSource(),
 			config.ShardingFactor,
@@ -257,7 +259,7 @@ func NewDiskTable(
 	}
 	mutableSegment, err := segment.NewSegment(
 		config.Logger,
-		dbPanic,
+		fatalErrorHandler,
 		nextSegmentIndex,
 		segDirs,
 		config.TimeSource(),
@@ -376,23 +378,23 @@ func (d *DiskTable) Name() string {
 
 // Stop stops the disk table. Flushes all data out to disk.
 func (d *DiskTable) Stop() error {
-	if ok, err := d.panic.IsOk(); !ok {
+	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
 		return fmt.Errorf("Cannot process Stop() request: %v", err)
 	}
 
-	d.panic.Shutdown()
+	d.fatalErrorHandler.Shutdown()
 
 	shutdownCompleteChan := make(chan struct{}, 1)
 	request := &controlLoopShutdownRequest{
 		shutdownCompleteChan: shutdownCompleteChan,
 	}
 
-	err := util.Send(d.panic, d.controllerChannel, request)
+	err := util.Send(d.fatalErrorHandler, d.controllerChannel, request)
 	if err != nil {
 		return fmt.Errorf("failed to send shutdown request: %v", err)
 	}
 
-	_, err = util.Await(d.panic, shutdownCompleteChan)
+	_, err = util.Await(d.fatalErrorHandler, shutdownCompleteChan)
 	if err != nil {
 		return fmt.Errorf("failed to shutdown: %v", err)
 	}
@@ -402,7 +404,7 @@ func (d *DiskTable) Stop() error {
 
 // Destroy stops the disk table and delete all files.
 func (d *DiskTable) Destroy() error {
-	if ok, err := d.panic.IsOk(); !ok {
+	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
 		return fmt.Errorf("Cannot process Destroy() request: %v", err)
 	}
 
@@ -472,7 +474,7 @@ func (d *DiskTable) Destroy() error {
 // SetTTL sets the TTL for the disk table. If set to 0, no TTL is enforced. This setting effects both new
 // data and data already written.
 func (d *DiskTable) SetTTL(ttl time.Duration) error {
-	if ok, err := d.panic.IsOk(); !ok {
+	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
 		return fmt.Errorf("Cannot process SetTTL() request: %v", err)
 	}
 
@@ -484,7 +486,7 @@ func (d *DiskTable) SetTTL(ttl time.Duration) error {
 }
 
 func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
-	if ok, err := d.panic.IsOk(); !ok {
+	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
 		return fmt.Errorf("Cannot process SetShardingFactor() request: %v", err)
 	}
 
@@ -495,7 +497,7 @@ func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
 	request := &controlLoopSetShardingFactorRequest{
 		shardingFactor: shardingFactor,
 	}
-	err := util.Send(d.panic, d.controllerChannel, request)
+	err := util.Send(d.fatalErrorHandler, d.controllerChannel, request)
 	if err != nil {
 		return fmt.Errorf("failed to send sharding factor request: %v", err)
 	}
@@ -524,7 +526,7 @@ func (d *DiskTable) getReservedSegment(index uint32) (*segment.Segment, bool) {
 }
 
 func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
-	if ok, err := d.panic.IsOk(); !ok {
+	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
 		return nil, false, fmt.Errorf("Cannot process Get() request: %v", err)
 	}
 
@@ -576,7 +578,7 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 }
 
 func (d *DiskTable) Put(key []byte, value []byte) error {
-	if ok, err := d.panic.IsOk(); !ok {
+	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
 		return fmt.Errorf("Cannot process Put() request: %v", err)
 	}
 
@@ -599,7 +601,7 @@ func (d *DiskTable) Put(key []byte, value []byte) error {
 		Value: value,
 	}
 
-	err := util.Send(d.panic, d.controllerChannel, writeReq)
+	err := util.Send(d.fatalErrorHandler, d.controllerChannel, writeReq)
 	if err != nil {
 		return fmt.Errorf("failed to send write request: %v", err)
 	}
@@ -610,7 +612,7 @@ func (d *DiskTable) Put(key []byte, value []byte) error {
 }
 
 func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
-	if ok, err := d.panic.IsOk(); !ok {
+	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
 		return fmt.Errorf("Cannot process PutBatch() request: %v", err)
 	}
 
@@ -634,7 +636,7 @@ func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 	request := &controlLoopWriteRequest{
 		values: batch,
 	}
-	err := util.Send(d.panic, d.controllerChannel, request)
+	err := util.Send(d.fatalErrorHandler, d.controllerChannel, request)
 	if err != nil {
 		return fmt.Errorf("failed to send write request: %v", err)
 	}
@@ -651,7 +653,8 @@ func (d *DiskTable) handleControlLoopWriteRequest(req *controlLoopWriteRequest) 
 		seg := d.segments[d.highestSegmentIndex]
 		keyCount, keyFileSize, shardSize, err := seg.Write(kv)
 		if err != nil {
-			d.panic.Panic(fmt.Errorf("failed to write to segment %d: %v", d.highestSegmentIndex, err))
+			d.fatalErrorHandler.Panic(
+				fmt.Errorf("failed to write to segment %d: %v", d.highestSegmentIndex, err))
 			return
 		}
 
@@ -660,7 +663,7 @@ func (d *DiskTable) handleControlLoopWriteRequest(req *controlLoopWriteRequest) 
 			// Mutable segment is full. Before continuing, we need to expand the segments.
 			err = d.expandSegments()
 			if err != nil {
-				d.panic.Panic(fmt.Errorf("failed to expand segments: %v", err))
+				d.fatalErrorHandler.Panic(fmt.Errorf("failed to expand segments: %v", err))
 				return
 			}
 		}
@@ -685,7 +688,7 @@ func (d *DiskTable) Exists(key []byte) (bool, error) {
 
 // Flush flushes all data to disk. Blocks until all data previously submitted to Put has been written to disk.
 func (d *DiskTable) Flush() error {
-	if ok, err := d.panic.IsOk(); !ok {
+	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
 		return fmt.Errorf("Cannot process Flush() request: %v", err)
 	}
 
@@ -701,12 +704,12 @@ func (d *DiskTable) Flush() error {
 	flushReq := &controlLoopFlushRequest{
 		responseChan: make(chan struct{}, 1),
 	}
-	err := util.Send(d.panic, d.controllerChannel, flushReq)
+	err := util.Send(d.fatalErrorHandler, d.controllerChannel, flushReq)
 	if err != nil {
 		return fmt.Errorf("failed to send flush request: %v", err)
 	}
 
-	_, err = util.Await(d.panic, flushReq.responseChan)
+	_, err = util.Await(d.fatalErrorHandler, flushReq.responseChan)
 	if err != nil {
 		return fmt.Errorf("failed to flush: %v", err)
 	}
@@ -721,13 +724,13 @@ func (d *DiskTable) handleControlLoopShutdownRequest(req *controlLoopShutdownReq
 	request := &flushLoopShutdownRequest{
 		shutdownCompleteChan: shutdownCompleteChan,
 	}
-	err := util.Send(d.panic, d.flushChannel, request)
+	err := util.Send(d.fatalErrorHandler, d.flushChannel, request)
 	if err != nil {
 		d.logger.Errorf("failed to send shutdown request to flush loop: %v", err)
 		return
 	}
 
-	_, err = util.Await(d.panic, shutdownCompleteChan)
+	_, err = util.Await(d.fatalErrorHandler, shutdownCompleteChan)
 	if err != nil {
 		d.logger.Errorf("failed to shutdown flush loop: %v", err)
 		return
@@ -736,21 +739,21 @@ func (d *DiskTable) handleControlLoopShutdownRequest(req *controlLoopShutdownReq
 	// Seal the mutable segment
 	durableKeys, err := d.segments[d.highestSegmentIndex].Seal(d.timeSource())
 	if err != nil {
-		d.panic.Panic(fmt.Errorf("failed to seal mutable segment: %v", err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to seal mutable segment: %v", err))
 		return
 	}
 
 	// Flush the keys that are now durable in the segment.
 	err = d.writeKeysToKeymap(durableKeys)
 	if err != nil {
-		d.panic.Panic(fmt.Errorf("failed to flush keys: %v", err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to flush keys: %v", err))
 		return
 	}
 
 	// Stop the keymap
 	err = d.keymap.Stop()
 	if err != nil {
-		d.panic.Panic(fmt.Errorf("failed to stop keymap: %v", err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to stop keymap: %v", err))
 		return
 	}
 
@@ -792,7 +795,7 @@ func (d *DiskTable) doGarbageCollection() {
 		// Segment is old enough to be deleted.
 		keys, err := seg.GetKeys()
 		if err != nil {
-			d.panic.Panic(fmt.Errorf("failed to get keys: %v", err))
+			d.fatalErrorHandler.Panic(fmt.Errorf("failed to get keys: %v", err))
 			return
 		}
 
@@ -803,7 +806,7 @@ func (d *DiskTable) doGarbageCollection() {
 			}
 			err = d.keymap.Delete(keys[keyIndex:lastIndex])
 			if err != nil {
-				d.panic.Panic(fmt.Errorf("failed to delete keys: %v", err))
+				d.fatalErrorHandler.Panic(fmt.Errorf("failed to delete keys: %v", err))
 				return
 			}
 		}
@@ -824,7 +827,7 @@ func (d *DiskTable) doGarbageCollection() {
 }
 
 func (d *DiskTable) SetCacheSize(_ uint64) error {
-	if ok, err := d.panic.IsOk(); !ok {
+	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
 		return fmt.Errorf("Cannot process SetCacheSize() request: %v", err)
 	}
 
@@ -844,7 +847,7 @@ func (d *DiskTable) expandSegments() error {
 		now:          now,
 		responseChan: flushLoopResponseChan,
 	}
-	err := util.Send(d.panic, d.flushChannel, request)
+	err := util.Send(d.fatalErrorHandler, d.flushChannel, request)
 	if err != nil {
 		return fmt.Errorf("failed to send seal request: %v", err)
 	}
@@ -852,7 +855,7 @@ func (d *DiskTable) expandSegments() error {
 	// Unfortunately, it is necessary to block until the sealing has been completed. Although this may result
 	// in a brief interruption in new write work being sent to the segment, expanding the number of segments is
 	// infrequent, even for very high throughput workloads.
-	_, err = util.Await(d.panic, flushLoopResponseChan)
+	_, err = util.Await(d.fatalErrorHandler, flushLoopResponseChan)
 	if err != nil {
 		return fmt.Errorf("failed to seal segment: %v", err)
 	}
@@ -860,7 +863,7 @@ func (d *DiskTable) expandSegments() error {
 	// Create a new segment.
 	newSegment, err := segment.NewSegment(
 		d.logger,
-		d.panic,
+		d.fatalErrorHandler,
 		d.highestSegmentIndex+1,
 		d.segmentDirectories,
 		now,
@@ -888,12 +891,12 @@ func (d *DiskTable) ScheduleImmediateGC() error {
 		completionChan: make(chan struct{}, 1),
 	}
 
-	err := util.Send(d.panic, d.controllerChannel, request)
+	err := util.Send(d.fatalErrorHandler, d.controllerChannel, request)
 	if err != nil {
 		return fmt.Errorf("failed to send GC request: %v", err)
 	}
 
-	_, err = util.Await(d.panic, request.completionChan)
+	_, err = util.Await(d.fatalErrorHandler, request.completionChan)
 	if err != nil {
 		return fmt.Errorf("failed to await GC completion: %v", err)
 	}
@@ -911,14 +914,14 @@ func (d *DiskTable) ScheduleImmediateGC() error {
 func (d *DiskTable) handleFlushLoopSealRequest(req *flushLoopSealRequest) {
 	durableKeys, err := d.segments[d.highestSegmentIndex].Seal(req.now)
 	if err != nil {
-		d.panic.Panic(fmt.Errorf("failed to seal segment %d: %v", d.highestSegmentIndex, err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to seal segment %d: %v", d.highestSegmentIndex, err))
 		return
 	}
 
 	// Flush the keys that are now durable in the segment.
 	err = d.writeKeysToKeymap(durableKeys)
 	if err != nil {
-		d.panic.Panic(fmt.Errorf("failed to flush keys: %v", err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to flush keys: %v", err))
 		return
 	}
 
@@ -934,7 +937,7 @@ func (d *DiskTable) handleControlLoopFlushRequest(req *controlLoopFlushRequest) 
 	// it becomes the responsibility of the flush loop to wait for the flush to complete.
 	flushWaitFunction, err := d.segments[d.highestSegmentIndex].Flush()
 	if err != nil {
-		d.panic.Panic(fmt.Errorf("failed to flush segment %d: %v", d.highestSegmentIndex, err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to flush segment %d: %v", d.highestSegmentIndex, err))
 		return
 	}
 
@@ -943,7 +946,7 @@ func (d *DiskTable) handleControlLoopFlushRequest(req *controlLoopFlushRequest) 
 		flushWaitFunction: flushWaitFunction,
 		responseChan:      req.responseChan,
 	}
-	err = util.Send(d.panic, d.flushChannel, request)
+	err = util.Send(d.fatalErrorHandler, d.flushChannel, request)
 	if err != nil {
 		d.logger.Errorf("failed to send flush request to flush loop: %v", err)
 	}
@@ -958,7 +961,7 @@ func (d *DiskTable) handleFlushLoopFlushRequest(req *flushLoopFlushRequest) {
 
 	durableKeys, err := req.flushWaitFunction()
 	if err != nil {
-		d.panic.Panic(fmt.Errorf("failed to flush mutable segment: %v", err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to flush mutable segment: %v", err))
 		return
 	}
 
@@ -970,7 +973,7 @@ func (d *DiskTable) handleFlushLoopFlushRequest(req *flushLoopFlushRequest) {
 
 	err = d.writeKeysToKeymap(durableKeys)
 	if err != nil {
-		d.panic.Panic(fmt.Errorf("failed to flush keys: %v", err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to flush keys: %v", err))
 		return
 	}
 
@@ -1019,14 +1022,14 @@ func (d *DiskTable) handleControlLoopSetShardingFactorRequest(req *controlLoopSe
 	}
 	err := d.metadata.SetShardingFactor(req.shardingFactor)
 	if err != nil {
-		d.panic.Panic(fmt.Errorf("failed to set sharding factor: %v", err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to set sharding factor: %v", err))
 		return
 	}
 
 	// This seals the current mutable segment and creates a new one. The new segment will have the new sharding factor.
 	err = d.expandSegments()
 	if err != nil {
-		d.panic.Panic(fmt.Errorf("failed to expand segments: %v", err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to expand segments: %v", err))
 		return
 	}
 }
@@ -1068,7 +1071,7 @@ func (d *DiskTable) controlLoop() {
 
 	for {
 		select {
-		case <-d.panic.ImmediateShutdownRequired():
+		case <-d.fatalErrorHandler.ImmediateShutdownRequired():
 			d.logger.Infof("context done, shutting down disk table control loop")
 			return
 		case message := <-d.controllerChannel:
@@ -1085,7 +1088,7 @@ func (d *DiskTable) controlLoop() {
 				d.doGarbageCollection()
 				req.completionChan <- struct{}{}
 			} else {
-				d.panic.Panic(fmt.Errorf("Unknown control message type %T", message))
+				d.fatalErrorHandler.Panic(fmt.Errorf("Unknown control message type %T", message))
 				return
 			}
 		case <-ticker.C:
@@ -1124,7 +1127,7 @@ type flushLoopShutdownRequest struct {
 func (d *DiskTable) flushLoop() {
 	for {
 		select {
-		case <-d.panic.ImmediateShutdownRequired():
+		case <-d.fatalErrorHandler.ImmediateShutdownRequired():
 			d.logger.Infof("context done, shutting down disk table flush loop")
 			return
 		case message := <-d.flushChannel:
@@ -1136,7 +1139,7 @@ func (d *DiskTable) flushLoop() {
 				req.shutdownCompleteChan <- struct{}{}
 				return
 			} else {
-				d.panic.Panic(fmt.Errorf("Unknown flush message type %T", message))
+				d.fatalErrorHandler.Panic(fmt.Errorf("Unknown flush message type %T", message))
 				return
 			}
 		}
