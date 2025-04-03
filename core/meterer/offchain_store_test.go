@@ -53,13 +53,29 @@ func TestUpdateReservationBin(t *testing.T) {
 	reservationPeriod := uint64(1)
 	size := uint64(1000)
 
-	binUsage, err := tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, size)
+	// First verify it doesn't exist
+	binUsage, err := tc.store.GetReservationBin(tc.ctx, accountID, reservationPeriod)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(0), binUsage)
+
+	// Update the bin
+	binUsage, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, size)
+	require.NoError(t, err)
+	assert.Equal(t, size, binUsage)
+
+	// Verify the update
+	binUsage, err = tc.store.GetReservationBin(tc.ctx, accountID, reservationPeriod)
 	require.NoError(t, err)
 	assert.Equal(t, size, binUsage)
 
 	// Test updating existing bin
 	additionalSize := uint64(500)
 	binUsage, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, additionalSize)
+	require.NoError(t, err)
+	assert.Equal(t, size+additionalSize, binUsage)
+
+	// Verify the update
+	binUsage, err = tc.store.GetReservationBin(tc.ctx, accountID, reservationPeriod)
 	require.NoError(t, err)
 	assert.Equal(t, size+additionalSize, binUsage)
 }
@@ -72,13 +88,29 @@ func TestUpdateGlobalBin(t *testing.T) {
 	reservationPeriod := uint64(1)
 	size := uint64(2000)
 
-	binUsage, err := tc.store.UpdateGlobalBin(tc.ctx, reservationPeriod, size)
+	// First verify it doesn't exist
+	binUsage, err := tc.store.GetGlobalBin(tc.ctx, reservationPeriod)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(0), binUsage)
+
+	// Update the bin
+	binUsage, err = tc.store.UpdateGlobalBin(tc.ctx, reservationPeriod, size)
+	require.NoError(t, err)
+	assert.Equal(t, size, binUsage)
+
+	// Verify the update
+	binUsage, err = tc.store.GetGlobalBin(tc.ctx, reservationPeriod)
 	require.NoError(t, err)
 	assert.Equal(t, size, binUsage)
 
 	// Test updating existing bin
 	additionalSize := uint64(1000)
 	binUsage, err = tc.store.UpdateGlobalBin(tc.ctx, reservationPeriod, additionalSize)
+	require.NoError(t, err)
+	assert.Equal(t, size+additionalSize, binUsage)
+
+	// Verify the update
+	binUsage, err = tc.store.GetGlobalBin(tc.ctx, reservationPeriod)
 	require.NoError(t, err)
 	assert.Equal(t, size+additionalSize, binUsage)
 }
@@ -95,10 +127,20 @@ func TestAddOnDemandPayment(t *testing.T) {
 	}
 	charge1 := big.NewInt(100)
 
+	// First verify it doesn't exist
+	payment, err := tc.store.GetOnDemandPayment(tc.ctx, accountID)
+	require.NoError(t, err)
+	assert.Equal(t, big.NewInt(0), payment)
+
 	// Add the payment
 	oldPayment, err := tc.store.AddOnDemandPayment(tc.ctx, payment1, charge1)
 	require.NoError(t, err)
 	require.Equal(t, big.NewInt(0), oldPayment, "Old payment should be 0 for first payment")
+
+	// Verify the update
+	payment, err = tc.store.GetOnDemandPayment(tc.ctx, accountID)
+	require.NoError(t, err)
+	assert.Equal(t, payment1.CumulativePayment, payment)
 
 	// Test case: Add a larger payment with sufficient increment
 	payment2 := core.PaymentMetadata{
@@ -111,6 +153,11 @@ func TestAddOnDemandPayment(t *testing.T) {
 	oldPayment, err = tc.store.AddOnDemandPayment(tc.ctx, payment2, charge2)
 	require.NoError(t, err)
 	require.Equal(t, big.NewInt(100), oldPayment, "Old payment should be 100")
+
+	// Verify the update
+	payment, err = tc.store.GetOnDemandPayment(tc.ctx, accountID)
+	require.NoError(t, err)
+	assert.Equal(t, payment2.CumulativePayment, payment)
 
 	// Test case: Add a larger payment but with insufficient increment
 	payment3 := core.PaymentMetadata{
@@ -125,6 +172,11 @@ func TestAddOnDemandPayment(t *testing.T) {
 	assert.Contains(t, err.Error(), "insufficient cumulative payment increment")
 	require.Nil(t, oldPayment, "Old payment should be nil on error")
 
+	// Verify the payment wasn't updated
+	payment, err = tc.store.GetOnDemandPayment(tc.ctx, accountID)
+	require.NoError(t, err)
+	assert.Equal(t, payment2.CumulativePayment, payment)
+
 	// Test case: Add a smaller payment (should fail)
 	payment4 := core.PaymentMetadata{
 		AccountID:         accountID,
@@ -137,6 +189,11 @@ func TestAddOnDemandPayment(t *testing.T) {
 	require.Error(t, err) // Should fail since payment is smaller than current
 	assert.Contains(t, err.Error(), "insufficient cumulative payment increment")
 	require.Nil(t, oldPayment, "Old payment should be nil on error")
+
+	// Verify the payment wasn't updated
+	payment, err = tc.store.GetOnDemandPayment(tc.ctx, accountID)
+	require.NoError(t, err)
+	assert.Equal(t, payment2.CumulativePayment, payment)
 }
 
 // TestRollbackOnDemandPayment tests the RollbackOnDemandPayment function
