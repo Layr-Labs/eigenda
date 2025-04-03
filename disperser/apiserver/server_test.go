@@ -768,29 +768,9 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 		QuorumNumbers:    []uint8{0, 1},
 		QuorumSplits:     []byte{50, 50},
 	}, nil)
-	// append test name to each table name for an unique store
-	table_names := []string{"reservations_server_" + testName, "ondemand_server_" + testName, "global_server_" + testName}
-	err = meterer.CreateReservationTable(awsConfig, table_names[0])
-	if err != nil {
-		teardown()
-		panic("failed to create reservation table")
-	}
-	err = meterer.CreateOnDemandTable(awsConfig, table_names[1])
-	if err != nil {
-		teardown()
-		panic("failed to create ondemand table")
-	}
-	err = meterer.CreateGlobalReservationTable(awsConfig, table_names[2])
-	if err != nil {
-		teardown()
-		panic("failed to create global reservation table")
-	}
 
 	store, err := meterer.NewOffchainStore(
-		awsConfig,
-		table_names[0],
-		table_names[1],
-		table_names[2],
+		"server_test",
 		logger,
 	)
 	if err != nil {

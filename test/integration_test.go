@@ -264,29 +264,8 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
 	}
 
-	table_names := []string{"reservations_integration", "ondemand_integration", "global_integration"}
-
-	err = meterer.CreateReservationTable(clientConfig, table_names[0])
-	if err != nil {
-		teardown()
-		panic("failed to create reservation table")
-	}
-	err = meterer.CreateOnDemandTable(clientConfig, table_names[1])
-	if err != nil {
-		teardown()
-		panic("failed to create ondemand table")
-	}
-	err = meterer.CreateGlobalReservationTable(clientConfig, table_names[2])
-	if err != nil {
-		teardown()
-		panic("failed to create global reservation table")
-	}
-
 	offchainStore, err := meterer.NewOffchainStore(
-		clientConfig,
-		table_names[0],
-		table_names[1],
-		table_names[2],
+		"testdata/payment.db",
 		logger,
 	)
 	if err != nil {
