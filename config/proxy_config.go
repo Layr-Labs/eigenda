@@ -82,6 +82,26 @@ func ReadProxyConfig(ctx *cli.Context) (ProxyConfig, error) {
 
 // Check ... verifies that configuration values are adequately set
 func (cfg *ProxyConfig) Check() error {
+	v1Enabled := slices.Contains(cfg.StorageConfig.BackendsToEnable, common.V1EigenDABackend)
+	if v1Enabled {
+		err := cfg.checkV1Config()
+		if err != nil {
+			return fmt.Errorf("check v1 config: %w", err)
+		}
+	}
+
+	v2Enabled := slices.Contains(cfg.StorageConfig.BackendsToEnable, common.V2EigenDABackend)
+	if v2Enabled && !cfg.MemstoreEnabled {
+		err := cfg.ClientConfigV2.Check()
+		if err != nil {
+			return fmt.Errorf("check v2 config: %w", err)
+		}
+	}
+
+	return cfg.StorageConfig.Check()
+}
+
+func (cfg *ProxyConfig) checkV1Config() error {
 	if cfg.MemstoreEnabled {
 		// provide dummy values to eigenda client config. Since the client won't be called in this
 		// mode it doesn't matter.
@@ -115,15 +135,7 @@ func (cfg *ProxyConfig) Check() error {
 		}
 	}
 
-	v2Enabled := slices.Contains(cfg.StorageConfig.BackendsToEnable, common.V2EigenDABackend)
-	if v2Enabled && !cfg.MemstoreEnabled {
-		err := cfg.ClientConfigV2.Check()
-		if err != nil {
-			return err
-		}
-	}
-
-	return cfg.StorageConfig.Check()
+	return nil
 }
 
 func (cfg *ProxyConfig) ToString() (string, error) {
