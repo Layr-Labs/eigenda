@@ -173,22 +173,22 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	probe.SetStage("acquire_accountant_lock")
 	c.accountantLock.Lock()
 
-	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(ctx, time.Now().UnixNano(), uint64(symbolLength), quorums)
-	if err != nil {
-		c.accountantLock.Unlock()
-		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
-	}
-
 	probe.SetStage("prepare_for_dispersal")
 
-	err = c.initOncePopulateAccountant(ctx)
+	err := c.initOncePopulateAccountant(ctx)
 	if err != nil {
 		return nil, [32]byte{}, api.NewErrorFailover(err)
 	}
 	err = c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, [32]byte{}, api.NewErrorFailover(err)
+	}
+
+	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
+	payment, err := c.accountant.AccountBlob(ctx, time.Now().UnixNano(), uint64(symbolLength), quorums)
+	if err != nil {
+		c.accountantLock.Unlock()
+		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
 	}
 
 	if payment.CumulativePayment == nil || payment.CumulativePayment.Sign() == 0 {
