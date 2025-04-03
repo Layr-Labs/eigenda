@@ -31,7 +31,8 @@
 			"settings": {
 				"go.toolsManagement.checkForUpdates": "local",
 				"go.useLanguageServer": true,
-				"go.gopath": "/go"
+				"go.gopath": "/go",
+				"solidity.formatter": "forge"
 			},
 
 			// Add the IDs of extensions you want installed when the container is created.

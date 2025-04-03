@@ -1,6 +1,6 @@
+pragma solidity =0.8.12;
 // SPDX-License-Identifier: BUSL-1.1
 /*
-pragma solidity =0.8.12;
 
 import {PauserRegistry} from "../lib/eigenlayer-middleware/src/contracts/permissions/PauserRegistry.sol";
 import {EmptyContract} from "../lib/eigenlayer-middleware/src/test/mocks/EmptyContract.sol";
@@ -89,7 +89,8 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
         /**
          * First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
          * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
-         *//*
+         */
+/*
         eigenDAServiceManager = EigenDAServiceManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
@@ -272,7 +273,8 @@ contract Deployer_Mainnet is ExistingDeploymentParser {
         /**
          * First, deploy upgradeable proxy contracts that **will point** to the implementations. Since the implementation contracts are
          * not yet deployed, we give these proxies an empty contract as the initial implementation, to act as if they have no code.
-         *//*
+         */
+/*
         eigenDAServiceManager = EigenDAServiceManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
