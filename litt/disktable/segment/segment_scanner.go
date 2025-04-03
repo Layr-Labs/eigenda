@@ -355,7 +355,7 @@ func linkSegments(lowestSegmentIndex uint32, highestSegmentIndex uint32, segment
 // orphaned files and checks for corrupted files. It creates a new mutable segment at the end.
 func GatherSegmentFiles(
 	logger logging.Logger,
-	panic *util.DBPanic,
+	fatalErrorHandler *util.FatalErrorHandler,
 	rootDirectories []string,
 	now time.Time,
 	shardingFactor uint32,
@@ -414,7 +414,7 @@ func GatherSegmentFiles(
 		// Load all healthy segments.
 		for i := lowestSegmentIndex; i <= highestSegmentIndex; i++ {
 			segment, err := NewSegment(
-				logger, panic, i, rootDirectories, now, shardingFactor, salt, true, fsync)
+				logger, fatalErrorHandler, i, rootDirectories, now, shardingFactor, salt, true, fsync)
 			if err != nil {
 				return 0, 0, nil,
 					fmt.Errorf("failed to create segment %d: %v", i, err)

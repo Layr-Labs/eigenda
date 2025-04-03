@@ -261,7 +261,7 @@ func NewLittDBMetrics(registry *prometheus.Registry, namespace string) *LittDBMe
 
 // CollectPeriodicMetrics is a method that is periodically called to collect metrics. Tables are not permitted to be
 // added or dropped while this method is running.
-func (m *LittDBMetrics) CollectPeriodicMetrics(db litt.DB, tables map[string]litt.ManagedTable) {
+func (m *LittDBMetrics) CollectPeriodicMetrics(tables map[string]litt.ManagedTable) {
 	if m == nil {
 		return
 	}

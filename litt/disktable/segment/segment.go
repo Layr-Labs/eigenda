@@ -27,9 +27,9 @@ type Segment struct {
 	// The logger for the segment.
 	logger logging.Logger
 
-	// Used to signal an unrecoverable error in the segment. If panic.Panic() is called, the entire DB enters a
-	// "panic" state and will refuse to do additional work.
-	panic *util.DBPanic
+	// Used to signal an unrecoverable error in the segment. If fatalErrorHandler.Panic() is called, the entire DB
+	// enters a "panic" state and will refuse to do additional work.
+	fatalErrorHandler *util.FatalErrorHandler
 
 	// The index of the data segment. The first data segment ever created has index 0, the next has index 1, and so on.
 	index uint32
@@ -92,7 +92,7 @@ type Segment struct {
 // disk always use their original sharding factor and salt values
 func NewSegment(
 	logger logging.Logger,
-	panic *util.DBPanic,
+	fatalErrorHandler *util.FatalErrorHandler,
 	index uint32,
 	parentDirectories []string,
 	now time.Time,
@@ -176,17 +176,17 @@ func NewSegment(
 	keyFileChannel := make(chan any, shardControlChannelCapacity*metadata.shardingFactor)
 
 	segment := &Segment{
-		logger:          logger,
-		panic:           panic,
-		index:           index,
-		metadata:        metadata,
-		keys:            keys,
-		shards:          shards,
-		shardSizes:      shardSizes,
-		keyFileSize:     keyFileSize,
-		shardChannels:   shardChannels,
-		keyFileChannel:  keyFileChannel,
-		deletionChannel: make(chan struct{}, 1),
+		logger:            logger,
+		fatalErrorHandler: fatalErrorHandler,
+		index:             index,
+		metadata:          metadata,
+		keys:              keys,
+		shards:            shards,
+		shardSizes:        shardSizes,
+		keyFileSize:       keyFileSize,
+		shardChannels:     shardChannels,
+		keyFileChannel:    keyFileChannel,
+		deletionChannel:   make(chan struct{}, 1),
 	}
 
 	// Segments are returned with an initial reference count of 1, as the caller of the constructor is considered to
@@ -301,7 +301,7 @@ func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64
 		value:                  data.Value,
 		expectedFirstByteIndex: firstByteIndex,
 	}
-	err = util.Send(s.panic, s.shardChannels[shard], shardRequest)
+	err = util.Send(s.fatalErrorHandler, s.shardChannels[shard], shardRequest)
 	if err != nil {
 		return 0, 0, 0,
 			fmt.Errorf("failed to send value to shard control loop: %v", err)
@@ -312,7 +312,7 @@ func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64
 		Key:     data.Key,
 		Address: types.NewAddress(s.index, firstByteIndex),
 	}
-	err = util.Send(s.panic, s.keyFileChannel, keyRequest)
+	err = util.Send(s.fatalErrorHandler, s.keyFileChannel, keyRequest)
 	if err != nil {
 		return 0, 0, 0,
 			fmt.Errorf("failed to send key to key file control loop: %v", err)
@@ -348,8 +348,8 @@ func (s *Segment) GetKeys() ([]*types.KAPair, error) {
 	return keys, nil
 }
 
-// FlushWaitFunction is a function that waits for a flush operation to complete. It returns the addresses of the data that
-// was flushed, or an error if the flush operation failed.
+// FlushWaitFunction is a function that waits for a flush operation to complete. It returns the addresses of the data
+// that was flushed, or an error if the flush operation failed.
 type FlushWaitFunction func() ([]*types.KAPair, error)
 
 // Flush schedules a flush operation. Flush operations are performed serially in the order they are scheduled.
@@ -364,7 +364,7 @@ func (s *Segment) Flush() (FlushWaitFunction, error) {
 		request := &shardFlushRequest{
 			completionChannel: shardResponseChannels[shard],
 		}
-		err := util.Send(s.panic, shardChannel, request)
+		err := util.Send(s.fatalErrorHandler, shardChannel, request)
 		if err != nil {
 			return nil, fmt.Errorf("failed to send flush request to shard %d: %v", shard, err)
 		}
@@ -377,7 +377,7 @@ func (s *Segment) Flush() (FlushWaitFunction, error) {
 		seal:              false,
 		completionChannel: keyResponseChannel,
 	}
-	err := util.Send(s.panic, s.keyFileChannel, request)
+	err := util.Send(s.fatalErrorHandler, s.keyFileChannel, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send flush request to key file: %v", err)
 	}
@@ -385,13 +385,13 @@ func (s *Segment) Flush() (FlushWaitFunction, error) {
 	return func() ([]*types.KAPair, error) {
 		// Wait for each shard to finish flushing.
 		for i := range s.shardChannels {
-			_, err := util.Await(s.panic, shardResponseChannels[i])
+			_, err := util.Await(s.fatalErrorHandler, shardResponseChannels[i])
 			if err != nil {
 				return nil, fmt.Errorf("failed to flush shard %d: %v", i, err)
 			}
 		}
 
-		keyFlushResponse, err := util.Await(s.panic, keyResponseChannel)
+		keyFlushResponse, err := util.Await(s.fatalErrorHandler, keyResponseChannel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to flush key file: %v", err)
 		}
@@ -413,7 +413,7 @@ func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
 			seal:              true,
 			completionChannel: shardResponseChannels[shard],
 		}
-		err := util.Send(s.panic, shardChannel, request)
+		err := util.Send(s.fatalErrorHandler, shardChannel, request)
 		if err != nil {
 			return nil, fmt.Errorf("failed to send flush request to shard %d: %v", shard, err)
 		}
@@ -425,21 +425,21 @@ func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
 		seal:              true,
 		completionChannel: keyResponseChannel,
 	}
-	err := util.Send(s.panic, s.keyFileChannel, request)
+	err := util.Send(s.fatalErrorHandler, s.keyFileChannel, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send flush request to key file: %v", err)
 	}
 
 	// Wait for each shard to finish flushing.
 	for i := range s.shardChannels {
-		_, err = util.Await(s.panic, shardResponseChannels[i])
+		_, err = util.Await(s.fatalErrorHandler, shardResponseChannels[i])
 		if err != nil {
 			return nil, fmt.Errorf("failed to flush shard %d: %v", i, err)
 		}
 	}
 
 	// Wait for the key file to finish flushing.
-	response, err := util.Await(s.panic, keyResponseChannel)
+	response, err := util.Await(s.fatalErrorHandler, keyResponseChannel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to flush key file: %v", err)
 	}
@@ -496,13 +496,14 @@ func (s *Segment) Release() {
 
 	if reservations < 0 {
 		// This should be impossible.
-		s.panic.Panic(fmt.Errorf("segment %d has negative reservation count: %d", s.index, reservations))
+		s.fatalErrorHandler.Panic(
+			fmt.Errorf("segment %d has negative reservation count: %d", s.index, reservations))
 	}
 
 	go func() {
 		err := s.delete()
 		if err != nil {
-			s.panic.Panic(fmt.Errorf("failed to delete segment: %v", err))
+			s.fatalErrorHandler.Panic(fmt.Errorf("failed to delete segment: %v", err))
 		}
 	}()
 }
@@ -511,7 +512,7 @@ func (s *Segment) Release() {
 // this method will block until it is. This method should only be called once per segment (the second call
 // will block forever!).
 func (s *Segment) BlockUntilFullyDeleted() error {
-	_, err := util.Await(s.panic, s.deletionChannel)
+	_, err := util.Await(s.fatalErrorHandler, s.deletionChannel)
 	if err != nil {
 		return fmt.Errorf("failed to await segment deletion: %v", err)
 	}
@@ -563,12 +564,12 @@ func (s *Segment) handleShardFlushRequest(shard uint32, request *shardFlushReque
 	if request.seal {
 		err := s.shards[shard].seal()
 		if err != nil {
-			s.panic.Panic(fmt.Errorf("failed to seal value file: %v", err))
+			s.fatalErrorHandler.Panic(fmt.Errorf("failed to seal value file: %v", err))
 		}
 	} else {
 		err := s.shards[shard].flush()
 		if err != nil {
-			s.panic.Panic(fmt.Errorf("failed to flush value file: %v", err))
+			s.fatalErrorHandler.Panic(fmt.Errorf("failed to flush value file: %v", err))
 		}
 	}
 	request.completionChannel <- struct{}{}
@@ -578,13 +579,14 @@ func (s *Segment) handleShardFlushRequest(shard uint32, request *shardFlushReque
 func (s *Segment) handleShardWrite(shard uint32, data *valueToWrite) {
 	firstByteIndex, err := s.shards[shard].write(data.value)
 	if err != nil {
-		s.panic.Panic(fmt.Errorf("failed to write value to value file: %v", err))
+		s.fatalErrorHandler.Panic(fmt.Errorf("failed to write value to value file: %v", err))
 	}
 
 	if firstByteIndex != data.expectedFirstByteIndex {
 		// This should never happen. But it's a good sanity check.
 		if firstByteIndex != data.expectedFirstByteIndex {
-			s.panic.Panic(fmt.Errorf("expected first byte index %d, got %d", data.expectedFirstByteIndex, firstByteIndex))
+			s.fatalErrorHandler.Panic(
+				fmt.Errorf("expected first byte index %d, got %d", data.expectedFirstByteIndex, firstByteIndex))
 		}
 	}
 }
@@ -593,7 +595,7 @@ func (s *Segment) handleShardWrite(shard uint32, data *valueToWrite) {
 func (s *Segment) handleKeyFileWrite(data *types.KAPair) {
 	err := s.keys.write(data.Key, data.Address)
 	if err != nil {
-		s.panic.Panic(fmt.Errorf("failed to write key to key file: %v", err))
+		s.fatalErrorHandler.Panic(fmt.Errorf("failed to write key to key file: %v", err))
 	}
 }
 
@@ -602,12 +604,12 @@ func (s *Segment) handleKeyFileFlushRequest(request *keyFileFlushRequest, unflus
 	if request.seal {
 		err := s.keys.seal()
 		if err != nil {
-			s.panic.Panic(fmt.Errorf("failed to seal key file: %v", err))
+			s.fatalErrorHandler.Panic(fmt.Errorf("failed to seal key file: %v", err))
 		}
 	} else {
 		err := s.keys.flush()
 		if err != nil {
-			s.panic.Panic(fmt.Errorf("failed to flush key file: %v", err))
+			s.fatalErrorHandler.Panic(fmt.Errorf("failed to flush key file: %v", err))
 		}
 	}
 
@@ -636,7 +638,7 @@ type valueToWrite struct {
 func (s *Segment) shardControlLoop(shard uint32) {
 	for {
 		select {
-		case <-s.panic.ImmediateShutdownRequired():
+		case <-s.fatalErrorHandler.ImmediateShutdownRequired():
 			s.logger.Infof("segment %d shard %d control loop exiting, context cancelled", s.index, shard)
 			return
 		case operation := <-s.shardChannels[shard]:
@@ -650,7 +652,8 @@ func (s *Segment) shardControlLoop(shard uint32) {
 				s.handleShardWrite(shard, data)
 				continue
 			} else {
-				s.panic.Panic(fmt.Errorf("unknown operation type in shard control loop: %T", operation))
+				s.fatalErrorHandler.Panic(
+					fmt.Errorf("unknown operation type in shard control loop: %T", operation))
 			}
 		}
 	}
@@ -679,7 +682,7 @@ func (s *Segment) keyFileControlLoop() {
 
 	for {
 		select {
-		case <-s.panic.ImmediateShutdownRequired():
+		case <-s.fatalErrorHandler.ImmediateShutdownRequired():
 			s.logger.Infof("segment %d key file control loop exiting, context cancelled", s.index)
 			return
 		case operation := <-s.keyFileChannel:
@@ -698,7 +701,8 @@ func (s *Segment) keyFileControlLoop() {
 				unflushedKeys = append(unflushedKeys, data)
 
 			} else {
-				s.panic.Panic(fmt.Errorf("unknown operation type in key file control loop: %T", operation))
+				s.fatalErrorHandler.Panic(
+					fmt.Errorf("unknown operation type in key file control loop: %T", operation))
 			}
 		}
 	}

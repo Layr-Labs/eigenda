@@ -247,7 +247,14 @@ func (d *db) gatherMetrics(interval time.Duration) {
 		case <-d.ctx.Done():
 			return
 		case <-ticker.C:
-			d.metrics.CollectPeriodicMetrics(d, d.tables)
+			d.lock.Lock()
+			tablesCopy := make(map[string]litt.ManagedTable, len(d.tables))
+			for name, table := range d.tables {
+				tablesCopy[name] = table
+			}
+			d.lock.Unlock()
+
+			d.metrics.CollectPeriodicMetrics(tablesCopy)
 		}
 	}
 }
