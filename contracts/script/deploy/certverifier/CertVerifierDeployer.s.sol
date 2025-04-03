@@ -20,21 +20,19 @@ import "src/interfaces/IEigenDAStructs.sol";
 
 //forge script script/deploy/certverifier/CertVerifierDeployer.s.sol:CertVerifierDeployer --sig "run(string, string)" <config.json> <output.json> --rpc-url $RPC --private-key $PRIVATE_KEY -vvvv --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast
 contract CertVerifierDeployer is Script, Test {
-
     address eigenDACertVerifier;
 
     address eigenDAServiceManager;
     address eigenDAThresholdRegistry;
     address eigenDARelayRegistry;
-    address registryCoordinator ;
-    address operatorStateRetriever; 
+    address registryCoordinator;
+    address operatorStateRetriever;
 
     SecurityThresholds defaultSecurityThresholds;
     bytes quorumNumbersRequired;
 
-    function run(string memory json, string memory outputPath) external {
-
-        string memory path = string.concat("./script/deploy/certverifier/config/", json);
+    function run(string memory inputJSONFile, string memory outputJSONFile) external {
+        string memory path = string.concat("./script/deploy/certverifier/config/", inputJSONFile);
         string memory data = vm.readFile(path);
 
         bytes memory raw = stdJson.parseRaw(data, ".eigenDAServiceManager");
@@ -70,15 +68,17 @@ contract CertVerifierDeployer is Script, Test {
                 IRegistryCoordinator(registryCoordinator),
                 defaultSecurityThresholds,
                 quorumNumbersRequired
-        ));
+            )
+        );
 
         vm.stopBroadcast();
 
         console.log("Deployed new EigenDACertVerifier at address: ", eigenDACertVerifier);
 
-        string memory outputPath = string.concat("./script/deploy/certverifier/output/", outputPath);
+        string memory outputPath = string.concat("./script/deploy/certverifier/output/", outputJSONFile);
         string memory parent_object = "parent object";
-        string memory finalJson = vm.serializeAddress(parent_object, "eigenDACertVerifier", address(eigenDACertVerifier));
+        string memory finalJson =
+            vm.serializeAddress(parent_object, "eigenDACertVerifier", address(eigenDACertVerifier));
         vm.writeJson(finalJson, outputPath);
     }
 }

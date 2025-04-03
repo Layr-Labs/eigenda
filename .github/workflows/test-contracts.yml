@@ -17,6 +17,21 @@ concurrency:
 ##       - (stretch) yarn fmt
 ##       - some level of security through automated static analysis (e.g, slither)
 jobs:
+  fmt:
+    name: Enforce Contracts Formatting
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+        with:
+          submodules: recursive
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+      - run: make fmt
+        working-directory: ./contracts
+      - run: git diff --exit-code
+
   forge-tests:
     name: Foundry Project
     runs-on: ubuntu-24.04
@@ -86,10 +101,11 @@ jobs:
       - name: Setup Go 1.21.13
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21.13'
+          go-version: "1.21.13"
 
       - name: Install abi gen
-        run: go install github.com/ethereum/go-ethereum/cmd/abigen@latest
+        run:
+          go install github.com/ethereum/go-ethereum/cmd/abigen@latest
 
           # TODO(0x0aa0): re-enable this once the failure is fixed
           # - name: Bindings diff check
