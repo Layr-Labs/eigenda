@@ -264,9 +264,9 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
 	accountID := gethcommon.HexToAddress(hex.EncodeToString(accountBytes))
-	timestamp, err := rand.Int(rand.Reader, big.NewInt(42))
+	timestamp, err := rand.Int(rand.Reader, big.NewInt(int64(time.Now().Nanosecond())))
 	require.NoError(t, err)
-	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(123))
+	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(int64(time.Now().Nanosecond())))
 	require.NoError(t, err)
 	sig := make([]byte, 32)
 	_, err = rand.Read(sig)
@@ -2096,6 +2096,211 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
+}
+
+func TestFetchAccountBlobFeed(t *testing.T) {
+	r := setUpRouter()
+	ctx := context.Background()
+
+	numBlobs := 60
+	now := uint64(time.Now().UnixNano())
+	firstBlobTime := now - uint64(int64(numBlobs)*time.Minute.Nanoseconds())
+	nanoSecsPerBlob := uint64(time.Minute.Nanoseconds()) // 1 blob/min
+
+	accountId := gethcommon.HexToAddress(fmt.Sprintf("0x000000000000000000000000000000000000000%d", 5))
+
+	// Create blobs for testing
+	requestedAt := make([]uint64, numBlobs)
+	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	for i := 0; i < numBlobs; i++ {
+		blobHeader := makeBlobHeaderV2(t)
+		blobHeader.PaymentMetadata.AccountID = accountId
+		blobKey, err := blobHeader.BlobKey()
+		require.NoError(t, err)
+		requestedAt[i] = firstBlobTime + nanoSecsPerBlob*uint64(i)
+		now := time.Now()
+		metadata := &v2.BlobMetadata{
+			BlobHeader:  blobHeader,
+			Signature:   []byte{1, 2, 3},
+			BlobStatus:  v2.Encoded,
+			Expiry:      uint64(now.Add(time.Hour).Unix()),
+			NumRetries:  0,
+			UpdatedAt:   uint64(now.UnixNano()),
+			RequestedAt: requestedAt[i],
+		}
+		err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
+		require.NoError(t, err)
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
+		}
+	}
+	defer deleteItems(t, dynamoKeys)
+
+	r.GET("/v2/accounts/:account_id/blobs", testDataApiServerV2.FetchAccountBlobFeed)
+	baseUrl := fmt.Sprintf("/v2/accounts/%s/blobs", accountId.Hex())
+
+	t.Run("invalid account ID params", func(t *testing.T) {
+		tests := []struct {
+			name           string
+			accountID      string
+			expectedStatus int
+			expectedError  string
+		}{
+			// Invalid format cases
+			{
+				accountID:      "not-a-hex-string",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			{
+				accountID:      "0x",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			{
+				accountID:      "0xG1234567890123456789012345678901234567",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			{
+				accountID:      "0x123",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			{
+				accountID:      "0x" + "1234567890123456789012345678901234567890abcdef",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			// Zero address case
+			{
+				accountID:      "0x0000000000000000000000000000000000000000",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "zero account id is not valid",
+			},
+			// Empty & whitespace cases
+			{
+				accountID:      "",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			{
+				accountID:      " ",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+		}
+
+		for _, tc := range tests {
+			url := "/v2/accounts/" + tc.accountID + "/blobs"
+
+			w := httptest.NewRecorder()
+			req, _ := http.NewRequest(http.MethodGet, url, nil)
+			r.ServeHTTP(w, req)
+
+			assert.Equal(t, tc.expectedStatus, w.Code)
+
+			var response serverv2.ErrorResponse
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			require.NoError(t, err)
+			assert.Contains(t, response.Error, tc.expectedError)
+		}
+	})
+
+	t.Run("nonexistent account", func(t *testing.T) {
+		otherID := gethcommon.HexToAddress(fmt.Sprintf("0x000000000000000000000000000000000000000%d", 6))
+		url := fmt.Sprintf("/v2/accounts/%s/blobs", otherID.Hex())
+		w := executeRequest(t, r, http.MethodGet, url)
+		response := decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		require.Equal(t, 0, len(response.Blobs))
+	})
+
+	t.Run("default params", func(t *testing.T) {
+		// Default query returns:
+		// - Most recent 1 hour of blobs include all of blobs[1] through blobs[59]
+		// - Limited to 20 results (the default "limit")
+		// - Result will first 20 blobs
+		w := executeRequest(t, r, http.MethodGet, baseUrl)
+		response := decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, 20, len(response.Blobs))
+		for i := 0; i < 20; i++ {
+			assert.Equal(t, requestedAt[1+i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+	})
+
+	t.Run("forward iteration with various query ranges and limits", func(t *testing.T) {
+		// Test 1: Unlimited results in 1-hour window
+		// With 1h ending time at now, this retrieves blobs[1] through blobs[59] (59 blobs)
+		w := executeRequest(t, r, http.MethodGet, baseUrl+"?limit=0")
+		response := decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, 59, len(response.Blobs))
+		for i := 0; i < 59; i++ {
+			assert.Equal(t, requestedAt[1+i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+
+		// Test 2: 2-hour window captures all test blobs
+		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s", baseUrl, afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, 60, len(response.Blobs))
+		for i := 0; i < 60; i++ {
+			assert.Equal(t, requestedAt[i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+
+		// Teste 3: custom end time
+		after := time.Unix(0, int64(requestedAt[20])).UTC()
+		afterTime = after.Format("2006-01-02T15:04:05.999999999Z")
+		before := time.Unix(0, int64(requestedAt[50])).UTC()
+		beforeTime := before.Format("2006-01-02T15:04:05.999999999Z")
+		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1", baseUrl, beforeTime, afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		require.Equal(t, 29, len(response.Blobs))
+		for i := 0; i < 29; i++ {
+			assert.Equal(t, requestedAt[21+i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+	})
+
+	t.Run("backward iteration with various query ranges and limits", func(t *testing.T) {
+		// Test 1: Unlimited results in 1-hour window
+		// With 1h ending time at now, this retrieves blobs[59] through blobs[1] (59 blobs)
+		w := executeRequest(t, r, http.MethodGet, baseUrl+"?limit=0&direction=backward")
+		response := decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, 59, len(response.Blobs))
+		for i := 0; i < 59; i++ {
+			assert.Equal(t, requestedAt[59-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+
+		// Test 2: 2-hour window captures all test blobs
+		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s&direction=backward", baseUrl, afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, 60, len(response.Blobs))
+		for i := 0; i < 60; i++ {
+			assert.Equal(t, requestedAt[59-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+
+		// Teste 3: custom end time
+		after := time.Unix(0, int64(requestedAt[20])).UTC()
+		afterTime = after.Format("2006-01-02T15:04:05.999999999Z")
+		before := time.Unix(0, int64(requestedAt[50])).UTC()
+		beforeTime := before.Format("2006-01-02T15:04:05.999999999Z")
+		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1&direction=backward", baseUrl, beforeTime, afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		require.Equal(t, 29, len(response.Blobs))
+		for i := 0; i < 29; i++ {
+			assert.Equal(t, requestedAt[49-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+	})
 }
 
 func TestFetchOperatorDispersalResponse(t *testing.T) {

@@ -25,7 +25,7 @@ import (
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
-//	@Router		/operators/{operator_id}/dispersals [get]
+//	@Router		/accounts/{account_id}/blobs [get]
 func (s *ServerV2) FetchAccountBlobFeed(c *gin.Context) {
 	handlerStart := time.Now()
 	var err error
@@ -34,19 +34,20 @@ func (s *ServerV2) FetchAccountBlobFeed(c *gin.Context) {
 	accountStr := c.Param("account_id")
 	if !gethcommon.IsHexAddress(accountStr) {
 		s.metrics.IncrementInvalidArgRequestNum("FetchAccountBlobFeed")
-		errorResponse(c, errors.New("account id is not valid hex"))
+		invalidParamsErrorResponse(c, errors.New("account id is not valid hex"))
 		return
 	}
 	accountId := gethcommon.HexToAddress(accountStr)
 	if accountId == (gethcommon.Address{}) {
 		s.metrics.IncrementInvalidArgRequestNum("FetchAccountBlobFeed")
-		errorResponse(c, errors.New("zero account id is not valid"))
+		invalidParamsErrorResponse(c, errors.New("zero account id is not valid"))
 		return
 	}
 
 	// Parse the feed params
 	params, err := ParseFeedParams(c, s.metrics, "FetchAccountBlobFeed")
 	if err != nil {
+		s.metrics.IncrementInvalidArgRequestNum("FetchAccountBlobFeed")
 		invalidParamsErrorResponse(c, err)
 		return
 	}
@@ -84,7 +85,7 @@ func (s *ServerV2) FetchAccountBlobFeed(c *gin.Context) {
 		bk, err := blobs[i].BlobHeader.BlobKey()
 		if err != nil {
 			s.metrics.IncrementFailedRequestNum("FetchAccountBlobFeed")
-			errorResponse(c, fmt.Errorf("failed to serialize blob key: %w", err))
+			errorResponse(c, fmt.Errorf("blob metadata is malformed and failed to serialize blob key: %w", err))
 			return
 		}
 		blobInfo[i].BlobKey = bk.Hex()
