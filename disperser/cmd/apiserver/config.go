@@ -36,9 +36,7 @@ type Config struct {
 	EnableRatelimiter           bool
 	EnablePaymentMeterer        bool
 	ChainReadTimeout            time.Duration
-	ReservationsTableName       string
-	OnDemandTableName           string
-	GlobalRateTableName         string
+	PaymentDBPath               string
 	BucketTableName             string
 	BucketStoreSize             int
 	EthClientConfig             geth.EthClientConfig
@@ -115,9 +113,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EncodingConfig:              encodingConfig,
 		EnableRatelimiter:           ctx.GlobalBool(flags.EnableRatelimiter.Name),
 		EnablePaymentMeterer:        ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
-		ReservationsTableName:       ctx.GlobalString(flags.ReservationsTableName.Name),
-		OnDemandTableName:           ctx.GlobalString(flags.OnDemandTableName.Name),
-		GlobalRateTableName:         ctx.GlobalString(flags.GlobalRateTableName.Name),
+		PaymentDBPath:               ctx.GlobalString(flags.PaymentDBPath.Name),
 		BucketTableName:             ctx.GlobalString(flags.BucketTableName.Name),
 		BucketStoreSize:             ctx.GlobalInt(flags.BucketStoreSize.Name),
 		ChainReadTimeout:            ctx.GlobalDuration(flags.ChainReadTimeout.Name),
