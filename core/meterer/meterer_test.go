@@ -5,19 +5,15 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"strconv"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common"
-	commonaws "github.com/Layr-Labs/eigenda/common/aws"
-	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ory/dockertest/v3"
@@ -28,8 +24,6 @@ import (
 var (
 	dockertestPool           *dockertest.Pool
 	dockertestResource       *dockertest.Resource
-	dynamoClient             commondynamodb.Client
-	clientConfig             commonaws.ClientConfig
 	accountID1               gethcommon.Address
 	account1Reservations     *core.ReservedPayment
 	account1OnDemandPayments *core.OnDemandPayment
@@ -39,13 +33,11 @@ var (
 	accountID3               gethcommon.Address
 	account3Reservations     *core.ReservedPayment
 	mt                       *meterer.Meterer
+	store                    meterer.OffchainStore
 
-	deployLocalStack           bool
-	localStackPort             = "4566"
-	paymentChainState          = &mock.MockOnchainPaymentState{}
-	ondemandTableName          = "ondemand_meterer"
-	reservationTableName       = "reservations_meterer"
-	globalReservationTableName = "global_reservation_meterer"
+	deployLocalStack  bool
+	localStackPort    = "4566"
+	paymentChainState = &mock.MockOnchainPaymentState{}
 )
 
 func TestMain(m *testing.M) {
@@ -55,78 +47,30 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func setup(_ *testing.M) {
-
-	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
-	if !deployLocalStack {
-		localStackPort = os.Getenv("LOCALSTACK_PORT")
-	}
-
-	if deployLocalStack {
-		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
-		if err != nil {
-			teardown()
-			panic("failed to start localstack container")
-		}
-	}
-
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err := common.NewLogger(loggerConfig)
+func createTestStore(t *testing.T) meterer.OffchainStore {
+	logger := testutils.GetLogger()
+	tmpDir := os.TempDir()
+	dbPath := filepath.Join(tmpDir, fmt.Sprintf("test_db_%d", time.Now().UnixNano()))
+	store, err := meterer.NewOffchainStore(dbPath, logger)
 	if err != nil {
-		teardown()
-		panic("failed to create logger")
+		t.Fatalf("Failed to create offchain store: %v", err)
 	}
+	return store
+}
 
-	clientConfig = commonaws.ClientConfig{
-		Region:          "us-east-1",
-		AccessKey:       "localstack",
-		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
-	}
-
-	dynamoClient, err = commondynamodb.NewClient(clientConfig, logger)
-	if err != nil {
-		teardown()
-		panic("failed to create dynamodb client")
-	}
-
+func setup(m *testing.M) {
+	// Create test accounts
 	privateKey1, err := crypto.GenerateKey()
 	if err != nil {
-		teardown()
-		panic("failed to generate private key")
+		panic("failed to generate key 1")
 	}
 	privateKey2, err := crypto.GenerateKey()
 	if err != nil {
-		teardown()
-		panic("failed to generate private key")
+		panic("failed to generate key 2")
 	}
 	privateKey3, err := crypto.GenerateKey()
 	if err != nil {
-		teardown()
-		panic("failed to generate private key")
-	}
-
-	logger = testutils.GetLogger()
-	config := meterer.Config{
-		ChainReadTimeout: 3 * time.Second,
-		UpdateInterval:   1 * time.Second,
-	}
-
-	err = meterer.CreateReservationTable(clientConfig, reservationTableName)
-	if err != nil {
-		teardown()
-		panic("failed to create reservation table")
-	}
-	err = meterer.CreateOnDemandTable(clientConfig, ondemandTableName)
-	if err != nil {
-		teardown()
-		panic("failed to create ondemand table")
-	}
-	err = meterer.CreateGlobalReservationTable(clientConfig, globalReservationTableName)
-	if err != nil {
-		teardown()
-		panic("failed to create global reservation table")
+		panic("failed to generate key 3")
 	}
 
 	now := uint64(time.Now().Unix())
@@ -139,34 +83,10 @@ func setup(_ *testing.M) {
 	account1OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}
 	account2OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(2000)}
 
-	store, err := meterer.NewOffchainStore(
-		clientConfig,
-		reservationTableName,
-		ondemandTableName,
-		globalReservationTableName,
-		logger,
-	)
-
-	if err != nil {
-		teardown()
-		panic("failed to create offchain store")
-	}
-
 	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil).Maybe()
 	if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
-
-	// add some default sensible configs
-	mt = meterer.NewMeterer(
-		config,
-		paymentChainState,
-		store,
-		logger,
-		// metrics.NewNoopMetrics(),
-	)
-
-	mt.Start(context.Background())
 }
 
 func teardown() {
@@ -176,6 +96,17 @@ func teardown() {
 }
 
 func TestMetererReservations(t *testing.T) {
+	store = createTestStore(t)
+	mt = meterer.NewMeterer(
+		meterer.Config{
+			ChainReadTimeout: 5 * time.Second,
+			UpdateInterval:   1 * time.Second,
+		},
+		paymentChainState,
+		store,
+		testutils.GetLogger(),
+	)
+	mt.Start(context.Background())
 	ctx := context.Background()
 	paymentChainState.On("GetReservationWindow", testifymock.Anything).Return(uint64(5), nil)
 	paymentChainState.On("GetGlobalSymbolsPerSecond", testifymock.Anything).Return(uint64(1009), nil)
@@ -244,16 +175,11 @@ func TestMetererReservations(t *testing.T) {
 		header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
 		symbolsCharged, err := mt.MeterRequest(ctx, *header, symbolLength, quoromNumbers, now)
 		assert.NoError(t, err)
-		item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
-			"AccountID":         &types.AttributeValueMemberS{Value: accountID2.Hex()},
-			"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(reservationPeriod))},
-		})
-		assert.NotNil(t, item)
+		// Verify reservation bin usage
+		binUsage, err := store.UpdateReservationBin(ctx, accountID2, reservationPeriod, 0)
 		assert.NoError(t, err)
+		assert.Equal(t, uint64(requiredLength)*uint64(i+1), binUsage)
 		assert.Equal(t, uint64(requiredLength), symbolsCharged)
-		assert.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
-		assert.Equal(t, strconv.Itoa(int(reservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
-		assert.Equal(t, strconv.Itoa((i+1)*int(requiredLength)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 	}
 	// first over flow is allowed
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
@@ -261,15 +187,10 @@ func TestMetererReservations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(27), symbolsCharged)
 	overflowedReservationPeriod := reservationPeriod + 2
-	item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID2.Hex()},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(overflowedReservationPeriod))},
-	})
+	// Verify overflow bin usage
+	binUsage, err := store.UpdateReservationBin(ctx, accountID2, overflowedReservationPeriod, 0)
 	assert.NoError(t, err)
-	assert.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, strconv.Itoa(int(overflowedReservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
-	// 25 rounded up to the nearest multiple of minNumSymbols - (200-21*9) = 16
-	assert.Equal(t, strconv.Itoa(int(16)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, uint64(16), binUsage) // 25 rounded up to the nearest multiple of minNumSymbols - (200-21*9) = 16
 
 	// second over flow
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
@@ -280,19 +201,37 @@ func TestMetererReservations(t *testing.T) {
 
 func TestMetererOnDemand(t *testing.T) {
 	ctx := context.Background()
-	quorumNumbers := []uint8{0, 1}
-	paymentChainState.On("GetPricePerSymbol", testifymock.Anything, testifymock.Anything).Return(uint64(2), nil)
-	paymentChainState.On("GetMinNumSymbols", testifymock.Anything, testifymock.Anything).Return(uint64(3), nil)
 	now := time.Now()
-
+	store := createTestStore(t)
+	quorumNumbers := []uint8{0, 1}
+	paymentChainState := &mock.MockOnchainPaymentState{}
+	paymentChainState.On("GetPricePerSymbol").Return(uint64(2))
+	paymentChainState.On("GetMinNumSymbols").Return(uint64(1))
+	paymentChainState.On("GetGlobalRatePeriodInterval").Return(uint64(300))
+	paymentChainState.On("GetGlobalSymbolsPerSecond").Return(uint64(10000))
+	paymentChainState.On("GetOnDemandQuorumNumbers", testifymock.Anything).Return(quorumNumbers, nil)
 	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == accountID1
-	})).Return(account1OnDemandPayments, nil)
+	})).Return(&core.OnDemandPayment{
+		CumulativePayment: big.NewInt(4000),
+	}, nil)
 	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == accountID2
-	})).Return(account2OnDemandPayments, nil)
-	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(&core.OnDemandPayment{}, fmt.Errorf("payment not found"))
-	paymentChainState.On("GetOnDemandQuorumNumbers", testifymock.Anything).Return(quorumNumbers, nil)
+	})).Return(&core.OnDemandPayment{
+		CumulativePayment: big.NewInt(2040),
+	}, nil)
+	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(nil, fmt.Errorf("payment not found"))
+
+	mt := meterer.NewMeterer(
+		meterer.Config{
+			ChainReadTimeout: 1 * time.Second,
+			UpdateInterval:   1 * time.Second,
+		},
+		paymentChainState,
+		store,
+		testutils.GetLogger(),
+	)
+	mt.Start(ctx)
 
 	// test unregistered account
 	unregisteredUser, err := crypto.GenerateKey()
@@ -307,87 +246,82 @@ func TestMetererOnDemand(t *testing.T) {
 	// test invalid quorom ID
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(2), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, now)
-	assert.ErrorContains(t, err, "invalid quorum for On-Demand Request")
+	assert.ErrorContains(t, err, "invalid on-demand request: invalid quorum for On-Demand Request")
 
 	// test insufficient cumulative payment
-	header = createPaymentHeader(now.UnixNano(), big.NewInt(1), accountID1)
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(4001), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers, now)
-	assert.ErrorContains(t, err, "payment validation failed: payment charged is greater than cumulative payment")
-	// No record for invalid payment
-	result, err := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
-		":account": &types.AttributeValueMemberS{
-			Value: accountID1.Hex(),
-		}})
+	assert.ErrorContains(t, err, "invalid on-demand request: request claims a cumulative payment greater than the on-chain deposit")
+	// Verify no record for invalid payment
+	oldPayment, err := store.GetLargestCumulativePayment(ctx, accountID1)
 	assert.NoError(t, err)
-	assert.Equal(t, 0, len(result))
+	assert.Equal(t, big.NewInt(0), oldPayment)
 
-	// test duplicated cumulative payments
-	symbolLength := uint64(100)
-	symbolsCharged := mt.SymbolsCharged(symbolLength)
-	priceCharged := meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol())
-	assert.Equal(t, big.NewInt(int64(102*mt.ChainPaymentState.GetPricePerSymbol())), priceCharged)
-	header = createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
-	symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
+	// test successful payment
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(204), accountID2)
+	_, err = mt.MeterRequest(ctx, *header, 100, quorumNumbers, now)
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(102), symbolsCharged)
-	header = createPaymentHeader(now.UnixNano(), priceCharged, accountID2)
-	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
-	// Doesn't check for exact payment, checks for increment
-	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
+	oldPayment, err = store.GetLargestCumulativePayment(ctx, accountID2)
+	assert.NoError(t, err)
+	assert.Equal(t, big.NewInt(204), oldPayment)
 
-	// test valid payments
-	for i := 1; i < 9; i++ {
-		header = createPaymentHeader(now.UnixNano(), new(big.Int).Mul(priceCharged, big.NewInt(int64(i+1))), accountID2)
-		symbolsCharged, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
+	// test insufficient cumulative payment increment
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(204), accountID2)
+	_, err = mt.MeterRequest(ctx, *header, 100, quorumNumbers, now)
+	assert.ErrorContains(t, err, "invalid on-demand request: failed to update cumulative payment: insufficient cumulative payment increment")
+	oldPayment, err = store.GetLargestCumulativePayment(ctx, accountID2)
+	assert.NoError(t, err)
+	assert.Equal(t, big.NewInt(204), oldPayment)
+
+	// test successful payment
+	for i := 0; i < 9; i++ {
+		header = createPaymentHeader(now.UnixNano(), big.NewInt(int64((i+2)*204)), accountID2)
+		_, err = mt.MeterRequest(ctx, *header, 100, quorumNumbers, now)
 		assert.NoError(t, err)
-		assert.Equal(t, uint64(102), symbolsCharged)
+		oldPayment, err = store.GetLargestCumulativePayment(ctx, accountID2)
+		assert.NoError(t, err)
+		assert.Equal(t, big.NewInt(int64((i+2)*204)), oldPayment)
 	}
 
-	// test cumulative payment on-chain constraint
+	// test failed global rate limit
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(2023), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 1, quorumNumbers, now)
-	assert.ErrorContains(t, err, "invalid on-demand request: request claims a cumulative payment greater than the on-chain deposit")
+	assert.ErrorContains(t, err, "invalid on-demand request: failed to update cumulative payment: insufficient cumulative payment increment")
+	oldPayment, err = store.GetLargestCumulativePayment(ctx, accountID2)
+	assert.NoError(t, err)
+	assert.Equal(t, big.NewInt(2040), oldPayment)
 
-	// test insufficient increment in cumulative payment
-	previousCumulativePayment := priceCharged.Mul(priceCharged, big.NewInt(9))
-	symbolLength = uint64(2)
-	symbolsCharged = mt.SymbolsCharged(symbolLength)
-	priceCharged = meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol())
-	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, big.NewInt(0).Sub(priceCharged, big.NewInt(1))), accountID2)
-	_, err = mt.MeterRequest(ctx, *header, symbolLength, quorumNumbers, now)
-	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
-	previousCumulativePayment = big.NewInt(0).Add(previousCumulativePayment, priceCharged)
+	// test insufficient cumulative payment increment
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(1841), accountID2)
+	_, err = mt.MeterRequest(ctx, *header, 2, quorumNumbers, now)
+	assert.ErrorContains(t, err, "invalid on-demand request: failed to update cumulative payment: insufficient cumulative payment increment")
+	oldPayment, err = store.GetLargestCumulativePayment(ctx, accountID2)
+	assert.NoError(t, err)
+	assert.Equal(t, big.NewInt(2040), oldPayment)
 
-	// test cannot insert cumulative payment in out of order
-	symbolsCharged = mt.SymbolsCharged(uint64(50))
-	header = createPaymentHeader(now.UnixNano(), meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol()), accountID2)
+	// test insufficient cumulative payment increment
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(102), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 50, quorumNumbers, now)
-	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
-
-	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
-		":account": &types.AttributeValueMemberS{
-			Value: accountID2.Hex(),
-		}})
+	assert.ErrorContains(t, err, "invalid on-demand request: failed to update cumulative payment: insufficient cumulative payment increment")
+	oldPayment, err = store.GetLargestCumulativePayment(ctx, accountID2)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(result))
+	assert.Equal(t, big.NewInt(2040), oldPayment)
 
-	// with rollback of invalid payments, users cannot cheat by inserting an invalid cumulative payment
-	symbolsCharged = mt.SymbolsCharged(uint64(30))
-	header = createPaymentHeader(now.UnixNano(), meterer.PaymentCharged(symbolsCharged, mt.ChainPaymentState.GetPricePerSymbol()), accountID2)
+	// test insufficient cumulative payment increment
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(60), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 30, quorumNumbers, now)
-	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
-
-	// test failed global rate limit (previously payment recorded: 2, global limit: 1009)
-	header = createPaymentHeader(now.UnixNano(), big.NewInt(0).Add(previousCumulativePayment, meterer.PaymentCharged(1010, mt.ChainPaymentState.GetPricePerSymbol())), accountID1)
-	_, err = mt.MeterRequest(ctx, *header, 1010, quorumNumbers, now)
-	assert.ErrorContains(t, err, "failed global rate limiting")
-	// Correct rollback
-	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
-		":account": &types.AttributeValueMemberS{
-			Value: accountID2.Hex(),
-		}})
+	assert.ErrorContains(t, err, "invalid on-demand request: failed to update cumulative payment: insufficient cumulative payment increment")
+	oldPayment, err = store.GetLargestCumulativePayment(ctx, accountID2)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(result))
+	assert.Equal(t, big.NewInt(2040), oldPayment)
+
+	// test successful payment
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(3862), accountID1)
+	_, err = mt.MeterRequest(ctx, *header, 1010, quorumNumbers, now)
+	assert.NoError(t, err)
+	oldPayment, err = store.GetLargestCumulativePayment(ctx, accountID1)
+	assert.NoError(t, err)
+	assert.Equal(t, big.NewInt(3862), oldPayment)
 }
 
 func TestPaymentCharged(t *testing.T) {
