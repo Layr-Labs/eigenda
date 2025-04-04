@@ -1087,8 +1087,8 @@
         "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch": {
             "type": "object",
             "properties": {
-                "attestation": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
+                "attestation_info": {
+                    "$ref": "#/definitions/v2.AttestationInfo"
                 },
                 "batch_header": {
                     "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader"
