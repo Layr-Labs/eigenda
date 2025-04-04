@@ -149,19 +149,52 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 			if err := s.db.Put(key, paymentMetadata.CumulativePayment.Bytes()); err != nil {
 				return nil, fmt.Errorf("failed to create new payment: %w", err)
 			}
-			return big.NewInt(0), nil // Return 0 for new accounts to match original behavior
+			value = make([]byte, 32)
+			copy(value, big.NewInt(0).Bytes())
+			// s.logger.Info("Created new on-demand payment entry",
+			// 	"accountID", paymentMetadata.AccountID.Hex(),
+			// 	"cumulativePayment", paymentMetadata.CumulativePayment.String())
+		} else {
+			s.logger.Error("failed to get existing payment", "accountID", paymentMetadata.AccountID.Hex(), "error", err)
+			return nil, fmt.Errorf("failed to get payment: %w", err)
 		}
-		return nil, fmt.Errorf("failed to get payment: %w", err)
 	}
 
 	// Validate payment increment first
 	oldPayment := new(big.Int).SetBytes(value)
 	paymentCheckpoint := new(big.Int).Sub(paymentMetadata.CumulativePayment, paymentCharged)
+	// s.logger.Info("Validating on-demand payment",
+	// 	"accountID", paymentMetadata.AccountID.Hex(),
+	// 	"oldPayment", oldPayment.String(),
+	// 	"newPayment", paymentMetadata.CumulativePayment.String(),
+	// 	"paymentCharged", paymentCharged.String(),
+	// 	"paymentCheckpoint", paymentCheckpoint.String())
+
 	if paymentCheckpoint.Sign() < 0 {
+		// s.logger.Error("Payment validation failed: payment charged is greater than cumulative payment",
+		// 	"accountID", paymentMetadata.AccountID.Hex(),
+		// 	"cumulativePayment", paymentMetadata.CumulativePayment.String(),
+		// 	"paymentCharged", paymentCharged.String())
+		if oldPayment.Cmp(big.NewInt(0)) == 0 {
+			// s.logger.Info("Deleting payment entry for new account", "accountID", paymentMetadata.AccountID.Hex())
+			if err := s.db.Delete(key); err != nil {
+				return nil, fmt.Errorf("failed to delete payment entry: %w", err)
+			}
+		}
 		return nil, fmt.Errorf("payment validation failed: payment charged is greater than cumulative payment")
 	}
 
 	if oldPayment.Cmp(paymentCheckpoint) > 0 {
+		// s.logger.Error("Insufficient cumulative payment increment",
+		// 	"accountID", paymentMetadata.AccountID.Hex(),
+		// 	"oldPayment", oldPayment.String(),
+		// 	"paymentCheckpoint", paymentCheckpoint.String())
+		if oldPayment.Cmp(big.NewInt(0)) == 0 {
+			s.logger.Info("Deleting payment entry for new account", "accountID", paymentMetadata.AccountID.Hex())
+			if err := s.db.Delete(key); err != nil {
+				return nil, fmt.Errorf("failed to delete payment entry: %w", err)
+			}
+		}
 		return nil, fmt.Errorf("insufficient cumulative payment increment")
 	}
 
@@ -169,6 +202,11 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 	if err := s.db.Put(key, paymentMetadata.CumulativePayment.Bytes()); err != nil {
 		return nil, fmt.Errorf("failed to update payment: %w", err)
 	}
+
+	// s.logger.Info("Successfully updated on-demand payment",
+	// 	"accountID", paymentMetadata.AccountID.Hex(),
+	// 	"oldPayment", oldPayment.String(),
+	// 	"newPayment", paymentMetadata.CumulativePayment.String())
 
 	return oldPayment, nil
 }
@@ -187,18 +225,26 @@ func (s *OffchainStore) RollbackOnDemandPayment(ctx context.Context, accountID g
 			if err := s.db.Put(key, oldPayment.Bytes()); err != nil {
 				return fmt.Errorf("failed to create new payment: %w", err)
 			}
+			// s.logger.Info("Created new payment entry during rollback",
+			// 	"accountID", accountID.Hex(),
+			// 	"payment", oldPayment.String())
 			return nil
 		}
 		return fmt.Errorf("failed to get payment: %w", err)
 	}
 
 	currentPayment := new(big.Int).SetBytes(value)
+	// s.logger.Info("Attempting payment rollback",
+	// 	"accountID", accountID.Hex(),
+	// 	"currentPayment", currentPayment.String(),
+	// 	"newPayment", newPayment.String(),
+	// 	"oldPayment", oldPayment.String())
+
 	if currentPayment.Cmp(newPayment) != 0 {
-		if s.logger != nil {
-			s.logger.Debug("Skipping rollback as current payment doesn't match the expected value",
-				"accountID", accountID.Hex(),
-				"expectedPayment", newPayment.String())
-		}
+		// s.logger.Debug("Skipping rollback as current payment doesn't match the expected value",
+		// 	"accountID", accountID.Hex(),
+		// 	"expectedPayment", newPayment.String(),
+		// 	"currentPayment", currentPayment.String())
 		return nil
 	}
 
@@ -210,12 +256,10 @@ func (s *OffchainStore) RollbackOnDemandPayment(ctx context.Context, accountID g
 		return fmt.Errorf("failed to rollback payment: %w", err)
 	}
 
-	if s.logger != nil {
-		s.logger.Debug("Successfully rolled back payment to previous value",
-			"accountID", accountID.Hex(),
-			"rolledBackFrom", newPayment.String(),
-			"rolledBackTo", oldPayment.String())
-	}
+	// s.logger.Info("Successfully rolled back payment",
+	// 	"accountID", accountID.Hex(),
+	// 	"rolledBackFrom", newPayment.String(),
+	// 	"rolledBackTo", oldPayment.String())
 
 	return nil
 }

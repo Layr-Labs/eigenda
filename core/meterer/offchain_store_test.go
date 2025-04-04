@@ -135,7 +135,9 @@ func TestAddOnDemandPayment(t *testing.T) {
 	// Add the payment
 	oldPayment, err := tc.store.AddOnDemandPayment(tc.ctx, payment1, charge1)
 	require.NoError(t, err)
-	require.Equal(t, big.NewInt(0), oldPayment, "Old payment should be 0 for first payment")
+	require.Condition(t, func() bool {
+		return oldPayment.Cmp(big.NewInt(0)) == 0
+	}, "Old payment should be 0 for first payment")
 
 	// Verify the update
 	payment, err = tc.store.GetOnDemandPayment(tc.ctx, accountID)
@@ -213,7 +215,9 @@ func TestRollbackOnDemandPayment(t *testing.T) {
 
 	oldPayment, err := tc.store.AddOnDemandPayment(tc.ctx, paymentMetadata, paymentCharged)
 	require.NoError(t, err)
-	require.Equal(t, big.NewInt(0), oldPayment, "Old payment should be 0 for first payment")
+	require.Condition(t, func() bool {
+		return oldPayment.Cmp(big.NewInt(0)) == 0
+	}, "Old payment should be 0 for first payment")
 
 	// Add another payment
 	newCumulativePayment := big.NewInt(2000)
@@ -271,7 +275,9 @@ func TestGetLargestCumulativePayment(t *testing.T) {
 	}
 	oldPayment, err := tc.store.AddOnDemandPayment(tc.ctx, payment1, big.NewInt(100))
 	require.NoError(t, err)
-	require.Equal(t, big.NewInt(0), oldPayment, "Old payment should be 0 for first payment")
+	require.Condition(t, func() bool {
+		return oldPayment.Cmp(big.NewInt(0)) == 0
+	}, "Old payment should be 0 for first payment")
 
 	largest, err = tc.store.GetLargestCumulativePayment(tc.ctx, accountID)
 	require.NoError(t, err)
