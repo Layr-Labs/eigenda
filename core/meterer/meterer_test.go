@@ -129,6 +129,11 @@ func teardown() {
 	if deployLocalStack {
 		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
 	}
+
+	// Clean up the meterer test directory
+	if err := os.RemoveAll("./testdata/meterer_test"); err != nil {
+		fmt.Printf("Failed to remove testdata directory: %v\n", err)
+	}
 }
 
 func TestMetererReservations(t *testing.T) {
