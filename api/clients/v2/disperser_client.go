@@ -170,16 +170,17 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		}
 	}
 
+	err := c.initOnceGrpcConnection()
+	if err != nil {
+		return nil, [32]byte{}, api.NewErrorFailover(err)
+	}
+
 	probe.SetStage("acquire_accountant_lock")
 	c.accountantLock.Lock()
 
 	probe.SetStage("prepare_for_dispersal")
 
-	err := c.initOncePopulateAccountant(ctx)
-	if err != nil {
-		return nil, [32]byte{}, api.NewErrorFailover(err)
-	}
-	err = c.initOnceGrpcConnection()
+	err = c.initOncePopulateAccountant(ctx)
 	if err != nil {
 		return nil, [32]byte{}, api.NewErrorFailover(err)
 	}

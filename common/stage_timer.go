@@ -15,8 +15,8 @@ type StageTimer struct {
 
 // SequenceProbe can be used to track the amount of time that a particular operation spends doing particular
 // sub-operations (i.e. stages). Multiple instances of a particular operation can be tracked concurrently by the same
-// StageTimer. For each operation, the StageTimer builds a SequenceProbe. Each SequenceProbe the lifecycle of a single
-// iteration of an operation.
+// StageTimer. For each operation, the StageTimer builds a SequenceProbe. Each SequenceProbe is responsible for
+// tracking the lifecycle of a single  iteration of an operation.
 type SequenceProbe struct {
 	stageTimer        *StageTimer
 	currentStage      string
