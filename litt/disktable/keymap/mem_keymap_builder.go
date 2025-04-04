@@ -25,7 +25,3 @@ func (b *MemKeymapBuilder) Build(
 	doubleWriteProtection bool) (Keymap, bool, error) {
 	return NewMemKeymap(logger, doubleWriteProtection), true, nil
 }
-
-func (b *MemKeymapBuilder) DeleteFiles(logger logging.Logger, keymapPath string) error {
-	return nil
-}

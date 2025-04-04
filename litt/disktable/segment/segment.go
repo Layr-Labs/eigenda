@@ -3,7 +3,6 @@ package segment
 import (
 	"fmt"
 	"math"
-	"os"
 	"path"
 	"sync/atomic"
 	"time"
@@ -233,11 +232,12 @@ func lookForFile(directories []string, fileName string) (string, error) {
 	locations := make([]string, 0, 1)
 	for _, directory := range directories {
 		potentialLocation := path.Join(directory, fileName)
-		_, err := os.Stat(potentialLocation)
-		if err == nil {
+		exists, err := util.Exists(potentialLocation)
+		if err != nil {
+			return "", fmt.Errorf("failed to check if file %s exists: %v", potentialLocation, err)
+		}
+		if exists {
 			locations = append(locations, potentialLocation)
-		} else if !os.IsNotExist(err) {
-			return "", fmt.Errorf("failed to stat file %s: %v", potentialLocation, err)
 		}
 	}
 

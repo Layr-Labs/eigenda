@@ -52,3 +52,15 @@ func VerifyFilePermissions(path string) (exists bool, size int64, err error) {
 
 	return true, info.Size(), nil
 }
+
+// Exists checks if a file or directory exists at the given path. More aesthetically pleasant than os.Stat.
+func Exists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, fmt.Errorf("error checking if path %s exists: %w", path, err)
+}

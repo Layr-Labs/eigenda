@@ -144,14 +144,15 @@ func NewDiskTable(
 
 	// If the root directories don't exist, create them.
 	for _, root := range roots {
-		_, err := os.Stat(root)
-		if os.IsNotExist(err) {
-			err := os.MkdirAll(root, 0755)
+		exists, err := util.Exists(root)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if root directory exists: %v", err)
+		}
+		if !exists {
+			err = os.MkdirAll(root, 0755)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create root directory: %v", err)
 			}
-		} else if err != nil {
-			return nil, fmt.Errorf("failed to stat root directory: %v", err)
 		}
 	}
 
@@ -160,14 +161,17 @@ func NewDiskTable(
 	for _, root := range roots {
 		segDir := path.Join(root, segmentDirectory)
 		segDirs = append(segDirs, segDir)
-		_, err := os.Stat(segDir)
-		if os.IsNotExist(err) {
+
+		exists, err := util.Exists(segDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if segment directory exists: %v", err)
+		}
+
+		if !exists {
 			err := os.MkdirAll(segDir, 0755)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create root directory: %v", err)
 			}
-		} else if err != nil {
-			return nil, fmt.Errorf("failed to stat root directory: %v", err)
 		}
 	}
 
@@ -177,12 +181,13 @@ func NewDiskTable(
 	// Find the table metadata file or create a new one.
 	for _, root := range roots {
 		possibleMetadataPath := metadataPath(root)
-		_, err := os.Stat(possibleMetadataPath)
-		if err == nil {
+		exists, err := util.Exists(possibleMetadataPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if metadata file exists: %v", err)
+		}
+		if exists {
 			// We've found an existing metadata file. Use it.
 			metadataFilePath = possibleMetadataPath
-		} else if !os.IsNotExist(err) {
-			return nil, fmt.Errorf("failed to stat metadata file: %v", err)
 		}
 	}
 	if metadataFilePath == "" {
@@ -369,6 +374,22 @@ func (d *DiskTable) reloadKeymap() error {
 		}
 	}
 
+	// Now that the keymap is loaded, write the marker file that indicates that the keymap is fully loaded.
+	// If we crash prior to writing this file, the keymap will reload from the segments again.
+	keymapInitializedFile := path.Join(d.keymapPath, keymap.KeymapInitializedFileName)
+	f, err := os.Create(keymapInitializedFile)
+	if err != nil {
+		return fmt.Errorf("failed to create keymap initialized file: %v", err)
+	}
+	err = f.Sync()
+	if err != nil {
+		return fmt.Errorf("failed to sync keymap initialized file: %v", err)
+	}
+	err = f.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close keymap initialized file: %v", err)
+	}
+
 	return nil
 }
 
@@ -444,14 +465,15 @@ func (d *DiskTable) Destroy() error {
 	if err != nil {
 		return fmt.Errorf("failed to delete keymap type file: %v", err)
 	}
-	_, err = os.Stat(d.keymapPath)
-	if err == nil {
-		err = os.Remove(d.keymapPath)
+	exists, err := util.Exists(d.keymapPath)
+	if err != nil {
+		return fmt.Errorf("failed to check if keymap directory exists: %v", err)
+	}
+	if exists {
+		err = os.RemoveAll(d.keymapPath)
 		if err != nil {
 			return fmt.Errorf("failed to remove keymap directory: %v", err)
 		}
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("failed to stat keymap directory: %v", err)
 	}
 
 	// delete the metadata file

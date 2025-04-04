@@ -4,9 +4,8 @@ import "github.com/Layr-Labs/eigensdk-go/logging"
 
 // KeymapBuilder is an interface for building and managing keymaps.
 type KeymapBuilder interface {
-
 	// Type returns the type of the keymap builder.
-	Type() KeymapType
+	Type() KeymapType // TODO this is unused
 
 	// Build creates a new keymap. Keymap implementations that do not
 	// store files on disk can instantiate an empty keymap and return it.
@@ -15,7 +14,4 @@ type KeymapBuilder interface {
 	// implementations, this will always return true. For disk-based implementations, this will return true if the
 	// Keymap's files are present on disk, and false otherwise.
 	Build(logger logging.Logger, keymapPath string, doubleWriteProtection bool) (Keymap, bool, error)
-
-	// DeleteFiles deletes all files associated with the keymap that are located inside keymap data directory.
-	DeleteFiles(logger logging.Logger, keymapPath string) error
 }
