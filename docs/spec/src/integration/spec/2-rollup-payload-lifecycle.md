@@ -45,14 +45,14 @@ flowchart TD
     class Batch,Blob,Cert,D1 data
 ```
 
-At a high-level, a rollup sequencer needs to make it’s `payload` available for download from validators of its network. The EigenDA network makes use of cryptographic concepts such as KZG commitments as fundamental building blocks. Because of this, it can only work with `eigenda blobs` (herreafter referred to simply as `blobs`; see technical definition below) of data. The [EigenDA proxy](https://github.com/Layr-Labs/eigenda-proxy) is used to bridge the rollup domain (which deals with payloads) and the EigenDA domain (which deals with blobs).
+At a high-level, a rollup sequencer needs to make its `payload` available for download from validators of its network. The EigenDA network makes use of cryptographic concepts such as KZG commitments as fundamental building blocks. Because of this, it can only work with `eigenda blobs` (hereafter referred to simply as `blobs`; see technical definition below) of data. The [EigenDA proxy](https://github.com/Layr-Labs/eigenda-proxy) is used to bridge the rollup domain (which deals with payloads) and the EigenDA domain (which deals with blobs).
 
-As an example, an op-stack Ethereum rollup’s `payload` is a compressed batch of txs (called a [frame](https://specs.optimism.io/protocol/derivation.html#frame-format)). This frame gets sent to Ethereum to be made available either as a simple tx, or as a [`4844 blob`](https://eips.ethereum.org/EIPS/eip-4844#type-aliases) (using a [blob tx](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)). Using EigenDA instead of Ethereum for data availability works similarly: the payloads are encoded into an `eigenda blob`  and dispersed to the EigenDA network via an EigenDA disperser. The disperser eventually returns a `certificate` containing signatures of EigenDA operators certifying the availability of the data, which is then posted to Ethereum as the `input` field of a normal tx. Note that due to the rollup settling on Ethereum, Ethereum DA is needed, but only to make the `cert` available, which is much smaller than the `blob` containing the `payload` which is made available on EigenDA instead.
+As an example, an op-stack Ethereum rollup’s `payload` is a compressed batch of txs (called a [frame](https://specs.optimism.io/protocol/derivation.html#frame-format)). This frame gets sent to Ethereum to be made available either as a simple tx, or as a [`4844 blob`](https://eips.ethereum.org/EIPS/eip-4844#type-aliases) (using a [blob tx](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)). Using EigenDA instead of Ethereum for data availability works similarly: the payloads are encoded into an `eigenda blob`  and dispersed to the EigenDA network via an EigenDA disperser. The disperser eventually returns a `certificate` containing signatures of EigenDA operators certifying the availability of the data, which is then posted to Ethereum as the `input` field of a normal tx. Note that due to the rollup settling on Ethereum, Ethereum DA is needed, but only to make the `cert` available, which is much smaller than the `blob` itself.
 
 [**Data structs**](./3-datastructs.md)
 
 - `Payload`: piece of data that an EigenDA client (rollup, avs, etc.) wants to make available. This is typically compressed batches of transactions or state transition diffs.
-- `EncodedPayload`: payload encoded into a list of bn254 field elements (each 32 bytes), typically with a prefixed field element containing the payload length in bytes, such that the payload can decoded.
+- `EncodedPayload`: payload encoded into a list of bn254 field elements (each 32 bytes), typically with a prefixed field element containing the payload length in bytes, such that the payload can be decoded.
 - `PayloadPolynomial` : encodedPayload padded with 0s to the next power of 2 (if needed) and interpreted either as evaluations (`PolyCoeff`) or coefficients (`PolyEval`) of a polynomial. Because the EigenDA network interprets blobs as coefficients, a `PolyEval` will need to be IFFT’d into a `PolyCoeff` before being dispersed.
 - `(EigenDA) Blob`: array of bn254 field elements of length a power of two. Interpreted by the network as coefficients of a polynomial. Equivalent to `PolyCoeff`.
 - `Blob Header`: contains the information necessary to uniquely identify a BlobDispersal request.
@@ -63,10 +63,10 @@ As an example, an op-stack Ethereum rollup’s `payload` is a compressed batch o
 
 [**Contracts**](./4-contracts.md)
 
-- `EigenDACertVerifier`: contains one main important function verifyCertV2 which is used to verify `certs`.
+- `EigenDACertVerifier`: contains one main important function verifyCertV2 which is used to verify `DACert`s.
 - `EigenDAThresholdRegistry`: contains signature related thresholds and blob→chunks encoding related parameters.
-- `EigenDARelayRegistry`: contains EigenDA network registered Relays’ Ethereum address and DNS hostname or IP address.
-- `EigenDADisperserRegistry` : contains EigenDA network registered Dispersers’ Ethereum address.
+- `EigenDARelayRegistry`: contains an Ethereum address and DNS hostname (or IP address) for each registered Relay.
+- `EigenDADisperserRegistry` : contains an Ethereum address network for each registered Disperser.
 
 [**Lifecycle phases**](./5-lifecycle-phases.md)
 
