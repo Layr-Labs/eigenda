@@ -17,8 +17,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-// Tests migration from one type of Keymap to another. This is not defined in the disktable package because this
-// migration requires a littbuilder.Config, which is not available in the disktable package.
+// Tests migration from one type of Keymap to another.
 func TestKeymapMigration(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
@@ -142,8 +141,9 @@ func TestKeymapMigration(t *testing.T) {
 		require.Equal(t, expectedValue, value)
 	}
 
-	// We shouldn't see the keymap directory anymore
-	_, err = os.Stat(newKeymapPath)
+	// The keymap data path should be empty.
+	keymapDataPath := path.Join(newKeymapPath, keymap.KeymapDataDirectoryName)
+	_, err = os.Stat(keymapDataPath)
 	require.True(t, os.IsNotExist(err))
 
 	// Close the table and reopen it using a LevelDBKeymap

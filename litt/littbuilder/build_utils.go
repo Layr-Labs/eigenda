@@ -24,9 +24,9 @@ import (
 
 // keymapBuilders contains builders for all supported keymap types.
 var keymapBuilders = map[keymap.KeymapType]keymap.KeymapBuilder{
-	keymap.MemKeymapType:           keymap.MemKeymapBuilder,
-	keymap.LevelDBKeymapType:       keymap.LevelDBKeymapBuilder,
-	keymap.UnsafeLevelDBKeymapType: keymap.UnsafeLevelDBKeymapBuilder,
+	keymap.MemKeymapType:           keymap.NewMemKeymap,
+	keymap.LevelDBKeymapType:       keymap.NewLevelDBKeymap,
+	keymap.UnsafeLevelDBKeymapType: keymap.NewUnsafeLevelDBKeymap,
 }
 
 // cacheWeight is a function that calculates the weight of a cache entry.
@@ -61,7 +61,7 @@ func buildKeymap(
 	var keymapInitialized bool
 
 	for _, directory := range keymapDirectories {
-		exists, err := keymap.KeymapFileExists(directory)
+		exists, err := util.Exists(directory)
 		if err != nil {
 			return nil, "", nil, false,
 				fmt.Errorf("error checking for keymap type file: %w", err)
@@ -140,6 +140,19 @@ func buildKeymap(
 			if err != nil {
 				return nil, "", nil, false,
 					fmt.Errorf("error deleting keymap files: %w", err)
+			}
+
+			// write the new keymap type file
+			err = os.MkdirAll(keymapDirectory, 0755)
+			if err != nil {
+				return nil, "", nil, false,
+					fmt.Errorf("error creating keymap directory: %w", err)
+			}
+			keymapTypeFile = keymap.NewKeymapTypeFile(keymapDirectory, config.KeymapType)
+			err = keymapTypeFile.Write()
+			if err != nil {
+				return nil, "", nil, false,
+					fmt.Errorf("error writing keymap type file: %w", err)
 			}
 		}
 	}

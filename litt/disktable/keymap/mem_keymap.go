@@ -25,22 +25,16 @@ type memKeymap struct {
 	lock                  sync.RWMutex
 }
 
-// MemKeymapBuilder is a function that builds a MemKeymap.
-var MemKeymapBuilder KeymapBuilder = func(
-	logger logging.Logger,
-	keymapPath string,
-	doubleWriteProtection bool,
-) (Keymap, bool, error) {
-	return NewMemKeymap(logger, doubleWriteProtection), true, nil
-}
-
 // NewMemKeymap creates a new in-memory keymap.
-func NewMemKeymap(logger logging.Logger, doubleWriteProtection bool) Keymap {
+func NewMemKeymap(logger logging.Logger,
+	keymapPath string,
+	doubleWriteProtection bool) (kmap Keymap, requiresReload bool, err error) {
+
 	return &memKeymap{
 		logger:                logger,
 		data:                  make(map[string]types.Address),
 		doubleWriteProtection: doubleWriteProtection,
-	}
+	}, true, nil
 }
 
 func (m *memKeymap) Put(pairs []*types.KAPair) error {

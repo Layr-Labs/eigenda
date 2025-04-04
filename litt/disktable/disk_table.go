@@ -377,13 +377,18 @@ func (d *DiskTable) reloadKeymap() error {
 	// Now that the keymap is loaded, write the marker file that indicates that the keymap is fully loaded.
 	// If we crash prior to writing this file, the keymap will reload from the segments again.
 	keymapInitializedFile := path.Join(d.keymapPath, keymap.KeymapInitializedFileName)
+	err := os.MkdirAll(d.keymapPath, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create keymap directory: %v", err)
+	}
+
 	f, err := os.Create(keymapInitializedFile)
 	if err != nil {
-		return fmt.Errorf("failed to create keymap initialized file: %v", err)
+		return fmt.Errorf("failed to create keymap initialized file after reload: %v", err)
 	}
 	err = f.Close()
 	if err != nil {
-		return fmt.Errorf("failed to close keymap initialized file: %v", err)
+		return fmt.Errorf("failed to close keymap initialized file after reload: %v", err)
 	}
 
 	return nil
