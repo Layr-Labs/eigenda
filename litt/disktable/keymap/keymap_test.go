@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )
@@ -113,14 +114,10 @@ func TestBasicBehavior(t *testing.T) {
 		testBasicBehavior(t, keymap)
 
 		// verify that test dir is empty (destroy should have deleted everything)
-		_, err = os.Stat(dbDir)
-		if err != nil {
-			if !os.IsNotExist(err) {
-				require.NoError(t, err)
-			}
+		exists, err := util.Exists(dbDir)
+		require.NoError(t, err)
 
-			// Directory doesn't exist. We are good.
-		} else {
+		if !exists {
 			// Directory exists. Make sure it's empty.
 			entries, err := os.ReadDir(dbDir)
 			require.NoError(t, err)

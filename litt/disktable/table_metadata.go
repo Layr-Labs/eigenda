@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -63,7 +64,12 @@ func newTableMetadata(
 // loadTableMetadata loads the table metadata from disk.
 func loadTableMetadata(logger logging.Logger, tableDirectory string) (*tableMetadata, error) {
 	mPath := metadataPath(tableDirectory)
-	if _, err := os.Stat(mPath); os.IsNotExist(err) {
+
+	exists, err := util.Exists(mPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if table metadata file exists: %v", err)
+	}
+	if !exists {
 		return nil, fmt.Errorf("table metadata file does not exist: %s", mPath)
 	}
 
@@ -218,7 +224,13 @@ func (t *tableMetadata) swapPath() string {
 // This can happen if the process crashes while writing the metadata file (recoverable).
 func (t *tableMetadata) deleteOrphanedSwapFile() error {
 	swapPath := t.swapPath()
-	if _, err := os.Stat(swapPath); err == nil {
+
+	exists, err := util.Exists(swapPath)
+	if err != nil {
+		return fmt.Errorf("failed to check if swap file exists: %v", err)
+	}
+
+	if exists {
 		t.logger.Warnf("Found orphaned table metadata swap file %s, deleting", swapPath)
 
 		// delete orphaned swap file

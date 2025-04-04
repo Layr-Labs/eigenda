@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -483,8 +484,9 @@ func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelet
 		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.MetadataFileExtension)
 	}
 
-	_, err = os.Stat(filePath)
+	exists, err := util.Exists(filePath)
 	require.NoError(t, err)
+	require.True(t, exists)
 
 	err = os.Remove(filePath)
 	require.NoError(t, err)
@@ -608,8 +610,9 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 		filePath = fmt.Sprintf("%s/table/segments/%d%s",
 			directory, lowestSegmentIndex, segment.MetadataFileExtension)
 	}
-	_, err = os.Stat(filePath)
+	exists, err := util.Exists(filePath)
 	require.NoError(t, err)
+	require.True(t, exists)
 
 	err = os.Remove(filePath)
 	require.NoError(t, err)
@@ -796,8 +799,9 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 	} else {
 		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, highestSegmentIndex, segment.MetadataFileExtension)
 	}
-	_, err = os.Stat(filePath)
+	exists, err := util.Exists(filePath)
 	require.NoError(t, err)
+	require.True(t, exists)
 
 	err = os.Remove(filePath)
 	require.NoError(t, err)

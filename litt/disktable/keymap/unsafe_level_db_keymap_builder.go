@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -30,17 +31,16 @@ func (b *UnsafeLevelDBKeymapBuilder) Build(
 	doubleWriteProtection bool) (Keymap, bool, error) {
 
 	// check to see if the keymap directory exists in one of the provided paths
-	exists := false
-	_, err := os.Stat(keymapPath)
-	if err == nil {
-		exists = true
-	} else if os.IsNotExist(err) {
+	exists, err := util.Exists(keymapPath)
+	if err != nil {
+		return nil, false, fmt.Errorf("error checking for keymap directory: %w", err)
+	}
+
+	if !exists {
 		err = os.MkdirAll(keymapPath, 0755)
 		if err != nil {
 			return nil, false, fmt.Errorf("error creating keymap directory: %w", err)
 		}
-	} else {
-		return nil, false, fmt.Errorf("error checking for keymap directory: %w", err)
 	}
 
 	keymap, err := NewUnsafeLevelDBKeymap(logger, keymapPath, doubleWriteProtection)
@@ -50,17 +50,4 @@ func (b *UnsafeLevelDBKeymapBuilder) Build(
 
 	requiresReload := !exists
 	return keymap, requiresReload, nil
-}
-
-func (b *UnsafeLevelDBKeymapBuilder) DeleteFiles(logger logging.Logger, keymapPath string) error {
-	_, err := os.Stat(keymapPath)
-	if err == nil {
-		logger.Infof("deleting keymap directory: %s", keymapPath)
-		err = os.RemoveAll(keymapPath)
-		if err != nil {
-			return fmt.Errorf("error deleting keymap directory: %w", err)
-		}
-	}
-
-	return nil
 }

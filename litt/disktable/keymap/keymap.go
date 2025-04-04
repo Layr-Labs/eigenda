@@ -11,6 +11,10 @@ const KeymapDirectoryName = "keymap"
 // This directory will be created inside the keymap directory.
 const KeymapDataDirectoryName = "data"
 
+// KeymapInitializedFileName is the name of the file that indicates that the keymap has been initialized.
+// This file contains no data, and serves as a flag that is set when the keymap has been fully initialized.
+const KeymapInitializedFileName = "initialized"
+
 // Keymap maintains a mapping between keys and addresses. Implementations of this interface are goroutine safe.
 type Keymap interface {
 	// Put adds keys to the keymap as a batch.

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 )
 
-// VerifyFileProperties checks if a file has read/write permissions and is a regular file (if it exists),
+// VerifyFilePermissions checks if a file has read/write permissions and is a regular file (if it exists),
 // returning an error if it does not if the file permissions or file type is not as expected.
 // Also returns a boolean indicating if the file exists and its size (to save on additional os.Stat calls).
 //
@@ -16,7 +16,7 @@ import (
 //
 // The arguments for the function are the result of os.Stat(path). There is no need to do error checking on the
 // result of os.Stat in the calling context (this method does it for you).
-func VerifyFileProperties(path string) (exists bool, size int64, err error) {
+func VerifyFilePermissions(path string) (exists bool, size int64, err error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -37,11 +37,9 @@ func VerifyFileProperties(path string) (exists bool, size int64, err error) {
 			if parentInfo.Mode()&0700 != 0700 {
 				return false, -1, fmt.Errorf("parent directory %s has insufficent permissions", parentPath)
 			}
-
-			return false, -1, nil
-		} else {
-			return false, 0, fmt.Errorf("failed to stat path %s: %w", path, err)
 		}
+
+		return false, 0, nil
 	}
 
 	// File exists. Check if it is a regular file and that it is readable+writeable.
