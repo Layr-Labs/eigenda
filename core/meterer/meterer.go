@@ -202,7 +202,7 @@ func GetReservationPeriod(timestamp int64, binInterval uint64) uint64 {
 // On-demand requests doesn't have additional quorum settings and should only be
 // allowed by ETH and EIGEN quorums
 func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, symbolsCharged uint64, headerQuorums []uint8, receivedAt time.Time) error {
-	m.logger.Debug("Recording and validating on-demand usage", "header", header, "onDemandPayment", onDemandPayment)
+	m.logger.Info("Recording and validating on-demand usage", "header", header, "onDemandPayment", onDemandPayment)
 	quorumNumbers, err := m.ChainPaymentState.GetOnDemandQuorumNumbers(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get on-demand quorum numbers: %w", err)
@@ -218,6 +218,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 	}
 
 	paymentCharged := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol())
+	m.logger.Info("paymentCharged", "paymentCharged", paymentCharged.String(), "symbolsCharged", symbolsCharged, "pricePerSymbol", m.ChainPaymentState.GetPricePerSymbol())
 	oldPayment, err := m.OffchainStore.AddOnDemandPayment(ctx, header, paymentCharged)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
