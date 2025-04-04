@@ -185,8 +185,8 @@ func (s *ServerV2) FetchBlob(c *gin.Context) {
 		errorResponse(c, err)
 		return
 	}
-	metadata, cached := s.blobMetadataCache.Get(blobKey.Hex())
-	if !cached {
+	metadata, found := s.blobMetadataCache.Get(blobKey.Hex())
+	if !found {
 		metadata, err = s.blobMetadataStore.GetBlobMetadata(c.Request.Context(), blobKey)
 		if err != nil {
 			s.metrics.IncrementFailedRequestNum("FetchBlob")
@@ -236,8 +236,8 @@ func (s *ServerV2) FetchBlobCertificate(c *gin.Context) {
 		errorResponse(c, err)
 		return
 	}
-	cert, cached := s.blobCertificateCache.Get(blobKey.Hex())
-	if !cached {
+	cert, found := s.blobCertificateCache.Get(blobKey.Hex())
+	if !found {
 		cert, _, err = s.blobMetadataStore.GetBlobCertificate(c.Request.Context(), blobKey)
 		if err != nil {
 			s.metrics.IncrementFailedRequestNum("FetchBlobCertificate")
@@ -279,8 +279,8 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 		return
 	}
 
-	response, cached := s.blobAttestationInfoResponseCache.Get(blobKey.Hex())
-	if !cached {
+	response, found := s.blobAttestationInfoResponseCache.Get(blobKey.Hex())
+	if !found {
 		response, err = s.getBlobAttestationInfoResponse(ctx, blobKey)
 		if err != nil {
 			s.metrics.IncrementFailedRequestNum("FetchBlobAttestationInfo")
@@ -300,8 +300,8 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 
 func (s *ServerV2) getBlobAttestationInfoResponse(ctx context.Context, blobKey corev2.BlobKey) (*BlobAttestationInfoResponse, error) {
 	var err error
-	attestationInfo, cached := s.blobAttestationInfoCache.Get(blobKey.Hex())
-	if !cached {
+	attestationInfo, found := s.blobAttestationInfoCache.Get(blobKey.Hex())
+	if !found {
 		attestationInfo, err = s.blobMetadataStore.GetBlobAttestationInfo(ctx, blobKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch blob attestation info: %w", err)
@@ -315,8 +315,8 @@ func (s *ServerV2) getBlobAttestationInfoResponse(ctx context.Context, blobKey c
 	}
 
 	// Get quorums that this blob was dispersed to
-	metadata, cached := s.blobMetadataCache.Get(blobKey.Hex())
-	if !cached {
+	metadata, found := s.blobMetadataCache.Get(blobKey.Hex())
+	if !found {
 		metadata, err = s.blobMetadataStore.GetBlobMetadata(ctx, blobKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch blob metadata: %w", err)
