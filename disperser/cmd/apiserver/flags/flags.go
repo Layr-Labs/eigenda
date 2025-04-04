@@ -134,6 +134,14 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_BLOB_SIZE"),
 		Required: false,
 	}
+	InstanceID = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "instance-id"),
+		Usage:    "ID of the server, unique across all replicas of apiserver service",
+		Value:    -1,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "INSTANCE_ID"),
+		Required: false,
+	}
+
 	OnchainStateRefreshInterval = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "onchain-state-refresh-interval"),
 		Usage:    "The interval at which to refresh the onchain state. This flag is only relevant in v2",
