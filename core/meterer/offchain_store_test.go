@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -18,14 +19,13 @@ import (
 )
 
 type testContext struct {
-	ctx    context.Context
-	store  meterer.OffchainStore
-	dbPath string
+	ctx     context.Context
+	dbPath  string
+	store   meterer.OffchainStore
+	cleanup func()
 }
 
-// setupTest creates a test context with a temporary LevelDB directory
-func setupTest(t *testing.T) *testContext {
-	// Create a temporary directory for the test
+func setupTestContext(t *testing.T) *testContext {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, fmt.Sprintf("test_db_%d", rand.Int()))
 
@@ -43,12 +43,44 @@ func setupTest(t *testing.T) *testContext {
 	)
 	require.NoError(t, err)
 
+	// Set up cleanup function after store is created
+	tc.cleanup = func() {
+		t.Logf("Cleaning up store")
+		// First destroy the store to ensure all files are closed
+		if err := tc.store.Destroy(); err != nil {
+			t.Logf("Failed to destroy store: %v", err)
+		}
+
+		// Give a small delay to ensure all file handles are released
+		time.Sleep(100 * time.Millisecond)
+
+		// Remove all files in the test directory
+		t.Logf("Removing test directory: %s", tmpDir)
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("Failed to remove test directory: %v", err)
+		}
+
+		// Double check that the directory is gone
+		if _, err := os.Stat(tmpDir); !os.IsNotExist(err) {
+			t.Logf("Test directory still exists after cleanup: %v", err)
+			// Try to list remaining files for debugging
+			if files, err := os.ReadDir(tmpDir); err == nil {
+				for _, file := range files {
+					t.Logf("Remaining file: %s", file.Name())
+				}
+			}
+		}
+	}
+
+	// Register cleanup with testing.T
+	t.Cleanup(tc.cleanup)
+
 	return tc
 }
 
 // TestUpdateReservationBin tests the UpdateReservationBin function
 func TestUpdateReservationBin(t *testing.T) {
-	tc := setupTest(t)
+	tc := setupTestContext(t)
 
 	// Test updating bin that doesn't exist yet (should create it)
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
@@ -84,7 +116,7 @@ func TestUpdateReservationBin(t *testing.T) {
 
 // TestUpdateGlobalBin tests the UpdateGlobalBin function
 func TestUpdateGlobalBin(t *testing.T) {
-	tc := setupTest(t)
+	tc := setupTestContext(t)
 
 	// Test updating global bin that doesn't exist yet (should create it)
 	reservationPeriod := uint64(1)
@@ -119,7 +151,7 @@ func TestUpdateGlobalBin(t *testing.T) {
 
 // TestAddOnDemandPayment tests the AddOnDemandPayment function
 func TestAddOnDemandPayment(t *testing.T) {
-	tc := setupTest(t)
+	tc := setupTestContext(t)
 
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 	payment1 := core.PaymentMetadata{
@@ -202,7 +234,7 @@ func TestAddOnDemandPayment(t *testing.T) {
 
 // TestRollbackOnDemandPayment tests the RollbackOnDemandPayment function
 func TestRollbackOnDemandPayment(t *testing.T) {
-	tc := setupTest(t)
+	tc := setupTestContext(t)
 
 	// Create and add a payment
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
@@ -259,7 +291,7 @@ func TestRollbackOnDemandPayment(t *testing.T) {
 
 // TestGetLargestCumulativePayment tests the GetLargestCumulativePayment function
 func TestGetLargestCumulativePayment(t *testing.T) {
-	tc := setupTest(t)
+	tc := setupTestContext(t)
 
 	// Create an account to test with
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
@@ -356,7 +388,7 @@ func TestGetLargestCumulativePayment(t *testing.T) {
 
 // TestGetPeriodRecords tests the GetPeriodRecords function
 func TestGetPeriodRecords(t *testing.T) {
-	tc := setupTest(t)
+	tc := setupTestContext(t)
 
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 	reservationPeriod := uint64(1)
