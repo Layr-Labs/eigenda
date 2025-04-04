@@ -76,6 +76,9 @@ func buildGlobalBinKey(reservationPeriod uint64) []byte {
 func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, size uint64) (uint64, error) {
 	key := buildReservationKey(accountID, reservationPeriod)
 
+	// Create a batch for atomic updates
+	batch := s.db.NewBatch()
+
 	// Get current value
 	value, err := s.db.Get(key)
 	if err != nil {
@@ -83,7 +86,8 @@ func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID geth
 			// If not found, create new entry
 			value = make([]byte, 8)
 			binary.BigEndian.PutUint64(value, size)
-			if err := s.db.Put(key, value); err != nil {
+			batch.Put(key, value)
+			if err := batch.Apply(); err != nil {
 				return 0, fmt.Errorf("failed to create new reservation bin: %w", err)
 			}
 			return size, nil
@@ -97,7 +101,8 @@ func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID geth
 	newValue := make([]byte, 8)
 	binary.BigEndian.PutUint64(newValue, newSize)
 
-	if err := s.db.Put(key, newValue); err != nil {
+	batch.Put(key, newValue)
+	if err := batch.Apply(); err != nil {
 		return 0, fmt.Errorf("failed to update reservation bin: %w", err)
 	}
 
@@ -107,6 +112,9 @@ func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID geth
 func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error) {
 	key := buildGlobalBinKey(reservationPeriod)
 
+	// Create a batch for atomic updates
+	batch := s.db.NewBatch()
+
 	// Get current value
 	value, err := s.db.Get(key)
 	if err != nil {
@@ -114,7 +122,8 @@ func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod u
 			// If not found, create new entry
 			value = make([]byte, 8)
 			binary.BigEndian.PutUint64(value, size)
-			if err := s.db.Put(key, value); err != nil {
+			batch.Put(key, value)
+			if err := batch.Apply(); err != nil {
 				return 0, fmt.Errorf("failed to create new global bin: %w", err)
 			}
 			return size, nil
@@ -131,7 +140,8 @@ func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod u
 	newValue := make([]byte, 8)
 	binary.BigEndian.PutUint64(newValue, newSize)
 
-	if err := s.db.Put(key, newValue); err != nil {
+	batch.Put(key, newValue)
+	if err := batch.Apply(); err != nil {
 		return 0, fmt.Errorf("failed to update global bin: %w", err)
 	}
 
@@ -141,78 +151,65 @@ func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod u
 func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, paymentCharged *big.Int) (*big.Int, error) {
 	key := buildOnDemandKey(paymentMetadata.AccountID)
 
+	// Create a batch for atomic updates
+	batch := s.db.NewBatch()
+
 	// Get current value
 	value, err := s.db.Get(key)
 	if err != nil {
 		if errors.Is(err, kvstore.ErrNotFound) {
 			// If not found, create new entry
-			if err := s.db.Put(key, paymentMetadata.CumulativePayment.Bytes()); err != nil {
-				return nil, fmt.Errorf("failed to create new payment: %w", err)
+			batch.Put(key, paymentMetadata.CumulativePayment.Bytes())
+			if err := batch.Apply(); err != nil {
+				return nil, fmt.Errorf("failed to apply batch: %w", err)
 			}
 			value = make([]byte, 32)
 			copy(value, big.NewInt(0).Bytes())
-			// s.logger.Info("Created new on-demand payment entry",
-			// 	"accountID", paymentMetadata.AccountID.Hex(),
-			// 	"cumulativePayment", paymentMetadata.CumulativePayment.String())
-		} else {
-			s.logger.Error("failed to get existing payment", "accountID", paymentMetadata.AccountID.Hex(), "error", err)
-			return nil, fmt.Errorf("failed to get payment: %w", err)
+			return big.NewInt(0), nil
 		}
+		return nil, fmt.Errorf("failed to get payment: %w", err)
 	}
 
 	// Validate payment increment first
 	oldPayment := new(big.Int).SetBytes(value)
 	paymentCheckpoint := new(big.Int).Sub(paymentMetadata.CumulativePayment, paymentCharged)
-	// s.logger.Info("Validating on-demand payment",
-	// 	"accountID", paymentMetadata.AccountID.Hex(),
-	// 	"oldPayment", oldPayment.String(),
-	// 	"newPayment", paymentMetadata.CumulativePayment.String(),
-	// 	"paymentCharged", paymentCharged.String(),
-	// 	"paymentCheckpoint", paymentCheckpoint.String())
 
 	if paymentCheckpoint.Sign() < 0 {
-		// s.logger.Error("Payment validation failed: payment charged is greater than cumulative payment",
-		// 	"accountID", paymentMetadata.AccountID.Hex(),
-		// 	"cumulativePayment", paymentMetadata.CumulativePayment.String(),
-		// 	"paymentCharged", paymentCharged.String())
 		if oldPayment.Cmp(big.NewInt(0)) == 0 {
-			// s.logger.Info("Deleting payment entry for new account", "accountID", paymentMetadata.AccountID.Hex())
-			if err := s.db.Delete(key); err != nil {
-				return nil, fmt.Errorf("failed to delete payment entry: %w", err)
+			batch.Delete(key)
+			if err := batch.Apply(); err != nil {
+				return nil, fmt.Errorf("failed to apply batch: %w", err)
 			}
 		}
 		return nil, fmt.Errorf("payment validation failed: payment charged is greater than cumulative payment")
 	}
 
 	if oldPayment.Cmp(paymentCheckpoint) > 0 {
-		// s.logger.Error("Insufficient cumulative payment increment",
-		// 	"accountID", paymentMetadata.AccountID.Hex(),
-		// 	"oldPayment", oldPayment.String(),
-		// 	"paymentCheckpoint", paymentCheckpoint.String())
 		if oldPayment.Cmp(big.NewInt(0)) == 0 {
-			s.logger.Info("Deleting payment entry for new account", "accountID", paymentMetadata.AccountID.Hex())
-			if err := s.db.Delete(key); err != nil {
-				return nil, fmt.Errorf("failed to delete payment entry: %w", err)
+			batch.Delete(key)
+			if err := batch.Apply(); err != nil {
+				return nil, fmt.Errorf("failed to apply batch: %w", err)
 			}
 		}
 		return nil, fmt.Errorf("insufficient cumulative payment increment")
 	}
 
 	// Only store after validation
-	if err := s.db.Put(key, paymentMetadata.CumulativePayment.Bytes()); err != nil {
-		return nil, fmt.Errorf("failed to update payment: %w", err)
-	}
+	batch.Put(key, paymentMetadata.CumulativePayment.Bytes())
 
-	// s.logger.Info("Successfully updated on-demand payment",
-	// 	"accountID", paymentMetadata.AccountID.Hex(),
-	// 	"oldPayment", oldPayment.String(),
-	// 	"newPayment", paymentMetadata.CumulativePayment.String())
+	// Apply the batch atomically
+	if err := batch.Apply(); err != nil {
+		return nil, fmt.Errorf("failed to apply batch: %w", err)
+	}
 
 	return oldPayment, nil
 }
 
 func (s *OffchainStore) RollbackOnDemandPayment(ctx context.Context, accountID gethcommon.Address, newPayment, oldPayment *big.Int) error {
 	key := buildOnDemandKey(accountID)
+
+	// Create a batch for atomic updates
+	batch := s.db.NewBatch()
 
 	// Get current value
 	value, err := s.db.Get(key)
@@ -222,29 +219,18 @@ func (s *OffchainStore) RollbackOnDemandPayment(ctx context.Context, accountID g
 			if oldPayment == nil {
 				oldPayment = big.NewInt(0)
 			}
-			if err := s.db.Put(key, oldPayment.Bytes()); err != nil {
+			batch.Put(key, oldPayment.Bytes())
+			if err := batch.Apply(); err != nil {
 				return fmt.Errorf("failed to create new payment: %w", err)
 			}
-			// s.logger.Info("Created new payment entry during rollback",
-			// 	"accountID", accountID.Hex(),
-			// 	"payment", oldPayment.String())
 			return nil
 		}
 		return fmt.Errorf("failed to get payment: %w", err)
 	}
 
 	currentPayment := new(big.Int).SetBytes(value)
-	// s.logger.Info("Attempting payment rollback",
-	// 	"accountID", accountID.Hex(),
-	// 	"currentPayment", currentPayment.String(),
-	// 	"newPayment", newPayment.String(),
-	// 	"oldPayment", oldPayment.String())
 
 	if currentPayment.Cmp(newPayment) != 0 {
-		// s.logger.Debug("Skipping rollback as current payment doesn't match the expected value",
-		// 	"accountID", accountID.Hex(),
-		// 	"expectedPayment", newPayment.String(),
-		// 	"currentPayment", currentPayment.String())
 		return nil
 	}
 
@@ -252,14 +238,10 @@ func (s *OffchainStore) RollbackOnDemandPayment(ctx context.Context, accountID g
 	if oldPayment == nil {
 		oldPayment = big.NewInt(0)
 	}
-	if err := s.db.Put(key, oldPayment.Bytes()); err != nil {
+	batch.Put(key, oldPayment.Bytes())
+	if err := batch.Apply(); err != nil {
 		return fmt.Errorf("failed to rollback payment: %w", err)
 	}
-
-	// s.logger.Info("Successfully rolled back payment",
-	// 	"accountID", accountID.Hex(),
-	// 	"rolledBackFrom", newPayment.String(),
-	// 	"rolledBackTo", oldPayment.String())
 
 	return nil
 }
