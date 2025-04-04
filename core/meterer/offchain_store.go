@@ -2,334 +2,374 @@ package meterer
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
-	"strconv"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	commonaws "github.com/Layr-Labs/eigenda/common/aws"
-	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
+	"github.com/Layr-Labs/eigenda/common/kvstore"
+	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 const MinNumBins int32 = 3
 
+// Key prefixes for different tables
+const (
+	reservationPrefix = "reservation:"
+	onDemandPrefix    = "ondemand:"
+	globalBinPrefix   = "globalbin:"
+)
+
 type OffchainStore struct {
-	dynamoClient         commondynamodb.Client
-	reservationTableName string
-	onDemandTableName    string
-	globalBinTableName   string
-	logger               logging.Logger
-	// TODO: add maximum storage for both tables
+	db     kvstore.Store[[]byte]
+	logger logging.Logger
 }
 
 func NewOffchainStore(
-	cfg commonaws.ClientConfig,
-	reservationTableName string,
-	onDemandTableName string,
-	globalBinTableName string,
+	path string,
 	logger logging.Logger,
 ) (OffchainStore, error) {
-
-	dynamoClient, err := commondynamodb.NewClient(cfg, logger)
+	db, err := leveldb.NewStore(logger, path, false, true, nil)
 	if err != nil {
-		return OffchainStore{}, err
+		return OffchainStore{}, fmt.Errorf("failed to create leveldb store: %w", err)
 	}
 
-	err = dynamoClient.TableExists(context.Background(), reservationTableName)
-	if err != nil {
-		return OffchainStore{}, err
-	}
-	err = dynamoClient.TableExists(context.Background(), onDemandTableName)
-	if err != nil {
-		return OffchainStore{}, err
-	}
-	err = dynamoClient.TableExists(context.Background(), globalBinTableName)
-	if err != nil {
-		return OffchainStore{}, err
-	}
-	//TODO: add a separate thread to periodically clean up the tables
-	// delete expired reservation bins (<i-1) and old on-demand payments (retain max N payments)
 	return OffchainStore{
-		dynamoClient:         dynamoClient,
-		reservationTableName: reservationTableName,
-		onDemandTableName:    onDemandTableName,
-		globalBinTableName:   globalBinTableName,
-		logger:               logger,
+		db:     db,
+		logger: logger,
 	}, nil
 }
 
+// buildReservationKey builds a key for the reservation table
+func buildReservationKey(accountID gethcommon.Address, reservationPeriod uint64) []byte {
+	key := make([]byte, 0, len(reservationPrefix)+20+8)
+	key = append(key, []byte(reservationPrefix)...)
+	key = append(key, accountID.Bytes()...)
+	periodBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(periodBytes, reservationPeriod)
+	key = append(key, periodBytes...)
+	return key
+}
+
+// buildOnDemandKey builds a key for the on-demand table
+func buildOnDemandKey(accountID gethcommon.Address) []byte {
+	key := make([]byte, 0, len(onDemandPrefix)+20)
+	key = append(key, []byte(onDemandPrefix)...)
+	key = append(key, accountID.Bytes()...)
+	return key
+}
+
+// buildGlobalBinKey builds a key for the global bin table
+func buildGlobalBinKey(reservationPeriod uint64) []byte {
+	key := make([]byte, 0, len(globalBinPrefix)+8)
+	key = append(key, []byte(globalBinPrefix)...)
+	periodBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(periodBytes, reservationPeriod)
+	key = append(key, periodBytes...)
+	return key
+}
+
 func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, size uint64) (uint64, error) {
-	key := map[string]types.AttributeValue{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
-	}
+	key := buildReservationKey(accountID, reservationPeriod)
 
-	res, err := s.dynamoClient.IncrementBy(ctx, s.reservationTableName, key, "BinUsage", size)
+	// Create a batch for atomic updates
+	batch := s.db.NewBatch()
+
+	// Get current value
+	value, err := s.db.Get(key)
 	if err != nil {
-		return 0, fmt.Errorf("failed to increment bin usage: %w", err)
+		if errors.Is(err, kvstore.ErrNotFound) {
+			// If not found, create new entry
+			value = make([]byte, 8)
+			binary.BigEndian.PutUint64(value, size)
+			batch.Put(key, value)
+			if err := batch.Apply(); err != nil {
+				return 0, fmt.Errorf("failed to create new reservation bin: %w", err)
+			}
+			return size, nil
+		}
+		return 0, fmt.Errorf("failed to get reservation bin: %w", err)
 	}
 
-	binUsage, ok := res["BinUsage"]
-	if !ok {
-		return 0, errors.New("BinUsage is not present in the response")
+	// Update existing value
+	currentSize := binary.BigEndian.Uint64(value)
+	newSize := currentSize + size
+	newValue := make([]byte, 8)
+	binary.BigEndian.PutUint64(newValue, newSize)
+
+	batch.Put(key, newValue)
+	if err := batch.Apply(); err != nil {
+		return 0, fmt.Errorf("failed to update reservation bin: %w", err)
 	}
 
-	binUsageAttr, ok := binUsage.(*types.AttributeValueMemberN)
-	if !ok {
-		return 0, fmt.Errorf("unexpected type for BinUsage: %T", binUsage)
-	}
-
-	binUsageValue, err := strconv.ParseUint(binUsageAttr.Value, 10, 32)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse BinUsage: %w", err)
-	}
-
-	return binUsageValue, nil
+	return newSize, nil
 }
 
 func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error) {
-	key := map[string]types.AttributeValue{
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
-	}
+	key := buildGlobalBinKey(reservationPeriod)
 
-	res, err := s.dynamoClient.IncrementBy(ctx, s.globalBinTableName, key, "BinUsage", size)
+	// Create a batch for atomic updates
+	batch := s.db.NewBatch()
+
+	// Get current value
+	value, err := s.db.Get(key)
 	if err != nil {
-		return 0, err
+		if errors.Is(err, kvstore.ErrNotFound) {
+			// If not found, create new entry
+			value = make([]byte, 8)
+			binary.BigEndian.PutUint64(value, size)
+			batch.Put(key, value)
+			if err := batch.Apply(); err != nil {
+				return 0, fmt.Errorf("failed to create new global bin: %w", err)
+			}
+			return size, nil
+		}
+		return 0, fmt.Errorf("failed to get global bin: %w", err)
 	}
 
-	binUsage, ok := res["BinUsage"]
-	if !ok {
-		return 0, nil
+	// Update existing value
+	currentSize := binary.BigEndian.Uint64(value)
+	newSize := currentSize + size
+	if newSize < currentSize {
+		return 0, fmt.Errorf("global bin usage overflows")
+	}
+	newValue := make([]byte, 8)
+	binary.BigEndian.PutUint64(newValue, newSize)
+
+	batch.Put(key, newValue)
+	if err := batch.Apply(); err != nil {
+		return 0, fmt.Errorf("failed to update global bin: %w", err)
 	}
 
-	binUsageAttr, ok := binUsage.(*types.AttributeValueMemberN)
-	if !ok {
-		return 0, nil
-	}
-
-	binUsageValue, err := strconv.ParseUint(binUsageAttr.Value, 10, 32)
-	if err != nil {
-		return 0, err
-	}
-
-	return binUsageValue, nil
+	return newSize, nil
 }
 
 func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, paymentCharged *big.Int) (*big.Int, error) {
-	// Create new item with only AccountID and CumulativePayment
-	item := commondynamodb.Item{
-		"AccountID":         &types.AttributeValueMemberS{Value: paymentMetadata.AccountID.Hex()},
-		"CumulativePayment": &types.AttributeValueMemberN{Value: paymentMetadata.CumulativePayment.String()},
+	key := buildOnDemandKey(paymentMetadata.AccountID)
+	s.logger.Info("processing on-demand payment", "accountID", paymentMetadata.AccountID, "paymentCharged", paymentCharged)
+
+	// Create a batch for atomic updates
+	batch := s.db.NewBatch()
+
+	// Get current value
+	value, err := s.db.Get(key)
+	if err != nil {
+		if errors.Is(err, kvstore.ErrNotFound) {
+			s.logger.Info("no existing payment found, creating new entry", "accountID", paymentMetadata.AccountID)
+			// If not found, create new entry
+			batch.Put(key, paymentMetadata.CumulativePayment.Bytes())
+			if err := batch.Apply(); err != nil {
+				s.logger.Error("failed to apply batch for new payment", "error", err)
+				return nil, fmt.Errorf("failed to apply batch: %w", err)
+			}
+			value = make([]byte, 32)
+			copy(value, big.NewInt(0).Bytes())
+			// return big.NewInt(0), nil
+		} else {
+			s.logger.Error("failed to get payment", "error", err)
+			return nil, fmt.Errorf("failed to get payment: %w", err)
+
+		}
 	}
 
-	// Use conditional expression to ensure:
-	// 1. If no record exists, accept the payment
-	// 2. If record exists, the increment must be at least the payment charged
-	//    (which also ensures the new payment is larger than the existing one since paymentCharged > 0)
-	paymentCheckpoint := big.NewInt(0).Sub(paymentMetadata.CumulativePayment, paymentCharged)
+	// Validate payment increment first
+	oldPayment := new(big.Int).SetBytes(value)
+	paymentCheckpoint := new(big.Int).Sub(paymentMetadata.CumulativePayment, paymentCharged)
+	s.logger.Info("validating payment increment",
+		"oldPayment", oldPayment,
+		"paymentCheckpoint", paymentCheckpoint,
+		"cumulativePayment", paymentMetadata.CumulativePayment,
+		"paymentCharged", paymentCharged)
+
 	if paymentCheckpoint.Sign() < 0 {
+		s.logger.Warn("payment charged exceeds cumulative payment",
+			"paymentCheckpoint", paymentCheckpoint,
+			"paymentCharged", paymentCharged)
+		if oldPayment.Cmp(big.NewInt(0)) == 0 {
+			s.logger.Info("deleting zero payment entry")
+			batch.Delete(key)
+			if err := batch.Apply(); err != nil {
+				s.logger.Error("failed to apply batch for deletion", "error", err)
+				return nil, fmt.Errorf("failed to apply batch: %w", err)
+			}
+		}
 		return nil, fmt.Errorf("payment validation failed: payment charged is greater than cumulative payment")
 	}
-	conditionExpression := "attribute_not_exists(CumulativePayment) OR " +
-		"CumulativePayment <= :payment"
 
-	expressionValues := map[string]types.AttributeValue{
-		":payment": &types.AttributeValueMemberN{Value: paymentCheckpoint.String()},
-	}
-
-	oldItem, err := s.dynamoClient.PutItemWithConditionAndReturn(ctx, s.onDemandTableName, item, conditionExpression, nil, expressionValues)
-	if err != nil {
-		if errors.Is(err, commondynamodb.ErrConditionFailed) {
-			return nil, fmt.Errorf("insufficient cumulative payment increment: %w", err)
+	if oldPayment.Cmp(paymentCheckpoint) > 0 {
+		s.logger.Warn("insufficient cumulative payment increment",
+			"oldPayment", oldPayment,
+			"paymentCheckpoint", paymentCheckpoint)
+		if oldPayment.Cmp(big.NewInt(0)) == 0 {
+			s.logger.Info("deleting zero payment entry")
+			batch.Delete(key)
+			if err := batch.Apply(); err != nil {
+				s.logger.Error("failed to apply batch for deletion", "error", err)
+				return nil, fmt.Errorf("failed to apply batch: %w", err)
+			}
 		}
-		return nil, fmt.Errorf("failed to add on-demand payment: %w", err)
+		return nil, fmt.Errorf("insufficient cumulative payment increment")
 	}
 
-	// If there was no previous item, return zero
-	if len(oldItem) == 0 {
-		return big.NewInt(0), nil
+	// Only store after validation
+	s.logger.Info("storing validated payment",
+		"cumulativePayment", paymentMetadata.CumulativePayment)
+	batch.Put(key, paymentMetadata.CumulativePayment.Bytes())
+
+	// Apply the batch atomically
+	if err := batch.Apply(); err != nil {
+		s.logger.Error("failed to apply batch for payment update", "error", err)
+		return nil, fmt.Errorf("failed to apply batch: %w", err)
 	}
 
-	// Extract the old CumulativePayment value
-	oldPaymentAttr, ok := oldItem["CumulativePayment"]
-	if !ok {
-		return big.NewInt(0), nil
-	}
-
-	// Type assertion with check
-	oldPaymentNum, ok := oldPaymentAttr.(*types.AttributeValueMemberN)
-	if !ok {
-		return big.NewInt(0), fmt.Errorf("CumulativePayment has invalid type: %T", oldPaymentAttr)
-	}
-
-	oldPayment := new(big.Int)
-	if _, success := oldPayment.SetString(oldPaymentNum.Value, 10); !success {
-		return big.NewInt(0), fmt.Errorf("failed to parse old payment value: %s", oldPaymentNum.Value)
-	}
-
+	s.logger.Info("successfully processed payment",
+		"oldPayment", oldPayment,
+		"newPayment", paymentMetadata.CumulativePayment)
 	return oldPayment, nil
 }
 
-// RollbackOnDemandPayment rolls back a payment to the previous value
-// If oldPayment is 0, it writes a zero value instead of deleting the record
-// This method uses a conditional expression to ensure we only roll back if the current value matches newPayment
 func (s *OffchainStore) RollbackOnDemandPayment(ctx context.Context, accountID gethcommon.Address, newPayment, oldPayment *big.Int) error {
-	// Initialize oldPayment to zero if it's nil
-	if oldPayment == nil {
-		oldPayment = big.NewInt(0)
-	}
+	key := buildOnDemandKey(accountID)
 
-	// Create the item with the old payment value (which might be zero)
-	item := commondynamodb.Item{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
-		"CumulativePayment": &types.AttributeValueMemberN{Value: oldPayment.String()},
-	}
+	// Create a batch for atomic updates
+	batch := s.db.NewBatch()
 
-	// Construct a condition expression as a string
-	conditionExpression := "attribute_not_exists(CumulativePayment) OR CumulativePayment = :expectedPayment"
-
-	// Create the expression attribute values map
-	expressionValues := map[string]types.AttributeValue{
-		":expectedPayment": &types.AttributeValueMemberN{Value: newPayment.String()},
-	}
-
-	err := s.dynamoClient.PutItemWithCondition(
-		ctx,
-		s.onDemandTableName,
-		item,
-		conditionExpression,
-		nil, // No expression attribute names needed
-		expressionValues,
-	)
-
-	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		if s.logger != nil {
-			s.logger.Debug("Skipping rollback as current payment doesn't match the expected value",
-				"accountID", accountID.Hex(),
-				"expectedPayment", newPayment.String())
+	// Get current value
+	value, err := s.db.Get(key)
+	if err != nil {
+		if errors.Is(err, kvstore.ErrNotFound) {
+			// If not found, create new entry with oldPayment (which might be nil)
+			if oldPayment == nil {
+				oldPayment = big.NewInt(0)
+			}
+			batch.Put(key, oldPayment.Bytes())
+			if err := batch.Apply(); err != nil {
+				return fmt.Errorf("failed to create new payment: %w", err)
+			}
+			return nil
 		}
+		return fmt.Errorf("failed to get payment: %w", err)
+	}
+
+	currentPayment := new(big.Int).SetBytes(value)
+
+	if currentPayment.Cmp(newPayment) != 0 {
 		return nil
 	}
 
-	if err != nil {
-		return fmt.Errorf("failed to rollback payment: %w", err)
+	// Update payment
+	if oldPayment == nil {
+		oldPayment = big.NewInt(0)
 	}
-
-	if s.logger != nil {
-		s.logger.Debug("Successfully rolled back payment to previous value",
-			"accountID", accountID.Hex(),
-			"rolledBackFrom", newPayment.String(),
-			"rolledBackTo", oldPayment.String())
+	batch.Put(key, oldPayment.Bytes())
+	if err := batch.Apply(); err != nil {
+		return fmt.Errorf("failed to rollback payment: %w", err)
 	}
 
 	return nil
 }
 
 func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error) {
-	// Fetch the 3 bins start from the current bin
-	queryInput := &dynamodb.QueryInput{
-		TableName:              aws.String(s.reservationTableName),
-		KeyConditionExpression: aws.String("AccountID = :account AND ReservationPeriod >= :reservationPeriod"),
-		ExpressionAttributeValues: commondynamodb.ExpressionValues{
-			":account":           &types.AttributeValueMemberS{Value: accountID.Hex()},
-			":reservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
-		},
-		ScanIndexForward: aws.Bool(true),
-		Limit:            aws.Int32(MinNumBins),
-	}
-	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
-	if err != nil {
-		return [MinNumBins]*pb.PeriodRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
-	}
-
 	records := [MinNumBins]*pb.PeriodRecord{}
-	for i := 0; i < len(bins) && i < int(MinNumBins); i++ {
-		periodRecord, err := parsePeriodRecord(bins[i])
+
+	// Get records for the next MinNumBins periods
+	for i := 0; i < int(MinNumBins); i++ {
+		period := reservationPeriod + uint64(i)
+		key := buildReservationKey(accountID, period)
+
+		value, err := s.db.Get(key)
 		if err != nil {
-			return [MinNumBins]*pb.PeriodRecord{}, fmt.Errorf("failed to parse bin %d record: %w", i, err)
+			if errors.Is(err, kvstore.ErrNotFound) {
+				continue
+			}
+			return [MinNumBins]*pb.PeriodRecord{}, fmt.Errorf("failed to get period record: %w", err)
 		}
-		records[i] = periodRecord
+
+		usage := binary.BigEndian.Uint64(value)
+		records[i] = &pb.PeriodRecord{
+			Index: uint32(period),
+			Usage: usage,
+		}
 	}
 
 	return records, nil
 }
 
 func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
-	// Get the single record for this account
-	key := commondynamodb.Key{
-		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
-	}
+	key := buildOnDemandKey(accountID)
 
-	result, err := s.dynamoClient.GetItem(ctx, s.onDemandTableName, key)
+	value, err := s.db.Get(key)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get payment for account: %w", err)
+		if errors.Is(err, kvstore.ErrNotFound) {
+			return big.NewInt(0), nil // Return 0 for non-existent keys to match original behavior
+		}
+		return nil, fmt.Errorf("failed to get payment: %w", err)
 	}
 
-	// If no item found, return zero
-	if len(result) == 0 {
-		return big.NewInt(0), nil
-	}
-
-	// Extract CumulativePayment
-	largestPaymentAttr, ok := result["CumulativePayment"]
-	if !ok {
-		return big.NewInt(0), nil
-	}
-
-	// Type assertion with check
-	largestPaymentNum, ok := largestPaymentAttr.(*types.AttributeValueMemberN)
-	if !ok {
-		return nil, fmt.Errorf("CumulativePayment has invalid type: %T", largestPaymentAttr)
-	}
-
-	payment := new(big.Int)
-	if _, success := payment.SetString(largestPaymentNum.Value, 10); !success {
-		return nil, fmt.Errorf("failed to parse payment value: %s", largestPaymentNum.Value)
-	}
-
-	return payment, nil
+	return new(big.Int).SetBytes(value), nil
 }
 
-func parsePeriodRecord(bin map[string]types.AttributeValue) (*pb.PeriodRecord, error) {
-	reservationPeriod, ok := bin["ReservationPeriod"]
-	if !ok {
-		return nil, errors.New("ReservationPeriod is not present in the response")
-	}
+func (s *OffchainStore) GetGlobalBinUsage(ctx context.Context, reservationPeriod uint64) (uint64, error) {
+	key := buildGlobalBinKey(reservationPeriod)
 
-	reservationPeriodAttr, ok := reservationPeriod.(*types.AttributeValueMemberN)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type for ReservationPeriod: %T", reservationPeriod)
-	}
-
-	reservationPeriodValue, err := strconv.ParseUint(reservationPeriodAttr.Value, 10, 32)
+	value, err := s.db.Get(key)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse ReservationPeriod: %w", err)
+		if errors.Is(err, kvstore.ErrNotFound) {
+			return 0, nil // Return 0 for non-existent keys
+		}
+		return 0, fmt.Errorf("failed to get global bin usage: %w", err)
 	}
 
-	binUsage, ok := bin["BinUsage"]
-	if !ok {
-		return nil, errors.New("BinUsage is not present in the response")
-	}
+	return binary.BigEndian.Uint64(value), nil
+}
 
-	binUsageAttr, ok := binUsage.(*types.AttributeValueMemberN)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type for BinUsage: %T", binUsage)
-	}
+func (s *OffchainStore) GetReservationBin(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64) (uint64, error) {
+	key := buildReservationKey(accountID, reservationPeriod)
 
-	binUsageValue, err := strconv.ParseUint(binUsageAttr.Value, 10, 32)
+	value, err := s.db.Get(key)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse BinUsage: %w", err)
+		if errors.Is(err, kvstore.ErrNotFound) {
+			return 0, nil // Return 0 for non-existent keys
+		}
+		return 0, fmt.Errorf("failed to get reservation bin: %w", err)
 	}
 
-	return &pb.PeriodRecord{
-		Index: uint32(reservationPeriodValue),
-		Usage: uint64(binUsageValue),
-	}, nil
+	return binary.BigEndian.Uint64(value), nil
+}
+
+func (s *OffchainStore) GetOnDemandPayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
+	key := buildOnDemandKey(accountID)
+
+	value, err := s.db.Get(key)
+	if err != nil {
+		if errors.Is(err, kvstore.ErrNotFound) {
+			return big.NewInt(0), nil // Return 0 for non-existent keys
+		}
+		return nil, fmt.Errorf("failed to get on-demand payment: %w", err)
+	}
+
+	return new(big.Int).SetBytes(value), nil
+}
+
+func (s *OffchainStore) GetGlobalBin(ctx context.Context, reservationPeriod uint64) (uint64, error) {
+	key := buildGlobalBinKey(reservationPeriod)
+
+	value, err := s.db.Get(key)
+	if err != nil {
+		if errors.Is(err, kvstore.ErrNotFound) {
+			return 0, nil // Return 0 for non-existent keys
+		}
+		return 0, fmt.Errorf("failed to get global bin: %w", err)
+	}
+
+	return binary.BigEndian.Uint64(value), nil
+}
+
+// Destroy shuts down and permanently deletes all data in the store
+func (s *OffchainStore) Destroy() error {
+	return s.db.Destroy()
 }

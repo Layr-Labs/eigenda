@@ -5,19 +5,14 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"strconv"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	commonaws "github.com/Layr-Labs/eigenda/common/aws"
-	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ory/dockertest/v3"
@@ -28,8 +23,6 @@ import (
 var (
 	dockertestPool           *dockertest.Pool
 	dockertestResource       *dockertest.Resource
-	dynamoClient             commondynamodb.Client
-	clientConfig             commonaws.ClientConfig
 	accountID1               gethcommon.Address
 	account1Reservations     *core.ReservedPayment
 	account1OnDemandPayments *core.OnDemandPayment
@@ -40,12 +33,8 @@ var (
 	account3Reservations     *core.ReservedPayment
 	mt                       *meterer.Meterer
 
-	deployLocalStack           bool
-	localStackPort             = "4566"
-	paymentChainState          = &mock.MockOnchainPaymentState{}
-	ondemandTableName          = "ondemand_meterer"
-	reservationTableName       = "reservations_meterer"
-	globalReservationTableName = "global_reservation_meterer"
+	deployLocalStack  bool
+	paymentChainState = &mock.MockOnchainPaymentState{}
 )
 
 func TestMain(m *testing.M) {
@@ -57,38 +46,25 @@ func TestMain(m *testing.M) {
 
 func setup(_ *testing.M) {
 
-	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
-	if !deployLocalStack {
-		localStackPort = os.Getenv("LOCALSTACK_PORT")
-	}
+	// deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	// if !deployLocalStack {
+	// 	localStackPort = os.Getenv("LOCALSTACK_PORT")
+	// }
 
-	if deployLocalStack {
-		var err error
-		dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
-		if err != nil {
-			teardown()
-			panic("failed to start localstack container")
-		}
-	}
+	// if deployLocalStack {
+	// 	var err error
+	// 	dockertestPool, dockertestResource, err = deploy.StartDockertestWithLocalstackContainer(localStackPort)
+	// 	if err != nil {
+	// 		teardown()
+	// 		panic("failed to start localstack container")
+	// 	}
+	// }
 
 	loggerConfig := common.DefaultLoggerConfig()
 	logger, err := common.NewLogger(loggerConfig)
 	if err != nil {
 		teardown()
 		panic("failed to create logger")
-	}
-
-	clientConfig = commonaws.ClientConfig{
-		Region:          "us-east-1",
-		AccessKey:       "localstack",
-		SecretAccessKey: "localstack",
-		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
-	}
-
-	dynamoClient, err = commondynamodb.NewClient(clientConfig, logger)
-	if err != nil {
-		teardown()
-		panic("failed to create dynamodb client")
 	}
 
 	privateKey1, err := crypto.GenerateKey()
@@ -107,26 +83,9 @@ func setup(_ *testing.M) {
 		panic("failed to generate private key")
 	}
 
-	logger = testutils.GetLogger()
 	config := meterer.Config{
 		ChainReadTimeout: 3 * time.Second,
 		UpdateInterval:   1 * time.Second,
-	}
-
-	err = meterer.CreateReservationTable(clientConfig, reservationTableName)
-	if err != nil {
-		teardown()
-		panic("failed to create reservation table")
-	}
-	err = meterer.CreateOnDemandTable(clientConfig, ondemandTableName)
-	if err != nil {
-		teardown()
-		panic("failed to create ondemand table")
-	}
-	err = meterer.CreateGlobalReservationTable(clientConfig, globalReservationTableName)
-	if err != nil {
-		teardown()
-		panic("failed to create global reservation table")
 	}
 
 	now := uint64(time.Now().Unix())
@@ -140,10 +99,7 @@ func setup(_ *testing.M) {
 	account2OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(2000)}
 
 	store, err := meterer.NewOffchainStore(
-		clientConfig,
-		reservationTableName,
-		ondemandTableName,
-		globalReservationTableName,
+		"./testdata/meterer_test",
 		logger,
 	)
 
@@ -172,6 +128,11 @@ func setup(_ *testing.M) {
 func teardown() {
 	if deployLocalStack {
 		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+	}
+
+	// Clean up the meterer test directory
+	if err := os.RemoveAll("./testdata/meterer_test"); err != nil {
+		fmt.Printf("Failed to remove testdata directory: %v\n", err)
 	}
 }
 
@@ -244,16 +205,11 @@ func TestMetererReservations(t *testing.T) {
 		header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
 		symbolsCharged, err := mt.MeterRequest(ctx, *header, symbolLength, quoromNumbers, now)
 		assert.NoError(t, err)
-		item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
-			"AccountID":         &types.AttributeValueMemberS{Value: accountID2.Hex()},
-			"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(reservationPeriod))},
-		})
+		item, err := mt.OffchainStore.GetReservationBin(ctx, accountID2, reservationPeriod)
 		assert.NotNil(t, item)
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(requiredLength), symbolsCharged)
-		assert.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
-		assert.Equal(t, strconv.Itoa(int(reservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
-		assert.Equal(t, strconv.Itoa((i+1)*int(requiredLength)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
+		assert.Equal(t, uint64((i+1)*int(requiredLength)), item)
 	}
 	// first over flow is allowed
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
@@ -261,15 +217,10 @@ func TestMetererReservations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(27), symbolsCharged)
 	overflowedReservationPeriod := reservationPeriod + 2
-	item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID2.Hex()},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(overflowedReservationPeriod))},
-	})
+	item, err := mt.OffchainStore.GetReservationBin(ctx, accountID2, overflowedReservationPeriod)
 	assert.NoError(t, err)
-	assert.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
-	assert.Equal(t, strconv.Itoa(int(overflowedReservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 	// 25 rounded up to the nearest multiple of minNumSymbols - (200-21*9) = 16
-	assert.Equal(t, strconv.Itoa(int(16)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
+	assert.Equal(t, uint64(16), item)
 
 	// second over flow
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
@@ -314,12 +265,9 @@ func TestMetererOnDemand(t *testing.T) {
 	_, err = mt.MeterRequest(ctx, *header, 1000, quorumNumbers, now)
 	assert.ErrorContains(t, err, "payment validation failed: payment charged is greater than cumulative payment")
 	// No record for invalid payment
-	result, err := dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
-		":account": &types.AttributeValueMemberS{
-			Value: accountID1.Hex(),
-		}})
+	result, err := mt.OffchainStore.GetOnDemandPayment(ctx, accountID1)
 	assert.NoError(t, err)
-	assert.Equal(t, 0, len(result))
+	assert.Equal(t, big.NewInt(0), result)
 
 	// test duplicated cumulative payments
 	symbolLength := uint64(100)
@@ -364,12 +312,9 @@ func TestMetererOnDemand(t *testing.T) {
 	_, err = mt.MeterRequest(ctx, *header, 50, quorumNumbers, now)
 	assert.ErrorContains(t, err, "insufficient cumulative payment increment")
 
-	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
-		":account": &types.AttributeValueMemberS{
-			Value: accountID2.Hex(),
-		}})
+	result, err = mt.OffchainStore.GetOnDemandPayment(ctx, accountID2)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(result))
+	assert.Equal(t, big.NewInt(1836), result)
 
 	// with rollback of invalid payments, users cannot cheat by inserting an invalid cumulative payment
 	symbolsCharged = mt.SymbolsCharged(uint64(30))
@@ -382,12 +327,9 @@ func TestMetererOnDemand(t *testing.T) {
 	_, err = mt.MeterRequest(ctx, *header, 1010, quorumNumbers, now)
 	assert.ErrorContains(t, err, "failed global rate limiting")
 	// Correct rollback
-	result, err = dynamoClient.Query(ctx, ondemandTableName, "AccountID = :account", commondynamodb.ExpressionValues{
-		":account": &types.AttributeValueMemberS{
-			Value: accountID2.Hex(),
-		}})
+	result, err = mt.OffchainStore.GetOnDemandPayment(ctx, accountID2)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(result))
+	assert.Equal(t, big.NewInt(1836), result)
 }
 
 func TestPaymentCharged(t *testing.T) {

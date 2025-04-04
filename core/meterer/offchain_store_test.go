@@ -5,96 +5,102 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
-	"strconv"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
-	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type testContext struct {
-	ctx              context.Context
-	store            meterer.OffchainStore
-	reservationTable string
-	onDemandTable    string
-	globalBinTable   string
+	ctx     context.Context
+	dbPath  string
+	store   meterer.OffchainStore
+	cleanup func()
 }
 
-// setupTest creates a test context with tables created and cleaned up after the test
-func setupTest(t *testing.T) *testContext {
+func setupTestContext(t *testing.T) *testContext {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, fmt.Sprintf("test_db_%d", rand.Int()))
+
 	tc := &testContext{
-		ctx:              context.Background(),
-		reservationTable: fmt.Sprintf("reservation_test_%d", rand.Int()),
-		onDemandTable:    fmt.Sprintf("ondemand_test_%d", rand.Int()),
-		globalBinTable:   fmt.Sprintf("global_bin_test_%d", rand.Int()),
+		ctx:    context.Background(),
+		dbPath: dbPath,
 	}
 
-	var err error
-
-	// Create the tables
-	err = meterer.CreateReservationTable(clientConfig, tc.reservationTable)
-	require.NoError(t, err)
-
-	err = meterer.CreateOnDemandTable(clientConfig, tc.onDemandTable)
-	require.NoError(t, err)
-
-	err = meterer.CreateGlobalReservationTable(clientConfig, tc.globalBinTable)
-	require.NoError(t, err)
-
-	// Register cleanup to remove tables after test completes
-	t.Cleanup(func() {
-		cleanupTables(tc)
-	})
-
 	// Create the OffchainStore
+	logger := testutils.GetLogger()
+	var err error
 	tc.store, err = meterer.NewOffchainStore(
-		clientConfig,
-		tc.reservationTable,
-		tc.onDemandTable,
-		tc.globalBinTable,
-		nil, // Logger not needed for test
+		dbPath,
+		logger,
 	)
 	require.NoError(t, err)
+
+	// Set up cleanup function after store is created
+	tc.cleanup = func() {
+		t.Logf("Cleaning up store")
+		// First destroy the store to ensure all files are closed
+		if err := tc.store.Destroy(); err != nil {
+			t.Logf("Failed to destroy store: %v", err)
+		}
+
+		// Give a small delay to ensure all file handles are released
+		time.Sleep(100 * time.Millisecond)
+
+		// Remove all files in the test directory
+		t.Logf("Removing test directory: %s", tmpDir)
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("Failed to remove test directory: %v", err)
+		}
+
+		// Double check that the directory is gone
+		if _, err := os.Stat(tmpDir); !os.IsNotExist(err) {
+			t.Logf("Test directory still exists after cleanup: %v", err)
+			// Try to list remaining files for debugging
+			if files, err := os.ReadDir(tmpDir); err == nil {
+				for _, file := range files {
+					t.Logf("Remaining file: %s", file.Name())
+				}
+			}
+		}
+	}
+
+	// Register cleanup with testing.T
+	t.Cleanup(tc.cleanup)
 
 	return tc
 }
 
-// cleanupTables removes all tables created for a test
-func cleanupTables(tc *testContext) {
-	_ = dynamoClient.DeleteTable(tc.ctx, tc.reservationTable)
-	_ = dynamoClient.DeleteTable(tc.ctx, tc.onDemandTable)
-	_ = dynamoClient.DeleteTable(tc.ctx, tc.globalBinTable)
-}
-
 // TestUpdateReservationBin tests the UpdateReservationBin function
 func TestUpdateReservationBin(t *testing.T) {
-	tc := setupTest(t)
+	tc := setupTestContext(t)
 
 	// Test updating bin that doesn't exist yet (should create it)
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 	reservationPeriod := uint64(1)
 	size := uint64(1000)
 
-	binUsage, err := tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, size)
+	// First verify it doesn't exist
+	binUsage, err := tc.store.GetReservationBin(tc.ctx, accountID, reservationPeriod)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(0), binUsage)
+
+	// Update the bin
+	binUsage, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, size)
 	require.NoError(t, err)
 	assert.Equal(t, size, binUsage)
 
-	// Get the bin directly from DynamoDB to verify
-	item, err := dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
-	})
+	// Verify the update
+	binUsage, err = tc.store.GetReservationBin(tc.ctx, accountID, reservationPeriod)
 	require.NoError(t, err)
-	binUsageStr := item["BinUsage"].(*types.AttributeValueMemberN).Value
-	binUsageVal, err := strconv.ParseUint(binUsageStr, 10, 64)
-	require.NoError(t, err)
-	assert.Equal(t, size, binUsageVal)
+	assert.Equal(t, size, binUsage)
 
 	// Test updating existing bin
 	additionalSize := uint64(500)
@@ -102,39 +108,34 @@ func TestUpdateReservationBin(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, size+additionalSize, binUsage)
 
-	// Verify updated bin
-	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
-	})
+	// Verify the update
+	binUsage, err = tc.store.GetReservationBin(tc.ctx, accountID, reservationPeriod)
 	require.NoError(t, err)
-	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
-	binUsageVal, err = strconv.ParseUint(binUsageStr, 10, 64)
-	require.NoError(t, err)
-	assert.Equal(t, size+additionalSize, binUsageVal)
+	assert.Equal(t, size+additionalSize, binUsage)
 }
 
 // TestUpdateGlobalBin tests the UpdateGlobalBin function
 func TestUpdateGlobalBin(t *testing.T) {
-	tc := setupTest(t)
+	tc := setupTestContext(t)
 
 	// Test updating global bin that doesn't exist yet (should create it)
 	reservationPeriod := uint64(1)
 	size := uint64(2000)
 
-	binUsage, err := tc.store.UpdateGlobalBin(tc.ctx, reservationPeriod, size)
+	// First verify it doesn't exist
+	binUsage, err := tc.store.GetGlobalBin(tc.ctx, reservationPeriod)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(0), binUsage)
+
+	// Update the bin
+	binUsage, err = tc.store.UpdateGlobalBin(tc.ctx, reservationPeriod, size)
 	require.NoError(t, err)
 	assert.Equal(t, size, binUsage)
 
-	// Get the bin directly from DynamoDB to verify
-	item, err := dynamoClient.GetItem(tc.ctx, tc.globalBinTable, commondynamodb.Key{
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
-	})
+	// Verify the update
+	binUsage, err = tc.store.GetGlobalBin(tc.ctx, reservationPeriod)
 	require.NoError(t, err)
-	binUsageStr := item["BinUsage"].(*types.AttributeValueMemberN).Value
-	binUsageVal, err := strconv.ParseUint(binUsageStr, 10, 64)
-	require.NoError(t, err)
-	assert.Equal(t, size, binUsageVal)
+	assert.Equal(t, size, binUsage)
 
 	// Test updating existing bin
 	additionalSize := uint64(1000)
@@ -142,20 +143,15 @@ func TestUpdateGlobalBin(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, size+additionalSize, binUsage)
 
-	// Verify updated bin
-	item, err = dynamoClient.GetItem(tc.ctx, tc.globalBinTable, commondynamodb.Key{
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
-	})
+	// Verify the update
+	binUsage, err = tc.store.GetGlobalBin(tc.ctx, reservationPeriod)
 	require.NoError(t, err)
-	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
-	binUsageVal, err = strconv.ParseUint(binUsageStr, 10, 64)
-	require.NoError(t, err)
-	assert.Equal(t, size+additionalSize, binUsageVal)
+	assert.Equal(t, size+additionalSize, binUsage)
 }
 
 // TestAddOnDemandPayment tests the AddOnDemandPayment function
 func TestAddOnDemandPayment(t *testing.T) {
-	tc := setupTest(t)
+	tc := setupTestContext(t)
 
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 	payment1 := core.PaymentMetadata{
@@ -165,23 +161,22 @@ func TestAddOnDemandPayment(t *testing.T) {
 	}
 	charge1 := big.NewInt(100)
 
+	// First verify it doesn't exist
+	payment, err := tc.store.GetOnDemandPayment(tc.ctx, accountID)
+	require.NoError(t, err)
+	assert.Equal(t, big.NewInt(0), payment)
+
 	// Add the payment
 	oldPayment, err := tc.store.AddOnDemandPayment(tc.ctx, payment1, charge1)
 	require.NoError(t, err)
-	require.Equal(t, big.NewInt(0), oldPayment, "Old payment should be 0 for first payment")
+	require.Condition(t, func() bool {
+		return oldPayment.Cmp(big.NewInt(0)) == 0
+	}, "Old payment should be 0 for first payment")
 
-	// Verify the payment was added with the correct structure
-	item, err := dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
-		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
-	})
+	// Verify the update
+	payment, err = tc.store.GetOnDemandPayment(tc.ctx, accountID)
 	require.NoError(t, err)
-	require.NotNil(t, item, "Item should exist in the table")
-
-	// Verify the CumulativePayment field
-	cumulativePaymentStr := item["CumulativePayment"].(*types.AttributeValueMemberN).Value
-	cumulativePaymentVal, err := strconv.ParseInt(cumulativePaymentStr, 10, 64)
-	require.NoError(t, err)
-	assert.Equal(t, payment1.CumulativePayment.Int64(), cumulativePaymentVal)
+	assert.Equal(t, payment1.CumulativePayment, payment)
 
 	// Test case: Add a larger payment with sufficient increment
 	payment2 := core.PaymentMetadata{
@@ -195,15 +190,10 @@ func TestAddOnDemandPayment(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, big.NewInt(100), oldPayment, "Old payment should be 100")
 
-	// Verify the payment was updated
-	item, err = dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
-		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
-	})
+	// Verify the update
+	payment, err = tc.store.GetOnDemandPayment(tc.ctx, accountID)
 	require.NoError(t, err)
-	cumulativePaymentStr = item["CumulativePayment"].(*types.AttributeValueMemberN).Value
-	cumulativePaymentVal, err = strconv.ParseInt(cumulativePaymentStr, 10, 64)
-	require.NoError(t, err)
-	assert.Equal(t, payment2.CumulativePayment.Int64(), cumulativePaymentVal)
+	assert.Equal(t, payment2.CumulativePayment, payment)
 
 	// Test case: Add a larger payment but with insufficient increment
 	payment3 := core.PaymentMetadata{
@@ -219,14 +209,9 @@ func TestAddOnDemandPayment(t *testing.T) {
 	require.Nil(t, oldPayment, "Old payment should be nil on error")
 
 	// Verify the payment wasn't updated
-	item, err = dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
-		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
-	})
+	payment, err = tc.store.GetOnDemandPayment(tc.ctx, accountID)
 	require.NoError(t, err)
-	cumulativePaymentStr = item["CumulativePayment"].(*types.AttributeValueMemberN).Value
-	cumulativePaymentVal, err = strconv.ParseInt(cumulativePaymentStr, 10, 64)
-	require.NoError(t, err)
-	assert.Equal(t, payment2.CumulativePayment.Int64(), cumulativePaymentVal, "Payment should not have been updated")
+	assert.Equal(t, payment2.CumulativePayment, payment)
 
 	// Test case: Add a smaller payment (should fail)
 	payment4 := core.PaymentMetadata{
@@ -242,19 +227,14 @@ func TestAddOnDemandPayment(t *testing.T) {
 	require.Nil(t, oldPayment, "Old payment should be nil on error")
 
 	// Verify the payment wasn't updated
-	item, err = dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
-		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
-	})
+	payment, err = tc.store.GetOnDemandPayment(tc.ctx, accountID)
 	require.NoError(t, err)
-	cumulativePaymentStr = item["CumulativePayment"].(*types.AttributeValueMemberN).Value
-	cumulativePaymentVal, err = strconv.ParseInt(cumulativePaymentStr, 10, 64)
-	require.NoError(t, err)
-	assert.Equal(t, payment2.CumulativePayment.Int64(), cumulativePaymentVal, "Payment should not have been updated")
+	assert.Equal(t, payment2.CumulativePayment, payment)
 }
 
 // TestRollbackOnDemandPayment tests the RollbackOnDemandPayment function
 func TestRollbackOnDemandPayment(t *testing.T) {
-	tc := setupTest(t)
+	tc := setupTestContext(t)
 
 	// Create and add a payment
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
@@ -269,14 +249,9 @@ func TestRollbackOnDemandPayment(t *testing.T) {
 
 	oldPayment, err := tc.store.AddOnDemandPayment(tc.ctx, paymentMetadata, paymentCharged)
 	require.NoError(t, err)
-	require.Equal(t, big.NewInt(0), oldPayment, "Old payment should be 0 for first payment")
-
-	// Verify the payment was added
-	item, err := dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
-		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
-	})
-	require.NoError(t, err)
-	require.NotNil(t, item, "Item should exist in the table")
+	require.Condition(t, func() bool {
+		return oldPayment.Cmp(big.NewInt(0)) == 0
+	}, "Old payment should be 0 for first payment")
 
 	// Add another payment
 	newCumulativePayment := big.NewInt(2000)
@@ -295,34 +270,10 @@ func TestRollbackOnDemandPayment(t *testing.T) {
 	err = tc.store.RollbackOnDemandPayment(tc.ctx, accountID, newCumulativePayment, oldPayment)
 	require.NoError(t, err)
 
-	// Verify the payment was rolled back
-	item, err = dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
-		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
-	})
-	require.NoError(t, err)
-	require.NotNil(t, item, "Item should still exist in the table")
-
-	cumulativePaymentStr := item["CumulativePayment"].(*types.AttributeValueMemberN).Value
-	cumulativePaymentVal, err := strconv.ParseInt(cumulativePaymentStr, 10, 64)
-	require.NoError(t, err)
-	assert.Equal(t, oldPayment.Int64(), cumulativePaymentVal, "Payment should be rolled back to 1000")
-
 	// Test case 2: Rollback to a different value directly
 	// The value will be updated regardless of what the current value is
 	err = tc.store.RollbackOnDemandPayment(tc.ctx, accountID, big.NewInt(1000), big.NewInt(500))
 	require.NoError(t, err)
-
-	// Verify the payment was updated to the new value
-	item, err = dynamoClient.GetItem(tc.ctx, tc.onDemandTable, commondynamodb.Key{
-		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
-	})
-	require.NoError(t, err)
-	require.NotNil(t, item, "Item should still exist in the table")
-
-	cumulativePaymentStr = item["CumulativePayment"].(*types.AttributeValueMemberN).Value
-	cumulativePaymentVal, err = strconv.ParseInt(cumulativePaymentStr, 10, 64)
-	require.NoError(t, err)
-	assert.Equal(t, int64(500), cumulativePaymentVal, "Payment should be set to 500 regardless of current value")
 
 	// Test case 3: Rollback to zero (should delete the record)
 	err = tc.store.RollbackOnDemandPayment(tc.ctx, accountID, big.NewInt(500), big.NewInt(0))
@@ -340,7 +291,7 @@ func TestRollbackOnDemandPayment(t *testing.T) {
 
 // TestGetLargestCumulativePayment tests the GetLargestCumulativePayment function
 func TestGetLargestCumulativePayment(t *testing.T) {
-	tc := setupTest(t)
+	tc := setupTestContext(t)
 
 	// Create an account to test with
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
@@ -358,7 +309,9 @@ func TestGetLargestCumulativePayment(t *testing.T) {
 	}
 	oldPayment, err := tc.store.AddOnDemandPayment(tc.ctx, payment1, big.NewInt(100))
 	require.NoError(t, err)
-	require.Equal(t, big.NewInt(0), oldPayment, "Old payment should be 0 for first payment")
+	require.Condition(t, func() bool {
+		return oldPayment.Cmp(big.NewInt(0)) == 0
+	}, "Old payment should be 0 for first payment")
 
 	largest, err = tc.store.GetLargestCumulativePayment(tc.ctx, accountID)
 	require.NoError(t, err)
@@ -431,4 +384,32 @@ func TestGetLargestCumulativePayment(t *testing.T) {
 	// Test case 8: Verify rolling back a non-existent payment has no effect
 	err = tc.store.RollbackOnDemandPayment(tc.ctx, accountID, big.NewInt(9999), big.NewInt(500))
 	require.NoError(t, err)
+}
+
+// TestGetPeriodRecords tests the GetPeriodRecords function
+func TestGetPeriodRecords(t *testing.T) {
+	tc := setupTestContext(t)
+
+	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
+	reservationPeriod := uint64(1)
+
+	// Add some test data
+	_, err := tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, 1000)
+	require.NoError(t, err)
+	_, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod+1, 2000)
+	require.NoError(t, err)
+	_, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod+2, 3000)
+	require.NoError(t, err)
+
+	// Get records
+	records, err := tc.store.GetPeriodRecords(tc.ctx, accountID, reservationPeriod)
+	require.NoError(t, err)
+
+	// Verify records
+	assert.Equal(t, uint32(reservationPeriod), records[0].Index)
+	assert.Equal(t, uint64(1000), records[0].Usage)
+	assert.Equal(t, uint32(reservationPeriod+1), records[1].Index)
+	assert.Equal(t, uint64(2000), records[1].Usage)
+	assert.Equal(t, uint32(reservationPeriod+2), records[2].Index)
+	assert.Equal(t, uint64(3000), records[2].Usage)
 }

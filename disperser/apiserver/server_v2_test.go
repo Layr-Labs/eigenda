@@ -501,33 +501,14 @@ func newTestServerV2(t *testing.T) *testComponents {
 	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
-	table_names := []string{"reservations_server_" + t.Name(), "ondemand_server_" + t.Name(), "global_server_" + t.Name()}
-	err = meterer.CreateReservationTable(awsConfig, table_names[0])
-	if err != nil {
-		teardown()
-		panic("failed to create reservation table")
-	}
-	err = meterer.CreateOnDemandTable(awsConfig, table_names[1])
-	if err != nil {
-		teardown()
-		panic("failed to create ondemand table")
-	}
-	err = meterer.CreateGlobalReservationTable(awsConfig, table_names[2])
-	if err != nil {
-		teardown()
-		panic("failed to create global reservation table")
-	}
 
 	store, err := meterer.NewOffchainStore(
-		awsConfig,
-		table_names[0],
-		table_names[1],
-		table_names[2],
+		"./testdata/server_v2_test_"+t.Name(),
 		logger,
 	)
 	if err != nil {
 		teardown()
-		panic("failed to create offchain store")
+		panic("failed to create offchain store: " + err.Error())
 	}
 	meterer := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
 

@@ -89,23 +89,11 @@ var (
 		Usage:  "enable rate limiter",
 		EnvVar: common.PrefixEnvVar(envVarPrefix, "ENABLE_RATELIMITER"),
 	}
-	ReservationsTableName = cli.StringFlag{
-		Name:   common.PrefixFlag(FlagPrefix, "reservations-table-name"),
-		Usage:  "name of the dynamodb table to store reservation usages",
-		Value:  "reservations",
-		EnvVar: common.PrefixEnvVar(envVarPrefix, "RESERVATIONS_TABLE_NAME"),
-	}
-	OnDemandTableName = cli.StringFlag{
-		Name:   common.PrefixFlag(FlagPrefix, "on-demand-table-name"),
-		Usage:  "name of the dynamodb table to store on-demand payments",
-		Value:  "on_demand",
-		EnvVar: common.PrefixEnvVar(envVarPrefix, "ON_DEMAND_TABLE_NAME"),
-	}
-	GlobalRateTableName = cli.StringFlag{
-		Name:   common.PrefixFlag(FlagPrefix, "global-rate-table-name"),
-		Usage:  "name of the dynamodb table to store global rate usage. If not provided, a local store will be used",
-		Value:  "global_rate",
-		EnvVar: common.PrefixEnvVar(envVarPrefix, "GLOBAL_RATE_TABLE_NAME"),
+	PaymentDBPath = cli.StringFlag{
+		Name:   common.PrefixFlag(FlagPrefix, "payment-db-path"),
+		Usage:  "path to the payment db",
+		Value:  "payment.db",
+		EnvVar: common.PrefixEnvVar(envVarPrefix, "PAYMENT_DB_PATH"),
 	}
 	ChainReadTimeout = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "chain-read-timeout"),
@@ -262,9 +250,7 @@ var optionalFlags = []cli.Flag{
 	BucketStoreSize,
 	GrpcTimeoutFlag,
 	MaxBlobSize,
-	ReservationsTableName,
-	OnDemandTableName,
-	GlobalRateTableName,
+	PaymentDBPath,
 	OnchainStateRefreshInterval,
 	MaxNumSymbolsPerBlob,
 	PprofHttpPort,

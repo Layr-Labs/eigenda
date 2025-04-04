@@ -112,10 +112,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		}
 
 		offchainStore, err := mt.NewOffchainStore(
-			config.AwsClientConfig,
-			config.ReservationsTableName,
-			config.OnDemandTableName,
-			config.GlobalRateTableName,
+			config.PaymentDBPath,
 			logger,
 		)
 		if err != nil {
