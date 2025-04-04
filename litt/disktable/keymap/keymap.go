@@ -2,6 +2,7 @@ package keymap
 
 import (
 	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 // KeymapDirectoryName is the name of the directory where the keymap stores its files.
@@ -41,3 +42,6 @@ type Keymap interface {
 	// Destroy stops the keymap and permanently deletes all data.
 	Destroy() error
 }
+
+// KeymapBuilder is a function that builds a Keymap.
+type KeymapBuilder func(logger logging.Logger, keymapPath string, doubleWriteProtection bool) (Keymap, bool, error)

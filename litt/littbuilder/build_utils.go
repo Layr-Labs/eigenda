@@ -24,9 +24,9 @@ import (
 
 // keymapBuilders contains builders for all supported keymap types.
 var keymapBuilders = map[keymap.KeymapType]keymap.KeymapBuilder{
-	keymap.MemKeymapType:           keymap.NewMemKeymapBuilder(),
-	keymap.LevelDBKeymapType:       keymap.NewLevelDBKeymapBuilder(),
-	keymap.UnsafeLevelDBKeymapType: keymap.NewUnsafeLevelDBKeymapBuilder(),
+	keymap.MemKeymapType:           keymap.MemKeymapBuilder,
+	keymap.LevelDBKeymapType:       keymap.LevelDBKeymapBuilder,
+	keymap.UnsafeLevelDBKeymapType: keymap.UnsafeLevelDBKeymapBuilder,
 }
 
 // cacheWeight is a function that calculates the weight of a cache entry.
@@ -145,7 +145,7 @@ func buildKeymap(
 	}
 
 	keymapDataDirectory := path.Join(keymapDirectory, keymap.KeymapDataDirectoryName)
-	kmap, requiresReload, err = builderForConfiguredType.Build(logger, keymapDataDirectory, config.DoubleWriteProtection)
+	kmap, requiresReload, err = builderForConfiguredType(logger, keymapDataDirectory, config.DoubleWriteProtection)
 	if err != nil {
 		return nil, "", nil, false,
 			fmt.Errorf("error building keymap: %w", err)

@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -26,6 +27,64 @@ type LevelDBKeymap struct {
 	// is critical. Unit tests write lots of little values, and syncing each one is slow, so it may be desirable
 	// to set this to false in some tests.
 	syncWrites bool
+}
+
+// LevelDBKeymapBuilder is a KeymapBuilder that builds LevelDBKeymap instances.
+var LevelDBKeymapBuilder KeymapBuilder = func(
+	logger logging.Logger,
+	keymapPath string,
+	doubleWriteProtection bool,
+) (Keymap, bool, error) {
+
+	// check to see if the keymap directory exists in one of the provided paths
+	exists, err := util.Exists(keymapPath)
+	if err != nil {
+		return nil, false, fmt.Errorf("error checking for keymap directory: %w", err)
+	}
+
+	if !exists {
+		err = os.MkdirAll(keymapPath, 0755)
+		if err != nil {
+			return nil, false, fmt.Errorf("error creating keymap directory: %w", err)
+		}
+	}
+
+	keymap, err := NewLevelDBKeymap(logger, keymapPath, doubleWriteProtection)
+	if err != nil {
+		return nil, false, fmt.Errorf("error creating LevelDBKeymap: %w", err)
+	}
+
+	requiresReload := !exists
+	return keymap, requiresReload, nil
+}
+
+// UnsafeLevelDBKeymapBuilder is a KeymapBuilder that builds test only LevelDBKeymap instances.
+var UnsafeLevelDBKeymapBuilder KeymapBuilder = func(
+	logger logging.Logger,
+	keymapPath string,
+	doubleWriteProtection bool,
+) (Keymap, bool, error) {
+
+	// check to see if the keymap directory exists in one of the provided paths
+	exists, err := util.Exists(keymapPath)
+	if err != nil {
+		return nil, false, fmt.Errorf("error checking for keymap directory: %w", err)
+	}
+
+	if !exists {
+		err = os.MkdirAll(keymapPath, 0755)
+		if err != nil {
+			return nil, false, fmt.Errorf("error creating keymap directory: %w", err)
+		}
+	}
+
+	keymap, err := NewUnsafeLevelDBKeymap(logger, keymapPath, doubleWriteProtection)
+	if err != nil {
+		return nil, false, fmt.Errorf("error creating LevelDBKeymap: %w", err)
+	}
+
+	requiresReload := !exists
+	return keymap, requiresReload, nil
 }
 
 // NewLevelDBKeymap creates a new LevelDBKeymap instance.
