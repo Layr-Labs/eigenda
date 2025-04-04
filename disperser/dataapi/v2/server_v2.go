@@ -67,8 +67,8 @@ type (
 	}
 
 	SignedBatch struct {
-		BatchHeader *corev2.BatchHeader `json:"batch_header"`
-		Attestation *corev2.Attestation `json:"attestation"`
+		BatchHeader     *corev2.BatchHeader `json:"batch_header"`
+		AttestationInfo *AttestationInfo    `json:"attestation_info"`
 	}
 
 	BlobResponse struct {
