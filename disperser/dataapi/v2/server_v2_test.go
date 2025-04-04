@@ -1272,12 +1272,6 @@ func TestFetchBatch(t *testing.T) {
 	err = blobMetadataStore.PutAttestation(context.Background(), attestation)
 	require.NoError(t, err)
 
-	dk := commondynamodb.Key{
-		"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
-		"SK": &types.AttributeValueMemberS{Value: "Attestation"},
-	}
-	defer deleteItems(t, []commondynamodb.Key{dk})
-
 	mockTx.On("BatchOperatorIDToAddress").Return(
 		func(ids []core.OperatorID) []gethcommon.Address {
 			result := make([]gethcommon.Address, len(ids))
@@ -1391,6 +1385,19 @@ func TestFetchBatch(t *testing.T) {
 		require.True(t, exists)
 		assert.ElementsMatch(t, expectedNonsigners, actualNonsigners)
 	}
+
+	mockTx.ExpectedCalls = nil
+	mockTx.Calls = nil
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
+			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		},
+	})
 }
 
 func TestFetchBatchFeed(t *testing.T) {
