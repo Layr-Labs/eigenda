@@ -1080,3 +1080,8 @@ func contextError(err error) error {
 
 	return nil
 }
+
+// GetMeterer returns the meterer instance
+func (s *DispersalServer) GetMeterer() *meterer.Meterer {
+	return s.meterer
+}

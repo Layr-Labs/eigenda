@@ -278,3 +278,8 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged ui
 func (m *Meterer) GetReservationBinLimit(reservation *core.ReservedPayment, reservationWindow uint64) uint64 {
 	return reservation.SymbolsPerSecond * reservationWindow
 }
+
+// GetOffchainStore returns the offchain store instance
+func (m *Meterer) GetOffchainStore() OffchainStore {
+	return m.OffchainStore
+}

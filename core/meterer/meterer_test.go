@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
@@ -34,11 +33,8 @@ var (
 	account3Reservations     *core.ReservedPayment
 	mt                       *meterer.Meterer
 
-	deployLocalStack           bool
-	paymentChainState          = &mock.MockOnchainPaymentState{}
-	ondemandTableName          = "ondemand_meterer"
-	reservationTableName       = "reservations_meterer"
-	globalReservationTableName = "global_reservation_meterer"
+	deployLocalStack  bool
+	paymentChainState = &mock.MockOnchainPaymentState{}
 )
 
 func TestMain(m *testing.M) {
@@ -87,7 +83,6 @@ func setup(_ *testing.M) {
 		panic("failed to generate private key")
 	}
 
-	logger = testutils.GetLogger()
 	config := meterer.Config{
 		ChainReadTimeout: 3 * time.Second,
 		UpdateInterval:   1 * time.Second,
@@ -104,7 +99,7 @@ func setup(_ *testing.M) {
 	account2OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(2000)}
 
 	store, err := meterer.NewOffchainStore(
-		"testdata/payment.db",
+		"./testdata/meterer_test",
 		logger,
 	)
 
