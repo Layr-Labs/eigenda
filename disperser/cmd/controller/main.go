@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/indexer"
@@ -35,6 +37,10 @@ var (
 	version   string
 	gitCommit string
 	gitDate   string
+
+	controllerReadinessProbePath string        = "/tmp/controller-ready"
+	controllerHealthProbePath    string        = "/tmp/controller-health"
+	controllerMaxStallDuration   time.Duration = 240 * time.Second
 )
 
 func main() {
@@ -50,6 +56,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("application failed: %v", err)
 	}
+
+	if _, err := os.Create(controllerHealthProbePath); err != nil {
+		log.Printf("Failed to create healthProbe file: %v", err)
+	}
+
+	controllerLivenessChan := make(chan healthcheck.HeartbeatMessage, 10)
+	// Start heartbeat monitor
+	go healthcheck.HeartbeatMonitor(controllerHealthProbePath, controllerMaxStallDuration, controllerLivenessChan)
+
 	select {}
 }
 
@@ -62,6 +77,11 @@ func RunController(ctx *cli.Context) error {
 	logger, err := common.NewLogger(config.LoggerConfig)
 	if err != nil {
 		return err
+	}
+
+	// Reset readiness probe upon start-up
+	if err := os.Remove(controllerReadinessProbePath); err != nil {
+		logger.Warn("Failed to clean up readiness file", "error", err, "path", controllerReadinessProbePath)
 	}
 
 	dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
@@ -100,6 +120,8 @@ func RunController(ctx *cli.Context) error {
 		Handler: mux,
 	}
 
+	controllerLivenessChan := make(chan healthcheck.HeartbeatMessage, 10)
+
 	encoderClient, err := encoder.NewEncoderClientV2(config.EncodingManagerConfig.EncoderAddress)
 	if err != nil {
 		return fmt.Errorf("failed to create encoder client: %v", err)
@@ -115,6 +137,7 @@ func RunController(ctx *cli.Context) error {
 		logger,
 		metricsRegistry,
 		encodingManagerBlobSet,
+		func() { healthcheck.SignalHeartbeat("encodingManager", controllerLivenessChan, logger) },
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create encoding manager: %v", err)
@@ -188,6 +211,7 @@ func RunController(ctx *cli.Context) error {
 		metricsRegistry,
 		beforeDispatch,
 		dispatcherBlobSet,
+		func() { healthcheck.SignalHeartbeat("dispatcher", controllerLivenessChan, logger) },
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)
@@ -216,6 +240,11 @@ func RunController(ctx *cli.Context) error {
 			logger.Errorf("metrics metricsServer error: %v", err)
 		}
 	}()
+
+	// Create readiness probe file once the controller starts successfully
+	if _, err := os.Create(controllerReadinessProbePath); err != nil {
+		logger.Warn("Failed to create readiness file", "error", err, "path", controllerReadinessProbePath)
+	}
 
 	return nil
 }
