@@ -503,12 +503,12 @@ func newTestServerV2(t *testing.T) *testComponents {
 	}
 
 	store, err := meterer.NewOffchainStore(
-		"server_v2_test",
+		"./testdata/server_v2_test_"+t.Name(),
 		logger,
 	)
 	if err != nil {
 		teardown()
-		panic("failed to create offchain store")
+		panic("failed to create offchain store: " + err.Error())
 	}
 	meterer := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
 

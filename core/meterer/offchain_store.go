@@ -150,6 +150,7 @@ func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod u
 
 func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, paymentCharged *big.Int) (*big.Int, error) {
 	key := buildOnDemandKey(paymentMetadata.AccountID)
+	s.logger.Info("processing on-demand payment", "accountID", paymentMetadata.AccountID, "paymentCharged", paymentCharged)
 
 	// Create a batch for atomic updates
 	batch := s.db.NewBatch()
@@ -158,26 +159,41 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 	value, err := s.db.Get(key)
 	if err != nil {
 		if errors.Is(err, kvstore.ErrNotFound) {
+			s.logger.Info("no existing payment found, creating new entry", "accountID", paymentMetadata.AccountID)
 			// If not found, create new entry
 			batch.Put(key, paymentMetadata.CumulativePayment.Bytes())
 			if err := batch.Apply(); err != nil {
+				s.logger.Error("failed to apply batch for new payment", "error", err)
 				return nil, fmt.Errorf("failed to apply batch: %w", err)
 			}
 			value = make([]byte, 32)
 			copy(value, big.NewInt(0).Bytes())
-			return big.NewInt(0), nil
+			// return big.NewInt(0), nil
+		} else {
+			s.logger.Error("failed to get payment", "error", err)
+			return nil, fmt.Errorf("failed to get payment: %w", err)
+
 		}
-		return nil, fmt.Errorf("failed to get payment: %w", err)
 	}
 
 	// Validate payment increment first
 	oldPayment := new(big.Int).SetBytes(value)
 	paymentCheckpoint := new(big.Int).Sub(paymentMetadata.CumulativePayment, paymentCharged)
+	s.logger.Info("validating payment increment",
+		"oldPayment", oldPayment,
+		"paymentCheckpoint", paymentCheckpoint,
+		"cumulativePayment", paymentMetadata.CumulativePayment,
+		"paymentCharged", paymentCharged)
 
 	if paymentCheckpoint.Sign() < 0 {
+		s.logger.Warn("payment charged exceeds cumulative payment",
+			"paymentCheckpoint", paymentCheckpoint,
+			"paymentCharged", paymentCharged)
 		if oldPayment.Cmp(big.NewInt(0)) == 0 {
+			s.logger.Info("deleting zero payment entry")
 			batch.Delete(key)
 			if err := batch.Apply(); err != nil {
+				s.logger.Error("failed to apply batch for deletion", "error", err)
 				return nil, fmt.Errorf("failed to apply batch: %w", err)
 			}
 		}
@@ -185,9 +201,14 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 	}
 
 	if oldPayment.Cmp(paymentCheckpoint) > 0 {
+		s.logger.Warn("insufficient cumulative payment increment",
+			"oldPayment", oldPayment,
+			"paymentCheckpoint", paymentCheckpoint)
 		if oldPayment.Cmp(big.NewInt(0)) == 0 {
+			s.logger.Info("deleting zero payment entry")
 			batch.Delete(key)
 			if err := batch.Apply(); err != nil {
+				s.logger.Error("failed to apply batch for deletion", "error", err)
 				return nil, fmt.Errorf("failed to apply batch: %w", err)
 			}
 		}
@@ -195,13 +216,19 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 	}
 
 	// Only store after validation
+	s.logger.Info("storing validated payment",
+		"cumulativePayment", paymentMetadata.CumulativePayment)
 	batch.Put(key, paymentMetadata.CumulativePayment.Bytes())
 
 	// Apply the batch atomically
 	if err := batch.Apply(); err != nil {
+		s.logger.Error("failed to apply batch for payment update", "error", err)
 		return nil, fmt.Errorf("failed to apply batch: %w", err)
 	}
 
+	s.logger.Info("successfully processed payment",
+		"oldPayment", oldPayment,
+		"newPayment", paymentMetadata.CumulativePayment)
 	return oldPayment, nil
 }
 
@@ -340,4 +367,9 @@ func (s *OffchainStore) GetGlobalBin(ctx context.Context, reservationPeriod uint
 	}
 
 	return binary.BigEndian.Uint64(value), nil
+}
+
+// Destroy shuts down and permanently deletes all data in the store
+func (s *OffchainStore) Destroy() error {
+	return s.db.Destroy()
 }

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"flag"
 	"fmt"
+	"log"
 	"math"
 	"math/big"
 	"net"
@@ -708,12 +709,25 @@ func setup() {
 	}
 }
 
+// cleanupStore cleans up the LevelDB store by destroying it
+func cleanupStore(store meterer.OffchainStore) error {
+	return store.Destroy()
+}
+
 func teardown() {
 	if deployLocalStack {
 		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
 	}
 	if allowlistFile != nil {
 		_ = os.Remove(allowlistFile.Name())
+	}
+	if dispersalServer != nil {
+		meterer := dispersalServer.GetMeterer()
+		if meterer != nil {
+			if err := cleanupStore(meterer.GetOffchainStore()); err != nil {
+				log.Printf("Failed to cleanup store: %v", err)
+			}
+		}
 	}
 }
 
@@ -728,10 +742,12 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	}
 	s3Client, err := s3.NewClient(context.Background(), awsConfig, logger)
 	if err != nil {
+		logger.Error("failed to create s3 client", "error", err)
 		panic("failed to create s3 client")
 	}
 	dynamoClient, err := dynamodb.NewClient(awsConfig, logger)
 	if err != nil {
+		logger.Error("failed to create dynamoDB client", "error", err)
 		panic("failed to create dynamoDB client")
 	}
 	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName, time.Hour)
@@ -770,12 +786,13 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	}, nil)
 
 	store, err := meterer.NewOffchainStore(
-		"server_test",
+		"./testdata/server_test_"+testName,
 		logger,
 	)
 	if err != nil {
+		logger.Error("failed to create offchain store", "error", err)
 		teardown()
-		panic("failed to create offchain store")
+		panic("failed to create offchain store: " + err.Error())
 	}
 	mt := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
 	err = mt.ChainPaymentState.RefreshOnchainPaymentState(context.Background())

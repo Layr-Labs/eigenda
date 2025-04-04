@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -34,10 +35,11 @@ func setupTest(t *testing.T) *testContext {
 	}
 
 	// Create the OffchainStore
+	logger := testutils.GetLogger()
 	var err error
 	tc.store, err = meterer.NewOffchainStore(
 		dbPath,
-		nil, // Logger not needed for test
+		logger,
 	)
 	require.NoError(t, err)
 
