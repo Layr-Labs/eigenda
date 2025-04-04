@@ -381,10 +381,6 @@ func (d *DiskTable) reloadKeymap() error {
 	if err != nil {
 		return fmt.Errorf("failed to create keymap initialized file: %v", err)
 	}
-	err = f.Sync()
-	if err != nil {
-		return fmt.Errorf("failed to sync keymap initialized file: %v", err)
-	}
 	err = f.Close()
 	if err != nil {
 		return fmt.Errorf("failed to close keymap initialized file: %v", err)
