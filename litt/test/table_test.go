@@ -128,7 +128,10 @@ func buildMemKeyDiskTable(
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
 	}
 
-	keys := keymap.NewMemKeymap(logger, true)
+	keys, _, err := keymap.NewMemKeymap(logger, "", true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create keymap: %w", err)
+	}
 
 	config, err := litt.DefaultConfig(path)
 	if err != nil {
@@ -176,7 +179,7 @@ func buildLevelDBKeyDiskTable(
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
 	}
 
-	keys, err := keymap.NewUnsafeLevelDBKeymap(logger, keymapPath, true)
+	keys, _, err := keymap.NewUnsafeLevelDBKeymap(logger, keymapPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create keymap: %w", err)
 	}

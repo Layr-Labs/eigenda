@@ -21,11 +21,21 @@ var builders = []keymapBuilder{
 type keymapBuilder func(logger logging.Logger, path string) (Keymap, error)
 
 func buildMemKeymap(logger logging.Logger, path string) (Keymap, error) {
-	return NewMemKeymap(logger, true), nil
+	kmap, _, err := NewMemKeymap(logger, path, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return kmap, nil
 }
 
 func buildLevelDBKeymap(logger logging.Logger, path string) (Keymap, error) {
-	return NewUnsafeLevelDBKeymap(logger, path, true)
+	kmap, _, err := NewUnsafeLevelDBKeymap(logger, path, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return kmap, nil
 }
 
 func testBasicBehavior(t *testing.T, keymap Keymap) {
@@ -108,16 +118,14 @@ func TestBasicBehavior(t *testing.T) {
 
 	for _, builder := range builders {
 		keymap, err := builder(logger, dbDir)
-		if err != nil {
-			t.Fatalf("Failed to create keymap: %v", err)
-		}
+		require.NoError(t, err)
 		testBasicBehavior(t, keymap)
 
 		// verify that test dir is empty (destroy should have deleted everything)
 		exists, err := util.Exists(dbDir)
 		require.NoError(t, err)
 
-		if !exists {
+		if exists {
 			// Directory exists. Make sure it's empty.
 			entries, err := os.ReadDir(dbDir)
 			require.NoError(t, err)
@@ -136,7 +144,7 @@ func TestRestart(t *testing.T) {
 	testDir := t.TempDir()
 	dbDir := path.Join(testDir, "keymap")
 
-	keymap, err := NewUnsafeLevelDBKeymap(logger, dbDir, true)
+	keymap, _, err := NewUnsafeLevelDBKeymap(logger, dbDir, true)
 	require.NoError(t, err)
 
 	expected := make(map[string]types.Address)
@@ -206,7 +214,7 @@ func TestRestart(t *testing.T) {
 	err = keymap.Stop()
 	require.NoError(t, err)
 
-	keymap, err = NewUnsafeLevelDBKeymap(logger, dbDir, true)
+	keymap, _, err = NewUnsafeLevelDBKeymap(logger, dbDir, true)
 	require.NoError(t, err)
 
 	// Expected data should be present
