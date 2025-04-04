@@ -24,7 +24,7 @@ func buildMemKeymap(logger logging.Logger, path string) (Keymap, error) {
 }
 
 func buildLevelDBKeymap(logger logging.Logger, path string) (Keymap, error) {
-	return NewLevelDBKeymap(logger, path, true, false)
+	return NewUnsafeLevelDBKeymap(logger, path, true)
 }
 
 func testBasicBehavior(t *testing.T, keyMap KeyMap) {
@@ -121,7 +121,7 @@ func TestBasicBehavior(t *testing.T) {
 
 			// Directory doesn't exist. We are good.
 		} else {
-			// Directory exists. Make sure it's emtpy.
+			// Directory exists. Make sure it's empty.
 			entries, err := os.ReadDir(dbDir)
 			require.NoError(t, err)
 			require.Empty(t, entries)
@@ -139,7 +139,7 @@ func TestRestart(t *testing.T) {
 	testDir := t.TempDir()
 	dbDir := path.Join(testDir, "keymap")
 
-	keymap, err := NewLevelDBKeymap(logger, dbDir, true, false)
+	keymap, err := NewUnsafeLevelDBKeymap(logger, dbDir, true)
 	require.NoError(t, err)
 
 	expected := make(map[string]types.Address)
@@ -209,7 +209,7 @@ func TestRestart(t *testing.T) {
 	err = keymap.Stop()
 	require.NoError(t, err)
 
-	keymap, err = NewLevelDBKeymap(logger, dbDir, true, false)
+	keymap, err = NewUnsafeLevelDBKeymap(logger, dbDir, true)
 	require.NoError(t, err)
 
 	// Expected data should be present

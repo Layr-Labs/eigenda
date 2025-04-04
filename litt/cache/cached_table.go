@@ -96,7 +96,7 @@ func (c *cachedTable) SetTTL(ttl time.Duration) error {
 }
 
 func (c *cachedTable) SetCacheSize(size uint64) error {
-	c.cache.SetCapacity(size)
+	c.cache.SetMaxWeight(size)
 	err := c.base.SetCacheSize(size)
 	if err != nil {
 		return fmt.Errorf("failed to set base table cache size: %w", err)

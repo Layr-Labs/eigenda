@@ -155,7 +155,7 @@ func (c *Config) SanityCheck() error {
 	if c.CTX == nil {
 		return fmt.Errorf("context cannot be nil")
 	}
-	if c.Paths == nil || len(c.Paths) == 0 {
+	if len(c.Paths) == 0 {
 		return fmt.Errorf("at least one path must be provided")
 	}
 	if c.Logger == nil && c.LoggerConfig == nil {

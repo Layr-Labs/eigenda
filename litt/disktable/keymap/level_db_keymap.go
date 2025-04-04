@@ -14,7 +14,7 @@ import (
 
 var _ Keymap = &LevelDBKeymap{}
 
-// LevelDBKeymap is a keymap that uses LevelDB as the underlying storage.
+// LevelDBKeymap is a keymap that uses LevelDB as the underlying storage. Methods on this struct are goroutine safe.
 type LevelDBKeymap struct {
 	logger logging.Logger
 	db     *leveldb.DB
@@ -22,12 +22,33 @@ type LevelDBKeymap struct {
 	doubleWriteProtection bool
 	keymapPath            string
 	alive                 atomic.Bool
-	// This is a "test mode only" flag. Unit tests write lots of little values, and syncing each one is slow.
+	// This is a "test mode only" flag. Should be true in production use cases or anywhere that data consistency
+	// is critical. Unit tests write lots of little values, and syncing each one is slow, so it may be desirable
+	// to set this to false in some tests.
 	syncWrites bool
 }
 
 // NewLevelDBKeymap creates a new LevelDBKeymap instance.
 func NewLevelDBKeymap(
+	logger logging.Logger,
+	keymapPath string,
+	doubleWriteProtection bool) (*LevelDBKeymap, error) {
+
+	return newLevelDBKeymap(logger, keymapPath, doubleWriteProtection, true)
+}
+
+// NewUnsafeLevelDBKeymap creates a new LevelDBKeymap instance. It does not use sync writes. This makes it faster,
+// but unsafe if data consistency is critical (i.e. production use cases).
+func NewUnsafeLevelDBKeymap(
+	logger logging.Logger,
+	keymapPath string,
+	doubleWriteProtection bool) (*LevelDBKeymap, error) {
+
+	return newLevelDBKeymap(logger, keymapPath, doubleWriteProtection, false)
+}
+
+// newLevelDBKeymap creates a new LevelDBKeymap instance.
+func newLevelDBKeymap(
 	logger logging.Logger,
 	keymapPath string,
 	doubleWriteProtection bool,

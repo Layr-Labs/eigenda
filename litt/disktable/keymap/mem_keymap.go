@@ -12,7 +12,7 @@ import (
 var _ Keymap = &memKeymap{}
 
 // An in-memory keymap implementation. When a table using a memKeymap is restarted, it loads all keys from
-// the segment files.
+// the segment files.  Methods on this struct are goroutine safe.
 //
 // - potentially high memory usage for large keymaps
 // - potentially slow startup time for large keymaps

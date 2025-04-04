@@ -41,7 +41,7 @@ func (b *LevelDBKeymapBuilder) Build(
 		return nil, false, fmt.Errorf("error checking for keymap directory: %w", err)
 	}
 
-	keymap, err := NewLevelDBKeymap(logger, keymapPath, doubleWriteProtection, true)
+	keymap, err := NewLevelDBKeymap(logger, keymapPath, doubleWriteProtection)
 	if err != nil {
 		return nil, false, fmt.Errorf("error creating LevelDBKeymap: %w", err)
 	}

@@ -16,6 +16,6 @@ type KeymapBuilder interface {
 	// Keymap's files are present on disk, and false otherwise.
 	Build(logger logging.Logger, keymapPath string, doubleWriteProtection bool) (Keymap, bool, error)
 
-	// DeleteFiles deletes all files associated with the keymap that are located in any of the provided path.
+	// DeleteFiles deletes all files associated with the keymap that are located inside keymap data directory.
 	DeleteFiles(logger logging.Logger, keymapPath string) error
 }
