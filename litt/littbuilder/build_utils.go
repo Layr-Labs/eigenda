@@ -151,6 +151,21 @@ func buildKeymap(
 			fmt.Errorf("error building keymap: %w", err)
 	}
 
+	if !requiresReload {
+		// If the keymap does not need to be reloaded, then it is already fully initialized.
+		keymapInitializedFile := path.Join(keymapDirectory, keymap.KeymapInitializedFileName)
+		f, err := os.Create(keymapInitializedFile)
+		if err != nil {
+			return nil, "", nil, false,
+				fmt.Errorf("failed to create keymap initialized file: %v", err)
+		}
+		err = f.Close()
+		if err != nil {
+			return nil, "", nil, false,
+				fmt.Errorf("failed to close keymap initialized file: %v", err)
+		}
+	}
+
 	return kmap, keymapDirectory, keymapTypeFile, requiresReload || newKeymap, nil
 }
 
