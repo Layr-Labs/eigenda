@@ -1218,10 +1218,27 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 func TestFetchBatch(t *testing.T) {
 	r := setUpRouter()
 
+	operatorPubKeys := []*core.G1Point{
+		core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+		core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+		core.NewG1Point(big.NewInt(4), big.NewInt(5)),
+		core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+	}
+	operatorAddresses := []gethcommon.Address{
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fb"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fc"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fd"),
+	}
+	operatorIDToAddr := make(map[string]gethcommon.Address)
+	for i := 0; i < len(operatorPubKeys); i++ {
+		operatorIDToAddr[operatorPubKeys[i].GetOperatorID().Hex()] = operatorAddresses[i]
+	}
+
 	// Set up batch header in metadata store
 	batchHeader := &corev2.BatchHeader{
-		BatchRoot:            [32]byte{1, 0, 2, 4},
-		ReferenceBlockNumber: 1024,
+		BatchRoot:            [32]byte{1, 2, 3},
+		ReferenceBlockNumber: 10,
 	}
 	err := blobMetadataStore.PutBatchHeader(context.Background(), batchHeader)
 	require.NoError(t, err)
@@ -1230,30 +1247,92 @@ func TestFetchBatch(t *testing.T) {
 	batchHeaderHash := hex.EncodeToString(batchHeaderHashBytes[:])
 
 	// Set up attestation in metadata store
-	commitment := makeCommitment(t)
+	keyPair, err := core.GenRandomBlsKeys()
+	assert.NoError(t, err)
+	apk := keyPair.GetPubKeyG2()
+	nonsignerPubKeys := operatorPubKeys[:2]
 	attestation := &corev2.Attestation{
-		BatchHeader: batchHeader,
-		NonSignerPubKeys: []*core.G1Point{
-			core.NewG1Point(big.NewInt(1), big.NewInt(0)),
-			core.NewG1Point(big.NewInt(2), big.NewInt(4)),
-		},
-		APKG2: &core.G2Point{
-			G2Affine: &bn254.G2Affine{
-				X: commitment.LengthCommitment.X,
-				Y: commitment.LengthCommitment.Y,
-			},
+		BatchHeader:      batchHeader,
+		AttestedAt:       uint64(time.Now().UnixNano()),
+		NonSignerPubKeys: nonsignerPubKeys,
+		APKG2:            apk,
+		QuorumAPKs: map[uint8]*core.G1Point{
+			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
 		},
 		Sigma: &core.Signature{
-			G1Point: core.NewG1Point(big.NewInt(2), big.NewInt(0)),
+			G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+		},
+		QuorumNumbers: []core.QuorumID{0, 1},
+		QuorumResults: map[uint8]uint8{
+			0: 100,
+			1: 80,
 		},
 	}
 	err = blobMetadataStore.PutAttestation(context.Background(), attestation)
 	require.NoError(t, err)
+
 	dk := commondynamodb.Key{
 		"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
 		"SK": &types.AttributeValueMemberS{Value: "Attestation"},
 	}
 	defer deleteItems(t, []commondynamodb.Key{dk})
+
+	mockTx.On("BatchOperatorIDToAddress").Return(
+		func(ids []core.OperatorID) []gethcommon.Address {
+			result := make([]gethcommon.Address, len(ids))
+			for i, id := range ids {
+				result[i] = operatorIDToAddr[id.Hex()]
+			}
+			return result
+		},
+		nil,
+	)
+
+	operatorStakesByBlock := map[uint32]core.OperatorStakes{
+		10: core.OperatorStakes{
+			0: {
+				0: {
+					OperatorID: operatorPubKeys[0].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorPubKeys[1].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				2: {
+					OperatorID: operatorPubKeys[2].GetOperatorID(),
+					Stake:      big.NewInt(3),
+				},
+			},
+			1: {
+				0: {
+					OperatorID: operatorPubKeys[0].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorPubKeys[2].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				2: {
+					OperatorID: operatorPubKeys[3].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+			},
+			2: {
+				1: {
+					OperatorID: operatorPubKeys[0].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+			},
+		},
+	}
+	mockTx.On("GetOperatorStakesForQuorums").Return(
+		func(quorums []core.QuorumID, blockNum uint32) core.OperatorStakes {
+			return operatorStakesByBlock[blockNum]
+		},
+		nil,
+	)
 
 	r.GET("/v2/batches/:batch_header_hash", testDataApiServerV2.FetchBatch)
 
@@ -1263,8 +1342,55 @@ func TestFetchBatch(t *testing.T) {
 	assert.Equal(t, batchHeaderHash, response.BatchHeaderHash)
 	assert.Equal(t, batchHeader.BatchRoot, response.SignedBatch.BatchHeader.BatchRoot)
 	assert.Equal(t, batchHeader.ReferenceBlockNumber, response.SignedBatch.BatchHeader.ReferenceBlockNumber)
-	assert.Equal(t, attestation.AttestedAt, response.SignedBatch.Attestation.AttestedAt)
-	assert.Equal(t, attestation.QuorumNumbers, response.SignedBatch.Attestation.QuorumNumbers)
+	assert.Equal(t, attestation.AttestedAt, response.SignedBatch.AttestationInfo.Attestation.AttestedAt)
+	assert.Equal(t, attestation.QuorumNumbers, response.SignedBatch.AttestationInfo.Attestation.QuorumNumbers)
+
+	signers := map[uint8][]serverv2.OperatorIdentity{
+		0: []serverv2.OperatorIdentity{
+			{
+				OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[2].Hex(),
+			},
+		},
+		1: []serverv2.OperatorIdentity{
+			{
+				OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[2].Hex(),
+			},
+			{
+				OperatorId:      operatorPubKeys[3].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[3].Hex(),
+			},
+		},
+	}
+	nonsigners := map[uint8][]serverv2.OperatorIdentity{
+		0: []serverv2.OperatorIdentity{
+			{
+				OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[0].Hex(),
+			},
+			{
+				OperatorId:      operatorPubKeys[1].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[1].Hex(),
+			},
+		},
+		1: []serverv2.OperatorIdentity{
+			{
+				OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[0].Hex(),
+			},
+		},
+	}
+	for key, expectedSigners := range signers {
+		actualSigners, exists := response.SignedBatch.AttestationInfo.Signers[key]
+		require.True(t, exists)
+		assert.ElementsMatch(t, expectedSigners, actualSigners)
+	}
+	for key, expectedNonsigners := range nonsigners {
+		actualNonsigners, exists := response.SignedBatch.AttestationInfo.Nonsigners[key]
+		require.True(t, exists)
+		assert.ElementsMatch(t, expectedNonsigners, actualNonsigners)
+	}
 }
 
 func TestFetchBatchFeed(t *testing.T) {
