@@ -2,6 +2,8 @@
 
 ## EigenDA Managed Contracts
 
+> Warning: This page is a work in progress as we have not completely finalized the design. The details might change but the information contained here should be enough to understand the different concerns and main ideas.
+
 The smart contracts can be found [here](https://github.com/Layr-Labs/eigenda/tree/master/contracts/src/core).
 
 ![image.png](../../assets/integration/contracts-eigenda.png)
@@ -27,17 +29,17 @@ struct SecurityThresholds {
 }
 ```
 
-The securityThresholds are currently immutable. These are the same as the [previously called](https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/overview.md#security-model) liveness and safety thresholds:
+The securityThresholds are currently immutable. Confirmation and adversary thresholds are sometimes also [referred to](https://docs.eigenda.xyz/overview#optimal-da-sharding) as liveness and safety thresholds:
 
-- Confirmation Threshold (fka liveness threshold): minimum percentage of stake which an attacker must control in order to mount a liveness attack on the system.
-- Adversary Threshold (fka safety threshold): total percentage of stake which an attacker must control in order to mount a first-order safety attack on the system.
+- Confirmation Threshold (aka liveness threshold): minimum percentage of stake which an attacker must control in order to mount a liveness attack on the system.
+- Adversary Threshold (aka safety threshold): total percentage of stake which an attacker must control in order to mount a first-order safety attack on the system.
 
-Their values are
+Their values are currently set as
 
 ```solidity
 defaultSecurityThresholdsV2 = {
-    confirmationThreshold = ??,
-    adversaryThreshold = ??,
+    confirmationThreshold = 55,
+    adversaryThreshold = 33,
 }
 ```
 
@@ -73,4 +75,4 @@ Contains EigenDA network registered Dispersers’ Ethereum address. The EigenDA 
 
 ### EigenDACertVerifier
 
-Contains a single function verifyDACertV2 which is used to verify `certs` . This function’s logic is described in the [Cert Validation](./6-secure-integration.md#cert-validation) section.
+This contract's main use case is exposing a function verifyDACertV2 which is used to verify `DACert`s. This function’s logic is described in the [Cert Validation](./6-secure-integration.md#cert-validation) section.
