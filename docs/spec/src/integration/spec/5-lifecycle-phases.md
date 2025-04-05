@@ -3,9 +3,9 @@
 
 ## Encoding
 
-This phase is done inside the eigenda-proxy, because the proxy acts as the “bridge” between the Rollup Domain and Data Availability Domain (see [lifecycle](./2-rollup-payload-lifecycle.md) diagram).
+This phase occurs inside the eigenda-proxy, because the proxy acts as the “bridge” between the Rollup Domain and Data Availability Domain (see [lifecycle](./2-rollup-payload-lifecycle.md) diagram).
 
-A `payload` contains an arbitrary byte array. The DisperseBlob endpoint accepts `encodedPayload`s, which are bn254 
+A `payload` consists of an arbitrary byte array. The DisperseBlob endpoint accepts an `encodedPayload`, which needs to be a bn254 field element array.
 
 ## BlobHeader Construction
 
@@ -17,11 +17,11 @@ The blobHeader version refers to one of the versionedBlobParams struct defined i
 
 **QuorumNumbers**
 
-QuorumNumbers represents a list a quorums that are required to sign over and make the blob available. The quorums 0 represents the ETH quorum, and quorum 1 represents the EIGEN quorum, and both of these are required. Custom quorums can also be added to this list.
+QuorumNumbers represents a list a quorums that are required to sign over and make the blob available. Quorum 0 represents the ETH quorum, quorum 1 represents the EIGEN quorum, and both of these are required. Custom quorums can also be added to this list.
 
 **BlobCommitment**
 
-The BlobCommitment is the unique identifier for an EigenDA Blob. It can either be computed locally from the blob, or one can ask the disperser to generate it via the `GetBlobCommitment` endpoint.
+The BlobCommitment is binding commitment for an EigenDA Blob. Because of the length field, a BlobCommitment can only represent a single unique `Blob`. It is also used by the disperser to convince EigenDA validators that the chunks that they have received are indeed part of the blob (or it's reed-solomon extension). It can either be computed locally from the blob, or one can ask the disperser to generate it via the `GetBlobCommitment` endpoint.
 
 ```protobuf
 message BlobCommitment {
@@ -49,29 +49,29 @@ Unlike Ethereum blobs which are all 128KiB, EigenDA blobs can be any power of 2 
 
 **PaymentHeader**
 
-The paymentHeader specifies how the blob dispersal to the network will be paid for. There are 2 main modes of payment, the permissionless pay-per-blob model and the permissioned reserved-bandwidth approach. See the [Payments](https://docs.eigenda.xyz/releases/payments) release doc for full details; we will only describe how to set these 4 fields here.
+The paymentHeader specifies how the blob dispersal to the network will be paid for. There are 2 modes of payment, the permissionless pay-per-blob model and the permissioned reserved-bandwidth approach. See the [Payments](https://docs.eigenda.xyz/releases/payments) release doc for full details; we will only describe how to set these 4 fields here.
 
 ```protobuf
 message PaymentHeader {
-  // The account ID of the disperser client. This should be a hex-encoded string of the ECSDA public key
+  // The account ID of the disperser client. This should be a hex-encoded string of the ECDSA public key
   // corresponding to the key used by the client to sign the BlobHeader.
   string account_id = 1;
-  uint32 reservation_period = 2;
+  // UNIX timestamp in nanoseconds at the time of the dispersal request.
+  // Used to determine the reservation period, for the reserved-bandwidth payment model.
+  int64 timestamp = 2;
+  // Total amount of tokens paid by the requesting account, including the current request.
+  // Used for the pay-per-blob payment model.
   bytes cumulative_payment = 3;
-    // The salt is used to ensure that the payment header is intentionally unique.
-  uint32 salt = 4;
 }
 ```
 
-Users who want to pay-per-blob need to set the cumulative_payment. Users who have already paid for reserved-bandwidth can set the reservation_period.
+Users who want to pay-per-blob need to set the cumulative_payment. Users who have already paid for reserved-bandwidth should instead set the timestamp. If both are set, reserved-bandwidth will be used first, and cumulative_payment only used if the entire bandwidth for the current reservation period has been used up.
 
-An rpc call to the Disperser’s `GetPaymentState` method can be made to query the current state of an `account_id`. A client can query for this information on startup, cache it and then update it manually when making pay-per-blob payments, by keeping track of its current `cumulative_payment` to set it correctly for subsequent dispersals.
-
-The `salt` is needed for reserved bandwidth users: given that the `blob_header_hash` uniquely identifies a dispersal, if a dispersal ever fails (see next section), then to redisperse the same blob, a new unique `blob_header` must be created. If the `reservation_period` is still the same (currently set to 300 second intervals), then the salt must be increased (or randomly changed) to allow resubmitting the same `blob`.
+An rpc call to the Disperser’s `GetPaymentState` method can be made to query the current state of an `account_id`. A client can query for this information on startup, cache it, and then update it manually when making pay-per-blob payments. In this way, it can keep track of the cumulative_payment and set it correctly for subsequent dispersals.
 
 ## Blob Dispersal
 
-The `DisperseBlob` method takes a `blob` and `blob_header` as input. Dispersal entails taking a blob, reed-solomon encoding it into chunks, dispersing those to the EigenDA nodes, retrieving their signatures, creating a `cert` from them, and returning that cert to the client. The disperser batches blob for a few seconds before dispersing them to nodes, so an entire dispersal process can take north of 10 seconds. For this reason, the API has been designed asynchronously with 2 relevant methods:
+The `DisperseBlob` method takes a `blob` and `blob_header` as input. Dispersal entails taking a blob, reed-solomon encoding it into chunks, dispersing those to the EigenDA nodes, retrieving their signatures, creating a `cert` from them, and returning that cert to the client. The disperser batches blobs for a few seconds before dispersing them to nodes, so an entire dispersal process can exceed 10 seconds. For this reason, the API has been designed asynchronously with 2 relevant methods:
 
 ```protobuf
 // Async call which queues up the blob for processing and immediately returns.
@@ -106,7 +106,7 @@ After a successful DisperseBlob rpc call, `BlobStatus.QUEUED` is returned. To re
 
 **Failover to EthDA**
 
-The proxy can be configured to retry any failed terminal status n times, after which it returns to the rollup a `503` HTTP status code which rollup batchers can use to failover to EthDA. See [here](https://github.com/ethereum-optimism/specs/issues/434) for more info.
+The proxy can be configured to retry `FAILED` dispersal n times, after which it returns to the rollup a `503` HTTP status code which rollup batchers can use to failover to EthDA. See [here](https://github.com/ethereum-optimism/specs/issues/434) for more info.
 
 ## BlobStatusReply → Cert
 
@@ -159,10 +159,10 @@ The proxy converts the `cert` to an [`altda-commitment`](./3-datastructs.md#altd
 
 There are two main blob retrieval paths:
 
-1. decentralized trustless retrieval: retrieve chunks from Validators are recreate the `blob` from them.
-2. centralized trustful retrieval: the same [Relay API](https://docs.eigenda.xyz/releases/v2#relay-interfaces) that Validators use to download chunks, can also be used to retrieve full blobs.
+1. decentralized retrieval: retrieve chunks from Validators are recreate the `blob` from them.
+2. centralized retrieval: the same [Relay API](https://docs.eigenda.xyz/releases/v2#relay-interfaces) that Validators use to download chunks, can also be used to retrieve full blobs.
 
-EigenDA V2 has a new [Relay API](https://docs.eigenda.xyz/releases/v2#relay-interfaces) for retrieving blobs from the disperser. The `GetBlob` method takes a `blob_key` as input, which is a synonym for `blob_header_hash`. Note that `BlobCertificate` (different from `Cert`!) contains an array of `relay_keys`, which are the relays that can serve that specific blob. A relay’s URL can be retrieved from the [relayKeyToUrl](https://github.com/Layr-Labs/eigenda/blob/9a4bdc099b98f6e5116b11778f0cf1466f13779c/contracts/src/core/EigenDARelayRegistry.sol#L35) function on the EigenDARelayRegistry.sol contract.
+EigenDA V2 has a new [Relay API](https://docs.eigenda.xyz/releases/v2#relay-interfaces) for retrieving blobs from the disperser. The `GetBlob` method takes a `blob_key` as input, which is a synonym for `blob_header_hash`. Note that `BlobCertificate` (different from `DACert`!) contains an array of `relay_keys`, which are the relays that can serve that specific blob. A relay’s URL can be retrieved from the [relayKeyToUrl](https://github.com/Layr-Labs/eigenda/blob/9a4bdc099b98f6e5116b11778f0cf1466f13779c/contracts/src/core/EigenDARelayRegistry.sol#L35) function on the EigenDARelayRegistry.sol contract.
 
 ## Decoding
 
