@@ -93,7 +93,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             avsDirectory,
-            rewardsCoordinator,
+            rewardsCoordinatorMock,
             registryCoordinator,
             stakeRegistry,
             eigenDAThresholdRegistry,
