@@ -6,7 +6,7 @@ The [EigenDA V2](https://docs.eigenda.xyz/releases/v2) release documentation des
 
 1. Blob batches are no longer bridged to Ethereum with dispersals now being confirmed once a batch has been `CERTIFIED`  (i.e, signed over by operator set). This operation takes 10-20 seconds - providing lower confirmation latency and higher throughput for the rollup. Verification of the blobs now needs to be done by the rollup stack.
 2. Centralized (accounting done by disperser) payments model
-3. A new relayer API from which to retrieve blobs (distinct from the disperser API which is now only used to disperse blobs)
+3. A new relay API from which to retrieve blobs (distinct from the disperser API which is now only used to disperse blobs)
 
 # Diagrams
 
