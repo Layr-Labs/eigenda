@@ -366,12 +366,16 @@ type FlushWaitFunction func() ([]*types.KAPair, error)
 // This method returns a function that, when called, will block until the flush operation is complete. The function
 // returns the addresses of the data that was flushed, or an error if the flush operation failed.
 func (s *Segment) Flush() (FlushWaitFunction, error) {
+	return s.flush(false)
+}
 
+func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 	// Schedule a flush for all shards.
 	shardResponseChannels := make([]chan struct{}, s.metadata.shardingFactor)
 	for shard, shardChannel := range s.shardChannels {
 		shardResponseChannels[shard] = make(chan struct{}, 1)
 		request := &shardFlushRequest{
+			seal:              seal,
 			completionChannel: shardResponseChannels[shard],
 		}
 		err := util.Send(s.fatalErrorHandler, shardChannel, request)
@@ -384,7 +388,7 @@ func (s *Segment) Flush() (FlushWaitFunction, error) {
 	// Now that all shards have sent their key/address pairs to the key file, flush the key file.
 	keyResponseChannel := make(chan *keyFileFlushResponse, 1)
 	request := &keyFileFlushRequest{
-		seal:              false,
+		seal:              seal,
 		completionChannel: keyResponseChannel,
 	}
 	err := util.Send(s.fatalErrorHandler, s.keyFileChannel, request)
@@ -414,45 +418,11 @@ func (s *Segment) Flush() (FlushWaitFunction, error) {
 // Seal flushes all data to disk and finalizes the metadata. Returns addresses that became durable as a result of
 // this method call. After this method is called, no more data can be written to this segment.
 func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
-
-	// Schedule a flush+seal for all shards.
-	shardResponseChannels := make([]chan struct{}, s.metadata.shardingFactor)
-	for shard, shardChannel := range s.shardChannels {
-		shardResponseChannels[shard] = make(chan struct{}, 1)
-		request := &shardFlushRequest{
-			seal:              true,
-			completionChannel: shardResponseChannels[shard],
-		}
-		err := util.Send(s.fatalErrorHandler, shardChannel, request)
-		if err != nil {
-			return nil, fmt.Errorf("failed to send flush request to shard %d: %v", shard, err)
-		}
-	}
-
-	// Schedule a flush+seal for the key file
-	keyResponseChannel := make(chan *keyFileFlushResponse, 1)
-	request := &keyFileFlushRequest{
-		seal:              true,
-		completionChannel: keyResponseChannel,
-	}
-	err := util.Send(s.fatalErrorHandler, s.keyFileChannel, request)
+	flushWaitFunction, err := s.flush(true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send flush request to key file: %v", err)
+		return nil, fmt.Errorf("failed to flush segment: %v", err)
 	}
-
-	// Wait for each shard to finish flushing.
-	for i := range s.shardChannels {
-		_, err = util.Await(s.fatalErrorHandler, shardResponseChannels[i])
-		if err != nil {
-			return nil, fmt.Errorf("failed to flush shard %d: %v", i, err)
-		}
-	}
-
-	// Wait for the key file to finish flushing.
-	response, err := util.Await(s.fatalErrorHandler, keyResponseChannel)
-	if err != nil {
-		return nil, fmt.Errorf("failed to flush key file: %v", err)
-	}
+	addresses, err := flushWaitFunction()
 
 	// Seal the metadata file.
 	err = s.metadata.seal(now)
@@ -460,13 +430,12 @@ func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
 		return nil, fmt.Errorf("failed to seal metadata file: %v", err)
 	}
 
-	s.unflushedKeyCount.Add(-int64(len(response.addresses)))
 	unflushedKeyCount := s.unflushedKeyCount.Load()
 	if s.unflushedKeyCount.Load() != 0 {
 		return nil, fmt.Errorf("segment %d has %d unflushedKeyCount keys", s.index, unflushedKeyCount)
 	}
 
-	return response.addresses, nil
+	return addresses, nil
 }
 
 // IsSealed returns true if the segment is sealed, and false otherwise.
