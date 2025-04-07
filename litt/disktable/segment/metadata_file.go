@@ -7,8 +7,6 @@ import (
 	"path"
 	"strconv"
 	"time"
-
-	"github.com/Layr-Labs/eigenda/litt/util"
 )
 
 const (
@@ -65,12 +63,9 @@ type metadataFile struct {
 	parentDirectory string
 }
 
-// newMetadataFile creates a new metadata file. When this method returns, the metadata file will
+// createMetadataFile creates a new metadata file. When this method returns, the metadata file will
 // be durably written to disk.
-//
-// Note that shardingFactor and salt parameters are ignored if this is not a new metadata file. Metadata files
-// loaded from disk always use their original sharding factor and salt values.
-func newMetadataFile(
+func createMetadataFile(
 	index uint32,
 	shardingFactor uint32,
 	salt uint32,
@@ -81,31 +76,42 @@ func newMetadataFile(
 		parentDirectory: parentDirectory,
 	}
 
-	filePath := file.path()
-	exists, _, err := util.VerifyFilePermissions(filePath)
+	file.serializationVersion = currentSerializationVersion
+	file.shardingFactor = shardingFactor
+	file.salt = salt
+	err := file.write()
 	if err != nil {
-		return nil, fmt.Errorf("file %s has incorrect permissions: %v", filePath, err)
+		return nil, fmt.Errorf("failed to write metadata file: %v", err)
 	}
 
-	if exists {
-		// File exists. Load it.
-		data, err := os.ReadFile(filePath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read metadata file %s: %v", filePath, err)
-		}
-		err = file.deserialize(data)
-		if err != nil {
-			return nil, fmt.Errorf("failed to deserialize metadata file %s: %v", filePath, err)
-		}
-	} else {
-		// File does not exist. Create it.
-		file.serializationVersion = currentSerializationVersion
-		file.shardingFactor = shardingFactor
-		file.salt = salt
-		err = file.write()
-		if err != nil {
-			return nil, fmt.Errorf("failed to write metadata file: %v", err)
-		}
+	return file, nil
+}
+
+// loadMetadataFile loads the metadata file from disk, looking in the given parent directories until it finds the file.
+// If the file is not found, it returns an error.
+func loadMetadataFile(index uint32, parentDirectories []string) (*metadataFile, error) {
+	metadataFileName := fmt.Sprintf("%d%s", index, MetadataFileExtension)
+	metadataPath, err := lookForFile(parentDirectories, metadataFileName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find metadata file: %w", err)
+	}
+	if metadataPath == "" {
+		return nil, fmt.Errorf("failed to find metadata file %s", metadataFileName)
+	}
+	parentDirectory := path.Dir(metadataPath)
+
+	file := &metadataFile{
+		index:           index,
+		parentDirectory: parentDirectory,
+	}
+
+	data, err := os.ReadFile(metadataPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read metadata file %s: %v", metadataPath, err)
+	}
+	err = file.deserialize(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize metadata file %s: %v", metadataPath, err)
 	}
 
 	return file, nil

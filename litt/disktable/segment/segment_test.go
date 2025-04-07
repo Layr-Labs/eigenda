@@ -48,7 +48,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	expectedLargestShardSize := uint64(0)
 
 	salt := rand.Uint32()
-	seg, err := NewSegment(
+	seg, err := CreateSegment(
 		logger,
 		util.NewFatalErrorHandler(context.Background(), logger),
 		index,
@@ -56,7 +56,6 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 		time.Now(),
 		1,
 		salt,
-		false,
 		false)
 
 	require.NoError(t, err)
@@ -137,16 +136,12 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	}
 
 	// Reopen the segment and read all keys and values.
-	seg2, err := NewSegment(
+	seg2, err := LoadSegment(
 		logger,
 		util.NewFatalErrorHandler(context.Background(), logger),
 		index,
 		[]string{directory},
-		time.Now(),
-		1,
-		salt,
-		false,
-		false)
+		time.Now())
 	require.NoError(t, err)
 	require.True(t, seg2.IsSealed())
 
@@ -196,7 +191,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	addressMap := make(map[string]types.Address)
 
 	salt := rand.Uint32()
-	seg, err := NewSegment(
+	seg, err := CreateSegment(
 		logger,
 		util.NewFatalErrorHandler(context.Background(), logger),
 		index,
@@ -204,7 +199,6 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 		time.Now(),
 		shardCount,
 		salt,
-		false,
 		false)
 
 	require.NoError(t, err)
@@ -290,16 +284,12 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	}
 
 	// Reopen the segment and read all keys and values.
-	seg2, err := NewSegment(
+	seg2, err := LoadSegment(
 		logger,
 		util.NewFatalErrorHandler(context.Background(), logger),
 		index,
 		[]string{directory},
-		time.Now(),
-		1,
-		salt,
-		false,
-		false)
+		time.Now())
 	require.NoError(t, err)
 	require.True(t, seg2.IsSealed())
 
@@ -353,7 +343,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	addressMap := make(map[string]types.Address)
 
 	salt := rand.Uint32()
-	seg, err := NewSegment(
+	seg, err := CreateSegment(
 		logger,
 		util.NewFatalErrorHandler(context.Background(), logger),
 		index,
@@ -361,7 +351,6 @@ func TestWriteAndReadColdShard(t *testing.T) {
 		time.Now(),
 		shardCount,
 		salt,
-		false,
 		false)
 
 	require.NoError(t, err)
@@ -413,16 +402,12 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	}
 
 	// Reopen the segment and read all keys and values.
-	seg2, err := NewSegment(
+	seg2, err := LoadSegment(
 		logger,
 		util.NewFatalErrorHandler(context.Background(), logger),
 		index,
 		[]string{directory},
-		time.Now(),
-		1,
-		salt,
-		false,
-		false)
+		time.Now())
 	require.NoError(t, err)
 	require.True(t, seg2.IsSealed())
 

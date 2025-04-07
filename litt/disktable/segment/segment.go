@@ -86,11 +86,11 @@ type Segment struct {
 	unflushedKeyCount atomic.Int64
 }
 
-// NewSegment creates a new data segment.
+// CreateSegment creates a new data segment.
 //
 // Note that shardingFactor and salt parameters are ignored if this is not a new segment. Segments loaded from
 // disk always use their original sharding factor and salt values
-func NewSegment(
+func CreateSegment(
 	logger logging.Logger,
 	fatalErrorHandler *util.FatalErrorHandler,
 	index uint32,
@@ -98,7 +98,6 @@ func NewSegment(
 	now time.Time,
 	shardingFactor uint32,
 	salt uint32,
-	sealIfUnsealed bool,
 	fsync bool) (*Segment, error) {
 
 	if len(parentDirectories) == 0 {
@@ -117,16 +116,9 @@ func NewSegment(
 		// By default, put the metadata file in the first parent directory.
 		metadataDir = parentDirectories[0]
 	}
-	metadata, err := newMetadataFile(index, shardingFactor, salt, metadataDir)
+	metadata, err := createMetadataFile(index, shardingFactor, salt, metadataDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open metadata file: %v", err)
-	}
-
-	if sealIfUnsealed && !metadata.sealed {
-		err = metadata.seal(now)
-		if err != nil {
-			return nil, fmt.Errorf("failed to seal segment: %v", err)
-		}
 	}
 
 	keysPath, err := lookForFile(parentDirectories, fmt.Sprintf("%d%s", index, KeyFileExtension))
@@ -140,7 +132,7 @@ func NewSegment(
 		// By default, put the key file in the first parent directory.
 		keysDirectory = parentDirectories[0]
 	}
-	keys, err := newKeyFile(logger, index, keysDirectory, metadata.sealed)
+	keys, err := createKeyFile(logger, index, keysDirectory)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open key file: %v", err)
 	}
@@ -149,22 +141,13 @@ func NewSegment(
 
 	shards := make([]*valueFile, metadata.shardingFactor)
 	for shard := uint32(0); shard < metadata.shardingFactor; shard++ {
-		valuesPath, err := lookForFile(parentDirectories,
-			fmt.Sprintf("%d-%d%s", index, shard, ValuesFileExtension))
-		var parentDirectory string
-		if err != nil {
-			return nil, fmt.Errorf("failed to find value file: %v", err)
-		}
-		if valuesPath != "" {
-			parentDirectory = path.Dir(valuesPath)
-		} else {
-			// Assign value files to parent directories in a round-robin fashion.
-			// Assign the first shard to the directory at index 1. The first directory
-			// is used by the keymap, so if we have enough directories we don't want to
-			// use it for value files too.
-			parentDirectory = parentDirectories[int(shard+1)%len(parentDirectories)]
-		}
-		values, err := newValueFile(logger, index, shard, parentDirectory, metadata.sealed, fsync)
+		// Assign value files to parent directories in a round-robin fashion.
+		// Assign the first shard to the directory at index 1. The first directory
+		// is used by the keymap, so if we have enough directories we don't want to
+		// use it for value files too.
+		parentDirectory := parentDirectories[int(shard+1)%len(parentDirectories)]
+
+		values, err := createValueFile(logger, index, shard, parentDirectory, fsync)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open value file: %v", err)
 		}
@@ -201,16 +184,75 @@ func NewSegment(
 	// have a reference to the segment.
 	segment.reservationCount.Store(1)
 
-	// If the segment is mutable, start up the control loops.
-	if !segment.IsSealed() {
-		for shard := uint32(0); shard < metadata.shardingFactor; shard++ {
-			go segment.shardControlLoop(shard)
-		}
-
-		go segment.keyFileControlLoop()
+	// Start up the control loops.
+	for shard := uint32(0); shard < metadata.shardingFactor; shard++ {
+		go segment.shardControlLoop(shard)
 	}
 
+	go segment.keyFileControlLoop()
+
 	return segment, nil
+}
+
+// LoadSegment loads an existing segment from disk. If that segment is unsealed, this method will seal it.
+func LoadSegment(logger logging.Logger,
+	fatalErrorHandler *util.FatalErrorHandler,
+	index uint32,
+	parentDirectories []string,
+	now time.Time) (*Segment, error) {
+
+	if len(parentDirectories) == 0 {
+		return nil, errors.New("no parent directories provided")
+	}
+
+	// Look for the metadata file.
+	metadata, err := loadMetadataFile(index, parentDirectories)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open metadata file: %w", err)
+	}
+
+	// seal the segment if it is unsealed
+	if !metadata.sealed {
+		err = metadata.seal(now)
+		if err != nil {
+			return nil, fmt.Errorf("failed to seal segment: %w", err)
+		}
+	}
+
+	// Look for the key file.
+	keys, err := loadKeyFile(logger, index, parentDirectories)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open key file: %v", err)
+	}
+	keyFileSize := keys.Size()
+
+	// Look for the value files. There should be one for each shard.
+	shards := make([]*valueFile, metadata.shardingFactor)
+	for shard := uint32(0); shard < metadata.shardingFactor; shard++ {
+		values, err := loadValueFile(logger, index, shard, parentDirectories)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open value file: %v", err)
+		}
+		shards[shard] = values
+	}
+
+	segment := &Segment{
+		logger:            logger,
+		fatalErrorHandler: fatalErrorHandler,
+		index:             index,
+		metadata:          metadata,
+		keys:              keys,
+		shards:            shards,
+		keyFileSize:       keyFileSize,
+		deletionChannel:   make(chan struct{}, 1),
+	}
+
+	// Segments are returned with an initial reference count of 1, as the caller of the constructor is considered to
+	// have a reference to the segment.
+	segment.reservationCount.Store(1)
+
+	return segment, nil
+
 }
 
 // Size returns the size of the segment in bytes. Counts bytes that are on disk or that will eventually end up on disk.
