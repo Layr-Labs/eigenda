@@ -14,8 +14,7 @@ const (
 	// The current serialization version. If we ever change how we serialize data, bump this version.
 	currentSerializationVersion = uint32(0)
 
-	// MetadataFileExtension is the file extension for the metadata file. This file contains metadata about the data
-	// segment, such as serialization version and expiration time.
+	// MetadataFileExtension is the file extension for the metadata file.
 	MetadataFileExtension = ".metadata"
 
 	// MetadataSwapExtension is the file extension for the metadata swap file. This file is used to atomically update
@@ -33,7 +32,8 @@ const (
 	metadataSize = 21
 )
 
-// metadataFile contains metadata about a segment.
+// metadataFile contains metadata about a segment. This file contains metadata about the data segment, such as
+// serialization version and the timestamp when the file was sealed.
 type metadataFile struct {
 	// The segment index. This value is encoded in the file name.
 	index uint32
@@ -149,7 +149,6 @@ func (m *metadataFile) seal(now time.Time) error {
 
 // serialize serializes the metadata file to a byte array.
 func (m *metadataFile) serialize() []byte {
-	// 4 bytes for version, 8 bytes for timestamp, 1 byte for sealed
 	data := make([]byte, metadataSize)
 
 	// Write the version

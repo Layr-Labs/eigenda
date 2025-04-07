@@ -146,12 +146,12 @@ func NewDiskTable(
 	for _, root := range roots {
 		exists, err := util.Exists(root)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check if root directory exists: %v", err)
+			return nil, fmt.Errorf("failed to check if root directory exists: %w", err)
 		}
 		if !exists {
 			err = os.MkdirAll(root, 0755)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create root directory: %v", err)
+				return nil, fmt.Errorf("failed to create root directory: %w", err)
 			}
 		}
 	}
@@ -164,13 +164,13 @@ func NewDiskTable(
 
 		exists, err := util.Exists(segDir)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check if segment directory exists: %v", err)
+			return nil, fmt.Errorf("failed to check if segment directory exists: %w", err)
 		}
 
 		if !exists {
 			err := os.MkdirAll(segDir, 0755)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create root directory: %v", err)
+				return nil, fmt.Errorf("failed to create root directory: %w", err)
 			}
 		}
 	}
@@ -183,7 +183,7 @@ func NewDiskTable(
 		possibleMetadataPath := metadataPath(root)
 		exists, err := util.Exists(possibleMetadataPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check if metadata file exists: %v", err)
+			return nil, fmt.Errorf("failed to check if metadata file exists: %w", err)
 		}
 		if exists {
 			// We've found an existing metadata file. Use it.
@@ -196,7 +196,7 @@ func NewDiskTable(
 		metadataDir := roots[0]
 		metadata, err = newTableMetadata(config.Logger, metadataDir, config.TTL, config.ShardingFactor)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create table metadata: %v", err)
+			return nil, fmt.Errorf("failed to create table metadata: %w", err)
 		}
 	} else {
 		// Metadata file exists, so we need to load it.
@@ -204,7 +204,7 @@ func NewDiskTable(
 		metadataDir := path.Dir(metadataFilePath)
 		metadata, err = loadTableMetadata(config.Logger, metadataDir)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load table metadata: %v", err)
+			return nil, fmt.Errorf("failed to load table metadata: %w", err)
 		}
 	}
 
@@ -246,7 +246,7 @@ func NewDiskTable(
 			config.SaltShaker.Uint32(),
 			config.Fsync)
 	if err != nil {
-		return nil, fmt.Errorf("failed to gather segment files: %v", err)
+		return nil, fmt.Errorf("failed to gather segment files: %w", err)
 	}
 
 	for _, seg := range table.segments {
@@ -273,7 +273,7 @@ func NewDiskTable(
 		false,
 		config.Fsync)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create mutable segment: %v", err)
+		return nil, fmt.Errorf("failed to create mutable segment: %w", err)
 	}
 	if !creatingFirstSegment {
 		table.segments[table.highestSegmentIndex].SetNextSegment(mutableSegment)
@@ -287,7 +287,7 @@ func NewDiskTable(
 		config.Logger.Infof("reloading keymap from segments")
 		err = table.reloadKeymap()
 		if err != nil {
-			return nil, fmt.Errorf("failed to load keymap from segments: %v", err)
+			return nil, fmt.Errorf("failed to load keymap from segments: %w", err)
 		}
 	}
 
@@ -335,7 +335,7 @@ func (d *DiskTable) reloadKeymap() error {
 
 		keys, err := d.segments[i].GetKeys()
 		if err != nil {
-			return fmt.Errorf("failed to get keys from segment: %v", err)
+			return fmt.Errorf("failed to get keys from segment: %w", err)
 		}
 		for keyIndex := len(keys) - 1; keyIndex >= 0; keyIndex-- {
 			key := keys[keyIndex]
@@ -358,7 +358,7 @@ func (d *DiskTable) reloadKeymap() error {
 				if len(batch) == keymapReloadBatchSize {
 					err = d.keymap.Put(batch)
 					if err != nil {
-						return fmt.Errorf("failed to put keys: %v", err)
+						return fmt.Errorf("failed to put keys: %w", err)
 					}
 					batch = make([]*types.KAPair, 0, keymapReloadBatchSize)
 				}
@@ -370,7 +370,7 @@ func (d *DiskTable) reloadKeymap() error {
 	if len(batch) > 0 {
 		err := d.keymap.Put(batch)
 		if err != nil {
-			return fmt.Errorf("failed to put keys: %v", err)
+			return fmt.Errorf("failed to put keys: %w", err)
 		}
 	}
 
@@ -379,16 +379,16 @@ func (d *DiskTable) reloadKeymap() error {
 	keymapInitializedFile := path.Join(d.keymapPath, keymap.KeymapInitializedFileName)
 	err := os.MkdirAll(d.keymapPath, 0755)
 	if err != nil {
-		return fmt.Errorf("failed to create keymap directory: %v", err)
+		return fmt.Errorf("failed to create keymap directory: %w", err)
 	}
 
 	f, err := os.Create(keymapInitializedFile)
 	if err != nil {
-		return fmt.Errorf("failed to create keymap initialized file after reload: %v", err)
+		return fmt.Errorf("failed to create keymap initialized file after reload: %w", err)
 	}
 	err = f.Close()
 	if err != nil {
-		return fmt.Errorf("failed to close keymap initialized file after reload: %v", err)
+		return fmt.Errorf("failed to close keymap initialized file after reload: %w", err)
 	}
 
 	return nil
@@ -401,7 +401,7 @@ func (d *DiskTable) Name() string {
 // Stop stops the disk table. Flushes all data out to disk.
 func (d *DiskTable) Stop() error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process Stop() request: %v", err)
+		return fmt.Errorf("Cannot process Stop() request: %w", err)
 	}
 
 	d.fatalErrorHandler.Shutdown()
@@ -413,12 +413,12 @@ func (d *DiskTable) Stop() error {
 
 	err := util.Send(d.fatalErrorHandler, d.controllerChannel, request)
 	if err != nil {
-		return fmt.Errorf("failed to send shutdown request: %v", err)
+		return fmt.Errorf("failed to send shutdown request: %w", err)
 	}
 
 	_, err = util.Await(d.fatalErrorHandler, shutdownCompleteChan)
 	if err != nil {
-		return fmt.Errorf("failed to shutdown: %v", err)
+		return fmt.Errorf("failed to shutdown: %w", err)
 	}
 
 	return nil
@@ -427,12 +427,12 @@ func (d *DiskTable) Stop() error {
 // Destroy stops the disk table and delete all files.
 func (d *DiskTable) Destroy() error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process Destroy() request: %v", err)
+		return fmt.Errorf("Cannot process Destroy() request: %w", err)
 	}
 
 	err := d.Stop()
 	if err != nil {
-		return fmt.Errorf("failed to stop: %v", err)
+		return fmt.Errorf("failed to stop: %w", err)
 	}
 
 	d.logger.Infof("deleting disk table at path(s): %v", d.roots)
@@ -445,7 +445,7 @@ func (d *DiskTable) Destroy() error {
 	for _, seg := range d.segments {
 		err = seg.BlockUntilFullyDeleted()
 		if err != nil {
-			return fmt.Errorf("failed to delete segment: %v", err)
+			return fmt.Errorf("failed to delete segment: %w", err)
 		}
 	}
 
@@ -453,41 +453,41 @@ func (d *DiskTable) Destroy() error {
 	for _, segDir := range d.segmentDirectories {
 		err = os.Remove(segDir)
 		if err != nil {
-			return fmt.Errorf("failed to remove root directory: %v", err)
+			return fmt.Errorf("failed to remove root directory: %w", err)
 		}
 	}
 
 	// destroy the keymap
 	err = d.keymap.Destroy()
 	if err != nil {
-		return fmt.Errorf("failed to destroy keymap: %v", err)
+		return fmt.Errorf("failed to destroy keymap: %w", err)
 	}
 	err = d.keymapTypeFile.Delete()
 	if err != nil {
-		return fmt.Errorf("failed to delete keymap type file: %v", err)
+		return fmt.Errorf("failed to delete keymap type file: %w", err)
 	}
 	exists, err := util.Exists(d.keymapPath)
 	if err != nil {
-		return fmt.Errorf("failed to check if keymap directory exists: %v", err)
+		return fmt.Errorf("failed to check if keymap directory exists: %w", err)
 	}
 	if exists {
 		err = os.RemoveAll(d.keymapPath)
 		if err != nil {
-			return fmt.Errorf("failed to remove keymap directory: %v", err)
+			return fmt.Errorf("failed to remove keymap directory: %w", err)
 		}
 	}
 
 	// delete the metadata file
 	err = d.metadata.delete()
 	if err != nil {
-		return fmt.Errorf("failed to delete metadata: %v", err)
+		return fmt.Errorf("failed to delete metadata: %w", err)
 	}
 
 	// delete the root directories for the table
 	for _, root := range d.roots {
 		err = os.Remove(root)
 		if err != nil {
-			return fmt.Errorf("failed to remove root directory: %v", err)
+			return fmt.Errorf("failed to remove root directory: %w", err)
 		}
 	}
 
@@ -498,19 +498,19 @@ func (d *DiskTable) Destroy() error {
 // data and data already written.
 func (d *DiskTable) SetTTL(ttl time.Duration) error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process SetTTL() request: %v", err)
+		return fmt.Errorf("Cannot process SetTTL() request: %w", err)
 	}
 
 	err := d.metadata.SetTTL(ttl)
 	if err != nil {
-		return fmt.Errorf("failed to set TTL: %v", err)
+		return fmt.Errorf("failed to set TTL: %w", err)
 	}
 	return nil
 }
 
 func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process SetShardingFactor() request: %v", err)
+		return fmt.Errorf("Cannot process SetShardingFactor() request: %w", err)
 	}
 
 	if shardingFactor == 0 {
@@ -522,7 +522,7 @@ func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
 	}
 	err := util.Send(d.fatalErrorHandler, d.controllerChannel, request)
 	if err != nil {
-		return fmt.Errorf("failed to send sharding factor request: %v", err)
+		return fmt.Errorf("failed to send sharding factor request: %w", err)
 	}
 
 	return nil
@@ -550,7 +550,7 @@ func (d *DiskTable) getReservedSegment(index uint32) (*segment.Segment, bool) {
 
 func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return nil, false, fmt.Errorf("Cannot process Get() request: %v", err)
+		return nil, false, fmt.Errorf("Cannot process Get() request: %w", err)
 	}
 
 	var cacheHit bool
@@ -576,7 +576,7 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 	// Look up the address of the data.
 	address, ok, err := d.keymap.Get(key)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to get address: %v", err)
+		return nil, false, fmt.Errorf("failed to get address: %w", err)
 	}
 	if !ok {
 		return nil, false, nil
@@ -592,7 +592,7 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 	// Read the data from disk.
 	data, err := seg.Read(key, address)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to read data: %v", err)
+		return nil, false, fmt.Errorf("failed to read data: %w", err)
 	}
 
 	dataSize += uint64(len(data))
@@ -602,7 +602,7 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 
 func (d *DiskTable) Put(key []byte, value []byte) error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process Put() request: %v", err)
+		return fmt.Errorf("Cannot process Put() request: %w", err)
 	}
 
 	if d.metrics != nil {
@@ -626,7 +626,7 @@ func (d *DiskTable) Put(key []byte, value []byte) error {
 
 	err := util.Send(d.fatalErrorHandler, d.controllerChannel, writeReq)
 	if err != nil {
-		return fmt.Errorf("failed to send write request: %v", err)
+		return fmt.Errorf("failed to send write request: %w", err)
 	}
 
 	d.keyCount.Add(1)
@@ -636,7 +636,7 @@ func (d *DiskTable) Put(key []byte, value []byte) error {
 
 func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process PutBatch() request: %v", err)
+		return fmt.Errorf("Cannot process PutBatch() request: %w", err)
 	}
 
 	if d.metrics != nil {
@@ -661,7 +661,7 @@ func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 	}
 	err := util.Send(d.fatalErrorHandler, d.controllerChannel, request)
 	if err != nil {
-		return fmt.Errorf("failed to send write request: %v", err)
+		return fmt.Errorf("failed to send write request: %w", err)
 	}
 
 	d.keyCount.Add(int64(len(batch)))
@@ -677,7 +677,7 @@ func (d *DiskTable) handleControlLoopWriteRequest(req *controlLoopWriteRequest) 
 		keyCount, keyFileSize, shardSize, err := seg.Write(kv)
 		if err != nil {
 			d.fatalErrorHandler.Panic(
-				fmt.Errorf("failed to write to segment %d: %v", d.highestSegmentIndex, err))
+				fmt.Errorf("failed to write to segment %d: %w", d.highestSegmentIndex, err))
 			return
 		}
 
@@ -686,7 +686,7 @@ func (d *DiskTable) handleControlLoopWriteRequest(req *controlLoopWriteRequest) 
 			// Mutable segment is full. Before continuing, we need to expand the segments.
 			err = d.expandSegments()
 			if err != nil {
-				d.fatalErrorHandler.Panic(fmt.Errorf("failed to expand segments: %v", err))
+				d.fatalErrorHandler.Panic(fmt.Errorf("failed to expand segments: %w", err))
 				return
 			}
 		}
@@ -703,7 +703,7 @@ func (d *DiskTable) Exists(key []byte) (bool, error) {
 
 	_, ok, err := d.keymap.Get(key)
 	if err != nil {
-		return false, fmt.Errorf("failed to get address: %v", err)
+		return false, fmt.Errorf("failed to get address: %w", err)
 	}
 
 	return ok, nil
@@ -712,7 +712,7 @@ func (d *DiskTable) Exists(key []byte) (bool, error) {
 // Flush flushes all data to disk. Blocks until all data previously submitted to Put has been written to disk.
 func (d *DiskTable) Flush() error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process Flush() request: %v", err)
+		return fmt.Errorf("Cannot process Flush() request: %w", err)
 	}
 
 	if d.metrics != nil {
@@ -729,12 +729,12 @@ func (d *DiskTable) Flush() error {
 	}
 	err := util.Send(d.fatalErrorHandler, d.controllerChannel, flushReq)
 	if err != nil {
-		return fmt.Errorf("failed to send flush request: %v", err)
+		return fmt.Errorf("failed to send flush request: %w", err)
 	}
 
 	_, err = util.Await(d.fatalErrorHandler, flushReq.responseChan)
 	if err != nil {
-		return fmt.Errorf("failed to flush: %v", err)
+		return fmt.Errorf("failed to flush: %w", err)
 	}
 
 	return nil
@@ -749,34 +749,34 @@ func (d *DiskTable) handleControlLoopShutdownRequest(req *controlLoopShutdownReq
 	}
 	err := util.Send(d.fatalErrorHandler, d.flushChannel, request)
 	if err != nil {
-		d.logger.Errorf("failed to send shutdown request to flush loop: %v", err)
+		d.logger.Errorf("failed to send shutdown request to flush loop: %w", err)
 		return
 	}
 
 	_, err = util.Await(d.fatalErrorHandler, shutdownCompleteChan)
 	if err != nil {
-		d.logger.Errorf("failed to shutdown flush loop: %v", err)
+		d.logger.Errorf("failed to shutdown flush loop: %w", err)
 		return
 	}
 
 	// Seal the mutable segment
 	durableKeys, err := d.segments[d.highestSegmentIndex].Seal(d.timeSource())
 	if err != nil {
-		d.fatalErrorHandler.Panic(fmt.Errorf("failed to seal mutable segment: %v", err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to seal mutable segment: %w", err))
 		return
 	}
 
 	// Flush the keys that are now durable in the segment.
 	err = d.writeKeysToKeymap(durableKeys)
 	if err != nil {
-		d.fatalErrorHandler.Panic(fmt.Errorf("failed to flush keys: %v", err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to flush keys: %w", err))
 		return
 	}
 
 	// Stop the keymap
 	err = d.keymap.Stop()
 	if err != nil {
-		d.fatalErrorHandler.Panic(fmt.Errorf("failed to stop keymap: %v", err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to stop keymap: %w", err))
 		return
 	}
 
@@ -818,7 +818,7 @@ func (d *DiskTable) doGarbageCollection() {
 		// Segment is old enough to be deleted.
 		keys, err := seg.GetKeys()
 		if err != nil {
-			d.fatalErrorHandler.Panic(fmt.Errorf("failed to get keys: %v", err))
+			d.fatalErrorHandler.Panic(fmt.Errorf("failed to get keys: %w", err))
 			return
 		}
 
@@ -829,7 +829,7 @@ func (d *DiskTable) doGarbageCollection() {
 			}
 			err = d.keymap.Delete(keys[keyIndex:lastIndex])
 			if err != nil {
-				d.fatalErrorHandler.Panic(fmt.Errorf("failed to delete keys: %v", err))
+				d.fatalErrorHandler.Panic(fmt.Errorf("failed to delete keys: %w", err))
 				return
 			}
 		}
@@ -851,7 +851,7 @@ func (d *DiskTable) doGarbageCollection() {
 
 func (d *DiskTable) SetCacheSize(_ uint64) error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process SetCacheSize() request: %v", err)
+		return fmt.Errorf("Cannot process SetCacheSize() request: %w", err)
 	}
 
 	// this implementation does not provide a cache, if a cache is needed then it must be provided by a wrapper
@@ -872,7 +872,7 @@ func (d *DiskTable) expandSegments() error {
 	}
 	err := util.Send(d.fatalErrorHandler, d.flushChannel, request)
 	if err != nil {
-		return fmt.Errorf("failed to send seal request: %v", err)
+		return fmt.Errorf("failed to send seal request: %w", err)
 	}
 
 	// Unfortunately, it is necessary to block until the sealing has been completed. Although this may result
@@ -880,7 +880,7 @@ func (d *DiskTable) expandSegments() error {
 	// infrequent, even for very high throughput workloads.
 	_, err = util.Await(d.fatalErrorHandler, flushLoopResponseChan)
 	if err != nil {
-		return fmt.Errorf("failed to seal segment: %v", err)
+		return fmt.Errorf("failed to seal segment: %w", err)
 	}
 
 	// Create a new segment.
@@ -916,12 +916,12 @@ func (d *DiskTable) ScheduleImmediateGC() error {
 
 	err := util.Send(d.fatalErrorHandler, d.controllerChannel, request)
 	if err != nil {
-		return fmt.Errorf("failed to send GC request: %v", err)
+		return fmt.Errorf("failed to send GC request: %w", err)
 	}
 
 	_, err = util.Await(d.fatalErrorHandler, request.completionChan)
 	if err != nil {
-		return fmt.Errorf("failed to await GC completion: %v", err)
+		return fmt.Errorf("failed to await GC completion: %w", err)
 	}
 
 	return nil
@@ -937,14 +937,14 @@ func (d *DiskTable) ScheduleImmediateGC() error {
 func (d *DiskTable) handleFlushLoopSealRequest(req *flushLoopSealRequest) {
 	durableKeys, err := d.segments[d.highestSegmentIndex].Seal(req.now)
 	if err != nil {
-		d.fatalErrorHandler.Panic(fmt.Errorf("failed to seal segment %d: %v", d.highestSegmentIndex, err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to seal segment %d: %w", d.highestSegmentIndex, err))
 		return
 	}
 
 	// Flush the keys that are now durable in the segment.
 	err = d.writeKeysToKeymap(durableKeys)
 	if err != nil {
-		d.fatalErrorHandler.Panic(fmt.Errorf("failed to flush keys: %v", err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to flush keys: %w", err))
 		return
 	}
 
@@ -960,7 +960,7 @@ func (d *DiskTable) handleControlLoopFlushRequest(req *controlLoopFlushRequest) 
 	// it becomes the responsibility of the flush loop to wait for the flush to complete.
 	flushWaitFunction, err := d.segments[d.highestSegmentIndex].Flush()
 	if err != nil {
-		d.fatalErrorHandler.Panic(fmt.Errorf("failed to flush segment %d: %v", d.highestSegmentIndex, err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to flush segment %d: %w", d.highestSegmentIndex, err))
 		return
 	}
 
@@ -971,7 +971,7 @@ func (d *DiskTable) handleControlLoopFlushRequest(req *controlLoopFlushRequest) 
 	}
 	err = util.Send(d.fatalErrorHandler, d.flushChannel, request)
 	if err != nil {
-		d.logger.Errorf("failed to send flush request to flush loop: %v", err)
+		d.logger.Errorf("failed to send flush request to flush loop: %w", err)
 	}
 }
 
@@ -984,7 +984,7 @@ func (d *DiskTable) handleFlushLoopFlushRequest(req *flushLoopFlushRequest) {
 
 	durableKeys, err := req.flushWaitFunction()
 	if err != nil {
-		d.fatalErrorHandler.Panic(fmt.Errorf("failed to flush mutable segment: %v", err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to flush mutable segment: %w", err))
 		return
 	}
 
@@ -996,7 +996,7 @@ func (d *DiskTable) handleFlushLoopFlushRequest(req *flushLoopFlushRequest) {
 
 	err = d.writeKeysToKeymap(durableKeys)
 	if err != nil {
-		d.fatalErrorHandler.Panic(fmt.Errorf("failed to flush keys: %v", err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to flush keys: %w", err))
 		return
 	}
 
@@ -1022,7 +1022,7 @@ func (d *DiskTable) writeKeysToKeymap(keys []*types.KAPair) error {
 
 	err := d.keymap.Put(keys)
 	if err != nil {
-		return fmt.Errorf("failed to flush keys: %v", err)
+		return fmt.Errorf("failed to flush keys: %w", err)
 	}
 
 	// Keys are now durably written to both the segment and the keymap. It is therefore safe to remove them from the
@@ -1045,14 +1045,14 @@ func (d *DiskTable) handleControlLoopSetShardingFactorRequest(req *controlLoopSe
 	}
 	err := d.metadata.SetShardingFactor(req.shardingFactor)
 	if err != nil {
-		d.fatalErrorHandler.Panic(fmt.Errorf("failed to set sharding factor: %v", err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to set sharding factor: %w", err))
 		return
 	}
 
 	// This seals the current mutable segment and creates a new one. The new segment will have the new sharding factor.
 	err = d.expandSegments()
 	if err != nil {
-		d.fatalErrorHandler.Panic(fmt.Errorf("failed to expand segments: %v", err))
+		d.fatalErrorHandler.Panic(fmt.Errorf("failed to expand segments: %w", err))
 		return
 	}
 }

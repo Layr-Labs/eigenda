@@ -29,7 +29,7 @@ func getMetadataFileIndex(fileName string) (uint32, error) {
 // where X is the segment index.
 func getKeyFileIndex(fileName string) (uint32, error) {
 	baseName := path.Base(fileName)
-	indexString := baseName[:len(baseName)-len(KeysFileExtension)]
+	indexString := baseName[:len(baseName)-len(KeyFileExtension)]
 	index, err := strconv.Atoi(indexString)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse index from file name %s: %v", fileName, err)
@@ -131,7 +131,7 @@ func scanDirectories(logger logging.Logger, rootDirectories []string) (
 						fmt.Errorf("failed to get file index: %v", err)
 				}
 				metadataFiles[index] = filePath
-			case KeysFileExtension:
+			case KeyFileExtension:
 				index, err = getKeyFileIndex(fileName)
 				if err != nil {
 					return nil, nil, nil, nil,
