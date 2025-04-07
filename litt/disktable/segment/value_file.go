@@ -50,13 +50,14 @@ type valueFile struct {
 	fsync bool
 }
 
-// newValueFile creates a new value file.
-func newValueFile(
+// TODO create vs load
+
+// createValueFile creates a new value file.
+func createValueFile(
 	logger logging.Logger,
 	index uint32,
 	shard uint32,
 	parentDirectory string,
-	sealed bool,
 	fsync bool) (*valueFile, error) {
 
 	values := &valueFile{
@@ -68,35 +69,66 @@ func newValueFile(
 	}
 
 	filePath := values.path()
-	exists, size, err := util.VerifyFilePermissions(filePath)
+	exists, _, err := util.VerifyFilePermissions(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("file %s has incorrect permissions: %v", filePath, err)
 	}
 
 	if exists {
-		values.size = uint64(size)
-		values.flushedSize.Store(values.size)
+		return nil, fmt.Errorf("value file %s already exists", filePath)
 	}
 
-	if sealed {
-		if !exists {
-			return nil, fmt.Errorf("value file %s does not exist", filePath)
-		}
-
-	} else {
-		if exists {
-			return nil, fmt.Errorf("value file %s already exists", filePath)
-		}
-
-		// Open the file for writing.
-		file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0644)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open value file %s: %v", filePath, err)
-		}
-
-		values.file = file
-		values.writer = bufio.NewWriter(file)
+	// Open the file for writing.
+	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open value file %s: %v", filePath, err)
 	}
+
+	values.file = file
+	values.writer = bufio.NewWriter(file)
+
+	return values, nil
+}
+
+// loadValueFile loads a value file from disk. It looks for the file in the given parent directories until it finds
+// the file. If the file is not found, it returns an error.
+func loadValueFile(
+	logger logging.Logger,
+	index uint32,
+	shard uint32,
+	parentDirectories []string) (*valueFile, error) {
+
+	valuesFileName := fmt.Sprintf("%d-%d%s", index, shard, ValuesFileExtension)
+	valuesPath, err := lookForFile(parentDirectories, valuesFileName)
+	var parentDirectory string
+	if err != nil {
+		return nil, fmt.Errorf("failed to find value file: %v", err)
+	}
+	if valuesPath == "" {
+		return nil, fmt.Errorf("value file %s not found", valuesFileName)
+	}
+	parentDirectory = path.Dir(valuesPath)
+
+	values := &valueFile{
+		logger:          logger,
+		index:           index,
+		shard:           shard,
+		parentDirectory: parentDirectory,
+		fsync:           false,
+	}
+
+	filePath := values.path()
+	exists, size, err := util.VerifyFilePermissions(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("file %s has incorrect permissions: %v", filePath, err)
+	}
+
+	if !exists {
+		return nil, fmt.Errorf("value file %s does not exist", filePath)
+	}
+
+	values.size = uint64(size)
+	values.flushedSize.Store(values.size)
 
 	return values, nil
 }

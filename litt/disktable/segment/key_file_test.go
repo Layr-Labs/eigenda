@@ -28,7 +28,7 @@ func TestReadWriteKeys(t *testing.T) {
 		keys[i] = &types.KAPair{Key: key, Address: address}
 	}
 
-	file, err := newKeyFile(logger, index, directory, false)
+	file, err := createKeyFile(logger, index, directory)
 	require.NoError(t, err)
 
 	for _, key := range keys {
@@ -59,7 +59,7 @@ func TestReadWriteKeys(t *testing.T) {
 	}
 
 	// Create a new in-memory instance from the on-disk file and verify that it behaves the same.
-	file2, err := newKeyFile(logger, index, directory, true)
+	file2, err := loadKeyFile(logger, index, []string{directory})
 	require.NoError(t, err)
 	require.Equal(t, file.Size(), file2.Size())
 
@@ -98,7 +98,7 @@ func TestReadingTruncatedKeyFile(t *testing.T) {
 		keys[i] = &types.KAPair{Key: key, Address: address}
 	}
 
-	file, err := newKeyFile(logger, index, directory, false)
+	file, err := createKeyFile(logger, index, directory)
 	require.NoError(t, err)
 
 	for _, key := range keys {

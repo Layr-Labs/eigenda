@@ -29,7 +29,7 @@ func TestUnsealedSerialization(t *testing.T) {
 	err := m.write()
 	require.NoError(t, err)
 
-	deserialized, err := newMetadataFile(index, 1234, 5678, m.parentDirectory)
+	deserialized, err := loadMetadataFile(index, []string{m.parentDirectory})
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
@@ -78,7 +78,7 @@ func TestSealedSerialization(t *testing.T) {
 	actualSize := uint64(stat.Size())
 	require.Equal(t, actualSize, reportedSize)
 
-	deserialized, err := newMetadataFile(index, 1234, 5678, m.parentDirectory)
+	deserialized, err := loadMetadataFile(index, []string{m.parentDirectory})
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
@@ -100,7 +100,7 @@ func TestFreshFileSerialization(t *testing.T) {
 	directory := t.TempDir()
 
 	index := rand.Uint32()
-	m, err := newMetadataFile(index, 1234, 5678, directory)
+	m, err := createMetadataFile(index, 1234, 5678, directory)
 	require.NoError(t, err)
 
 	require.Equal(t, index, m.index)
@@ -115,7 +115,7 @@ func TestFreshFileSerialization(t *testing.T) {
 	actualSize := uint64(stat.Size())
 	require.Equal(t, actualSize, reportedSize)
 
-	deserialized, err := newMetadataFile(index, 42, 42, m.parentDirectory)
+	deserialized, err := loadMetadataFile(index, []string{m.parentDirectory})
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
@@ -137,7 +137,7 @@ func TestSealing(t *testing.T) {
 	directory := t.TempDir()
 
 	index := rand.Uint32()
-	m, err := newMetadataFile(index, 1234, 5678, directory)
+	m, err := createMetadataFile(index, 1234, 5678, directory)
 	require.NoError(t, err)
 
 	// seal the file
@@ -152,7 +152,7 @@ func TestSealing(t *testing.T) {
 	require.Equal(t, directory, m.parentDirectory)
 
 	// load the file
-	deserialized, err := newMetadataFile(index, 42, 42, m.parentDirectory)
+	deserialized, err := loadMetadataFile(index, []string{m.parentDirectory})
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 

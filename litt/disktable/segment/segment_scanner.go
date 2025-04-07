@@ -208,7 +208,7 @@ func lookForMissingFiles(
 			metadataPath := metadataFiles[segment]
 			metadataDirectory := path.Dir(metadataPath)
 
-			metadata, err := newMetadataFile(segment, 0, 0, metadataDirectory)
+			metadata, err := loadMetadataFile(segment, []string{metadataDirectory})
 			if err != nil {
 				return nil, nil,
 					fmt.Errorf("failed to load metadata file: %v", err)
@@ -355,8 +355,7 @@ func GatherSegmentFiles(
 
 		// Load all healthy segments.
 		for i := lowestSegmentIndex; i <= highestSegmentIndex; i++ {
-			segment, err := NewSegment(
-				logger, fatalErrorHandler, i, rootDirectories, now, shardingFactor, salt, true, fsync)
+			segment, err := LoadSegment(logger, fatalErrorHandler, i, rootDirectories, now)
 			if err != nil {
 				return 0, 0, nil,
 					fmt.Errorf("failed to create segment %d: %v", i, err)

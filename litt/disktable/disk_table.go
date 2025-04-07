@@ -262,7 +262,7 @@ func NewDiskTable(
 	} else {
 		nextSegmentIndex = table.highestSegmentIndex + 1
 	}
-	mutableSegment, err := segment.NewSegment(
+	mutableSegment, err := segment.CreateSegment(
 		config.Logger,
 		fatalErrorHandler,
 		nextSegmentIndex,
@@ -270,7 +270,6 @@ func NewDiskTable(
 		config.TimeSource(),
 		metadata.GetShardingFactor(),
 		config.SaltShaker.Uint32(),
-		false,
 		config.Fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mutable segment: %w", err)
@@ -884,7 +883,7 @@ func (d *DiskTable) expandSegments() error {
 	}
 
 	// Create a new segment.
-	newSegment, err := segment.NewSegment(
+	newSegment, err := segment.CreateSegment(
 		d.logger,
 		d.fatalErrorHandler,
 		d.highestSegmentIndex+1,
@@ -892,7 +891,6 @@ func (d *DiskTable) expandSegments() error {
 		now,
 		d.metadata.GetShardingFactor(),
 		d.saltShaker.Uint32(),
-		false,
 		d.fsync)
 	if err != nil {
 		return err

@@ -39,11 +39,53 @@ type keyFile struct {
 }
 
 // newKeyFile creates a new key file.
-func newKeyFile(
+func createKeyFile(
 	logger logging.Logger,
 	index uint32,
-	parentDirectory string,
-	sealed bool) (*keyFile, error) {
+	parentDirectory string) (*keyFile, error) {
+
+	keys := &keyFile{
+		logger:          logger,
+		index:           index,
+		parentDirectory: parentDirectory,
+	}
+
+	filePath := keys.path()
+
+	exists, _, err := util.VerifyFilePermissions(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("can not write to file: %v", err)
+	}
+
+	if exists {
+		return nil, fmt.Errorf("key file %s already exists", filePath)
+	}
+
+	flags := os.O_RDWR | os.O_CREATE
+	file, err := os.OpenFile(filePath, flags, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open key file: %v", err)
+	}
+
+	writer := bufio.NewWriter(file)
+	keys.writer = writer
+
+	return keys, nil
+}
+
+// loadKeyFile loads the key file from disk, looking in the given parent directories until it finds the file.
+// If the file is not found, it returns an error.
+func loadKeyFile(logger logging.Logger, index uint32, parentDirectories []string) (*keyFile, error) {
+
+	keyFileName := fmt.Sprintf("%d%s", index, KeyFileExtension)
+	keysPath, err := lookForFile(parentDirectories, keyFileName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find key file: %w", err)
+	}
+	if keysPath == "" {
+		return nil, fmt.Errorf("failed to find key file %s", keyFileName)
+	}
+	parentDirectory := path.Dir(keysPath)
 
 	keys := &keyFile{
 		logger:          logger,
@@ -62,23 +104,8 @@ func newKeyFile(
 		keys.size = uint64(size)
 	}
 
-	if sealed {
-		if !exists {
-			return nil, fmt.Errorf("key file %s does not exist", filePath)
-		}
-	} else {
-		if exists {
-			return nil, fmt.Errorf("key file %s already exists", filePath)
-		}
-
-		flags := os.O_RDWR | os.O_CREATE
-		file, err := os.OpenFile(filePath, flags, 0644)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open key file: %v", err)
-		}
-
-		writer := bufio.NewWriter(file)
-		keys.writer = writer
+	if !exists {
+		return nil, fmt.Errorf("key file %s does not exist", filePath)
 	}
 
 	return keys, nil
