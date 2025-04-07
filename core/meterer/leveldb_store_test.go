@@ -18,18 +18,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type testContext struct {
+type leveldbTestContext struct {
 	ctx     context.Context
 	dbPath  string
 	store   meterer.OffchainStore
 	cleanup func()
 }
 
-func setupTestContext(t *testing.T) *testContext {
+func setupLevelDBTestContext(t *testing.T) *leveldbTestContext {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, fmt.Sprintf("test_db_%d", rand.Int()))
 
-	tc := &testContext{
+	tc := &leveldbTestContext{
 		ctx:    context.Background(),
 		dbPath: dbPath,
 	}
@@ -79,8 +79,8 @@ func setupTestContext(t *testing.T) *testContext {
 }
 
 // TestUpdateReservationBin tests the UpdateReservationBin function
-func TestUpdateReservationBin(t *testing.T) {
-	tc := setupTestContext(t)
+func TestLevelDBUpdateReservationBin(t *testing.T) {
+	tc := setupLevelDBTestContext(t)
 
 	// Test updating bin that doesn't exist yet (should create it)
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
@@ -115,8 +115,8 @@ func TestUpdateReservationBin(t *testing.T) {
 }
 
 // TestUpdateGlobalBin tests the UpdateGlobalBin function
-func TestUpdateGlobalBin(t *testing.T) {
-	tc := setupTestContext(t)
+func TestLevelDBUpdateGlobalBin(t *testing.T) {
+	tc := setupLevelDBTestContext(t)
 
 	// Test updating global bin that doesn't exist yet (should create it)
 	reservationPeriod := uint64(1)
@@ -150,8 +150,8 @@ func TestUpdateGlobalBin(t *testing.T) {
 }
 
 // TestAddOnDemandPayment tests the AddOnDemandPayment function
-func TestAddOnDemandPayment(t *testing.T) {
-	tc := setupTestContext(t)
+func TestLevelDBAddOnDemandPayment(t *testing.T) {
+	tc := setupLevelDBTestContext(t)
 
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 	payment1 := core.PaymentMetadata{
@@ -233,8 +233,8 @@ func TestAddOnDemandPayment(t *testing.T) {
 }
 
 // TestRollbackOnDemandPayment tests the RollbackOnDemandPayment function
-func TestRollbackOnDemandPayment(t *testing.T) {
-	tc := setupTestContext(t)
+func TestLevelDBRollbackOnDemandPayment(t *testing.T) {
+	tc := setupLevelDBTestContext(t)
 
 	// Create and add a payment
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
@@ -290,8 +290,8 @@ func TestRollbackOnDemandPayment(t *testing.T) {
 }
 
 // TestGetLargestCumulativePayment tests the GetLargestCumulativePayment function
-func TestGetLargestCumulativePayment(t *testing.T) {
-	tc := setupTestContext(t)
+func TestLevelDBGetLargestCumulativePayment(t *testing.T) {
+	tc := setupLevelDBTestContext(t)
 
 	// Create an account to test with
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
@@ -387,8 +387,8 @@ func TestGetLargestCumulativePayment(t *testing.T) {
 }
 
 // TestGetPeriodRecords tests the GetPeriodRecords function
-func TestGetPeriodRecords(t *testing.T) {
-	tc := setupTestContext(t)
+func TestLevelDBGetPeriodRecords(t *testing.T) {
+	tc := setupLevelDBTestContext(t)
 
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 	reservationPeriod := uint64(1)

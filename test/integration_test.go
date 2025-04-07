@@ -264,7 +264,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		EndpointURL:     fmt.Sprintf("http://0.0.0.0:%s", localStackPort),
 	}
 
-	offchainStore, err := meterer.NewOffchainStore(
+	offchainStore, err := meterer.NewLevelDBOffchainStore(
 		"testdata/payment.db",
 		logger,
 	)
