@@ -91,6 +91,12 @@ type controlLoop struct {
 
 	// The keymap used to store key-to-address mappings.
 	keymap keymap.Keymap
+
+	// The goroutine responsible for blocking on flush operations.
+	flushLoop *flushLoop
+
+	// garbageCollectionPeriod is the period at which garbage collection is run.
+	garbageCollectionPeriod time.Duration
 }
 
 // enqueue enqueues a request to the control loop. Returns an error if the request could not be sent due to the
@@ -103,7 +109,7 @@ func (c *controlLoop) enqueue(request controlLoopMessage) error {
 // run runs the control loop for the disk table. It has sole responsibility for scheduling all operations that
 // mutate the data in the disk table.
 func (c *controlLoop) run() {
-	ticker := time.NewTicker(c.diskTable.garbageCollectionPeriod)
+	ticker := time.NewTicker(c.garbageCollectionPeriod)
 
 	for {
 		select {
@@ -274,7 +280,7 @@ func (c *controlLoop) expandSegments() error {
 		segmentToSeal: c.segments[c.highestSegmentIndex],
 		responseChan:  flushLoopResponseChan,
 	}
-	err := util.Send(c.fatalErrorHandler, c.diskTable.flushChannel, request) // TODO
+	err := c.flushLoop.enqueue(request)
 	if err != nil {
 		return fmt.Errorf("failed to send seal request: %w", err)
 	}
@@ -330,7 +336,7 @@ func (c *controlLoop) handleFlushRequest(req *controlLoopFlushRequest) {
 		flushWaitFunction: flushWaitFunction,
 		responseChan:      req.responseChan,
 	}
-	err = util.Send(c.fatalErrorHandler, c.diskTable.flushChannel, request) // TODO
+	err = c.flushLoop.enqueue(request)
 	if err != nil {
 		c.logger.Errorf("failed to send flush request to flush loop: %v", err)
 	}
@@ -366,7 +372,7 @@ func (c *controlLoop) handleShutdownRequest(req *controlLoopShutdownRequest) {
 	request := &flushLoopShutdownRequest{
 		shutdownCompleteChan: shutdownCompleteChan,
 	}
-	err := util.Send(c.fatalErrorHandler, c.diskTable.flushChannel, request) // TODO
+	err := c.flushLoop.enqueue(request)
 	if err != nil {
 		c.logger.Errorf("failed to send shutdown request to flush loop: %v", err)
 		return
