@@ -22,13 +22,13 @@ const (
 	// deleted.
 	MetadataSwapExtension = ".metadata.swap"
 
-	// The size of the metadata file in bytes. This is a constant, so it's convenient to have it here.
+	// MetadataSize is the size of the metadata file in bytes. This is a constant, so it's convenient to have it here.
 	// - 4 bytes for version
 	// - 4 bytes for the sharding factor
 	// - 4 bytes for salt
 	// - 8 bytes for timestamp
 	// - and 1 byte for sealed.
-	metadataSize = 21
+	MetadataSize = 21
 )
 
 // metadataFile contains metadata about a segment. This file contains metadata about the data segment, such as
@@ -131,7 +131,7 @@ func getMetadataFileIndex(fileName string) (uint32, error) {
 
 // Size returns the size of the metadata file in bytes.
 func (m *metadataFile) Size() uint64 {
-	return metadataSize
+	return MetadataSize
 }
 
 // Name returns the file name for this metadata file.
@@ -168,7 +168,7 @@ func (m *metadataFile) seal(now time.Time) error {
 
 // serialize serializes the metadata file to a byte array.
 func (m *metadataFile) serialize() []byte {
-	data := make([]byte, metadataSize)
+	data := make([]byte, MetadataSize)
 
 	// Write the version
 	binary.BigEndian.PutUint32(data[0:4], m.serializationVersion)
@@ -194,7 +194,7 @@ func (m *metadataFile) serialize() []byte {
 
 // deserialize deserializes the metadata file from a byte array.
 func (m *metadataFile) deserialize(data []byte) error {
-	if len(data) != metadataSize {
+	if len(data) != MetadataSize {
 		return fmt.Errorf("metadata file is not the correct size: %d", len(data))
 	}
 
