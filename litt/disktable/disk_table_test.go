@@ -480,7 +480,7 @@ func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelet
 
 	filePath := ""
 	if typeToDelete == "key" {
-		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.KeysFileExtension)
+		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.KeyFileExtension)
 	} else if typeToDelete == "value" {
 		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
 		shard := rand.Uint32Range(0, shardingFactor)
@@ -605,7 +605,7 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 	filePath := ""
 	if typeToDelete == "key" {
 		filePath = fmt.Sprintf("%s/table/segments/%d%s",
-			directory, lowestSegmentIndex, segment.KeysFileExtension)
+			directory, lowestSegmentIndex, segment.KeyFileExtension)
 	} else if typeToDelete == "value" {
 		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
 		shard := rand.Uint32Range(0, shardingFactor)
@@ -796,7 +796,7 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 	// Delete a file in the final segment.
 	filePath := ""
 	if typeToDelete == "key" {
-		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, highestSegmentIndex, segment.KeysFileExtension)
+		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, highestSegmentIndex, segment.KeyFileExtension)
 	} else if typeToDelete == "value" {
 		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
 		shard := rand.Uint32Range(0, shardingFactor)
@@ -980,7 +980,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		false)
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
-		directory, highestSegmentIndex, segment.KeysFileExtension)
+		directory, highestSegmentIndex, segment.KeyFileExtension)
 	keyFileBytes, err := os.ReadFile(keyFileName)
 	require.NoError(t, err)
 
@@ -1013,7 +1013,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	require.NoError(t, err)
 
 	keyFileName = fmt.Sprintf("%s/table/segments/%d%s",
-		directory, highestSegmentIndex, segment.KeysFileExtension)
+		directory, highestSegmentIndex, segment.KeyFileExtension)
 	keyFileBytes, err = os.ReadFile(keyFileName)
 	require.NoError(t, err)
 
@@ -1208,7 +1208,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		false)
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
-		directory, highestSegmentIndex, segment.KeysFileExtension)
+		directory, highestSegmentIndex, segment.KeyFileExtension)
 	keyFileBytes, err := os.ReadFile(keyFileName)
 	require.NoError(t, err)
 
@@ -1457,7 +1457,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 		false)
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
-		directory, highestSegmentIndex, segment.KeysFileExtension)
+		directory, highestSegmentIndex, segment.KeyFileExtension)
 	keyFileBytes, err := os.ReadFile(keyFileName)
 	require.NoError(t, err)
 	if len(keyFileBytes) == 0 {

@@ -1,6 +1,7 @@
 package segment
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"path"
@@ -81,7 +82,7 @@ type Segment struct {
 	// Used as a sanity checker. For each value written to the segment, the segment must eventually return
 	// a key to be written to the keymap. This value tracks the number of values that have been written to the
 	// segment but have not yet been flushed to the keymap. When the segment is eventually sealed, the code
-	// asserts that this value is zero. This check should never fail, bit is a nice safety net.
+	// asserts that this value is zero. This check should never fail, but is a nice safety net.
 	unflushedKeyCount atomic.Int64
 }
 
@@ -100,8 +101,12 @@ func NewSegment(
 	sealIfUnsealed bool,
 	fsync bool) (*Segment, error) {
 
+	if len(parentDirectories) == 0 {
+		return nil, errors.New("no parent directories provided")
+	}
+
 	// look for the metadata file
-	metadataPath, err := lookForFile(parentDirectories, fmt.Sprintf("%d.metadata", index))
+	metadataPath, err := lookForFile(parentDirectories, fmt.Sprintf("%d%s", index, MetadataFileExtension))
 	var metadataDir string
 	if err != nil {
 		return nil, fmt.Errorf("failed to find metadata file: %v", err)
@@ -124,7 +129,7 @@ func NewSegment(
 		}
 	}
 
-	keysPath, err := lookForFile(parentDirectories, fmt.Sprintf("%d.keys", index))
+	keysPath, err := lookForFile(parentDirectories, fmt.Sprintf("%d%s", index, KeyFileExtension))
 	var keysDirectory string
 	if err != nil {
 		return nil, fmt.Errorf("failed to find key file: %v", err)
@@ -144,7 +149,8 @@ func NewSegment(
 
 	shards := make([]*valueFile, metadata.shardingFactor)
 	for shard := uint32(0); shard < metadata.shardingFactor; shard++ {
-		valuesPath, err := lookForFile(parentDirectories, fmt.Sprintf("%d-%d.values", index, shard))
+		valuesPath, err := lookForFile(parentDirectories,
+			fmt.Sprintf("%d-%d%s", index, shard, ValuesFileExtension))
 		var parentDirectory string
 		if err != nil {
 			return nil, fmt.Errorf("failed to find value file: %v", err)
@@ -172,6 +178,9 @@ func NewSegment(
 		shardChannels[shard] = make(chan any, shardControlChannelCapacity)
 	}
 
+	// If at all possible, we want to size this channel so that the goroutines writing data to the sharded value files
+	// do not block on insertion into this channel. Scale the size of this channel by the number of shards, as more
+	// shards mean there may be a higher rate of writes to this channel.
 	keyFileChannel := make(chan any, shardControlChannelCapacity*metadata.shardingFactor)
 
 	segment := &Segment{
@@ -227,7 +236,8 @@ func (s *Segment) Size() uint64 {
 }
 
 // lookForFile looks for a file in a list of directories. It returns an error if the file appears
-// in more than one directory, and an empty string if the file is not found.
+// in more than one directory, and an empty string if the file is not found. If the file is found and
+// there are no errors, this method returns the path to the file.
 func lookForFile(directories []string, fileName string) (string, error) {
 	locations := make([]string, 0, 1)
 	for _, directory := range directories {
@@ -270,24 +280,24 @@ func (s *Segment) GetShard(key []byte) uint32 {
 // Write records a key-value pair in the data segment, returning the maximum size of all shards within this segment.
 //
 // This method does not ensure that the key-value pair is actually written to disk, only that it will eventually be
-// written to disk. Flush must be called to ensure that all data previously passed to Put is written to disk.
+// written to disk. Flush must be called to ensure that all data previously passed to Write is written to disk.
 func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64, maxShardSize uint64, err error) {
 	if s.metadata.sealed {
 		return 0, 0, 0, fmt.Errorf("segment is sealed, cannot write data")
 	}
 
 	shard := s.GetShard(data.Key)
-	newSize := s.shardSizes[shard]
+	currentSize := s.shardSizes[shard]
 
-	if newSize > math.MaxUint32 {
-		// No mater the configuration, we absolutely cannot permit a value to be written if the first byte of the
+	if currentSize > math.MaxUint32 {
+		// No matter the configuration, we absolutely cannot permit a value to be written if the first byte of the
 		// value would be beyond position 2^32. This is because we only have 32 bits in an address to store the
 		// position of a value's first byte.
 		return 0, 0, 0,
-			fmt.Errorf("value file already contains %d bytes, cannot add a new value", newSize)
+			fmt.Errorf("value file already contains %d bytes, cannot add a new value", currentSize)
 	}
 	s.unflushedKeyCount.Add(1)
-	firstByteIndex := uint32(newSize)
+	firstByteIndex := uint32(currentSize)
 
 	s.shardSizes[shard] += uint64(len(data.Value)) + 4 /* uint32 length */
 	if s.shardSizes[shard] > s.maxShardSize {

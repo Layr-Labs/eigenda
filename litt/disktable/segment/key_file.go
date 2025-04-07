@@ -12,11 +12,14 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// KeysFileExtension is the file extension for the keys file. This file contains the keys for the data segment,
-// and is used for performing garbage collection on the key index.
-const KeysFileExtension = ".keys"
+// KeyFileExtension is the file extension for the keys file. This file contains the keys for the data segment,
+// and is used for performing garbage collection on the keymap. It can also be used to rebuild the keymap.
+//
+// This struct is NOT goroutine safe. It is unsafe to concurrently call write, flush, or seal on the same key file.
+// A key file cannot be read until it is sealed. Once sealed, read only operations are goroutine safe.
+const KeyFileExtension = ".keys"
 
-// keyFile tracks the keys in a segment. It is used to do garbage collection on the key-to-address map.
+// keyFile tracks the keys in a segment. It is used to do garbage collection on the keymap.
 type keyFile struct {
 	// The logger for the key file.
 	logger logging.Logger
@@ -51,7 +54,7 @@ func newKeyFile(
 
 	exists, size, err := util.VerifyFilePermissions(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("file is not writeable: %v", err)
+		return nil, fmt.Errorf("can not write to file: %v", err)
 	}
 
 	if exists {
@@ -87,7 +90,7 @@ func (k *keyFile) Size() uint64 {
 
 // name returns the name of the key file.
 func (k *keyFile) name() string {
-	return fmt.Sprintf("%d%s", k.index, KeysFileExtension)
+	return fmt.Sprintf("%d%s", k.index, KeyFileExtension)
 }
 
 // path returns the full path to the key file.
@@ -177,15 +180,15 @@ func (k *keyFile) readKeys() ([]*types.KAPair, error) {
 		if index+4 >= len(keyBytes) {
 			break
 		}
-		keyLength := binary.BigEndian.Uint32(keyBytes[index : index+4])
+		keyLength := int(binary.BigEndian.Uint32(keyBytes[index : index+4]))
 		index += 4
 
-		if index+int(keyLength)+8 > len(keyBytes) {
+		if index+keyLength+8 > len(keyBytes) {
 			break
 		}
 
-		key := keyBytes[index : index+int(keyLength)]
-		index += int(keyLength)
+		key := keyBytes[index : index+keyLength]
+		index += keyLength
 
 		address := types.Address(binary.BigEndian.Uint64(keyBytes[index : index+8]))
 		index += 8
