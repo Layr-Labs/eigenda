@@ -98,7 +98,7 @@ func setup(_ *testing.M) {
 	account1OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}
 	account2OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(2000)}
 
-	store, err := meterer.NewOffchainStore(
+	store, err := meterer.NewLevelDBOffchainStore(
 		"./testdata/meterer_test",
 		logger,
 	)
