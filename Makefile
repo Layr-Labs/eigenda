@@ -25,25 +25,20 @@ disperse-test-blob:
 
 # Runs all tests, excluding e2e
 test-unit:
-	go test `go list ./... | grep -v ./e2e` -parallel 4
+	gotestsum --format pkgname-and-test-fails -- `go list ./... | grep -v ./e2e` -parallel 4
 
 # E2E tests using local memstore, leveraging op-e2e framework. Also tests the standard client against the proxy.
 test-e2e-local:
-	# Add the -v flag to observe logs as the run is happening on CI, given that this test takes ~10 minutes to run.
-	# Good to have early feedback when needed.
-	BACKEND=memstore go test -v -timeout 20m ./e2e -parallel 4
+	BACKEND=memstore gotestsum --format testname -- -v -timeout 10m ./e2e -parallel 8
 
 # E2E tests using holesky testnet backend, leveraging op-e2e framework. Also tests the standard client against the proxy.
 # If holesky tests are failing, consider checking https://dora.holesky.ethpandaops.io/epochs for block production status.
 test-e2e-testnet:
-	# Add the -v flag to observe logs as the run is happening on CI, given that this test takes ~40 minutes to run.
-	# Good to have early feedback when needed.
-	BACKEND=testnet go test -v -timeout 60m ./e2e -parallel 4
+	BACKEND=testnet gotestsum --format testname -- -v -timeout 20m ./e2e -parallel 32
 
+## Equivalent to `test-e2e-testnet`, but against preprod instead of testnet
 test-e2e-preprod:
-	# Add the -v flag to observe logs as the run is happening on CI, given that this test takes ~40 minutes to run.
-	# Good to have early feedback when needed.
-	BACKEND=preprod go test -v -timeout 60m ./e2e -parallel 4
+	BACKEND=preprod gotestsum --format testname -- -v -timeout 20m ./e2e -parallel 32
 
 # Very simple fuzzer which generates random bytes arrays and sends them to the proxy using the standard client.
 # To clean the cached corpus, run `go clean -fuzzcache` before running this.
@@ -92,4 +87,7 @@ op-devnet-allocs:
 benchmark:
 	go test -benchmem -run=^$ -bench . ./benchmark -test.parallel 4
 
-.PHONY: build clean docker-build test lint format benchmark
+deps:
+	go install gotest.tools/gotestsum@latest
+
+.PHONY: build clean docker-build test lint format benchmark deps

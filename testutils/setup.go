@@ -152,6 +152,7 @@ type TestConfig struct {
 	DisperseToV2     bool
 	Backend          Backend
 	Expiration       time.Duration
+	MaxBlobLength    string
 	WriteThreadCount int
 	// at most one of the below options should be true
 	UseKeccak256ModeS3 bool
@@ -215,13 +216,11 @@ func createS3Config(storeConfig store.Config) store.Config {
 
 func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	useMemory := testCfg.Backend == MemstoreBackend
-	// load signer key from environment
 	pk := os.Getenv(privateKeyEnvVar)
 	if pk == "" && !useMemory {
 		panic("SIGNER_PRIVATE_KEY environment variable not set")
 	}
 
-	// load node url from environment
 	ethRPC := os.Getenv(ethRPCEnvVar)
 	if ethRPC == "" && !useMemory {
 		panic("ETHEREUM_RPC environment variable is not set")
@@ -234,7 +233,11 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		pollInterval = time.Minute * 1
 	}
 
-	maxBlobLengthBytes, err := common.ParseBytesAmount("16mib")
+	maxBlobLength := testCfg.MaxBlobLength
+	if maxBlobLength == "" {
+		maxBlobLength = "1mib"
+	}
+	maxBlobLengthBytes, err := common.ParseBytesAmount(maxBlobLength)
 	if err != nil {
 		panic(err)
 	}
@@ -278,6 +281,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 				SvcManagerAddr:           svcManagerAddress,
 			},
 			MaxBlobSizeBytes: maxBlobLengthBytes,
+			PutRetries:       3,
 		},
 		VerifierConfigV1: verify.Config{
 			VerifyCerts:          false,
@@ -320,7 +324,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 				PayloadClientConfig: payloadClientConfig,
 				RelayTimeout:        5 * time.Second,
 			},
-			PutRetries:                 1,
+			PutRetries:                 3,
 			MaxBlobSizeBytes:           maxBlobLengthBytes,
 			EigenDACertVerifierAddress: certVerifierAddress,
 		},
@@ -340,15 +344,12 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	switch {
 	case testCfg.UseKeccak256ModeS3:
 		proxyConfig.StorageConfig = createS3Config(proxyConfig.StorageConfig)
-
 	case testCfg.UseS3Caching:
 		proxyConfig.StorageConfig.CacheTargets = []string{"S3"}
 		proxyConfig.StorageConfig = createS3Config(proxyConfig.StorageConfig)
-
 	case testCfg.UseS3Fallback:
 		proxyConfig.StorageConfig.FallbackTargets = []string{"S3"}
 		proxyConfig.StorageConfig = createS3Config(proxyConfig.StorageConfig)
-
 	case testCfg.UseRedisCaching:
 		proxyConfig.StorageConfig.CacheTargets = []string{"redis"}
 		proxyConfig.StorageConfig = createRedisConfig(proxyConfig.StorageConfig)

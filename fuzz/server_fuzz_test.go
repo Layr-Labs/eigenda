@@ -25,6 +25,7 @@ func FuzzProxyClientServerV2(f *testing.F) {
 
 func fuzzProxyClientServer(f *testing.F, disperseToV2 bool) {
 	testCfg := testutils.NewTestConfig(testutils.MemstoreBackend, disperseToV2)
+	testCfg.MaxBlobLength = "16mib"
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 
 	// We want a silent logger for fuzzing because we need to see the output of the fuzzer itself,

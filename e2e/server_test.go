@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/store"
 	"github.com/Layr-Labs/eigenda-proxy/testutils"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -478,4 +479,35 @@ func TestInterleavedVersions(t *testing.T) {
 
 	requireStandardClientSetGet(t, testSuite, testRandom.Bytes(100))
 	requireDispersalRetrievalEigenDA(t, testSuite.Metrics.HTTPServerRequestsTotal, commitments.Standard)
+}
+
+func TestMaxBlobSizeV1(t *testing.T) {
+	if testutils.GetBackend() == testutils.PreprodBackend {
+		t.Skip("Preprod for v1 has a stricter blob size than normal.")
+	}
+
+	testMaxBlobSize(t, false)
+}
+
+func TestMaxBlobSizeV2(t *testing.T) {
+	testMaxBlobSize(t, true)
+}
+
+func testMaxBlobSize(t *testing.T, disperseToV2 bool) {
+	t.Parallel()
+
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
+	testCfg.MaxBlobLength = "16mib"
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+
+	ts, kill := testutils.CreateTestSuite(tsConfig)
+	defer kill()
+
+	// the payload has things added to it during encoding, so it has a slightly lower limit than max blob size
+	maxPayloadSize, err := codec.GetMaxPermissiblePayloadLength(
+		uint32(tsConfig.EigenDAConfig.ClientConfigV2.MaxBlobSizeBytes / 32))
+	require.NoError(t, err)
+
+	requireStandardClientSetGet(t, ts, testutils.RandBytes(int(maxPayloadSize)))
+	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
 }

@@ -52,7 +52,7 @@ func NewL2AltDA(t actions.Testing, daHost string, altDA bool) *L2AltDA {
 		AllocType:           e2econfig.AllocTypeAltDA,
 	}
 
-	log := testlog.Logger(t, log.LvlDebug)
+	log := testlog.Logger(t, log.LevelWarn)
 
 	// config.DeployConfig.DACommitmentType = altda.GenericCommitmentString
 	dp := e2eutils.MakeDeployParams(t, p)

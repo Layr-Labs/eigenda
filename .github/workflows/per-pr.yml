@@ -60,6 +60,8 @@ jobs:
       - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
+      - name: Install dependencies
+        run: make deps
       - run: go mod download
       - run: make test-unit
 
@@ -72,6 +74,8 @@ jobs:
       - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
+      - name: Install dependencies
+        run: make deps
       - run: go mod download
       - run: make test-e2e-local
 
@@ -84,6 +88,8 @@ jobs:
       - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
+      - name: Install dependencies
+        run: make deps
       - run: go mod download
       - run: make test-e2e-testnet
         env:
@@ -99,6 +105,8 @@ jobs:
       - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
+      - name: Install dependencies
+        run: make deps
       - run: go mod download
       - run: make test-e2e-preprod
         env:
