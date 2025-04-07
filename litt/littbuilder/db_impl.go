@@ -14,6 +14,8 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
+// All table names must match this regex. Permits uppercase and lowercase letters, numbers, underscores, and dashes.
+// Must be at least one character long.
 var tableNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 var _ litt.DB = &db{}
@@ -33,7 +35,7 @@ type db struct {
 	// A function that returns the current time.
 	timeSource func() time.Time
 
-	// The time-to-live for tables that haven't had their TTL set.
+	// The default time-to-live for new tables. Once created, the TTL for a table can be changed.
 	ttl time.Duration
 
 	// The period between garbage collection runs.
@@ -77,7 +79,7 @@ func NewDB(config *litt.Config) (litt.DB, error) {
 		name string,
 		metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
 
-		return buildTable(config, ctx, logger, name, metrics)
+		return buildTable(config, logger, name, metrics)
 	}
 
 	return NewDBWithTableBuilder(config, tableBuilder)
@@ -148,9 +150,6 @@ func (d *db) lockFreeSize() uint64 {
 
 // isTableNameValid returns true if the table name is valid.
 func (d *db) isTableNameValid(name string) bool {
-	if name == "" {
-		return false
-	}
 	return tableNameRegex.MatchString(name)
 }
 

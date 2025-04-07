@@ -141,7 +141,7 @@ func (c *controlLoop) run() {
 
 // doGarbageCollection performs garbage collection on all segments, deleting old ones as necessary.
 func (c *controlLoop) doGarbageCollection() {
-	now := c.timeSource()
+	start := c.timeSource()
 	ttl := c.metadata.GetTTL()
 	if ttl.Nanoseconds() == 0 {
 		// No TTL set, so nothing to do.
@@ -149,7 +149,6 @@ func (c *controlLoop) doGarbageCollection() {
 	}
 
 	if c.metrics != nil {
-		start := c.timeSource()
 		defer func() {
 			end := c.timeSource()
 			delta := end.Sub(start)
@@ -165,7 +164,7 @@ func (c *controlLoop) doGarbageCollection() {
 		}
 
 		sealTime := seg.GetSealTime()
-		segmentAge := now.Sub(sealTime)
+		segmentAge := start.Sub(sealTime)
 		if segmentAge < ttl {
 			// Segment is not old enough to be deleted.
 			return
@@ -180,7 +179,7 @@ func (c *controlLoop) doGarbageCollection() {
 
 		for keyIndex := uint64(0); keyIndex < uint64(len(keys)); keyIndex += c.gcBatchSize {
 			lastIndex := keyIndex + c.gcBatchSize
-			if lastIndex >= uint64(len(keys)) {
+			if lastIndex > uint64(len(keys)) {
 				lastIndex = uint64(len(keys))
 			}
 			err = c.keymap.Delete(keys[keyIndex:lastIndex])
@@ -267,7 +266,7 @@ func (c *controlLoop) handleWriteRequest(req *controlLoopWriteRequest) {
 	c.updateCurrentSize()
 }
 
-// expandSegments checks if the highest segment is full, and if so, creates a new segment.
+// expandSegments seals the latest segment and creates a new mutable segment.
 func (c *controlLoop) expandSegments() error {
 	now := c.timeSource()
 

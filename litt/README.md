@@ -266,7 +266,7 @@ If `Flush()` is never called, data becomes durable through two mechanisms:
 - When a [segment](#segment) becomes full, it is made immutable and a new segment is created. As part of the process
   of making a segment immutable, all data in the segment is fully written to disk.
 - When the database is cleanly stopped via a call to `Stop()`, all unflushed data is written to disk. `Stop()` blocks
-  this has been completed.
+  until this has been completed.
 
 `Flush()` makes no guarantees about the [durability](#durability) of data written concurrently with the call to
 `Flush()` or after the call to `Flush()` has returned. It's not harmful to write data concurrently with a call to
@@ -302,7 +302,7 @@ compared to [values](#value). The use case LittDB was originally intended for us
 
 At a conceptual level, a keymap is a mapping from [keys](#key) to [addresses](#address). In order to look up a
 [value](#value) in the database one needs to know two things: the [key](#key) and the [address](#address). The keymap
-is therefor necessary to lookup data given a specific [key](#key).
+is therefore necessary to lookup data given a specific [key](#key).
 
 There are currently two implementations of the keymap in LittDB: an in-memory keymap and a keymap that uses levelDB.
 There are tradeoffs to each implementation. The in-memory keymap is faster, but has higher memory usage and longer
@@ -695,7 +695,7 @@ that all map to the same shard, causing a hot spot in the database. To prevent t
 "salt" value that it includes in the hash function. As long as an attacker does not know the salt value, they cannot
 predict which shard a key will map to.
 
-We already have a metadata file for each segment. We can go ahead and safe the sharding factor and salt in the metadata
+We already have a metadata file for each segment. We can go ahead and save the sharding factor and salt in the metadata
 file. This will give us enough information to find data contained within the segment.
 
 ## Iteration 9: Multi-table support

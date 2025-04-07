@@ -161,7 +161,7 @@ func (t *tableMetadata) serialize() []byte {
 	// 4 bytes for version
 	// 8 bytes for TTL
 	// 4 bytes for sharding factor
-	data := make([]byte, 16)
+	data := make([]byte, tableMetadataSize)
 
 	// Write the version
 	binary.BigEndian.PutUint32(data[0:4], tableMetadataSerializationVersion)

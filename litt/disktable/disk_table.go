@@ -696,6 +696,11 @@ func (d *DiskTable) SetCacheSize(_ uint64) error {
 }
 
 func (d *DiskTable) ScheduleImmediateGC() error {
+	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+		return fmt.Errorf(
+			"Cannot process ScheduleImmediateGC() request, DB is in panicked state due to error: %w", err)
+	}
+
 	request := &controlLoopGCRequest{
 		completionChan: make(chan struct{}, 1),
 	}

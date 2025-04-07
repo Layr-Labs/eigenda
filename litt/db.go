@@ -27,8 +27,8 @@ type DB interface {
 	// ASCII alphanumeric characters, dashes, and underscores. The name must be at least one character long.
 	//
 	// The first time a table is fetched (either a new table or an existing one loaded from disk), its TTL is always
-	// set to 0 (i.e. it has no TTL). If you want to set a TTL, you must call Table.SetTTL() to do so. This is
-	// necessary after each time the database is started/restarted.
+	// set to 0 (i.e. it has no TTL, meaning data is never deleted). If you want to set a TTL, you must call
+	// Table.SetTTL() to do so. This is necessary after each time the database is started/restarted.
 	GetTable(name string) (Table, error)
 
 	// DropTable deletes a table and all of its data.

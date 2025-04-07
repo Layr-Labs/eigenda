@@ -52,7 +52,7 @@ func createKeyFile(
 
 	filePath := keys.path()
 
-	exists, _, err := util.VerifyFilePermissions(filePath)
+	exists, _, err := util.VerifyFileProperties(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("can not write to file: %v", err)
 	}
@@ -95,7 +95,7 @@ func loadKeyFile(logger logging.Logger, index uint32, parentDirectories []string
 
 	filePath := keys.path()
 
-	exists, size, err := util.VerifyFilePermissions(filePath)
+	exists, size, err := util.VerifyFileProperties(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("can not write to file: %v", err)
 	}
