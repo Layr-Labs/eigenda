@@ -1,4 +1,5 @@
 syntax = "proto3";
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX // Skip this rule to not create a breaking change.
 package retriever;
 
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/retriever";
@@ -16,9 +17,14 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/retriever";
 // Disperser manages the blobs that it has processed, whereas the Retriever.RetrieveBlob()
 // (the 2nd approach here) removes the need to trust the Disperser, with the downside of
 // worse cost and performance.
+//
+// buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
 service Retriever {
   // This fans out request to EigenDA Nodes to retrieve the chunks and returns the
   // reconstructed original blob in response.
+  //
+  // buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
+  // buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
   rpc RetrieveBlob(BlobRequest) returns (BlobReply) {}
 }
 
