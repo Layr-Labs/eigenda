@@ -35,20 +35,11 @@ type controlLoop struct {
 	// The index of the highest numbered segment. All writes are applied to this segment.
 	highestSegmentIndex uint32
 
-	// This value mirrors highestSegmentIndex, but is thread safe to read from external goroutines.
-	// There are several unit tests that read this value, and so there needs to be a threadsafe way
-	// to access it. Since new segments are added on an infrequent basis and this is never read in
-	// production, maintaining this atomic variable has negligible overhead.
-	threadsafeHighestSegmentIndex atomic.Uint32
-
-	// segmentLock protects access to the variables segments and highestSegmentIndex.
+	// segmentLock protects access to the segments map and highestSegmentIndex.
 	// Does not protect the segments themselves.
 	segmentLock sync.RWMutex
 
-	// All segments currently in use. Only the control loop modifies this map, but other threads may read from it.
-	// The control loop does not need to hold a lock when doing read operations on this map, since no other thread
-	// will modify it. The control loop does need to hold a lock when modifying this map, though, and other threads
-	// must hold a lock when reading from it.
+	// All segments currently in use.
 	segments map[uint32]*segment.Segment
 
 	// The number of bytes contained within the immutable segments. This tracks the number of bytes that are
@@ -71,8 +62,8 @@ type controlLoop struct {
 	// The number of keys in the table.
 	keyCount *atomic.Int64
 
-	// clock is the time source used by the disk table.
-	clock func() time.Time
+	// timeSource is the time source used by the disk table.
+	timeSource func() time.Time
 
 	// The directories where segment files are stored.
 	segmentDirectories []string
@@ -100,25 +91,19 @@ type controlLoop struct {
 
 	// The keymap used to store key-to-address mappings.
 	keymap keymap.Keymap
-
-	// The goroutine responsible for blocking on flush operations.
-	flushLoop *flushLoop
-
-	// garbageCollectionPeriod is the period at which garbage collection is run.
-	garbageCollectionPeriod time.Duration
 }
 
 // enqueue enqueues a request to the control loop. Returns an error if the request could not be sent due to the
 // database being in a panicked state. Only types defined in control_loop_messages.go are permitted to be sent
 // to the control loop.
 func (c *controlLoop) enqueue(request controlLoopMessage) error {
-	return util.SendIfNotFatal(c.fatalErrorHandler, c.controllerChannel, request)
+	return util.Send(c.fatalErrorHandler, c.controllerChannel, request)
 }
 
 // run runs the control loop for the disk table. It has sole responsibility for scheduling all operations that
 // mutate the data in the disk table.
 func (c *controlLoop) run() {
-	ticker := time.NewTicker(c.garbageCollectionPeriod)
+	ticker := time.NewTicker(c.diskTable.garbageCollectionPeriod)
 
 	for {
 		select {
@@ -150,16 +135,17 @@ func (c *controlLoop) run() {
 
 // doGarbageCollection performs garbage collection on all segments, deleting old ones as necessary.
 func (c *controlLoop) doGarbageCollection() {
-	start := c.clock()
+	now := c.timeSource()
 	ttl := c.metadata.GetTTL()
-	if ttl.Nanoseconds() <= 0 {
+	if ttl.Nanoseconds() == 0 {
 		// No TTL set, so nothing to do.
 		return
 	}
 
 	if c.metrics != nil {
+		start := c.timeSource()
 		defer func() {
-			end := c.clock()
+			end := c.timeSource()
 			delta := end.Sub(start)
 			c.metrics.ReportGarbageCollectionLatency(c.name, delta)
 		}()
@@ -173,7 +159,7 @@ func (c *controlLoop) doGarbageCollection() {
 		}
 
 		sealTime := seg.GetSealTime()
-		segmentAge := start.Sub(sealTime)
+		segmentAge := now.Sub(sealTime)
 		if segmentAge < ttl {
 			// Segment is not old enough to be deleted.
 			return
@@ -188,7 +174,7 @@ func (c *controlLoop) doGarbageCollection() {
 
 		for keyIndex := uint64(0); keyIndex < uint64(len(keys)); keyIndex += c.gcBatchSize {
 			lastIndex := keyIndex + c.gcBatchSize
-			if lastIndex > uint64(len(keys)) {
+			if lastIndex >= uint64(len(keys)) {
 				lastIndex = uint64(len(keys))
 			}
 			err = c.keymap.Delete(keys[keyIndex:lastIndex])
@@ -254,8 +240,7 @@ func (c *controlLoop) handleWriteRequest(req *controlLoopWriteRequest) {
 	for _, kv := range req.values {
 		// Do the write.
 		seg := c.segments[c.highestSegmentIndex]
-		keyCount, keyFileSize, err := seg.Write(kv)
-		shardSize := seg.GetMaxShardSize()
+		keyCount, keyFileSize, shardSize, err := seg.Write(kv)
 		if err != nil {
 			c.fatalErrorHandler.Panic(
 				fmt.Errorf("failed to write to segment %d: %w", c.highestSegmentIndex, err))
@@ -276,9 +261,9 @@ func (c *controlLoop) handleWriteRequest(req *controlLoopWriteRequest) {
 	c.updateCurrentSize()
 }
 
-// expandSegments seals the latest segment and creates a new mutable segment.
+// expandSegments checks if the highest segment is full, and if so, creates a new segment.
 func (c *controlLoop) expandSegments() error {
-	now := c.clock()
+	now := c.timeSource()
 
 	c.immutableSegmentSize += c.segments[c.highestSegmentIndex].Size()
 
@@ -289,7 +274,7 @@ func (c *controlLoop) expandSegments() error {
 		segmentToSeal: c.segments[c.highestSegmentIndex],
 		responseChan:  flushLoopResponseChan,
 	}
-	err := c.flushLoop.enqueue(request)
+	err := util.Send(c.fatalErrorHandler, c.diskTable.flushChannel, request) // TODO
 	if err != nil {
 		return fmt.Errorf("failed to send seal request: %w", err)
 	}
@@ -297,7 +282,7 @@ func (c *controlLoop) expandSegments() error {
 	// Unfortunately, it is necessary to block until the sealing has been completed. Although this may result
 	// in a brief interruption in new write work being sent to the segment, expanding the number of segments is
 	// infrequent, even for very high throughput workloads.
-	_, err = util.AwaitIfNotFatal(c.fatalErrorHandler, flushLoopResponseChan)
+	_, err = util.Await(c.fatalErrorHandler, flushLoopResponseChan)
 	if err != nil {
 		return fmt.Errorf("failed to seal segment: %w", err)
 	}
@@ -317,7 +302,6 @@ func (c *controlLoop) expandSegments() error {
 	}
 	c.segments[c.highestSegmentIndex].SetNextSegment(newSegment)
 	c.highestSegmentIndex++
-	c.threadsafeHighestSegmentIndex.Add(1)
 
 	c.segmentLock.Lock()
 	c.segments[c.highestSegmentIndex] = newSegment
@@ -346,7 +330,7 @@ func (c *controlLoop) handleFlushRequest(req *controlLoopFlushRequest) {
 		flushWaitFunction: flushWaitFunction,
 		responseChan:      req.responseChan,
 	}
-	err = c.flushLoop.enqueue(request)
+	err = util.Send(c.fatalErrorHandler, c.diskTable.flushChannel, request) // TODO
 	if err != nil {
 		c.logger.Errorf("failed to send flush request to flush loop: %v", err)
 	}
@@ -382,20 +366,20 @@ func (c *controlLoop) handleShutdownRequest(req *controlLoopShutdownRequest) {
 	request := &flushLoopShutdownRequest{
 		shutdownCompleteChan: shutdownCompleteChan,
 	}
-	err := c.flushLoop.enqueue(request)
+	err := util.Send(c.fatalErrorHandler, c.diskTable.flushChannel, request) // TODO
 	if err != nil {
 		c.logger.Errorf("failed to send shutdown request to flush loop: %v", err)
 		return
 	}
 
-	_, err = util.AwaitIfNotFatal(c.fatalErrorHandler, shutdownCompleteChan)
+	_, err = util.Await(c.fatalErrorHandler, shutdownCompleteChan)
 	if err != nil {
 		c.logger.Errorf("failed to shutdown flush loop: %v", err)
 		return
 	}
 
 	// Seal the mutable segment
-	durableKeys, err := c.segments[c.highestSegmentIndex].Seal(c.clock())
+	durableKeys, err := c.segments[c.highestSegmentIndex].Seal(c.timeSource())
 	if err != nil {
 		c.fatalErrorHandler.Panic(fmt.Errorf("failed to seal mutable segment: %w", err))
 		return

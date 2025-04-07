@@ -1222,7 +1222,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	diskTable := table.(*DiskTable)
 	nonEmptyShards := make(map[uint32]struct{})
 	for key := range keysInLastFile {
-		keyShard := diskTable.segments[highestSegmentIndex].GetShard(keysInLastFile[key].Key)
+		keyShard := diskTable.controlLoop.segments[highestSegmentIndex].GetShard(keysInLastFile[key].Key)
 		nonEmptyShards[keyShard] = struct{}{}
 	}
 	var shard uint32
@@ -1248,7 +1248,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	// Figure out which keys are expected to be missing
 	missingKeys := make(map[string]struct{})
 	for _, key := range keysInLastFile {
-		keyShard := diskTable.segments[diskTable.highestSegmentIndex].GetShard(key.Key)
+		keyShard := diskTable.controlLoop.segments[diskTable.controlLoop.highestSegmentIndex].GetShard(key.Key)
 		if keyShard != shard {
 			// key does not belong to the shard that was truncated
 			continue
@@ -1898,7 +1898,7 @@ func checkShardsInSegments(
 
 // getLatestSegmentIndex returns the index of the latest segment in the table.
 func getLatestSegmentIndex(table litt.Table) uint32 {
-	return (table.(*DiskTable)).highestSegmentIndex
+	return (table.(*DiskTable)).controlLoop.highestSegmentIndex
 }
 
 func changingShardingFactorTest(t *testing.T, tableBuilder *tableBuilder) {
