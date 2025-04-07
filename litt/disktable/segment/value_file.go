@@ -46,7 +46,11 @@ type valueFile struct {
 	// The current size of the file, only including flushed data. Protects against reads of partially written values.
 	flushedSize atomic.Uint64
 
-	// Whether fsync mode is enabled.
+	// Whether fsync mode is enabled. If fsync mode is enabled, then each flush operation will invoke the OS fsync
+	// operation before returning. An fsync operation is required to ensure that data is not sitting in OS level
+	// in-memory buffers (otherwise, an OS crash may lead to data loss). This option is provided for testing,
+	// as many test scenarios do lots of tiny writes and flushes, and this workload is MUCH slower with fsync
+	// mode enabled. In production, fsync mode should always be enabled.
 	fsync bool
 }
 
@@ -309,12 +313,12 @@ func (v *valueFile) seal() error {
 
 // delete deletes the value file.
 func (v *valueFile) delete() error {
-	// As an extra safety check, make it so that all future reads fail before they do I/O.
-	v.flushedSize.Store(0)
-
 	if v.writer != nil {
 		return fmt.Errorf("value file is not sealed")
 	}
+
+	// As an extra safety check, make it so that all future reads fail before they do I/O.
+	v.flushedSize.Store(0)
 
 	err := os.Remove(v.path())
 	if err != nil {

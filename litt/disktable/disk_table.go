@@ -69,7 +69,7 @@ type DiskTable struct {
 	unflushedDataCache sync.Map
 
 	// The index of the lowest numbered segment. After initial creation, only the garbage collection
-	// thread is permitted to read/write this value  for the sake of thread safety.
+	// thread is permitted to read/write this value for the sake of thread safety.
 	lowestSegmentIndex uint32
 
 	// The index of the highest numbered segment. All writes are applied to this segment.
@@ -170,7 +170,7 @@ func NewDiskTable(
 		if !exists {
 			err := os.MkdirAll(segDir, 0755)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create root directory: %w", err)
+				return nil, fmt.Errorf("failed to create segment directory: %w", err)
 			}
 		}
 	}
@@ -186,6 +186,11 @@ func NewDiskTable(
 			return nil, fmt.Errorf("failed to check if metadata file exists: %w", err)
 		}
 		if exists {
+			if metadataFilePath != "" {
+				return nil, fmt.Errorf("multiple metadata files found: %s and %s",
+					metadataFilePath, possibleMetadataPath)
+			}
+
 			// We've found an existing metadata file. Use it.
 			metadataFilePath = possibleMetadataPath
 		}
@@ -241,10 +246,7 @@ func NewDiskTable(
 			config.Logger,
 			fatalErrorHandler,
 			table.segmentDirectories,
-			config.TimeSource(),
-			config.ShardingFactor,
-			config.SaltShaker.Uint32(),
-			config.Fsync)
+			config.TimeSource())
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather segment files: %w", err)
 	}
@@ -334,7 +336,7 @@ func (d *DiskTable) reloadKeymap() error {
 
 		keys, err := d.segments[i].GetKeys()
 		if err != nil {
-			return fmt.Errorf("failed to get keys from segment: %w", err)
+			return fmt.Errorf("failed to get keys from segment %d: %w", i, err)
 		}
 		for keyIndex := len(keys) - 1; keyIndex >= 0; keyIndex-- {
 			key := keys[keyIndex]
@@ -348,7 +350,8 @@ func (d *DiskTable) reloadKeymap() error {
 					// This is not cause for alarm (probably).
 					// This can happen when the database is not cleanly shut down,
 					// and just means that some data near the end was not fully committed.
-					d.logger.Infof("truncated value for key %s with address %s", key.Key, key.Address)
+					d.logger.Infof("truncated value for key %s with address %s for segment %d",
+						key.Key, key.Address, i)
 				}
 			}
 
@@ -357,7 +360,7 @@ func (d *DiskTable) reloadKeymap() error {
 				if len(batch) == keymapReloadBatchSize {
 					err = d.keymap.Put(batch)
 					if err != nil {
-						return fmt.Errorf("failed to put keys: %w", err)
+						return fmt.Errorf("failed to put keys for segment %d: %w", i, err)
 					}
 					batch = make([]*types.KAPair, 0, keymapReloadBatchSize)
 				}
@@ -400,7 +403,7 @@ func (d *DiskTable) Name() string {
 // Stop stops the disk table. Flushes all data out to disk.
 func (d *DiskTable) Stop() error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process Stop() request: %w", err)
+		return fmt.Errorf("cannot process Stop() request, DB is in panicked state due to error: %w", err)
 	}
 
 	d.fatalErrorHandler.Shutdown()
@@ -426,7 +429,7 @@ func (d *DiskTable) Stop() error {
 // Destroy stops the disk table and delete all files.
 func (d *DiskTable) Destroy() error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process Destroy() request: %w", err)
+		return fmt.Errorf("Cannot process Destroy() request, DB is in panicked state due to error: %w", err)
 	}
 
 	err := d.Stop()
@@ -452,7 +455,7 @@ func (d *DiskTable) Destroy() error {
 	for _, segDir := range d.segmentDirectories {
 		err = os.Remove(segDir)
 		if err != nil {
-			return fmt.Errorf("failed to remove root directory: %w", err)
+			return fmt.Errorf("failed to remove segment directory: %w", err)
 		}
 	}
 
@@ -493,11 +496,11 @@ func (d *DiskTable) Destroy() error {
 	return nil
 }
 
-// SetTTL sets the TTL for the disk table. If set to 0, no TTL is enforced. This setting effects both new
+// SetTTL sets the TTL for the disk table. If set to 0, no TTL is enforced. This setting affects both new
 // data and data already written.
 func (d *DiskTable) SetTTL(ttl time.Duration) error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process SetTTL() request: %w", err)
+		return fmt.Errorf("Cannot process SetTTL() request, DB is in panicked state due to error: %w", err)
 	}
 
 	err := d.metadata.SetTTL(ttl)
@@ -509,7 +512,8 @@ func (d *DiskTable) SetTTL(ttl time.Duration) error {
 
 func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process SetShardingFactor() request: %w", err)
+		return fmt.Errorf(
+			"Cannot process SetShardingFactor() request, DB is in panicked state due to error: %w", err)
 	}
 
 	if shardingFactor == 0 {
@@ -527,8 +531,9 @@ func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
 	return nil
 }
 
-// getSegment returns the segment with the given index. Segment is reserved, and it is the caller's responsibility to
-// release the reservation when done.
+// getReservedSegment returns the segment with the given index. Segment is reserved, and it is the caller's
+// responsibility to release the reservation when done. Returns true if the segment was found and reserved,
+// and false if the segment could not be found or could not be reserved.
 func (d *DiskTable) getReservedSegment(index uint32) (*segment.Segment, bool) {
 	d.segmentLock.RLock()
 	defer d.segmentLock.RUnlock()
@@ -549,7 +554,8 @@ func (d *DiskTable) getReservedSegment(index uint32) (*segment.Segment, bool) {
 
 func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return nil, false, fmt.Errorf("Cannot process Get() request: %w", err)
+		return nil, false, fmt.Errorf(
+			"Cannot process Get() request, DB is in panicked state due to error: %w", err)
 	}
 
 	var cacheHit bool
@@ -594,14 +600,14 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 		return nil, false, fmt.Errorf("failed to read data: %w", err)
 	}
 
-	dataSize += uint64(len(data))
+	dataSize = uint64(len(data))
 
 	return data, true, nil
 }
 
 func (d *DiskTable) Put(key []byte, value []byte) error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process Put() request: %w", err)
+		return fmt.Errorf("Cannot process Put() request, DB is in panicked state due to error: %w", err)
 	}
 
 	if d.metrics != nil {
@@ -635,7 +641,7 @@ func (d *DiskTable) Put(key []byte, value []byte) error {
 
 func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process PutBatch() request: %w", err)
+		return fmt.Errorf("Cannot process PutBatch() request, DB is in panicked state due to error: %w", err)
 	}
 
 	if d.metrics != nil {
@@ -711,7 +717,7 @@ func (d *DiskTable) Exists(key []byte) (bool, error) {
 // Flush flushes all data to disk. Blocks until all data previously submitted to Put has been written to disk.
 func (d *DiskTable) Flush() error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process Flush() request: %w", err)
+		return fmt.Errorf("Cannot process Flush() request, DB is in panicked state due to error: %w", err)
 	}
 
 	if d.metrics != nil {
@@ -850,7 +856,7 @@ func (d *DiskTable) doGarbageCollection() {
 
 func (d *DiskTable) SetCacheSize(_ uint64) error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process SetCacheSize() request: %w", err)
+		return fmt.Errorf("Cannot process SetCacheSize() request, DB is in panicked state due to error: %w", err)
 	}
 
 	// this implementation does not provide a cache, if a cache is needed then it must be provided by a wrapper
