@@ -124,7 +124,7 @@ jobs:
       - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
-      - run: make eigenda-proxy
+      - run: make build
 
   build-docker:
     runs-on: ubuntu-latest

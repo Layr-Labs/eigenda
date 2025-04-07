@@ -18,7 +18,7 @@ RUN go mod download
 COPY . .
 
 # Build the application binary
-RUN make eigenda-proxy
+RUN make build
 
 # Use alpine to run app
 FROM alpine:3.16
