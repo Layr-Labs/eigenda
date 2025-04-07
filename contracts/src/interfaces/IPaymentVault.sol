@@ -56,20 +56,13 @@ interface IPaymentVault {
     function setReservation(
         address _account, 
         Reservation memory _reservation
-    ) external payable;
+    ) external;
 
     /**
      * @notice This function is called to deposit funds for on demand payment
      * @param _account is the address to deposit the funds for
      */
     function depositOnDemand(address _account) external payable;
-
-    /**
-     * @notice Calculate required payment for symbol rate reservation
-     * @param symbolsPerSecond Number of symbols per second to reserve
-     * @return payment Required payment in wei
-     */
-    function calculateReservationPayment(uint256 symbolsPerSecond, uint256 numPeriods) external view returns (uint256);
 
     /**
      * @notice Control if new reservations can be created
@@ -143,13 +136,6 @@ interface IPaymentVault {
      * @param _amount Amount to withdraw
      */
     function withdraw(uint256 _amount) external;
-
-    /**
-     * @notice Withdraw ERC20 tokens from the contract
-     * @param _token Token to withdraw
-     * @param _amount Amount to withdraw
-     */
-    function withdrawERC20(IERC20 _token, uint256 _amount) external;
 
     /// @notice Fetches the current reservation for a quorum and account
     function getReservation(uint64 _quorumNumber, address _account) external view returns (Reservation memory);

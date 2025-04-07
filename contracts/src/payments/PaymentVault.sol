@@ -82,7 +82,7 @@ contract PaymentVault is OwnableUpgradeable, ReentrancyGuardUpgradeable, Payment
     function setReservation(
         address _account, 
         IPaymentVault.Reservation memory _reservation
-    ) external payable { 
+    ) external { 
         require(newReservationsEnabled, "New reservations are currently disabled");
         require(_reservation.symbolsPerSecond > 0, "Symbols per second must be positive");
         require(quorumOwner[_reservation.quorumNumber].length > 0, "Quorum does not exist");
@@ -106,10 +106,6 @@ contract PaymentVault is OwnableUpgradeable, ReentrancyGuardUpgradeable, Payment
         // Validate timestamp overflow
         require(_reservation.startTimestamp <= type(uint64).max / reservationSchedulePeriod, "Start timestamp too large");
         require(_reservation.endTimestamp - _reservation.startTimestamp <= type(uint256).max / (1000 * 365 days), "Reservation period too long");
-
-        // Calculate required payment
-        uint256 payment = calculateReservationPayment(_reservation.symbolsPerSecond, _reservation.endTimestamp - _reservation.startTimestamp);
-        require(msg.value == payment, "Incorrect payment amount");
 
         // Retrieve the existing reservation (if any)
         IPaymentVault.Reservation storage existingReservation = reservations[_reservation.quorumNumber][_account];
@@ -169,17 +165,6 @@ contract PaymentVault is OwnableUpgradeable, ReentrancyGuardUpgradeable, Payment
         require(newReservationsEnabled != status, "Reservations status already set to the target");
         newReservationsEnabled = status;
         emit NewReservationsStatusChange(status);
-    }
-
-    /**
-     * @notice Calculate required payment for symbol rate reservation
-     * @param symbolsPerSecond Number of symbols per second to reserve
-     * @return payment Required payment in wei
-     */
-    function calculateReservationPayment(uint256 symbolsPerSecond, uint256 numPeriods) public view returns (uint256) {
-        require(symbolsPerSecond <= type(uint256).max / (reservationPeriodInterval * reservationPricePerSymbol), "Symbols per second too large");
-        require(numPeriods <= type(uint256).max / (symbolsPerSecond * reservationPeriodInterval * reservationPricePerSymbol), "Number of periods too large");
-        return symbolsPerSecond * reservationPeriodInterval * numPeriods * reservationPricePerSymbol;
     }
 
     /**
@@ -274,11 +259,6 @@ contract PaymentVault is OwnableUpgradeable, ReentrancyGuardUpgradeable, Payment
         require(_amount <= address(this).balance, "Insufficient balance");
         (bool success,) = payable(owner()).call{value: _amount}("");
         require(success, "Transfer failed");
-    }
-
-    function withdrawERC20(IERC20 _token, uint256 _amount) external onlyOwner nonReentrant {
-        require(_amount <= _token.balanceOf(address(this)), "Insufficient token balance");
-        require(_token.transfer(owner(), _amount), "Transfer failed");
     }
 
     function _checkQuorumSplit(bytes memory _quorumNumbers, bytes memory _quorumSplits) public pure {
