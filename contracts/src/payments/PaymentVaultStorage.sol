@@ -1,30 +1,43 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
+import "../interfaces/IEigenDAStructs.sol";
+import "../interfaces/IPaymentVault.sol";
 
-abstract contract PaymentVaultStorage is IPaymentVault {
+/**
+ * @title Storage variables for the `PaymentVault` contract.
+ * @author Layr Labs, Inc.
+ * @notice This storage contract is separate from the logic to simplify the upgrade process.
+ */
+abstract contract PaymentVaultStorage {
+    // Quorum-specific reservation data
+    mapping(uint64 => mapping(address => IPaymentVault.Reservation)) public reservations;
+    mapping(uint64 => mapping(uint64 => uint64)) public quorumPeriodUsage;
+    mapping(uint64 => uint64) public quorumReservationSymbolsPerPeriod;
+    mapping(uint64 => bytes) public quorumOwner;
+    mapping(uint256 => address) public quorumOwnerAddress;
 
-    /// @notice minimum chargeable size for on-demand payments
-    uint64 public minNumSymbols; 
-    /// @notice price per symbol in wei
-    uint64 public pricePerSymbol; 
-    /// @notice cooldown period before the price can be updated again
-    uint64 public priceUpdateCooldown;    
-    /// @notice timestamp of the last price update
-    uint64 public lastPriceUpdateTime; 
+    // General config
+    uint64 public reservationAdvanceWindow;
+    uint64 public reservationSchedulePeriod;
+    bool public newReservationsEnabled;
 
-    /// @notice maximum number of symbols to disperse per second network-wide for on-demand payments (applied to only ETH and EIGEN)
-    uint64 public globalSymbolsPerPeriod;  
-    /// @notice reservation period interval 
-    uint64 public reservationPeriodInterval;  
-    /// @notice global rate period interval
+    // On-demand payment data
+    mapping(address => IPaymentVault.OnDemandPayment) public onDemandPayments;
+
+    // Reservation parameters
+    uint64 public minNumSymbols;
+    uint64 public pricePerSymbol;
+    uint64 public priceUpdateCooldown;
+    uint64 public lastPriceUpdateTime;
+    uint64 public globalSymbolsPerPeriod;
+    uint64 public reservationPeriodInterval;
     uint64 public globalRatePeriodInterval;
+    uint256 public maxAdvanceWindow;
+    uint256 public maxPermissionlessReservationSymbolsPerSecond;
+    uint256 public reservationPricePerSymbol;
 
-    /// @notice mapping from user address to current reservation 
-    mapping(address => Reservation) public reservations;
-    /// @notice mapping from user address to current on-demand payment
-    mapping(address => OnDemandPayment) public onDemandPayments;
-
-    uint256[46] private __GAP;
+    // storage gap for upgradeability
+    // slither-disable-next-line shadowing-state
+    uint256[39] private __gap;
 }
