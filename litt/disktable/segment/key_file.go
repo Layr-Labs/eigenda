@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 
 	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/Layr-Labs/eigenda/litt/util"
@@ -125,6 +126,19 @@ func (k *keyFile) write(key []byte, address types.Address) error {
 	k.size += uint64(4 + len(key) + 8)
 
 	return nil
+}
+
+// getKeyFileIndex returns the index of the key file from the file name. Key file names have the form "X.keys",
+// where X is the segment index.
+func getKeyFileIndex(fileName string) (uint32, error) {
+	baseName := path.Base(fileName)
+	indexString := baseName[:len(baseName)-len(KeyFileExtension)]
+	index, err := strconv.Atoi(indexString)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse index from file name %s: %v", fileName, err)
+	}
+
+	return uint32(index), nil
 }
 
 // flush flushes the key file to disk.

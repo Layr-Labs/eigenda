@@ -5,78 +5,11 @@ import (
 	"math"
 	"os"
 	"path"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
-
-// MetadataFileExtension is the file extension for the metadata file. Metadata file names have the form "X.metadata",
-// where X is the segment index.
-func getMetadataFileIndex(fileName string) (uint32, error) {
-	indexString := path.Base(fileName)[:len(fileName)-len(MetadataFileExtension)]
-	index, err := strconv.Atoi(indexString)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse index from file name %s: %v", fileName, err)
-	}
-
-	return uint32(index), nil
-}
-
-// getKeyFileIndex returns the index of the key file from the file name. Key file names have the form "X.keys",
-// where X is the segment index.
-func getKeyFileIndex(fileName string) (uint32, error) {
-	baseName := path.Base(fileName)
-	indexString := baseName[:len(baseName)-len(KeyFileExtension)]
-	index, err := strconv.Atoi(indexString)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse index from file name %s: %v", fileName, err)
-	}
-
-	return uint32(index), nil
-}
-
-// getValueFileIndex returns the index of the value file from the file name. Value file names have the form
-// "X-Y.values", where X is the segment index and Y is the shard number.
-func getValueFileIndex(fileName string) (uint32, error) {
-	baseName := path.Base(fileName)
-	indexString := baseName[:len(baseName)-len(ValuesFileExtension)]
-
-	parts := strings.Split(indexString, "-")
-	if len(parts) != 2 {
-		return 0, fmt.Errorf("invalid value file name %s", fileName)
-	}
-	indexString = parts[0]
-
-	index, err := strconv.Atoi(indexString)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse index from file name %s: %v", fileName, err)
-	}
-
-	return uint32(index), nil
-}
-
-// getValueFileShard returns the shard number of the value file from the file name. Value file names have the form
-// "X-Y.values", where X is the segment index and Y is the shard number.
-func getValueFileShard(fileName string) (uint32, error) {
-	baseName := path.Base(fileName)
-	indexString := baseName[:len(baseName)-len(ValuesFileExtension)]
-
-	parts := strings.Split(indexString, "-")
-	if len(parts) != 2 {
-		return 0, fmt.Errorf("invalid value file name %s", fileName)
-	}
-	shardString := parts[1]
-
-	shard, err := strconv.Atoi(shardString)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse shard from file name %s: %v", fileName, err)
-	}
-
-	return uint32(shard), nil
-}
 
 // scanDirectories scans directories for segment files and returns a map of metadata, key, and value files.
 // Also returns a list of garbage files that should be deleted. Does not do anything to files with unrecognized
@@ -88,7 +21,8 @@ func scanDirectories(logger logging.Logger, rootDirectories []string) (
 	garbageFiles []string,
 	highestSegmentIndex uint32,
 	lowestSegmentIndex uint32,
-	isEmpty bool,
+	// containsDBFiles is true if there are any non-garbage DB files discovered in the directories.
+	containsDBFiles bool,
 	err error) {
 
 	highestSegmentIndex = uint32(0)
@@ -166,9 +100,16 @@ func scanDirectories(logger logging.Logger, rootDirectories []string) (
 		lowestSegmentIndex = 0
 	}
 
-	isEmpty = len(metadataFiles) == 0 && len(keyFiles) == 0 && len(valueFiles) == 0
+	containsDBFiles = len(metadataFiles) == 0 && len(keyFiles) == 0 && len(valueFiles) == 0
 
-	return metadataFiles, keyFiles, valueFiles, garbageFiles, highestSegmentIndex, lowestSegmentIndex, isEmpty, nil
+	return metadataFiles,
+		keyFiles,
+		valueFiles,
+		garbageFiles,
+		highestSegmentIndex,
+		lowestSegmentIndex,
+		containsDBFiles,
+		nil
 }
 
 // diagnoseMissingFile decides what to do with specific missing files. If the segment is either the segment
@@ -200,8 +141,9 @@ func diagnoseMissingFile(
 }
 
 // lookForMissingFiles ensures that all files that should be present are actually present. Returns an error
-// if files are missing in a way that cannot be recovered. If recoverable, returns a set of segments that
-// have orphaned files.
+// if files are missing in a way that cannot be recovered. If recoverable, returns a list of orphaned files.
+// An "orphaned file" is defined as a file on disk for a segment that is missing one or more of its files.
+// For example, if a segment has a metadata file but is missing its key file, the metadata file is considered orphaned.
 func lookForMissingFiles(
 	logger logging.Logger,
 	lowestSegmentIndex uint32,
@@ -363,7 +305,7 @@ func GatherSegmentFiles(
 	fsync bool) (lowestSegmentIndex uint32, highestSegmentIndex uint32, segments map[uint32]*Segment, err error) {
 
 	// Scan the root directories for segment files.
-	metadataFiles, keyFiles, valueFiles, garbageFiles, highestSegmentIndex, lowestSegmentIndex, isEmpty, err :=
+	metadataFiles, keyFiles, valueFiles, garbageFiles, highestSegmentIndex, lowestSegmentIndex, containsDBFiles, err :=
 		scanDirectories(logger, rootDirectories)
 	if err != nil {
 		return 0, 0, nil,
@@ -373,7 +315,7 @@ func GatherSegmentFiles(
 	segments = make(map[uint32]*Segment)
 
 	// Delete any garbage files. Ignore files with unrecognized extensions.
-	if !isEmpty {
+	if !containsDBFiles {
 		for _, garbageFile := range garbageFiles {
 			logger.Infof("deleting file %s", garbageFile)
 			err = os.Remove(garbageFile)

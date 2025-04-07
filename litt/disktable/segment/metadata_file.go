@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/litt/util"
@@ -108,6 +109,18 @@ func newMetadataFile(
 	}
 
 	return file, nil
+}
+
+// MetadataFileExtension is the file extension for the metadata file. Metadata file names have the form "X.metadata",
+// where X is the segment index.
+func getMetadataFileIndex(fileName string) (uint32, error) {
+	indexString := path.Base(fileName)[:len(fileName)-len(MetadataFileExtension)]
+	index, err := strconv.Atoi(indexString)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse index from file name %s: %v", fileName, err)
+	}
+
+	return uint32(index), nil
 }
 
 // Size returns the size of the metadata file in bytes.

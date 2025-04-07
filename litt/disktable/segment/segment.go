@@ -423,6 +423,9 @@ func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
 		return nil, fmt.Errorf("failed to flush segment: %v", err)
 	}
 	addresses, err := flushWaitFunction()
+	if err != nil {
+		return nil, fmt.Errorf("failed to flush segment: %v", err)
+	}
 
 	// Seal the metadata file.
 	err = s.metadata.seal(now)
@@ -464,8 +467,9 @@ func (s *Segment) Reserve() bool {
 	}
 }
 
-// Release releases the segment, allowing it to be deleted. Deletion happens inside this method if the reservation count
-// reaches zero as a result of this call.
+// Release releases a reservation held on this segment. A segment cannot be deleted until all reservations on it
+// have been released. The last call to Release() that releases the final reservation schedules the segment for
+// asynchronous deletion.
 func (s *Segment) Release() {
 	reservations := s.reservationCount.Add(-1)
 
@@ -506,17 +510,17 @@ func (s *Segment) delete() error {
 
 	err := s.keys.delete()
 	if err != nil {
-		return fmt.Errorf("failed to delete key file: %v", err)
+		return fmt.Errorf("failed to delete key file, segment %d: %v", s.index, err)
 	}
-	for _, shard := range s.shards {
+	for shardIndex, shard := range s.shards {
 		err = shard.delete()
 		if err != nil {
-			return fmt.Errorf("failed to delete value file: %v", err)
+			return fmt.Errorf("failed to delete value file, segment %d, shard %d: %v", s.index, shardIndex, err)
 		}
 	}
 	err = s.metadata.delete()
 	if err != nil {
-		return fmt.Errorf("failed to delete metadata file: %v", err)
+		return fmt.Errorf("failed to delete metadata file, segment %d: %v", s.index, err)
 	}
 
 	// The next segment is now eligible for deletion once it is fully released by other reservation holders.
