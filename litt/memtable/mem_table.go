@@ -14,7 +14,7 @@ import (
 
 var _ litt.ManagedTable = &memTable{}
 
-// expirationRecord is a record of when a key was inserted into the table, and for when it should be deleted.
+// expirationRecord is a record of when a key was inserted into the table.
 type expirationRecord struct {
 	// The time at which the key was inserted into the table.
 	creationTime time.Time

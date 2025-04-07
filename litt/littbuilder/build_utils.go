@@ -1,7 +1,6 @@
 package littbuilder
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -47,9 +46,9 @@ func buildKeymap(
 			fmt.Errorf("unsupported keymap type: %v", config.KeymapType)
 	}
 
-	keymapDirectories := make([]string, len(config.Paths))
+	potentialKeymapDirectories := make([]string, len(config.Paths))
 	for i, p := range config.Paths {
-		keymapDirectories[i] = path.Join(p, tableName, keymap.KeymapDirectoryName)
+		potentialKeymapDirectories[i] = path.Join(p, tableName, keymap.KeymapDirectoryName)
 	}
 
 	// The directory where the keymap data is stored. There are multiple plausible directories, but there
@@ -60,7 +59,7 @@ func buildKeymap(
 	// the keymap will need to be reloaded as a part of the table initialization.
 	var keymapInitialized bool
 
-	for _, directory := range keymapDirectories {
+	for _, directory := range potentialKeymapDirectories {
 		exists, err := util.Exists(directory)
 		if err != nil {
 			return nil, "", nil, false,
@@ -111,7 +110,7 @@ func buildKeymap(
 		newKeymap = true
 
 		// by convention, always select the first path as the keymap directory
-		keymapDirectory = keymapDirectories[0]
+		keymapDirectory = potentialKeymapDirectories[0]
 		keymapTypeFile = keymap.NewKeymapTypeFile(keymapDirectory, config.KeymapType)
 
 		// create the keymap directory
@@ -185,7 +184,6 @@ func buildKeymap(
 // buildTable creates a new table based on the configuration.
 func buildTable(
 	config *litt.Config,
-	ctx context.Context,
 	logger logging.Logger,
 	name string,
 	metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
@@ -246,7 +244,7 @@ func buildMetrics(config *litt.Config, logger logging.Logger) (*metrics.LittDBMe
 	var registry *prometheus.Registry
 	var server *http.Server
 
-	if config.MetricsRegistry != nil {
+	if config.MetricsRegistry == nil && config.MetricsEnabled {
 		registry = prometheus.NewRegistry()
 		registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 		registry.MustRegister(collectors.NewGoCollector())

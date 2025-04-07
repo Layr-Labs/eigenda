@@ -21,7 +21,7 @@ type Table interface {
 	Put(key []byte, value []byte) error
 
 	// PutBatch stores multiple values in the database. Similar to Put, but allows for multiple values to be written
-	// at once. This may improve performance, but is otherwise has identical properties to a sequence of Put calls
+	// at once. This may improve performance, but it otherwise has identical properties to a sequence of Put calls
 	// (i.e. this method does not atomically write the entire batch).
 	//
 	// It is not thread safe to modify the byte slices passed to this function after the call
@@ -73,7 +73,7 @@ type Table interface {
 
 	// SetCacheSize sets the cache size, in bytes, for the table. For tables without a cache, this method does nothing.
 	// If the cache size is set to 0 (default), the cache is disabled. The size of each cache entry is equal to the sum
-	// the key length and the value length. Note that the actual in-memory footprint if the cache will be slightly
+	// of key length and the value length. Note that the actual in-memory footprint of the cache will be slightly
 	// larger than the cache size due to implementation overhead (e.g. pointers, slice headers, map entries, etc.).
 	SetCacheSize(size uint64) error
 }
