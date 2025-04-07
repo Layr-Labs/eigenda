@@ -37,7 +37,7 @@ func setupTestContext(t *testing.T) *testContext {
 	// Create the OffchainStore
 	logger := testutils.GetLogger()
 	var err error
-	tc.store, err = meterer.NewOffchainStore(
+	tc.store, err = meterer.NewLevelDBOffchainStore(
 		dbPath,
 		logger,
 	)
