@@ -502,7 +502,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		panic("failed to make initial query to the on-chain state")
 	}
 
-	store, err := meterer.NewOffchainStore(
+	store, err := meterer.NewLevelDBOffchainStore(
 		"./testdata/server_v2_test_"+t.Name(),
 		logger,
 	)

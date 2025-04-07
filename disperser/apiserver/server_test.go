@@ -785,7 +785,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 		QuorumSplits:     []byte{50, 50},
 	}, nil)
 
-	store, err := meterer.NewOffchainStore(
+	store, err := meterer.NewLevelDBOffchainStore(
 		"./testdata/server_test_"+testName,
 		logger,
 	)
