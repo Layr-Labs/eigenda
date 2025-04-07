@@ -4,6 +4,8 @@
 // - protoc             v4.23.4
 // source: validator/node_v2.proto
 
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX // Skip this rule to not create a breaking change.
+
 package validator
 
 import (
@@ -32,8 +34,13 @@ type DispersalClient interface {
 	// the validator is able to acquire and validate the chunks, it returns a signature over the batch header.
 	// This RPC describes which chunks the validator should store but does not contain that chunk data. The validator
 	// is expected to fetch the chunk data from one of the relays that is in possession of the chunk.
+	//
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	StoreChunks(ctx context.Context, in *StoreChunksRequest, opts ...grpc.CallOption) (*StoreChunksReply, error)
 	// GetNodeInfo fetches metadata about the node.
+	//
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
+	// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.
 	GetNodeInfo(ctx context.Context, in *GetNodeInfoRequest, opts ...grpc.CallOption) (*GetNodeInfoReply, error)
 }
 
@@ -72,8 +79,13 @@ type DispersalServer interface {
 	// the validator is able to acquire and validate the chunks, it returns a signature over the batch header.
 	// This RPC describes which chunks the validator should store but does not contain that chunk data. The validator
 	// is expected to fetch the chunk data from one of the relays that is in possession of the chunk.
+	//
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	StoreChunks(context.Context, *StoreChunksRequest) (*StoreChunksReply, error)
 	// GetNodeInfo fetches metadata about the node.
+	//
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
+	// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.
 	GetNodeInfo(context.Context, *GetNodeInfoRequest) (*GetNodeInfoReply, error)
 	mustEmbedUnimplementedDispersalServer()
 }
@@ -168,8 +180,13 @@ const (
 type RetrievalClient interface {
 	// GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally
 	// faster to retrieve chunks from the relay service if that service is available.
+	//
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	GetChunks(ctx context.Context, in *GetChunksRequest, opts ...grpc.CallOption) (*GetChunksReply, error)
 	// Retrieve node info metadata
+	//
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
+	// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.
 	GetNodeInfo(ctx context.Context, in *GetNodeInfoRequest, opts ...grpc.CallOption) (*GetNodeInfoReply, error)
 }
 
@@ -205,8 +222,13 @@ func (c *retrievalClient) GetNodeInfo(ctx context.Context, in *GetNodeInfoReques
 type RetrievalServer interface {
 	// GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally
 	// faster to retrieve chunks from the relay service if that service is available.
+	//
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	GetChunks(context.Context, *GetChunksRequest) (*GetChunksReply, error)
 	// Retrieve node info metadata
+	//
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
+	// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.
 	GetNodeInfo(context.Context, *GetNodeInfoRequest) (*GetNodeInfoReply, error)
 	mustEmbedUnimplementedRetrievalServer()
 }

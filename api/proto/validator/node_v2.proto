@@ -145,7 +145,7 @@ enum ChunkEncodingFormat {
   // - Frame.SerializeGnark()
   // - Frame.DeserializeGnark()
   // Package: github.com/Layr-Labs/eigenda/encoding
-  // 
+  //
   // buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
   GNARK = 1;
 }

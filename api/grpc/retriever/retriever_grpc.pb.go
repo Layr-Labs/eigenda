@@ -4,6 +4,8 @@
 // - protoc             v4.23.4
 // source: retriever/retriever.proto
 
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX // Skip this rule to not create a breaking change.
+
 package retriever
 
 import (
@@ -28,6 +30,9 @@ const (
 type RetrieverClient interface {
 	// This fans out request to EigenDA Nodes to retrieve the chunks and returns the
 	// reconstructed original blob in response.
+	//
+	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	RetrieveBlob(ctx context.Context, in *BlobRequest, opts ...grpc.CallOption) (*BlobReply, error)
 }
 
@@ -54,6 +59,9 @@ func (c *retrieverClient) RetrieveBlob(ctx context.Context, in *BlobRequest, opt
 type RetrieverServer interface {
 	// This fans out request to EigenDA Nodes to retrieve the chunks and returns the
 	// reconstructed original blob in response.
+	//
+	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	RetrieveBlob(context.Context, *BlobRequest) (*BlobReply, error)
 	mustEmbedUnimplementedRetrieverServer()
 }

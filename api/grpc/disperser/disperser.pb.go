@@ -4,6 +4,8 @@
 // 	protoc        v4.23.4
 // source: disperser/disperser.proto
 
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX // Skip this rule to not create a breaking change.
+
 package disperser
 
 import (
@@ -35,11 +37,17 @@ const (
 type BlobStatus int32
 
 const (
+	// buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
+	// buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX // Skip this rule to not create a breaking change.
 	BlobStatus_UNKNOWN BlobStatus = 0
 	// PROCESSING means that the blob is currently being processed by the disperser
+	//
+	// buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
 	BlobStatus_PROCESSING BlobStatus = 1
 	// CONFIRMED means that the blob has been dispersed to DA Nodes and the dispersed
 	// batch containing the blob has been confirmed onchain
+	//
+	// buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
 	BlobStatus_CONFIRMED BlobStatus = 2
 	// FAILED means that the blob has failed permanently (for reasons other than insufficient
 	// signatures, which is a separate state). This status is somewhat of a catch-all category,
@@ -48,15 +56,23 @@ const (
 	//   - internal logic error while requesting encoding
 	//   - blob retry has exceeded its limit while waiting for blob finalization after confirmation.
 	//     Most likely triggered by a chain reorg: see https://github.com/Layr-Labs/eigenda/blob/master/disperser/batcher/finalizer.go#L179-L189.
+	//
+	// buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
 	BlobStatus_FAILED BlobStatus = 3
 	// FINALIZED means that the block containing the blob's confirmation transaction has been finalized on Ethereum
+	//
+	// buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
 	BlobStatus_FINALIZED BlobStatus = 4
 	// INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met
 	// for at least one quorum.
+	//
+	// buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
 	BlobStatus_INSUFFICIENT_SIGNATURES BlobStatus = 5
 	// The DISPERSING state is comprised of two separate phases:
 	//   - Dispersing to DA nodes and collecting signature
 	//   - Submitting the transaction on chain and waiting for tx receipt
+	//
+	// buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
 	BlobStatus_DISPERSING BlobStatus = 6
 )
 

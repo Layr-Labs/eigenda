@@ -75,9 +75,13 @@ relay manages the blobs that it has processed, whereas the Retriever.RetrieveBlo
 (the 2nd approach here) removes the need to trust the relay, with the downside of
 worse cost and performance.
 
+buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
+
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| RetrieveBlob | [BlobRequest](#retriever-v2-BlobRequest) | [BlobReply](#retriever-v2-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response. |
+| RetrieveBlob | [BlobRequest](#retriever-v2-BlobRequest) | [BlobReply](#retriever-v2-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response.
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
 
  
 

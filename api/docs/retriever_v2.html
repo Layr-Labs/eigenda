@@ -278,7 +278,7 @@ multiple quorums). </p></td>
 
       
         <h3 id="retriever.v2.Retriever">Retriever</h3>
-        <p>The Retriever is a service for retrieving chunks corresponding to a blob from</p><p>the EigenDA operator nodes and reconstructing the original blob from the chunks.</p><p>This is a client-side library that the users are supposed to operationalize.</p><p>Note: Users generally have two ways to retrieve a blob from EigenDA V2:</p><p>1) Retrieve from the relay that the blob is assigned to: the API</p><p>is Relay.GetBlob() as defined in api/proto/relay/relay.proto</p><p>2) Retrieve directly from the EigenDA Nodes, which is supported by this Retriever.</p><p>The Relay.GetBlob() (the 1st approach) is generally faster and cheaper as the</p><p>relay manages the blobs that it has processed, whereas the Retriever.RetrieveBlob()</p><p>(the 2nd approach here) removes the need to trust the relay, with the downside of</p><p>worse cost and performance.</p>
+        <p>The Retriever is a service for retrieving chunks corresponding to a blob from</p><p>the EigenDA operator nodes and reconstructing the original blob from the chunks.</p><p>This is a client-side library that the users are supposed to operationalize.</p><p>Note: Users generally have two ways to retrieve a blob from EigenDA V2:</p><p>1) Retrieve from the relay that the blob is assigned to: the API</p><p>is Relay.GetBlob() as defined in api/proto/relay/relay.proto</p><p>2) Retrieve directly from the EigenDA Nodes, which is supported by this Retriever.</p><p>The Relay.GetBlob() (the 1st approach) is generally faster and cheaper as the</p><p>relay manages the blobs that it has processed, whereas the Retriever.RetrieveBlob()</p><p>(the 2nd approach here) removes the need to trust the relay, with the downside of</p><p>worse cost and performance.</p><p>buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -290,7 +290,10 @@ multiple quorums). </p></td>
                 <td><a href="#retriever.v2.BlobRequest">BlobRequest</a></td>
                 <td><a href="#retriever.v2.BlobReply">BlobReply</a></td>
                 <td><p>This fans out request to EigenDA Nodes to retrieve the chunks and returns the
-reconstructed original blob in response.</p></td>
+reconstructed original blob in response.
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
+buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.</p></td>
               </tr>
             
           </tbody>

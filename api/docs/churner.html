@@ -413,7 +413,7 @@ concat(&#34;churn&#34;, time.Now(), operatorToChurn&#39;s OperatorID, Churner&#3
 
       
         <h3 id="churner.Churner">Churner</h3>
-        <p>The Churner is a service that handles churn requests from new operators trying to</p><p>join the EigenDA network.</p><p>When the EigenDA network reaches the maximum number of operators, any new operator</p><p>trying to join will have to make a churn request to this Churner, which acts as the</p><p>sole decision maker to decide whether this new operator could join, and if so, which</p><p>existing operator will be churned out (so the max number of operators won't be</p><p>exceeded).</p><p>The max number of operators, as well as the rules to make churn decisions, are</p><p>defined onchain, see details in OperatorSetParam at:</p><p>https://github.com/Layr-Labs/eigenlayer-middleware/blob/master/src/interfaces/IBLSRegistryCoordinatorWithIndices.sol#L24.</p>
+        <p>The Churner is a service that handles churn requests from new operators trying to</p><p>join the EigenDA network.</p><p>When the EigenDA network reaches the maximum number of operators, any new operator</p><p>trying to join will have to make a churn request to this Churner, which acts as the</p><p>sole decision maker to decide whether this new operator could join, and if so, which</p><p>existing operator will be churned out (so the max number of operators won't be</p><p>exceeded).</p><p>The max number of operators, as well as the rules to make churn decisions, are</p><p>defined onchain, see details in OperatorSetParam at:</p><p>https://github.com/Layr-Labs/eigenlayer-middleware/blob/master/src/interfaces/IBLSRegistryCoordinatorWithIndices.sol#L24.</p><p>buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -424,7 +424,7 @@ concat(&#34;churn&#34;, time.Now(), operatorToChurn&#39;s OperatorID, Churner&#3
                 <td>Churn</td>
                 <td><a href="#churner.ChurnRequest">ChurnRequest</a></td>
                 <td><a href="#churner.ChurnReply">ChurnReply</a></td>
-                <td><p></p></td>
+                <td><p>buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.</p></td>
               </tr>
             
           </tbody>

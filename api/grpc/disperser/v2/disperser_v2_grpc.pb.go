@@ -33,8 +33,14 @@ type DisperserClient interface {
 	// This executes the dispersal asynchronously, i.e. it returns once the request
 	// is accepted. The client could use GetBlobStatus() API to poll the the
 	// processing status of the blob.
+	//
+	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	DisperseBlob(ctx context.Context, in *DisperseBlobRequest, opts ...grpc.CallOption) (*DisperseBlobReply, error)
 	// GetBlobStatus is meant to be polled for the blob status.
+	//
+	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	GetBlobStatus(ctx context.Context, in *BlobStatusRequest, opts ...grpc.CallOption) (*BlobStatusReply, error)
 	// GetBlobCommitment is a utility method that calculates commitment for a blob payload.
 	// It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header
@@ -42,6 +48,9 @@ type DisperserClient interface {
 	//
 	// For an example usage, see how our disperser_client makes a call to this endpoint when it doesn't have a local prover:
 	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166
+	//
+	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	GetBlobCommitment(ctx context.Context, in *BlobCommitmentRequest, opts ...grpc.CallOption) (*BlobCommitmentReply, error)
 	// GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
 	// EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
@@ -51,6 +60,9 @@ type DisperserClient interface {
 	//
 	// For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
 	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
+	//
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
+	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
 	GetPaymentState(ctx context.Context, in *GetPaymentStateRequest, opts ...grpc.CallOption) (*GetPaymentStateReply, error)
 }
 
@@ -106,8 +118,14 @@ type DisperserServer interface {
 	// This executes the dispersal asynchronously, i.e. it returns once the request
 	// is accepted. The client could use GetBlobStatus() API to poll the the
 	// processing status of the blob.
+	//
+	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	DisperseBlob(context.Context, *DisperseBlobRequest) (*DisperseBlobReply, error)
 	// GetBlobStatus is meant to be polled for the blob status.
+	//
+	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	GetBlobStatus(context.Context, *BlobStatusRequest) (*BlobStatusReply, error)
 	// GetBlobCommitment is a utility method that calculates commitment for a blob payload.
 	// It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header
@@ -115,6 +133,9 @@ type DisperserServer interface {
 	//
 	// For an example usage, see how our disperser_client makes a call to this endpoint when it doesn't have a local prover:
 	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166
+	//
+	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	GetBlobCommitment(context.Context, *BlobCommitmentRequest) (*BlobCommitmentReply, error)
 	// GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
 	// EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
@@ -124,6 +145,9 @@ type DisperserServer interface {
 	//
 	// For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
 	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
+	//
+	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
+	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
 	GetPaymentState(context.Context, *GetPaymentStateRequest) (*GetPaymentStateReply, error)
 	mustEmbedUnimplementedDisperserServer()
 }

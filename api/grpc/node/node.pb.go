@@ -4,6 +4,8 @@
 // 	protoc        v4.23.4
 // source: node/node.proto
 
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX // Skip this rule to not create a breaking change.
+
 package node
 
 import (
@@ -27,9 +29,13 @@ const (
 type ChunkEncodingFormat int32
 
 const (
+	// buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
+	// buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX // Skip this rule to not create a breaking change.
 	ChunkEncodingFormat_UNKNOWN ChunkEncodingFormat = 0
-	ChunkEncodingFormat_GNARK   ChunkEncodingFormat = 1
-	ChunkEncodingFormat_GOB     ChunkEncodingFormat = 2
+	// buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
+	ChunkEncodingFormat_GNARK ChunkEncodingFormat = 1
+	// buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
+	ChunkEncodingFormat_GOB ChunkEncodingFormat = 2
 )
 
 // Enum value maps for ChunkEncodingFormat.

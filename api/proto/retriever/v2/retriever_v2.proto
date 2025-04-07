@@ -23,7 +23,7 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/retriever/v2";
 service Retriever {
   // This fans out request to EigenDA Nodes to retrieve the chunks and returns the
   // reconstructed original blob in response.
-  // 
+  //
   // buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
   // buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
   rpc RetrieveBlob(BlobRequest) returns (BlobReply) {}

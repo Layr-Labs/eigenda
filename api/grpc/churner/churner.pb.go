@@ -4,6 +4,10 @@
 // 	protoc        v4.23.4
 // source: churner/churner.proto
 
+// Skip this rule for this package name. Changing name creates a breaking change.
+// See https://buf.build/docs/lint/overview/#comment-ignores
+// buf:lint:ignore PACKAGE_VERSION_SUFFIX
+
 package churner
 
 import (

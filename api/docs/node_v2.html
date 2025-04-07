@@ -402,7 +402,8 @@ The ID must be in range [0, 254]. </p></td>
                   <td>disperserID</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p>ID of the disperser that is requesting the storage of the batch. </p></td>
+                  <td><p>ID of the disperser that is requesting the storage of the batch.
+buf:lint:ignore FIELD_LOWER_SNAKE_CASE // Skip this rule to not create a breaking change. </p></td>
                 </tr>
               
                 <tr>
@@ -477,7 +478,9 @@ Note that this signature is not included in the hash for obvious reasons. </p></
                 <td>UNKNOWN</td>
                 <td>0</td>
                 <td><p>A valid response should never use this value.
-If encountered, the client should treat it as an error.</p></td>
+If encountered, the client should treat it as an error.
+buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
+buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX // Skip this rule to not create a breaking change.</p></td>
               </tr>
             
               <tr>
@@ -501,7 +504,9 @@ References:
 Golang serialization and deserialization can be found in:
 - Frame.SerializeGnark()
 - Frame.DeserializeGnark()
-Package: github.com/Layr-Labs/eigenda/encoding</p></td>
+Package: github.com/Layr-Labs/eigenda/encoding
+
+buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.</p></td>
               </tr>
             
           </tbody>
@@ -512,7 +517,7 @@ Package: github.com/Layr-Labs/eigenda/encoding</p></td>
 
       
         <h3 id="validator.Dispersal">Dispersal</h3>
-        <p>Dispersal is utilized to disperse chunk data.</p>
+        <p>Dispersal is utilized to disperse chunk data.</p><p>buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -527,14 +532,19 @@ Package: github.com/Layr-Labs/eigenda/encoding</p></td>
 either acquires the chunks or the validator determines that it is unable to acquire the chunks. If
 the validator is able to acquire and validate the chunks, it returns a signature over the batch header.
 This RPC describes which chunks the validator should store but does not contain that chunk data. The validator
-is expected to fetch the chunk data from one of the relays that is in possession of the chunk.</p></td>
+is expected to fetch the chunk data from one of the relays that is in possession of the chunk.
+
+buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.</p></td>
               </tr>
             
               <tr>
                 <td>GetNodeInfo</td>
                 <td><a href="#validator.GetNodeInfoRequest">GetNodeInfoRequest</a></td>
                 <td><a href="#validator.GetNodeInfoReply">GetNodeInfoReply</a></td>
-                <td><p>GetNodeInfo fetches metadata about the node.</p></td>
+                <td><p>GetNodeInfo fetches metadata about the node.
+
+buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
+buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.</p></td>
               </tr>
             
           </tbody>
@@ -542,7 +552,7 @@ is expected to fetch the chunk data from one of the relays that is in possession
 
         
         <h3 id="validator.Retrieval">Retrieval</h3>
-        <p>Retrieval is utilized to retrieve chunk data.</p>
+        <p>Retrieval is utilized to retrieve chunk data.</p><p>buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -554,14 +564,19 @@ is expected to fetch the chunk data from one of the relays that is in possession
                 <td><a href="#validator.GetChunksRequest">GetChunksRequest</a></td>
                 <td><a href="#validator.GetChunksReply">GetChunksReply</a></td>
                 <td><p>GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally
-faster to retrieve chunks from the relay service if that service is available.</p></td>
+faster to retrieve chunks from the relay service if that service is available.
+
+buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.</p></td>
               </tr>
             
               <tr>
                 <td>GetNodeInfo</td>
                 <td><a href="#validator.GetNodeInfoRequest">GetNodeInfoRequest</a></td>
                 <td><a href="#validator.GetNodeInfoReply">GetNodeInfoReply</a></td>
-                <td><p>Retrieve node info metadata</p></td>
+                <td><p>Retrieve node info metadata
+
+buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
+buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.</p></td>
               </tr>
             
           </tbody>

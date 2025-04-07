@@ -229,9 +229,11 @@ The max number of operators, as well as the rules to make churn decisions, are
 defined onchain, see details in OperatorSetParam at:
 https://github.com/Layr-Labs/eigenlayer-middleware/blob/master/src/interfaces/IBLSRegistryCoordinatorWithIndices.sol#L24.
 
+buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
+
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| Churn | [ChurnRequest](#churner-ChurnRequest) | [ChurnReply](#churner-ChurnReply) |  |
+| Churn | [ChurnRequest](#churner-ChurnRequest) | [ChurnReply](#churner-ChurnReply) | buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
 
  
 
@@ -714,13 +716,25 @@ Terminal states are states that will not be updated to a different state:
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
-| UNKNOWN | 0 |  |
-| PROCESSING | 1 | PROCESSING means that the blob is currently being processed by the disperser |
-| CONFIRMED | 2 | CONFIRMED means that the blob has been dispersed to DA Nodes and the dispersed batch containing the blob has been confirmed onchain |
-| FAILED | 3 | FAILED means that the blob has failed permanently (for reasons other than insufficient signatures, which is a separate state). This status is somewhat of a catch-all category, containing (but not necessarily exclusively as errors can be added in the future): - blob has expired - internal logic error while requesting encoding - blob retry has exceeded its limit while waiting for blob finalization after confirmation. Most likely triggered by a chain reorg: see https://github.com/Layr-Labs/eigenda/blob/master/disperser/batcher/finalizer.go#L179-L189. |
-| FINALIZED | 4 | FINALIZED means that the block containing the blob&#39;s confirmation transaction has been finalized on Ethereum |
-| INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met for at least one quorum. |
-| DISPERSING | 6 | The DISPERSING state is comprised of two separate phases: - Dispersing to DA nodes and collecting signature - Submitting the transaction on chain and waiting for tx receipt |
+| UNKNOWN | 0 | buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX // Skip this rule to not create a breaking change. |
+| PROCESSING | 1 | PROCESSING means that the blob is currently being processed by the disperser
+
+buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
+| CONFIRMED | 2 | CONFIRMED means that the blob has been dispersed to DA Nodes and the dispersed batch containing the blob has been confirmed onchain
+
+buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
+| FAILED | 3 | FAILED means that the blob has failed permanently (for reasons other than insufficient signatures, which is a separate state). This status is somewhat of a catch-all category, containing (but not necessarily exclusively as errors can be added in the future): - blob has expired - internal logic error while requesting encoding - blob retry has exceeded its limit while waiting for blob finalization after confirmation. Most likely triggered by a chain reorg: see https://github.com/Layr-Labs/eigenda/blob/master/disperser/batcher/finalizer.go#L179-L189.
+
+buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
+| FINALIZED | 4 | FINALIZED means that the block containing the blob&#39;s confirmation transaction has been finalized on Ethereum
+
+buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
+| INSUFFICIENT_SIGNATURES | 5 | INSUFFICIENT_SIGNATURES means that the confirmation threshold for the blob was not met for at least one quorum.
+
+buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
+| DISPERSING | 6 | The DISPERSING state is comprised of two separate phases: - Dispersing to DA nodes and collecting signature - Submitting the transaction on chain and waiting for tx receipt
+
+buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
 
 
  
@@ -733,14 +747,24 @@ Terminal states are states that will not be updated to a different state:
 ### Disperser
 Disperser defines the public APIs for dispersing blobs.
 
+buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
+
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | DisperseBlob | [DisperseBlobRequest](#disperser-DisperseBlobRequest) | [DisperseBlobReply](#disperser-DisperseBlobReply) | DisperseBlob accepts a single blob to be dispersed. This executes the dispersal async, i.e. it returns once the request is accepted. The client should use GetBlobStatus() API to poll the processing status of the blob.
 
-If DisperseBlob returns the following error codes: INVALID_ARGUMENT (400): request is invalid for a reason specified in the error msg. RESOURCE_EXHAUSTED (429): request is rate limited for the quorum specified in the error msg. user should retry after the specified duration. INTERNAL (500): serious error, user should NOT retry. |
-| DisperseBlobAuthenticated | [AuthenticatedRequest](#disperser-AuthenticatedRequest) stream | [AuthenticatedReply](#disperser-AuthenticatedReply) stream | DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the client to authenticate itself via the AuthenticationData message. The protocol is as follows: 1. The client sends a DisperseBlobAuthenticated request with the DisperseBlobRequest message 2. The Disperser sends back a BlobAuthHeader message containing information for the client to verify and sign. 3. The client verifies the BlobAuthHeader and sends back the signed BlobAuthHeader in an 	 AuthenticationData message. 4. The Disperser verifies the signature and returns a DisperseBlobReply message. |
-| GetBlobStatus | [BlobStatusRequest](#disperser-BlobStatusRequest) | [BlobStatusReply](#disperser-BlobStatusReply) | This API is meant to be polled for the blob status. |
-| RetrieveBlob | [RetrieveBlobRequest](#disperser-RetrieveBlobRequest) | [RetrieveBlobReply](#disperser-RetrieveBlobReply) | This retrieves the requested blob from the Disperser&#39;s backend. This is a more efficient way to retrieve blobs than directly retrieving from the DA Nodes (see detail about this approach in api/proto/retriever/retriever.proto). The blob should have been initially dispersed via this Disperser service for this API to work. |
+If DisperseBlob returns the following error codes: INVALID_ARGUMENT (400): request is invalid for a reason specified in the error msg. RESOURCE_EXHAUSTED (429): request is rate limited for the quorum specified in the error msg. user should retry after the specified duration. INTERNAL (500): serious error, user should NOT retry.
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
+| DisperseBlobAuthenticated | [AuthenticatedRequest](#disperser-AuthenticatedRequest) stream | [AuthenticatedReply](#disperser-AuthenticatedReply) stream | DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the client to authenticate itself via the AuthenticationData message. The protocol is as follows: 1. The client sends a DisperseBlobAuthenticated request with the DisperseBlobRequest message 2. The Disperser sends back a BlobAuthHeader message containing information for the client to verify and sign. 3. The client verifies the BlobAuthHeader and sends back the signed BlobAuthHeader in an 	 AuthenticationData message. 4. The Disperser verifies the signature and returns a DisperseBlobReply message.
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
+| GetBlobStatus | [BlobStatusRequest](#disperser-BlobStatusRequest) | [BlobStatusReply](#disperser-BlobStatusReply) | This API is meant to be polled for the blob status.
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
+| RetrieveBlob | [RetrieveBlobRequest](#disperser-RetrieveBlobRequest) | [RetrieveBlobReply](#disperser-RetrieveBlobReply) | This retrieves the requested blob from the Disperser&#39;s backend. This is a more efficient way to retrieve blobs than directly retrieving from the DA Nodes (see detail about this approach in api/proto/retriever/retriever.proto). The blob should have been initially dispersed via this Disperser service for this API to work.
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
 
  
 
@@ -1024,12 +1048,24 @@ Terminal states are states that will not be updated to a different state:
 | ---- | ------ | ----------- |
 | UNKNOWN | 0 | UNKNOWN means that the status of the blob is unknown. This is a catch all and should not be encountered absent a bug.
 
-This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an unanticipated bug. |
-| QUEUED | 1 | QUEUED means that the blob has been queued by the disperser for processing. The DisperseBlob API is asynchronous, meaning that after request validation, but before any processing, the blob is stored in a queue of some sort, and a response immediately returned to the client. |
-| ENCODED | 2 | ENCODED means that the blob has been Reed-Solomon encoded into chunks and is ready to be dispersed to DA Nodes. |
-| GATHERING_SIGNATURES | 3 | GATHERING_SIGNATURES means that the blob chunks are currently actively being transmitted to validators, and in doing so requesting that the validators sign to acknowledge receipt of the blob. Requests that timeout or receive errors are resubmitted to DA nodes for some period of time set by the disperser, after which the BlobStatus becomes COMPLETE. |
-| COMPLETE | 4 | COMPLETE means the blob has been dispersed to DA nodes, and the GATHERING_SIGNATURES period of time has completed. This status does not guarantee any signer percentage, so a client should check that the signature has met its required threshold, and resubmit a new blob dispersal request if not. |
-| FAILED | 5 | FAILED means that the blob has failed permanently. Note that this is a terminal state, and in order to retry the blob, the client must submit the blob again (blob key is required to be unique). |
+This status is functionally equivalent to FAILED, but is used to indicate that the failure is due to an unanticipated bug.
+
+buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX // Skip this rule to not create a breaking change. |
+| QUEUED | 1 | QUEUED means that the blob has been queued by the disperser for processing. The DisperseBlob API is asynchronous, meaning that after request validation, but before any processing, the blob is stored in a queue of some sort, and a response immediately returned to the client.
+
+buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
+| ENCODED | 2 | ENCODED means that the blob has been Reed-Solomon encoded into chunks and is ready to be dispersed to DA Nodes.
+
+buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
+| GATHERING_SIGNATURES | 3 | GATHERING_SIGNATURES means that the blob chunks are currently actively being transmitted to validators, and in doing so requesting that the validators sign to acknowledge receipt of the blob. Requests that timeout or receive errors are resubmitted to DA nodes for some period of time set by the disperser, after which the BlobStatus becomes COMPLETE.
+
+buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
+| COMPLETE | 4 | COMPLETE means the blob has been dispersed to DA nodes, and the GATHERING_SIGNATURES period of time has completed. This status does not guarantee any signer percentage, so a client should check that the signature has met its required threshold, and resubmit a new blob dispersal request if not.
+
+buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
+| FAILED | 5 | FAILED means that the blob has failed permanently. Note that this is a terminal state, and in order to retry the blob, the client must submit the blob again (blob key is required to be unique).
+
+buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
 
 
  
@@ -1042,16 +1078,26 @@ This status is functionally equivalent to FAILED, but is used to indicate that t
 ### Disperser
 Disperser defines the public APIs for dispersing blobs.
 
+buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
+
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| DisperseBlob | [DisperseBlobRequest](#disperser-v2-DisperseBlobRequest) | [DisperseBlobReply](#disperser-v2-DisperseBlobReply) | DisperseBlob accepts blob to disperse from clients. This executes the dispersal asynchronously, i.e. it returns once the request is accepted. The client could use GetBlobStatus() API to poll the the processing status of the blob. |
-| GetBlobStatus | [BlobStatusRequest](#disperser-v2-BlobStatusRequest) | [BlobStatusReply](#disperser-v2-BlobStatusReply) | GetBlobStatus is meant to be polled for the blob status. |
+| DisperseBlob | [DisperseBlobRequest](#disperser-v2-DisperseBlobRequest) | [DisperseBlobReply](#disperser-v2-DisperseBlobReply) | DisperseBlob accepts blob to disperse from clients. This executes the dispersal asynchronously, i.e. it returns once the request is accepted. The client could use GetBlobStatus() API to poll the the processing status of the blob.
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
+| GetBlobStatus | [BlobStatusRequest](#disperser-v2-BlobStatusRequest) | [BlobStatusReply](#disperser-v2-BlobStatusReply) | GetBlobStatus is meant to be polled for the blob status.
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
 | GetBlobCommitment | [BlobCommitmentRequest](#disperser-v2-BlobCommitmentRequest) | [BlobCommitmentReply](#disperser-v2-BlobCommitmentReply) | GetBlobCommitment is a utility method that calculates commitment for a blob payload. It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header and don&#39;t have the ability to calculate the commitment themselves (expensive operation which requires SRS points).
 
-For an example usage, see how our disperser_client makes a call to this endpoint when it doesn&#39;t have a local prover: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166 |
+For an example usage, see how our disperser_client makes a call to this endpoint when it doesn&#39;t have a local prover: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
 | GetPaymentState | [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest) | [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply) | GetPaymentState is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting. A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser. That typically only needs to be done once, and the state can be updated locally as the client disperses blobs. The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
 
-For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298 |
+For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
+
+buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. |
 
  
 
@@ -1391,9 +1437,9 @@ Used to facilitate the decoding of chunks.
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
-| UNKNOWN | 0 |  |
-| GNARK | 1 |  |
-| GOB | 2 |  |
+| UNKNOWN | 0 | buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX // Skip this rule to not create a breaking change. |
+| GNARK | 1 | buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
+| GOB | 2 | buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
 
 
  
@@ -1404,26 +1450,43 @@ Used to facilitate the decoding of chunks.
 <a name="node-Dispersal"></a>
 
 ### Dispersal
+The EigenDA Node implements two services, Dispersal and Retrieval, as defined below,
+for better security and separation of concerns.
 
+buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| StoreChunks | [StoreChunksRequest](#node-StoreChunksRequest) | [StoreChunksReply](#node-StoreChunksReply) | StoreChunks validates that the chunks match what the Node is supposed to receive ( different Nodes are responsible for different chunks, as EigenDA is horizontally sharded) and is correctly coded (e.g. each chunk must be a valid KZG multiproof) according to the EigenDA protocol. It also stores the chunks along with metadata for the protocol-defined length of custody. It will return a signature at the end to attest to the data in this request it has processed. |
-| StoreBlobs | [StoreBlobsRequest](#node-StoreBlobsRequest) | [StoreBlobsReply](#node-StoreBlobsReply) | StoreBlobs is similar to StoreChunks, but it stores the blobs using a different storage schema so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch. StoreBlobs &#43; AttestBatch will eventually replace and deprecate StoreChunks method. DEPRECATED: StoreBlobs method is not used |
-| AttestBatch | [AttestBatchRequest](#node-AttestBatchRequest) | [AttestBatchReply](#node-AttestBatchReply) | AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch. It will return a signature at the end to attest to the aggregated batch. DEPRECATED: AttestBatch method is not used |
-| NodeInfo | [NodeInfoRequest](#node-NodeInfoRequest) | [NodeInfoReply](#node-NodeInfoReply) | Retrieve node info metadata |
+| StoreChunks | [StoreChunksRequest](#node-StoreChunksRequest) | [StoreChunksReply](#node-StoreChunksReply) | StoreChunks validates that the chunks match what the Node is supposed to receive ( different Nodes are responsible for different chunks, as EigenDA is horizontally sharded) and is correctly coded (e.g. each chunk must be a valid KZG multiproof) according to the EigenDA protocol. It also stores the chunks along with metadata for the protocol-defined length of custody. It will return a signature at the end to attest to the data in this request it has processed.
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
+| StoreBlobs | [StoreBlobsRequest](#node-StoreBlobsRequest) | [StoreBlobsReply](#node-StoreBlobsReply) | StoreBlobs is similar to StoreChunks, but it stores the blobs using a different storage schema so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch. StoreBlobs &#43; AttestBatch will eventually replace and deprecate StoreChunks method. DEPRECATED: StoreBlobs method is not used
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
+| AttestBatch | [AttestBatchRequest](#node-AttestBatchRequest) | [AttestBatchReply](#node-AttestBatchReply) | AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch. It will return a signature at the end to attest to the aggregated batch. DEPRECATED: AttestBatch method is not used
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
+| NodeInfo | [NodeInfoRequest](#node-NodeInfoRequest) | [NodeInfoReply](#node-NodeInfoReply) | Retrieve node info metadata
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change. |
 
 
 <a name="node-Retrieval"></a>
 
 ### Retrieval
-
+buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| RetrieveChunks | [RetrieveChunksRequest](#node-RetrieveChunksRequest) | [RetrieveChunksReply](#node-RetrieveChunksReply) | RetrieveChunks retrieves the chunks for a blob custodied at the Node. |
-| GetBlobHeader | [GetBlobHeaderRequest](#node-GetBlobHeaderRequest) | [GetBlobHeaderReply](#node-GetBlobHeaderReply) | GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob. |
-| NodeInfo | [NodeInfoRequest](#node-NodeInfoRequest) | [NodeInfoReply](#node-NodeInfoReply) | Retrieve node info metadata |
+| RetrieveChunks | [RetrieveChunksRequest](#node-RetrieveChunksRequest) | [RetrieveChunksReply](#node-RetrieveChunksReply) | RetrieveChunks retrieves the chunks for a blob custodied at the Node.
+
+buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change. |
+| GetBlobHeader | [GetBlobHeaderRequest](#node-GetBlobHeaderRequest) | [GetBlobHeaderReply](#node-GetBlobHeaderReply) | GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
+
+buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change. |
+| NodeInfo | [NodeInfoRequest](#node-NodeInfoRequest) | [NodeInfoReply](#node-NodeInfoReply) | Retrieve node info metadata
+
+buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change. |
 
  
 
@@ -1566,10 +1629,16 @@ Perform a keccak256 hash on the following data in the following order: 1. the le
 ### Relay
 Relay is a service that provides access to public relay functionality.
 
+buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
+
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| GetBlob | [GetBlobRequest](#relay-GetBlobRequest) | [GetBlobReply](#relay-GetBlobReply) | GetBlob retrieves a blob stored by the relay. |
-| GetChunks | [GetChunksRequest](#relay-GetChunksRequest) | [GetChunksReply](#relay-GetChunksReply) | GetChunks retrieves chunks from blobs stored by the relay. |
+| GetBlob | [GetBlobRequest](#relay-GetBlobRequest) | [GetBlobReply](#relay-GetBlobReply) | GetBlob retrieves a blob stored by the relay.
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
+| GetChunks | [GetChunksRequest](#relay-GetChunksRequest) | [GetChunksReply](#relay-GetChunksReply) | GetChunks retrieves chunks from blobs stored by the relay.
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
 
  
 
@@ -1638,9 +1707,13 @@ Disperser manages the blobs that it has processed, whereas the Retriever.Retriev
 (the 2nd approach here) removes the need to trust the Disperser, with the downside of
 worse cost and performance.
 
+buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
+
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| RetrieveBlob | [BlobRequest](#retriever-BlobRequest) | [BlobReply](#retriever-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response. |
+| RetrieveBlob | [BlobRequest](#retriever-BlobRequest) | [BlobReply](#retriever-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response.
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
 
  
 
@@ -1708,9 +1781,13 @@ relay manages the blobs that it has processed, whereas the Retriever.RetrieveBlo
 (the 2nd approach here) removes the need to trust the relay, with the downside of
 worse cost and performance.
 
+buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
+
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| RetrieveBlob | [BlobRequest](#retriever-v2-BlobRequest) | [BlobReply](#retriever-v2-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response. |
+| RetrieveBlob | [BlobRequest](#retriever-v2-BlobRequest) | [BlobReply](#retriever-v2-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response.
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
 
  
 
@@ -1808,7 +1885,7 @@ Request that the Node store a batch of chunks.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | batch | [common.v2.Batch](#common-v2-Batch) |  | batch of blobs to store |
-| disperserID | [uint32](#uint32) |  | ID of the disperser that is requesting the storage of the batch. |
+| disperserID | [uint32](#uint32) |  | ID of the disperser that is requesting the storage of the batch. buf:lint:ignore FIELD_LOWER_SNAKE_CASE // Skip this rule to not create a breaking change. |
 | timestamp | [uint32](#uint32) |  | Timestamp of the request in seconds since the Unix epoch. If too far out of sync with the server&#39;s clock, request may be rejected. |
 | signature | [bytes](#bytes) |  | Signature using the disperser&#39;s ECDSA key over keccak hash of the batch. The purpose of this signature is to prevent hooligans from tricking validators into storing data that they shouldn&#39;t be storing.
 
@@ -1833,7 +1910,7 @@ Used to facilitate the decoding of chunks.
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
-| UNKNOWN | 0 | A valid response should never use this value. If encountered, the client should treat it as an error. |
+| UNKNOWN | 0 | A valid response should never use this value. If encountered, the client should treat it as an error. buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX // Skip this rule to not create a breaking change. |
 | GNARK | 1 | A chunk encoded in GNARK has the following format:
 
 [KZG proof: 32 bytes] [Coeff 1: 32 bytes] [Coeff 2: 32 bytes] ... [Coeff n: 32 bytes]
@@ -1842,7 +1919,9 @@ The KZG proof is a point on G1 and is serialized with bn254.G1Affine.Bytes(). Th
 
 References: - bn254.G1Affine: github.com/consensys/gnark-crypto/ecc/bn254 - fr.Element: github.com/consensys/gnark-crypto/ecc/bn254/fr
 
-Golang serialization and deserialization can be found in: - Frame.SerializeGnark() - Frame.DeserializeGnark() Package: github.com/Layr-Labs/eigenda/encoding |
+Golang serialization and deserialization can be found in: - Frame.SerializeGnark() - Frame.DeserializeGnark() Package: github.com/Layr-Labs/eigenda/encoding
+
+buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
 
 
  
@@ -1855,10 +1934,16 @@ Golang serialization and deserialization can be found in: - Frame.SerializeGnark
 ### Dispersal
 Dispersal is utilized to disperse chunk data.
 
+buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
+
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| StoreChunks | [StoreChunksRequest](#validator-StoreChunksRequest) | [StoreChunksReply](#validator-StoreChunksReply) | StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator either acquires the chunks or the validator determines that it is unable to acquire the chunks. If the validator is able to acquire and validate the chunks, it returns a signature over the batch header. This RPC describes which chunks the validator should store but does not contain that chunk data. The validator is expected to fetch the chunk data from one of the relays that is in possession of the chunk. |
-| GetNodeInfo | [GetNodeInfoRequest](#validator-GetNodeInfoRequest) | [GetNodeInfoReply](#validator-GetNodeInfoReply) | GetNodeInfo fetches metadata about the node. |
+| StoreChunks | [StoreChunksRequest](#validator-StoreChunksRequest) | [StoreChunksReply](#validator-StoreChunksReply) | StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator either acquires the chunks or the validator determines that it is unable to acquire the chunks. If the validator is able to acquire and validate the chunks, it returns a signature over the batch header. This RPC describes which chunks the validator should store but does not contain that chunk data. The validator is expected to fetch the chunk data from one of the relays that is in possession of the chunk.
+
+buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
+| GetNodeInfo | [GetNodeInfoRequest](#validator-GetNodeInfoRequest) | [GetNodeInfoReply](#validator-GetNodeInfoReply) | GetNodeInfo fetches metadata about the node.
+
+buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change. |
 
 
 <a name="validator-Retrieval"></a>
@@ -1866,10 +1951,16 @@ Dispersal is utilized to disperse chunk data.
 ### Retrieval
 Retrieval is utilized to retrieve chunk data.
 
+buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
+
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| GetChunks | [GetChunksRequest](#validator-GetChunksRequest) | [GetChunksReply](#validator-GetChunksReply) | GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally faster to retrieve chunks from the relay service if that service is available. |
-| GetNodeInfo | [GetNodeInfoRequest](#validator-GetNodeInfoRequest) | [GetNodeInfoReply](#validator-GetNodeInfoReply) | Retrieve node info metadata |
+| GetChunks | [GetChunksRequest](#validator-GetChunksRequest) | [GetChunksReply](#validator-GetChunksReply) | GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally faster to retrieve chunks from the relay service if that service is available.
+
+buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
+| GetNodeInfo | [GetNodeInfoRequest](#validator-GetNodeInfoRequest) | [GetNodeInfoReply](#validator-GetNodeInfoReply) | Retrieve node info metadata
+
+buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change. |
 
  
 

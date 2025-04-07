@@ -367,9 +367,9 @@ Used to facilitate the decoding of chunks.
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
-| UNKNOWN | 0 |  |
-| GNARK | 1 |  |
-| GOB | 2 |  |
+| UNKNOWN | 0 | buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX // Skip this rule to not create a breaking change. |
+| GNARK | 1 | buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
+| GOB | 2 | buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
 
 
  
@@ -380,26 +380,43 @@ Used to facilitate the decoding of chunks.
 <a name="node-Dispersal"></a>
 
 ### Dispersal
+The EigenDA Node implements two services, Dispersal and Retrieval, as defined below,
+for better security and separation of concerns.
 
+buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| StoreChunks | [StoreChunksRequest](#node-StoreChunksRequest) | [StoreChunksReply](#node-StoreChunksReply) | StoreChunks validates that the chunks match what the Node is supposed to receive ( different Nodes are responsible for different chunks, as EigenDA is horizontally sharded) and is correctly coded (e.g. each chunk must be a valid KZG multiproof) according to the EigenDA protocol. It also stores the chunks along with metadata for the protocol-defined length of custody. It will return a signature at the end to attest to the data in this request it has processed. |
-| StoreBlobs | [StoreBlobsRequest](#node-StoreBlobsRequest) | [StoreBlobsReply](#node-StoreBlobsReply) | StoreBlobs is similar to StoreChunks, but it stores the blobs using a different storage schema so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch. StoreBlobs &#43; AttestBatch will eventually replace and deprecate StoreChunks method. DEPRECATED: StoreBlobs method is not used |
-| AttestBatch | [AttestBatchRequest](#node-AttestBatchRequest) | [AttestBatchReply](#node-AttestBatchReply) | AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch. It will return a signature at the end to attest to the aggregated batch. DEPRECATED: AttestBatch method is not used |
-| NodeInfo | [NodeInfoRequest](#node-NodeInfoRequest) | [NodeInfoReply](#node-NodeInfoReply) | Retrieve node info metadata |
+| StoreChunks | [StoreChunksRequest](#node-StoreChunksRequest) | [StoreChunksReply](#node-StoreChunksReply) | StoreChunks validates that the chunks match what the Node is supposed to receive ( different Nodes are responsible for different chunks, as EigenDA is horizontally sharded) and is correctly coded (e.g. each chunk must be a valid KZG multiproof) according to the EigenDA protocol. It also stores the chunks along with metadata for the protocol-defined length of custody. It will return a signature at the end to attest to the data in this request it has processed.
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
+| StoreBlobs | [StoreBlobsRequest](#node-StoreBlobsRequest) | [StoreBlobsReply](#node-StoreBlobsReply) | StoreBlobs is similar to StoreChunks, but it stores the blobs using a different storage schema so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch. StoreBlobs &#43; AttestBatch will eventually replace and deprecate StoreChunks method. DEPRECATED: StoreBlobs method is not used
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
+| AttestBatch | [AttestBatchRequest](#node-AttestBatchRequest) | [AttestBatchReply](#node-AttestBatchReply) | AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch. It will return a signature at the end to attest to the aggregated batch. DEPRECATED: AttestBatch method is not used
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
+| NodeInfo | [NodeInfoRequest](#node-NodeInfoRequest) | [NodeInfoReply](#node-NodeInfoReply) | Retrieve node info metadata
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change. |
 
 
 <a name="node-Retrieval"></a>
 
 ### Retrieval
-
+buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| RetrieveChunks | [RetrieveChunksRequest](#node-RetrieveChunksRequest) | [RetrieveChunksReply](#node-RetrieveChunksReply) | RetrieveChunks retrieves the chunks for a blob custodied at the Node. |
-| GetBlobHeader | [GetBlobHeaderRequest](#node-GetBlobHeaderRequest) | [GetBlobHeaderReply](#node-GetBlobHeaderReply) | GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob. |
-| NodeInfo | [NodeInfoRequest](#node-NodeInfoRequest) | [NodeInfoReply](#node-NodeInfoReply) | Retrieve node info metadata |
+| RetrieveChunks | [RetrieveChunksRequest](#node-RetrieveChunksRequest) | [RetrieveChunksReply](#node-RetrieveChunksReply) | RetrieveChunks retrieves the chunks for a blob custodied at the Node.
+
+buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change. |
+| GetBlobHeader | [GetBlobHeaderRequest](#node-GetBlobHeaderRequest) | [GetBlobHeaderReply](#node-GetBlobHeaderReply) | GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
+
+buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change. |
+| NodeInfo | [NodeInfoRequest](#node-NodeInfoRequest) | [NodeInfoReply](#node-NodeInfoReply) | Retrieve node info metadata
+
+buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change. |
 
  
 

@@ -76,9 +76,13 @@ Disperser manages the blobs that it has processed, whereas the Retriever.Retriev
 (the 2nd approach here) removes the need to trust the Disperser, with the downside of
 worse cost and performance.
 
+buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
+
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| RetrieveBlob | [BlobRequest](#retriever-BlobRequest) | [BlobReply](#retriever-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response. |
+| RetrieveBlob | [BlobRequest](#retriever-BlobRequest) | [BlobReply](#retriever-BlobReply) | This fans out request to EigenDA Nodes to retrieve the chunks and returns the reconstructed original blob in response.
+
+buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
 
  
 
