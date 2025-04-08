@@ -208,7 +208,7 @@ func lookForMissingFiles(
 
 			if uint32(len(valueFiles[segment])) > metadata.shardingFactor {
 				return nil, nil,
-					fmt.Errorf("too many value files for segment %d, expected %d, got %d",
+					fmt.Errorf("too many value files for segment %d, expected at most %d, got %d",
 						segment, metadata.shardingFactor, len(valueFiles[segment]))
 			}
 
