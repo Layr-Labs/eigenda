@@ -218,13 +218,17 @@ func (k *keyFile) readKeys() ([]*types.KAPair, error) {
 
 	index := 0
 	for {
-		if index+4 >= len(keyBytes) {
+		// We need at least 4 bytes to read the length of the key.
+		if index+4 > len(keyBytes) {
+			// There are fewer than 4 bytes left in the file.
 			break
 		}
 		keyLength := int(binary.BigEndian.Uint32(keyBytes[index : index+4]))
 		index += 4
 
+		// We need to read the key, as well as the 8 byte address.
 		if index+keyLength+8 > len(keyBytes) {
+			// There are insufficient bytes left in the file to read the key and address.
 			break
 		}
 
