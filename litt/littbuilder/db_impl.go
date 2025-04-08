@@ -33,7 +33,7 @@ type db struct {
 	logger logging.Logger
 
 	// A function that returns the current time.
-	timeSource func() time.Time
+	clock func() time.Time
 
 	// The default time-to-live for new tables. Once created, the TTL for a table can be changed.
 	ttl time.Duration
@@ -102,7 +102,7 @@ func NewDBWithTableBuilder(config *litt.Config, tableBuilder TableBuilder) (litt
 	database := &db{
 		ctx:           config.CTX,
 		logger:        logger,
-		timeSource:    config.TimeSource,
+		clock:         config.Clock,
 		ttl:           config.TTL,
 		gcPeriod:      config.GCPeriod,
 		tableBuilder:  tableBuilder,
