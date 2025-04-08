@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
+	"github.com/Layr-Labs/eigenda-proxy/config"
 	"github.com/gorilla/mux"
 )
 
@@ -85,6 +86,13 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 	)
 
 	r.HandleFunc("/health", withLogging(svr.handleHealth, svr.log)).Methods("GET")
+
+	// Only register admin endpoints if explicitly enabled in configuration
+	if svr.config.IsAPIEnabled(config.AdminAPIType) {
+		// Admin endpoints to check and set EigenDA backend used for dispersal
+		r.HandleFunc("/admin/eigenda-dispersal-backend", withLogging(svr.handleGetEigenDADispersalBackend, svr.log)).Methods("GET")
+		r.HandleFunc("/admin/eigenda-dispersal-backend", withLogging(svr.handleSetEigenDADispersalBackend, svr.log)).Methods("PUT")
+	}
 }
 
 func notCommitmentModeStandard(r *http.Request, _ *mux.RouteMatch) bool {

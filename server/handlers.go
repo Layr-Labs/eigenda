@@ -3,18 +3,26 @@ package server
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/gorilla/mux"
 )
 
 const (
 	// limit requests to only 32 mib to mitigate potential DoS attacks
 	maxRequestBodySize int64 = 1024 * 1024 * 32
+
+	// HTTP headers
+	headerContentType = "Content-Type"
+
+	// Content types
+	contentTypeJSON = "application/json"
 )
 
 func (svr *Server) handleHealth(w http.ResponseWriter, _ *http.Request) error {
@@ -121,6 +129,42 @@ func (svr *Server) handleGetShared(
 	}
 
 	svr.writeResponse(w, input)
+	return nil
+}
+
+// disperseToV2ToEigenDABackend converts the boolean disperseToV2 flag to the corresponding EigenDABackend enum
+func disperseToV2ToEigenDABackend(disperseToV2 bool) common.EigenDABackend {
+	if disperseToV2 {
+		return common.V2EigenDABackend
+	}
+	return common.V1EigenDABackend
+}
+
+// eigenDABackendToDisperseToV2 converts an EigenDABackend enum to the corresponding boolean flag
+func eigenDABackendToDisperseToV2(backend common.EigenDABackend) bool {
+	return backend == common.V2EigenDABackend
+}
+
+// handleGetEigenDADispersalBackend handles the GET request to check the current EigenDA backend used for dispersal.
+// This endpoint returns which EigenDA backend version (v1 or v2) is currently being used for blob dispersal.
+func (svr *Server) handleGetEigenDADispersalBackend(w http.ResponseWriter, _ *http.Request) error {
+	w.Header().Set(headerContentType, contentTypeJSON)
+	w.WriteHeader(http.StatusOK)
+
+	backend := disperseToV2ToEigenDABackend(svr.sm.DisperseToV2())
+	backendString := common.EigenDABackendToString(backend)
+
+	response := struct {
+		EigenDADispersalBackend string `json:"eigenDADispersalBackend"`
+	}{
+		EigenDADispersalBackend: backendString,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, fmt.Sprintf("failed to encode response: %v", err), http.StatusInternalServerError)
+		return err
+	}
+
 	return nil
 }
 
@@ -234,5 +278,56 @@ func (svr *Server) handlePostShared(
 	if meta.Mode != commitments.OptimismKeccak {
 		svr.writeResponse(w, responseCommit)
 	}
+	return nil
+}
+
+// handleSetEigenDADispersalBackend handles the PUT request to set the EigenDA backend used for dispersal.
+// This endpoint configures which EigenDA backend version (v1 or v2) will be used for blob dispersal.
+func (svr *Server) handleSetEigenDADispersalBackend(w http.ResponseWriter, r *http.Request) error {
+	// Read request body to get the new value
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1024)) // Small limit since we only expect a string
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to read request body: %v", err), http.StatusBadRequest)
+		return err
+	}
+
+	// Parse the backend string value
+	var setRequest struct {
+		EigenDADispersalBackend string `json:"eigenDADispersalBackend"`
+	}
+
+	if err := json.Unmarshal(body, &setRequest); err != nil {
+		http.Error(w, fmt.Sprintf("failed to parse JSON request: %v", err), http.StatusBadRequest)
+		return err
+	}
+
+	// Convert the string to EigenDABackend enum
+	backend, err := common.StringToEigenDABackend(setRequest.EigenDADispersalBackend)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid eigenDADispersalBackend value: %v", err), http.StatusBadRequest)
+		return err
+	}
+
+	disperseToV2 := eigenDABackendToDisperseToV2(backend)
+	svr.SetDisperseToV2(disperseToV2)
+
+	// Return the current value in the response
+	w.Header().Set(headerContentType, contentTypeJSON)
+	w.WriteHeader(http.StatusOK)
+
+	currentBackend := disperseToV2ToEigenDABackend(svr.sm.DisperseToV2())
+	backendString := common.EigenDABackendToString(currentBackend)
+
+	response := struct {
+		EigenDADispersalBackend string `json:"eigenDADispersalBackend"`
+	}{
+		EigenDADispersalBackend: backendString,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, fmt.Sprintf("failed to encode response: %v", err), http.StatusInternalServerError)
+		return err
+	}
+
 	return nil
 }

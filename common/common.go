@@ -102,3 +102,15 @@ func StringToEigenDABackend(inputString string) (EigenDABackend, error) {
 		return 0, fmt.Errorf("invalid backend option: %s", inputString)
 	}
 }
+
+// EigenDABackendToString converts an EigenDABackend enum to its string representation
+func EigenDABackendToString(backend EigenDABackend) string {
+	switch backend {
+	case V1EigenDABackend:
+		return "v1"
+	case V2EigenDABackend:
+		return "v2"
+	default:
+		return "unknown"
+	}
+}

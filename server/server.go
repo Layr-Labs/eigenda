@@ -30,6 +30,7 @@ type Server struct {
 	m          metrics.Metricer
 	httpServer *http.Server
 	listener   net.Listener
+	config     config.ServerConfig
 }
 
 func NewServer(
@@ -44,6 +45,7 @@ func NewServer(
 		log:      log,
 		endpoint: endpoint,
 		sm:       sm,
+		config:   cfg,
 		httpServer: &http.Server{
 			Addr:              endpoint,
 			ReadHeaderTimeout: 10 * time.Second,

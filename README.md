@@ -35,6 +35,10 @@ Features:
   - [REST API Routes](#rest-api-routes)
     - [Standard Routes](#standard-routes)
     - [Optimism Routes](#optimism-routes)
+    - [Admin Routes](#admin-routes)
+  - [Migrating from EigenDA V1 to V2](#migrating-from-eigenda-v1-to-v2)
+    - [On-the-Fly Migration](#on-the-fly-migration)
+    - [Migration With Service Restart](#migration-with-service-restart)
   - [Deployment Against Real EigenDA Network](#deployment-against-real-eigenda-network)
   - [Features and Configuration Options (flags/env vars)](#features-and-configuration-options-flagsenv-vars)
   - [Requirements / Dependencies](#requirements--dependencies)
@@ -126,6 +130,103 @@ Response:
   Body: <preimage_bytes>
 ```
 
+#### Admin Routes
+
+The proxy provides administrative endpoints to control runtime behavior. By default, these endpoints are disabled 
+and must be explicitly enabled through configuration.
+
+> **SECURITY WARNING:** The admin endpoints should NEVER be publicly accessible. These endpoints 
+> do not implement authentication or authorization controls and should only be exposed on internal networks.
+
+To enable admin endpoints, include "admin" in the `--api-enabled` flag value or set the environment variable 
+`EIGENDA_PROXY_API_ENABLED=admin` when starting the proxy server. For example:
+  
+```bash
+# Enable admin API
+./bin/eigenda-proxy --api-enabled admin
+
+# Example of enabling multiple APIs (note: 'metrics' shown for illustration only and is not currently implemented)
+./bin/eigenda-proxy --api-enabled admin,metrics
+```
+
+When enabled, the following admin endpoints are available:
+
+```text
+Request:
+  GET /admin/eigenda-dispersal-backend
+
+Response:
+  200 OK
+  Content-Type: application/json
+  Body: {"eigenDADispersalBackend": string}
+```
+
+```text
+Request:
+  PUT /admin/eigenda-dispersal-backend
+  Content-Type: application/json
+  Body: {"eigenDADispersalBackend": string}
+
+Response:
+  200 OK
+  Content-Type: application/json
+  Body: {"eigenDADispersalBackend": string}
+```
+
+These endpoints allow operators to check and set which EigenDA backend version is used for blob dispersal. 
+The GET endpoint retrieves the current state, while the PUT endpoint idempotently updates the state to the specified value. 
+The `eigenDADispersalBackend` value represents the current backend being used after any changes have been applied.
+
+Valid values for `eigenDADispersalBackend` are:
+- `"v1"`: Use EigenDA V1 backend for dispersal
+- `"v2"`: Use EigenDA V2 backend for dispersal
+
+### Migrating from EigenDA V1 to V2
+
+There are two approaches for migrating from EigenDA V1 to V2: on-the-fly migration using runtime configuration,
+and migration with a service restart. Choose the approach that best fits your operational requirements.
+
+#### On-the-Fly Migration
+
+This approach allows you to switch from V1 to V2 while the proxy is running, without any service interruption:
+
+1. **Configure Both V1 and V2 Backends**
+   - Use a configuration file that includes settings for both V1 and V2 backends
+      - See `.env.exampleV1AndV2.holesky` for an example configuration
+   - Set `EIGENDA_PROXY_STORAGE_DISPERSE_TO_V2=false` in your configuration
+      - This ensures that the proxy will continue dispersing to the V1 backend, until it's time to migrate
+   - Set `EIGENDA_PROXY_API_ENABLED=admin` to expose the admin API
+      - This allows runtime switching between V1 and V2 without service restart
+
+2. **Runtime Migration**
+   - When ready to migrate to V2, use the admin endpoint to switch dispersal targets:
+   ```
+   curl -X PUT http://localhost:3100/admin/eigenda-dispersal-backend \
+     -H "Content-Type: application/json" \
+     -d '{"eigenDADispersalBackend": "v2"}'
+   ```
+
+This migration path allows for a seamless transition from V1 to V2 without service downtime and provides the ability 
+to roll back to V1 if needed.
+
+#### Migration With Service Restart
+
+If you prefer a more controlled migration with explicit service updates, follow this approach:
+
+1. **Initial Configuration (V1 Only)**
+   - Start proxy with a V1-only configuration
+      - See `.env.exampleV1.holesky` for an example configuration
+
+2. **Prepare V2 Configuration**
+   - Prepare a configuration file that includes settings for both V1 and V2 backends
+      - See `.env.exampleV1AndV2.holesky` for an example configuration
+   - Set `EIGENDA_PROXY_STORAGE_DISPERSE_TO_V2=true`, so that the proxy started with this config will immediately
+enable V2 dispersal
+
+3. **Scheduled Migration**
+   - During a planned migration window, stop the V1-only proxy service
+   - Restart the proxy service, using the prepared V2 configuration
+
 ### Deployment Against Real EigenDA Network
 
 We also provide network-specific example env configuration files in `.env.example.holesky` and `.env.example.mainnet` as a place to get started:
@@ -205,7 +306,7 @@ In order to disperse to the EigenDA V1 network in production, or at high through
 
 #### Ethereum Node
 
-A normal (non-archival) Ethereum node is sufficient for running the proxy with [cert verification](#certificate-verification) turned on. This is because all parameters that are read from the chain are either:
+A normal (non-archival) Ethereum node is sufficient for running the proxy with cert verification turned on. This is because all parameters that are read from the chain are either:
 1. immutable (eg: [securityThresholds](https://github.com/Layr-Labs/eigenda/blob/a6dd724acdf732af483fd2d9a86325febe7ebdcd/contracts/src/core/EigenDAThresholdRegistryStorage.sol#L30)), or
 2. are upgradeable but have all the historical versions available in contract storage (eg: [versioninedBlobParams](https://github.com/Layr-Labs/eigenda/blob/a6dd724acdf732af483fd2d9a86325febe7ebdcd/contracts/src/core/EigenDAThresholdRegistryStorage.sol#L27))
 
@@ -238,11 +339,11 @@ The proxy fundamentally acts as a bridge between the rollup nodes and the EigenD
 
 ![Posting Blobs](./resources/payload-blob-poly-lifecycle.png)
 
-The rollup payload is submitted via a POST request to the proxy. Proxy encodes the payload into a blob and submits it to the EigenDA disperser. After the DACertificate is available via the GetBlobStatus endpoint, it is encoded using the requested [commitment schema](#commitment-schemas) and sent back to the rollup sequencer. The sequencer then submits the commitment to the rollup's batcher inbox.
+The rollup payload is submitted via a POST request to the proxy. Proxy encodes the payload into a blob and submits it to the EigenDA disperser. After the DACertificate is available via the GetBlobStatus endpoint, it is encoded using the requested [commitment schema](#rollup-commitment-schemas) and sent back to the rollup sequencer. The sequencer then submits the commitment to the rollup's batcher inbox.
 
 ### Retrieving Payloads
 
-Validator nodes proceed with the exact reverse process as that used by the sequencer in the [posting blobs](#posting-blobs) section. The rollup validator submits a GET request to the proxy with the DACert in the body. The proxy validates the cert, fetches the corresponding blob from EigenDA, validates it, decodes it back into the rollup payload, and returns it the rollup node.
+Validator nodes proceed with the exact reverse process as that used by the sequencer in the [posting payloads](#posting-payloads) section. The rollup validator submits a GET request to the proxy with the DACert in the body. The proxy validates the cert, fetches the corresponding blob from EigenDA, validates it, decodes it back into the rollup payload, and returns it the rollup node.
 
 ### Rollup Commitment Schemas
 

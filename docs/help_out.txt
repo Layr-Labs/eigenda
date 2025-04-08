@@ -13,9 +13,7 @@ COMMANDS:
    help, h  Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   --addr value   Server listening address (default: "0.0.0.0") [$EIGENDA_PROXY_ADDR]
    --help, -h     show help
-   --port value   Server listening port (default: 3100) [$EIGENDA_PROXY_PORT]
    --version, -v  print the version
 
    Cert Verifier (V1 only)
@@ -97,6 +95,12 @@ GLOBAL OPTIONS:
    --metrics.addr value  Metrics listening address (default: "0.0.0.0") [$EIGENDA_PROXY_METRICS_ADDR]
    --metrics.enabled     Enable the metrics server (default: false) [$EIGENDA_PROXY_METRICS_ENABLED]
    --metrics.port value  Metrics listening port (default: 7300) [$EIGENDA_PROXY_METRICS_PORT]
+
+   Proxy Server
+
+   --addr value                                 Server listening address (default: "0.0.0.0") [$EIGENDA_PROXY_ADDR]
+   --api-enabled value [ --api-enabled value ]  List of API types to enable (e.g. admin) [$EIGENDA_PROXY_API_ENABLED]
+   --port value                                 Server listening port (default: 3100) [$EIGENDA_PROXY_PORT]
 
    Redis Cache/Fallback
 
