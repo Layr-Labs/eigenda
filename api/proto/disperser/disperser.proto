@@ -105,9 +105,9 @@ message DisperseBlobRequest {
   // within the same batch.
   repeated uint32 custom_quorum_numbers = 2;
 
-	// The account ID of the client. This should be a hex-encoded string of the ECDSA public key
-	// corresponding to the key used by the client to sign the BlobAuthHeader.
-	string account_id = 3;
+  // The account ID of the client. This should be a hex-encoded string of the ECDSA public key
+  // corresponding to the key used by the client to sign the BlobAuthHeader.
+  string account_id = 3;
 }
 
 message DisperseBlobReply {
