@@ -37,9 +37,11 @@ func VerifyFileProperties(path string) (exists bool, size int64, err error) {
 			if parentInfo.Mode()&0700 != 0700 {
 				return false, -1, fmt.Errorf("parent directory %s has insufficent permissions", parentPath)
 			}
-		}
 
-		return false, 0, fmt.Errorf("failed to stat path %s: %w", path, err)
+			return false, -1, nil
+		} else {
+			return false, 0, fmt.Errorf("failed to stat path %s: %w", path, err)
+		}
 	}
 
 	// File exists. Check if it is a regular file and that it is readable+writeable.
