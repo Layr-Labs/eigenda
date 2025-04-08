@@ -26,7 +26,7 @@ type flushLoop struct {
 	metrics *metrics.LittDBMetrics
 
 	// provides the current time
-	timeSource func() time.Time
+	clock func() time.Time
 
 	// the name of the table
 	name string
@@ -91,7 +91,7 @@ func (f *flushLoop) handleSealRequest(req *flushLoopSealRequest) {
 func (f *flushLoop) handleFlushRequest(req *flushLoopFlushRequest) {
 	var segmentFlushStart time.Time
 	if f.metrics != nil {
-		segmentFlushStart = f.timeSource()
+		segmentFlushStart = f.clock()
 	}
 
 	durableKeys, err := req.flushWaitFunction()
@@ -101,7 +101,7 @@ func (f *flushLoop) handleFlushRequest(req *flushLoopFlushRequest) {
 	}
 
 	if f.metrics != nil {
-		segmentFlushEnd := f.timeSource()
+		segmentFlushEnd := f.clock()
 		delta := segmentFlushEnd.Sub(segmentFlushStart)
 		f.metrics.ReportSegmentFlushLatency(f.name, delta)
 	}

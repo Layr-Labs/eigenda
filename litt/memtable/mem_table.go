@@ -25,7 +25,7 @@ type expirationRecord struct {
 // memTable is a simple implementation of a Table that stores its data in memory.
 type memTable struct {
 	// A function that returns the current time.
-	timeSource func() time.Time
+	clock func() time.Time
 
 	// The name of the table.
 	name string
@@ -53,7 +53,7 @@ type memTable struct {
 func NewMemTable(config *litt.Config, name string) litt.ManagedTable {
 
 	table := &memTable{
-		timeSource:      config.TimeSource,
+		clock:           config.Clock,
 		name:            name,
 		ttl:             config.TTL,
 		data:            make(map[string][]byte),
@@ -95,7 +95,7 @@ func (m *memTable) KeyCount() uint64 {
 func (m *memTable) Put(key []byte, value []byte) error {
 	stringKey := string(key)
 	expiration := &expirationRecord{
-		creationTime: m.timeSource(),
+		creationTime: m.clock(),
 		key:          stringKey,
 	}
 
@@ -186,7 +186,7 @@ func (m *memTable) ScheduleImmediateGC() error {
 		return nil
 	}
 
-	now := m.timeSource()
+	now := m.clock()
 	earliestPermittedCreationTime := now.Add(-m.ttl)
 
 	for {

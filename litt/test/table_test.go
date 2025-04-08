@@ -24,7 +24,7 @@ import (
 
 type tableBuilder struct {
 	name    string
-	builder func(timeSource func() time.Time, name string, path string) (litt.ManagedTable, error)
+	builder func(clock func() time.Time, name string, path string) (litt.ManagedTable, error)
 }
 
 // This test executes against different table implementations.
@@ -71,12 +71,12 @@ var noCacheTableBuilders = []*tableBuilder{
 }
 
 func buildMemTable(
-	timeSource func() time.Time,
+	clock func() time.Time,
 	name string,
 	path string) (litt.ManagedTable, error) {
 
 	config, err := litt.DefaultConfig(path)
-	config.TimeSource = timeSource
+	config.Clock = clock
 	config.GCPeriod = 0
 
 	if err != nil {
@@ -113,7 +113,7 @@ func setupKeymapTypeFile(keymapPath string, keymapType keymap.KeymapType) (*keym
 }
 
 func buildMemKeyDiskTable(
-	timeSource func() time.Time,
+	clock func() time.Time,
 	name string,
 	path string) (litt.ManagedTable, error) {
 
@@ -138,7 +138,7 @@ func buildMemKeyDiskTable(
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
 	config.GCPeriod = time.Millisecond
-	config.TimeSource = timeSource
+	config.Clock = clock
 	config.Fsync = false
 	config.DoubleWriteProtection = true
 	config.SaltShaker = random.NewTestRandom().Rand
@@ -164,7 +164,7 @@ func buildMemKeyDiskTable(
 }
 
 func buildLevelDBKeyDiskTable(
-	timeSource func() time.Time,
+	clock func() time.Time,
 	name string,
 	path string) (litt.ManagedTable, error) {
 
@@ -189,7 +189,7 @@ func buildLevelDBKeyDiskTable(
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
 	config.GCPeriod = time.Millisecond
-	config.TimeSource = timeSource
+	config.Clock = clock
 	config.Fsync = false
 	config.DoubleWriteProtection = true
 	config.SaltShaker = random.NewTestRandom().Rand
@@ -215,11 +215,11 @@ func buildLevelDBKeyDiskTable(
 }
 
 func buildCachedMemTable(
-	timeSource func() time.Time,
+	clock func() time.Time,
 	name string,
 	path string) (litt.ManagedTable, error) {
 
-	baseTable, err := buildMemTable(timeSource, name, path)
+	baseTable, err := buildMemTable(clock, name, path)
 	if err != nil {
 		return nil, err
 	}
@@ -232,11 +232,11 @@ func buildCachedMemTable(
 }
 
 func buildCachedMemKeyDiskTable(
-	timeSource func() time.Time,
+	clock func() time.Time,
 	name string,
 	path string) (litt.ManagedTable, error) {
 
-	baseTable, err := buildMemKeyDiskTable(timeSource, name, path)
+	baseTable, err := buildMemKeyDiskTable(clock, name, path)
 	if err != nil {
 		return nil, err
 	}
@@ -249,11 +249,11 @@ func buildCachedMemKeyDiskTable(
 }
 
 func buildCachedLevelDBKeyDiskTable(
-	timeSource func() time.Time,
+	clock func() time.Time,
 	name string,
 	path string) (litt.ManagedTable, error) {
 
-	baseTable, err := buildLevelDBKeyDiskTable(timeSource, name, path)
+	baseTable, err := buildLevelDBKeyDiskTable(clock, name, path)
 	if err != nil {
 		return nil, err
 	}
@@ -369,12 +369,12 @@ func garbageCollectionTest(t *testing.T, tableBuilder *tableBuilder) {
 	var fakeTime atomic.Pointer[time.Time]
 	fakeTime.Store(&startTime)
 
-	timeSource := func() time.Time {
+	clock := func() time.Time {
 		return *fakeTime.Load()
 	}
 
 	tableName := rand.String(8)
-	table, err := tableBuilder.builder(timeSource, tableName, directory)
+	table, err := tableBuilder.builder(clock, tableName, directory)
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}

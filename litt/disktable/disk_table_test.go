@@ -26,7 +26,7 @@ import (
 
 type tableBuilder struct {
 	name    string
-	builder func(timeSource func() time.Time, name string, paths []string) (litt.ManagedTable, error)
+	builder func(clock func() time.Time, name string, paths []string) (litt.ManagedTable, error)
 }
 
 // This test executes against different table implementations. This is useful for distinguishing between bugs that
@@ -77,7 +77,7 @@ func setupKeymapTypeFile(keymapPath string, keymapType keymap.KeymapType) (*keym
 }
 
 func buildMemKeyDiskTableSingleShard(
-	timeSource func() time.Time,
+	clock func() time.Time,
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
@@ -107,7 +107,7 @@ func buildMemKeyDiskTableSingleShard(
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
 
-	config.TimeSource = timeSource
+	config.Clock = clock
 	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
 	config.GCPeriod = time.Millisecond
 	config.Fsync = false
@@ -132,7 +132,7 @@ func buildMemKeyDiskTableSingleShard(
 }
 
 func buildMemKeyDiskTableMultiShard(
-	timeSource func() time.Time,
+	clock func() time.Time,
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
@@ -162,7 +162,7 @@ func buildMemKeyDiskTableMultiShard(
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
 
-	config.TimeSource = timeSource
+	config.Clock = clock
 	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
 	config.GCPeriod = time.Millisecond
 	config.Fsync = false
@@ -188,7 +188,7 @@ func buildMemKeyDiskTableMultiShard(
 }
 
 func buildLevelDBKeyDiskTableSingleShard(
-	timeSource func() time.Time,
+	clock func() time.Time,
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
@@ -218,7 +218,7 @@ func buildLevelDBKeyDiskTableSingleShard(
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
 
-	config.TimeSource = timeSource
+	config.Clock = clock
 	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
 	config.GCPeriod = time.Millisecond
 	config.Fsync = false
@@ -243,7 +243,7 @@ func buildLevelDBKeyDiskTableSingleShard(
 }
 
 func buildLevelDBKeyDiskTableMultiShard(
-	timeSource func() time.Time,
+	clock func() time.Time,
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
@@ -273,7 +273,7 @@ func buildLevelDBKeyDiskTableMultiShard(
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
 
-	config.TimeSource = timeSource
+	config.Clock = clock
 	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
 	config.GCPeriod = time.Millisecond
 	config.Fsync = false
@@ -2059,12 +2059,12 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 	var fakeTime atomic.Pointer[time.Time]
 	fakeTime.Store(&startTime)
 
-	timeSource := func() time.Time {
+	clock := func() time.Time {
 		return *fakeTime.Load()
 	}
 
 	tableName := rand.String(8)
-	table, err := tableBuilder.builder(timeSource, tableName, []string{directory})
+	table, err := tableBuilder.builder(clock, tableName, []string{directory})
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}

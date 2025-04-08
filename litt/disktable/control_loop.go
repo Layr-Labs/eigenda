@@ -62,8 +62,8 @@ type controlLoop struct {
 	// The number of keys in the table.
 	keyCount *atomic.Int64
 
-	// timeSource is the time source used by the disk table.
-	timeSource func() time.Time
+	// clock is the time source used by the disk table.
+	clock func() time.Time
 
 	// The directories where segment files are stored.
 	segmentDirectories []string
@@ -141,7 +141,7 @@ func (c *controlLoop) run() {
 
 // doGarbageCollection performs garbage collection on all segments, deleting old ones as necessary.
 func (c *controlLoop) doGarbageCollection() {
-	start := c.timeSource()
+	start := c.clock()
 	ttl := c.metadata.GetTTL()
 	if ttl.Nanoseconds() <= 0 {
 		// No TTL set, so nothing to do.
@@ -150,7 +150,7 @@ func (c *controlLoop) doGarbageCollection() {
 
 	if c.metrics != nil {
 		defer func() {
-			end := c.timeSource()
+			end := c.clock()
 			delta := end.Sub(start)
 			c.metrics.ReportGarbageCollectionLatency(c.name, delta)
 		}()
@@ -268,7 +268,7 @@ func (c *controlLoop) handleWriteRequest(req *controlLoopWriteRequest) {
 
 // expandSegments seals the latest segment and creates a new mutable segment.
 func (c *controlLoop) expandSegments() error {
-	now := c.timeSource()
+	now := c.clock()
 
 	c.immutableSegmentSize += c.segments[c.highestSegmentIndex].Size()
 
@@ -384,7 +384,7 @@ func (c *controlLoop) handleShutdownRequest(req *controlLoopShutdownRequest) {
 	}
 
 	// Seal the mutable segment
-	durableKeys, err := c.segments[c.highestSegmentIndex].Seal(c.timeSource())
+	durableKeys, err := c.segments[c.highestSegmentIndex].Seal(c.clock())
 	if err != nil {
 		c.fatalErrorHandler.Panic(fmt.Errorf("failed to seal mutable segment: %w", err))
 		return

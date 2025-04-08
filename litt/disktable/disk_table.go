@@ -65,8 +65,8 @@ type DiskTable struct {
 	// lookup table when data is requested from the table before it has been flushed to disk.
 	unflushedDataCache sync.Map
 
-	// timeSource is the time source used by the disk table.
-	timeSource func() time.Time
+	// clock is the time source used by the disk table.
+	clock func() time.Time
 
 	// The number of bytes contained within all segments, including the mutable segment. This tracks the number of
 	// bytes that are on disk, not bytes in memory.
@@ -176,7 +176,7 @@ func NewDiskTable(
 	table := &DiskTable{
 		logger:             config.Logger,
 		fatalErrorHandler:  fatalErrorHandler,
-		timeSource:         config.TimeSource,
+		clock:              config.Clock,
 		roots:              roots,
 		segmentDirectories: segDirs,
 		name:               name,
@@ -192,7 +192,7 @@ func NewDiskTable(
 			config.Logger,
 			fatalErrorHandler,
 			table.segmentDirectories,
-			config.TimeSource())
+			config.Clock())
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather segment files: %w", err)
 	}
@@ -216,7 +216,7 @@ func NewDiskTable(
 		fatalErrorHandler,
 		nextSegmentIndex,
 		segDirs,
-		config.TimeSource(),
+		config.Clock(),
 		metadata.GetShardingFactor(),
 		config.SaltShaker.Uint32(),
 		config.Fsync)
@@ -246,7 +246,7 @@ func NewDiskTable(
 		fatalErrorHandler: fatalErrorHandler,
 		flushChannel:      make(chan any, tableFlushChannelCapacity),
 		metrics:           metrics,
-		timeSource:        config.TimeSource,
+		clock:             config.Clock,
 		name:              name,
 	}
 	table.flushLoop = fLoop
@@ -266,7 +266,7 @@ func NewDiskTable(
 		targetFileSize:          config.TargetSegmentFileSize,
 		targetKeyFileSize:       config.TargetSegmentKeyFileSize,
 		maxKeyCount:             config.MaxSegmentKeyCount,
-		timeSource:              config.TimeSource,
+		clock:                   config.Clock,
 		segmentDirectories:      segDirs,
 		saltShaker:              tableSaltShaker,
 		metadata:                metadata,
@@ -300,9 +300,9 @@ func (d *DiskTable) reloadKeymap(
 	lowestSegmentIndex uint32,
 	highestSegmentIndex uint32) error {
 
-	start := d.timeSource()
+	start := d.clock()
 	defer func() {
-		d.logger.Infof("spent %v reloading keymap", d.timeSource().Sub(start))
+		d.logger.Infof("spent %v reloading keymap", d.clock().Sub(start))
 	}()
 
 	// It's possible that some of the data written near the end of the previous session was corrupted.
@@ -528,9 +528,9 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 	var cacheHit bool
 	var dataSize uint64
 	if d.metrics != nil {
-		start := d.timeSource()
+		start := d.clock()
 		defer func() {
-			end := d.timeSource()
+			end := d.clock()
 			delta := end.Sub(start)
 			d.metrics.ReportReadOperation(d.name, delta, dataSize, cacheHit)
 		}()
@@ -578,9 +578,9 @@ func (d *DiskTable) Put(key []byte, value []byte) error {
 	}
 
 	if d.metrics != nil {
-		start := d.timeSource()
+		start := d.clock()
 		defer func() {
-			end := d.timeSource()
+			end := d.clock()
 			delta := end.Sub(start)
 			d.metrics.ReportWriteOperation(d.name, delta, 1, uint64(len(value)))
 		}()
@@ -612,13 +612,13 @@ func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 	}
 
 	if d.metrics != nil {
-		start := d.timeSource()
+		start := d.clock()
 		totalSize := uint64(0)
 		for _, kv := range batch {
 			totalSize += uint64(len(kv.Value))
 		}
 		defer func() {
-			end := d.timeSource()
+			end := d.clock()
 			delta := end.Sub(start)
 			d.metrics.ReportWriteOperation(d.name, delta, uint64(len(batch)), totalSize)
 		}()
@@ -662,9 +662,9 @@ func (d *DiskTable) Flush() error {
 	}
 
 	if d.metrics != nil {
-		start := d.timeSource()
+		start := d.clock()
 		defer func() {
-			end := d.timeSource()
+			end := d.clock()
 			delta := end.Sub(start)
 			d.metrics.ReportFlushOperation(d.name, delta)
 		}()
@@ -727,9 +727,9 @@ func (d *DiskTable) writeKeysToKeymap(keys []*types.KAPair) error {
 	}
 
 	if d.metrics != nil {
-		start := d.timeSource()
+		start := d.clock()
 		defer func() {
-			end := d.timeSource()
+			end := d.clock()
 			delta := end.Sub(start)
 			d.metrics.ReportKeymapFlushLatency(d.name, delta)
 		}()
