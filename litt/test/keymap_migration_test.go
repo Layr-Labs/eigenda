@@ -100,7 +100,7 @@ func TestKeymapMigration(t *testing.T) {
 	}
 
 	// Shut down the table and move the keymap directory. There shouldn't be any problems caused by this.
-	err = db.Stop()
+	err = db.Close()
 	require.NoError(t, err)
 
 	// By default, the keymap will store its data inside directory 0
@@ -125,7 +125,7 @@ func TestKeymapMigration(t *testing.T) {
 	}
 
 	// Close the table and reopen it using a MemKeymap
-	err = db.Stop()
+	err = db.Close()
 	require.NoError(t, err)
 	config.KeymapType = keymap.MemKeymapType
 
@@ -147,7 +147,7 @@ func TestKeymapMigration(t *testing.T) {
 	require.True(t, os.IsNotExist(err))
 
 	// Close the table and reopen it using a LevelDBKeymap
-	err = db.Stop()
+	err = db.Close()
 	require.NoError(t, err)
 	config.KeymapType = keymap.UnsafeLevelDBKeymapType
 
@@ -248,7 +248,7 @@ func TestFailedKeymapMigration(t *testing.T) {
 		}
 	}
 
-	err = db.Stop()
+	err = db.Close()
 	require.NoError(t, err)
 
 	// Simulate a failed reload. A failed reload be identified by the missing "initialized" flag file.

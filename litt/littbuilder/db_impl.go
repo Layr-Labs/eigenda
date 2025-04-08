@@ -195,7 +195,7 @@ func (d *db) DropTable(name string) error {
 	return nil
 }
 
-func (d *db) Stop() error {
+func (d *db) Close() error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -203,7 +203,7 @@ func (d *db) Stop() error {
 	d.stopped.Store(true)
 
 	for name, table := range d.tables {
-		err := table.Stop()
+		err := table.Close()
 		if err != nil {
 			return fmt.Errorf("error stopping table %s: %w", name, err)
 		}
