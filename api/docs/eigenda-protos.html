@@ -1141,7 +1141,7 @@ Check the allowed quorum numbers by looking up reservation struct: https://githu
         
       
         <h3 id="common.v2.PaymentHeader">PaymentHeader</h3>
-        <p>PaymentHeader contains payment information for a blob.</p><p>At least one of reservation_period or cumulative_payment must be set, and reservation_period </p><p>is always considered before cumulative_payment. If reservation_period is set but not valid, </p><p>the server will reject the request and not proceed with dispersal. If reservation_period is not set </p><p>and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.</p><p>Once the server has accepted the payment header, a client cannot cancel or rollback the payment.</p><p>Every dispersal request will be charged by a multiple of `minNumSymbols` field defined by the payment vault contract.</p><p>If the request blob size is smaller or not a multiple of `minNumSymbols`, the server will charge the user for the next </p><p>multiple of `minNumSymbols` (https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/payments/PaymentVaultStorage.sol#L9).</p>
+        <p>PaymentHeader contains payment information for a blob. </p><p>At least one of timestamp or cumulative_payment must be set, and timestamp </p><p>is always checked before cumulative_payment. If timestamp is set but not valid, </p><p>the server will reject the request and not proceed with dispersal. If timestamp is not set </p><p>and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.</p><p>Once the server has accepted the payment header, a client cannot cancel or rollback the payment.</p><p>Every dispersal request will be charged by a multiple of `minNumSymbols` field defined by the payment vault contract.</p><p>If the request blob size is smaller or not a multiple of `minNumSymbols`, the server will charge the user for the next </p><p>multiple of `minNumSymbols` (https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/payments/PaymentVaultStorage.sol#L9).</p>
 
         
           <table class="field-table">
@@ -1214,8 +1214,7 @@ Example Decision Flow:
    payment vault contract, and calculate the incremental amount of tokens needed for the current request needs based on 
    protocol defined pricing.
   4. They take the sum of previousCumPmt &#43; new incremental payment and place it in the “cumulative_payment” field.
-  5. The disperser checks this new cumulative total against on-chain deposits and prior records (largest previous payment 
-   and smallest later payment if exists).
+  5. The disperser checks this new cumulative total against on-chain deposits and largest existing payment.
   6. If the payment number is valid, the request is confirmed and disperser proceeds with dispersal; otherwise it’s rejected. </p></td>
                 </tr>
               
