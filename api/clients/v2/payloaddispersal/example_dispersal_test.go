@@ -47,7 +47,4 @@ func Example_payloadDispersal() {
 	//    from EigenDA when needed
 
 	fmt.Printf("Successfully dispersed payload")
-
-	// Output:
-	// Successfully dispersed payload
 }
