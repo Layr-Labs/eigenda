@@ -384,8 +384,8 @@ func (d *DiskTable) Name() string {
 	return d.name
 }
 
-// Stop stops the disk table. Flushes all data out to disk.
-func (d *DiskTable) Stop() error {
+// Close stops the disk table. Flushes all data out to disk.
+func (d *DiskTable) Close() error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
 		return fmt.Errorf("cannot process Stop() request, DB is in panicked state due to error: %w", err)
 	}
@@ -416,7 +416,7 @@ func (d *DiskTable) Destroy() error {
 		return fmt.Errorf("Cannot process Destroy() request, DB is in panicked state due to error: %w", err)
 	}
 
-	err := d.Stop()
+	err := d.Close()
 	if err != nil {
 		return fmt.Errorf("failed to stop: %w", err)
 	}

@@ -143,7 +143,7 @@ func (c *controlLoop) run() {
 func (c *controlLoop) doGarbageCollection() {
 	start := c.timeSource()
 	ttl := c.metadata.GetTTL()
-	if ttl.Nanoseconds() == 0 {
+	if ttl.Nanoseconds() <= 0 {
 		// No TTL set, so nothing to do.
 		return
 	}

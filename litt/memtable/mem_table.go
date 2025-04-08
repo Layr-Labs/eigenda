@@ -163,7 +163,7 @@ func (m *memTable) Destroy() error {
 	return nil
 }
 
-func (m *memTable) Stop() error {
+func (m *memTable) Close() error {
 	m.shutdown.Store(true)
 	return nil
 }

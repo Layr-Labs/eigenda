@@ -58,7 +58,7 @@ func TestGenerateExampleTree(t *testing.T) {
 	require.NoError(t, err)
 
 	// Shut down the database to ensure all data is flushed to disk
-	err = db.Stop()
+	err = db.Close()
 	require.NoError(t, err)
 
 	// Run the tree command on testDir

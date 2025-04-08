@@ -322,7 +322,7 @@ func restartTest(t *testing.T, tableBuilder *tableBuilder) {
 		if i == restartIteration {
 			ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 			require.True(t, ok)
-			err = table.Stop()
+			err = table.Close()
 			require.NoError(t, err)
 
 			table, err = tableBuilder.builder(time.Now, tableName, []string{directory})
@@ -460,7 +460,7 @@ func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelet
 	// Stop the table
 	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	fatalErrorHandler := table.(*DiskTable).fatalErrorHandler
@@ -577,7 +577,7 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 	// Stop the table
 	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	lowestSegmentIndex, _, segments, err := segment.GatherSegmentFiles(
@@ -766,7 +766,7 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 	// Stop the table
 	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
@@ -983,7 +983,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	// Stop the table
 	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
@@ -1205,7 +1205,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	// Stop the table
 	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
@@ -1447,7 +1447,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	// Stop the table
 	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
@@ -1613,7 +1613,7 @@ func metadataPreservedOnRestartTest(t *testing.T, tableBuilder *tableBuilder) {
 	// Stop the table
 	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	// Restart the table.
@@ -1662,7 +1662,7 @@ func orphanedMetadataTest(t *testing.T, tableBuilder *tableBuilder) {
 	// Stop the table
 	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	// Simulate an orphaned metadata file.
@@ -1725,7 +1725,7 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder *table
 		if i == restartIteration {
 			ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 			require.True(t, ok)
-			err = table.Stop()
+			err = table.Close()
 			require.NoError(t, err)
 
 			// Shuffle around the segment files. This should not cause problems.
@@ -1945,7 +1945,7 @@ func changingShardingFactorTest(t *testing.T, tableBuilder *tableBuilder) {
 
 			ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 			require.True(t, ok)
-			err = table.Stop()
+			err = table.Close()
 			require.NoError(t, err)
 
 			table, err = tableBuilder.builder(time.Now, tableName, roots)
@@ -2033,7 +2033,7 @@ func changingShardingFactorTest(t *testing.T, tableBuilder *tableBuilder) {
 	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
 
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	checkShardsInSegments(t, roots, expectedShardCounts)
@@ -2185,7 +2185,7 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 
 	reportedSize := table.Size()
 
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	// Walk the "directory" file tree and calculate the actual size of the table.
