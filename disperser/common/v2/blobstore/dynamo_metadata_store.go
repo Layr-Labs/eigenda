@@ -24,6 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 const (
@@ -32,6 +33,7 @@ const (
 	OperatorResponseIndexName  = "OperatorResponseIndex"
 	RequestedAtIndexName       = "RequestedAtIndex"
 	AttestedAtIndexName        = "AttestedAtAIndex"
+	AccountBlobIndexName       = "AccountBlobIndex"
 
 	blobKeyPrefix             = "BlobKey#"
 	dispersalKeyPrefix        = "Dispersal#"
@@ -480,6 +482,83 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtBackward(
 	return result, lastProcessedCursor, nil
 }
 
+// GetBlobMetadataByAccountID returns blobs (as BlobMetadata) within time range (start, end)
+// (in ns, both exclusive), retrieved and ordered by RequestedAt timestamp in specified order, for
+// a given account.
+//
+// If specified order is ascending (`ascending` is true), retrieve data from the oldest (`start`)
+// to the newest (`end`); otherwise retrieve by the opposite direction.
+//
+// If limit > 0, returns at most that many blobs. If limit <= 0, returns all results
+// in the time range.
+func (s *BlobMetadataStore) GetBlobMetadataByAccountID(
+	ctx context.Context,
+	accountId gethcommon.Address,
+	start uint64,
+	end uint64,
+	limit int,
+	ascending bool,
+) ([]*v2.BlobMetadata, error) {
+	if start+1 > end-1 {
+		return nil, fmt.Errorf("no time point in exclusive time range (%d, %d)", start, end)
+	}
+
+	blobs := make([]*v2.BlobMetadata, 0)
+	var lastEvaledKey map[string]types.AttributeValue
+	adjustedStart, adjustedEnd := start+1, end-1
+
+	// Iteratively fetch results until we get desired number of items or exhaust the
+	// available data.
+	// This needs to be processed in a loop because DynamoDb has a limit on the response
+	// size of a query (1MB) and we may have more data than that.
+	for {
+		remaining := math.MaxInt
+		if limit > 0 {
+			remaining = limit - len(blobs)
+		}
+		res, err := s.dynamoDBClient.QueryIndexWithPagination(
+			ctx,
+			s.tableName,
+			AccountBlobIndexName,
+			"AccountID = :pk AND RequestedAt BETWEEN :start AND :end",
+			commondynamodb.ExpressionValues{
+				":pk":    &types.AttributeValueMemberS{Value: accountId.Hex()},
+				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedStart), 10)},
+				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedEnd), 10)},
+			},
+			int32(remaining),
+			lastEvaledKey,
+			ascending,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("query failed for accountId %s with time range (%d, %d): %w", accountId.Hex(), adjustedStart, adjustedEnd, err)
+		}
+
+		// Collect results
+		for _, item := range res.Items {
+			it, err := UnmarshalBlobMetadata(item)
+			if err != nil {
+				return blobs, fmt.Errorf("failed to unmarshal blob metadata: %w", err)
+			}
+			blobs = append(blobs, it)
+
+			// Desired number of items collected
+			if limit > 0 && len(blobs) >= limit {
+				return blobs, nil
+			}
+		}
+
+		// Exhausted all items already
+		if res.LastEvaluatedKey == nil {
+			break
+		}
+		// For next iteration
+		lastEvaledKey = res.LastEvaluatedKey
+	}
+
+	return blobs, nil
+}
+
 // queryBucketAttestation returns attestations within a single bucket of time range [start, end]. Results are ordered by AttestedAt in
 // ascending order.
 //
@@ -872,7 +951,7 @@ func (s *BlobMetadataStore) GetDispersalRequest(ctx context.Context, batchHeader
 // If specified order is ascending (`ascending` is true), retrieve data from the oldest (`start`)
 // to the newest (`end`); otherwise retrieve by the opposite direction.
 //
-// If limit > 0, returns at most that many attestations. If limit <= 0, returns all results
+// If limit > 0, returns at most that many dispersals. If limit <= 0, returns all results
 // in the time range.
 func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
 	ctx context.Context,
@@ -890,8 +969,8 @@ func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
 	var lastEvaledKey map[string]types.AttributeValue
 	adjustedStart, adjustedEnd := start+1, end-1
 
-	// Iteratively fetch results from the bucket until we get desired number of items or
-	// exhaust the available data.
+	// Iteratively fetch results until we get desired number of items or exhaust the
+	// available data.
 	// This needs to be processed in a loop because DynamoDb has a limit on the response
 	// size of a query (1MB) and we may have more data than that.
 	for {
@@ -1320,6 +1399,14 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 				AttributeType: types.ScalarAttributeTypeN,
 			},
 			{
+				AttributeName: aws.String("AccountID"),
+				AttributeType: types.ScalarAttributeTypeS,
+			},
+			{
+				AttributeName: aws.String("RequestedAt"),
+				AttributeType: types.ScalarAttributeTypeN,
+			},
+			{
 				AttributeName: aws.String("RequestedAtBucket"),
 				AttributeType: types.ScalarAttributeTypeS,
 			},
@@ -1409,6 +1496,26 @@ func GenerateTableSchema(tableName string, readCapacityUnits int64, writeCapacit
 				},
 			},
 			{
+				IndexName: aws.String(AccountBlobIndexName),
+				KeySchema: []types.KeySchemaElement{
+					{
+						AttributeName: aws.String("AccountID"),
+						KeyType:       types.KeyTypeHash,
+					},
+					{
+						AttributeName: aws.String("RequestedAt"),
+						KeyType:       types.KeyTypeRange,
+					},
+				},
+				Projection: &types.Projection{
+					ProjectionType: types.ProjectionTypeAll,
+				},
+				ProvisionedThroughput: &types.ProvisionedThroughput{
+					ReadCapacityUnits:  aws.Int64(readCapacityUnits),
+					WriteCapacityUnits: aws.Int64(writeCapacityUnits),
+				},
+			},
+			{
 				IndexName: aws.String(RequestedAtIndexName),
 				KeySchema: []types.KeySchemaElement{
 					{
@@ -1471,6 +1578,8 @@ func MarshalBlobMetadata(metadata *v2.BlobMetadata) (commondynamodb.Item, error)
 	fields["SK"] = &types.AttributeValueMemberS{Value: blobMetadataSK}
 	fields["RequestedAtBucket"] = &types.AttributeValueMemberS{Value: computeRequestedAtBucket(metadata.RequestedAt)}
 	fields["RequestedAtBlobKey"] = &types.AttributeValueMemberS{Value: encodeBlobFeedCursorKey(metadata.RequestedAt, &blobKey)}
+	fields["AccountID"] = &types.AttributeValueMemberS{Value: metadata.BlobHeader.PaymentMetadata.AccountID.Hex()}
+
 	return fields, nil
 }
 
@@ -1596,7 +1705,7 @@ func UnmarshalOperatorID(item commondynamodb.Item) (*core.OperatorID, error) {
 	operatorIDStr := obj.OperatorID
 	if strings.HasPrefix(operatorIDStr, dispersalRequestSKPrefix) {
 		operatorIDStr = strings.TrimPrefix(operatorIDStr, dispersalRequestSKPrefix)
-	} else if strings.HasPrefix(operatorIDStr, dispersalResponseSKPrefix) {
+	} else {
 		operatorIDStr = strings.TrimPrefix(operatorIDStr, dispersalResponseSKPrefix)
 	}
 

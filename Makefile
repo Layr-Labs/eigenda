@@ -22,7 +22,7 @@ endif
 RELEASE_TAG := $(or $(RELEASE_TAG),latest)
 
 compile-contracts:
-	cd contracts && ./compile.sh
+	$(MAKE) -C contracts compile
 
 clean:
 	$(MAKE) -C api clean
@@ -39,6 +39,10 @@ lint:
 	golint -set_exit_status ./...
 	go tool fix ./..
 	golangci-lint run
+
+# TODO: this should also format go code, github workflows, etc.
+fmt:
+	$(MAKE) -C contracts fmt
 
 build:
 	cd operators/churner && make build

@@ -8,8 +8,10 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/common"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // PayloadDisperser provides the ability to disperse payloads to EigenDA via a Disperser grpc service.
@@ -20,9 +22,11 @@ type PayloadDisperser struct {
 	config          PayloadDisperserConfig
 	disperserClient clients.DisperserClient
 	certVerifier    clients.ICertVerifier
+	stageTimer      *common.StageTimer
 }
 
 // NewPayloadDisperser creates a PayloadDisperser from subcomponents that have already been constructed and initialized.
+// If the registry is nil then no metrics will be collected.
 func NewPayloadDisperser(
 	logger logging.Logger,
 	payloadDisperserConfig PayloadDisperserConfig,
@@ -35,6 +39,8 @@ func NewPayloadDisperser(
 	//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
 	disperserClient clients.DisperserClient,
 	certVerifier clients.ICertVerifier,
+	// if nil, then no metrics will be collected
+	registry *prometheus.Registry,
 ) (*PayloadDisperser, error) {
 
 	err := payloadDisperserConfig.checkAndSetDefaults()
@@ -47,6 +53,7 @@ func NewPayloadDisperser(
 		config:          payloadDisperserConfig,
 		disperserClient: disperserClient,
 		certVerifier:    certVerifier,
+		stageTimer:      common.NewStageTimer(registry, "PayloadDisperser", "SendPayload"),
 	}, nil
 }
 
@@ -63,10 +70,16 @@ func (pd *PayloadDisperser) SendPayload(
 	// payload is the raw data to be stored on eigenDA
 	payload *coretypes.Payload,
 ) (*coretypes.EigenDACert, error) {
+
+	probe := pd.stageTimer.NewSequence("convert_to_blob")
+	defer probe.End()
+
 	blob, err := payload.ToBlob(pd.config.PayloadPolynomialForm)
 	if err != nil {
 		return nil, fmt.Errorf("convert payload to blob: %w", err)
 	}
+
+	probe.SetStage("get_quorums")
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
@@ -82,30 +95,36 @@ func (pd *PayloadDisperser) SendPayload(
 	//  serialized bytes. The operations taking place in DisperseBlob require the bytes to be converted into field
 	//  elements anyway, so serializing the blob here is unnecessary work. This will be a larger change that affects
 	//  many areas of code, though.
-	blobStatus, blobKey, err := pd.disperserClient.DisperseBlob(
+	blobStatus, blobKey, err := pd.disperserClient.DisperseBlobWithProbe(
 		timeoutCtx,
 		blob.Serialize(),
 		pd.config.BlobVersion,
 		requiredQuorums,
-	)
+		probe)
 	if err != nil {
 		return nil, fmt.Errorf("disperse blob: %w", err)
 	}
 	pd.logger.Debug("Successful DisperseBlob", "blobStatus", blobStatus.String(), "blobKey", blobKey.Hex())
 
+	probe.SetStage("QUEUED")
+
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCertifiedTimeout)
 	defer cancel()
-	blobStatusReply, err := pd.pollBlobStatusUntilCertified(timeoutCtx, blobKey, blobStatus.ToProfobuf())
+	blobStatusReply, err := pd.pollBlobStatusUntilCertified(timeoutCtx, blobKey, blobStatus.ToProfobuf(), probe)
 	if err != nil {
 		return nil, fmt.Errorf("poll blob status until certified: %w", err)
 	}
 	pd.logger.Debug("Blob status CERTIFIED", "blobKey", blobKey.Hex())
+
+	probe.SetStage("build_cert")
 
 	eigenDACert, err := pd.buildEigenDACert(ctx, blobKey, blobStatusReply)
 	if err != nil {
 		// error returned from method is sufficiently descriptive
 		return nil, err
 	}
+
+	probe.SetStage("verify_cert")
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
@@ -141,6 +160,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 	ctx context.Context,
 	blobKey core.BlobKey,
 	initialStatus dispgrpc.BlobStatus,
+	probe *common.SequenceProbe,
 ) (*dispgrpc.BlobStatusReply, error) {
 
 	previousStatus := initialStatus
@@ -182,6 +202,9 @@ func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
 			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED, dispgrpc.BlobStatus_GATHERING_SIGNATURES:
 				// TODO (litt): check signing percentage when we are gathering signatures, potentially break
 				//  out of this loop early if we have enough signatures
+
+				// Report all non-terminal statuses to the probe. Repeat reports are no-ops.
+				probe.SetStage(newStatus.String())
 				continue
 			default:
 				return nil, fmt.Errorf(

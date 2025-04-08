@@ -171,7 +171,8 @@ func NewTestClient(
 		logger,
 		payloadDisperserConfig,
 		disperserClient,
-		certVerifier)
+		certVerifier,
+		metrics.registry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload disperser: %w", err)
 	}

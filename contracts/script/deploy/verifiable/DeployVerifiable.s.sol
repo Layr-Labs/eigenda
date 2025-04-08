@@ -51,7 +51,6 @@ import {
 } from "./DeploymentInitializer.sol";
 
 import "forge-std/Script.sol";
-import "forge-std/StdJson.sol";
 import {console2} from "forge-std/console2.sol";
 
 contract DeployVerifiable is Script {

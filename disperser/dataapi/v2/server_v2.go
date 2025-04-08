@@ -67,8 +67,8 @@ type (
 	}
 
 	SignedBatch struct {
-		BatchHeader *corev2.BatchHeader `json:"batch_header"`
-		Attestation *corev2.Attestation `json:"attestation"`
+		BatchHeader     *corev2.BatchHeader `json:"batch_header"`
+		AttestationInfo *AttestationInfo    `json:"attestation_info"`
 	}
 
 	BlobResponse struct {
@@ -188,6 +188,11 @@ type (
 		RetrievalSocket string `json:"retrieval_socket"`
 		RetrievalOnline bool   `json:"retrieval_online"`
 		RetrievalStatus string `json:"retrieval_status"`
+	}
+
+	AccountBlobFeedResponse struct {
+		AccountId string     `json:"account_id"`
+		Blobs     []BlobInfo `json:"blobs"`
 	}
 
 	SemverReportResponse struct {
@@ -360,6 +365,10 @@ func (s *ServerV2) Start() error {
 		{
 			batches.GET("/feed", s.FetchBatchFeed)
 			batches.GET("/:batch_header_hash", s.FetchBatch)
+		}
+		accounts := v2.Group("/accounts")
+		{
+			accounts.GET("/:account_id/blobs", s.FetchAccountBlobFeed)
 		}
 		operators := v2.Group("/operators")
 		{

@@ -20,7 +20,6 @@ import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 import "forge-std/Test.sol";
 
-
 /// @dev This script is used to test the state of the contracts after the deployment initializer is deployed.
 /// It is written as a script so that it does not run with this repo's test suite because of the dependency on env variables
 /// (May be integrated into the test suite in the future)
