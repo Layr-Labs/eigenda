@@ -302,6 +302,17 @@ func (t *MockWriter) GetDisperserAddress(ctx context.Context, disperserID uint32
 	return result.(gethcommon.Address), args.Error(1)
 }
 
+func (t *MockWriter) GetDisperserAddresses(ctx context.Context, keys []uint32) ([]gethcommon.Address, error) {
+	args := t.Called(keys)
+	result := args.Get(0)
+	if result == nil {
+		var zeroValue []gethcommon.Address
+		return zeroValue, args.Error(1)
+	}
+
+	return result.([]gethcommon.Address), args.Error(1)
+}
+
 func (t *MockWriter) GetRelayRegistryAddress() gethcommon.Address {
 	args := t.Called()
 	result := args.Get(0)

@@ -994,6 +994,23 @@ func (t *Reader) GetDisperserAddress(ctx context.Context, disperserID uint32) (g
 	return address, nil
 }
 
+func (t *Reader) GetDisperserAddresses(ctx context.Context, keys []uint32) ([]gethcommon.Address, error) {
+	registry := t.bindings.DisperserRegistry
+	if registry == nil {
+		return nil, errors.New("disperser registry not deployed")
+	}
+
+	//TODO: uncomment this when the disperser registry is deployed with new view functions
+	// addresses, err := registry.DisperserKeysToAddresses(
+	// 	&bind.CallOpts{
+	// 		Context: ctx,
+	// 	},
+	// 	keys)
+	addresses := []gethcommon.Address{gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")}
+
+	return addresses, nil
+}
+
 func (t *Reader) GetRelayRegistryAddress() gethcommon.Address {
 	return t.bindings.RelayRegistryAddress
 }

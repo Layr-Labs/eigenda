@@ -272,6 +272,38 @@ func (d *ChainDataMock) GetOperatorSocket(ctx context.Context, blockNumber uint,
 	return state.IndexedOperatorState.IndexedOperators[operator].Socket, nil
 }
 
+// DisperserAddresses stores a mapping of disperser keys to their addresses
+type DisperserAddresses map[uint32]string
+
+func (d *ChainDataMock) getDisperserAddresses() DisperserAddresses {
+	// Mock a few disperser keys and addresses
+	return DisperserAddresses{
+		1: "0x1234567890123456789012345678901234567890",
+		2: "0x2345678901234567890123456789012345678901",
+		3: "0x3456789012345678901234567890123456789012",
+		4: "0x4567890123456789012345678901234567890123",
+		5: "0x5678901234567890123456789012345678901234",
+	}
+}
+
+func (d *ChainDataMock) GetDisperserKeyToAddress(ctx context.Context, blockNumber uint, key uint32) (string, error) {
+	addresses := d.getDisperserAddresses()
+	return addresses[key], nil
+}
+
+func (d *ChainDataMock) GetDisperserKeysToAddresses(ctx context.Context, blockNumber uint, keys []uint32) ([]string, error) {
+	addresses := d.getDisperserAddresses()
+
+	// Filter keys to only include ones that exist
+	result := make([]string, 0)
+	for _, key := range keys {
+		if address, ok := addresses[key]; ok {
+			result = append(result, address)
+		}
+	}
+	return result, nil
+}
+
 func (d *ChainDataMock) GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.IndexedOperatorState, error) {
 
 	state := d.GetTotalOperatorStateWithQuorums(ctx, blockNumber, quorums)

@@ -55,6 +55,24 @@ func (m *IndexedChainState) GetOperatorSocket(
 	return args.Get(0).(string), args.Error(1)
 }
 
+func (m *IndexedChainState) GetDisperserKeyToAddress(
+	ctx context.Context,
+	blockNumber uint,
+	key uint32) (string, error) {
+
+	args := m.Mock.Called(blockNumber, key)
+	return args.Get(0).(string), args.Error(1)
+}
+
+func (m *IndexedChainState) GetDisperserKeysToAddresses(
+	ctx context.Context,
+	blockNumber uint,
+	keys []uint32) ([]string, error) {
+
+	args := m.Mock.Called(blockNumber, keys)
+	return args.Get(0).([]string), args.Error(1)
+}
+
 func (m *IndexedChainState) GetIndexedOperatorState(
 	ctx context.Context,
 	blockNumber uint,
