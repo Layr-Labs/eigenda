@@ -212,7 +212,7 @@ func (s *ServerV2) FetchBlob(c *gin.Context) {
 	}
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlob")
 	s.metrics.ObserveLatency("FetchBlob", time.Since(handlerStart))
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBlobDataAge))
 	c.JSON(http.StatusOK, response)
 }
 
@@ -253,7 +253,7 @@ func (s *ServerV2) FetchBlobCertificate(c *gin.Context) {
 	}
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlobCertificate")
 	s.metrics.ObserveLatency("FetchBlobCertificate", time.Since(handlerStart))
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBlobDataAge))
 	c.JSON(http.StatusOK, response)
 }
 
@@ -294,7 +294,7 @@ func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlobAttestationInfo")
 	s.metrics.ObserveLatency("FetchBlobAttestationInfo", time.Since(handlerStart))
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBlobDataAge))
 	c.JSON(http.StatusOK, response)
 }
 
@@ -452,7 +452,7 @@ func (s *ServerV2) sendBlobFeedResponse(
 		Blobs:  blobInfo,
 		Cursor: cursorStr,
 	}
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBlobFeedAge))
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlobFeed")
 	s.metrics.ObserveLatency("FetchBlobFeed", time.Since(handlerStart))
 	c.JSON(http.StatusOK, response)

@@ -170,6 +170,7 @@ func (s *ServerV2) FetchBatchFeed(c *gin.Context) {
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchBatchFeed")
 	s.metrics.ObserveLatency("FetchBatchFeed", time.Since(handlerStart))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBatchFeedAge))
 	c.JSON(http.StatusOK, response)
 }
 
@@ -234,6 +235,6 @@ func (s *ServerV2) FetchBatch(c *gin.Context) {
 	}
 	s.metrics.IncrementSuccessfulRequestNum("FetchBatch")
 	s.metrics.ObserveLatency("FetchBatch", time.Since(handlerStart))
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBatchDataAge))
 	c.JSON(http.StatusOK, batchResponse)
 }
