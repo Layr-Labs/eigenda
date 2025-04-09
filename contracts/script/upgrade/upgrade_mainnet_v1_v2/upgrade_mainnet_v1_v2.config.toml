@@ -19,9 +19,9 @@ versionedBlobParams = [
 ]
 
 [initParams.paymentVault]
-minNumSymbols = 0
-pricePerSymbol = 0
-priceUpdateCooldown = 0
-globalSymbolsPerPeriod = 0
-reservationPeriodInterval = 0
-globalRatePeriodInterval = 0
+minNumSymbols = 4096
+pricePerSymbol = 447000000
+priceUpdateCooldown = 1
+globalSymbolsPerPeriod = 131072
+reservationPeriodInterval = 300
+globalRatePeriodInterval = 30
