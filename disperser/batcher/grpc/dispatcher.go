@@ -154,6 +154,8 @@ func (c *dispatcher) sendChunks(
 	defer conn.Close()
 
 	gc := node.NewDispersalClient(conn)
+	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
+	defer cancel()
 	start := time.Now()
 	request, totalSize, err := GetStoreChunksRequest(blobs, batchHeader, c.EnableGnarkBundleEncoding)
 	if err != nil {

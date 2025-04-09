@@ -100,6 +100,12 @@ var (
 		Value:    20 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ATTESTATION_TIMEOUT"),
 	}
+	BatchAttestationTimeoutFlag = cli.DurationFlag{
+		Name:     "batch-attestation-timeout",
+		Usage:    "connection timeout from grpc call to DA nodes for batch attestation",
+		Required: false,
+		Value:    25 * time.Second,
+	}
 	ChainReadTimeoutFlag = cli.DurationFlag{
 		Name:     "chain-read-timeout",
 		Usage:    "connection timeout to read from chain",
@@ -233,6 +239,7 @@ var optionalFlags = []cli.Flag{
 	IndexerDataDirFlag,
 	EncodingTimeoutFlag,
 	AttestationTimeoutFlag,
+	BatchAttestationTimeoutFlag,
 	ChainReadTimeoutFlag,
 	ChainWriteTimeoutFlag,
 	ChainStateTimeoutFlag,
