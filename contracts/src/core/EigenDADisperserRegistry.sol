@@ -87,4 +87,12 @@ contract EigenDADisperserRegistry is OwnableUpgradeable, EigenDADisperserRegistr
     function disperserKeyToAddress(uint32 _key) external view returns (address) {
         return disperserKeyToInfo[_key].disperserAddress;
     }
+    
+    function disperserKeysToAddresses(uint32[] memory _keys) external view returns (address[] memory) {
+        address[] memory addresses = new address[](_keys.length);
+        for (uint32 i = 0; i < _keys.length; i++) {
+            addresses[i] = disperserKeyToInfo[_keys[i]].disperserAddress;
+        }
+        return addresses;
+    }
 }
