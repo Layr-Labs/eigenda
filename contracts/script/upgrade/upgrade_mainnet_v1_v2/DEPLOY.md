@@ -1,4 +1,4 @@
-# V1 to V2 Upgrade Process (WIP)
+# V1 to V2 Upgrade Process
 
 ## Goals
 
@@ -22,7 +22,6 @@ Listed are the steps to do the upgrade by each party, divided up into phases, wh
     * EigenDARelayRegistry
     * EigenDADisperserRegistry
     * PaymentVault
-    * Pauser Registry
 * Deploy Implementations for the following:
     * EjectionManager
     * RegistryCoordinator
@@ -37,14 +36,6 @@ The Core Ops multisig should call the following on the timelock.
     * EjectionManager
     * RegistryCoordinator
     * EigenDAServiceManager
-* Transfer DA Proxy Admin ownership to DA Ops Multisig
-
-#### Core Ops Multisig
-* Transfer ownership of the following contracts to the DA Ops Multisig (implementation level fns)
-    * Registry Coordinator
-    * EigenDAServiceManager
-    * Ejection Manager
-* Call setPauserRegistry(new pauser registry) on the RegistryCoordinator
 
 #### DA Ops Multisig
 * Initialize parameters in new V2 registries
@@ -53,6 +44,17 @@ The Core Ops multisig should call the following on the timelock.
     * DisperserRegistry
 
 ### Phase 3
+
+#### Executor Multisig
+* Transfer DA Proxy Admin ownership to DA Ops Multisig
+
+#### Core Ops Multisig
+* Transfer ownership of the following contracts to the DA Ops Multisig (implementation level fns)
+    * Registry Coordinator
+    * EigenDAServiceManager
+    * Ejection Manager
+
+#### Verifiers
 * Verify and test upgrades thoroughly during the timelock period
 * Execute timelock transactions.
 
@@ -67,6 +69,6 @@ The Core Ops multisig should call the following on the timelock.
 
 * The SocketRegistry is not the same implementation as on master at the time of writing. Upgrading would remove the migrateOperatorSockets function.
 * The ThresholdRegistry, DisperserRegistry, RelayRegistry, and PaymentVault are contracts new to V2
-* A new PauserRegistry is needed to not share the same one controlled by the Core Ops multisig
+* A new PauserRegistry is needed to not share the same one controlled by the Core Ops multisig, but this task is deferred to later.
 * EjectionManager and RegistryCoordinator are to be upgraded immediately because of significant logic diffs from master to what's on chain.
 * IndexRegistry + StakeRegistry + BLS APK Registry only contain code level optimizations, so upgrade is deferred.
