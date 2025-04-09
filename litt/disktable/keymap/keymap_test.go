@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )
@@ -20,11 +21,21 @@ var builders = []keymapBuilder{
 type keymapBuilder func(logger logging.Logger, path string) (Keymap, error)
 
 func buildMemKeymap(logger logging.Logger, path string) (Keymap, error) {
-	return NewMemKeymap(logger, true), nil
+	kmap, _, err := NewMemKeymap(logger, path, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return kmap, nil
 }
 
 func buildLevelDBKeymap(logger logging.Logger, path string) (Keymap, error) {
-	return NewLevelDBKeymap(logger, path, true, false)
+	kmap, _, err := NewUnsafeLevelDBKeymap(logger, path, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return kmap, nil
 }
 
 func testBasicBehavior(t *testing.T, keymap Keymap) {
@@ -107,21 +118,15 @@ func TestBasicBehavior(t *testing.T) {
 
 	for _, builder := range builders {
 		keymap, err := builder(logger, dbDir)
-		if err != nil {
-			t.Fatalf("Failed to create keymap: %v", err)
-		}
+		require.NoError(t, err)
 		testBasicBehavior(t, keymap)
 
 		// verify that test dir is empty (destroy should have deleted everything)
-		_, err = os.Stat(dbDir)
-		if err != nil {
-			if !os.IsNotExist(err) {
-				require.NoError(t, err)
-			}
+		exists, err := util.Exists(dbDir)
+		require.NoError(t, err)
 
-			// Directory doesn't exist. We are good.
-		} else {
-			// Directory exists. Make sure it's emtpy.
+		if exists {
+			// Directory exists. Make sure it's empty.
 			entries, err := os.ReadDir(dbDir)
 			require.NoError(t, err)
 			require.Empty(t, entries)
@@ -139,7 +144,7 @@ func TestRestart(t *testing.T) {
 	testDir := t.TempDir()
 	dbDir := path.Join(testDir, "keymap")
 
-	keymap, err := NewLevelDBKeymap(logger, dbDir, true, false)
+	keymap, _, err := NewUnsafeLevelDBKeymap(logger, dbDir, true)
 	require.NoError(t, err)
 
 	expected := make(map[string]types.Address)
@@ -209,7 +214,7 @@ func TestRestart(t *testing.T) {
 	err = keymap.Stop()
 	require.NoError(t, err)
 
-	keymap, err = NewLevelDBKeymap(logger, dbDir, true, false)
+	keymap, _, err = NewUnsafeLevelDBKeymap(logger, dbDir, true)
 	require.NoError(t, err)
 
 	// Expected data should be present

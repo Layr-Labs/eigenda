@@ -14,6 +14,8 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
+// All table names must match this regex. Permits uppercase and lowercase letters, numbers, underscores, and dashes.
+// Must be at least one character long.
 var tableNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 var _ litt.DB = &db{}
@@ -31,9 +33,9 @@ type db struct {
 	logger logging.Logger
 
 	// A function that returns the current time.
-	timeSource func() time.Time
+	clock func() time.Time
 
-	// The time-to-live for tables that haven't had their TTL set.
+	// The default time-to-live for new tables. Once created, the TTL for a table can be changed.
 	ttl time.Duration
 
 	// The period between garbage collection runs.
@@ -77,7 +79,7 @@ func NewDB(config *litt.Config) (litt.DB, error) {
 		name string,
 		metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
 
-		return buildTable(config, ctx, logger, name, metrics)
+		return buildTable(config, logger, name, metrics)
 	}
 
 	return NewDBWithTableBuilder(config, tableBuilder)
@@ -100,7 +102,7 @@ func NewDBWithTableBuilder(config *litt.Config, tableBuilder TableBuilder) (litt
 	database := &db{
 		ctx:           config.CTX,
 		logger:        logger,
-		timeSource:    config.TimeSource,
+		clock:         config.Clock,
 		ttl:           config.TTL,
 		gcPeriod:      config.GCPeriod,
 		tableBuilder:  tableBuilder,
@@ -148,9 +150,6 @@ func (d *db) lockFreeSize() uint64 {
 
 // isTableNameValid returns true if the table name is valid.
 func (d *db) isTableNameValid(name string) bool {
-	if name == "" {
-		return false
-	}
 	return tableNameRegex.MatchString(name)
 }
 
@@ -196,7 +195,7 @@ func (d *db) DropTable(name string) error {
 	return nil
 }
 
-func (d *db) Stop() error {
+func (d *db) Close() error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -204,7 +203,7 @@ func (d *db) Stop() error {
 	d.stopped.Store(true)
 
 	for name, table := range d.tables {
-		err := table.Stop()
+		err := table.Close()
 		if err != nil {
 			return fmt.Errorf("error stopping table %s: %w", name, err)
 		}
@@ -247,7 +246,14 @@ func (d *db) gatherMetrics(interval time.Duration) {
 		case <-d.ctx.Done():
 			return
 		case <-ticker.C:
-			d.metrics.CollectPeriodicMetrics(d, d.tables)
+			d.lock.Lock()
+			tablesCopy := make(map[string]litt.ManagedTable, len(d.tables))
+			for name, table := range d.tables {
+				tablesCopy[name] = table
+			}
+			d.lock.Unlock()
+
+			d.metrics.CollectPeriodicMetrics(tablesCopy)
 		}
 	}
 }

@@ -8,6 +8,8 @@ import (
 	"math"
 	"os"
 	"path"
+	"strconv"
+	"strings"
 	"sync/atomic"
 
 	"github.com/Layr-Labs/eigenda/litt/util"
@@ -44,17 +46,22 @@ type valueFile struct {
 	// The current size of the file, only including flushed data. Protects against reads of partially written values.
 	flushedSize atomic.Uint64
 
-	// Whether fsync mode is enabled.
+	// Whether fsync mode is enabled. If fsync mode is enabled, then each flush operation will invoke the OS fsync
+	// operation before returning. An fsync operation is required to ensure that data is not sitting in OS level
+	// in-memory buffers (otherwise, an OS crash may lead to data loss). This option is provided for testing,
+	// as many test scenarios do lots of tiny writes and flushes, and this workload is MUCH slower with fsync
+	// mode enabled. In production, fsync mode should always be enabled.
 	fsync bool
 }
 
-// newValueFile creates a new value file.
-func newValueFile(
+// TODO create vs load
+
+// createValueFile creates a new value file.
+func createValueFile(
 	logger logging.Logger,
 	index uint32,
 	shard uint32,
 	parentDirectory string,
-	sealed bool,
 	fsync bool) (*valueFile, error) {
 
 	values := &valueFile{
@@ -66,37 +73,108 @@ func newValueFile(
 	}
 
 	filePath := values.path()
-	exists, size, err := util.VerifyFilePermissions(filePath)
+	exists, _, err := util.VerifyFileProperties(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("file %s has incorrect permissions: %v", filePath, err)
 	}
 
 	if exists {
-		values.size = uint64(size)
-		values.flushedSize.Store(values.size)
+		return nil, fmt.Errorf("value file %s already exists", filePath)
 	}
 
-	if sealed {
-		if !exists {
-			return nil, fmt.Errorf("value file %s does not exist", filePath)
-		}
-
-	} else {
-		if exists {
-			return nil, fmt.Errorf("value file %s already exists", filePath)
-		}
-
-		// Open the file for writing.
-		file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0644)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open value file %s: %v", filePath, err)
-		}
-
-		values.file = file
-		values.writer = bufio.NewWriter(file)
+	// Open the file for writing.
+	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open value file %s: %v", filePath, err)
 	}
+
+	values.file = file
+	values.writer = bufio.NewWriter(file)
 
 	return values, nil
+}
+
+// loadValueFile loads a value file from disk. It looks for the file in the given parent directories until it finds
+// the file. If the file is not found, it returns an error.
+func loadValueFile(
+	logger logging.Logger,
+	index uint32,
+	shard uint32,
+	parentDirectories []string) (*valueFile, error) {
+
+	valuesFileName := fmt.Sprintf("%d-%d%s", index, shard, ValuesFileExtension)
+	valuesPath, err := lookForFile(parentDirectories, valuesFileName)
+	var parentDirectory string
+	if err != nil {
+		return nil, fmt.Errorf("failed to find value file: %v", err)
+	}
+	if valuesPath == "" {
+		return nil, fmt.Errorf("value file %s not found", valuesFileName)
+	}
+	parentDirectory = path.Dir(valuesPath)
+
+	values := &valueFile{
+		logger:          logger,
+		index:           index,
+		shard:           shard,
+		parentDirectory: parentDirectory,
+		fsync:           false,
+	}
+
+	filePath := values.path()
+	exists, size, err := util.VerifyFileProperties(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("file %s has incorrect permissions: %v", filePath, err)
+	}
+
+	if !exists {
+		return nil, fmt.Errorf("value file %s does not exist", filePath)
+	}
+
+	values.size = uint64(size)
+	values.flushedSize.Store(values.size)
+
+	return values, nil
+}
+
+// getValueFileIndex returns the index of the value file from the file name. Value file names have the form
+// "X-Y.values", where X is the segment index and Y is the shard number.
+func getValueFileIndex(fileName string) (uint32, error) {
+	baseName := path.Base(fileName)
+	strippedName := baseName[:len(baseName)-len(ValuesFileExtension)]
+
+	parts := strings.Split(strippedName, "-")
+	if len(parts) != 2 {
+		return 0, fmt.Errorf("invalid value file name %s", fileName)
+	}
+	indexString := parts[0]
+
+	index, err := strconv.Atoi(indexString)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse index from file name %s: %v", fileName, err)
+	}
+
+	return uint32(index), nil
+}
+
+// getValueFileShard returns the shard number of the value file from the file name. Value file names have the form
+// "X-Y.values", where X is the segment index and Y is the shard number.
+func getValueFileShard(fileName string) (uint32, error) {
+	baseName := path.Base(fileName)
+	strippedName := baseName[:len(baseName)-len(ValuesFileExtension)]
+
+	parts := strings.Split(strippedName, "-")
+	if len(parts) != 2 {
+		return 0, fmt.Errorf("invalid value file name %s", fileName)
+	}
+	shardString := parts[1]
+
+	shard, err := strconv.Atoi(shardString)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse shard from file name %s: %v", fileName, err)
+	}
+
+	return uint32(shard), nil
 }
 
 // Size returns the size of the value file in bytes.
@@ -235,12 +313,12 @@ func (v *valueFile) seal() error {
 
 // delete deletes the value file.
 func (v *valueFile) delete() error {
-	// As an extra safety check, make it so that all future reads fail before they do I/O.
-	v.flushedSize.Store(0)
-
 	if v.writer != nil {
 		return fmt.Errorf("value file is not sealed")
 	}
+
+	// As an extra safety check, make it so that all future reads fail before they do I/O.
+	v.flushedSize.Store(0)
 
 	err := os.Remove(v.path())
 	if err != nil {

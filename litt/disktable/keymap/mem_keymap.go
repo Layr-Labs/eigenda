@@ -5,13 +5,14 @@ import (
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 var _ Keymap = &memKeymap{}
 
 // An in-memory keymap implementation. When a table using a memKeymap is restarted, it loads all keys from
-// the segment files.
+// the segment files.  Methods on this struct are goroutine safe.
 //
 // - potentially high memory usage for large keymaps
 // - potentially slow startup time for large keymaps
@@ -25,13 +26,15 @@ type memKeymap struct {
 }
 
 // NewMemKeymap creates a new in-memory keymap.
-func NewMemKeymap(logger logging.Logger, doubleWriteProtection bool) Keymap {
+func NewMemKeymap(logger logging.Logger,
+	keymapPath string,
+	doubleWriteProtection bool) (kmap Keymap, requiresReload bool, err error) {
 
 	return &memKeymap{
 		logger:                logger,
 		data:                  make(map[string]types.Address),
 		doubleWriteProtection: doubleWriteProtection,
-	}
+	}, true, nil
 }
 
 func (m *memKeymap) Put(pairs []*types.KAPair) error {
@@ -39,14 +42,16 @@ func (m *memKeymap) Put(pairs []*types.KAPair) error {
 	defer m.lock.Unlock()
 
 	for _, pair := range pairs {
+		stringKey := util.UnsafeBytesToString(pair.Key)
+
 		if m.doubleWriteProtection {
-			_, ok := m.data[string(pair.Key)]
+			_, ok := m.data[stringKey]
 			if ok {
 				return fmt.Errorf("key %s already exists", pair.Key)
 			}
 		}
 
-		m.data[string(pair.Key)] = pair.Address
+		m.data[stringKey] = pair.Address
 	}
 	return nil
 }
@@ -55,7 +60,7 @@ func (m *memKeymap) Get(key []byte) (types.Address, bool, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	address, ok := m.data[string(key)]
+	address, ok := m.data[util.UnsafeBytesToString(key)]
 	return address, ok, nil
 }
 
@@ -64,7 +69,7 @@ func (m *memKeymap) Delete(keys []*types.KAPair) error {
 	defer m.lock.Unlock()
 
 	for _, key := range keys {
-		delete(m.data, string(key.Key))
+		delete(m.data, util.UnsafeBytesToString(key.Key))
 	}
 
 	return nil

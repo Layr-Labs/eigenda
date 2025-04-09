@@ -1,7 +1,6 @@
 package littbuilder
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -15,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/metrics"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -23,9 +23,9 @@ import (
 
 // keymapBuilders contains builders for all supported keymap types.
 var keymapBuilders = map[keymap.KeymapType]keymap.KeymapBuilder{
-	keymap.MemKeymapType:           keymap.NewMemKeymapBuilder(),
-	keymap.LevelDBKeymapType:       keymap.NewLevelDBKeymapBuilder(),
-	keymap.UnsafeLevelDBKeymapType: keymap.NewUnsafeLevelDBKeymapBuilder(),
+	keymap.MemKeymapType:           keymap.NewMemKeymap,
+	keymap.LevelDBKeymapType:       keymap.NewLevelDBKeymap,
+	keymap.UnsafeLevelDBKeymapType: keymap.NewUnsafeLevelDBKeymap,
 }
 
 // cacheWeight is a function that calculates the weight of a cache entry.
@@ -46,36 +46,71 @@ func buildKeymap(
 			fmt.Errorf("unsupported keymap type: %v", config.KeymapType)
 	}
 
-	keymapDirectories := make([]string, len(config.Paths))
+	potentialKeymapDirectories := make([]string, len(config.Paths))
 	for i, p := range config.Paths {
-		keymapDirectories[i] = path.Join(p, tableName, keymap.KeymapDirectoryName)
+		potentialKeymapDirectories[i] = path.Join(p, tableName, keymap.KeymapDirectoryName)
 	}
 
+	// The directory where the keymap data is stored. There are multiple plausible directories, but there
+	// should only be keymap data that exists in at most one of them.
 	var keymapDirectory string
-	for _, directory := range keymapDirectories {
-		exists, err := keymap.KeymapFileExists(directory)
+
+	// If there is no keymap on disk or if the prior keymap was not fully initialized, this will be false. If false,
+	// the keymap will need to be reloaded as a part of the table initialization.
+	var keymapInitialized bool
+
+	for _, directory := range potentialKeymapDirectories {
+		exists, err := util.Exists(directory)
 		if err != nil {
 			return nil, "", nil, false,
 				fmt.Errorf("error checking for keymap type file: %w", err)
 		}
 		if exists {
+			if keymapDirectory != "" {
+				return nil, "", nil, false,
+					fmt.Errorf("multiple keymap directories found: %s and %s", keymapDirectory, directory)
+			}
+
 			keymapDirectory = directory
 			keymapTypeFile, err = keymap.LoadKeymapTypeFile(directory)
 			if err != nil {
 				return nil, "", nil, false,
 					fmt.Errorf("error loading keymap type file: %w", err)
 			}
-			break
+
+			initializedExists, err := util.Exists(path.Join(keymapDirectory, keymap.KeymapInitializedFileName))
+			if err != nil {
+				return nil, "", nil, false,
+					fmt.Errorf("error checking for keymap initialized file: %w", err)
+			}
+			if initializedExists {
+				keymapInitialized = true
+			}
 		}
+	}
+
+	if keymapTypeFile != nil && !keymapInitialized {
+		// The keymap has not been fully initialized. This is likely due to a crash during the keymap reloading process.
+		logger.Warnf("incomplete keymap initialization detected. Deleting keymap directory: %s",
+			keymapDirectory)
+
+		err := os.RemoveAll(keymapDirectory)
+		if err != nil {
+			return nil, "", nil, false,
+				fmt.Errorf("error deleting keymap directory: %w", err)
+		}
+
+		keymapTypeFile = nil
+		keymapDirectory = ""
 	}
 
 	newKeymap := false
 	if keymapTypeFile == nil {
-		// No previous keymap exists. Either we are starting fresh or the keymap was deleted manually.
+		// No previous keymap exists. Either we are starting fresh or the keymap was deleted.
 		newKeymap = true
 
 		// by convention, always select the first path as the keymap directory
-		keymapDirectory = keymapDirectories[0]
+		keymapDirectory = potentialKeymapDirectories[0]
 		keymapTypeFile = keymap.NewKeymapTypeFile(keymapDirectory, config.KeymapType)
 
 		// create the keymap directory
@@ -94,50 +129,53 @@ func buildKeymap(
 
 	} else {
 		// A previous keymap exists. Check if the keymap type has changed.
-
-		builderForTypeOnDisk, ok := keymapBuilders[keymapTypeFile.Type()]
-		if !ok {
-			return nil, "", nil, false,
-				fmt.Errorf("unsupported keymap type: %v", keymapTypeFile.Type())
-		}
-
 		if config.KeymapType != keymapTypeFile.Type() {
 			// The previously used keymap type is different from the one in the configuration.
 
+			keymapTypeFile = nil
+
 			// delete the old keymap
-			err := builderForTypeOnDisk.DeleteFiles(logger, keymapDirectory)
+			err = os.RemoveAll(keymapDirectory)
 			if err != nil {
 				return nil, "", nil, false,
 					fmt.Errorf("error deleting keymap files: %w", err)
 			}
 
-			// delete the keymap type file
-			err = keymapTypeFile.Delete()
+			// write the new keymap type file
+			err = os.MkdirAll(keymapDirectory, 0755)
 			if err != nil {
 				return nil, "", nil, false,
-					fmt.Errorf("error deleting keymap type file: %w", err)
+					fmt.Errorf("error creating keymap directory: %w", err)
 			}
-
-			// finally, delete the keymap directory
-			_, err = os.Stat(keymapDirectory)
-			if err == nil {
-				err = os.Remove(keymapDirectory)
-				if err != nil {
-					return nil, "", nil, false,
-						fmt.Errorf("error deleting keymap directory: %w", err)
-				}
-			} else if !os.IsNotExist(err) {
+			keymapTypeFile = keymap.NewKeymapTypeFile(keymapDirectory, config.KeymapType)
+			err = keymapTypeFile.Write()
+			if err != nil {
 				return nil, "", nil, false,
-					fmt.Errorf("error checking for keymap directory: %w", err)
+					fmt.Errorf("error writing keymap type file: %w", err)
 			}
 		}
 	}
 
 	keymapDataDirectory := path.Join(keymapDirectory, keymap.KeymapDataDirectoryName)
-	kmap, requiresReload, err = builderForConfiguredType.Build(logger, keymapDataDirectory, config.DoubleWriteProtection)
+	kmap, requiresReload, err = builderForConfiguredType(logger, keymapDataDirectory, config.DoubleWriteProtection)
 	if err != nil {
 		return nil, "", nil, false,
 			fmt.Errorf("error building keymap: %w", err)
+	}
+
+	if !requiresReload {
+		// If the keymap does not need to be reloaded, then it is already fully initialized.
+		keymapInitializedFile := path.Join(keymapDirectory, keymap.KeymapInitializedFileName)
+		f, err := os.Create(keymapInitializedFile)
+		if err != nil {
+			return nil, "", nil, false,
+				fmt.Errorf("failed to create keymap initialized file: %v", err)
+		}
+		err = f.Close()
+		if err != nil {
+			return nil, "", nil, false,
+				fmt.Errorf("failed to close keymap initialized file: %v", err)
+		}
 	}
 
 	return kmap, keymapDirectory, keymapTypeFile, requiresReload || newKeymap, nil
@@ -146,7 +184,6 @@ func buildKeymap(
 // buildTable creates a new table based on the configuration.
 func buildTable(
 	config *litt.Config,
-	ctx context.Context,
 	logger logging.Logger,
 	name string,
 	metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
@@ -207,7 +244,7 @@ func buildMetrics(config *litt.Config, logger logging.Logger) (*metrics.LittDBMe
 	var registry *prometheus.Registry
 	var server *http.Server
 
-	if config.MetricsRegistry != nil {
+	if config.MetricsRegistry == nil && config.MetricsEnabled {
 		registry = prometheus.NewRegistry()
 		registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 		registry.MustRegister(collectors.NewGoCollector())

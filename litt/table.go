@@ -8,37 +8,51 @@ import (
 
 // Table is a key-value store with a namespace that does not overlap with other tables.
 // Values may be written to the table, but once written, they may not be changed or deleted (except via TTL).
+//
+// All methods in this interface are thread safe.
 type Table interface {
-	// Name returns the name of the table.
+	// Name returns the name of the table. Table names are unique across the database.
 	Name() string
 
 	// Put stores a value in the database. May not be used to overwrite an existing value.
 	// Note that when this method returns, data written may not be crash durable on disk
 	// (although the write does have atomicity). In order to ensure crash durability, call Flush().
+	//
+	// There are no limits on the size of the key or the value. This database has been optimized under the assumption
+	// that values are generally much larger than keys. This affects performance, but not correctness.
+	//
+	// It is not thread safe to modify the byte slices passed to this function after the call
+	// (both the key and the value).
 	Put(key []byte, value []byte) error
 
 	// PutBatch stores multiple values in the database. Similar to Put, but allows for multiple values to be written
-	// at once. This may improve performance, but is otherwise has identical properties to a sequence of Put calls
+	// at once. This may improve performance, but it otherwise has identical properties to a sequence of Put calls
 	// (i.e. this method does not atomically write the entire batch).
+	//
+	// It is not thread safe to modify the byte slices passed to this function after the call
+	// (including the key byte slices and the value byte slices).
 	PutBatch(batch []*types.KVPair) error
 
 	// Get retrieves a value from the database. The returned boolean indicates whether the key exists in the database
 	// (returns false if the key does not exist).
 	//
 	// For the sake of performance, the returned data is NOT safe to mutate. If you need to modify the data,
-	// make a copy of it first. Better to avoid a copy if it's not necessary, though.
+	// make a copy of it first. It is also not thread safe to modify the key byte slice after it is passed to this
+	// method.
 	Get(key []byte) ([]byte, bool, error)
 
 	// Exists returns true if the key exists in the database, and false otherwise. This is faster than calling Get.
+	//
+	// It is not thread safe to modify the key byte slice after it is passed to this method.
 	Exists(key []byte) (bool, error)
 
 	// Flush ensures that all data written to the database is crash durable on disk. When this method returns,
-	// all data written by Put() operations is guaranteed to be crash durable. Put() operations called synchronously
-	// with this method may not be crash durable after this method returns.
+	// all data written by Put() operations is guaranteed to be crash durable. Put() operations that overlap with calls
+	// to Flush() may not be crash durable after this method returns.
 	//
 	// Note that data flushed at the same time is not atomic. If the process crashes mid-flush, some data
 	// being flushed may become persistent, while some may not. Each individual key-value pair is atomic
-	// in the event of a crash, though.
+	// in the event of a crash, though. This is true even for very large keys/values.
 	Flush() error
 
 	// Size returns the disk size of the table in bytes. Does not include the size of any data stored only in memory.
@@ -56,15 +70,21 @@ type Table interface {
 
 	// SetTTL sets the time to live for data in this table. This TTL is immediately applied to data already in
 	// the table. Note that deletion is lazy. That is, when the data expires, it may not be deleted immediately.
+	//
+	// A TTL less than or equal to 0 means that the data never expires.
 	SetTTL(ttl time.Duration) error
 
 	// SetShardingFactor sets the number of write shards used. Increasing this value increases the number of parallel
 	// writes that can be performed.
 	SetShardingFactor(shardingFactor uint32) error
 
-	// SetCacheSize sets the cache size, in bytes, for the table. For tables without a cache, this method does nothing.
+	// SetCacheSize sets the cache size, in bytes, for the table. For table implementations without a cache, this
+	// method does nothing. The cache is used to store recently inserted or accessed data. When reading from the table,
+	// if the requested data is present in the cache, the cache is used instead of reading from disk. Reading from the
+	// cache is significantly faster than reading from the disk.
+	//
 	// If the cache size is set to 0 (default), the cache is disabled. The size of each cache entry is equal to the sum
-	// the key length and the value length. Note that the actual in-memory footprint if the cache will be slightly
+	// of key length and the value length. Note that the actual in-memory footprint of the cache will be slightly
 	// larger than the cache size due to implementation overhead (e.g. pointers, slice headers, map entries, etc.).
 	SetCacheSize(size uint64) error
 }
@@ -74,10 +94,10 @@ type Table interface {
 type ManagedTable interface {
 	Table
 
-	// Stop shuts down the table, flushing data to disk.
-	Stop() error
+	// Close shuts down the table, flushing data to disk.
+	Close() error
 
-	// Destroy cleans up resources used by the table. Table will not be usable after this method is called.
+	// Destroy cleans up resources used by the table. All data on disk is permanently and unrecoverable deleted.
 	Destroy() error
 
 	// ScheduleImmediateGC schedules an immediate garbage collection run. This method blocks until that run is complete.

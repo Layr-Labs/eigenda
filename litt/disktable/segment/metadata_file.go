@@ -5,17 +5,15 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 	"time"
-
-	"github.com/Layr-Labs/eigenda/litt/util"
 )
 
 const (
 	// The current serialization version. If we ever change how we serialize data, bump this version.
 	currentSerializationVersion = uint32(0)
 
-	// MetadataFileExtension is the file extension for the metadata file. This file contains metadata about the data
-	// segment, such as serialization version and expiration time.
+	// MetadataFileExtension is the file extension for the metadata file.
 	MetadataFileExtension = ".metadata"
 
 	// MetadataSwapExtension is the file extension for the metadata swap file. This file is used to atomically update
@@ -24,16 +22,17 @@ const (
 	// deleted.
 	MetadataSwapExtension = ".metadata.swap"
 
-	// The size of the metadata file in bytes. This is a constant, so it's convenient to have it here.
+	// MetadataSize is the size of the metadata file in bytes. This is a constant, so it's convenient to have it here.
 	// - 4 bytes for version
 	// - 4 bytes for the sharding factor
 	// - 4 bytes for salt
 	// - 8 bytes for timestamp
 	// - and 1 byte for sealed.
-	metadataSize = 21
+	MetadataSize = 21
 )
 
-// metadataFile contains metadata about a segment.
+// metadataFile contains metadata about a segment. This file contains metadata about the data segment, such as
+// serialization version and the timestamp when the file was sealed.
 type metadataFile struct {
 	// The segment index. This value is encoded in the file name.
 	index uint32
@@ -64,12 +63,9 @@ type metadataFile struct {
 	parentDirectory string
 }
 
-// newMetadataFile creates a new metadata file. When this method returns, the metadata file will
+// createMetadataFile creates a new metadata file. When this method returns, the metadata file will
 // be durably written to disk.
-//
-// Note that shardingFactor and salt parameters are ignored if this is not a new metadata file. Metadata files
-// loaded from disk always use their original sharding factor and salt values.
-func newMetadataFile(
+func createMetadataFile(
 	index uint32,
 	shardingFactor uint32,
 	salt uint32,
@@ -80,39 +76,62 @@ func newMetadataFile(
 		parentDirectory: parentDirectory,
 	}
 
-	filePath := file.path()
-	exists, _, err := util.VerifyFilePermissions(filePath)
+	file.serializationVersion = currentSerializationVersion
+	file.shardingFactor = shardingFactor
+	file.salt = salt
+	err := file.write()
 	if err != nil {
-		return nil, fmt.Errorf("file %s has incorrect permissions: %v", filePath, err)
-	}
-
-	if exists {
-		// File exists. Load it.
-		data, err := os.ReadFile(filePath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read metadata file %s: %v", filePath, err)
-		}
-		err = file.deserialize(data)
-		if err != nil {
-			return nil, fmt.Errorf("failed to deserialize metadata file %s: %v", filePath, err)
-		}
-	} else {
-		// File does not exist. Create it.
-		file.serializationVersion = currentSerializationVersion
-		file.shardingFactor = shardingFactor
-		file.salt = salt
-		err = file.write()
-		if err != nil {
-			return nil, fmt.Errorf("failed to write metadata file: %v", err)
-		}
+		return nil, fmt.Errorf("failed to write metadata file: %v", err)
 	}
 
 	return file, nil
 }
 
+// loadMetadataFile loads the metadata file from disk, looking in the given parent directories until it finds the file.
+// If the file is not found, it returns an error.
+func loadMetadataFile(index uint32, parentDirectories []string) (*metadataFile, error) {
+	metadataFileName := fmt.Sprintf("%d%s", index, MetadataFileExtension)
+	metadataPath, err := lookForFile(parentDirectories, metadataFileName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find metadata file: %w", err)
+	}
+	if metadataPath == "" {
+		return nil, fmt.Errorf("failed to find metadata file %s", metadataFileName)
+	}
+	parentDirectory := path.Dir(metadataPath)
+
+	file := &metadataFile{
+		index:           index,
+		parentDirectory: parentDirectory,
+	}
+
+	data, err := os.ReadFile(metadataPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read metadata file %s: %v", metadataPath, err)
+	}
+	err = file.deserialize(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize metadata file %s: %v", metadataPath, err)
+	}
+
+	return file, nil
+}
+
+// MetadataFileExtension is the file extension for the metadata file. Metadata file names have the form "X.metadata",
+// where X is the segment index.
+func getMetadataFileIndex(fileName string) (uint32, error) {
+	indexString := path.Base(fileName)[:len(fileName)-len(MetadataFileExtension)]
+	index, err := strconv.Atoi(indexString)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse index from file name %s: %v", fileName, err)
+	}
+
+	return uint32(index), nil
+}
+
 // Size returns the size of the metadata file in bytes.
 func (m *metadataFile) Size() uint64 {
-	return metadataSize
+	return MetadataSize
 }
 
 // Name returns the file name for this metadata file.
@@ -149,8 +168,7 @@ func (m *metadataFile) seal(now time.Time) error {
 
 // serialize serializes the metadata file to a byte array.
 func (m *metadataFile) serialize() []byte {
-	// 4 bytes for version, 8 bytes for timestamp, 1 byte for sealed
-	data := make([]byte, metadataSize)
+	data := make([]byte, MetadataSize)
 
 	// Write the version
 	binary.BigEndian.PutUint32(data[0:4], m.serializationVersion)
@@ -176,7 +194,7 @@ func (m *metadataFile) serialize() []byte {
 
 // deserialize deserializes the metadata file from a byte array.
 func (m *metadataFile) deserialize(data []byte) error {
-	if len(data) != metadataSize {
+	if len(data) != MetadataSize {
 		return fmt.Errorf("metadata file is not the correct size: %d", len(data))
 	}
 

@@ -7,6 +7,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/cache"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/Layr-Labs/eigenda/litt/util"
 )
 
 var _ litt.ManagedTable = &cachedTable{}
@@ -52,14 +53,15 @@ func (c *cachedTable) PutBatch(batch []*types.KVPair) error {
 		return err
 	}
 	for _, kv := range batch {
-		c.cache.Put(string(kv.Key), kv.Value)
+		c.cache.Put(util.UnsafeBytesToString(kv.Key), kv.Value)
 	}
 	return nil
 }
 
 func (c *cachedTable) Get(key []byte) ([]byte, bool, error) {
+	stringKey := util.UnsafeBytesToString(key)
 
-	value, ok := c.cache.Get(string(key))
+	value, ok := c.cache.Get(stringKey)
 	if ok {
 		return value, true, nil
 	}
@@ -70,14 +72,14 @@ func (c *cachedTable) Get(key []byte) ([]byte, bool, error) {
 	}
 
 	if ok {
-		c.cache.Put(string(key), value)
+		c.cache.Put(stringKey, value)
 	}
 
 	return value, ok, nil
 }
 
 func (c *cachedTable) Exists(key []byte) (bool, error) {
-	_, ok := c.cache.Get(string(key))
+	_, ok := c.cache.Get(util.UnsafeBytesToString(key))
 	if ok {
 		return true, nil
 	}
@@ -94,7 +96,7 @@ func (c *cachedTable) SetTTL(ttl time.Duration) error {
 }
 
 func (c *cachedTable) SetCacheSize(size uint64) error {
-	c.cache.SetCapacity(size)
+	c.cache.SetMaxWeight(size)
 	err := c.base.SetCacheSize(size)
 	if err != nil {
 		return fmt.Errorf("failed to set base table cache size: %w", err)
@@ -102,8 +104,8 @@ func (c *cachedTable) SetCacheSize(size uint64) error {
 	return nil
 }
 
-func (c *cachedTable) Stop() error {
-	return c.base.Stop()
+func (c *cachedTable) Close() error {
+	return c.base.Close()
 }
 
 func (c *cachedTable) Destroy() error {

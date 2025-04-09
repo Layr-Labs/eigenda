@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -14,7 +15,7 @@ import (
 
 var _ Keymap = &LevelDBKeymap{}
 
-// LevelDBKeymap is a keymap that uses LevelDB as the underlying storage.
+// LevelDBKeymap is a keymap that uses LevelDB as the underlying storage. Methods on this struct are goroutine safe.
 type LevelDBKeymap struct {
 	logger logging.Logger
 	db     *leveldb.DB
@@ -22,7 +23,9 @@ type LevelDBKeymap struct {
 	doubleWriteProtection bool
 	keymapPath            string
 	alive                 atomic.Bool
-	// This is a "test mode only" flag. Unit tests write lots of little values, and syncing each one is slow.
+	// This is a "test mode only" flag. Should be true in production use cases or anywhere that data consistency
+	// is critical. Unit tests write lots of little values, and syncing each one is slow, so it may be desirable
+	// to set this to false in some tests.
 	syncWrites bool
 }
 
@@ -30,15 +33,47 @@ type LevelDBKeymap struct {
 func NewLevelDBKeymap(
 	logger logging.Logger,
 	keymapPath string,
+	doubleWriteProtection bool) (kmap Keymap, requiresReload bool, err error) {
+
+	return newLevelDBKeymap(logger, keymapPath, doubleWriteProtection, true)
+}
+
+// NewUnsafeLevelDBKeymap creates a new LevelDBKeymap instance. It does not use sync writes. This makes it faster,
+// but unsafe if data consistency is critical (i.e. production use cases).
+func NewUnsafeLevelDBKeymap(
+	logger logging.Logger,
+	keymapPath string,
+	doubleWriteProtection bool) (kmap Keymap, requiresReload bool, err error) {
+
+	return newLevelDBKeymap(logger, keymapPath, doubleWriteProtection, false)
+}
+
+// newLevelDBKeymap creates a new LevelDBKeymap instance.
+func newLevelDBKeymap(
+	logger logging.Logger,
+	keymapPath string,
 	doubleWriteProtection bool,
-	syncWrites bool) (*LevelDBKeymap, error) {
+	syncWrites bool) (kmap *LevelDBKeymap, requiresReload bool, err error) {
+
+	exists, err := util.Exists(keymapPath)
+	if err != nil {
+		return nil, false, fmt.Errorf("error checking for keymap directory: %w", err)
+	}
+
+	if !exists {
+		err = os.MkdirAll(keymapPath, 0755)
+		if err != nil {
+			return nil, false, fmt.Errorf("error creating keymap directory: %w", err)
+		}
+	}
+	requiresReload = !exists
 
 	db, err := leveldb.OpenFile(keymapPath, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open LevelDB: %w", err)
+		return nil, false, fmt.Errorf("failed to open LevelDB: %w", err)
 	}
 
-	kmap := &LevelDBKeymap{
+	kmap = &LevelDBKeymap{
 		logger:                logger,
 		db:                    db,
 		keymapPath:            keymapPath,
@@ -47,7 +82,7 @@ func NewLevelDBKeymap(
 	}
 	kmap.alive.Store(true)
 
-	return kmap, nil
+	return kmap, requiresReload, nil
 }
 
 func (l *LevelDBKeymap) Put(pairs []*types.KAPair) error {

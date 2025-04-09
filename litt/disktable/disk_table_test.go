@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/types"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,7 +26,7 @@ import (
 
 type tableBuilder struct {
 	name    string
-	builder func(timeSource func() time.Time, name string, paths []string) (litt.ManagedTable, error)
+	builder func(clock func() time.Time, name string, paths []string) (litt.ManagedTable, error)
 }
 
 // This test executes against different table implementations. This is useful for distinguishing between bugs that
@@ -76,7 +77,7 @@ func setupKeymapTypeFile(keymapPath string, keymapType keymap.KeymapType) (*keym
 }
 
 func buildMemKeyDiskTableSingleShard(
-	timeSource func() time.Time,
+	clock func() time.Time,
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
@@ -91,7 +92,10 @@ func buildMemKeyDiskTableSingleShard(
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
 	}
 
-	keys := keymap.NewMemKeymap(logger, true)
+	keys, _, err := keymap.NewMemKeymap(logger, "", true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create keymap: %w", err)
+	}
 
 	roots := make([]string, 0, len(paths))
 	for _, p := range paths {
@@ -103,7 +107,7 @@ func buildMemKeyDiskTableSingleShard(
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
 
-	config.TimeSource = timeSource
+	config.Clock = clock
 	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
 	config.GCPeriod = time.Millisecond
 	config.Fsync = false
@@ -128,7 +132,7 @@ func buildMemKeyDiskTableSingleShard(
 }
 
 func buildMemKeyDiskTableMultiShard(
-	timeSource func() time.Time,
+	clock func() time.Time,
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
@@ -143,7 +147,10 @@ func buildMemKeyDiskTableMultiShard(
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
 	}
 
-	keys := keymap.NewMemKeymap(logger, true)
+	keys, _, err := keymap.NewMemKeymap(logger, "", true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create keymap: %w", err)
+	}
 
 	roots := make([]string, 0, len(paths))
 	for _, p := range paths {
@@ -155,7 +162,7 @@ func buildMemKeyDiskTableMultiShard(
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
 
-	config.TimeSource = timeSource
+	config.Clock = clock
 	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
 	config.GCPeriod = time.Millisecond
 	config.Fsync = false
@@ -181,7 +188,7 @@ func buildMemKeyDiskTableMultiShard(
 }
 
 func buildLevelDBKeyDiskTableSingleShard(
-	timeSource func() time.Time,
+	clock func() time.Time,
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
@@ -196,7 +203,7 @@ func buildLevelDBKeyDiskTableSingleShard(
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
 	}
 
-	keys, err := keymap.NewLevelDBKeymap(logger, keymapPath, false, false)
+	keys, _, err := keymap.NewUnsafeLevelDBKeymap(logger, keymapPath, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create keymap: %w", err)
 	}
@@ -211,7 +218,7 @@ func buildLevelDBKeyDiskTableSingleShard(
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
 
-	config.TimeSource = timeSource
+	config.Clock = clock
 	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
 	config.GCPeriod = time.Millisecond
 	config.Fsync = false
@@ -236,7 +243,7 @@ func buildLevelDBKeyDiskTableSingleShard(
 }
 
 func buildLevelDBKeyDiskTableMultiShard(
-	timeSource func() time.Time,
+	clock func() time.Time,
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
@@ -251,7 +258,7 @@ func buildLevelDBKeyDiskTableMultiShard(
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
 	}
 
-	keys, err := keymap.NewLevelDBKeymap(logger, keymapPath, true, false)
+	keys, _, err := keymap.NewUnsafeLevelDBKeymap(logger, keymapPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create keymap: %w", err)
 	}
@@ -266,7 +273,7 @@ func buildLevelDBKeyDiskTableMultiShard(
 		return nil, fmt.Errorf("failed to create config: %w", err)
 	}
 
-	config.TimeSource = timeSource
+	config.Clock = clock
 	config.TargetSegmentFileSize = 100 // intentionally use a very small segment size
 	config.GCPeriod = time.Millisecond
 	config.Fsync = false
@@ -313,9 +320,9 @@ func restartTest(t *testing.T, tableBuilder *tableBuilder) {
 
 		// Somewhere in the middle of the test, restart the table.
 		if i == restartIteration {
-			ok, _ := table.(*DiskTable).panic.IsOk()
+			ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 			require.True(t, ok)
-			err = table.Stop()
+			err = table.Close()
 			require.NoError(t, err)
 
 			table, err = tableBuilder.builder(time.Now, tableName, []string{directory})
@@ -387,7 +394,7 @@ func restartTest(t *testing.T, tableBuilder *tableBuilder) {
 		}
 	}
 
-	ok, _ := table.(*DiskTable).panic.IsOk()
+	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -451,29 +458,26 @@ func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelet
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).panic.IsOk()
+	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
-	dbPanic := table.(*DiskTable).panic
+	fatalErrorHandler := table.(*DiskTable).fatalErrorHandler
 
 	// Delete a file in the middle of the sequence of segments.
 	lowestSegmentIndex, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
-		dbPanic,
+		fatalErrorHandler,
 		[]string{directory + "/table/segments"},
-		time.Now(),
-		0,
-		0,
-		false)
+		time.Now())
 	require.NoError(t, err)
 
 	middleIndex := lowestSegmentIndex + (highestSegmentIndex-lowestSegmentIndex)/2
 
 	filePath := ""
 	if typeToDelete == "key" {
-		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.KeysFileExtension)
+		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.KeyFileExtension)
 	} else if typeToDelete == "value" {
 		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
 		shard := rand.Uint32Range(0, shardingFactor)
@@ -483,8 +487,9 @@ func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelet
 		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.MetadataFileExtension)
 	}
 
-	_, err = os.Stat(filePath)
+	exists, err := util.Exists(filePath)
 	require.NoError(t, err)
+	require.True(t, exists)
 
 	err = os.Remove(filePath)
 	require.NoError(t, err)
@@ -570,19 +575,16 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).panic.IsOk()
+	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	lowestSegmentIndex, _, segments, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).panic,
+		table.(*DiskTable).fatalErrorHandler,
 		[]string{directory + "/table/segments"},
-		time.Now(),
-		0,
-		0,
-		false)
+		time.Now())
 	require.NoError(t, err)
 
 	// All keys in the initial segment are expected to be missing after the restart.
@@ -597,7 +599,7 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 	filePath := ""
 	if typeToDelete == "key" {
 		filePath = fmt.Sprintf("%s/table/segments/%d%s",
-			directory, lowestSegmentIndex, segment.KeysFileExtension)
+			directory, lowestSegmentIndex, segment.KeyFileExtension)
 	} else if typeToDelete == "value" {
 		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
 		shard := rand.Uint32Range(0, shardingFactor)
@@ -608,8 +610,9 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 		filePath = fmt.Sprintf("%s/table/segments/%d%s",
 			directory, lowestSegmentIndex, segment.MetadataFileExtension)
 	}
-	_, err = os.Stat(filePath)
+	exists, err := util.Exists(filePath)
 	require.NoError(t, err)
+	require.True(t, exists)
 
 	err = os.Remove(filePath)
 	require.NoError(t, err)
@@ -691,7 +694,7 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 		}
 	}
 
-	ok, _ = table.(*DiskTable).panic.IsOk()
+	ok, _ = table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -761,19 +764,16 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).panic.IsOk()
+	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).panic,
+		table.(*DiskTable).fatalErrorHandler,
 		[]string{directory + "/table/segments"},
-		time.Now(),
-		0,
-		0,
-		false)
+		time.Now())
 	require.NoError(t, err)
 
 	// All keys in the final segment are expected to be missing after the restart.
@@ -787,7 +787,7 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 	// Delete a file in the final segment.
 	filePath := ""
 	if typeToDelete == "key" {
-		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, highestSegmentIndex, segment.KeysFileExtension)
+		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, highestSegmentIndex, segment.KeyFileExtension)
 	} else if typeToDelete == "value" {
 		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
 		shard := rand.Uint32Range(0, shardingFactor)
@@ -796,8 +796,9 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 	} else {
 		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, highestSegmentIndex, segment.MetadataFileExtension)
 	}
-	_, err = os.Stat(filePath)
+	exists, err := util.Exists(filePath)
 	require.NoError(t, err)
+	require.True(t, exists)
 
 	err = os.Remove(filePath)
 	require.NoError(t, err)
@@ -887,7 +888,7 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 		}
 	}
 
-	ok, _ = table.(*DiskTable).panic.IsOk()
+	ok, _ = table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -962,15 +963,12 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	// if there is no data to be truncated.
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).panic,
+		table.(*DiskTable).fatalErrorHandler,
 		[]string{directory + "/table/segments"},
-		time.Now(),
-		0,
-		0,
-		false)
+		time.Now())
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
-		directory, highestSegmentIndex, segment.KeysFileExtension)
+		directory, highestSegmentIndex, segment.KeyFileExtension)
 	keyFileBytes, err := os.ReadFile(keyFileName)
 	require.NoError(t, err)
 
@@ -983,19 +981,16 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).panic.IsOk()
+	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).panic,
+		table.(*DiskTable).fatalErrorHandler,
 		[]string{directory + "/table/segments"},
-		time.Now(),
-		0,
-		0,
-		false)
+		time.Now())
 	require.NoError(t, err)
 
 	// Truncate the last key file.
@@ -1003,7 +998,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	require.NoError(t, err)
 
 	keyFileName = fmt.Sprintf("%s/table/segments/%d%s",
-		directory, highestSegmentIndex, segment.KeysFileExtension)
+		directory, highestSegmentIndex, segment.KeyFileExtension)
 	keyFileBytes, err = os.ReadFile(keyFileName)
 	require.NoError(t, err)
 
@@ -1123,7 +1118,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		}
 	}
 
-	ok, _ = table.(*DiskTable).panic.IsOk()
+	ok, _ = table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -1190,15 +1185,12 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).panic,
+		table.(*DiskTable).fatalErrorHandler,
 		[]string{directory + "/table/segments"},
-		time.Now(),
-		0,
-		0,
-		false)
+		time.Now())
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
-		directory, highestSegmentIndex, segment.KeysFileExtension)
+		directory, highestSegmentIndex, segment.KeyFileExtension)
 	keyFileBytes, err := os.ReadFile(keyFileName)
 	require.NoError(t, err)
 
@@ -1211,19 +1203,16 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).panic.IsOk()
+	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).panic,
+		table.(*DiskTable).fatalErrorHandler,
 		[]string{directory + "/table/segments"},
-		time.Now(),
-		0,
-		0,
-		false)
+		time.Now())
 	require.NoError(t, err)
 
 	// Truncate a random shard of the last value file.
@@ -1233,7 +1222,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	diskTable := table.(*DiskTable)
 	nonEmptyShards := make(map[uint32]struct{})
 	for key := range keysInLastFile {
-		keyShard := diskTable.segments[highestSegmentIndex].GetShard(keysInLastFile[key].Key)
+		keyShard := diskTable.controlLoop.segments[highestSegmentIndex].GetShard(keysInLastFile[key].Key)
 		nonEmptyShards[keyShard] = struct{}{}
 	}
 	var shard uint32
@@ -1259,7 +1248,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	// Figure out which keys are expected to be missing
 	missingKeys := make(map[string]struct{})
 	for _, key := range keysInLastFile {
-		keyShard := diskTable.segments[diskTable.highestSegmentIndex].GetShard(key.Key)
+		keyShard := diskTable.controlLoop.segments[diskTable.controlLoop.highestSegmentIndex].GetShard(key.Key)
 		if keyShard != shard {
 			// key does not belong to the shard that was truncated
 			continue
@@ -1369,7 +1358,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		}
 	}
 
-	ok, _ = table.(*DiskTable).panic.IsOk()
+	ok, _ = table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -1439,15 +1428,12 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	// if there is no data left unflushed.
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).panic,
+		table.(*DiskTable).fatalErrorHandler,
 		[]string{directory + "/table/segments"},
-		time.Now(),
-		0,
-		0,
-		false)
+		time.Now())
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
-		directory, highestSegmentIndex, segment.KeysFileExtension)
+		directory, highestSegmentIndex, segment.KeyFileExtension)
 	keyFileBytes, err := os.ReadFile(keyFileName)
 	require.NoError(t, err)
 	if len(keyFileBytes) == 0 {
@@ -1459,19 +1445,16 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).panic.IsOk()
+	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).panic,
+		table.(*DiskTable).fatalErrorHandler,
 		[]string{directory + "/table/segments"},
-		time.Now(),
-		0,
-		0,
-		false)
+		time.Now())
 	require.NoError(t, err)
 
 	// Identify keys in the last file. These will be removed from the keymap to simulate keys that have not
@@ -1588,7 +1571,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	// do bad things if it is going to. Nothing bad should happen if the GC is implemented correctly.
 	time.Sleep(50 * time.Millisecond)
 
-	ok, _ = table.(*DiskTable).panic.IsOk()
+	ok, _ = table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -1628,9 +1611,9 @@ func metadataPreservedOnRestartTest(t *testing.T, tableBuilder *tableBuilder) {
 	require.NoError(t, err)
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).panic.IsOk()
+	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	// Restart the table.
@@ -1677,9 +1660,9 @@ func orphanedMetadataTest(t *testing.T, tableBuilder *tableBuilder) {
 	require.NoError(t, err)
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).panic.IsOk()
+	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	// Simulate an orphaned metadata file.
@@ -1740,9 +1723,9 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder *table
 
 		// Somewhere in the middle of the test, restart the table.
 		if i == restartIteration {
-			ok, _ := table.(*DiskTable).panic.IsOk()
+			ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 			require.True(t, ok)
-			err = table.Stop()
+			err = table.Close()
 			require.NoError(t, err)
 
 			// Shuffle around the segment files. This should not cause problems.
@@ -1850,7 +1833,7 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder *table
 		}
 	}
 
-	ok, _ := table.(*DiskTable).panic.IsOk()
+	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -1915,7 +1898,7 @@ func checkShardsInSegments(
 
 // getLatestSegmentIndex returns the index of the latest segment in the table.
 func getLatestSegmentIndex(table litt.Table) uint32 {
-	return (table.(*DiskTable)).highestSegmentIndex
+	return (table.(*DiskTable)).controlLoop.threadsafeHighestSegmentIndex.Load()
 }
 
 func changingShardingFactorTest(t *testing.T, tableBuilder *tableBuilder) {
@@ -1960,9 +1943,9 @@ func changingShardingFactorTest(t *testing.T, tableBuilder *tableBuilder) {
 		if i == restartIteration {
 			expectedShardCounts[getLatestSegmentIndex(table)] = shardingFactor
 
-			ok, _ := table.(*DiskTable).panic.IsOk()
+			ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 			require.True(t, ok)
-			err = table.Stop()
+			err = table.Close()
 			require.NoError(t, err)
 
 			table, err = tableBuilder.builder(time.Now, tableName, roots)
@@ -2047,10 +2030,10 @@ func changingShardingFactorTest(t *testing.T, tableBuilder *tableBuilder) {
 		}
 	}
 
-	ok, _ := table.(*DiskTable).panic.IsOk()
+	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
 	require.True(t, ok)
 
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	checkShardsInSegments(t, roots, expectedShardCounts)
@@ -2076,12 +2059,12 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 	var fakeTime atomic.Pointer[time.Time]
 	fakeTime.Store(&startTime)
 
-	timeSource := func() time.Time {
+	clock := func() time.Time {
 		return *fakeTime.Load()
 	}
 
 	tableName := rand.String(8)
-	table, err := tableBuilder.builder(timeSource, tableName, []string{directory})
+	table, err := tableBuilder.builder(clock, tableName, []string{directory})
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -2202,7 +2185,7 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 
 	reportedSize := table.Size()
 
-	err = table.Stop()
+	err = table.Close()
 	require.NoError(t, err)
 
 	// Walk the "directory" file tree and calculate the actual size of the table.

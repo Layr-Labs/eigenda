@@ -29,7 +29,7 @@ func TestWriteThenReadValues(t *testing.T) {
 	// A map from the first byte index of the value to the value itself.
 	addressMap := make(map[uint32][]byte)
 
-	file, err := newValueFile(logger, index, shard, directory, false, false)
+	file, err := createValueFile(logger, index, shard, directory, false)
 	require.NoError(t, err)
 
 	for _, value := range values {
@@ -71,7 +71,7 @@ func TestWriteThenReadValues(t *testing.T) {
 	require.Equal(t, actualFileSize, reportedFileSize)
 
 	// Create a new in-memory instance from the on-disk file and verify that it behaves the same.
-	file2, err := newValueFile(logger, index, shard, directory, true, false)
+	file2, err := loadValueFile(logger, index, shard, []string{directory})
 	require.NoError(t, err)
 	require.Equal(t, file.size, file2.size)
 	for key, val := range addressMap {
@@ -110,7 +110,7 @@ func TestReadingTruncatedValueFile(t *testing.T) {
 	// A map from the first byte index of the value to the value itself.
 	addressMap := make(map[uint32][]byte)
 
-	file, err := newValueFile(logger, index, shard, directory, false, false)
+	file, err := createValueFile(logger, index, shard, directory, false)
 	require.NoError(t, err)
 
 	var lastAddress uint32
@@ -138,7 +138,7 @@ func TestReadingTruncatedValueFile(t *testing.T) {
 	err = os.WriteFile(filePath, bytes, 0644)
 	require.NoError(t, err)
 
-	file, err = newValueFile(logger, index, shard, directory, true, false)
+	file, err = loadValueFile(logger, index, shard, []string{directory})
 	require.NoError(t, err)
 
 	// We should be able to read all values except for the last one.
@@ -160,7 +160,7 @@ func TestReadingTruncatedValueFile(t *testing.T) {
 	err = os.WriteFile(filePath, bytes, 0644)
 	require.NoError(t, err)
 
-	file, err = newValueFile(logger, index, shard, directory, true, false)
+	file, err = loadValueFile(logger, index, shard, []string{directory})
 	require.NoError(t, err)
 
 	// We should be able to read all values except for the last one.

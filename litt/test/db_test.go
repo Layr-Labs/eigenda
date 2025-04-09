@@ -218,7 +218,7 @@ func dbRestartTest(t *testing.T, builder *dbBuilder) {
 	for i := 0; i < iterations; i++ {
 		// Somewhere in the middle of the test, restart the db.
 		if i == restartIteration {
-			err = db.Stop()
+			err = db.Close()
 			require.NoError(t, err)
 
 			db, err = builder.builder(t, directory)

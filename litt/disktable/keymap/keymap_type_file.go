@@ -23,14 +23,7 @@ type KeymapTypeFile struct {
 
 // KeymapFileExists checks if the keymap type file exists in the target directory.
 func KeymapFileExists(keymapPath string) (bool, error) {
-	_, err := os.Stat(path.Join(keymapPath, KeymapTypeFileName))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, fmt.Errorf("error checking for keymap type file: %w", err)
-	}
-	return true, nil
+	return util.Exists(path.Join(keymapPath, KeymapTypeFileName))
 }
 
 // NewKeymapTypeFile creates a new KeymapTypeFile.
@@ -45,12 +38,12 @@ func NewKeymapTypeFile(keymapPath string, keymapType KeymapType) *KeymapTypeFile
 func LoadKeymapTypeFile(keymapPath string) (*KeymapTypeFile, error) {
 	filePath := path.Join(keymapPath, KeymapTypeFileName)
 
-	_, err := os.Stat(filePath)
+	exists, err := util.Exists(filePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("file %s does not exist", filePath)
-		}
 		return nil, fmt.Errorf("error checking for keymap type file: %w", err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("keymap type file does not exist: %v", filePath)
 	}
 
 	fileContents, err := os.ReadFile(filePath)
@@ -85,7 +78,7 @@ func (k *KeymapTypeFile) Type() KeymapType {
 func (k *KeymapTypeFile) Write() error {
 	filePath := path.Join(k.keymapPath, KeymapTypeFileName)
 
-	exists, _, err := util.VerifyFilePermissions(filePath)
+	exists, _, err := util.VerifyFileProperties(filePath)
 	if err != nil {
 		return fmt.Errorf("unable to open keymap type file: %v", err)
 	}
@@ -114,13 +107,12 @@ func (k *KeymapTypeFile) Write() error {
 
 // Delete deletes the keymap type file.
 func (k *KeymapTypeFile) Delete() error {
-	_, err := os.Stat(path.Join(k.keymapPath, KeymapTypeFileName))
+	exists, err := util.Exists(path.Join(k.keymapPath, KeymapTypeFileName))
 	if err != nil {
-		if os.IsNotExist(err) {
-			// file is already deleted
-			return nil
-		}
 		return fmt.Errorf("error checking for keymap type file: %w", err)
+	}
+	if !exists {
+		return nil
 	}
 
 	err = os.Remove(path.Join(k.keymapPath, KeymapTypeFileName))

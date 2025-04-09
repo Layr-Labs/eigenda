@@ -23,6 +23,12 @@ type Config struct {
 	// If more than one path is provided, then the database will do its best to spread out the data across
 	// the paths. If the database is restarted, it will attempt to load data from all paths. Note: the number
 	// of paths should not exceed the sharding factor, or else data may not be split across all paths.
+	//
+	// Most of the time, providing exactly one path is sufficient. If the data should be spread across multiple
+	// drives, then providing multiple permits that. The number of provided paths should be a small number, perhaps
+	// a few dozen paths at most. Providing an excessive number of paths may lead to degraded performance.
+	//
+	// Providing zero paths will cause the DB to return an error at startup.
 	Paths []string
 
 	// The logger for the database. If nil, a logger is built using the LoggerConfig.
@@ -65,7 +71,14 @@ type Config struct {
 	// The size of the keymap deletion batch for garbage collection. The default is 10,000.
 	GCBatchSize uint64
 
-	// The sharding factor for the database. The default is 8. Must be at least 1.
+	// The sharding factor for the database. If the sharding factor is greater than 1, then values will be spread
+	// out across multiple files. (Note that individual values will always be written to a single file, but two
+	// different values may be written to different files.) These shard files are spead evenly across the paths
+	// provided in the Paths field. If the sharding factor is larger than the number of paths, then some paths will
+	// have multiple shard files. If the sharding factor is smaller than the number of paths, then some paths may not
+	// always have an actively written shard file.
+	//
+	// The default is 8. Must be at least 1.
 	ShardingFactor uint32
 
 	// The random number generator used for generating sharding salts. The default is a standard rand.New()
@@ -79,7 +92,7 @@ type Config struct {
 
 	// The time source used by the database. This can be substituted for an artificial time source
 	// for testing purposes. The default is time.Now.
-	TimeSource func() time.Time
+	Clock func() time.Time
 
 	// If true, then flush operations will call fsync on the underlying file to ensure data is flushed out of the
 	// operating system's buffer and onto disk. Setting this to false means that even after flushing data,
@@ -130,7 +143,7 @@ func DefaultConfig(paths ...string) (*Config, error) {
 		CTX:                      context.Background(),
 		Paths:                    paths,
 		LoggerConfig:             &loggerConfig,
-		TimeSource:               time.Now,
+		Clock:                    time.Now,
 		GCPeriod:                 5 * time.Minute,
 		GCBatchSize:              10_000,
 		ShardingFactor:           8,
@@ -155,13 +168,13 @@ func (c *Config) SanityCheck() error {
 	if c.CTX == nil {
 		return fmt.Errorf("context cannot be nil")
 	}
-	if c.Paths == nil || len(c.Paths) == 0 {
+	if len(c.Paths) == 0 {
 		return fmt.Errorf("at least one path must be provided")
 	}
 	if c.Logger == nil && c.LoggerConfig == nil {
 		return fmt.Errorf("logger or logger config must be provided")
 	}
-	if c.TimeSource == nil {
+	if c.Clock == nil {
 		return fmt.Errorf("time source cannot be nil")
 	}
 	if c.GCBatchSize == 0 {
