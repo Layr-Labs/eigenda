@@ -420,12 +420,42 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		reader.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
 
 		serverV1 := nodegrpc.NewServer(config, n, logger, rateLimiter)
+
+		// append test name to each table name for an unique store
+		mockState := &coremock.MockOnchainPaymentState{}
+		mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(nil).Maybe()
+		mockState.On("GetReservationWindow", mock.Anything).Return(uint64(1), nil)
+		mockState.On("GetPricePerSymbol", mock.Anything).Return(uint64(2), nil)
+		mockState.On("GetGlobalSymbolsPerSecond", mock.Anything).Return(uint64(1009), nil)
+		mockState.On("GetGlobalRatePeriodInterval", mock.Anything).Return(uint64(1), nil)
+		mockState.On("GetMinNumSymbols", mock.Anything).Return(uint64(3), nil)
+
+		now := uint64(time.Now().Unix())
+		mockState.On("GetReservedPaymentByAccount", mock.Anything, mock.Anything).Return(&core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
+		mockState.On("GetOnDemandPaymentByAccount", mock.Anything, mock.Anything).Return(&core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}, nil)
+		mockState.On("GetOnDemandQuorumNumbers", mock.Anything).Return([]uint8{0, 1}, nil)
+
+		if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
+			panic("failed to make initial query to the on-chain state")
+		}
+
+		offchainStore, err := meterer.NewLevelDBOffchainStore(
+			"./testdata/server_v2_test_"+t.Name(),
+			logger,
+		)
+		if err != nil {
+			teardown()
+			panic("failed to create offchain store: " + err.Error())
+		}
+		meterer := meterer.NewMeterer(meterer.Config{}, mockState, offchainStore, logger)
+
 		serverV2, err := nodegrpc.NewServerV2(
 			context.Background(),
 			config,
 			n,
 			logger,
 			rateLimiter,
+			meterer,
 			prometheus.NewRegistry(),
 			reader)
 		require.NoError(t, err)

@@ -250,7 +250,7 @@ func NewNode(
 
 	var blobVersionParams *corev2.BlobVersionParameterMap
 	var mt *meterer.Meterer
-	var authenticator = authv2.NewAuthenticator()
+	var authenticator = authv2.NewBlobRequestAuthenticator()
 	if config.EnableV2 {
 		// 12s per block
 		ttl := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second
@@ -284,7 +284,11 @@ func NewNode(
 
 		n.RelayClient.Store(relayClient)
 		// Create meterer
-		offchainStore, err := meterer.NewOffchainStore(config.AwsClientConfig, config.ReservationsTableName, config.OnDemandTableName, config.GlobalRateTableName, logger)
+		offchainStore, err := meterer.NewLevelDBOffchainStore(
+			//TODO: config.PaymentDBPath
+			"../testdata/node_main_test",
+			logger,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create offchain store: %w", err)
 		}
@@ -477,8 +481,12 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 	}
 }
 
-// ProcessBatch validates the batch is correct, stores data into the node's Store, and then returns a
-// signature for the entire batch.
+// // LoadOnchainState loads the onchain state of the node.
+// func (n *Node) LoadOnchainState() *eth.OnchainState {
+// 	return n.onchainState.Load()
+// }
+
+// ProcessBatch validates the batch is correct, stores data into the node's Store, and then returns a signature for the entire batch.
 //
 // The batch will be itemized into batch header, header and chunks of each blob in the batch. These items will
 // be stored atomically to the database.

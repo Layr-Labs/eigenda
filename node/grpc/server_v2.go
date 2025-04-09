@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"runtime"
 	"time"
 
@@ -14,7 +15,11 @@ import (
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/core"
+	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
+	"github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/auth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -27,13 +32,15 @@ type ServerV2 struct {
 	pb.UnimplementedDispersalServer
 	pb.UnimplementedRetrievalServer
 
-	config         *node.Config
-	node           *node.Node
-	ratelimiter    common.RateLimiter
-	logger         logging.Logger
-	metrics        *MetricsV2
-	authenticator  auth.RequestAuthenticator
-	replayGuardian replay.ReplayGuardian
+	config             *node.Config
+	node               *node.Node
+	ratelimiter        common.RateLimiter
+	meterer            *meterer.Meterer
+	logger             logging.Logger
+	metrics            *MetricsV2
+	chunkAuthenticator auth.RequestAuthenticator
+	blobAuthenticator  corev2.BlobRequestAuthenticator
+	replayGuardian     replay.ReplayGuardian
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -43,6 +50,7 @@ func NewServerV2(
 	node *node.Node,
 	logger logging.Logger,
 	ratelimiter common.RateLimiter,
+	meterer *meterer.Meterer,
 	registry *prometheus.Registry,
 	reader core.Reader) (*ServerV2, error) {
 
@@ -51,21 +59,23 @@ func NewServerV2(
 		return nil, err
 	}
 
-	var authenticator auth.RequestAuthenticator
-	if !config.DisableDispersalAuthentication {
-		authenticator, err = auth.NewRequestAuthenticator(
-			ctx,
-			reader,
-			config.DispersalAuthenticationKeyCacheSize,
-			config.DisperserKeyTimeout,
-			func(id uint32) bool {
-				return id == api.EigenLabsDisperserID
-			},
-			time.Now())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create authenticator: %w", err)
-		}
+	chunkAuthenticator, err := auth.NewRequestAuthenticator(
+		ctx,
+		reader,
+		config.DispersalAuthenticationKeyCacheSize,
+		config.DisperserKeyTimeout,
+		func(id uint32) bool {
+			return id == api.EigenLabsDisperserID
+		},
+		time.Now())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create authenticator: %w", err)
 	}
+	blobAuthenticator := authv2.NewPaymentStateAuthenticator(
+		//TODO: add as configs
+		time.Duration(10)*time.Second,
+		time.Duration(10)*time.Second,
+	)
 
 	replayGuardian := replay.NewReplayGuardian(
 		time.Now,
@@ -73,13 +83,15 @@ func NewServerV2(
 		config.StoreChunksRequestMaxFutureAge)
 
 	return &ServerV2{
-		config:         config,
-		node:           node,
-		ratelimiter:    ratelimiter,
-		logger:         logger,
-		metrics:        metrics,
-		authenticator:  authenticator,
-		replayGuardian: replayGuardian,
+		config:             config,
+		node:               node,
+		ratelimiter:        ratelimiter,
+		meterer:            meterer,
+		logger:             logger,
+		metrics:            metrics,
+		chunkAuthenticator: chunkAuthenticator,
+		blobAuthenticator:  blobAuthenticator,
+		replayGuardian:     replayGuardian,
 	}, nil
 }
 
@@ -119,7 +131,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 
 	// Validate the request parameters (which is cheap) before starting any further
 	// processing of the request.
-	batch, err := s.validateStoreChunksRequest(in)
+	batch, err := s.validateStoreChunksRequest(ctx, in)
 	if err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate store chunk request: %v", err))
 	}
@@ -129,17 +141,15 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to serialize batch header hash: %v", err))
 	}
 
-	if s.authenticator != nil {
-		hash, err := s.authenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
-		if err != nil {
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
-		}
+	hash, err := s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
+	if err != nil {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
+	}
 
-		timestamp := time.Unix(int64(in.Timestamp), 0)
-		err = s.replayGuardian.VerifyRequest(hash, timestamp)
-		if err != nil {
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
-		}
+	timestamp := time.Unix(int64(in.Timestamp), 0)
+	err = s.replayGuardian.VerifyRequest(hash, timestamp)
+	if err != nil {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
 	}
 
 	probe.SetStage("get_operator_state")
@@ -302,7 +312,7 @@ func (s *ServerV2) validateAndStoreChunksLittDB(
 }
 
 // validateStoreChunksRequest validates the StoreChunksRequest and returns deserialized batch in the request
-func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*corev2.Batch, error) {
+func (s *ServerV2) validateStoreChunksRequest(ctx context.Context, req *pb.StoreChunksRequest) (*corev2.Batch, error) {
 	// The signature is created by go-ethereum library, which contains 1 additional byte (for
 	// recovering the public key from signature), so it's 65 bytes.
 	if len(req.GetSignature()) != 65 {
@@ -317,6 +327,13 @@ func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*core
 	batch, err := corev2.BatchFromProtobuf(req.GetBatch())
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize batch: %v", err)
+	}
+
+	for _, cert := range batch.BlobCertificates {
+		err := s.validateDispersalRequest(ctx, cert, s.node.LoadOnchainState())
+		if err != nil {
+			return nil, fmt.Errorf("failed to validate dispersal request: %v", err)
+		}
 	}
 
 	return batch, nil
@@ -366,4 +383,72 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 		Chunks:              chunks,
 		ChunkEncodingFormat: pb.ChunkEncodingFormat_GNARK,
 	}, nil
+}
+
+func (s *ServerV2) validateDispersalRequest(ctx context.Context, blobCert *corev2.BlobCertificate, onchainState *eth.OnchainState) error {
+	if len(blobCert.Signature) != 65 {
+		return api.NewErrorInvalidArg(fmt.Sprintf("signature is expected to be 65 bytes, but got %d bytes", len(blobCert.Signature)))
+	}
+
+	blobLength := blobCert.BlobHeader.BlobCommitments.Length
+	if blobLength == 0 {
+		return api.NewErrorInvalidArg("blob length must be greater than 0")
+	}
+	if blobLength > uint(onchainState.MaxNumSymbolsPerBlob) {
+		return api.NewErrorInvalidArg("blob length too big")
+	}
+	if blobLength != encoding.NextPowerOf2(blobLength) {
+		return api.NewErrorInvalidArg("invalid blob length, must be a power of 2")
+	}
+
+	blobHeader := blobCert.BlobHeader
+	if blobHeader.PaymentMetadata == (core.PaymentMetadata{}) {
+		return api.NewErrorInvalidArg("payment metadata is required")
+	}
+
+	if len(blobHeader.PaymentMetadata.AccountID) == 0 || (blobHeader.PaymentMetadata.Timestamp == 0 && blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == 0) {
+		return api.NewErrorInvalidArg("invalid payment metadata")
+	}
+
+	quorumNumbers := blobHeader.QuorumNumbers
+	if len(quorumNumbers) == 0 {
+		return api.NewErrorInvalidArg("blob header must contain at least one quorum number")
+	}
+
+	if len(quorumNumbers) > int(onchainState.QuorumCount) {
+		return api.NewErrorInvalidArg(fmt.Sprintf("too many quorum numbers specified: maximum is %d", onchainState.QuorumCount))
+	}
+
+	for _, quorum := range quorumNumbers {
+		if quorum > corev2.MaxQuorumID || uint8(quorum) >= onchainState.QuorumCount {
+			return api.NewErrorInvalidArg(fmt.Sprintf("invalid quorum number %d; maximum is %d", quorum, onchainState.QuorumCount))
+		}
+	}
+
+	if _, ok := onchainState.BlobVersionParameters.Get(corev2.BlobVersion(blobHeader.BlobVersion)); !ok {
+		return api.NewErrorInvalidArg(fmt.Sprintf("invalid blob version %d; valid blob versions are: %v", blobHeader.BlobVersion, onchainState.BlobVersionParameters.Keys()))
+	}
+
+	if err := s.blobAuthenticator.AuthenticateBlobRequest(blobHeader, blobCert.Signature); err != nil {
+		return api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
+	}
+
+	// handle payments and check rate limits
+	timestamp := blobHeader.PaymentMetadata.Timestamp
+	cumulativePayment := blobHeader.PaymentMetadata.CumulativePayment
+	accountID := blobHeader.PaymentMetadata.AccountID
+
+	paymentHeader := core.PaymentMetadata{
+		AccountID:         accountID,
+		Timestamp:         timestamp,
+		CumulativePayment: cumulativePayment,
+	}
+
+	// TODO: meterer must be updated to limit on-demand requests to the EigenDA disperser
+	if _, err := s.meterer.MeterRequest(ctx, paymentHeader, uint64(blobLength), blobHeader.QuorumNumbers, time.Now()); err != nil {
+		return api.NewErrorResourceExhausted(err.Error())
+	}
+
+	// should node run prover here? doesn't have data yet though
+	return nil
 }

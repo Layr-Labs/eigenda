@@ -3,12 +3,15 @@ package grpc_test
 import (
 	"context"
 	"errors"
+	"math/big"
 	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/gammazero/workerpool"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -111,12 +114,38 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 	// The eth client is only utilized for StoreChunks validation, which is disabled in these tests
 	var reader *coreeth.Reader
 
+	mockState := &coremock.MockOnchainPaymentState{}
+	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(nil).Maybe()
+	mockState.On("GetReservationWindow", mock.Anything).Return(uint64(1), nil)
+	mockState.On("GetPricePerSymbol", mock.Anything).Return(uint64(2), nil)
+	mockState.On("GetGlobalSymbolsPerSecond", mock.Anything).Return(uint64(1009), nil)
+	mockState.On("GetGlobalRatePeriodInterval", mock.Anything).Return(uint64(1), nil)
+	mockState.On("GetMinNumSymbols", mock.Anything).Return(uint64(3), nil)
+
+	now := uint64(time.Now().Unix())
+	mockState.On("GetReservedPaymentByAccount", mock.Anything, mock.Anything).Return(&core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
+	mockState.On("GetOnDemandPaymentByAccount", mock.Anything, mock.Anything).Return(&core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}, nil)
+	mockState.On("GetOnDemandQuorumNumbers", mock.Anything).Return([]uint8{0, 1}, nil)
+
+	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
+		panic("failed to make initial query to the on-chain state")
+	}
+	store, err := meterer.NewLevelDBOffchainStore(
+		"./testdata/server_v2_test_"+t.Name(),
+		logger,
+	)
+	if err != nil {
+		panic("failed to create offchain store: " + err.Error())
+	}
+	meterer := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
+
 	server, err := grpc.NewServerV2(
 		context.Background(),
 		config,
 		node,
 		logger,
 		ratelimiter,
+		meterer,
 		prometheus.NewRegistry(),
 		reader)
 
