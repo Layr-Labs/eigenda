@@ -436,23 +436,25 @@ Example Usage Flow:
                   <td></td>
                   <td><p>Cumulative payment is the total amount of tokens paid by the requesting account, including the current request.
 This value is serialized as an uint256 and parsed as a big integer, and must match the user’s on-chain deposit limits
-as well as the recorded payments for all previous requests. Because it is a cumulative (not incremental) total, 
-requests can arrive out of order and still unambiguously declare how much of the on-chain deposit can be deducted.
+as well as the recorded payments for all previous requests. 
 
 Example Decision Flow:
   1. In the set up phase, the user must deposit tokens into the EigenDA PaymentVault contract. The payment vault contract
    specifies the minimum number of symbols charged per dispersal, the pricing per symbol, and the maximum global rate for 
    on-demand dispersals. The user should calculate the amount of tokens they would like to deposit based on their usage. 
-   The first time a user make a request, server will immediate read the contract for the on-chain balance. When user runs 
-   out of on-chain balance, the server will reject the request and not proceed with dispersal. When a user top up on-chain, 
-   the server will only refresh every few minutes for the top-up to take effect.
-  2. The disperser client accounts how many tokens they’ve already paid (previousCumPmt).
-  3. They should calculate the payment by rounding up blob size to the nearest multiple of `minNumSymbols` defined by the 
-   payment vault contract, and calculate the incremental amount of tokens needed for the current request needs based on 
-   protocol defined pricing.
-  4. They take the sum of previousCumPmt &#43; new incremental payment and place it in the “cumulative_payment” field.
-  5. The disperser checks this new cumulative total against on-chain deposits and largest existing payment.
-  6. If the payment number is valid, the request is confirmed and disperser proceeds with dispersal; otherwise it’s rejected. </p></td>
+  2. The first time a user makes a request, server will immediate read the contract for the on-chain balance. When user runs 
+   out of on-chain balance, the server will reject the dispersal request. When a user tops up on-chain, 
+   the server will refresh every few minutes for the user top-up to take effect.
+  3. The disperser client accounts how many tokens they’ve already paid (previousCumPmt).
+  4. Disperser client calculates the price of a request by rounding up blob size to the nearest multiple of `minNumSymbols` 
+   and then multiply by `pricePerSymbol` as defined by the payment vault contract. Client considers it as the required charge 
+   of the blob dispersal request. 
+  4. Dispersal client takes the sum of previousCumPmt &#43; charge and place it in the “cumulative_payment” field as part of the request header.
+  5. The disperser checks this new cumulative total against on-chain deposits and the largest seen payment from the same client.
+  6. If the “cumulative_payment” field is not valid, the request is rejected.
+  7. If the “cumulative_payment” field is valid, the disperser will check the request usage against the current global ratelimiting period&#39;s
+   on-demand usage. If the new global on-demand usage doesn&#39;t exceed the maximum, then dispersal request should proceed. If the disperser 
+   the new usage does exceed the maximum, then dispersal request is rejected with payments not charged against the client. </p></td>
                 </tr>
               
             </tbody>
