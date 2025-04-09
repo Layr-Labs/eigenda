@@ -236,7 +236,7 @@ func NewValidatorStore(
 	if config.LittDBEnabled {
 		logger.Infof("Using littDB at %s", littDBPath)
 
-		littConfig, err := littbuilder.DefaultConfig(littDBPath)
+		littConfig, err := litt.DefaultConfig(littDBPath)
 		littConfig.ShardingFactor = 1
 		littConfig.MetricsEnabled = true
 		littConfig.MetricsRegistry = registry
@@ -246,7 +246,7 @@ func NewValidatorStore(
 			return nil, fmt.Errorf("failed to create new litt config: %w", err)
 		}
 
-		littDB, err = littConfig.Build()
+		littDB, err = littbuilder.NewDB(littConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new litt store: %w", err)
 		}
@@ -552,7 +552,7 @@ func BundleKey(blobKey corev2.BlobKey, quorumID core.QuorumID) ([]byte, error) {
 
 func (s *validatorStore) Stop() error {
 	if s.littDB != nil {
-		err := s.littDB.Stop()
+		err := s.littDB.Close()
 		if err != nil {
 			return fmt.Errorf("failed to close littDB: %v", err)
 		}
