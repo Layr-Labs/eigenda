@@ -366,6 +366,10 @@ func (s *ServerV2) Start() error {
 			batches.GET("/feed", s.FetchBatchFeed)
 			batches.GET("/:batch_header_hash", s.FetchBatch)
 		}
+		accounts := v2.Group("/accounts")
+		{
+			accounts.GET("/:account_id/blobs", s.FetchAccountBlobFeed)
+		}
 		operators := v2.Group("/operators")
 		{
 			operators.GET("/:operator_id/dispersals", s.FetchOperatorDispersalFeed)

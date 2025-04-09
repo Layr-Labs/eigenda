@@ -391,7 +391,7 @@ type DisperseBlobRequest struct {
 	// The disperser will ensure that the encoded blobs for each quorum are all processed
 	// within the same batch.
 	CustomQuorumNumbers []uint32 `protobuf:"varint,2,rep,packed,name=custom_quorum_numbers,json=customQuorumNumbers,proto3" json:"custom_quorum_numbers,omitempty"`
-	// The account ID of the client. This should be a hex-encoded string of the ECSDA public key
+	// The account ID of the client. This should be a hex-encoded string of the ECDSA public key
 	// corresponding to the key used by the client to sign the BlobAuthHeader.
 	AccountId string `protobuf:"bytes,3,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 }
