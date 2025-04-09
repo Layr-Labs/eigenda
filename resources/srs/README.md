@@ -4,15 +4,19 @@ This directory contains the Structured Reference String (SRS) files required for
 
 ## File Information
 
-| File Name          | Size   | Number of Points | Point Size |
-|--------------------|--------|------------------|------------|
-| g1.point           | 16 MB  | 524,288          | 32 bytes   |
-| g2.point           | 32 MB  | 524,288          | 64 bytes   |
-| g2.trailing.point  | 32 MB  | 524,288          | 64 bytes   |
+| File Name          | Size   | Number of Points | Point Size | SHA256 Hash                                                      |
+|--------------------|--------|------------------|------------|------------------------------------------------------------------|
+| g1.point           | 16 MB  | 524,288          | 32 bytes   | 8f18b9c04ed4bddcdb73001fb693703197328cecabdfa9025f647410b0c50d7f |
+| g2.point           | 32 MB  | 524,288          | 64 bytes   | a6942684aa751b4ec7873e2edb4660ac5c4516adb3b310441802cc0d489f645a |
+| g2.trailing.point  | 32 MB  | 524,288          | 64 bytes   | 78fad17d74d28cecdb7f826fdd72dee08bdbe1e8ad66f2b24fcf2fc140176788 |
 
 These files are only a portion of the total SRS data that exists for eigenDA. The files here are sufficiently large
 to support the largest permitted blob size of 16MB. This maximum blob size may be increased at some point in the future,
-at which time larger SRS files will need to be committed.
+at which time larger SRS files will be needed.
+
+Note that the G2 point files (`g2.point` and `g2.trailing.point`) are twice the size of the G1 point file because G2 
+points require twice as many bytes to represent as G1 points in the BN254 curve. Each G1 point requires 32 bytes 
+of storage, while each G2 point requires 64 bytes.
 
 ## Retrieving SRS Files
 
@@ -21,22 +25,26 @@ These SRS files can be fetched from the AWS S3 bucket at:
 https://srs-mainnet.s3.amazonaws.com/kzg/
 ```
 
-### Important Notes:
+### Using the Download Script
 
-1. The S3 bucket only directly contains `g1.point` and `g2.point` files.
-2. To retrieve trailing G2 points, you must explicitly specify the byte range when using curl. For example:
+The EigenDA repository provides a convenience script located at `tools/download-srs.sh` for downloading and 
+generating SRS file hashes.
 
-   ```bash
-   # To download the entire g1.point file
-   curl -o g1.point https://srs-mainnet.s3.amazonaws.com/kzg/g1.point
-   
-   # To download the entire g2.point file
-   curl -o g2.point https://srs-mainnet.s3.amazonaws.com/kzg/g2.point
-   
-   # To download g2.trailing.point (by specifying byte range)
-   # The exact byte range will depend on your requirements
-   curl -o g2.trailing.point -r <start>-<end> https://srs-mainnet.s3.amazonaws.com/kzg/g2.point
-   ```
+Usage:
+```bash
+# Download SRS files for a specified blob size (in bytes)
+./tools/download-srs.sh <size_in_bytes>
+
+# Example: Download SRS files for 16MB blobs
+./tools/download-srs.sh 16777216
+```
+
+The script will:
+1. Download the appropriate portions of g1.point and g2.point files
+2. Calculate the correct byte range for g2.trailing.point
+3. Save all files to a "srs-files" directory
+4. Generate SHA256 hashes for verification
+5. Create a hash file with labeled hashes for each downloaded file
 
 ## SRS Verification and Alternative Retrieval Method
 
