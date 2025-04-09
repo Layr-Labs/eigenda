@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/testutils"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,19 +20,19 @@ func isNilPtrDerefPanic(err string) bool {
 }
 
 func TestOpClientKeccak256MalformedInputsV1(t *testing.T) {
-	testOpClientKeccak256MalformedInputs(t, false)
+	testOpClientKeccak256MalformedInputs(t, common.V1EigenDABackend)
 }
 
 func TestOpClientKeccak256MalformedInputsV2(t *testing.T) {
-	testOpClientKeccak256MalformedInputs(t, true)
+	testOpClientKeccak256MalformedInputs(t, common.V2EigenDABackend)
 }
 
 // TestOpClientKeccak256MalformedInputs tests the NewDAClient from altda by setting and getting against []byte("")
 // preimage. It sets the precompute option to false on the NewDAClient.
-func testOpClientKeccak256MalformedInputs(t *testing.T, disperseToV2 bool) {
+func testOpClientKeccak256MalformedInputs(t *testing.T, dispersalBackend common.EigenDABackend) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
 
 	testCfg.UseKeccak256ModeS3 = true
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
@@ -76,19 +76,19 @@ func testOpClientKeccak256MalformedInputs(t *testing.T, disperseToV2 bool) {
 }
 
 func TestProxyClientMalformedInputCasesV1(t *testing.T) {
-	testProxyClientMalformedInputCases(t, false)
+	testProxyClientMalformedInputCases(t, common.V1EigenDABackend)
 }
 
 func TestProxyClientMalformedInputCasesV2(t *testing.T) {
-	testProxyClientMalformedInputCases(t, true)
+	testProxyClientMalformedInputCases(t, common.V2EigenDABackend)
 }
 
 // TestProxyClientMalformedInputCases tests the proxy client and server integration by setting the data as a single
 // byte, many unicode characters, single unicode character and an empty preimage. It then tries to get the data from the
 // proxy server with empty byte, single byte and random string.
-func testProxyClientMalformedInputCases(t *testing.T, disperseToV2 bool) {
+func testProxyClientMalformedInputCases(t *testing.T, dispersalBackend common.EigenDABackend) {
 	t.Parallel()
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
 
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 
@@ -192,19 +192,19 @@ func testProxyClientMalformedInputCases(t *testing.T, disperseToV2 bool) {
 }
 
 func TestKeccak256CommitmentRequestErrorsWhenS3NotSetV1(t *testing.T) {
-	testKeccak256CommitmentRequestErrorsWhenS3NotSet(t, false)
+	testKeccak256CommitmentRequestErrorsWhenS3NotSet(t, common.V1EigenDABackend)
 }
 
 func TestKeccak256CommitmentRequestErrorsWhenS3NotSetV2(t *testing.T) {
-	testKeccak256CommitmentRequestErrorsWhenS3NotSet(t, true)
+	testKeccak256CommitmentRequestErrorsWhenS3NotSet(t, common.V2EigenDABackend)
 }
 
 // TestKeccak256CommitmentRequestErrorsWhenS3NotSet ensures that the proxy returns a client error in the event
 // that an OP Keccak commitment mode is provided when S3 is non-configured server side
-func testKeccak256CommitmentRequestErrorsWhenS3NotSet(t *testing.T, disperseToV2 bool) {
+func testKeccak256CommitmentRequestErrorsWhenS3NotSet(t *testing.T, dispersalBackend common.EigenDABackend) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
 	testCfg.UseKeccak256ModeS3 = true
 
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
@@ -223,17 +223,17 @@ func testKeccak256CommitmentRequestErrorsWhenS3NotSet(t *testing.T, disperseToV2
 }
 
 func TestOversizedBlobRequestErrorsV1(t *testing.T) {
-	testOversizedBlobRequestErrors(t, false)
+	testOversizedBlobRequestErrors(t, common.V1EigenDABackend)
 }
 
 func TestOversizedBlobRequestErrorsV2(t *testing.T) {
-	testOversizedBlobRequestErrors(t, true)
+	testOversizedBlobRequestErrors(t, common.V2EigenDABackend)
 }
 
-func testOversizedBlobRequestErrors(t *testing.T, disperseToV2 bool) {
+func testOversizedBlobRequestErrors(t *testing.T, dispersalBackend common.EigenDABackend) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 
 	ts, kill := testutils.CreateTestSuite(tsConfig)

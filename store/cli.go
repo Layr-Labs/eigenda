@@ -12,7 +12,7 @@ import (
 
 var (
 	BackendsToEnableFlagName = withFlagPrefix("backends-to-enable")
-	DisperseToV2FlagName     = withFlagPrefix("disperse-to-v2")
+	DispersalBackendFlagName = withFlagPrefix("dispersal-backend")
 	FallbackTargetsFlagName  = withFlagPrefix("fallback-targets")
 	CacheTargetsFlagName     = withFlagPrefix("cache-targets")
 	ConcurrentWriteThreads   = withFlagPrefix("concurrent-write-routines")
@@ -38,12 +38,13 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Category: category,
 			Required: false,
 		},
-		&cli.BoolFlag{
-			Name:     DisperseToV2FlagName,
-			Usage:    "Enable blob dispersal to EigenDA V2 protocol.",
-			EnvVars:  withEnvPrefix(envPrefix, "DISPERSE_TO_V2"),
+		&cli.StringFlag{
+			Name:     DispersalBackendFlagName,
+			Usage:    "Target EigenDA backend version for blob dispersal (e.g. V1 or V2).",
+			EnvVars:  withEnvPrefix(envPrefix, "DISPERSAL_BACKEND"),
 			Category: category,
 			Required: false,
+			Value:    "V1",
 		},
 		&cli.StringSliceFlag{
 			Name:     FallbackTargetsFlagName,
@@ -84,9 +85,14 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		backends = append(backends, backend)
 	}
 
+	dispersalBackend, err := common.StringToEigenDABackend(ctx.String(DispersalBackendFlagName))
+	if err != nil {
+		return Config{}, fmt.Errorf("string to eigenDA backend: %w", err)
+	}
+
 	return Config{
 		BackendsToEnable: backends,
-		DisperseToV2:     ctx.Bool(DisperseToV2FlagName),
+		DispersalBackend: dispersalBackend,
 		AsyncPutWorkers:  ctx.Int(ConcurrentWriteThreads),
 		FallbackTargets:  ctx.StringSlice(FallbackTargetsFlagName),
 		CacheTargets:     ctx.StringSlice(CacheTargetsFlagName),

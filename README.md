@@ -193,7 +193,7 @@ This approach allows you to switch from V1 to V2 while the proxy is running, wit
 1. **Configure Both V1 and V2 Backends**
    - Use a configuration file that includes settings for both V1 and V2 backends
       - See `.env.exampleV1AndV2.holesky` for an example configuration
-   - Set `EIGENDA_PROXY_STORAGE_DISPERSE_TO_V2=false` in your configuration
+   - Set `EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND=V1` in your configuration
       - This ensures that the proxy will continue dispersing to the V1 backend, until it's time to migrate
    - Set `EIGENDA_PROXY_API_ENABLED=admin` to expose the admin API
       - This allows runtime switching between V1 and V2 without service restart
@@ -220,7 +220,7 @@ If you prefer a more controlled migration with explicit service updates, follow 
 2. **Prepare V2 Configuration**
    - Prepare a configuration file that includes settings for both V1 and V2 backends
       - See `.env.exampleV1AndV2.holesky` for an example configuration
-   - Set `EIGENDA_PROXY_STORAGE_DISPERSE_TO_V2=true`, so that the proxy started with this config will immediately
+   - Set `EIGENDA_PROXY_STORAGE_DISPERSAL_BACKEND=V2`, so that the proxy started with this config will immediately
 enable V2 dispersal
 
 3. **Scheduled Migration**

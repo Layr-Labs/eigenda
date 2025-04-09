@@ -129,7 +129,7 @@ func TestHandlerPutSuccess(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockStorageMgr := mocks.NewMockIManager(ctrl)
-	mockStorageMgr.EXPECT().DisperseToV2().AnyTimes().Return(false)
+	mockStorageMgr.EXPECT().GetDispersalBackend().AnyTimes().Return(common.V1EigenDABackend)
 
 	tests := []struct {
 		name         string
@@ -232,7 +232,7 @@ func TestHandlerPutErrors(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	mockStorageMgr := mocks.NewMockIManager(ctrl)
-	mockStorageMgr.EXPECT().DisperseToV2().AnyTimes().Return(false)
+	mockStorageMgr.EXPECT().GetDispersalBackend().AnyTimes().Return(common.V1EigenDABackend)
 
 	tests := []struct {
 		name                         string
@@ -327,7 +327,7 @@ func TestEigenDADispersalBackendEndpoints(t *testing.T) {
 	// Test with admin endpoints enabled
 	t.Run("Admin Endpoints Enabled", func(t *testing.T) {
 		// Initial state is false
-		mockStorageMgr.EXPECT().DisperseToV2().Return(false)
+		mockStorageMgr.EXPECT().GetDispersalBackend().Return(common.V1EigenDABackend)
 
 		// Test GET endpoint first to verify initial state
 		t.Run("Get EigenDA Dispersal Backend", func(t *testing.T) {
@@ -380,8 +380,8 @@ func TestEigenDADispersalBackendEndpoints(t *testing.T) {
 			jsonBody, err := json.Marshal(requestBody)
 			require.NoError(t, err)
 
-			mockStorageMgr.EXPECT().SetDisperseToV2(true)
-			mockStorageMgr.EXPECT().DisperseToV2().Return(true)
+			mockStorageMgr.EXPECT().SetDispersalBackend(common.V2EigenDABackend)
+			mockStorageMgr.EXPECT().GetDispersalBackend().Return(common.V2EigenDABackend)
 
 			req := httptest.NewRequest(http.MethodPut, "/admin/eigenda-dispersal-backend", bytes.NewReader(jsonBody))
 			rec := httptest.NewRecorder()

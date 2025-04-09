@@ -64,7 +64,7 @@ func validCfg() ProxyConfig {
 		},
 		StorageConfig: store.Config{
 			BackendsToEnable: []common.EigenDABackend{common.V1EigenDABackend, common.V2EigenDABackend},
-			DisperseToV2:     true,
+			DispersalBackend: common.V2EigenDABackend,
 		},
 	}
 

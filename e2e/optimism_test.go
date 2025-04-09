@@ -4,14 +4,14 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
-	proxycommon "github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/testutils"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	e2econfig "github.com/ethereum-optimism/optimism/op-e2e/config"
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils"
 	"github.com/ethereum-optimism/optimism/op-service/sources"
 	"github.com/ethereum-optimism/optimism/op-service/testlog"
-	"github.com/ethereum/go-ethereum/common"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/require"
 
@@ -56,7 +56,7 @@ func NewL2AltDA(t actions.Testing, daHost string, altDA bool) *L2AltDA {
 
 	// config.DeployConfig.DACommitmentType = altda.GenericCommitmentString
 	dp := e2eutils.MakeDeployParams(t, p)
-	dp.DeployConfig.DAChallengeProxy = common.Address{0x42}
+	dp.DeployConfig.DAChallengeProxy = gethcommon.Address{0x42}
 	sd := e2eutils.Setup(t, dp, defaultAlloc)
 
 	require.True(t, sd.RollupCfg.AltDAEnabled())
@@ -97,7 +97,7 @@ func NewL2AltDA(t actions.Testing, daHost string, altDA bool) *L2AltDA {
 	require.True(t, enabled)
 
 	sequencer := actions.NewL2Sequencer(t, log, l1F, miner.BlobStore(), daMgr, engCl, sd.RollupCfg, 0, nil)
-	miner.ActL1SetFeeRecipient(common.Address{'A'})
+	miner.ActL1SetFeeRecipient(gethcommon.Address{'A'})
 	sequencer.ActL2PipelineFull(t)
 
 	batcher := actions.NewL2Batcher(
@@ -132,15 +132,15 @@ func (a *L2AltDA) ActL1Finalized(t actions.Testing) {
 }
 
 func TestOptimismKeccak256CommitmentV1(t *testing.T) {
-	testOptimismKeccak256Commitment(t, false)
+	testOptimismKeccak256Commitment(t, common.V1EigenDABackend)
 }
 
 func TestOptimismKeccak256CommitmentV2(t *testing.T) {
-	testOptimismKeccak256Commitment(t, true)
+	testOptimismKeccak256Commitment(t, common.V2EigenDABackend)
 }
 
-func testOptimismKeccak256Commitment(t *testing.T, disperseToV2 bool) {
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
+func testOptimismKeccak256Commitment(t *testing.T, dispersalBackend common.EigenDABackend) {
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
 	testCfg.UseKeccak256ModeS3 = true
 
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
@@ -192,15 +192,15 @@ func testOptimismKeccak256Commitment(t *testing.T, disperseToV2 bool) {
 }
 
 func TestOptimismGenericCommitmentV1(t *testing.T) {
-	testOptimismGenericCommitment(t, false)
+	testOptimismGenericCommitment(t, common.V1EigenDABackend)
 }
 
 func TestOptimismGenericCommitmentV2(t *testing.T) {
-	testOptimismGenericCommitment(t, true)
+	testOptimismGenericCommitment(t, common.V2EigenDABackend)
 }
 
-func testOptimismGenericCommitment(t *testing.T, disperseToV2 bool) {
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
+func testOptimismGenericCommitment(t *testing.T, dispersalBackend common.EigenDABackend) {
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
 
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 	proxyTS, shutDown := testutils.CreateTestSuite(tsConfig)
@@ -267,9 +267,8 @@ func exerciseGenericCommitments(
 func TestOptimismGenericCommitmentMigration(t *testing.T) {
 	testCfg := testutils.NewTestConfig(
 		testutils.GetBackend(),
-		false,
-		proxycommon.V1EigenDABackend,
-		proxycommon.V2EigenDABackend)
+		common.V1EigenDABackend,
+		[]common.EigenDABackend{common.V1EigenDABackend, common.V2EigenDABackend})
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 	proxyTS, shutDown := testutils.CreateTestSuite(tsConfig)
 	defer shutDown()
@@ -291,7 +290,7 @@ func TestOptimismGenericCommitmentMigration(t *testing.T) {
 		expectedReadCount)
 
 	// turn on v2 dispersal
-	proxyTS.Server.SetDisperseToV2(true)
+	proxyTS.Server.SetDispersalBackend(common.V2EigenDABackend)
 	exerciseGenericCommitments(t, ot, optimism)
 	expectedWriteCount++
 	expectedReadCount++

@@ -149,7 +149,7 @@ func GetBackend() Backend {
 
 type TestConfig struct {
 	BackendsToEnable []common.EigenDABackend
-	DisperseToV2     bool
+	DispersalBackend common.EigenDABackend
 	Backend          Backend
 	Expiration       time.Duration
 	MaxBlobLength    string
@@ -162,10 +162,14 @@ type TestConfig struct {
 }
 
 // NewTestConfig returns a new TestConfig
-func NewTestConfig(backend Backend, disperseToV2 bool, backendsToEnable ...common.EigenDABackend) TestConfig {
-	// if the caller doesn't specify which backends to enable, enable whichever eigenda backend is being dispersed to
-	if len(backendsToEnable) == 0 {
-		if disperseToV2 {
+func NewTestConfig(
+	backend Backend,
+	dispersalBackend common.EigenDABackend,
+	// if backendsToEnable is nil, then this method will simply enable whichever backend is being dispersed to
+	backendsToEnable []common.EigenDABackend,
+) TestConfig {
+	if backendsToEnable == nil {
+		if dispersalBackend == common.V2EigenDABackend {
 			backendsToEnable = []common.EigenDABackend{common.V2EigenDABackend}
 		} else {
 			backendsToEnable = []common.EigenDABackend{common.V1EigenDABackend}
@@ -174,7 +178,7 @@ func NewTestConfig(backend Backend, disperseToV2 bool, backendsToEnable ...commo
 
 	return TestConfig{
 		BackendsToEnable:   backendsToEnable,
-		DisperseToV2:       disperseToV2,
+		DispersalBackend:   dispersalBackend,
 		Backend:            backend,
 		Expiration:         14 * 24 * time.Hour,
 		UseKeccak256ModeS3: false,
@@ -331,7 +335,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		StorageConfig: store.Config{
 			AsyncPutWorkers:  testCfg.WriteThreadCount,
 			BackendsToEnable: testCfg.BackendsToEnable,
-			DisperseToV2:     testCfg.DisperseToV2,
+			DispersalBackend: testCfg.DispersalBackend,
 		},
 	}
 

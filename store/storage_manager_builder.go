@@ -112,10 +112,10 @@ func (smb *StorageManagerBuilder) Build(ctx context.Context) (*Manager, error) {
 	v1Enabled := slices.Contains(smb.managerCfg.BackendsToEnable, common.V1EigenDABackend)
 	v2Enabled := slices.Contains(smb.managerCfg.BackendsToEnable, common.V2EigenDABackend)
 
-	if smb.managerCfg.DisperseToV2 && !v2Enabled {
-		return nil, fmt.Errorf("DisperseToV2 is true, but v2 backend is not enabled")
-	} else if !smb.managerCfg.DisperseToV2 && !v1Enabled {
-		return nil, fmt.Errorf("DisperseToV2 is false, but v1 backend is not enabled")
+	if smb.managerCfg.DispersalBackend == common.V2EigenDABackend && !v2Enabled {
+		return nil, fmt.Errorf("dispersal backend is set to V2, but V2 backend is not enabled")
+	} else if smb.managerCfg.DispersalBackend == common.V1EigenDABackend && !v1Enabled {
+		return nil, fmt.Errorf("dispersal backend is set to V1, but V1 backend is not enabled")
 	}
 
 	if v1Enabled {
@@ -158,7 +158,7 @@ func (smb *StorageManagerBuilder) Build(ctx context.Context) (*Manager, error) {
 		"verify_v1_certs", smb.v1VerifierCfg.VerifyCerts,
 	)
 
-	return NewManager(eigenDAV1Store, eigenDAV2Store, s3Store, smb.log, secondary, smb.managerCfg.DisperseToV2)
+	return NewManager(eigenDAV1Store, eigenDAV2Store, s3Store, smb.log, secondary, smb.managerCfg.DispersalBackend)
 }
 
 // buildSecondaries ... Creates a slice of secondary targets used for either read

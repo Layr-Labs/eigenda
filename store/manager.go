@@ -17,8 +17,8 @@ import (
 type IManager interface {
 	Get(ctx context.Context, key []byte, cm commitments.CommitmentMeta) ([]byte, error)
 	Put(ctx context.Context, cm commitments.CommitmentMode, key, value []byte) ([]byte, error)
-	SetDisperseToV2(disperseToV2 bool)
-	DisperseToV2() bool
+	SetDispersalBackend(backend common.EigenDABackend)
+	GetDispersalBackend() common.EigenDABackend
 }
 
 // Manager ... storage backend routing layer
@@ -27,9 +27,9 @@ type Manager struct {
 
 	s3 common.PrecomputedKeyStore // for op keccak256 commitment
 	// For op generic commitments & standard commitments
-	eigenda      common.GeneratedKeyStore // v0 da commitment version
-	eigendaV2    common.GeneratedKeyStore // v1 da commitment version
-	disperseToV2 *atomic.Bool             // write blobs to EigenDAV2 backend
+	eigenda          common.GeneratedKeyStore // v0 da commitment version
+	eigendaV2        common.GeneratedKeyStore // v1 da commitment version
+	dispersalBackend atomic.Value             // stores the EigenDABackend to write blobs to
 
 	// secondary storage backends (caching and fallbacks)
 	secondary ISecondary
@@ -37,16 +37,20 @@ type Manager struct {
 
 var _ IManager = &Manager{}
 
-// DisperseToV2 returns whether v2 dispersal is enabled
-func (m *Manager) DisperseToV2() bool {
-	return m.disperseToV2.Load()
+// GetDispersalBackend returns which EigenDA backend is currently being used for dispersal
+func (m *Manager) GetDispersalBackend() common.EigenDABackend {
+	val := m.dispersalBackend.Load()
+	backend, ok := val.(common.EigenDABackend)
+	if !ok {
+		m.log.Error("Failed to convert dispersalBackend to EigenDABackend type", "value", val)
+		return 0
+	}
+	return backend
 }
 
-// SetDisperseToV2 sets whether v2 dispersal is enabled.
-//
-// If set to true, the manager will disperse to eigenDA v2. If false, it will disperse to eigenDA v1
-func (m *Manager) SetDisperseToV2(disperseToV2 bool) {
-	m.disperseToV2.Store(disperseToV2)
+// SetDispersalBackend sets which EigenDA backend to use for dispersal
+func (m *Manager) SetDispersalBackend(backend common.EigenDABackend) {
+	m.dispersalBackend.Store(backend)
 }
 
 // NewManager ... Init
@@ -56,28 +60,26 @@ func NewManager(
 	s3 common.PrecomputedKeyStore,
 	l logging.Logger,
 	secondary ISecondary,
-	disperseToV2 bool,
+	dispersalBackend common.EigenDABackend,
 ) (*Manager, error) {
 	// Enforce invariants
-	if disperseToV2 && eigenDAV2 == nil {
+	if dispersalBackend == common.V2EigenDABackend && eigenDAV2 == nil {
 		return nil, fmt.Errorf("EigenDA V2 dispersal enabled but no v2 store provided")
 	}
 
-	if !disperseToV2 && eigenda == nil {
+	if dispersalBackend == common.V1EigenDABackend && eigenda == nil {
 		return nil, fmt.Errorf("EigenDA dispersal enabled but no store provided")
 	}
 
-	disperseToV2Atomic := &atomic.Bool{}
-	disperseToV2Atomic.Store(disperseToV2)
-
-	return &Manager{
-		log:          l,
-		eigenda:      eigenda,
-		eigendaV2:    eigenDAV2,
-		s3:           s3,
-		secondary:    secondary,
-		disperseToV2: disperseToV2Atomic,
-	}, nil
+	manager := &Manager{
+		log:       l,
+		eigenda:   eigenda,
+		eigendaV2: eigenDAV2,
+		s3:        s3,
+		secondary: secondary,
+	}
+	manager.dispersalBackend.Store(dispersalBackend)
+	return manager, nil
 }
 
 // Get ... fetches a value from a storage backend based on the (commitment mode, type)
@@ -208,12 +210,27 @@ func (m *Manager) getVerifyMethod(commitmentType commitments.EigenDACommitmentTy
 
 // putEigenDAMode ... disperses blob to EigenDA backend
 func (m *Manager) putEigenDAMode(ctx context.Context, value []byte) ([]byte, error) {
-	if !m.disperseToV2.Load() { // disperse v1
-		m.log.Info("Storing data to EigenDA V1 backend")
+	val := m.dispersalBackend.Load()
+	backend, ok := val.(common.EigenDABackend)
+	if !ok {
+		return nil, fmt.Errorf("invalid dispersal backend type: %v", val)
+	}
+
+	if backend == common.V1EigenDABackend {
+		if m.eigenda == nil {
+			return nil, errors.New("EigenDA V1 dispersal requested but not configured")
+		}
 		return m.eigenda.Put(ctx, value)
 	}
 
-	return m.eigendaV2.Put(ctx, value)
+	if backend == common.V2EigenDABackend {
+		if m.eigendaV2 == nil {
+			return nil, errors.New("EigenDA V2 dispersal requested but not configured")
+		}
+		return m.eigendaV2.Put(ctx, value)
+	}
+
+	return nil, fmt.Errorf("unsupported dispersal backend: %v", backend)
 }
 
 func (m *Manager) getEigenDAMode(

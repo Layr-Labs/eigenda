@@ -132,26 +132,13 @@ func (svr *Server) handleGetShared(
 	return nil
 }
 
-// disperseToV2ToEigenDABackend converts the boolean disperseToV2 flag to the corresponding EigenDABackend enum
-func disperseToV2ToEigenDABackend(disperseToV2 bool) common.EigenDABackend {
-	if disperseToV2 {
-		return common.V2EigenDABackend
-	}
-	return common.V1EigenDABackend
-}
-
-// eigenDABackendToDisperseToV2 converts an EigenDABackend enum to the corresponding boolean flag
-func eigenDABackendToDisperseToV2(backend common.EigenDABackend) bool {
-	return backend == common.V2EigenDABackend
-}
-
 // handleGetEigenDADispersalBackend handles the GET request to check the current EigenDA backend used for dispersal.
 // This endpoint returns which EigenDA backend version (v1 or v2) is currently being used for blob dispersal.
 func (svr *Server) handleGetEigenDADispersalBackend(w http.ResponseWriter, _ *http.Request) error {
 	w.Header().Set(headerContentType, contentTypeJSON)
 	w.WriteHeader(http.StatusOK)
 
-	backend := disperseToV2ToEigenDABackend(svr.sm.DisperseToV2())
+	backend := svr.sm.GetDispersalBackend()
 	backendString := common.EigenDABackendToString(backend)
 
 	response := struct {
@@ -179,7 +166,7 @@ func (svr *Server) handlePostStdCommitment(w http.ResponseWriter, r *http.Reques
 		Version: commitments.CertV0,
 	}
 
-	if svr.sm.DisperseToV2() {
+	if svr.sm.GetDispersalBackend() == common.V2EigenDABackend {
 		commitmentMeta.Version = commitments.CertV1
 	}
 
@@ -219,7 +206,7 @@ func (svr *Server) handlePostOPGenericCommitment(w http.ResponseWriter, r *http.
 		Version: commitments.CertV0,
 	}
 
-	if svr.sm.DisperseToV2() {
+	if svr.sm.GetDispersalBackend() == common.V2EigenDABackend {
 		commitmentMeta.Version = commitments.CertV1
 	}
 
@@ -308,14 +295,13 @@ func (svr *Server) handleSetEigenDADispersalBackend(w http.ResponseWriter, r *ht
 		return err
 	}
 
-	disperseToV2 := eigenDABackendToDisperseToV2(backend)
-	svr.SetDisperseToV2(disperseToV2)
+	svr.SetDispersalBackend(backend)
 
 	// Return the current value in the response
 	w.Header().Set(headerContentType, contentTypeJSON)
 	w.WriteHeader(http.StatusOK)
 
-	currentBackend := disperseToV2ToEigenDABackend(svr.sm.DisperseToV2())
+	currentBackend := svr.sm.GetDispersalBackend()
 	backendString := common.EigenDABackendToString(currentBackend)
 
 	response := struct {

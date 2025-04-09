@@ -91,12 +91,12 @@ const (
 
 // StringToEigenDABackend converts a string to EigenDABackend enum
 func StringToEigenDABackend(inputString string) (EigenDABackend, error) {
-	inputString = strings.ToLower(strings.TrimSpace(inputString))
+	inputString = strings.ToUpper(strings.TrimSpace(inputString))
 
 	switch inputString {
-	case "v1":
+	case "V1":
 		return V1EigenDABackend, nil
-	case "v2":
+	case "V2":
 		return V2EigenDABackend, nil
 	default:
 		return 0, fmt.Errorf("invalid backend option: %s", inputString)
@@ -107,9 +107,9 @@ func StringToEigenDABackend(inputString string) (EigenDABackend, error) {
 func EigenDABackendToString(backend EigenDABackend) string {
 	switch backend {
 	case V1EigenDABackend:
-		return "v1"
+		return "V1"
 	case V2EigenDABackend:
-		return "v2"
+		return "V2"
 	default:
 		return "unknown"
 	}

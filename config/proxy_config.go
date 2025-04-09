@@ -50,10 +50,14 @@ func ReadProxyConfig(ctx *cli.Context) (ProxyConfig, error) {
 	}
 
 	var maxBlobSizeBytes uint64
-	if storageConfig.DisperseToV2 {
-		maxBlobSizeBytes = clientConfigV2.MaxBlobSizeBytes
-	} else {
+	switch storageConfig.DispersalBackend {
+	case common.V1EigenDABackend:
 		maxBlobSizeBytes = clientConfigV1.MaxBlobSizeBytes
+	case common.V2EigenDABackend:
+		maxBlobSizeBytes = clientConfigV2.MaxBlobSizeBytes
+	default:
+		return ProxyConfig{}, fmt.Errorf("unknown dispersal backend %s",
+			common.EigenDABackendToString(storageConfig.DispersalBackend))
 	}
 
 	kzgConfig := verify.ReadKzgConfig(ctx, maxBlobSizeBytes)

@@ -91,17 +91,17 @@ func requireOPClientSetGet(t *testing.T, ts testutils.TestSuite, blob []byte, pr
 }
 
 func TestOptimismClientWithKeccak256CommitmentV1(t *testing.T) {
-	testOptimismClientWithKeccak256Commitment(t, false)
+	testOptimismClientWithKeccak256Commitment(t, common.V1EigenDABackend)
 }
 
 func TestOptimismClientWithKeccak256CommitmentV2(t *testing.T) {
-	testOptimismClientWithKeccak256Commitment(t, true)
+	testOptimismClientWithKeccak256Commitment(t, common.V2EigenDABackend)
 }
 
-func testOptimismClientWithKeccak256Commitment(t *testing.T, disperseToV2 bool) {
+func testOptimismClientWithKeccak256Commitment(t *testing.T, dispersalBackend common.EigenDABackend) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
 	testCfg.UseKeccak256ModeS3 = true
 
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
@@ -113,21 +113,21 @@ func testOptimismClientWithKeccak256Commitment(t *testing.T, disperseToV2 bool) 
 }
 
 func TestOptimismClientWithGenericCommitmentV1(t *testing.T) {
-	testOptimismClientWithGenericCommitment(t, false)
+	testOptimismClientWithGenericCommitment(t, common.V1EigenDABackend)
 }
 
 func TestOptimismClientWithGenericCommitmentV2(t *testing.T) {
-	testOptimismClientWithGenericCommitment(t, true)
+	testOptimismClientWithGenericCommitment(t, common.V2EigenDABackend)
 }
 
 /*
 this test asserts that the data can be posted/read to EigenDA
 with a concurrent S3 backend configured
 */
-func testOptimismClientWithGenericCommitment(t *testing.T, disperseToV2 bool) {
+func testOptimismClientWithGenericCommitment(t *testing.T, dispersalBackend common.EigenDABackend) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
@@ -137,20 +137,20 @@ func testOptimismClientWithGenericCommitment(t *testing.T, disperseToV2 bool) {
 }
 
 func TestProxyClientServerIntegrationV1(t *testing.T) {
-	testProxyClientServerIntegration(t, false)
+	testProxyClientServerIntegration(t, common.V1EigenDABackend)
 }
 
 func TestProxyClientServerIntegrationV2(t *testing.T) {
-	testProxyClientServerIntegration(t, true)
+	testProxyClientServerIntegration(t, common.V2EigenDABackend)
 }
 
 // TestProxyClientServerIntegration tests the proxy client and server integration by setting the data as a single byte,
 // many unicode characters, single unicode character and an empty preimage. It then tries to get the data from the
 // proxy server with empty byte, single byte and random string.
-func testProxyClientServerIntegration(t *testing.T, disperseToV2 bool) {
+func testProxyClientServerIntegration(t *testing.T, dispersalBackend common.EigenDABackend) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 
 	ts, kill := testutils.CreateTestSuite(tsConfig)
@@ -221,17 +221,17 @@ func testProxyClientServerIntegration(t *testing.T, disperseToV2 bool) {
 }
 
 func TestProxyClientV1(t *testing.T) {
-	testProxyClient(t, false)
+	testProxyClient(t, common.V1EigenDABackend)
 }
 
 func TestProxyClientV2(t *testing.T) {
-	testProxyClient(t, true)
+	testProxyClient(t, common.V2EigenDABackend)
 }
 
-func testProxyClient(t *testing.T, disperseToV2 bool) {
+func testProxyClient(t *testing.T, dispersalBackend common.EigenDABackend) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 
 	ts, kill := testutils.CreateTestSuite(tsConfig)
@@ -255,17 +255,17 @@ func testProxyClient(t *testing.T, disperseToV2 bool) {
 }
 
 func TestProxyClientWriteReadV1(t *testing.T) {
-	testProxyClientWriteRead(t, false)
+	testProxyClientWriteRead(t, common.V1EigenDABackend)
 }
 
 func TestProxyClientWriteReadV2(t *testing.T) {
-	testProxyClientWriteRead(t, true)
+	testProxyClientWriteRead(t, common.V2EigenDABackend)
 }
 
-func testProxyClientWriteRead(t *testing.T, disperseToV2 bool) {
+func testProxyClientWriteRead(t *testing.T, dispersalBackend common.EigenDABackend) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.MemstoreBackend, disperseToV2)
+	testCfg := testutils.NewTestConfig(testutils.MemstoreBackend, dispersalBackend, nil)
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
@@ -275,20 +275,20 @@ func testProxyClientWriteRead(t *testing.T, disperseToV2 bool) {
 }
 
 func TestProxyCachingV1(t *testing.T) {
-	testProxyCaching(t, false)
+	testProxyCaching(t, common.V1EigenDABackend)
 }
 
 func TestProxyCachingV2(t *testing.T) {
-	testProxyCaching(t, true)
+	testProxyCaching(t, common.V2EigenDABackend)
 }
 
 /*
 Ensure that proxy is able to write/read from a cache backend when enabled
 */
-func testProxyCaching(t *testing.T, disperseToV2 bool) {
+func testProxyCaching(t *testing.T, dispersalBackend common.EigenDABackend) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
 	testCfg.UseS3Caching = true
 
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
@@ -301,17 +301,17 @@ func testProxyCaching(t *testing.T, disperseToV2 bool) {
 }
 
 func TestProxyCachingWithRedisV1(t *testing.T) {
-	testProxyCachingWithRedis(t, false)
+	testProxyCachingWithRedis(t, common.V1EigenDABackend)
 }
 
 func TestProxyCachingWithRedisV2(t *testing.T) {
-	testProxyCachingWithRedis(t, true)
+	testProxyCachingWithRedis(t, common.V2EigenDABackend)
 }
 
-func testProxyCachingWithRedis(t *testing.T, disperseToV2 bool) {
+func testProxyCachingWithRedis(t *testing.T, dispersalBackend common.EigenDABackend) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
 	testCfg.UseRedisCaching = true
 
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
@@ -324,11 +324,11 @@ func testProxyCachingWithRedis(t *testing.T, disperseToV2 bool) {
 }
 
 func TestProxyReadFallbackV1(t *testing.T) {
-	testProxyReadFallback(t, false)
+	testProxyReadFallback(t, common.V1EigenDABackend)
 }
 
 func TestProxyReadFallbackV2(t *testing.T) {
-	testProxyReadFallback(t, true)
+	testProxyReadFallback(t, common.V2EigenDABackend)
 }
 
 /*
@@ -336,7 +336,7 @@ Ensure that fallback location is read from when EigenDA blob is not available.
 This is done by setting the memstore expiration time to 1ms and waiting for the blob to expire
 before attempting to read it.
 */
-func testProxyReadFallback(t *testing.T, disperseToV2 bool) {
+func testProxyReadFallback(t *testing.T, dispersalBackend common.EigenDABackend) {
 	t.Parallel()
 
 	if testutils.GetBackend() != testutils.MemstoreBackend {
@@ -344,7 +344,7 @@ func testProxyReadFallback(t *testing.T, disperseToV2 bool) {
 						against actual eigen DA`)
 	}
 
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
 	testCfg.UseS3Fallback = true
 	// ensure that blob memstore eviction times result in near immediate activation
 	testCfg.Expiration = time.Millisecond * 1
@@ -374,14 +374,14 @@ func testProxyReadFallback(t *testing.T, disperseToV2 bool) {
 }
 
 func TestProxyMemConfigClientCanGetAndPatchV1(t *testing.T) {
-	testProxyMemConfigClientCanGetAndPatch(t, false)
+	testProxyMemConfigClientCanGetAndPatch(t, common.V1EigenDABackend)
 }
 
 func TestProxyMemConfigClientCanGetAndPatchV2(t *testing.T) {
-	testProxyMemConfigClientCanGetAndPatch(t, true)
+	testProxyMemConfigClientCanGetAndPatch(t, common.V2EigenDABackend)
 }
 
-func testProxyMemConfigClientCanGetAndPatch(t *testing.T, disperseToV2 bool) {
+func testProxyMemConfigClientCanGetAndPatch(t *testing.T, dispersalBackend common.EigenDABackend) {
 	t.Parallel()
 
 	useMemstore := testutils.GetBackend() == testutils.MemstoreBackend
@@ -389,7 +389,7 @@ func testProxyMemConfigClientCanGetAndPatch(t *testing.T, disperseToV2 bool) {
 		t.Skip("test can't be run against holesky since read failure case can't be manually triggered")
 	}
 
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 
 	ts, kill := testutils.CreateTestSuite(tsConfig)
@@ -427,9 +427,8 @@ func TestInterleavedVersions(t *testing.T) {
 
 	testCfg := testutils.NewTestConfig(
 		testutils.GetBackend(),
-		false,
 		common.V1EigenDABackend,
-		common.V2EigenDABackend)
+		[]common.EigenDABackend{common.V1EigenDABackend, common.V2EigenDABackend})
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 	testSuite, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()
@@ -445,19 +444,19 @@ func TestInterleavedVersions(t *testing.T) {
 	require.NoError(t, err)
 
 	// disperse a payload to v2
-	testSuite.Server.SetDisperseToV2(true)
+	testSuite.Server.SetDispersalBackend(common.V2EigenDABackend)
 	payload2a := testRandom.Bytes(1000)
 	cert2a, err := client.SetData(testSuite.Ctx, payload2a)
 	require.NoError(t, err)
 
 	// disperse another payload to v1
-	testSuite.Server.SetDisperseToV2(false)
+	testSuite.Server.SetDispersalBackend(common.V1EigenDABackend)
 	payload1b := testRandom.Bytes(1000)
 	cert1b, err := client.SetData(testSuite.Ctx, payload1b)
 	require.NoError(t, err)
 
 	// disperse another payload to v2
-	testSuite.Server.SetDisperseToV2(true)
+	testSuite.Server.SetDispersalBackend(common.V2EigenDABackend)
 	payload2b := testRandom.Bytes(1000)
 	cert2b, err := client.SetData(testSuite.Ctx, payload2b)
 	require.NoError(t, err)
@@ -486,17 +485,17 @@ func TestMaxBlobSizeV1(t *testing.T) {
 		t.Skip("Preprod for v1 has a stricter blob size than normal.")
 	}
 
-	testMaxBlobSize(t, false)
+	testMaxBlobSize(t, common.V1EigenDABackend)
 }
 
 func TestMaxBlobSizeV2(t *testing.T) {
-	testMaxBlobSize(t, true)
+	testMaxBlobSize(t, common.V2EigenDABackend)
 }
 
-func testMaxBlobSize(t *testing.T, disperseToV2 bool) {
+func testMaxBlobSize(t *testing.T, dispersalBackend common.EigenDABackend) {
 	t.Parallel()
 
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), disperseToV2)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
 	testCfg.MaxBlobLength = "16mib"
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 

@@ -10,7 +10,7 @@ import (
 
 type Config struct {
 	BackendsToEnable []common.EigenDABackend
-	DisperseToV2     bool
+	DispersalBackend common.EigenDABackend
 
 	AsyncPutWorkers int
 	FallbackTargets []string

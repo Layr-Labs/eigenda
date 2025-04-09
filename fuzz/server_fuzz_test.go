@@ -3,28 +3,27 @@ package fuzz_test
 import (
 	"log/slog"
 	"os"
-
-	"github.com/Layr-Labs/eigenda-proxy/testutils"
-	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/stretchr/testify/require"
-
 	"testing"
 
 	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
+	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/testutils"
+	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/stretchr/testify/require"
 )
 
 // FuzzProxyClientServerV1 will fuzz the proxy client server integration
 // and op client keccak256 with malformed inputs. This is never meant to be fuzzed with EigenDA.
 func FuzzProxyClientServerV1(f *testing.F) {
-	fuzzProxyClientServer(f, false)
+	fuzzProxyClientServer(f, common.V1EigenDABackend)
 }
 
 func FuzzProxyClientServerV2(f *testing.F) {
-	fuzzProxyClientServer(f, true)
+	fuzzProxyClientServer(f, common.V2EigenDABackend)
 }
 
-func fuzzProxyClientServer(f *testing.F, disperseToV2 bool) {
-	testCfg := testutils.NewTestConfig(testutils.MemstoreBackend, disperseToV2)
+func fuzzProxyClientServer(f *testing.F, dispersalBackend common.EigenDABackend) {
+	testCfg := testutils.NewTestConfig(testutils.MemstoreBackend, dispersalBackend, nil)
 	testCfg.MaxBlobLength = "16mib"
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
 

@@ -9,6 +9,7 @@ import (
 	reflect "reflect"
 
 	commitments "github.com/Layr-Labs/eigenda-proxy/commitments"
+	common "github.com/Layr-Labs/eigenda-proxy/common"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -50,18 +51,18 @@ func (mr *MockIManagerMockRecorder) Get(arg0, arg1, arg2 interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockIManager)(nil).Get), arg0, arg1, arg2)
 }
 
-// DisperseToV2 mocks base method.
-func (m *MockIManager) DisperseToV2() bool {
+// GetDispersalBackend mocks base method.
+func (m *MockIManager) GetDispersalBackend() common.EigenDABackend {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DisperseToV2")
-	ret0, _ := ret[0].(bool)
+	ret := m.ctrl.Call(m, "GetDispersalBackend")
+	ret0, _ := ret[0].(common.EigenDABackend)
 	return ret0
 }
 
-// DisperseToV2 indicates an expected call of DisperseToV2.
-func (mr *MockIManagerMockRecorder) DisperseToV2() *gomock.Call {
+// GetDispersalBackend indicates an expected call of GetDispersalBackend.
+func (mr *MockIManagerMockRecorder) GetDispersalBackend() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DisperseToV2", reflect.TypeOf((*MockIManager)(nil).DisperseToV2))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDispersalBackend", reflect.TypeOf((*MockIManager)(nil).GetDispersalBackend))
 }
 
 // Put mocks base method.
@@ -79,14 +80,14 @@ func (mr *MockIManagerMockRecorder) Put(arg0, arg1, arg2, arg3 interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockIManager)(nil).Put), arg0, arg1, arg2, arg3)
 }
 
-// SetDisperseToV2 mocks base method.
-func (m *MockIManager) SetDisperseToV2(arg0 bool) {
+// SetDispersalBackend mocks base method.
+func (m *MockIManager) SetDispersalBackend(arg0 common.EigenDABackend) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetDisperseToV2", arg0)
+	m.ctrl.Call(m, "SetDispersalBackend", arg0)
 }
 
-// SetDisperseToV2 indicates an expected call of SetDisperseToV2.
-func (mr *MockIManagerMockRecorder) SetDisperseToV2(arg0 interface{}) *gomock.Call {
+// SetDispersalBackend indicates an expected call of SetDispersalBackend.
+func (mr *MockIManagerMockRecorder) SetDispersalBackend(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDisperseToV2", reflect.TypeOf((*MockIManager)(nil).SetDisperseToV2), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDispersalBackend", reflect.TypeOf((*MockIManager)(nil).SetDispersalBackend), arg0)
 }

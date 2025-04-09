@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/commitments"
+	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/config"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/store"
@@ -140,9 +141,9 @@ func (svr *Server) Stop() error {
 	return nil
 }
 
-// SetDisperseToV2 configures which version of eigenDA the server disperses to
-func (svr *Server) SetDisperseToV2(disperseToV2 bool) {
-	svr.sm.SetDisperseToV2(disperseToV2)
+// SetDispersalBackend configures which version of eigenDA the server disperses to
+func (svr *Server) SetDispersalBackend(backend common.EigenDABackend) {
+	svr.sm.SetDispersalBackend(backend)
 }
 
 func (svr *Server) writeResponse(w http.ResponseWriter, data []byte) {
