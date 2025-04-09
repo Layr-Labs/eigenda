@@ -144,6 +144,11 @@ func setup(_ *testing.M) {
 		globalReservationTableName,
 		logger,
 	)
+	if err != nil {
+		teardown()
+		panic("failed to create offchain store")
+	}
+
 	leveldbStore, err := meterer.NewLevelDBOffchainStore(
 		"./testdata/meterer_test",
 		logger,
