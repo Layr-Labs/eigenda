@@ -234,7 +234,7 @@ func NewNode(
 	var storeV2 StoreV2
 	var blobVersionParams *corev2.BlobVersionParameterMap
 	var mt *meterer.Meterer
-	var authenticator = authv2.NewAuthenticator()
+	var authenticator = authv2.NewBlobRequestAuthenticator()
 	if config.EnableV2 {
 		v2Path := config.DbPath + "/chunk_v2"
 		dbV2, err := tablestore.Start(logger, &tablestore.Config{
@@ -279,7 +279,11 @@ func NewNode(
 
 		n.RelayClient.Store(relayClient)
 		// Create meterer
-		offchainStore, err := meterer.NewOffchainStore(config.AwsClientConfig, config.ReservationsTableName, config.OnDemandTableName, config.GlobalRateTableName, logger)
+		offchainStore, err := meterer.NewLevelDBOffchainStore(
+			//TODO: config.PaymentDBPath
+			"../testdata/node_main_test",
+			logger,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create offchain store: %w", err)
 		}
@@ -450,6 +454,11 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 			return ctx.Err()
 		}
 	}
+}
+
+// LoadOnchainState loads the onchain state of the node.
+func (n *Node) LoadOnchainState() *eth.OnchainState {
+	return n.onchainState.Load()
 }
 
 // ProcessBatch validates the batch is correct, stores data into the node's Store, and then returns a signature for the entire batch.
