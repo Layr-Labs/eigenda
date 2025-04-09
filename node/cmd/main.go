@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/pubip"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/urfave/cli"
@@ -111,7 +112,32 @@ func NodeMain(ctx *cli.Context) error {
 
 	var serverV2 *nodegrpc.ServerV2
 	if config.EnableV2 {
-		serverV2, err = nodegrpc.NewServerV2(context.Background(), config, node, logger, ratelimiter, reg, reader)
+		paymentChainState, err := meterer.NewOnchainPaymentState(context.Background(), reader, logger)
+		if err != nil {
+			return fmt.Errorf("failed to create onchain payment state: %w", err)
+		}
+		if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
+			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
+		}
+
+		offchainStore, err := meterer.NewLevelDBOffchainStore(
+			"../testdata/node_main_test",
+			logger,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create offchain store: %w", err)
+		}
+		mt := meterer.NewMeterer(
+			meterer.Config{
+				// add configs
+			},
+			paymentChainState,
+			offchainStore,
+			logger,
+		)
+		mt.Start(context.Background())
+
+		serverV2, err = nodegrpc.NewServerV2(context.Background(), config, node, logger, ratelimiter, mt, reg, reader)
 		if err != nil {
 			return fmt.Errorf("failed to create server v2: %v", err)
 		}

@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/core"
+	core "github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -428,3 +429,10 @@ const (
 	// different IDs).
 	MaxQuorumID = 254
 )
+
+type OnchainState struct {
+	QuorumCount           uint8
+	RequiredQuorums       []core.QuorumID
+	BlobVersionParameters *BlobVersionParameterMap
+	TTL                   time.Duration
+}
