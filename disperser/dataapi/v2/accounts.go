@@ -99,5 +99,6 @@ func (s *ServerV2) FetchAccountBlobFeed(c *gin.Context) {
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchAccountBlobFeed")
 	s.metrics.ObserveLatency("FetchAccountBlobFeed", time.Since(handlerStart))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBlobFeedAge))
 	c.JSON(http.StatusOK, response)
 }
