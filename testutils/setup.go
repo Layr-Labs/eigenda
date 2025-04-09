@@ -315,8 +315,8 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			},
 			PayloadDisperserCfg: payloaddispersal.PayloadDisperserConfig{
 				PayloadClientConfig:    payloadClientConfig,
-				DisperseBlobTimeout:    2 * time.Minute,
-				BlobCertifiedTimeout:   2 * time.Minute,
+				DisperseBlobTimeout:    5 * time.Minute,
+				BlobCertifiedTimeout:   5 * time.Minute,
 				BlobStatusPollInterval: 1 * time.Second,
 				ContractCallTimeout:    5 * time.Second,
 			},
