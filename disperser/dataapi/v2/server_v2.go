@@ -69,7 +69,7 @@ const (
 	maxBlobFeedAge      = 5
 	maxBatchFeedAge     = 5
 	maxDispersalFeedAge = 5
-	maxSigningInfoAge   = 15
+	maxSigningInfoAge   = 5
 )
 
 type (
