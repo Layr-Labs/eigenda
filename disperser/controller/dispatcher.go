@@ -136,7 +136,6 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 					if err != nil {
 						d.logger.Error("failed to handle signatures", "err", err)
 					}
-					close(sigChan)
 					cancel()
 				}()
 			}

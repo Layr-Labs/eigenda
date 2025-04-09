@@ -155,12 +155,12 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 	// Aggregate Signatures
 	numOperators := len(state.IndexedOperators)
 
-forEachReply:
 	for numReply := 0; numReply < numOperators; numReply++ {
 		var err error
 
 		var r SigningMessage
 
+		var contextExpired bool
 		select {
 		case r = <-messageChan:
 		case <-attestationCtx.Done():
@@ -168,7 +168,10 @@ forEachReply:
 			a.Logger.Errorf(
 				"global batch attestation time exceeded, no further signatures will be "+
 					"accepted for batch %x. Uncollected signature count: %d", message, remainingReplies)
-			break forEachReply
+			contextExpired = true
+		}
+		if contextExpired {
+			break
 		}
 
 		if seen := signerMap[r.Operator]; seen {
