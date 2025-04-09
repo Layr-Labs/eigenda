@@ -278,6 +278,7 @@ func NewDiskTable(
 		flushLoop:               fLoop,
 		garbageCollectionPeriod: config.GCPeriod,
 	}
+	cLoop.threadsafeHighestSegmentIndex.Store(highestSegmentIndex)
 	table.controlLoop = cLoop
 	cLoop.updateCurrentSize()
 	go cLoop.run()
