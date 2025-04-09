@@ -35,6 +35,12 @@ type controlLoop struct {
 	// The index of the highest numbered segment. All writes are applied to this segment.
 	highestSegmentIndex uint32
 
+	// This value mirrors highestSegmentIndex, but is thread safe to read from external goroutines.
+	// There are several unit tests that read this value, and so there needs to be a threadsafe way
+	// to access it. Since new segments are added on an infrequent basis and this is never read in
+	// production, maintaining this atomic variable has negligible overhead.
+	threadsafeHighestSegmentIndex atomic.Uint32
+
 	// segmentLock protects access to the segments map and highestSegmentIndex.
 	// Does not protect the segments themselves.
 	segmentLock sync.RWMutex
@@ -307,6 +313,7 @@ func (c *controlLoop) expandSegments() error {
 	}
 	c.segments[c.highestSegmentIndex].SetNextSegment(newSegment)
 	c.highestSegmentIndex++
+	c.threadsafeHighestSegmentIndex.Add(1)
 
 	c.segmentLock.Lock()
 	c.segments[c.highestSegmentIndex] = newSegment

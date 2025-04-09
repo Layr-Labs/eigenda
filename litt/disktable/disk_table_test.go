@@ -1898,7 +1898,7 @@ func checkShardsInSegments(
 
 // getLatestSegmentIndex returns the index of the latest segment in the table.
 func getLatestSegmentIndex(table litt.Table) uint32 {
-	return (table.(*DiskTable)).controlLoop.highestSegmentIndex
+	return (table.(*DiskTable)).controlLoop.threadsafeHighestSegmentIndex.Load()
 }
 
 func changingShardingFactorTest(t *testing.T, tableBuilder *tableBuilder) {
