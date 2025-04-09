@@ -40,13 +40,16 @@ The Core Ops multisig should call the following on the timelock.
     * DisperserRegistry
 
 ## Phase 3
-* Verify and test upgrades thoroughly during the timelock period.
+* Verify and test upgrades thoroughly during the timelock period
+* Execute timelock transactions.
+
+## Phase 4
 * Consider upgrading other contracts, refer to notes below.
 * Deploy periphery contracts like:
-    * OperatorStateRetriever
-    * CertVerifier
+    * OperatorStateRetriever 
+    * CertVerifier 
+* Merge old and new DA Proxy Admin
 
 ## Notes
 
 * The SocketRegistry is not the same implementation as on master at the time of writing. Upgrading would remove the migrateOperatorSockets function.
-* 
