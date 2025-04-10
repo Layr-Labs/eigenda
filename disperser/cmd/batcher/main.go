@@ -84,10 +84,6 @@ func RunBatcher(ctx *cli.Context) error {
 		return err
 	}
 
-	// TODO remove this log statement
-	logger.Errorf("attestation timeout: %v, batch attestation timeout: %v",
-		config.TimeoutConfig.AttestationTimeout, config.TimeoutConfig.BatchAttestationTimeout)
-
 	bucketName := config.BlobstoreConfig.BucketName
 	s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
 	if err != nil {
