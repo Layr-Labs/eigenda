@@ -74,7 +74,6 @@ GLOBAL OPTIONS:
    --eigenda.g1-path value           path to g1.point file. (default: "resources/g1.point") [$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G1_PATH]
    --eigenda.g2-path value           path to g2.point file. (default: "resources/g2.point") [$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_PATH]
    --eigenda.g2-path-trailing value  path to g2.trailing.point file. (default: "resources/g2.trailing.point") [$EIGENDA_PROXY_EIGENDA_TARGET_KZG_G2_TRAILING_PATH]
-   --eigenda.read-g2-points          Whether to read in G2 SRS points. (default: false) [$EIGENDA_PROXY_EIGENDA_READ_G2_POINTS]
 
    Logging
 

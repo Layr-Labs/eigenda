@@ -299,7 +299,6 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			G1Path:          "../resources/g1.point",
 			G2Path:          "../resources/g2.point",
 			G2TrailingPath:  "../resources/g2.trailing.point",
-			LoadG2Points:    true,
 			CacheDir:        "../resources/SRSTables",
 			SRSOrder:        eigendaflags.SrsOrder,
 			SRSNumberToLoad: maxBlobLengthBytes / 32,

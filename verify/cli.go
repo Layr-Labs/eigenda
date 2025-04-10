@@ -19,7 +19,6 @@ var (
 	G2PowerOf2PathFlagNameDeprecated = withFlagPrefix("g2-power-of-2-path")
 	G2PathFlagName                   = withFlagPrefix("g2-path")
 	G2TrailingPathFlagName           = withFlagPrefix("g2-path-trailing")
-	ReadG2PointsFlagName             = withFlagPrefix("read-g2-points")
 	CachePathFlagName                = withFlagPrefix("cache-path")
 )
 
@@ -87,13 +86,6 @@ func KZGCLIFlags(envPrefix, category string) []cli.Flag {
 			Value:    "resources/g2.trailing.point",
 			Category: category,
 		},
-		&cli.BoolFlag{
-			Name:     ReadG2PointsFlagName,
-			Usage:    "Whether to read in G2 SRS points.",
-			EnvVars:  []string{withEnvPrefix(envPrefix, "READ_G2_POINTS")},
-			Value:    false,
-			Category: category,
-		},
 		&cli.StringFlag{
 			Name:     CachePathFlagName,
 			Usage:    "path to SRS tables for caching. This resource is not currently used, but needed because of the shared eigenda KZG library that we use. We will eventually fix this.",
@@ -109,11 +101,13 @@ func ReadKzgConfig(ctx *cli.Context, maxBlobSizeBytes uint64) kzg.KzgConfig {
 		G1Path:          ctx.String(G1PathFlagName),
 		G2Path:          ctx.String(G2PathFlagName),
 		G2TrailingPath:  ctx.String(G2TrailingPathFlagName),
-		LoadG2Points:    ctx.Bool(ReadG2PointsFlagName),
 		CacheDir:        ctx.String(CachePathFlagName),
 		SRSOrder:        eigendaflags.SrsOrder,
 		SRSNumberToLoad: maxBlobSizeBytes / 32,         // # of fr.Elements
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)), // #nosec G115
+		// we are intentionally not setting the `LoadG2Points` field here. `LoadG2Points` has different requirements
+		// for v1 vs v2. To make things foolproof, we just set this value locally prior to use, so that it can't
+		// ever be set incorrectly.
 	}
 }
 

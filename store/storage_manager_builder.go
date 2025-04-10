@@ -193,9 +193,14 @@ func (smb *StorageManagerBuilder) buildSecondaries(
 
 // buildEigenDAV2Backend ... Builds EigenDA V2 storage backend
 func (smb *StorageManagerBuilder) buildEigenDAV2Backend(ctx context.Context) (common.GeneratedKeyStore, error) {
-	// TODO: Figure out how to better manage the v1 verifier
-	//  may make sense to live in some global kzg config that's passed down across EigenDA versions
-	kzgProver, err := prover.NewProver(&smb.kzgConfig, nil)
+	// This is a bit of a hack. The kzg config is used by both v1 AND v2, but the `LoadG2Points` field has special
+	// requirements. For v1, it must always be false. For v2, it must always be true. Ideally, we would modify
+	// the underlying core library to be more flexible, but that is a larger change for another time. As a stopgap, we
+	// simply set this value to whatever it needs to be prior to using it.
+	config := smb.kzgConfig
+	config.LoadG2Points = true
+
+	kzgProver, err := prover.NewProver(&config, nil)
 	if err != nil {
 		return nil, fmt.Errorf("new KZG prover: %w", err)
 	}
