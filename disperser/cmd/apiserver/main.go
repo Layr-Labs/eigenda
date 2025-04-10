@@ -111,11 +111,8 @@ func RunDisperserServer(ctx *cli.Context) error {
 			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
 		}
 
-		offchainStore, err := mt.NewOffchainStore(
-			config.AwsClientConfig,
-			config.ReservationsTableName,
-			config.OnDemandTableName,
-			config.GlobalRateTableName,
+		offchainStore, err := mt.NewLevelDBOffchainStore(
+			config.PaymentDBPath,
 			logger,
 		)
 		if err != nil {
