@@ -105,6 +105,7 @@ var (
 		Usage:    "connection timeout from grpc call to DA nodes for batch attestation",
 		Required: false,
 		Value:    25 * time.Second,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BATCH_ATTESTATION_TIMEOUT"),
 	}
 	ChainReadTimeoutFlag = cli.DurationFlag{
 		Name:     "chain-read-timeout",
