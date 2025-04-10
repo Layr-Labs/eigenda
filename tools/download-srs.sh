@@ -148,7 +148,7 @@ function download_srs_files() {
     # Generate the hash file
     {
         echo "# SRS files hashes for blob size ${size_bytes} bytes"
-        echo "# Generated on $(date)"
+        echo "# Generated on $(date -u "+%Y-%m-%d %H:%M:%S UTC")"
         echo "# Format: SHA256 (filename)"
         echo ""
         sha256sum "${output_dir}/g1.point" | sed "s|${output_dir}/||"
