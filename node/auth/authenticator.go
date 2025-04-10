@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -47,8 +48,8 @@ type requestAuthenticator struct {
 	// reloaded from the chain state in case the key has been changed.
 	keyTimeoutDuration time.Duration
 
-	// disperserIDFilter is a function that returns true if the given disperser ID is valid.
-	disperserIDFilter func(uint32) bool
+	// disperserBlacklist is a list of disperser ID that has been blacklisted by the validator node
+	disperserBlacklist []uint32
 }
 
 // NewRequestAuthenticator creates a new RequestAuthenticator.
@@ -57,7 +58,7 @@ func NewRequestAuthenticator(
 	chainReader core.Reader,
 	keyCacheSize int,
 	keyTimeoutDuration time.Duration,
-	disperserIDFilter func(uint32) bool,
+	disperserBlacklist []uint32,
 	now time.Time) (RequestAuthenticator, error) {
 
 	keyCache, err := lru.New[uint32, *keyWithTimeout](keyCacheSize)
@@ -69,7 +70,7 @@ func NewRequestAuthenticator(
 		chainReader:        chainReader,
 		keyCache:           keyCache,
 		keyTimeoutDuration: keyTimeoutDuration,
-		disperserIDFilter:  disperserIDFilter,
+		disperserBlacklist: disperserBlacklist,
 	}
 
 	err = authenticator.preloadCache(ctx, now)
@@ -114,9 +115,10 @@ func (a *requestAuthenticator) getDisperserKey(
 	now time.Time,
 	disperserID uint32) (*gethcommon.Address, error) {
 
-	// if !a.disperserIDFilter(disperserID) {
-	// 	return nil, fmt.Errorf("invalid disperser ID: %d", disperserID)
-	// }
+	// Check if the disperser ID is blacklisted
+	if slices.Contains(a.disperserBlacklist, disperserID) {
+		return nil, fmt.Errorf("blacklisted disperser ID: %d", disperserID)
+	}
 
 	key, ok := a.keyCache.Get(disperserID)
 	if ok {
@@ -129,6 +131,7 @@ func (a *requestAuthenticator) getDisperserKey(
 	address, err := a.chainReader.GetDisperserAddress(ctx, disperserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get disperser address: %w", err)
+		// if the IP address of the request consistently sends key that are not found, add it to blacklist
 	}
 
 	a.keyCache.Add(disperserID, &keyWithTimeout{
@@ -138,3 +141,34 @@ func (a *requestAuthenticator) getDisperserKey(
 
 	return &address, nil
 }
+
+// // refreshCache refreshes all existing disperser keys in the cache.
+// // It gathers all keys first, then makes a single multi-read call to the chain reader,
+// // and finally repopulates the cache with the fresh values.
+// func (a *requestAuthenticator) refreshCache(ctx context.Context, now time.Time) error {
+// 	// Get all existing disperser IDs from the cache
+// 	disperserIDs := make([]uint32, 0)
+// 	for _, id := range a.keyCache.Keys() {
+// 		disperserIDs = append(disperserIDs, id)
+// 	}
+
+// 	if len(disperserIDs) == 0 {
+// 		return nil
+// 	}
+
+// 	// Get all keys in a single call
+// 	keys, err := a.chainReader.GetDisperserAddresses(ctx, disperserIDs)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to get disperser keys: %w", err)
+// 	}
+
+// 	// Repopulate the cache with fresh values
+// 	for i, id := range disperserIDs {
+// 		a.keyCache.Add(id, &keyWithTimeout{
+// 			key:        keys[i],
+// 			expiration: now.Add(a.keyTimeoutDuration),
+// 		})
+// 	}
+
+// 	return nil
+// }

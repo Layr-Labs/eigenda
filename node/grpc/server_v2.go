@@ -52,21 +52,20 @@ func NewServerV2(
 		return nil, err
 	}
 
-	var authenticator auth.RequestAuthenticator
-	if !config.DisableDispersalAuthentication {
-		authenticator, err = auth.NewRequestAuthenticator(
-			ctx,
-			reader,
-			config.DispersalAuthenticationKeyCacheSize,
-			config.DisperserKeyTimeout,
-			func(id uint32) bool {
-				return id == api.EigenLabsDisperserID
-			},
-			time.Now())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create authenticator: %w", err)
-		}
+	//Q: Why would a validator node disable validate the request?
+	// var authenticator auth.RequestAuthenticator
+	// if !config.DisableDispersalAuthentication {
+	authenticator, err := auth.NewRequestAuthenticator(
+		ctx,
+		reader,
+		config.DispersalAuthenticationKeyCacheSize,
+		config.DisperserKeyTimeout,
+		[]uint32{},
+		time.Now())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create authenticator: %w", err)
 	}
+	// }
 
 	replayGuardian := replay.NewReplayGuardian(
 		time.Now,
@@ -121,7 +120,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 
 	// Validate the request parameters (which is cheap) before starting any further
 	// processing of the request.
-	batch, err := s.validateStoreChunksRequest(in)
+	batch, err := s.validateStoreChunksRequest(ctx, in)
 	if err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate store chunk request: %v", err))
 	}
@@ -129,19 +128,6 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	batchHeaderHash, err := batch.BatchHeader.Hash()
 	if err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to serialize batch header hash: %v", err))
-	}
-
-	if s.authenticator != nil {
-		hash, err := s.authenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
-		if err != nil {
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
-		}
-
-		timestamp := time.Unix(int64(in.Timestamp), 0)
-		err = s.replayGuardian.VerifyRequest(hash, timestamp)
-		if err != nil {
-			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
-		}
 	}
 
 	s.logger.Info("new StoreChunks request", "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]), "numBlobs", len(batch.BlobCertificates), "referenceBlockNumber", batch.BatchHeader.ReferenceBlockNumber)
@@ -212,7 +198,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 }
 
 // validateStoreChunksRequest validates the StoreChunksRequest and returns deserialized batch in the request
-func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*corev2.Batch, error) {
+func (s *ServerV2) validateStoreChunksRequest(ctx context.Context, req *pb.StoreChunksRequest) (*corev2.Batch, error) {
 	// The signature is created by go-ethereum library, which contains 1 additional byte (for
 	// recovering the public key from signature), so it's 65 bytes.
 	if len(req.GetSignature()) != 65 {
@@ -227,6 +213,17 @@ func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*core
 	batch, err := corev2.BatchFromProtobuf(req.GetBatch())
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize batch: %v", err)
+	}
+
+	hash, err := s.authenticator.AuthenticateStoreChunksRequest(ctx, req, time.Now())
+	if err != nil {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
+	}
+
+	timestamp := time.Unix(int64(req.Timestamp), 0)
+	err = s.replayGuardian.VerifyRequest(hash, timestamp)
+	if err != nil {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
 	}
 
 	// check if the batch contains a on-demand dispersal request; require disperser ID to be EigenLabsDisperserID
