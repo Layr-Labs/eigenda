@@ -89,12 +89,8 @@ func GetClient(configPath string) (*TestClient, error) {
 	if len(clientMap) == 0 {
 		// do one time setup
 
-		var loggerConfig common.LoggerConfig
-		if os.Getenv("CI") != "" {
-			loggerConfig = common.DefaultLoggerConfig()
-		} else {
-			loggerConfig = common.DefaultConsoleLoggerConfig()
-		}
+		// TODO (cody.littley): add a setting to enable colored logging
+		loggerConfig := common.DefaultTextLoggerConfig()
 
 		logger, err = common.NewLogger(loggerConfig)
 		if err != nil {
