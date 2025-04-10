@@ -1,10 +1,11 @@
 package cache
 
 import (
+	"testing"
+
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
-	"testing"
 )
 
 func TestExpirationOrder(t *testing.T) {
