@@ -108,10 +108,11 @@ func (r *retrievalClient) GetBlob(
 	chunksChan := make(chan clients.RetrievedChunks, len(operators))
 	pool := workerpool.New(r.numConnections)
 	for opID := range operators {
-		opID := opID
-		opInfo := operatorState.Operators[quorumID][opID]
+		// make sure the value doesn't change before being submitted to the pool
+		boundOperatorId := opID
+		opInfo := operatorState.Operators[quorumID][boundOperatorId]
 		pool.Submit(func() {
-			r.getChunksFromOperator(ctx, opID, opInfo, blobKey, quorumID, chunksChan)
+			r.getChunksFromOperator(ctx, boundOperatorId, opInfo, blobKey, quorumID, chunksChan)
 		})
 	}
 
