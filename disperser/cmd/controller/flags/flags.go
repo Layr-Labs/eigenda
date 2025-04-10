@@ -124,11 +124,17 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPATCHER_PULL_INTERVAL"),
 	}
-	NodeRequestTimeoutFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "node-request-timeout"),
+	AttestationTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "attestation-timeout"),
 		Usage:    "Timeout for node requests",
 		Required: true,
-		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NODE_REQUEST_TIMEOUT"),
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ATTESTATION_TIMEOUT"),
+	}
+	BatchAttestationTimeoutFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "batch-attestation-timeout"),
+		Usage:    "Timeout for batch attestation requests",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BATCH_ATTESTATION_TIMEOUT"),
 	}
 	FinalizationBlockDelayFlag = cli.Uint64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "finalization-block-delay"),
@@ -196,7 +202,8 @@ var requiredFlags = []cli.Flag{
 	EncoderAddressFlag,
 
 	DispatcherPullIntervalFlag,
-	NodeRequestTimeoutFlag,
+	AttestationTimeoutFlag,
+	BatchAttestationTimeoutFlag,
 }
 
 var optionalFlags = []cli.Flag{
