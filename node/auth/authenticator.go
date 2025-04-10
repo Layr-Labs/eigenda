@@ -81,7 +81,7 @@ func NewRequestAuthenticator(
 }
 
 func (a *requestAuthenticator) preloadCache(ctx context.Context, now time.Time) error {
-	// this will need to be updated for decentralized dispersers
+	// Populate the cache with the EigenLabs disperser ID; other disperser IDs will be added as they are encountered.
 	_, err := a.getDisperserKey(ctx, now, api.EigenLabsDisperserID)
 	if err != nil {
 		return fmt.Errorf("failed to get operator key: %w", err)
@@ -114,9 +114,9 @@ func (a *requestAuthenticator) getDisperserKey(
 	now time.Time,
 	disperserID uint32) (*gethcommon.Address, error) {
 
-	if !a.disperserIDFilter(disperserID) {
-		return nil, fmt.Errorf("invalid disperser ID: %d", disperserID)
-	}
+	// if !a.disperserIDFilter(disperserID) {
+	// 	return nil, fmt.Errorf("invalid disperser ID: %d", disperserID)
+	// }
 
 	key, ok := a.keyCache.Get(disperserID)
 	if ok {

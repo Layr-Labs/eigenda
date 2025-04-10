@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"runtime"
 	"time"
 
@@ -226,6 +227,15 @@ func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*core
 	batch, err := corev2.BatchFromProtobuf(req.GetBatch())
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize batch: %v", err)
+	}
+
+	// check if the batch contains a on-demand dispersal request; require disperser ID to be EigenLabsDisperserID
+	for _, blobCertificate := range batch.BlobCertificates {
+		if blobCertificate.BlobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) != 0 {
+			if req.DisperserID != api.EigenLabsDisperserID {
+				return nil, fmt.Errorf("on-demand dispersal is not supported for non-EigenLabs dispersers")
+			}
+		}
 	}
 
 	return batch, nil

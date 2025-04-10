@@ -85,7 +85,9 @@ type Node struct {
 
 	// BlobVersionParams is a map of blob version parameters loaded from the chain.
 	// It is used to determine blob parameters based on the version number.
-	BlobVersionParams atomic.Pointer[corev2.BlobVersionParameterMap]
+	BlobVersionParams       atomic.Pointer[corev2.BlobVersionParameterMap]
+	DisperserAddresses      atomic.Pointer[map[uint32]gethcommon.Address]
+	BlacklistedDisperserIDs atomic.Pointer[[]uint32]
 }
 
 // NewNode creates a new Node with the provided config.
@@ -415,6 +417,27 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 				}
 			} else {
 				n.Logger.Error("error fetching blob params", "err", err)
+			}
+			// load the current disperser IDs, then refresh the disperser addresses
+			disperserAddresses := n.DisperserAddresses.Load()
+			disperserIDs := make([]uint32, 0, len(*disperserAddresses))
+			for id := range *disperserAddresses {
+				disperserIDs = append(disperserIDs, id)
+			}
+			if err == nil {
+				disperserAddresses, err := n.Transactor.GetDisperserAddresses(ctx, disperserIDs)
+				if err == nil {
+					// Convert the addresses array into a map
+					addressMap := make(map[uint32]gethcommon.Address)
+					for i, id := range disperserIDs {
+						addressMap[id] = disperserAddresses[i]
+					}
+					n.DisperserAddresses.Store(&addressMap)
+				} else {
+					n.Logger.Error("error fetching disperser addresses", "err", err)
+				}
+			} else {
+				n.Logger.Error("error fetching disperser IDs", "err", err)
 			}
 		case <-ctx.Done():
 			return ctx.Err()
