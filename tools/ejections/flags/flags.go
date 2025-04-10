@@ -59,6 +59,38 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
+	DataAPIURLFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "dataapi-url"),
+		Required: true,
+		Usage:    "Base URL for dataapi (i.e. \"https://dataapi.eigenda.xyz/\" for mainnet)",
+		EnvVar:   common.PrefixEnvVar(envPrefix, "DATAAPI_URL"),
+	}
+	EvalFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eval"),
+		Usage:    "Evaluate current operator signing rates",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "EVAL"),
+	}
+	NonsigningRateThresholdFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "nonsigning-rate-threshold"),
+		Usage:    "Nonsigning rate threshold for ejection evaluation",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "NONSIGNING_RATE_THRESHOLD"),
+		Value:    -1,
+	}
+	EvalIntervalFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eval-interval"),
+		Usage:    "Interval in seconds for ejection evaluation (default 86400)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "EVAL_INTERVAL"),
+		Value:    86400,
+	}
+	EvalV2Flag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "eval-v2"),
+		Usage:    "Evaluate current operator signing rates using v2 dataapi",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "EVAL_V2"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -72,6 +104,11 @@ var optionalFlags = []cli.Flag{
 	DaysFlag,
 	FirstFlag,
 	SkipFlag,
+	DataAPIURLFlag,
+	EvalFlag,
+	EvalV2Flag,
+	EvalIntervalFlag,
+	NonsigningRateThresholdFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
