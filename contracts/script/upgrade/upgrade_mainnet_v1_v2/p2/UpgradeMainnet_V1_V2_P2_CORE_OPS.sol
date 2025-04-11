@@ -25,7 +25,7 @@ contract UpgradeMainnet_V1_V2_P2_CORE_OPS is Script {
         InitParams memory initParams = _initParams();
 
         vm.startBroadcast(initParams.coreOpsMsig);
-        
+
         Ownable(initParams.ejectionManager).transferOwnership(initParams.daOpsMsig);
         Ownable(initParams.registryCoordinator).transferOwnership(initParams.daOpsMsig);
         Ownable(initParams.serviceManager).transferOwnership(initParams.daOpsMsig);

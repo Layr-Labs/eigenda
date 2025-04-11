@@ -23,7 +23,7 @@ contract UpgradeMainnet_V1_V2_P2_EXECUTOR is Script {
         InitParams memory initParams = _initParams();
 
         vm.startBroadcast(initParams.executorMsig);
-        
+
         Ownable(initParams.daProxyAdmin).transferOwnership(initParams.daOpsMsig);
 
         vm.stopBroadcast();
