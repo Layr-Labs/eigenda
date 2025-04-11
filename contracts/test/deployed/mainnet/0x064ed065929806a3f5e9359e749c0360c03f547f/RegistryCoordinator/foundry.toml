@@ -1,0 +1,39 @@
+[profile.default]
+# Source directory
+src = 'lib'
+# Output directory for artifacts
+out = 'out'
+# Libraries directory
+libs = ['lib']
+
+# Compiler settings
+optimizer = true
+optimizer_runs = 200
+evm_version = 'london'
+via_ir = false
+
+# Metadata settings
+bytecode_hash = 'ipfs'
+use_literal_content = false
+
+# Remappings section
+remappings = [
+    "@openzeppelin/=node_modules/@openzeppelin/",
+    "@openzeppelin-upgrades-v4.9.0/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable-v4.9.0/",
+    "@openzeppelin-upgrades/=lib/eigenlayer-middleware/lib/openzeppelin-contracts-upgradeable/",
+    "@openzeppelin-v4.9.0/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/",
+    "ds-test/=lib/eigenlayer-middleware/lib/ds-test/src/",
+    "eigenlayer-contracts/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/",
+    "eigenlayer-middleware/=lib/eigenlayer-middleware/",
+    "erc4626-tests/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable-v4.9.0/lib/erc4626-tests/",
+    "forge-std/=lib/forge-std/src/",
+    "openzeppelin-contracts-upgradeable-v4.9.0/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable-v4.9.0/",
+    "openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/",
+    "openzeppelin-contracts-v4.9.0/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/",
+    "openzeppelin-contracts/=lib/openzeppelin-contracts/",
+    "openzeppelin/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable-v4.9.0/contracts/",
+    "zeus-templates/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/lib/zeus-templates/src/"
+]
+
+# Build info for output selection
+build_info = true
