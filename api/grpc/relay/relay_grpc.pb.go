@@ -4,8 +4,6 @@
 // - protoc             v4.23.4
 // source: relay/relay.proto
 
-// buf:lint:ignore PACKAGE_VERSION_SUFFIX // Skip this rule to not create a breaking change.
-
 package relay
 
 import (
@@ -30,14 +28,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type RelayClient interface {
 	// GetBlob retrieves a blob stored by the relay.
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	GetBlob(ctx context.Context, in *GetBlobRequest, opts ...grpc.CallOption) (*GetBlobReply, error)
 	// GetChunks retrieves chunks from blobs stored by the relay.
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	GetChunks(ctx context.Context, in *GetChunksRequest, opts ...grpc.CallOption) (*GetChunksReply, error)
 }
 
@@ -72,14 +64,8 @@ func (c *relayClient) GetChunks(ctx context.Context, in *GetChunksRequest, opts 
 // for forward compatibility
 type RelayServer interface {
 	// GetBlob retrieves a blob stored by the relay.
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	GetBlob(context.Context, *GetBlobRequest) (*GetBlobReply, error)
 	// GetChunks retrieves chunks from blobs stored by the relay.
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	GetChunks(context.Context, *GetChunksRequest) (*GetChunksReply, error)
 	mustEmbedUnimplementedRelayServer()
 }

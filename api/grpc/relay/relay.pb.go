@@ -4,8 +4,6 @@
 // 	protoc        v4.23.4
 // source: relay/relay.proto
 
-// buf:lint:ignore PACKAGE_VERSION_SUFFIX // Skip this rule to not create a breaking change.
-
 package relay
 
 import (

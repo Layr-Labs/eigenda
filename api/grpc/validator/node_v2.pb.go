@@ -4,8 +4,6 @@
 // 	protoc        v4.23.4
 // source: validator/node_v2.proto
 
-// buf:lint:ignore PACKAGE_VERSION_SUFFIX // Skip this rule to not create a breaking change.
-
 package validator
 
 import (
@@ -30,8 +28,6 @@ type ChunkEncodingFormat int32
 const (
 	// A valid response should never use this value.
 	// If encountered, the client should treat it as an error.
-	// buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
-	// buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX // Skip this rule to not create a breaking change.
 	ChunkEncodingFormat_UNKNOWN ChunkEncodingFormat = 0
 	// A chunk encoded in GNARK has the following format:
 	//
@@ -52,8 +48,6 @@ const (
 	// - Frame.SerializeGnark()
 	// - Frame.DeserializeGnark()
 	// Package: github.com/Layr-Labs/eigenda/encoding
-	//
-	// buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
 	ChunkEncodingFormat_GNARK ChunkEncodingFormat = 1
 )
 
@@ -105,7 +99,6 @@ type StoreChunksRequest struct {
 	// batch of blobs to store
 	Batch *v2.Batch `protobuf:"bytes,1,opt,name=batch,proto3" json:"batch,omitempty"`
 	// ID of the disperser that is requesting the storage of the batch.
-	// buf:lint:ignore FIELD_LOWER_SNAKE_CASE // Skip this rule to not create a breaking change.
 	DisperserID uint32 `protobuf:"varint,2,opt,name=disperserID,proto3" json:"disperserID,omitempty"`
 	// Timestamp of the request in seconds since the Unix epoch. If too far out of sync with the server's clock,
 	// request may be rejected.

@@ -4,8 +4,6 @@
 // - protoc             v4.23.4
 // source: disperser/disperser.proto
 
-// buf:lint:ignore PACKAGE_VERSION_SUFFIX // Skip this rule to not create a breaking change.
-
 package disperser
 
 import (
@@ -43,9 +41,6 @@ type DisperserClient interface {
 	//	user should retry after the specified duration.
 	//
 	// INTERNAL (500): serious error, user should NOT retry.
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	DisperseBlob(ctx context.Context, in *DisperseBlobRequest, opts ...grpc.CallOption) (*DisperseBlobReply, error)
 	// DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the
 	// client to authenticate itself via the AuthenticationData message. The protocol is as follows:
@@ -55,14 +50,8 @@ type DisperserClient interface {
 	//  3. The client verifies the BlobAuthHeader and sends back the signed BlobAuthHeader in an
 	//     AuthenticationData message.
 	//  4. The Disperser verifies the signature and returns a DisperseBlobReply message.
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	DisperseBlobAuthenticated(ctx context.Context, opts ...grpc.CallOption) (Disperser_DisperseBlobAuthenticatedClient, error)
 	// This API is meant to be polled for the blob status.
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	GetBlobStatus(ctx context.Context, in *BlobStatusRequest, opts ...grpc.CallOption) (*BlobStatusReply, error)
 	// This retrieves the requested blob from the Disperser's backend.
 	// This is a more efficient way to retrieve blobs than directly retrieving
@@ -70,9 +59,6 @@ type DisperserClient interface {
 	// api/proto/retriever/retriever.proto).
 	// The blob should have been initially dispersed via this Disperser service
 	// for this API to work.
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	RetrieveBlob(ctx context.Context, in *RetrieveBlobRequest, opts ...grpc.CallOption) (*RetrieveBlobReply, error)
 }
 
@@ -158,9 +144,6 @@ type DisperserServer interface {
 	//	user should retry after the specified duration.
 	//
 	// INTERNAL (500): serious error, user should NOT retry.
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	DisperseBlob(context.Context, *DisperseBlobRequest) (*DisperseBlobReply, error)
 	// DisperseBlobAuthenticated is similar to DisperseBlob, except that it requires the
 	// client to authenticate itself via the AuthenticationData message. The protocol is as follows:
@@ -170,14 +153,8 @@ type DisperserServer interface {
 	//  3. The client verifies the BlobAuthHeader and sends back the signed BlobAuthHeader in an
 	//     AuthenticationData message.
 	//  4. The Disperser verifies the signature and returns a DisperseBlobReply message.
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	DisperseBlobAuthenticated(Disperser_DisperseBlobAuthenticatedServer) error
 	// This API is meant to be polled for the blob status.
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	GetBlobStatus(context.Context, *BlobStatusRequest) (*BlobStatusReply, error)
 	// This retrieves the requested blob from the Disperser's backend.
 	// This is a more efficient way to retrieve blobs than directly retrieving
@@ -185,9 +162,6 @@ type DisperserServer interface {
 	// api/proto/retriever/retriever.proto).
 	// The blob should have been initially dispersed via this Disperser service
 	// for this API to work.
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	RetrieveBlob(context.Context, *RetrieveBlobRequest) (*RetrieveBlobReply, error)
 	mustEmbedUnimplementedDisperserServer()
 }

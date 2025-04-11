@@ -4,10 +4,6 @@
 // - protoc             v4.23.4
 // source: churner/churner.proto
 
-// Skip this rule for this package name. Changing name creates a breaking change.
-// See https://buf.build/docs/lint/overview/#comment-ignores
-// buf:lint:ignore PACKAGE_VERSION_SUFFIX
-
 package churner
 
 import (
@@ -30,7 +26,6 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ChurnerClient interface {
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	Churn(ctx context.Context, in *ChurnRequest, opts ...grpc.CallOption) (*ChurnReply, error)
 }
 
@@ -55,7 +50,6 @@ func (c *churnerClient) Churn(ctx context.Context, in *ChurnRequest, opts ...grp
 // All implementations must embed UnimplementedChurnerServer
 // for forward compatibility
 type ChurnerServer interface {
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	Churn(context.Context, *ChurnRequest) (*ChurnReply, error)
 	mustEmbedUnimplementedChurnerServer()
 }

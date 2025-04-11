@@ -112,7 +112,7 @@ Request that the Node store a batch of chunks.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | batch | [common.v2.Batch](#common-v2-Batch) |  | batch of blobs to store |
-| disperserID | [uint32](#uint32) |  | ID of the disperser that is requesting the storage of the batch. buf:lint:ignore FIELD_LOWER_SNAKE_CASE // Skip this rule to not create a breaking change. |
+| disperserID | [uint32](#uint32) |  | ID of the disperser that is requesting the storage of the batch. |
 | timestamp | [uint32](#uint32) |  | Timestamp of the request in seconds since the Unix epoch. If too far out of sync with the server&#39;s clock, request may be rejected. |
 | signature | [bytes](#bytes) |  | Signature using the disperser&#39;s ECDSA key over keccak hash of the batch. The purpose of this signature is to prevent hooligans from tricking validators into storing data that they shouldn&#39;t be storing.
 
@@ -137,7 +137,7 @@ Used to facilitate the decoding of chunks.
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
-| UNKNOWN | 0 | A valid response should never use this value. If encountered, the client should treat it as an error. buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX // Skip this rule to not create a breaking change. |
+| UNKNOWN | 0 | A valid response should never use this value. If encountered, the client should treat it as an error. |
 | GNARK | 1 | A chunk encoded in GNARK has the following format:
 
 [KZG proof: 32 bytes] [Coeff 1: 32 bytes] [Coeff 2: 32 bytes] ... [Coeff n: 32 bytes]
@@ -146,9 +146,7 @@ The KZG proof is a point on G1 and is serialized with bn254.G1Affine.Bytes(). Th
 
 References: - bn254.G1Affine: github.com/consensys/gnark-crypto/ecc/bn254 - fr.Element: github.com/consensys/gnark-crypto/ecc/bn254/fr
 
-Golang serialization and deserialization can be found in: - Frame.SerializeGnark() - Frame.DeserializeGnark() Package: github.com/Layr-Labs/eigenda/encoding
-
-buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change. |
+Golang serialization and deserialization can be found in: - Frame.SerializeGnark() - Frame.DeserializeGnark() Package: github.com/Layr-Labs/eigenda/encoding |
 
 
  
@@ -161,16 +159,10 @@ buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking cha
 ### Dispersal
 Dispersal is utilized to disperse chunk data.
 
-buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
-
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| StoreChunks | [StoreChunksRequest](#validator-StoreChunksRequest) | [StoreChunksReply](#validator-StoreChunksReply) | StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator either acquires the chunks or the validator determines that it is unable to acquire the chunks. If the validator is able to acquire and validate the chunks, it returns a signature over the batch header. This RPC describes which chunks the validator should store but does not contain that chunk data. The validator is expected to fetch the chunk data from one of the relays that is in possession of the chunk.
-
-buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
-| GetNodeInfo | [GetNodeInfoRequest](#validator-GetNodeInfoRequest) | [GetNodeInfoReply](#validator-GetNodeInfoReply) | GetNodeInfo fetches metadata about the node.
-
-buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change. |
+| StoreChunks | [StoreChunksRequest](#validator-StoreChunksRequest) | [StoreChunksReply](#validator-StoreChunksReply) | StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator either acquires the chunks or the validator determines that it is unable to acquire the chunks. If the validator is able to acquire and validate the chunks, it returns a signature over the batch header. This RPC describes which chunks the validator should store but does not contain that chunk data. The validator is expected to fetch the chunk data from one of the relays that is in possession of the chunk. |
+| GetNodeInfo | [GetNodeInfoRequest](#validator-GetNodeInfoRequest) | [GetNodeInfoReply](#validator-GetNodeInfoReply) | GetNodeInfo fetches metadata about the node. |
 
 
 <a name="validator-Retrieval"></a>
@@ -178,16 +170,10 @@ buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a bre
 ### Retrieval
 Retrieval is utilized to retrieve chunk data.
 
-buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
-
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| GetChunks | [GetChunksRequest](#validator-GetChunksRequest) | [GetChunksReply](#validator-GetChunksReply) | GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally faster to retrieve chunks from the relay service if that service is available.
-
-buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
-| GetNodeInfo | [GetNodeInfoRequest](#validator-GetNodeInfoRequest) | [GetNodeInfoReply](#validator-GetNodeInfoReply) | Retrieve node info metadata
-
-buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change. |
+| GetChunks | [GetChunksRequest](#validator-GetChunksRequest) | [GetChunksReply](#validator-GetChunksReply) | GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally faster to retrieve chunks from the relay service if that service is available. |
+| GetNodeInfo | [GetNodeInfoRequest](#validator-GetNodeInfoRequest) | [GetNodeInfoReply](#validator-GetNodeInfoReply) | Retrieve node info metadata |
 
  
 

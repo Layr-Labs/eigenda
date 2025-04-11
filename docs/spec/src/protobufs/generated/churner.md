@@ -114,11 +114,9 @@ The max number of operators, as well as the rules to make churn decisions, are
 defined onchain, see details in OperatorSetParam at:
 https://github.com/Layr-Labs/eigenlayer-middleware/blob/master/src/interfaces/IBLSRegistryCoordinatorWithIndices.sol#L24.
 
-buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
-
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| Churn | [ChurnRequest](#churner-ChurnRequest) | [ChurnReply](#churner-ChurnReply) | buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change. |
+| Churn | [ChurnRequest](#churner-ChurnRequest) | [ChurnReply](#churner-ChurnReply) |  |
 
  
 

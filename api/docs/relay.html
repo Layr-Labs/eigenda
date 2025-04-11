@@ -480,7 +480,7 @@ Perform a keccak256 hash on the following data in the following order:
 
       
         <h3 id="relay.Relay">Relay</h3>
-        <p>Relay is a service that provides access to public relay functionality.</p><p>buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.</p>
+        <p>Relay is a service that provides access to public relay functionality.</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -491,20 +491,14 @@ Perform a keccak256 hash on the following data in the following order:
                 <td>GetBlob</td>
                 <td><a href="#relay.GetBlobRequest">GetBlobRequest</a></td>
                 <td><a href="#relay.GetBlobReply">GetBlobReply</a></td>
-                <td><p>GetBlob retrieves a blob stored by the relay.
-
-buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.</p></td>
+                <td><p>GetBlob retrieves a blob stored by the relay.</p></td>
               </tr>
             
               <tr>
                 <td>GetChunks</td>
                 <td><a href="#relay.GetChunksRequest">GetChunksRequest</a></td>
                 <td><a href="#relay.GetChunksReply">GetChunksReply</a></td>
-                <td><p>GetChunks retrieves chunks from blobs stored by the relay.
-
-buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.</p></td>
+                <td><p>GetChunks retrieves chunks from blobs stored by the relay.</p></td>
               </tr>
             
           </tbody>

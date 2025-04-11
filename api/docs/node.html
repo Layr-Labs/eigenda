@@ -963,20 +963,19 @@ in the request, with empty signatures in the places for discarded blobs. </p></t
               <tr>
                 <td>UNKNOWN</td>
                 <td>0</td>
-                <td><p>buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
-buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX // Skip this rule to not create a breaking change.</p></td>
+                <td><p></p></td>
               </tr>
             
               <tr>
                 <td>GNARK</td>
                 <td>1</td>
-                <td><p>buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.</p></td>
+                <td><p></p></td>
               </tr>
             
               <tr>
                 <td>GOB</td>
                 <td>2</td>
-                <td><p>buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.</p></td>
+                <td><p></p></td>
               </tr>
             
           </tbody>
@@ -987,7 +986,7 @@ buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX // Skip this rule to not create a breakin
 
       
         <h3 id="node.Dispersal">Dispersal</h3>
-        <p>The EigenDA Node implements two services, Dispersal and Retrieval, as defined below,</p><p>for better security and separation of concerns.</p><p>buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.</p>
+        <p></p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -1003,10 +1002,7 @@ different Nodes are responsible for different chunks, as EigenDA is horizontally
 sharded) and is correctly coded (e.g. each chunk must be a valid KZG multiproof)
 according to the EigenDA protocol. It also stores the chunks along with metadata
 for the protocol-defined length of custody. It will return a signature at the
-end to attest to the data in this request it has processed.
-
-buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.</p></td>
+end to attest to the data in this request it has processed.</p></td>
               </tr>
             
               <tr>
@@ -1016,10 +1012,7 @@ buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a bre
                 <td><p>StoreBlobs is similar to StoreChunks, but it stores the blobs using a different storage schema
 so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
 StoreBlobs &#43; AttestBatch will eventually replace and deprecate StoreChunks method.
-DEPRECATED: StoreBlobs method is not used
-
-buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.</p></td>
+DEPRECATED: StoreBlobs method is not used</p></td>
               </tr>
             
               <tr>
@@ -1028,21 +1021,14 @@ buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a bre
                 <td><a href="#node.AttestBatchReply">AttestBatchReply</a></td>
                 <td><p>AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch.
 It will return a signature at the end to attest to the aggregated batch.
-DEPRECATED: AttestBatch method is not used
-
-buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.</p></td>
+DEPRECATED: AttestBatch method is not used</p></td>
               </tr>
             
               <tr>
                 <td>NodeInfo</td>
                 <td><a href="#node.NodeInfoRequest">NodeInfoRequest</a></td>
                 <td><a href="#node.NodeInfoReply">NodeInfoReply</a></td>
-                <td><p>Retrieve node info metadata
-
-buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
-buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.</p></td>
+                <td><p>Retrieve node info metadata</p></td>
               </tr>
             
           </tbody>
@@ -1050,7 +1036,7 @@ buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a br
 
         
         <h3 id="node.Retrieval">Retrieval</h3>
-        <p>buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.</p>
+        <p></p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -1061,30 +1047,21 @@ buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a br
                 <td>RetrieveChunks</td>
                 <td><a href="#node.RetrieveChunksRequest">RetrieveChunksRequest</a></td>
                 <td><a href="#node.RetrieveChunksReply">RetrieveChunksReply</a></td>
-                <td><p>RetrieveChunks retrieves the chunks for a blob custodied at the Node.
-
-buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
-buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.</p></td>
+                <td><p>RetrieveChunks retrieves the chunks for a blob custodied at the Node.</p></td>
               </tr>
             
               <tr>
                 <td>GetBlobHeader</td>
                 <td><a href="#node.GetBlobHeaderRequest">GetBlobHeaderRequest</a></td>
                 <td><a href="#node.GetBlobHeaderReply">GetBlobHeaderReply</a></td>
-                <td><p>GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
-
-buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
-buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.</p></td>
+                <td><p>GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.</p></td>
               </tr>
             
               <tr>
                 <td>NodeInfo</td>
                 <td><a href="#node.NodeInfoRequest">NodeInfoRequest</a></td>
                 <td><a href="#node.NodeInfoReply">NodeInfoReply</a></td>
-                <td><p>Retrieve node info metadata
-
-buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
-buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.</p></td>
+                <td><p>Retrieve node info metadata</p></td>
               </tr>
             
           </tbody>

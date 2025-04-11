@@ -4,8 +4,6 @@
 // - protoc             v4.23.4
 // source: node/node.proto
 
-// buf:lint:ignore PACKAGE_VERSION_SUFFIX // Skip this rule to not create a breaking change.
-
 package node
 
 import (
@@ -37,30 +35,17 @@ type DispersalClient interface {
 	// according to the EigenDA protocol. It also stores the chunks along with metadata
 	// for the protocol-defined length of custody. It will return a signature at the
 	// end to attest to the data in this request it has processed.
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	StoreChunks(ctx context.Context, in *StoreChunksRequest, opts ...grpc.CallOption) (*StoreChunksReply, error)
 	// StoreBlobs is similar to StoreChunks, but it stores the blobs using a different storage schema
 	// so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
 	// StoreBlobs + AttestBatch will eventually replace and deprecate StoreChunks method.
 	// DEPRECATED: StoreBlobs method is not used
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	StoreBlobs(ctx context.Context, in *StoreBlobsRequest, opts ...grpc.CallOption) (*StoreBlobsReply, error)
 	// AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch.
 	// It will return a signature at the end to attest to the aggregated batch.
 	// DEPRECATED: AttestBatch method is not used
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	AttestBatch(ctx context.Context, in *AttestBatchRequest, opts ...grpc.CallOption) (*AttestBatchReply, error)
 	// Retrieve node info metadata
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.
 	NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error)
 }
 
@@ -118,30 +103,17 @@ type DispersalServer interface {
 	// according to the EigenDA protocol. It also stores the chunks along with metadata
 	// for the protocol-defined length of custody. It will return a signature at the
 	// end to attest to the data in this request it has processed.
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	StoreChunks(context.Context, *StoreChunksRequest) (*StoreChunksReply, error)
 	// StoreBlobs is similar to StoreChunks, but it stores the blobs using a different storage schema
 	// so that the stored blobs can later be aggregated by AttestBatch method to a bigger batch.
 	// StoreBlobs + AttestBatch will eventually replace and deprecate StoreChunks method.
 	// DEPRECATED: StoreBlobs method is not used
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	StoreBlobs(context.Context, *StoreBlobsRequest) (*StoreBlobsReply, error)
 	// AttestBatch is used to aggregate the batches stored by StoreBlobs method to a bigger batch.
 	// It will return a signature at the end to attest to the aggregated batch.
 	// DEPRECATED: AttestBatch method is not used
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
 	AttestBatch(context.Context, *AttestBatchRequest) (*AttestBatchReply, error)
 	// Retrieve node info metadata
-	//
-	// buf:lint:ignore RPC_REQUEST_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.
 	NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error)
 	mustEmbedUnimplementedDispersalServer()
 }
@@ -286,19 +258,10 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type RetrievalClient interface {
 	// RetrieveChunks retrieves the chunks for a blob custodied at the Node.
-	//
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.
 	RetrieveChunks(ctx context.Context, in *RetrieveChunksRequest, opts ...grpc.CallOption) (*RetrieveChunksReply, error)
 	// GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
-	//
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.
 	GetBlobHeader(ctx context.Context, in *GetBlobHeaderRequest, opts ...grpc.CallOption) (*GetBlobHeaderReply, error)
 	// Retrieve node info metadata
-	//
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.
 	NodeInfo(ctx context.Context, in *NodeInfoRequest, opts ...grpc.CallOption) (*NodeInfoReply, error)
 }
 
@@ -342,19 +305,10 @@ func (c *retrievalClient) NodeInfo(ctx context.Context, in *NodeInfoRequest, opt
 // for forward compatibility
 type RetrievalServer interface {
 	// RetrieveChunks retrieves the chunks for a blob custodied at the Node.
-	//
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.
 	RetrieveChunks(context.Context, *RetrieveChunksRequest) (*RetrieveChunksReply, error)
 	// GetBlobHeader is similar to RetrieveChunks, this just returns the header of the blob.
-	//
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.
 	GetBlobHeader(context.Context, *GetBlobHeaderRequest) (*GetBlobHeaderReply, error)
 	// Retrieve node info metadata
-	//
-	// buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
-	// buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.
 	NodeInfo(context.Context, *NodeInfoRequest) (*NodeInfoReply, error)
 	mustEmbedUnimplementedRetrievalServer()
 }
