@@ -5,7 +5,8 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// KeymapDirectoryName is the name of the directory where the keymap stores its files.
+// KeymapDirectoryName is the name of the directory where the keymap stores its files. One keymap directory is
+// created per table
 const KeymapDirectoryName = "keymap"
 
 // KeymapDataDirectoryName is the name of the directory where the keymap implementation stores its data files.
@@ -20,19 +21,23 @@ const KeymapInitializedFileName = "initialized"
 type Keymap interface {
 	// Put adds keys to the keymap as a batch.
 	//
-	// It is not thread safe to modify the contents of any slices passed to this function after the call.
+	// A keymap provides atomicity for individual key-address pairs, but not for the batch as a whole.
+	//
+	// It is not safe to modify the contents of any slices passed to this function after the call.
 	// This includes the byte slices containing the keys.
 	Put(pairs []*types.KAPair) error
 
 	// Get returns the address for a key. Returns true if the key exists, and false otherwise (i.e. does not
 	// return an error if the key does not exist).
 	//
-	// It is not thread safe to modify key byte slice after it is passed to this method.
+	// It is not safe to modify key byte slice after it is passed to this method.
 	Get(key []byte) (types.Address, bool, error)
 
 	// Delete removes keys from the keymap. Deleting non-existent keys is a no-op.
 	//
-	// It is not thread safe to modify the contents of any slices passed to this function after the call.
+	// Deletion of keys is atomic, but deletion is not atomic across the entire batch.
+	//
+	// It is not safe to modify the contents of any slices passed to this function after the call.
 	// This includes the byte slices containing the keys.
 	Delete(keys []*types.KAPair) error
 
@@ -43,5 +48,5 @@ type Keymap interface {
 	Destroy() error
 }
 
-// KeymapBuilder is a function that builds a Keymap.
-type KeymapBuilder func(logger logging.Logger, keymapPath string, doubleWriteProtection bool) (Keymap, bool, error)
+// BuildKeymap is a function that builds a Keymap.
+type BuildKeymap func(logger logging.Logger, keymapPath string, doubleWriteProtection bool) (Keymap, bool, error)

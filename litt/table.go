@@ -21,7 +21,7 @@ type Table interface {
 	// There are no limits on the size of the key or the value. This database has been optimized under the assumption
 	// that values are generally much larger than keys. This affects performance, but not correctness.
 	//
-	// It is not thread safe to modify the byte slices passed to this function after the call
+	// It is not safe to modify the byte slices passed to this function after the call
 	// (both the key and the value).
 	Put(key []byte, value []byte) error
 
@@ -29,7 +29,7 @@ type Table interface {
 	// at once. This may improve performance, but it otherwise has identical properties to a sequence of Put calls
 	// (i.e. this method does not atomically write the entire batch).
 	//
-	// It is not thread safe to modify the byte slices passed to this function after the call
+	// It is not safe to modify the byte slices passed to this function after the call
 	// (including the key byte slices and the value byte slices).
 	PutBatch(batch []*types.KVPair) error
 
@@ -37,13 +37,13 @@ type Table interface {
 	// (returns false if the key does not exist).
 	//
 	// For the sake of performance, the returned data is NOT safe to mutate. If you need to modify the data,
-	// make a copy of it first. It is also not thread safe to modify the key byte slice after it is passed to this
+	// make a copy of it first. It is also not safe to modify the key byte slice after it is passed to this
 	// method.
 	Get(key []byte) ([]byte, bool, error)
 
 	// Exists returns true if the key exists in the database, and false otherwise. This is faster than calling Get.
 	//
-	// It is not thread safe to modify the key byte slice after it is passed to this method.
+	// It is not safe to modify the key byte slice after it is passed to this method.
 	Exists(key []byte) (bool, error)
 
 	// Flush ensures that all data written to the database is crash durable on disk. When this method returns,
@@ -100,8 +100,8 @@ type ManagedTable interface {
 	// Destroy cleans up resources used by the table. All data on disk is permanently and unrecoverable deleted.
 	Destroy() error
 
-	// ScheduleImmediateGC schedules an immediate garbage collection run. This method blocks until that run is complete.
+	// RunGC performs a garbage collection run. This method blocks until that run is complete.
 	// This method is intended for use in tests, where it can be useful to force a garbage collection run to occur
 	// at a specific time.
-	ScheduleImmediateGC() error
+	RunGC() error
 }

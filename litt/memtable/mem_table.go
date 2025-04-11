@@ -65,7 +65,7 @@ func NewMemTable(config *litt.Config, name string) litt.ManagedTable {
 		go func() {
 			for !table.shutdown.Load() {
 				<-ticker.C
-				err := table.ScheduleImmediateGC()
+				err := table.RunGC()
 				if err != nil {
 					panic(err) // this is a class designed for use in testing, not worth properly handling errors
 				}
@@ -178,7 +178,7 @@ func (m *memTable) SetShardingFactor(shardingFactor uint32) error {
 	return nil
 }
 
-func (m *memTable) ScheduleImmediateGC() error {
+func (m *memTable) RunGC() error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
