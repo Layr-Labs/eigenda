@@ -88,10 +88,17 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/health", withLogging(svr.handleHealth, svr.log)).Methods("GET")
 
 	// Only register admin endpoints if explicitly enabled in configuration
+	//
+	// Note: A common pattern for admin endpoints is to generate a random API key on startup for authentication.
+	// Since the proxy isn't meant to be exposed publicly, we haven't implemented this here, but it's something
+	// that might be done in the future.
 	if svr.config.IsAPIEnabled(config.AdminAPIType) {
+		svr.log.Warn("Admin API endpoints are enabled")
 		// Admin endpoints to check and set EigenDA backend used for dispersal
-		r.HandleFunc("/admin/eigenda-dispersal-backend", withLogging(svr.handleGetEigenDADispersalBackend, svr.log)).Methods("GET")
-		r.HandleFunc("/admin/eigenda-dispersal-backend", withLogging(svr.handleSetEigenDADispersalBackend, svr.log)).Methods("PUT")
+		r.HandleFunc("/admin/eigenda-dispersal-backend",
+			withLogging(svr.handleGetEigenDADispersalBackend, svr.log)).Methods("GET")
+		r.HandleFunc("/admin/eigenda-dispersal-backend",
+			withLogging(svr.handleSetEigenDADispersalBackend, svr.log)).Methods("PUT")
 	}
 }
 
