@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"net"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -135,9 +136,33 @@ func pluginOps(ctx *cli.Context) {
 		return
 	}
 
-	_, dispersalPort, retrievalPort, v2DispersalPort, v2RetrievalPort, err := core.ParseOperatorSocket(config.Socket)
+	opSocket, err := core.ParseOperatorSocket(config.Socket)
 	if err != nil {
 		log.Printf("Error: failed to parse operator socket: %v", err)
+		return
+	}
+
+	_, dispersalPort, err := net.SplitHostPort(opSocket.GetV1DispersalSocket())
+	if err != nil {
+		log.Printf("Error: failed to get dispersal port from the socket: %s, err: %s", opSocket.Encode(), err)
+		return
+	}
+
+	_, retrievalPort, err := net.SplitHostPort(opSocket.GetV1RetrievalSocket())
+	if err != nil {
+		log.Printf("Error: failed to get retrieval port from the socket: %s, err: %s", opSocket.Encode(), err)
+		return
+	}
+
+	_, v2DispersalPort, err := net.SplitHostPort(opSocket.GetV2DispersalSocket())
+	if err != nil {
+		log.Printf("Error: failed to get v2 dispersal port from the socket: %s, err: %s", opSocket.Encode(), err)
+		return
+	}
+
+	_, v2RetrievalPort, err := net.SplitHostPort(opSocket.GetV2RetrievalSocket())
+	if err != nil {
+		log.Printf("Error: failed to get v2 retrieval port from the socket: %s, err: %s", opSocket.Encode(), err)
 		return
 	}
 
