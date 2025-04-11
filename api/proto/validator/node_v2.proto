@@ -1,5 +1,4 @@
 syntax = "proto3";
-// buf:lint:ignore PACKAGE_VERSION_SUFFIX // Skip this rule to not create a breaking change.
 package validator;
 
 import "common/v2/common_v2.proto";
@@ -10,37 +9,23 @@ option go_package = "github.com/Layr-Labs/eigenda/api/grpc/validator";
 // for better security and separation of concerns.
 
 // Dispersal is utilized to disperse chunk data.
-//
-// buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
 service Dispersal {
   // StoreChunks instructs the validator to store a batch of chunks. This call blocks until the validator
   // either acquires the chunks or the validator determines that it is unable to acquire the chunks. If
   // the validator is able to acquire and validate the chunks, it returns a signature over the batch header.
   // This RPC describes which chunks the validator should store but does not contain that chunk data. The validator
   // is expected to fetch the chunk data from one of the relays that is in possession of the chunk.
-  //
-  // buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
   rpc StoreChunks(StoreChunksRequest) returns (StoreChunksReply) {}
   // GetNodeInfo fetches metadata about the node.
-  //
-  // buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
-  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.
   rpc GetNodeInfo(GetNodeInfoRequest) returns (GetNodeInfoReply) {}
 }
 
 // Retrieval is utilized to retrieve chunk data.
-//
-// buf:lint:ignore SERVICE_SUFFIX // Skip this rule to not create a breaking change.
 service Retrieval {
   // GetChunks retrieves the chunks for a blob custodied at the Node. Note that where possible, it is generally
   // faster to retrieve chunks from the relay service if that service is available.
-  //
-  // buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
   rpc GetChunks(GetChunksRequest) returns (GetChunksReply) {}
   // Retrieve node info metadata
-  //
-  // buf:lint:ignore RPC_RESPONSE_STANDARD_NAME // Skip this rule to not create a breaking change.
-  // buf:lint:ignore RPC_REQUEST_RESPONSE_UNIQUE // Skip this rule to not create a breaking change.
   rpc GetNodeInfo(GetNodeInfoRequest) returns (GetNodeInfoReply) {}
 }
 
@@ -52,7 +37,6 @@ message StoreChunksRequest {
   common.v2.Batch batch = 1;
 
   // ID of the disperser that is requesting the storage of the batch.
-  // buf:lint:ignore FIELD_LOWER_SNAKE_CASE // Skip this rule to not create a breaking change.
   uint32 disperserID = 2;
 
   // Timestamp of the request in seconds since the Unix epoch. If too far out of sync with the server's clock,
@@ -122,8 +106,6 @@ message GetChunksRequest {
 enum ChunkEncodingFormat {
   // A valid response should never use this value.
   // If encountered, the client should treat it as an error.
-  // buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
-  // buf:lint:ignore ENUM_ZERO_VALUE_SUFFIX // Skip this rule to not create a breaking change.
   UNKNOWN = 0;
 
   // A chunk encoded in GNARK has the following format:
@@ -145,8 +127,6 @@ enum ChunkEncodingFormat {
   // - Frame.SerializeGnark()
   // - Frame.DeserializeGnark()
   // Package: github.com/Layr-Labs/eigenda/encoding
-  //
-  // buf:lint:ignore ENUM_VALUE_PREFIX // Skip this rule to not create a breaking change.
   GNARK = 1;
 }
 

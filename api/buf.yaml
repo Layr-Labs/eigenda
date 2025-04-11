@@ -7,11 +7,6 @@ version: v2
 modules:
   - path: proto
     name: buf.build/layrlabs/eigenda
-# This linter was added after the proto files were already used in production.
-# We added a bunch of ignore lint comments inside the protobuf files themselves,
-# instead of turning off rules entirely here.
-# This way any new protobuf messages or services will follow the
-# protobuf conventions: https://protobuf.dev/programming-guides/style/
 lint:
   use:
     - STANDARD

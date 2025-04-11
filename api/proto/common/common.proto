@@ -1,5 +1,4 @@
 syntax = "proto3";
-// buf:lint:ignore PACKAGE_VERSION_SUFFIX // Skip this rule to not create a breaking change.
 package common;
 
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/common";
