@@ -1,0 +1,67 @@
+# We currently only push the eigenda proto files to the buf registry
+# in order for it to generate rust prost/tonic bindings for us.
+# We also get nice documentation and versioning: see https://buf.build/layrlabs/eigenda.
+
+# For details on buf.yaml configuration, visit https://buf.build/docs/configuration/v2/buf-yaml
+version: v2
+modules:
+  - path: proto
+    name: buf.build/layrlabs/eigenda
+lint:
+  use:
+    - STANDARD
+  # This buf linter was added after the proto files (including v2) were already used in production.
+  # A lot of our proto files don't follow protobuf conventions: https://protobuf.dev/programming-guides/style/
+  # In order to not creating breaking changes however, we are ignoring all the rules below,
+  # which were generated from `buf lint --error-format config-ignore-yaml`.
+  # New messages/services in the future should be added in new files, in order for lint not to be skipped for them.
+  ignore_only:
+    ENUM_VALUE_PREFIX:
+      - proto/disperser/disperser.proto
+      - proto/disperser/v2/disperser_v2.proto
+      - proto/node/node.proto
+      - proto/validator/node_v2.proto
+    ENUM_ZERO_VALUE_SUFFIX:
+      - proto/disperser/disperser.proto
+      - proto/disperser/v2/disperser_v2.proto
+      - proto/node/node.proto
+      - proto/validator/node_v2.proto
+    FIELD_LOWER_SNAKE_CASE:
+      - proto/validator/node_v2.proto
+    PACKAGE_VERSION_SUFFIX:
+      - proto/churner/churner.proto
+      - proto/common/common.proto
+      - proto/disperser/disperser.proto
+      - proto/node/node.proto
+      - proto/relay/relay.proto
+      - proto/retriever/retriever.proto
+      - proto/validator/node_v2.proto
+    RPC_REQUEST_RESPONSE_UNIQUE:
+      - proto/node/node.proto
+      - proto/validator/node_v2.proto
+    RPC_REQUEST_STANDARD_NAME:
+      - proto/disperser/disperser.proto
+      - proto/disperser/v2/disperser_v2.proto
+      - proto/retriever/retriever.proto
+      - proto/retriever/v2/retriever_v2.proto
+    RPC_RESPONSE_STANDARD_NAME:
+      - proto/churner/churner.proto
+      - proto/disperser/disperser.proto
+      - proto/disperser/v2/disperser_v2.proto
+      - proto/node/node.proto
+      - proto/relay/relay.proto
+      - proto/retriever/retriever.proto
+      - proto/retriever/v2/retriever_v2.proto
+      - proto/validator/node_v2.proto
+    SERVICE_SUFFIX:
+      - proto/churner/churner.proto
+      - proto/disperser/disperser.proto
+      - proto/disperser/v2/disperser_v2.proto
+      - proto/node/node.proto
+      - proto/relay/relay.proto
+      - proto/retriever/retriever.proto
+      - proto/retriever/v2/retriever_v2.proto
+      - proto/validator/node_v2.proto
+breaking:
+  use:
+    - FILE
