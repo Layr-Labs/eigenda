@@ -42,8 +42,8 @@ type QuorumAttestation struct {
 	QuorumAggPubKey map[QuorumID]*G1Point
 	// SignersAggPubKey is the aggregated public key for all of the operators that signed the message by each quorum
 	SignersAggPubKey map[QuorumID]*G2Point
-	// AggSignature is the aggregated signature for all of the operators that signed the message for each quorum, mirroring the
-	// SignersAggPubKey.
+	// AggSignature is the aggregated signature for all of the operators that signed the message for each quorum, 
+	// mirroring the SignersAggPubKey.
 	AggSignature map[QuorumID]*Signature
 	// QuorumResults contains the quorum ID and the amount signed for each quorum
 	QuorumResults map[QuorumID]*QuorumResult
@@ -69,13 +69,26 @@ type SignatureAggregation struct {
 	QuorumResults map[QuorumID]*QuorumResult
 }
 
-// SignatureAggregator is an interface for aggregating the signatures returned by DA nodes so that they can be verified by the DA contract
+// SignatureAggregator is an interface for aggregating the signatures returned by DA nodes 
+// so that they can be verified by the DA contract
 type SignatureAggregator interface {
-	// ReceiveSignatures blocks until it receives a response for each operator in the operator state via messageChan, and then returns the attestation result by quorum.
-	ReceiveSignatures(ctx context.Context, state *IndexedOperatorState, message [32]byte, messageChan chan SigningMessage) (*QuorumAttestation, error)
+	// ReceiveSignatures blocks until it receives a response for each operator in the operator state via messageChan, 
+	// and then returns the attestation result by quorum.
+	ReceiveSignatures(
+		ctx context.Context,
+		state *IndexedOperatorState,
+		message [32]byte,
+		messageChan chan SigningMessage,
+	) (*QuorumAttestation, error)
 	// AggregateSignatures takes attestation result by quorum and aggregates the signatures across them.
 	// If the aggregated signature is invalid, an error is returned.
-	AggregateSignatures(ctx context.Context, ics IndexedChainState, referenceBlockNumber uint, quorumAttestation *QuorumAttestation, quorumIDs []QuorumID) (*SignatureAggregation, error)
+	AggregateSignatures(
+		ctx context.Context,
+		ics IndexedChainState,
+		referenceBlockNumber uint,
+		quorumAttestation *QuorumAttestation,
+		quorumIDs []QuorumID,
+	) (*SignatureAggregation, error)
 }
 
 type StdSignatureAggregator struct {
@@ -92,7 +105,8 @@ func NewStdSignatureAggregator(logger logging.Logger, transactor Reader) (*StdSi
 	}
 
 	return &StdSignatureAggregator{
-		Logger:            logger.With("component", "SignatureAggregator"),
+		Logger: logger.With(
+			"component", "SignatureAggregator"),
 		Transactor:        transactor,
 		OperatorAddresses: operatorAddrs,
 	}, nil
@@ -100,7 +114,12 @@ func NewStdSignatureAggregator(logger logging.Logger, transactor Reader) (*StdSi
 
 var _ SignatureAggregator = (*StdSignatureAggregator)(nil)
 
-func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *IndexedOperatorState, message [32]byte, messageChan chan SigningMessage) (*QuorumAttestation, error) {
+func (a *StdSignatureAggregator) ReceiveSignatures(
+	ctx context.Context,
+	state *IndexedOperatorState,
+	message [32]byte,
+	messageChan chan SigningMessage,
+) (*QuorumAttestation, error) {
 	quorumIDs := make([]QuorumID, 0, len(state.AggKeys))
 	for quorumID := range state.Operators {
 		quorumIDs = append(quorumIDs, quorumID)
@@ -158,13 +177,22 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 		}
 		batchHeaderHashHex := hex.EncodeToString(r.BatchHeaderHash[:])
 		if r.Err != nil {
-			a.Logger.Warn("error returned from messageChan", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "batchHeaderHash", batchHeaderHashHex, "attestationLatencyMs", r.AttestationLatencyMs, "err", r.Err)
+			a.Logger.Warn("error returned from messageChan",
+				"operatorID", operatorIDHex,
+				"operatorAddress", operatorAddr,
+				"socket", socket,
+				"batchHeaderHash", batchHeaderHashHex,
+				"attestationLatencyMs", r.AttestationLatencyMs,
+				"err", r.Err)
 			continue
 		}
 
 		op, found := state.IndexedOperators[r.Operator]
 		if !found {
-			a.Logger.Error("Operator not found in state", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket)
+			a.Logger.Error("Operator not found in state",
+				"operatorID", operatorIDHex,
+				"operatorAddress", operatorAddr,
+				"socket", socket)
 			continue
 		}
 
@@ -172,7 +200,11 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 		sig := r.Signature
 		ok = sig.Verify(op.PubkeyG2, message)
 		if !ok {
-			a.Logger.Error("signature is not valid", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "pubkey", hexutil.Encode(op.PubkeyG2.Serialize()))
+			a.Logger.Error("signature is not valid",
+				"operatorID", operatorIDHex,
+				"operatorAddress", operatorAddr,
+				"socket", socket,
+				"pubkey", hexutil.Encode(op.PubkeyG2.Serialize()))
 			continue
 		}
 
@@ -201,7 +233,13 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 				aggPubKeys[quorumID].Add(op.PubkeyG2)
 			}
 		}
-		a.Logger.Info("received signature from operator", "operatorID", operatorIDHex, "operatorAddress", operatorAddr, "socket", socket, "quorumIDs", fmt.Sprint(operatorQuorums), "batchHeaderHash", batchHeaderHashHex, "attestationLatencyMs", r.AttestationLatencyMs)
+		a.Logger.Info("received signature from operator",
+			"operatorID", operatorIDHex,
+			"operatorAddress", operatorAddr,
+			"socket", socket,
+			"quorumIDs", fmt.Sprint(operatorQuorums),
+			"batchHeaderHash", batchHeaderHashHex,
+			"attestationLatencyMs", r.AttestationLatencyMs)
 	}
 
 	// Aggregate Non signer Pubkey Id
@@ -234,7 +272,8 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 			continue
 		}
 
-		// Verify that the aggregated public key for the quorum matches the on-chain quorum aggregate public key sans non-signers of the quorum
+		// Verify that the aggregated public key for the quorum matches the on-chain quorum aggregate public key 
+		// sans non-signers of the quorum
 		quorumAggKey := state.AggKeys[quorumID]
 		quorumAggPubKeys[quorumID] = quorumAggKey
 
@@ -274,12 +313,19 @@ func (a *StdSignatureAggregator) ReceiveSignatures(ctx context.Context, state *I
 	}, nil
 }
 
-func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics IndexedChainState, referenceBlockNumber uint, quorumAttestation *QuorumAttestation, quorumIDs []QuorumID) (*SignatureAggregation, error) {
+func (a *StdSignatureAggregator) AggregateSignatures(
+	ctx context.Context,
+	ics IndexedChainState,
+	referenceBlockNumber uint,
+	quorumAttestation *QuorumAttestation,
+	quorumIDs []QuorumID,
+) (*SignatureAggregation, error) {
 	// Aggregate the aggregated signatures. We reuse the first aggregated signature as the accumulator
 	var aggSig *Signature
 	for _, quorumID := range quorumIDs {
 		if quorumAttestation.AggSignature[quorumID] == nil {
-			a.Logger.Error("cannot aggregate signature for quorum because aggregated signature is nil", "quorumID", quorumID)
+			a.Logger.Error("cannot aggregate signature for quorum because aggregated signature is nil",
+				"quorumID", quorumID)
 			continue
 		}
 		sig := quorumAttestation.AggSignature[quorumID]
@@ -294,7 +340,8 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics In
 	var aggPubKey *G2Point
 	for _, quorumID := range quorumIDs {
 		if quorumAttestation.SignersAggPubKey[quorumID] == nil {
-			a.Logger.Error("cannot aggregate public key for quorum because signers aggregated public key is nil", "quorumID", quorumID)
+			a.Logger.Error("cannot aggregate public key for quorum because signers aggregated public key is nil",
+				"quorumID", quorumID)
 			continue
 		}
 		apk := quorumAttestation.SignersAggPubKey[quorumID]
@@ -329,7 +376,8 @@ func (a *StdSignatureAggregator) AggregateSignatures(ctx context.Context, ics In
 	quorumAggKeys := make(map[QuorumID]*G1Point, len(quorumIDs))
 	for _, quorumID := range quorumIDs {
 		if quorumAttestation.QuorumAggPubKey[quorumID] == nil {
-			a.Logger.Error("cannot aggregate public key for quorum because aggregated public key is nil", "quorumID", quorumID)
+			a.Logger.Error("cannot aggregate public key for quorum because aggregated public key is nil",
+				"quorumID", quorumID)
 			continue
 		}
 		quorumAggKeys[quorumID] = quorumAttestation.QuorumAggPubKey[quorumID]
