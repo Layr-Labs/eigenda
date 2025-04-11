@@ -167,12 +167,18 @@ func NewTestClient(
 		DisperseBlobTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 		BlobCompleteTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 	}
+
+	var registry *prometheus.Registry
+	if metrics != nil {
+		registry = metrics.registry
+	}
+
 	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
 		disperserClient,
 		certVerifier,
-		metrics.registry)
+		registry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload disperser: %w", err)
 	}
@@ -282,7 +288,7 @@ func NewTestClient(
 		validatorPayloadRetriever:   validatorPayloadRetriever,
 		certVerifier:                certVerifier,
 		privateKey:                  privateKey,
-		metricsRegistry:             metrics.registry,
+		metricsRegistry:             registry,
 		metrics:                     metrics,
 	}, nil
 }

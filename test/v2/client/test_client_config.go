@@ -56,6 +56,8 @@ type TestClientConfig struct {
 	MaxBlobSize uint64
 	// The port to use for metrics (if metrics are being collected)
 	MetricsPort int
+	// If true, do not start the metrics server.
+	DisableMetrics bool
 }
 
 // ResolveSRSPath returns a path relative to the SRSPath root directory.
