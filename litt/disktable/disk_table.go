@@ -78,7 +78,7 @@ type DiskTable struct {
 	// The control loop is a goroutine responsible for scheduling operations that mutate the table.
 	controlLoop *controlLoop
 
-	// The control loop is a goroutine responsible for blocking on flush operations.
+	// The flush loop is a goroutine responsible for blocking on flush operations.
 	flushLoop *flushLoop
 
 	// Encapsulates metrics for the database.
@@ -574,37 +574,7 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 }
 
 func (d *DiskTable) Put(key []byte, value []byte) error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process Put() request, DB is in panicked state due to error: %w", err)
-	}
-
-	if d.metrics != nil {
-		start := d.clock()
-		defer func() {
-			end := d.clock()
-			delta := end.Sub(start)
-			d.metrics.ReportWriteOperation(d.name, delta, 1, uint64(len(value)))
-		}()
-	}
-
-	d.unflushedDataCache.Store(util.UnsafeBytesToString(key), value)
-
-	writeReq := &controlLoopWriteRequest{
-		values: make([]*types.KVPair, 1),
-	}
-	writeReq.values[0] = &types.KVPair{
-		Key:   key,
-		Value: value,
-	}
-
-	err := d.controlLoop.enqueue(writeReq)
-	if err != nil {
-		return fmt.Errorf("failed to send write request: %w", err)
-	}
-
-	d.keyCount.Add(1)
-
-	return nil
+	return d.PutBatch([]*types.KVPair{{Key: key, Value: value}})
 }
 
 func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
@@ -696,10 +666,10 @@ func (d *DiskTable) SetCacheSize(_ uint64) error {
 	return nil
 }
 
-func (d *DiskTable) ScheduleImmediateGC() error {
+func (d *DiskTable) RunGC() error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
 		return fmt.Errorf(
-			"Cannot process ScheduleImmediateGC() request, DB is in panicked state due to error: %w", err)
+			"Cannot process RunGC() request, DB is in panicked state due to error: %w", err)
 	}
 
 	request := &controlLoopGCRequest{

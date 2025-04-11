@@ -63,7 +63,7 @@ func buildMemDB(t *testing.T, path string) (litt.DB, error) {
 		return memtable.NewMemTable(config, name), nil
 	}
 
-	return littbuilder.NewDBWithTableBuilder(config, tb)
+	return littbuilder.NewDBUnsafe(config, tb)
 }
 
 func buildMemKeyDiskDB(t *testing.T, path string) (litt.DB, error) {

@@ -22,7 +22,7 @@ const shardControlChannelCapacity = 32
 
 // Segment is a chunk of data stored on disk. All data in a particular data segment is expired at the same time.
 //
-// This struct is not thread safe for operations that mutate the segment, access control must be handled by the caller.
+// This struct is not safe for operations that mutate the segment, access control must be handled by the caller.
 type Segment struct {
 	// The logger for the segment.
 	logger logging.Logger

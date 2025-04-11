@@ -81,6 +81,8 @@ func (m *memKeymap) Stop() error {
 }
 
 func (m *memKeymap) Destroy() error {
-	// nothing to do here
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	m.data = nil
 	return nil
 }

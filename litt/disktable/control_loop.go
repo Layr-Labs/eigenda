@@ -41,7 +41,7 @@ type controlLoop struct {
 	// production, maintaining this atomic variable has negligible overhead.
 	threadsafeHighestSegmentIndex atomic.Uint32
 
-	// segmentLock protects access to the segments map and highestSegmentIndex.
+	// segmentLock protects access to the variables segments and highestSegmentIndex.
 	// Does not protect the segments themselves.
 	segmentLock sync.RWMutex
 

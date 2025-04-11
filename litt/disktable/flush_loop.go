@@ -63,7 +63,7 @@ func (f *flushLoop) run() {
 	}
 }
 
-// handleFlushLoopSealRequest handles the part of the seal operation that is performed on the flush loop.
+// handleSealRequest handles the part of the seal operation that is performed on the flush loop.
 // We don't want to send a flush request to a segment that has already been sealed. By performing the sealing
 // on the flush loop, we ensure that this can never happen. Any previously scheduled flush requests against the
 // segment that is being sealed will be processed prior to this request being processed due to the FIFO nature
@@ -87,7 +87,7 @@ func (f *flushLoop) handleSealRequest(req *flushLoopSealRequest) {
 	req.responseChan <- struct{}{}
 }
 
-// handleFlushLoopFlushRequest handles the part of the flush that is performed on the flush loop.
+// handleFlushRequest handles the part of the flush that is performed on the flush loop.
 func (f *flushLoop) handleFlushRequest(req *flushLoopFlushRequest) {
 	var segmentFlushStart time.Time
 	if f.metrics != nil {
