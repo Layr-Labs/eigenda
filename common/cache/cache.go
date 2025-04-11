@@ -22,4 +22,8 @@ type Cache[K comparable, V any] interface {
 
 	// Weight returns the total weight of the key-value pairs in the cache.
 	Weight() uint64
+
+	// SetMaxWeight sets the maximum weight of the cache. If the current weight exceeds the new capacity,
+	// the cache will evict key-value pairs until the weight is less than or equal to the new capacity.
+	SetMaxWeight(capacity uint64)
 }
