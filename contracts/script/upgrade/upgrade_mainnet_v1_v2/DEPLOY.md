@@ -30,12 +30,9 @@ Listed are the steps to do the upgrade by each party, divided up into phases, wh
 ###  Phase 2
 
 #### Executor Multisig
-The Core Ops multisig should call the following on the timelock.
+The Core Ops multisig should propose the following on the timelock.
 
-* Call DA Proxy Admin to upgrade the following contracts:
-    * EjectionManager
-    * RegistryCoordinator
-    * EigenDAServiceManager
+* Transfer ownership of DA Proxy Admin to DA Ops Multisig
 
 #### DA Ops Multisig
 * Initialize parameters in new V2 registries
@@ -43,27 +40,31 @@ The Core Ops multisig should call the following on the timelock.
     * RelayRegistry
     * DisperserRegistry
 
+#### Core Ops Multisig
+* Transfer ownership of the following contracts to the DA Ops Multisig (implementation level fns)
+    * Ejection Manager
+    * Registry Coordinator
+    * EigenDAServiceManager
+
 ### Phase 3
 
 #### Executor Multisig
-* Transfer DA Proxy Admin ownership to DA Ops Multisig
-
-#### Core Ops Multisig
-* Transfer ownership of the following contracts to the DA Ops Multisig (implementation level fns)
-    * Registry Coordinator
-    * EigenDAServiceManager
-    * Ejection Manager
-
-#### Verifiers
-* Verify and test upgrades thoroughly during the timelock period
-* Execute timelock transactions.
+    * Execute timelocked transaction
 
 ### Phase 4
+
+#### DA Ops
+* Upgrade 
+    * EjectionManager
+    * Registry Coordinator
+    * EigenDAServiceManager
+
 * Consider upgrading other contracts, refer to notes below.
 * Deploy periphery contracts like:
     * OperatorStateRetriever 
     * CertVerifier 
 * Merge old and new DA Proxy Admin
+* Setup a timelock for Proxy Admin
 
 ## Deployer's Notes
 

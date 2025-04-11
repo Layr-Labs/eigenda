@@ -29,7 +29,7 @@ import "forge-std/StdToml.sol";
 import {console2} from "forge-std/console2.sol";
 
 /// @title Upgrade Mainnet V1 to V2 Phase 1
-contract UpgradeMainnet_V1_V2_P1 is Script {
+contract UpgradeMainnet_V1_V2_P1_DEPLOYER is Script {
     using stdToml for string;
 
     struct InitParams {
