@@ -4,6 +4,7 @@ inabox/anvil.pid
 test/testdata/*
 inabox/resources/kzg/SRSTables/*
 encoding/kzgrs/prover/data/SRSTable/*
+resources/srs/SRSTables/*
 
 **/bin/*
 coverage.*
