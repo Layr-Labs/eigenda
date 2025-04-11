@@ -1,4 +1,6 @@
 [initParams.existing]
+daProxyAdmin = "0x8247EF5705d3345516286B72bFE6D690197C2E99"
+coreOpsMsig = "0xBE1685C81aA44FF9FB319dD389addd9374383e90"
 daOpsMsig = "0x002721B4790d97dC140a049936aA710152Ba92D5"
 registryCoordinator = "0x0BAAc79acD45A023E19345c352d8a7a83C4e5656"
 stakeRegistry = "0x006124Ae7976137266feeBFb3F4D2BE4C073139D"
@@ -8,6 +10,8 @@ indexRegistry = "0xBd35a7a1CDeF403a6a99e4E8BA0974D198455030"
 socketRegistry = "0x5a3eD432f2De9645940333e4474bBAAB8cf64cf2"
 avsDirectory = "0x135DDa560e946695d6f155dACaFC6f1F25C1F5AF"
 rewardsCoordinator = "0x7750d328b314EfFa365A0402CcfD489B80B0adda"
+ejectionManager = "0x130d8EA0052B45554e4C99079B84df292149Bd5E"
+executorMsig = "0x369e6F597e22EaB55fFb173C6d9cD234BD699111"
 
 # Parameters for the Threshold Registry contract
 [initParams.thresholdRegistry]
