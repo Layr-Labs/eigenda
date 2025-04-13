@@ -1,0 +1,65 @@
+### CORE ###
+
+# Only this address can finalize the deployment and be the owner of the deployed contracts.
+# Currently just set to the deployer. The deployer will have to transfer ownership of each contract to an ops multisig when it is created.
+initialOwner = "0xDF291ebfe90eF9187c3f45609603E366a21a16Ea"
+
+# Parameters shared across various deployed contracts
+[initParams.shared]
+rewardsCoordinator = "0x5ae8152fb88c26ff9ca5C014c94fca3c68029349"
+avsDirectory = "0xa789c91ECDdae96865913130B786140Ee17aF545"
+delegationManager = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
+initialPausedStatus = 0
+
+# Parameters for the pauser registry contract
+[initParams.core.pauserRegistry]
+pausers = ["0xDA29BB71669f46F2a779b4b62f03644A84eE3479"]
+unpauser = "0xDA29BB71669f46F2a779b4b62f03644A84eE3479"
+
+### MIDDLEWARE ###
+
+# Parameters for the registry coordinator contract
+[initParams.middleware.registryCoordinator]
+churnApprover = "0x8Fc54A397586a5948cb4700B59397f2Ce0903Fd1"
+minimumStakes = ["32000000000000000000"]
+strategyParams = [
+    [
+        { 0_strategy = "0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0", 1_multiplier = 1000000000000000000 }
+    ]
+]
+operatorSetParams = [
+    { 0_maxOperatorCount = 200, 1_kickBIPsOfOperatorStake = 11000, 2_kickBIPsOfTotalStake = 50 }
+]
+
+# Parameters for the ejection manager contract
+[initParams.middleware.ejectionManager]
+ejectors = ["0xe93765d8462034C43B417e6081BC1e1572c7F55f", "0xDA29BB71669f46F2a779b4b62f03644A84eE3479"]
+quorumEjectionParams = [
+    { 0_rateLimitWindow = 604800, 1_ejectableStakePercent = 3000 }
+]
+
+
+### EIGEN DA ###
+
+# Parameters for the Threshold Registry contract
+[initParams.eigenDA.thresholdRegistry]
+quorumAdversaryThresholdPercentages = "0x21"
+quorumConfirmationThresholdPercentages = "0x37"
+quorumNumbersRequired = "0x00"
+versionedBlobParams = [
+    { 0_maxNumOperators = 3537, 1_numChunks = 8192, 2_codingRate = 8 }
+]
+
+# Parameters for the payment vault contract
+[initParams.eigenDA.paymentVault]
+minNumSymbols = 4096
+pricePerSymbol = 447000000
+priceUpdateCooldown = 1
+globalSymbolsPerPeriod = 131072
+reservationPeriodInterval = 300
+globalRatePeriodInterval = 30
+
+# Parameters for the rewards initiator contract
+[initParams.eigenDA.serviceManager]
+rewardsInitiator = "0xDA29BB71669f46F2a779b4b62f03644A84eE3479"
+batchConfirmers = []

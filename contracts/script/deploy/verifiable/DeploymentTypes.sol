@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity =0.8.12;
 
+import {IEjectionManager} from "lib/eigenlayer-middleware/src/interfaces/IEjectionManager.sol";
 import {IRegistryCoordinator, RegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
@@ -12,6 +13,7 @@ import "forge-std/StdToml.sol";
 /// @dev This is the struct needed by the multisig to initialize the contracts.
 struct CalldataInitParams {
     CalldataRegistryCoordinatorParams registryCoordinatorParams;
+    CalldataEjectionManagerParams ejectionManagerParams;
     CalldataThresholdRegistryParams thresholdRegistryParams;
     CalldataServiceManagerParams serviceManagerParams;
 }
@@ -20,6 +22,11 @@ struct CalldataRegistryCoordinatorParams {
     RegistryCoordinator.OperatorSetParam[] operatorSetParams;
     uint96[] minimumStakes;
     IStakeRegistry.StrategyParams[][] strategyParams;
+}
+
+struct CalldataEjectionManagerParams {
+    address[] ejectors;
+    IEjectionManager.QuorumEjectionParams[] quorumEjectionParams;
 }
 
 struct CalldataThresholdRegistryParams {
@@ -51,6 +58,7 @@ struct DeployedAddresses {
     address socketRegistry;
     address blsApkRegistry;
     address registryCoordinator;
+    address ejectionManager;
     address thresholdRegistry;
     address relayRegistry;
     address paymentVault;
@@ -60,7 +68,6 @@ struct DeployedAddresses {
 
 struct ImmutableRegistryCoordinatorParams {
     address churnApprover;
-    address ejector;
 }
 
 struct ImmutablePaymentVaultParams {
@@ -111,8 +118,21 @@ library InitParamsLib {
         returns (ImmutableRegistryCoordinatorParams memory)
     {
         return ImmutableRegistryCoordinatorParams({
-            churnApprover: stdToml.readAddress(configData, ".initParams.middleware.registryCoordinator.churnApprover"),
-            ejector: stdToml.readAddress(configData, ".initParams.middleware.registryCoordinator.ejector")
+            churnApprover: stdToml.readAddress(configData, ".initParams.middleware.registryCoordinator.churnApprover")
+        });
+    }
+
+    function ejectorManagerParams(string memory configData)
+        internal
+        pure
+        returns (CalldataEjectionManagerParams memory)
+    {
+        return CalldataEjectionManagerParams({
+            ejectors: stdToml.readAddressArray(configData, ".initParams.middleware.ejectionManager.ejectors"),
+            quorumEjectionParams: abi.decode(
+                stdToml.parseRaw(configData, ".initParams.middleware.ejectionManager.quorumEjectionParams"),
+                (IEjectionManager.QuorumEjectionParams[])
+            )
         });
     }
 
@@ -202,6 +222,10 @@ library InitParamsLib {
                 operatorSetParams: operatorSetParams(configData),
                 minimumStakes: minimumStakes(configData),
                 strategyParams: strategyParams(configData)
+            }),
+            ejectionManagerParams: CalldataEjectionManagerParams({
+                ejectors: ejectorManagerParams(configData).ejectors,
+                quorumEjectionParams: ejectorManagerParams(configData).quorumEjectionParams
             }),
             thresholdRegistryParams: CalldataThresholdRegistryParams({
                 quorumAdversaryThresholdPercentages: quorumAdversaryThresholdPercentages(configData),
