@@ -62,4 +62,4 @@ globalRatePeriodInterval = 30
 # Parameters for the rewards initiator contract
 [initParams.eigenDA.serviceManager]
 rewardsInitiator = "0xDA29BB71669f46F2a779b4b62f03644A84eE3479"
-batchConfirmers = []
+batchConfirmers = ["0xC0996A3Cc9ECF2A96115C117f6Da99FA80F525eB"]
