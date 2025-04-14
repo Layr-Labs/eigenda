@@ -1,9 +1,5 @@
 package load
 
-import (
-	"time"
-)
-
 // LoadGeneratorConfig is the configuration for the load generator.
 type LoadGeneratorConfig struct {
 	// The desired number of megabytes bytes per second to write.
@@ -29,12 +25,12 @@ type LoadGeneratorConfig struct {
 	RelayReadParallelism uint64
 	// The maximum number of parallel blob validator read operations in flight.
 	ValidatorReadParallelism uint64
-	// The timeout for each blob dispersal.
-	DispersalTimeout time.Duration
-	// The timeout for reading a blob from a relay. This is the timeout per individual read.
-	RelayReadTimeout time.Duration
-	// The timeout for reading a blob from the validators. This is the timeout per individual read.
-	ValidatorReadTimeout time.Duration
+	// The timeout for each blob dispersal, in seconds.
+	DispersalTimeout uint32
+	// The timeout for reading a blob from a relay, in seconds. This is the timeout per individual read.
+	RelayReadTimeout uint32
+	// The timeout for reading a blob from the validators, in seconds. This is the timeout per individual read.
+	ValidatorReadTimeout uint32
 	// EnablePprof enables the pprof HTTP server for profiling
 	EnablePprof bool
 	// PprofHttpPort is the port that the pprof HTTP server listens on

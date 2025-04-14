@@ -543,7 +543,6 @@ func (c *TestClient) ReadBlobFromRelay(
 		defer cancel()
 	}
 
-	c.logger.Debugf("Reading blob from relay %d", relayKey)
 	blobBytesFromRelay, err := c.relayClient.GetBlob(ctx, relayKey, key)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relay: %w", err)

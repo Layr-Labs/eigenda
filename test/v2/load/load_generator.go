@@ -165,7 +165,8 @@ func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 		float64(l.client.GetConfig().MaxBlobSize+1)))
 	payload = rand.Bytes(payloadSize)
 
-	ctx, cancel := context.WithTimeout(l.ctx, l.config.DispersalTimeout*time.Second)
+	timeout := time.Duration(l.config.DispersalTimeout) * time.Second
+	ctx, cancel := context.WithTimeout(l.ctx, timeout)
 	l.metrics.startOperation("dispersal")
 	defer func() {
 		l.metrics.endOperation("dispersal")
@@ -214,6 +215,8 @@ func (l *LoadGenerator) readBlobFromRelays(
 		relayReadCount = int(l.config.RelayReadAmplification)
 	}
 
+	timeout := time.Duration(l.config.RelayReadTimeout) * time.Second
+
 	for i := 0; i < relayReadCount; i++ {
 		err := l.client.ReadBlobFromRelays(
 			context.Background(),
@@ -221,7 +224,7 @@ func (l *LoadGenerator) readBlobFromRelays(
 			eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys,
 			payload,
 			blobLengthSymbols,
-			l.config.RelayReadTimeout)
+			timeout)
 		if err == nil {
 			l.metrics.reportRelayReadSuccess()
 		} else {
@@ -259,6 +262,8 @@ func (l *LoadGenerator) readBlobFromValidators(
 		validatorReadCount = int(l.config.ValidatorReadAmplification)
 	}
 
+	timeout := time.Duration(l.config.ValidatorReadTimeout) * time.Second
+
 	for i := 0; i < validatorReadCount; i++ {
 		err = l.client.ReadBlobFromValidators(
 			context.Background(),
@@ -267,7 +272,7 @@ func (l *LoadGenerator) readBlobFromValidators(
 			*commitment,
 			eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
 			payload,
-			l.config.ValidatorReadTimeout)
+			timeout)
 		if err == nil {
 			l.metrics.reportValidatorReadSuccess()
 		} else {
