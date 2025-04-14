@@ -166,6 +166,7 @@ func NewTestClient(
 		PayloadClientConfig: *payloadClientConfig,
 		DisperseBlobTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 		BlobCompleteTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
+		ContractCallTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 	}
 
 	var registry *prometheus.Registry

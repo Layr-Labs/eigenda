@@ -150,19 +150,19 @@ func (l *LoadGenerator) submitBlob(rand *random.TestRandom) (
 	eigenDACert *coretypes.EigenDACert,
 	err error) {
 
-	ctx, cancel := context.WithTimeout(l.ctx, l.config.DispersalTimeout*time.Second)
-	l.metrics.startOperation("write")
-	defer func() {
-		l.metrics.endOperation("write")
-		cancel()
-	}()
-
 	payloadSize := int(rand.BoundedGaussian(
 		l.config.AverageBlobSizeMB*units.MiB,
 		l.config.BlobSizeStdDev*units.MiB,
 		1.0,
 		float64(l.client.GetConfig().MaxBlobSize+1)))
 	payload = rand.Bytes(payloadSize)
+
+	ctx, cancel := context.WithTimeout(l.ctx, l.config.DispersalTimeout*time.Second)
+	l.metrics.startOperation("write")
+	defer func() {
+		l.metrics.endOperation("write")
+		cancel()
+	}()
 
 	eigenDACert, err = l.client.DispersePayload(ctx, payload)
 	if err != nil {
