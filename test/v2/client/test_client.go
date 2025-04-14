@@ -562,15 +562,18 @@ func (c *TestClient) ReadBlobFromValidators(
 
 		start := time.Now()
 
-		retrievedBlobBytes, err := c.retrievalClient.GetBlob(
+		probe := c.metrics.validatorReadTimer.NewSequence()
+		retrievedBlobBytes, err := c.retrievalClient.GetBlobWithProbe(
 			ctx,
 			blobKey,
 			blobVersion,
 			blobCommitments,
 			uint64(currentBlockNumber),
-			quorumID)
+			quorumID,
+			probe)
+		probe.End()
 		if err != nil {
-			return fmt.Errorf("failed to read blob from validators: %w", err)
+			return fmt.Errorf("failed to read blob from validators, %s: %w", probe.History(), err)
 		}
 
 		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)

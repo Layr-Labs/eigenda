@@ -81,7 +81,7 @@ func TestRetrieveBlob(t *testing.T) {
 	server := newTestServer(t)
 	data := codec.ConvertByPaddingEmptyByte(gettysburgAddressBytes)
 	retrievalClient.On(
-		"GetBlob",
+		"GetBlobWithProbe",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,

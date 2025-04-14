@@ -5,6 +5,7 @@ package mock
 import (
 	"context"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/mock"
 
@@ -16,8 +17,28 @@ type MockRetrievalClient struct {
 	mock.Mock
 }
 
+func (_m *MockRetrievalClient) GetBlob(
+	ctx context.Context,
+	blobKey v2.BlobKey,
+	blobVersion uint16,
+	blobCommitments encoding.BlobCommitments,
+	referenceBlockNumber uint64,
+	quorumID uint8,
+) ([]byte, error) {
+	return _m.GetBlobWithProbe(ctx, blobKey, blobVersion, blobCommitments, referenceBlockNumber, quorumID, nil)
+}
+
 // GetBlob provides a mock function with given fields: ctx, blobKey, blobVersion, blobCommitments, referenceBlockNumber, quorumID
-func (_m *MockRetrievalClient) GetBlob(ctx context.Context, blobKey v2.BlobKey, blobVersion uint16, blobCommitments encoding.BlobCommitments, referenceBlockNumber uint64, quorumID uint8) ([]byte, error) {
+func (_m *MockRetrievalClient) GetBlobWithProbe(
+	ctx context.Context,
+	blobKey v2.BlobKey,
+	blobVersion uint16,
+	blobCommitments encoding.BlobCommitments,
+	referenceBlockNumber uint64,
+	quorumID uint8,
+	probe *common.SequenceProbe,
+) ([]byte, error) {
+
 	ret := _m.Called(ctx, blobKey, blobVersion, blobCommitments, referenceBlockNumber, quorumID)
 
 	if len(ret) == 0 {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -30,6 +31,18 @@ type RetrievalClient interface {
 		blobCommitments encoding.BlobCommitments,
 		referenceBlockNumber uint64,
 		quorumID core.QuorumID,
+	) ([]byte, error)
+
+	// GetBlobWithProbe is the same as GetBlob, but it also takes a probe object to capture metrics. No metrics are
+	// captured if the probe is nil.
+	GetBlobWithProbe(
+		ctx context.Context,
+		blobKey corev2.BlobKey,
+		blobVersion corev2.BlobVersion,
+		blobCommitments encoding.BlobCommitments,
+		referenceBlockNumber uint64,
+		quorumID core.QuorumID,
+		probe *common.SequenceProbe,
 	) ([]byte, error)
 }
 
@@ -68,13 +81,27 @@ func (r *retrievalClient) GetBlob(
 	referenceBlockNumber uint64,
 	quorumID core.QuorumID,
 ) ([]byte, error) {
+	return r.GetBlobWithProbe(ctx, blobKey, blobVersion, blobCommitments, referenceBlockNumber, quorumID, nil)
+}
 
+func (r *retrievalClient) GetBlobWithProbe(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+	blobVersion corev2.BlobVersion,
+	blobCommitments encoding.BlobCommitments,
+	referenceBlockNumber uint64,
+	quorumID core.QuorumID,
+	probe *common.SequenceProbe,
+) ([]byte, error) {
+
+	probe.SetStage("verify_commitment")
 	commitmentBatch := []encoding.BlobCommitments{blobCommitments}
 	err := r.verifier.VerifyCommitEquivalenceBatch(commitmentBatch)
 	if err != nil {
 		return nil, err
 	}
 
+	probe.SetStage("get_operator_state")
 	operatorState, err := r.chainState.GetOperatorStateWithSocket(ctx, uint(referenceBlockNumber), []core.QuorumID{quorumID})
 	if err != nil {
 		return nil, err
@@ -84,6 +111,7 @@ func (r *retrievalClient) GetBlob(
 		return nil, fmt.Errorf("no quorum with ID: %d", quorumID)
 	}
 
+	probe.SetStage("get_blob_versions")
 	blobVersions, err := r.ethClient.GetAllVersionedBlobParams(ctx)
 	if err != nil {
 		return nil, err
@@ -94,17 +122,20 @@ func (r *retrievalClient) GetBlob(
 		return nil, fmt.Errorf("invalid blob version %d", blobVersion)
 	}
 
+	probe.SetStage("get_encoding_params")
 	encodingParams, err := corev2.GetEncodingParams(blobCommitments.Length, blobParam)
 	if err != nil {
 		return nil, err
 	}
 
+	probe.SetStage("get_assignments")
 	assignments, err := corev2.GetAssignments(operatorState, blobParam, quorumID)
 	if err != nil {
 		return nil, errors.New("failed to get assignments")
 	}
 
 	// Fetch chunks from all operators
+	probe.SetStage("get_chunks")
 	chunksChan := make(chan clients.RetrievedChunks, len(operators))
 	pool := workerpool.New(r.numConnections)
 	for opID := range operators {
@@ -151,6 +182,7 @@ func (r *retrievalClient) GetBlob(
 		return nil, errors.New("failed to retrieve any chunks")
 	}
 
+	probe.SetStage("decode_blob")
 	return r.verifier.Decode(
 		chunks,
 		indices,
