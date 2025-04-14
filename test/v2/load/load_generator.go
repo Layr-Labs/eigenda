@@ -166,19 +166,19 @@ func (l *LoadGenerator) submitBlob(rand *random.TestRandom) (
 
 	eigenDACert, err = l.client.DispersePayload(ctx, payload)
 	if err != nil {
-		l.metrics.reportWriteFailure()
+		l.metrics.reportDispersalFailure()
 		l.client.GetLogger().Errorf("failed to disperse blob: %v", err)
 		return nil, nil, nil, err
 	}
 
 	blobKey, err = eigenDACert.ComputeBlobKey()
 	if err != nil {
-		l.metrics.reportWriteFailure()
+		l.metrics.reportDispersalFailure()
 		l.client.GetLogger().Errorf("failed to compute blob key: %v", err)
 		return nil, nil, nil, err
 	}
 
-	l.metrics.reportWriteSuccess()
+	l.metrics.reportDispersalSuccess()
 	return blobKey, payload, eigenDACert, nil
 }
 

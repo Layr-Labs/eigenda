@@ -10,8 +10,8 @@ const namespace = "eigenda_test_client"
 // loadGeneratorMetrics encapsulates the metrics for the load generator.
 type loadGeneratorMetrics struct {
 	operationsInFlight     *prometheus.GaugeVec
-	writeSuccesses         *prometheus.CounterVec
-	writeFailures          *prometheus.CounterVec
+	dispersalSuccesses     *prometheus.CounterVec
+	dispersalFailures      *prometheus.CounterVec
 	relayReadSuccesses     *prometheus.CounterVec
 	relayReadFailures      *prometheus.CounterVec
 	validatorReadSuccesses *prometheus.CounterVec
@@ -29,21 +29,21 @@ func newLoadGeneratorMetrics(registry *prometheus.Registry) *loadGeneratorMetric
 		[]string{"operation"},
 	)
 
-	writeSuccesses := promauto.With(registry).NewCounterVec(
+	dispersalSuccesses := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
-			Name:      "write_successes",
-			Help:      "Number of write successes",
+			Name:      "dispersal_successes",
+			Help:      "Number of successful dispersal operations",
 		},
 		[]string{},
 	)
 
-	writeFailures := promauto.With(registry).NewCounterVec(
+	dispersalFailures := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: namespace,
 
-			Name: "write_failures",
-			Help: "Number of write failures",
+			Name: "dispersal_failures",
+			Help: "Number of failed dispersals",
 		},
 		[]string{},
 	)
@@ -86,8 +86,8 @@ func newLoadGeneratorMetrics(registry *prometheus.Registry) *loadGeneratorMetric
 
 	return &loadGeneratorMetrics{
 		operationsInFlight:     operationsInFlight,
-		writeSuccesses:         writeSuccesses,
-		writeFailures:          writeFailures,
+		dispersalSuccesses:     dispersalSuccesses,
+		dispersalFailures:      dispersalFailures,
 		relayReadSuccesses:     relayReadSuccesses,
 		relayReadFailures:      relayReadFailures,
 		validatorReadSuccesses: validatorReadSuccesses,
@@ -105,12 +105,12 @@ func (m *loadGeneratorMetrics) endOperation(operation string) {
 	m.operationsInFlight.WithLabelValues(operation).Dec()
 }
 
-func (m *loadGeneratorMetrics) reportWriteSuccess() {
-	m.writeSuccesses.WithLabelValues().Inc()
+func (m *loadGeneratorMetrics) reportDispersalSuccess() {
+	m.dispersalSuccesses.WithLabelValues().Inc()
 }
 
-func (m *loadGeneratorMetrics) reportWriteFailure() {
-	m.writeFailures.WithLabelValues().Inc()
+func (m *loadGeneratorMetrics) reportDispersalFailure() {
+	m.dispersalFailures.WithLabelValues().Inc()
 }
 
 func (m *loadGeneratorMetrics) reportRelayReadSuccess() {
