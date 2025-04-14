@@ -165,7 +165,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 		case r = <-messageChan:
 		case <-attestationCtx.Done():
 			remainingReplies := numOperators - numReply
-			a.Logger.Errorf(
+			a.Logger.Warnf(
 				"global batch attestation time exceeded, no further signatures will be "+
 					"accepted for batch %x. Uncollected signature count: %d", message, remainingReplies)
 			contextExpired = true
