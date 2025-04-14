@@ -16,24 +16,24 @@ func TestOperatorStateHash(t *testing.T) {
 				[32]byte{0}: &core.OperatorInfo{
 					Stake:  big.NewInt(12),
 					Index:  uint(2),
-					Socket: "192.168.1.100:8080",
+					Socket: core.NewOperatorSocket("192.168.1.100", "8080", "", "", ""),
 				},
 				[32]byte{1}: &core.OperatorInfo{
 					Stake:  big.NewInt(23),
 					Index:  uint(3),
-					Socket: "127.0.0.1:3000",
+					Socket: core.NewOperatorSocket("127.0.0.1", "3000", "", "", ""),
 				},
 			},
 			1: {
 				[32]byte{1}: &core.OperatorInfo{
 					Stake:  big.NewInt(23),
 					Index:  uint(3),
-					Socket: "127.0.0.1:3000",
+					Socket: core.NewOperatorSocket("127.0.0.1", "3000", "", "", ""),
 				},
 				[32]byte{2}: &core.OperatorInfo{
 					Stake:  big.NewInt(34),
 					Index:  uint(4),
-					Socket: "192.168.1.100:8080",
+					Socket: core.NewOperatorSocket("192.168.1.100", "8080", "", "", ""),
 				},
 			},
 		},
@@ -41,12 +41,12 @@ func TestOperatorStateHash(t *testing.T) {
 			0: {
 				Stake:  big.NewInt(35),
 				Index:  uint(2),
-				Socket: "",
+				Socket: core.OperatorSocket{},
 			},
 			1: {
 				Stake:  big.NewInt(57),
 				Index:  uint(2),
-				Socket: "",
+				Socket: core.OperatorSocket{},
 			},
 		},
 		BlockNumber: uint(123),
@@ -56,8 +56,8 @@ func TestOperatorStateHash(t *testing.T) {
 	assert.NoError(t, err)
 	q0 := hash1[0]
 	q1 := hash1[1]
-	assert.Equal(t, "6098562ea2e61a8f68743f9162b0adc0", hex.EncodeToString(q0[:]))
-	assert.Equal(t, "8ceea2ec543eb311e51ccfdc9e00ea4f", hex.EncodeToString(q1[:]))
+	assert.Equal(t, "7f227566a0f077dd9bba7613a40de260", hex.EncodeToString(q0[:]))
+	assert.Equal(t, "aa1da3df03ce4c71fae05d5e6c957748", hex.EncodeToString(q1[:]))
 
 	s2 := core.OperatorState{
 		Operators: map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo{
@@ -99,6 +99,6 @@ func TestOperatorStateHash(t *testing.T) {
 	assert.NoError(t, err)
 	q0 = hash2[0]
 	q1 = hash2[1]
-	assert.Equal(t, "dc1bbb0b2b5d20238adfd4bd33661423", hex.EncodeToString(q0[:]))
-	assert.Equal(t, "8ceea2ec543eb311e51ccfdc9e00ea4f", hex.EncodeToString(q1[:]))
+	assert.Equal(t, "a382adf83f330be719af7e2cdaad0ebe", hex.EncodeToString(q0[:]))
+	assert.Equal(t, "aa1da3df03ce4c71fae05d5e6c957748", hex.EncodeToString(q1[:]))
 }

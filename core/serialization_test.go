@@ -195,125 +195,184 @@ func TestHashPubKeyG1(t *testing.T) {
 }
 
 func TestParseOperatorSocket(t *testing.T) {
-	operatorSocket := "localhost:1234;5678;9999;10001"
-	host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, v2RetrievalPort, err := core.ParseOperatorSocket(operatorSocket)
+	opSocketStr := "localhost:1234;5678;9999;10001"
+	operatorSocket, err := core.ParseOperatorSocket(opSocketStr)
 	assert.NoError(t, err)
-	assert.Equal(t, "localhost", host)
-	assert.Equal(t, "1234", v1DispersalPort)
-	assert.Equal(t, "5678", v1RetrievalPort)
-	assert.Equal(t, "9999", v2DispersalPort)
-	assert.Equal(t, "10001", v2RetrievalPort)
 
-	host, v1DispersalPort, v1RetrievalPort, v2DispersalPort, _, err = core.ParseOperatorSocket("localhost:1234;5678")
+	assert.Equal(t, "localhost", operatorSocket.GetHost())
+	assert.Equal(t, "localhost:1234", operatorSocket.GetV1DispersalSocket())
+	assert.Equal(t, "localhost:5678", operatorSocket.GetV1RetrievalSocket())
+	assert.Equal(t, "localhost:9999", operatorSocket.GetV2DispersalSocket())
+	assert.Equal(t, "localhost:10001", operatorSocket.GetV2RetrievalSocket())
+
+	opSocketStr = "localhost:1234;5678"
+	operatorSocket, err = core.ParseOperatorSocket(opSocketStr)
 	assert.NoError(t, err)
-	assert.Equal(t, "localhost", host)
-	assert.Equal(t, "1234", v1DispersalPort)
-	assert.Equal(t, "5678", v1RetrievalPort)
-	assert.Equal(t, "", v2DispersalPort)
+	assert.Equal(t, "localhost", operatorSocket.GetHost())
+	assert.Equal(t, "localhost:1234", operatorSocket.GetV1DispersalSocket())
+	assert.Equal(t, "localhost:5678", operatorSocket.GetV1RetrievalSocket())
+	assert.Equal(t, "", operatorSocket.GetV2DispersalSocket())
 
-	_, _, _, _, _, err = core.ParseOperatorSocket("localhost;1234;5678")
+	opSocketStr = "localhost;1234;5678"
+	_, err = core.ParseOperatorSocket(opSocketStr)
 	assert.NotNil(t, err)
 	assert.ErrorContains(t, err, "invalid host address format")
 
-	_, _, _, _, _, err = core.ParseOperatorSocket("localhost:12345678")
+	opSocketStr = "localhost:12345678"
+	_, err = core.ParseOperatorSocket(opSocketStr)
 	assert.NotNil(t, err)
 	assert.ErrorContains(t, err, "invalid v1 dispersal port format")
 
-	_, _, _, _, _, err = core.ParseOperatorSocket("localhost1234;5678")
+	opSocketStr = "localhost1234;5678"
+	_, err = core.ParseOperatorSocket(opSocketStr)
 	assert.NotNil(t, err)
 	assert.ErrorContains(t, err, "invalid host address format")
 }
 
 func TestGetV1DispersalSocket(t *testing.T) {
-	operatorSocket := core.OperatorSocket("localhost:1234;5678;9999;1025")
+	operatorSocket, err := core.ParseOperatorSocket("localhost:1234;5678;9999;1025")
 	socket := operatorSocket.GetV1DispersalSocket()
+	assert.NoError(t, err)
 	assert.Equal(t, "localhost:1234", socket)
 
-	operatorSocket = core.OperatorSocket("localhost:1234;5678")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:1234;5678")
 	socket = operatorSocket.GetV1DispersalSocket()
+	assert.NoError(t, err)
 	assert.Equal(t, "localhost:1234", socket)
 
-	operatorSocket = core.OperatorSocket("localhost:1234;5678;")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:1234;5678;")
 	socket = operatorSocket.GetV1DispersalSocket()
+	assert.NotNil(t, err)
 	assert.Equal(t, "", socket)
 
-	operatorSocket = core.OperatorSocket("localhost:1234")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:1234")
+	assert.NotNil(t, err)
 	socket = operatorSocket.GetV1DispersalSocket()
 	assert.Equal(t, "", socket)
 }
 
 func TestGetV1RetrievalSocket(t *testing.T) {
 	// Valid v1/v2 socket
-	operatorSocket := core.OperatorSocket("localhost:1234;5678;9999;10001")
+	operatorSocket, err := core.ParseOperatorSocket("localhost:1234;5678;9999;10001")
+	assert.NoError(t, err)
 	socket := operatorSocket.GetV1RetrievalSocket()
 	assert.Equal(t, "localhost:5678", socket)
 
 	// Valid v1 socket
-	operatorSocket = core.OperatorSocket("localhost:1234;5678")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:1234;5678")
 	socket = operatorSocket.GetV1RetrievalSocket()
+	assert.NoError(t, err)
 	assert.Equal(t, "localhost:5678", socket)
 
 	// Invalid socket testcases
-	operatorSocket = core.OperatorSocket("localhost:1234;5678;9999;10001;")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:1234;5678;9999;10001;")
+	assert.NotNil(t, err)
 	socket = operatorSocket.GetV1RetrievalSocket()
 	assert.Equal(t, "", socket)
 
-	operatorSocket = core.OperatorSocket("localhost:1234;5678;")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:1234;5678;")
+	assert.NotNil(t, err)
 	socket = operatorSocket.GetV1RetrievalSocket()
 	assert.Equal(t, "", socket)
 
-	operatorSocket = core.OperatorSocket("localhost:;1234;5678;")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:;1234;5678;")
+	assert.NotNil(t, err)
 	socket = operatorSocket.GetV1RetrievalSocket()
 	assert.Equal(t, "", socket)
 
-	operatorSocket = core.OperatorSocket("localhost:1234;:;5678;")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:1234;:;5678;")
+	assert.NotNil(t, err)
 	socket = operatorSocket.GetV1RetrievalSocket()
 	assert.Equal(t, "", socket)
 
-	operatorSocket = core.OperatorSocket("localhost:;;;")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:;;;")
+	assert.NotNil(t, err)
 	socket = operatorSocket.GetV1RetrievalSocket()
 	assert.Equal(t, "", socket)
 
-	operatorSocket = core.OperatorSocket("localhost:1234")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:1234")
+	assert.NotNil(t, err)
 	socket = operatorSocket.GetV1RetrievalSocket()
 	assert.Equal(t, "", socket)
 }
 
 func TestGetV2RetrievalSocket(t *testing.T) {
 	// Valid v1/v2 socket
-	operatorSocket := core.OperatorSocket("localhost:1234;5678;9999;10001")
+	operatorSocket, err := core.ParseOperatorSocket("localhost:1234;5678;9999;10001")
+	assert.NoError(t, err)
 	socket := operatorSocket.GetV2RetrievalSocket()
 	assert.Equal(t, "localhost:10001", socket)
 
-	// Invalid v2 socket
-	operatorSocket = core.OperatorSocket("localhost:1234;5678")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:1234;5678")
+	assert.NoError(t, err)
 	socket = operatorSocket.GetV2RetrievalSocket()
 	assert.Equal(t, "", socket)
 
 	// Invalid socket testcases
-	operatorSocket = core.OperatorSocket("localhost:1234;5678;9999;10001;")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:1234;5678;9999;10001;")
+	assert.NotNil(t, err)
 	socket = operatorSocket.GetV2RetrievalSocket()
 	assert.Equal(t, "", socket)
 
-	operatorSocket = core.OperatorSocket("localhost:1234;5678;")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:1234;5678;")
+	assert.NotNil(t, err)
 	socket = operatorSocket.GetV2RetrievalSocket()
 	assert.Equal(t, "", socket)
 
-	operatorSocket = core.OperatorSocket("localhost:;1234;5678;")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:;1234;5678;")
+	assert.NotNil(t, err)
 	socket = operatorSocket.GetV2RetrievalSocket()
 	assert.Equal(t, "", socket)
 
-	operatorSocket = core.OperatorSocket("localhost:1234;:;5678;")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:1234;:;5678;")
+	assert.NotNil(t, err)
 	socket = operatorSocket.GetV2RetrievalSocket()
 	assert.Equal(t, "", socket)
 
-	operatorSocket = core.OperatorSocket("localhost:;;;")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:;;;")
+	assert.NotNil(t, err)
 	socket = operatorSocket.GetV2RetrievalSocket()
 	assert.Equal(t, "", socket)
 
-	operatorSocket = core.OperatorSocket("localhost:1234")
+	operatorSocket, err = core.ParseOperatorSocket("localhost:1234")
+	assert.NotNil(t, err)
 	socket = operatorSocket.GetV2RetrievalSocket()
 	assert.Equal(t, "", socket)
+}
+
+func TestParseOperatorSocketOnInvalidSocketStrings(t *testing.T) {
+	//Invalid Socket String Cases
+	invalidSocketStr_OnlyHost := "localhost"
+	_, err := core.ParseOperatorSocket(invalidSocketStr_OnlyHost)
+	assert.ErrorContains(t, err, "invalid host address format")
+
+	invalidSocketStr_MissingPorts := "localhost:"
+	_, err = core.ParseOperatorSocket(invalidSocketStr_MissingPorts)
+	assert.ErrorContains(t, err, "invalid v1 dispersal port format")
+
+	invalidSocketStr_MissingHost := ":1234;4567"
+	_, err = core.ParseOperatorSocket(invalidSocketStr_MissingHost)
+	assert.ErrorContains(t, err, "unable to lookup host")
+
+	invalidSocketStr_MissingV1RetrievalPort := "localhost:1234"
+	_, err = core.ParseOperatorSocket(invalidSocketStr_MissingV1RetrievalPort)
+	assert.ErrorContains(t, err, " it must specify v1 dispersal/retrieval ports")
+
+	invalidSocketStr_MissingV1DisperserPort := "localhost:;5467"
+	_, err = core.ParseOperatorSocket(invalidSocketStr_MissingV1DisperserPort)
+	assert.ErrorContains(t, err, "invalid v1 dispersal port format")
+
+	invalidSocketStr_MissingV2RetrievalPort := "localhost:1234;5678;9101"
+	_, err = core.ParseOperatorSocket(invalidSocketStr_MissingV2RetrievalPort)
+	assert.ErrorContains(t, err, "invalid opSocketStr address format")
+
+	invalidSocketStr_MissingV2DispersalPort := "localhost:1234;5678;;9101"
+	_, err = core.ParseOperatorSocket(invalidSocketStr_MissingV2DispersalPort)
+	assert.ErrorContains(t, err, "invalid v2 dispersal port format")
+
+	invalidSocketStr_MissingV1Ports := "localhost:;;1234;5678"
+	_, err = core.ParseOperatorSocket(invalidSocketStr_MissingV1Ports)
+	assert.ErrorContains(t, err, "it must specify valid v1 dispersal port")
 }
 
 func TestSignatureBytes(t *testing.T) {

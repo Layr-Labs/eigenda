@@ -85,8 +85,9 @@ func (c client) GetChunks(
 	quorumID core.QuorumID,
 	chunksChan chan RetrievedChunks,
 ) {
+
 	conn, err := grpc.NewClient(
-		core.OperatorSocket(opInfo.Socket).GetV1RetrievalSocket(),
+		opInfo.Socket.GetV1RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
