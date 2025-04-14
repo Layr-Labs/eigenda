@@ -458,7 +458,8 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		*blobKey,
 		eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys,
 		payload,
-		blobLengthSymbols)
+		blobLengthSymbols,
+		0)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relays: %w", err)
 	}
@@ -476,7 +477,8 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		blobHeader.Version,
 		*commitment,
 		eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
-		payload)
+		payload,
+		0)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from validators: %w", err)
 	}
@@ -510,34 +512,59 @@ func (c *TestClient) ReadBlobFromRelays(
 	key corev2.BlobKey,
 	relayKeys []corev2.RelayKey,
 	expectedPayload []byte,
-	blobLengthSymbols uint32) error {
+	blobLengthSymbols uint32,
+	timeout time.Duration) error {
 
 	for _, relayID := range relayKeys {
-		start := time.Now()
-
-		c.logger.Debugf("Reading blob from relay %d", relayID)
-		blobBytesFromRelay, err := c.relayClient.GetBlob(ctx, relayID, key)
+		err := c.ReadBlobFromRelay(ctx, key, relayID, expectedPayload, blobLengthSymbols, timeout)
 		if err != nil {
-			return fmt.Errorf("failed to read blob from relay: %w", err)
+			return fmt.Errorf("failed to read blob from relay %d: %w", relayID, err)
 		}
+	}
 
-		c.metrics.reportRelayReadTime(time.Since(start), relayID)
+	return nil
+}
 
-		blob, err := coretypes.DeserializeBlob(blobBytesFromRelay, blobLengthSymbols)
-		if err != nil {
-			return fmt.Errorf("failed to deserialize blob: %w", err)
-		}
+// ReadBlobFromRelay reads a blob from the relay and compares it to the given payload.
+func (c *TestClient) ReadBlobFromRelay(
+	ctx context.Context,
+	key corev2.BlobKey,
+	relayKey corev2.RelayKey,
+	expectedPayload []byte,
+	blobLengthSymbols uint32,
+	timeout time.Duration,
+) error {
 
-		payload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
-		if err != nil {
-			return fmt.Errorf("failed to decode blob: %w", err)
-		}
+	start := time.Now()
 
-		payloadBytesFromRelay := payload.Serialize()
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 
-		if !bytes.Equal(payloadBytesFromRelay, expectedPayload) {
-			return fmt.Errorf("payloads do not match")
-		}
+	c.logger.Debugf("Reading blob from relay %d", relayKey)
+	blobBytesFromRelay, err := c.relayClient.GetBlob(ctx, relayKey, key)
+	if err != nil {
+		return fmt.Errorf("failed to read blob from relay: %w", err)
+	}
+
+	c.metrics.reportRelayReadTime(time.Since(start), relayKey)
+
+	blob, err := coretypes.DeserializeBlob(blobBytesFromRelay, blobLengthSymbols)
+	if err != nil {
+		return fmt.Errorf("failed to deserialize blob: %w", err)
+	}
+
+	payload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
+	if err != nil {
+		return fmt.Errorf("failed to decode blob: %w", err)
+	}
+
+	payloadBytesFromRelay := payload.Serialize()
+
+	if !bytes.Equal(payloadBytesFromRelay, expectedPayload) {
+		return fmt.Errorf("payloads do not match")
 	}
 
 	return nil
@@ -550,7 +577,8 @@ func (c *TestClient) ReadBlobFromValidators(
 	blobVersion corev2.BlobVersion,
 	blobCommitments encoding.BlobCommitments,
 	quorums []core.QuorumID,
-	expectedPayloadBytes []byte) error {
+	expectedPayloadBytes []byte,
+	timeout time.Duration) error {
 
 	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
@@ -558,41 +586,73 @@ func (c *TestClient) ReadBlobFromValidators(
 	}
 
 	for _, quorumID := range quorums {
-		c.logger.Debugf("Reading blob from validators for quorum %d", quorumID)
-
-		start := time.Now()
-
-		probe := c.metrics.validatorReadTimer.NewSequence()
-		retrievedBlobBytes, err := c.retrievalClient.GetBlobWithProbe(
+		err = c.ReadBlobFromValidatorsInQuorum(
 			ctx,
 			blobKey,
 			blobVersion,
 			blobCommitments,
-			uint64(currentBlockNumber),
 			quorumID,
-			probe)
-		probe.End()
+			uint64(currentBlockNumber),
+			expectedPayloadBytes,
+			timeout)
 		if err != nil {
-			return fmt.Errorf("failed to read blob from validators, %s: %w", probe.History(), err)
+			return fmt.Errorf("failed to read blob from validators in quorum %d: %w", quorumID, err)
 		}
+	}
 
-		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
+	return nil
+}
 
-		blobLengthSymbols := uint32(blobCommitments.Length)
-		blob, err := coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
-		if err != nil {
-			return fmt.Errorf("failed to deserialize blob: %w", err)
-		}
+// ReadBlobFromValidatorsInQuorum reads a blob from the validators in a specific quorum and compares it to
+// the given payload.
+func (c *TestClient) ReadBlobFromValidatorsInQuorum(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+	blobVersion corev2.BlobVersion,
+	blobCommitments encoding.BlobCommitments,
+	quorumID core.QuorumID,
+	currentBlockNumber uint64,
+	expectedPayloadBytes []byte,
+	timeout time.Duration) error {
 
-		retrievedPayload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
-		if err != nil {
-			return fmt.Errorf("failed to convert blob to payload: %w", err)
-		}
+	start := time.Now()
 
-		payloadBytes := retrievedPayload.Serialize()
-		if !bytes.Equal(payloadBytes, expectedPayloadBytes) {
-			return fmt.Errorf("payloads do not match")
-		}
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	probe := c.metrics.validatorReadTimer.NewSequence()
+	retrievedBlobBytes, err := c.retrievalClient.GetBlobWithProbe(
+		ctx,
+		blobKey,
+		blobVersion,
+		blobCommitments,
+		currentBlockNumber,
+		quorumID,
+		probe)
+	probe.End()
+	if err != nil {
+		return fmt.Errorf("failed to read blob from validators, %s: %w", probe.History(), err)
+	}
+
+	c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
+
+	blobLengthSymbols := uint32(blobCommitments.Length)
+	blob, err := coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
+	if err != nil {
+		return fmt.Errorf("failed to deserialize blob: %w", err)
+	}
+
+	retrievedPayload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
+	if err != nil {
+		return fmt.Errorf("failed to convert blob to payload: %w", err)
+	}
+
+	payloadBytes := retrievedPayload.Serialize()
+	if !bytes.Equal(payloadBytes, expectedPayloadBytes) {
+		return fmt.Errorf("payloads do not match")
 	}
 
 	return nil

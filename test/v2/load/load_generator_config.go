@@ -25,12 +25,16 @@ type LoadGeneratorConfig struct {
 	ValidatorReadAmplification float64
 	// The maximum number of parallel blobs submissions in flight.
 	SubmissionParallelism uint64
-	// The maximum number of parallel blob read operations in flight.
-	ReadParallelism uint64
+	// The maximum number of parallel blob relay read operations in flight.
+	RelayReadParallelism uint64
+	// The maximum number of parallel blob validator read operations in flight.
+	ValidatorReadParallelism uint64
 	// The timeout for each blob dispersal.
 	DispersalTimeout time.Duration
-	// The timeout for reading each blob.
-	ReadTimeout time.Duration
+	// The timeout for reading a blob from a relay. This is the timeout per individual read.
+	RelayReadTimeout time.Duration
+	// The timeout for reading a blob from the validators. This is the timeout per individual read.
+	ValidatorReadTimeout time.Duration
 	// EnablePprof enables the pprof HTTP server for profiling
 	EnablePprof bool
 	// PprofHttpPort is the port that the pprof HTTP server listens on
