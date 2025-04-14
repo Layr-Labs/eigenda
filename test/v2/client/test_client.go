@@ -490,9 +490,13 @@ func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (
 
 	payload := coretypes.NewPayload(payloadBytes)
 
-	cert, err := c.GetPayloadDisperser().SendPayload(ctx, payload)
+	probe := c.metrics.dispersalTimer.NewSequence()
+	defer probe.End()
+	cert, err := c.GetPayloadDisperser().SendPayloadWithProbe(ctx, payload, probe)
+	probe.End()
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to disperse payload: %w", err)
+		return nil, fmt.Errorf("failed to disperse payload, %s: %w", probe.History(), err)
 	}
 
 	c.metrics.reportDispersalTime(time.Since(start))

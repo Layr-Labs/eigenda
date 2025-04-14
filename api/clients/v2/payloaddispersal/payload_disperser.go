@@ -22,7 +22,6 @@ type PayloadDisperser struct {
 	config          PayloadDisperserConfig
 	disperserClient clients.DisperserClient
 	certVerifier    clients.ICertVerifier
-	stageTimer      *common.StageTimer
 }
 
 // NewPayloadDisperser creates a PayloadDisperser from subcomponents that have already been constructed and initialized.
@@ -30,16 +29,16 @@ type PayloadDisperser struct {
 func NewPayloadDisperser(
 	logger logging.Logger,
 	payloadDisperserConfig PayloadDisperserConfig,
-	// IMPORTANT: it is permissible for the disperserClient to be configured without a prover, but operating with this
-	// configuration puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for computing
-	// the commitments to a blob, and the PayloadDisperser doesn't have a mechanism to verify these commitments.
-	//
-	// TODO: In the future, an optimized method of commitment verification using fiat shamir transformation will
-	//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
-	//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
+// IMPORTANT: it is permissible for the disperserClient to be configured without a prover, but operating with this
+// configuration puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for computing
+// the commitments to a blob, and the PayloadDisperser doesn't have a mechanism to verify these commitments.
+//
+// TODO: In the future, an optimized method of commitment verification using fiat shamir transformation will
+//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
+//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
 	disperserClient clients.DisperserClient,
 	certVerifier clients.ICertVerifier,
-	// if nil, then no metrics will be collected
+// if nil, then no metrics will be collected
 	registry *prometheus.Registry,
 ) (*PayloadDisperser, error) {
 
@@ -53,7 +52,6 @@ func NewPayloadDisperser(
 		config:          payloadDisperserConfig,
 		disperserClient: disperserClient,
 		certVerifier:    certVerifier,
-		stageTimer:      common.NewStageTimer(registry, "PayloadDisperser", "SendPayload"),
 	}, nil
 }
 
@@ -67,16 +65,26 @@ func NewPayloadDisperser(
 //  6. Return the valid cert
 func (pd *PayloadDisperser) SendPayload(
 	ctx context.Context,
-	// payload is the raw data to be stored on eigenDA
+// payload is the raw data to be stored on eigenDA
 	payload *coretypes.Payload,
 ) (*coretypes.EigenDACert, error) {
+	return pd.SendPayloadWithProbe(ctx, payload, nil)
+}
 
-	probe := pd.stageTimer.NewSequence("convert_to_blob")
-	defer probe.End()
+// SendPayloadWithProbe is the same as SendPayload, but allows the caller to pass in a probe for collecting metrics.
+// If the probe is nil then no metrics will be collected.
+func (pd *PayloadDisperser) SendPayloadWithProbe(
+	ctx context.Context,
+// payload is the raw data to be stored on eigenDA
+	payload *coretypes.Payload,
+	probe *common.SequenceProbe,
+) (*coretypes.EigenDACert, error) {
+
+	probe.SetStage("convert_to_blob")
 
 	blob, err := payload.ToBlob(pd.config.PayloadPolynomialForm)
 	if err != nil {
-		return nil, fmt.Errorf("convert payload to blob: %w", err)
+		return nil, fmt.Errorf("failed to convert payload to blob: %w", err)
 	}
 
 	probe.SetStage("get_quorums")

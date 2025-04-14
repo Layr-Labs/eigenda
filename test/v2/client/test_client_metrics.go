@@ -27,6 +27,8 @@ type testClientMetrics struct {
 	certificationTime *prometheus.SummaryVec
 	relayReadTime     *prometheus.SummaryVec
 	validatorReadTime *prometheus.SummaryVec
+
+	dispersalTimer *common.StageTimer
 }
 
 // newTestClientMetrics creates a new testClientMetrics.
@@ -103,6 +105,8 @@ func newTestClientMetrics(logger logging.Logger, port int) *testClientMetrics {
 		[]string{"quorum"},
 	)
 
+	dispersalTimer := common.NewStageTimer(registry, "PayloadDisperser", "SendPayload")
+
 	return &testClientMetrics{
 		logger:            logger,
 		server:            server,
@@ -111,6 +115,7 @@ func newTestClientMetrics(logger logging.Logger, port int) *testClientMetrics {
 		certificationTime: certificationTime,
 		relayReadTime:     relayReadTime,
 		validatorReadTime: validatorReadTime,
+		dispersalTimer:    dispersalTimer,
 	}
 }
 
