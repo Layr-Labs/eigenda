@@ -103,9 +103,11 @@ func GetClient(configPath string) (*TestClient, error) {
 			return nil, fmt.Errorf("failed to setup filesystem: %w", err)
 		}
 
-		testMetrics := newTestClientMetrics(logger, testConfig.MetricsPort)
-		metrics = testMetrics
-		testMetrics.start()
+		if !testConfig.DisableMetrics {
+			testMetrics := newTestClientMetrics(logger, testConfig.MetricsPort)
+			metrics = testMetrics
+			testMetrics.start()
+		}
 	}
 
 	client, err := NewTestClient(logger, metrics, testConfig)

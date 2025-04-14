@@ -1,7 +1,9 @@
 syntax = "proto3";
 package disperser.v2;
+
 import "common/common.proto";
 import "common/v2/common_v2.proto";
+
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2";
 
 // Disperser defines the public APIs for dispersing blobs.
@@ -41,8 +43,8 @@ message DisperseBlobRequest {
   // The blob to be dispersed.
   //
   // The size of this byte array may be any size as long as it does not exceed the maximum length of 16MiB.
-  // While the data being dispersed is only required to be greater than 0 bytes, the blob size charged against the 
-  // payment method will be rounded up to the nearest multiple of `minNumSymbols` defined by the payment vault contract 
+  // While the data being dispersed is only required to be greater than 0 bytes, the blob size charged against the
+  // payment method will be rounded up to the nearest multiple of `minNumSymbols` defined by the payment vault contract
   // (https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/payments/PaymentVaultStorage.sol#L9).
   //
   // Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more
@@ -91,7 +93,7 @@ message BlobStatusReply {
   // signed_batch and blob_inclusion_info are only set if the blob status is GATHERING_SIGNATURES or COMPLETE.
   // When blob is in GATHERING_SIGNATURES status, the attestation object in signed_batch contains attestation information
   // at the point in time. As it gathers more signatures, attestation object will be updated according to the latest attestation status.
-  // The client can use this intermediate attestation to verify a blob if it has gathered enough signatures. 
+  // The client can use this intermediate attestation to verify a blob if it has gathered enough signatures.
   // Otherwise, it should should poll the GetBlobStatus API until the desired level of attestation has been gathered or status is COMPLETE.
   // When blob is in COMPLETE status, the attestation object in signed_batch contains the final attestation information.
   // If the final attestation does not meet the client's requirement, the client should try a new dispersal.

@@ -754,7 +754,7 @@ where metadata contains a requestedAt timestamp and the requested quorum numbers
 BlobKey definition: https://github.com/Layr-Labs/eigenda/blob/6b02bf966afa2b9bf2385db8dd01f66f17334e17/disperser/disperser.go#L87
 BlobKey computation: https://github.com/Layr-Labs/eigenda/blob/6b02bf966afa2b9bf2385db8dd01f66f17334e17/disperser/common/blobstore/shared_storage.go#L83-L84
 
-Different DisperseBlobRequests have different IDs, including two identical DisperseBlobRequests 
+Different DisperseBlobRequests have different IDs, including two identical DisperseBlobRequests
 sent at different times. Clients should thus store this ID and use it to query the processing
 status of the request via the GetBlobStatus API. </p></td>
                 </tr>
