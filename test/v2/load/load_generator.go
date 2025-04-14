@@ -199,21 +199,23 @@ func (l *LoadGenerator) readBlobFromRelays(
 	eigenDACert *coretypes.EigenDACert,
 ) {
 
+	var relayReadCount int
+	if l.config.RelayReadAmplification < 1 {
+		if rand.Float64() < l.config.RelayReadAmplification {
+			relayReadCount = 1
+		} else {
+			return
+		}
+	} else {
+		relayReadCount = int(l.config.RelayReadAmplification)
+	}
+
 	l.metrics.startOperation("relay_read")
 	defer func() {
 		l.metrics.endOperation("relay_read")
 	}()
 
 	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
-
-	var relayReadCount int
-	if l.config.RelayReadAmplification < 1 {
-		if rand.Float64() < l.config.RelayReadAmplification {
-			relayReadCount = 1
-		}
-	} else {
-		relayReadCount = int(l.config.RelayReadAmplification)
-	}
 
 	timeout := time.Duration(l.config.RelayReadTimeout) * time.Second
 
@@ -241,6 +243,17 @@ func (l *LoadGenerator) readBlobFromValidators(
 	payload []byte,
 	eigenDACert *coretypes.EigenDACert) {
 
+	var validatorReadCount int
+	if l.config.ValidatorReadAmplification < 1 {
+		if rand.Float64() < l.config.ValidatorReadAmplification {
+			validatorReadCount = 1
+		} else {
+			return
+		}
+	} else {
+		validatorReadCount = int(l.config.ValidatorReadAmplification)
+	}
+
 	l.metrics.startOperation("validator_read")
 	defer func() {
 		l.metrics.endOperation("validator_read")
@@ -251,15 +264,6 @@ func (l *LoadGenerator) readBlobFromValidators(
 	if err != nil {
 		l.client.GetLogger().Errorf("failed to bind blob commitments: %v", err)
 		return
-	}
-
-	var validatorReadCount int
-	if l.config.ValidatorReadAmplification < 1 {
-		if rand.Float64() < l.config.ValidatorReadAmplification {
-			validatorReadCount = 1
-		}
-	} else {
-		validatorReadCount = int(l.config.ValidatorReadAmplification)
 	}
 
 	timeout := time.Duration(l.config.ValidatorReadTimeout) * time.Second
