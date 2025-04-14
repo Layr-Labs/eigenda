@@ -453,8 +453,12 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	defer func() {
 		d.metrics.reportNewBatchLatency(time.Since(newBatchStart))
 	}()
-	blobMetadatas, cursor, err := d.blobMetadataStore.GetBlobMetadataByStatusPaginated(ctx,
-		v2.Encoded, d.cursor, d.MaxBatchSize)
+	blobMetadatas, cursor, err := d.blobMetadataStore.GetBlobMetadataByStatusPaginated(
+		ctx,
+		v2.Encoded,
+		d.cursor,
+		d.MaxBatchSize,
+	)
 	getBlobMetadataFinished := time.Now()
 	d.metrics.reportGetBlobMetadataLatency(getBlobMetadataFinished.Sub(newBatchStart))
 	if err != nil {
@@ -616,8 +620,12 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 }
 
 // GetOperatorState returns the operator state for the given quorums at the given block number
-func (d *Dispatcher) GetOperatorState(ctx context.Context, metadatas []*v2.BlobMetadata,
-	blockNumber uint64) (*core.IndexedOperatorState, error) {
+func (d *Dispatcher) GetOperatorState(
+	ctx context.Context,
+	metadatas []*v2.BlobMetadata,
+	blockNumber uint64,
+) (*core.IndexedOperatorState, error) {
+
 	quorums := make(map[core.QuorumID]struct{}, 0)
 	for _, m := range metadatas {
 		for _, quorum := range m.BlobHeader.QuorumNumbers {
@@ -636,9 +644,14 @@ func (d *Dispatcher) GetOperatorState(ctx context.Context, metadatas []*v2.BlobM
 	return d.chainState.GetIndexedOperatorState(ctx, uint(blockNumber), quorumIds)
 }
 
-func (d *Dispatcher) sendChunks(ctx context.Context, client clients.NodeClient,
-	batch *corev2.Batch) (*core.Signature, error) {
+func (d *Dispatcher) sendChunks(
+	ctx context.Context,
+	client clients.NodeClient,
+	batch *corev2.Batch,
+) (*core.Signature, error) {
+
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, d.AttestationTimeout)
+
 	defer cancel()
 
 	sig, err := client.StoreChunks(ctxWithTimeout, batch)
@@ -656,8 +669,12 @@ func (d *Dispatcher) sendChunks(ctx context.Context, client clients.NodeClient,
 // If the blob is removed from the blob set after the time it is retrieved as part of a batch
 // for processing by `NewBatch` (when it's in `ENCODED` state) and before the time the batch
 // is deduplicated against the blobSet, it will be dispatched again in a different batch.
-func (d *Dispatcher) updateBatchStatus(ctx context.Context, batch *batchData,
-	quorumResults map[core.QuorumID]uint8) error {
+func (d *Dispatcher) updateBatchStatus(
+	ctx context.Context,
+	batch *batchData,
+	quorumResults map[core.QuorumID]uint8,
+) error {
+
 	var multierr error
 	for i, cert := range batch.Batch.BlobCertificates {
 		blobKey := batch.BlobKeys[i]
