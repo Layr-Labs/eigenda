@@ -492,7 +492,6 @@ func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (
 	payload := coretypes.NewPayload(payloadBytes)
 
 	probe := c.metrics.dispersalTimer.NewSequence()
-	defer probe.End()
 	cert, err := c.GetPayloadDisperser().SendPayloadWithProbe(ctx, payload, probe)
 	probe.End()
 
