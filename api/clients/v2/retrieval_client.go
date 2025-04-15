@@ -51,7 +51,21 @@ type retrievalClient struct {
 	ethClient      core.Reader
 	chainState     core.ChainState
 	verifier       encoding.Verifier
-	numConnections int
+	connectionPool *workerpool.WorkerPool
+	computePool    *workerpool.WorkerPool
+}
+
+// encapsulates a GetChunksReply
+type getChunksReply struct {
+	OperatorID core.OperatorID
+	Err        error
+	Reply      *grpcnode.GetChunksReply
+}
+
+// work done by decode is passed back to the caller via this struct
+type decodeChunksReply struct {
+	Blob []byte
+	Err  error
 }
 
 var _ RetrievalClient = &retrievalClient{}
@@ -62,14 +76,18 @@ func NewRetrievalClient(
 	ethClient core.Reader,
 	chainState core.ChainState,
 	verifier encoding.Verifier,
-	numConnections int,
+// connectionPoolSize limits the maximum number of concurrent network connections
+	connectionPoolSize int,
+// computePoolSize limits the maximum number of concurrent compute intensive tasks
+	computePoolSize int,
 ) RetrievalClient {
 	return &retrievalClient{
 		logger:         logger.With("component", "RetrievalClient"),
 		ethClient:      ethClient,
 		chainState:     chainState,
 		verifier:       verifier,
-		numConnections: numConnections,
+		connectionPool: workerpool.New(connectionPoolSize),
+		computePool:    workerpool.New(computePoolSize),
 	}
 }
 
@@ -134,71 +152,113 @@ func (r *retrievalClient) GetBlobWithProbe(
 		return nil, errors.New("failed to get assignments")
 	}
 
-	// Fetch chunks from all operators
-	probe.SetStage("submit_to_pool")
-	chunksChan := make(chan clients.RetrievedChunks, len(operators))
-	pool := workerpool.New(r.numConnections)
+	// Submit download requests to the connection pool
+	probe.SetStage("connection_pool")
+	replyChan := make(chan *getChunksReply, len(operators))
 	for opID := range operators {
 		// make sure the value doesn't change before being submitted to the pool
 		boundOperatorId := opID
 		opInfo := operatorState.Operators[quorumID][boundOperatorId]
-		pool.Submit(func() {
-			r.getChunksFromOperator(ctx, boundOperatorId, opInfo, blobKey, quorumID, chunksChan)
+		r.connectionPool.Submit(func() {
+			r.downloadChunks(ctx, boundOperatorId, opInfo, blobKey, quorumID, replyChan)
 		})
 	}
 
-	probe.SetStage("get_chunks")
+	// Wait for all download requests to finish
+	probe.SetStage("download")
+	replies := make([]*getChunksReply, 0, len(operators))
+	for i := 0; i < len(operators); i++ {
+		select {
+		case reply := <-replyChan:
+			if reply.Err != nil {
+				r.logger.Warn("failed to get chunks from operator",
+					"operator", reply.OperatorID.Hex(),
+					"err", reply.Err)
+				continue
+			}
+			replies = append(replies, reply)
+		case <-ctx.Done():
+			return nil, errors.New("context cancelled while waiting for chunks from operators")
+		}
+	}
+
+	// Submit deserialization and verification requests to the compute pool
+	probe.SetStage("compute_pool")
+	deserializeChan := make(chan clients.RetrievedChunks, len(operators))
+	for _, reply := range replies {
+		r.computePool.Submit(func() {
+			r.deserializeAndVerifyChunks(
+				reply.OperatorID,
+				assignments,
+				reply.Reply,
+				blobCommitments,
+				encodingParams,
+				deserializeChan)
+		})
+	}
+
+	probe.SetStage("deserialize_and_verify")
 	var chunks []*encoding.Frame
 	var indices []encoding.ChunkNumber
-	// TODO(ian-shim): if we gathered enough chunks, cancel remaining RPC calls
-	for i := 0; i < len(operators); i++ {
-		reply := <-chunksChan
-		if reply.Err != nil {
-			r.logger.Warn("failed to get chunks from operator", "operator", reply.OperatorID.Hex(), "err", reply.Err)
-			continue
-		}
-		assignment, ok := assignments[reply.OperatorID]
-		if !ok {
-			return nil, fmt.Errorf("no assignment to operator %s", reply.OperatorID.Hex())
-		}
+	for i := 0; i < len(replies); i++ {
+		select {
+		case reply := <-deserializeChan:
+			if reply.Err != nil {
+				deserializeChan <- clients.RetrievedChunks{
+					OperatorID: reply.OperatorID,
+					Err:        reply.Err,
+				}
+			} else {
+				assignment, ok := assignments[reply.OperatorID]
+				if !ok {
+					return nil, fmt.Errorf("no assignment to operator %s", reply.OperatorID.Hex())
+				}
 
-		assignmentIndices := make([]uint, len(assignment.GetIndices()))
-		for i, index := range assignment.GetIndices() {
-			assignmentIndices[i] = uint(index)
-		}
+				assignmentIndices := make([]uint, len(assignment.GetIndices()))
+				for i, index := range assignment.GetIndices() {
+					assignmentIndices[i] = uint(index)
+				}
 
-		err = r.verifier.VerifyFrames(reply.Chunks, assignmentIndices, blobCommitments, encodingParams)
-		if err != nil {
-			r.logger.Warn("failed to verify chunks from operator", "operator", reply.OperatorID.Hex(), "err", err)
-			continue
-		} else {
-			r.logger.Info("verified chunks from operator", "operator", reply.OperatorID.Hex())
+				chunks = append(chunks, reply.Chunks...)
+				indices = append(indices, assignmentIndices...)
+			}
+		case <-ctx.Done():
+			return nil, errors.New("context cancelled while waiting for chunks from operators")
 		}
-
-		chunks = append(chunks, reply.Chunks...)
-		indices = append(indices, assignmentIndices...)
 	}
 
-	if len(chunks) == 0 {
-		return nil, errors.New("failed to retrieve any chunks")
-	}
+	probe.SetStage("compute_pool")
+	decodeResponseChan := make(chan *decodeChunksReply, 1)
+	r.computePool.Submit(func() {
+		blob, err := r.verifier.Decode(
+			chunks,
+			indices,
+			encodingParams,
+			uint64(blobCommitments.Length)*encoding.BYTES_PER_SYMBOL,
+		)
+		decodeResponseChan <- &decodeChunksReply{
+			Blob: blob,
+			Err:  err,
+		}
+	})
 
-	probe.SetStage("decode_blob")
-	return r.verifier.Decode(
-		chunks,
-		indices,
-		encodingParams,
-		uint64(blobCommitments.Length)*encoding.BYTES_PER_SYMBOL,
-	)
+	probe.SetStage("decode")
+	select {
+	case decodeResponse := <-decodeResponseChan:
+		return decodeResponse.Blob, decodeResponse.Err
+	case <-ctx.Done():
+		return nil, errors.New("context cancelled while waiting for decode response")
+	}
 }
 
-func (r *retrievalClient) getChunksFromOperator(
+// downloadChunks downloads chunks from the operator using the GetChunks() gRPC.
+func (r *retrievalClient) downloadChunks(
 	ctx context.Context,
 	opID core.OperatorID,
 	opInfo *core.OperatorInfo,
 	blobKey corev2.BlobKey,
 	quorumID core.QuorumID,
-	chunksChan chan clients.RetrievedChunks,
+	replyChan chan *getChunksReply,
 ) {
 
 	// TODO (cody-littley): this client should be refactored to make requests for smaller quantities of data
@@ -222,10 +282,9 @@ func (r *retrievalClient) getChunksFromOperator(
 		}
 	}()
 	if err != nil {
-		chunksChan <- clients.RetrievedChunks{
+		replyChan <- &getChunksReply{
 			OperatorID: opID,
 			Err:        err,
-			Chunks:     nil,
 		}
 		return
 	}
@@ -238,21 +297,35 @@ func (r *retrievalClient) getChunksFromOperator(
 
 	reply, err := n.GetChunks(ctx, request)
 	if err != nil {
-		chunksChan <- clients.RetrievedChunks{
+		replyChan <- &getChunksReply{
 			OperatorID: opID,
 			Err:        err,
-			Chunks:     nil,
 		}
 		return
 	}
 
-	chunks := make([]*encoding.Frame, len(reply.GetChunks()))
-	for i, data := range reply.GetChunks() {
-		var chunk *encoding.Frame
-		chunk, err = new(encoding.Frame).DeserializeGnark(data)
+	replyChan <- &getChunksReply{
+		OperatorID: opID,
+		Reply:      reply,
+	}
+}
+
+// deserializeAndVerifyChunks deserializes the chunks from the GetChunksReply and sends them to the chunksChan.
+func (r *retrievalClient) deserializeAndVerifyChunks(
+	operatorID core.OperatorID,
+	assignments map[core.OperatorID]corev2.Assignment,
+	getChunksReply *grpcnode.GetChunksReply,
+	blobCommitments encoding.BlobCommitments,
+	encodingParams encoding.EncodingParams,
+	replyChan chan clients.RetrievedChunks,
+) {
+
+	chunks := make([]*encoding.Frame, len(getChunksReply.GetChunks()))
+	for i, data := range getChunksReply.GetChunks() {
+		chunk, err := new(encoding.Frame).DeserializeGnark(data)
 		if err != nil {
-			chunksChan <- clients.RetrievedChunks{
-				OperatorID: opID,
+			replyChan <- clients.RetrievedChunks{
+				OperatorID: operatorID,
 				Err:        err,
 				Chunks:     nil,
 			}
@@ -261,8 +334,36 @@ func (r *retrievalClient) getChunksFromOperator(
 
 		chunks[i] = chunk
 	}
-	chunksChan <- clients.RetrievedChunks{
-		OperatorID: opID,
+
+	assignment, ok := assignments[operatorID]
+	if !ok {
+		replyChan <- clients.RetrievedChunks{
+			OperatorID: operatorID,
+			Err:        fmt.Errorf("no assignment to operator %s", operatorID.Hex()),
+		}
+	}
+
+	assignmentIndices := make([]uint, len(assignment.GetIndices()))
+	for i, index := range assignment.GetIndices() {
+		assignmentIndices[i] = uint(index)
+	}
+
+	err := r.verifier.VerifyFrames(chunks, assignmentIndices, blobCommitments, encodingParams)
+	if err != nil {
+		r.logger.Warn("failed to verify chunks from operator",
+			"operator", operatorID.Hex(),
+			"err", err)
+		replyChan <- clients.RetrievedChunks{
+			OperatorID: operatorID,
+			Err:        err,
+		}
+		return
+	} else {
+		r.logger.Info("verified chunks from operator", "operator", operatorID.Hex())
+	}
+
+	replyChan <- clients.RetrievedChunks{
+		OperatorID: operatorID,
 		Err:        nil,
 		Chunks:     chunks,
 	}

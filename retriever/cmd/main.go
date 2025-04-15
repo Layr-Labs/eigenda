@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"runtime"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -63,9 +64,9 @@ func RetrieverMain(ctx *cli.Context) error {
 	gs := grpc.NewServer(
 		opt,
 		grpc.ChainUnaryInterceptor(
-		// TODO(ian-shim): Add interceptors
-		// correlation.UnaryServerInterceptor(),
-		// logger.UnaryServerInterceptor(*s.logger.Logger),
+			// TODO(ian-shim): Add interceptors
+			// correlation.UnaryServerInterceptor(),
+			// logger.UnaryServerInterceptor(*s.logger.Logger),
 		),
 	)
 
@@ -125,7 +126,8 @@ func RetrieverMain(ctx *cli.Context) error {
 	}
 
 	if config.EigenDAVersion == 2 {
-		retrievalClient := clientsv2.NewRetrievalClient(logger, tx, cs, v, config.NumConnections)
+		numCPUs := runtime.NumCPU()
+		retrievalClient := clientsv2.NewRetrievalClient(logger, tx, cs, v, config.NumConnections, numCPUs)
 		retrieverServiceServer := retrieverv2.NewServer(config, logger, retrievalClient, cs)
 		retrieverServiceServer.Start(context.Background())
 
