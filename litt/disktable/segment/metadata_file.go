@@ -26,13 +26,13 @@ const (
 	// - 4 bytes for version
 	// - 4 bytes for the sharding factor
 	// - 4 bytes for salt
-	// - 8 bytes for timestamp
+	// - 8 bytes for lastValueTimestamp
 	// - and 1 byte for sealed.
 	MetadataSize = 21
 )
 
 // metadataFile contains metadata about a segment. This file contains metadata about the data segment, such as
-// serialization version and the timestamp when the file was sealed.
+// serialization version and the lastValueTimestamp when the file was sealed.
 type metadataFile struct {
 	// The segment index. This value is encoded in the file name.
 	index uint32
@@ -49,10 +49,10 @@ type metadataFile struct {
 	salt uint32
 
 	// The time when the last value was written into the segment, in nanoseconds since the epoch. A segment can
-	// only be deleted when all values within it are expired, and so we only need to keep track of the timestamp of
+	// only be deleted when all values within it are expired, and so we only need to keep track of the lastValueTimestamp of
 	// the last value (which always expires last). This value is irrelevant if the segment is not yet sealed.
 	// This value is encoded in the file.
-	timestamp uint64
+	lastValueTimestamp uint64
 
 	// If true, the segment is sealed and no more data can be written to it. If false, then data can still be written to
 	// this segment. This value is encoded in the file.
@@ -158,7 +158,7 @@ func (m *metadataFile) swapPath() string {
 // and should only be performed when all data that will be written to the key/value files has been made durable.
 func (m *metadataFile) seal(now time.Time) error {
 	m.sealed = true
-	m.timestamp = uint64(now.UnixNano())
+	m.lastValueTimestamp = uint64(now.UnixNano())
 	err := m.write()
 	if err != nil {
 		return fmt.Errorf("failed to write sealed metadata file: %v", err)
@@ -179,8 +179,8 @@ func (m *metadataFile) serialize() []byte {
 	// Write the salt
 	binary.BigEndian.PutUint32(data[8:12], m.salt)
 
-	// Write the timestamp
-	binary.BigEndian.PutUint64(data[12:20], m.timestamp)
+	// Write the lastValueTimestamp
+	binary.BigEndian.PutUint64(data[12:20], m.lastValueTimestamp)
 
 	// Write the sealed flag
 	if m.sealed {
@@ -205,7 +205,7 @@ func (m *metadataFile) deserialize(data []byte) error {
 
 	m.shardingFactor = binary.BigEndian.Uint32(data[4:8])
 	m.salt = binary.BigEndian.Uint32(data[8:12])
-	m.timestamp = binary.BigEndian.Uint64(data[12:20])
+	m.lastValueTimestamp = binary.BigEndian.Uint64(data[12:20])
 	m.sealed = data[20] == 1
 
 	return nil

@@ -45,7 +45,10 @@ type controlLoop struct {
 	// Does not protect the segments themselves.
 	segmentLock sync.RWMutex
 
-	// All segments currently in use.
+	// All segments currently in use. Only the control loop modifies this map, but other threads may read from it.
+	// The control loop does not need to hold a lock when doing read operations on this map, since no other thread
+	// will modify it. The control loop does need to hold a lock when modifying this map, though, and other threads
+	// must hold a lock when reading from it.
 	segments map[uint32]*segment.Segment
 
 	// The number of bytes contained within the immutable segments. This tracks the number of bytes that are
@@ -251,7 +254,8 @@ func (c *controlLoop) handleWriteRequest(req *controlLoopWriteRequest) {
 	for _, kv := range req.values {
 		// Do the write.
 		seg := c.segments[c.highestSegmentIndex]
-		keyCount, keyFileSize, shardSize, err := seg.Write(kv)
+		keyCount, keyFileSize, err := seg.Write(kv)
+		shardSize := seg.GetMaxShardSize()
 		if err != nil {
 			c.fatalErrorHandler.Panic(
 				fmt.Errorf("failed to write to segment %d: %w", c.highestSegmentIndex, err))

@@ -43,6 +43,7 @@ The following features are currently supported by LittDB:
 - [tables](#table) with non-overlapping namespaces
 - multi-drive support (data can be spread across multiple physical volumes)
 - incremental backups (both local and remote)
+- keys and values up to 2^32 bytes in size
 
 ## Consistency Guarantees
 
@@ -76,6 +77,7 @@ enough need is demonstrated:
   a good use case to justify the implementation effort)
 - more keymap implementations (e.g. badgerDB, a custom solution, etc.)
 - data check-summing and verification (to protect/detect things like disk corruption)
+- keys and values up to 2^64 bytes in size
 
 ## Anti-Features
 

@@ -22,18 +22,27 @@ type FatalErrorHandler struct {
 
 	logger logging.Logger
 
+	// callback is called when the DB panics.
+	callback func(error)
+
 	// If this is non-nil, the DB is in a "panic" state and will refuse to do additional work.
 	error atomic.Pointer[error]
 }
 
-// NewFatalErrorHandler creates a new FatalErrorHandler struct.
-func NewFatalErrorHandler(ctx context.Context, logger logging.Logger) *FatalErrorHandler {
+// NewFatalErrorHandler creates a new FatalErrorHandler struct. Executes the callback function when/if the DB panics.
+// The callback is ignored if it is nil.
+func NewFatalErrorHandler(
+	ctx context.Context,
+	logger logging.Logger,
+	callback func(error)) *FatalErrorHandler {
+
 	ctx, cancel := context.WithCancel(ctx)
 
 	return &FatalErrorHandler{
-		ctx:    ctx,
-		cancel: cancel,
-		logger: logger,
+		ctx:      ctx,
+		cancel:   cancel,
+		logger:   logger,
+		callback: callback,
 	}
 }
 
@@ -98,10 +107,14 @@ func (h *FatalErrorHandler) Panic(err error) {
 	h.logger.Errorf("LittDB encountered an unrecoverable error: %v\n%s", err, stackTrace)
 
 	// only store the error if there isn't already an error stored
-	h.error.CompareAndSwap(nil, &err)
+	firstError := h.error.CompareAndSwap(nil, &err)
 
 	// Always cancel the context, even if this is not the first error. It's possible that the first "error" was
 	// actually a shutdown request, and we want to make sure that the context is always cancelled in the event
 	// of an unexpected error.
 	h.cancel()
+
+	if firstError && h.callback != nil {
+		h.callback(err)
+	}
 }
