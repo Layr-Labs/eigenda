@@ -2,9 +2,9 @@
 
 This project provides tools for working with EigenDA's Structured Reference String (SRS). It includes tools to:
 
-1. Extract G1 and G2 points used by EigenDA from the ptau challenge file, created from the Perpetual Powers of Tau MPC ceremony run by the Ethereum Foundation
-2. Verify that the extracted points are correct based on approaches used in the Ethereum Foundation's KZG ceremony
-3. Download pre-processed SRS files directly from the EigenDA S3 bucket
+1. Download pre-processed SRS files directly from the EigenDA S3 bucket
+2. Extract G1 and G2 points used by EigenDA from the ptau challenge file, created from the Perpetual Powers of Tau MPC ceremony run by the Ethereum Foundation
+3. Verify that the extracted points are correct based on approaches used in the Ethereum Foundation's KZG ceremony
 
 ## Structured Reference String (SRS) Files
 
