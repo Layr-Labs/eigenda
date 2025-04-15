@@ -200,8 +200,8 @@ definitions:
     - Failed
   github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch:
     properties:
-      attestation:
-        $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation'
+      attestation_info:
+        $ref: '#/definitions/v2.AttestationInfo'
       batch_header:
         $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader'
     type: object
@@ -226,6 +226,15 @@ definitions:
         additionalProperties:
           type: number
         type: object
+    type: object
+  v2.AccountBlobFeedResponse:
+    properties:
+      account_id:
+        type: string
+      blobs:
+        items:
+          $ref: '#/definitions/v2.BlobInfo'
+        type: array
     type: object
   v2.AttestationInfo:
     properties:
@@ -542,6 +551,56 @@ info:
   title: EigenDA Data Access API V2
   version: "2.0"
 paths:
+  /accounts/{account_id}/blobs:
+    get:
+      parameters:
+      - description: The account ID to fetch blob feed for
+        in: path
+        name: account_id
+        required: true
+        type: string
+      - description: 'Direction to fetch: ''forward'' (oldest to newest, ASC order)
+          or ''backward'' (newest to oldest, DESC order) [default: forward]'
+        in: query
+        name: direction
+        type: string
+      - description: 'Fetch blobs before this time, exclusive (ISO 8601 format, example:
+          2006-01-02T15:04:05Z) [default: now]'
+        in: query
+        name: before
+        type: string
+      - description: 'Fetch blobs after this time, exclusive (ISO 8601 format, example:
+          2006-01-02T15:04:05Z); must be smaller than `before` [default: `before`-1h]'
+        in: query
+        name: after
+        type: string
+      - description: 'Maximum number of blobs to return; if limit <= 0 or >1000, it''s
+          treated as 1000 [default: 20; max: 1000]'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.AccountBlobFeedResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch blobs posted by an account in a time window by specific direction
+      tags:
+      - Accounts
   /batches/{batch_header_hash}:
     get:
       parameters:

@@ -99,13 +99,13 @@ Reserved-bandwidth dispersal is free to use multiple quorums, however those must
 
 ### PaymentHeader
 PaymentHeader contains payment information for a blob.
-At least one of reservation_period or cumulative_payment must be set, and reservation_period 
-is always considered before cumulative_payment. If reservation_period is set but not valid, 
-the server will reject the request and not proceed with dispersal. If reservation_period is not set 
+At least one of reservation_period or cumulative_payment must be set, and reservation_period
+is always considered before cumulative_payment. If reservation_period is set but not valid,
+the server will reject the request and not proceed with dispersal. If reservation_period is not set
 and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.
 Once the server has accepted the payment header, a client cannot cancel or rollback the payment.
 Every dispersal request will be charged by a multiple of `minNumSymbols` field defined by the payment vault contract.
-If the request blob size is smaller or not a multiple of `minNumSymbols`, the server will charge the user for the next 
+If the request blob size is smaller or not a multiple of `minNumSymbols`, the server will charge the user for the next
 multiple of `minNumSymbols` (https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/payments/PaymentVaultStorage.sol#L9).
 
 
