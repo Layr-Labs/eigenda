@@ -135,7 +135,7 @@ func (r *retrievalClient) GetBlobWithProbe(
 	}
 
 	// Fetch chunks from all operators
-	probe.SetStage("get_chunks")
+	probe.SetStage("submit_to_pool")
 	chunksChan := make(chan clients.RetrievedChunks, len(operators))
 	pool := workerpool.New(r.numConnections)
 	for opID := range operators {
@@ -147,6 +147,7 @@ func (r *retrievalClient) GetBlobWithProbe(
 		})
 	}
 
+	probe.SetStage("get_chunks")
 	var chunks []*encoding.Frame
 	var indices []encoding.ChunkNumber
 	// TODO(ian-shim): if we gathered enough chunks, cancel remaining RPC calls
