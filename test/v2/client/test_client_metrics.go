@@ -124,6 +124,9 @@ func newTestClientMetrics(logger logging.Logger, port int) *testClientMetrics {
 
 // start starts the metrics server.
 func (m *testClientMetrics) start() {
+	if m == nil {
+		return
+	}
 	go func() {
 		err := m.server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -134,6 +137,9 @@ func (m *testClientMetrics) start() {
 
 // stop stops the metrics server.
 func (m *testClientMetrics) stop() {
+	if m == nil {
+		return
+	}
 	err := m.server.Close()
 	if err != nil {
 		m.logger.Errorf("failed to close metrics server: %v", err)
@@ -142,20 +148,32 @@ func (m *testClientMetrics) stop() {
 
 // reportDispersalTime reports the time taken to disperse a blob.
 func (m *testClientMetrics) reportDispersalTime(duration time.Duration) {
+	if m == nil {
+		return
+	}
 	m.dispersalTime.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 // reportCertificationTime reports the time taken to certify a blob.
 func (m *testClientMetrics) reportCertificationTime(duration time.Duration) {
+	if m == nil {
+		return
+	}
 	m.certificationTime.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 // reportRelayReadTime reports the time taken to read a blob from a relay.
 func (m *testClientMetrics) reportRelayReadTime(duration time.Duration, relayID uint32) {
+	if m == nil {
+		return
+	}
 	m.relayReadTime.WithLabelValues(fmt.Sprintf("%d", relayID)).Observe(common.ToMilliseconds(duration))
 }
 
 // reportValidatorReadTime reports the time taken to read a blob from a validator.
 func (m *testClientMetrics) reportValidatorReadTime(duration time.Duration, quorum core.QuorumID) {
+	if m == nil {
+		return
+	}
 	m.validatorReadTime.WithLabelValues(fmt.Sprintf("%d", quorum)).Observe(common.ToMilliseconds(duration))
 }

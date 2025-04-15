@@ -112,6 +112,9 @@ func (r *retrievalClient) GetBlobWithProbe(
 	probe *common.SequenceProbe,
 ) ([]byte, error) {
 
+	// TODO: currently, we download, verify, and decode all chunks. Instead, we could get away with only downloading
+	//  1/(encoding ratio) chunks.
+
 	probe.SetStage("verify_commitment")
 	commitmentBatch := []encoding.BlobCommitments{blobCommitments}
 	err := r.verifier.VerifyCommitEquivalenceBatch(commitmentBatch)

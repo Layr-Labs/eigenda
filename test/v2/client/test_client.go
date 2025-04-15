@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	relayv2 "github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -496,7 +497,10 @@ func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (
 
 	payload := coretypes.NewPayload(payloadBytes)
 
-	probe := c.metrics.dispersalTimer.NewSequence()
+	var probe *common.SequenceProbe
+	if c.metrics != nil {
+		probe = c.metrics.dispersalTimer.NewSequence()
+	}
 	cert, err := c.GetPayloadDisperser().SendPayloadWithProbe(ctx, payload, probe)
 	probe.End()
 
@@ -625,7 +629,11 @@ func (c *TestClient) ReadBlobFromValidatorsInQuorum(
 		defer cancel()
 	}
 
-	probe := c.metrics.validatorReadTimer.NewSequence()
+	var probe *common.SequenceProbe
+	if c.metrics != nil {
+		probe = c.metrics.validatorReadTimer.NewSequence()
+	}
+
 	retrievedBlobBytes, err := c.retrievalClient.GetBlobWithProbe(
 		ctx,
 		blobKey,
