@@ -2,7 +2,7 @@
 
 ## Goals
 
-* Upgrade from EigenDA V1 to EigenDA V2 to mainnet ASAP with the following constraints:
+* Upgrade from EigenDA V1 to EigenDA V2 on mainnet ASAP with the following constraints:
     * DA Proxy Admin is currently controlled by the executor multisig, which requires a 10 day timelocked tx by the Core Ops Multisig
     * Implementation level ownership of DA contracts is currently the Core Ops Multisig
     * DA Ops Multisig not yet fully formed
@@ -16,8 +16,7 @@ Listed are the steps to do the upgrade by each party, divided up into phases, wh
 ### Phase 1
 
 #### Deployer 
-* Deploy a new proxy admin owned by the DA Ops multisig. 
-* Deploy Proxies + Implementations + Initialize for the following:
+* Deploy Proxies + Implementations + Initialize for the following managed by the DA Proxy Admin:
     * EigenDAThresholdRegistry
     * EigenDARelayRegistry
     * EigenDADisperserRegistry
@@ -27,18 +26,10 @@ Listed are the steps to do the upgrade by each party, divided up into phases, wh
     * RegistryCoordinator
     * EigenDAServiceManager
 
-###  Phase 2
-
 #### Executor Multisig
 The Core Ops multisig should propose the following on the timelock.
 
 * Transfer ownership of DA Proxy Admin to DA Ops Multisig
-
-#### DA Ops Multisig
-* Initialize parameters in new V2 registries
-    * ThresholdRegistry
-    * RelayRegistry
-    * DisperserRegistry
 
 #### Core Ops Multisig
 * Transfer ownership of the following contracts to the DA Ops Multisig (implementation level fns)
@@ -46,12 +37,18 @@ The Core Ops multisig should propose the following on the timelock.
     * Registry Coordinator
     * EigenDAServiceManager
 
-### Phase 3
+### Phase 2
+
+#### DA Ops Multisig
+* Initialize parameters in new V2 registries
+    * ThresholdRegistry
+    * RelayRegistry
+    * DisperserRegistry
 
 #### Executor Multisig
     * Execute timelocked transaction
 
-### Phase 4
+### Phase 3
 
 #### DA Ops
 * Upgrade 

@@ -39,6 +39,7 @@ contract UpgradeMainnet_V1_V2_P1_DEPLOYER is Script {
     }
 
     struct ExistingDeployments {
+        address daProxyAdmin;
         address daOpsMsig;
         address registryCoordinator;
         address stakeRegistry;
@@ -51,7 +52,6 @@ contract UpgradeMainnet_V1_V2_P1_DEPLOYER is Script {
     }
 
     struct CreatedContracts {
-        address proxyAdmin;
         address thresholdRegistry;
         address thresholdRegistryImpl;
         address relayRegistry;
@@ -92,6 +92,7 @@ contract UpgradeMainnet_V1_V2_P1_DEPLOYER is Script {
         string memory cfg = _cfg();
         return InitParams({
             existing: ExistingDeployments({
+                daProxyAdmin: cfg.readAddress(".initParams.existing.daProxyAdmin"),
                 daOpsMsig: cfg.readAddress(".initParams.existing.daOpsMsig"),
                 registryCoordinator: cfg.readAddress(".initParams.existing.registryCoordinator"),
                 stakeRegistry: cfg.readAddress(".initParams.existing.stakeRegistry"),
@@ -133,7 +134,7 @@ contract UpgradeMainnet_V1_V2_P1_DEPLOYER is Script {
         _deployContracts(initParams);
 
         // transfer ownership of the proxy admin to the multisig. The deployer should own no contracts after this script is run.
-        ProxyAdmin(createdContracts.proxyAdmin).transferOwnership(initParams.existing.daOpsMsig);
+        ProxyAdmin(initParams.existing.daProxyAdmin).transferOwnership(initParams.existing.daOpsMsig);
 
         vm.stopBroadcast();
 
@@ -142,9 +143,6 @@ contract UpgradeMainnet_V1_V2_P1_DEPLOYER is Script {
 
     function _logContracts() internal view {
         console2.log("DEPLOYED CONTRACTS");
-        console2.log("ProxyAdmin: ", createdContracts.proxyAdmin);
-        console2.log();
-
         console2.log("PROXIES");
         console2.log("ThresholdRegistry: ", createdContracts.thresholdRegistry);
         console2.log("RelayRegistry: ", createdContracts.relayRegistry);
@@ -163,7 +161,6 @@ contract UpgradeMainnet_V1_V2_P1_DEPLOYER is Script {
     }
 
     function _deployContracts(InitParams memory initParams) internal {
-        createdContracts.proxyAdmin = address(new ProxyAdmin());
         _deployThresholdRegistry(initParams);
         _deployRelayRegistry(initParams);
         _deployDisperserRegistry(initParams);
@@ -178,7 +175,7 @@ contract UpgradeMainnet_V1_V2_P1_DEPLOYER is Script {
         createdContracts.thresholdRegistry = address(
             new TransparentUpgradeableProxy(
                 createdContracts.thresholdRegistryImpl,
-                createdContracts.proxyAdmin,
+                initParams.existing.daProxyAdmin,
                 abi.encodeCall(
                     EigenDAThresholdRegistry.initialize,
                     (
@@ -198,7 +195,7 @@ contract UpgradeMainnet_V1_V2_P1_DEPLOYER is Script {
         createdContracts.relayRegistry = address(
             new TransparentUpgradeableProxy(
                 createdContracts.relayRegistryImpl,
-                createdContracts.proxyAdmin,
+                initParams.existing.daProxyAdmin,
                 abi.encodeCall(EigenDARelayRegistry.initialize, (initParams.existing.daOpsMsig))
             )
         );
@@ -209,7 +206,7 @@ contract UpgradeMainnet_V1_V2_P1_DEPLOYER is Script {
         createdContracts.disperserRegistry = address(
             new TransparentUpgradeableProxy(
                 createdContracts.disperserRegistryImpl,
-                createdContracts.proxyAdmin,
+                initParams.existing.daProxyAdmin,
                 abi.encodeCall(EigenDADisperserRegistry.initialize, (initParams.existing.daOpsMsig))
             )
         );
@@ -220,7 +217,7 @@ contract UpgradeMainnet_V1_V2_P1_DEPLOYER is Script {
         createdContracts.paymentVault = address(
             new TransparentUpgradeableProxy(
                 createdContracts.paymentVaultImpl,
-                createdContracts.proxyAdmin,
+                initParams.existing.daProxyAdmin,
                 abi.encodeCall(
                     PaymentVault.initialize,
                     (

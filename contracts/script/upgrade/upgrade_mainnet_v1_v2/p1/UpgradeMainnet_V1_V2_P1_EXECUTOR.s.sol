@@ -10,25 +10,21 @@ interface Ownable {
 }
 
 /// @title Upgrade Mainnet V1 to V2 Phase 2
-contract UpgradeMainnet_V1_V2_P2_CORE_OPS is Script {
+contract UpgradeMainnet_V1_V2_P1_EXECUTOR is Script {
     using stdToml for string;
 
     struct InitParams {
-        address coreOpsMsig;
-        address ejectionManager;
-        address registryCoordinator;
-        address serviceManager;
+        address executorMsig;
+        address daProxyAdmin;
         address daOpsMsig;
     }
 
     function run() external {
         InitParams memory initParams = _initParams();
 
-        vm.startBroadcast(initParams.coreOpsMsig);
+        vm.startBroadcast(initParams.executorMsig);
 
-        Ownable(initParams.ejectionManager).transferOwnership(initParams.daOpsMsig);
-        Ownable(initParams.registryCoordinator).transferOwnership(initParams.daOpsMsig);
-        Ownable(initParams.serviceManager).transferOwnership(initParams.daOpsMsig);
+        Ownable(initParams.daProxyAdmin).transferOwnership(initParams.daOpsMsig);
 
         vm.stopBroadcast();
     }
@@ -41,10 +37,8 @@ contract UpgradeMainnet_V1_V2_P2_CORE_OPS is Script {
     function _initParams() internal virtual returns (InitParams memory) {
         string memory cfg = _cfg();
         return InitParams({
-            coreOpsMsig: cfg.readAddress(".initParams.existing.coreOpsMsig"),
-            ejectionManager: cfg.readAddress(".initParams.existing.ejectionManager"),
-            registryCoordinator: cfg.readAddress(".initParams.existing.registryCoordinator"),
-            serviceManager: cfg.readAddress(".initParams.existing.serviceManager"),
+            executorMsig: cfg.readAddress(".initParams.existing.executorMsig"),
+            daProxyAdmin: cfg.readAddress(".initParams.existing.daProxyAdmin"),
             daOpsMsig: cfg.readAddress(".initParams.existing.daOpsMsig")
         });
     }
