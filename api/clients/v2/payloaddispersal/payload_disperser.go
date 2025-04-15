@@ -108,13 +108,13 @@ func (pd *PayloadDisperser) SendPayload(
 
 	probe.SetStage("QUEUED")
 
-	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCertifiedTimeout)
+	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCompleteTimeout)
 	defer cancel()
-	blobStatusReply, err := pd.pollBlobStatusUntilCertified(timeoutCtx, blobKey, blobStatus.ToProfobuf(), probe)
+	blobStatusReply, err := pd.pollBlobStatusUntilComplete(timeoutCtx, blobKey, blobStatus.ToProfobuf(), probe)
 	if err != nil {
-		return nil, fmt.Errorf("poll blob status until certified: %w", err)
+		return nil, fmt.Errorf("poll blob status until complete: %w", err)
 	}
-	pd.logger.Debug("Blob status CERTIFIED", "blobKey", blobKey.Hex())
+	pd.logger.Debug("Blob status COMPLETE", "blobKey", blobKey.Hex())
 
 	probe.SetStage("build_cert")
 
@@ -152,11 +152,11 @@ func (pd *PayloadDisperser) Close() error {
 	return nil
 }
 
-// pollBlobStatusUntilCertified polls the disperser for the status of a blob that has been dispersed
+// pollBlobStatusUntilComplete polls the disperser for the status of a blob that has been dispersed
 //
-// This method will only return a non-nil BlobStatusReply if the blob is reported to be CERTIFIED prior to the timeout.
+// This method will only return a non-nil BlobStatusReply if the blob is reported to be COMPLETE prior to the timeout.
 // In all other cases, this method will return a nil BlobStatusReply, along with an error describing the failure.
-func (pd *PayloadDisperser) pollBlobStatusUntilCertified(
+func (pd *PayloadDisperser) pollBlobStatusUntilComplete(
 	ctx context.Context,
 	blobKey core.BlobKey,
 	initialStatus dispgrpc.BlobStatus,

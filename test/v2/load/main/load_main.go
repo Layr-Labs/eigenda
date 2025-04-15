@@ -6,7 +6,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/test/v2/client"
 	"github.com/Layr-Labs/eigenda/test/v2/load"
-	"github.com/stretchr/testify/require"
 )
 
 func main() {
@@ -35,11 +34,13 @@ func main() {
 
 	c, err := client.GetClient(envFile)
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("failed to get client: %w", err))
 	}
 
 	config, err := load.ReadConfigFile(loadFile)
-	require.NoError(nil, err)
+	if err != nil {
+		panic(fmt.Errorf("failed to read config file %s: %w", loadFile, err))
+	}
 
 	generator := load.NewLoadGenerator(config, c)
 
