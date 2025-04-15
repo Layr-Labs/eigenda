@@ -133,9 +133,6 @@ contract UpgradeMainnet_V1_V2_P1_DEPLOYER is Script {
 
         _deployContracts(initParams);
 
-        // transfer ownership of the proxy admin to the multisig. The deployer should own no contracts after this script is run.
-        ProxyAdmin(initParams.existing.daProxyAdmin).transferOwnership(initParams.existing.daOpsMsig);
-
         vm.stopBroadcast();
 
         _logContracts();
