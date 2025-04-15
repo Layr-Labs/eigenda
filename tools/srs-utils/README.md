@@ -26,9 +26,19 @@ Note that the G2 point files (`g2.point` and `g2.trailing.point`) are twice the 
 points require twice as many bytes to represent as G1 points in the BN254 curve. Each G1 point requires 32 bytes 
 of storage, while each G2 point requires 64 bytes.
 
+## Installation
+
+```bash
+go install github.com/Layr-Labs/eigenda/tools/srs-utils@latest
+```
+
 ## How to use
 
-`go run main.go help`
+Once installed, you can run:
+
+```bash
+srs-utils help
+```
 
 ### Downloading SRS Files
 
@@ -36,7 +46,7 @@ The simplest way to get the required SRS files is to download the pre-processed 
 S3 bucket:
 
 ```bash
-go run main.go download --blob-size-bytes 16777216
+srs-utils download --blob-size-bytes 16777216
 ```
 
 This will download the SRS files needed for 16MB blob support (the default size). The files will be saved to a directory
@@ -66,7 +76,7 @@ The challenge file has 103079215232 Bytes.
 #### 2. Parse G1, G2 points from the challenge file
 
 ```bash
-go run main.go parse --ptau-path <Path to challenge file>
+srs-utils parse --ptau-path <Path to challenge file>
 ```
 
 It produces two files, g1.point and g2.point. g1.point contains 8589934592 Bytes and g2.point 17179869184 Bytes
@@ -78,7 +88,7 @@ Note: The challenge file contains 2^29 G1 points and 2^28 G2 points with secret 
 #### 3. Verify the parsed G1, G2 points
 
 ```bash
-go run main.go verify --g1-path <Path to g1.point> --g2-path <Path to g2.point>
+srs-utils verify --g1-path <Path to g1.point> --g2-path <Path to g2.point>
 ```
 
 The verification is based on the method listed here: https://github.com/ethereum/kzg-ceremony-specs/blob/master/docs/sequencer/sequencer.md#pairing-checks

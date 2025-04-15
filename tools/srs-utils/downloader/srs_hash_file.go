@@ -103,7 +103,7 @@ func getFileHashInfo(outputDir string, fileName string) (*fileHashInfo, error) {
 	}
 
 	return &fileHashInfo{
-		filePath,
+		fileName,
 		hex.EncodeToString(hasher.Sum(nil)),
 	}, nil
 }
