@@ -54,8 +54,6 @@ type valueFile struct {
 	fsync bool
 }
 
-// TODO create vs load
-
 // createValueFile creates a new value file.
 func createValueFile(
 	logger logging.Logger,

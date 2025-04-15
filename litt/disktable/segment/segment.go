@@ -44,8 +44,8 @@ type Segment struct {
 	shards []*valueFile
 
 	// shardSizes is a list of the current sizes of each shard in the segment. Indexed by shard number. This
-	// value is only tracked for mutable segments, meaning that if this segment was loaded from disk, the values
-	// in this slice will be zero.
+	// value is only tracked for mutable segments (i.e. the unsealed segment), meaning that if this segment was loaded
+	// from disk, the values in this slice will be zero.
 	shardSizes []uint64
 
 	// The current size of the key file in bytes. This is only tracked for mutable segments, meaning that if this
@@ -65,7 +65,7 @@ type Segment struct {
 	// keyFileChannel is a channel used to send messages to the goroutine responsible for writing to the key file.
 	keyFileChannel chan any
 
-	// deletionMutex permits a caller to block until this segment is fully deleted. An element is inserted into
+	// deletionChannel permits a caller to block until this segment is fully deleted. An element is inserted into
 	// the channel when the segment is fully deleted.
 	deletionChannel chan struct{}
 
@@ -323,9 +323,9 @@ func (s *Segment) GetShard(key []byte) uint32 {
 //
 // This method does not ensure that the key-value pair is actually written to disk, only that it will eventually be
 // written to disk. Flush must be called to ensure that all data previously passed to Write is written to disk.
-func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64, maxShardSize uint64, err error) {
+func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64, err error) {
 	if s.metadata.sealed {
-		return 0, 0, 0, fmt.Errorf("segment is sealed, cannot write data")
+		return 0, 0, fmt.Errorf("segment is sealed, cannot write data")
 	}
 
 	shard := s.GetShard(data.Key)
@@ -335,7 +335,7 @@ func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64
 		// No matter the configuration, we absolutely cannot permit a value to be written if the first byte of the
 		// value would be beyond position 2^32. This is because we only have 32 bits in an address to store the
 		// position of a value's first byte.
-		return 0, 0, 0,
+		return 0, 0,
 			fmt.Errorf("value file already contains %d bytes, cannot add a new value", currentSize)
 	}
 	s.unflushedKeyCount.Add(1)
@@ -355,7 +355,7 @@ func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64
 	}
 	err = util.Send(s.fatalErrorHandler, s.shardChannels[shard], shardRequest)
 	if err != nil {
-		return 0, 0, 0,
+		return 0, 0,
 			fmt.Errorf("failed to send value to shard control loop: %v", err)
 	}
 
@@ -366,11 +366,16 @@ func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64
 	}
 	err = util.Send(s.fatalErrorHandler, s.keyFileChannel, keyRequest)
 	if err != nil {
-		return 0, 0, 0,
+		return 0, 0,
 			fmt.Errorf("failed to send key to key file control loop: %v", err)
 	}
 
-	return s.keyCount, s.keyFileSize, s.maxShardSize, nil
+	return s.keyCount, s.keyFileSize, nil
+}
+
+// GetMaxShardSize returns the maximum size of all shards in this segment.
+func (s *Segment) GetMaxShardSize() uint64 {
+	return s.maxShardSize
 }
 
 // Read fetches the data for a key from the data segment.
@@ -491,7 +496,7 @@ func (s *Segment) IsSealed() bool {
 // GetSealTime returns the time at which the segment was sealed. If the file is not sealed, this method will return
 // the zero time.
 func (s *Segment) GetSealTime() time.Time {
-	return time.Unix(0, int64(s.metadata.timestamp))
+	return time.Unix(0, int64(s.metadata.lastValueTimestamp))
 }
 
 // Reserve reserves the segment, preventing it from being deleted. Returns true if the reservation was successful, and

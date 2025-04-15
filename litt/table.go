@@ -18,8 +18,9 @@ type Table interface {
 	// Note that when this method returns, data written may not be crash durable on disk
 	// (although the write does have atomicity). In order to ensure crash durability, call Flush().
 	//
-	// There are no limits on the size of the key or the value. This database has been optimized under the assumption
-	// that values are generally much larger than keys. This affects performance, but not correctness.
+	// The maximum size of the key is 2^32 bytes. The maximum size of the value is 2^32 bytes.
+	// This database has been optimized under the assumption that values are generally much larger than keys.
+	// This affects performance, but not correctness.
 	//
 	// It is not safe to modify the byte slices passed to this function after the call
 	// (both the key and the value).
@@ -29,12 +30,21 @@ type Table interface {
 	// at once. This may improve performance, but it otherwise has identical properties to a sequence of Put calls
 	// (i.e. this method does not atomically write the entire batch).
 	//
+	// The maximum size of a key is 2^32 bytes. The maximum size of a value is 2^32 bytes.
+	// This database has been optimized under the assumption that values are generally much larger than keys.
+	// This affects performance, but not correctness.
+	//
 	// It is not safe to modify the byte slices passed to this function after the call
 	// (including the key byte slices and the value byte slices).
 	PutBatch(batch []*types.KVPair) error
 
 	// Get retrieves a value from the database. The returned boolean indicates whether the key exists in the database
-	// (returns false if the key does not exist).
+	// (returns false if the key does not exist). If an error is returned, the value of the other returned values are
+	// undefined.
+	//
+	// The maximum size of a key is 2^32 bytes. The maximum size of a value is 2^32 bytes.
+	// This database has been optimized under the assumption that values are generally much larger than keys.
+	// This affects performance, but not correctness.
 	//
 	// For the sake of performance, the returned data is NOT safe to mutate. If you need to modify the data,
 	// make a copy of it first. It is also not safe to modify the key byte slice after it is passed to this

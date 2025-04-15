@@ -126,6 +126,11 @@ type Config struct {
 
 	// The interval at which various DB metrics are updated. The default is 1 second.
 	MetricsUpdateInterval time.Duration
+
+	// A function that is called if the database experiences a non-recoverable error (e.g. data corruption,
+	// a crashed goroutine, a full disk, etc.). If nil (the default), no callback is called. If called at all,
+	// this method is called exactly once.
+	FatalErrorCallback func(error)
 }
 
 // DefaultConfig returns a Config with default values.

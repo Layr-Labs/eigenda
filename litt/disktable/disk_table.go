@@ -3,6 +3,7 @@ package disktable
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"path"
@@ -171,7 +172,7 @@ func NewDiskTable(
 		}
 	}
 
-	fatalErrorHandler := util.NewFatalErrorHandler(config.CTX, config.Logger)
+	fatalErrorHandler := util.NewFatalErrorHandler(config.CTX, config.Logger, config.FatalErrorCallback)
 
 	table := &DiskTable{
 		logger:             config.Logger,
@@ -596,6 +597,13 @@ func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 	}
 
 	for _, kv := range batch {
+		if len(kv.Key) > math.MaxUint32 {
+			return fmt.Errorf("key is too large, length must not exceed 2^32 bytes: %d bytes", len(kv.Key))
+		}
+		if len(kv.Value) > math.MaxUint32 {
+			return fmt.Errorf("value is too large, length must not exceed 2^32 bytes: %d bytes", len(kv.Value))
+		}
+
 		d.unflushedDataCache.Store(util.UnsafeBytesToString(kv.Key), kv.Value)
 	}
 
