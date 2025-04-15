@@ -89,19 +89,14 @@ The program periodically prints out the time spent and its progress in validatin
 
 ## Security Considerations
 
-Using the correct SRS files is essential for the proper functioning of any software interacting with EigenDA. 
-If a user has incorrect or tampered SRS files, the following would occur:
+Using the correct SRS files is essential for the proper functioning of any software interacting with EigenDA. If a
+piece of software has incorrect or tampered SRS files, the following would occur:
 
-1. **Verification failures**: The user would be unable to successfully verify KZG commitments and proofs, making it 
+1. **Verification failures**: The software would be unable to successfully verify KZG commitments and proofs, making it 
    impossible to validate blob data from the network.
 
-2. **Network incompatibility**: A node using incorrect SRS files would be unable to meaningfully interact with the 
-   EigenDA network, as it would consistently fail to verify certificates from honest nodes.
+2. **Submission failures**: The software would be unable to submit data to the EigenDA network, as it would
+   consistently fail to generate commitments that can be verified by other participants.
 
-3. **Self-isolation**: Rather than creating a security vulnerability, having incorrect SRS files simply results in 
-   self-isolation from the network's consensus.
-
-It's important to understand that this isn't a security concern for the broader network. If a disperser attempted 
-to use incorrect SRS files, honest nodes would immediately detect this during certificate verification. The network's 
-security properties rely on the fact that honest nodes using the correct SRS can detect and reject improperly generated 
-certificates.
+It's important to understand that this isn't a security concern for the broader network. Rather, having incorrect SRS
+files simply results in self-isolation from the network.
