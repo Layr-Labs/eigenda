@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/utils"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
@@ -27,8 +28,11 @@ type StoreConfig struct {
 	// total duration time that client waits for blob to confirm
 	StatusQueryTimeout time.Duration
 
-	// number of times to retry eigenda blob dispersals
-	PutRetries uint
+	// Number of times to try blob dispersals:
+	// - If > 0: Try N times total
+	// - If < 0: Retry indefinitely until success
+	// - If = 0: Not permitted
+	PutTries int
 }
 
 // Store does storage interactions and verifications for blobs with DA.
@@ -41,8 +45,33 @@ type Store struct {
 
 var _ common.GeneratedKeyStore = (*Store)(nil)
 
-func NewStore(client *clients.EigenDAClient,
-	v *verify.Verifier, log logging.Logger, cfg *StoreConfig) (*Store, error) {
+// NewStoreConfig creates a new StoreConfig with validation for PutTries.
+// PutTries==0 is not permitted, and will return an error
+func NewStoreConfig(
+	maxBlobSizeBytes uint64,
+	ethConfirmationDepth uint64,
+	statusQueryTimeout time.Duration,
+	putTries int,
+) (*StoreConfig, error) {
+	if putTries == 0 {
+		return nil, fmt.Errorf(
+			"putTries==0 is not permitted. >0 means 'try N times', <0 means 'retry indefinitely'")
+	}
+
+	return &StoreConfig{
+		MaxBlobSizeBytes:     maxBlobSizeBytes,
+		EthConfirmationDepth: ethConfirmationDepth,
+		StatusQueryTimeout:   statusQueryTimeout,
+		PutTries:             putTries,
+	}, nil
+}
+
+func NewStore(
+	client *clients.EigenDAClient,
+	v *verify.Verifier,
+	log logging.Logger,
+	cfg *StoreConfig,
+) (*Store, error) {
 	return &Store{
 		client:   client,
 		verifier: v,
@@ -93,7 +122,8 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 		)
 	}
 
-	// We attempt to disperse the blob to EigenDA up to 3 times, unless we get a 400 error on any attempt.
+	// We attempt to disperse the blob to EigenDA up to e.cfg.PutTries times total,
+	// unless we get a 400 error which aborts retries.
 	blobInfo, err := retry.DoWithData(
 		func() (*disperser.BlobInfo, error) {
 			return e.client.PutBlob(ctx, value)
@@ -125,7 +155,9 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 		// it to an http 503 to signify to the client (batcher) to failover to ethda
 		// b/c eigenda is temporarily down.
 		retry.LastErrorOnly(true),
-		retry.Attempts(e.cfg.PutRetries),
+		// retry.Attempts uses different semantics than our config field. ConvertToRetryGoAttempts converts between
+		// these two semantics.
+		retry.Attempts(utils.ConvertToRetryGoAttempts(e.cfg.PutTries)),
 	)
 	if err != nil {
 		// TODO: we will want to filter for errors here and return a 503 when needed

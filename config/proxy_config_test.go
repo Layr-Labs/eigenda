@@ -34,6 +34,7 @@ func validCfg() ProxyConfig {
 				SvcManagerAddr:               "0x00000000069",
 				EthRpcUrl:                    "http://localhosts",
 			},
+			PutTries: 3,
 		},
 		VerifierConfigV1: verify.Config{
 			VerifyCerts:          false,
@@ -61,6 +62,7 @@ func validCfg() ProxyConfig {
 			},
 			EigenDACertVerifierAddress: "0x0000000000032443134",
 			MaxBlobSizeBytes:           maxBlobLengthBytes,
+			PutTries:                   3,
 		},
 		StorageConfig: store.Config{
 			BackendsToEnable: []common.EigenDABackend{common.V1EigenDABackend, common.V2EigenDABackend},

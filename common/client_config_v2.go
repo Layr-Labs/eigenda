@@ -16,7 +16,12 @@ type ClientConfigV2 struct {
 
 	// The following fields are not needed directly by any underlying components. Rather, these are configuration
 	// values required by the proxy itself.
-	PutRetries                 uint
+
+	// Number of times to try blob dispersals:
+	// - If > 0: Try N times total
+	// - If < 0: Retry indefinitely until success
+	// - If = 0: Not permitted
+	PutTries                   int
 	MaxBlobSizeBytes           uint64
 	EigenDACertVerifierAddress string
 }
@@ -37,6 +42,10 @@ func (cfg *ClientConfigV2) Check() error {
 
 	if cfg.MaxBlobSizeBytes == 0 {
 		return fmt.Errorf("max blob size is required for using EigenDA V2 backend")
+	}
+
+	if cfg.PutTries == 0 {
+		return fmt.Errorf("PutTries==0 is not permitted. >0 means 'try N times', <0 means 'retry indefinitely'")
 	}
 
 	return nil

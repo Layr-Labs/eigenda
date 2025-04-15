@@ -39,7 +39,7 @@ GLOBAL OPTIONS:
                                                                                       loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. Maximum size
                                                                                       slightly exceeds 1GB. (default: "16MiB") [$EIGENDA_PROXY_EIGENDA_MAX_BLOB_LENGTH]
    --eigenda.put-blob-encoding-version value                                Blob encoding version to use when writing blobs from the high-level interface. (default: 0) [$EIGENDA_PROXY_EIGENDA_PUT_BLOB_ENCODING_VERSION]
-   --eigenda.put-retries value                                              Number of times to retry blob dispersals. (default: 3) [$EIGENDA_PROXY_EIGENDA_PUT_RETRIES]
+   --eigenda.put-retries value                                              Total number of times to try blob dispersals before serving an error response.>0 = try dispersal that many times. <0 = retry indefinitely. 0 is not permitted (causes startup error). (default: 3) [$EIGENDA_PROXY_EIGENDA_PUT_RETRIES]
    --eigenda.response-timeout value                                         Flag used to configure the underlying disperser-client. Total time to wait for the disperseBlob call to return or disperseAuthenticatedBlob stream to finish and close. (default: 1m0s) [$EIGENDA_PROXY_EIGENDA_RESPONSE_TIMEOUT]
    --eigenda.signer-private-key-hex value                                   Hex-encoded signer private key. Used for authn/authz and rate limits on EigenDA disperser. Should not be associated with an Ethereum address holding any funds. [$EIGENDA_PROXY_EIGENDA_SIGNER_PRIVATE_KEY_HEX]
    --eigenda.status-query-retry-interval value                              Interval between retries when awaiting network blob finalization. Default is 5 seconds. (default: 5s) [$EIGENDA_PROXY_EIGENDA_STATUS_QUERY_INTERVAL]
@@ -64,7 +64,7 @@ GLOBAL OPTIONS:
    --eigenda.v2.max-blob-length value            Maximum blob length to be written or read from EigenDA. Determines the number of SRS points
                                                            loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. Maximum size
                                                            slightly exceeds 1GB. (default: "16MiB") [$EIGENDA_PROXY_EIGENDA_V2_MAX_BLOB_LENGTH]
-   --eigenda.v2.put-retries value                Number of times to retry blob dispersals before serving an error response. (default: 3) [$EIGENDA_PROXY_EIGENDA_V2_PUT_RETRIES]
+   --eigenda.v2.put-retries value                Total number of times to try blob dispersals before serving an error response.>0 = try dispersal that many times. <0 = retry indefinitely. 0 is not permitted (causes startup error). (default: 3) [$EIGENDA_PROXY_EIGENDA_V2_PUT_RETRIES]
    --eigenda.v2.relay-timeout value              Timeout used when querying an individual relay for blob contents. (default: 10s) [$EIGENDA_PROXY_EIGENDA_V2_RELAY_TIMEOUT]
    --eigenda.v2.signer-payment-key-hex value     Hex-encoded signer private key. Used for authorizing payments with EigenDA disperser. Should not be associated with an Ethereum address holding any funds. [$EIGENDA_PROXY_EIGENDA_V2_SIGNER_PRIVATE_KEY_HEX]
 

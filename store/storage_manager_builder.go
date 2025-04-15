@@ -237,12 +237,17 @@ func (smb *StorageManagerBuilder) buildEigenDAV2Backend(ctx context.Context) (co
 		return nil, fmt.Errorf("build payload disperser: %w", err)
 	}
 
-	return eigenda_v2.NewStore(
+	eigenDAV2Store, err := eigenda_v2.NewStore(
 		smb.log,
-		smb.v2ClientCfg.PutRetries,
+		smb.v2ClientCfg.PutTries,
 		payloadDisperser,
 		relayPayloadRetriever,
 		certVerifier)
+	if err != nil {
+		return nil, fmt.Errorf("create v2 store: %w", err)
+	}
+
+	return eigenDAV2Store, nil
 }
 
 // buildEigenDAV1Backend ... Builds EigenDA V1 storage backend
@@ -270,16 +275,21 @@ func (smb *StorageManagerBuilder) buildEigenDAV1Backend(ctx context.Context) (co
 		return nil, err
 	}
 
+	storeConfig, err := eigenda.NewStoreConfig(
+		smb.v1ClientCfg.MaxBlobSizeBytes,
+		smb.v1VerifierCfg.EthConfirmationDepth,
+		smb.v1ClientCfg.EdaClientCfg.StatusQueryTimeout,
+		smb.v1ClientCfg.PutTries,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create v1 store config: %w", err)
+	}
+
 	return eigenda.NewStore(
 		client,
 		verifier,
 		smb.log,
-		&eigenda.StoreConfig{
-			MaxBlobSizeBytes:     smb.v1ClientCfg.MaxBlobSizeBytes,
-			EthConfirmationDepth: smb.v1VerifierCfg.EthConfirmationDepth,
-			StatusQueryTimeout:   smb.v1ClientCfg.EdaClientCfg.StatusQueryTimeout,
-			PutRetries:           smb.v1ClientCfg.PutRetries,
-		},
+		storeConfig,
 	)
 }
 

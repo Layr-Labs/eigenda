@@ -285,7 +285,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 				SvcManagerAddr:           svcManagerAddress,
 			},
 			MaxBlobSizeBytes: maxBlobLengthBytes,
-			PutRetries:       3,
+			PutTries:         3,
 		},
 		VerifierConfigV1: verify.Config{
 			VerifyCerts:          false,
@@ -327,7 +327,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 				PayloadClientConfig: payloadClientConfig,
 				RelayTimeout:        5 * time.Second,
 			},
-			PutRetries:                 3,
+			PutTries:                   3,
 			MaxBlobSizeBytes:           maxBlobLengthBytes,
 			EigenDACertVerifierAddress: certVerifierAddress,
 		},
