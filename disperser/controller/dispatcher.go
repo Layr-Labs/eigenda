@@ -248,7 +248,7 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 						Error:            "",
 					})
 					if storeErr != nil {
-						d.logger.Error("failed to put dispersal response", "err", storeErr)
+						d.logger.Error("failed to store a succeeded dispersal response", "err", storeErr)
 					}
 
 					d.metrics.reportPutDispersalResponseLatency(time.Since(sendChunksFinished))
@@ -277,6 +277,16 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 					"NumAttempts", i,
 					"batchHeader", hex.EncodeToString(batchData.BatchHeaderHash[:]),
 					"err", lastErr)
+				storeErr := d.blobMetadataStore.PutDispersalResponse(ctx, &corev2.DispersalResponse{
+					DispersalRequest: req,
+					RespondedAt:      uint64(time.Now().UnixNano()),
+					Signature:        [32]byte{}, // all zero sig for failed dispersal
+					Error:            lastErr.Error(),
+				})
+				if storeErr != nil {
+					d.logger.Error("failed to store a failed dispersal response", "err", storeErr)
+				}
+
 				sigChan <- core.SigningMessage{
 					Signature:            nil,
 					Operator:             opID,
