@@ -90,7 +90,7 @@ type retrievalWorker struct {
 	downloadCompletedChan chan *validatorDownloadCompleted
 
 	// When a thread completes verifying chunk data, it will send a message to the verificationCompleteChan.
-	verificationCompleteChan chan verificationCompleted
+	verificationCompleteChan chan *verificationCompleted
 
 	// When a thread completes decoding chunk data, it will send a message to the decodeResponseChan.
 	decodeResponseChan chan *decodeResult
@@ -178,7 +178,8 @@ func newRetrievalWorker(
 		blobCommitments:          blobCommitments,
 		downloadStartedChan:      make(chan *downloadStarted, len(operators)),
 		downloadCompletedChan:    make(chan *validatorDownloadCompleted, len(operators)),
-		verificationCompleteChan: make(chan verificationCompleted, len(operators)),
+		verificationCompleteChan: make(chan *verificationCompleted, len(operators)),
+		decodeResponseChan:       make(chan *decodeResult, len(operators)),
 	}, nil
 }
 
@@ -351,8 +352,8 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 
 	for !verifiedChunks.Empty() {
 		next, _ := verifiedChunks.Dequeue()
-		operatorID := next.(*downloadStarted).operatorID
-		operatorChunks := next.(verificationCompleted).chunks
+		operatorID := next.(*verificationCompleted).OperatorID
+		operatorChunks := next.(*verificationCompleted).chunks
 
 		assignment := w.assignments[operatorID]
 		assignmentIndices := make([]uint, len(assignment.GetIndices()))
@@ -370,6 +371,8 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 	w.computePool.Submit(func() {
 		w.decodeBlob(chunks, indices)
 	})
+
+	fmt.Printf("<<<<<<<<< waiting for decode response\n") // TODO
 
 	select {
 	case <-w.ctx.Done():
@@ -454,7 +457,7 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 	for i, data := range getChunksReply.GetChunks() {
 		chunk, err := new(encoding.Frame).DeserializeGnark(data)
 		if err != nil {
-			w.verificationCompleteChan <- verificationCompleted{
+			w.verificationCompleteChan <- &verificationCompleted{
 				OperatorID: operatorID,
 				Err:        fmt.Errorf("failed to deserialize chunk from operator %s: %w", operatorID.Hex(), err),
 			}
@@ -474,14 +477,14 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 	// TODO this can be parallelized!
 	err := w.verifier.VerifyFrames(chunks, assignmentIndices, w.blobCommitments, w.encodingParams)
 	if err != nil {
-		w.verificationCompleteChan <- verificationCompleted{
+		w.verificationCompleteChan <- &verificationCompleted{
 			OperatorID: operatorID,
 			Err:        fmt.Errorf("failed to verify chunks from operator %s: %w", operatorID.Hex(), err),
 		}
 		return
 	}
 
-	w.verificationCompleteChan <- verificationCompleted{
+	w.verificationCompleteChan <- &verificationCompleted{
 		OperatorID: operatorID,
 		chunks:     chunks,
 	}
