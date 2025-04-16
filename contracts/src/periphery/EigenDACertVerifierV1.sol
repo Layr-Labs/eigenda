@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
+import {IEigenDACertVerifierV1} from "src/periphery/interfaces/IEigenDACertVerifierV1.sol";
 import {IEigenDAThresholdRegistry} from "src/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {EigenDACertVerificationV1Lib as CertLib} from "src/periphery/libraries/EigenDACertVerificationV1Lib.sol";
@@ -11,7 +12,7 @@ import "src/interfaces/IEigenDAStructs.sol";
  * @author Layr Labs, Inc.
  * @notice Contains all V1-specific verification functionality
  */
-contract EigenDACertVerifierV1 {
+contract EigenDACertVerifierV1 is IEigenDACertVerifierV1 {
     /// @notice Thrown when there is a length mismatch
     error LengthMismatch();
 
@@ -22,6 +23,11 @@ contract EigenDACertVerifierV1 {
     /// @dev On L1 this contract is the EigenDA Service Manager contract
     IEigenDABatchMetadataStorage public immutable eigenDABatchMetadataStorageV1;
 
+    /**
+     * @notice Constructor for the EigenDA V1 certificate verifier
+     * @param _eigenDAThresholdRegistryV1 The address of the EigenDAThresholdRegistry contract
+     * @param _eigenDABatchMetadataStorageV1 The address of the EigenDABatchMetadataStorage contract
+     */
     constructor(
         IEigenDAThresholdRegistry _eigenDAThresholdRegistryV1,
         IEigenDABatchMetadataStorage _eigenDABatchMetadataStorageV1
@@ -93,22 +99,48 @@ contract EigenDACertVerifierV1 {
         }
     }
 
+    /**
+     * @notice Returns the threshold registry contract
+     * @return The IEigenDAThresholdRegistry contract
+     * @dev Can be overridden by derived contracts
+     */
     function _thresholdRegistry() internal view virtual returns (IEigenDAThresholdRegistry) {
         return eigenDAThresholdRegistryV1;
     }
 
+    /**
+     * @notice Returns the batch metadata storage contract
+     * @return The IEigenDABatchMetadataStorage contract
+     * @dev Can be overridden by derived contracts
+     */
     function _batchMetadataStorage() internal view virtual returns (IEigenDABatchMetadataStorage) {
         return eigenDABatchMetadataStorageV1;
     }
 
+    /**
+     * @notice Returns the quorum numbers required for verification
+     * @return bytes The required quorum numbers
+     * @dev Can be overridden by derived contracts
+     */
     function _quorumNumbersRequired() internal view virtual returns (bytes memory) {
         return _thresholdRegistry().quorumNumbersRequired();
     }
 
+    /**
+     * @notice Returns the quorum confirmation threshold percentages
+     * @return bytes The confirmation threshold percentages for each quorum
+     * @dev Can be overridden by derived contracts
+     */
     function _quorumConfirmationThresholdPercentages() internal view virtual returns (bytes memory) {
         return _thresholdRegistry().quorumConfirmationThresholdPercentages();
     }
 
+    /**
+     * @notice Returns the stored batch metadata hash for a given blob verification proof
+     * @param blobVerificationProof The blob verification proof
+     * @return bytes32 The stored batch metadata hash
+     * @dev Can be overridden by derived contracts
+     */
     function _storedBatchMetadataHash(BlobVerificationProof calldata blobVerificationProof)
         internal
         view

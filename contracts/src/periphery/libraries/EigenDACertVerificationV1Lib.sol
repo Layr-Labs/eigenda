@@ -10,9 +10,15 @@ import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.s
 
 import {BlobHeader, BlobVerificationProof, QuorumBlobParam} from "src/interfaces/IEigenDAStructs.sol";
 
+/**
+ * @title EigenDACertVerificationV1Lib - EigenDA V1 certificate verification library
+ * @author Layr Labs, Inc.
+ * @notice Library of functions for verifying EigenDA V1 certificates
+ */
 library EigenDACertVerificationV1Lib {
     using BN254 for BN254.G1Point;
 
+    /// @notice Denominator used for threshold percentage calculations (100 for percentages)
     uint256 internal constant THRESHOLD_DENOMINATOR = 100;
 
     /// @notice Thrown when the batch metadata does not match stored metadata
@@ -53,25 +59,38 @@ library EigenDACertVerificationV1Lib {
     /// @param confirmedQuorumsBitmap The bitmap of confirmed quorums
     error RequiredQuorumsNotSubset(uint256 requiredQuorumsBitmap, uint256 confirmedQuorumsBitmap);
 
+    /// @notice Thrown when security assumptions are not met
+    /// @param errParams Additional error parameters
     error SecurityAssumptionsNotMet(bytes errParams);
+
+    /// @notice Thrown when blob quorums are not a subset of confirmed quorums
+    /// @param blobQuorumsBitmap The bitmap of blob quorums
+    /// @param confirmedQuorumsBitmap The bitmap of confirmed quorums
     error BlobQuorumsNotSubset(uint256 blobQuorumsBitmap, uint256 confirmedQuorumsBitmap);
 
+    /// @notice Thrown when there is a length mismatch
+    /// @param expected The expected length
+    /// @param actual The actual length
     error LengthMismatch(uint256 expected, uint256 actual);
 
+    /// @notice Thrown when a relay key is not set
+    /// @param relayKey The relay key that was not set
     error RelayKeyNotSet(uint32 relayKey);
 
+    /// @notice Error codes for certificate verification results
     enum ErrorCode {
-        SUCCESS,
-        BATCH_METADATA_MISMATCH,
-        INVALID_INCLUSION_PROOF,
-        QUORUM_NUMBER_MISMATCH,
-        INVALID_THRESHOLD_PERCENTAGES,
-        CONFIRMATION_THRESHOLD_NOT_MET,
-        STAKE_THRESHOLD_NOT_MET,
-        REQUIRED_QUORUMS_NOT_SUBSET,
-        SECURITY_ASSUMPTIONS_NOT_MET,
-        BLOB_QUORUMS_NOT_SUBSET,
-        RELAY_KEY_NOT_SET
+        SUCCESS, // Verification succeeded
+        BATCH_METADATA_MISMATCH, // Batch metadata hash doesn't match stored hash
+        INVALID_INCLUSION_PROOF, // Merkle inclusion proof is invalid
+        QUORUM_NUMBER_MISMATCH, // Quorum number doesn't match expected value
+        INVALID_THRESHOLD_PERCENTAGES, // Threshold percentages are invalid
+        CONFIRMATION_THRESHOLD_NOT_MET, // Confirmation threshold not met
+        STAKE_THRESHOLD_NOT_MET, // Stake threshold not met
+        REQUIRED_QUORUMS_NOT_SUBSET, // Required quorums not a subset of confirmed quorums
+        SECURITY_ASSUMPTIONS_NOT_MET, // Security assumptions not met
+        BLOB_QUORUMS_NOT_SUBSET, // Blob quorums not a subset of confirmed quorums
+        RELAY_KEY_NOT_SET // Relay key not set
+
     }
 
     /**
@@ -303,6 +322,10 @@ library EigenDACertVerificationV1Lib {
             (uint8 quorumNumber, uint8 requiredThreshold, uint8 actualThreshold) =
                 abi.decode(errParams, (uint8, uint8, uint8));
             revert ConfirmationThresholdNotMet(quorumNumber, requiredThreshold, actualThreshold);
+        } else if (err == ErrorCode.STAKE_THRESHOLD_NOT_MET) {
+            (uint8 quorumNumber, uint8 requiredThreshold, uint8 actualThreshold) =
+                abi.decode(errParams, (uint8, uint8, uint8));
+            revert StakeThresholdNotMet(quorumNumber, requiredThreshold, actualThreshold);
         } else if (err == ErrorCode.REQUIRED_QUORUMS_NOT_SUBSET) {
             (uint256 requiredQuorumsBitmap, uint256 confirmedQuorumsBitmap) = abi.decode(errParams, (uint256, uint256));
             revert RequiredQuorumsNotSubset(requiredQuorumsBitmap, confirmedQuorumsBitmap);
@@ -314,6 +337,8 @@ library EigenDACertVerificationV1Lib {
         } else if (err == ErrorCode.BLOB_QUORUMS_NOT_SUBSET) {
             (uint256 blobQuorumsBitmap, uint256 confirmedQuorumsBitmap) = abi.decode(errParams, (uint256, uint256));
             revert BlobQuorumsNotSubset(blobQuorumsBitmap, confirmedQuorumsBitmap);
+        } else {
+            revert("Unknown error code");
         }
     }
 }
