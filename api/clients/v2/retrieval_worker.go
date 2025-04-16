@@ -6,6 +6,7 @@ import (
 	"time"
 
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -46,9 +47,11 @@ type ValidatorRetrievalConfig struct {
 // retrievalWorker implements the distributed retrieval process for a specified blob (i.e. reading the blobs from
 // validators). It is responsible for coordinating the lifecycle of this retrieval workflow.
 type retrievalWorker struct {
-	ctx    context.Context
-	logger logging.Logger
-	config *ValidatorRetrievalConfig
+	ctx                      context.Context
+	downloadAndVerifyContext context.Context
+	cancel                   context.CancelFunc
+	logger                   logging.Logger
+	config                   *ValidatorRetrievalConfig
 
 	// A pool of workers for network intensive operations (e.g. downloading blob data).
 	connectionPool *workerpool.WorkerPool
@@ -94,6 +97,9 @@ type retrievalWorker struct {
 
 	// When a thread completes decoding chunk data, it will send a message to the decodeResponseChan.
 	decodeResponseChan chan *decodeResult
+
+	// Used to collect metrics.
+	probe *common.SequenceProbe
 }
 
 // downloadStarted is used to signal that a download of chunk data has been initiated.
@@ -149,6 +155,7 @@ func newRetrievalWorker(
 	blobKey v2.BlobKey,
 	verifier encoding.Verifier,
 	blobCommitments encoding.BlobCommitments,
+	probe *common.SequenceProbe,
 ) (*retrievalWorker, error) {
 
 	// TODO set up some arguments here
@@ -160,9 +167,12 @@ func newRetrievalWorker(
 		return nil, fmt.Errorf(
 			"verificationPessimism must be greater than 1.0, got %f", config.VerificationPessimism)
 	}
+	downloadAndVerifyCtx, cancel := context.WithCancel(ctx)
 
 	return &retrievalWorker{
 		ctx:                      ctx,
+		downloadAndVerifyContext: downloadAndVerifyCtx,
+		cancel:                   cancel,
 		logger:                   logger,
 		config:                   config,
 		connectionPool:           connectionPool,
@@ -180,6 +190,7 @@ func newRetrievalWorker(
 		downloadCompletedChan:    make(chan *validatorDownloadCompleted, len(operators)),
 		verificationCompleteChan: make(chan *verificationCompleted, len(operators)),
 		decodeResponseChan:       make(chan *decodeResult, len(operators)),
+		probe:                    probe,
 	}, nil
 }
 
@@ -188,6 +199,8 @@ func newRetrievalWorker(
 
 // downloadBlobFromValidators downloads the blob from the validators.
 func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
+	// Once everything is completed, we can abort all ongoing work.
+	defer w.cancel()
 
 	// Attempt to download chunk data from all operators in a random order.
 	downloadOrder := make([]core.OperatorID, 0, len(w.operators))
@@ -246,6 +259,7 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 	}
 
 	// TODO encapsulate parts of this loop to make it easier to read
+	w.probe.SetStage("download_and_verify")
 
 	controlLoopTicker := time.NewTicker(w.config.ControlLoopPeriod)
 	for verifiedChunkCount < minimumChunkCount {
@@ -339,12 +353,16 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 		// TODO check to see if more verifications need to be requested
 	}
 
+	// This aborts all unfinished download/verification work.
+	w.cancel()
+
 	if verifiedChunkCount < minimumChunkCount {
 		return nil, fmt.Errorf("not enough chunks verified: %d < %d", verifiedChunkCount, minimumChunkCount)
 	}
 
 	// TODO can this last part be encapsulated in to a helper function?
 
+	w.probe.SetStage("decode")
 	w.logger.Info("decoding blob", "blobKey", w.blobKey.Hex())
 
 	chunks := make([]*encoding.Frame, 0)
@@ -372,8 +390,6 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 		w.decodeBlob(chunks, indices)
 	})
 
-	fmt.Printf("<<<<<<<<< waiting for decode response\n") // TODO
-
 	select {
 	case <-w.ctx.Done():
 		return nil, fmt.Errorf("retrieval worker context cancelled: %w", w.ctx.Err())
@@ -390,6 +406,8 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 
 // downloadChunks downloads the chunk data from the specified operator.
 func (w *retrievalWorker) downloadChunks(operatorID core.OperatorID) {
+	ctx, cancel := context.WithTimeout(w.downloadAndVerifyContext, w.config.DownloadTimeout)
+	defer cancel()
 
 	// Report back to the control loop when the download started. This may be later than when
 	// the download was scheduled if there is contention for the connection pool.
@@ -430,9 +448,7 @@ func (w *retrievalWorker) downloadChunks(operatorID core.OperatorID) {
 		QuorumId: uint32(w.quorumID),
 	}
 
-	// TODO add a timeout why not
-
-	reply, err := n.GetChunks(w.ctx, request)
+	reply, err := n.GetChunks(ctx, request)
 	if err != nil {
 		w.downloadCompletedChan <- &validatorDownloadCompleted{
 			OperatorID: operatorID,
@@ -452,6 +468,11 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 	operatorID core.OperatorID,
 	getChunksReply *grpcnode.GetChunksReply,
 ) {
+
+	if w.downloadAndVerifyContext.Err() != nil {
+		// blob is already finished
+		return
+	}
 
 	chunks := make([]*encoding.Frame, len(getChunksReply.GetChunks()))
 	for i, data := range getChunksReply.GetChunks() {

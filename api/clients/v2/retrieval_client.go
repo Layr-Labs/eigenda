@@ -56,11 +56,17 @@ func NewRetrievalClient(
 	ethClient core.Reader,
 	chainState core.ChainState,
 	verifier encoding.Verifier,
-// connectionPoolSize limits the maximum number of concurrent network connections
 	connectionPoolSize int,
-// computePoolSize limits the maximum number of concurrent compute intensive tasks
 	computePoolSize int,
 ) RetrievalClient {
+
+	if connectionPoolSize <= 0 {
+		connectionPoolSize = 1
+	}
+	if computePoolSize <= 0 {
+		computePoolSize = 1
+	}
+
 	return &retrievalClient{
 		logger:         logger.With("component", "RetrievalClient"),
 		ethClient:      ethClient,
@@ -135,7 +141,7 @@ func (r *retrievalClient) GetBlobWithProbe(
 	worker, err := newRetrievalWorker(
 		ctx,
 		r.logger,
-		DefaultValidatorRetrievalConfig(),
+		DefaultValidatorRetrievalConfig(), // TODO pass this in
 		r.connectionPool,
 		r.computePool,
 		operators,
@@ -146,12 +152,12 @@ func (r *retrievalClient) GetBlobWithProbe(
 		quorumID,
 		blobKey,
 		r.verifier,
-		blobCommitments)
+		blobCommitments,
+		probe)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create retrieval worker: %w", err)
 	}
 
-	probe.SetStage("download_and_verify")
 	data, err := worker.downloadBlobFromValidators()
 	if err != nil {
 		return nil, fmt.Errorf("failed to download blob from validators: %w", err)

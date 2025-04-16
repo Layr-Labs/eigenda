@@ -78,7 +78,7 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 			quorumID)
 
 		if err != nil {
-			pr.logger.Warn(
+			pr.logger.Error(
 				"blob couldn't be retrieved from quorum",
 				"blobKey", blobKey.Hex(),
 				"quorumId", quorumID,
