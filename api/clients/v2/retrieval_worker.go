@@ -287,6 +287,7 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 					downloadsInProgress.Dequeue()
 				} else if time.Since(downloadStart) > w.config.PessimisticTimeout {
 					// Too much time has passed. Assume that the operator is not responding.
+					downloadsInProgress.Dequeue()
 					operatorChunks := w.assignments[operatorID].NumChunks
 					chunksBeingDownloaded -= operatorChunks
 				} else {
