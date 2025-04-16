@@ -29,8 +29,11 @@ type DispatcherConfig struct {
 	PullInterval time.Duration
 
 	FinalizationBlockDelay uint64
-	NodeRequestTimeout     time.Duration
-	NumRequestRetries      int
+	// The maximum time permitted to wait for a node to provide a signature for a batch.
+	AttestationTimeout time.Duration
+	// The maximum time permitted to wait for all nodes to provide signatures for a batch.
+	BatchAttestationTimeout time.Duration
+	NumRequestRetries       int
 	// MaxBatchSize is the maximum number of blobs to dispatch in a batch
 	MaxBatchSize int32
 }
@@ -78,7 +81,10 @@ func NewDispatcher(
 	if config == nil {
 		return nil, errors.New("config is required")
 	}
-	if config.PullInterval == 0 || config.NodeRequestTimeout == 0 || config.MaxBatchSize == 0 {
+	if config.PullInterval == 0 ||
+		config.AttestationTimeout == 0 ||
+		config.BatchAttestationTimeout == 0 ||
+		config.MaxBatchSize == 0 {
 		return nil, errors.New("invalid config")
 	}
 	return &Dispatcher{
@@ -112,21 +118,25 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				sigChan, batchData, err := d.HandleBatch(ctx)
+
+				attestationCtx, cancel := context.WithTimeout(ctx, d.BatchAttestationTimeout)
+
+				sigChan, batchData, err := d.HandleBatch(attestationCtx)
 				if err != nil {
 					if errors.Is(err, errNoBlobsToDispatch) {
 						d.logger.Debug("no blobs to dispatch")
 					} else {
 						d.logger.Error("failed to process a batch", "err", err)
 					}
+					cancel()
 					continue
 				}
 				go func() {
-					err := d.HandleSignatures(ctx, batchData, sigChan)
+					err := d.HandleSignatures(ctx, attestationCtx, batchData, sigChan)
 					if err != nil {
 						d.logger.Error("failed to handle signatures", "err", err)
 					}
-					close(sigChan)
+					cancel()
 				}()
 			}
 		}
@@ -285,8 +295,12 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 }
 
 // HandleSignatures receives signatures from operators, validates, and aggregates them
-func (d *Dispatcher) HandleSignatures(ctx context.Context, batchData *batchData,
+func (d *Dispatcher) HandleSignatures(
+	ctx context.Context,
+	attestationCtx context.Context,
+	batchData *batchData,
 	sigChan chan core.SigningMessage) error {
+
 	if batchData == nil {
 		return errors.New("batchData is required")
 	}
@@ -322,8 +336,12 @@ func (d *Dispatcher) HandleSignatures(ctx context.Context, batchData *batchData,
 
 	// TODO(ian-shim): periodically update the attestation with intermediate quorum results
 
-	quorumAttestation, err := d.aggregator.ReceiveSignatures(ctx, batchData.OperatorState,
-		batchData.BatchHeaderHash, sigChan)
+	quorumAttestation, err := d.aggregator.ReceiveSignatures(
+		ctx,
+		attestationCtx,
+		batchData.OperatorState,
+		batchData.BatchHeaderHash,
+		sigChan)
 	if err != nil {
 		dbErr := d.failBatch(ctx, batchData)
 		if dbErr != nil {
@@ -632,7 +650,8 @@ func (d *Dispatcher) sendChunks(
 	batch *corev2.Batch,
 ) (*core.Signature, error) {
 
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, d.NodeRequestTimeout)
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, d.AttestationTimeout)
+
 	defer cancel()
 
 	sig, err := client.StoreChunks(ctxWithTimeout, batch)
