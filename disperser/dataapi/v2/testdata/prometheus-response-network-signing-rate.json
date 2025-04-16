@@ -1,11 +1,10 @@
 {
   "metric": {
-      "__name__": "blob_total{status=\"success\"}",
+      "__name__": "eigenda_dispatcher_attestation{type=\"percent_signed\"}",
       "instance": "host.docker.internal:8080",
       "job": "bookmark",
       "origin": "testclient",
       "quorum": "0",
-      "status": "success",
       "cluster": "test-cluster"
   },
   "values": [
