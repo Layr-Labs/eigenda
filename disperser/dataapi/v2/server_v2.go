@@ -218,6 +218,18 @@ type (
 		Throughput float64 `json:"throughput"`
 		Timestamp  uint64  `json:"timestamp"`
 	}
+
+	SigningRateDataPoint struct {
+		SigningRate float64 `json:"signing_rate"`
+		Timestamp   uint64  `json:"timestamp"`
+	}
+	QuorumSigningRateData struct {
+		QuorumId   string                 `json:"quorum_id"`
+		DataPoints []SigningRateDataPoint `json:"data_points"`
+	}
+	NetworkSigningRateResponse struct {
+		QuorumSigningRates []QuorumSigningRateData `json:"quorum_signing_rates"`
+	}
 )
 
 type ServerV2 struct {
@@ -394,6 +406,7 @@ func (s *ServerV2) Start() error {
 		{
 			metrics.GET("/summary", s.FetchMetricsSummary)
 			metrics.GET("/timeseries/throughput", s.FetchMetricsThroughputTimeseries)
+			metrics.GET("/timeseries/network-signing-rate", s.FetchNetworkSigningRate)
 		}
 		swagger := v2.Group("/swagger")
 		{
