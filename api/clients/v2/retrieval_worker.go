@@ -199,6 +199,11 @@ func newRetrievalWorker(
 
 // downloadBlobFromValidators downloads the blob from the validators.
 func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
+
+	defer func() {
+		w.logger.Debug("closing retrieval worker", "blobKey", w.blobKey.Hex())
+	}() // TODO don't ship with this log enabled
+
 	// Once everything is completed, we can abort all ongoing work.
 	defer w.cancel()
 
@@ -265,7 +270,9 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 	for verifiedChunkCount < minimumChunkCount {
 		select {
 		case <-w.ctx.Done():
-			return nil, fmt.Errorf("retrieval worker context cancelled: %w", w.ctx.Err())
+			return nil, fmt.Errorf(
+				"retrieval worker context cancelled, blobKey: %s: %w",
+				w.blobKey.Hex(), w.ctx.Err())
 		case message := <-w.downloadStartedChan:
 			downloadsInProgress.Enqueue(message)
 		case <-controlLoopTicker.C:
