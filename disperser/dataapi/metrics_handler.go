@@ -64,18 +64,12 @@ func (mh *MetricsHandler) GetQuorumSigningRateTimeseries(ctx context.Context, st
 		return nil, errors.New("only V2 signing rate fetch is supported")
 	}
 
-	rateSecs := uint16(defaultThroughputRateSecs)
-	if endTime.Sub(startTime).Seconds() >= 7*24*60*60 {
-		rateSecs = uint16(sevenDayThroughputRateSecs)
-	}
-
-	result, err := mh.promClient.QueryQuorumNetworkSigningRateV2(ctx, startTime, endTime, rateSecs, quorumID)
+	result, err := mh.promClient.QueryQuorumNetworkSigningRateV2(ctx, startTime, endTime, quorumID)
 	if err != nil {
 		return nil, err
 	}
 
 	return result, nil
-
 }
 
 func (mh *MetricsHandler) GetThroughputTimeseries(ctx context.Context, startTime int64, endTime int64) ([]*Throughput, error) {
