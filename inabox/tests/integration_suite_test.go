@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
-	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
@@ -48,7 +48,7 @@ var (
 	mockRollup          *rollupbindings.ContractMockRollup
 	verifierContract    *verifierbindings.ContractEigenDACertVerifier
 	retrievalClient     clients.RetrievalClient
-	retrievalClientV2   clientsv2.RetrievalClient
+	retrievalClientV2   clientsv2.ValidatorClient
 	numConfirmations    int = 3
 	numRetries              = 0
 	chainReader         core.Reader

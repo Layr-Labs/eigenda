@@ -10,7 +10,7 @@ import (
 	"runtime"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
-	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
 	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/retriever/v2"
 	"github.com/Layr-Labs/eigenda/common"
@@ -64,9 +64,9 @@ func RetrieverMain(ctx *cli.Context) error {
 	gs := grpc.NewServer(
 		opt,
 		grpc.ChainUnaryInterceptor(
-			// TODO(ian-shim): Add interceptors
-			// correlation.UnaryServerInterceptor(),
-			// logger.UnaryServerInterceptor(*s.logger.Logger),
+		// TODO(ian-shim): Add interceptors
+		// correlation.UnaryServerInterceptor(),
+		// logger.UnaryServerInterceptor(*s.logger.Logger),
 		),
 	)
 

@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	relayv2 "github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -50,10 +51,10 @@ type TestClient struct {
 	certVerifierAddressProvider *test.TestCertVerifierAddressProvider
 	disperserClient             clients.DisperserClient
 	payloadDisperser            *payloaddispersal.PayloadDisperser
-	relayClient                 clients.RelayClient
+	relayClient                 relayv2.RelayClient
 	relayPayloadRetriever       *payloadretrieval.RelayPayloadRetriever
 	indexedChainState           core.IndexedChainState
-	retrievalClient             clients.RetrievalClient
+	retrievalClient             validator.ValidatorClient
 	validatorPayloadRetriever   *payloadretrieval.ValidatorPayloadRetriever
 	certVerifier                *verification.CertVerifier
 	privateKey                  string
@@ -205,11 +206,11 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to generate BLS keypair: %w", err)
 	}
 
-	var fakeSigner clients.MessageSigner = func(ctx context.Context, data [32]byte) (*core.Signature, error) {
+	var fakeSigner relayv2.MessageSigner = func(ctx context.Context, data [32]byte) (*core.Signature, error) {
 		return keypair.SignMessage(data), nil
 	}
 
-	relayConfig := &clients.RelayClientConfig{
+	relayConfig := &relayv2.RelayClientConfig{
 		UseSecureGrpcFlag:  true,
 		MaxGRPCMessageSize: units.GiB,
 		OperatorID:         &core.OperatorID{0},
@@ -221,7 +222,7 @@ func NewTestClient(
 		return nil, fmt.Errorf("create relay url provider: %w", err)
 	}
 
-	relayClient, err := clients.NewRelayClient(relayConfig, logger, relayUrlProvider)
+	relayClient, err := relayv2.NewRelayClient(relayConfig, logger, relayUrlProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create relay client: %w", err)
 	}
@@ -262,7 +263,7 @@ func NewTestClient(
 	}
 
 	numCPUs := runtime.NumCPU()
-	retrievalClient := clients.NewRetrievalClient(
+	retrievalClient := validator.NewRetrievalClient(
 		logger,
 		ethReader,
 		indexedChainState,
@@ -375,7 +376,7 @@ func (c *TestClient) GetPayloadDisperser() *payloaddispersal.PayloadDisperser {
 }
 
 // GetRelayClient returns the test client's relay client.
-func (c *TestClient) GetRelayClient() clients.RelayClient {
+func (c *TestClient) GetRelayClient() relayv2.RelayClient {
 	return c.relayClient
 }
 
@@ -390,7 +391,7 @@ func (c *TestClient) GetIndexedChainState() core.IndexedChainState {
 }
 
 // GetRetrievalClient returns the test client's retrieval client.
-func (c *TestClient) GetRetrievalClient() clients.RetrievalClient {
+func (c *TestClient) GetRetrievalClient() validator.ValidatorClient {
 	return c.retrievalClient
 }
 

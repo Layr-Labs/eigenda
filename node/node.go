@@ -28,7 +28,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
@@ -247,7 +246,7 @@ func NewNode(
 		}
 		blobVersionParams = corev2.NewBlobVersionParameterMap(blobParams)
 
-		relayClientConfig := &clients.RelayClientConfig{
+		relayClientConfig := &relay.RelayClientConfig{
 			UseSecureGrpcFlag:  config.UseSecureGrpc,
 			OperatorID:         &config.ID,
 			MessageSigner:      n.SignMessage,
@@ -259,7 +258,7 @@ func NewNode(
 			return nil, fmt.Errorf("create relay url provider: %w", err)
 		}
 
-		relayClient, err := clients.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
+		relayClient, err := relay.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new relay client: %w", err)
 		}

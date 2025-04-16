@@ -1,7 +1,8 @@
-package clients
+package validator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -146,20 +147,16 @@ func newRetrievalWorker(
 	config *ValidatorRetrievalConfig,
 	connectionPool *workerpool.WorkerPool,
 	computePool *workerpool.WorkerPool,
-	operators map[core.OperatorID]*core.OperatorInfo,
-	operatorState *core.OperatorState,
-	blobParams *core.BlobVersionParameters,
-	encodingParams encoding.EncodingParams,
-	assignments map[core.OperatorID]v2.Assignment,
+	chainState core.ChainState,
+	referenceBlockNumber uint64,
+	blobVersion v2.BlobVersion,
+	ethClient core.Reader,
 	quorumID core.QuorumID,
 	blobKey v2.BlobKey,
 	verifier encoding.Verifier,
 	blobCommitments encoding.BlobCommitments,
 	probe *common.SequenceProbe,
 ) (*retrievalWorker, error) {
-
-	// TODO set up some arguments here
-
 	if config.DownloadPessimism < 1.0 {
 		return nil, fmt.Errorf("downloadPessimism must be greater than 1.0, got %f", config.DownloadPessimism)
 	}
@@ -167,6 +164,47 @@ func newRetrievalWorker(
 		return nil, fmt.Errorf(
 			"verificationPessimism must be greater than 1.0, got %f", config.VerificationPessimism)
 	}
+
+	probe.SetStage("verify_commitment")
+	commitmentBatch := []encoding.BlobCommitments{blobCommitments}
+	err := verifier.VerifyCommitEquivalenceBatch(commitmentBatch)
+	if err != nil {
+		return nil, err
+	}
+
+	probe.SetStage("get_operator_state")
+	operatorState, err := chainState.GetOperatorStateWithSocket(ctx, uint(referenceBlockNumber), []core.QuorumID{quorumID})
+	if err != nil {
+		return nil, err
+	}
+	operators, ok := operatorState.Operators[quorumID]
+	if !ok {
+		return nil, fmt.Errorf("no quorum with ID: %d", quorumID)
+	}
+
+	probe.SetStage("get_blob_versions")
+	blobVersions, err := ethClient.GetAllVersionedBlobParams(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	blobParams, ok := blobVersions[blobVersion]
+	if !ok {
+		return nil, fmt.Errorf("invalid blob version %d", blobVersion)
+	}
+
+	probe.SetStage("get_encoding_params")
+	encodingParams, err := v2.GetEncodingParams(blobCommitments.Length, blobParams)
+	if err != nil {
+		return nil, err
+	}
+
+	probe.SetStage("get_assignments")
+	assignments, err := v2.GetAssignments(operatorState, blobParams, quorumID)
+	if err != nil {
+		return nil, errors.New("failed to get assignments")
+	}
+
 	downloadAndVerifyCtx, cancel := context.WithCancel(ctx)
 
 	return &retrievalWorker{

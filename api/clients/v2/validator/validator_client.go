@@ -1,8 +1,7 @@
-package clients
+package validator
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -13,9 +12,9 @@ import (
 	"github.com/gammazero/workerpool"
 )
 
-// RetrievalClient is an object that can retrieve blobs from the DA nodes.
+// ValidatorClient is an object that can retrieve blobs from the validator nodes.
 // To retrieve a blob from the relay, use RelayClient instead.
-type RetrievalClient interface {
+type ValidatorClient interface {
 	// GetBlob downloads chunks of a blob from operator network and reconstructs the blob.
 	GetBlob(
 		ctx context.Context,
@@ -48,7 +47,7 @@ type retrievalClient struct {
 	computePool    *workerpool.WorkerPool
 }
 
-var _ RetrievalClient = &retrievalClient{}
+var _ ValidatorClient = &retrievalClient{}
 
 // NewRetrievalClient creates a new retrieval client.
 func NewRetrievalClient(
@@ -58,7 +57,7 @@ func NewRetrievalClient(
 	verifier encoding.Verifier,
 	connectionPoolSize int,
 	computePoolSize int,
-) RetrievalClient {
+) ValidatorClient {
 
 	if connectionPoolSize <= 0 {
 		connectionPoolSize = 1
@@ -68,7 +67,7 @@ func NewRetrievalClient(
 	}
 
 	return &retrievalClient{
-		logger:         logger.With("component", "RetrievalClient"),
+		logger:         logger.With("component", "ValidatorClient"),
 		ethClient:      ethClient,
 		chainState:     chainState,
 		verifier:       verifier,
@@ -98,57 +97,16 @@ func (r *retrievalClient) GetBlobWithProbe(
 	probe *common.SequenceProbe,
 ) ([]byte, error) {
 
-	probe.SetStage("verify_commitment")
-	commitmentBatch := []encoding.BlobCommitments{blobCommitments}
-	err := r.verifier.VerifyCommitEquivalenceBatch(commitmentBatch)
-	if err != nil {
-		return nil, err
-	}
-
-	probe.SetStage("get_operator_state")
-	operatorState, err := r.chainState.GetOperatorStateWithSocket(ctx, uint(referenceBlockNumber), []core.QuorumID{quorumID})
-	if err != nil {
-		return nil, err
-	}
-	operators, ok := operatorState.Operators[quorumID]
-	if !ok {
-		return nil, fmt.Errorf("no quorum with ID: %d", quorumID)
-	}
-
-	probe.SetStage("get_blob_versions")
-	blobVersions, err := r.ethClient.GetAllVersionedBlobParams(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	blobParams, ok := blobVersions[blobVersion]
-	if !ok {
-		return nil, fmt.Errorf("invalid blob version %d", blobVersion)
-	}
-
-	probe.SetStage("get_encoding_params")
-	encodingParams, err := corev2.GetEncodingParams(blobCommitments.Length, blobParams)
-	if err != nil {
-		return nil, err
-	}
-
-	probe.SetStage("get_assignments")
-	assignments, err := corev2.GetAssignments(operatorState, blobParams, quorumID)
-	if err != nil {
-		return nil, errors.New("failed to get assignments")
-	}
-
 	worker, err := newRetrievalWorker(
 		ctx,
 		r.logger,
 		DefaultValidatorRetrievalConfig(), // TODO pass this in
 		r.connectionPool,
 		r.computePool,
-		operators,
-		operatorState,
-		blobParams,
-		encodingParams,
-		assignments,
+		r.chainState,
+		referenceBlockNumber,
+		blobVersion,
+		r.ethClient,
 		quorumID,
 		blobKey,
 		r.verifier,
