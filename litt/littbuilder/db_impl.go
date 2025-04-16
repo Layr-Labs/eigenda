@@ -20,8 +20,8 @@ var tableNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 var _ litt.DB = &db{}
 
-// TableBuilder is a function that creates a new table.
-type TableBuilder func(
+// TableBuilderFunc is a function that creates a new table.
+type TableBuilderFunc func(
 	ctx context.Context,
 	logger logging.Logger,
 	name string,
@@ -42,7 +42,7 @@ type db struct {
 	gcPeriod time.Duration
 
 	// A function that creates new tables.
-	tableBuilder TableBuilder
+	tableBuilder TableBuilderFunc
 
 	// A map of all tables in the database.
 	tables map[string]litt.ManagedTable
@@ -87,7 +87,7 @@ func NewDB(config *litt.Config) (litt.DB, error) {
 
 // NewDBUnsafe creates a new DB instance with a custom table builder. This is intended for unit test use,
 // and should not be considered a stable API.
-func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilder) (litt.DB, error) {
+func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, error) {
 	logger, err := buildLogger(config)
 	if err != nil {
 		return nil, fmt.Errorf("error building logger: %w", err)

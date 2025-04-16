@@ -404,7 +404,7 @@ func (d *DiskTable) Close() error {
 		return fmt.Errorf("failed to send shutdown request: %w", err)
 	}
 
-	_, err = util.Await(d.fatalErrorHandler, shutdownCompleteChan)
+	_, err = util.AwaitIfNotFatal(d.fatalErrorHandler, shutdownCompleteChan)
 	if err != nil {
 		return fmt.Errorf("failed to shutdown: %w", err)
 	}
@@ -657,7 +657,7 @@ func (d *DiskTable) Flush() error {
 		return fmt.Errorf("failed to send flush request: %w", err)
 	}
 
-	_, err = util.Await(d.fatalErrorHandler, flushReq.responseChan)
+	_, err = util.AwaitIfNotFatal(d.fatalErrorHandler, flushReq.responseChan)
 	if err != nil {
 		return fmt.Errorf("failed to flush: %w", err)
 	}
@@ -689,7 +689,7 @@ func (d *DiskTable) RunGC() error {
 		return fmt.Errorf("failed to send GC request: %w", err)
 	}
 
-	_, err = util.Await(d.fatalErrorHandler, request.completionChan)
+	_, err = util.AwaitIfNotFatal(d.fatalErrorHandler, request.completionChan)
 	if err != nil {
 		return fmt.Errorf("failed to await GC completion: %w", err)
 	}

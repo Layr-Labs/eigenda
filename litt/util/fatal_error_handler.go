@@ -46,9 +46,9 @@ func NewFatalErrorHandler(
 	}
 }
 
-// Await waits for a value to be sent on a channel. If the channel sends a value, the value is returned. If the DB
-// panics before the channel sends a value, an error is returned.
-func Await[T any](handler *FatalErrorHandler, channel <-chan T) (T, error) {
+// AwaitIfNotFatal waits for a value to be sent on a channel. If the channel sends a value, the value is returned.
+// If the DB panics before the channel sends a value, an error is returned.
+func AwaitIfNotFatal[T any](handler *FatalErrorHandler, channel <-chan T) (T, error) {
 	select {
 	case value := <-channel:
 		return value, nil
@@ -58,9 +58,9 @@ func Await[T any](handler *FatalErrorHandler, channel <-chan T) (T, error) {
 	}
 }
 
-// Send sends a value on a channel. If the value is sent, nil is returned. If the DB panics before the value is sent,
-// an error is returned.
-func Send[T any](handler *FatalErrorHandler, channel chan<- any, value T) error {
+// SendIfNotFatal sends a value on a channel. If the value is sent, nil is returned. If the DB panics before the value
+// is sent, an error is returned.
+func SendIfNotFatal[T any](handler *FatalErrorHandler, channel chan<- any, value T) error {
 	select {
 	case channel <- value:
 		return nil
