@@ -481,6 +481,9 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 
 	if w.downloadAndVerifyContext.Err() != nil {
 		// blob is already finished
+		w.logger.Debug("will not verify chunks, context cancelled",
+			"operator", operatorID.Hex(),
+			"blobKey", w.blobKey.Hex()) // TODO don't ship with this log enabled
 		return
 	}
 
@@ -492,6 +495,9 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 	for i, data := range getChunksReply.GetChunks() {
 		chunk, err := new(encoding.Frame).DeserializeGnark(data)
 		if err != nil {
+			w.logger.Warn("failed to deserialize chunk",
+				"operator", operatorID.Hex(),
+				"blobKey", w.blobKey.Hex()) // TODO don't ship with this log enabled
 			w.verificationCompleteChan <- &verificationCompleted{
 				OperatorID: operatorID,
 				Err:        fmt.Errorf("failed to deserialize chunk from operator %s: %w", operatorID.Hex(), err),
@@ -501,6 +507,10 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 
 		chunks[i] = chunk
 	}
+
+	w.logger.Debug("done deserializing chunks",
+		"operator", operatorID.Hex(),
+		"blobKey", w.blobKey.Hex()) // TODO don't ship with this log enabled
 
 	assignment := w.assignments[operatorID]
 
@@ -518,6 +528,10 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 		}
 		return
 	}
+
+	w.logger.Debug("verified chunks, sending message to control loop",
+		"operator", operatorID.Hex(),
+		"blobKey", w.blobKey.Hex()) // TODO don't ship with this log enabled
 
 	w.verificationCompleteChan <- &verificationCompleted{
 		OperatorID: operatorID,
