@@ -67,6 +67,24 @@ func (cs *ChainState) GetOperatorSocket(ctx context.Context, blockNumber uint, o
 	return socket, nil
 }
 
+func (cs *ChainState) GetDisperserKeyToAddress(ctx context.Context, blockNumber uint, key uint32) (string, error) {
+	// address, err := cs.Tx.GetDisperserKeyToAddress(ctx, key)
+	// if err != nil {
+	// 	return "", err
+	// }
+	address := "0x1234567890123456789012345678901234567890"
+	return address, nil
+}
+
+func (cs *ChainState) GetDisperserKeysToAddresses(ctx context.Context, blockNumber uint, keys []uint32) ([]string, error) {
+	// addresses, err := cs.Tx.GetDisperserKeysToAddresses(ctx, keys)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	addresses := []string{"0x1234567890123456789012345678901234567890"}
+	return addresses, nil
+}
+
 func getOperatorState(operatorsByQuorum core.OperatorStakes, blockNumber uint32) (*core.OperatorState, error) {
 	operators := make(map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo)
 	totals := make(map[core.QuorumID]*core.OperatorInfo)
