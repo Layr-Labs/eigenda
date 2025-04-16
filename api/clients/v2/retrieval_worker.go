@@ -289,11 +289,14 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 			}
 		case message := <-w.downloadCompletedChan:
 			if message.Err == nil {
-				w.logger.Info("downloaded chunks from operator", "operator", message.OperatorID.Hex())
+				w.logger.Debug("downloaded chunks from operator",
+					"operator", message.OperatorID.Hex(),
+					"blobKey", w.blobKey.Hex())
 				unverifiedChunks.Enqueue(message)
 			} else {
 				w.logger.Warn("failed to download chunk data",
 					"operator", message.OperatorID.Hex(),
+					"blobKey", w.blobKey.Hex(),
 					"err", message.Err)
 
 				chunkCount := w.assignments[message.OperatorID].NumChunks
@@ -301,12 +304,15 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 			}
 		case message := <-w.verificationCompleteChan:
 			if message.Err == nil {
-				w.logger.Info("verified chunks from operator", "operator", message.OperatorID.Hex())
+				w.logger.Debug("verified chunks from operator",
+					"operator", message.OperatorID.Hex(),
+					"blobKey", w.blobKey.Hex())
 				verifiedChunks.Enqueue(message)
 				verifiedChunkCount += uint32(len(message.chunks))
 			} else {
 				w.logger.Warn("failed to verify chunk data",
 					"operator", message.OperatorID.Hex(),
+					"blobKey", w.blobKey.Hex(),
 					"err", message.Err)
 
 				chunkCount := w.assignments[message.OperatorID].NumChunks
@@ -406,6 +412,10 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 
 // downloadChunks downloads the chunk data from the specified operator.
 func (w *retrievalWorker) downloadChunks(operatorID core.OperatorID) {
+	w.logger.Debug("downloading chunks",
+		"operator", operatorID.Hex(),
+		"blobKey", w.blobKey.Hex())
+
 	ctx, cancel := context.WithTimeout(w.downloadAndVerifyContext, w.config.DownloadTimeout)
 	defer cancel()
 
@@ -474,6 +484,10 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 		return
 	}
 
+	w.logger.Debug("verifying chunks",
+		"operator", operatorID.Hex(),
+		"blobKey", w.blobKey.Hex())
+
 	chunks := make([]*encoding.Frame, len(getChunksReply.GetChunks()))
 	for i, data := range getChunksReply.GetChunks() {
 		chunk, err := new(encoding.Frame).DeserializeGnark(data)
@@ -513,6 +527,9 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 
 // decodeBlob decodes the blob from the chunks and indices.
 func (w *retrievalWorker) decodeBlob(chunks []*encoding.Frame, indices []uint) {
+
+	w.logger.Debug("decoding blob", "blobKey", w.blobKey.Hex())
+
 	blob, err := w.verifier.Decode(
 		chunks,
 		indices,
