@@ -104,13 +104,13 @@ func (s *ServerV2) FetchMetricsThroughputTimeseries(c *gin.Context) {
 //	@Summary	Fetch network signing rate time series in the specified time range
 //	@Tags		Metrics
 //	@Produce	json
-//	@Param		end				query		string	false	"Fetch network signing rate up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
-//	@Param		interval		query		int		false	"Fetch network signing rate starting from an interval (in seconds) before the end time [default: 3600]"
-//	@Param      quorums         query       string  false   "Comma-separated list of quorum IDs to filter (e.g., 0,1) [default: 0,1]"
-//	@Success	200		{object}	NetworkSigningRateResponse
-//	@Failure	400		{object}	ErrorResponse	"error: Bad request"
-//	@Failure	404		{object}	ErrorResponse	"error: Not found"
-//	@Failure	500		{object}	ErrorResponse	"error: Server error"
+//	@Param		end			query		string	false	"Fetch network signing rate up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]"
+//	@Param		interval	query		int		false	"Fetch network signing rate starting from an interval (in seconds) before the end time [default: 3600]"
+//	@Param		quorums		query		string	false	"Comma-separated list of quorum IDs to filter (e.g., 0,1) [default: 0,1]"
+//	@Success	200			{object}	NetworkSigningRateResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/timeseries/network-signing-rate [get]
 func (s *ServerV2) FetchNetworkSigningRate(c *gin.Context) {
 	handlerStart := time.Now()
