@@ -34,10 +34,10 @@ import (
 )
 
 const (
-	SRSPathG1         = "/g1.point"
-	SRSPathG2         = "/g2.point"
-	SRSPathG2PowerOf2 = "/g2.point.powerOf2"
-	SRSPathSRSTables  = "/SRSTables"
+	SRSPathG1         = "../../../resources/srs/g1.point"
+	SRSPathG2         = "../../../resources/srs/g2.point"
+	SRSPathG2Trailing = "../../../resources/srs/g2.trailing.point"
+	SRSPathSRSTables  = "../../../resources/srs/SRSTables"
 )
 
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
@@ -86,29 +86,12 @@ func NewTestClient(
 	}
 	logger.Infof("Account ID: %s", accountId.String())
 
-	g1Path, err := config.ResolveSRSPath(SRSPathG1)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get path to G1 file: %w", err)
-	}
-	g2Path, err := config.ResolveSRSPath(SRSPathG2)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get path to G2 file: %w", err)
-	}
-	g2PowerOf2Path, err := config.ResolveSRSPath(SRSPathG2PowerOf2)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get path to G2 power of 2 file: %w", err)
-	}
-	srsTablesPath, err := config.ResolveSRSPath(SRSPathSRSTables)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get path to SRS tables: %w", err)
-	}
-
 	kzgConfig := &kzg.KzgConfig{
 		LoadG2Points:    true,
-		G1Path:          g1Path,
-		G2Path:          g2Path,
-		G2PowerOf2Path:  g2PowerOf2Path,
-		CacheDir:        srsTablesPath,
+		G1Path:         SRSPathG1,
+		G2Path:         SRSPathG2,
+		G2TrailingPath: SRSPathG2Trailing,
+		CacheDir:       SRSPathSRSTables,
 		SRSOrder:        config.SRSOrder,
 		SRSNumberToLoad: config.SRSNumberToLoad,
 		NumWorker:       32,
@@ -223,7 +206,9 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create relay client: %w", err)
 	}
 
-	blobVerifier, err := verifier.NewVerifier(kzgConfig, nil)
+	verifierKzgConfig := kzgConfig
+	verifierKzgConfig.LoadG2Points = false
+	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob verifier: %w", err)
 	}
