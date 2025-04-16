@@ -1,6 +1,8 @@
 syntax = "proto3";
 package validator;
+
 import "common/v2/common_v2.proto";
+
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/validator";
 
 // The EigenDA Validator Node implements two services, Dispersal and Retrieval, as defined below,
@@ -138,8 +140,7 @@ message GetChunksReply {
 }
 
 // The parameter for the GetNodeInfo() RPC.
-message GetNodeInfoRequest {
-}
+message GetNodeInfoRequest {}
 
 // Node info reply
 message GetNodeInfoReply {

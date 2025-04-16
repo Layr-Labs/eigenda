@@ -15,9 +15,9 @@ type PayloadDisperserConfig struct {
 	// blob
 	DisperseBlobTimeout time.Duration
 
-	// BlobCertifiedTimeout is the duration after which the PayloadDisperser will time out, while polling
-	// the disperser for blob status, waiting for BlobStatus_CERTIFIED
-	BlobCertifiedTimeout time.Duration
+	// BlobCompleteTimeout is the duration after which the PayloadDisperser will time out, while polling
+	// the disperser for blob status, waiting for BlobStatus_COMPLETE
+	BlobCompleteTimeout time.Duration
 
 	// BlobStatusPollInterval is the tick rate for the PayloadDisperser to use, while polling the disperser with
 	// GetBlobStatus.
@@ -32,7 +32,7 @@ func getDefaultPayloadDisperserConfig() *PayloadDisperserConfig {
 	return &PayloadDisperserConfig{
 		PayloadClientConfig:    *clients.GetDefaultPayloadClientConfig(),
 		DisperseBlobTimeout:    2 * time.Minute,
-		BlobCertifiedTimeout:   2 * time.Minute,
+		BlobCompleteTimeout:    2 * time.Minute,
 		BlobStatusPollInterval: 1 * time.Second,
 		ContractCallTimeout:    5 * time.Second,
 	}
@@ -47,8 +47,8 @@ func (dc *PayloadDisperserConfig) checkAndSetDefaults() error {
 		dc.DisperseBlobTimeout = defaultConfig.DisperseBlobTimeout
 	}
 
-	if dc.BlobCertifiedTimeout == 0 {
-		dc.BlobCertifiedTimeout = defaultConfig.BlobCertifiedTimeout
+	if dc.BlobCompleteTimeout == 0 {
+		dc.BlobCompleteTimeout = defaultConfig.BlobCompleteTimeout
 	}
 
 	if dc.BlobStatusPollInterval == 0 {
