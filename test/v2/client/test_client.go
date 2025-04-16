@@ -88,10 +88,10 @@ func NewTestClient(
 
 	kzgConfig := &kzg.KzgConfig{
 		LoadG2Points:    true,
-		G1Path:         SRSPathG1,
-		G2Path:         SRSPathG2,
-		G2TrailingPath: SRSPathG2Trailing,
-		CacheDir:       SRSPathSRSTables,
+		G1Path:          SRSPathG1,
+		G2Path:          SRSPathG2,
+		G2TrailingPath:  SRSPathG2Trailing,
+		CacheDir:        SRSPathSRSTables,
 		SRSOrder:        config.SRSOrder,
 		SRSNumberToLoad: config.SRSNumberToLoad,
 		NumWorker:       32,
