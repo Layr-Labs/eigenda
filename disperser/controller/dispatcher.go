@@ -599,6 +599,15 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		return nil, fmt.Errorf("failed to put blob inclusion infos: %w", err)
 	}
 
+	batch := &corev2.Batch{
+		BatchHeader:      batchHeader,
+		BlobCertificates: certs,
+	}
+	err = d.blobMetadataStore.PutBatchInfo(ctx, batch)
+	if err != nil {
+		return nil, fmt.Errorf("failed to put batch info: %w", err)
+	}
+
 	d.cursor = cursor
 
 	// Add blobs to the blob set to deduplicate blobs
@@ -608,10 +617,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 
 	d.logger.Debug("new batch", "referenceBlockNumber", referenceBlockNumber, "numBlobs", len(certs))
 	return &batchData{
-		Batch: &corev2.Batch{
-			BatchHeader:      batchHeader,
-			BlobCertificates: certs,
-		},
+		Batch:           batch,
 		BatchHeaderHash: batchHeaderHash,
 		BlobKeys:        keys,
 		Metadata:        metadataMap,
