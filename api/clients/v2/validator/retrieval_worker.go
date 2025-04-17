@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
+	"github.com/emirpasic/gods/queues"
 	"github.com/emirpasic/gods/queues/linkedlistqueue"
 	"github.com/gammazero/workerpool"
 	"google.golang.org/grpc"
@@ -67,9 +68,6 @@ type retrievalWorker struct {
 	operatorState *core.OperatorState
 
 	// The encoding parameters for the blob.
-	blobParams *core.BlobVersionParameters
-
-	// The encoding parameters for the blob.
 	encodingParams encoding.EncodingParams
 
 	// The assignments for the operators, i.e. which operators are responsible for which chunks.
@@ -101,6 +99,49 @@ type retrievalWorker struct {
 
 	// Used to collect metrics.
 	probe *common.SequenceProbe
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////
+	// All variables below this line are for use only on the downloadBlobFromValidators() goroutine  //
+	///////////////////////////////////////////////////////////////////////////////////////////////////
+
+	// The order in which to download chunks from the operators.
+	downloadOrder []core.OperatorID
+
+	// The index of the next operator to download from.
+	nextDownloadIndex int
+
+	// TODO verify technical accuracy of this
+	// The minimum number of chunks needed to reconstruct the blob.
+	minimumChunkCount uint32
+
+	// The number of chunks we'd like to download.
+	targetDownloadCount uint32
+
+	// The number of chunks we'd like to verify.
+	targetVerifiedCount uint32
+
+	// The number of chunks currently in the process of being downloaded, or which have already been downloaded.
+	// If chunk data is found to be invalid, then those chunks will be removed from this count.
+	chunksBeingDownloaded uint32
+
+	// The number of chunks currently in the process of being validated, or which have already been validated.
+	// If chunk data is found to be invalid, then those chunks will be removed from this count.
+	chunksBeingVerified uint32
+
+	// This queue is used to determine when the pessimistic timeout for a download has been reached.
+	downloadsInProgress queues.Queue
+
+	// The set of validators that have completed their download (successfully or unsuccessfully).
+	completedDownloadSet map[core.OperatorID]struct{}
+
+	// Contains chunks that have been downloaded but not yet verified.
+	unverifiedChunks queues.Queue
+
+	// Contains chunks that have been verified.
+	verifiedChunks queues.Queue
+
+	// The number of chunks that have been verified.
+	verifiedChunkCount uint32
 }
 
 // downloadStarted is used to signal that a download of chunk data has been initiated.
@@ -205,6 +246,14 @@ func newRetrievalWorker(
 		return nil, errors.New("failed to get assignments")
 	}
 
+	// TODO verify technical accuracy of this
+	minimumChunkCount := uint32(encodingParams.NumChunks) / blobParams.CodingRate
+
+	downloadOrder := make([]core.OperatorID, 0, len(operators))
+	for opID := range operators {
+		downloadOrder = append(downloadOrder, opID)
+	}
+
 	downloadAndVerifyCtx, cancel := context.WithCancel(ctx)
 
 	return &retrievalWorker{
@@ -217,7 +266,6 @@ func newRetrievalWorker(
 		computePool:              computePool,
 		operators:                operators,
 		operatorState:            operatorState,
-		blobParams:               blobParams,
 		encodingParams:           encodingParams,
 		assignments:              assignments,
 		quorumID:                 quorumID,
@@ -229,6 +277,12 @@ func newRetrievalWorker(
 		verificationCompleteChan: make(chan *verificationCompleted, len(operators)),
 		decodeResponseChan:       make(chan *decodeResult, len(operators)),
 		probe:                    probe,
+		minimumChunkCount:        minimumChunkCount,
+		completedDownloadSet:     make(map[core.OperatorID]struct{}),
+		downloadsInProgress:      linkedlistqueue.New(),
+		unverifiedChunks:         linkedlistqueue.New(),
+		verifiedChunks:           linkedlistqueue.New(),
+		downloadOrder:            downloadOrder,
 	}, nil
 }
 
@@ -237,97 +291,52 @@ func newRetrievalWorker(
 
 // downloadBlobFromValidators downloads the blob from the validators.
 func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
-
-	defer func() {
-		w.logger.Debug("closing retrieval worker", "blobKey", w.blobKey.Hex())
-	}() // TODO don't ship with this log enabled
-
 	// Once everything is completed, we can abort all ongoing work.
 	defer w.cancel()
 
-	// Attempt to download chunk data from all operators in a random order.
-	downloadOrder := make([]core.OperatorID, 0, len(w.operators))
-	nextDownloadIndex := 0
-	for opID := range w.operators {
-		downloadOrder = append(downloadOrder, opID)
-	}
-
-	// TODO verify technical accuracy of this
-	// The minimum number of chunks needed to reconstruct the blob.
-	minimumChunkCount := uint32(w.encodingParams.NumChunks) / w.blobParams.CodingRate
-
-	// The number of chunks we'd like to download.
-	targetDownloadCount := uint32(float64(minimumChunkCount) * w.config.DownloadPessimism)
-
-	// The number of chunks we'd like to verify.
-	targetVerifiedCount := uint32(float64(minimumChunkCount) * w.config.VerificationPessimism)
-
-	// The number of chunks currently in the process of being downloaded, or which have already been downloaded.
-	// If chunk data is found to be invalid, then those chunks will be removed from this count.
-	chunksBeingDownloaded := uint32(0)
-
-	// The number of chunks currently in the process of being validated, or which have already been validated.
-	// If chunk data is found to be invalid, then those chunks will be removed from this count.
-	chunksBeingVerified := uint32(0)
-
-	// This queue is used to determine when the pessimistic timeout for a download has been reached.
-	downloadsInProgress := linkedlistqueue.New()
-
-	// The set of validators that have completed their download (successfully or unsuccessfully).
-	completedDownloadSet := make(map[core.OperatorID]struct{})
-
-	// Contains chunks that have been downloaded but not yet verified.
-	unverifiedChunks := linkedlistqueue.New()
-
-	// Contains chunks that have been verified.
-	verifiedChunks := linkedlistqueue.New()
-
-	// The number of chunks that have been verified.
-	verifiedChunkCount := uint32(0)
-
 	// To start things off, request an initial number of downloads.
-	for nextDownloadIndex < len(downloadOrder) {
-		if chunksBeingDownloaded > targetDownloadCount {
+	for w.nextDownloadIndex < len(w.downloadOrder) {
+		if w.chunksBeingDownloaded > w.targetDownloadCount {
 			// We've requested enough downloads
 			break
 		}
-		operatorID := downloadOrder[nextDownloadIndex]
+		operatorID := w.downloadOrder[w.nextDownloadIndex]
 		assignedChunks := w.assignments[operatorID].NumChunks
-		chunksBeingDownloaded += assignedChunks
+		w.chunksBeingDownloaded += assignedChunks
 		w.connectionPool.Submit(func() {
 			w.downloadChunks(operatorID)
 		})
 
-		nextDownloadIndex++
+		w.nextDownloadIndex++
 	}
 
 	// TODO encapsulate parts of this loop to make it easier to read
 	w.probe.SetStage("download_and_verify")
 
 	controlLoopTicker := time.NewTicker(w.config.ControlLoopPeriod)
-	for verifiedChunkCount < minimumChunkCount {
+	for w.verifiedChunkCount < w.minimumChunkCount {
 		select {
 		case <-w.ctx.Done():
 			return nil, fmt.Errorf(
 				"retrieval worker context cancelled, blobKey: %s: %w",
 				w.blobKey.Hex(), w.ctx.Err())
 		case message := <-w.downloadStartedChan:
-			downloadsInProgress.Enqueue(message)
+			w.downloadsInProgress.Enqueue(message)
 		case <-controlLoopTicker.C:
 			// Check to see if any downloads in progress have exceeded the pessimistic timeout.
-			for !downloadsInProgress.Empty() {
-				next, _ := downloadsInProgress.Peek()
+			for !w.downloadsInProgress.Empty() {
+				next, _ := w.downloadsInProgress.Peek()
 				operatorID := next.(*downloadStarted).operatorID
 				downloadStart := next.(*downloadStarted).downloadStart
 
-				if _, ok := completedDownloadSet[operatorID]; ok {
+				if _, ok := w.completedDownloadSet[operatorID]; ok {
 					// The operator has finished downloading, we can remove it from the queue.
-					downloadsInProgress.Dequeue()
+					w.downloadsInProgress.Dequeue()
 				} else if time.Since(downloadStart) > w.config.PessimisticTimeout {
 					// Too much time has passed. Assume that the operator is not responding.
-					downloadsInProgress.Dequeue()
+					w.downloadsInProgress.Dequeue()
 					operatorChunks := w.assignments[operatorID].NumChunks
-					chunksBeingDownloaded -= operatorChunks
+					w.chunksBeingDownloaded -= operatorChunks
 				} else {
 					// The next download has not yet timed out.
 					break
@@ -338,7 +347,7 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 				w.logger.Debug("downloaded chunks from operator",
 					"operator", message.OperatorID.Hex(),
 					"blobKey", w.blobKey.Hex())
-				unverifiedChunks.Enqueue(message)
+				w.unverifiedChunks.Enqueue(message)
 			} else {
 				w.logger.Warn("failed to download chunk data",
 					"operator", message.OperatorID.Hex(),
@@ -346,15 +355,15 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 					"err", message.Err)
 
 				chunkCount := w.assignments[message.OperatorID].NumChunks
-				chunksBeingDownloaded -= chunkCount
+				w.chunksBeingDownloaded -= chunkCount
 			}
 		case message := <-w.verificationCompleteChan:
 			if message.Err == nil {
 				w.logger.Debug("verified chunks from operator",
 					"operator", message.OperatorID.Hex(),
 					"blobKey", w.blobKey.Hex())
-				verifiedChunks.Enqueue(message)
-				verifiedChunkCount += uint32(len(message.chunks))
+				w.verifiedChunks.Enqueue(message)
+				w.verifiedChunkCount += uint32(len(message.chunks))
 			} else {
 				w.logger.Warn("failed to verify chunk data",
 					"operator", message.OperatorID.Hex(),
@@ -362,54 +371,51 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 					"err", message.Err)
 
 				chunkCount := w.assignments[message.OperatorID].NumChunks
-				chunksBeingVerified -= chunkCount
-				chunksBeingDownloaded -= chunkCount
+				w.chunksBeingVerified -= chunkCount
+				w.chunksBeingDownloaded -= chunkCount
 			}
 		}
 
 		// Check to see if we need to schedule more downloads.
-		for nextDownloadIndex < len(downloadOrder) {
-			if chunksBeingDownloaded > targetDownloadCount {
+		for w.nextDownloadIndex < len(w.downloadOrder) {
+			if w.chunksBeingDownloaded > w.targetDownloadCount {
 				// We've requested enough downloads
 				break
 			}
-			operatorID := downloadOrder[nextDownloadIndex]
+			operatorID := w.downloadOrder[w.nextDownloadIndex]
 			assignedChunks := w.assignments[operatorID].NumChunks
-			chunksBeingDownloaded += assignedChunks
+			w.chunksBeingDownloaded += assignedChunks
 			w.connectionPool.Submit(func() {
 				w.downloadChunks(operatorID)
 			})
 
-			nextDownloadIndex++
+			w.nextDownloadIndex++
 		}
 
 		// Check to see if we need to schedule more verifications.
-		for !unverifiedChunks.Empty() {
-			if chunksBeingVerified > targetVerifiedCount {
+		for !w.unverifiedChunks.Empty() {
+			if w.chunksBeingVerified > w.targetVerifiedCount {
 				// We've requested enough verifications
 				break
 			}
 
-			next, _ := unverifiedChunks.Dequeue()
+			next, _ := w.unverifiedChunks.Dequeue()
 			reply := next.(*validatorDownloadCompleted).Reply
 			operatorID := next.(*validatorDownloadCompleted).OperatorID
 
-			chunksBeingVerified += uint32(len(reply.Chunks))
+			w.chunksBeingVerified += uint32(len(reply.Chunks))
 
 			w.computePool.Submit(func() {
 				w.deserializeAndVerifyChunks(operatorID, reply)
 			})
 		}
-
-		// TODO check to see if more downloads need to be requested
-		// TODO check to see if more verifications need to be requested
 	}
 
 	// This aborts all unfinished download/verification work.
 	w.cancel()
 
-	if verifiedChunkCount < minimumChunkCount {
-		return nil, fmt.Errorf("not enough chunks verified: %d < %d", verifiedChunkCount, minimumChunkCount)
+	if w.verifiedChunkCount < w.minimumChunkCount {
+		return nil, fmt.Errorf("not enough chunks verified: %d < %d", w.verifiedChunkCount, w.minimumChunkCount)
 	}
 
 	// TODO can this last part be encapsulated in to a helper function?
@@ -420,8 +426,8 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 	chunks := make([]*encoding.Frame, 0)
 	indices := make([]uint, 0)
 
-	for !verifiedChunks.Empty() {
-		next, _ := verifiedChunks.Dequeue()
+	for !w.verifiedChunks.Empty() {
+		next, _ := w.verifiedChunks.Dequeue()
 		operatorID := next.(*verificationCompleted).OperatorID
 		operatorChunks := next.(*verificationCompleted).chunks
 
@@ -527,9 +533,6 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 
 	if w.downloadAndVerifyContext.Err() != nil {
 		// blob is already finished
-		w.logger.Debug("will not verify chunks, context cancelled",
-			"operator", operatorID.Hex(),
-			"blobKey", w.blobKey.Hex()) // TODO don't ship with this log enabled
 		return
 	}
 
@@ -541,9 +544,6 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 	for i, data := range getChunksReply.GetChunks() {
 		chunk, err := new(encoding.Frame).DeserializeGnark(data)
 		if err != nil {
-			w.logger.Warn("failed to deserialize chunk",
-				"operator", operatorID.Hex(),
-				"blobKey", w.blobKey.Hex()) // TODO don't ship with this log enabled
 			w.verificationCompleteChan <- &verificationCompleted{
 				OperatorID: operatorID,
 				Err:        fmt.Errorf("failed to deserialize chunk from operator %s: %w", operatorID.Hex(), err),
@@ -553,10 +553,6 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 
 		chunks[i] = chunk
 	}
-
-	w.logger.Debug("done deserializing chunks",
-		"operator", operatorID.Hex(),
-		"blobKey", w.blobKey.Hex()) // TODO don't ship with this log enabled
 
 	assignment := w.assignments[operatorID]
 
@@ -574,10 +570,6 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 		}
 		return
 	}
-
-	w.logger.Debug("verified chunks, sending message to control loop",
-		"operator", operatorID.Hex(),
-		"blobKey", w.blobKey.Hex()) // TODO don't ship with this log enabled
 
 	w.verificationCompleteChan <- &verificationCompleted{
 		OperatorID: operatorID,
