@@ -67,7 +67,9 @@ func Example_validatorPayloadRetrieval() {
 
 	fmt.Printf("Successfully verified eigenDACert")
 
-	// Output is disabled, since tests fail without a valid payment address
+	// Output is disabled, since tests fail without a valid payment address. To enable the test, delete this comment,
+	// and change `DisabledOutput` to `Output`.
+
 	// DisabledOutput: Successfully dispersed payload
 	// Successfully retrieved payload
 	// Successfully verified eigenDACert
