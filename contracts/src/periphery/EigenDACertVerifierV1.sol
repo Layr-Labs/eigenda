@@ -13,8 +13,6 @@ import "src/interfaces/IEigenDAStructs.sol";
  * @notice Contains all V1-specific verification functionality
  */
 contract EigenDACertVerifierV1 is IEigenDACertVerifierV1 {
-    /// @notice Thrown when there is a length mismatch
-    error LengthMismatch();
 
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistryV1;
 
@@ -52,25 +50,6 @@ contract EigenDACertVerifierV1 is IEigenDACertVerifierV1 {
         CertLib.revertOnError(err, errParams);
     }
 
-    /**
-     * @notice Verifies a batch of blob certs for the required quorums
-     * @param blobHeaders Pointer to array of blob headers in calldata
-     * @param blobVerificationProofs Pointer to array of blob cert verification proofs in calldata
-     */
-    function verifyDACertsV1(BlobHeader[] calldata blobHeaders, BlobVerificationProof[] calldata blobVerificationProofs)
-        external
-        view
-    {
-        // Check length match
-        if (blobHeaders.length != blobVerificationProofs.length) {
-            revert LengthMismatch();
-        }
-
-        // Verify each blob
-        for (uint256 i; i < blobHeaders.length; ++i) {
-            verifyDACertV1(blobHeaders[i], blobVerificationProofs[i]);
-        }
-    }
 
     /**
      * @notice Verifies a blob cert and returns result without reverting

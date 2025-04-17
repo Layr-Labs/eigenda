@@ -18,12 +18,4 @@ interface IEigenDACertVerifierV1 {
         external
         view;
 
-    /**
-     * @notice Verifies a batch of blob certs for the required quorums
-     * @param blobHeaders The blob headers to verify
-     * @param blobVerificationProofs The blob cert verification proofs to verify against
-     */
-    function verifyDACertsV1(BlobHeader[] calldata blobHeaders, BlobVerificationProof[] calldata blobVerificationProofs)
-        external
-        view;
 }
