@@ -29,7 +29,7 @@ func Example_validatorPayloadRetrieval() {
 		panic(fmt.Sprintf("create random payload: %v", err))
 	}
 
-	dispersalCtx, dispersalCancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	dispersalCtx, dispersalCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer dispersalCancel()
 	eigenDACert, err := payloadDisperser.SendPayload(dispersalCtx, payload)
 	if err != nil {
@@ -70,7 +70,7 @@ func Example_validatorPayloadRetrieval() {
 		panic(fmt.Sprintf("create cert verifier: %v", err))
 	}
 
-	verificationCtx, verificationCancel := context.WithTimeout(context.Background(), 1*time.Minute)
+	verificationCtx, verificationCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer verificationCancel()
 	err = certVerifier.VerifyCertV2(verificationCtx, eigenDACert)
 	if err != nil {
