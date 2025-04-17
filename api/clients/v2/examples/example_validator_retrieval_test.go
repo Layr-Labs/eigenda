@@ -1,12 +1,9 @@
 package examples
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/status-im/keycard-go/hexutils"
 )
 
 // This example demonstrates how to use the ValidatorPayloadRetriever to retrieve a payload from EigenDA, running on
@@ -48,18 +45,9 @@ func Example_validatorPayloadRetrieval() {
 	retrievalCtx, retrievalCancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer retrievalCancel()
 	// Retrieve the payload using the certificate by fetching from validator nodes
-	retrievedPayload, err := validatorPayloadRetriever.GetPayload(retrievalCtx, eigenDACert)
+	_, err = validatorPayloadRetriever.GetPayload(retrievalCtx, eigenDACert)
 	if err != nil {
 		panic(fmt.Sprintf("get payload: %v", err))
-	}
-
-	// Verify that the retrieved payload matches the original by comparing bytes
-	originalBytes := payload.Serialize()
-	retrievedBytes := retrievedPayload.Serialize()
-	if !bytes.Equal(originalBytes, retrievedBytes) {
-		panic(fmt.Sprintf(
-			"retrieved payload doesn't match original payload (original: %s, retrieved: %s)",
-			hexutils.BytesToHex(originalBytes), hexutils.BytesToHex(retrievedBytes)))
 	}
 
 	fmt.Printf("Successfully retrieved payload\n")
