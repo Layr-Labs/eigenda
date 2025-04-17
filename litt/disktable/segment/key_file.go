@@ -15,12 +15,12 @@ import (
 
 // KeyFileExtension is the file extension for the keys file. This file contains the keys for the data segment,
 // and is used for performing garbage collection on the keymap. It can also be used to rebuild the keymap.
-//
-// This struct is NOT goroutine safe. It is unsafe to concurrently call write, flush, or seal on the same key file.
-// A key file cannot be read until it is sealed. Once sealed, read only operations are goroutine safe.
 const KeyFileExtension = ".keys"
 
 // keyFile tracks the keys in a segment. It is used to do garbage collection on the keymap.
+//
+// This struct is NOT goroutine safe. It is unsafe to concurrently call write, flush, or seal on the same key file.
+// It is not safe to read a key file until it is sealed. Once sealed, read only operations are goroutine safe.
 type keyFile struct {
 	// The logger for the key file.
 	logger logging.Logger
@@ -193,6 +193,9 @@ func (k *keyFile) seal() error {
 }
 
 // readKeys reads all keys from the key file. This method returns an error if the key file is not sealed.
+// If there are keys that were only partially written (i.e. keys being written when the process crashed), then
+// those keys may not be returned. If a key is returned, it is guaranteed to be "whole" (i.e. a partial key will
+// never be returned).
 func (k *keyFile) readKeys() ([]*types.KAPair, error) {
 	if k.writer != nil {
 		return nil, fmt.Errorf("key file is not sealed")
@@ -248,7 +251,7 @@ func (k *keyFile) readKeys() ([]*types.KAPair, error) {
 	if index != len(keyBytes) {
 		// This can happen if there is a crash while we are writing to the key file.
 		// Recoverable, but best to note the event in the logs.
-		k.logger.Warnf("key file %s has %d corrupted bytes", k.path(), len(keyBytes)-index)
+		k.logger.Warnf("key file %s has %d partial bytes", k.path(), len(keyBytes)-index)
 	}
 
 	return keys, nil

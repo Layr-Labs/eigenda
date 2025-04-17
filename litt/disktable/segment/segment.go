@@ -22,7 +22,7 @@ const shardControlChannelCapacity = 32
 
 // Segment is a chunk of data stored on disk. All data in a particular data segment is expired at the same time.
 //
-// This struct is not thread safe for operations that mutate the segment, access control must be handled by the caller.
+// This struct is not safe for operations that mutate the segment, access control must be handled by the caller.
 type Segment struct {
 	// The logger for the segment.
 	logger logging.Logger
@@ -44,8 +44,8 @@ type Segment struct {
 	shards []*valueFile
 
 	// shardSizes is a list of the current sizes of each shard in the segment. Indexed by shard number. This
-	// value is only tracked for mutable segments, meaning that if this segment was loaded from disk, the values
-	// in this slice will be zero.
+	// value is only tracked for mutable segments (i.e. the unsealed segment), meaning that if this segment was loaded
+	// from disk, the values in this slice will be zero.
 	shardSizes []uint64
 
 	// The current size of the key file in bytes. This is only tracked for mutable segments, meaning that if this
@@ -65,7 +65,7 @@ type Segment struct {
 	// keyFileChannel is a channel used to send messages to the goroutine responsible for writing to the key file.
 	keyFileChannel chan any
 
-	// deletionMutex permits a caller to block until this segment is fully deleted. An element is inserted into
+	// deletionChannel permits a caller to block until this segment is fully deleted. An element is inserted into
 	// the channel when the segment is fully deleted.
 	deletionChannel chan struct{}
 
@@ -323,9 +323,9 @@ func (s *Segment) GetShard(key []byte) uint32 {
 //
 // This method does not ensure that the key-value pair is actually written to disk, only that it will eventually be
 // written to disk. Flush must be called to ensure that all data previously passed to Write is written to disk.
-func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64, maxShardSize uint64, err error) {
+func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64, err error) {
 	if s.metadata.sealed {
-		return 0, 0, 0, fmt.Errorf("segment is sealed, cannot write data")
+		return 0, 0, fmt.Errorf("segment is sealed, cannot write data")
 	}
 
 	shard := s.GetShard(data.Key)
@@ -335,7 +335,7 @@ func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64
 		// No matter the configuration, we absolutely cannot permit a value to be written if the first byte of the
 		// value would be beyond position 2^32. This is because we only have 32 bits in an address to store the
 		// position of a value's first byte.
-		return 0, 0, 0,
+		return 0, 0,
 			fmt.Errorf("value file already contains %d bytes, cannot add a new value", currentSize)
 	}
 	s.unflushedKeyCount.Add(1)
@@ -353,9 +353,9 @@ func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64
 		value:                  data.Value,
 		expectedFirstByteIndex: firstByteIndex,
 	}
-	err = util.Send(s.fatalErrorHandler, s.shardChannels[shard], shardRequest)
+	err = util.SendIfNotFatal(s.fatalErrorHandler, s.shardChannels[shard], shardRequest)
 	if err != nil {
-		return 0, 0, 0,
+		return 0, 0,
 			fmt.Errorf("failed to send value to shard control loop: %v", err)
 	}
 
@@ -364,13 +364,18 @@ func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64
 		Key:     data.Key,
 		Address: types.NewAddress(s.index, firstByteIndex),
 	}
-	err = util.Send(s.fatalErrorHandler, s.keyFileChannel, keyRequest)
+	err = util.SendIfNotFatal(s.fatalErrorHandler, s.keyFileChannel, keyRequest)
 	if err != nil {
-		return 0, 0, 0,
+		return 0, 0,
 			fmt.Errorf("failed to send key to key file control loop: %v", err)
 	}
 
-	return s.keyCount, s.keyFileSize, s.maxShardSize, nil
+	return s.keyCount, s.keyFileSize, nil
+}
+
+// GetMaxShardSize returns the maximum size of all shards in this segment.
+func (s *Segment) GetMaxShardSize() uint64 {
+	return s.maxShardSize
 }
 
 // Read fetches the data for a key from the data segment.
@@ -420,7 +425,7 @@ func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 			seal:              seal,
 			completionChannel: shardResponseChannels[shard],
 		}
-		err := util.Send(s.fatalErrorHandler, shardChannel, request)
+		err := util.SendIfNotFatal(s.fatalErrorHandler, shardChannel, request)
 		if err != nil {
 			return nil, fmt.Errorf("failed to send flush request to shard %d: %v", shard, err)
 		}
@@ -433,7 +438,7 @@ func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 		seal:              seal,
 		completionChannel: keyResponseChannel,
 	}
-	err := util.Send(s.fatalErrorHandler, s.keyFileChannel, request)
+	err := util.SendIfNotFatal(s.fatalErrorHandler, s.keyFileChannel, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send flush request to key file: %v", err)
 	}
@@ -441,13 +446,13 @@ func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 	return func() ([]*types.KAPair, error) {
 		// Wait for each shard to finish flushing.
 		for i := range s.shardChannels {
-			_, err := util.Await(s.fatalErrorHandler, shardResponseChannels[i])
+			_, err := util.AwaitIfNotFatal(s.fatalErrorHandler, shardResponseChannels[i])
 			if err != nil {
 				return nil, fmt.Errorf("failed to flush shard %d: %v", i, err)
 			}
 		}
 
-		keyFlushResponse, err := util.Await(s.fatalErrorHandler, keyResponseChannel)
+		keyFlushResponse, err := util.AwaitIfNotFatal(s.fatalErrorHandler, keyResponseChannel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to flush key file: %v", err)
 		}
@@ -491,7 +496,7 @@ func (s *Segment) IsSealed() bool {
 // GetSealTime returns the time at which the segment was sealed. If the file is not sealed, this method will return
 // the zero time.
 func (s *Segment) GetSealTime() time.Time {
-	return time.Unix(0, int64(s.metadata.timestamp))
+	return time.Unix(0, int64(s.metadata.lastValueTimestamp))
 }
 
 // Reserve reserves the segment, preventing it from being deleted. Returns true if the reservation was successful, and
@@ -537,7 +542,7 @@ func (s *Segment) Release() {
 // this method will block until it is. This method should only be called once per segment (the second call
 // will block forever!).
 func (s *Segment) BlockUntilFullyDeleted() error {
-	_, err := util.Await(s.fatalErrorHandler, s.deletionChannel)
+	_, err := util.AwaitIfNotFatal(s.fatalErrorHandler, s.deletionChannel)
 	if err != nil {
 		return fmt.Errorf("failed to await segment deletion: %v", err)
 	}

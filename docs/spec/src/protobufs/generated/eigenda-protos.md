@@ -379,13 +379,13 @@ Reserved-bandwidth dispersal is free to use multiple quorums, however those must
 
 ### PaymentHeader
 PaymentHeader contains payment information for a blob.
-At least one of reservation_period or cumulative_payment must be set, and reservation_period 
-is always considered before cumulative_payment. If reservation_period is set but not valid, 
-the server will reject the request and not proceed with dispersal. If reservation_period is not set 
+At least one of reservation_period or cumulative_payment must be set, and reservation_period
+is always considered before cumulative_payment. If reservation_period is set but not valid,
+the server will reject the request and not proceed with dispersal. If reservation_period is not set
 and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.
 Once the server has accepted the payment header, a client cannot cancel or rollback the payment.
 Every dispersal request will be charged by a multiple of `minNumSymbols` field defined by the payment vault contract.
-If the request blob size is smaller or not a multiple of `minNumSymbols`, the server will charge the user for the next 
+If the request blob size is smaller or not a multiple of `minNumSymbols`, the server will charge the user for the next
 multiple of `minNumSymbols` (https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/payments/PaymentVaultStorage.sol#L9).
 
 
@@ -657,7 +657,7 @@ Different DisperseBlobRequests have different IDs, including two identical Dispe
 | ----- | ---- | ----- | ----------- |
 | data | [bytes](#bytes) |  | The data to be dispersed. The size of data must be &lt;= 16MiB. Every 32 bytes of data is interpreted as an integer in big endian format where the lower address has more significant bits. The integer must stay in the valid range to be interpreted as a field element on the bn254 curve. The valid range is 0 &lt;= x &lt; 21888242871839275222246405745257275088548364400416034343698204186575808495617 If any one of the 32 bytes elements is outside the range, the whole request is deemed as invalid, and rejected. |
 | custom_quorum_numbers | [uint32](#uint32) | repeated | The quorums to which the blob will be sent, in addition to the required quorums which are configured on the EigenDA smart contract. If required quorums are included here, an error will be returned. The disperser will ensure that the encoded blobs for each quorum are all processed within the same batch. |
-| account_id | [string](#string) |  | The account ID of the client. This should be a hex-encoded string of the ECSDA public key corresponding to the key used by the client to sign the BlobAuthHeader. |
+| account_id | [string](#string) |  | The account ID of the client. This should be a hex-encoded string of the ECDSA public key corresponding to the key used by the client to sign the BlobAuthHeader. |
 
 
 

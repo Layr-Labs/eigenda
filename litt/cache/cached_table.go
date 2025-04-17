@@ -116,6 +116,6 @@ func (c *cachedTable) SetShardingFactor(shardingFactor uint32) error {
 	return c.base.SetShardingFactor(shardingFactor)
 }
 
-func (c *cachedTable) ScheduleImmediateGC() error {
-	return c.base.ScheduleImmediateGC()
+func (c *cachedTable) RunGC() error {
+	return c.base.RunGC()
 }

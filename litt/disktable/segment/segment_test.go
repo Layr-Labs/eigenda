@@ -50,7 +50,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	salt := rand.Uint32()
 	seg, err := CreateSegment(
 		logger,
-		util.NewFatalErrorHandler(context.Background(), logger),
+		util.NewFatalErrorHandler(context.Background(), logger, nil),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -68,7 +68,8 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 
 		expectedLargestShardSize += uint64(len(value)) + 4 /* uint32 length */
 
-		_, _, largestShardSize, err := seg.Write(&types.KVPair{Key: key, Value: value})
+		_, _, err := seg.Write(&types.KVPair{Key: key, Value: value})
+		largestShardSize := seg.GetMaxShardSize()
 		require.NoError(t, err)
 		require.Equal(t, expectedLargestShardSize, largestShardSize)
 
@@ -138,7 +139,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	// Reopen the segment and read all keys and values.
 	seg2, err := LoadSegment(
 		logger,
-		util.NewFatalErrorHandler(context.Background(), logger),
+		util.NewFatalErrorHandler(context.Background(), logger, nil),
 		index,
 		[]string{directory},
 		time.Now())
@@ -193,7 +194,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	salt := rand.Uint32()
 	seg, err := CreateSegment(
 		logger,
-		util.NewFatalErrorHandler(context.Background(), logger),
+		util.NewFatalErrorHandler(context.Background(), logger, nil),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -209,8 +210,9 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 		value := values[i]
 		expectedValues[string(key)] = value
 
-		_, _, largestShardSize, err := seg.Write(&types.KVPair{Key: key, Value: value})
+		_, _, err := seg.Write(&types.KVPair{Key: key, Value: value})
 		require.NoError(t, err)
+		largestShardSize := seg.GetMaxShardSize()
 		require.True(t, largestShardSize >= uint64(len(value)+4))
 
 		// Occasionally flush the segment to disk.
@@ -286,7 +288,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	// Reopen the segment and read all keys and values.
 	seg2, err := LoadSegment(
 		logger,
-		util.NewFatalErrorHandler(context.Background(), logger),
+		util.NewFatalErrorHandler(context.Background(), logger, nil),
 		index,
 		[]string{directory},
 		time.Now())
@@ -345,7 +347,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	salt := rand.Uint32()
 	seg, err := CreateSegment(
 		logger,
-		util.NewFatalErrorHandler(context.Background(), logger),
+		util.NewFatalErrorHandler(context.Background(), logger, nil),
 		index,
 		[]string{directory},
 		time.Now(),
@@ -361,8 +363,9 @@ func TestWriteAndReadColdShard(t *testing.T) {
 		value := values[i]
 		expectedValues[string(key)] = value
 
-		_, _, largestShardSize, err := seg.Write(&types.KVPair{Key: key, Value: value})
+		_, _, err := seg.Write(&types.KVPair{Key: key, Value: value})
 		require.NoError(t, err)
+		largestShardSize := seg.GetMaxShardSize()
 		require.True(t, largestShardSize >= uint64(len(value)+4))
 	}
 
@@ -404,7 +407,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	// Reopen the segment and read all keys and values.
 	seg2, err := LoadSegment(
 		logger,
-		util.NewFatalErrorHandler(context.Background(), logger),
+		util.NewFatalErrorHandler(context.Background(), logger, nil),
 		index,
 		[]string{directory},
 		time.Now())

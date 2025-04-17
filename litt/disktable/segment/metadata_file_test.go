@@ -22,7 +22,7 @@ func TestUnsealedSerialization(t *testing.T) {
 		serializationVersion: currentSerializationVersion,
 		shardingFactor:       shardingFactor,
 		salt:                 salt,
-		timestamp:            timestamp,
+		lastValueTimestamp:   timestamp,
 		sealed:               false,
 		parentDirectory:      directory,
 	}
@@ -65,7 +65,7 @@ func TestSealedSerialization(t *testing.T) {
 		serializationVersion: currentSerializationVersion,
 		shardingFactor:       shardingFactor,
 		salt:                 salt,
-		timestamp:            timestamp,
+		lastValueTimestamp:   timestamp,
 		sealed:               true,
 		parentDirectory:      directory,
 	}
@@ -106,7 +106,7 @@ func TestFreshFileSerialization(t *testing.T) {
 	require.Equal(t, index, m.index)
 	require.Equal(t, currentSerializationVersion, m.serializationVersion)
 	require.False(t, m.sealed)
-	require.Zero(t, m.timestamp)
+	require.Zero(t, m.lastValueTimestamp)
 	require.Equal(t, directory, m.parentDirectory)
 
 	reportedSize := m.Size()
@@ -148,7 +148,7 @@ func TestSealing(t *testing.T) {
 	require.Equal(t, index, m.index)
 	require.Equal(t, currentSerializationVersion, m.serializationVersion)
 	require.True(t, m.sealed)
-	require.Equal(t, uint64(sealTime.UnixNano()), m.timestamp)
+	require.Equal(t, uint64(sealTime.UnixNano()), m.lastValueTimestamp)
 	require.Equal(t, directory, m.parentDirectory)
 
 	// load the file

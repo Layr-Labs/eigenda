@@ -2180,7 +2180,7 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 
 	err = table.Flush()
 	require.NoError(t, err)
-	err = table.ScheduleImmediateGC()
+	err = table.RunGC()
 	require.NoError(t, err)
 
 	reportedSize := table.Size()

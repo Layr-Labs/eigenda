@@ -7,7 +7,7 @@ type KeymapType string
 const LevelDBKeymapType = "LevelDBKeymap"
 
 // UnsafeLevelDBKeymapType is similar to LevelDBKeymapType, but it is not safe to use in production.
-// It runs a lost faster, but with weaker crash recovery guarantees.
+// It runs a lot faster, but with weaker crash recovery guarantees.
 const UnsafeLevelDBKeymapType = "UnsafeLevelDBKeymap"
 
 // MemKeymapType is the type of a MemKeymap.

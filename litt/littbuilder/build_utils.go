@@ -22,7 +22,7 @@ import (
 )
 
 // keymapBuilders contains builders for all supported keymap types.
-var keymapBuilders = map[keymap.KeymapType]keymap.KeymapBuilder{
+var keymapBuilders = map[keymap.KeymapType]keymap.BuildKeymap{
 	keymap.MemKeymapType:           keymap.NewMemKeymap,
 	keymap.LevelDBKeymapType:       keymap.NewLevelDBKeymap,
 	keymap.UnsafeLevelDBKeymapType: keymap.NewUnsafeLevelDBKeymap,

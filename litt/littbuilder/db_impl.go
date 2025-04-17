@@ -20,8 +20,8 @@ var tableNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 var _ litt.DB = &db{}
 
-// TableBuilder is a function that creates a new table.
-type TableBuilder func(
+// TableBuilderFunc is a function that creates a new table.
+type TableBuilderFunc func(
 	ctx context.Context,
 	logger logging.Logger,
 	name string,
@@ -42,7 +42,7 @@ type db struct {
 	gcPeriod time.Duration
 
 	// A function that creates new tables.
-	tableBuilder TableBuilder
+	tableBuilder TableBuilderFunc
 
 	// A map of all tables in the database.
 	tables map[string]litt.ManagedTable
@@ -82,12 +82,12 @@ func NewDB(config *litt.Config) (litt.DB, error) {
 		return buildTable(config, logger, name, metrics)
 	}
 
-	return NewDBWithTableBuilder(config, tableBuilder)
+	return NewDBUnsafe(config, tableBuilder)
 }
 
-// NewDBWithTableBuilder creates a new DB instance with a custom table builder. This is intended for unit test use,
+// NewDBUnsafe creates a new DB instance with a custom table builder. This is intended for unit test use,
 // and should not be considered a stable API.
-func NewDBWithTableBuilder(config *litt.Config, tableBuilder TableBuilder) (litt.DB, error) {
+func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, error) {
 	logger, err := buildLogger(config)
 	if err != nil {
 		return nil, fmt.Errorf("error building logger: %w", err)
@@ -166,6 +166,7 @@ func (d *db) GetTable(name string) (litt.Table, error) {
 		}
 
 		var err error
+		d.logger.Infof("creating table %s", name)
 		table, err = d.tableBuilder(d.ctx, d.logger, name, d.metrics)
 		if err != nil {
 			return nil, fmt.Errorf("error creating table: %w", err)
@@ -186,6 +187,7 @@ func (d *db) DropTable(name string) error {
 		return fmt.Errorf("table %s does not exist", name)
 	}
 
+	d.logger.Infof("dropping table %s", name)
 	err := table.Destroy()
 	if err != nil {
 		return fmt.Errorf("error destroying table: %w", err)
