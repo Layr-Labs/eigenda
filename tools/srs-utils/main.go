@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/Layr-Labs/eigenda/tools/srs-utils/downloader"
 	"github.com/Layr-Labs/eigenda/tools/srs-utils/parser"
 	"github.com/Layr-Labs/eigenda/tools/srs-utils/verifier"
 	"github.com/urfave/cli"
@@ -33,6 +34,25 @@ func main() {
 					config := parser.ReadCLIConfig(cCtx)
 					fmt.Printf("config %v\n", config.PtauPath)
 					parser.ParsePtauChallenge(config)
+					return nil
+				},
+			},
+			{
+				Name:    "download",
+				Aliases: []string{"d"},
+				Usage:   "download SRS files for specified blob size",
+				Flags:   downloader.Flags,
+				Action: func(cCtx *cli.Context) error {
+					config, err := downloader.ReadCLIConfig(cCtx)
+					if err != nil {
+						return fmt.Errorf("error in configuration: %w", err)
+					}
+
+					err = downloader.DownloadSRSFiles(config)
+					if err != nil {
+						return fmt.Errorf("download SRS files: %w", err)
+					}
+
 					return nil
 				},
 			},
