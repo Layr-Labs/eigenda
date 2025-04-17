@@ -18,6 +18,34 @@ type MockCertVerifier struct {
 	mock.Mock
 }
 
+// GetConfirmationThreshold provides a mock function with given fields: ctx, referenceBlockNumber
+func (_m *MockCertVerifier) GetConfirmationThreshold(ctx context.Context, referenceBlockNumber uint64) (uint8, error) {
+	ret := _m.Called(ctx, referenceBlockNumber)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetConfirmationThreshold")
+	}
+
+	var r0 uint8
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) (uint8, error)); ok {
+		return rf(ctx, referenceBlockNumber)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint64) uint8); ok {
+		r0 = rf(ctx, referenceBlockNumber)
+	} else {
+		r0 = ret.Get(0).(uint8)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uint64) error); ok {
+		r1 = rf(ctx, referenceBlockNumber)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetNonSignerStakesAndSignature provides a mock function with given fields: ctx, signedBatch
 func (_m *MockCertVerifier) GetNonSignerStakesAndSignature(ctx context.Context, signedBatch *v2.SignedBatch) (*contractEigenDACertVerifier.NonSignerStakesAndSignature, error) {
 	ret := _m.Called(ctx, signedBatch)
