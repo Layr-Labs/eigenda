@@ -52,12 +52,12 @@ contract EigenDACertVerifierV1 is IEigenDACertVerifierV1 {
 
 
     /**
-     * @notice Verifies a blob cert and returns result without reverting
+     * @notice Checks a blob cert and returns result without reverting
      * @param blobHeader Pointer to the blob header in calldata
      * @param blobVerificationProof Pointer to the blob cert verification proof in calldata
-     * @return success True if verification succeeded
+     * @return success True if verification succeeded, false otherwise
      */
-    function verifyDACertV1ForZkProof(
+    function checkDACertV1(
         BlobHeader calldata blobHeader,
         BlobVerificationProof calldata blobVerificationProof
     ) external view returns (bool success) {

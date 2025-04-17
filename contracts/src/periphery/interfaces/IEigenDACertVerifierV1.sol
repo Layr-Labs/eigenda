@@ -18,4 +18,14 @@ interface IEigenDACertVerifierV1 {
         external
         view;
 
+    /**
+     * @notice Checks a blob cert and returns result without reverting
+     * @param blobHeader The blob header to verify
+     * @param blobVerificationProof The blob cert verification proof to verify against
+     * @return success True if verification succeeded, false otherwise
+     */
+    function checkDACertV1(
+        BlobHeader calldata blobHeader, 
+        BlobVerificationProof calldata blobVerificationProof
+    ) external view returns (bool success);
 }

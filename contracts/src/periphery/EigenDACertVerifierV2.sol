@@ -121,15 +121,14 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
     }
 
     /**
-     * @notice Thin try/catch wrapper around verifyDACertV2 that returns false instead of reverting
-     * @dev Useful for ZK proof systems that require a return value
+     * @notice Checks a blob cert and returns result without reverting
      * @param batchHeader The batch header of the blob
      * @param blobInclusionInfo The inclusion proof for the blob cert
      * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob cert against
      * @param signedQuorumNumbers The signed quorum numbers corresponding to the nonSignerStakesAndSignature
-     * @return success True if verification succeeded
+     * @return success True if verification succeeded, false otherwise
      */
-    function verifyDACertV2ForZKProof(
+    function checkDACertV2(
         BatchHeaderV2 calldata batchHeader,
         BlobInclusionInfo calldata blobInclusionInfo,
         NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,

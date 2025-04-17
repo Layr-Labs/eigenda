@@ -69,7 +69,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         EigenDACertVerificationV2Lib.getNonSignerStakesAndSignature(
             operatorStateRetriever, registryCoordinator, signedBatch
         );
-        bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(
+        bool zk = eigenDACertVerifier.checkDACertV2(
             signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers
         );
         assert(zk);
@@ -96,7 +96,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         EigenDACertVerificationV2Lib.getNonSignerStakesAndSignature(
             operatorStateRetriever, registryCoordinator, signedBatch
         );
-        bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(
+        bool zk = eigenDACertVerifier.checkDACertV2(
             signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers
         );
         assert(!zk);

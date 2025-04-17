@@ -34,15 +34,14 @@ interface IEigenDACertVerifierV2 {
     ) external view;
 
     /**
-     * @notice Thin try/catch wrapper around verifyDACertV2 that returns false instead of panicing
-     * @dev The Steel library (https://github.com/risc0/risc0-ethereum/tree/main/crates/steel)
-     *      currently has a limitation that it can only create zk proofs for functions that return a value
+     * @notice Checks a blob cert and returns result without reverting
      * @param batchHeader The batch header of the blob
      * @param blobInclusionInfo The inclusion proof for the blob cert
      * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob cert against
      * @param signedQuorumNumbers The signed quorum numbers corresponding to the nonSignerStakesAndSignature
+     * @return success True if verification succeeded, false otherwise
      */
-    function verifyDACertV2ForZKProof(
+    function checkDACertV2(
         BatchHeaderV2 calldata batchHeader,
         BlobInclusionInfo calldata blobInclusionInfo,
         NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
