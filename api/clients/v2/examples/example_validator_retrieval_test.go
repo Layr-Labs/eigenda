@@ -20,6 +20,8 @@ func Example_validatorPayloadRetrieval() {
 	// by sending funds to the payment vault.
 	privateKey := ""
 
+	ctx := context.Background()
+
 	// Create a payload disperser and disperse a sample payload to EigenDA
 	// This will be the payload we will later retrieve
 	payloadDisperser, err := createPayloadDisperser(privateKey)
@@ -33,9 +35,7 @@ func Example_validatorPayloadRetrieval() {
 		panic(fmt.Sprintf("create random payload: %v", err))
 	}
 
-	dispersalCtx, dispersalCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer dispersalCancel()
-	eigenDACert, err := payloadDisperser.SendPayload(dispersalCtx, payload)
+	eigenDACert, err := payloadDisperser.SendPayload(ctx, payload)
 	if err != nil {
 		panic(fmt.Sprintf("send payload: %v", err))
 	}
@@ -48,11 +48,8 @@ func Example_validatorPayloadRetrieval() {
 		panic(fmt.Sprintf("create validator payload retriever: %v", err))
 	}
 
-	// Create a context with timeout for retrieval
-	retrievalCtx, retrievalCancel := context.WithTimeout(context.Background(), 1*time.Minute)
-	defer retrievalCancel()
 	// Retrieve the payload using the certificate by fetching from validator nodes
-	_, err = validatorPayloadRetriever.GetPayload(retrievalCtx, eigenDACert)
+	_, err = validatorPayloadRetriever.GetPayload(ctx, eigenDACert)
 	if err != nil {
 		panic(fmt.Sprintf("get payload: %v", err))
 	}

@@ -47,8 +47,8 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 
 	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
 		PayloadClientConfig:    *clients.GetDefaultPayloadClientConfig(),
-		DisperseBlobTimeout:    2 * time.Minute,
-		BlobCompleteTimeout:    2 * time.Minute,
+		DisperseBlobTimeout:    30 * time.Second,
+		BlobCompleteTimeout:    30 * time.Second,
 		BlobStatusPollInterval: 1 * time.Second,
 		ContractCallTimeout:    5 * time.Second,
 	}
@@ -137,7 +137,7 @@ func createValidatorPayloadRetriever() (*payloadretrieval.ValidatorPayloadRetrie
 	// Create the ValidatorPayloadRetriever config
 	validatorPayloadRetrieverConfig := payloadretrieval.ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig: *clients.GetDefaultPayloadClientConfig(),
-		RetrievalTimeout:    30 * time.Second,
+		RetrievalTimeout:    1 * time.Minute,
 	}
 
 	return payloadretrieval.NewValidatorPayloadRetriever(
