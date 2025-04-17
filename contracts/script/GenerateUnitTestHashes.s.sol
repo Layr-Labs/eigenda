@@ -14,7 +14,7 @@ contract GenerateHashes is Script {
     string deployConfigPath = "script/input/eigenda_deploy_config.json";
 
     // deploy all the EigenDA contracts. Relies on many EL contracts having already been deployed.
-    function run() external view {
+    function run() external pure {
         QuorumBlobParam[] memory quorumBlobParam = new QuorumBlobParam[](1);
 
         quorumBlobParam[0] = QuorumBlobParam({
