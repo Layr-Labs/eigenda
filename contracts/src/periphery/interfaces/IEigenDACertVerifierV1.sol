@@ -24,8 +24,8 @@ interface IEigenDACertVerifierV1 {
      * @param blobVerificationProof The blob cert verification proof to verify against
      * @return success True if verification succeeded, false otherwise
      */
-    function checkDACertV1(
-        BlobHeader calldata blobHeader, 
-        BlobVerificationProof calldata blobVerificationProof
-    ) external view returns (bool success);
+    function checkDACertV1(BlobHeader calldata blobHeader, BlobVerificationProof calldata blobVerificationProof)
+        external
+        view
+        returns (bool success);
 }

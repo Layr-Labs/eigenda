@@ -61,7 +61,6 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         emit log_named_uint("gas used", gasBefore - gasAfter);
     }
 
-
     function testVerifyBlob_InvalidMetadataHash(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = pseudoRandomNumber % 192;
         BlobHeader[] memory blobHeader = new BlobHeader[](2);

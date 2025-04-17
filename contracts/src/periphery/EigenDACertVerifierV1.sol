@@ -13,7 +13,6 @@ import "src/interfaces/IEigenDAStructs.sol";
  * @notice Contains all V1-specific verification functionality
  */
 contract EigenDACertVerifierV1 is IEigenDACertVerifierV1 {
-
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistryV1;
 
     IEigenDABatchMetadataStorage public immutable eigenDABatchMetadataStorageV1;
@@ -50,17 +49,17 @@ contract EigenDACertVerifierV1 is IEigenDACertVerifierV1 {
         CertLib.revertOnError(err, errParams);
     }
 
-
     /**
      * @notice Checks a blob cert and returns result without reverting
      * @param blobHeader Pointer to the blob header in calldata
      * @param blobVerificationProof Pointer to the blob cert verification proof in calldata
      * @return success True if verification succeeded, false otherwise
      */
-    function checkDACertV1(
-        BlobHeader calldata blobHeader,
-        BlobVerificationProof calldata blobVerificationProof
-    ) external view returns (bool success) {
+    function checkDACertV1(BlobHeader calldata blobHeader, BlobVerificationProof calldata blobVerificationProof)
+        external
+        view
+        returns (bool success)
+    {
         (CertLib.ErrorCode errorCode,) = CertLib.verifyDACert(
             _quorumConfirmationThresholdPercentages(),
             _storedBatchMetadataHash(blobVerificationProof),
