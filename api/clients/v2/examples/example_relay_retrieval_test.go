@@ -60,6 +60,9 @@ func Example_relayPayloadRetrieval() {
 
 	verificationCtx, verificationCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer verificationCancel()
+	// VerifyCertV2 is a view-only call to the `EigenDACertVerifier` contract. This call verifies that the provided cert
+	// is valid: if this call doesn't return an error, then the eigenDA network has attested to the availability of the
+	// dispersed blob.
 	err = certVerifier.VerifyCertV2(verificationCtx, eigenDACert)
 	if err != nil {
 		panic(fmt.Sprintf("verify cert: %v", err))
