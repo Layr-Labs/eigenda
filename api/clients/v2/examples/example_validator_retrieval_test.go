@@ -7,7 +7,14 @@ import (
 )
 
 // This example demonstrates how to use the ValidatorPayloadRetriever to retrieve a payload from EigenDA, running on
-// holesky testnet
+// holesky testnet.
+//
+// The ValidatorPayloadRetriever retrieves the payload from the EigenDA validator nodes directly. This is a fallback
+// retrieval mechanism: in normal operation, payloads are retrieved from a network of relays (see
+// Example_relayPayloadRetrieval for an example). Retrieval directly from the EigenDA validator nodes is a fallback
+// option that provides an additional security guarantee: regardless of whether the relay network is able to serve a
+// retrieval request, a user always has the option of retrieving data directly from the nodes which have attested to
+// the availability of the data.
 func Example_validatorPayloadRetrieval() {
 	// You must provide a private key that either has a testnet reservation, or you must configure on-demand payments
 	// by sending funds to the payment vault.

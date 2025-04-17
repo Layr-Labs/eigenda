@@ -8,6 +8,11 @@ import (
 
 // This example demonstrates how to use the RelayPayloadRetriever to retrieve a payload from EigenDA, running on
 // holesky testnet
+//
+// The RelayPayloadRetriever retrieves the payload from a network of relays, which exists to serve EigenDA data. This
+// is the standard retrieval mechanism. There exists an alternate retrieval mechanism, where payloads are retrieved
+// from the EigenDA validator nodes directly (see Example_validatorPayloadRetrieval for an example), but users should
+// default to retrieving data from the relays for optimal performance.
 func Example_relayPayloadRetrieval() {
 	// You must provide a private key that either has a testnet reservation, or you must configure on-demand payments
 	// by sending funds to the payment vault.
