@@ -409,6 +409,20 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_ENABLED"),
 	}
+	DownloadPoolMultiplierFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "download-pool-multiplier"),
+		Usage:    "The multiplier for the download pool size. The default value is 2.0",
+		Required: false,
+		Value:    2.0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DOWNLOAD_POOL_MULTIPLIER"),
+	}
+	DownloadPoolConstantFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "download-pool-constant"),
+		Usage:    "The constant for the download pool size. The default value is 0.",
+		Required: false,
+		Value:    0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DOWNLOAD_POOL_CONSTANT"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -534,6 +548,8 @@ var optionalFlags = []cli.Flag{
 	LevelDBDisableSeeksCompactionV2Flag,
 	LevelDBEnableSyncWritesV2Flag,
 	LittDBEnabledFlag,
+	DownloadPoolMultiplierFlag,
+	DownloadPoolConstantFlag,
 }
 
 func init() {

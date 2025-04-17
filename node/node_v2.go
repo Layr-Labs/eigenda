@@ -83,7 +83,8 @@ func (n *Node) DownloadBundles(
 
 			if _, ok := operatorState.Operators[quorum]; !ok {
 				// operator is not part of the quorum or the quorum is not valid
-				n.Logger.Debug("operator is not part of the quorum or the quorum is not valid", "quorum", quorum)
+				n.Logger.Debug("operator is not part of the quorum or the quorum is not valid",
+					"quorum", quorum)
 				continue
 			}
 
@@ -115,13 +116,14 @@ func (n *Node) DownloadBundles(
 	}
 
 	probe.SetStage("download")
+	// TODO (cody-littley) metric for the time until start of download
+	// TODO (cody-littley) metric for the time of individual downloads
 
-	pool := workerpool.New(len(requests))
 	bundleChan := make(chan response, len(requests))
 	for relayKey := range requests {
 		relayKey := relayKey
 		req := requests[relayKey]
-		pool.Submit(func() {
+		n.downloadPool.Submit(func() {
 			ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
 			defer cancel()
 			bundles, err := relayClient.GetChunksByRange(ctxTimeout, relayKey, req.chunkRequests)
@@ -141,12 +143,19 @@ func (n *Node) DownloadBundles(
 			}
 		})
 	}
-	pool.StopWait()
+
+	responses := make([]response, len(requests))
+	for i := 0; i < len(requests); i++ {
+		responses[i] = <-bundleChan
+	}
+
+	probe.SetStage("deserialize")
 
 	var err error
 	for i := 0; i < len(requests); i++ {
-		resp := <-bundleChan
+		resp := responses[i]
 		if resp.err != nil {
+			// TODO (cody-littley) this is flaky, and will fail if any relay fails. We should retry failures
 			return nil, nil, fmt.Errorf("failed to get chunks from relays: %v", resp.err)
 		}
 		for i, bundle := range resp.bundles {

@@ -143,8 +143,14 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	}
 
 	probe.SetStage("get_operator_state")
-	s.logger.Info("new StoreChunks request", "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]), "numBlobs", len(batch.BlobCertificates), "referenceBlockNumber", batch.BatchHeader.ReferenceBlockNumber)
-	operatorState, err := s.node.ChainState.GetOperatorStateByOperator(ctx, uint(batch.BatchHeader.ReferenceBlockNumber), s.node.Config.ID)
+	s.logger.Info("new StoreChunks request",
+		"batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]),
+		"numBlobs", len(batch.BlobCertificates),
+		"referenceBlockNumber", batch.BatchHeader.ReferenceBlockNumber)
+	operatorState, err := s.node.ChainState.GetOperatorStateByOperator(
+		ctx,
+		uint(batch.BatchHeader.ReferenceBlockNumber),
+		s.node.Config.ID)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
