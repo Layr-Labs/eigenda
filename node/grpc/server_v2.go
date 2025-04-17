@@ -143,14 +143,8 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	}
 
 	probe.SetStage("get_operator_state")
-	s.logger.Info("new StoreChunks request",
-		"batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]),
-		"numBlobs", len(batch.BlobCertificates),
-		"referenceBlockNumber", batch.BatchHeader.ReferenceBlockNumber)
-	operatorState, err := s.node.ChainState.GetOperatorStateByOperator(
-		ctx,
-		uint(batch.BatchHeader.ReferenceBlockNumber),
-		s.node.Config.ID)
+	s.logger.Info("new StoreChunks request", "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]), "numBlobs", len(batch.BlobCertificates), "referenceBlockNumber", batch.BatchHeader.ReferenceBlockNumber)
+	operatorState, err := s.node.ChainState.GetOperatorStateByOperator(ctx, uint(batch.BatchHeader.ReferenceBlockNumber), s.node.Config.ID)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
@@ -160,7 +154,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
 
-	err = s.validateAndStoreChunks(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash, probe)
+	err = s.validateAndStoreV2Chunks(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash, probe)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +170,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	}, nil
 }
 
-func (s *ServerV2) validateAndStoreChunks(
+func (s *ServerV2) validateAndStoreV2Chunks(
 	ctx context.Context,
 	batch *corev2.Batch,
 	blobShards []*corev2.BlobShard,
@@ -207,7 +201,7 @@ func (s *ServerV2) validateAndStoreChunks(
 	}
 
 	if s.config.LittDBEnabled {
-		return s.validateAndStoreChunksLittDB(
+		return s.validateAndStoreV2ChunksLittDB(
 			ctx,
 			batch,
 			blobShards,
@@ -217,66 +211,6 @@ func (s *ServerV2) validateAndStoreChunks(
 			probe)
 	} else {
 		probe.SetStage("validate_and_store")
-		return s.validateAndStoreChunksLevelDB(ctx, batch, blobShards, batchData, operatorState, batchHeaderHash)
-	}
-}
-
-func (s *ServerV2) validateAndStoreChunksLevelDB(
-	ctx context.Context,
-	batch *corev2.Batch,
-	blobShards []*corev2.BlobShard,
-	batchData []*node.BundleToStore,
-	operatorState *core.OperatorState,
-	batchHeaderHash [32]byte) error {
-
-	err = s.validateAndStoreV2Chunks(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash)
-	if err != nil {
-		return nil, err
-	}
-
-	sig, err := s.node.BLSSigner.Sign(ctx, batchHeaderHash[:])
-	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to sign batch: %v", err))
-	}
-
-	s.metrics.ReportStoreChunksLatency("total", time.Since(start))
-
-	return &pb.StoreChunksReply{
-		Signature: sig,
-	}, nil
-}
-
-func (s *ServerV2) validateAndStoreV2Chunks(
-	ctx context.Context,
-	batch *corev2.Batch,
-	blobShards []*corev2.BlobShard,
-	rawBundles []*node.RawBundles,
-	operatorState *core.OperatorState,
-	batchHeaderHash [32]byte) error {
-
-	batchData := make([]*node.BundleToStore, 0, len(rawBundles))
-	for _, bundles := range rawBundles {
-		blobKey, err := bundles.BlobCertificate.BlobHeader.BlobKey()
-		if err != nil {
-			return api.NewErrorInternal("failed to get blob key")
-		}
-
-		for quorum, bundle := range bundles.Bundles {
-			bundleKey, err := node.BundleKey(blobKey, quorum)
-			if err != nil {
-				return api.NewErrorInternal("failed to get bundle key")
-			}
-
-			batchData = append(batchData, &node.BundleToStore{
-				BundleKey:   bundleKey,
-				BundleBytes: bundle,
-			})
-		}
-	}
-
-	if s.config.LittDBEnabled {
-		return s.validateAndStoreV2ChunksLittDB(ctx, batch, blobShards, batchData, operatorState, batchHeaderHash)
-	} else {
 		return s.validateAndStoreV2ChunksLevelDB(ctx, batch, blobShards, batchData, operatorState, batchHeaderHash)
 	}
 }
@@ -295,7 +229,6 @@ func (s *ServerV2) validateAndStoreV2ChunksLevelDB(
 	}
 	storeChan := make(chan storeResult)
 	go func() {
-		storageStart := time.Now()
 		keys, size, err := s.node.ValidatorStore.StoreBatch(batchHeaderHash[:], batchData)
 		if err != nil {
 			storeChan <- storeResult{
@@ -312,7 +245,6 @@ func (s *ServerV2) validateAndStoreV2ChunksLevelDB(
 		}
 	}()
 
-	stageTimer := time.Now()
 	err := s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
 	if err != nil {
 		res := <-storeChan
@@ -341,23 +273,22 @@ func (s *ServerV2) validateAndStoreV2ChunksLittDB(
 	blobShards []*corev2.BlobShard,
 	batchData []*node.BundleToStore,
 	operatorState *core.OperatorState,
-	batchHeaderHash [32]byte) error {
-
-	stageTimer := time.Now()
+	batchHeaderHash [32]byte,
+	probe *common.SequenceProbe,
+) error {
+	probe.SetStage("validate")
 	err := s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
 	if err != nil {
 		return api.NewErrorInternal(fmt.Sprintf("failed to validate batch %s: %v", batchHeaderHash, err))
 	}
-	s.metrics.ReportStoreChunksLatency("validation", time.Since(stageTimer))
 
-	storageStart := time.Now()
+	probe.SetStage("store")
 	_, size, err := s.node.ValidatorStore.StoreBatch(batchHeaderHash[:], batchData)
 	if err != nil {
 		return api.NewErrorInternal(fmt.Sprintf("failed to store batch %s: %v", batchHeaderHash, err))
 	}
 
 	s.metrics.ReportStoreChunksRequestSize(size)
-	s.metrics.ReportStoreChunksLatency("storage", time.Since(storageStart))
 
 	return nil
 }

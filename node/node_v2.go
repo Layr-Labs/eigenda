@@ -117,6 +117,7 @@ func (n *Node) DownloadBundles(
 
 	probe.SetStage("download")
 
+	pool := workerpool.New(len(requests))
 	bundleChan := make(chan response, len(requests))
 	for relayKey := range requests {
 		relayKey := relayKey
