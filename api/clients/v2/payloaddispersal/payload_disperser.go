@@ -200,14 +200,10 @@ func (pd *PayloadDisperser) pollBlobStatus(
 			// TODO: we'll need to add more in-depth response status processing to derive failover errors
 			switch newStatus {
 			case dispgrpc.BlobStatus_COMPLETE:
-				thresholdChecker, err := newSignatureThresholdChecker(ctx, pd.certVerifier, blobStatusReply)
+				err := checkThresholds(ctx, pd.certVerifier, blobStatusReply, blobKey.Hex())
 				if err != nil {
-					return nil, fmt.Errorf("new signature threshold checker for blobKey %v: %w",
-						blobKey.Hex(), err)
-				}
-
-				if !thresholdChecker.signatureThresholdsMet() {
-					return nil, errors.New(thresholdChecker.describeFailureToMeetThresholds(blobKey.Hex()))
+					// returned error is verbose enough, no need to wrap it with additional context
+					return nil, err
 				}
 
 				return blobStatusReply, nil
@@ -218,24 +214,25 @@ func (pd *PayloadDisperser) pollBlobStatus(
 			case dispgrpc.BlobStatus_GATHERING_SIGNATURES:
 				// Report all non-terminal statuses to the probe. Repeat reports are no-ops.
 				probe.SetStage(newStatus.String())
-				thresholdChecker, err := newSignatureThresholdChecker(ctx, pd.certVerifier, blobStatusReply)
-				if err != nil {
-					// Just continue if we fail to create the threshold checker.
-					// With the current disperser implementation, it's expected that the blobStatusReply will *always*
-					// be nil, which means that newSignatureThresholdChecker will *always* return an error.
-					//
-					// TODO (litt3): Once the disperser has been updated to return non-nil blobStatusReply while in the
-					//  gathering signatures status, construction of the threshold checker should succeed. This
-					//  status poll loop will be able to be exited early, as soon as enough signatures have been
-					//  gathered. Once that change has been made, a warning should be logged here, for when
-					//  signatureThresholdChecker construction fails.
-					continue
-				}
 
-				if thresholdChecker.signatureThresholdsMet() {
+				err := checkThresholds(ctx, pd.certVerifier, blobStatusReply, blobKey.Hex())
+				if err == nil {
+					// If there's no error, then all thresholds are met, so we can stop polling
 					return blobStatusReply, nil
 				}
 
+				var thresholdNotMetErr *thresholdNotMetError
+				if !errors.As(err, &thresholdNotMetErr) {
+					// an error occurred which was unrelated to an unmet threshold: something went wrong while checking!
+					//
+					// TODO (litt3): with the current disperser implementation, it's expected that the blobStatusReply
+					//  will be nil while gathering signatures, so this case will *always* be triggered. Once the
+					//  disperser has been updated to return a non-nil blobStatusReply while gathering signatures,
+					//  this case will no longer be expected to occur, so a warning should be logged here.
+					continue
+				}
+
+				// thresholds weren't met yet. that's ok, since signature gathering is still in progress
 				continue
 			default:
 				return nil, fmt.Errorf(
