@@ -15,6 +15,8 @@ type StageTimer struct {
 	stageCount *prometheus.GaugeVec
 	// tracks the latency for each stage
 	stageLatency *prometheus.SummaryVec
+	// if true, then history is captured for debugging purposes
+	historyEnabled bool
 }
 
 // SequenceProbe can be used to track the amount of time that a particular operation spends doing particular
@@ -30,12 +32,13 @@ type SequenceProbe struct {
 	currentStage string
 	// the time when the current stage started
 	currentStageStart time.Time
-	// a history of operations, concatenate and log if a lifecycle description is needed
+	// a history of operations, concatenate and log if a lifecycle description is needed.
+	// If nil, then no history is captured.
 	history *strings.Builder
 }
 
 // NewStageTimer creates a new stageTimer with the given prefix and name.
-func NewStageTimer(registry *prometheus.Registry, prefix, name string) *StageTimer {
+func NewStageTimer(registry *prometheus.Registry, prefix, name string, historyEnabled bool) *StageTimer {
 	if registry == nil {
 		return nil
 	}
@@ -60,8 +63,9 @@ func NewStageTimer(registry *prometheus.Registry, prefix, name string) *StageTim
 	)
 
 	return &StageTimer{
-		stageLatency: stageLatency,
-		stageCount:   stageCount,
+		stageLatency:   stageLatency,
+		stageCount:     stageCount,
+		historyEnabled: historyEnabled,
 	}
 }
 
@@ -70,7 +74,10 @@ func (s *StageTimer) NewSequence() *SequenceProbe {
 	if s == nil {
 		return nil
 	}
-	history := &strings.Builder{}
+	var history *strings.Builder
+	if s.historyEnabled {
+		history = &strings.Builder{}
+	}
 	return &SequenceProbe{
 		stageTimer: s,
 		history:    history,
@@ -93,7 +100,9 @@ func (p *SequenceProbe) SetStage(stage string) {
 		// First stage setup
 		p.currentStage = stage
 		p.currentStageStart = now
-		p.history.WriteString(p.currentStage)
+		if p.history != nil {
+			p.history.WriteString(p.currentStage)
+		}
 		p.initialized = true
 		return
 	}
@@ -105,7 +114,9 @@ func (p *SequenceProbe) SetStage(stage string) {
 	p.stageTimer.stageCount.WithLabelValues(p.currentStage).Dec()
 	p.currentStage = stage
 
-	p.history.WriteString(fmt.Sprintf(":%0.1f,%s", elapsed, stage))
+	if p.history != nil {
+		p.history.WriteString(fmt.Sprintf(":%0.1f,%s", elapsed, stage))
+	}
 }
 
 // End completes the current sequence. It is important to call this before discarding the sequenceProbe.
@@ -120,7 +131,9 @@ func (p *SequenceProbe) End() {
 
 	p.stageTimer.stageCount.WithLabelValues(p.currentStage).Dec()
 
-	p.history.WriteString(fmt.Sprintf(":%0.1f", elapsed))
+	if p.history != nil {
+		p.history.WriteString(fmt.Sprintf(":%0.1f", elapsed))
+	}
 }
 
 // History returns a string representation of the history of stages for this sequenceProbe. Useful for debugging
@@ -129,6 +142,9 @@ func (p *SequenceProbe) End() {
 //	<stage1>:<elapsed1>,<stage2>:<elapsed2>,...,<stageN>:<elapsedN>
 func (p *SequenceProbe) History() string {
 	if p == nil {
+		return ""
+	}
+	if p.history == nil {
 		return ""
 	}
 	return p.history.String()

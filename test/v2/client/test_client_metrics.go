@@ -106,8 +106,8 @@ func newTestClientMetrics(logger logging.Logger, port int) *testClientMetrics {
 		[]string{"quorum"},
 	)
 
-	dispersalTimer := common.NewStageTimer(registry, "PayloadDisperser", "SendPayload")
-	validatorReadTimer := common.NewStageTimer(registry, "RetrievalClient", "GetBlob")
+	dispersalTimer := common.NewStageTimer(registry, "PayloadDisperser", "SendPayload", true)
+	validatorReadTimer := common.NewStageTimer(registry, "RetrievalClient", "GetBlob", true)
 
 	return &testClientMetrics{
 		logger:             logger,
