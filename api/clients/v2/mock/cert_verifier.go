@@ -6,7 +6,7 @@ import (
 	"context"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1_V2"
 
 	"github.com/stretchr/testify/mock"
 
