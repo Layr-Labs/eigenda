@@ -400,7 +400,7 @@ func (s *validatorStore) storeBatchLittDB(batchData []*BundleToStore) (uint64, e
 
 			exists, err := s.chunkTable.Exists(bundleKeyBytes[:])
 			if err != nil {
-				writeCompleteChan <- fmt.Errorf("failed to check batch header existence: %v", err)
+				writeCompleteChan <- fmt.Errorf("failed to check existence: %v", err)
 				return
 			}
 
