@@ -34,8 +34,9 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
     IRegistryCoordinator public immutable registryCoordinatorV2;
 
     /// @notice Security thresholds for V2 certificate verification
-    /// Storing individual fields as immutable instead of the struct
+    /// @notice Minimum percentage of stake required for confirmation of a blob (must be higher than adversaryThreshold)
     uint8 public immutable securityThresholdsConfirmation;
+    /// @notice Maximum percentage of stake an adversary is assumed to control (must be lower than confirmationThreshold)
     uint8 public immutable securityThresholdsAdversary;
 
     /**

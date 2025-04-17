@@ -34,7 +34,7 @@ contract EigenDACertVerifierV1 is IEigenDACertVerifierV1 {
     }
 
     /**
-     * @notice Verifies a the blob cert is valid for the required quorums
+     * @notice Verifies a the blob cert is valid for the required quorums. Reverts on verification failure.
      * @param blobHeader Pointer to the blob header in calldata
      * @param blobVerificationProof Pointer to the blob cert verification proof in calldata
      */
