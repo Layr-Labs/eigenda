@@ -9,7 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
-	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1_V2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -172,7 +172,7 @@ func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context) ([]uint8, 
 		return nil, fmt.Errorf("get verifier caller from address: %w", err)
 	}
 
-	quorumNumbersRequired, err := certVerifierCaller.QuorumNumbersRequiredV2(&bind.CallOpts{Context: ctx})
+	quorumNumbersRequired, err := certVerifierCaller.GetQuorumNumbersRequired(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, fmt.Errorf("get quorum numbers required: %w", err)
 	}
@@ -194,7 +194,7 @@ func (cv *CertVerifier) GetRelayRegistryAddress(ctx context.Context) (*gethcommo
 		return nil, fmt.Errorf("get verifier caller from block number: %w", err)
 	}
 
-	relayRegistryAddress, err := certVerifierCaller.EigenDARelayRegistry(&bind.CallOpts{Context: ctx})
+	relayRegistryAddress, err := certVerifierCaller.EigenDARelayRegistryV2(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return nil, fmt.Errorf("get relay registry address: %w", err)
 	}
@@ -202,15 +202,15 @@ func (cv *CertVerifier) GetRelayRegistryAddress(ctx context.Context) (*gethcommo
 	return &relayRegistryAddress, nil
 }
 
-// getVerifierCallerFromBlockNumber returns a ContractEigenDACertVerifierCaller that corresponds to the input reference
+// getVerifierCallerFromBlockNumber returns a ContractEigenDACertVerifierV1V2Caller that corresponds to the input reference
 // block number.
 //
-// This method caches ContractEigenDACertVerifierCaller instances, since their construction requires acquiring a lock
+// This method caches ContractEigenDACertVerifierV1V2Caller instances, since their construction requires acquiring a lock
 // and parsing json, and is therefore non-trivially expensive.
 func (cv *CertVerifier) getVerifierCallerFromBlockNumber(
 	ctx context.Context,
 	referenceBlockNumber uint64,
-) (*verifierBindings.ContractEigenDACertVerifierCaller, error) {
+) (*verifierBindings.ContractEigenDACertVerifierV1V2Caller, error) {
 	certVerifierAddress, err := cv.certVerifierAddressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("get cert verifier address: %w", err)
@@ -219,25 +219,25 @@ func (cv *CertVerifier) getVerifierCallerFromBlockNumber(
 	return cv.getVerifierCallerFromAddress(certVerifierAddress)
 }
 
-// getVerifierCallerFromAddress returns a ContractEigenDACertVerifierCaller that corresponds to the input contract
+// getVerifierCallerFromAddress returns a ContractEigenDACertVerifierV1V2Caller that corresponds to the input contract
 // address
 //
-// This method caches ContractEigenDACertVerifierCaller instances, since their construction requires acquiring a lock
+// This method caches ContractEigenDACertVerifierV1V2Caller instances, since their construction requires acquiring a lock
 // and parsing json, and is therefore non-trivially expensive.
 func (cv *CertVerifier) getVerifierCallerFromAddress(
 	certVerifierAddress gethcommon.Address,
-) (*verifierBindings.ContractEigenDACertVerifierCaller, error) {
+) (*verifierBindings.ContractEigenDACertVerifierV1V2Caller, error) {
 	existingCallerAny, valueExists := cv.verifierCallers.Load(certVerifierAddress)
 	if valueExists {
-		existingCaller, ok := existingCallerAny.(*verifierBindings.ContractEigenDACertVerifierCaller)
+		existingCaller, ok := existingCallerAny.(*verifierBindings.ContractEigenDACertVerifierV1V2Caller)
 		if !ok {
 			return nil, fmt.Errorf(
-				"value in verifierCallers wasn't of type ContractEigenDACertVerifierCaller. this should be impossible")
+				"value in verifierCallers wasn't of type ContractEigenDACertVerifierV1V2Caller. this should be impossible")
 		}
 		return existingCaller, nil
 	}
 
-	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(certVerifierAddress, cv.ethClient)
+	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierV1V2Caller(certVerifierAddress, cv.ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
 	}

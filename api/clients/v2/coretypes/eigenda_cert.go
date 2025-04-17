@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1_V2"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 )
 

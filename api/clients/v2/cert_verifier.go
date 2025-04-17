@@ -5,7 +5,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1_V2"
 )
 
 // ICertVerifier is an interface for interacting with the EigenDACertVerifier contract.
