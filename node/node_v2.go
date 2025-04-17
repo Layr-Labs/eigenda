@@ -123,7 +123,7 @@ func (n *Node) DownloadBundles(
 	for relayKey := range requests {
 		relayKey := relayKey
 		req := requests[relayKey]
-		n.downloadPool.Submit(func() {
+		n.DownloadPool.Submit(func() {
 			ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
 			defer cancel()
 			bundles, err := relayClient.GetChunksByRange(ctxTimeout, relayKey, req.chunkRequests)
