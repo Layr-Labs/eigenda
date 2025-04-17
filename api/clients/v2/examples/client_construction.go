@@ -68,7 +68,6 @@ func createRelayPayloadRetriever() (*payloadretrieval.RelayPayloadRetriever, err
 		return nil, fmt.Errorf("create logger: %w", err)
 	}
 
-	// we don't need signing functionality for this eth client
 	ethClient, err := createEthClient(logger)
 	if err != nil {
 		return nil, fmt.Errorf("create eth client: %w", err)
