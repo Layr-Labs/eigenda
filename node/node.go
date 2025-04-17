@@ -75,7 +75,7 @@ type Node struct {
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
 	ChainID                 *big.Int
 	// a worker pool used to download chunk data from the relays
-	downloadPool *workerpool.WorkerPool
+	DownloadPool *workerpool.WorkerPool
 
 	BLSSigner blssigner.Signer
 
@@ -234,7 +234,7 @@ func NewNode(
 		OperatorSocketsFilterer: socketsFilterer,
 		ChainID:                 chainID,
 		BLSSigner:               blsSigner,
-		downloadPool:            downloadPool,
+		DownloadPool:            downloadPool,
 	}
 
 	if !config.EnableV2 {

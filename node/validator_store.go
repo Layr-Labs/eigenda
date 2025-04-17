@@ -241,6 +241,7 @@ func NewValidatorStore(
 		littConfig.MetricsRegistry = registry
 		littConfig.MetricsNamespace = "node_littdb"
 		littConfig.Logger = logger
+		littConfig.DoubleWriteProtection = config.LittDBDoubleWriteProtection
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new litt config: %w", err)
 		}
