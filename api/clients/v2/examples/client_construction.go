@@ -24,6 +24,16 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
+// These constants are specific to the EigenDA holesky testnet. To execute the provided examples on a different
+// network, you will need to set these constants to the correct values, based on the chosen network.
+const (
+	ethRPCURL                        = "https://ethereum-holesky-rpc.publicnode.com"
+	disperserHostname                = "disperser-testnet-holesky.eigenda.xyz"
+	certVerifierAddress              = "0xFe52fE1940858DCb6e12153E2104aD0fDFbE1162"
+	blsOperatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
+	eigenDAServiceManagerAddress     = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
+)
+
 func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDisperser, error) {
 	logger, err := createLogger()
 	if err != nil {
@@ -175,7 +185,7 @@ func createDisperserClient(privateKey string, kzgProver *prover.Prover) (clients
 	}
 
 	disperserClientConfig := &clients.DisperserClientConfig{
-		Hostname:          "disperser-testnet-holesky.eigenda.xyz",
+		Hostname:          disperserHostname,
 		Port:              "443",
 		UseSecureGrpcFlag: true,
 	}
@@ -222,13 +232,12 @@ func createCertVerifier() (*verification.CertVerifier, error) {
 	return verification.NewCertVerifier(
 		logger,
 		ethClient,
-		verification.NewStaticCertVerifierAddressProvider(
-			gethcommon.HexToAddress("0xFe52fE1940858DCb6e12153E2104aD0fDFbE1162")))
+		verification.NewStaticCertVerifierAddressProvider(gethcommon.HexToAddress(certVerifierAddress)))
 }
 
 func createEthClient(logger logging.Logger) (*geth.EthClient, error) {
 	ethClientConfig := geth.EthClientConfig{
-		RPCURLs:          []string{"https://ethereum-holesky-rpc.publicnode.com"},
+		RPCURLs:          []string{ethRPCURL},
 		NumConfirmations: 0,
 		NumRetries:       3,
 	}
@@ -258,8 +267,8 @@ func createEthReader(logger logging.Logger, ethClient common.EthClient) (*eth.Re
 	ethReader, err := eth.NewReader(
 		logger,
 		ethClient,
-		"0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7",
-		"0xD4A7E1Bd8015057293f0D0A557088c286942e84b",
+		blsOperatorStateRetrieverAddress,
+		eigenDAServiceManagerAddress,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new reader: %w", err)
