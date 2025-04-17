@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.12;
 
-import {EigenDACertVerifier} from "src/core/EigenDACertVerifier.sol";
+import {EigenDACertVerifierV1_V2} from "src/periphery/EigenDACertVerifierV1_V2.sol";
 import {RegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
@@ -59,7 +59,7 @@ contract CertVerifierDeployer is Script, Test {
         vm.startBroadcast();
 
         eigenDACertVerifier = address(
-            new EigenDACertVerifier(
+            new EigenDACertVerifierV1_V2(
                 IEigenDAThresholdRegistry(eigenDAThresholdRegistry),
                 IEigenDABatchMetadataStorage(eigenDAServiceManager),
                 IEigenDASignatureVerifier(eigenDAServiceManager),
