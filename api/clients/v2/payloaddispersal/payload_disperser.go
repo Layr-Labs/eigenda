@@ -197,9 +197,6 @@ func (pd *PayloadDisperser) pollBlobStatus(
 				previousStatus = newStatus
 			}
 
-			// Repeat stage reports are no-ops.
-			probe.SetStage(newStatus.String())
-
 			// TODO: we'll need to add more in-depth response status processing to derive failover errors
 			switch newStatus {
 			case dispgrpc.BlobStatus_COMPLETE:
@@ -215,8 +212,12 @@ func (pd *PayloadDisperser) pollBlobStatus(
 
 				return blobStatusReply, nil
 			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED:
+				// Report all non-terminal statuses to the probe. Repeat reports are no-ops.
+				probe.SetStage(newStatus.String())
 				continue
 			case dispgrpc.BlobStatus_GATHERING_SIGNATURES:
+				// Report all non-terminal statuses to the probe. Repeat reports are no-ops.
+				probe.SetStage(newStatus.String())
 				thresholdChecker, err := newSignatureThresholdChecker(ctx, pd.certVerifier, blobStatusReply)
 				if err != nil {
 					// Just continue if we fail to create the threshold checker.
