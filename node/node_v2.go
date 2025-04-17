@@ -9,6 +9,7 @@ import (
 	"math/rand"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/gammazero/workerpool"
@@ -33,7 +34,15 @@ type RawBundles struct {
 	Bundles         map[core.QuorumID][]byte
 }
 
-func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch, operatorState *core.OperatorState) ([]*corev2.BlobShard, []*RawBundles, error) {
+func (n *Node) DownloadBundles(
+	ctx context.Context,
+	batch *corev2.Batch,
+	operatorState *core.OperatorState,
+	probe *common.SequenceProbe,
+) ([]*corev2.BlobShard, []*RawBundles, error) {
+
+	probe.SetStage("prepare_to_download")
+
 	relayClient, ok := n.RelayClient.Load().(clients.RelayClient)
 	if !ok || relayClient == nil {
 		return nil, nil, fmt.Errorf("relay client is not set")
@@ -104,6 +113,8 @@ func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch, operato
 			})
 		}
 	}
+
+	probe.SetStage("download")
 
 	pool := workerpool.New(len(requests))
 	bundleChan := make(chan response, len(requests))

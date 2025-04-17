@@ -1,6 +1,8 @@
 package common
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -9,8 +11,12 @@ import (
 
 // StageTimer encapsulates metrics to help track the time spent in each stage of the payload dispersal process.
 type StageTimer struct {
-	stageCount   *prometheus.GaugeVec
+	// counts the number of operations in each specific stage
+	stageCount *prometheus.GaugeVec
+	// tracks the latency for each stage
 	stageLatency *prometheus.SummaryVec
+	// if true, then history is captured for debugging purposes
+	historyEnabled bool
 }
 
 // SequenceProbe can be used to track the amount of time that a particular operation spends doing particular
@@ -18,13 +24,21 @@ type StageTimer struct {
 // StageTimer. For each operation, the StageTimer builds a SequenceProbe. Each SequenceProbe is responsible for
 // tracking the lifecycle of a single  iteration of an operation.
 type SequenceProbe struct {
-	stageTimer        *StageTimer
-	currentStage      string
+	// the parent StageTimer
+	stageTimer *StageTimer
+	// set to true when the SequenceProbe has entered its first stage
+	initialized bool
+	// the current stage of the operation
+	currentStage string
+	// the time when the current stage started
 	currentStageStart time.Time
+	// a history of operations, concatenate and log if a lifecycle description is needed.
+	// If nil, then no history is captured.
+	history *strings.Builder
 }
 
 // NewStageTimer creates a new stageTimer with the given prefix and name.
-func NewStageTimer(registry *prometheus.Registry, prefix, name string) *StageTimer {
+func NewStageTimer(registry *prometheus.Registry, prefix, name string, historyEnabled bool) *StageTimer {
 	if registry == nil {
 		return nil
 	}
@@ -49,22 +63,24 @@ func NewStageTimer(registry *prometheus.Registry, prefix, name string) *StageTim
 	)
 
 	return &StageTimer{
-		stageLatency: stageLatency,
-		stageCount:   stageCount,
+		stageLatency:   stageLatency,
+		stageCount:     stageCount,
+		historyEnabled: historyEnabled,
 	}
 }
 
 // NewSequence creates a new sequenceProbe with the given initial stage.
-func (s *StageTimer) NewSequence(initialStage string) *SequenceProbe {
+func (s *StageTimer) NewSequence() *SequenceProbe {
 	if s == nil {
 		return nil
 	}
-
-	s.stageCount.WithLabelValues(initialStage).Inc()
+	var history *strings.Builder
+	if s.historyEnabled {
+		history = &strings.Builder{}
+	}
 	return &SequenceProbe{
-		stageTimer:        s,
-		currentStage:      initialStage,
-		currentStageStart: time.Now(),
+		stageTimer: s,
+		history:    history,
 	}
 }
 
@@ -78,13 +94,29 @@ func (p *SequenceProbe) SetStage(stage string) {
 	}
 
 	now := time.Now()
-	elapsed := now.Sub(p.currentStageStart)
-	p.stageTimer.stageLatency.WithLabelValues(p.currentStage).Observe(ToMilliseconds(elapsed))
+	p.stageTimer.stageCount.WithLabelValues(stage).Inc()
+
+	if !p.initialized {
+		// First stage setup
+		p.currentStage = stage
+		p.currentStageStart = now
+		if p.history != nil {
+			p.history.WriteString(p.currentStage)
+		}
+		p.initialized = true
+		return
+	}
+
+	elapsed := ToMilliseconds(now.Sub(p.currentStageStart))
+	p.stageTimer.stageLatency.WithLabelValues(p.currentStage).Observe(elapsed)
 	p.currentStageStart = now
 
 	p.stageTimer.stageCount.WithLabelValues(p.currentStage).Dec()
-	p.stageTimer.stageCount.WithLabelValues(stage).Inc()
 	p.currentStage = stage
+
+	if p.history != nil {
+		p.history.WriteString(fmt.Sprintf(":%0.1f,%s", elapsed, stage))
+	}
 }
 
 // End completes the current sequence. It is important to call this before discarding the sequenceProbe.
@@ -94,8 +126,26 @@ func (p *SequenceProbe) End() {
 	}
 
 	now := time.Now()
-	elapsed := now.Sub(p.currentStageStart)
-	p.stageTimer.stageLatency.WithLabelValues(p.currentStage).Observe(ToMilliseconds(elapsed))
+	elapsed := ToMilliseconds(now.Sub(p.currentStageStart))
+	p.stageTimer.stageLatency.WithLabelValues(p.currentStage).Observe(elapsed)
 
 	p.stageTimer.stageCount.WithLabelValues(p.currentStage).Dec()
+
+	if p.history != nil {
+		p.history.WriteString(fmt.Sprintf(":%0.1f", elapsed))
+	}
+}
+
+// History returns a string representation of the history of stages for this sequenceProbe. Useful for debugging
+// specific executions of a sequence. Format is as follows. The elapsed time is in milliseconds.
+//
+//	<stage1>:<elapsed1>,<stage2>:<elapsed2>,...,<stageN>:<elapsedN>
+func (p *SequenceProbe) History() string {
+	if p == nil {
+		return ""
+	}
+	if p.history == nil {
+		return ""
+	}
+	return p.history.String()
 }
