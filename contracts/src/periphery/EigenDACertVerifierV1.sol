@@ -16,11 +16,8 @@ contract EigenDACertVerifierV1 is IEigenDACertVerifierV1 {
     /// @notice Thrown when there is a length mismatch
     error LengthMismatch();
 
-    /// @notice The EigenDAThresholdRegistry contract address
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistryV1;
 
-    /// @notice The EigenDABatchMetadataStorage contract address
-    /// @dev On L1 this contract is the EigenDA Service Manager contract
     IEigenDABatchMetadataStorage public immutable eigenDABatchMetadataStorageV1;
 
     /**
