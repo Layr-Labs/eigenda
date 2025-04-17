@@ -1,5 +1,10 @@
 package client
 
+import (
+	"fmt"
+	"path"
+)
+
 // TestClientConfig is the configuration for the test client.
 type TestClientConfig struct {
 	// The location where the SRS files can be found.
@@ -53,4 +58,13 @@ type TestClientConfig struct {
 	MetricsPort int
 	// If true, do not start the metrics server.
 	DisableMetrics bool
+}
+
+// ResolveSRSPath returns a path relative to the SRSPath root directory.
+func (c *TestClientConfig) ResolveSRSPath(srsFile string) (string, error) {
+	root, err := ResolveTildeInPath(c.SRSPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve tilde in path: %w", err)
+	}
+	return path.Join(root, srsFile), nil
 }

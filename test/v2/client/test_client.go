@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -34,10 +35,10 @@ import (
 )
 
 const (
-	SRSPathG1         = "../../../resources/srs/g1.point"
-	SRSPathG2         = "../../../resources/srs/g2.point"
-	SRSPathG2Trailing = "../../../resources/srs/g2.trailing.point"
-	SRSPathSRSTables  = "../../../resources/srs/SRSTables"
+	SRSPathG1         = "g1.point"
+	SRSPathG2         = "g2.point"
+	SRSPathG2Trailing = "g2.trailing.point"
+	SRSPathSRSTables  = "SRSTables"
 )
 
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
@@ -86,12 +87,38 @@ func NewTestClient(
 	}
 	logger.Infof("Account ID: %s", accountId.String())
 
+	g1Path, err := config.ResolveSRSPath(SRSPathG1)
+	if err != nil {
+		return nil, fmt.Errorf("resolve G1 SRS path: %w", err)
+	}
+	g2Path, err := config.ResolveSRSPath(SRSPathG2)
+	if err != nil {
+		return nil, fmt.Errorf("resolve G2 SRS path: %w", err)
+	}
+	g2TrailingPath, err := config.ResolveSRSPath(SRSPathG2Trailing)
+	if err != nil {
+		return nil, fmt.Errorf("resolve trailing G2 SRS path: %w", err)
+	}
+	srsTablesPath, err := config.ResolveSRSPath(SRSPathSRSTables)
+	if err != nil {
+		return nil, fmt.Errorf("resolve SRS tables path: %w", err)
+	}
+
+	// There is special logic for the trailing G2 point file. Some environments won't have a dedicated file for
+	// trailing G2 points, and instead will simply have the unabridged G2 points (which definitionally contain the
+	// trailing G2 points at the end of the file). If there isn't a trailing G2 point file in the expected location,
+	// assume that the environment has access to the entire G2 point file, and pass in "" for the trailing path.
+	// If this assumption turns out to be wrong, an error will be thrown when SRS parsing is attempted.
+	if _, err := os.Stat(g2TrailingPath); errors.Is(err, os.ErrNotExist) {
+		g2TrailingPath = ""
+	}
+
 	kzgConfig := &kzg.KzgConfig{
 		LoadG2Points:    true,
-		G1Path:          SRSPathG1,
-		G2Path:          SRSPathG2,
-		G2TrailingPath:  SRSPathG2Trailing,
-		CacheDir:        SRSPathSRSTables,
+		G1Path:          g1Path,
+		G2Path:          g2Path,
+		G2TrailingPath:  g2TrailingPath,
+		CacheDir:        srsTablesPath,
 		SRSOrder:        config.SRSOrder,
 		SRSNumberToLoad: config.SRSNumberToLoad,
 		NumWorker:       32,
