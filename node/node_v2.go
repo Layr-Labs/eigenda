@@ -116,13 +116,14 @@ func (n *Node) DownloadBundles(
 	}
 
 	probe.SetStage("download")
+	// TODO (cody-littley) metric for the time until start of download
+	// TODO (cody-littley) metric for the time of individual downloads
 
-	pool := workerpool.New(len(requests))
 	bundleChan := make(chan response, len(requests))
 	for relayKey := range requests {
 		relayKey := relayKey
 		req := requests[relayKey]
-		n.DownloadPool.Submit(func() {
+		n.downloadPool.Submit(func() {
 			ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
 			defer cancel()
 			bundles, err := relayClient.GetChunksByRange(ctxTimeout, relayKey, req.chunkRequests)

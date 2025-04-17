@@ -409,19 +409,19 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_ENABLED"),
 	}
-	DownloadPoolSizeFlag = cli.IntFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
-		Usage:    "The size of the download pool. The default value is 16.",
+	DownloadPoolMultiplierFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "download-pool-multiplier"),
+		Usage:    "The multiplier for the download pool size. The default value is 2.0",
 		Required: false,
-		Value:    16,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DOWNLOAD_POOL_SIZE"),
+		Value:    2.0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DOWNLOAD_POOL_MULTIPLIER"),
 	}
-
-	LittDBEnabledFlag = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "litt-db-enabled"),
-		Usage:    "Enable LittDB instead of LevelDB",
+	DownloadPoolConstantFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "download-pool-constant"),
+		Usage:    "The constant for the download pool size. The default value is 0.",
 		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_ENABLED"),
+		Value:    0,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DOWNLOAD_POOL_CONSTANT"),
 	}
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -544,6 +544,8 @@ var optionalFlags = []cli.Flag{
 	StoreChunksRequestMaxPastAgeFlag,
 	StoreChunksRequestMaxFutureAgeFlag,
 	LittDBEnabledFlag,
+	DownloadPoolMultiplierFlag,
+	DownloadPoolConstantFlag,
 }
 
 func init() {

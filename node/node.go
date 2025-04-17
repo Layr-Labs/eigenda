@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -74,7 +75,7 @@ type Node struct {
 	OperatorSocketsFilterer indexer.OperatorSocketsFilterer
 	ChainID                 *big.Int
 	// a worker pool used to download chunk data from the relays
-	DownloadPool *workerpool.WorkerPool
+	downloadPool *workerpool.WorkerPool
 
 	BLSSigner blssigner.Signer
 
@@ -104,7 +105,8 @@ func NewNode(
 
 	nodeLogger := logger.With("component", "Node")
 
-	eigenMetrics := metrics.NewEigenMetrics(AppName, fmt.Sprintf(":%d", config.MetricsPort), reg, logger.With("component", "EigenMetrics"))
+	socketAddr := fmt.Sprintf(":%d", config.MetricsPort)
+	eigenMetrics := metrics.NewEigenMetrics(AppName, socketAddr, reg, logger.With("component", "EigenMetrics"))
 
 	// Make sure config folder exists.
 	err := os.MkdirAll(config.DbPath, os.ModePerm)
@@ -211,7 +213,8 @@ func NewNode(
 		"storeDurationBlocks", storeDurationBlocks,
 		"enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
 
-	downloadPoolSize := config.DownloadPoolSize
+	numCPUs := runtime.NumCPU()
+	downloadPoolSize := config.DownloadPoolMultiplier*numCPUs + config.DownloadPoolConstant
 	if downloadPoolSize < 1 {
 		downloadPoolSize = 1
 	}
@@ -231,7 +234,7 @@ func NewNode(
 		OperatorSocketsFilterer: socketsFilterer,
 		ChainID:                 chainID,
 		BLSSigner:               blsSigner,
-		DownloadPool:            downloadPool,
+		downloadPool:            downloadPool,
 	}
 
 	if !config.EnableV2 {
@@ -240,7 +243,8 @@ func NewNode(
 
 	var blobVersionParams *corev2.BlobVersionParameterMap
 	if config.EnableV2 {
-		ttl := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second // 12s per block
+		// 12s per block
+		ttl := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second
 		n.ValidatorStore, err = NewValidatorStore(context.Background(), logger, config, time.Now, ttl, reg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new store v2: %w", err)
