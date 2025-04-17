@@ -19,7 +19,6 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
-	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/prometheus/client_golang/prometheus"
@@ -256,20 +255,16 @@ func NewValidatorStore(
 			return nil, fmt.Errorf("failed to get chunks table: %w", err)
 		}
 
-		headerTable, err = littDB.GetTable("headers")
+		// A prior implementation stored data here. Delete it if it exists.
+		// This is safe to delete once all old validators have been migrated to the new version.
+		err = littDB.DropTable("headers")
 		if err != nil {
-			return nil, fmt.Errorf("failed to get headers table: %w", err)
+			return nil, fmt.Errorf("failed to drop headers table: %w", err)
 		}
 
 		err = chunkTable.SetTTL(ttl)
 		if err != nil {
 			return nil, fmt.Errorf("failed to set TTL for chunks table: %w", err)
-		}
-		// We store headers to prevent duplicate insertions. Store the headers for 2x the TTL to ensure that
-		// we don't delete the headers before the corresponding chunks.
-		err = headerTable.SetTTL(2 * ttl)
-		if err != nil {
-			return nil, fmt.Errorf("failed to set TTL for headers table: %w", err)
 		}
 	}
 
@@ -284,7 +279,7 @@ func NewValidatorStore(
 		headerTable:           headerTable,
 		ttl:                   ttl,
 		migrationCompleteTime: migrationComplete,
-		duplicateRequestLock:  common.NewIndexLock(128),
+		duplicateRequestLock:  common.NewIndexLock(1024),
 		duplicateRequestSalt:  rand.Uint32(),
 	}
 
@@ -302,7 +297,7 @@ func (s *validatorStore) StoreBatch(batchHeaderHash []byte, batchData []*BundleT
 	}
 
 	if s.littDB != nil {
-		size, err := s.storeBatchLittDB(batchHeaderHash, batchData)
+		size, err := s.storeBatchLittDB(batchData)
 		return nil, size, err
 	} else {
 		return s.storeBatchLevelDB(batchHeaderHash, batchData)
@@ -382,48 +377,58 @@ func (s *validatorStore) storeBatchHeaderHash(batchHeaderHash []byte) error {
 	return nil
 }
 
-func (s *validatorStore) storeBatchLittDB(batchHeaderHash []byte, batchData []*BundleToStore) (uint64, error) {
+// TODO (cody-littley): currently, in order to prevent duplicate writes, we have to check for the existence of
+//  the data before writing it. This extra latency can be avoided with the following strategy:
+//  - add a timestamp to each blob header
+//  - reject blobs if their timestamp is too old
+//  - keep a set recently written blobs in memory
+//  - reject writes if we have recently written the data
+
+func (s *validatorStore) storeBatchLittDB(batchData []*BundleToStore) (uint64, error) {
 	var size uint64
 
-	// Store the batch header to prevent duplicate insertions.
-	err := s.storeBatchHeaderHash(batchHeaderHash)
-	if err != nil {
-		return 0, fmt.Errorf("failed to store batch header hash: %v", err)
-	}
-	size += uint64(len(batchHeaderHash))
-	err = s.headerTable.Flush()
-	if err != nil {
-		return 0, fmt.Errorf("failed to flush header table: %v", err)
-	}
-
-	// Now that the batch header is durable on disk, this validator will reject all future requests to store this batch.
-	// If the validator crashes between now and when it returns the availability signature, it will never
-	// return the availability signature for this batch. Although the validator could, in theory, reprocess this
-	// batch after starting back up, the performance and complexity overhead of doing so is cost prohibitive.
-	// Even if the validator was capable of reprocessing the batch after a crash, it's highly likely that the time
-	// window for returning the availability signature for this batch would have already passed -- thus negating
-	// any potential benefit of being able to reprocess the batch. It is, after all, not unreasonable to expect that
-	// a validator may not sign for some batches if it crashes.
-
-	// Store chunk data.
-	batch := make([]*types.KVPair, 0, len(batchData))
+	writeCompleteChan := make(chan error, len(batchData))
 	for _, batchDatum := range batchData {
 		bundleKeyBytes := batchDatum.BundleKey
 		bundleData := batchDatum.BundleBytes
+
+		go func() {
+			// Grab a lock on the hash of the blob. This protects against duplicate writes of the same blob.
+			lockIndex := uint64(util.HashKey(bundleKeyBytes[:], s.duplicateRequestSalt))
+			s.duplicateRequestLock.Lock(lockIndex)
+			defer s.duplicateRequestLock.Unlock(lockIndex)
+
+			exists, err := s.chunkTable.Exists(bundleKeyBytes[:])
+			if err != nil {
+				writeCompleteChan <- fmt.Errorf("failed to check batch header existence: %v", err)
+				return
+			}
+
+			if exists {
+				// Data is already present, no need to write it again.
+				writeCompleteChan <- nil
+				return
+			}
+
+			err = s.chunkTable.Put(bundleKeyBytes, bundleData)
+			if err != nil {
+				writeCompleteChan <- fmt.Errorf("failed to put data: %v", err)
+			}
+
+			writeCompleteChan <- nil
+		}()
+
 		size += uint64(len(bundleKeyBytes) + len(bundleData))
-
-		batch = append(batch, &types.KVPair{
-			Key:   bundleKeyBytes,
-			Value: bundleData,
-		})
 	}
 
-	err = s.chunkTable.PutBatch(batch)
-	if err != nil {
-		return 0, fmt.Errorf("failed to put batch: %v", err)
+	for i := 0; i < len(batchData); i++ {
+		err := <-writeCompleteChan
+		if err != nil {
+			return 0, err
+		}
 	}
 
-	err = s.chunkTable.Flush()
+	err := s.chunkTable.Flush()
 	if err != nil {
 		return 0, fmt.Errorf("failed to flush chunk table: %v", err)
 	}
