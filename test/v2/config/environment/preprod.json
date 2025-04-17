@@ -1,5 +1,5 @@
 {
-  "SRSPath": "~/.test-v2/srs",
+  "SRSPath": "../../../resources/srs",
   "KeyPath": "~/.test-v2/preprod-private-key.txt",
   "DisperserHostname": "disperser-preprod-holesky.eigenda.xyz",
   "DisperserPort": 443,
