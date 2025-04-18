@@ -74,7 +74,7 @@ func (pc *prometheusClient) QueryQuorumNetworkSigningRateV2(ctx context.Context,
 		"avg_over_time(eigenda_dispatcher_attestation{type=\"percent_signed\",cluster=\"%s\",quorum=\"%d\"}[%dm:])",
 		pc.cluster,
 		quorumID,
-		siningRateRangeVectorMinutes,
+		signingRateRangeVectorMinutes,
 	)
 	return pc.queryRange(ctx, query, start, end)
 }
