@@ -6,6 +6,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/relay"
 )
 
+var _ TestClient = &protobufClient{}
+
 type protobufClient struct {
 	client relay.ThroughputTestClient
 }
@@ -16,8 +18,8 @@ func newProtobufClient(client relay.ThroughputTestClient) *protobufClient {
 	}
 }
 
-// getData retrieves data from the server with the specified size and seed
-func (c *protobufClient) getData(size int64, seed int64) ([]byte, error) {
+// GetData retrieves data from the server with the specified size and seed
+func (c *protobufClient) GetData(size int64, seed int64) ([]byte, error) {
 	request := &relay.ThroughputTestRequest{
 		Size: size,
 		Seed: seed,

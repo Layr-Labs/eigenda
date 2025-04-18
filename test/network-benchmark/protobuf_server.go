@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/relay"
 )
 
+var _ TestServer = &protobufServer{}
 var _ relay.ThroughputTestServer = &protobufServer{}
 
 type protobufServer struct {
@@ -13,10 +14,12 @@ type protobufServer struct {
 	randomData *reusableRandomness
 }
 
-func NewProtobufServer(randomData *reusableRandomness) relay.ThroughputTestServer {
-	return &protobufServer{
-		randomData: randomData,
-	}
+func NewProtobufServer() relay.ThroughputTestServer {
+	return &protobufServer{}
+}
+
+func (s *protobufServer) SetRandomData(randomData *reusableRandomness) {
+	s.randomData = randomData
 }
 
 func (s *protobufServer) GetData(

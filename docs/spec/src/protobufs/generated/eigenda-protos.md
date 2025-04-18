@@ -1564,6 +1564,12 @@ Perform a keccak256 hash on the following data in the following order: 1. the le
 
 
 
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| size | [int64](#int64) |  |  |
+| seed | [int64](#int64) |  |  |
+
+
 
 
 
