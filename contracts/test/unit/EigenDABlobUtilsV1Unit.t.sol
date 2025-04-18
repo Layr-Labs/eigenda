@@ -61,54 +61,6 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         emit log_named_uint("gas used", gasBefore - gasAfter);
     }
 
-    function testVerifyBlobs_TwoBlobs(uint256 pseudoRandomNumber) public {
-        uint256 numQuorumBlobParams = 2;
-        BlobHeader[] memory blobHeader = new BlobHeader[](2);
-        blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
-        uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
-        blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
-        BatchHeader memory batchHeader;
-        bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
-        bytes memory secondBlobHash = abi.encodePacked(blobHeader[1].hashBlobHeader());
-        batchHeader.blobHeadersRoot = keccak256(abi.encodePacked(keccak256(firstBlobHash), keccak256(secondBlobHash)));
-        // add dummy quorum numbers and quorum threshold percentages making sure confirmationThresholdPercentage = adversaryThresholdPercentage + defaultCodingRatioPercentage
-        for (uint256 i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
-            batchHeader.quorumNumbers =
-                abi.encodePacked(batchHeader.quorumNumbers, blobHeader[1].quorumBlobParams[i].quorumNumber);
-            batchHeader.signedStakeForQuorums = abi.encodePacked(
-                batchHeader.signedStakeForQuorums, blobHeader[1].quorumBlobParams[i].confirmationThresholdPercentage
-            );
-        }
-        batchHeader.referenceBlockNumber = uint32(block.number);
-        // add dummy batch metadata
-        BatchMetadata memory batchMetadata;
-        batchMetadata.batchHeader = batchHeader;
-        batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
-        batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
-        stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
-            defaultBatchId
-        ).checked_write(batchMetadata.hashBatchMetadata());
-        BlobVerificationProof[] memory blobVerificationProofs = new BlobVerificationProof[](2);
-        blobVerificationProofs[0].batchId = defaultBatchId;
-        blobVerificationProofs[1].batchId = defaultBatchId;
-        blobVerificationProofs[0].batchMetadata = batchMetadata;
-        blobVerificationProofs[1].batchMetadata = batchMetadata;
-        blobVerificationProofs[0].inclusionProof = abi.encodePacked(keccak256(secondBlobHash));
-        blobVerificationProofs[1].inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
-        blobVerificationProofs[0].blobIndex = 0;
-        blobVerificationProofs[1].blobIndex = 1;
-        blobVerificationProofs[0].quorumIndices = new bytes(batchHeader.quorumNumbers.length);
-        blobVerificationProofs[1].quorumIndices = new bytes(batchHeader.quorumNumbers.length);
-        for (uint256 i = 0; i < batchHeader.quorumNumbers.length; i++) {
-            blobVerificationProofs[0].quorumIndices[i] = bytes1(uint8(i));
-            blobVerificationProofs[1].quorumIndices[i] = bytes1(uint8(i));
-        }
-        uint256 gasBefore = gasleft();
-        eigenDACertVerifier.verifyDACertsV1(blobHeader, blobVerificationProofs);
-        uint256 gasAfter = gasleft();
-        emit log_named_uint("gas used", gasBefore - gasAfter);
-    }
-
     function testVerifyBlob_InvalidMetadataHash(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = pseudoRandomNumber % 192;
         BlobHeader[] memory blobHeader = new BlobHeader[](2);
@@ -119,9 +71,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
 
-        cheats.expectRevert(
-            "EigenDACertVerificationUtils._verifyDACertForQuorums: batchMetadata does not match stored metadata"
-        );
+        cheats.expectPartialRevert(EigenDACertVerificationV1Lib.BatchMetadataMismatch.selector);
         eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
@@ -145,7 +95,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobVerificationProof.inclusionProof = abi.encodePacked(bytes32(0));
         blobVerificationProof.blobIndex = 1;
 
-        cheats.expectRevert("EigenDACertVerificationUtils._verifyDACertForQuorums: inclusion proof is invalid");
+        cheats.expectPartialRevert(EigenDACertVerificationV1Lib.InvalidInclusionProof.selector);
         eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
@@ -189,9 +139,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
         }
 
-        cheats.expectRevert(
-            "EigenDACertVerificationUtils._verifyDACertForQuorums: required quorums are not a subset of the confirmed quorums"
-        );
+        cheats.expectPartialRevert(EigenDACertVerificationV1Lib.RequiredQuorumsNotSubset.selector);
         eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
@@ -236,7 +184,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(batchHeader.quorumNumbers.length - 1 - i));
         }
 
-        cheats.expectRevert("EigenDACertVerificationUtils._verifyDACertForQuorums: quorumNumber does not match");
+        cheats.expectPartialRevert(EigenDACertVerificationV1Lib.QuorumNumberMismatch.selector);
         eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
@@ -282,39 +230,37 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
         }
 
-        cheats.expectRevert(
-            "EigenDACertVerificationUtils._verifyDACertForQuorums: confirmationThresholdPercentage is not met"
-        );
+        cheats.expectPartialRevert(EigenDACertVerificationV1Lib.StakeThresholdNotMet.selector);
         eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
     function testThresholds() public view {
         require(
-            eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(0) == 33,
+            eigenDAThresholdRegistry.getQuorumAdversaryThresholdPercentage(0) == 33,
             "getQuorumAdversaryThresholdPercentage failed"
         );
         require(
-            eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(1) == 33,
+            eigenDAThresholdRegistry.getQuorumAdversaryThresholdPercentage(1) == 33,
             "getQuorumAdversaryThresholdPercentage failed"
         );
         require(
-            eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(2) == 33,
+            eigenDAThresholdRegistry.getQuorumAdversaryThresholdPercentage(2) == 33,
             "getQuorumAdversaryThresholdPercentage failed"
         );
         require(
-            eigenDACertVerifier.getQuorumConfirmationThresholdPercentage(0) == 55,
+            eigenDAThresholdRegistry.getQuorumConfirmationThresholdPercentage(0) == 55,
             "getQuorumConfirmationThresholdPercentage failed"
         );
         require(
-            eigenDACertVerifier.getQuorumConfirmationThresholdPercentage(1) == 55,
+            eigenDAThresholdRegistry.getQuorumConfirmationThresholdPercentage(1) == 55,
             "getQuorumConfirmationThresholdPercentage failed"
         );
         require(
-            eigenDACertVerifier.getQuorumConfirmationThresholdPercentage(2) == 55,
+            eigenDAThresholdRegistry.getQuorumConfirmationThresholdPercentage(2) == 55,
             "getQuorumConfirmationThresholdPercentage failed"
         );
-        require(eigenDACertVerifier.getIsQuorumRequired(0) == true, "getIsQuorumRequired failed");
-        require(eigenDACertVerifier.getIsQuorumRequired(1) == true, "getIsQuorumRequired failed");
-        require(eigenDACertVerifier.getIsQuorumRequired(2) == false, "getIsQuorumRequired failed");
+        require(eigenDAThresholdRegistry.getIsQuorumRequired(0) == true, "getIsQuorumRequired failed");
+        require(eigenDAThresholdRegistry.getIsQuorumRequired(1) == true, "getIsQuorumRequired failed");
+        require(eigenDAThresholdRegistry.getIsQuorumRequired(2) == false, "getIsQuorumRequired failed");
     }
 }

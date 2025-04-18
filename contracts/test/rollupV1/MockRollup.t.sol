@@ -141,14 +141,14 @@ contract MockRollupTest is MockEigenDADeployer {
                 }
                 quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = true;
             }
-            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage =
-                eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
+            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = eigenDAThresholdRegistry
+                .getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
             blobHeader.quorumBlobParams[i].chunkLength = uint32(
                 uint256(
                     keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))
                 )
             );
-            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDACertVerifier
+            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDAThresholdRegistry
                 .getQuorumConfirmationThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
         }
         // mark all quorum numbers as unused

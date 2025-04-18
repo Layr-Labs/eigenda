@@ -8,7 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	disperserv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1_V2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"

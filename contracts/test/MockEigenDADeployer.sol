@@ -6,11 +6,11 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDAServiceManager, IRewardsCoordinator} from "../src/core/EigenDAServiceManager.sol";
-import {EigenDACertVerificationUtils} from "../src/libraries/EigenDACertVerificationUtils.sol";
+import {EigenDACertVerificationV1Lib} from "../src/periphery/libraries/EigenDACertVerificationV1Lib.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
 import {IEigenDAServiceManager} from "../src/interfaces/IEigenDAServiceManager.sol";
-import {EigenDACertVerifier} from "../src/core/EigenDACertVerifier.sol";
+import {EigenDACertVerifierV1_V2} from "../src/periphery/EigenDACertVerifierV1_V2.sol";
 import {EigenDAThresholdRegistry, IEigenDAThresholdRegistry} from "../src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "../src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../src/interfaces/IEigenDASignatureVerifier.sol";
@@ -46,7 +46,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
     EigenDADisperserRegistry eigenDADisperserRegistryImplementation;
     PaymentVault paymentVault;
     PaymentVault paymentVaultImplementation;
-    EigenDACertVerifier eigenDACertVerifier;
+    EigenDACertVerifierV1_V2 eigenDACertVerifier;
 
     ERC20 mockToken;
 
@@ -181,7 +181,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
 
         mockToken = new ERC20("Mock Token", "MOCK");
 
-        eigenDACertVerifier = new EigenDACertVerifier(
+        eigenDACertVerifier = new EigenDACertVerifierV1_V2(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDABatchMetadataStorage(address(eigenDAServiceManager)),
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
@@ -275,14 +275,14 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
                 quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = true;
             }
 
-            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage =
-                eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
+            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = eigenDAThresholdRegistry
+                .getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
             blobHeader.quorumBlobParams[i].chunkLength = uint32(
                 uint256(
                     keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))
                 )
             );
-            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDACertVerifier
+            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDAThresholdRegistry
                 .getQuorumConfirmationThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
         }
         // mark all quorum numbers as unused
