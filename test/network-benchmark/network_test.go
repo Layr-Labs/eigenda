@@ -1,7 +1,6 @@
 package network_benchmark
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"sync/atomic"
@@ -13,7 +12,6 @@ import (
 	"github.com/docker/go-units"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/test/bufconn"
 )
 
 const bufSize = units.MiB
@@ -21,6 +19,10 @@ const bufSize = units.MiB
 var dataPerTransfer = int64(1 * units.MiB)
 var totalDataToTransfer = int64(100 * units.GiB)
 var parallelism = 8
+
+// TODO claude: respect these addresses in the test
+var serverAddress = "localhost:50051"
+var clientAddress = "localhost:50052"
 
 func worker(
 	t *testing.T,
@@ -165,44 +167,41 @@ func throughputTest(t *testing.T, server TestServer, clients []TestClient) {
 }
 
 func TestProtobufThroughput(t *testing.T) {
+	// Use real network addresses instead of in-memory bufconn
+	// Start gRPC server with the real server address
+	lis, err := net.Listen("tcp", serverAddress)
+	if err != nil {
+		t.Fatalf("Failed to listen: %v", err)
+	}
 
-	// Set up server and client on localhost
-	listener := bufconn.Listen(bufSize)
 	server := grpc.NewServer()
 	protobufServer := NewProtobufServer()
 	relay.RegisterThroughputTestServer(server, protobufServer)
 
 	go func() {
-		if err := server.Serve(listener); err != nil {
+		if err := server.Serve(lis); err != nil {
 			t.Fatalf("Failed to serve: %v", err)
 		}
 	}()
 	defer server.Stop()
 
-	// Set up client
-	bufDialer := func(context.Context, string) (net.Conn, error) {
-		return listener.Dial()
-	}
-
-	conn, err := grpc.DialContext(
-		context.Background(),
-		"bufnet",
-		grpc.WithContextDialer(bufDialer),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
-	if err != nil {
-		t.Fatalf("Failed to dial bufnet: %v", err)
-	}
-	defer conn.Close()
-
-	grpcClient := relay.NewThroughputTestClient(conn)
-	client := newProtobufClient(grpcClient)
-
+	// Set up clients that connect to the real server address
 	clients := make([]TestClient, parallelism)
 	for i := 0; i < parallelism; i++ {
-		// we can reuse the same client for all workers
-		clients[i] = client
+		// Create a new connection for each client
+		conn, err := grpc.Dial(
+			serverAddress,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			t.Fatalf("Failed to dial server: %v", err)
+		}
+		defer conn.Close()
+
+		grpcClient := relay.NewThroughputTestClient(conn)
+		clients[i] = newProtobufClient(grpcClient)
 	}
 
+	// Run the benchmark test
 	throughputTest(t, protobufServer.(TestServer), clients)
 }
