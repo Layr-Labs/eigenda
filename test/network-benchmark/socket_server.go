@@ -2,18 +2,21 @@ package network_benchmark
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 )
 
 // socketServer implements TestServer interface for direct socket communication
 type socketServer struct {
-	listener   net.Listener
-	randomData *reusableRandomness
-	mu         sync.RWMutex
-	clients    []net.Conn
-	done       chan struct{}
+	listener       net.Listener
+	randomData     *reusableRandomness
+	mu             sync.RWMutex
+	clients        []net.Conn
+	done           chan struct{}
+	requestsServed atomic.Uint64
 }
 
 // NewSocketServer creates a new socketServer instance
@@ -117,6 +120,11 @@ func (s *socketServer) handleClient(conn net.Conn) {
 			_, err = conn.Write(data)
 			if err != nil {
 				return // Error writing data
+			}
+
+			requestsServed := s.requestsServed.Add(1)
+			if requestsServed%10000 == 0 {
+				fmt.Printf("Requests served: %d\r", requestsServed)
 			}
 		}
 	}

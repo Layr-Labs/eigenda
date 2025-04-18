@@ -2,9 +2,13 @@ package network_benchmark
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"net"
+	"os"
+	"os/signal"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -23,8 +27,47 @@ var parallelism = 8
 var serverAddress = "localhost:50051"
 var clientAddress = "localhost:50052"
 
+var seed = int64(1337)
+
+// Command-line flags to control test behavior
+var runServer bool
+var runClient bool
+
+// Initialize flags in init()
+func init() {
+	if os.Getenv("RUN_SERVER") == "true" {
+		runServer = true
+	}
+	if os.Getenv("RUN_CLIENT") == "true" {
+		runClient = true
+	}
+
+	if runServer {
+		fmt.Println("Running server...")
+	} else {
+		fmt.Println("Not running server...")
+	}
+	if runClient {
+		fmt.Println("Running client...")
+	} else {
+		fmt.Println("Not running client...")
+	}
+}
+
+// waitForCtrlC blocks until the user presses Ctrl+C
+func waitForCtrlC() {
+	fmt.Println("Server running. Press Ctrl+C to stop...")
+
+	// Set up channel to receive interrupt signal
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	// Wait for signal
+	<-sigChan
+	fmt.Println("\nReceived interrupt signal, shutting down...")
+}
+
 func worker(
-	t *testing.T,
 	client TestClient,
 	dataSize int64,
 	seed int64,
@@ -74,9 +117,9 @@ func worker(
 	finishedChan <- struct{}{}
 }
 
-func throughputTest(t *testing.T, server TestServer, clients []TestClient) {
-	rand := testrandom.NewTestRandom()
-	randomData := newReusableRandomness(units.GiB, rand.Int63())
+func throughputTest(server TestServer, clients []TestClient) {
+	rand := testrandom.NewTestRandom(seed)
+	randomData := newReusableRandomness(units.GiB, seed)
 	server.SetRandomData(randomData)
 
 	start := time.Now()
@@ -89,7 +132,6 @@ func throughputTest(t *testing.T, server TestServer, clients []TestClient) {
 
 	for i := 0; i < len(clients); i++ {
 		go worker(
-			t,
 			clients[i],
 			dataPerTransfer,
 			rand.Int63(),
@@ -166,96 +208,203 @@ func throughputTest(t *testing.T, server TestServer, clients []TestClient) {
 }
 
 func TestProtobufThroughput(t *testing.T) {
-	// Use real network addresses instead of in-memory bufconn
-	// Start gRPC server with the real server address
-	lis, err := net.Listen("tcp", serverAddress)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to listen: %v", err))
+	// Parse flags if they haven't been parsed yet (this happens when running the test directly)
+	if !flag.Parsed() {
+		flag.Parse()
 	}
 
-	server := grpc.NewServer()
-	protobufServer := NewProtobufServer()
-	relay.RegisterThroughputTestServer(server, protobufServer)
+	var server *grpc.Server
+	var pbufServer TestServer
 
-	go func() {
-		if err := server.Serve(lis); err != nil {
-			panic(fmt.Sprintf("Failed to serve: %v", err))
-		}
-	}()
-	defer server.Stop()
+	// Start the server if runServer flag is true
+	if runServer {
+		fmt.Printf("Starting Protobuf server on %s\n", serverAddress)
 
-	// Set up clients that connect to the real server address
-	clients := make([]TestClient, parallelism)
-	for i := 0; i < parallelism; i++ {
-		// Create a new connection for each client using the recommended DialContext method
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		
-		conn, err := grpc.DialContext(
-			ctx,
-			serverAddress,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithBlock(),
-		)
+		// Use real network addresses instead of in-memory bufconn
+		lis, err := net.Listen("tcp", serverAddress)
 		if err != nil {
-			panic(fmt.Sprintf("Failed to dial server: %v", err))
+			t.Fatalf("Failed to listen: %v", err)
 		}
-		defer conn.Close()
 
-		grpcClient := relay.NewThroughputTestClient(conn)
-		clients[i] = newProtobufClient(grpcClient)
+		server = grpc.NewServer()
+		pbufServer = NewProtobufServer()
+
+		randomData := newReusableRandomness(units.GiB, seed)
+		pbufServer.(TestServer).SetRandomData(randomData)
+		fmt.Printf("random data initialized\n")
+
+		// Type assertion to register with gRPC
+		grpcServer, ok := pbufServer.(*protobufServer)
+		if !ok {
+			t.Fatalf("Failed to cast to protobufServer type")
+		}
+		relay.RegisterThroughputTestServer(server, grpcServer)
+
+		// If only running the server and not the client, run the server and block until Ctrl+C
+		if !runClient {
+			fmt.Printf("Running Protobuf server only mode on %s\n", serverAddress)
+
+			// Start the server in a goroutine
+			go func() {
+				if err := server.Serve(lis); err != nil {
+					if err != grpc.ErrServerStopped {
+						t.Errorf("Failed to serve: %v", err)
+					}
+				}
+			}()
+
+			// Wait for Ctrl+C
+			waitForCtrlC()
+
+			// Stop the server before exiting
+			server.Stop()
+			return
+		}
+
+		// If also running the client, start server in background
+		go func() {
+			if err := server.Serve(lis); err != nil {
+				if err != grpc.ErrServerStopped {
+					t.Errorf("Failed to serve: %v", err)
+				}
+			}
+		}()
+		defer server.Stop()
+	} else {
+		// Create a mock server for the client-only case
+		pbufServer = NewProtobufServer()
 	}
 
-	// Run the benchmark test
-	throughputTest(t, protobufServer.(TestServer), clients)
+	// Run the client part if runClient flag is true
+	if runClient {
+		fmt.Printf("Starting Protobuf clients connecting to %s\n", serverAddress)
+
+		// Set up clients that connect to the server address
+		clients := make([]TestClient, parallelism)
+		for i := 0; i < parallelism; i++ {
+			// Create a new connection for each client
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			// Using grpc.DialContext with nolint directive to suppress the deprecation warning
+			// We're using this method instead of NewClient for backwards compatibility
+			//nolint:staticcheck
+			conn, err := grpc.DialContext(
+				ctx,
+				serverAddress,
+				grpc.WithTransportCredentials(insecure.NewCredentials()),
+				//nolint:staticcheck
+				grpc.WithBlock(),
+			)
+			if err != nil {
+				t.Fatalf("Failed to dial server: %v", err)
+			}
+			defer conn.Close()
+
+			grpcClient := relay.NewThroughputTestClient(conn)
+			clients[i] = newProtobufClient(grpcClient)
+		}
+
+		// Run the benchmark test
+		throughputTest(pbufServer, clients)
+	}
 }
 
 func TestSocketThroughput(t *testing.T) {
-	// Skip in short mode
-	if testing.Short() {
-		t.Skip("Skipping TestSocketThroughput in short mode")
+	// Parse flags if they haven't been parsed yet
+	if !flag.Parsed() {
+		flag.Parse()
 	}
 
-	// Create a socket server listening on the clientAddress
-	server, err := NewSocketServer(clientAddress)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to create socket server: %v", err))
-	}
+	var server TestServer
+	var err error
 
-	// Ensure server resources are cleaned up after the test
-	defer func() {
-		if ss, ok := server.(*socketServer); ok {
-			err = ss.Close()
-			if err != nil {
-				panic(fmt.Sprintf("Failed to close socket server: %v", err))
-			}
-		}
-	}()
+	// Start the server if runServer flag is true
+	if runServer {
+		fmt.Printf("Starting Socket server on %s\n", clientAddress)
 
-	// Wait for the server to start
-	time.Sleep(100 * time.Millisecond)
-
-	// Create socket clients connecting to the server
-	clients := make([]TestClient, parallelism)
-	for i := 0; i < parallelism; i++ {
-		client, err := NewSocketClient(clientAddress)
+		// Create a socket server listening on the clientAddress
+		server, err = NewSocketServer(clientAddress)
 		if err != nil {
-			t.Fatalf("Failed to create socket client %d: %v", i, err)
+			t.Fatalf("Failed to create socket server: %v", err)
 		}
 
-		// Ensure client resources are cleaned up after the test
-		defer func(c TestClient) {
-			if sc, ok := c.(*socketClient); ok {
-				err = sc.Close()
+		randomData := newReusableRandomness(units.GiB, seed)
+		server.SetRandomData(randomData)
+		fmt.Printf("random data initialized\n")
+
+		// If only running the server and not the client, block until Ctrl+C
+		if !runClient {
+			fmt.Printf("Running Socket server only mode on %s\n", clientAddress)
+
+			// Wait for Ctrl+C
+			waitForCtrlC()
+
+			// Cleanup before exiting
+			socketServerImpl, ok := server.(*socketServer)
+			if !ok {
+				t.Errorf("Failed to cast to socketServer type")
+			} else {
+				err = socketServerImpl.Close()
 				if err != nil {
-					t.Fatalf("Failed to close socket client %d: %v", i, err)
+					t.Errorf("Failed to close socket server: %v", err)
 				}
 			}
-		}(client)
+			return
+		}
 
-		clients[i] = client
+		// Ensure server resources are cleaned up after the test when both server and client are running
+		defer func() {
+			socketServerImpl, ok := server.(*socketServer)
+			if !ok {
+				t.Errorf("Failed to cast to socketServer type")
+			} else {
+				err = socketServerImpl.Close()
+				if err != nil {
+					t.Errorf("Failed to close socket server: %v", err)
+				}
+			}
+		}()
+
+		// Wait for the server to start
+		time.Sleep(100 * time.Millisecond)
+	} else {
+		// Create a mock server for the client-only case
+		mockServer := &protobufServer{
+			randomData: newReusableRandomness(units.MiB, seed),
+		}
+		server = mockServer
 	}
 
-	// Run the benchmark test with socket server and clients
-	throughputTest(t, server, clients)
+	// Run the client part if runClient flag is true
+	if runClient {
+		fmt.Printf("Starting Socket clients connecting to %s\n", clientAddress)
+
+		// Create socket clients connecting to the server
+		clients := make([]TestClient, parallelism)
+		for i := 0; i < parallelism; i++ {
+			client, err := NewSocketClient(clientAddress)
+			if err != nil {
+				t.Fatalf("Failed to create socket client %d: %v", i, err)
+			}
+
+			// Ensure client resources are cleaned up after the test
+			defer func(c TestClient) {
+				socketClient, ok := c.(*socketClient)
+				if !ok {
+					t.Errorf("Failed to cast to socketClient type")
+				} else {
+					err := socketClient.Close()
+					if err != nil {
+						t.Errorf("Failed to close socket client: %v", err)
+					}
+				}
+			}(client)
+
+			clients[i] = client
+		}
+
+		// Run the benchmark test with socket server and clients
+		throughputTest(server, clients)
+	}
 }
