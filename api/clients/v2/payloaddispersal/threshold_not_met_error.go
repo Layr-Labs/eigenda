@@ -7,6 +7,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"google.golang.org/protobuf/encoding/prototext"
+	"google.golang.org/protobuf/proto"
 )
 
 // thresholdNotMetError represents an error when signature thresholds are not met
@@ -45,53 +47,24 @@ func checkThresholds(
 	blobStatusReply *dispgrpc.BlobStatusReply,
 	blobKey string,
 ) error {
-	if blobStatusReply == nil {
-		return fmt.Errorf("blobStatusReply is nil")
-	}
-	blobInclusionInfo := blobStatusReply.GetBlobInclusionInfo()
-	if blobInclusionInfo == nil {
-		return fmt.Errorf("blobInclusionInfo is nil")
-	}
-	blobCertificate := blobInclusionInfo.GetBlobCertificate()
-	if blobCertificate == nil {
-		return fmt.Errorf("blobCertificate is nil")
-	}
-	blobHeader := blobCertificate.GetBlobHeader()
-	if blobHeader == nil {
-		return fmt.Errorf("blobHeader is nil")
-	}
-	quorumNumbers := blobHeader.GetQuorumNumbers()
-	if quorumNumbers == nil {
-		return fmt.Errorf("quorumNumbers is nil")
-	}
+	quorumNumbers := blobStatusReply.GetBlobInclusionInfo().GetBlobCertificate().GetBlobHeader().GetQuorumNumbers()
 	if len(quorumNumbers) == 0 {
-		return fmt.Errorf("quorumNumbers is empty")
-	}
-	signedBatch := blobStatusReply.GetSignedBatch()
-	if signedBatch == nil {
-		return fmt.Errorf("signedBatch is nil")
-	}
-	batchHeader := signedBatch.GetHeader()
-	if batchHeader == nil {
-		return fmt.Errorf("batchHeader is nil")
-	}
-	referenceBlockNumber := batchHeader.GetReferenceBlockNumber()
-	attestation := signedBatch.GetAttestation()
-	if attestation == nil {
-		return fmt.Errorf("attestation is nil")
-	}
-	quorumSignedPercentages := attestation.GetQuorumSignedPercentages()
-	if quorumSignedPercentages == nil {
-		return fmt.Errorf("quorumSignedPercentages is nil")
+		return fmt.Errorf("get quorum numbers: %v", protoToString(blobStatusReply))
 	}
 
+	quorumSignedPercentages := blobStatusReply.GetSignedBatch().GetAttestation().GetQuorumSignedPercentages()
 	if len(quorumSignedPercentages) != len(quorumNumbers) {
-		return fmt.Errorf("expected number of quorum signed percentages to match number of quorums."+
-			"quorum signed percentages count: %d. quorum number count: %d",
+		return fmt.Errorf("expected number of signed percentages to match number of quorums. "+
+			"signed percentages count: %d; quorum count: %d",
 			len(quorumSignedPercentages), len(quorumNumbers))
 	}
 
-	confirmationThreshold, err := certVerifier.GetConfirmationThreshold(ctx, referenceBlockNumber)
+	batchHeader := blobStatusReply.GetSignedBatch().GetHeader()
+	if batchHeader == nil {
+		return fmt.Errorf("get batch header: %v", protoToString(blobStatusReply))
+	}
+
+	confirmationThreshold, err := certVerifier.GetConfirmationThreshold(ctx, batchHeader.GetReferenceBlockNumber())
 	if err != nil {
 		return fmt.Errorf("get confirmation threshold: %w", err)
 	}
@@ -109,4 +82,11 @@ func checkThresholds(
 	}
 
 	return nil
+}
+
+func protoToString(protoMessage proto.Message) string {
+	return prototext.MarshalOptions{
+		Multiline: true,
+		Indent:    "  ",
+	}.Format(protoMessage)
 }
