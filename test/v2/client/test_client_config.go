@@ -64,7 +64,7 @@ type TestClientConfig struct {
 func (c *TestClientConfig) ResolveSRSPath(srsFile string) (string, error) {
 	root, err := ResolveTildeInPath(c.SRSPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve tilde in path: %w", err)
+		return "", fmt.Errorf("resolve tilde in path: %w", err)
 	}
 	return path.Join(root, srsFile), nil
 }
