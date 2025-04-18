@@ -20,11 +20,12 @@ type MetricsV2 struct {
 	registry         *prometheus.Registry
 	grpcServerOption grpc.ServerOption
 
-	storeChunksLatency     *prometheus.SummaryVec
 	storeChunksRequestSize *prometheus.GaugeVec
 
 	getChunksLatency  *prometheus.SummaryVec
 	getChunksDataSize *prometheus.GaugeVec
+
+	storeChunksStageTimer *common.StageTimer
 }
 
 // NewV2Metrics creates a new MetricsV2 instance. dbSizePollPeriod is the period at which the database size is polled.
@@ -41,16 +42,6 @@ func NewV2Metrics(logger logging.Logger, registry *prometheus.Registry) (*Metric
 		grpcMetrics.UnaryServerInterceptor(),
 	)
 
-	storeChunksLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  namespace,
-			Name:       "store_chunks_latency_ms",
-			Help:       "The latency of a StoreChunks() RPC call.",
-			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
-		},
-		[]string{"stage"},
-	)
-
 	storeChunksRequestSize := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -64,7 +55,7 @@ func NewV2Metrics(logger logging.Logger, registry *prometheus.Registry) (*Metric
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "get_chunks_latency_ms",
-			Help:       "The latency of a GetChunks() RPC call.",
+			Help:       "The latency of a GetBundleData() RPC call.",
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		},
 		[]string{},
@@ -74,19 +65,21 @@ func NewV2Metrics(logger logging.Logger, registry *prometheus.Registry) (*Metric
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "get_chunks_data_size_bytes",
-			Help:      "The size of the data requested to be retrieved by GetChunks() RPC calls.",
+			Help:      "The size of the data requested to be retrieved by GetBundleData() RPC calls.",
 		},
 		[]string{},
 	)
+
+	storeChunksStageTimer := common.NewStageTimer(registry, namespace, "store_chunks", false)
 
 	return &MetricsV2{
 		logger:                 logger,
 		registry:               registry,
 		grpcServerOption:       grpcServerOption,
-		storeChunksLatency:     storeChunksLatency,
 		storeChunksRequestSize: storeChunksRequestSize,
 		getChunksLatency:       getChunksLatency,
 		getChunksDataSize:      getChunksDataSize,
+		storeChunksStageTimer:  storeChunksStageTimer,
 	}, nil
 }
 
@@ -95,8 +88,9 @@ func (m *MetricsV2) GetGRPCServerOption() grpc.ServerOption {
 	return m.grpcServerOption
 }
 
-func (m *MetricsV2) ReportStoreChunksLatency(stage string, latency time.Duration) {
-	m.storeChunksLatency.WithLabelValues(stage).Observe(common.ToMilliseconds(latency))
+// GetStoreChunksProbe returns a probe for measuring the latency of the StoreChunks() RPC call.
+func (m *MetricsV2) GetStoreChunksProbe() *common.SequenceProbe {
+	return m.storeChunksStageTimer.NewSequence()
 }
 
 func (m *MetricsV2) ReportStoreChunksRequestSize(size uint64) {

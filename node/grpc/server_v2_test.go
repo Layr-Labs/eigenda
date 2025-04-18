@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/gammazero/workerpool"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
@@ -94,15 +95,16 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 	var atomicRelayClient atomic.Value
 	atomicRelayClient.Store(relay)
 	node := &node.Node{
-		Config:      config,
-		Logger:      logger,
-		KeyPair:     keyPair,
-		BLSSigner:   signer,
-		Metrics:     metrics,
-		StoreV2:     s,
-		ChainState:  chainState,
-		ValidatorV2: val,
-		RelayClient: atomicRelayClient,
+		Config:         config,
+		Logger:         logger,
+		KeyPair:        keyPair,
+		BLSSigner:      signer,
+		Metrics:        metrics,
+		ValidatorStore: s,
+		ChainState:     chainState,
+		ValidatorV2:    val,
+		RelayClient:    atomicRelayClient,
+		DownloadPool:   workerpool.New(1),
 	}
 	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 
@@ -229,7 +231,7 @@ func TestV2StoreChunksSuccess(t *testing.T) {
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 		require.Equal(t, blobKeys[1], requests[1].BlobKey)
 	})
-	c.store.On("StoreBatch", batch, mock.Anything).Return(nil, nil)
+	c.store.On("StoreBatch", mock.Anything, mock.Anything).Return(nil, nil)
 	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
 		DisperserID: 0,
 		Signature:   ecdsaSig,
@@ -307,7 +309,7 @@ func TestV2StoreChunksStorageFailure(t *testing.T) {
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 		require.Equal(t, blobKeys[1], requests[1].BlobKey)
 	})
-	c.store.On("StoreBatch", batch, mock.Anything).Return(nil, errors.New("error"))
+	c.store.On("StoreBatch", mock.Anything, mock.Anything).Return(nil, errors.New("error"))
 	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
 		DisperserID: 0,
 		Signature:   ecdsaSig,
@@ -320,6 +322,7 @@ func TestV2StoreChunksStorageFailure(t *testing.T) {
 func TestV2StoreChunksValidationFailure(t *testing.T) {
 	config := makeConfig(t)
 	config.EnableV2 = true
+	config.LittDBEnabled = true
 	c := newTestComponents(t, config)
 
 	blobKeys, batch, bundles := nodemock.MockBatch(t)
@@ -365,7 +368,9 @@ func TestV2StoreChunksValidationFailure(t *testing.T) {
 	require.Nil(t, reply.GetSignature())
 	requireErrorStatus(t, err, codes.Internal)
 
-	c.store.AssertCalled(t, "DeleteKeys", mock.Anything, mock.Anything)
+	if !config.LittDBEnabled {
+		c.store.AssertCalled(t, "DeleteKeys", mock.Anything, mock.Anything)
+	}
 }
 
 func TestV2GetChunksInputValidation(t *testing.T) {

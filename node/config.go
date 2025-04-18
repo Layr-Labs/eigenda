@@ -108,6 +108,21 @@ type Config struct {
 	DispersalAuthenticationKeyCacheSize int
 	// the timeout for disperser keys (after which the disperser key is reloaded from the chain)
 	DisperserKeyTimeout time.Duration
+
+	// The size of the thread pool used to download chunks from the network is computed by the following formula:
+	// (number of CPUs) * DownloadPoolMultiplier + DownloadPoolConstant
+	DownloadPoolMultiplier int
+
+	// The size of the thread pool used to download chunks from the network is computed by the following formula:
+	// (number of CPUs) * DownloadPoolMultiplier + DownloadPoolConstant
+	DownloadPoolConstant int
+
+	// If true, use littDB instead of levelDB for v2 storage. Note than in its current form, no data migration is
+	// performed when this setting is enabled. (Migration is a feature we will need prior to deployment to mainnet.)
+	LittDBEnabled bool
+
+	// A special test only setting. If true, then littDB will throw an error if the same data is written twice.
+	LittDBDoubleWriteProtection bool
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -329,5 +344,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DisperserKeyTimeout:                 ctx.GlobalDuration(flags.DisperserKeyTimeoutFlag.Name),
 		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),
 		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
+		LittDBEnabled:                       ctx.GlobalBool(flags.LittDBEnabledFlag.Name),
+		DownloadPoolMultiplier:              ctx.GlobalInt(flags.DownloadPoolMultiplierFlag.Name),
+		DownloadPoolConstant:                ctx.GlobalInt(flags.DownloadPoolConstantFlag.Name),
 	}, nil
 }

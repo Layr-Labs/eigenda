@@ -33,7 +33,7 @@ type DB interface {
 	// Table.SetTTL() to do so. This is necessary after each time the database is started/restarted.
 	GetTable(name string) (Table, error)
 
-	// DropTable deletes a table and all of its data.
+	// DropTable deletes a table and all of its data. This is a no-op if the table does not exist.
 	//
 	// Note that it is NOT thread safe to drop a table concurrently with any operation that accesses the table.
 	// The table returned by GetTable() before DropTable() is called must not be used once DropTable() is called.
