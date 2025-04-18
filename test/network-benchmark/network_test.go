@@ -1,6 +1,7 @@
 package network_benchmark
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync/atomic"
@@ -14,13 +15,11 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-const bufSize = units.MiB
-
 var dataPerTransfer = int64(1 * units.MiB)
 var totalDataToTransfer = int64(100 * units.GiB)
 var parallelism = 8
 
-// TODO claude: respect these addresses in the test
+// Server and client addresses for the benchmark tests
 var serverAddress = "localhost:50051"
 var clientAddress = "localhost:50052"
 
@@ -47,20 +46,20 @@ func worker(
 		requestStart := time.Now()
 		data, err := client.GetData(int64(dataSize), seed)
 		if err != nil {
-			t.Fatalf("Failed to get data: %v", err)
+			panic(fmt.Sprintf("Failed to get data: %v", err))
 		}
 		requestLatency := time.Since(requestStart)
 
 		// Regenerate the data using the same seed and verify it matches
 		expectedData := randomData.getData(int64(dataSize), seed)
 		if len(data) != len(expectedData) {
-			t.Fatalf("Data length mismatch: got %d, expected %d", len(data), len(expectedData))
+			panic(fmt.Sprintf("Data length mismatch: %d vs %d", len(data), len(expectedData)))
 		}
 
 		// Compare the data
 		for i := 0; i < len(data); i++ {
 			if data[i] != expectedData[i] {
-				t.Fatalf("Data mismatch at index %d: got %d, expected %d", i, data[i], expectedData[i])
+				panic(fmt.Sprintf("Data mismatch: %d vs %d", data[i], expectedData[i]))
 			}
 		}
 
@@ -171,7 +170,7 @@ func TestProtobufThroughput(t *testing.T) {
 	// Start gRPC server with the real server address
 	lis, err := net.Listen("tcp", serverAddress)
 	if err != nil {
-		t.Fatalf("Failed to listen: %v", err)
+		panic(fmt.Sprintf("Failed to listen: %v", err))
 	}
 
 	server := grpc.NewServer()
@@ -180,7 +179,7 @@ func TestProtobufThroughput(t *testing.T) {
 
 	go func() {
 		if err := server.Serve(lis); err != nil {
-			t.Fatalf("Failed to serve: %v", err)
+			panic(fmt.Sprintf("Failed to serve: %v", err))
 		}
 	}()
 	defer server.Stop()
@@ -188,13 +187,18 @@ func TestProtobufThroughput(t *testing.T) {
 	// Set up clients that connect to the real server address
 	clients := make([]TestClient, parallelism)
 	for i := 0; i < parallelism; i++ {
-		// Create a new connection for each client
-		conn, err := grpc.Dial(
+		// Create a new connection for each client using the recommended DialContext method
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		
+		conn, err := grpc.DialContext(
+			ctx,
 			serverAddress,
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithBlock(),
 		)
 		if err != nil {
-			t.Fatalf("Failed to dial server: %v", err)
+			panic(fmt.Sprintf("Failed to dial server: %v", err))
 		}
 		defer conn.Close()
 
@@ -204,4 +208,54 @@ func TestProtobufThroughput(t *testing.T) {
 
 	// Run the benchmark test
 	throughputTest(t, protobufServer.(TestServer), clients)
+}
+
+func TestSocketThroughput(t *testing.T) {
+	// Skip in short mode
+	if testing.Short() {
+		t.Skip("Skipping TestSocketThroughput in short mode")
+	}
+
+	// Create a socket server listening on the clientAddress
+	server, err := NewSocketServer(clientAddress)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create socket server: %v", err))
+	}
+
+	// Ensure server resources are cleaned up after the test
+	defer func() {
+		if ss, ok := server.(*socketServer); ok {
+			err = ss.Close()
+			if err != nil {
+				panic(fmt.Sprintf("Failed to close socket server: %v", err))
+			}
+		}
+	}()
+
+	// Wait for the server to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Create socket clients connecting to the server
+	clients := make([]TestClient, parallelism)
+	for i := 0; i < parallelism; i++ {
+		client, err := NewSocketClient(clientAddress)
+		if err != nil {
+			t.Fatalf("Failed to create socket client %d: %v", i, err)
+		}
+
+		// Ensure client resources are cleaned up after the test
+		defer func(c TestClient) {
+			if sc, ok := c.(*socketClient); ok {
+				err = sc.Close()
+				if err != nil {
+					t.Fatalf("Failed to close socket client %d: %v", i, err)
+				}
+			}
+		}(client)
+
+		clients[i] = client
+	}
+
+	// Run the benchmark test with socket server and clients
+	throughputTest(t, server, clients)
 }
