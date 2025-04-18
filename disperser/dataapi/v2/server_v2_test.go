@@ -61,6 +61,9 @@ var (
 	//go:embed testdata/prometheus-resp-avg-throughput.json
 	mockPrometheusRespAvgThroughput string
 
+	//go:embed testdata/prometheus-response-network-signing-rate.json
+	mockPrometheusResponseNetworkSigningRate string
+
 	UUID                = uuid.New()
 	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
 	blobMetadataStore   *blobstorev2.BlobMetadataStore
@@ -2595,6 +2598,31 @@ func TestFetchMetricsThroughputTimeseries(t *testing.T) {
 	assert.Equal(t, float64(12000), response[0].Throughput)
 	assert.Equal(t, uint64(1701292920), response[0].Timestamp)
 	assert.Equal(t, float64(3.503022666666651e+07), totalThroughput)
+}
+
+func TestFetchMetricsNetworkSigningRateTimeseries(t *testing.T) {
+	r := setUpRouter()
+
+	s := new(model.SampleStream)
+	err := s.UnmarshalJSON([]byte(mockPrometheusResponseNetworkSigningRate))
+	assert.NoError(t, err)
+
+	matrix := make(model.Matrix, 0)
+	matrix = append(matrix, s)
+	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil)
+
+	r.GET("/v2/metrics/timeseries/network-signing-rate", testDataApiServerV2.FetchNetworkSigningRate)
+
+	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/timeseries/network-signing-rate")
+	response := decodeResponseBody[serverv2.NetworkSigningRateResponse](t, w)
+
+	require.Equal(t, 2, len(response.QuorumSigningRates))
+	assert.Equal(t, "0", response.QuorumSigningRates[0].QuorumId)
+	require.Equal(t, 12, len(response.QuorumSigningRates[0].DataPoints))
+	assert.Equal(t, float64(98.1), response.QuorumSigningRates[0].DataPoints[0].SigningRate)
+	assert.Equal(t, "1", response.QuorumSigningRates[1].QuorumId)
+	assert.Equal(t, 12, len(response.QuorumSigningRates[1].DataPoints))
+	assert.Equal(t, float64(98.1), response.QuorumSigningRates[1].DataPoints[0].SigningRate)
 }
 
 func createAttestation(

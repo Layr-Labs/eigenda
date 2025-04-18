@@ -12,6 +12,11 @@ import (
 const (
 	// maxNumOfDataPoints is the maximum number of data points that can be queried from Prometheus based on latency that this API can provide
 	maxNumOfDataPoints = 3500
+
+	// Calculate the average over this number of minutes for signing rate
+	// The attestation can happen every second (but may take multiple seconds to finish), so
+	// assuming it takes 5s, this will average over 60 data points
+	signingRateRangeVectorMinutes = 5
 )
 
 type (
@@ -20,6 +25,7 @@ type (
 		QueryDisperserAvgThroughputBlobSizeBytes(ctx context.Context, start time.Time, end time.Time, windowSizeInSec uint16) (*PrometheusResult, error)
 		QueryDisperserBlobSizeBytesPerSecondV2(ctx context.Context, start time.Time, end time.Time) (*PrometheusResult, error)
 		QueryDisperserAvgThroughputBlobSizeBytesV2(ctx context.Context, start time.Time, end time.Time, windowSizeInSec uint16) (*PrometheusResult, error)
+		QueryQuorumNetworkSigningRateV2(ctx context.Context, start time.Time, end time.Time, quorum uint8) (*PrometheusResult, error)
 	}
 
 	PrometheusResultValues struct {
@@ -60,6 +66,16 @@ func (pc *prometheusClient) QueryDisperserAvgThroughputBlobSizeBytes(ctx context
 
 func (pc *prometheusClient) QueryDisperserAvgThroughputBlobSizeBytesV2(ctx context.Context, start time.Time, end time.Time, throughputRateSecs uint16) (*PrometheusResult, error) {
 	query := fmt.Sprintf("avg_over_time( sum by (job) (rate(eigenda_dispatcher_completed_blobs_total{state=\"complete\",data=\"size\",cluster=\"%s\"}[%ds])) [9m:])", pc.cluster, throughputRateSecs)
+	return pc.queryRange(ctx, query, start, end)
+}
+
+func (pc *prometheusClient) QueryQuorumNetworkSigningRateV2(ctx context.Context, start time.Time, end time.Time, quorumID uint8) (*PrometheusResult, error) {
+	query := fmt.Sprintf(
+		"avg_over_time(eigenda_dispatcher_attestation{type=\"percent_signed\",cluster=\"%s\",quorum=\"%d\"}[%dm:])",
+		pc.cluster,
+		quorumID,
+		signingRateRangeVectorMinutes,
+	)
 	return pc.queryRange(ctx, query, start, end)
 }
 
