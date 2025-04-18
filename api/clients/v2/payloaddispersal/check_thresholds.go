@@ -49,7 +49,7 @@ func checkThresholds(
 ) error {
 	quorumNumbers := blobStatusReply.GetBlobInclusionInfo().GetBlobCertificate().GetBlobHeader().GetQuorumNumbers()
 	if len(quorumNumbers) == 0 {
-		return fmt.Errorf("get quorum numbers: %v", protoToString(blobStatusReply))
+		return fmt.Errorf("expected >0 quorum numbers: %v", protoToString(blobStatusReply))
 	}
 
 	quorumSignedPercentages := blobStatusReply.GetSignedBatch().GetAttestation().GetQuorumSignedPercentages()
@@ -61,7 +61,7 @@ func checkThresholds(
 
 	batchHeader := blobStatusReply.GetSignedBatch().GetHeader()
 	if batchHeader == nil {
-		return fmt.Errorf("get batch header: %v", protoToString(blobStatusReply))
+		return fmt.Errorf("expected non-nil batch header: %v", protoToString(blobStatusReply))
 	}
 
 	confirmationThreshold, err := certVerifier.GetConfirmationThreshold(ctx, batchHeader.GetReferenceBlockNumber())
