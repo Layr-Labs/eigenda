@@ -2,6 +2,7 @@ package payloaddispersal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -110,9 +111,9 @@ func (pd *PayloadDisperser) SendPayload(
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCompleteTimeout)
 	defer cancel()
-	blobStatusReply, err := pd.pollBlobStatusUntilComplete(timeoutCtx, blobKey, blobStatus.ToProfobuf(), probe)
+	blobStatusReply, err := pd.pollBlobStatusUntilSigned(timeoutCtx, blobKey, blobStatus.ToProfobuf(), probe)
 	if err != nil {
-		return nil, fmt.Errorf("poll blob status until complete: %w", err)
+		return nil, fmt.Errorf("poll blob status until signed: %w", err)
 	}
 	pd.logger.Debug("Blob status COMPLETE", "blobKey", blobKey.Hex())
 
@@ -152,11 +153,12 @@ func (pd *PayloadDisperser) Close() error {
 	return nil
 }
 
-// pollBlobStatusUntilComplete polls the disperser for the status of a blob that has been dispersed
+// pollBlobStatusUntilSigned polls the disperser for the status of a blob that has been dispersed
 //
-// This method will only return a non-nil BlobStatusReply if the blob is reported to be COMPLETE prior to the timeout.
-// In all other cases, this method will return a nil BlobStatusReply, along with an error describing the failure.
-func (pd *PayloadDisperser) pollBlobStatusUntilComplete(
+// This method will only return a non-nil BlobStatusReply if all quorums meet the required confirmation threshold prior
+// to timeout. In all other cases, this method will return a nil BlobStatusReply, along with an error describing the
+// failure.
+func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 	ctx context.Context,
 	blobKey core.BlobKey,
 	initialStatus dispgrpc.BlobStatus,
@@ -198,13 +200,39 @@ func (pd *PayloadDisperser) pollBlobStatusUntilComplete(
 			// TODO: we'll need to add more in-depth response status processing to derive failover errors
 			switch newStatus {
 			case dispgrpc.BlobStatus_COMPLETE:
-				return blobStatusReply, nil
-			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED, dispgrpc.BlobStatus_GATHERING_SIGNATURES:
-				// TODO (litt): check signing percentage when we are gathering signatures, potentially break
-				//  out of this loop early if we have enough signatures
+				err := checkThresholds(ctx, pd.certVerifier, blobStatusReply, blobKey.Hex())
+				if err != nil {
+					// returned error is verbose enough, no need to wrap it with additional context
+					return nil, err
+				}
 
+				return blobStatusReply, nil
+			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED:
 				// Report all non-terminal statuses to the probe. Repeat reports are no-ops.
 				probe.SetStage(newStatus.String())
+				continue
+			case dispgrpc.BlobStatus_GATHERING_SIGNATURES:
+				// Report all non-terminal statuses to the probe. Repeat reports are no-ops.
+				probe.SetStage(newStatus.String())
+
+				err := checkThresholds(ctx, pd.certVerifier, blobStatusReply, blobKey.Hex())
+				if err == nil {
+					// If there's no error, then all thresholds are met, so we can stop polling
+					return blobStatusReply, nil
+				}
+
+				var thresholdNotMetErr *thresholdNotMetError
+				if !errors.As(err, &thresholdNotMetErr) {
+					// an error occurred which was unrelated to an unmet threshold: something went wrong while checking!
+					//
+					// TODO (litt3): with the current disperser implementation, it's expected that the blobStatusReply
+					//  will be nil while gathering signatures, so this case will *always* be triggered. Once the
+					//  disperser has been updated to return a non-nil blobStatusReply while gathering signatures,
+					//  this case will no longer be expected to occur, so a warning should be logged here.
+					continue
+				}
+
+				// thresholds weren't met yet. that's ok, since signature gathering is still in progress
 				continue
 			default:
 				return nil, fmt.Errorf(

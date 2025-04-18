@@ -25,4 +25,10 @@ type ICertVerifier interface {
 	// GetQuorumNumbersRequired queries the cert verifier contract for the configured set of quorum numbers that must
 	// be set in the BlobHeader, and verified in VerifyDACertV2 and verifyDACertV2FromSignedBatch
 	GetQuorumNumbersRequired(ctx context.Context) ([]uint8, error)
+
+	// GetConfirmationThreshold queries the cert verifier contract for the configured ConfirmationThreshold.
+	// The ConfirmationThreshold is an integer value between 0 and 100 (inclusive), where the value represents
+	// a percentage of validator stake that needs to have signed for availability, for the blob to be considered
+	// "available".
+	GetConfirmationThreshold(ctx context.Context, referenceBlockNumber uint64) (uint8, error)
 }
