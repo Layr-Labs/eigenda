@@ -19,6 +19,96 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
+	ThroughputTest_GetData_FullMethodName = "/relay.ThroughputTest/GetData"
+)
+
+// ThroughputTestClient is the client API for ThroughputTest service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type ThroughputTestClient interface {
+	GetData(ctx context.Context, in *ThroughputTestRequest, opts ...grpc.CallOption) (*ThroughputTestResponse, error)
+}
+
+type throughputTestClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewThroughputTestClient(cc grpc.ClientConnInterface) ThroughputTestClient {
+	return &throughputTestClient{cc}
+}
+
+func (c *throughputTestClient) GetData(ctx context.Context, in *ThroughputTestRequest, opts ...grpc.CallOption) (*ThroughputTestResponse, error) {
+	out := new(ThroughputTestResponse)
+	err := c.cc.Invoke(ctx, ThroughputTest_GetData_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ThroughputTestServer is the server API for ThroughputTest service.
+// All implementations must embed UnimplementedThroughputTestServer
+// for forward compatibility
+type ThroughputTestServer interface {
+	GetData(context.Context, *ThroughputTestRequest) (*ThroughputTestResponse, error)
+	mustEmbedUnimplementedThroughputTestServer()
+}
+
+// UnimplementedThroughputTestServer must be embedded to have forward compatible implementations.
+type UnimplementedThroughputTestServer struct {
+}
+
+func (UnimplementedThroughputTestServer) GetData(context.Context, *ThroughputTestRequest) (*ThroughputTestResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetData not implemented")
+}
+func (UnimplementedThroughputTestServer) mustEmbedUnimplementedThroughputTestServer() {}
+
+// UnsafeThroughputTestServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ThroughputTestServer will
+// result in compilation errors.
+type UnsafeThroughputTestServer interface {
+	mustEmbedUnimplementedThroughputTestServer()
+}
+
+func RegisterThroughputTestServer(s grpc.ServiceRegistrar, srv ThroughputTestServer) {
+	s.RegisterService(&ThroughputTest_ServiceDesc, srv)
+}
+
+func _ThroughputTest_GetData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ThroughputTestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ThroughputTestServer).GetData(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ThroughputTest_GetData_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ThroughputTestServer).GetData(ctx, req.(*ThroughputTestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// ThroughputTest_ServiceDesc is the grpc.ServiceDesc for ThroughputTest service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var ThroughputTest_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "relay.ThroughputTest",
+	HandlerType: (*ThroughputTestServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetData",
+			Handler:    _ThroughputTest_GetData_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "relay/relay.proto",
+}
+
+const (
 	Relay_GetBlob_FullMethodName   = "/relay.Relay/GetBlob"
 	Relay_GetChunks_FullMethodName = "/relay.Relay/GetChunks"
 )

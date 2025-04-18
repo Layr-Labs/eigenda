@@ -544,11 +544,23 @@
                   <a href="#relay.GetChunksRequest"><span class="badge">M</span>GetChunksRequest</a>
                 </li>
               
+                <li>
+                  <a href="#relay.ThroughputTestRequest"><span class="badge">M</span>ThroughputTestRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#relay.ThroughputTestResponse"><span class="badge">M</span>ThroughputTestResponse</a>
+                </li>
+              
               
               
               
                 <li>
                   <a href="#relay.Relay"><span class="badge">S</span>Relay</a>
+                </li>
+              
+                <li>
+                  <a href="#relay.ThroughputTest"><span class="badge">S</span>ThroughputTest</a>
                 </li>
               
             </ul>
@@ -3712,6 +3724,37 @@ Perform a keccak256 hash on the following data in the following order:
 
         
       
+        <h3 id="relay.ThroughputTestRequest">ThroughputTestRequest</h3>
+        <p></p>
+
+        
+
+        
+      
+        <h3 id="relay.ThroughputTestResponse">ThroughputTestResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
 
       
 
@@ -3738,6 +3781,25 @@ Perform a keccak256 hash on the following data in the following order:
                 <td><a href="#relay.GetChunksRequest">GetChunksRequest</a></td>
                 <td><a href="#relay.GetChunksReply">GetChunksReply</a></td>
                 <td><p>GetChunks retrieves chunks from blobs stored by the relay.</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+        <h3 id="relay.ThroughputTest">ThroughputTest</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>GetData</td>
+                <td><a href="#relay.ThroughputTestRequest">ThroughputTestRequest</a></td>
+                <td><a href="#relay.ThroughputTestResponse">ThroughputTestResponse</a></td>
+                <td><p></p></td>
               </tr>
             
           </tbody>

@@ -3,6 +3,18 @@ package relay;
 
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/relay";
 
+service ThroughputTest {
+  rpc GetData(ThroughputTestRequest) returns (ThroughputTestResponse) {}
+}
+
+message ThroughputTestRequest {
+
+}
+
+message ThroughputTestResponse {
+  bytes data = 1;
+}
+
 // Relay is a service that provides access to public relay functionality.
 service Relay {
   // GetBlob retrieves a blob stored by the relay.

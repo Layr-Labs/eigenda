@@ -25,15 +25,16 @@ compile-contracts:
 	$(MAKE) -C contracts compile
 
 clean:
-	$(MAKE) -C api clean
+	./api/builder/clean.sh
 
 # Builds the protobuf files inside a docker container.
-protoc:
-	$(MAKE) -C api protoc
+protoc: clean
+	./api/builder/protoc-docker.sh
+	./api/builder/generate-docs.sh
 
 # Builds the protobuf files locally (i.e. without docker).
-protoc-local:
-	$(MAKE) -C api protoc-local
+protoc-local: clean
+	./api/builder/protoc.sh
 
 lint:
 	golint -set_exit_status ./...

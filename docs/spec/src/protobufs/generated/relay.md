@@ -11,8 +11,11 @@
     - [GetBlobRequest](#relay-GetBlobRequest)
     - [GetChunksReply](#relay-GetChunksReply)
     - [GetChunksRequest](#relay-GetChunksRequest)
+    - [ThroughputTestRequest](#relay-ThroughputTestRequest)
+    - [ThroughputTestResponse](#relay-ThroughputTestResponse)
   
     - [Relay](#relay-Relay)
+    - [ThroughputTest](#relay-ThroughputTest)
   
 - [Scalar Value Types](#scalar-value-types)
 
@@ -143,6 +146,31 @@ Perform a keccak256 hash on the following data in the following order: 1. the le
 
 
 
+
+<a name="relay-ThroughputTestRequest"></a>
+
+### ThroughputTestRequest
+
+
+
+
+
+
+
+<a name="relay-ThroughputTestResponse"></a>
+
+### ThroughputTestResponse
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| data | [bytes](#bytes) |  |  |
+
+
+
+
+
  
 
  
@@ -159,6 +187,16 @@ Relay is a service that provides access to public relay functionality.
 | ----------- | ------------ | ------------- | ------------|
 | GetBlob | [GetBlobRequest](#relay-GetBlobRequest) | [GetBlobReply](#relay-GetBlobReply) | GetBlob retrieves a blob stored by the relay. |
 | GetChunks | [GetChunksRequest](#relay-GetChunksRequest) | [GetChunksReply](#relay-GetChunksReply) | GetChunks retrieves chunks from blobs stored by the relay. |
+
+
+<a name="relay-ThroughputTest"></a>
+
+### ThroughputTest
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetData | [ThroughputTestRequest](#relay-ThroughputTestRequest) | [ThroughputTestResponse](#relay-ThroughputTestResponse) |  |
 
  
 
