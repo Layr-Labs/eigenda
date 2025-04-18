@@ -1840,6 +1840,34 @@ func TestBlobMetadataStoreDispersalsByDispersedAt(t *testing.T) {
 	})
 }
 
+func TestBlobMetadataStoreBatch(t *testing.T) {
+	ctx := context.Background()
+	_, blobHeader := newBlob(t)
+	blobCert := &corev2.BlobCertificate{
+		BlobHeader: blobHeader,
+		Signature:  []byte("signature"),
+		RelayKeys:  []corev2.RelayKey{0, 2, 4},
+	}
+
+	batchHeader := &corev2.BatchHeader{
+		BatchRoot:            [32]byte{1, 2, 3},
+		ReferenceBlockNumber: 1024,
+	}
+	bhh, err := batchHeader.Hash()
+	assert.NoError(t, err)
+
+	batch := &corev2.Batch{
+		BatchHeader:      batchHeader,
+		BlobCertificates: []*corev2.BlobCertificate{blobCert},
+	}
+	err = blobMetadataStore.PutBatch(ctx, batch)
+	require.NoError(t, err)
+
+	b, err := blobMetadataStore.GetBatch(ctx, bhh)
+	require.NoError(t, err)
+	assert.Equal(t, batch, b)
+}
+
 func TestBlobMetadataStoreBlobAttestationInfo(t *testing.T) {
 	ctx := context.Background()
 	blobKey := corev2.BlobKey{1, 1, 1}
