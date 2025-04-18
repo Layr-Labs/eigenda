@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/gammazero/workerpool"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
@@ -103,6 +104,7 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		ChainState:     chainState,
 		ValidatorV2:    val,
 		RelayClient:    atomicRelayClient,
+		DownloadPool:   workerpool.New(1),
 	}
 	node.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 

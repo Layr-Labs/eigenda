@@ -351,33 +351,6 @@ func (s *validatorStore) storeBatchLevelDB(batchHeaderHash []byte, batchData []*
 	return keys, size, nil
 }
 
-// storeBatchHeader stores the batch header hash in the database, returning an error if it is already present.
-// This method is guaranteed to only return nil exactly once if called multiple times with the same batch header hash.
-func (s *validatorStore) storeBatchHeaderHash(batchHeaderHash []byte) error {
-
-	// Grab a lock that is mutually exclusive for this batch header hash. This prevents us from storing
-	// data twice if we receive concurrent requests to store the same batch.
-	lockIndex := uint64(util.HashKey(batchHeaderHash[:], s.duplicateRequestSalt))
-	s.duplicateRequestLock.Lock(lockIndex)
-	defer s.duplicateRequestLock.Unlock(lockIndex)
-
-	ok, err := s.headerTable.Exists(batchHeaderHash[:])
-	if err != nil {
-		return fmt.Errorf("failed to check batch header existence: %v", err)
-	}
-	if ok {
-		return ErrBatchAlreadyExist
-	}
-
-	// Store batch header.
-	err = s.headerTable.Put(batchHeaderHash[:], []byte{})
-	if err != nil {
-		return fmt.Errorf("failed to put batch header: %v", err)
-	}
-
-	return nil
-}
-
 // TODO (cody-littley): currently, in order to prevent duplicate writes, we have to check for the existence of
 //  the data before writing it. This extra latency can be avoided with the following strategy:
 //  - add a timestamp to each blob header
