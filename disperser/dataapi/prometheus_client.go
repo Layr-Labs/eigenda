@@ -14,7 +14,9 @@ const (
 	maxNumOfDataPoints = 3500
 
 	// Calculate the average over this number of minutes for signing rate
-	siningRateRangeVectorMinutes = 9
+	// The attestation can happen every second (but may take multiple seconds to finish), so
+	// assuming it takes 5s, this will average over 60 data points
+	signingRateRangeVectorMinutes = 5
 )
 
 type (
