@@ -564,6 +564,8 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		BlobCertificates: certs,
 	}
 	err = d.blobMetadataStore.PutBatch(ctx, batch)
+	putBatchFinished := time.Now()
+	d.metrics.reportPutBatchHeaderLatency(putBatchFinished.Sub(putBatchHeaderFinished))
 	if err != nil {
 		return nil, fmt.Errorf("failed to put batch: %w", err)
 	}
@@ -594,7 +596,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	}
 
 	proofGenerationFinished := time.Now()
-	d.metrics.reportProofLatency(proofGenerationFinished.Sub(putBatchHeaderFinished))
+	d.metrics.reportProofLatency(proofGenerationFinished.Sub(putBatchFinished))
 
 	inclusionInfos := make([]*corev2.BlobInclusionInfo, len(inclusionInfoMap))
 	i := 0
