@@ -111,9 +111,9 @@ func (pd *PayloadDisperser) SendPayload(
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCompleteTimeout)
 	defer cancel()
-	blobStatusReply, err := pd.pollBlobStatus(timeoutCtx, blobKey, blobStatus.ToProfobuf(), probe)
+	blobStatusReply, err := pd.pollBlobStatusUntilSigned(timeoutCtx, blobKey, blobStatus.ToProfobuf(), probe)
 	if err != nil {
-		return nil, fmt.Errorf("poll blob status: %w", err)
+		return nil, fmt.Errorf("poll blob status until signed: %w", err)
 	}
 	pd.logger.Debug("Blob status COMPLETE", "blobKey", blobKey.Hex())
 
@@ -153,12 +153,12 @@ func (pd *PayloadDisperser) Close() error {
 	return nil
 }
 
-// pollBlobStatus polls the disperser for the status of a blob that has been dispersed
+// pollBlobStatusUntilSigned polls the disperser for the status of a blob that has been dispersed
 //
 // This method will only return a non-nil BlobStatusReply if all quorums meet the required confirmation threshold prior
 // to timeout. In all other cases, this method will return a nil BlobStatusReply, along with an error describing the
 // failure.
-func (pd *PayloadDisperser) pollBlobStatus(
+func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 	ctx context.Context,
 	blobKey core.BlobKey,
 	initialStatus dispgrpc.BlobStatus,
