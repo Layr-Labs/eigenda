@@ -378,12 +378,12 @@ func TestSocketThroughput(t *testing.T) {
 
 	// Run the client part if runClient flag is true
 	if runClient {
-		fmt.Printf("Starting Socket clients connecting to %s\n", clientAddress)
+		fmt.Printf("Starting Socket clients connecting to %s\n", serverAddress)
 
 		// Create socket clients connecting to the server
 		clients := make([]TestClient, parallelism)
 		for i := 0; i < parallelism; i++ {
-			client, err := NewSocketClient(clientAddress)
+			client, err := NewSocketClient(serverAddress)
 			if err != nil {
 				t.Fatalf("Failed to create socket client %d: %v", i, err)
 			}
