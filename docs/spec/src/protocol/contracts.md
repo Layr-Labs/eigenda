@@ -11,7 +11,7 @@ This page describe EigenDA contracts that are manage by EigenDA related actors (
 
 The smart contracts can be found [here](https://github.com/Layr-Labs/eigenda/tree/master/contracts/src/core).
 
-![image.png](../assets/eigenda-contracts.png)
+
 
 #### EigenDACertVerifier
 

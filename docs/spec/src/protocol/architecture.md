@@ -1,6 +1,6 @@
 # System Architecture
 
-![image](../../../assets/architecture.png)
+![image](../assets/architecture.png)
 
 ## Core Components
 
