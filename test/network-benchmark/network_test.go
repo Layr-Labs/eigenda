@@ -321,10 +321,10 @@ func TestSocketThroughput(t *testing.T) {
 
 	// Start the server if runServer flag is true
 	if runServer {
-		fmt.Printf("Starting Socket server on %s\n", clientAddress)
+		fmt.Printf("Starting Socket server on %s\n", serverAddress)
 
 		// Create a socket server listening on the clientAddress
-		server, err = NewSocketServer(clientAddress)
+		server, err = NewSocketServer(serverAddress)
 		if err != nil {
 			t.Fatalf("Failed to create socket server: %v", err)
 		}
@@ -335,7 +335,7 @@ func TestSocketThroughput(t *testing.T) {
 
 		// If only running the server and not the client, block until Ctrl+C
 		if !runClient {
-			fmt.Printf("Running Socket server only mode on %s\n", clientAddress)
+			fmt.Printf("Running Socket server only mode on %s\n", serverAddress)
 
 			// Wait for Ctrl+C
 			waitForCtrlC()
