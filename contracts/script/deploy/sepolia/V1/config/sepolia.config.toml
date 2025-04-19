@@ -1,0 +1,70 @@
+# Sepolia deployment configuration
+
+### INITIALIZATION PARAMETERS ###
+
+# Only this address can finalize the deployment and be the owner of the deployed contracts.
+# For now, this and most admin params are controlled by the deployer, 
+# and should be transferred over to other accounts as appropriate after the upgrade path is tested.
+initialOwner = "0xDF291ebfe90eF9187c3f45609603E366a21a16Ea" 
+
+# EigenLayer core contracts - shared dependencies
+[initParams.shared]
+avsDirectory = "0xa789c91ECDdae96865913130B786140Ee17aF545"
+delegationManager = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
+rewardsCoordinator = "0x5ae8152fb88c26ff9ca5C014c94fca3c68029349"
+initialPausedStatus = 0
+
+# Parameters for the pauser registry contract
+[initParams.core.pauserRegistry]
+pausers = []
+unpauser = "0xDF291ebfe90eF9187c3f45609603E366a21a16Ea"
+
+# Source contract directories and artifacts
+[sources]
+# Specify the root directory and compiled artifact paths
+indexRegistry = "/workspaces/eigenda/contracts/sources/0x1ae0b73118906f39d5ed30ae4a484ce2f479a14c"
+indexRegistryArtifact = "out/IndexRegistry.sol/IndexRegistry.json"
+
+stakeRegistry = "/workspaces/eigenda/contracts/sources/0x1c468cf7089d263c2f53e2579b329b16abc4dd96" 
+stakeRegistryArtifact = "out/StakeRegistry.sol/StakeRegistry.json"
+
+socketRegistry = "/workspaces/eigenda/contracts/sources/0x5b60105ced5207d6ad217bf2d426e133454ecfb4"
+socketRegistryArtifact = "out/SocketRegistry.sol/SocketRegistry.json"
+
+blsApkRegistry = "/workspaces/eigenda/contracts/sources/0x5d0b9ce2e277daf508528e9f6bf6314e79e4ed2b"
+blsApkRegistryArtifact = "out/BLSApkRegistry.sol/BLSApkRegistry.json"
+
+registryCoordinator = "/workspaces/eigenda/contracts/sources/0xdcabf0be991d4609096cce316df08d091356e03f"
+registryCoordinatorArtifact = "out/RegistryCoordinator.sol/RegistryCoordinator.json"
+
+ejectionManager = "/workspaces/eigenda/contracts/sources/0x33a517608999df5ceffa2b2eba88b4461c26af6f"
+ejectionManagerArtifact = "out/EjectionManager.sol/EjectionManager.json"
+
+eigenDAServiceManager = "/workspaces/eigenda/contracts/sources/0x58fde694db83e589abb21a6fe66cb20ce5554a07"
+eigenDAServiceManagerArtifact = "out/EigenDAServiceManager.sol/EigenDAServiceManager.json"
+
+### MIDDLEWARE ###
+
+# Parameters for the registry coordinator contract
+[initParams.middleware.registryCoordinator]
+churnApprover = "0xDF291ebfe90eF9187c3f45609603E366a21a16Ea"
+ejector = "0xDF291ebfe90eF9187c3f45609603E366a21a16Ea"
+minimumStakes = []
+operatorSetParams = [
+]
+strategyParams = [
+]
+
+# Parameters for the ejection manager contract
+[initParams.middleware.ejectionManager]
+ejectors = []
+quorumEjectionParams = [
+]
+
+### EIGEN DA ###
+
+# Parameters for the service manager contract
+[initParams.eigenDA.serviceManager]
+initialPausedStatus = 0
+batchConfirmers = []
+rewardsInitiator = "0xDF291ebfe90eF9187c3f45609603E366a21a16Ea"
