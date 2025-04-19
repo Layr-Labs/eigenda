@@ -481,6 +481,13 @@ var (
 	// 2. Document their purpose and impact
 	/////////////////////////////////////////////////////////////////////////////
 
+	NumConnectionsPerRelayFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "num-connections-per-relay"),
+		Usage:    "Number of gRPC connections to open per relay for round-robin load balancing",
+		Required: false,
+		Value:    4,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "NUM_CONNECTIONS_PER_RELAY"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -550,6 +557,7 @@ var optionalFlags = []cli.Flag{
 	LittDBEnabledFlag,
 	DownloadPoolMultiplierFlag,
 	DownloadPoolConstantFlag,
+	NumConnectionsPerRelayFlag,
 }
 
 func init() {

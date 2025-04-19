@@ -257,10 +257,11 @@ func NewNode(
 		blobVersionParams = corev2.NewBlobVersionParameterMap(blobParams)
 
 		relayClientConfig := &clients.RelayClientConfig{
-			UseSecureGrpcFlag:  config.UseSecureGrpc,
-			OperatorID:         &config.ID,
-			MessageSigner:      n.SignMessage,
-			MaxGRPCMessageSize: n.Config.RelayMaxMessageSize,
+			UseSecureGrpcFlag:      config.UseSecureGrpc,
+			OperatorID:             &config.ID,
+			MessageSigner:          n.SignMessage,
+			MaxGRPCMessageSize:     n.Config.RelayMaxMessageSize,
+			NumConnectionsPerRelay: n.Config.NumConnectionsPerRelay,
 		}
 
 		relayUrlProvider, err := relay.NewRelayUrlProvider(client, tx.GetRelayRegistryAddress())

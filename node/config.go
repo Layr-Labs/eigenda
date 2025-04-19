@@ -81,6 +81,7 @@ type Config struct {
 	ClientIPHeader                  string
 	UseSecureGrpc                   bool
 	RelayMaxMessageSize             uint
+	NumConnectionsPerRelay          int
 	ReachabilityPollIntervalSec     uint64
 	DisableNodeInfoResources        bool
 	StoreChunksRequestMaxPastAge    time.Duration
@@ -347,5 +348,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		LittDBEnabled:                       ctx.GlobalBool(flags.LittDBEnabledFlag.Name),
 		DownloadPoolMultiplier:              ctx.GlobalInt(flags.DownloadPoolMultiplierFlag.Name),
 		DownloadPoolConstant:                ctx.GlobalInt(flags.DownloadPoolConstantFlag.Name),
+		NumConnectionsPerRelay:              ctx.GlobalInt(flags.NumConnectionsPerRelayFlag.Name),
 	}, nil
 }
