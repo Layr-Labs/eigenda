@@ -22,6 +22,7 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/channelz/service"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
 )
@@ -552,6 +553,8 @@ func (s *Server) Start(ctx context.Context) error {
 
 	s.grpcServer = grpc.NewServer(opt, s.metrics.GetGRPCServerOption())
 	reflection.Register(s.grpcServer)
+	// Register channelz service for better debugging capabilities
+	service.RegisterChannelzServiceToServer(s.grpcServer)
 	pb.RegisterRelayServer(s.grpcServer, s)
 
 	// Register Server for Health Checks
