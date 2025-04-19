@@ -22,6 +22,7 @@ type dispatcherMetrics struct {
 	getBlobCertificatesLatency  *prometheus.SummaryVec
 	buildMerkleTreeLatency      *prometheus.SummaryVec
 	putBatchHeaderLatency       *prometheus.SummaryVec
+	putBatchLatency             *prometheus.SummaryVec
 	proofLatency                *prometheus.SummaryVec
 	putInclusionInfosLatency    *prometheus.SummaryVec
 	poolSubmissionLatency       *prometheus.SummaryVec
@@ -118,6 +119,16 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 			Namespace:  dispatcherNamespace,
 			Name:       "put_batch_header_latency_ms",
 			Help:       "The time required to put the batch header (part of NewBatch()).",
+			Objectives: objectives,
+		},
+		[]string{},
+	)
+
+	putBatchLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  dispatcherNamespace,
+			Name:       "put_batch_latency_ms",
+			Help:       "The time required to put the batch (part of NewBatch()).",
 			Objectives: objectives,
 		},
 		[]string{},
@@ -278,6 +289,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		getBlobCertificatesLatency:  getBlobCertificatesLatency,
 		buildMerkleTreeLatency:      buildMerkleTreeLatency,
 		putBatchHeaderLatency:       putBatchHeaderLatency,
+		putBatchLatency:             putBatchLatency,
 		proofLatency:                proofLatency,
 		putInclusionInfosLatency:    putInclusionInfosLatency,
 		poolSubmissionLatency:       poolSubmissionLatency,
@@ -323,6 +335,10 @@ func (m *dispatcherMetrics) reportBuildMerkleTreeLatency(duration time.Duration)
 
 func (m *dispatcherMetrics) reportPutBatchHeaderLatency(duration time.Duration) {
 	m.putBatchHeaderLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
+func (m *dispatcherMetrics) reportPutBatchLatency(duration time.Duration) {
+	m.putBatchLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *dispatcherMetrics) reportProofLatency(duration time.Duration) {
