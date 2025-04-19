@@ -160,6 +160,27 @@ func (c *relayClient) GetChunksByRange(
 		return nil, fmt.Errorf("no requests")
 	}
 
+	// Break large requests into batches of maxRequestsPerRPC
+	const maxRequestsPerRPC = 64
+	if len(requests) > maxRequestsPerRPC {
+		c.logger.Debug("Breaking large request into batches", "relayKey", relayKey, "totalRequests", len(requests), "batchSize", maxRequestsPerRPC)
+
+		var allData [][]byte
+		for start := 0; start < len(requests); start += maxRequestsPerRPC {
+			end := start + maxRequestsPerRPC
+			if end > len(requests) {
+				end = len(requests)
+			}
+
+			batchData, err := c.GetChunksByRange(ctx, relayKey, requests[start:end])
+			if err != nil {
+				return nil, err
+			}
+			allData = append(allData, batchData...)
+		}
+		return allData, nil
+	}
+
 	client, err := c.getClient(ctx, relayKey)
 	if err != nil {
 		return nil, fmt.Errorf("get grpc relay client for key %d: %w", relayKey, err)
@@ -188,12 +209,7 @@ func (c *relayClient) GetChunksByRange(
 		return nil, err
 	}
 
-	// Log chunk request count to identify large requests
-	if len(grpcRequests) > 100 {
-		c.logger.Info("Processing large number of chunk requests", "relayKey", relayKey, "count", len(grpcRequests))
-	} else {
-		c.logger.Debug("Processing chunk requests", "relayKey", relayKey, "count", len(grpcRequests))
-	}
+	c.logger.Debug("Processing chunk requests", "relayKey", relayKey, "count", len(grpcRequests))
 
 	startTime := time.Now()
 	res, err := client.GetChunks(ctx, request)
@@ -216,6 +232,27 @@ func (c *relayClient) GetChunksByIndex(
 
 	if len(requests) == 0 {
 		return nil, fmt.Errorf("no requests")
+	}
+
+	// Break large requests into batches of maxRequestsPerRPC
+	const maxRequestsPerRPC = 64
+	if len(requests) > maxRequestsPerRPC {
+		c.logger.Debug("Breaking large request into batches", "relayKey", relayKey, "totalRequests", len(requests), "batchSize", maxRequestsPerRPC)
+
+		var allData [][]byte
+		for start := 0; start < len(requests); start += maxRequestsPerRPC {
+			end := start + maxRequestsPerRPC
+			if end > len(requests) {
+				end = len(requests)
+			}
+
+			batchData, err := c.GetChunksByIndex(ctx, relayKey, requests[start:end])
+			if err != nil {
+				return nil, err
+			}
+			allData = append(allData, batchData...)
+		}
+		return allData, nil
 	}
 
 	client, err := c.getClient(ctx, relayKey)
@@ -245,12 +282,7 @@ func (c *relayClient) GetChunksByIndex(
 		return nil, err
 	}
 
-	// Log chunk request count to identify large requests
-	if len(grpcRequests) > 100 {
-		c.logger.Info("Processing large number of chunk requests by index", "relayKey", relayKey, "count", len(grpcRequests))
-	} else {
-		c.logger.Debug("Processing chunk requests by index", "relayKey", relayKey, "count", len(grpcRequests))
-	}
+	c.logger.Debug("Processing chunk requests by index", "relayKey", relayKey, "count", len(grpcRequests))
 
 	startTime := time.Now()
 	res, err := client.GetChunks(ctx, request)
