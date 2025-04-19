@@ -24,15 +24,8 @@ This approach ensures we're testing the true upgrade path from the exact same co
 ### Prerequisites
 
 - An Etherscan API key (required for fetching contract source code)
-- Sepolia RPC URL
-- A private key with Sepolia ETH for contract deployment
 
 ### Setup Environment Variables
-
-```bash
-export SEPOLIA_RPC_URL=your_sepolia_rpc_url
-export PRIVATE_KEY=your_private_key
-```
 
 To run the complete deployment process:
 
@@ -117,7 +110,6 @@ forge script script/deploy/sepolia/V1/VerifyV1Contracts.s.sol:VerifyV1Contracts 
 This script checks that:
 1. All contracts are initialized with correct parameters
 2. Contract relationships are set up properly (e.g., registries linked to the coordinator)
-3. All security parameters are correct
 
 ## Configuration
 
@@ -131,10 +123,5 @@ You can modify this file to adjust the deployment parameters for your Sepolia te
 
 ## Notes
 
-- The contract source code is compiled in isolated environments to match the exact same bytecode as on mainnet.
-- These scripts are designed to be idempotent and can be run multiple times.
-- Make sure to have sufficient Sepolia ETH in your deployer account before running the scripts.
 - **Important**: Contracts deployed this way cannot be verified using Forge's built-in verification mechanism (e.g., `--verify` flag). This is because the deployment uses pre-compiled artifacts, and the source code is not directly available to the deployment script. If verification on Etherscan is needed, it would have to be done manually using the source code in the `contracts/sources` directory.
 - The fetch scripts require an Etherscan API key to download the contract source code. You can obtain one by creating an account on [Etherscan](https://etherscan.io/myapikey).
-- The API key must be passed as an argument to the scripts (not as an environment variable).
-- If you encounter rate limiting issues with Etherscan, the scripts have a built-in delay between requests, but you may need to increase it.
