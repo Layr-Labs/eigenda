@@ -3,6 +3,7 @@ pragma solidity =0.8.12;
 
 import {Script} from "forge-std/Script.sol";
 import {DeployV1Contracts} from "./DeployV1Contracts.s.sol";
+import {ConfigV1Lib} from "./ConfigV1Lib.sol";
 import {IStakeRegistryTest} from "./interfaces/IStakeRegistryTest.sol";
 import {IIndexRegistryTest} from "./interfaces/IIndexRegistryTest.sol";
 import {IBLSApkRegistryTest} from "./interfaces/IBLSApkRegistryTest.sol";
@@ -11,11 +12,15 @@ import {IEjectionManagerTest} from "./interfaces/IEjectionManagerTest.sol";
 import {IEigenDAServiceManagerTest} from "./interfaces/IEigenDAServiceManagerTest.sol";
 
 contract VerifyV1Contracts is DeployV1Contracts {
+    using ConfigV1Lib for string;
+
     function run() public override {
         super.run();
 
         _verifyStakeRegistry(
-            deployedContracts.stakeRegistry.proxy, deployedContracts.registryCoordinator.proxy, config.delegationManager
+            deployedContracts.stakeRegistry.proxy,
+            deployedContracts.registryCoordinator.proxy,
+            configFile.delegationManager()
         );
 
         _verifyIndexRegistry(deployedContracts.indexRegistry.proxy, deployedContracts.registryCoordinator.proxy);
@@ -29,7 +34,7 @@ contract VerifyV1Contracts is DeployV1Contracts {
         _verifyServiceManager(
             deployedContracts.eigenDAServiceManager.proxy,
             deployedContracts.registryCoordinator.proxy,
-            config.avsDirectory
+            configFile.avsDirectory()
         );
     }
 
