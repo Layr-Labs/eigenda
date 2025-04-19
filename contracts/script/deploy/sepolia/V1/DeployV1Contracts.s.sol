@@ -9,7 +9,7 @@ import {
     PauserRegistry
 } from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
 
-import {ConfigV1Contracts} from "./ConfigV1Contracts.sol";
+import {ConfigV1Lib, ContractSource} from "./ConfigV1Lib.sol";
 import {IStakeRegistryTest} from "./interfaces/IStakeRegistryTest.sol";
 import {IIndexRegistryTest} from "./interfaces/IIndexRegistryTest.sol";
 import {IBLSApkRegistryTest} from "./interfaces/IBLSApkRegistryTest.sol";
@@ -18,9 +18,38 @@ import {IRegistryCoordinatorTest} from "./interfaces/IRegistryCoordinatorTest.so
 import {IEjectionManagerTest} from "./interfaces/IEjectionManagerTest.sol";
 import {IEigenDAServiceManagerTest} from "./interfaces/IEigenDAServiceManagerTest.sol";
 
-contract DeployV1Contracts is ConfigV1Contracts {
+contract DeployV1Contracts is Script {
+    using ConfigV1Lib for string;
+
+    struct ContractDeployment {
+        address proxy;
+        address implementation;
+    }
+
+    struct DeployedContracts {
+        ContractDeployment stakeRegistry;
+        ContractDeployment indexRegistry;
+        ContractDeployment socketRegistry;
+        ContractDeployment blsApkRegistry;
+        ContractDeployment registryCoordinator;
+        ContractDeployment ejectionManager;
+        ContractDeployment eigenDAServiceManager;
+    }
+
+    string internal configFile;
+    DeployedContracts internal deployedContracts;
+
+    function _loadConfig() internal returns (string memory) {
+        string memory configPath = vm.envOr(
+            "DEPLOY_CONFIG_PATH",
+            string("/workspaces/eigenda/contracts/script/deploy/sepolia/V1/config/sepolia.config.toml")
+        );
+        configFile = vm.readFile(configPath);
+        return configFile;
+    }
+
     function run() public virtual {
-        config = _parseConfig();
+        _loadConfig();
 
         vm.startBroadcast();
 
@@ -40,7 +69,7 @@ contract DeployV1Contracts is ConfigV1Contracts {
         deployedContracts.socketRegistry =
             _deploySocketRegistry(proxyAdmin, deployedContracts.registryCoordinator.proxy);
 
-        bytes memory rcBytecode = _readContractBytecode(config.registryCoordinator);
+        bytes memory rcBytecode = _readContractBytecode(configFile.registryCoordinatorSource());
         bytes memory rcConstructorArgs = abi.encode(
             deployedContracts.eigenDAServiceManager.proxy,
             deployedContracts.stakeRegistry.proxy,
@@ -49,22 +78,22 @@ contract DeployV1Contracts is ConfigV1Contracts {
         );
         deployedContracts.registryCoordinator.implementation = _deployContract(rcBytecode, rcConstructorArgs);
 
-        bytes memory rcInitData = _getRegistryCoordinatorInitData(config.initialOwner, address(pauserRegistry));
+        bytes memory rcInitData = _getRegistryCoordinatorInitData(configFile.initialOwner(), address(pauserRegistry));
         proxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(deployedContracts.registryCoordinator.proxy)),
             deployedContracts.registryCoordinator.implementation,
             rcInitData
         );
 
-        bytes memory smBytecode = _readContractBytecode(config.eigenDAServiceManager);
+        bytes memory smBytecode = _readContractBytecode(configFile.eigenDAServiceManagerSource());
         bytes memory smConstructorArgs = abi.encode(
-            config.avsDirectory,
-            config.rewardsCoordinator,
+            configFile.avsDirectory(),
+            configFile.rewardsCoordinator(),
             deployedContracts.registryCoordinator.proxy,
             deployedContracts.stakeRegistry.proxy
         );
         deployedContracts.eigenDAServiceManager.implementation = _deployContract(smBytecode, smConstructorArgs);
-        bytes memory smInitData = _getServiceManagerInitData(config.initialOwner, address(pauserRegistry));
+        bytes memory smInitData = _getServiceManagerInitData(configFile.initialOwner(), address(pauserRegistry));
         proxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(deployedContracts.eigenDAServiceManager.proxy)),
             deployedContracts.eigenDAServiceManager.implementation,
@@ -74,8 +103,8 @@ contract DeployV1Contracts is ConfigV1Contracts {
         deployedContracts.ejectionManager = _deployEjectionManager(
             proxyAdmin, deployedContracts.registryCoordinator.proxy, deployedContracts.stakeRegistry.proxy
         );
-        if (config.initialOwner != address(0)) {
-            proxyAdmin.transferOwnership(config.initialOwner);
+        if (configFile.initialOwner() != address(0)) {
+            proxyAdmin.transferOwnership(configFile.initialOwner());
         }
         _logDeployedAddresses(proxyAdmin, emptyContract, pauserRegistry);
         vm.stopBroadcast();
@@ -87,7 +116,7 @@ contract DeployV1Contracts is ConfigV1Contracts {
     {
         proxyAdmin = new ProxyAdmin();
         emptyContract = address(new EmptyContract());
-        pauserRegistry = new PauserRegistry(config.pausers, config.unpauser);
+        pauserRegistry = new PauserRegistry(configFile.pausers(), configFile.unpauser());
         return (proxyAdmin, emptyContract, pauserRegistry);
     }
 
@@ -95,8 +124,8 @@ contract DeployV1Contracts is ConfigV1Contracts {
         private
         returns (ContractDeployment memory deployment)
     {
-        bytes memory bytecode = _readContractBytecode(config.stakeRegistry);
-        bytes memory constructorArgs = abi.encode(registryCoordinatorAddr, config.delegationManager);
+        bytes memory bytecode = _readContractBytecode(configFile.stakeRegistrySource());
+        bytes memory constructorArgs = abi.encode(registryCoordinatorAddr, configFile.delegationManager());
         deployment.implementation = _deployContract(bytecode, constructorArgs);
         bytes memory initData = "";
         deployment.proxy =
@@ -123,7 +152,7 @@ contract DeployV1Contracts is ConfigV1Contracts {
         private
         returns (ContractDeployment memory deployment)
     {
-        bytes memory bytecode = _readContractBytecode(config.indexRegistry);
+        bytes memory bytecode = _readContractBytecode(configFile.indexRegistrySource());
         bytes memory constructorArgs = abi.encode(registryCoordinatorAddr);
         deployment.implementation = _deployContract(bytecode, constructorArgs);
         bytes memory initData = "";
@@ -136,7 +165,7 @@ contract DeployV1Contracts is ConfigV1Contracts {
         private
         returns (ContractDeployment memory deployment)
     {
-        bytes memory bytecode = _readContractBytecode(config.blsApkRegistry);
+        bytes memory bytecode = _readContractBytecode(configFile.blsApkRegistrySource());
         bytes memory constructorArgs = abi.encode(registryCoordinatorAddr);
         deployment.implementation = _deployContract(bytecode, constructorArgs);
         bytes memory initData = "";
@@ -149,7 +178,7 @@ contract DeployV1Contracts is ConfigV1Contracts {
         private
         returns (ContractDeployment memory deployment)
     {
-        bytes memory bytecode = _readContractBytecode(config.socketRegistry);
+        bytes memory bytecode = _readContractBytecode(configFile.socketRegistrySource());
         bytes memory constructorArgs = abi.encode(registryCoordinatorAddr);
         deployment.implementation = _deployContract(bytecode, constructorArgs);
         bytes memory initData = "";
@@ -162,13 +191,33 @@ contract DeployV1Contracts is ConfigV1Contracts {
         private
         returns (ContractDeployment memory deployment)
     {
-        bytes memory bytecode = _readContractBytecode(config.ejectionManager);
+        bytes memory bytecode = _readContractBytecode(configFile.ejectionManagerSource());
         bytes memory constructorArgs = abi.encode(registryCoordinatorAddr, stakeRegistryAddr);
         deployment.implementation = _deployContract(bytecode, constructorArgs);
-        bytes memory initData = _getEjectionManagerInitData(config.initialOwner);
+        bytes memory initData = _getEjectionManagerInitData(configFile.initialOwner());
         deployment.proxy =
             address(new TransparentUpgradeableProxy(deployment.implementation, address(proxyAdmin), initData));
         return deployment;
+    }
+
+    function _getRegistryCoordinatorInitData(address initialOwner, address pauserRegistry)
+        internal
+        view
+        returns (bytes memory)
+    {
+        return configFile.getRegistryCoordinatorInitData(initialOwner, pauserRegistry);
+    }
+
+    function _getEjectionManagerInitData(address initialOwner) internal view returns (bytes memory) {
+        return configFile.getEjectionManagerInitData(initialOwner);
+    }
+
+    function _getServiceManagerInitData(address initialOwner, address pauserRegistry)
+        internal
+        view
+        returns (bytes memory)
+    {
+        return configFile.getServiceManagerInitData(initialOwner, pauserRegistry);
     }
 
     function _logDeployedAddresses(ProxyAdmin proxyAdmin, address emptyContract, IPauserRegistry pauserRegistry)
