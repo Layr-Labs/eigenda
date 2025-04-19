@@ -565,7 +565,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	}
 	err = d.blobMetadataStore.PutBatch(ctx, batch)
 	putBatchFinished := time.Now()
-	d.metrics.reportPutBatchHeaderLatency(putBatchFinished.Sub(putBatchHeaderFinished))
+	d.metrics.reportPutBatchLatency(putBatchFinished.Sub(putBatchHeaderFinished))
 	if err != nil {
 		return nil, fmt.Errorf("failed to put batch: %w", err)
 	}
