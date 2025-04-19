@@ -188,10 +188,23 @@ func (c *relayClient) GetChunksByRange(
 		return nil, err
 	}
 
+	// Log chunk request count to identify large requests
+	if len(grpcRequests) > 100 {
+		c.logger.Info("Processing large number of chunk requests", "relayKey", relayKey, "count", len(grpcRequests))
+	} else {
+		c.logger.Debug("Processing chunk requests", "relayKey", relayKey, "count", len(grpcRequests))
+	}
+
+	startTime := time.Now()
 	res, err := client.GetChunks(ctx, request)
+	duration := time.Since(startTime)
+
 	if err != nil {
+		c.logger.Error("Failed to get chunks by range", "relayKey", relayKey, "count", len(grpcRequests), "duration", duration, "error", err)
 		return nil, err
 	}
+
+	c.logger.Debug("Completed GetChunks by range", "relayKey", relayKey, "count", len(grpcRequests), "duration", duration)
 
 	return res.GetData(), nil
 }
@@ -232,11 +245,23 @@ func (c *relayClient) GetChunksByIndex(
 		return nil, err
 	}
 
+	// Log chunk request count to identify large requests
+	if len(grpcRequests) > 100 {
+		c.logger.Info("Processing large number of chunk requests by index", "relayKey", relayKey, "count", len(grpcRequests))
+	} else {
+		c.logger.Debug("Processing chunk requests by index", "relayKey", relayKey, "count", len(grpcRequests))
+	}
+
+	startTime := time.Now()
 	res, err := client.GetChunks(ctx, request)
+	duration := time.Since(startTime)
 
 	if err != nil {
+		c.logger.Error("Failed to get chunks by index", "relayKey", relayKey, "count", len(grpcRequests), "duration", duration, "error", err)
 		return nil, err
 	}
+
+	c.logger.Debug("Completed GetChunks by index", "relayKey", relayKey, "count", len(grpcRequests), "duration", duration)
 
 	return res.GetData(), nil
 }
