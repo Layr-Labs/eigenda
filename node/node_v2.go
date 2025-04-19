@@ -132,6 +132,10 @@ func (n *Node) DownloadBundles(
 			ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
 			defer cancel()
 
+			n.Logger.Debug("Sending GetChunksByRange request",
+				"relayKey", relayKey,
+				"requestCount", len(req.chunkRequests))
+
 			bundles, err := relayClient.GetChunksByRange(ctxTimeout, relayKey, req.chunkRequests)
 
 			// Record download latency metric

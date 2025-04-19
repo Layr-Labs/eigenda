@@ -15,6 +15,7 @@ import (
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/hashicorp/go-multierror"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
 
@@ -26,7 +27,8 @@ type RelayClientConfig struct {
 	MaxGRPCMessageSize     uint
 	OperatorID             *core.OperatorID
 	MessageSigner          MessageSigner
-	NumConnectionsPerRelay int // Number of gRPC connections to open per relay for round-robin load balancing
+	NumConnectionsPerRelay int           // Number of gRPC connections to open per relay for round-robin load balancing
+	ChunkTimeout           time.Duration // Timeout for individual chunk request calls
 }
 
 type ChunkRequestByRange struct {
@@ -53,6 +55,13 @@ type RelayClient interface {
 	GetChunksByIndex(ctx context.Context, relayKey corev2.RelayKey, requests []*ChunkRequestByIndex) ([][]byte, error)
 	Close() error
 }
+
+// Default values for configuration
+const (
+	DefaultNumConnectionsPerRelay = 4
+	DefaultChunkTimeout           = 20 * time.Second
+	MaxRequestsPerRPC             = 64
+)
 
 // relayClient is a client for the entire relay subsystem.
 //
@@ -97,10 +106,17 @@ func NewRelayClient(
 
 	// Default to 4 connections per relay if not specified
 	if config.NumConnectionsPerRelay <= 0 {
-		config.NumConnectionsPerRelay = 4
+		config.NumConnectionsPerRelay = DefaultNumConnectionsPerRelay
 	}
 
-	logger.Info("creating relay client", "connectionsPerRelay", config.NumConnectionsPerRelay)
+	// Set default chunk timeout if not specified
+	if config.ChunkTimeout == 0 {
+		config.ChunkTimeout = DefaultChunkTimeout
+	}
+
+	logger.Info("creating relay client",
+		"connectionsPerRelay", config.NumConnectionsPerRelay,
+		"chunkTimeout", config.ChunkTimeout)
 
 	return &relayClient{
 		config:            config,
@@ -151,6 +167,9 @@ func (c *relayClient) signGetChunksRequest(ctx context.Context, request *relaygr
 	return nil
 }
 
+// GetChunksByRange retrieves blob chunks from a relay by chunk index range
+// The returned slice has the same length and ordering as the input slice, and the i-th element is the bundle for the i-th request.
+// Each bundle is a sequence of frames in raw form (i.e., serialized core.Bundle bytearray).
 func (c *relayClient) GetChunksByRange(
 	ctx context.Context,
 	relayKey corev2.RelayKey,
@@ -160,23 +179,62 @@ func (c *relayClient) GetChunksByRange(
 		return nil, fmt.Errorf("no requests")
 	}
 
-	// Break large requests into batches of maxRequestsPerRPC
-	const maxRequestsPerRPC = 64
-	if len(requests) > maxRequestsPerRPC {
-		c.logger.Debug("Breaking large request into batches", "relayKey", relayKey, "totalRequests", len(requests), "batchSize", maxRequestsPerRPC)
+	// Break large requests into batches and process them in parallel
+	if len(requests) > MaxRequestsPerRPC {
+		c.logger.Debug("Breaking large request into batches", "relayKey", relayKey, "totalRequests", len(requests), "batchSize", MaxRequestsPerRPC)
 
-		var allData [][]byte
-		for start := 0; start < len(requests); start += maxRequestsPerRPC {
-			end := start + maxRequestsPerRPC
+		// Calculate number of slices needed
+		slices := (len(requests) + MaxRequestsPerRPC - 1) / MaxRequestsPerRPC
+		results := make([][][]byte, slices) // one slot per slice
+
+		// Use errgroup for parallel execution with error handling
+		g, gctx := errgroup.WithContext(ctx)
+
+		// Semaphore to limit concurrency to number of connections
+		sem := make(chan struct{}, c.config.NumConnectionsPerRelay)
+
+		// Launch goroutines for each slice
+		for s := 0; s < slices; s++ {
+			start := s * MaxRequestsPerRPC
+			end := start + MaxRequestsPerRPC
 			if end > len(requests) {
 				end = len(requests)
 			}
+			slice := requests[start:end]
+			idx := s // capture for closure
 
-			batchData, err := c.GetChunksByRange(ctx, relayKey, requests[start:end])
-			if err != nil {
-				return nil, err
-			}
-			allData = append(allData, batchData...)
+			g.Go(func() error {
+				sem <- struct{}{}        // acquire semaphore slot
+				defer func() { <-sem }() // release slot when done
+
+				// Create a fresh timeout context for each slice
+				chunkTimeout := c.config.ChunkTimeout
+				if chunkTimeout == 0 {
+					chunkTimeout = DefaultChunkTimeout
+				}
+				ctxRPC, cancel := context.WithTimeout(gctx, chunkTimeout)
+				defer cancel()
+
+				// Process this slice
+				data, err := c.GetChunksByRange(ctxRPC, relayKey, slice)
+				if err != nil {
+					return fmt.Errorf("failed processing slice %d/%d: %w", idx+1, slices, err)
+				}
+
+				results[idx] = data
+				return nil
+			})
+		}
+
+		// Wait for all goroutines to complete
+		if err := g.Wait(); err != nil {
+			return nil, err
+		}
+
+		// Flatten results in original order
+		var allData [][]byte
+		for _, part := range results {
+			allData = append(allData, part...)
 		}
 		return allData, nil
 	}
@@ -234,23 +292,62 @@ func (c *relayClient) GetChunksByIndex(
 		return nil, fmt.Errorf("no requests")
 	}
 
-	// Break large requests into batches of maxRequestsPerRPC
-	const maxRequestsPerRPC = 64
-	if len(requests) > maxRequestsPerRPC {
-		c.logger.Debug("Breaking large request into batches", "relayKey", relayKey, "totalRequests", len(requests), "batchSize", maxRequestsPerRPC)
+	// Break large requests into batches and process them in parallel
+	if len(requests) > MaxRequestsPerRPC {
+		c.logger.Debug("Breaking large request into batches", "relayKey", relayKey, "totalRequests", len(requests), "batchSize", MaxRequestsPerRPC)
 
-		var allData [][]byte
-		for start := 0; start < len(requests); start += maxRequestsPerRPC {
-			end := start + maxRequestsPerRPC
+		// Calculate number of slices needed
+		slices := (len(requests) + MaxRequestsPerRPC - 1) / MaxRequestsPerRPC
+		results := make([][][]byte, slices) // one slot per slice
+
+		// Use errgroup for parallel execution with error handling
+		g, gctx := errgroup.WithContext(ctx)
+
+		// Semaphore to limit concurrency to number of connections
+		sem := make(chan struct{}, c.config.NumConnectionsPerRelay)
+
+		// Launch goroutines for each slice
+		for s := 0; s < slices; s++ {
+			start := s * MaxRequestsPerRPC
+			end := start + MaxRequestsPerRPC
 			if end > len(requests) {
 				end = len(requests)
 			}
+			slice := requests[start:end]
+			idx := s // capture for closure
 
-			batchData, err := c.GetChunksByIndex(ctx, relayKey, requests[start:end])
-			if err != nil {
-				return nil, err
-			}
-			allData = append(allData, batchData...)
+			g.Go(func() error {
+				sem <- struct{}{}        // acquire semaphore slot
+				defer func() { <-sem }() // release slot when done
+
+				// Create a fresh timeout context for each slice
+				chunkTimeout := c.config.ChunkTimeout
+				if chunkTimeout == 0 {
+					chunkTimeout = DefaultChunkTimeout
+				}
+				ctxRPC, cancel := context.WithTimeout(gctx, chunkTimeout)
+				defer cancel()
+
+				// Process this slice
+				data, err := c.GetChunksByIndex(ctxRPC, relayKey, slice)
+				if err != nil {
+					return fmt.Errorf("failed processing slice %d/%d: %w", idx+1, slices, err)
+				}
+
+				results[idx] = data
+				return nil
+			})
+		}
+
+		// Wait for all goroutines to complete
+		if err := g.Wait(); err != nil {
+			return nil, err
+		}
+
+		// Flatten results in original order
+		var allData [][]byte
+		for _, part := range results {
+			allData = append(allData, part...)
 		}
 		return allData, nil
 	}
