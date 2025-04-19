@@ -14,6 +14,7 @@ import {IStakeRegistry, StakeRegistry} from "lib/eigenlayer-middleware/src/Stake
 import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
 import {BLSApkRegistry} from "lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
 import {RegistryCoordinator, IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {EjectionManager, IEjectionManager} from "lib/eigenlayer-middleware/src/EjectionManager.sol";
 import {IEigenDAThresholdRegistry, EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry, EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {PaymentVault} from "src/payments/PaymentVault.sol";
@@ -152,6 +153,7 @@ contract DeployVerifiable is Script {
         );
         proxies.registryCoordinator =
             address(new TransparentUpgradeableProxy(mockRegistryCoordinator, address(proxyAdmin), ""));
+        proxies.ejectionManager = address(new TransparentUpgradeableProxy(emptyContract, address(proxyAdmin), ""));
         proxies.thresholdRegistry = address(new TransparentUpgradeableProxy(emptyContract, address(proxyAdmin), ""));
         proxies.relayRegistry = address(new TransparentUpgradeableProxy(emptyContract, address(proxyAdmin), ""));
         proxies.paymentVault = address(new TransparentUpgradeableProxy(emptyContract, address(proxyAdmin), ""));
@@ -175,6 +177,11 @@ contract DeployVerifiable is Script {
                 IBLSApkRegistry(proxies.blsApkRegistry),
                 IIndexRegistry(proxies.indexRegistry),
                 ISocketRegistry(proxies.socketRegistry)
+            )
+        );
+        implementations.ejectionManager = address(
+            new EjectionManager(
+                IRegistryCoordinator(proxies.registryCoordinator), IStakeRegistry(proxies.stakeRegistry)
             )
         );
         implementations.thresholdRegistry = address(new EigenDAThresholdRegistry());

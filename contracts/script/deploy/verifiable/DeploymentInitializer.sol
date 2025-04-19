@@ -2,6 +2,7 @@
 pragma solidity =0.8.12;
 
 import {IRegistryCoordinator, RegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {EjectionManager, IEjectionManager} from "lib/eigenlayer-middleware/src/EjectionManager.sol";
 import {IPauserRegistry} from
     "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
@@ -50,6 +51,9 @@ contract DeploymentInitializer {
     address public immutable REGISTRY_COORDINATOR;
     address public immutable REGISTRY_COORDINATOR_IMPL;
 
+    address public immutable EJECTION_MANAGER;
+    address public immutable EJECTION_MANAGER_IMPL;
+
     address public immutable THRESHOLD_REGISTRY;
     address public immutable THRESHOLD_REGISTRY_IMPL;
 
@@ -67,7 +71,6 @@ contract DeploymentInitializer {
 
     /// Registry Coordinator Immutables
     address public immutable CHURN_APPROVER;
-    address public immutable EJECTOR;
 
     /// Payment Vault Immutables
     uint64 public immutable MIN_NUM_SYMBOLS;
@@ -94,6 +97,7 @@ contract DeploymentInitializer {
             SOCKET_REGISTRY = initParams.proxies.socketRegistry;
             BLS_APK_REGISTRY = initParams.proxies.blsApkRegistry;
             REGISTRY_COORDINATOR = initParams.proxies.registryCoordinator;
+            EJECTION_MANAGER = initParams.proxies.ejectionManager;
             THRESHOLD_REGISTRY = initParams.proxies.thresholdRegistry;
             RELAY_REGISTRY = initParams.proxies.relayRegistry;
             PAYMENT_VAULT = initParams.proxies.paymentVault;
@@ -107,6 +111,7 @@ contract DeploymentInitializer {
             SOCKET_REGISTRY_IMPL = initParams.implementations.socketRegistry;
             BLS_APK_REGISTRY_IMPL = initParams.implementations.blsApkRegistry;
             REGISTRY_COORDINATOR_IMPL = initParams.implementations.registryCoordinator;
+            EJECTION_MANAGER_IMPL = initParams.implementations.ejectionManager;
             THRESHOLD_REGISTRY_IMPL = initParams.implementations.thresholdRegistry;
             RELAY_REGISTRY_IMPL = initParams.implementations.relayRegistry;
             PAYMENT_VAULT_IMPL = initParams.implementations.paymentVault;
@@ -116,7 +121,6 @@ contract DeploymentInitializer {
         {
             // Registry Coordinator
             CHURN_APPROVER = initParams.registryCoordinatorParams.churnApprover;
-            EJECTOR = initParams.registryCoordinatorParams.ejector;
         }
         {
             // Payment Vault
@@ -155,12 +159,19 @@ contract DeploymentInitializer {
         RegistryCoordinator(REGISTRY_COORDINATOR).initialize(
             INITIAL_OWNER,
             CHURN_APPROVER,
-            EJECTOR,
+            EJECTION_MANAGER,
             IPauserRegistry(PAUSER_REGISTRY),
             INITIAL_PAUSED_STATUS,
             initParams.registryCoordinatorParams.operatorSetParams,
             initParams.registryCoordinatorParams.minimumStakes,
             initParams.registryCoordinatorParams.strategyParams
+        );
+
+        upgrade(EJECTION_MANAGER, EJECTION_MANAGER_IMPL);
+        EjectionManager(EJECTION_MANAGER).initialize(
+            INITIAL_OWNER,
+            initParams.ejectionManagerParams.ejectors,
+            initParams.ejectionManagerParams.quorumEjectionParams
         );
 
         upgrade(THRESHOLD_REGISTRY, THRESHOLD_REGISTRY_IMPL);

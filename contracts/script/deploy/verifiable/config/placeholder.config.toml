@@ -31,6 +31,11 @@ operatorSetParams = [
     { 0_maxOperatorCount = 0, 1_kickBIPsOfOperatorStake = 0, 2_kickBIPsOfTotalStake = 0 }
 ]
 
+# Parameters for the ejection manager contract
+[initParams.middleware.ejectionManager]
+ejectors = [] # Settable by owner
+quorumEjectionParams = [] # Settable by owner
+
 ### EIGEN DA ###
 
 # Parameters for the Threshold Registry contract
