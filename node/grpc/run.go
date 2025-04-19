@@ -46,6 +46,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			// Register reflection service on gRPC server
 			// This makes "grpcurl -plaintext localhost:9000 list" command work
 			reflection.Register(gs)
+			node.RegisterChannelzService(gs)
 
 			pb.RegisterDispersalServer(gs, serverV1)
 
@@ -77,6 +78,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			// Register reflection service on gRPC server
 			// This makes "grpcurl -plaintext localhost:9000 list" command work
 			reflection.Register(gs)
+			node.RegisterChannelzService(gs)
 
 			validator.RegisterDispersalServer(gs, serverV2)
 
@@ -108,6 +110,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			// Register reflection service on gRPC server
 			// This makes "grpcurl -plaintext localhost:9000 list" command work
 			reflection.Register(gs)
+			node.RegisterChannelzService(gs)
 
 			pb.RegisterRetrievalServer(gs, serverV1)
 			healthcheck.RegisterHealthServer("node.Retrieval", gs)
@@ -137,6 +140,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			// Register reflection service on gRPC server
 			// This makes "grpcurl -plaintext localhost:9000 list" command work
 			reflection.Register(gs)
+			node.RegisterChannelzService(gs)
 
 			validator.RegisterRetrievalServer(gs, serverV2)
 

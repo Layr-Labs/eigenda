@@ -55,8 +55,6 @@ type Metrics struct {
 	QueueLatency *prometheus.HistogramVec
 	// Download stage latency for GetChunksByRange
 	DownloadLatency *prometheus.HistogramVec
-	// Worker pool backlog length
-	WorkerPoolBacklog prometheus.Gauge
 
 	registry *prometheus.Registry
 	// socketAddr is the address at which the metrics server will be listening.
@@ -192,13 +190,6 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 				Buckets:   prometheus.ExponentialBuckets(0.01, 2, 16), // from 10ms to ~10min
 			},
 			[]string{"connection_id"},
-		),
-		WorkerPoolBacklog: promauto.With(reg).NewGauge(
-			prometheus.GaugeOpts{
-				Namespace: Namespace,
-				Name:      "worker_pool_backlog",
-				Help:      "the number of tasks waiting in the worker pool",
-			},
 		),
 
 		EigenMetrics:           eigenMetrics,
