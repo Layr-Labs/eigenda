@@ -3,13 +3,15 @@
 ### INITIALIZATION PARAMETERS ###
 
 # Only this address can finalize the deployment and be the owner of the deployed contracts.
-initialOwner = "0xDF291ebfe90eF9187c3f45609603E366a21a16Ea"
+# For now, this and most admin params are controlled by the deployer, 
+# and should be transferred over to other accounts as appropriate after the upgrade path is tested.
+initialOwner = "0xDF291ebfe90eF9187c3f45609603E366a21a16Ea" 
 
 # EigenLayer core contracts - shared dependencies
 [initParams.shared]
-avsDirectory = "0xF2d1511E53AeAE16213EcA7963A103cB5CEc2b18"
-delegationManager = "0xB4D5cABA07826838AcA633E7a6055Ae38f9F5b95"
-rewardsCoordinator = "0xfC4C575ea3f8316D38F83076Cf765f7B8DeaFC58"
+avsDirectory = "0xa789c91ECDdae96865913130B786140Ee17aF545"
+delegationManager = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
+rewardsCoordinator = "0x5ae8152fb88c26ff9ca5C014c94fca3c68029349"
 initialPausedStatus = 0
 
 # Parameters for the pauser registry contract
@@ -47,7 +49,6 @@ eigenDAServiceManagerArtifact = "out/EigenDAServiceManager.sol/EigenDAServiceMan
 [initParams.middleware.registryCoordinator]
 churnApprover = "0xDF291ebfe90eF9187c3f45609603E366a21a16Ea"
 ejector = "0xDF291ebfe90eF9187c3f45609603E366a21a16Ea"
-pauserRegistry = "0xDF291ebfe90eF9187c3f45609603E366a21a16Ea"
 minimumStakes = []
 operatorSetParams = [
 ]
