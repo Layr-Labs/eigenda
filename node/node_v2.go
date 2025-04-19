@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
@@ -116,17 +117,29 @@ func (n *Node) DownloadBundles(
 	}
 
 	probe.SetStage("download")
-	// TODO (cody-littley) metric for the time until start of download
-	// TODO (cody-littley) metric for the time of individual downloads
 
+	// Record metric for time until start of download (queue time)
+	queueStart := time.Now()
 	bundleChan := make(chan response, len(requests))
 	for relayKey := range requests {
 		relayKey := relayKey
 		req := requests[relayKey]
 		n.DownloadPool.Submit(func() {
+			// Record connection-specific metrics
+			downloadStart := time.Now()
+			connectionID := fmt.Sprintf("relay-%d", relayKey)
+
 			ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
 			defer cancel()
+
 			bundles, err := relayClient.GetChunksByRange(ctxTimeout, relayKey, req.chunkRequests)
+
+			// Record download latency metric
+			if n.Metrics != nil {
+				downloadLatency := time.Since(downloadStart)
+				n.Metrics.RecordDownloadLatency(connectionID, downloadLatency)
+			}
+
 			if err != nil {
 				n.Logger.Errorf("failed to get chunks from relays: %v", err)
 				bundleChan <- response{
@@ -142,6 +155,12 @@ func (n *Node) DownloadBundles(
 				err:      nil,
 			}
 		})
+	}
+
+	// Record queue latency metric
+	if n.Metrics != nil {
+		queueLatency := time.Since(queueStart)
+		n.Metrics.RecordQueueLatency("all", "DownloadBundles", queueLatency)
 	}
 
 	responses := make([]response, len(requests))

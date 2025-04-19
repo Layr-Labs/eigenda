@@ -49,6 +49,15 @@ type Metrics struct {
 	// The throughput (bytes per second) at which the data is written to database.
 	DBWriteThroughput prometheus.Gauge
 
+	// In-flight streams per connection
+	StreamsInFlightGauge *prometheus.GaugeVec
+	// Queue time before RPC starts (measured in milliseconds)
+	QueueLatency *prometheus.HistogramVec
+	// Download stage latency for GetChunksByRange
+	DownloadLatency *prometheus.HistogramVec
+	// Worker pool backlog length
+	WorkerPoolBacklog prometheus.Gauge
+
 	registry *prometheus.Registry
 	// socketAddr is the address at which the metrics server will be listening.
 	// should be in format ip:port
@@ -157,6 +166,40 @@ func NewMetrics(eigenMetrics eigenmetrics.Metrics, reg *prometheus.Registry, log
 				Help:      "the throughput (bytes per second) at which the data is written to database",
 			},
 		),
+		// New metrics for connection management
+		StreamsInFlightGauge: promauto.With(reg).NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: Namespace,
+				Name:      "grpc_streams_in_flight",
+				Help:      "the number of currently active gRPC streams per connection",
+			},
+			[]string{"connection_id"},
+		),
+		QueueLatency: promauto.With(reg).NewHistogramVec(
+			prometheus.HistogramOpts{
+				Namespace: Namespace,
+				Name:      "grpc_request_queue_seconds",
+				Help:      "the time spent waiting for an RPC to start (in queue)",
+				Buckets:   prometheus.ExponentialBuckets(0.001, 2, 16), // from 1ms to ~1min
+			},
+			[]string{"connection_id", "method"},
+		),
+		DownloadLatency: promauto.With(reg).NewHistogramVec(
+			prometheus.HistogramOpts{
+				Namespace: Namespace,
+				Name:      "download_seconds",
+				Help:      "the time spent downloading chunks from relays",
+				Buckets:   prometheus.ExponentialBuckets(0.01, 2, 16), // from 10ms to ~10min
+			},
+			[]string{"connection_id"},
+		),
+		WorkerPoolBacklog: promauto.With(reg).NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: Namespace,
+				Name:      "worker_pool_backlog",
+				Help:      "the number of tasks waiting in the worker pool",
+			},
+		),
 
 		EigenMetrics:           eigenMetrics,
 		logger:                 logger.With("component", "NodeMetrics"),
@@ -221,6 +264,18 @@ func (g *Metrics) AcceptBatches(status string, batchSize uint64) {
 func (g *Metrics) RecordStoreChunksStage(stage string, dataSize uint64, latency time.Duration) {
 	g.AcceptBatches(stage, dataSize)
 	g.ObserveLatency("StoreChunks", stage, float64(latency.Milliseconds()))
+}
+
+func (g *Metrics) RecordStreamsInFlight(connectionID string, numStreams int) {
+	g.StreamsInFlightGauge.WithLabelValues(connectionID).Set(float64(numStreams))
+}
+
+func (g *Metrics) RecordQueueLatency(connectionID, method string, latency time.Duration) {
+	g.QueueLatency.WithLabelValues(connectionID, method).Observe(latency.Seconds())
+}
+
+func (g *Metrics) RecordDownloadLatency(connectionID string, latency time.Duration) {
+	g.DownloadLatency.WithLabelValues(connectionID).Observe(latency.Seconds())
 }
 
 func (g *Metrics) collectOnchainMetrics() {

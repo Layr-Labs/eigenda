@@ -268,7 +268,7 @@ func NewNode(
 			return nil, fmt.Errorf("create relay url provider: %w", err)
 		}
 
-		relayClient, err := clients.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
+		relayClient, err := NewInstrumentedRelayClient(relayClientConfig, logger, relayUrlProvider, metrics)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new relay client: %w", err)
 		}
