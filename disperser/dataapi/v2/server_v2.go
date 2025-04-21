@@ -52,13 +52,24 @@ const (
 	// Cache ~1h worth of batches for KV lookups
 	maxNumKVBatchesToCache = 3600
 
-	cacheControlParam       = "Cache-Control"
-	maxFeedBlobAge          = 300 // this is completely static
-	maxOperatorsStakeAge    = 300 // not expect the stake change to happen frequently
-	maxOperatorResponseAge  = 300 // this is completely static
-	maxOperatorPortCheckAge = 60
-	maxMetricAge            = 10
-	maxThroughputAge        = 10
+	cacheControlParam = "Cache-Control"
+
+	// Static content
+	maxBlobDataAge                  = 300
+	maxBatchDataAge                 = 300
+	maxOperatorDispersalResponseAge = 300
+
+	// Rarely changing content
+	maxOperatorsStakeAge    = 300 // not expect the stake changes frequently
+	maxOperatorPortCheckAge = 60  // not expect validator port changes frequently, but it's consequential to have right port
+
+	// Live content
+	maxMetricAge        = 5
+	maxThroughputAge    = 5
+	maxBlobFeedAge      = 5
+	maxBatchFeedAge     = 5
+	maxDispersalFeedAge = 5
+	maxSigningInfoAge   = 5
 )
 
 type (
@@ -67,8 +78,8 @@ type (
 	}
 
 	SignedBatch struct {
-		BatchHeader *corev2.BatchHeader `json:"batch_header"`
-		Attestation *corev2.Attestation `json:"attestation"`
+		BatchHeader     *corev2.BatchHeader `json:"batch_header"`
+		AttestationInfo *AttestationInfo    `json:"attestation_info"`
 	}
 
 	BlobResponse struct {
@@ -138,7 +149,10 @@ type (
 	}
 
 	MetricSummary struct {
-		AvgThroughput float64 `json:"avg_throughput"`
+		TotalBytesPosted      uint64  `json:"total_bytes_posted"`
+		AverageBytesPerSecond float64 `json:"average_bytes_per_second"`
+		StartTimestampSec     int64   `json:"start_timestamp_sec"`
+		EndTimestampSec       int64   `json:"end_timestamp_sec"`
 	}
 
 	OperatorSigningInfo struct {
@@ -187,6 +201,11 @@ type (
 		RetrievalStatus string `json:"retrieval_status"`
 	}
 
+	AccountBlobFeedResponse struct {
+		AccountId string     `json:"account_id"`
+		Blobs     []BlobInfo `json:"blobs"`
+	}
+
 	SemverReportResponse struct {
 		Semver map[string]*semver.SemverMetrics `json:"semver"`
 	}
@@ -198,6 +217,18 @@ type (
 	Throughput struct {
 		Throughput float64 `json:"throughput"`
 		Timestamp  uint64  `json:"timestamp"`
+	}
+
+	SigningRateDataPoint struct {
+		SigningRate float64 `json:"signing_rate"`
+		Timestamp   uint64  `json:"timestamp"`
+	}
+	QuorumSigningRateData struct {
+		QuorumId   string                 `json:"quorum_id"`
+		DataPoints []SigningRateDataPoint `json:"data_points"`
+	}
+	NetworkSigningRateResponse struct {
+		QuorumSigningRates []QuorumSigningRateData `json:"quorum_signing_rates"`
 	}
 )
 
@@ -358,6 +389,10 @@ func (s *ServerV2) Start() error {
 			batches.GET("/feed", s.FetchBatchFeed)
 			batches.GET("/:batch_header_hash", s.FetchBatch)
 		}
+		accounts := v2.Group("/accounts")
+		{
+			accounts.GET("/:account_id/blobs", s.FetchAccountBlobFeed)
+		}
 		operators := v2.Group("/operators")
 		{
 			operators.GET("/:operator_id/dispersals", s.FetchOperatorDispersalFeed)
@@ -371,6 +406,7 @@ func (s *ServerV2) Start() error {
 		{
 			metrics.GET("/summary", s.FetchMetricsSummary)
 			metrics.GET("/timeseries/throughput", s.FetchMetricsThroughputTimeseries)
+			metrics.GET("/timeseries/network-signing-rate", s.FetchNetworkSigningRate)
 		}
 		swagger := v2.Group("/swagger")
 		{

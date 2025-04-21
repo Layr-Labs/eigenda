@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"math"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -115,7 +114,6 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 		return nil, err
 	}
 
-	fmt.Println("numthread", runtime.GOMAXPROCS(0))
 
 	// Create RS encoder
 	rsEncoder, err := rs.NewEncoder(encoderConfig)

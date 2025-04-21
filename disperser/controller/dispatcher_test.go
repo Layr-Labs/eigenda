@@ -111,7 +111,7 @@ func TestDispatcherHandleBatch(t *testing.T) {
 	components.CallbackBlobSet.AssertNumberOfCalls(t, "RemoveBlob", len(objs.blobKeys))
 	components.BlobSet.AssertNumberOfCalls(t, "AddBlob", len(objs.blobKeys))
 	components.BlobSet.AssertNumberOfCalls(t, "Contains", len(objs.blobKeys))
-	err = components.Dispatcher.HandleSignatures(ctx, batchData, sigChan)
+	err = components.Dispatcher.HandleSignatures(ctx, ctx, batchData, sigChan)
 	require.NoError(t, err)
 	for _, key := range objs.blobKeys {
 		components.BlobSet.AssertCalled(t, "RemoveBlob", key)
@@ -208,7 +208,7 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 
 	sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx)
 	require.NoError(t, err)
-	err = components.Dispatcher.HandleSignatures(ctx, batchData, sigChan)
+	err = components.Dispatcher.HandleSignatures(ctx, ctx, batchData, sigChan)
 	require.NoError(t, err)
 
 	// Test that the blob metadata status are updated
@@ -301,7 +301,7 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 
 	sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx)
 	require.NoError(t, err)
-	err = components.Dispatcher.HandleSignatures(ctx, batchData, sigChan)
+	err = components.Dispatcher.HandleSignatures(ctx, ctx, batchData, sigChan)
 	require.ErrorContains(t, err, "all quorums received no attestation")
 
 	// Test that the blob metadata status are updated
@@ -675,11 +675,12 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 	}
 
 	d, err := controller.NewDispatcher(&controller.DispatcherConfig{
-		PullInterval:           1 * time.Second,
-		FinalizationBlockDelay: finalizationBlockDelay,
-		NodeRequestTimeout:     1 * time.Second,
-		NumRequestRetries:      3,
-		MaxBatchSize:           maxBatchSize,
+		PullInterval:            1 * time.Second,
+		FinalizationBlockDelay:  finalizationBlockDelay,
+		AttestationTimeout:      1 * time.Second,
+		BatchAttestationTimeout: 2 * time.Second,
+		NumRequestRetries:       3,
+		MaxBatchSize:            maxBatchSize,
 	}, blobMetadataStore, pool, mockChainState, agg, nodeClientManager, logger, prometheus.NewRegistry(), beforeDispatch, blobSet, mockSignalHeartbeat)
 	require.NoError(t, err)
 	return &dispatcherComponents{

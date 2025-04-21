@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -34,10 +35,10 @@ import (
 )
 
 const (
-	SRSPathG1         = "/g1.point"
-	SRSPathG2         = "/g2.point"
-	SRSPathG2PowerOf2 = "/g2.point.powerOf2"
-	SRSPathSRSTables  = "/SRSTables"
+	SRSPathG1         = "g1.point"
+	SRSPathG2         = "g2.point"
+	SRSPathG2Trailing = "g2.trailing.point"
+	SRSPathSRSTables  = "SRSTables"
 )
 
 // TestClient encapsulates the various clients necessary for interacting with EigenDA.
@@ -88,26 +89,35 @@ func NewTestClient(
 
 	g1Path, err := config.ResolveSRSPath(SRSPathG1)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get path to G1 file: %w", err)
+		return nil, fmt.Errorf("resolve G1 SRS path: %w", err)
 	}
 	g2Path, err := config.ResolveSRSPath(SRSPathG2)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get path to G2 file: %w", err)
+		return nil, fmt.Errorf("resolve G2 SRS path: %w", err)
 	}
-	g2PowerOf2Path, err := config.ResolveSRSPath(SRSPathG2PowerOf2)
+	g2TrailingPath, err := config.ResolveSRSPath(SRSPathG2Trailing)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get path to G2 power of 2 file: %w", err)
+		return nil, fmt.Errorf("resolve trailing G2 SRS path: %w", err)
 	}
 	srsTablesPath, err := config.ResolveSRSPath(SRSPathSRSTables)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get path to SRS tables: %w", err)
+		return nil, fmt.Errorf("resolve SRS tables path: %w", err)
+	}
+
+	// There is special logic for the trailing G2 point file. Some environments won't have a dedicated file for
+	// trailing G2 points, and instead will simply have the unabridged G2 points (which definitionally contain the
+	// trailing G2 points at the end of the file). If there isn't a trailing G2 point file in the expected location,
+	// assume that the environment has access to the entire G2 point file, and pass in "" for the trailing path.
+	// If this assumption turns out to be wrong, an error will be thrown when SRS parsing is attempted.
+	if _, err := os.Stat(g2TrailingPath); errors.Is(err, os.ErrNotExist) {
+		g2TrailingPath = ""
 	}
 
 	kzgConfig := &kzg.KzgConfig{
 		LoadG2Points:    true,
 		G1Path:          g1Path,
 		G2Path:          g2Path,
-		G2PowerOf2Path:  g2PowerOf2Path,
+		G2TrailingPath:  g2TrailingPath,
 		CacheDir:        srsTablesPath,
 		SRSOrder:        config.SRSOrder,
 		SRSNumberToLoad: config.SRSNumberToLoad,
@@ -163,15 +173,22 @@ func NewTestClient(
 	payloadClientConfig := clients.GetDefaultPayloadClientConfig()
 
 	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
-		PayloadClientConfig:  *payloadClientConfig,
-		DisperseBlobTimeout:  1337 * time.Hour, // this suite enforces its own timeouts
-		BlobCertifiedTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
+		PayloadClientConfig: *payloadClientConfig,
+		DisperseBlobTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
+		BlobCompleteTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 	}
+
+	var registry *prometheus.Registry
+	if metrics != nil {
+		registry = metrics.registry
+	}
+
 	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
 		disperserClient,
-		certVerifier)
+		certVerifier,
+		registry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create payload disperser: %w", err)
 	}
@@ -216,7 +233,9 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create relay client: %w", err)
 	}
 
-	blobVerifier, err := verifier.NewVerifier(kzgConfig, nil)
+	verifierKzgConfig := kzgConfig
+	verifierKzgConfig.LoadG2Points = false
+	blobVerifier, err := verifier.NewVerifier(verifierKzgConfig, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blob verifier: %w", err)
 	}
@@ -281,7 +300,7 @@ func NewTestClient(
 		validatorPayloadRetriever:   validatorPayloadRetriever,
 		certVerifier:                certVerifier,
 		privateKey:                  privateKey,
-		metricsRegistry:             metrics.registry,
+		metricsRegistry:             registry,
 		metrics:                     metrics,
 	}, nil
 }

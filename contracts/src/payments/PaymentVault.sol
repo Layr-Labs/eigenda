@@ -5,13 +5,12 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {PaymentVaultStorage} from "./PaymentVaultStorage.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-
 /**
  * @title Entrypoint for making reservations and on demand payments for EigenDA.
  * @author Layr Labs, Inc.
-**/
+ *
+ */
 contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
- 
     constructor() {
         _disableInitializers();
     }
@@ -34,7 +33,7 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
         uint64 _globalRatePeriodInterval
     ) public initializer {
         _transferOwnership(_initialOwner);
-        
+
         minNumSymbols = _minNumSymbols;
         pricePerSymbol = _pricePerSymbol;
         priceUpdateCooldown = _priceUpdateCooldown;
@@ -50,12 +49,12 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
      * @param _account is the address to submit the reservation for
      * @param _reservation is the Reservation struct containing details of the reservation
      */
-    function setReservation(
-        address _account, 
-        Reservation memory _reservation
-    ) external onlyOwner { 
+    function setReservation(address _account, Reservation memory _reservation) external onlyOwner {
         _checkQuorumSplit(_reservation.quorumNumbers, _reservation.quorumSplits);
-        require(_reservation.endTimestamp > _reservation.startTimestamp, "end timestamp must be greater than start timestamp");
+        require(
+            _reservation.endTimestamp > _reservation.startTimestamp,
+            "end timestamp must be greater than start timestamp"
+        );
         reservations[_account] = _reservation;
         emit ReservationUpdated(_account, _reservation);
     }
@@ -68,17 +67,14 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
         _deposit(_account, msg.value);
     }
 
-    function setPriceParams(
-        uint64 _minNumSymbols,
-        uint64 _pricePerSymbol,
-        uint64 _priceUpdateCooldown
-    ) external onlyOwner {
+    function setPriceParams(uint64 _minNumSymbols, uint64 _pricePerSymbol, uint64 _priceUpdateCooldown)
+        external
+        onlyOwner
+    {
         require(block.timestamp >= lastPriceUpdateTime + priceUpdateCooldown, "price update cooldown not surpassed");
 
         emit PriceParamsUpdated(
-            minNumSymbols, _minNumSymbols, 
-            pricePerSymbol, _pricePerSymbol, 
-            priceUpdateCooldown, _priceUpdateCooldown
+            minNumSymbols, _minNumSymbols, pricePerSymbol, _pricePerSymbol, priceUpdateCooldown, _priceUpdateCooldown
         );
 
         pricePerSymbol = _pricePerSymbol;
@@ -114,7 +110,9 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
     function _checkQuorumSplit(bytes memory _quorumNumbers, bytes memory _quorumSplits) internal pure {
         require(_quorumNumbers.length == _quorumSplits.length, "arrays must have the same length");
         uint8 total;
-        for(uint256 i; i < _quorumSplits.length; ++i) total += uint8(_quorumSplits[i]);
+        for (uint256 i; i < _quorumSplits.length; ++i) {
+            total += uint8(_quorumSplits[i]);
+        }
         require(total == 100, "sum of quorumSplits must be 100");
     }
 
@@ -132,7 +130,7 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
     /// @notice Fetches the current reservations for a set of accounts
     function getReservations(address[] memory _accounts) external view returns (Reservation[] memory _reservations) {
         _reservations = new Reservation[](_accounts.length);
-        for(uint256 i; i < _accounts.length; ++i){
+        for (uint256 i; i < _accounts.length; ++i) {
             _reservations[i] = reservations[_accounts[i]];
         }
     }
@@ -140,12 +138,12 @@ contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
     /// @notice Fetches the current total on demand balance of an account
     function getOnDemandTotalDeposit(address _account) external view returns (uint80) {
         return onDemandPayments[_account].totalDeposit;
-    }    
+    }
 
     /// @notice Fetches the current total on demand balances for a set of accounts
     function getOnDemandTotalDeposits(address[] memory _accounts) external view returns (uint80[] memory _payments) {
         _payments = new uint80[](_accounts.length);
-        for(uint256 i; i < _accounts.length; ++i){
+        for (uint256 i; i < _accounts.length; ++i) {
             _payments[i] = onDemandPayments[_accounts[i]].totalDeposit;
         }
     }

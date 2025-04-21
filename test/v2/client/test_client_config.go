@@ -56,13 +56,15 @@ type TestClientConfig struct {
 	MaxBlobSize uint64
 	// The port to use for metrics (if metrics are being collected)
 	MetricsPort int
+	// If true, do not start the metrics server.
+	DisableMetrics bool
 }
 
 // ResolveSRSPath returns a path relative to the SRSPath root directory.
 func (c *TestClientConfig) ResolveSRSPath(srsFile string) (string, error) {
 	root, err := ResolveTildeInPath(c.SRSPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve tilde in path: %w", err)
+		return "", fmt.Errorf("resolve tilde in path: %w", err)
 	}
 	return path.Join(root, srsFile), nil
 }

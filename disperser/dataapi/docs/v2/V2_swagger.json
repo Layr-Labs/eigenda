@@ -12,6 +12,76 @@
     },
     "basePath": "/api/v2",
     "paths": {
+        "/accounts/{account_id}/blobs": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Fetch blobs posted by an account in a time window by specific direction",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "The account ID to fetch blob feed for",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Direction to fetch: 'forward' (oldest to newest, ASC order) or 'backward' (newest to oldest, DESC order) [default: forward]",
+                        "name": "direction",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fetch blobs before this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z) [default: now]",
+                        "name": "before",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fetch blobs after this time, exclusive (ISO 8601 format, example: 2006-01-02T15:04:05Z); must be smaller than `before` [default: `before`-1h]",
+                        "name": "after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of blobs to return; if limit \u003c= 0 or \u003e1000, it's treated as 1000 [default: 20; max: 1000]",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.AccountBlobFeedResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/batches/feed": {
             "get": {
                 "produces": [
@@ -355,7 +425,64 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/v2.Metric"
+                            "$ref": "#/definitions/v2.MetricSummary"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/metrics/timeseries/network-signing-rate": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Metrics"
+                ],
+                "summary": "Fetch network signing rate time series in the specified time range",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Fetch network signing rate up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]",
+                        "name": "end",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Fetch network signing rate starting from an interval (in seconds) before the end time [default: 3600]",
+                        "name": "interval",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated list of quorum IDs to filter (e.g., 0,1) [default: 0,1]",
+                        "name": "quorums",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.NetworkSigningRateResponse"
                         }
                     },
                     "400": {
@@ -1017,8 +1144,8 @@
         "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch": {
             "type": "object",
             "properties": {
-                "attestation": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.Attestation"
+                "attestation_info": {
+                    "$ref": "#/definitions/v2.AttestationInfo"
                 },
                 "batch_header": {
                     "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader"
@@ -1055,6 +1182,20 @@
                     "type": "object",
                     "additionalProperties": {
                         "type": "number"
+                    }
+                }
+            }
+        },
+        "v2.AccountBlobFeedResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "blobs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.BlobInfo"
                     }
                 }
             }
@@ -1318,11 +1459,31 @@
                 }
             }
         },
-        "v2.Metric": {
+        "v2.MetricSummary": {
             "type": "object",
             "properties": {
-                "throughput": {
+                "average_bytes_per_second": {
                     "type": "number"
+                },
+                "end_timestamp_sec": {
+                    "type": "integer"
+                },
+                "start_timestamp_sec": {
+                    "type": "integer"
+                },
+                "total_bytes_posted": {
+                    "type": "integer"
+                }
+            }
+        },
+        "v2.NetworkSigningRateResponse": {
+            "type": "object",
+            "properties": {
+                "quorum_signing_rates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.QuorumSigningRateData"
+                    }
                 }
             }
         },
@@ -1491,6 +1652,20 @@
                 }
             }
         },
+        "v2.QuorumSigningRateData": {
+            "type": "object",
+            "properties": {
+                "data_points": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.SigningRateDataPoint"
+                    }
+                },
+                "quorum_id": {
+                    "type": "string"
+                }
+            }
+        },
         "v2.SemverReportResponse": {
             "type": "object",
             "properties": {
@@ -1499,6 +1674,17 @@
                     "additionalProperties": {
                         "$ref": "#/definitions/semver.SemverMetrics"
                     }
+                }
+            }
+        },
+        "v2.SigningRateDataPoint": {
+            "type": "object",
+            "properties": {
+                "signing_rate": {
+                    "type": "number"
+                },
+                "timestamp": {
+                    "type": "integer"
                 }
             }
         },

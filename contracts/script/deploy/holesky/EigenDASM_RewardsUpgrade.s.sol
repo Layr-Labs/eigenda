@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
-/*
 pragma solidity ^0.8.12;
+/*
 
 import {TransparentUpgradeableProxy} from "lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ERC20PresetFixedSupply} from "lib/openzeppelin-contracts/contracts/token/ERC20/presets/ERC20PresetFixedSupply.sol";
@@ -33,7 +33,8 @@ import {EigenDAServiceManager} from "../../../src/core/EigenDAServiceManager.sol
  * forge script script/deploy/holesky/EigenDASM_RewardsUpgrade.s.sol:ServiceManagerBaseUpgrade --rpc-url $RPC_HOLESKY --private-key $PRIVATE_KEY --broadcast --verify -vvvv --sig "run(string memory deployArg)" upgrade
  * forge script script/deploy/holesky/EigenDASM_RewardsUpgrade.s.sol:ServiceManagerBaseUpgrade --rpc-url $RPC_HOLESKY --private-key $PRIVATE_KEY --broadcast --verify -vvvv --sig "run(string memory deployArg)" deploy
  * forge script script/deploy/holesky/EigenDASM_RewardsUpgrade.s.sol:ServiceManagerBaseUpgrade --rpc-url $RPC_HOLESKY --private-key $PRIVATE_KEY --broadcast --verify -vvvv --sig "run(string memory deployArg)" createAVSRewardsSubmission
- *//*
+ */
+/*
 contract ServiceManagerBaseUpgrade is ExistingDeploymentParser {
     // Hardcode these values to your needs
     address public serviceManager = 0x54A03db2784E3D0aCC08344D05385d0b62d4F432;

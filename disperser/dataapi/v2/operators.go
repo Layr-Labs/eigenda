@@ -108,6 +108,7 @@ func (s *ServerV2) FetchOperatorDispersalFeed(c *gin.Context) {
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorDispersalFeed")
 	s.metrics.ObserveLatency("FetchOperatorDispersalFeed", time.Since(handlerStart))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxDispersalFeedAge))
 	c.JSON(http.StatusOK, response)
 }
 
@@ -232,6 +233,7 @@ func (s *ServerV2) FetchOperatorSigningInfo(c *gin.Context) {
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorSigningInfo")
 	s.metrics.ObserveLatency("FetchOperatorSigningInfo", time.Since(handlerStart))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxSigningInfoAge))
 	c.JSON(http.StatusOK, response)
 }
 
@@ -374,7 +376,7 @@ func (s *ServerV2) FetchOperatorDispersalResponse(c *gin.Context) {
 	}
 	s.metrics.IncrementSuccessfulRequestNum("FetchOperatorDispersalResponse")
 	s.metrics.ObserveLatency("FetchOperatorDispersalResponse", time.Since(handlerStart))
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorResponseAge))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorDispersalResponseAge))
 	c.JSON(http.StatusOK, response)
 }
 

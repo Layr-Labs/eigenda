@@ -3,7 +3,7 @@ pragma solidity =0.8.12;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "../../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
+import "../lib/eigenlayer-middleware/test/utils/BLSMockAVSDeployer.sol";
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDAServiceManager, IRewardsCoordinator} from "../src/core/EigenDAServiceManager.sol";
 import {EigenDACertVerificationUtils} from "../src/libraries/EigenDACertVerificationUtils.sol";
@@ -14,7 +14,7 @@ import {EigenDACertVerifier} from "../src/core/EigenDACertVerifier.sol";
 import {EigenDAThresholdRegistry, IEigenDAThresholdRegistry} from "../src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "../src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../src/interfaces/IEigenDASignatureVerifier.sol";
-import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {IRegistryCoordinator} from "../lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IEigenDARelayRegistry} from "../src/interfaces/IEigenDARelayRegistry.sol";
 import {EigenDARelayRegistry} from "../src/core/EigenDARelayRegistry.sol";
 import {IPaymentVault} from "../src/interfaces/IPaymentVault.sol";
@@ -72,35 +72,23 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
         _setUpBLSMockAVSDeployer();
 
         eigenDAServiceManager = EigenDAServiceManager(
-            address(
-                new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), "")
-            )
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), ""))
         );
 
         eigenDAThresholdRegistry = EigenDAThresholdRegistry(
-            address(
-                new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), "")
-            )
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), ""))
         );
 
         eigenDARelayRegistry = EigenDARelayRegistry(
-            address(
-                new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), "")
-            )
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), ""))
         );
 
         paymentVault = PaymentVault(
-            payable(
-                address(
-                    new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), "")
-                )
-            )
+            payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), "")))
         );
 
         eigenDADisperserRegistry = EigenDADisperserRegistry(
-            address(
-                new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), "")
-            )
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), ""))
         );
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
@@ -134,11 +122,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
         eigenDAThresholdRegistryImplementation = new EigenDAThresholdRegistry();
 
         VersionedBlobParams[] memory versionedBlobParams = new VersionedBlobParams[](1);
-        versionedBlobParams[0] = VersionedBlobParams({
-            maxNumOperators: 3537,
-            numChunks: 8192,
-            codingRate: 8
-        });
+        versionedBlobParams[0] = VersionedBlobParams({maxNumOperators: 3537, numChunks: 8192, codingRate: 8});
 
         cheats.prank(proxyAdminOwner);
         proxyAdmin.upgradeAndCall(
@@ -209,17 +193,23 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
         );
     }
 
-    function _getHeaderandNonSigners(uint256 _nonSigners, uint256 _pseudoRandomNumber, uint8 _threshold) internal returns (BatchHeader memory, BLSSignatureChecker.NonSignerStakesAndSignature memory) {
+    function _getHeaderandNonSigners(uint256 _nonSigners, uint256 _pseudoRandomNumber, uint8 _threshold)
+        internal
+        returns (BatchHeader memory, BLSSignatureChecker.NonSignerStakesAndSignature memory)
+    {
         // register a bunch of operators
         uint256 quorumBitmap = 1;
         bytes memory quorumNumbers = BitmapUtils.bitmapToBytesArray(quorumBitmap);
 
         // 0 nonSigners
-        (uint32 referenceBlockNumber, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) = 
-            _registerSignatoriesAndGetNonSignerStakeAndSignatureRandom(_pseudoRandomNumber, _nonSigners, quorumBitmap);
+        (
+            uint32 referenceBlockNumber,
+            BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
+        ) = _registerSignatoriesAndGetNonSignerStakeAndSignatureRandom(_pseudoRandomNumber, _nonSigners, quorumBitmap);
 
         // get a random batch header
-        BatchHeader memory batchHeader = _getRandomBatchHeader(_pseudoRandomNumber, quorumNumbers, referenceBlockNumber, _threshold);
+        BatchHeader memory batchHeader =
+            _getRandomBatchHeader(_pseudoRandomNumber, quorumNumbers, referenceBlockNumber, _threshold);
 
         // set batch specific signature
         bytes32 reducedBatchHeaderHash = batchHeader.hashBatchHeaderToReducedBatchHeader();
@@ -228,7 +218,12 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
         return (batchHeader, nonSignerStakesAndSignature);
     }
 
-    function _getRandomBatchHeader(uint256 pseudoRandomNumber, bytes memory quorumNumbers, uint32 referenceBlockNumber, uint8 threshold) internal pure returns(BatchHeader memory) {
+    function _getRandomBatchHeader(
+        uint256 pseudoRandomNumber,
+        bytes memory quorumNumbers,
+        uint32 referenceBlockNumber,
+        uint8 threshold
+    ) internal pure returns (BatchHeader memory) {
         BatchHeader memory batchHeader;
         batchHeader.blobHeadersRoot = keccak256(abi.encodePacked("blobHeadersRoot", pseudoRandomNumber));
         batchHeader.quorumNumbers = quorumNumbers;
@@ -240,38 +235,58 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
         return batchHeader;
     }
 
-    function _generateRandomBlobHeader(uint256 pseudoRandomNumber, uint256 numQuorumsBlobParams) internal returns (BlobHeader memory) {
-        if(pseudoRandomNumber == 0) {
+    function _generateRandomBlobHeader(uint256 pseudoRandomNumber, uint256 numQuorumsBlobParams)
+        internal
+        returns (BlobHeader memory)
+    {
+        if (pseudoRandomNumber == 0) {
             pseudoRandomNumber = 1;
         }
 
         BlobHeader memory blobHeader;
-        blobHeader.commitment.X = uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.commitment.X"))) % BN254.FP_MODULUS;
-        blobHeader.commitment.Y = uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.commitment.Y"))) % BN254.FP_MODULUS;
+        blobHeader.commitment.X =
+            uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.commitment.X"))) % BN254.FP_MODULUS;
+        blobHeader.commitment.Y =
+            uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.commitment.Y"))) % BN254.FP_MODULUS;
 
-        blobHeader.dataLength = uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.dataLength"))));
+        blobHeader.dataLength =
+            uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.dataLength"))));
 
         blobHeader.quorumBlobParams = new QuorumBlobParam[](numQuorumsBlobParams);
-        blobHeader.dataLength = uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.dataLength"))));
-        for (uint i = 0; i < numQuorumsBlobParams; i++) {
-            if(i < 2){
+        blobHeader.dataLength =
+            uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.dataLength"))));
+        for (uint256 i = 0; i < numQuorumsBlobParams; i++) {
+            if (i < 2) {
                 blobHeader.quorumBlobParams[i].quorumNumber = uint8(i);
             } else {
-                blobHeader.quorumBlobParams[i].quorumNumber = uint8(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].quorumNumber", i)))) % 192;
+                blobHeader.quorumBlobParams[i].quorumNumber = uint8(
+                    uint256(
+                        keccak256(
+                            abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].quorumNumber", i)
+                        )
+                    )
+                ) % 192;
 
                 // make sure it isn't already used
-                while(quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber]) {
-                    blobHeader.quorumBlobParams[i].quorumNumber = uint8(uint256(blobHeader.quorumBlobParams[i].quorumNumber) + 1) % 192;
+                while (quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber]) {
+                    blobHeader.quorumBlobParams[i].quorumNumber =
+                        uint8(uint256(blobHeader.quorumBlobParams[i].quorumNumber) + 1) % 192;
                 }
                 quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = true;
             }
-            
-            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
-            blobHeader.quorumBlobParams[i].chunkLength = uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))));
-            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDACertVerifier.getQuorumConfirmationThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
+
+            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage =
+                eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
+            blobHeader.quorumBlobParams[i].chunkLength = uint32(
+                uint256(
+                    keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))
+                )
+            );
+            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDACertVerifier
+                .getQuorumConfirmationThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
         }
         // mark all quorum numbers as unused
-        for (uint i = 0; i < numQuorumsBlobParams; i++) {
+        for (uint256 i = 0; i < numQuorumsBlobParams; i++) {
             quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = false;
         }
 

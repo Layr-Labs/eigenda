@@ -2,6 +2,7 @@ package dataapi
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
@@ -24,6 +25,20 @@ func NewMetricsHandler(promClient PrometheusClient, version DataApiVersion) *Met
 	}
 }
 
+func (mh *MetricsHandler) GetCompleteBlobSize(ctx context.Context, startTime int64, endTime int64) (*PrometheusResult, error) {
+	var result *PrometheusResult
+	var err error
+	if mh.version == V1 {
+		result, err = mh.promClient.QueryDisperserBlobSizeBytesPerSecond(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0))
+	} else {
+		result, err = mh.promClient.QueryDisperserBlobSizeBytesPerSecondV2(ctx, time.Unix(startTime, 0), time.Unix(endTime, 0))
+	}
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (mh *MetricsHandler) GetAvgThroughput(ctx context.Context, startTime int64, endTime int64) (float64, error) {
 	var result *PrometheusResult
 	var err error
@@ -42,6 +57,19 @@ func (mh *MetricsHandler) GetAvgThroughput(ctx context.Context, startTime int64,
 	totalBytes := result.Values[size-1].Value - result.Values[0].Value
 	timeDuration := result.Values[size-1].Timestamp.Sub(result.Values[0].Timestamp).Seconds()
 	return totalBytes / timeDuration, nil
+}
+
+func (mh *MetricsHandler) GetQuorumSigningRateTimeseries(ctx context.Context, startTime time.Time, endTime time.Time, quorumID uint8) (*PrometheusResult, error) {
+	if mh.version != V2 {
+		return nil, errors.New("only V2 signing rate fetch is supported")
+	}
+
+	result, err := mh.promClient.QueryQuorumNetworkSigningRateV2(ctx, startTime, endTime, quorumID)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 func (mh *MetricsHandler) GetThroughputTimeseries(ctx context.Context, startTime int64, endTime int64) ([]*Throughput, error) {

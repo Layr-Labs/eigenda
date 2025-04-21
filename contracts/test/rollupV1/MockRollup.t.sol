@@ -31,7 +31,7 @@ contract MockRollupTest is MockEigenDADeployer {
 
     function setUp() public {
         _deployDA();
-       
+
         mockRollup = new MockRollup(IEigenDAServiceManager(address(eigenDAServiceManager)), s1);
 
         //hardcode g2 proof
@@ -43,7 +43,8 @@ contract MockRollupTest is MockEigenDADeployer {
 
     function testChallenge(uint256 pseudoRandomNumber) public {
         //get commitment with illegal value
-        (BlobHeader memory blobHeader, BlobVerificationProof memory blobVerificationProof) = _getCommitment(pseudoRandomNumber);
+        (BlobHeader memory blobHeader, BlobVerificationProof memory blobVerificationProof) =
+            _getCommitment(pseudoRandomNumber);
 
         mockRollup.postCommitment(blobHeader, blobVerificationProof);
 
@@ -55,10 +56,14 @@ contract MockRollupTest is MockEigenDADeployer {
     }
 
     function _getIllegalCommitment() internal view returns (BN254.G1Point memory illegalCommitment) {
-        illegalCommitment = s0.scalar_mul(1).plus(s1.scalar_mul(1)).plus(s2.scalar_mul(1)).plus(s3.scalar_mul(1)).plus(s4.scalar_mul(1));
+        illegalCommitment =
+            s0.scalar_mul(1).plus(s1.scalar_mul(1)).plus(s2.scalar_mul(1)).plus(s3.scalar_mul(1)).plus(s4.scalar_mul(1));
     }
 
-    function _getCommitment(uint256 pseudoRandomNumber) internal returns (BlobHeader memory, BlobVerificationProof memory){
+    function _getCommitment(uint256 pseudoRandomNumber)
+        internal
+        returns (BlobHeader memory, BlobVerificationProof memory)
+    {
         uint256 numQuorumBlobParams = 2;
         BlobHeader[] memory blobHeader = new BlobHeader[](2);
         blobHeader[0] = _generateBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
@@ -70,9 +75,12 @@ contract MockRollupTest is MockEigenDADeployer {
         bytes memory secondBlobHash = abi.encodePacked(blobHeader[1].hashBlobHeader());
         batchHeader.blobHeadersRoot = keccak256(abi.encodePacked(keccak256(firstBlobHash), keccak256(secondBlobHash)));
         // add dummy quorum numbers and quorum threshold percentages making sure confirmationThresholdPercentage = adversaryThresholdPercentage + defaultCodingRatioPercentage
-        for (uint i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
-            batchHeader.quorumNumbers = abi.encodePacked(batchHeader.quorumNumbers, blobHeader[1].quorumBlobParams[i].quorumNumber);
-            batchHeader.signedStakeForQuorums = abi.encodePacked(batchHeader.signedStakeForQuorums, blobHeader[1].quorumBlobParams[i].confirmationThresholdPercentage);
+        for (uint256 i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
+            batchHeader.quorumNumbers =
+                abi.encodePacked(batchHeader.quorumNumbers, blobHeader[1].quorumBlobParams[i].quorumNumber);
+            batchHeader.signedStakeForQuorums = abi.encodePacked(
+                batchHeader.signedStakeForQuorums, blobHeader[1].quorumBlobParams[i].confirmationThresholdPercentage
+            );
         }
         batchHeader.referenceBlockNumber = uint32(block.number);
 
@@ -82,11 +90,9 @@ contract MockRollupTest is MockEigenDADeployer {
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
 
-        stdstore
-            .target(address(eigenDAServiceManager))
-            .sig("batchIdToBatchMetadataHash(uint32)")
-            .with_key(defaultBatchId)
-            .checked_write(batchMetadata.hashBatchMetadata());
+        stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
+            defaultBatchId
+        ).checked_write(batchMetadata.hashBatchMetadata());
 
         BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
@@ -94,42 +100,59 @@ contract MockRollupTest is MockEigenDADeployer {
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
         blobVerificationProof.blobIndex = 1;
         blobVerificationProof.quorumIndices = new bytes(batchHeader.quorumNumbers.length);
-        for (uint i = 0; i < batchHeader.quorumNumbers.length; i++) {
+        for (uint256 i = 0; i < batchHeader.quorumNumbers.length; i++) {
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(i));
         }
 
         return (blobHeader[1], blobVerificationProof);
     }
 
-    function _generateBlobHeader(uint256 pseudoRandomNumber, uint256 numQuorumsBlobParams) internal returns (BlobHeader memory) {
-        if(pseudoRandomNumber == 0) {
+    function _generateBlobHeader(uint256 pseudoRandomNumber, uint256 numQuorumsBlobParams)
+        internal
+        returns (BlobHeader memory)
+    {
+        if (pseudoRandomNumber == 0) {
             pseudoRandomNumber = 1;
         }
 
         BlobHeader memory blobHeader;
         blobHeader.commitment = _getIllegalCommitment();
 
-        blobHeader.dataLength = uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.dataLength"))));
+        blobHeader.dataLength =
+            uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.dataLength"))));
 
         blobHeader.quorumBlobParams = new QuorumBlobParam[](numQuorumsBlobParams);
-        for (uint i = 0; i < numQuorumsBlobParams; i++) {
-            if(i < 2){
+        for (uint256 i = 0; i < numQuorumsBlobParams; i++) {
+            if (i < 2) {
                 blobHeader.quorumBlobParams[i].quorumNumber = uint8(i);
             } else {
-                blobHeader.quorumBlobParams[i].quorumNumber = uint8(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].quorumNumber", i)))) % 192;
+                blobHeader.quorumBlobParams[i].quorumNumber = uint8(
+                    uint256(
+                        keccak256(
+                            abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].quorumNumber", i)
+                        )
+                    )
+                ) % 192;
 
                 // make sure it isn't already used
-                while(quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber]) {
-                    blobHeader.quorumBlobParams[i].quorumNumber = uint8(uint256(blobHeader.quorumBlobParams[i].quorumNumber) + 1) % 192;
+                while (quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber]) {
+                    blobHeader.quorumBlobParams[i].quorumNumber =
+                        uint8(uint256(blobHeader.quorumBlobParams[i].quorumNumber) + 1) % 192;
                 }
                 quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = true;
             }
-            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
-            blobHeader.quorumBlobParams[i].chunkLength = uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))));
-            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDACertVerifier.getQuorumConfirmationThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
+            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage =
+                eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
+            blobHeader.quorumBlobParams[i].chunkLength = uint32(
+                uint256(
+                    keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))
+                )
+            );
+            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDACertVerifier
+                .getQuorumConfirmationThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
         }
         // mark all quorum numbers as unused
-        for (uint i = 0; i < numQuorumsBlobParams; i++) {
+        for (uint256 i = 0; i < numQuorumsBlobParams; i++) {
             quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = false;
         }
 

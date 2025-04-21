@@ -6,7 +6,6 @@ import (
 	"log"
 	"math"
 	"math/big"
-	"runtime"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -92,7 +91,6 @@ func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifi
 		return nil, fmt.Errorf("failed to create SRS: %v", err)
 	}
 
-	fmt.Println("numthread", runtime.GOMAXPROCS(0))
 
 	encoder, err := rs.NewEncoder(encoderConfig)
 	if err != nil {

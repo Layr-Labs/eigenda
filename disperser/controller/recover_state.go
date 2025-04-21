@@ -22,23 +22,24 @@ func RecoverState(
 		return fmt.Errorf("failed to get blobs in gathering signatures state: %w", err)
 	}
 
-	if len(metadata) == 0 {
-		logger.Info("no blobs in gathering signatures state")
-		return nil
-	}
+	for len(metadata) > 0 {
+		logger.Info("blobs in gathering signatures state", "count", len(metadata))
+		for _, blob := range metadata {
+			key, err := blob.BlobHeader.BlobKey()
+			if err != nil {
+				logger.Error("failed to get blob key", "err", err)
+				continue
+			}
 
-	logger.Info("found blobs in gathering signatures state", "count", len(metadata))
-
-	for _, blob := range metadata {
-		key, err := blob.BlobHeader.BlobKey()
-		if err != nil {
-			logger.Error("failed to get blob key", "err", err)
-			continue
+			logger.Debug("updating blob status", "key", key, "status", v2.Failed)
+			if err := blobStore.UpdateBlobStatus(ctx, key, v2.Failed); err != nil {
+				logger.Error("failed to update blob status", "blobKey", key.Hex(), "err", err)
+			}
 		}
 
-		logger.Debug("updating blob status", "key", key, "status", v2.Failed)
-		if err := blobStore.UpdateBlobStatus(ctx, key, v2.Failed); err != nil {
-			logger.Error("failed to update blob status", "blobKey", key.Hex(), "err", err)
+		metadata, err = blobStore.GetBlobMetadataByStatus(ctx, v2.GatheringSignatures, 0)
+		if err != nil {
+			return fmt.Errorf("failed to get blobs in gathering signatures state: %w", err)
 		}
 	}
 	logger.Info("recovered state successfully")

@@ -170,6 +170,7 @@ func (s *ServerV2) FetchBatchFeed(c *gin.Context) {
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchBatchFeed")
 	s.metrics.ObserveLatency("FetchBatchFeed", time.Since(handlerStart))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBatchFeedAge))
 	c.JSON(http.StatusOK, response)
 }
 
@@ -186,6 +187,7 @@ func (s *ServerV2) FetchBatchFeed(c *gin.Context) {
 //	@Router		/batches/{batch_header_hash} [get]
 func (s *ServerV2) FetchBatch(c *gin.Context) {
 	handlerStart := time.Now()
+	ctx := c.Request.Context()
 
 	batchHeaderHashHex := c.Param("batch_header_hash")
 	batchHeaderHash, err := dataapi.ConvertHexadecimalToBytes([]byte(batchHeaderHashHex))
@@ -194,17 +196,33 @@ func (s *ServerV2) FetchBatch(c *gin.Context) {
 		errorResponse(c, errors.New("invalid batch header hash"))
 		return
 	}
-	signedBatch, cached := s.signedBatchCache.Get(batchHeaderHashHex)
-	if !cached {
-		batchHeader, attestation, err := s.blobMetadataStore.GetSignedBatch(c.Request.Context(), batchHeaderHash)
+	signedBatch, found := s.signedBatchCache.Get(batchHeaderHashHex)
+	if !found {
+		batchHeader, attestation, err := s.blobMetadataStore.GetSignedBatch(ctx, batchHeaderHash)
 		if err != nil {
 			s.metrics.IncrementFailedRequestNum("FetchBatch")
 			errorResponse(c, err)
 			return
 		}
+
+		quorums := make(map[uint8]struct{}, 0)
+		for _, q := range attestation.QuorumNumbers {
+			quorums[q] = struct{}{}
+		}
+		signers, nonsigners, err := s.getSignersAndNonSigners(ctx, quorums, attestation)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBatch")
+			errorResponse(c, err)
+			return
+		}
+
 		signedBatch = &SignedBatch{
 			BatchHeader: batchHeader,
-			Attestation: attestation,
+			AttestationInfo: &AttestationInfo{
+				Attestation: attestation,
+				Signers:     signers,
+				Nonsigners:  nonsigners,
+			},
 		}
 		s.signedBatchCache.Add(batchHeaderHashHex, signedBatch)
 	} else {
@@ -213,13 +231,10 @@ func (s *ServerV2) FetchBatch(c *gin.Context) {
 	// TODO: support fetch of blob inclusion info
 	batchResponse := &BatchResponse{
 		BatchHeaderHash: batchHeaderHashHex,
-		SignedBatch: &SignedBatch{
-			BatchHeader: signedBatch.BatchHeader,
-			Attestation: signedBatch.Attestation,
-		},
+		SignedBatch:     signedBatch,
 	}
 	s.metrics.IncrementSuccessfulRequestNum("FetchBatch")
 	s.metrics.ObserveLatency("FetchBatch", time.Since(handlerStart))
-	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxFeedBlobAge))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBatchDataAge))
 	c.JSON(http.StatusOK, batchResponse)
 }

@@ -61,6 +61,9 @@ var (
 	//go:embed testdata/prometheus-resp-avg-throughput.json
 	mockPrometheusRespAvgThroughput string
 
+	//go:embed testdata/prometheus-response-network-signing-rate.json
+	mockPrometheusResponseNetworkSigningRate string
+
 	UUID                = uuid.New()
 	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
 	blobMetadataStore   *blobstorev2.BlobMetadataStore
@@ -264,9 +267,9 @@ func makeBlobHeaderV2(t *testing.T) *corev2.BlobHeader {
 	_, err := rand.Read(accountBytes)
 	require.NoError(t, err)
 	accountID := gethcommon.HexToAddress(hex.EncodeToString(accountBytes))
-	timestamp, err := rand.Int(rand.Reader, big.NewInt(42))
+	timestamp, err := rand.Int(rand.Reader, big.NewInt(int64(time.Now().Nanosecond())))
 	require.NoError(t, err)
-	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(123))
+	cumulativePayment, err := rand.Int(rand.Reader, big.NewInt(int64(time.Now().Nanosecond())))
 	require.NoError(t, err)
 	sig := make([]byte, 32)
 	_, err = rand.Read(sig)
@@ -1218,10 +1221,27 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 func TestFetchBatch(t *testing.T) {
 	r := setUpRouter()
 
+	operatorPubKeys := []*core.G1Point{
+		core.NewG1Point(big.NewInt(1), big.NewInt(2)),
+		core.NewG1Point(big.NewInt(3), big.NewInt(4)),
+		core.NewG1Point(big.NewInt(4), big.NewInt(5)),
+		core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+	}
+	operatorAddresses := []gethcommon.Address{
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fb"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fc"),
+		gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fd"),
+	}
+	operatorIDToAddr := make(map[string]gethcommon.Address)
+	for i := 0; i < len(operatorPubKeys); i++ {
+		operatorIDToAddr[operatorPubKeys[i].GetOperatorID().Hex()] = operatorAddresses[i]
+	}
+
 	// Set up batch header in metadata store
 	batchHeader := &corev2.BatchHeader{
-		BatchRoot:            [32]byte{1, 0, 2, 4},
-		ReferenceBlockNumber: 1024,
+		BatchRoot:            [32]byte{1, 2, 3},
+		ReferenceBlockNumber: 10,
 	}
 	err := blobMetadataStore.PutBatchHeader(context.Background(), batchHeader)
 	require.NoError(t, err)
@@ -1230,30 +1250,86 @@ func TestFetchBatch(t *testing.T) {
 	batchHeaderHash := hex.EncodeToString(batchHeaderHashBytes[:])
 
 	// Set up attestation in metadata store
-	commitment := makeCommitment(t)
+	keyPair, err := core.GenRandomBlsKeys()
+	assert.NoError(t, err)
+	apk := keyPair.GetPubKeyG2()
+	nonsignerPubKeys := operatorPubKeys[:2]
 	attestation := &corev2.Attestation{
-		BatchHeader: batchHeader,
-		NonSignerPubKeys: []*core.G1Point{
-			core.NewG1Point(big.NewInt(1), big.NewInt(0)),
-			core.NewG1Point(big.NewInt(2), big.NewInt(4)),
-		},
-		APKG2: &core.G2Point{
-			G2Affine: &bn254.G2Affine{
-				X: commitment.LengthCommitment.X,
-				Y: commitment.LengthCommitment.Y,
-			},
+		BatchHeader:      batchHeader,
+		AttestedAt:       uint64(time.Now().UnixNano()),
+		NonSignerPubKeys: nonsignerPubKeys,
+		APKG2:            apk,
+		QuorumAPKs: map[uint8]*core.G1Point{
+			0: core.NewG1Point(big.NewInt(5), big.NewInt(6)),
+			1: core.NewG1Point(big.NewInt(7), big.NewInt(8)),
 		},
 		Sigma: &core.Signature{
-			G1Point: core.NewG1Point(big.NewInt(2), big.NewInt(0)),
+			G1Point: core.NewG1Point(big.NewInt(9), big.NewInt(10)),
+		},
+		QuorumNumbers: []core.QuorumID{0, 1},
+		QuorumResults: map[uint8]uint8{
+			0: 100,
+			1: 80,
 		},
 	}
 	err = blobMetadataStore.PutAttestation(context.Background(), attestation)
 	require.NoError(t, err)
-	dk := commondynamodb.Key{
-		"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
-		"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+
+	mockTx.On("BatchOperatorIDToAddress").Return(
+		func(ids []core.OperatorID) []gethcommon.Address {
+			result := make([]gethcommon.Address, len(ids))
+			for i, id := range ids {
+				result[i] = operatorIDToAddr[id.Hex()]
+			}
+			return result
+		},
+		nil,
+	)
+
+	operatorStakesByBlock := map[uint32]core.OperatorStakes{
+		10: core.OperatorStakes{
+			0: {
+				0: {
+					OperatorID: operatorPubKeys[0].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorPubKeys[1].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				2: {
+					OperatorID: operatorPubKeys[2].GetOperatorID(),
+					Stake:      big.NewInt(3),
+				},
+			},
+			1: {
+				0: {
+					OperatorID: operatorPubKeys[0].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				1: {
+					OperatorID: operatorPubKeys[2].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+				2: {
+					OperatorID: operatorPubKeys[3].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+			},
+			2: {
+				1: {
+					OperatorID: operatorPubKeys[0].GetOperatorID(),
+					Stake:      big.NewInt(2),
+				},
+			},
+		},
 	}
-	defer deleteItems(t, []commondynamodb.Key{dk})
+	mockTx.On("GetOperatorStakesForQuorums").Return(
+		func(quorums []core.QuorumID, blockNum uint32) core.OperatorStakes {
+			return operatorStakesByBlock[blockNum]
+		},
+		nil,
+	)
 
 	r.GET("/v2/batches/:batch_header_hash", testDataApiServerV2.FetchBatch)
 
@@ -1263,8 +1339,68 @@ func TestFetchBatch(t *testing.T) {
 	assert.Equal(t, batchHeaderHash, response.BatchHeaderHash)
 	assert.Equal(t, batchHeader.BatchRoot, response.SignedBatch.BatchHeader.BatchRoot)
 	assert.Equal(t, batchHeader.ReferenceBlockNumber, response.SignedBatch.BatchHeader.ReferenceBlockNumber)
-	assert.Equal(t, attestation.AttestedAt, response.SignedBatch.Attestation.AttestedAt)
-	assert.Equal(t, attestation.QuorumNumbers, response.SignedBatch.Attestation.QuorumNumbers)
+	assert.Equal(t, attestation.AttestedAt, response.SignedBatch.AttestationInfo.Attestation.AttestedAt)
+	assert.Equal(t, attestation.QuorumNumbers, response.SignedBatch.AttestationInfo.Attestation.QuorumNumbers)
+
+	signers := map[uint8][]serverv2.OperatorIdentity{
+		0: []serverv2.OperatorIdentity{
+			{
+				OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[2].Hex(),
+			},
+		},
+		1: []serverv2.OperatorIdentity{
+			{
+				OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[2].Hex(),
+			},
+			{
+				OperatorId:      operatorPubKeys[3].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[3].Hex(),
+			},
+		},
+	}
+	nonsigners := map[uint8][]serverv2.OperatorIdentity{
+		0: []serverv2.OperatorIdentity{
+			{
+				OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[0].Hex(),
+			},
+			{
+				OperatorId:      operatorPubKeys[1].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[1].Hex(),
+			},
+		},
+		1: []serverv2.OperatorIdentity{
+			{
+				OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
+				OperatorAddress: operatorAddresses[0].Hex(),
+			},
+		},
+	}
+	for key, expectedSigners := range signers {
+		actualSigners, exists := response.SignedBatch.AttestationInfo.Signers[key]
+		require.True(t, exists)
+		assert.ElementsMatch(t, expectedSigners, actualSigners)
+	}
+	for key, expectedNonsigners := range nonsigners {
+		actualNonsigners, exists := response.SignedBatch.AttestationInfo.Nonsigners[key]
+		require.True(t, exists)
+		assert.ElementsMatch(t, expectedNonsigners, actualNonsigners)
+	}
+
+	mockTx.ExpectedCalls = nil
+	mockTx.Calls = nil
+	deleteItems(t, []commondynamodb.Key{
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
+			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
+			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		},
+	})
 }
 
 func TestFetchBatchFeed(t *testing.T) {
@@ -2098,6 +2234,211 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 	mockSubgraphApi.Calls = nil
 }
 
+func TestFetchAccountBlobFeed(t *testing.T) {
+	r := setUpRouter()
+	ctx := context.Background()
+
+	numBlobs := 60
+	now := uint64(time.Now().UnixNano())
+	firstBlobTime := now - uint64(int64(numBlobs)*time.Minute.Nanoseconds())
+	nanoSecsPerBlob := uint64(time.Minute.Nanoseconds()) // 1 blob/min
+
+	accountId := gethcommon.HexToAddress(fmt.Sprintf("0x000000000000000000000000000000000000000%d", 5))
+
+	// Create blobs for testing
+	requestedAt := make([]uint64, numBlobs)
+	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	for i := 0; i < numBlobs; i++ {
+		blobHeader := makeBlobHeaderV2(t)
+		blobHeader.PaymentMetadata.AccountID = accountId
+		blobKey, err := blobHeader.BlobKey()
+		require.NoError(t, err)
+		requestedAt[i] = firstBlobTime + nanoSecsPerBlob*uint64(i)
+		now := time.Now()
+		metadata := &v2.BlobMetadata{
+			BlobHeader:  blobHeader,
+			Signature:   []byte{1, 2, 3},
+			BlobStatus:  v2.Encoded,
+			Expiry:      uint64(now.Add(time.Hour).Unix()),
+			NumRetries:  0,
+			UpdatedAt:   uint64(now.UnixNano()),
+			RequestedAt: requestedAt[i],
+		}
+		err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
+		require.NoError(t, err)
+		dynamoKeys[i] = commondynamodb.Key{
+			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
+		}
+	}
+	defer deleteItems(t, dynamoKeys)
+
+	r.GET("/v2/accounts/:account_id/blobs", testDataApiServerV2.FetchAccountBlobFeed)
+	baseUrl := fmt.Sprintf("/v2/accounts/%s/blobs", accountId.Hex())
+
+	t.Run("invalid account ID params", func(t *testing.T) {
+		tests := []struct {
+			name           string
+			accountID      string
+			expectedStatus int
+			expectedError  string
+		}{
+			// Invalid format cases
+			{
+				accountID:      "not-a-hex-string",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			{
+				accountID:      "0x",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			{
+				accountID:      "0xG1234567890123456789012345678901234567",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			{
+				accountID:      "0x123",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			{
+				accountID:      "0x" + "1234567890123456789012345678901234567890abcdef",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			// Zero address case
+			{
+				accountID:      "0x0000000000000000000000000000000000000000",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "zero account id is not valid",
+			},
+			// Empty & whitespace cases
+			{
+				accountID:      "",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+			{
+				accountID:      " ",
+				expectedStatus: http.StatusBadRequest,
+				expectedError:  "account id is not valid hex",
+			},
+		}
+
+		for _, tc := range tests {
+			url := "/v2/accounts/" + tc.accountID + "/blobs"
+
+			w := httptest.NewRecorder()
+			req, _ := http.NewRequest(http.MethodGet, url, nil)
+			r.ServeHTTP(w, req)
+
+			assert.Equal(t, tc.expectedStatus, w.Code)
+
+			var response serverv2.ErrorResponse
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			require.NoError(t, err)
+			assert.Contains(t, response.Error, tc.expectedError)
+		}
+	})
+
+	t.Run("nonexistent account", func(t *testing.T) {
+		otherID := gethcommon.HexToAddress(fmt.Sprintf("0x000000000000000000000000000000000000000%d", 6))
+		url := fmt.Sprintf("/v2/accounts/%s/blobs", otherID.Hex())
+		w := executeRequest(t, r, http.MethodGet, url)
+		response := decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		require.Equal(t, 0, len(response.Blobs))
+	})
+
+	t.Run("default params", func(t *testing.T) {
+		// Default query returns:
+		// - Most recent 1 hour of blobs include all of blobs[1] through blobs[59]
+		// - Limited to 20 results (the default "limit")
+		// - Result will first 20 blobs
+		w := executeRequest(t, r, http.MethodGet, baseUrl)
+		response := decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, 20, len(response.Blobs))
+		for i := 0; i < 20; i++ {
+			assert.Equal(t, requestedAt[1+i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+	})
+
+	t.Run("forward iteration with various query ranges and limits", func(t *testing.T) {
+		// Test 1: Unlimited results in 1-hour window
+		// With 1h ending time at now, this retrieves blobs[1] through blobs[59] (59 blobs)
+		w := executeRequest(t, r, http.MethodGet, baseUrl+"?limit=0")
+		response := decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, 59, len(response.Blobs))
+		for i := 0; i < 59; i++ {
+			assert.Equal(t, requestedAt[1+i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+
+		// Test 2: 2-hour window captures all test blobs
+		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s", baseUrl, afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, 60, len(response.Blobs))
+		for i := 0; i < 60; i++ {
+			assert.Equal(t, requestedAt[i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+
+		// Teste 3: custom end time
+		after := time.Unix(0, int64(requestedAt[20])).UTC()
+		afterTime = after.Format("2006-01-02T15:04:05.999999999Z")
+		before := time.Unix(0, int64(requestedAt[50])).UTC()
+		beforeTime := before.Format("2006-01-02T15:04:05.999999999Z")
+		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1", baseUrl, beforeTime, afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		require.Equal(t, 29, len(response.Blobs))
+		for i := 0; i < 29; i++ {
+			assert.Equal(t, requestedAt[21+i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+	})
+
+	t.Run("backward iteration with various query ranges and limits", func(t *testing.T) {
+		// Test 1: Unlimited results in 1-hour window
+		// With 1h ending time at now, this retrieves blobs[59] through blobs[1] (59 blobs)
+		w := executeRequest(t, r, http.MethodGet, baseUrl+"?limit=0&direction=backward")
+		response := decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, 59, len(response.Blobs))
+		for i := 0; i < 59; i++ {
+			assert.Equal(t, requestedAt[59-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+
+		// Test 2: 2-hour window captures all test blobs
+		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s&direction=backward", baseUrl, afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		assert.Equal(t, accountId.Hex(), response.AccountId)
+		require.Equal(t, 60, len(response.Blobs))
+		for i := 0; i < 60; i++ {
+			assert.Equal(t, requestedAt[59-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+
+		// Teste 3: custom end time
+		after := time.Unix(0, int64(requestedAt[20])).UTC()
+		afterTime = after.Format("2006-01-02T15:04:05.999999999Z")
+		before := time.Unix(0, int64(requestedAt[50])).UTC()
+		beforeTime := before.Format("2006-01-02T15:04:05.999999999Z")
+		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1&direction=backward", baseUrl, beforeTime, afterTime)
+		w = executeRequest(t, r, http.MethodGet, reqUrl)
+		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
+		require.Equal(t, 29, len(response.Blobs))
+		for i := 0; i < 29; i++ {
+			assert.Equal(t, requestedAt[49-i], response.Blobs[i].BlobMetadata.RequestedAt)
+		}
+	})
+}
+
 func TestFetchOperatorDispersalResponse(t *testing.T) {
 	r := setUpRouter()
 	ctx := context.Background()
@@ -2229,7 +2570,7 @@ func TestFetchMetricsSummary(t *testing.T) {
 	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/summary")
 	response := decodeResponseBody[serverv2.MetricSummary](t, w)
 
-	assert.Equal(t, 16555.555555555555, response.AvgThroughput)
+	assert.Equal(t, 16555.555555555555, response.AverageBytesPerSecond)
 }
 
 func TestFetchMetricsThroughputTimeseries(t *testing.T) {
@@ -2257,6 +2598,31 @@ func TestFetchMetricsThroughputTimeseries(t *testing.T) {
 	assert.Equal(t, float64(12000), response[0].Throughput)
 	assert.Equal(t, uint64(1701292920), response[0].Timestamp)
 	assert.Equal(t, float64(3.503022666666651e+07), totalThroughput)
+}
+
+func TestFetchMetricsNetworkSigningRateTimeseries(t *testing.T) {
+	r := setUpRouter()
+
+	s := new(model.SampleStream)
+	err := s.UnmarshalJSON([]byte(mockPrometheusResponseNetworkSigningRate))
+	assert.NoError(t, err)
+
+	matrix := make(model.Matrix, 0)
+	matrix = append(matrix, s)
+	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil)
+
+	r.GET("/v2/metrics/timeseries/network-signing-rate", testDataApiServerV2.FetchNetworkSigningRate)
+
+	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/timeseries/network-signing-rate")
+	response := decodeResponseBody[serverv2.NetworkSigningRateResponse](t, w)
+
+	require.Equal(t, 2, len(response.QuorumSigningRates))
+	assert.Equal(t, "0", response.QuorumSigningRates[0].QuorumId)
+	require.Equal(t, 12, len(response.QuorumSigningRates[0].DataPoints))
+	assert.Equal(t, float64(98.1), response.QuorumSigningRates[0].DataPoints[0].SigningRate)
+	assert.Equal(t, "1", response.QuorumSigningRates[1].QuorumId)
+	assert.Equal(t, 12, len(response.QuorumSigningRates[1].DataPoints))
+	assert.Equal(t, float64(98.1), response.QuorumSigningRates[1].DataPoints[0].SigningRate)
 }
 
 func createAttestation(

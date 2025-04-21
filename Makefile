@@ -22,24 +22,27 @@ endif
 RELEASE_TAG := $(or $(RELEASE_TAG),latest)
 
 compile-contracts:
-	cd contracts && ./compile.sh
+	$(MAKE) -C contracts compile
 
 clean:
-	./api/builder/clean.sh
+	$(MAKE) -C api clean
 
 # Builds the protobuf files inside a docker container.
-protoc: clean
-	./api/builder/protoc-docker.sh
-	./api/builder/generate-docs.sh
+protoc:
+	$(MAKE) -C api protoc
 
 # Builds the protobuf files locally (i.e. without docker).
-protoc-local: clean
-	./api/builder/protoc.sh
+protoc-local:
+	$(MAKE) -C api protoc-local
 
 lint:
 	golint -set_exit_status ./...
 	go tool fix ./..
 	golangci-lint run
+
+# TODO: this should also format go code, github workflows, etc.
+fmt:
+	$(MAKE) -C contracts fmt
 
 build:
 	cd operators/churner && make build
