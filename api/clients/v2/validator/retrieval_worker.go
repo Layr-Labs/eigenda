@@ -20,6 +20,34 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+/*                     The lifecycle of a retrieval operation is as follows:
+
+	                        ...........................................
+	                        .    chunk downloading/verification       .
+	                        .          happens in parallel   	      .
+	                        .         (for different chunks)  	      .
+	                        ...........................................
+	                                 |                      |
+	                                 v                      v
+	+-----------------+     +-----------------+     +-----------------+     +-----------------+
+	|     request     | --> | download chunks | --> |  verify chunks  | --> |  decode blob    |
+	+-----------------+     +-----------------+     +-----------------+     +-----------------+
+	                                 ^                          ^
+                                     |                          |
+	................................................    .....................................................
+	. - DownloadPessimism setting determines       .    . - VerificationPessimism setting determines         .
+	.   how many chunks to download.               .    .   how many chunks to verify.                       .
+	. - If the download takes longer than the      .    . - Verification for a chunk may begin once it       .
+	.   PessimisticTimeout, then more downloads    .    .   has been downloaded.                             .
+	.   for different chunks are started.          .    . - If verification fails, the chunk is discarded.   .
+	. - If the download fails or takes longer than .    .   More chunks may be scheduled for both            .
+	.   the DownloadTimeout, then the download is  .    .   downloading and verification.                    .
+	.   aborted and more downloads for different   .    . - Once a sufficient number of chunks are verified, .
+	.   chunks are started.                        .    .   all pending downloads/verifications are aborted, .
+    ................................................    .   and the blob is decoded.                         .
+                                                        ......................................................
+*/
+
 // ValidatorRetrievalConfig contains the configuration for the validator retrieval client.
 type ValidatorRetrievalConfig struct {
 	// If 1.0, then the validator retrieval client will attempt to download the exact number of chunks
@@ -120,14 +148,6 @@ type retrievalWorker struct {
 	// The number of chunks we'd like to verify.
 	targetVerifiedCount uint32
 
-	// The number of chunks currently in the process of being downloaded, or which have already been downloaded.
-	// If chunk data is found to be invalid, then those chunks will be removed from this count.
-	chunksBeingDownloaded uint32
-
-	// The number of chunks currently in the process of being validated, or which have already been validated.
-	// If chunk data is found to be invalid, then those chunks will be removed from this count.
-	chunksBeingVerified uint32
-
 	// This queue is used to determine when the pessimistic timeout for a download has been reached.
 	downloadsInProgress queues.Queue
 
@@ -139,6 +159,14 @@ type retrievalWorker struct {
 
 	// Contains chunks that have been verified.
 	verifiedChunks queues.Queue
+
+	// The number of chunks currently in the process of being downloaded, or which have already been downloaded.
+	// If chunk data is found to be invalid, then those chunks will be removed from this count.
+	chunkDownloadCount uint32
+
+	// The number of chunks currently in the process of being validated, or which have already been verified.
+	// If chunk data is found to be invalid, then those chunks will be removed from this count.
+	chunksBeingVerifiedCount uint32
 
 	// The number of chunks that have been verified.
 	verifiedChunkCount uint32
@@ -296,13 +324,13 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 
 	// To start things off, request an initial number of downloads.
 	for w.nextDownloadIndex < len(w.downloadOrder) {
-		if w.chunksBeingDownloaded > w.targetDownloadCount {
+		if w.chunkDownloadCount > w.targetDownloadCount {
 			// We've requested enough downloads
 			break
 		}
 		operatorID := w.downloadOrder[w.nextDownloadIndex]
 		assignedChunks := w.assignments[operatorID].NumChunks
-		w.chunksBeingDownloaded += assignedChunks
+		w.chunkDownloadCount += assignedChunks
 		w.connectionPool.Submit(func() {
 			w.downloadChunks(operatorID)
 		})
@@ -334,9 +362,11 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 					w.downloadsInProgress.Dequeue()
 				} else if time.Since(downloadStart) > w.config.PessimisticTimeout {
 					// Too much time has passed. Assume that the operator is not responding.
+					w.logger.Debug("soft timeout exceeded for chunk download",
+						"operator", operatorID.Hex())
 					w.downloadsInProgress.Dequeue()
 					operatorChunks := w.assignments[operatorID].NumChunks
-					w.chunksBeingDownloaded -= operatorChunks
+					w.chunkDownloadCount -= operatorChunks
 				} else {
 					// The next download has not yet timed out.
 					break
@@ -347,6 +377,7 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 				w.logger.Debug("downloaded chunks from operator",
 					"operator", message.OperatorID.Hex(),
 					"blobKey", w.blobKey.Hex())
+				w.completedDownloadSet[message.OperatorID] = struct{}{}
 				w.unverifiedChunks.Enqueue(message)
 			} else {
 				w.logger.Warn("failed to download chunk data",
@@ -355,7 +386,7 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 					"err", message.Err)
 
 				chunkCount := w.assignments[message.OperatorID].NumChunks
-				w.chunksBeingDownloaded -= chunkCount
+				w.chunkDownloadCount -= chunkCount
 			}
 		case message := <-w.verificationCompleteChan:
 			if message.Err == nil {
@@ -371,20 +402,20 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 					"err", message.Err)
 
 				chunkCount := w.assignments[message.OperatorID].NumChunks
-				w.chunksBeingVerified -= chunkCount
-				w.chunksBeingDownloaded -= chunkCount
+				w.chunksBeingVerifiedCount -= chunkCount
+				w.chunkDownloadCount -= chunkCount
 			}
 		}
 
 		// Check to see if we need to schedule more downloads.
 		for w.nextDownloadIndex < len(w.downloadOrder) {
-			if w.chunksBeingDownloaded > w.targetDownloadCount {
+			if w.chunkDownloadCount > w.targetDownloadCount {
 				// We've requested enough downloads
 				break
 			}
 			operatorID := w.downloadOrder[w.nextDownloadIndex]
 			assignedChunks := w.assignments[operatorID].NumChunks
-			w.chunksBeingDownloaded += assignedChunks
+			w.chunkDownloadCount += assignedChunks
 			w.connectionPool.Submit(func() {
 				w.downloadChunks(operatorID)
 			})
@@ -394,7 +425,7 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 
 		// Check to see if we need to schedule more verifications.
 		for !w.unverifiedChunks.Empty() {
-			if w.chunksBeingVerified > w.targetVerifiedCount {
+			if w.chunksBeingVerifiedCount > w.targetVerifiedCount {
 				// We've requested enough verifications
 				break
 			}
@@ -403,7 +434,7 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 			reply := next.(*validatorDownloadCompleted).Reply
 			operatorID := next.(*validatorDownloadCompleted).OperatorID
 
-			w.chunksBeingVerified += uint32(len(reply.Chunks))
+			w.chunksBeingVerifiedCount += uint32(len(reply.Chunks))
 
 			w.computePool.Submit(func() {
 				w.deserializeAndVerifyChunks(operatorID, reply)
