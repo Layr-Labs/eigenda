@@ -81,7 +81,6 @@ func (s *ServerV2) FetchOperatorDispersalFeed(c *gin.Context) {
 	}
 
 	batches := make([]*OperatorDispersal, len(dispersals))
-	var zeroSignature [32]byte
 	for i, d := range dispersals {
 		batchHeaderHash, err := d.BatchHeader.Hash()
 		if err != nil {
@@ -89,9 +88,9 @@ func (s *ServerV2) FetchOperatorDispersalFeed(c *gin.Context) {
 			errorResponse(c, fmt.Errorf("failed to compute batch header hash from batch header: %w", err))
 			return
 		}
-		sig := hex.EncodeToString(d.Signature[:])
-		if d.Signature == zeroSignature {
-			sig = ""
+		var sig string
+		if d.Signature != [32]byte{} {
+			sig = hex.EncodeToString(d.Signature[:])
 		}
 		batches[i] = &OperatorDispersal{
 			BatchHeaderHash: hex.EncodeToString(batchHeaderHash[:]),

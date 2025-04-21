@@ -380,6 +380,7 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 
 	dispersedAt := make([]uint64, numRequests)
 	batchHeaders := make([]*corev2.BatchHeader, numRequests)
+	signatures := make([][32]byte, numRequests)
 	dynamoKeys := make([]commondynamodb.Key, numRequests)
 	for i := 0; i < numRequests; i++ {
 		dispersedAt[i] = firstRequestTs + uint64(i)*nanoSecsPerRequest
@@ -394,11 +395,15 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 			DispersedAt:     dispersedAt[i],
 			BatchHeader:     *batchHeaders[i],
 		}
+		signatures[i] = [32]byte{}
+		if i%2 == 0 {
+			signatures[i] = [32]byte{1, 1, uint8(i)}
+		}
 		dispersalResponse := &corev2.DispersalResponse{
 			DispersalRequest: dispersalRequest,
 			RespondedAt:      dispersedAt[i],
-			Signature:        [32]byte{1, 1, 1},
-			Error:            "error",
+			Signature:        signatures[i],
+			Error:            "",
 		}
 
 		err := blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
@@ -522,6 +527,11 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 			assert.Equal(t, dispersedAt[1+i], response.Dispersals[i].DispersedAt)
 			assert.Equal(t, batchHeaders[1+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
 			assert.Equal(t, batchHeaders[1+i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
+			if (1+i)%2 == 0 {
+				assert.Equal(t, hex.EncodeToString(signatures[1+i][:]), response.Dispersals[i].Signature)
+			} else {
+				assert.Equal(t, "", response.Dispersals[i].Signature)
+			}
 		}
 	})
 
