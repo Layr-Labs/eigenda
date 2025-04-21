@@ -1499,8 +1499,11 @@ const docTemplateV2 = `{
                 "batch_header_hash": {
                     "type": "string"
                 },
-                "dispersedAt": {
+                "dispersed_at": {
                     "type": "integer"
+                },
+                "signature": {
+                    "type": "string"
                 }
             }
         },

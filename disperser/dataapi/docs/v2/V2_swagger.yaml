@@ -437,8 +437,10 @@ definitions:
         $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader'
       batch_header_hash:
         type: string
-      dispersedAt:
+      dispersed_at:
         type: integer
+      signature:
+        type: string
     type: object
   v2.OperatorDispersalFeedResponse:
     properties:
