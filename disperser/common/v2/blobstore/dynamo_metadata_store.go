@@ -945,27 +945,28 @@ func (s *BlobMetadataStore) GetDispersalRequest(ctx context.Context, batchHeader
 	return req, nil
 }
 
-// GetDispersalRequestByDispersedAt returns DispersalRequest within time range (start, end)
-// (both exclusive), retrieved and ordered by DispersedAt timestamp in specified order.
+// GetDispersalsByRespondedAt returns dispersals (in DispersalResponse, which has joined
+// request and response together) to the given operator, within time range (start, end)
+// (both exclusive), retrieved and ordered by RespondedAt timestamp in the specified order.
 //
 // If specified order is ascending (`ascending` is true), retrieve data from the oldest (`start`)
 // to the newest (`end`); otherwise retrieve by the opposite direction.
 //
 // If limit > 0, returns at most that many dispersals. If limit <= 0, returns all results
 // in the time range.
-func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
+func (s *BlobMetadataStore) GetDispersalsByRespondedAt(
 	ctx context.Context,
 	operatorId core.OperatorID,
 	start uint64,
 	end uint64,
 	limit int,
 	ascending bool,
-) ([]*corev2.DispersalRequest, error) {
+) ([]*corev2.DispersalResponse, error) {
 	if start+1 > end-1 {
 		return nil, fmt.Errorf("no time point in exclusive time range (%d, %d)", start, end)
 	}
 
-	dispersals := make([]*corev2.DispersalRequest, 0)
+	dispersals := make([]*corev2.DispersalResponse, 0)
 	var lastEvaledKey map[string]types.AttributeValue
 	adjustedStart, adjustedEnd := start+1, end-1
 
@@ -981,10 +982,10 @@ func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
 		res, err := s.dynamoDBClient.QueryIndexWithPagination(
 			ctx,
 			s.tableName,
-			OperatorDispersalIndexName,
-			"OperatorID = :pk AND DispersedAt BETWEEN :start AND :end",
+			OperatorResponseIndexName,
+			"OperatorID = :pk AND RespondedAt BETWEEN :start AND :end",
 			commondynamodb.ExpressionValues{
-				":pk":    &types.AttributeValueMemberS{Value: dispersalRequestSKPrefix + operatorId.Hex()},
+				":pk":    &types.AttributeValueMemberS{Value: dispersalResponseSKPrefix + operatorId.Hex()},
 				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedStart), 10)},
 				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedEnd), 10)},
 			},
@@ -998,9 +999,9 @@ func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
 
 		// Collect results
 		for _, item := range res.Items {
-			it, err := UnmarshalDispersalRequest(item)
+			it, err := UnmarshalDispersalResponse(item)
 			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal DispersalRequest: %w", err)
+				return nil, fmt.Errorf("failed to unmarshal DispersalResponse: %w", err)
 			}
 			dispersals = append(dispersals, it)
 

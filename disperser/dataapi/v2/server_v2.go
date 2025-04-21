@@ -140,7 +140,8 @@ type (
 	OperatorDispersal struct {
 		BatchHeaderHash string              `json:"batch_header_hash"`
 		BatchHeader     *corev2.BatchHeader `json:"batch_header"`
-		DispersedAt     uint64
+		DispersedAt     uint64              `json:"dispersed_at"`
+		Signature       string              `json:"signature"`
 	}
 	OperatorDispersalFeedResponse struct {
 		OperatorIdentity OperatorIdentity     `json:"operator_identity"`

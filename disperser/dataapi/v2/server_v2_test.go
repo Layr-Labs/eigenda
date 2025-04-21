@@ -394,15 +394,21 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 			DispersedAt:     dispersedAt[i],
 			BatchHeader:     *batchHeaders[i],
 		}
+		dispersalResponse := &corev2.DispersalResponse{
+			DispersalRequest: dispersalRequest,
+			RespondedAt:      dispersedAt[i],
+			Signature:        [32]byte{1, 1, 1},
+			Error:            "error",
+		}
 
-		err := blobMetadataStore.PutDispersalRequest(ctx, dispersalRequest)
+		err := blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
 		require.NoError(t, err)
 
 		bhh, err := dispersalRequest.BatchHeader.Hash()
 		require.NoError(t, err)
 		dynamoKeys[i] = commondynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
-			"SK": &types.AttributeValueMemberS{Value: "DispersalRequest#" + opID.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID.Hex()},
 		}
 	}
 	defer deleteItems(t, dynamoKeys)
