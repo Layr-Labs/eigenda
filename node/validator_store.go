@@ -351,13 +351,6 @@ func (s *validatorStore) storeBatchLevelDB(batchHeaderHash []byte, batchData []*
 	return keys, size, nil
 }
 
-// TODO (cody-littley): currently, in order to prevent duplicate writes, we have to check for the existence of
-//  the data before writing it. This extra latency can be avoided with the following strategy:
-//  - add a timestamp to each blob header
-//  - reject blobs if their timestamp is too old
-//  - keep a set recently written blobs in memory
-//  - reject writes if we have recently written the data
-
 func (s *validatorStore) storeBatchLittDB(batchData []*BundleToStore) (uint64, error) {
 	var size uint64
 

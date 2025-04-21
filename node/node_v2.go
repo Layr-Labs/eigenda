@@ -116,8 +116,6 @@ func (n *Node) DownloadBundles(
 	}
 
 	probe.SetStage("download")
-	// TODO (cody-littley) metric for the time until start of download
-	// TODO (cody-littley) metric for the time of individual downloads
 
 	bundleChan := make(chan response, len(requests))
 	for relayKey := range requests {
