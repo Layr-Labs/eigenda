@@ -21,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/pubip"
+	"github.com/Layr-Labs/eigenda/common/tracing"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -288,6 +289,13 @@ func (n *Node) Start(ctx context.Context) error {
 		go pprofProfiler.Start()
 		n.Logger.Info("Enabled pprof for Node", "port", n.Config.PprofHttpPort)
 	}
+
+	if n.Config.Tracing.Enabled {
+		if err := n.InitTracingV1(ctx); err != nil {
+			n.Logger.Error("Failed to initialize V1 tracing", "err", err)
+		}
+	}
+
 	if n.Config.EnableMetrics {
 		n.Metrics.Start()
 		n.Logger.Info("Enabled metrics", "socket", n.Metrics.socketAddr)
@@ -307,6 +315,11 @@ func (n *Node) Start(ctx context.Context) error {
 			_ = n.RefreshOnchainState(ctx)
 		}()
 		go n.checkNodeReachability(v2CheckPath)
+		if n.Config.Tracing.Enabled {
+			if err := n.InitTracingV2(ctx); err != nil {
+				n.Logger.Error("Failed to initialize V2 tracing", "err", err)
+			}
+		}
 	}
 
 	// Build the socket based on the hostname/IP provided in the CLI
@@ -468,6 +481,9 @@ func (n *Node) ProcessBatch(
 	rawBlobs []*node.Blob,
 ) (*core.Signature, error) {
 
+	ctx, span := tracing.TraceOperation(ctx, "ProcessBatch")
+	defer span.End()
+
 	start := time.Now()
 	log := n.Logger
 
@@ -594,6 +610,9 @@ func (n *Node) ProcessBatch(
 }
 
 func (n *Node) SignMessage(ctx context.Context, data [32]byte) (*core.Signature, error) {
+	ctx, span := tracing.TraceOperation(ctx, "SignMessage")
+	defer span.End()
+
 	signature, err := n.BLSSigner.Sign(ctx, data[:])
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign message: %w", err)
@@ -609,6 +628,9 @@ func (n *Node) SignMessage(ctx context.Context, data [32]byte) (*core.Signature,
 }
 
 func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blobs []*core.BlobMessage) error {
+	ctx, span := tracing.TraceOperation(ctx, "ValidateBatch")
+	defer span.End()
+
 	start := time.Now()
 	operatorState, err := n.ChainState.GetOperatorStateByOperator(ctx, header.ReferenceBlockNumber, n.Config.ID)
 	if err != nil {
@@ -824,4 +846,34 @@ func GetReachabilityURL(dataApiUrl, path, operatorID string) (string, error) {
 	checkURL.RawQuery = q.Encode()
 
 	return checkURL.String(), nil
+}
+
+// InitTracingV1 initializes the tracing for v1 API components
+func (n *Node) InitTracingV1(ctx context.Context) error {
+	// Initialize tracing if enabled
+	if n.Config.Tracing.Enabled {
+		tracingCfg := tracing.TracingConfig{
+			Enabled:     n.Config.Tracing.Enabled,
+			ServiceName: n.Config.Tracing.ServiceName,
+			Endpoint:    n.Config.Tracing.Endpoint,
+			SampleRatio: n.Config.Tracing.SampleRatio,
+		}
+
+		telemetryShutdown, err := tracing.InitTelemetry(ctx, tracingCfg)
+		if err != nil {
+			n.Logger.Error("Failed to initialize tracing", "err", err)
+			// Continue with startup even if tracing fails
+			return err
+		} else {
+			n.Logger.Info("Enabled tracing for Node", "endpoint", n.Config.Tracing.Endpoint)
+			// Add cleanup handler for tracing when node shuts down
+			go func() {
+				<-ctx.Done()
+				if err := telemetryShutdown(context.Background()); err != nil {
+					n.Logger.Error("Failed to shutdown telemetry", "err", err)
+				}
+			}()
+		}
+	}
+	return nil
 }

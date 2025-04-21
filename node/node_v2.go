@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/tracing"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/gammazero/workerpool"
@@ -42,6 +43,9 @@ func (n *Node) DownloadBundles(
 ) ([]*corev2.BlobShard, []*RawBundles, error) {
 
 	probe.SetStage("prepare_to_download")
+
+	ctx, span := tracing.TraceOperation(ctx, "DownloadBundles")
+	defer span.End()
 
 	relayClient, ok := n.RelayClient.Load().(clients.RelayClient)
 	if !ok || relayClient == nil {
@@ -126,7 +130,11 @@ func (n *Node) DownloadBundles(
 		n.DownloadPool.Submit(func() {
 			ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
 			defer cancel()
-			bundles, err := relayClient.GetChunksByRange(ctxTimeout, relayKey, req.chunkRequests)
+
+			workerCtx, workerSpan := tracing.TraceOperation(ctxTimeout, "GetChunksByRange")
+			bundles, err := relayClient.GetChunksByRange(workerCtx, relayKey, req.chunkRequests)
+			workerSpan.End()
+
 			if err != nil {
 				n.Logger.Errorf("failed to get chunks from relays: %v", err)
 				bundleChan <- response{
@@ -177,6 +185,9 @@ func (n *Node) ValidateBatchV2(
 	blobShards []*corev2.BlobShard,
 	operatorState *core.OperatorState,
 ) error {
+	ctx, span := tracing.TraceOperation(ctx, "ValidateBatchV2")
+	defer span.End()
+
 	if n.ValidatorV2 == nil {
 		return fmt.Errorf("store v2 is not set")
 	}
@@ -187,4 +198,32 @@ func (n *Node) ValidateBatchV2(
 	pool := workerpool.New(n.Config.NumBatchValidators)
 	blobVersionParams := n.BlobVersionParams.Load()
 	return n.ValidatorV2.ValidateBlobs(ctx, blobShards, blobVersionParams, pool, operatorState)
+}
+
+func (n *Node) InitTracingV2(ctx context.Context) error {
+	// Initialize tracing if enabled
+	if n.Config.Tracing.Enabled {
+		tracingCfg := tracing.TracingConfig{
+			Enabled:     n.Config.Tracing.Enabled,
+			ServiceName: n.Config.Tracing.ServiceName + "-v2",
+			Endpoint:    n.Config.Tracing.Endpoint,
+			SampleRatio: n.Config.Tracing.SampleRatio,
+		}
+
+		telemetryShutdown, err := tracing.InitTelemetry(ctx, tracingCfg)
+		if err != nil {
+			n.Logger.Error("Failed to initialize V2 tracing", "err", err)
+			// Continue with startup even if tracing fails
+		} else {
+			n.Logger.Info("Enabled tracing for Node V2", "endpoint", n.Config.Tracing.Endpoint)
+			// Add cleanup handler for tracing when node shuts down
+			go func() {
+				<-ctx.Done()
+				if err := telemetryShutdown(context.Background()); err != nil {
+					n.Logger.Error("Failed to shutdown V2 telemetry", "err", err)
+				}
+			}()
+		}
+	}
+	return nil
 }

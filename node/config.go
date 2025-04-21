@@ -86,6 +86,14 @@ type Config struct {
 	StoreChunksRequestMaxPastAge    time.Duration
 	StoreChunksRequestMaxFutureAge  time.Duration
 
+	// Tracing configuration
+	Tracing struct {
+		Enabled     bool
+		ServiceName string
+		Endpoint    string
+		SampleRatio float64
+	}
+
 	BlsSignerConfig blssignerTypes.SignerConfig
 
 	EthClientConfig geth.EthClientConfig
@@ -347,5 +355,16 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		LittDBEnabled:                       ctx.GlobalBool(flags.LittDBEnabledFlag.Name),
 		DownloadPoolMultiplier:              ctx.GlobalInt(flags.DownloadPoolMultiplierFlag.Name),
 		DownloadPoolConstant:                ctx.GlobalInt(flags.DownloadPoolConstantFlag.Name),
+		Tracing: struct {
+			Enabled     bool
+			ServiceName string
+			Endpoint    string
+			SampleRatio float64
+		}{
+			Enabled:     ctx.GlobalBool(flags.TracingEnabledFlag.Name),
+			ServiceName: ctx.GlobalString(flags.TracingServiceNameFlag.Name),
+			Endpoint:    ctx.GlobalString(flags.TracingEndpointFlag.Name),
+			SampleRatio: ctx.GlobalFloat64(flags.TracingSampleRatioFlag.Name),
+		},
 	}, nil
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
+	"github.com/Layr-Labs/eigenda/common/tracing"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/core"
@@ -352,6 +353,9 @@ func (s *Store) deleteNBatches(currentTimeUnixSec int64, numBatches int) (int, e
 //
 // These entries will be stored atomically, i.e. either all or none entries will be stored.
 func (s *Store) StoreBatch(ctx context.Context, header *core.BatchHeader, blobs []*core.BlobMessage, blobsProto []*node.Blob) (*[][]byte, error) {
+	ctx, span := tracing.TraceOperation(ctx, "StoreBatch")
+	defer span.End()
+
 	storeBatchStart := time.Now()
 
 	log := s.logger

@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/replay"
+	"github.com/Layr-Labs/eigenda/common/tracing"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/node"
@@ -104,6 +105,9 @@ func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (
 }
 
 func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
+	ctx, span := tracing.TraceOperation(ctx, "StoreChunks")
+	defer span.End()
+
 	if !s.config.EnableV2 {
 		return nil, api.NewErrorInvalidArg("v2 API is disabled")
 	}
@@ -155,7 +159,9 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
 
-	blobShards, rawBundles, err := s.node.DownloadBundles(ctx, batch, operatorState, probe)
+	downloadCtx, downloadSpan := tracing.TraceOperation(ctx, "DownloadBundlesCall")
+	blobShards, rawBundles, err := s.node.DownloadBundles(downloadCtx, batch, operatorState, probe)
+	downloadSpan.End()
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
@@ -251,7 +257,9 @@ func (s *ServerV2) validateAndStoreV2ChunksLevelDB(
 		}
 	}()
 
-	err := s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
+	validateCtx, validateSpan := tracing.TraceOperation(ctx, "ValidateBatchV2Call")
+	err := s.node.ValidateBatchV2(validateCtx, batch, blobShards, operatorState)
+	validateSpan.End()
 	if err != nil {
 		res := <-storeChan
 		if len(res.keys) > 0 {
@@ -321,6 +329,9 @@ func (s *ServerV2) validateStoreChunksRequest(req *pb.StoreChunksRequest) (*core
 }
 
 func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
+	ctx, span := tracing.TraceOperation(ctx, "GetChunks")
+	defer span.End()
+
 	start := time.Now()
 
 	if !s.config.EnableV2 {

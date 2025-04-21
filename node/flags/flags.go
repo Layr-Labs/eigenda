@@ -473,6 +473,34 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "TEST_PRIVATE_BLS"),
 	}
 
+	// Tracing flags
+	TracingEnabledFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "tracing-enabled"),
+		Usage:    "Enable OpenTelemetry tracing",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "TRACING_ENABLED"),
+	}
+	TracingServiceNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "tracing-service-name"),
+		Usage:    "Service name for tracing (default: eigenda-node)",
+		Required: false,
+		Value:    "eigenda-node",
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "TRACING_SERVICE_NAME"),
+	}
+	TracingEndpointFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "tracing-endpoint"),
+		Usage:    "OpenTelemetry collector endpoint URL",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "TRACING_ENDPOINT"),
+	}
+	TracingSampleRatioFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "tracing-sample-ratio"),
+		Usage:    "Sampling ratio for traces (default: 0.1 = 10%)",
+		Required: false,
+		Value:    0.1,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "TRACING_SAMPLE_RATIO"),
+	}
+
 	/////////////////////////////////////////////////////////////////////////////
 	// END TEST FLAGS SECTION
 	//
@@ -546,6 +574,10 @@ var optionalFlags = []cli.Flag{
 	LittDBEnabledFlag,
 	DownloadPoolMultiplierFlag,
 	DownloadPoolConstantFlag,
+	TracingEnabledFlag,
+	TracingServiceNameFlag,
+	TracingEndpointFlag,
+	TracingSampleRatioFlag,
 }
 
 func init() {
