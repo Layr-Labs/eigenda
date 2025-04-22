@@ -95,10 +95,13 @@ func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameM
 		return nil, fmt.Errorf("no metadata provided")
 	}
 
+	// Add span for key preparation
+	_, keysSpan := tracing.TraceOperation(ctx, "chunkProvider.GetFrames.prepareKeys")
 	keys := make([]*blobKeyWithMetadata, 0, len(mMap))
 	for k, v := range mMap {
 		keys = append(keys, &blobKeyWithMetadata{blobKey: k, metadata: *v})
 	}
+	keysSpan.End()
 
 	type framesResult struct {
 		key  v2.BlobKey
@@ -109,35 +112,53 @@ func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameM
 	// Channel for results.
 	completionChannel := make(chan *framesResult, len(keys))
 
+	// Add span for goroutine launch phase
+	_, launchSpan := tracing.TraceOperation(ctx, "chunkProvider.GetFrames.launchGoroutines")
 	for _, key := range keys {
-
 		boundKey := key
 		go func() {
-			frames, err := s.frameCache.Get(ctx, *boundKey)
+			routineCtx, routineSpan := tracing.TraceOperation(ctx, "chunkProvider.GetFrames.goroutine")
+			defer routineSpan.End()
+
+			// Add cache operation span with sub-spans for different phases
+			cacheCtx, cacheSpan := tracing.TraceOperation(routineCtx, "chunkProvider.GetFrames.cacheOperation")
+			defer cacheSpan.End()
+
+			frames, err := s.frameCache.Get(cacheCtx, *boundKey)
+
+			// Add error handling span if there's an error
 			if err != nil {
+				_, errSpan := tracing.TraceOperation(routineCtx, "chunkProvider.GetFrames.errorHandling")
 				s.logger.Errorf("Failed to get frames for blob %v: %v", boundKey.blobKey.Hex(), err)
 				completionChannel <- &framesResult{
 					key: boundKey.blobKey,
 					err: err,
 				}
+				errSpan.End()
 			} else {
+				_, resultSpan := tracing.TraceOperation(routineCtx, "chunkProvider.GetFrames.sendResult")
 				completionChannel <- &framesResult{
 					key:  boundKey.blobKey,
 					data: frames,
 				}
+				resultSpan.End()
 			}
-
 		}()
 	}
+	launchSpan.End()
 
+	// Add span for result collection phase
+	_, collectSpan := tracing.TraceOperation(ctx, "chunkProvider.GetFrames.collectResults")
 	fMap := make(frameMap, len(keys))
 	for len(fMap) < len(keys) {
 		result := <-completionChannel
 		if result.err != nil {
+			collectSpan.End()
 			return nil, fmt.Errorf("error fetching frames for blob %v: %w", result.key.Hex(), result.err)
 		}
 		fMap[result.key] = result.data
 	}
+	collectSpan.End()
 
 	return fMap, nil
 }
@@ -147,12 +168,16 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) (*core.ChunksData, 
 	ctx, span := tracing.TraceOperation(s.ctx, "chunkProvider.fetchFrames")
 	defer span.End()
 
+	// Add span for setup phase
+	_, setupSpan := tracing.TraceOperation(ctx, "chunkProvider.fetchFrames.setup")
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-
 	var proofs [][]byte
 	var proofsErr error
+	setupSpan.End()
 
+	// Add span for proof fetching goroutine launch
+	_, proofLaunchSpan := tracing.TraceOperation(ctx, "chunkProvider.fetchFrames.launchProofFetch")
 	go func() {
 		proofCtx, cancel := context.WithTimeout(ctx, s.proofFetchTimeout)
 		proofCtx, proofSpan := tracing.TraceOperation(proofCtx, "chunkProvider.fetchProofs")
@@ -162,14 +187,22 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) (*core.ChunksData, 
 			cancel()
 		}()
 
+		// Add span for the actual proof fetching operation
+		_, fetchSpan := tracing.TraceOperation(proofCtx, "chunkProvider.fetchProofs.getBinaryChunkProofs")
 		proofs, proofsErr = s.chunkReader.GetBinaryChunkProofs(proofCtx, key.blobKey)
+		fetchSpan.End()
 	}()
+	proofLaunchSpan.End()
 
+	// Add span for fragment info preparation
+	_, fragSpan := tracing.TraceOperation(ctx, "chunkProvider.fetchFrames.prepareFragmentInfo")
 	fragmentInfo := &encoding.FragmentInfo{
 		TotalChunkSizeBytes: key.metadata.totalChunkSizeBytes,
 		FragmentSizeBytes:   key.metadata.fragmentSizeBytes,
 	}
+	fragSpan.End()
 
+	// Add spans for coefficient fetching with timeout
 	coeffCtx, cancel := context.WithTimeout(ctx, s.coefficientFetchTimeout)
 	coeffCtx, coeffSpan := tracing.TraceOperation(coeffCtx, "chunkProvider.fetchCoefficients")
 	defer func() {
@@ -177,18 +210,36 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) (*core.ChunksData, 
 		cancel()
 	}()
 
+	// Add span for the actual coefficient fetching operation
+	_, coeffFetchSpan := tracing.TraceOperation(coeffCtx, "chunkProvider.fetchCoefficients.getBinaryChunkCoefficients")
 	elementCount, coefficients, err := s.chunkReader.GetBinaryChunkCoefficients(coeffCtx, key.blobKey, fragmentInfo)
+	coeffFetchSpan.End()
+
 	if err != nil {
+		_, errSpan := tracing.TraceOperation(ctx, "chunkProvider.fetchFrames.coefficientError")
+		defer errSpan.End()
 		return nil, err
 	}
 
+	// Add span for waiting on proof fetch completion
+	_, waitSpan := tracing.TraceOperation(ctx, "chunkProvider.fetchFrames.waitForProofs")
 	wg.Wait()
+	waitSpan.End()
+
 	if proofsErr != nil {
+		_, errSpan := tracing.TraceOperation(ctx, "chunkProvider.fetchFrames.proofError")
+		defer errSpan.End()
 		return nil, proofsErr
 	}
 
+	// Add span for building chunks data
+	_, buildSpan := tracing.TraceOperation(ctx, "chunkProvider.buildChunksData")
 	frames, err := rs.BuildChunksData(proofs, int(elementCount), coefficients)
+	buildSpan.End()
+
 	if err != nil {
+		_, errSpan := tracing.TraceOperation(ctx, "chunkProvider.fetchFrames.buildError")
+		defer errSpan.End()
 		return nil, err
 	}
 
