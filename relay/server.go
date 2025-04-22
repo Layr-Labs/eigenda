@@ -22,6 +22,7 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/limiter"
 	"github.com/Layr-Labs/eigenda/relay/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
@@ -565,8 +566,9 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	opt := grpc.MaxRecvMsgSize(s.config.MaxGRPCMessageSize)
+	otelHandler := grpc.StatsHandler(otelgrpc.NewServerHandler())
 
-	s.grpcServer = grpc.NewServer(opt, s.metrics.GetGRPCServerOption())
+	s.grpcServer = grpc.NewServer(opt, s.metrics.GetGRPCServerOption(), otelHandler)
 	reflection.Register(s.grpcServer)
 	pb.RegisterRelayServer(s.grpcServer, s)
 

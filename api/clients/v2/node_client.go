@@ -17,9 +17,10 @@ import (
 )
 
 type NodeClientConfig struct {
-	Hostname          string
-	Port              string
-	UseSecureGrpcFlag bool
+	Hostname            string
+	Port                string
+	UseSecureGrpcFlag   bool
+	EnableOpenTelemetry bool
 }
 
 type NodeClient interface {
@@ -122,7 +123,7 @@ func (c *nodeClient) initOnceGrpcConnection() error {
 	var initErr error
 	c.initOnce.Do(func() {
 		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
-		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag, 4*units.MiB)
+		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag, 4*units.MiB, c.config.EnableOpenTelemetry)
 		conn, err := grpc.NewClient(addr, dialOptions...)
 		if err != nil {
 			initErr = err

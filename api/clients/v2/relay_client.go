@@ -21,10 +21,13 @@ import (
 type MessageSigner func(ctx context.Context, data [32]byte) (*core.Signature, error)
 
 type RelayClientConfig struct {
-	UseSecureGrpcFlag  bool
-	MaxGRPCMessageSize uint
-	OperatorID         *core.OperatorID
-	MessageSigner      MessageSigner
+	UseSecureGrpcFlag   bool
+	MaxGRPCMessageSize  uint
+	OperatorID          *core.OperatorID
+	MessageSigner       MessageSigner
+	Hostname            string
+	Port                int
+	EnableOpenTelemetry bool
 }
 
 type ChunkRequestByRange struct {
@@ -274,7 +277,7 @@ func (c *relayClient) initOnceGrpcConnection(ctx context.Context, key corev2.Rel
 		return fmt.Errorf("get relay url for key %d: %w", key, err)
 	}
 
-	dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag, c.config.MaxGRPCMessageSize)
+	dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag, c.config.MaxGRPCMessageSize, c.config.EnableOpenTelemetry)
 	conn, err := grpc.NewClient(relayUrl, dialOptions...)
 	if err != nil {
 		return fmt.Errorf("create grpc client for key %d: %w", key, err)

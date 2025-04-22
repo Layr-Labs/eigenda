@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -27,6 +28,8 @@ type Config struct {
 	// TODO: do we want to add config timeouts for those separate requests?
 	Timeout           time.Duration
 	UseSecureGrpcFlag bool
+	// EnableOpenTelemetry controls whether OpenTelemetry instrumentation is added to GRPC connections
+	EnableOpenTelemetry bool
 	// MaxRetrieveBlobSizeBytes is the maximum size of a blob that can be retrieved by using
 	// the RetrieveBlob method. This is used to set the max message size for the grpc client.
 	// DisperserClient uses a single underlying grpc channel shared for all methods,
@@ -330,8 +333,12 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 	var initErr error
 	c.initOnce.Do(func() {
 		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
-		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag)
-		conn, err := grpc.NewClient(addr, dialOptions...)
+		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag, c.config.EnableOpenTelemetry)
+
+		// We need to set max receive message size to allow retrieving large blobs
+		dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(c.config.MaxRetrieveBlobSizeBytes)))
+
+		conn, err := grpc.Dial(addr, dialOptions...)
 		if err != nil {
 			initErr = err
 			return
@@ -345,12 +352,18 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 	return nil
 }
 
-func getGrpcDialOptions(useSecureGrpcFlag bool) []grpc.DialOption {
+func getGrpcDialOptions(useSecureGrpcFlag bool, enableOpenTelemetry bool) []grpc.DialOption {
 	options := []grpc.DialOption{}
 	if useSecureGrpcFlag {
 		options = append(options, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})))
 	} else {
 		options = append(options, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
+
+	// Add OpenTelemetry instrumentation if enabled
+	if enableOpenTelemetry {
+		options = append(options, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	}
+
 	return options
 }

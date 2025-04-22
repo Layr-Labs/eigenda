@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -41,7 +42,8 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			}
 
 			opt := grpc.MaxRecvMsgSize(60 * 1024 * 1024 * 1024) // 60 GiB
-			gs := grpc.NewServer(opt)
+			otelHandler := grpc.StatsHandler(otelgrpc.NewServerHandler())
+			gs := grpc.NewServer(opt, otelHandler)
 
 			// Register reflection service on gRPC server
 			// This makes "grpcurl -plaintext localhost:9000 list" command work
@@ -72,7 +74,8 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			}
 
 			opt := grpc.MaxRecvMsgSize(config.GRPCMsgSizeLimitV2)
-			gs := grpc.NewServer(opt, serverV2.metrics.GetGRPCServerOption())
+			otelHandler := grpc.StatsHandler(otelgrpc.NewServerHandler())
+			gs := grpc.NewServer(opt, serverV2.metrics.GetGRPCServerOption(), otelHandler)
 
 			// Register reflection service on gRPC server
 			// This makes "grpcurl -plaintext localhost:9000 list" command work
@@ -103,7 +106,8 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			}
 
 			opt := grpc.MaxRecvMsgSize(1024 * 1024 * 300) // 300 MiB
-			gs := grpc.NewServer(opt)
+			otelHandler := grpc.StatsHandler(otelgrpc.NewServerHandler())
+			gs := grpc.NewServer(opt, otelHandler)
 
 			// Register reflection service on gRPC server
 			// This makes "grpcurl -plaintext localhost:9000 list" command work
@@ -132,7 +136,8 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 				logger.Fatalf("Could not start tcp listener: %v", err)
 			}
 			opt := grpc.MaxRecvMsgSize(config.GRPCMsgSizeLimitV2)
-			gs := grpc.NewServer(opt, serverV2.metrics.GetGRPCServerOption())
+			otelHandler := grpc.StatsHandler(otelgrpc.NewServerHandler())
+			gs := grpc.NewServer(opt, serverV2.metrics.GetGRPCServerOption(), otelHandler)
 
 			// Register reflection service on gRPC server
 			// This makes "grpcurl -plaintext localhost:9000 list" command work
