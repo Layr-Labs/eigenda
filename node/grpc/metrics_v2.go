@@ -55,7 +55,7 @@ func NewV2Metrics(logger logging.Logger, registry *prometheus.Registry) (*Metric
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Name:       "get_chunks_latency_ms",
-			Help:       "The latency of a GetBundleData() RPC call.",
+			Help:       "The latency of a GetChunks() RPC call.",
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		},
 		[]string{},
@@ -65,7 +65,7 @@ func NewV2Metrics(logger logging.Logger, registry *prometheus.Registry) (*Metric
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "get_chunks_data_size_bytes",
-			Help:      "The size of the data requested to be retrieved by GetBundleData() RPC calls.",
+			Help:      "The size of the data requested to be retrieved by GetChunks() RPC calls.",
 		},
 		[]string{},
 	)

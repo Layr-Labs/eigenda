@@ -10,6 +10,8 @@ import (
 )
 
 // StageTimer encapsulates metrics to help track the time spent in each stage of the payload dispersal process.
+//
+// This object is thread safe.
 type StageTimer struct {
 	// counts the number of operations in each specific stage
 	stageCount *prometheus.GaugeVec
@@ -23,6 +25,9 @@ type StageTimer struct {
 // sub-operations (i.e. stages). Multiple instances of a particular operation can be tracked concurrently by the same
 // StageTimer. For each operation, the StageTimer builds a SequenceProbe. Each SequenceProbe is responsible for
 // tracking the lifecycle of a single  iteration of an operation.
+//
+// A SequenceProbe is not thread safe. It is intended for use in measuring a linear sequence of operations. Do not call
+// SetStage or End from multiple goroutines at the same time.
 type SequenceProbe struct {
 	// the parent StageTimer
 	stageTimer *StageTimer

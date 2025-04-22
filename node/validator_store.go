@@ -30,12 +30,19 @@ const (
 	BundleTableName          = "bundles"
 	MigrationTableName       = "migration"
 
-	// LevelDBPath is he path where the levelDB database is stored.
+	// LevelDBPath is the path where the levelDB database is stored.
 	LevelDBPath = "chunk_v2"
 	// LevelDBDeletionPath is the path where the levelDB database is stored while it is being deleted (for atomicity).
 	LevelDBDeletionPath = "chunk_v2_deleted"
 	// LittDBPath is the path where the littDB database is stored.
 	LittDBPath = "chunk_v2_litt"
+
+	// The name of the littDB table containing chunk data.
+	chunksTableName = "chunks"
+	// A legacy littDB table, this will exist until all old implementations are migrated and delete this table.
+	headersTableName = "headers"
+	// The metrics prefix for littDB.
+	littDBMetricsPrefix = "node_littdb"
 )
 
 // BundleToStore is a struct that holds the bundle key and the bundle bytes.
@@ -183,7 +190,9 @@ func NewValidatorStore(
 		}
 	}
 
-	// Set up migration if necessary.
+	// Set up migration if necessary. The migrationComplete time is the time when all data in the old levelDB instance
+	// has exceeded its TTL. If the TTL is 2 weeks, then the migrationComplete time will be 2 weeks from now. At that
+	// moment, it becomes safe to permanently stop and delete the levelDB database.
 	var migrationComplete time.Time
 	if config.LittDBEnabled && levelDBExists {
 		// Both DBs are in play, meaning we are either about to start a migration or already in the middle of one.
@@ -199,7 +208,7 @@ func NewValidatorStore(
 			// in the levelDB. Start the data migration from levelDB to littDB.
 
 			migrationComplete = timeSource().Add(ttl)
-			logger.Infof("Begining data migration from levelDB to littDB. Migration will be completed at %s",
+			logger.Infof("Beginning data migration from levelDB to littDB. Migration will be completed at %s",
 				migrationComplete)
 
 			migrationCompleteUnix := migrationComplete.Unix()
@@ -239,7 +248,7 @@ func NewValidatorStore(
 		littConfig.ShardingFactor = 1
 		littConfig.MetricsEnabled = true
 		littConfig.MetricsRegistry = registry
-		littConfig.MetricsNamespace = "node_littdb"
+		littConfig.MetricsNamespace = littDBMetricsPrefix
 		littConfig.Logger = logger
 		littConfig.DoubleWriteProtection = config.LittDBDoubleWriteProtection
 		if err != nil {
@@ -251,14 +260,14 @@ func NewValidatorStore(
 			return nil, fmt.Errorf("failed to create new litt store: %w", err)
 		}
 
-		chunkTable, err = littDB.GetTable("chunks")
+		chunkTable, err = littDB.GetTable(chunksTableName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get chunks table: %w", err)
 		}
 
 		// A prior implementation stored data here. Delete it if it exists.
 		// This is safe to delete once all old validators have been migrated to the new version.
-		err = littDB.DropTable("headers")
+		err = littDB.DropTable(headersTableName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to drop headers table: %w", err)
 		}

@@ -22,9 +22,9 @@ func init() {
 // We don't test waiting for finality because that adds 12 minutes to the test, and is not necessary
 // because we already test for this in the unit tests using a mock disperser which is much faster.
 func TestClientUsingTestnet(t *testing.T) {
-	//if !runTestnetIntegrationTests { // TODO
-	//}
-	t.Skip("Skipping testnet integration test")
+	if !runTestnetIntegrationTests {
+		t.Skip("Skipping testnet integration test")
+	}
 
 	t.Run("PutBlobWaitForConfirmationDepth0AndGetBlob", func(t *testing.T) {
 		t.Parallel()

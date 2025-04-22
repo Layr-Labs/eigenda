@@ -5,6 +5,11 @@ import "sync"
 // IndexLock is similar to a sync.Mutex, but it allows for different indices to be locked independently. There
 // is a probability that any two indices' locks interfere with each other, but this can be made arbitrarily small
 // by configuration.
+//
+// Internally, an IndexLock keeps an array of mutexes. Each index is mapped onto one of these mutexes in the array,
+// such that the same index always maps to the same mutex. Note that due to this mapping, otherwise unrelated indices
+// may end up using the same mutex. Increasing the number of locks will decrease the probability of unrelated indices
+// contending for the same lock, but will also increase memory usage.
 type IndexLock struct {
 	locks []sync.Mutex
 }

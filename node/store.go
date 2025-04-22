@@ -41,7 +41,6 @@ type Store struct {
 }
 
 // NewLevelDBStore creates a new Store object with a levelDB at the provided path and the given logger.
-// TODO(jianoaix): parameterize this so we can switch between different database backends.
 func NewLevelDBStore(
 	path string,
 	logger logging.Logger,
@@ -51,8 +50,7 @@ func NewLevelDBStore(
 	syncWrites bool,
 	storeDurationBlocks uint32) (*Store, error) {
 
-	// Create the levelDB at the path. This is currently hardcoded to use
-	// levelDB.
+	// Create the DB at the path.
 	var db kvstore.Store[[]byte]
 	var err error
 	if metrics != nil {

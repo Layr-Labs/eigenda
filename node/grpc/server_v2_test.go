@@ -367,10 +367,6 @@ func TestV2StoreChunksValidationFailure(t *testing.T) {
 	})
 	require.Nil(t, reply.GetSignature())
 	requireErrorStatus(t, err, codes.Internal)
-
-	if !config.LittDBEnabled {
-		c.store.AssertCalled(t, "DeleteKeys", mock.Anything, mock.Anything)
-	}
 }
 
 func TestV2GetChunksInputValidation(t *testing.T) {

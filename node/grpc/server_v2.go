@@ -285,13 +285,15 @@ func (s *ServerV2) validateAndStoreV2ChunksLittDB(
 	probe.SetStage("validate")
 	err := s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
 	if err != nil {
-		return api.NewErrorInternal(fmt.Sprintf("failed to validate batch %s: %v", batchHeaderHash, err))
+		return api.NewErrorInternal(
+			fmt.Sprintf("failed to validate batch %s: %v", hex.EncodeToString(batchHeaderHash[:]), err))
 	}
 
 	probe.SetStage("store")
 	_, size, err := s.node.ValidatorStore.StoreBatch(batchHeaderHash[:], batchData)
 	if err != nil {
-		return api.NewErrorInternal(fmt.Sprintf("failed to store batch %s: %v", batchHeaderHash, err))
+		return api.NewErrorInternal(
+			fmt.Sprintf("failed to store batch %s: %v", hex.EncodeToString(batchHeaderHash[:]), err))
 	}
 
 	s.metrics.ReportStoreChunksRequestSize(size)

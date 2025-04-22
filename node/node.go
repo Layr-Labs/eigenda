@@ -111,7 +111,7 @@ func NewNode(
 	// Make sure config folder exists.
 	err := os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
-		return nil, fmt.Errorf("could not create levelDB directory at %s: %w", config.DbPath, err)
+		return nil, fmt.Errorf("could not create DB directory at %s: %w", config.DbPath, err)
 	}
 
 	chainID, err := client.ChainID(context.Background())

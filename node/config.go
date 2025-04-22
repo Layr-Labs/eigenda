@@ -117,8 +117,7 @@ type Config struct {
 	// (number of CPUs) * DownloadPoolMultiplier + DownloadPoolConstant
 	DownloadPoolConstant int
 
-	// If true, use littDB instead of levelDB for v2 storage. Note than in its current form, no data migration is
-	// performed when this setting is enabled. (Migration is a feature we will need prior to deployment to mainnet.)
+	// If true, use littDB instead of levelDB for v2 storage.
 	LittDBEnabled bool
 
 	// A special test only setting. If true, then littDB will throw an error if the same data is written twice.
