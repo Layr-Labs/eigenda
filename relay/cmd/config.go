@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/common/tracing"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/relay"
@@ -99,6 +100,12 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			EnableMetrics: ctx.Bool(flags.EnableMetricsFlag.Name),
 			EnablePprof:   ctx.Bool(flags.EnablePprofFlag.Name),
 			PprofHttpPort: ctx.Int(flags.PprofHttpPortFlag.Name),
+			Tracing: tracing.TracingConfig{
+				Enabled:     ctx.Bool(flags.TracingEnabledFlag.Name),
+				ServiceName: ctx.String(flags.TracingServiceNameFlag.Name),
+				Endpoint:    ctx.String(flags.TracingEndpointFlag.Name),
+				SampleRatio: ctx.Float64(flags.TracingSampleRatioFlag.Name),
+			},
 		},
 		EthClientConfig:               geth.ReadEthClientConfigRPCOnly(ctx),
 		BLSOperatorStateRetrieverAddr: ctx.String(flags.BlsOperatorStateRetrieverAddrFlag.Name),

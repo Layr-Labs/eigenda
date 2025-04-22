@@ -323,6 +323,34 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNKS_REQUEST_MAX_FUTURE_AGE"),
 		Value:    5 * time.Minute,
 	}
+
+	// Tracing flags
+	TracingEnabledFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "tracing-enabled"),
+		Usage:    "Enable OpenTelemetry tracing",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "TRACING_ENABLED"),
+	}
+	TracingServiceNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "tracing-service-name"),
+		Usage:    "Service name for tracing (default: eigenda-relay)",
+		Required: false,
+		Value:    "eigenda-relay",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "TRACING_SERVICE_NAME"),
+	}
+	TracingEndpointFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "tracing-endpoint"),
+		Usage:    "OpenTelemetry collector endpoint URL",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "TRACING_ENDPOINT"),
+	}
+	TracingSampleRatioFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "tracing-sample-ratio"),
+		Usage:    "Sampling ratio for traces (default is 0.1 which means 10%)",
+		Required: false,
+		Value:    0.1,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "TRACING_SAMPLE_RATIO"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -374,6 +402,10 @@ var optionalFlags = []cli.Flag{
 	PprofHttpPortFlag,
 	GetChunksRequestMaxPastAgeFlag,
 	GetChunksRequestMaxFutureAgeFlag,
+	TracingEnabledFlag,
+	TracingServiceNameFlag,
+	TracingEndpointFlag,
+	TracingSampleRatioFlag,
 }
 
 var Flags []cli.Flag
