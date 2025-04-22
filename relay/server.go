@@ -258,16 +258,23 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		ctx, cancel = context.WithTimeout(ctx, s.config.Timeouts.GetChunksTimeout)
 		defer cancel()
 	}
+
+	// Validation span
+	_, validateSpan := tracing.TraceOperation(ctx, "GetChunks.Validate")
 	err := s.validateGetChunksRequest(request)
+	validateSpan.End()
 	if err != nil {
 		return nil, err
 	}
 
 	s.metrics.ReportChunkKeyCount(len(request.ChunkRequests))
 
+	// Authentication span
+	_, authSpan := tracing.TraceOperation(ctx, "GetChunks.Authenticate")
 	if s.authenticator != nil {
 		client, ok := peer.FromContext(ctx)
 		if !ok {
+			authSpan.End()
 			return nil, api.NewErrorInvalidArg("could not get peer information")
 		}
 		clientAddress := client.Addr.String()
@@ -276,6 +283,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		if err != nil {
 			s.metrics.ReportChunkAuthFailure()
 			s.logger.Debug("rejected GetChunks request", "client", clientAddress)
+			authSpan.End()
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("auth failed: %v", err))
 		}
 
@@ -283,31 +291,41 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		err = s.replayGuardian.VerifyRequest(hash, timestamp)
 		if err != nil {
 			s.metrics.ReportChunkAuthFailure()
+			authSpan.End()
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
 		}
 
 		s.logger.Debug("received authenticated GetChunks request", "client", clientAddress)
 	}
+	authSpan.End()
 
 	finishedAuthenticating := time.Now()
 	if s.authenticator != nil {
 		s.metrics.ReportChunkAuthenticationLatency(finishedAuthenticating.Sub(start))
 	}
 
+	// Rate limiting span
+	_, rateLimitSpan := tracing.TraceOperation(ctx, "GetChunks.RateLimit")
 	clientID := string(request.OperatorId)
 	err = s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
+	rateLimitSpan.End()
 	if err != nil {
 		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("rate limit exceeded: %v", err))
 	}
 	defer s.chunkRateLimiter.FinishGetChunkOperation(clientID)
 
-	// keys might contain duplicate keys
+	// Key extraction span
+	_, keySpan := tracing.TraceOperation(ctx, "GetChunks.ExtractKeys")
 	keys, err := getKeysFromChunkRequest(request)
+	keySpan.End()
 	if err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid request: %v", err))
 	}
 
+	// Metadata fetch span
+	_, metadataSpan := tracing.TraceOperation(ctx, "GetChunks.FetchMetadata")
 	mMap, err := s.metadataProvider.GetMetadataForBlobs(ctx, keys)
+	metadataSpan.End()
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf(
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %v", err))
@@ -316,12 +334,19 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	finishedFetchingMetadata := time.Now()
 	s.metrics.ReportChunkMetadataLatency(finishedFetchingMetadata.Sub(finishedAuthenticating))
 
+	// Bandwidth computation span
+	_, bandwidthSpan := tracing.TraceOperation(ctx, "GetChunks.ComputeBandwidth")
 	requiredBandwidth, err := computeChunkRequestRequiredBandwidth(request, mMap)
+	bandwidthSpan.End()
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("error computing required bandwidth: %v", err))
 	}
 	s.metrics.ReportGetChunksRequestedBandwidthUsage(requiredBandwidth)
+
+	// Bandwidth rate limiting span
+	_, bandwidthLimitSpan := tracing.TraceOperation(ctx, "GetChunks.BandwidthRateLimit")
 	err = s.chunkRateLimiter.RequestGetChunkBandwidth(time.Now(), clientID, requiredBandwidth)
+	bandwidthLimitSpan.End()
 	if err != nil {
 		if strings.Contains(err.Error(), "internal error") {
 			return nil, api.NewErrorInternal(err.Error())
@@ -330,12 +355,18 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 	}
 	s.metrics.ReportGetChunksBandwidthUsage(requiredBandwidth)
 
+	// Frame fetching span
+	_, frameSpan := tracing.TraceOperation(ctx, "GetChunks.FetchFrames")
 	frames, err := s.chunkProvider.GetFrames(ctx, mMap)
+	frameSpan.End()
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("error fetching frames: %v", err))
 	}
 
+	// Response processing span
+	_, processSpan := tracing.TraceOperation(ctx, "GetChunks.ProcessResponse")
 	bytesToSend, err := gatherChunkDataToSend(frames, request)
+	processSpan.End()
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("error gathering chunk data: %v", err))
 	}
