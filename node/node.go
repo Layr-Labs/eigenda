@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -213,8 +212,7 @@ func NewNode(
 		"storeDurationBlocks", storeDurationBlocks,
 		"enableGnarkBundleEncoding", config.EnableGnarkBundleEncoding)
 
-	numCPUs := runtime.NumCPU()
-	downloadPoolSize := config.DownloadPoolMultiplier*numCPUs + config.DownloadPoolConstant
+	downloadPoolSize := config.DownloadPoolSize
 	if downloadPoolSize < 1 {
 		downloadPoolSize = 1
 	}

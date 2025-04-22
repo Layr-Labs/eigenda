@@ -160,7 +160,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
 
-	err = s.validateAndStoreV2Chunks(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash, probe)
+	err = s.validateAndStoreChunks(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash, probe)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	}, nil
 }
 
-func (s *ServerV2) validateAndStoreV2Chunks(
+func (s *ServerV2) validateAndStoreChunks(
 	ctx context.Context,
 	batch *corev2.Batch,
 	blobShards []*corev2.BlobShard,
@@ -207,7 +207,7 @@ func (s *ServerV2) validateAndStoreV2Chunks(
 	}
 
 	if s.config.LittDBEnabled {
-		return s.validateAndStoreV2ChunksLittDB(
+		return s.validateAndStoreChunksLittDB(
 			ctx,
 			batch,
 			blobShards,
@@ -217,11 +217,11 @@ func (s *ServerV2) validateAndStoreV2Chunks(
 			probe)
 	} else {
 		probe.SetStage("validate_and_store")
-		return s.validateAndStoreV2ChunksLevelDB(ctx, batch, blobShards, batchData, operatorState, batchHeaderHash)
+		return s.validateAndStoreChunksLevelDB(ctx, batch, blobShards, batchData, operatorState, batchHeaderHash)
 	}
 }
 
-func (s *ServerV2) validateAndStoreV2ChunksLevelDB(
+func (s *ServerV2) validateAndStoreChunksLevelDB(
 	ctx context.Context,
 	batch *corev2.Batch,
 	blobShards []*corev2.BlobShard,
@@ -273,7 +273,7 @@ func (s *ServerV2) validateAndStoreV2ChunksLevelDB(
 	return nil
 }
 
-func (s *ServerV2) validateAndStoreV2ChunksLittDB(
+func (s *ServerV2) validateAndStoreChunksLittDB(
 	ctx context.Context,
 	batch *corev2.Batch,
 	blobShards []*corev2.BlobShard,
