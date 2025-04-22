@@ -8,6 +8,7 @@ import (
 	"time"
 
 	cache2 "github.com/Layr-Labs/eigenda/common/cache"
+	"github.com/Layr-Labs/eigenda/common/tracing"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -99,6 +100,8 @@ type metadataMap map[v2.BlobKey]*blobMetadata
 // Note that resulting metadata map may not have the same length as the input
 // keys slice if the input keys slice has duplicate items.
 func (m *metadataProvider) GetMetadataForBlobs(ctx context.Context, keys []v2.BlobKey) (metadataMap, error) {
+	ctx, span := tracing.TraceOperation(ctx, "metadataProvider.GetMetadataForBlobs")
+	defer span.End()
 
 	// blobMetadataResult is the result of a metadata fetch operation.
 	type blobMetadataResult struct {
@@ -183,6 +186,9 @@ func (m *metadataProvider) computeChunkSize(header *v2.BlobHeader, totalChunkSiz
 func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) {
 	ctx, cancel := context.WithTimeout(m.ctx, m.fetchTimeout)
 	defer cancel()
+
+	ctx, span := tracing.TraceOperation(ctx, "metadataProvider.fetchMetadata")
+	defer span.End()
 
 	blobParamsMap := m.blobParamsMap.Load()
 	if blobParamsMap == nil {

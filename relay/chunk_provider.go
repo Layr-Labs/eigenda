@@ -7,7 +7,9 @@ import (
 	"sync"
 	"time"
 
-	cache2 "github.com/Layr-Labs/eigenda/common/cache"
+	cachecommon "github.com/Layr-Labs/eigenda/common/cache"
+	"github.com/Layr-Labs/eigenda/common/tracing"
+	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -86,6 +88,8 @@ func (s *chunkProvider) computeFramesCacheWeight(_ blobKeyWithMetadata, frames *
 
 // GetFrames retrieves the frames for a blob.
 func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameMap, error) {
+	ctx, span := tracing.TraceOperation(ctx, "chunkProvider.GetFrames")
+	defer span.End()
 
 	if len(mMap) == 0 {
 		return nil, fmt.Errorf("no metadata provided")
@@ -140,6 +144,8 @@ func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameM
 
 // fetchFrames retrieves the frames for a single blob.
 func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) (*core.ChunksData, error) {
+	ctx, span := tracing.TraceOperation(s.ctx, "chunkProvider.fetchFrames")
+	defer span.End()
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -148,13 +154,15 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) (*core.ChunksData, 
 	var proofsErr error
 
 	go func() {
-		ctx, cancel := context.WithTimeout(s.ctx, s.proofFetchTimeout)
+		proofCtx, cancel := context.WithTimeout(ctx, s.proofFetchTimeout)
+		proofCtx, proofSpan := tracing.TraceOperation(proofCtx, "chunkProvider.fetchProofs")
 		defer func() {
+			proofSpan.End()
 			wg.Done()
 			cancel()
 		}()
 
-		proofs, proofsErr = s.chunkReader.GetBinaryChunkProofs(ctx, key.blobKey)
+		proofs, proofsErr = s.chunkReader.GetBinaryChunkProofs(proofCtx, key.blobKey)
 	}()
 
 	fragmentInfo := &encoding.FragmentInfo{
@@ -162,10 +170,14 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) (*core.ChunksData, 
 		FragmentSizeBytes:   key.metadata.fragmentSizeBytes,
 	}
 
-	ctx, cancel := context.WithTimeout(s.ctx, s.coefficientFetchTimeout)
-	defer cancel()
+	coeffCtx, cancel := context.WithTimeout(ctx, s.coefficientFetchTimeout)
+	coeffCtx, coeffSpan := tracing.TraceOperation(coeffCtx, "chunkProvider.fetchCoefficients")
+	defer func() {
+		coeffSpan.End()
+		cancel()
+	}()
 
-	elementCount, coefficients, err := s.chunkReader.GetBinaryChunkCoefficients(ctx, key.blobKey, fragmentInfo)
+	elementCount, coefficients, err := s.chunkReader.GetBinaryChunkCoefficients(coeffCtx, key.blobKey, fragmentInfo)
 	if err != nil {
 		return nil, err
 	}

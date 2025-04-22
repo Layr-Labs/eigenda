@@ -6,7 +6,8 @@ import (
 	"time"
 
 	cache2 "github.com/Layr-Labs/eigenda/common/cache"
-	"github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/common/tracing"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/relay/cache"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -67,6 +68,9 @@ func computeBlobCacheWeight(_ v2.BlobKey, value []byte) uint64 {
 
 // GetBlob retrieves a blob from the blob store.
 func (s *blobProvider) GetBlob(ctx context.Context, blobKey v2.BlobKey) ([]byte, error) {
+	ctx, span := tracing.TraceOperation(ctx, "blobProvider.GetBlob")
+	defer span.End()
+
 	data, err := s.blobCache.Get(ctx, blobKey)
 
 	if err != nil {
@@ -83,6 +87,9 @@ func (s *blobProvider) GetBlob(ctx context.Context, blobKey v2.BlobKey) ([]byte,
 func (s *blobProvider) fetchBlob(blobKey v2.BlobKey) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(s.ctx, s.fetchTimeout)
 	defer cancel()
+
+	ctx, span := tracing.TraceOperation(ctx, "blobProvider.fetchBlob")
+	defer span.End()
 
 	data, err := s.blobStore.GetBlob(ctx, blobKey)
 	if err != nil {

@@ -3,6 +3,7 @@ package relay
 import (
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common/tracing"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
 )
@@ -75,4 +76,7 @@ type Config struct {
 
 	// PprofHttpPort is the port that the pprof HTTP server listens on
 	PprofHttpPort int
+
+	// Tracing contains configuration for tracing
+	Tracing tracing.TracingConfig
 }

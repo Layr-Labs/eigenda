@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/replay"
+	"github.com/Layr-Labs/eigenda/common/tracing"
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -67,6 +68,9 @@ type Server struct {
 
 	// metrics encapsulates the metrics for the relay server.
 	metrics *metrics.RelayMetrics
+
+	// telemetryShutdown is the function to call to shutdown telemetry
+	telemetryShutdown func(context.Context) error
 }
 
 // NewServer creates a new relay Server.
@@ -161,6 +165,9 @@ func NewServer(
 
 // GetBlob retrieves a blob stored by the relay.
 func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
+	ctx, span := tracing.TraceOperation(ctx, "RelayServer.GetBlob")
+	defer span.End()
+
 	start := time.Now()
 
 	if s.config.Timeouts.GetBlobTimeout > 0 {
@@ -240,6 +247,9 @@ func (s *Server) validateGetChunksRequest(request *pb.GetChunksRequest) error {
 
 // GetChunks retrieves chunks from blobs stored by the relay.
 func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
+	ctx, span := tracing.TraceOperation(ctx, "RelayServer.GetChunks")
+	defer span.End()
+
 	start := time.Now()
 
 	if s.config.Timeouts.GetChunksTimeout > 0 {
@@ -522,6 +532,12 @@ func buildInsufficientGetChunksBandwidthError(
 
 // Start starts the server listening for requests. This method will block until the server is stopped.
 func (s *Server) Start(ctx context.Context) error {
+	// Initialize tracing if enabled
+	if err := s.InitTracing(ctx); err != nil {
+		s.logger.Error("Failed to initialize tracing", "err", err)
+		// Continue with startup even if tracing fails
+	}
+
 	// Start metrics server if enabled
 	if s.config.EnableMetrics {
 		s.metrics.Start()
@@ -599,5 +615,43 @@ func (s *Server) Stop() error {
 		}
 	}
 
+	// Shutdown tracing if enabled
+	if s.telemetryShutdown != nil {
+		if err := s.telemetryShutdown(context.Background()); err != nil {
+			s.logger.Error("Failed to shutdown telemetry", "err", err)
+		}
+	}
+
+	return nil
+}
+
+// InitTracing initializes tracing if enabled in the config
+func (s *Server) InitTracing(ctx context.Context) error {
+	// Initialize tracing if enabled
+	if s.config.Tracing.Enabled {
+		tracingCfg := tracing.TracingConfig{
+			Enabled:     s.config.Tracing.Enabled,
+			ServiceName: s.config.Tracing.ServiceName,
+			Endpoint:    s.config.Tracing.Endpoint,
+			SampleRatio: s.config.Tracing.SampleRatio,
+		}
+
+		telemetryShutdown, err := tracing.InitTelemetry(ctx, tracingCfg)
+		if err != nil {
+			s.logger.Error("Failed to initialize tracing", "err", err)
+			// Continue with startup even if tracing fails
+		} else {
+			s.logger.Info("Enabled tracing for Relay Server", "endpoint", s.config.Tracing.Endpoint)
+			s.telemetryShutdown = telemetryShutdown
+
+			// Add cleanup handler for tracing when server shuts down
+			go func() {
+				<-ctx.Done()
+				if err := telemetryShutdown(context.Background()); err != nil {
+					s.logger.Error("Failed to shutdown telemetry", "err", err)
+				}
+			}()
+		}
+	}
 	return nil
 }
