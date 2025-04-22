@@ -123,20 +123,25 @@ func (oh *OperatorHandler) ProbeV2OperatorsLiveness(ctx context.Context, operato
 				retrievalOnline bool
 				retrievalStatus string
 			)
+
 			operatorSocket := core.OperatorSocket(opInfo.Socket)
 
 			retrievalSocket := operatorSocket.GetV2RetrievalSocket()
 			if retrievalSocket == "" {
 				retrievalStatus = "v2 retrieval port is not registered"
 			} else {
-				retrievalOnline, retrievalStatus = checkServiceOnline(ctx, "validator.Retrieval", retrievalSocket, 2*time.Second)
+				if ValidOperatorIP(retrievalSocket, oh.logger) {
+					retrievalOnline, retrievalStatus = checkServiceOnline(ctx, "validator.Retrieval", retrievalSocket, 2*time.Second)
+				}
 			}
 
 			dispersalSocket := operatorSocket.GetV2DispersalSocket()
 			if dispersalSocket == "" {
 				dispersalStatus = "v2 dispersal port is not registered"
 			} else {
-				dispersalOnline, dispersalStatus = checkServiceOnline(ctx, "validator.Dispersal", dispersalSocket, 2*time.Second)
+				if ValidOperatorIP(retrievalSocket, oh.logger) {
+					dispersalOnline, dispersalStatus = checkServiceOnline(ctx, "validator.Dispersal", dispersalSocket, 2*time.Second)
+				}
 			}
 
 			opLiveness := &OperatorLiveness{
@@ -157,7 +162,6 @@ func (oh *OperatorHandler) ProbeV2OperatorsLiveness(ctx context.Context, operato
 
 	results := make([]*OperatorLiveness, 0, numResults)
 	for res := range resultCh {
-		fmt.Println("YY res:", res)
 		results = append(results, res)
 	}
 

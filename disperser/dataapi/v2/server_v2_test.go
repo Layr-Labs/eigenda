@@ -2230,21 +2230,22 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
 
-	operatorId := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
-	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfoV1, nil)
+	mockIndexedChainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
 	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
 
+	operatorId := core.OperatorID{1}.Hex()
 	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId)
 	w := executeRequest(t, r, http.MethodGet, reqStr)
-	response := decodeResponseBody[dataapi.OperatorPortCheckResponse](t, w)
+	response := decodeResponseBody[serverv2.OperatorLivenessResponse](t, w)
 
-	assert.Equal(t, "", response.DispersalSocket)
-	assert.Equal(t, false, response.DispersalOnline)
-	assert.Equal(t, "v2 dispersal port is not registered", response.DispersalStatus)
-	assert.Equal(t, "", response.RetrievalSocket)
-	assert.Equal(t, false, response.RetrievalOnline)
-	assert.Equal(t, "v2 retrieval port is not registered", response.RetrievalStatus)
+	assert.Equal(t, 1, len(response.Operators))
+	assert.Equal(t, "0.0.0.0:3004", response.Operators[0].DispersalSocket)
+	assert.Equal(t, false, response.Operators[0].DispersalOnline)
+	assert.Equal(t, "", response.Operators[0].DispersalStatus)
+	assert.Equal(t, "0.0.0.0:3005", response.Operators[0].RetrievalSocket)
+	assert.Equal(t, false, response.Operators[0].RetrievalOnline)
+	assert.Equal(t, "", response.Operators[0].RetrievalStatus)
 
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
