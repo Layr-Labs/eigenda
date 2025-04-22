@@ -117,9 +117,14 @@ func (oh *OperatorHandler) ProbeV2OperatorsLiveness(ctx context.Context, operato
 			continue
 		}
 		wp.Submit(func() {
+			var (
+				dispersalOnline bool
+				dispersalStatus string
+				retrievalOnline bool
+				retrievalStatus string
+			)
 			operatorSocket := core.OperatorSocket(opInfo.Socket)
 
-			retrievalOnline, retrievalStatus := false, "v2 retrieval port closed or unreachable"
 			retrievalSocket := operatorSocket.GetV2RetrievalSocket()
 			if retrievalSocket == "" {
 				retrievalStatus = "v2 retrieval port is not registered"
@@ -127,7 +132,6 @@ func (oh *OperatorHandler) ProbeV2OperatorsLiveness(ctx context.Context, operato
 				retrievalOnline, retrievalStatus = checkServiceOnline(ctx, "validator.Retrieval", retrievalSocket, 2*time.Second)
 			}
 
-			dispersalOnline, dispersalStatus := false, "v2 dispersal port closed or unreachable"
 			dispersalSocket := operatorSocket.GetV2DispersalSocket()
 			if dispersalSocket == "" {
 				dispersalStatus = "v2 dispersal port is not registered"
