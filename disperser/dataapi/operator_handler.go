@@ -160,55 +160,6 @@ func (oh *OperatorHandler) ProbeV2OperatorsLiveness(ctx context.Context, operato
 	return results, nil
 }
 
-func (oh *OperatorHandler) ProbeV2OperatorPorts(ctx context.Context, operatorId string) (*OperatorPortCheckResponse, error) {
-	operatorInfo, err := oh.subgraphClient.QueryOperatorInfoByOperatorId(ctx, operatorId)
-	if err != nil {
-		oh.logger.Warn("failed to fetch operator info", "operatorId", operatorId, "error", err)
-		return &OperatorPortCheckResponse{}, err
-	}
-
-	operatorSocket := core.OperatorSocket(operatorInfo.Socket)
-
-	retrievalOnline, retrievalStatus := false, "v2 retrieval port closed or unreachable"
-	retrievalSocket := operatorSocket.GetV2RetrievalSocket()
-	if retrievalSocket == "" {
-		retrievalStatus = "v2 retrieval port is not registered"
-	} else {
-		retrievalPortOpen := checkIsOperatorPortOpen(retrievalSocket, 3, oh.logger)
-		if retrievalPortOpen {
-			retrievalOnline, retrievalStatus = checkServiceOnline(ctx, "validator.Retrieval", retrievalSocket, 3*time.Second)
-		}
-	}
-
-	dispersalOnline, dispersalStatus := false, "v2 dispersal port closed or unreachable"
-	dispersalSocket := operatorSocket.GetV2DispersalSocket()
-	if dispersalSocket == "" {
-		dispersalStatus = "v2 dispersal port is not registered"
-	} else {
-		dispersalPortOpen := checkIsOperatorPortOpen(dispersalSocket, 3, oh.logger)
-		if dispersalPortOpen {
-			dispersalOnline, dispersalStatus = checkServiceOnline(ctx, "validator.Dispersal", dispersalSocket, 3*time.Second)
-		}
-	}
-
-	// Create the metadata regardless of online status
-	portCheckResponse := &OperatorPortCheckResponse{
-		OperatorId:      operatorId,
-		DispersalSocket: dispersalSocket,
-		DispersalStatus: dispersalStatus,
-		DispersalOnline: dispersalOnline,
-		RetrievalSocket: retrievalSocket,
-		RetrievalOnline: retrievalOnline,
-		RetrievalStatus: retrievalStatus,
-	}
-
-	// Log the online status
-	oh.logger.Info("v2 operator port check response", "response", portCheckResponse)
-
-	// Send the metadata to the results channel
-	return portCheckResponse, nil
-}
-
 func (oh *OperatorHandler) ProbeV1OperatorPorts(ctx context.Context, operatorId string) (*OperatorPortCheckResponse, error) {
 	operatorInfo, err := oh.subgraphClient.QueryOperatorInfoByOperatorId(ctx, operatorId)
 	if err != nil {
