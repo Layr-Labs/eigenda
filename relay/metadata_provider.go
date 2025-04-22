@@ -183,8 +183,8 @@ func (m *metadataProvider) computeChunkSize(header *v2.BlobHeader, totalChunkSiz
 }
 
 // fetchMetadata retrieves metadata about a blob. Fetches from the cache if available, otherwise from the store.
-func (m *metadataProvider) fetchMetadata(key v2.BlobKey) (*blobMetadata, error) {
-	ctx, cancel := context.WithTimeout(m.ctx, m.fetchTimeout)
+func (m *metadataProvider) fetchMetadata(ctx context.Context, key v2.BlobKey) (*blobMetadata, error) {
+	ctx, cancel := context.WithTimeout(ctx, m.fetchTimeout)
 	defer cancel()
 
 	ctx, span := tracing.TraceOperation(ctx, "metadataProvider.fetchMetadata")

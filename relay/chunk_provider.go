@@ -164,8 +164,8 @@ func (s *chunkProvider) GetFrames(ctx context.Context, mMap metadataMap) (frameM
 }
 
 // fetchFrames retrieves the frames for a single blob.
-func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) (*core.ChunksData, error) {
-	ctx, span := tracing.TraceOperation(s.ctx, "chunkProvider.fetchFrames")
+func (s *chunkProvider) fetchFrames(ctx context.Context, key blobKeyWithMetadata) (*core.ChunksData, error) {
+	ctx, span := tracing.TraceOperation(ctx, "chunkProvider.fetchFrames")
 	defer span.End()
 
 	// Add span for setup phase
@@ -205,15 +205,15 @@ func (s *chunkProvider) fetchFrames(key blobKeyWithMetadata) (*core.ChunksData, 
 	// Add spans for coefficient fetching with timeout
 	coeffCtx, cancel := context.WithTimeout(ctx, s.coefficientFetchTimeout)
 	coeffCtx, coeffSpan := tracing.TraceOperation(coeffCtx, "chunkProvider.fetchCoefficients")
-	defer func() {
-		coeffSpan.End()
-		cancel()
-	}()
 
 	// Add span for the actual coefficient fetching operation
 	_, coeffFetchSpan := tracing.TraceOperation(coeffCtx, "chunkProvider.fetchCoefficients.getBinaryChunkCoefficients")
 	elementCount, coefficients, err := s.chunkReader.GetBinaryChunkCoefficients(coeffCtx, key.blobKey, fragmentInfo)
 	coeffFetchSpan.End()
+
+	// End coefficient span and cancel context immediately after fetch operation
+	coeffSpan.End()
+	cancel()
 
 	if err != nil {
 		_, errSpan := tracing.TraceOperation(ctx, "chunkProvider.fetchFrames.coefficientError")

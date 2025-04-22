@@ -24,7 +24,7 @@ func TestRandomOperationsSingleThread(t *testing.T) {
 		baseData[i] = tu.RandomString(10)
 	}
 
-	accessor := func(key int) (*string, error) {
+	accessor := func(ctx context.Context, key int) (*string, error) {
 		// Return an error if the key is a multiple of 17
 		if key%17 == 0 {
 			return nil, errors.New("intentional error")
@@ -77,7 +77,7 @@ func TestCacheMisses(t *testing.T) {
 
 	cacheMissCount := atomic.Uint64{}
 
-	accessor := func(key int) (*string, error) {
+	accessor := func(ctx context.Context, key int) (*string, error) {
 		cacheMissCount.Add(1)
 		str := baseData[key]
 		return &str, nil
@@ -133,7 +133,7 @@ func ParallelAccessTest(t *testing.T, sleepEnabled bool) {
 
 	accessorLock := sync.RWMutex{}
 	cacheMissCount := atomic.Uint64{}
-	accessor := func(key int) (*string, error) {
+	accessor := func(ctx context.Context, key int) (*string, error) {
 
 		// Intentionally block if accessorLock is held by the outside scope.
 		// Used to provoke specific race conditions.
@@ -205,7 +205,7 @@ func TestParallelAccessWithError(t *testing.T) {
 
 	accessorLock := sync.RWMutex{}
 	cacheMissCount := atomic.Uint64{}
-	accessor := func(key int) (*string, error) {
+	accessor := func(ctx context.Context, key int) (*string, error) {
 		// Intentionally block if accessorLock is held by the outside scope.
 		// Used to provoke specific race conditions.
 		accessorLock.Lock()
@@ -277,7 +277,7 @@ func TestConcurrencyLimiter(t *testing.T) {
 	accessorLock := sync.RWMutex{}
 	accessorLock.Lock()
 	activeAccessors := atomic.Int64{}
-	accessor := func(key int) (*string, error) {
+	accessor := func(ctx context.Context, key int) (*string, error) {
 		activeAccessors.Add(1)
 		accessorLock.Lock()
 		defer func() {
@@ -332,7 +332,7 @@ func TestOriginalRequesterTimesOut(t *testing.T) {
 
 	accessorLock := sync.RWMutex{}
 	cacheMissCount := atomic.Uint64{}
-	accessor := func(key int) (*string, error) {
+	accessor := func(ctx context.Context, key int) (*string, error) {
 
 		// Intentionally block if accessorLock is held by the outside scope.
 		// Used to provoke specific race conditions.
@@ -421,7 +421,7 @@ func TestSecondaryRequesterTimesOut(t *testing.T) {
 
 	accessorLock := sync.RWMutex{}
 	cacheMissCount := atomic.Uint64{}
-	accessor := func(key int) (*string, error) {
+	accessor := func(ctx context.Context, key int) (*string, error) {
 
 		// Intentionally block if accessorLock is held by the outside scope.
 		// Used to provoke specific race conditions.

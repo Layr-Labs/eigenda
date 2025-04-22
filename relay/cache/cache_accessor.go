@@ -6,6 +6,8 @@ import (
 	"time"
 
 	cachecommon "github.com/Layr-Labs/eigenda/common/cache"
+	"github.com/Layr-Labs/eigenda/common/tracing"
+	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -19,7 +21,7 @@ type CacheAccessor[K comparable, V any] interface {
 }
 
 // Accessor is function capable of fetching a value from a resource. Used by CacheAccessor when there is a cache miss.
-type Accessor[K comparable, V any] func(key K) (V, error)
+type Accessor[K comparable, V any] func(ctx context.Context, key K) (V, error)
 
 // accessResult is a struct that holds the result of an Accessor call.
 type accessResult[V any] struct {
@@ -102,6 +104,9 @@ func newAccessResult[V any]() *accessResult[V] {
 }
 
 func (c *cacheAccessor[K, V]) Get(ctx context.Context, key K) (V, error) {
+	ctx, span := tracing.TraceOperation(ctx, "cacheAccessor.Get")
+	defer span.End()
+
 	c.cacheLock.Lock()
 
 	// first, attempt to get the value from the cache
@@ -112,6 +117,7 @@ func (c *cacheAccessor[K, V]) Get(ctx context.Context, key K) (V, error) {
 		if c.metrics != nil {
 			c.metrics.ReportCacheHit()
 		}
+		span.SetAttributes(attribute.Bool("cache.hit", true))
 		return v, nil
 	}
 
@@ -134,6 +140,11 @@ func (c *cacheAccessor[K, V]) Get(ctx context.Context, key K) (V, error) {
 		}
 	}
 
+	span.SetAttributes(
+		attribute.Bool("cache.hit", false),
+		attribute.Bool("cache.already_loading", alreadyLoading),
+	)
+
 	if alreadyLoading {
 		// The result is being fetched on another goroutine. Wait for it to finish.
 		return c.waitForResult(ctx, result)
@@ -147,26 +158,42 @@ func (c *cacheAccessor[K, V]) Get(ctx context.Context, key K) (V, error) {
 // when it becomes is available. This method will return quickly if the provided context is cancelled.
 // Doing so does not disrupt the other requesters that are also waiting for this result.
 func (c *cacheAccessor[K, V]) waitForResult(ctx context.Context, result *accessResult[V]) (V, error) {
+	ctx, span := tracing.TraceOperation(ctx, "cacheAccessor.waitForResult")
+	defer span.End()
+
 	err := result.sem.Acquire(ctx, 1)
 	if err != nil {
+		span.SetAttributes(attribute.Bool("wait.success", false))
 		var zeroValue V
 		return zeroValue, err
 	}
 
 	result.sem.Release(1)
+	span.SetAttributes(attribute.Bool("wait.success", true))
 	return result.value, result.err
 }
 
 // fetchResult fetches the value for the given key and returns it. If the context is cancelled before the value
 // is fetched, the function will return early. If the fetch is successful, the value will be added to the cache.
 func (c *cacheAccessor[K, V]) fetchResult(ctx context.Context, key K, result *accessResult[V]) (V, error) {
+	ctx, span := tracing.TraceOperation(ctx, "cacheAccessor.fetchResult")
+	defer span.End()
 
 	// Perform the work in a background goroutine. This allows us to return early if the context is cancelled
 	// without disrupting the fetch operation that other requesters may be waiting for.
 	waitChan := make(chan struct{}, 1)
 	go func() {
+		fetchCtx, fetchSpan := tracing.TraceOperation(ctx, "cacheAccessor.fetchResult.worker")
+		defer fetchSpan.End()
+
 		if c.concurrencyLimiter != nil {
 			c.concurrencyLimiter <- struct{}{}
+		}
+
+		value, err := c.accessor(fetchCtx, key)
+
+		if c.concurrencyLimiter != nil {
+			<-c.concurrencyLimiter
 		}
 
 		if c.metrics != nil {
@@ -198,6 +225,14 @@ func (c *cacheAccessor[K, V]) fetchResult(ctx context.Context, key K, result *ac
 				}
 				c.metrics.ReportAverageWeight(averageWeight)
 			}
+
+			fetchSpan.SetAttributes(
+				attribute.Bool("fetch.success", true),
+				attribute.Int64("cache.size", int64(c.cache.Size())),
+				attribute.Int64("cache.weight", int64(c.cache.Weight())),
+			)
+		} else {
+			fetchSpan.SetAttributes(attribute.Bool("fetch.success", false))
 		}
 
 		// Provide the result to all other goroutines that may be waiting for it.
@@ -216,9 +251,11 @@ func (c *cacheAccessor[K, V]) fetchResult(ctx context.Context, key K, result *ac
 	select {
 	case <-ctx.Done():
 		// The context was cancelled before the value was fetched, possibly due to a timeout.
+		span.SetAttributes(attribute.Bool("cancelled", true))
 		var zeroValue V
 		return zeroValue, ctx.Err()
 	case <-waitChan:
+		span.SetAttributes(attribute.Bool("cancelled", false))
 		return result.value, result.err
 	}
 }

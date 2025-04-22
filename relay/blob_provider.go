@@ -84,14 +84,14 @@ func (s *blobProvider) GetBlob(ctx context.Context, blobKey v2.BlobKey) ([]byte,
 }
 
 // fetchBlob retrieves a single blob from the blob store.
-func (s *blobProvider) fetchBlob(blobKey v2.BlobKey) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(s.ctx, s.fetchTimeout)
+func (s *blobProvider) fetchBlob(ctx context.Context, blobKey v2.BlobKey) ([]byte, error) {
+	fetchCtx, cancel := context.WithTimeout(ctx, s.fetchTimeout)
 	defer cancel()
 
-	ctx, span := tracing.TraceOperation(ctx, "blobProvider.fetchBlob")
+	fetchCtx, span := tracing.TraceOperation(fetchCtx, "blobProvider.fetchBlob")
 	defer span.End()
 
-	data, err := s.blobStore.GetBlob(ctx, blobKey)
+	data, err := s.blobStore.GetBlob(fetchCtx, blobKey)
 	if err != nil {
 		s.logger.Errorf("Failed to fetch blob: %v", err)
 		return nil, err
