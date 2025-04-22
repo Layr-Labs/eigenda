@@ -107,25 +107,6 @@ var (
 		2: 10,
 	})
 
-	operatorInfoV1 = &subgraph.IndexedOperatorInfo{
-		Id:         "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ac",
-		PubkeyG1_X: "1336192159512049190945679273141887248666932624338963482128432381981287252980",
-		PubkeyG1_Y: "25195175002875833468883745675063986308012687914999552116603423331534089122704",
-		PubkeyG2_X: []graphql.String{
-			"31597023645215426396093421944506635812143308313031252511177204078669540440732",
-			"21405255666568400552575831267661419473985517916677491029848981743882451844775",
-		},
-		PubkeyG2_Y: []graphql.String{
-			"8416989242565286095121881312760798075882411191579108217086927390793923664442",
-			"23612061731370453436662267863740141021994163834412349567410746669651828926551",
-		},
-		SocketUpdates: []subgraph.SocketUpdates{
-			{
-				Socket: "23.93.76.1:32005;32006",
-			},
-		},
-	}
-
 	operatorInfoV2 = &subgraph.IndexedOperatorInfo{
 		Id:         "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ac",
 		PubkeyG1_X: "1336192159512049190945679273141887248666932624338963482128432381981287252980",
@@ -2199,32 +2180,6 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 }
 
 func TestCheckOperatorsLiveness(t *testing.T) {
-	r := setUpRouter()
-
-	mockSubgraphApi.ExpectedCalls = nil
-	mockSubgraphApi.Calls = nil
-
-	operatorId := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
-	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfoV2, nil)
-
-	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
-
-	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId)
-	w := executeRequest(t, r, http.MethodGet, reqStr)
-	response := decodeResponseBody[dataapi.OperatorPortCheckResponse](t, w)
-
-	assert.Equal(t, "23.93.76.1:32005", response.DispersalSocket)
-	assert.Equal(t, false, response.DispersalOnline)
-	assert.Equal(t, "v2 dispersal port closed or unreachable", response.DispersalStatus)
-	assert.Equal(t, "23.93.76.1:32006", response.RetrievalSocket)
-	assert.Equal(t, false, response.RetrievalOnline)
-	assert.Equal(t, "v2 retrieval port closed or unreachable", response.RetrievalStatus)
-
-	mockSubgraphApi.ExpectedCalls = nil
-	mockSubgraphApi.Calls = nil
-}
-
-func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 	r := setUpRouter()
 
 	mockSubgraphApi.ExpectedCalls = nil
