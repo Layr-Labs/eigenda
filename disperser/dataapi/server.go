@@ -175,6 +175,16 @@ type (
 		OperatorId string `json:"operator_id"`
 	}
 
+	OperatorLiveness struct {
+		OperatorId      string `json:"operator_id"`
+		DispersalSocket string `json:"dispersal_socket"`
+		DispersalOnline bool   `json:"dispersal_online"`
+		DispersalStatus string `json:"dispersal_status"`
+		RetrievalSocket string `json:"retrieval_socket"`
+		RetrievalOnline bool   `json:"retrieval_online"`
+		RetrievalStatus string `json:"retrieval_status"`
+	}
+
 	OperatorPortCheckResponse struct {
 		OperatorId      string `json:"operator_id"`
 		DispersalSocket string `json:"dispersal_socket"`

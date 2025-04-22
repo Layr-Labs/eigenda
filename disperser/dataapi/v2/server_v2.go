@@ -192,7 +192,7 @@ type (
 		Response *corev2.DispersalResponse `json:"operator_dispersal_response"`
 	}
 
-	OperatorLivenessResponse struct {
+	OperatorLiveness struct {
 		OperatorId      string `json:"operator_id"`
 		DispersalSocket string `json:"dispersal_socket"`
 		DispersalOnline bool   `json:"dispersal_online"`
@@ -200,6 +200,9 @@ type (
 		RetrievalSocket string `json:"retrieval_socket"`
 		RetrievalOnline bool   `json:"retrieval_online"`
 		RetrievalStatus string `json:"retrieval_status"`
+	}
+	OperatorLivenessResponse struct {
+		Operators []*OperatorLiveness `json:"operators"`
 	}
 
 	AccountBlobFeedResponse struct {
