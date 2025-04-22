@@ -2187,6 +2187,47 @@ func TestCheckOperatorsLiveness(t *testing.T) {
 	mockSubgraphApi.Calls = nil
 }
 
+func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
+	r := setUpRouter()
+
+	mockSubgraphApi.ExpectedCalls = nil
+	mockSubgraphApi.Calls = nil
+
+	operatorId := core.OperatorID{1}
+	ios := &core.IndexedOperatorState{
+		IndexedOperators: map[core.OperatorID]*core.IndexedOperatorInfo{
+			operatorId: &core.IndexedOperatorInfo{
+				Socket: "1.2.3.4:3004:3005",
+			},
+		},
+	}
+
+	mockIcs := &coremock.MockIndexedChainState{}
+
+	mockIcs.On("GetCurrentBlockNumber").Return(uint(1), nil)
+	mockIcs.On("GetIndexedOperatorState").Return(ios, nil)
+
+	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIcs, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
+	require.NoError(t, err)
+
+	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
+
+	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId.Hex())
+	w := executeRequest(t, r, http.MethodGet, reqStr)
+	response := decodeResponseBody[serverv2.OperatorLivenessResponse](t, w)
+
+	assert.Equal(t, 1, len(response.Operators))
+	assert.Equal(t, "", response.Operators[0].DispersalSocket)
+	assert.Equal(t, false, response.Operators[0].DispersalOnline)
+	assert.Equal(t, "v2 dispersal port is not registered", response.Operators[0].DispersalStatus)
+	assert.Equal(t, "", response.Operators[0].RetrievalSocket)
+	assert.Equal(t, false, response.Operators[0].RetrievalOnline)
+	assert.Equal(t, "v2 retrieval port is not registered", response.Operators[0].RetrievalStatus)
+
+	mockSubgraphApi.ExpectedCalls = nil
+	mockSubgraphApi.Calls = nil
+}
+
 func TestFetchAccountBlobFeed(t *testing.T) {
 	r := setUpRouter()
 	ctx := context.Background()
