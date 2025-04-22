@@ -52,10 +52,10 @@ func (s *ServerV2) FetchOperatorDispersalFeed(c *gin.Context) {
 		return
 	}
 
-	var dispersals []*corev2.DispersalRequest
+	var dispersals []*corev2.DispersalResponse
 
 	if params.direction == "forward" {
-		dispersals, err = s.blobMetadataStore.GetDispersalRequestByDispersedAt(
+		dispersals, err = s.blobMetadataStore.GetDispersalsByRespondedAt(
 			c.Request.Context(),
 			operatorId,
 			uint64(params.afterTime.UnixNano()),
@@ -64,7 +64,7 @@ func (s *ServerV2) FetchOperatorDispersalFeed(c *gin.Context) {
 			true, // ascending=true
 		)
 	} else {
-		dispersals, err = s.blobMetadataStore.GetDispersalRequestByDispersedAt(
+		dispersals, err = s.blobMetadataStore.GetDispersalsByRespondedAt(
 			c.Request.Context(),
 			operatorId,
 			uint64(params.afterTime.UnixNano()),
@@ -88,10 +88,15 @@ func (s *ServerV2) FetchOperatorDispersalFeed(c *gin.Context) {
 			errorResponse(c, fmt.Errorf("failed to compute batch header hash from batch header: %w", err))
 			return
 		}
+		var sig string
+		if d.Signature != [32]byte{} {
+			sig = hex.EncodeToString(d.Signature[:])
+		}
 		batches[i] = &OperatorDispersal{
 			BatchHeaderHash: hex.EncodeToString(batchHeaderHash[:]),
 			BatchHeader:     &d.BatchHeader,
 			DispersedAt:     d.DispersedAt,
+			Signature:       sig,
 		}
 	}
 

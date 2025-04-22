@@ -115,7 +115,9 @@ func (a *Accountant) BlobPaymentInfo(
 		a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 		return a.cumulativePayment, nil
 	}
-	return big.NewInt(0), fmt.Errorf("neither reservation nor on-demand payment is available")
+	return big.NewInt(0), fmt.Errorf(
+		"no bandwidth reservation found for account %s, and current cumulativePayment balance insufficient "+
+			"to make an on-demand dispersal. Consider depositing more eth to the PaymentVault contract.", a.accountID.Hex())
 }
 
 // AccountBlob accountant provides and records payment information

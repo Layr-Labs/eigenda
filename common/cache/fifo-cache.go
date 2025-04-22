@@ -62,6 +62,10 @@ func (f *FIFOCache[K, V]) Put(key K, value V) {
 		return
 	}
 
+	f.evict()
+}
+
+func (f *FIFOCache[K, V]) evict() {
 	for f.currentWeight > f.maxWeight {
 		val, _ := f.expirationQueue.Dequeue()
 		keyToEvict := val.(K)
@@ -77,4 +81,9 @@ func (f *FIFOCache[K, V]) Size() int {
 
 func (f *FIFOCache[K, V]) Weight() uint64 {
 	return f.currentWeight
+}
+
+func (f *FIFOCache[K, V]) SetMaxWeight(capacity uint64) {
+	f.maxWeight = capacity
+	f.evict()
 }

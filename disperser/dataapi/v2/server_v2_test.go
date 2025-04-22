@@ -61,6 +61,9 @@ var (
 	//go:embed testdata/prometheus-resp-avg-throughput.json
 	mockPrometheusRespAvgThroughput string
 
+	//go:embed testdata/prometheus-response-network-signing-rate.json
+	mockPrometheusResponseNetworkSigningRate string
+
 	UUID                = uuid.New()
 	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
 	blobMetadataStore   *blobstorev2.BlobMetadataStore
@@ -377,6 +380,7 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 
 	dispersedAt := make([]uint64, numRequests)
 	batchHeaders := make([]*corev2.BatchHeader, numRequests)
+	signatures := make([][32]byte, numRequests)
 	dynamoKeys := make([]commondynamodb.Key, numRequests)
 	for i := 0; i < numRequests; i++ {
 		dispersedAt[i] = firstRequestTs + uint64(i)*nanoSecsPerRequest
@@ -391,15 +395,25 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 			DispersedAt:     dispersedAt[i],
 			BatchHeader:     *batchHeaders[i],
 		}
+		signatures[i] = [32]byte{}
+		if i%2 == 0 {
+			signatures[i] = [32]byte{1, 1, uint8(i)}
+		}
+		dispersalResponse := &corev2.DispersalResponse{
+			DispersalRequest: dispersalRequest,
+			RespondedAt:      dispersedAt[i],
+			Signature:        signatures[i],
+			Error:            "",
+		}
 
-		err := blobMetadataStore.PutDispersalRequest(ctx, dispersalRequest)
+		err := blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
 		require.NoError(t, err)
 
 		bhh, err := dispersalRequest.BatchHeader.Hash()
 		require.NoError(t, err)
 		dynamoKeys[i] = commondynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
-			"SK": &types.AttributeValueMemberS{Value: "DispersalRequest#" + opID.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID.Hex()},
 		}
 	}
 	defer deleteItems(t, dynamoKeys)
@@ -513,6 +527,11 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 			assert.Equal(t, dispersedAt[1+i], response.Dispersals[i].DispersedAt)
 			assert.Equal(t, batchHeaders[1+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
 			assert.Equal(t, batchHeaders[1+i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
+			if (1+i)%2 == 0 {
+				assert.Equal(t, hex.EncodeToString(signatures[1+i][:]), response.Dispersals[i].Signature)
+			} else {
+				assert.Equal(t, "", response.Dispersals[i].Signature)
+			}
 		}
 	})
 
@@ -2595,6 +2614,31 @@ func TestFetchMetricsThroughputTimeseries(t *testing.T) {
 	assert.Equal(t, float64(12000), response[0].Throughput)
 	assert.Equal(t, uint64(1701292920), response[0].Timestamp)
 	assert.Equal(t, float64(3.503022666666651e+07), totalThroughput)
+}
+
+func TestFetchMetricsNetworkSigningRateTimeseries(t *testing.T) {
+	r := setUpRouter()
+
+	s := new(model.SampleStream)
+	err := s.UnmarshalJSON([]byte(mockPrometheusResponseNetworkSigningRate))
+	assert.NoError(t, err)
+
+	matrix := make(model.Matrix, 0)
+	matrix = append(matrix, s)
+	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil)
+
+	r.GET("/v2/metrics/timeseries/network-signing-rate", testDataApiServerV2.FetchNetworkSigningRate)
+
+	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/timeseries/network-signing-rate")
+	response := decodeResponseBody[serverv2.NetworkSigningRateResponse](t, w)
+
+	require.Equal(t, 2, len(response.QuorumSigningRates))
+	assert.Equal(t, "0", response.QuorumSigningRates[0].QuorumId)
+	require.Equal(t, 12, len(response.QuorumSigningRates[0].DataPoints))
+	assert.Equal(t, float64(98.1), response.QuorumSigningRates[0].DataPoints[0].SigningRate)
+	assert.Equal(t, "1", response.QuorumSigningRates[1].QuorumId)
+	assert.Equal(t, 12, len(response.QuorumSigningRates[1].DataPoints))
+	assert.Equal(t, float64(98.1), response.QuorumSigningRates[1].DataPoints[0].SigningRate)
 }
 
 func createAttestation(

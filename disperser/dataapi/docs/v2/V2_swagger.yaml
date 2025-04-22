@@ -424,14 +424,23 @@ definitions:
       total_bytes_posted:
         type: integer
     type: object
+  v2.NetworkSigningRateResponse:
+    properties:
+      quorum_signing_rates:
+        items:
+          $ref: '#/definitions/v2.QuorumSigningRateData'
+        type: array
+    type: object
   v2.OperatorDispersal:
     properties:
       batch_header:
         $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader'
       batch_header_hash:
         type: string
-      dispersedAt:
+      dispersed_at:
         type: integer
+      signature:
+        type: string
     type: object
   v2.OperatorDispersalFeedResponse:
     properties:
@@ -531,12 +540,28 @@ definitions:
           type: array
         type: object
     type: object
+  v2.QuorumSigningRateData:
+    properties:
+      data_points:
+        items:
+          $ref: '#/definitions/v2.SigningRateDataPoint'
+        type: array
+      quorum_id:
+        type: string
+    type: object
   v2.SemverReportResponse:
     properties:
       semver:
         additionalProperties:
           $ref: '#/definitions/semver.SemverMetrics'
         type: object
+    type: object
+  v2.SigningRateDataPoint:
+    properties:
+      signing_rate:
+        type: number
+      timestamp:
+        type: integer
     type: object
   v2.Throughput:
     properties:
@@ -849,6 +874,46 @@ paths:
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Fetch metrics summary
+      tags:
+      - Metrics
+  /metrics/timeseries/network-signing-rate:
+    get:
+      parameters:
+      - description: 'Fetch network signing rate up to the end time (ISO 8601 format:
+          2006-01-02T15:04:05Z) [default: now]'
+        in: query
+        name: end
+        type: string
+      - description: 'Fetch network signing rate starting from an interval (in seconds)
+          before the end time [default: 3600]'
+        in: query
+        name: interval
+        type: integer
+      - description: 'Comma-separated list of quorum IDs to filter (e.g., 0,1) [default:
+          0,1]'
+        in: query
+        name: quorums
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.NetworkSigningRateResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch network signing rate time series in the specified time range
       tags:
       - Metrics
   /metrics/timeseries/throughput:

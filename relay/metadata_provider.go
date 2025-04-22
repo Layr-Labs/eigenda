@@ -7,6 +7,7 @@ import (
 
 	"time"
 
+	cache2 "github.com/Layr-Labs/eigenda/common/cache"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -77,7 +78,7 @@ func newMetadataProvider(
 	server.blobParamsMap.Store(blobParamsMap)
 
 	metadataCache, err := cache.NewCacheAccessor[v2.BlobKey, *blobMetadata](
-		cache.NewFIFOCache[v2.BlobKey, *blobMetadata](uint64(metadataCacheSize), nil),
+		cache2.NewFIFOCache[v2.BlobKey, *blobMetadata](uint64(metadataCacheSize), nil),
 		maxIOConcurrency,
 		server.fetchMetadata,
 		metrics)
