@@ -155,6 +155,32 @@
       "startBlock": 1367721
     }
   },
+  "sepolia": {
+    "BLSApkRegistry": {
+      "address": "0xA8fF891E5b8cA255A0e884129bc14977F7A742BC",
+      "startBlock": 8153008
+    },
+    "BLSApkRegistry_Operator": {
+      "address": "0xA8fF891E5b8cA255A0e884129bc14977F7A742BC",
+      "startBlock": 8153008
+    },
+    "BLSApkRegistry_QuorumApkUpdates": {
+      "address": "0xA8fF891E5b8cA255A0e884129bc14977F7A742BC",
+      "startBlock": 8153008
+    },
+    "EjectionManager": {
+      "address": "0x399dc61317b0Cd533f931bCf23E1d646bF51C09B",
+      "startBlock": 8153008
+    },
+    "RegistryCoordinator": {
+      "address": "0xD8110B4A0465366140D4233772Bc383128e892Ca",
+      "startBlock": 8153008
+    },
+    "RegistryCoordinator_Operator": {
+      "address": "0xD8110B4A0465366140D4233772Bc383128e892Ca",
+      "startBlock": 8153008
+    }
+  },
   "mainnet": {
     "RegistryCoordinator": {
       "address": "0x0BAAc79acD45A023E19345c352d8a7a83C4e5656",
