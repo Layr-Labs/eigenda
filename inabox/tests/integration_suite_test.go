@@ -212,7 +212,7 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	if err != nil {
 		return err
 	}
-	retrievalClientV2 = clientsv2.NewRetrievalClient(logger, chainReader, cs, v, 10, 10)
+	retrievalClientV2 = clientsv2.NewValidatorClient(logger, chainReader, cs, v, 10, 10)
 
 	return nil
 }

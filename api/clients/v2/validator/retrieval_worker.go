@@ -90,32 +90,6 @@ const (
 	pessimisticTimeout
 )
 
-// ValidatorRetrievalConfig contains the configuration for the validator retrieval client.
-type ValidatorRetrievalConfig struct {
-	// If 1.0, then the validator retrieval client will attempt to download the exact number of chunks
-	// needed to reconstruct the blob. If higher than 1.0, then the validator retrieval client will
-	// pessimistically assume that some operators will not respond in time, and will download
-	// additional chunks from other operators. For example, at 2.0, the validator retrieval client
-	// will download twice the number of chunks needed to reconstruct the blob. Setting this to below
-	// 1.0 is not supported.
-	DownloadPessimism float64
-	// If 1.0, then the validator retrieval client will attempt to verify the exact number of chunks
-	// needed to reconstruct the blob. If higher than 1.0, then the validator retrieval client will
-	// pessimistically assume that some operators sent invalid chunks, and will verify additional chunks
-	// from other operators. For example, at 2.0, the validator retrieval client will verify twice the number of
-	// chunks needed to reconstruct the blob. Setting this to below 1.0 is not supported.
-	VerificationPessimism float64
-	// After this amount of time passes, the validator retrieval client will assume that the operator is not
-	// responding, and will start downloading from a different operator. The download is not terminated when
-	// this timeout is reached.
-	PessimisticTimeout time.Duration
-	// The absolute limit on the time to wait for a download to complete. If this timeout is reached, the
-	// download will be terminated.
-	DownloadTimeout time.Duration
-	// The control loop periodically wakes up to do work. This is the period of that control loop.
-	ControlLoopPeriod time.Duration
-}
-
 // retrievalWorker implements the distributed retrieval process for a specified blob (i.e. reading the blobs from
 // validators). It is responsible for coordinating the lifecycle of this retrieval workflow.
 type retrievalWorker struct {
@@ -123,7 +97,7 @@ type retrievalWorker struct {
 	downloadAndVerifyContext context.Context
 	cancel                   context.CancelFunc
 	logger                   logging.Logger
-	config                   *ValidatorRetrievalConfig
+	config                   *ValidatorClientConfig
 
 	// A pool of workers for network intensive operations (e.g. downloading blob data).
 	connectionPool *workerpool.WorkerPool
@@ -166,6 +140,9 @@ type retrievalWorker struct {
 
 	// When a thread completes decoding chunk data, it will send a message to the decodeResponseChan.
 	decodeResponseChan chan *decodeResult
+
+	// If true, then the validator retrieval client will log detailed information about the download process.
+	detailedLogging bool
 
 	// Used to collect metrics.
 	probe *common.SequenceProbe
@@ -236,22 +213,11 @@ type decodeResult struct {
 	Err  error
 }
 
-// DefaultValidatorRetrievalConfig returns the default configuration for the validator retrieval client.
-func DefaultValidatorRetrievalConfig() *ValidatorRetrievalConfig {
-	return &ValidatorRetrievalConfig{
-		DownloadPessimism:     2.0,
-		VerificationPessimism: 1.0,
-		PessimisticTimeout:    10 * time.Second,
-		DownloadTimeout:       30 * time.Second,
-		ControlLoopPeriod:     1 * time.Second,
-	}
-}
-
 // newRetrievalWorker creates a new retrieval worker.
 func newRetrievalWorker(
 	ctx context.Context,
 	logger logging.Logger,
-	config *ValidatorRetrievalConfig,
+	config *ValidatorClientConfig,
 	connectionPool *workerpool.WorkerPool,
 	computePool *workerpool.WorkerPool,
 	chainState core.ChainState,
@@ -365,6 +331,7 @@ func newRetrievalWorker(
 		chunkStatusCounts:        chunkStatusCounts,
 		targetDownloadCount:      targetDownloadCount,
 		targetVerifiedCount:      targetVerifiedCount,
+		detailedLogging:          config.DetailedLogging,
 	}, nil
 }
 
@@ -461,8 +428,10 @@ func (w *retrievalWorker) checkPessimisticTimeout() {
 			w.downloadsInProgressQueue.Dequeue()
 		} else if time.Since(downloadStart) > w.config.PessimisticTimeout {
 			// Too much time has passed. Assume that the operator is not responding.
-			w.logger.Debug("soft timeout exceeded for chunk download",
-				"operator", operatorID.Hex())
+			if w.detailedLogging {
+				w.logger.Debug("soft timeout exceeded for chunk download",
+					"operator", operatorID.Hex())
+			}
 			w.downloadsInProgressQueue.Dequeue()
 
 			w.updateChunkStatus(operatorID, pessimisticTimeout)
@@ -476,9 +445,11 @@ func (w *retrievalWorker) checkPessimisticTimeout() {
 // handleCompletedDownload handles the completion of a download.
 func (w *retrievalWorker) handleCompletedDownload(message *validatorDownloadCompleted) {
 	if message.Err == nil {
-		w.logger.Debug("downloaded chunks from operator",
-			"operator", message.OperatorID.Hex(),
-			"blobKey", w.blobKey.Hex())
+		if w.detailedLogging {
+			w.logger.Debug("downloaded chunks from operator",
+				"operator", message.OperatorID.Hex(),
+				"blobKey", w.blobKey.Hex())
+		}
 		w.downloadedChunksQueue.Enqueue(message)
 		w.updateChunkStatus(message.OperatorID, downloaded)
 	} else {
@@ -494,9 +465,11 @@ func (w *retrievalWorker) handleCompletedDownload(message *validatorDownloadComp
 // handleVerificationCompleted handles the completion of a verification.
 func (w *retrievalWorker) handleVerificationCompleted(message *verificationCompleted) {
 	if message.Err == nil {
-		w.logger.Debug("verified chunks from operator",
-			"operator", message.OperatorID.Hex(),
-			"blobKey", w.blobKey.Hex())
+		if w.detailedLogging {
+			w.logger.Debug("verified chunks from operator",
+				"operator", message.OperatorID.Hex(),
+				"blobKey", w.blobKey.Hex())
+		}
 		w.verifiedChunksQueue.Enqueue(message)
 		w.updateChunkStatus(message.OperatorID, verified)
 	} else {
@@ -590,9 +563,11 @@ func (w *retrievalWorker) decodeChunks() ([]byte, error) {
 
 // downloadChunks downloads the chunk data from the specified operator.
 func (w *retrievalWorker) downloadChunks(operatorID core.OperatorID) {
-	w.logger.Debug("downloading chunks",
-		"operator", operatorID.Hex(),
-		"blobKey", w.blobKey.Hex())
+	if w.detailedLogging {
+		w.logger.Debug("downloading chunks",
+			"operator", operatorID.Hex(),
+			"blobKey", w.blobKey.Hex())
+	}
 
 	ctx, cancel := context.WithTimeout(w.downloadAndVerifyContext, w.config.DownloadTimeout)
 	defer cancel()
@@ -662,9 +637,11 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 		return
 	}
 
-	w.logger.Debug("verifying chunks",
-		"operator", operatorID.Hex(),
-		"blobKey", w.blobKey.Hex())
+	if w.detailedLogging {
+		w.logger.Debug("verifying chunks",
+			"operator", operatorID.Hex(),
+			"blobKey", w.blobKey.Hex())
+	}
 
 	chunks := make([]*encoding.Frame, len(getChunksReply.GetChunks()))
 	for i, data := range getChunksReply.GetChunks() {
@@ -687,7 +664,6 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 		assignmentIndices[i] = uint(index)
 	}
 
-	// TODO this can be parallelized!
 	err := w.verifier.VerifyFrames(chunks, assignmentIndices, w.blobCommitments, w.encodingParams)
 	if err != nil {
 		w.verificationCompleteChan <- &verificationCompleted{
@@ -706,7 +682,9 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 // decodeBlob decodes the blob from the chunks and indices.
 func (w *retrievalWorker) decodeBlob(chunks []*encoding.Frame, indices []uint) {
 
-	w.logger.Debug("decoding blob", "blobKey", w.blobKey.Hex())
+	if w.detailedLogging {
+		w.logger.Debug("decoding blob", "blobKey", w.blobKey.Hex())
+	}
 
 	blob, err := w.verifier.Decode(
 		chunks,

@@ -49,8 +49,8 @@ type retrievalClient struct {
 
 var _ ValidatorClient = &retrievalClient{}
 
-// NewRetrievalClient creates a new retrieval client.
-func NewRetrievalClient(
+// NewValidatorClient creates a new retrieval client.
+func NewValidatorClient(
 	logger logging.Logger,
 	ethClient core.Reader,
 	chainState core.ChainState,
@@ -100,7 +100,7 @@ func (r *retrievalClient) GetBlobWithProbe(
 	worker, err := newRetrievalWorker(
 		ctx,
 		r.logger,
-		DefaultValidatorRetrievalConfig(), // TODO pass this in
+		DefaultClientConfig(), // TODO pass this in
 		r.connectionPool,
 		r.computePool,
 		r.chainState,

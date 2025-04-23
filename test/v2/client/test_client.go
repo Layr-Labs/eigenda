@@ -263,7 +263,7 @@ func NewTestClient(
 	}
 
 	numCPUs := runtime.NumCPU()
-	retrievalClient := validator.NewRetrievalClient(
+	retrievalClient := validator.NewValidatorClient(
 		logger,
 		ethReader,
 		indexedChainState,

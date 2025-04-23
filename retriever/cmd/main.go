@@ -127,7 +127,7 @@ func RetrieverMain(ctx *cli.Context) error {
 
 	if config.EigenDAVersion == 2 {
 		numCPUs := runtime.NumCPU()
-		retrievalClient := clientsv2.NewRetrievalClient(logger, tx, cs, v, config.NumConnections, numCPUs)
+		retrievalClient := clientsv2.NewValidatorClient(logger, tx, cs, v, config.NumConnections, numCPUs)
 		retrieverServiceServer := retrieverv2.NewServer(config, logger, retrievalClient, cs)
 		retrieverServiceServer.Start(context.Background())
 
