@@ -141,6 +141,18 @@ type retrievalWorker struct {
 	// When a thread completes decoding chunk data, it will send a message to the decodeResponseChan.
 	decodeResponseChan chan *decodeResult
 
+	// The function used to download chunks from the validators. This can be set to a custom function
+	// for testing purposes.
+	downloadChunksFunction DownloadChunksFunction
+
+	// The function used to deserialize and verify chunks from the validators. This can be set to a custom function
+	// for testing purposes.
+	deserializeAndVerifyFunction DeserializeAndVerifyFunction
+
+	// The function used to decode the blob from the chunks. This can be set to a custom function
+	// for testing purposes.
+	decodeBlobFunction DecodeBlobFunction
+
 	// If true, then the validator retrieval client will log detailed information about the download process.
 	detailedLogging bool
 
@@ -300,39 +312,54 @@ func newRetrievalWorker(
 	targetDownloadCount := uint32(math.Ceil(float64(minimumChunkCount) * config.DownloadPessimism))
 	targetVerifiedCount := uint32(math.Ceil(float64(minimumChunkCount) * config.VerificationPessimism))
 
-	return &retrievalWorker{
-		ctx:                      ctx,
-		downloadAndVerifyContext: downloadAndVerifyCtx,
-		cancel:                   cancel,
-		logger:                   logger,
-		config:                   config,
-		connectionPool:           connectionPool,
-		computePool:              computePool,
-		operators:                operators,
-		operatorState:            operatorState,
-		encodingParams:           encodingParams,
-		assignments:              assignments,
-		quorumID:                 quorumID,
-		blobKey:                  blobKey,
-		verifier:                 verifier,
-		blobCommitments:          blobCommitments,
-		downloadStartedChan:      make(chan *downloadStarted, len(operators)),
-		downloadCompletedChan:    make(chan *validatorDownloadCompleted, len(operators)),
-		verificationCompleteChan: make(chan *verificationCompleted, len(operators)),
-		decodeResponseChan:       make(chan *decodeResult, len(operators)),
-		probe:                    probe,
-		minimumChunkCount:        minimumChunkCount,
-		downloadsInProgressQueue: linkedlistqueue.New(),
-		downloadedChunksQueue:    linkedlistqueue.New(),
-		verifiedChunksQueue:      linkedlistqueue.New(),
-		downloadOrder:            downloadOrder,
-		totalChunkCount:          totalChunkCount,
-		chunkStatusMap:           chunkStatusMap,
-		chunkStatusCounts:        chunkStatusCounts,
-		targetDownloadCount:      targetDownloadCount,
-		targetVerifiedCount:      targetVerifiedCount,
-		detailedLogging:          config.DetailedLogging,
-	}, nil
+	worker := &retrievalWorker{
+		ctx:                          ctx,
+		downloadAndVerifyContext:     downloadAndVerifyCtx,
+		cancel:                       cancel,
+		logger:                       logger,
+		config:                       config,
+		connectionPool:               connectionPool,
+		computePool:                  computePool,
+		operators:                    operators,
+		operatorState:                operatorState,
+		encodingParams:               encodingParams,
+		assignments:                  assignments,
+		quorumID:                     quorumID,
+		blobKey:                      blobKey,
+		verifier:                     verifier,
+		blobCommitments:              blobCommitments,
+		downloadStartedChan:          make(chan *downloadStarted, len(operators)),
+		downloadCompletedChan:        make(chan *validatorDownloadCompleted, len(operators)),
+		verificationCompleteChan:     make(chan *verificationCompleted, len(operators)),
+		decodeResponseChan:           make(chan *decodeResult, len(operators)),
+		probe:                        probe,
+		minimumChunkCount:            minimumChunkCount,
+		downloadsInProgressQueue:     linkedlistqueue.New(),
+		downloadedChunksQueue:        linkedlistqueue.New(),
+		verifiedChunksQueue:          linkedlistqueue.New(),
+		downloadOrder:                downloadOrder,
+		totalChunkCount:              totalChunkCount,
+		chunkStatusMap:               chunkStatusMap,
+		chunkStatusCounts:            chunkStatusCounts,
+		targetDownloadCount:          targetDownloadCount,
+		targetVerifiedCount:          targetVerifiedCount,
+		detailedLogging:              config.DetailedLogging,
+		downloadChunksFunction:       config.UnsafeDownloadChunksFunction,
+		deserializeAndVerifyFunction: config.UnsafeDeserializeAndVerifyFunction,
+		decodeBlobFunction:           config.UnsafeDecodeBlobFunction,
+	}
+
+	if worker.downloadChunksFunction == nil {
+		worker.downloadChunksFunction = worker.standardDownloadChunks
+	}
+	if worker.deserializeAndVerifyFunction == nil {
+		worker.deserializeAndVerifyFunction = worker.standardDeserializeAndVerify
+	}
+	if worker.decodeBlobFunction == nil {
+		worker.decodeBlobFunction = worker.standardDecodeBlob
+	}
+
+	return worker, nil
 }
 
 // TODO unit test this workflow
@@ -522,7 +549,9 @@ func (w *retrievalWorker) scheduleVerifications() {
 
 // decodeBlob decodes the blob from the chunks.
 func (w *retrievalWorker) decodeChunks() ([]byte, error) {
-	w.logger.Info("decoding blob", "blobKey", w.blobKey.Hex())
+	if w.detailedLogging {
+		w.logger.Info("decoding blob", "blobKey", w.blobKey.Hex())
+	}
 
 	chunks := make([]*encoding.Frame, 0)
 	indices := make([]uint, 0)
@@ -569,15 +598,32 @@ func (w *retrievalWorker) downloadChunks(operatorID core.OperatorID) {
 			"blobKey", w.blobKey.Hex())
 	}
 
-	ctx, cancel := context.WithTimeout(w.downloadAndVerifyContext, w.config.DownloadTimeout)
-	defer cancel()
-
 	// Report back to the control loop when the download started. This may be later than when
 	// the download was scheduled if there is contention for the connection pool.
 	w.downloadStartedChan <- &downloadStarted{
 		operatorID:    operatorID,
 		downloadStart: time.Now(),
 	}
+
+	// Unless this has been overridden for testing, this is just a call to standardDownloadChunks().
+	reply, err := w.downloadChunksFunction(w.blobKey, operatorID)
+
+	w.downloadCompletedChan <- &validatorDownloadCompleted{
+		OperatorID: operatorID,
+		Reply:      reply,
+		Err:        err,
+	}
+}
+
+// downloadChunksFunction is the default function used to download chunks from a validator node. This may not
+// be called if
+func (w *retrievalWorker) standardDownloadChunks(
+	_ v2.BlobKey,
+	operatorID core.OperatorID,
+) (*grpcnode.GetChunksReply, error) {
+
+	ctx, cancel := context.WithTimeout(w.downloadAndVerifyContext, w.config.DownloadTimeout)
+	defer cancel()
 
 	// TODO we can get a tighter bound?
 	maxBlobSize := 16 * units.MiB // maximum size of the original blob
@@ -598,11 +644,7 @@ func (w *retrievalWorker) downloadChunks(operatorID core.OperatorID) {
 		}
 	}()
 	if err != nil {
-		w.downloadCompletedChan <- &validatorDownloadCompleted{
-			OperatorID: operatorID,
-			Err:        fmt.Errorf("failed to create connection to operator %s: %w", operatorID.Hex(), err),
-		}
-		return
+		return nil, fmt.Errorf("failed to create connection to operator %s: %w", operatorID.Hex(), err)
 	}
 
 	n := grpcnode.NewRetrievalClient(conn)
@@ -613,17 +655,10 @@ func (w *retrievalWorker) downloadChunks(operatorID core.OperatorID) {
 
 	reply, err := n.GetChunks(ctx, request)
 	if err != nil {
-		w.downloadCompletedChan <- &validatorDownloadCompleted{
-			OperatorID: operatorID,
-			Err:        fmt.Errorf("failed to get chunks from operator %s: %w", operatorID.Hex(), err),
-		}
-		return
+		return nil, fmt.Errorf("failed to get chunks from operator %s: %w", operatorID.Hex(), err)
 	}
 
-	w.downloadCompletedChan <- &validatorDownloadCompleted{
-		OperatorID: operatorID,
-		Reply:      reply,
-	}
+	return reply, nil
 }
 
 // deserializeAndVerifyChunks deserializes the chunks from the GetChunksReply and sends them to the chunksChan.
@@ -643,15 +678,28 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 			"blobKey", w.blobKey.Hex())
 	}
 
+	// Unless this has been overridden for testing, this is just a call to standardDeserializeAndVerify().
+	chunks, err := w.deserializeAndVerifyFunction(w.blobKey, operatorID, getChunksReply)
+
+	w.verificationCompleteChan <- &verificationCompleted{
+		OperatorID: operatorID,
+		chunks:     chunks,
+		Err:        err,
+	}
+}
+
+// standardDeserializeAndVerify is a standard implementation of the DeserializeAndVerifyFunction.
+func (w *retrievalWorker) standardDeserializeAndVerify(
+	_ v2.BlobKey,
+	operatorID core.OperatorID,
+	getChunksReply *grpcnode.GetChunksReply,
+) ([]*encoding.Frame, error) {
+
 	chunks := make([]*encoding.Frame, len(getChunksReply.GetChunks()))
 	for i, data := range getChunksReply.GetChunks() {
 		chunk, err := new(encoding.Frame).DeserializeGnark(data)
 		if err != nil {
-			w.verificationCompleteChan <- &verificationCompleted{
-				OperatorID: operatorID,
-				Err:        fmt.Errorf("failed to deserialize chunk from operator %s: %w", operatorID.Hex(), err),
-			}
-			return
+			return nil, fmt.Errorf("failed to deserialize chunk from operator %s: %w", operatorID.Hex(), err)
 		}
 
 		chunks[i] = chunk
@@ -666,17 +714,10 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 
 	err := w.verifier.VerifyFrames(chunks, assignmentIndices, w.blobCommitments, w.encodingParams)
 	if err != nil {
-		w.verificationCompleteChan <- &verificationCompleted{
-			OperatorID: operatorID,
-			Err:        fmt.Errorf("failed to verify chunks from operator %s: %w", operatorID.Hex(), err),
-		}
-		return
+		return nil, fmt.Errorf("failed to verify chunks from operator %s: %w", operatorID.Hex(), err)
 	}
 
-	w.verificationCompleteChan <- &verificationCompleted{
-		OperatorID: operatorID,
-		chunks:     chunks,
-	}
+	return chunks, nil
 }
 
 // decodeBlob decodes the blob from the chunks and indices.
@@ -686,14 +727,25 @@ func (w *retrievalWorker) decodeBlob(chunks []*encoding.Frame, indices []uint) {
 		w.logger.Debug("decoding blob", "blobKey", w.blobKey.Hex())
 	}
 
-	blob, err := w.verifier.Decode(
-		chunks,
-		indices,
-		w.encodingParams,
-		uint64(w.blobCommitments.Length)*encoding.BYTES_PER_SYMBOL,
-	)
+	// Unless this has been overridden for testing, this is just a call to standardDecodeBlob().
+	blob, err := w.decodeBlobFunction(w.blobKey, chunks, indices)
+
 	w.decodeResponseChan <- &decodeResult{
 		Blob: blob,
 		Err:  err,
 	}
+}
+
+// decodeBlobFunction is the default function used to decode the blob from the chunks.
+func (w *retrievalWorker) standardDecodeBlob(
+	blobKey v2.BlobKey,
+	chunks []*encoding.Frame,
+	indices []uint,
+) ([]byte, error) {
+
+	return w.verifier.Decode(
+		chunks,
+		indices,
+		w.encodingParams,
+		uint64(w.blobCommitments.Length)*encoding.BYTES_PER_SYMBOL)
 }

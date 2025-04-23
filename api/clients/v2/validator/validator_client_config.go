@@ -3,6 +3,11 @@ package validator
 import (
 	"runtime"
 	"time"
+
+	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
+	"github.com/Layr-Labs/eigenda/core"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/encoding"
 )
 
 // ValidatorClientConfig contains the configuration for the validator retrieval client.
@@ -37,7 +42,7 @@ type ValidatorClientConfig struct {
 	// The absolute limit on the time to wait for a download to complete. If this timeout is reached, the
 	// download will be terminated.
 	//
-	// The default value is 30 seconds.
+	// The default value is 120 seconds.
 	DownloadTimeout time.Duration
 
 	// The control loop periodically wakes up to do work. This is the period of that control loop.
@@ -60,18 +65,59 @@ type ValidatorClientConfig struct {
 	//
 	// The default is equal to the number of CPU cores.
 	ComputePoolSize int
+
+	// A function that overrides the default chunk downloader. This is intended for testing purposes, and should
+	// not be used in production code. This should not be considered a public API.
+	//
+	// The default is nil (i.e. the standard chunk downloader is used).
+	UnsafeDownloadChunksFunction DownloadChunksFunction
+
+	// A function that overrides the default chunk validation and deserialization logic. This is intended for testing
+	// purposes, and should not be used in production code. This should not be considered a public API.
+	//
+	// The default is nil (i.e. the standard chunk validation and deserialization logic is used).
+	UnsafeDeserializeAndVerifyFunction DeserializeAndVerifyFunction
+
+	// A function that overrides the default blob decoder. This is intended for testing purposes, and should not
+	// be used in production code. This should not be considered a public API.
+	//
+	// The default is nil (i.e. the standard blob decoder is used).
+	UnsafeDecodeBlobFunction DecodeBlobFunction
 }
+
+// DownloadChunksFunction is a function that downloads chunks from a validator node.
+type DownloadChunksFunction func(
+	blobKey v2.BlobKey,
+	operatorID core.OperatorID,
+) (*grpcnode.GetChunksReply, error)
+
+// DeserializeAndVerifyFunction is a function that deserializes and verifies chunks from a validator node.
+type DeserializeAndVerifyFunction func(
+	blobKey v2.BlobKey,
+	operatorID core.OperatorID,
+	getChunksReply *grpcnode.GetChunksReply,
+) ([]*encoding.Frame, error)
+
+// DecodeBlobFunction is a function that decodes a blob from the chunks received from a validator node.
+type DecodeBlobFunction func(
+	blobKey v2.BlobKey,
+	chunks []*encoding.Frame,
+	indices []uint,
+) ([]byte, error)
 
 // DefaultClientConfig returns the default configuration for the validator retrieval client.
 func DefaultClientConfig() *ValidatorClientConfig {
 	return &ValidatorClientConfig{
-		DownloadPessimism:     2.0,
-		VerificationPessimism: 1.0,
-		PessimisticTimeout:    10 * time.Second,
-		DownloadTimeout:       30 * time.Second,
-		ControlLoopPeriod:     1 * time.Second,
-		DetailedLogging:       false,
-		ConnectionPoolSize:    32,
-		ComputePoolSize:       runtime.NumCPU(),
+		DownloadPessimism:                  2.0,
+		VerificationPessimism:              1.0,
+		PessimisticTimeout:                 10 * time.Second,
+		DownloadTimeout:                    120 * time.Second,
+		ControlLoopPeriod:                  1 * time.Second,
+		DetailedLogging:                    false,
+		ConnectionPoolSize:                 32,
+		ComputePoolSize:                    runtime.NumCPU(),
+		UnsafeDownloadChunksFunction:       nil,
+		UnsafeDeserializeAndVerifyFunction: nil,
+		UnsafeDecodeBlobFunction:           nil,
 	}
 }
