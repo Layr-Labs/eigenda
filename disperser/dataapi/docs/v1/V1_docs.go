@@ -645,7 +645,7 @@ const docTemplateV1 = `{
                 "tags": [
                     "OperatorsInfo"
                 ],
-                "summary": "Operator node reachability port check",
+                "summary": "Operator v1 node reachability port check",
                 "parameters": [
                     {
                         "type": "string",
@@ -941,21 +941,15 @@ const docTemplateV1 = `{
                 },
                 "retrieval_status": {
                     "type": "string"
-                },
-                "v2_dispersal_online": {
-                    "type": "boolean"
-                },
-                "v2_dispersal_socket": {
-                    "type": "string"
-                },
-                "v2_dispersal_status": {
-                    "type": "string"
                 }
             }
         },
         "dataapi.OperatorStake": {
             "type": "object",
             "properties": {
+                "operator_address": {
+                    "type": "string"
+                },
                 "operator_id": {
                     "type": "string"
                 },
@@ -987,6 +981,9 @@ const docTemplateV1 = `{
         "dataapi.OperatorsStakeResponse": {
             "type": "object",
             "properties": {
+                "current_block": {
+                    "type": "integer"
+                },
                 "stake_ranked_operators": {
                     "type": "object",
                     "additionalProperties": {
@@ -1123,6 +1120,7 @@ const docTemplateV1 = `{
                     "$ref": "#/definitions/encoding.G1Commitment"
                 },
                 "length": {
+                    "description": "this is the length in SYMBOLS (32 byte field elements) of the blob. it must be a power of 2",
                     "type": "integer"
                 },
                 "length_commitment": {
@@ -1141,12 +1139,6 @@ const docTemplateV1 = `{
                     "items": {
                         "type": "integer"
                     }
-                },
-                "y": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
                 }
             }
         },
@@ -1155,9 +1147,6 @@ const docTemplateV1 = `{
             "properties": {
                 "x": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
         },
@@ -1165,9 +1154,6 @@ const docTemplateV1 = `{
             "type": "object",
             "properties": {
                 "x": {
-                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
-                },
-                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -1195,12 +1181,6 @@ const docTemplateV1 = `{
             "type": "object",
             "properties": {
                 "a0": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "a1": {
                     "type": "array",
                     "items": {
                         "type": "integer"
