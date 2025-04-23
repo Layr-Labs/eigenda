@@ -64,7 +64,7 @@ library EigenDACertVerificationV2Lib {
     /// @param relayKey The relay key that is not set
     error RelayKeyNotSet(uint32 relayKey);
 
-    /// @notice Error codes for certificate verification results
+    /// @notice Status codes for certificate verification results
     enum StatusCode {
         SUCCESS, // Verification succeeded
         INVALID_INCLUSION_PROOF, // Merkle inclusion proof is invalid
