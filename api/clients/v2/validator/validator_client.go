@@ -38,16 +38,17 @@ type ValidatorClient interface {
 	) ([]byte, error)
 }
 
-type retrievalClient struct {
+type validatorClient struct {
 	logger         logging.Logger
 	ethClient      core.Reader
 	chainState     core.ChainState
 	verifier       encoding.Verifier
+	config         *ValidatorClientConfig
 	connectionPool *workerpool.WorkerPool
 	computePool    *workerpool.WorkerPool
 }
 
-var _ ValidatorClient = &retrievalClient{}
+var _ ValidatorClient = &validatorClient{}
 
 // NewValidatorClient creates a new retrieval client.
 func NewValidatorClient(
@@ -55,28 +56,28 @@ func NewValidatorClient(
 	ethClient core.Reader,
 	chainState core.ChainState,
 	verifier encoding.Verifier,
-	connectionPoolSize int,
-	computePoolSize int,
+	config *ValidatorClientConfig,
 ) ValidatorClient {
 
-	if connectionPoolSize <= 0 {
-		connectionPoolSize = 1
+	if config.ConnectionPoolSize <= 0 {
+		config.ConnectionPoolSize = 1
 	}
-	if computePoolSize <= 0 {
-		computePoolSize = 1
+	if config.ComputePoolSize <= 0 {
+		config.ComputePoolSize = 1
 	}
 
-	return &retrievalClient{
+	return &validatorClient{
 		logger:         logger.With("component", "ValidatorClient"),
 		ethClient:      ethClient,
 		chainState:     chainState,
 		verifier:       verifier,
-		connectionPool: workerpool.New(connectionPoolSize),
-		computePool:    workerpool.New(computePoolSize),
+		config:         config,
+		connectionPool: workerpool.New(config.ConnectionPoolSize),
+		computePool:    workerpool.New(config.ComputePoolSize),
 	}
 }
 
-func (r *retrievalClient) GetBlob(
+func (c *validatorClient) GetBlob(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
 	blobVersion corev2.BlobVersion,
@@ -84,10 +85,10 @@ func (r *retrievalClient) GetBlob(
 	referenceBlockNumber uint64,
 	quorumID core.QuorumID,
 ) ([]byte, error) {
-	return r.GetBlobWithProbe(ctx, blobKey, blobVersion, blobCommitments, referenceBlockNumber, quorumID, nil)
+	return c.GetBlobWithProbe(ctx, blobKey, blobVersion, blobCommitments, referenceBlockNumber, quorumID, nil)
 }
 
-func (r *retrievalClient) GetBlobWithProbe(
+func (c *validatorClient) GetBlobWithProbe(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
 	blobVersion corev2.BlobVersion,
@@ -99,17 +100,17 @@ func (r *retrievalClient) GetBlobWithProbe(
 
 	worker, err := newRetrievalWorker(
 		ctx,
-		r.logger,
-		DefaultClientConfig(), // TODO pass this in
-		r.connectionPool,
-		r.computePool,
-		r.chainState,
+		c.logger,
+		c.config,
+		c.connectionPool,
+		c.computePool,
+		c.chainState,
 		referenceBlockNumber,
 		blobVersion,
-		r.ethClient,
+		c.ethClient,
 		quorumID,
 		blobKey,
-		r.verifier,
+		c.verifier,
 		blobCommitments,
 		probe)
 	if err != nil {

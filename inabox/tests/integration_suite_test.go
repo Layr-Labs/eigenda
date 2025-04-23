@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -212,7 +213,8 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	if err != nil {
 		return err
 	}
-	retrievalClientV2 = clientsv2.NewValidatorClient(logger, chainReader, cs, v, 10, 10)
+	clientConfig := validator.DefaultClientConfig()
+	retrievalClientV2 = clientsv2.NewValidatorClient(logger, chainReader, cs, v, clientConfig)
 
 	return nil
 }

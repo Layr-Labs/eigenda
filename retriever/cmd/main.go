@@ -7,9 +7,9 @@ import (
 	"log"
 	"net"
 	"os"
-	"runtime"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever"
 	pbv2 "github.com/Layr-Labs/eigenda/api/grpc/retriever/v2"
@@ -126,8 +126,10 @@ func RetrieverMain(ctx *cli.Context) error {
 	}
 
 	if config.EigenDAVersion == 2 {
-		numCPUs := runtime.NumCPU()
-		retrievalClient := clientsv2.NewValidatorClient(logger, tx, cs, v, config.NumConnections, numCPUs)
+		clientConfig := validator.DefaultClientConfig()
+		clientConfig.ConnectionPoolSize = config.NumConnections
+
+		retrievalClient := clientsv2.NewValidatorClient(logger, tx, cs, v, clientConfig)
 		retrieverServiceServer := retrieverv2.NewServer(config, logger, retrievalClient, cs)
 		retrieverServiceServer.Start(context.Background())
 

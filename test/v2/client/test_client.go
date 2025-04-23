@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
@@ -262,14 +261,13 @@ func NewTestClient(
 		RetrievalTimeout:    1337 * time.Hour, // this suite enforces its own timeouts
 	}
 
-	numCPUs := runtime.NumCPU()
+	clientConfig := validator.DefaultClientConfig()
 	retrievalClient := validator.NewValidatorClient(
 		logger,
 		ethReader,
 		indexedChainState,
 		blobVerifier,
-		numCPUs,
-		numCPUs)
+		clientConfig)
 
 	validatorPayloadRetriever, err := payloadretrieval.NewValidatorPayloadRetriever(
 		logger,

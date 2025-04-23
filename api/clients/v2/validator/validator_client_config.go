@@ -1,6 +1,9 @@
 package validator
 
-import "time"
+import (
+	"runtime"
+	"time"
+)
 
 // ValidatorClientConfig contains the configuration for the validator retrieval client.
 type ValidatorClientConfig struct {
@@ -47,6 +50,16 @@ type ValidatorClientConfig struct {
 	//
 	// The default value is false.
 	DetailedLogging bool
+
+	// The maximum number of goroutines permitted to do network intensive work (i.e. downloading chunks).
+	//
+	// The default is 32.
+	ConnectionPoolSize int
+
+	// The maximum number of goroutines permitted to do compute intensive work (i.e. verifying/recombining chunks).
+	//
+	// The default is equal to the number of CPU cores.
+	ComputePoolSize int
 }
 
 // DefaultClientConfig returns the default configuration for the validator retrieval client.
@@ -58,5 +71,7 @@ func DefaultClientConfig() *ValidatorClientConfig {
 		DownloadTimeout:       30 * time.Second,
 		ControlLoopPeriod:     1 * time.Second,
 		DetailedLogging:       false,
+		ConnectionPoolSize:    32,
+		ComputePoolSize:       runtime.NumCPU(),
 	}
 }
