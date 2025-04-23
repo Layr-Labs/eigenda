@@ -56,6 +56,20 @@ contract EigenDACertVerifier is EigenDACertVerifierV1, EigenDACertVerifierV2 {
         CertV2Lib.revertOnError(status, statusParams);
     }
 
+    function getNonSignerStakesAndSignature(SignedBatch calldata signedBatch)
+        external
+        view
+        returns (NonSignerStakesAndSignature memory)
+    {
+        (NonSignerStakesAndSignature memory nonSignerStakesAndSignature,) =
+            CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetrieverV2, registryCoordinatorV2, signedBatch);
+        return nonSignerStakesAndSignature;
+    }
+
+    function eigenDARelayRegistry() external view returns (IEigenDARelayRegistry) {
+        return eigenDARelayRegistryV2;
+    }
+
     /**
      * @notice Returns the threshold registry contract
      * @return The IEigenDAThresholdRegistry contract
