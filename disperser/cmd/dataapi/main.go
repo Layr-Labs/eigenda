@@ -103,8 +103,6 @@ func RunDataApi(ctx *cli.Context) error {
 		sharedStorage     = blobstore.NewSharedStorage(config.BlobstoreConfig.BucketName, s3Client, blobMetadataStore, logger)
 		subgraphApi       = subgraph.NewApi(config.SubgraphApiBatchMetadataAddr, config.SubgraphApiOperatorStateAddr)
 		subgraphClient    = dataapi.NewSubgraphClient(subgraphApi, logger)
-		chainState        = coreeth.NewChainState(tx, client)
-		indexedChainState = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
 		metrics           = dataapi.NewMetrics(config.ServerVersion, blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
 		server            = dataapi.NewServer(
 			dataapi.Config{

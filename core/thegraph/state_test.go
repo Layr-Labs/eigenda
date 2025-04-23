@@ -312,7 +312,7 @@ func TestIndexedChainState_GetIndexedOperatorInfoByOperatorId(t *testing.T) {
 }
 
 func TestIndexedOperatorStateCache_CacheEviction(t *testing.T) {
-	logger := logging.NewNoopLogger()
+	logger := testutils.GetLogger()
 	chainState, _ := coremock.MakeChainDataMock(map[uint8]int{
 		0: 1,
 	})

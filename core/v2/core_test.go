@@ -22,6 +22,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -55,7 +56,7 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	logger := testutils.GetLogger()
-	reader := &mock.MockWriter{}
+	reader := &coremock.MockWriter{}
 	reader.On("OperatorIDToAddress").Return(gethcommon.Address{}, nil)
 	agg, err = core.NewStdSignatureAggregator(logger, reader)
 	if err != nil {
