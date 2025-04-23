@@ -30,6 +30,13 @@ func (svr *Server) handleHealth(w http.ResponseWriter, _ *http.Request) error {
 	return nil
 }
 
+func (svr *Server) logDispersalGetError(w http.ResponseWriter, _ *http.Request) error {
+	svr.log.Warn(`GET method invoked on /put/ endpoint.
+		This can occur due to 303 redirects when using incorrect slash ticks.`)
+	w.WriteHeader(http.StatusMethodNotAllowed)
+	return nil
+}
+
 // =================================================================================================
 // GET ROUTES
 // =================================================================================================

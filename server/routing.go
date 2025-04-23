@@ -87,6 +87,9 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 
 	r.HandleFunc("/health", withLogging(svr.handleHealth, svr.log)).Methods("GET")
 
+	// this is done to explicitly log capture potential redirect errors
+	r.HandleFunc("/put", withLogging(svr.logDispersalGetError, svr.log)).Methods("GET")
+
 	// Only register admin endpoints if explicitly enabled in configuration
 	//
 	// Note: A common pattern for admin endpoints is to generate a random API key on startup for authentication.
