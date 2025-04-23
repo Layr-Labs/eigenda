@@ -263,7 +263,10 @@ func NewTestClient(
 		PullInterval: 100 * time.Millisecond,
 		MaxRetries:   5,
 	}
-	indexedChainState := thegraph.MakeIndexedChainState(icsConfig, chainState, logger)
+	indexedChainState, err := thegraph.MakeIndexedChainState(icsConfig, chainState, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create indexed chain state: %w", err)
+	}
 
 	validatorPayloadRetrieverConfig := &payloadretrieval.ValidatorPayloadRetrieverConfig{
 		PayloadClientConfig: *payloadClientConfig,
