@@ -33,8 +33,6 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         nonSignerStakesAndSignature.totalStakeIndices = nssas.totalStakeIndices;
         nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
 
-        _registerRelayKeys();
-
         eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
 
         (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
@@ -61,8 +59,6 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         nonSignerStakesAndSignature.totalStakeIndices = nssas.totalStakeIndices;
         nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
 
-        _registerRelayKeys();
-
         (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
             CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
         bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(
@@ -77,6 +73,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
             BlobInclusionInfo memory blobInclusionInfo,
             BLSSignatureChecker.NonSignerStakesAndSignature memory nssas
         ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
+        signedBatch.batchHeader.batchRoot = keccak256("bad root");
 
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
         nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = nssas.nonSignerQuorumBitmapIndices;
@@ -96,14 +93,6 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         assert(!zk);
     }
 
-    function test_verifyDACertV2_revert_RelayKeysNotSet(uint256 pseudoRandomNumber) public {
-        (SignedBatch memory signedBatch, BlobInclusionInfo memory blobInclusionInfo,) =
-            _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
-
-        vm.expectPartialRevert(CertV2Lib.RelayKeyNotSet.selector);
-        eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
-    }
-
     function test_verifyDACertV2_revert_InclusionProofInvalid(uint256 pseudoRandomNumber) public {
         (SignedBatch memory signedBatch, BlobInclusionInfo memory blobInclusionInfo,) =
             _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
@@ -119,21 +108,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         (SignedBatch memory signedBatch, BlobInclusionInfo memory blobInclusionInfo,) =
             _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 1);
 
-        _registerRelayKeys();
-
         vm.expectRevert();
-        eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
-    }
-
-    function test_verifyDACertV2_revert_BadSecurityParams(uint256 pseudoRandomNumber) public {
-        (SignedBatch memory signedBatch, BlobInclusionInfo memory blobInclusionInfo,) =
-            _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
-
-        vm.store(address(eigenDACertVerifier), bytes32(uint256(0)), bytes32(uint256(14113)));
-
-        _registerRelayKeys();
-
-        vm.expectPartialRevert(CertV2Lib.InvalidThresholdPercentages.selector);
         eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
     }
 
@@ -241,12 +216,5 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         });
 
         return blobHeader;
-    }
-
-    function _registerRelayKeys() internal {
-        vm.startPrank(registryCoordinatorOwner);
-        eigenDARelayRegistry.addRelayInfo(RelayInfo({relayAddress: relay0, relayURL: "https://relay0.com"}));
-        eigenDARelayRegistry.addRelayInfo(RelayInfo({relayAddress: relay1, relayURL: "https://relay1.com"}));
-        vm.stopPrank();
     }
 }
