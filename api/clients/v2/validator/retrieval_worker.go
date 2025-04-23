@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
@@ -32,18 +33,18 @@ import (
 	|     request     | --> | download chunks | --> |  verify chunks  | --> |  decode blob    |
 	+-----------------+     +-----------------+     +-----------------+     +-----------------+
 
-Each chunk goes through the following states:
+                          Each chunk goes through the following states:
 
- +-----------------------------------+
- |                                   |
- |                                   v
- |   available -> downloading -> downloaded -> verifying -> verified
- |                 |       |                       |
- |                 v       |                       |
- |   pessimistic timeout   |                       |
- |        |        |       |                       |
- |        |        |       v                       |
- +--------+        +---> failed <------------------+
+               +-----------------------------------+
+               |                                   |
+               |                                   v
+               |   available -> downloading -> downloaded -> verifying -> verified
+               |                 |       |                       |
+               |                 v       |                       |
+               |   pessimistic timeout   |                       |
+               |        |        |       |                       |
+               |        |        |       v                       |
+               +--------+        +---> failed <------------------+
 
 == DownloadPessimism ==
 
@@ -330,6 +331,9 @@ func newRetrievalWorker(
 		chunkStatusCounts[available] += int(assignments[opID].NumChunks)
 	}
 
+	targetDownloadCount := uint32(math.Ceil(float64(minimumChunkCount) * config.DownloadPessimism))
+	targetVerifiedCount := uint32(math.Ceil(float64(minimumChunkCount) * config.VerificationPessimism))
+
 	return &retrievalWorker{
 		ctx:                      ctx,
 		downloadAndVerifyContext: downloadAndVerifyCtx,
@@ -359,10 +363,11 @@ func newRetrievalWorker(
 		totalChunkCount:          totalChunkCount,
 		chunkStatusMap:           chunkStatusMap,
 		chunkStatusCounts:        chunkStatusCounts,
+		targetDownloadCount:      targetDownloadCount,
+		targetVerifiedCount:      targetVerifiedCount,
 	}, nil
 }
 
-// TODO document this workflow
 // TODO unit test this workflow
 
 // updateChunkStatus updates the status of a chunk from a given operator. It also updates the
@@ -392,22 +397,6 @@ func (w *retrievalWorker) getStatusCount(statuses ...int) uint32 {
 		}
 	}
 	return uint32(total)
-}
-
-func (w *retrievalWorker) logStatus() {
-	// TODO add toggle to enable/disable this log
-	w.logger.Debug("retrieval status",
-		"blobKey", w.blobKey.Hex(),
-		"available", w.getStatusCount(available),
-		"downloading", w.getStatusCount(downloading),
-		"downloaded", w.getStatusCount(downloaded),
-		"pessimistic", w.getStatusCount(pessimisticTimeout),
-		"failed", w.getStatusCount(failed),
-		"verifying", w.getStatusCount(verifying),
-		"verified", w.getStatusCount(verified),
-		"minimum", w.minimumChunkCount,
-		"total", w.totalChunkCount,
-	)
 }
 
 // downloadBlobFromValidators downloads the blob from the validators.
@@ -445,8 +434,6 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 		case message := <-w.verificationCompleteChan:
 			w.handleVerificationCompleted(message)
 		}
-
-		w.logStatus() // TODO
 	}
 
 	// This aborts all unfinished download/verification work.
