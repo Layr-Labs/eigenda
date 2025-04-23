@@ -110,6 +110,10 @@ type validatorStore struct {
 
 	// The salt used to prevent an attacker from causing hash collisions in the duplicate request lock.
 	duplicateRequestSalt uint32
+
+	// A flag indicating whether the migration is complete. Used to prevent a double migration race condition
+	// (which is possible only in a unit test).
+	migrationComplete bool
 }
 
 var _ ValidatorStore = &validatorStore{}
@@ -495,6 +499,12 @@ func (s *validatorStore) finalizeMigration(ctx context.Context) {
 	case <-time.After(timeUntilMigrationComplete):
 		s.migrationLock.Lock()
 		defer s.migrationLock.Unlock()
+
+		if s.migrationComplete {
+			s.logger.Info("migration already completed, nothing to do")
+			return
+		}
+		s.migrationComplete = true
 
 		s.logger.Infof("migration to littDB complete, deleting levelDB at %s", s.levelDBPath)
 
