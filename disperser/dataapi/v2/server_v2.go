@@ -122,7 +122,9 @@ type (
 	BatchResponse struct {
 		BatchHeaderHash    string                      `json:"batch_header_hash"`
 		SignedBatch        *SignedBatch                `json:"signed_batch"`
+		BlobKeys           []string                    `json:"blob_key"`
 		BlobInclusionInfos []*corev2.BlobInclusionInfo `json:"blob_inclusion_infos"`
+		BlobCertificates   []*corev2.BlobCertificate   `json:"blob_certificates"`
 	}
 
 	BatchInfo struct {
@@ -263,7 +265,7 @@ type ServerV2 struct {
 	blobAttestationInfoResponseCache *lru.Cache[string, *BlobAttestationInfoResponse]
 
 	// KV caches for batches, keyed by batch header hash
-	signedBatchCache *lru.Cache[string, *SignedBatch]
+	batchResponseCache *lru.Cache[string, *BatchResponse]
 }
 
 func NewServerV2(
@@ -316,9 +318,9 @@ func NewServerV2(
 		return nil, fmt.Errorf("failed to create blobAttestationInfoResponseCache: %w", err)
 	}
 
-	signedBatchCache, err := lru.New[string, *SignedBatch](maxNumKVBatchesToCache)
+	batchResponseCache, err := lru.New[string, *BatchResponse](maxNumKVBatchesToCache)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create signedBatchCache: %w", err)
+		return nil, fmt.Errorf("failed to create batchResponseCache: %w", err)
 	}
 
 	return &ServerV2{
@@ -340,7 +342,7 @@ func NewServerV2(
 		blobAttestationInfoCache:         blobAttestationInfoCache,
 		blobCertificateCache:             blobCertificateCache,
 		blobAttestationInfoResponseCache: blobAttestationInfoResponseCache,
-		signedBatchCache:                 signedBatchCache,
+		batchResponseCache:               batchResponseCache,
 	}, nil
 }
 
