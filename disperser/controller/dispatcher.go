@@ -156,7 +156,7 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get current block number: %w", err)
 	}
-	referenceBlockNumber := uint64(currentBlockNumber) - d.FinalizationBlockDelay
+	referenceBlockNumber := (uint64(currentBlockNumber)/uint64(d.FinalizationBlockDelay) - 1) * uint64(d.FinalizationBlockDelay)
 
 	// Get a batch of blobs to dispatch
 	// This also writes a batch header and blob inclusion info for each blob in metadata store
