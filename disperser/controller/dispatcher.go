@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -16,7 +17,6 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/cockroachdb/redact/builder"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
@@ -111,7 +111,6 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to start chain state: %w", err)
 	}
 
-	// does a batch
 	go func() {
 		ticker := time.NewTicker(d.PullInterval)
 		defer ticker.Stop()
@@ -478,11 +477,11 @@ func (d *Dispatcher) parseAndLogQuorumPercentages(
 	nonZeroQuorums := make([]core.QuorumID, 0)
 	quorumPercentages := make(map[core.QuorumID]uint8)
 
-	messageBuilder := builder.StringBuilder{}
-	messageBuilder.Printf("batchHeaderHash: %s (quorumID, percentSigned)", batchHeaderHash)
+	messageBuilder := strings.Builder{}
+	messageBuilder.WriteString(fmt.Sprintf("batchHeaderHash: %s (quorumID, percentSigned)", batchHeaderHash))
 
 	for quorumID, quorumResult := range quorumResults {
-		messageBuilder.Printf("\n%d, %d%%", quorumID, quorumResult.PercentSigned)
+		messageBuilder.WriteString(fmt.Sprintf("\n%d, %d%%", quorumID, quorumResult.PercentSigned))
 
 		if quorumResult.PercentSigned > 0 {
 			nonZeroQuorums = append(nonZeroQuorums, quorumID)
