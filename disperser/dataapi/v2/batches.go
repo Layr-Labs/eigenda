@@ -242,6 +242,8 @@ func (s *ServerV2) FetchBatch(c *gin.Context) {
 			blobKeys[i] = bk.Hex()
 		}
 
+		// TODO: Add blob inclusion info for each comprising blob if needed
+
 		batchResponse = &BatchResponse{
 			BatchHeaderHash:  batchHeaderHashHex,
 			BlobKeys:         blobKeys,
