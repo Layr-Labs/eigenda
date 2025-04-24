@@ -9,7 +9,7 @@ import {EigenDAServiceManager, IRewardsCoordinator} from "../src/core/EigenDASer
 import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
 import {IEigenDAServiceManager} from "../src/interfaces/IEigenDAServiceManager.sol";
-import {EigenDACertVerifier} from "../src/core/EigenDACertVerifier.sol";
+import {EigenDACertVerifierV2} from "src/periphery/EigenDACertVerifierV2.sol";
 import {EigenDAThresholdRegistry, IEigenDAThresholdRegistry} from "../src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "../src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../src/interfaces/IEigenDASignatureVerifier.sol";
@@ -45,7 +45,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
     EigenDADisperserRegistry eigenDADisperserRegistryImplementation;
     PaymentVault paymentVault;
     PaymentVault paymentVaultImplementation;
-    EigenDACertVerifier eigenDACertVerifier;
+    EigenDACertVerifierV2 eigenDACertVerifier;
 
     ERC20 mockToken;
 
@@ -180,9 +180,8 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
 
         mockToken = new ERC20("Mock Token", "MOCK");
 
-        eigenDACertVerifier = new EigenDACertVerifier(
+        eigenDACertVerifier = new EigenDACertVerifierV2(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
-            IEigenDABatchMetadataStorage(address(eigenDAServiceManager)),
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             IRegistryCoordinator(address(registryCoordinator)),
             defaultSecurityThresholds,
@@ -272,14 +271,14 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
                 quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = true;
             }
 
-            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage =
-                eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
+            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = eigenDAThresholdRegistry
+                .getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
             blobHeader.quorumBlobParams[i].chunkLength = uint32(
                 uint256(
                     keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))
                 )
             );
-            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDACertVerifier
+            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDAThresholdRegistry
                 .getQuorumConfirmationThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
         }
         // mark all quorum numbers as unused

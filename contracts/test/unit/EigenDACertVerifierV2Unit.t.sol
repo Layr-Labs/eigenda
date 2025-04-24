@@ -17,108 +17,46 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     }
 
     function test_verifyDACertV2(uint256 pseudoRandomNumber) public {
-        (
-            SignedBatch memory signedBatch,
-            BlobInclusionInfo memory blobInclusionInfo,
-            BLSSignatureChecker.NonSignerStakesAndSignature memory nssas
-        ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
-
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
-        nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = nssas.nonSignerQuorumBitmapIndices;
-        nonSignerStakesAndSignature.nonSignerPubkeys = nssas.nonSignerPubkeys;
-        nonSignerStakesAndSignature.quorumApks = nssas.quorumApks;
-        nonSignerStakesAndSignature.apkG2 = nssas.apkG2;
-        nonSignerStakesAndSignature.sigma = nssas.sigma;
-        nonSignerStakesAndSignature.quorumApkIndices = nssas.quorumApkIndices;
-        nonSignerStakesAndSignature.totalStakeIndices = nssas.totalStakeIndices;
-        nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
-
-        eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
-
-        (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
-            CertV2Lib.getNonSignerStakesAndSignature(registryCoordinator, signedBatch);
-        eigenDACertVerifier.verifyDACertV2(
-            signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers
-        );
+        EigenDACertV2 memory cert = _generateDACert(pseudoRandomNumber, 0);
+        eigenDACertVerifier.verifyDACertV2(cert);
     }
 
     function test_verifyDACertV2ZK_True(uint256 pseudoRandomNumber) public {
-        (
-            SignedBatch memory signedBatch,
-            BlobInclusionInfo memory blobInclusionInfo,
-            BLSSignatureChecker.NonSignerStakesAndSignature memory nssas
-        ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
-
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
-        nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = nssas.nonSignerQuorumBitmapIndices;
-        nonSignerStakesAndSignature.nonSignerPubkeys = nssas.nonSignerPubkeys;
-        nonSignerStakesAndSignature.quorumApks = nssas.quorumApks;
-        nonSignerStakesAndSignature.apkG2 = nssas.apkG2;
-        nonSignerStakesAndSignature.sigma = nssas.sigma;
-        nonSignerStakesAndSignature.quorumApkIndices = nssas.quorumApkIndices;
-        nonSignerStakesAndSignature.totalStakeIndices = nssas.totalStakeIndices;
-        nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
-
-        (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
-            CertV2Lib.getNonSignerStakesAndSignature(registryCoordinator, signedBatch);
-        bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(
-            signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers
-        );
+        EigenDACertV2 memory cert = _generateDACert(pseudoRandomNumber, 0);
+        bool zk = eigenDACertVerifier.checkDACert(cert);
         assert(zk);
     }
 
     function test_verifyDACertV2ZK_False(uint256 pseudoRandomNumber) public {
-        (
-            SignedBatch memory signedBatch,
-            BlobInclusionInfo memory blobInclusionInfo,
-            BLSSignatureChecker.NonSignerStakesAndSignature memory nssas
-        ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
-        signedBatch.batchHeader.batchRoot = keccak256("bad root");
+        EigenDACertV2 memory cert = _generateDACert(pseudoRandomNumber, 0);
+        cert.batchHeader.batchRoot = keccak256("bad root");
 
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
-        nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = nssas.nonSignerQuorumBitmapIndices;
-        nonSignerStakesAndSignature.nonSignerPubkeys = nssas.nonSignerPubkeys;
-        nonSignerStakesAndSignature.quorumApks = nssas.quorumApks;
-        nonSignerStakesAndSignature.apkG2 = nssas.apkG2;
-        nonSignerStakesAndSignature.sigma = nssas.sigma;
-        nonSignerStakesAndSignature.quorumApkIndices = nssas.quorumApkIndices;
-        nonSignerStakesAndSignature.totalStakeIndices = nssas.totalStakeIndices;
-        nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
-
-        (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
-            CertV2Lib.getNonSignerStakesAndSignature(registryCoordinator, signedBatch);
-        bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(
-            signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers
-        );
+        bool zk = eigenDACertVerifier.checkDACert(cert);
         assert(!zk);
     }
 
     function test_verifyDACertV2_revert_InclusionProofInvalid(uint256 pseudoRandomNumber) public {
-        (SignedBatch memory signedBatch, BlobInclusionInfo memory blobInclusionInfo,) =
-            _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
+        EigenDACertV2 memory cert = _generateDACert(pseudoRandomNumber, 0);
 
-        blobInclusionInfo.inclusionProof =
+        cert.blobInclusionInfo.inclusionProof =
             abi.encodePacked(keccak256(abi.encode(pseudoRandomNumber, "inclusion proof")));
 
         vm.expectPartialRevert(CertV2Lib.InvalidInclusionProof.selector);
-        eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
+        eigenDACertVerifier.verifyDACertV2(cert);
     }
 
     function test_verifyDACertV2_revert_BadVersion(uint256 pseudoRandomNumber) public {
-        (SignedBatch memory signedBatch, BlobInclusionInfo memory blobInclusionInfo,) =
-            _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 1);
+        EigenDACertV2 memory cert = _generateDACert(pseudoRandomNumber, 1);
 
         vm.expectRevert();
-        eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
+        eigenDACertVerifier.verifyDACertV2(cert);
     }
 
-    function test_verifyDACertSecurityParams() public view {
-        VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(0);
-        (uint8 confirmationThreshold, uint8 adversaryThreshold) = eigenDACertVerifier.securityThresholdsV2();
-        SecurityThresholds memory securityThresholds =
-            SecurityThresholds({confirmationThreshold: confirmationThreshold, adversaryThreshold: adversaryThreshold});
-        eigenDACertVerifier.verifyDACertSecurityParams(blobParams, securityThresholds);
-        eigenDACertVerifier.verifyDACertSecurityParams(0, securityThresholds);
+    function _generateDACert(uint256 rng, uint8 version) internal returns (EigenDACertV2 memory) {
+        (SignedBatch memory signedBatch, BlobInclusionInfo memory blobInclusionInfo,) =
+            _getSignedBatchAndBlobVerificationProof(rng, version);
+
+        return _signedBatchToDACert(signedBatch, blobInclusionInfo);
     }
 
     function _getSignedBatchAndBlobVerificationProof(uint256 pseudoRandomNumber, uint8 version)
@@ -216,5 +154,21 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         });
 
         return blobHeader;
+    }
+
+    function _signedBatchToDACert(SignedBatch memory signedBatch, BlobInclusionInfo memory blobInclusionInfo)
+        internal
+        view
+        returns (EigenDACertV2 memory)
+    {
+        (NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
+            CertV2Lib.getNonSignerStakesAndSignature(registryCoordinator, signedBatch);
+
+        return EigenDACertV2({
+            batchHeader: signedBatch.batchHeader,
+            blobInclusionInfo: blobInclusionInfo,
+            nonSignerStakesAndSignature: nonSignerStakesAndSignature,
+            signedQuorumNumbers: signedQuorumNumbers
+        });
     }
 }

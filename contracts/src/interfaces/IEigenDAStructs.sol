@@ -46,6 +46,13 @@ struct BlobVerificationProof {
 
 ///////////////////////// V2 ///////////////////////////////
 
+struct EigenDACertV2 {
+    BatchHeaderV2 batchHeader;
+    BlobInclusionInfo blobInclusionInfo;
+    NonSignerStakesAndSignature nonSignerStakesAndSignature;
+    bytes signedQuorumNumbers;
+}
+
 struct VersionedBlobParams {
     uint32 maxNumOperators;
     uint32 numChunks;
