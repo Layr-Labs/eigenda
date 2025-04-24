@@ -43,10 +43,8 @@ type DispatcherConfig struct {
 
 // CachedOnchainState holds a snapshot of chain state for faster access
 type CachedOnchainState struct {
-	CurrentBlockNumber   uint64
 	ReferenceBlockNumber uint64
 	OperatorState        *core.IndexedOperatorState
-	QuorumIDs            []core.QuorumID
 	LastRefreshed        time.Time
 }
 
@@ -111,6 +109,7 @@ func NewDispatcher(
 		pool:              pool,
 		chainState:        chainState,
 		aggregator:        aggregator,
+		chainReader:       chainReader,
 		nodeClientManager: nodeClientManager,
 		logger:            logger.With("component", "Dispatcher"),
 		metrics:           newDispatcherMetrics(registry),
@@ -148,16 +147,14 @@ func (d *Dispatcher) refreshOnchainState(ctx context.Context) error {
 
 	// Create new cached state
 	cached := &CachedOnchainState{
-		CurrentBlockNumber:   uint64(currentBlockNumber),
 		ReferenceBlockNumber: referenceBlockNumber,
 		OperatorState:        state,
-		QuorumIDs:            quorumIDs,
 		LastRefreshed:        time.Now(),
 	}
 
 	// Store updated cache atomically
 	d.cachedOnchainState.Store(cached)
-	d.logger.Debug("refreshed onchain state", "blockNumber", currentBlockNumber, "referenceBlockNumber", referenceBlockNumber)
+	d.logger.Debug("refreshed onchain state", "blockNumber", currentBlockNumber, "referenceBlockNumber", referenceBlockNumber, "quorumIDs", quorumIDs)
 	return nil
 }
 
@@ -167,23 +164,14 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to start chain state: %w", err)
 	}
 
-	// Initialize empty cache
-	d.cachedOnchainState.Store(&CachedOnchainState{
-		CurrentBlockNumber:   0,
-		ReferenceBlockNumber: 0,
-		OperatorState:        nil,
-		QuorumIDs:            make([]core.QuorumID, 0),
-		LastRefreshed:        time.Now(),
-	})
-
 	// Start background refresh of chain state
 	if d.OnchainStateRefreshInterval > 0 {
-		go func() {
-			// Refresh immediately on start
-			if err := d.refreshOnchainState(ctx); err != nil {
-				d.logger.Error("initial onchain state refresh failed", "err", err)
-			}
+		// Refresh immediately on start
+		if err := d.refreshOnchainState(ctx); err != nil {
+			return fmt.Errorf("failed to refresh onchain quorum state: %w", err)
+		}
 
+		go func() {
 			ticker := time.NewTicker(d.OnchainStateRefreshInterval)
 			defer ticker.Stop()
 
