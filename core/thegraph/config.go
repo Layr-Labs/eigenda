@@ -43,8 +43,8 @@ func CLIFlags(envPrefix string) []cli.Flag {
 		},
 		cli.IntFlag{
 			Name:   OperatorStateCacheSize,
-			Usage:  "The size of the operator state cache in elements (0 to disable)",
-			Value:  0,
+			Usage:  "The size of the operator state cache in elements (default 32)",
+			Value:  32,
 			EnvVar: common.PrefixEnvVar(envPrefix, "GRAPH_OPERATOR_STATE_CACHE_SIZE"),
 		},
 	}

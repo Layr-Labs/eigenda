@@ -140,6 +140,7 @@ func (ics *indexedChainState) Start(ctx context.Context) error {
 func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.IndexedOperatorState, error) {
 	// Check if the indexed operator state has been cached
 	cacheKey := computeCacheKey(blockNumber, quorums)
+	ics.logger.Debug("getting indexed operator state", "blockNumber", blockNumber, "quorums", quorums, "cacheKey", cacheKey)
 	if ics.operatorStateCache != nil {
 		ics.logger.Debug("checking cache", "cacheKey", cacheKey)
 		if val, ok := ics.operatorStateCache.Get(cacheKey); ok {
