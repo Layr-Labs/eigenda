@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -314,8 +315,15 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 			return nil, err
 		}
 		if !ok {
-			return nil, fmt.Errorf("public keys are not equal: %s != %s",
-				hex.EncodeToString(signersAggKey.Serialize()), hex.EncodeToString(aggPubKeys[quorumID].Serialize()))
+			sb := strings.Builder{}
+			for opID := range signerMap {
+				sb.WriteString(opID.Hex())
+				sb.WriteString(",")
+			}
+			return nil, fmt.Errorf("public keys are not equal: %s != %s, signers: %s",
+				hex.EncodeToString(signersAggKey.Serialize()),
+				hex.EncodeToString(aggPubKeys[quorumID].Serialize()),
+				sb.String())
 		}
 
 		// Verify the aggregated signature for the quorum
