@@ -179,6 +179,8 @@ type ChainState interface {
 	GetOperatorStateWithSocket(ctx context.Context, blockNumber uint, quorums []QuorumID) (*OperatorState, error)
 	GetOperatorStateByOperator(ctx context.Context, blockNumber uint, operator OperatorID) (*OperatorState, error)
 	GetOperatorSocket(ctx context.Context, blockNumber uint, operator OperatorID) (string, error)
+	GetDisperserKeyToAddress(ctx context.Context, blockNumber uint, key uint32) (string, error)
+	GetDisperserKeysToAddresses(ctx context.Context, blockNumber uint, keys []uint32) ([]string, error)
 }
 
 // ChainState is an interface for getting information about the current chain state.

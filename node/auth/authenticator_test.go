@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -32,7 +31,7 @@ func TestValidRequest(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
+		[]uint32{},
 		start)
 	require.NoError(t, err)
 
@@ -66,7 +65,7 @@ func TestInvalidRequestWrongHash(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
+		[]uint32{},
 		start)
 	require.NoError(t, err)
 
@@ -100,7 +99,7 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
+		[]uint32{},
 		start)
 	require.NoError(t, err)
 
@@ -137,20 +136,14 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 	chainReader.Mock.On("GetDisperserAddress", uint32(1234)).Return(
 		nil, errors.New("disperser not found"))
 
-	filterCallCount := atomic.Uint32{}
-
 	authenticator, err := NewRequestAuthenticator(
 		context.Background(),
 		&chainReader,
 		10,
 		time.Minute,
-		func(id uint32) bool {
-			filterCallCount.Add(1)
-			return id != uint32(1)
-		},
+		[]uint32{1},
 		start)
 	require.NoError(t, err)
-	require.Equal(t, uint32(1), filterCallCount.Load())
 
 	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
@@ -162,7 +155,6 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 	expectedHash, err := hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
 	require.Equal(t, expectedHash, hash)
-	require.Equal(t, uint32(2), filterCallCount.Load())
 
 	request.DisperserID = 1
 	signature, err = SignStoreChunksRequest(privateKey1, request)
@@ -196,7 +188,7 @@ func TestKeyExpiry(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
+		[]uint32{},
 		start)
 	require.NoError(t, err)
 
@@ -260,7 +252,7 @@ func TestKeyCacheSize(t *testing.T) {
 		&chainReader,
 		cacheSize,
 		time.Minute,
-		func(uint32) bool { return true },
+		[]uint32{},
 		start)
 	require.NoError(t, err)
 
