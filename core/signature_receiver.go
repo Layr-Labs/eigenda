@@ -126,17 +126,7 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 				continue
 			}
 
-			quorumResults := sr.computeQuorumResults()
-			attestationChan <- &QuorumAttestation{
-				// TODO: is this ok? semantics are changed from before: we used to exclude aggregate keys of quorums
-				//  that had no signatures, but I don't see why that case should be special
-				QuorumAggPubKey:  sr.indexedOperatorState.AggKeys,
-				SignersAggPubKey: sr.aggregateSignersG2PubKeys,
-				AggSignature:     sr.aggregateSignatures,
-				QuorumResults:    quorumResults,
-				SignerMap:        sr.signerMap,
-			}
-
+			sr.submitAttestation(attestationChan)
 			newSignaturesGathered = false
 		}
 
@@ -146,17 +136,7 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 	}
 
 	if newSignaturesGathered {
-		quorumResults := sr.computeQuorumResults()
-
-		attestationChan <- &QuorumAttestation{
-			// TODO: is this ok? semantics are changed from before: we used to exclude aggregate keys of quorums that had no
-			//  signatures, but I don't see why that case should be special
-			QuorumAggPubKey:  sr.indexedOperatorState.AggKeys,
-			SignersAggPubKey: sr.aggregateSignersG2PubKeys,
-			AggSignature:     sr.aggregateSignatures,
-			QuorumResults:    quorumResults,
-			SignerMap:        sr.signerMap,
-		}
+		sr.submitAttestation(attestationChan)
 	}
 }
 
@@ -232,8 +212,8 @@ func (sr *signatureReceiver) checkSigningMessage(signingMessage SigningMessage) 
 	return indexedOperatorInfo, nil
 }
 
-// computeQuorumResults goes through each quorum, and adds an entry to a QuorumResult map, which is returned
-func (sr *signatureReceiver) computeQuorumResults() map[QuorumID]*QuorumResult {
+// submitAttestation aggregates and submits a QuorumAttestation representing the most up-to-date aggregates
+func (sr *signatureReceiver) submitAttestation(attestationChan chan *QuorumAttestation) {
 	nonSignerMap := make(map[OperatorID]*G1Point)
 	for operatorID, operatorInfo := range sr.indexedOperatorState.IndexedOperators {
 		_, found := sr.signerMap[operatorID]
@@ -253,7 +233,15 @@ func (sr *signatureReceiver) computeQuorumResults() map[QuorumID]*QuorumResult {
 		quorumResults[quorumID] = quorumResult
 	}
 
-	return quorumResults
+	attestationChan <- &QuorumAttestation{
+		// TODO: is this ok? semantics are changed from before: we used to exclude aggregate keys of quorums that had no
+		//  signatures, but I don't see why that case should be special
+		QuorumAggPubKey:  sr.indexedOperatorState.AggKeys,
+		SignersAggPubKey: sr.aggregateSignersG2PubKeys,
+		AggSignature:     sr.aggregateSignatures,
+		QuorumResults:    quorumResults,
+		SignerMap:        sr.signerMap,
+	}
 }
 
 // computeQuorumResult creates a QuorumResult for a given quorum
