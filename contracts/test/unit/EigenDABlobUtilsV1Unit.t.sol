@@ -120,7 +120,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobVerificationProof.batchId = defaultBatchId;
 
         cheats.expectRevert(
-            "EigenDACertVerificationUtils._verifyDACertForQuorums: batchMetadata does not match stored metadata"
+            "EigenDACertVerificationV1Lib._verifyDACertForQuorums: batchMetadata does not match stored metadata"
         );
         eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
@@ -145,7 +145,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobVerificationProof.inclusionProof = abi.encodePacked(bytes32(0));
         blobVerificationProof.blobIndex = 1;
 
-        cheats.expectRevert("EigenDACertVerificationUtils._verifyDACertForQuorums: inclusion proof is invalid");
+        cheats.expectRevert("EigenDACertVerificationV1Lib._verifyDACertForQuorums: inclusion proof is invalid");
         eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
@@ -190,7 +190,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         }
 
         cheats.expectRevert(
-            "EigenDACertVerificationUtils._verifyDACertForQuorums: required quorums are not a subset of the confirmed quorums"
+            "EigenDACertVerificationV1Lib._verifyDACertForQuorums: required quorums are not a subset of the confirmed quorums"
         );
         eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
@@ -236,7 +236,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
             blobVerificationProof.quorumIndices[i] = bytes1(uint8(batchHeader.quorumNumbers.length - 1 - i));
         }
 
-        cheats.expectRevert("EigenDACertVerificationUtils._verifyDACertForQuorums: quorumNumber does not match");
+        cheats.expectRevert("EigenDACertVerificationV1Lib._verifyDACertForQuorums: quorumNumber does not match");
         eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
@@ -283,7 +283,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         }
 
         cheats.expectRevert(
-            "EigenDACertVerificationUtils._verifyDACertForQuorums: confirmationThresholdPercentage is not met"
+            "EigenDACertVerificationV1Lib._verifyDACertForQuorums: confirmationThresholdPercentage is not met"
         );
         eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }

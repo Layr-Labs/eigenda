@@ -2,6 +2,7 @@
 pragma solidity =0.8.12;
 
 import "../MockEigenDADeployer.sol";
+import {EigenDACertVerificationV2Lib} from "src/libraries/EigenDACertVerificationV2Lib.sol";
 
 contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     using stdStorage for StdStorage;
@@ -37,7 +38,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
 
         (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
-        EigenDACertVerificationUtils._getNonSignerStakesAndSignature(
+        EigenDACertVerificationV2Lib._getNonSignerStakesAndSignature(
             operatorStateRetriever, registryCoordinator, signedBatch
         );
         eigenDACertVerifier.verifyDACertV2(
@@ -65,7 +66,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         _registerRelayKeys();
 
         (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
-        EigenDACertVerificationUtils._getNonSignerStakesAndSignature(
+        EigenDACertVerificationV2Lib._getNonSignerStakesAndSignature(
             operatorStateRetriever, registryCoordinator, signedBatch
         );
         bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(
@@ -92,7 +93,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
 
         (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
-        EigenDACertVerificationUtils._getNonSignerStakesAndSignature(
+        EigenDACertVerificationV2Lib._getNonSignerStakesAndSignature(
             operatorStateRetriever, registryCoordinator, signedBatch
         );
         bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(
@@ -105,7 +106,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         (SignedBatch memory signedBatch, BlobInclusionInfo memory blobInclusionInfo,) =
             _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
 
-        vm.expectRevert("EigenDACertVerificationUtils._verifyRelayKeysSet: relay key is not set");
+        vm.expectRevert("EigenDACertVerificationV2Lib._verifyRelayKeysSet: relay key is not set");
         eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
     }
 
@@ -116,7 +117,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         blobInclusionInfo.inclusionProof =
             abi.encodePacked(keccak256(abi.encode(pseudoRandomNumber, "inclusion proof")));
 
-        vm.expectRevert("EigenDACertVerificationUtils._verifyDACertV2ForQuorums: inclusion proof is invalid");
+        vm.expectRevert("EigenDACertVerificationV2Lib._verifyDACertV2ForQuorums: inclusion proof is invalid");
         eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
     }
 
@@ -139,7 +140,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         _registerRelayKeys();
 
         vm.expectRevert(
-            "EigenDACertVerificationUtils._verifyDACertSecurityParams: confirmationThreshold must be greater than adversaryThreshold"
+            "EigenDACertVerificationV2Lib._verifyDACertSecurityParams: confirmationThreshold must be greater than adversaryThreshold"
         );
         eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
     }
