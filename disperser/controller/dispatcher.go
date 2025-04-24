@@ -306,8 +306,10 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 	return sigChan, batchData, nil
 }
 
-// this is the method to change, consider starting by splitting stuff
-// HandleSignatures receives signatures from operators, validates, and aggregates them
+// HandleSignatures receives signatures from operators, validates, and aggregates them.
+//
+// This method submits Attestations to the blobMetadataStore, containing signing data from the SigningMessages received
+// through the sigChan. It periodically submits Attestations, as signatures are gathered.
 func (d *Dispatcher) HandleSignatures(
 	ctx context.Context,
 	attestationCtx context.Context,
@@ -327,15 +329,15 @@ func (d *Dispatcher) HandleSignatures(
 	for _, key := range batchData.BlobKeys {
 		err := d.blobMetadataStore.UpdateBlobStatus(ctx, key, v2.GatheringSignatures)
 		if err != nil {
-			d.logger.Error("failed to update blob status to gathering signatures",
+			d.logger.Error("update blob status to 'gathering signatures'",
 				"blobKey", key.Hex(),
 				"batchHeaderHash", batchHeaderHash,
 				"err", err)
 		}
 	}
 
-	// submit an empty attestation before starting to gather signatures
-	// a new attestation will be periodically resubmitted as signatures are gathered
+	// submit an empty attestation before starting to gather signatures.
+	// a new attestation will be periodically resubmitted as signatures are gathered.
 	attestation := &corev2.Attestation{
 		BatchHeader:      batchData.Batch.BatchHeader,
 		AttestedAt:       uint64(time.Now().UnixNano()),
@@ -348,7 +350,8 @@ func (d *Dispatcher) HandleSignatures(
 	}
 	err := d.blobMetadataStore.PutAttestation(ctx, attestation)
 	if err != nil {
-		// this error isn't fatal: a subsequent put might succeed
+		// this error isn't fatal: a subsequent PutAttestation attempt might succeed
+		// TODO: this used to cause the HandleSignatures method to fail entirely. Is it ok to continue trying here?
 		d.logger.Error("put attestation",
 			"err", err,
 			"batchHeaderHash", batchHeaderHash)
@@ -370,7 +373,7 @@ func (d *Dispatcher) HandleSignatures(
 		if dbErr != nil {
 			return multierror.Append(
 				receiveSignaturesErr,
-				fmt.Errorf("update blob statuses for batch to failed: %w", dbErr))
+				fmt.Errorf("update blob statuses for batch to 'failed': %w", dbErr))
 		}
 
 		return receiveSignaturesErr
@@ -382,7 +385,7 @@ func (d *Dispatcher) HandleSignatures(
 	for receivedQuorumAttestation := range attestationChan {
 		err := d.submitAttestation(ctx, batchData, receivedQuorumAttestation)
 		if err != nil {
-			d.logger.Errorf("submit attestation for batch %s: %v", batchHeaderHash, err)
+			d.logger.Warnf("submit attestation for batch %s: %v", batchHeaderHash, err)
 			continue
 		}
 
@@ -398,9 +401,6 @@ func (d *Dispatcher) HandleSignatures(
 		return fmt.Errorf("update batch status: %w", err)
 	}
 	d.metrics.reportUpdateBatchStatusLatency(time.Since(updateBatchStatusStartTime))
-
-	// TODO: improve this. maybe log a summary or something? Or maybe this just isn't necessary
-	// d.logger.Debug("quorum attestation results", "quorumID", quorumID, "result", quorumResult)
 
 	// Track attestation metrics
 	operatorCount := make(map[core.QuorumID]int)
@@ -421,6 +421,7 @@ func (d *Dispatcher) HandleSignatures(
 	return nil
 }
 
+// submitAttestation submits a QuorumAttestation to the blobMetadataStore
 func (d *Dispatcher) submitAttestation(
 	ctx context.Context,
 	batchData *batchData,
@@ -466,6 +467,10 @@ func (d *Dispatcher) submitAttestation(
 	return nil
 }
 
+// parseAndLogQuorumPercentages iterates over the map of QuorumResults, and logs the signing percentages of each quorum.
+//
+// This method returns a sorted slice of nonZeroQuorums (quorums with >0 signing percentage), and a map from QuorumID to
+// signing percentage.
 func (d *Dispatcher) parseAndLogQuorumPercentages(
 	batchHeaderHash string,
 	quorumResults map[core.QuorumID]*core.QuorumResult,
