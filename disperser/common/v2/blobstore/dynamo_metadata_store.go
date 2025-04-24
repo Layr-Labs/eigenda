@@ -43,6 +43,7 @@ const (
 	dispersalRequestSKPrefix  = "DispersalRequest#"
 	dispersalResponseSKPrefix = "DispersalResponse#"
 	batchHeaderSK             = "BatchHeader"
+	batchSK                   = "BatchInfo"
 	attestationSK             = "Attestation"
 
 	// The number of nanoseconds for a requestedAt bucket (1h).
@@ -1091,6 +1092,46 @@ func (s *BlobMetadataStore) GetDispersalResponses(ctx context.Context, batchHead
 	return responses, nil
 }
 
+func (s *BlobMetadataStore) PutBatch(ctx context.Context, batch *corev2.Batch) error {
+	item, err := MarshalBatch(batch)
+	if err != nil {
+		return err
+	}
+
+	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	if errors.Is(err, commondynamodb.ErrConditionFailed) {
+		return common.ErrAlreadyExists
+	}
+
+	return err
+}
+
+func (s *BlobMetadataStore) GetBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.Batch, error) {
+	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+		"PK": &types.AttributeValueMemberS{
+			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+		},
+		"SK": &types.AttributeValueMemberS{
+			Value: batchSK,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if item == nil {
+		return nil, fmt.Errorf("%w: batch info not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+	}
+
+	batch, err := UnmarshalBatch(item)
+	if err != nil {
+		return nil, err
+	}
+
+	return batch, nil
+}
+
 func (s *BlobMetadataStore) PutBatchHeader(ctx context.Context, batchHeader *corev2.BatchHeader) error {
 	item, err := MarshalBatchHeader(batchHeader)
 	if err != nil {
@@ -1814,6 +1855,34 @@ func UnmarshalBatchHeader(item commondynamodb.Item) (*corev2.BatchHeader, error)
 	}
 
 	return &header, nil
+}
+
+func MarshalBatch(batch *corev2.Batch) (commondynamodb.Item, error) {
+	fields, err := attributevalue.MarshalMap(batch)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal batch: %w", err)
+	}
+
+	hash, err := batch.BatchHeader.Hash()
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash batch header: %w", err)
+	}
+	hashstr := hex.EncodeToString(hash[:])
+
+	fields["PK"] = &types.AttributeValueMemberS{Value: batchHeaderKeyPrefix + hashstr}
+	fields["SK"] = &types.AttributeValueMemberS{Value: batchSK}
+
+	return fields, nil
+}
+
+func UnmarshalBatch(item commondynamodb.Item) (*corev2.Batch, error) {
+	batch := corev2.Batch{}
+	err := attributevalue.UnmarshalMap(item, &batch)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal batch: %w", err)
+	}
+
+	return &batch, nil
 }
 
 func MarshalBlobInclusionInfo(inclusionInfo *corev2.BlobInclusionInfo) (commondynamodb.Item, error) {
