@@ -168,7 +168,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
         bytes memory signedQuorumNumbers
     ) external view returns (bool) {
-        (CertV2Lib.StatusCode err,) = CertV2Lib.checkDACertV2(
+        (CertV2Lib.StatusCode status,) = CertV2Lib.checkDACertV2(
             eigenDAThresholdRegistry,
             eigenDASignatureVerifier,
             eigenDARelayRegistry,
@@ -179,7 +179,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
             quorumNumbersRequiredV2,
             signedQuorumNumbers
         );
-        if (err == CertV2Lib.StatusCode.SUCCESS) {
+        if (status == CertV2Lib.StatusCode.SUCCESS) {
             return true;
         } else {
             return false;
@@ -212,9 +212,9 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         VersionedBlobParams memory blobParams,
         SecurityThresholds memory securityThresholds
     ) external pure {
-        (CertV2Lib.StatusCode err, bytes memory errParams) =
+        (CertV2Lib.StatusCode status, bytes memory statusParams) =
             CertV2Lib.checkSecurityParams(blobParams, securityThresholds);
-        CertV2Lib.revertOnError(err, errParams);
+        CertV2Lib.revertOnError(status, statusParams);
     }
 
     /**
@@ -223,9 +223,9 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
      * @param securityThresholds The security thresholds to verify against
      */
     function verifyDACertSecurityParams(uint16 version, SecurityThresholds memory securityThresholds) external view {
-        (CertV2Lib.StatusCode err, bytes memory errParams) =
+        (CertV2Lib.StatusCode status, bytes memory statusParams) =
             CertV2Lib.checkSecurityParams(getBlobParams(version), securityThresholds);
-        CertV2Lib.revertOnError(err, errParams);
+        CertV2Lib.revertOnError(status, statusParams);
     }
 
     /// @notice Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index
