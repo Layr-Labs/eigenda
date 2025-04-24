@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"sync/atomic"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -36,6 +37,17 @@ type DispatcherConfig struct {
 	NumRequestRetries       int
 	// MaxBatchSize is the maximum number of blobs to dispatch in a batch
 	MaxBatchSize int32
+	// How often to refresh chain state in background
+	OnchainStateRefreshInterval time.Duration
+}
+
+// CachedOnchainState holds a snapshot of chain state for faster access
+type CachedOnchainState struct {
+	CurrentBlockNumber   uint64
+	ReferenceBlockNumber uint64
+	OperatorState        *core.IndexedOperatorState
+	QuorumIDs            []core.QuorumID
+	LastRefreshed        time.Time
 }
 
 type Dispatcher struct {
@@ -45,6 +57,7 @@ type Dispatcher struct {
 	pool              common.WorkerPool
 	chainState        core.IndexedChainState
 	aggregator        core.SignatureAggregator
+	chainReader       core.Reader
 	nodeClientManager NodeClientManager
 	logger            logging.Logger
 	metrics           *dispatcherMetrics
@@ -56,6 +69,9 @@ type Dispatcher struct {
 	// This is used to deduplicate blobs to prevent the same blob from being dispatched multiple times
 	// Blobs are removed from the queue when they are in a terminal state (Complete or Failed)
 	blobSet BlobSet
+
+	// Cached state for faster onchain state lookups
+	cachedOnchainState atomic.Value // stores *CachedOnchainState
 }
 
 type batchData struct {
@@ -70,6 +86,7 @@ func NewDispatcher(
 	config *DispatcherConfig,
 	blobMetadataStore *blobstore.BlobMetadataStore,
 	pool common.WorkerPool,
+	chainReader core.Reader,
 	chainState core.IndexedChainState,
 	aggregator core.SignatureAggregator,
 	nodeClientManager NodeClientManager,
@@ -104,10 +121,79 @@ func NewDispatcher(
 	}, nil
 }
 
+// refreshOnchainState refreshes the cached onchain state in the background
+// Note that there is no lock. If the state is being updated concurrently, it may lead to inconsistent state
+func (d *Dispatcher) refreshOnchainState(ctx context.Context) error {
+	d.logger.Debug("refreshing onchain state")
+
+	currentBlockNumber, err := d.chainState.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get current block number: %w", err)
+	}
+
+	referenceBlockNumber := uint64(currentBlockNumber) - d.FinalizationBlockDelay
+	quorumIDs, err := d.chainReader.GetRequiredQuorumNumbers(ctx, uint32(referenceBlockNumber))
+	if err != nil {
+		return fmt.Errorf("failed to get required quorum IDs: %w", err)
+	}
+
+	state, err := d.chainState.GetIndexedOperatorState(ctx, uint(referenceBlockNumber), quorumIDs)
+	if err != nil {
+		return fmt.Errorf("failed to get operator state: %w", err)
+	}
+
+	// Create new cached state
+	cached := &CachedOnchainState{
+		CurrentBlockNumber:   uint64(currentBlockNumber),
+		ReferenceBlockNumber: referenceBlockNumber,
+		OperatorState:        state,
+		QuorumIDs:            quorumIDs,
+		LastRefreshed:        time.Now(),
+	}
+
+	// Store updated cache atomically
+	d.cachedOnchainState.Store(cached)
+	d.logger.Debug("refreshed onchain state", "blockNumber", currentBlockNumber, "referenceBlockNumber", referenceBlockNumber)
+	return nil
+}
+
 func (d *Dispatcher) Start(ctx context.Context) error {
 	err := d.chainState.Start(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start chain state: %w", err)
+	}
+
+	// Initialize empty cache
+	d.cachedOnchainState.Store(&CachedOnchainState{
+		CurrentBlockNumber:   0,
+		ReferenceBlockNumber: 0,
+		OperatorState:        nil,
+		QuorumIDs:            make([]core.QuorumID, 0),
+		LastRefreshed:        time.Now(),
+	})
+
+	// Start background refresh of chain state
+	if d.OnchainStateRefreshInterval > 0 {
+		go func() {
+			// Refresh immediately on start
+			if err := d.refreshOnchainState(ctx); err != nil {
+				d.logger.Error("initial onchain state refresh failed", "err", err)
+			}
+
+			ticker := time.NewTicker(d.OnchainStateRefreshInterval)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					if err := d.refreshOnchainState(ctx); err != nil {
+						d.logger.Error("failed to refresh onchain state", "err", err)
+					}
+				}
+			}
+		}()
 	}
 
 	go func() {
@@ -143,7 +229,6 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 	}()
 
 	return nil
-
 }
 
 func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage, *batchData, error) {
@@ -152,15 +237,20 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 		d.metrics.reportHandleBatchLatency(time.Since(start))
 	}()
 
-	currentBlockNumber, err := d.chainState.GetCurrentBlockNumber(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get current block number: %w", err)
+	// Get the cached onchain state. If it is outdated, we need to manually fetch it. If we fail to fetch it
+	// we will not be able to make a new batch.
+	cachedOnChainState := d.cachedOnchainState.Load().(*CachedOnchainState)
+	if time.Since(cachedOnChainState.LastRefreshed) > d.OnchainStateRefreshInterval {
+		d.logger.Warn("cached onchain state is outdated, manually fetching it")
+		err := d.refreshOnchainState(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to refresh onchain state: %w", err)
+		}
 	}
-	referenceBlockNumber := uint64(currentBlockNumber) - d.FinalizationBlockDelay
 
 	// Get a batch of blobs to dispatch
 	// This also writes a batch header and blob inclusion info for each blob in metadata store
-	batchData, err := d.NewBatch(ctx, referenceBlockNumber)
+	batchData, err := d.NewBatch(ctx, cachedOnChainState)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -458,7 +548,7 @@ func (d *Dispatcher) dedupBlobs(blobs []*v2.BlobMetadata) []*v2.BlobMetadata {
 
 // NewBatch creates a batch of blobs to dispatch
 // Warning: This function is not thread-safe
-func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) (*batchData, error) {
+func (d *Dispatcher) NewBatch(ctx context.Context, cachedOnChainState *CachedOnchainState) (*batchData, error) {
 	newBatchStart := time.Now()
 	defer func() {
 		d.metrics.reportNewBatchLatency(time.Since(newBatchStart))
@@ -482,14 +572,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	}
 	d.logger.Debug("got new metadatas to make batch",
 		"numBlobs", len(blobMetadatas),
-		"referenceBlockNumber", referenceBlockNumber)
-
-	state, err := d.GetOperatorState(ctx, blobMetadatas, referenceBlockNumber)
-	getOperatorStateFinished := time.Now()
-	d.metrics.reportGetOperatorStateLatency(getOperatorStateFinished.Sub(getBlobMetadataFinished))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get operator state at block %d: %w", referenceBlockNumber, err)
-	}
+		"referenceBlockNumber", cachedOnChainState.ReferenceBlockNumber)
 
 	keys := make([]corev2.BlobKey, len(blobMetadatas))
 	metadataMap := make(map[corev2.BlobKey]*v2.BlobMetadata, len(blobMetadatas))
@@ -514,7 +597,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 
 	certs, _, err := d.blobMetadataStore.GetBlobCertificates(ctx, keys)
 	getBlobCertificatesFinished := time.Now()
-	d.metrics.reportGetBlobCertificatesLatency(getBlobCertificatesFinished.Sub(getOperatorStateFinished))
+	d.metrics.reportGetBlobCertificatesLatency(getBlobCertificatesFinished.Sub(getBlobMetadataFinished))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get blob certificates: %w", err)
 	}
@@ -544,7 +627,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 
 	batchHeader := &corev2.BatchHeader{
 		BatchRoot:            [32]byte{},
-		ReferenceBlockNumber: referenceBlockNumber,
+		ReferenceBlockNumber: cachedOnChainState.ReferenceBlockNumber,
 	}
 
 	tree, err := corev2.BuildMerkleTree(certs)
@@ -616,7 +699,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		d.blobSet.AddBlob(blobKey)
 	}
 
-	d.logger.Debug("new batch", "referenceBlockNumber", referenceBlockNumber, "numBlobs", len(certs))
+	d.logger.Debug("new batch", "referenceBlockNumber", cachedOnChainState.ReferenceBlockNumber, "numBlobs", len(certs))
 	return &batchData{
 		Batch: &corev2.Batch{
 			BatchHeader:      batchHeader,
@@ -625,33 +708,8 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		BatchHeaderHash: batchHeaderHash,
 		BlobKeys:        keys,
 		Metadata:        metadataMap,
-		OperatorState:   state,
+		OperatorState:   cachedOnChainState.OperatorState,
 	}, nil
-}
-
-// GetOperatorState returns the operator state for the given quorums at the given block number
-func (d *Dispatcher) GetOperatorState(
-	ctx context.Context,
-	metadatas []*v2.BlobMetadata,
-	blockNumber uint64,
-) (*core.IndexedOperatorState, error) {
-
-	quorums := make(map[core.QuorumID]struct{}, 0)
-	for _, m := range metadatas {
-		for _, quorum := range m.BlobHeader.QuorumNumbers {
-			quorums[quorum] = struct{}{}
-		}
-	}
-
-	quorumIds := make([]core.QuorumID, len(quorums))
-	i := 0
-	for id := range quorums {
-		quorumIds[i] = id
-		i++
-	}
-
-	// GetIndexedOperatorState should return state for valid quorums only
-	return d.chainState.GetIndexedOperatorState(ctx, uint(blockNumber), quorumIds)
 }
 
 func (d *Dispatcher) sendChunks(

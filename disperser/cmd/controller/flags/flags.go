@@ -114,7 +114,7 @@ var (
 		Usage:    "Interval at which to refresh the onchain state",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
-		Value:    1 * time.Hour,
+		Value:    1 * time.Minute,
 	}
 
 	// Dispatcher Flags
