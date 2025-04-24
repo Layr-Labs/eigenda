@@ -36,8 +36,8 @@ type signatureReceiver struct {
 // QuorumAttestation will have incorporated more SigningMessages than the previously yielded QuorumAttestation.
 //
 // The caller should not manually close the returned QuorumAttestation chan. It will be closed automatically, when:
-// 1. the global attestation timeout is exceeded
-// 2. a SigningMessage from each and every Operator has been received and processed
+// 1. The global attestation timeout is exceeded
+// 2. A SigningMessage from every Operator has been received and processed
 //
 // Before being closed, the QuorumAttestation chan will have returned a QuorumAttestation containing data from every
 // gathered SigningMessage.
@@ -77,7 +77,7 @@ func ReceiveSignatures(
 	}
 
 	attestationChan := make(chan *QuorumAttestation)
-	receiver.receiveSigningMessages(ctx, attestationChan)
+	go receiver.receiveSigningMessages(ctx, attestationChan)
 
 	return attestationChan, nil
 }
