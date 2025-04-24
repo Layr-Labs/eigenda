@@ -80,6 +80,7 @@ func newComponents(t *testing.T, operatorID [32]byte) *components {
 		1: 4,
 		2: 3,
 	})
+	chainState.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(chainState.Operators)
 
 	store, err := node.NewLevelDBStore(
 		dbPath,

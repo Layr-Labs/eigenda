@@ -84,7 +84,10 @@ func run(ctx *cli.Context) error {
 	logger.Info("Using graph node")
 
 	logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
-	indexer := thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
+	indexer, err := thegraph.MakeIndexedChainState(config.ChainStateConfig, cs, logger)
+	if err != nil {
+		log.Fatalln("could not create indexer", err)
+	}
 
 	metrics := churner.NewMetrics(config.MetricsConfig.HTTPPort, logger)
 

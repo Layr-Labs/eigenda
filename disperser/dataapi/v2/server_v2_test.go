@@ -1115,6 +1115,43 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		},
 		nil,
 	)
+	mockChainState.On("GetOperatorState").Return(
+		func(ctx context.Context, blockNumber uint, quorums []uint8) (*core.OperatorState, error) {
+			// Convert block number to uint32 to match our test data
+			blockNum := uint32(blockNumber)
+			stakes := operatorStakesByBlock[blockNum]
+
+			// Build operators map
+			operators := make(map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo)
+			totals := make(map[core.QuorumID]*core.OperatorInfo)
+
+			for quorum, ops := range stakes {
+				operators[quorum] = make(map[core.OperatorID]*core.OperatorInfo)
+				totalStake := big.NewInt(0)
+				index := uint(0)
+
+				for _, op := range ops {
+					operators[quorum][op.OperatorID] = &core.OperatorInfo{
+						Stake: op.Stake,
+						Index: index,
+					}
+					totalStake.Add(totalStake, op.Stake)
+					index++
+				}
+
+				totals[quorum] = &core.OperatorInfo{
+					Stake: totalStake,
+					Index: index,
+				}
+			}
+
+			return &core.OperatorState{
+				Operators:   operators,
+				Totals:      totals,
+				BlockNumber: blockNumber,
+			}, nil
+		},
+	)
 
 	t.Run("found attestation info", func(t *testing.T) {
 		reqStr := fmt.Sprintf("/v2/blobs/%s/attestation-info", blobKey.Hex())
@@ -1305,6 +1342,42 @@ func TestFetchBatch(t *testing.T) {
 	mockTx.On("GetOperatorStakesForQuorums").Return(
 		func(quorums []core.QuorumID, blockNum uint32) core.OperatorStakes {
 			return operatorStakesByBlock[blockNum]
+		},
+		nil,
+	)
+	mockTx.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(
+		func(ctx context.Context, blockNum uint, quorums []uint8) (*core.OperatorState, error) {
+			state := &core.OperatorState{
+				Operators: make(map[uint8]map[core.OperatorID]*core.OperatorInfo),
+				Totals:    make(map[uint8]*core.OperatorInfo),
+			}
+
+			// Convert blockNum to uint32 to match our test data
+			blockNum32 := uint32(blockNum)
+
+			// Initialize the maps for each quorum
+			for _, q := range quorums {
+				state.Operators[q] = make(map[core.OperatorID]*core.OperatorInfo)
+				state.Totals[q] = &core.OperatorInfo{
+					Stake: big.NewInt(10), // Total stake of 10 for each quorum
+				}
+			}
+
+			// Fill in operator stakes from our test data
+			if stakes, ok := operatorStakesByBlock[blockNum32]; ok {
+				for quorum, operators := range stakes {
+					for _, op := range operators {
+						if state.Operators[quorum] == nil {
+							state.Operators[quorum] = make(map[core.OperatorID]*core.OperatorInfo)
+						}
+						state.Operators[quorum][op.OperatorID] = &core.OperatorInfo{
+							Stake: op.Stake,
+						}
+					}
+				}
+			}
+
+			return state, nil
 		},
 		nil,
 	)
@@ -1917,6 +1990,59 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
 	require.NoError(t, err)
 
+	mockChainState.On("GetOperatorState", mock.Anything, uint(5), []core.QuorumID{0, 1}).Return(
+		&core.OperatorState{
+			Operators: map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo{
+				0: {
+					operatorIds[1]: {Stake: big.NewInt(2), Index: 0},
+					operatorIds[2]: {Stake: big.NewInt(2), Index: 1},
+					operatorIds[4]: {Stake: big.NewInt(2), Index: 2},
+				},
+				1: {
+					operatorIds[1]: {Stake: big.NewInt(2), Index: 0},
+					operatorIds[2]: {Stake: big.NewInt(2), Index: 1},
+				},
+			},
+			Totals: map[core.QuorumID]*core.OperatorInfo{
+				0: {Stake: big.NewInt(6), Index: 3},
+				1: {Stake: big.NewInt(4), Index: 2},
+			},
+			BlockNumber: 5,
+		}, nil,
+	)
+
+	// Also add mocks for quorum 0, 1 individually
+	mockChainState.On("GetOperatorState", mock.Anything, uint(5), []core.QuorumID{0}).Return(
+		&core.OperatorState{
+			Operators: map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo{
+				0: {
+					operatorIds[1]: {Stake: big.NewInt(2), Index: 0},
+					operatorIds[2]: {Stake: big.NewInt(2), Index: 1},
+					operatorIds[4]: {Stake: big.NewInt(2), Index: 2},
+				},
+			},
+			Totals: map[core.QuorumID]*core.OperatorInfo{
+				0: {Stake: big.NewInt(6), Index: 3},
+			},
+			BlockNumber: 5,
+		}, nil,
+	)
+
+	mockChainState.On("GetOperatorState", mock.Anything, uint(5), []core.QuorumID{1}).Return(
+		&core.OperatorState{
+			Operators: map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo{
+				1: {
+					operatorIds[1]: {Stake: big.NewInt(2), Index: 0},
+					operatorIds[2]: {Stake: big.NewInt(2), Index: 1},
+				},
+			},
+			Totals: map[core.QuorumID]*core.OperatorInfo{
+				1: {Stake: big.NewInt(4), Index: 2},
+			},
+			BlockNumber: 5,
+		}, nil,
+	)
+
 	r.GET("/v2/operators/signing-info", testDataApiServerV2.FetchOperatorSigningInfo)
 
 	t.Run("invalid params", func(t *testing.T) {
@@ -2494,6 +2620,25 @@ func TestFetchOperatorsStake(t *testing.T) {
 	r := setUpRouter()
 
 	mockIndexedChainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
+	mockChainState.On("GetOperatorState", mock.Anything, uint(1), []core.QuorumID{0, 1, 2}).Return(
+		&core.OperatorState{
+			Operators: map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo{
+				0: {
+					opId0: {Stake: big.NewInt(60), Index: 0},
+					opId1: {Stake: big.NewInt(40), Index: 1},
+				},
+				1: {
+					opId1: {Stake: big.NewInt(70), Index: 0},
+					opId0: {Stake: big.NewInt(30), Index: 1},
+				},
+			},
+			Totals: map[core.QuorumID]*core.OperatorInfo{
+				0: {Stake: big.NewInt(100), Index: 2},
+				1: {Stake: big.NewInt(100), Index: 2},
+			},
+			BlockNumber: 1,
+		}, nil,
+	)
 
 	addr0 := gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa")
 	addr1 := gethcommon.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")

@@ -10,7 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/mock"
+	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
@@ -19,6 +19,7 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/hashicorp/go-multierror"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 var (
@@ -88,14 +89,15 @@ func makeTestBlob(t *testing.T, length int, securityParams []*core.SecurityParam
 
 // prepareBatch takes in multiple blob, encodes them, generates the associated assignments, and the batch header.
 // These are the products that a disperser will need in order to disperse data to the DA nodes.
-func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) ([]core.EncodedBlob, core.BatchHeader, *mock.ChainDataMock) {
+func prepareBatch(t *testing.T, operatorCount uint, blobs []core.Blob, bn uint) ([]core.EncodedBlob, core.BatchHeader, *coremock.ChainDataMock) {
 
-	cst, err := mock.MakeChainDataMock(map[uint8]int{
+	cst, err := coremock.MakeChainDataMock(map[uint8]int{
 		0: int(operatorCount),
 		1: int(operatorCount),
 		2: int(operatorCount),
 	})
 	assert.NoError(t, err)
+	cst.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(cst.Operators, nil)
 
 	batchHeader := core.BatchHeader{
 		ReferenceBlockNumber: bn,

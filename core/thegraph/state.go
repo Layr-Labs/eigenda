@@ -2,6 +2,7 @@ package thegraph
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -10,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/shurcooL/graphql"
 )
 
@@ -79,29 +81,41 @@ type (
 		core.ChainState
 		querier GraphQLQuerier
 
-		logger logging.Logger
+		logger             logging.Logger
+		operatorStateCache *lru.Cache[string, *core.IndexedOperatorState]
 	}
 )
 
 var _ IndexedChainState = (*indexedChainState)(nil)
 
-func MakeIndexedChainState(config Config, cs core.ChainState, logger logging.Logger) *indexedChainState {
-
+func MakeIndexedChainState(config Config, cs core.ChainState, logger logging.Logger) (*indexedChainState, error) {
 	logger.Info("Using graph node")
 	querier := graphql.NewClient(config.Endpoint, nil)
 
 	// RetryQuerier is a wrapper around the GraphQLQuerier that retries queries on failure
 	retryQuerier := NewRetryQuerier(querier, config.PullInterval, config.MaxRetries)
 
-	return NewIndexedChainState(cs, retryQuerier, logger)
+	return NewIndexedChainState(cs, retryQuerier, logger, config.OperatorStateCacheSize)
 }
 
-func NewIndexedChainState(cs core.ChainState, querier GraphQLQuerier, logger logging.Logger) *indexedChainState {
+func NewIndexedChainState(cs core.ChainState, querier GraphQLQuerier, logger logging.Logger, cacheSize int) (*indexedChainState, error) {
+	var operatorStateCache *lru.Cache[string, *core.IndexedOperatorState]
+	var err error
+
+	if cacheSize > 0 {
+		operatorStateCache, err = lru.New[string, *core.IndexedOperatorState](cacheSize)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &indexedChainState{
 		ChainState: cs,
-		querier:    querier,
-		logger:     logger.With("component", "IndexedChainState"),
-	}
+
+		querier:            querier,
+		logger:             logger.With("component", "IndexedChainState"),
+		operatorStateCache: operatorStateCache,
+	}, nil
 }
 
 func (ics *indexedChainState) Start(ctx context.Context) error {
@@ -124,6 +138,14 @@ func (ics *indexedChainState) Start(ctx context.Context) error {
 }
 
 func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, blockNumber uint, quorums []core.QuorumID) (*core.IndexedOperatorState, error) {
+	// Check if the indexed operator state has been cached
+	cacheKey := computeCacheKey(blockNumber, quorums)
+	if ics.operatorStateCache != nil {
+		if val, ok := ics.operatorStateCache.Get(cacheKey); ok {
+			return val, nil
+		}
+	}
+
 	operatorState, err := ics.ChainState.GetOperatorState(ctx, blockNumber, quorums)
 	if err != nil {
 		return nil, err
@@ -173,6 +195,11 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 		IndexedOperators: indexedOperators,
 		AggKeys:          aggKeys,
 	}
+
+	if ics.operatorStateCache != nil {
+		ics.operatorStateCache.Add(cacheKey, state)
+	}
+
 	return state, nil
 }
 
@@ -364,4 +391,14 @@ func convertIndexedOperatorInfoGqlToIndexedOperatorInfo(operator *IndexedOperato
 		PubkeyG2: &core.G2Point{G2Affine: pubkeyG2},
 		Socket:   string(operator.SocketUpdates[0].Socket),
 	}, nil
+}
+
+// Computes a cache key for the operator state cache. The cache key is a
+// combination of the block number and the quorum IDs. Note: the order of the
+// quorum IDs matters.
+func computeCacheKey(blockNumber uint, quorumIDs []uint8) string {
+	bytes := make([]byte, 8+len(quorumIDs))
+	binary.LittleEndian.PutUint64(bytes, uint64(blockNumber))
+	copy(bytes[8:], quorumIDs)
+	return string(bytes)
 }

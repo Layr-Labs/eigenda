@@ -370,6 +370,7 @@ func TestFetchMetricsHandler(t *testing.T) {
 	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 	mockSubgraphApi.On("QueryBatches").Return(subgraphBatches, nil)
 	mockPrometheusApi.On("QueryRange").Return(matrix, nil, nil).Once()
+	mockChainState.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(mockChainState.Operators)
 
 	r.GET("/v1/metrics", testDataApiServer.FetchMetricsHandler)
 

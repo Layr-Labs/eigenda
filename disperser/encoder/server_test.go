@@ -81,6 +81,8 @@ func getTestData() (core.Blob, encoding.EncodingParams) {
 		1: 10,
 		2: 10,
 	})
+	indexedChainState.On("GetOperatorState", mock.Anything, mock.Anything, mock.Anything).Return(indexedChainState.Operators, nil)
+
 	operatorState, err := indexedChainState.GetOperatorState(context.Background(), uint(0), []core.QuorumID{quorumID})
 	if err != nil {
 		log.Fatalf("failed to get operator state: %s", err)

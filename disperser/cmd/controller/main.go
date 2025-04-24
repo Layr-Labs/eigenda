@@ -9,10 +9,6 @@ import (
 	"strings"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/collectors"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -28,6 +24,9 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/gammazero/workerpool"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/urfave/cli"
 )
 
@@ -131,7 +130,10 @@ func RunController(ctx *cli.Context) error {
 		logger.Info("Using graph node")
 
 		logger.Info("Connecting to subgraph", "url", config.ChainStateConfig.Endpoint)
-		ics = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
+		ics, err = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
+		if err != nil {
+			return err
+		}
 	} else {
 		logger.Info("Using built-in indexer")
 		rpcClient, err := rpc.Dial(config.EthClientConfig.RPCURLs[0])
@@ -148,7 +150,7 @@ func RunController(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		ics, err = indexer.NewIndexedChainState(chainState, idx)
+		ics, err = indexer.NewIndexedChainState(chainState, idx, 32)
 		if err != nil {
 			return err
 		}
