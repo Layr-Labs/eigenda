@@ -141,16 +141,22 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 	// Check if the indexed operator state has been cached
 	cacheKey := computeCacheKey(blockNumber, quorums)
 	if ics.operatorStateCache != nil {
+		ics.logger.Debug("checking cache", "cacheKey", cacheKey)
 		if val, ok := ics.operatorStateCache.Get(cacheKey); ok {
+			ics.logger.Debug("cache hit", "cacheKey", cacheKey)
 			return val, nil
 		}
 	}
 
+	operatorStateStart := time.Now()
 	operatorState, err := ics.ChainState.GetOperatorState(ctx, blockNumber, quorums)
 	if err != nil {
 		return nil, err
 	}
+	operatorStateLatency := time.Since(operatorStateStart)
+	ics.logger.Debug("operator state latency", "latency", operatorStateLatency)
 
+	aggregatePublicKeysStart := time.Now()
 	aggregatePublicKeys := ics.getQuorumAPKs(ctx, quorums, uint32(blockNumber))
 	aggKeys := make(map[uint8]*core.G1Point)
 	for _, apk := range aggregatePublicKeys {
@@ -165,12 +171,18 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 	if len(aggKeys) == 0 {
 		return nil, fmt.Errorf("no aggregate public keys found for any of the specified quorums at block number %d", blockNumber)
 	}
+	aggregatePublicKeysLatency := time.Since(aggregatePublicKeysStart)
+	ics.logger.Debug("aggregate public keys latency", "latency", aggregatePublicKeysLatency)
 
+	indexedOperatorsStart := time.Now()
 	indexedOperators, err := ics.getRegisteredIndexedOperatorInfo(ctx, uint32(blockNumber))
 	if err != nil {
 		return nil, err
 	}
+	indexedOperatorsLatency := time.Since(indexedOperatorsStart)
+	ics.logger.Debug("indexed operators latency", "latency", indexedOperatorsLatency)
 
+	detectMissingOperatorsStart := time.Now()
 	// Detect missing operators
 	operatorSeen := make(map[core.OperatorID]struct{})
 	for _, quorumOperators := range operatorState.Operators {
@@ -181,7 +193,10 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 			operatorSeen[operatorID] = struct{}{}
 		}
 	}
+	detectMissingOperatorsLatency := time.Since(detectMissingOperatorsStart)
+	ics.logger.Debug("detect missing operators latency", "latency", detectMissingOperatorsLatency)
 
+	filterMissingOperatorsStart := time.Now()
 	// Filter out the operators who are not part of any quorum. This can happen if the operator registers or re-registers
 	// after the reference block number.
 	for operatorID := range indexedOperators {
@@ -189,6 +204,8 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 			delete(indexedOperators, operatorID)
 		}
 	}
+	filterMissingOperatorsLatency := time.Since(filterMissingOperatorsStart)
+	ics.logger.Debug("filter missing operators latency", "latency", filterMissingOperatorsLatency)
 
 	state := &core.IndexedOperatorState{
 		OperatorState:    operatorState,
@@ -196,9 +213,12 @@ func (ics *indexedChainState) GetIndexedOperatorState(ctx context.Context, block
 		AggKeys:          aggKeys,
 	}
 
+	cacheStateStart := time.Now()
 	if ics.operatorStateCache != nil {
 		ics.operatorStateCache.Add(cacheKey, state)
 	}
+	cacheStateLatency := time.Since(cacheStateStart)
+	ics.logger.Debug("cache state latency", "latency", cacheStateLatency)
 
 	return state, nil
 }
