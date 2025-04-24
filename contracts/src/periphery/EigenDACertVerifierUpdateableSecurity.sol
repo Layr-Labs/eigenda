@@ -1,24 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDACertVerifier} from "../interfaces/IEigenDACertVerifier.sol";
-import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDABatchMetadataStorage} from "../interfaces/IEigenDABatchMetadataStorage.sol";
-import {IEigenDASignatureVerifier} from "../interfaces/IEigenDASignatureVerifier.sol";
-import {EigenDACertVerificationV1Lib} from "src/libraries/EigenDACertVerificationV1Lib.sol";
-import {EigenDACertVerificationV2Lib} from "src/libraries/EigenDACertVerificationV2Lib.sol";
-import {OperatorStateRetriever} from "../../lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
-import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
-import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
-import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
-import "../interfaces/IEigenDAStructs.sol";
+import {IEigenDACertVerifier} from "src/interfaces/IEigenDACertVerifier.sol";
+import {IEigenDAThresholdRegistry} from "src/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDABatchMetadataStorage} from "src/interfaces/IEigenDABatchMetadataStorage.sol";
+import {IEigenDASignatureVerifier} from "src/interfaces/IEigenDASignatureVerifier.sol";
+import {EigenDACertVerificationUtils} from "src/libraries/EigenDACertVerificationUtils.sol";
+import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
+import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {IEigenDARelayRegistry} from "src/interfaces/IEigenDARelayRegistry.sol";
+import {IEigenDAThresholdRegistry} from "src/interfaces/IEigenDAThresholdRegistry.sol";
+import "src/interfaces/IEigenDAStructs.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 /**
  * @title A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates
  * @notice For V2 verification this contract is deployed with immutable security thresholds and required quorum numbers,
  *         to change these values or verification behavior a new CertVerifier must be deployed
  */
-contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDAThresholdRegistry {
+contract EigenDACertVerifierUpdateableSecurity is IEigenDACertVerifier, OwnableUpgradeable {
     /// @notice The EigenDAThresholdRegistry contract address
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
 
@@ -39,8 +39,13 @@ contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDAThresholdRegistry 
     /// @notice The EigenDA middleware RegistryCoordinator contract address
     IRegistryCoordinator public immutable registryCoordinator;
 
-    SecurityThresholds public securityThresholdsV2;
-    bytes public quorumNumbersRequiredV2;
+    mapping(uint32 => SecurityThresholds) public securityThresholdsV2;
+    mapping(uint32 => bytes) public quorumNumbersRequiredV2;
+    uint32[] public rbns;
+
+    event SecurityThresholdsAndQuorumNumbersAdded(
+        uint32 indexed rbn, uint8 indexed confirmationThreshold, uint8 indexed adversaryThreshold, bytes quorumNumbers
+    );
 
     constructor(
         IEigenDAThresholdRegistry _eigenDAThresholdRegistry,
@@ -48,22 +53,48 @@ contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDAThresholdRegistry 
         IEigenDASignatureVerifier _eigenDASignatureVerifier,
         IEigenDARelayRegistry _eigenDARelayRegistry,
         OperatorStateRetriever _operatorStateRetriever,
-        IRegistryCoordinator _registryCoordinator,
-        SecurityThresholds memory _securityThresholdsV2,
-        bytes memory _quorumNumbersRequiredV2
+        IRegistryCoordinator _registryCoordinator
     ) {
+        _disableInitializers();
         eigenDAThresholdRegistry = _eigenDAThresholdRegistry;
         eigenDABatchMetadataStorage = _eigenDABatchMetadataStorage;
         eigenDASignatureVerifier = _eigenDASignatureVerifier;
         eigenDARelayRegistry = _eigenDARelayRegistry;
         operatorStateRetriever = _operatorStateRetriever;
         registryCoordinator = _registryCoordinator;
+    }
 
-        // confirmation and adversary signing thresholds that must be met for all quorums in a V2 certificate
-        securityThresholdsV2 = _securityThresholdsV2;
+    function initialize(address _initialOwner) external initializer {
+        _transferOwnership(_initialOwner);
+    }
 
-        // quorum numbers that must be validated in a V2 certificate
-        quorumNumbersRequiredV2 = _quorumNumbersRequiredV2;
+    function addSecurityThresholdsAndQuorum(
+        uint32 referenceBlockNumber,
+        SecurityThresholds memory securityThresholds,
+        bytes memory quorumNumbers
+    ) external onlyOwner {
+        require(referenceBlockNumber > block.number, "Reference block number must be in the future");
+        require(
+            rbns.length == 0 || referenceBlockNumber > rbns[rbns.length - 1],
+            "Reference block number must be greater than the last registered RBN"
+        );
+        securityThresholdsV2[referenceBlockNumber] = securityThresholds;
+        quorumNumbersRequiredV2[referenceBlockNumber] = quorumNumbers;
+        rbns.push(referenceBlockNumber);
+        emit SecurityThresholdsAndQuorumNumbersAdded(
+            referenceBlockNumber,
+            securityThresholds.confirmationThreshold,
+            securityThresholds.adversaryThreshold,
+            quorumNumbers
+        );
+    }
+
+    function getSecurityParamsAt(uint32 rbn) external view returns (SecurityThresholds memory) {
+        return securityThresholdsV2[rbn];
+    }
+
+    function getQuorumNumbersAt(uint32 rbn) external view returns (bytes memory) {
+        return quorumNumbersRequiredV2[rbn];
     }
 
     ///////////////////////// V1 ///////////////////////////////
@@ -74,15 +105,17 @@ contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDAThresholdRegistry 
      * @param blobVerificationProof The blob cert verification proof to verify
      */
     function verifyDACertV1(BlobHeader calldata blobHeader, BlobVerificationProof calldata blobVerificationProof)
-        external
+        public
         view
     {
-        EigenDACertVerificationV1Lib._verifyDACertV1ForQuorums(
+        uint32 closestRbn =
+            _findClosestRegisteredRBN(blobVerificationProof.batchMetadata.batchHeader.referenceBlockNumber);
+        EigenDACertVerificationUtils._verifyDACertV1ForQuorums(
             eigenDAThresholdRegistry,
             eigenDABatchMetadataStorage,
             blobHeader,
             blobVerificationProof,
-            quorumNumbersRequired()
+            quorumNumbersRequiredV2[closestRbn]
         );
     }
 
@@ -95,13 +128,9 @@ contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDAThresholdRegistry 
         external
         view
     {
-        EigenDACertVerificationV1Lib._verifyDACertsV1ForQuorums(
-            eigenDAThresholdRegistry,
-            eigenDABatchMetadataStorage,
-            blobHeaders,
-            blobVerificationProofs,
-            quorumNumbersRequired()
-        );
+        for (uint256 i; i < blobHeaders.length; i++) {
+            verifyDACertV1(blobHeaders[i], blobVerificationProofs[i]);
+        }
     }
 
     ///////////////////////// V2 ///////////////////////////////
@@ -119,15 +148,16 @@ contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDAThresholdRegistry 
         NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
         bytes memory signedQuorumNumbers
     ) external view {
-        EigenDACertVerificationV2Lib._verifyDACertV2ForQuorums(
+        uint32 closestRbn = _findClosestRegisteredRBN(batchHeader.referenceBlockNumber);
+        EigenDACertVerificationUtils._verifyDACertV2ForQuorums(
             eigenDAThresholdRegistry,
             eigenDASignatureVerifier,
             eigenDARelayRegistry,
             batchHeader,
             blobInclusionInfo,
             nonSignerStakesAndSignature,
-            securityThresholdsV2,
-            quorumNumbersRequiredV2,
+            securityThresholdsV2[closestRbn],
+            quorumNumbersRequiredV2[closestRbn],
             signedQuorumNumbers
         );
     }
@@ -141,7 +171,8 @@ contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDAThresholdRegistry 
         SignedBatch calldata signedBatch,
         BlobInclusionInfo calldata blobInclusionInfo
     ) external view {
-        EigenDACertVerificationV2Lib._verifyDACertV2ForQuorumsFromSignedBatch(
+        uint32 closestRbn = _findClosestRegisteredRBN(signedBatch.batchHeader.referenceBlockNumber);
+        EigenDACertVerificationUtils._verifyDACertV2ForQuorumsFromSignedBatch(
             eigenDAThresholdRegistry,
             eigenDASignatureVerifier,
             eigenDARelayRegistry,
@@ -149,8 +180,8 @@ contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDAThresholdRegistry 
             registryCoordinator,
             signedBatch,
             blobInclusionInfo,
-            securityThresholdsV2,
-            quorumNumbersRequiredV2
+            securityThresholdsV2[closestRbn],
+            quorumNumbersRequiredV2[closestRbn]
         );
     }
 
@@ -169,15 +200,16 @@ contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDAThresholdRegistry 
         NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
         bytes memory signedQuorumNumbers
     ) external view returns (bool) {
-        try EigenDACertVerificationV2Lib.verifyDACertV2ForQuorumsExternal(
+        uint32 closestRbn = _findClosestRegisteredRBN(batchHeader.referenceBlockNumber);
+        try EigenDACertVerificationUtils.verifyDACertV2ForQuorumsExternal(
             eigenDAThresholdRegistry,
             eigenDASignatureVerifier,
             eigenDARelayRegistry,
             batchHeader,
             blobInclusionInfo,
             nonSignerStakesAndSignature,
-            securityThresholdsV2,
-            quorumNumbersRequiredV2,
+            securityThresholdsV2[closestRbn],
+            quorumNumbersRequiredV2[closestRbn],
             signedQuorumNumbers
         ) {
             return true;
@@ -198,7 +230,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDAThresholdRegistry 
         view
         returns (NonSignerStakesAndSignature memory)
     {
-        (NonSignerStakesAndSignature memory nonSignerStakesAndSignature,) = EigenDACertVerificationV2Lib
+        (NonSignerStakesAndSignature memory nonSignerStakesAndSignature,) = EigenDACertVerificationUtils
             ._getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
         return nonSignerStakesAndSignature;
     }
@@ -212,7 +244,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDAThresholdRegistry 
         VersionedBlobParams memory blobParams,
         SecurityThresholds memory securityThresholds
     ) external pure {
-        EigenDACertVerificationV2Lib._verifyDACertSecurityParams(blobParams, securityThresholds);
+        EigenDACertVerificationUtils._verifyDACertSecurityParams(blobParams, securityThresholds);
     }
 
     /**
@@ -221,40 +253,25 @@ contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDAThresholdRegistry 
      * @param securityThresholds The security thresholds to verify against
      */
     function verifyDACertSecurityParams(uint16 version, SecurityThresholds memory securityThresholds) external view {
-        EigenDACertVerificationV2Lib._verifyDACertSecurityParams(getBlobParams(version), securityThresholds);
+        EigenDACertVerificationUtils._verifyDACertSecurityParams(
+            eigenDAThresholdRegistry.getBlobParams(version), securityThresholds
+        );
     }
 
-    /// @notice Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index
-    function quorumAdversaryThresholdPercentages() external view returns (bytes memory) {
-        return eigenDAThresholdRegistry.quorumAdversaryThresholdPercentages();
-    }
+    /// @notice Given an RBN, find the closest RBN registered in this contract that is less than or equal to the given RBN.
+    /// @param referenceBlockNumber The reference block number to find the closest RBN for
+    /// @return closestRBN The closest RBN registered in this contract that is less than or equal to the given RBN.
+    function _findClosestRegisteredRBN(uint32 referenceBlockNumber) internal view returns (uint32) {
+        // It is assumed that the latest RBNs are the most likely to be used.
+        require(rbns.length > 0, "No rbn available");
 
-    /// @notice Returns an array of bytes where each byte represents the confirmation threshold percentage of the quorum at that index
-    function quorumConfirmationThresholdPercentages() external view returns (bytes memory) {
-        return eigenDAThresholdRegistry.quorumConfirmationThresholdPercentages();
-    }
-
-    /// @notice Returns an array of bytes where each byte represents the number of a required quorum
-    function quorumNumbersRequired() public view returns (bytes memory) {
-        return eigenDAThresholdRegistry.quorumNumbersRequired();
-    }
-
-    function getQuorumAdversaryThresholdPercentage(uint8 quorumNumber) external view returns (uint8) {
-        return eigenDAThresholdRegistry.getQuorumAdversaryThresholdPercentage(quorumNumber);
-    }
-
-    /// @notice Gets the confirmation threshold percentage for a quorum
-    function getQuorumConfirmationThresholdPercentage(uint8 quorumNumber) external view returns (uint8) {
-        return eigenDAThresholdRegistry.getQuorumConfirmationThresholdPercentage(quorumNumber);
-    }
-
-    /// @notice Checks if a quorum is required
-    function getIsQuorumRequired(uint8 quorumNumber) external view returns (bool) {
-        return eigenDAThresholdRegistry.getIsQuorumRequired(quorumNumber);
-    }
-
-    /// @notice Returns the blob params for a given blob version
-    function getBlobParams(uint16 version) public view returns (VersionedBlobParams memory) {
-        return eigenDAThresholdRegistry.getBlobParams(version);
+        uint256 rbnMaxIndex = rbns.length - 1; // cache to memory
+        for (uint256 i; i < rbns.length; i++) {
+            uint32 rbnMem = rbns[rbnMaxIndex - i];
+            if (rbnMem <= referenceBlockNumber) {
+                return rbnMem;
+            }
+        }
+        revert("No rbn found");
     }
 }
