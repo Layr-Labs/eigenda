@@ -267,8 +267,9 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 
 	sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx)
 	require.NoError(t, err)
+
 	err = components.Dispatcher.HandleSignatures(ctx, ctx, batchData, sigChan)
-	require.ErrorContains(t, err, "all quorums received no attestation")
+	require.NoError(t, err)
 
 	// Test that the blob metadata status are updated
 	for _, blobKey := range objsInBothQuorum.blobKeys {
