@@ -99,11 +99,16 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTi
 				}
 
 				stakePercentage := float64(0)
+				effectiveStakePercentage := float64(0)
 				if stake, ok := state.Operators[q][opID]; ok {
 					totalStake := new(big.Float).SetInt(state.Totals[q].Stake)
+					totalEffectiveStake := new(big.Float).SetInt(state.Totals[q].EffectiveStake)
 					stakePercentage, _ = new(big.Float).Quo(
 						new(big.Float).SetInt(stake.Stake),
 						totalStake).Float64()
+					effectiveStakePercentage, _ = new(big.Float).Quo(
+						new(big.Float).SetInt(stake.EffectiveStake),
+						totalEffectiveStake).Float64()
 				} else if liveOnly {
 					// Operator "opID" isn't live at "endBlock", skip it.
 					continue
@@ -116,13 +121,14 @@ func (s *server) getOperatorNonsigningRate(ctx context.Context, startTime, endTi
 					addr = "Unexpected internal error"
 				}
 				nonsignerMetric := OperatorNonsigningPercentageMetrics{
-					OperatorId:           fmt.Sprintf("0x%s", op),
-					OperatorAddress:      addr,
-					QuorumId:             q,
-					TotalUnsignedBatches: unsignedCount,
-					TotalBatches:         totalCount,
-					Percentage:           pf,
-					StakePercentage:      100 * stakePercentage,
+					OperatorId:               fmt.Sprintf("0x%s", op),
+					OperatorAddress:          addr,
+					QuorumId:                 q,
+					TotalUnsignedBatches:     unsignedCount,
+					TotalBatches:             totalCount,
+					Percentage:               pf,
+					StakePercentage:          100 * stakePercentage,
+					EffectiveStakePercentage: 100 * effectiveStakePercentage,
 				}
 				nonsignerMetrics = append(nonsignerMetrics, &nonsignerMetric)
 			}
