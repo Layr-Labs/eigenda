@@ -38,6 +38,7 @@ type dispatcherMetrics struct {
 	completedBlobs              *prometheus.CounterVec
 	attestation                 *prometheus.GaugeVec
 	blobSetSize                 *prometheus.GaugeVec
+	dedupLatency                *prometheus.SummaryVec
 }
 
 // NewDispatcherMetrics sets up metrics for the dispatcher.
@@ -270,6 +271,16 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
+	dedupLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  dispatcherNamespace,
+			Name:       "dedup_latency_ms",
+			Help:       "The time required to deduplicate blobs (part of NewBatch()).",
+			Objectives: objectives,
+		},
+		[]string{},
+	)
+
 	return &dispatcherMetrics{
 		handleBatchLatency:          handleBatchLatency,
 		newBatchLatency:             newBatchLatency,
@@ -294,6 +305,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		completedBlobs:              completedBlobs,
 		attestation:                 attestation,
 		blobSetSize:                 blobSetSize,
+		dedupLatency:                dedupLatency,
 	}
 }
 
@@ -395,6 +407,10 @@ func (m *dispatcherMetrics) reportCompletedBlob(size int, status dispv2.BlobStat
 
 func (m *dispatcherMetrics) reportBlobSetSize(size int) {
 	m.blobSetSize.WithLabelValues().Set(float64(size))
+}
+
+func (m *dispatcherMetrics) reportDedupLatency(duration time.Duration) {
+	m.dedupLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *dispatcherMetrics) reportAttestation(operatorCount map[core.QuorumID]int, signerCount map[core.QuorumID]int, quorumResults map[core.QuorumID]*core.QuorumResult) {

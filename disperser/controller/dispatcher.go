@@ -475,8 +475,19 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		return nil, fmt.Errorf("failed to get blob metadata by status: %w", err)
 	}
 
+	numBlobsBeforeDedup := len(blobMetadatas)
+	dedupStart := time.Now()
 	blobMetadatas = d.dedupBlobs(blobMetadatas)
+	d.metrics.reportDedupLatency(time.Since(dedupStart))
+	numBlobsAfterDedup := len(blobMetadatas)
+	numDedupedBlobs := numBlobsBeforeDedup - numBlobsAfterDedup
+
 	d.metrics.reportBlobSetSize(d.blobSet.Size())
+	d.logger.Debug("deduped blobs",
+		"numBlobsBeforeDedup", numBlobsBeforeDedup,
+		"numBlobsAfterDedup", numBlobsAfterDedup,
+		"numDedupedBlobs", numDedupedBlobs)
+
 	if len(blobMetadatas) == 0 {
 		return nil, errNoBlobsToDispatch
 	}
@@ -486,11 +497,12 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 
 	state, err := d.GetOperatorState(ctx, blobMetadatas, referenceBlockNumber)
 	getOperatorStateFinished := time.Now()
-	d.metrics.reportGetOperatorStateLatency(getOperatorStateFinished.Sub(getBlobMetadataFinished))
+	d.metrics.reportGetOperatorStateLatency(getOperatorStateFinished.Sub(dedupStart))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get operator state at block %d: %w", referenceBlockNumber, err)
 	}
 
+	processMetadataStart := time.Now()
 	keys := make([]corev2.BlobKey, len(blobMetadatas))
 	metadataMap := make(map[corev2.BlobKey]*v2.BlobMetadata, len(blobMetadatas))
 	for i, metadata := range blobMetadatas {
@@ -514,7 +526,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 
 	certs, _, err := d.blobMetadataStore.GetBlobCertificates(ctx, keys)
 	getBlobCertificatesFinished := time.Now()
-	d.metrics.reportGetBlobCertificatesLatency(getBlobCertificatesFinished.Sub(getOperatorStateFinished))
+	d.metrics.reportGetBlobCertificatesLatency(getBlobCertificatesFinished.Sub(processMetadataStart))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get blob certificates: %w", err)
 	}
@@ -523,6 +535,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		return nil, fmt.Errorf("blob certificates (%d) not found for all blob keys (%d)", len(certs), len(keys))
 	}
 
+	processCertsStart := time.Now()
 	certsMap := make(map[corev2.BlobKey]*corev2.BlobCertificate, len(certs))
 	for _, cert := range certs {
 		blobKey, err := cert.BlobHeader.BlobKey()
@@ -548,6 +561,8 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	}
 
 	tree, err := corev2.BuildMerkleTree(certs)
+	buildMerkleTreeFinished := time.Now()
+	d.metrics.reportBuildMerkleTreeLatency(buildMerkleTreeFinished.Sub(processCertsStart))
 	if err != nil {
 		return nil, fmt.Errorf("failed to build merkle tree: %w", err)
 	}
@@ -555,8 +570,6 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	copy(batchHeader.BatchRoot[:], tree.Root())
 
 	batchHeaderHash, err := batchHeader.Hash()
-	buildMerkleTreeFinished := time.Now()
-	d.metrics.reportBuildMerkleTreeLatency(buildMerkleTreeFinished.Sub(getBlobCertificatesFinished))
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash batch header: %w", err)
 	}
@@ -603,8 +616,8 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		i++
 	}
 	err = d.blobMetadataStore.PutBlobInclusionInfos(ctx, inclusionInfos)
-	putBlobInclusionInfosFinished := time.Now()
-	d.metrics.reportPutInclusionInfosLatency(putBlobInclusionInfosFinished.Sub(proofGenerationFinished))
+	putInclusionInfosFinished := time.Now()
+	d.metrics.reportPutInclusionInfosLatency(putInclusionInfosFinished.Sub(proofGenerationFinished))
 	if err != nil {
 		return nil, fmt.Errorf("failed to put blob inclusion infos: %w", err)
 	}
