@@ -125,6 +125,10 @@ func NewDispatcher(
 // Note that there is no lock. If the state is being updated concurrently, it may lead to inconsistent state
 func (d *Dispatcher) refreshOnchainState(ctx context.Context) error {
 	d.logger.Debug("refreshing onchain state")
+	start := time.Now()
+	defer func() {
+		d.metrics.reportGetOperatorStateLatency(time.Since(start))
+	}()
 
 	currentBlockNumber, err := d.chainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
