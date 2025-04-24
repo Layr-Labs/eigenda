@@ -19,10 +19,8 @@ import (
 const maxNumOperatorAddresses = 300
 
 var (
-	ErrPubKeysNotEqual     = errors.New("public keys are not equal")
-	ErrInsufficientEthSigs = errors.New("insufficient eth signatures")
-	ErrAggPubKeyNotValid   = errors.New("aggregated public key is not valid")
-	ErrAggSigNotValid      = errors.New("aggregated signature is not valid")
+	ErrAggPubKeyNotValid = errors.New("aggregated public key is not valid")
+	ErrAggSigNotValid    = errors.New("aggregated signature is not valid")
 )
 
 type SigningMessage struct {
@@ -316,7 +314,8 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 			return nil, err
 		}
 		if !ok {
-			return nil, ErrPubKeysNotEqual
+			return nil, fmt.Errorf("public keys are not equal: %s != %s",
+				hex.EncodeToString(signersAggKey.Serialize()), hex.EncodeToString(aggPubKeys[quorumID].Serialize()))
 		}
 
 		// Verify the aggregated signature for the quorum
