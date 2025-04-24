@@ -36,7 +36,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
 
         (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
-            CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
+            CertV2Lib.getNonSignerStakesAndSignature(registryCoordinator, signedBatch);
         eigenDACertVerifier.verifyDACertV2(
             signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers
         );
@@ -60,7 +60,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
 
         (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
-            CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
+            CertV2Lib.getNonSignerStakesAndSignature(registryCoordinator, signedBatch);
         bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(
             signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers
         );
@@ -86,7 +86,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
 
         (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
-            CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
+            CertV2Lib.getNonSignerStakesAndSignature(registryCoordinator, signedBatch);
         bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(
             signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers
         );

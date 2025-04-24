@@ -32,9 +32,6 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
     /// @notice The EigenDASignatureVerifier contract address
     IEigenDASignatureVerifier public immutable eigenDASignatureVerifierV2;
 
-    /// @notice The EigenDA middleware OperatorStateRetriever contract address
-    OperatorStateRetriever public immutable operatorStateRetrieverV2;
-
     /// @notice The EigenDA middleware RegistryCoordinator contract address
     IRegistryCoordinator public immutable registryCoordinatorV2;
 
@@ -46,14 +43,12 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
      * @notice Constructor for the EigenDA V2 certificate verifier
      * @param _eigenDAThresholdRegistryV2 The address of the EigenDAThresholdRegistry contract
      * @param _eigenDASignatureVerifierV2 The address of the EigenDASignatureVerifier contract
-     * @param _operatorStateRetrieverV2 The address of the OperatorStateRetriever contract
      * @param _registryCoordinatorV2 The address of the RegistryCoordinator contract
      * @param _securityThresholdsV2 The security thresholds for verification
      */
     constructor(
         IEigenDAThresholdRegistry _eigenDAThresholdRegistryV2,
         IEigenDASignatureVerifier _eigenDASignatureVerifierV2,
-        OperatorStateRetriever _operatorStateRetrieverV2,
         IRegistryCoordinator _registryCoordinatorV2,
         SecurityThresholds memory _securityThresholdsV2,
         bytes memory _quorumNumbersRequiredV2
@@ -63,7 +58,6 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
         }
         eigenDAThresholdRegistryV2 = _eigenDAThresholdRegistryV2;
         eigenDASignatureVerifierV2 = _eigenDASignatureVerifierV2;
-        operatorStateRetrieverV2 = _operatorStateRetrieverV2;
         registryCoordinatorV2 = _registryCoordinatorV2;
         securityThresholdsV2 = _securityThresholdsV2;
         quorumNumbersRequiredV2 = _quorumNumbersRequiredV2;
@@ -106,7 +100,6 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
         CertV2Lib.verifyDACertV2FromSignedBatch(
             _thresholdRegistry(),
             _signatureVerifier(),
-            _operatorStateRetriever(),
             _registryCoordinator(),
             signedBatch,
             blobInclusionInfo,
@@ -163,15 +156,6 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
      */
     function _signatureVerifier() internal view virtual returns (IEigenDASignatureVerifier) {
         return eigenDASignatureVerifierV2;
-    }
-
-    /**
-     * @notice Returns the operator state retriever contract
-     * @return The OperatorStateRetriever contract
-     * @dev Can be overridden by derived contracts
-     */
-    function _operatorStateRetriever() internal view virtual returns (OperatorStateRetriever) {
-        return operatorStateRetrieverV2;
     }
 
     /**
