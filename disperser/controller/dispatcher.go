@@ -16,6 +16,7 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/cockroachdb/redact/builder"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
@@ -110,6 +111,7 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to start chain state: %w", err)
 	}
 
+	// does a batch
 	go func() {
 		ticker := time.NewTicker(d.PullInterval)
 		defer ticker.Stop()
@@ -304,16 +306,18 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 	return sigChan, batchData, nil
 }
 
+// this is the method to change, consider starting by splitting stuff
 // HandleSignatures receives signatures from operators, validates, and aggregates them
 func (d *Dispatcher) HandleSignatures(
 	ctx context.Context,
 	attestationCtx context.Context,
 	batchData *batchData,
-	sigChan chan core.SigningMessage) error {
-
+	sigChan chan core.SigningMessage,
+) error {
 	if batchData == nil {
 		return errors.New("batchData is required")
 	}
+
 	handleSignaturesStart := time.Now()
 	defer func() {
 		d.metrics.reportHandleSignaturesLatency(time.Since(handleSignaturesStart))
@@ -323,12 +327,15 @@ func (d *Dispatcher) HandleSignatures(
 	for _, key := range batchData.BlobKeys {
 		err := d.blobMetadataStore.UpdateBlobStatus(ctx, key, v2.GatheringSignatures)
 		if err != nil {
-			d.logger.Error("failed to update blob status for blob %s to gathering signatures",
+			d.logger.Error("failed to update blob status to gathering signatures",
 				"blobKey", key.Hex(),
+				"batchHeaderHash", batchHeaderHash,
 				"err", err)
 		}
 	}
 
+	// submit an empty attestation before starting to gather signatures
+	// a new attestation will be periodically resubmitted as signatures are gathered
 	attestation := &corev2.Attestation{
 		BatchHeader:      batchData.Batch.BatchHeader,
 		AttestedAt:       uint64(time.Now().UnixNano()),
@@ -341,36 +348,59 @@ func (d *Dispatcher) HandleSignatures(
 	}
 	err := d.blobMetadataStore.PutAttestation(ctx, attestation)
 	if err != nil {
-		return fmt.Errorf("failed to put attestation for batch %s: %w", batchHeaderHash, err)
+		// this error isn't fatal: a subsequent put might succeed
+		d.logger.Error("put attestation",
+			"err", err,
+			"batchHeaderHash", batchHeaderHash)
 	}
 
-	// TODO(ian-shim): periodically update the attestation with intermediate quorum results
-
-	quorumAttestation, err := d.aggregator.ReceiveSignatures(
-		ctx,
+	// This channel will remain open until the attestationTimeout triggers, or until signatures from all validators
+	// have been received and processed. It will periodically yield QuorumAttestations with the latest set of received
+	// signatures.
+	attestationChan, err := core.ReceiveSignatures(
 		attestationCtx,
+		d.logger,
 		batchData.OperatorState,
 		batchData.BatchHeaderHash,
 		sigChan)
 	if err != nil {
+		receiveSignaturesErr := fmt.Errorf("receive and validate signatures for batch %s: %w", batchHeaderHash, err)
+
 		dbErr := d.failBatch(ctx, batchData)
 		if dbErr != nil {
-			return fmt.Errorf("failed to update blob statuses for batch %s to failed: %w", batchHeaderHash, dbErr)
+			return multierror.Append(
+				receiveSignaturesErr,
+				fmt.Errorf("update blob statuses for batch to failed: %w", dbErr))
 		}
-		return fmt.Errorf("failed to receive and validate signatures for batch %s: %w", batchHeaderHash, err)
-	}
-	receiveSignaturesFinished := time.Now()
-	d.metrics.reportReceiveSignaturesLatency(receiveSignaturesFinished.Sub(handleSignaturesStart))
 
-	nonZeroQuorums := make([]core.QuorumID, 0)
-	quorumResults := make(map[core.QuorumID]uint8)
-	for quorumID, quorumResult := range quorumAttestation.QuorumResults {
-		d.logger.Debug("quorum attestation results", "quorumID", quorumID, "result", quorumResult)
-		if quorumResult.PercentSigned > 0 {
-			nonZeroQuorums = append(nonZeroQuorums, quorumID)
-			quorumResults[quorumID] = quorumResult.PercentSigned
-		}
+		return receiveSignaturesErr
 	}
+
+	// keep track of the final attestation, since that's the attestation which will determine to final batch status
+	finalAttestation := &core.QuorumAttestation{}
+	// continue receiving attestations from the channel until it's closed
+	for receivedQuorumAttestation := range attestationChan {
+		err := d.submitAttestation(ctx, batchData, receivedQuorumAttestation)
+		if err != nil {
+			d.logger.Errorf("submit attestation for batch %s: %v", batchHeaderHash, err)
+			continue
+		}
+
+		finalAttestation = receivedQuorumAttestation
+	}
+
+	d.metrics.reportReceiveSignaturesLatency(time.Since(handleSignaturesStart))
+
+	updateBatchStatusStartTime := time.Now()
+	_, quorumPercentages := d.parseAndLogQuorumPercentages(batchHeaderHash, finalAttestation.QuorumResults)
+	err = d.updateBatchStatus(ctx, batchData, quorumPercentages)
+	if err != nil {
+		return fmt.Errorf("update batch status: %w", err)
+	}
+	d.metrics.reportUpdateBatchStatusLatency(time.Since(updateBatchStatusStartTime))
+
+	// TODO: improve this. maybe log a summary or something? Or maybe this just isn't necessary
+	// d.logger.Debug("quorum attestation results", "quorumID", quorumID, "result", quorumResult)
 
 	// Track attestation metrics
 	operatorCount := make(map[core.QuorumID]int)
@@ -381,64 +411,85 @@ func (d *Dispatcher) HandleSignatures(
 			signerCount[quorumID] = 0
 		}
 		for opID := range opState {
-			if _, ok := quorumAttestation.SignerMap[opID]; ok {
+			if _, ok := finalAttestation.SignerMap[opID]; ok {
 				signerCount[quorumID]++
 			}
 		}
 	}
-	d.metrics.reportAttestation(operatorCount, signerCount, quorumAttestation.QuorumResults)
+	d.metrics.reportAttestation(operatorCount, signerCount, finalAttestation.QuorumResults)
 
-	if len(nonZeroQuorums) == 0 {
-		err = d.updateBatchStatus(ctx, batchData, quorumResults)
-		if err != nil {
-			return fmt.Errorf("failed to update blob statuses for batch %s: %w", batchHeaderHash, err)
-		}
-		return fmt.Errorf("all quorums received no attestation for batch %s", batchHeaderHash)
+	return nil
+}
+
+func (d *Dispatcher) submitAttestation(
+	ctx context.Context,
+	batchData *batchData,
+	quorumAttestation *core.QuorumAttestation,
+) error {
+	sortedNonZeroQuorums, quorumPercentages := d.parseAndLogQuorumPercentages(
+		hex.EncodeToString(batchData.BatchHeaderHash[:]),
+		quorumAttestation.QuorumResults)
+	if len(sortedNonZeroQuorums) == 0 {
+		return errors.New("all quorums received no attestation for batch")
 	}
-	slices.Sort(nonZeroQuorums)
 
-	aggSig, err := d.aggregator.AggregateSignatures(ctx, d.chainState,
-		uint(batchData.Batch.BatchHeader.ReferenceBlockNumber), quorumAttestation, nonZeroQuorums)
-	aggregateSignaturesFinished := time.Now()
-	d.metrics.reportAggregateSignaturesLatency(aggregateSignaturesFinished.Sub(receiveSignaturesFinished))
+	aggregationStartTime := time.Now()
+	signatureAggregation, err := d.aggregator.AggregateSignatures(
+		ctx,
+		d.chainState,
+		uint(batchData.Batch.BatchHeader.ReferenceBlockNumber),
+		quorumAttestation,
+		sortedNonZeroQuorums)
+	d.metrics.reportAggregateSignaturesLatency(time.Since(aggregationStartTime))
 	if err != nil {
-		dbErr := d.failBatch(ctx, batchData)
-		if dbErr != nil {
-			return fmt.Errorf("failed to update blob statuses for batch %s to failed: %w", batchHeaderHash, dbErr)
-		}
-		return fmt.Errorf("failed to aggregate signatures for batch %s: %w", batchHeaderHash, err)
+		return fmt.Errorf("aggregate signatures: %w", err)
 	}
 
-	attestation = &corev2.Attestation{
+	attestation := &corev2.Attestation{
 		BatchHeader:      batchData.Batch.BatchHeader,
 		AttestedAt:       uint64(time.Now().UnixNano()),
-		NonSignerPubKeys: aggSig.NonSigners,
-		APKG2:            aggSig.AggPubKey,
-		QuorumAPKs:       aggSig.QuorumAggPubKeys,
-		Sigma:            aggSig.AggSignature,
-		QuorumNumbers:    nonZeroQuorums,
-		QuorumResults:    quorumResults,
+		NonSignerPubKeys: signatureAggregation.NonSigners,
+		APKG2:            signatureAggregation.AggPubKey,
+		QuorumAPKs:       signatureAggregation.QuorumAggPubKeys,
+		Sigma:            signatureAggregation.AggSignature,
+		QuorumNumbers:    sortedNonZeroQuorums,
+		QuorumResults:    quorumPercentages,
 	}
+
+	putAttestationStartTime := time.Now()
 	err = d.blobMetadataStore.PutAttestation(ctx, attestation)
-	putAttestationFinished := time.Now()
-	d.metrics.reportPutAttestationLatency(putAttestationFinished.Sub(aggregateSignaturesFinished))
 	if err != nil {
-		dbErr := d.failBatch(ctx, batchData)
-		if dbErr != nil {
-			return fmt.Errorf("failed to update blob statuses for batch %s to failed: %w", batchHeaderHash, dbErr)
-		}
-		return fmt.Errorf("failed to put attestation for batch %s: %w", batchHeaderHash, err)
+		return fmt.Errorf("put attestation: %w", err)
 	}
+	d.metrics.reportPutAttestationLatency(time.Since(putAttestationStartTime))
 
-	err = d.updateBatchStatus(ctx, batchData, attestation.QuorumResults)
-	updateBatchStatusFinished := time.Now()
-	d.metrics.reportUpdateBatchStatusLatency(updateBatchStatusFinished.Sub(putAttestationFinished))
-	if err != nil {
-		return fmt.Errorf("failed to update blob statuses for batch %s: %w", batchHeaderHash, err)
-	}
-
-	d.logger.Debug("successfully processed batch", "batchHeader", batchHeaderHash)
 	return nil
+}
+
+func (d *Dispatcher) parseAndLogQuorumPercentages(
+	batchHeaderHash string,
+	quorumResults map[core.QuorumID]*core.QuorumResult,
+) ([]core.QuorumID, map[core.QuorumID]uint8) {
+	nonZeroQuorums := make([]core.QuorumID, 0)
+	quorumPercentages := make(map[core.QuorumID]uint8)
+
+	messageBuilder := builder.StringBuilder{}
+	messageBuilder.Printf("batchHeaderHash: %s (quorumID, percentSigned)", batchHeaderHash)
+
+	for quorumID, quorumResult := range quorumResults {
+		messageBuilder.Printf("\n%d, %d%%", quorumID, quorumResult.PercentSigned)
+
+		if quorumResult.PercentSigned > 0 {
+			nonZeroQuorums = append(nonZeroQuorums, quorumID)
+			quorumPercentages[quorumID] = quorumResult.PercentSigned
+		}
+	}
+
+	d.logger.Debug(messageBuilder.String())
+
+	slices.Sort(nonZeroQuorums)
+
+	return nonZeroQuorums, quorumPercentages
 }
 
 func (d *Dispatcher) dedupBlobs(blobs []*v2.BlobMetadata) []*v2.BlobMetadata {

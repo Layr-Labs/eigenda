@@ -547,7 +547,7 @@ func (b *Batcher) HandleSingleBatch(ctx context.Context) error {
 	log.Debug("Aggregating signatures...")
 
 	stageTimer = time.Now()
-	quorumAttestation, err := b.Aggregator.ReceiveSignatures(ctx, attestationCtx, batch.State, headerHash, update)
+	quorumAttestation, err := b.Aggregator.ReceiveSignatures(attestationCtx, batch.State, headerHash, update)
 	if err != nil {
 		_ = b.handleFailure(ctx, batch.BlobMetadata, FailAggregateSignatures)
 		return fmt.Errorf("HandleSingleBatch: error receiving and validating signatures: %w", err)
