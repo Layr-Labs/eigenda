@@ -2,7 +2,6 @@ package validator
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -105,11 +104,8 @@ type retrievalWorker struct {
 	// A pool of workers for CPU intensive operations (e.g. deserializing and verifying blob data).
 	computePool *workerpool.WorkerPool
 
-	// The operators that are expected to have chunk data for the blob.
-	operators map[core.OperatorID]*core.OperatorInfo
-
-	// Information about operators.
-	operatorState *core.OperatorState
+	// Information about the operators in the quorum.
+	operatorInfo map[core.OperatorID]*core.OperatorInfo
 
 	// The encoding parameters for the blob.
 	encodingParams encoding.EncodingParams
@@ -156,6 +152,9 @@ type retrievalWorker struct {
 	// If true, then the validator retrieval client will log detailed information about the download process.
 	detailedLogging bool
 
+	// A function that returns the current time.
+	timeSource func() time.Time
+
 	// Used to collect metrics.
 	probe *common.SequenceProbe
 
@@ -172,7 +171,6 @@ type retrievalWorker struct {
 	// The total number of chunks.
 	totalChunkCount uint32
 
-	// TODO verify technical accuracy of this
 	// The minimum number of chunks needed to reconstruct the blob.
 	minimumChunkCount uint32
 
@@ -232,10 +230,11 @@ func newRetrievalWorker(
 	config *ValidatorClientConfig,
 	connectionPool *workerpool.WorkerPool,
 	computePool *workerpool.WorkerPool,
-	chainState core.ChainState,
-	referenceBlockNumber uint64,
-	blobVersion v2.BlobVersion,
-	ethClient core.Reader,
+	operatorInfo map[core.OperatorID]*core.OperatorInfo,
+	assignments map[core.OperatorID]v2.Assignment,
+	totalChunkCount uint32,
+	minimumChunkCount uint32,
+	encodingParams encoding.EncodingParams,
 	quorumID core.QuorumID,
 	blobKey v2.BlobKey,
 	verifier encoding.Verifier,
@@ -250,53 +249,8 @@ func newRetrievalWorker(
 			"verificationPessimism must be greater than 1.0, got %f", config.VerificationPessimism)
 	}
 
-	probe.SetStage("verify_commitment")
-	commitmentBatch := []encoding.BlobCommitments{blobCommitments}
-	err := verifier.VerifyCommitEquivalenceBatch(commitmentBatch)
-	if err != nil {
-		return nil, err
-	}
-
-	probe.SetStage("get_operator_state")
-	operatorState, err := chainState.GetOperatorStateWithSocket(ctx, uint(referenceBlockNumber), []core.QuorumID{quorumID})
-	if err != nil {
-		return nil, err
-	}
-	operators, ok := operatorState.Operators[quorumID]
-	if !ok {
-		return nil, fmt.Errorf("no quorum with ID: %d", quorumID)
-	}
-
-	probe.SetStage("get_blob_versions")
-	blobVersions, err := ethClient.GetAllVersionedBlobParams(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	blobParams, ok := blobVersions[blobVersion]
-	if !ok {
-		return nil, fmt.Errorf("invalid blob version %d", blobVersion)
-	}
-
-	probe.SetStage("get_encoding_params")
-	encodingParams, err := v2.GetEncodingParams(blobCommitments.Length, blobParams)
-	if err != nil {
-		return nil, err
-	}
-
-	probe.SetStage("get_assignments")
-	assignments, err := v2.GetAssignments(operatorState, blobParams, quorumID)
-	if err != nil {
-		return nil, errors.New("failed to get assignments")
-	}
-
-	// TODO verify technical accuracy of this
-	totalChunkCount := uint32(encodingParams.NumChunks)
-	availableChunkCount := uint32(encodingParams.NumChunks)
-	minimumChunkCount := availableChunkCount / blobParams.CodingRate
-
-	downloadOrder := make([]core.OperatorID, 0, len(operators))
-	for opID := range operators {
+	downloadOrder := make([]core.OperatorID, 0, len(assignments))
+	for opID := range assignments {
 		downloadOrder = append(downloadOrder, opID)
 	}
 
@@ -320,18 +274,17 @@ func newRetrievalWorker(
 		config:                       config,
 		connectionPool:               connectionPool,
 		computePool:                  computePool,
-		operators:                    operators,
-		operatorState:                operatorState,
+		operatorInfo:                 operatorInfo,
 		encodingParams:               encodingParams,
 		assignments:                  assignments,
 		quorumID:                     quorumID,
 		blobKey:                      blobKey,
 		verifier:                     verifier,
 		blobCommitments:              blobCommitments,
-		downloadStartedChan:          make(chan *downloadStarted, len(operators)),
-		downloadCompletedChan:        make(chan *validatorDownloadCompleted, len(operators)),
-		verificationCompleteChan:     make(chan *verificationCompleted, len(operators)),
-		decodeResponseChan:           make(chan *decodeResult, len(operators)),
+		downloadStartedChan:          make(chan *downloadStarted, len(assignments)),
+		downloadCompletedChan:        make(chan *validatorDownloadCompleted, len(assignments)),
+		verificationCompleteChan:     make(chan *verificationCompleted, len(assignments)),
+		decodeResponseChan:           make(chan *decodeResult, len(assignments)),
 		probe:                        probe,
 		minimumChunkCount:            minimumChunkCount,
 		downloadsInProgressQueue:     linkedlistqueue.New(),
@@ -344,6 +297,7 @@ func newRetrievalWorker(
 		targetDownloadCount:          targetDownloadCount,
 		targetVerifiedCount:          targetVerifiedCount,
 		detailedLogging:              config.DetailedLogging,
+		timeSource:                   config.timeSource,
 		downloadChunksFunction:       config.UnsafeDownloadChunksFunction,
 		deserializeAndVerifyFunction: config.UnsafeDeserializeAndVerifyFunction,
 		decodeBlobFunction:           config.UnsafeDecodeBlobFunction,
@@ -361,8 +315,6 @@ func newRetrievalWorker(
 
 	return worker, nil
 }
-
-// TODO unit test this workflow
 
 // updateChunkStatus updates the status of a chunk from a given operator. It also updates the
 // counts of the various chunk statuses.
@@ -602,7 +554,7 @@ func (w *retrievalWorker) downloadChunks(operatorID core.OperatorID) {
 	// the download was scheduled if there is contention for the connection pool.
 	w.downloadStartedChan <- &downloadStarted{
 		operatorID:    operatorID,
-		downloadStart: time.Now(),
+		downloadStart: w.timeSource(),
 	}
 
 	// Unless this has been overridden for testing, this is just a call to standardDownloadChunks().
@@ -631,7 +583,7 @@ func (w *retrievalWorker) standardDownloadChunks(
 	fudgeFactor := units.MiB      // to allow for some overhead from things like protobuf encoding
 	maxMessageSize := maxBlobSize*encodingRate + fudgeFactor
 
-	opInfo := w.operatorState.Operators[w.quorumID][operatorID]
+	opInfo := w.operatorInfo[operatorID]
 	conn, err := grpc.NewClient(
 		opInfo.Socket.GetV2RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -722,7 +674,6 @@ func (w *retrievalWorker) standardDeserializeAndVerify(
 
 // decodeBlob decodes the blob from the chunks and indices.
 func (w *retrievalWorker) decodeBlob(chunks []*encoding.Frame, indices []uint) {
-
 	if w.detailedLogging {
 		w.logger.Debug("decoding blob", "blobKey", w.blobKey.Hex())
 	}
@@ -738,7 +689,7 @@ func (w *retrievalWorker) decodeBlob(chunks []*encoding.Frame, indices []uint) {
 
 // decodeBlobFunction is the default function used to decode the blob from the chunks.
 func (w *retrievalWorker) standardDecodeBlob(
-	blobKey v2.BlobKey,
+	_ v2.BlobKey,
 	chunks []*encoding.Frame,
 	indices []uint,
 ) ([]byte, error) {

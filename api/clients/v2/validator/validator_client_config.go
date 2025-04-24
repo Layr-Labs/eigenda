@@ -66,6 +66,11 @@ type ValidatorClientConfig struct {
 	// The default is equal to the number of CPU cores.
 	ComputePoolSize int
 
+	// A function that returns the current time.
+	//
+	// The default is time.Now.
+	timeSource func() time.Time
+
 	// A function that overrides the default chunk downloader. This is intended for testing purposes, and should
 	// not be used in production code. This should not be considered a public API.
 	//
@@ -116,6 +121,7 @@ func DefaultClientConfig() *ValidatorClientConfig {
 		DetailedLogging:                    false,
 		ConnectionPoolSize:                 32,
 		ComputePoolSize:                    runtime.NumCPU(),
+		timeSource:                         time.Now,
 		UnsafeDownloadChunksFunction:       nil,
 		UnsafeDeserializeAndVerifyFunction: nil,
 		UnsafeDecodeBlobFunction:           nil,
