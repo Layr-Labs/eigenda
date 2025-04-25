@@ -136,11 +136,11 @@ func NewValidatorStore(
 	levelDBDeletionPath := path.Join(config.DbPath, LevelDBDeletionPath)
 
 	// If we previously made an attempt at deleting the levelDB database but it was interrupted, delete it now.
-	_, err := os.Stat(levelDBDeletionPath)
-	if err != nil && !os.IsNotExist(err) {
+	exists, err := util.Exists(levelDBDeletionPath)
+	if err != nil {
 		return nil, fmt.Errorf("failed to stat path %s: %v", levelDBDeletionPath, err)
 	}
-	if err == nil {
+	if exists {
 		// The previous attempt at deleting the levelDB database was interrupted.
 		logger.Warnf("partial deletion of levelDB database detected at %s. Deleting.", levelDBDeletionPath)
 		err = os.RemoveAll(levelDBDeletionPath)

@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -446,16 +447,41 @@ func TestMigration(t *testing.T) {
 	}
 
 	// At this point in time, the levelDB directory should still be present.
-	_, err = os.Stat(path.Join(testDir, LevelDBPath))
+	exists, err := util.Exists(path.Join(testDir, LevelDBPath))
 	require.NoError(t, err)
+	require.True(t, exists)
 
 	// Simulate time moving forward by a few hours and manually trigger the step to clean up levelDB data.
 	timeSourceDelta.Store(3 * 60 * 60)
 	store.(*validatorStore).finalizeMigration(context.Background())
 
 	// The levelDB directory should now be gone.
-	_, err = os.Stat(path.Join(testDir, LevelDBPath))
-	require.True(t, os.IsNotExist(err))
+	exists, err = util.Exists(path.Join(testDir, LevelDBPath))
+	require.NoError(t, err)
+	require.False(t, exists)
+
+	// Also, the temporary directory where the levelDB files are moved
+	// prior to deletion should also be gone.
+	tmpLevelDBDir := store.(*validatorStore).levelDBDeletionPath
+	exists, err = util.Exists(tmpLevelDBDir)
+	require.NoError(t, err)
+	require.False(t, exists)
+
+	err = store.Stop()
+	require.NoError(t, err)
+
+	// Recreate the temporary levelDB directory. This simulates what happens if we crash during the final phases
+	// of the previous step.
+	err = os.MkdirAll(tmpLevelDBDir, os.ModePerm)
+	require.NoError(t, err)
+
+	// Restarting the DB should cause the temporary directory we just created to be deleted.
+	store, err = NewValidatorStore(context.Background(), logger, config, timeSource, ttl, nil)
+	require.NoError(t, err)
+
+	exists, err = util.Exists(tmpLevelDBDir)
+	require.NoError(t, err)
+	require.False(t, exists)
 
 	err = store.Stop()
 	require.NoError(t, err)
