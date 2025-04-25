@@ -33,6 +33,10 @@ jobs:
       - name: Test eigenda-operator-state subgraph
         working-directory: subgraphs/eigenda-operator-state
         run: |
+          # Copy template files
+          cp ./templates/subgraph.yaml .
+          cp ./templates/networks.json .
+          
           yarn install
           yarn codegen
           yarn test
@@ -40,6 +44,10 @@ jobs:
       - name: Test eigenda-batch-metadata subgraph
         working-directory: subgraphs/eigenda-batch-metadata
         run: |
+          # Copy template files
+          cp ./templates/subgraph.yaml .
+          cp ./templates/networks.json .
+          
           yarn install
           yarn codegen
           yarn test 
