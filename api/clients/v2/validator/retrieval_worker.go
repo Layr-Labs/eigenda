@@ -248,6 +248,9 @@ func newRetrievalWorker(
 		return nil, fmt.Errorf(
 			"verificationPessimism must be greater than 1.0, got %f", config.VerificationPessimism)
 	}
+	if minimumChunkCount == 0 {
+		return nil, fmt.Errorf("minimumChunkCount must be greater than 0")
+	}
 
 	downloadOrder := make([]core.OperatorID, 0, len(assignments))
 	for opID := range assignments {
