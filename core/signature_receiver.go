@@ -35,7 +35,7 @@ type signatureReceiver struct {
 // The yielded QuorumAttestations contain aggregate signing data from all SigningMessages received thus far. Each
 // QuorumAttestation will have incorporated more SigningMessages than the previously yielded QuorumAttestation.
 //
-// The caller should not manually close the returned QuorumAttestation chan. It will be closed automatically, when:
+// This channel will be closed when one of the following conditions is met:
 // 1. The global attestation timeout is exceeded
 // 2. A SigningMessage from every Operator has been received and processed
 //
