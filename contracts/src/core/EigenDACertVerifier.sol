@@ -5,8 +5,8 @@ import {IEigenDACertVerifier} from "../interfaces/IEigenDACertVerifier.sol";
 import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "../interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../interfaces/IEigenDASignatureVerifier.sol";
-import {EigenDACertVerificationV1Lib} from "src/libraries/EigenDACertVerificationV1Lib.sol";
-import {EigenDACertVerificationV2Lib} from "src/libraries/EigenDACertVerificationV2Lib.sol";
+import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/libraries/EigenDACertVerificationV1Lib.sol";
+import {EigenDACertVerificationV2Lib as CertV2Lib} from "src/libraries/EigenDACertVerificationV2Lib.sol";
 import {OperatorStateRetriever} from "../../lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
@@ -76,7 +76,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         external
         view
     {
-        EigenDACertVerificationV1Lib._verifyDACertV1ForQuorums(
+        CertV1Lib._verifyDACertV1ForQuorums(
             eigenDAThresholdRegistry,
             eigenDABatchMetadataStorage,
             blobHeader,
@@ -94,7 +94,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         external
         view
     {
-        EigenDACertVerificationV1Lib._verifyDACertsV1ForQuorums(
+        CertV1Lib._verifyDACertsV1ForQuorums(
             eigenDAThresholdRegistry,
             eigenDABatchMetadataStorage,
             blobHeaders,
@@ -118,7 +118,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
         bytes memory signedQuorumNumbers
     ) external view {
-        EigenDACertVerificationV2Lib._verifyDACertV2ForQuorums(
+        CertV2Lib.verifyDACertV2(
             eigenDAThresholdRegistry,
             eigenDASignatureVerifier,
             eigenDARelayRegistry,
@@ -140,7 +140,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         SignedBatch calldata signedBatch,
         BlobInclusionInfo calldata blobInclusionInfo
     ) external view {
-        EigenDACertVerificationV2Lib._verifyDACertV2ForQuorumsFromSignedBatch(
+        CertV2Lib.verifyDACertV2FromSignedBatch(
             eigenDAThresholdRegistry,
             eigenDASignatureVerifier,
             eigenDARelayRegistry,
@@ -168,7 +168,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
         bytes memory signedQuorumNumbers
     ) external view returns (bool) {
-        try EigenDACertVerificationV2Lib.verifyDACertV2ForQuorumsExternal(
+        (CertV2Lib.StatusCode status,) = CertV2Lib.checkDACertV2(
             eigenDAThresholdRegistry,
             eigenDASignatureVerifier,
             eigenDARelayRegistry,
@@ -178,9 +178,10 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
             securityThresholdsV2,
             quorumNumbersRequiredV2,
             signedQuorumNumbers
-        ) {
+        );
+        if (status == CertV2Lib.StatusCode.SUCCESS) {
             return true;
-        } catch {
+        } else {
             return false;
         }
     }
@@ -197,8 +198,8 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         view
         returns (NonSignerStakesAndSignature memory)
     {
-        (NonSignerStakesAndSignature memory nonSignerStakesAndSignature,) = EigenDACertVerificationV2Lib
-            ._getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
+        (NonSignerStakesAndSignature memory nonSignerStakesAndSignature,) =
+            CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
         return nonSignerStakesAndSignature;
     }
 
@@ -211,7 +212,9 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         VersionedBlobParams memory blobParams,
         SecurityThresholds memory securityThresholds
     ) external pure {
-        EigenDACertVerificationV2Lib._verifyDACertSecurityParams(blobParams, securityThresholds);
+        (CertV2Lib.StatusCode status, bytes memory statusParams) =
+            CertV2Lib.checkSecurityParams(blobParams, securityThresholds);
+        CertV2Lib.revertOnError(status, statusParams);
     }
 
     /**
@@ -220,7 +223,9 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
      * @param securityThresholds The security thresholds to verify against
      */
     function verifyDACertSecurityParams(uint16 version, SecurityThresholds memory securityThresholds) external view {
-        EigenDACertVerificationV2Lib._verifyDACertSecurityParams(getBlobParams(version), securityThresholds);
+        (CertV2Lib.StatusCode status, bytes memory statusParams) =
+            CertV2Lib.checkSecurityParams(getBlobParams(version), securityThresholds);
+        CertV2Lib.revertOnError(status, statusParams);
     }
 
     /// @notice Returns an array of bytes where each byte represents the adversary threshold percentage of the quorum at that index
