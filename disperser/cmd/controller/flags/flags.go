@@ -136,6 +136,13 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BATCH_ATTESTATION_TIMEOUT"),
 	}
+	SignatureTickIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signature-tick-interval"),
+		Usage:    "Interval at which new Attestations will be submitted as signature gathering progresses",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNATURE_TICK_INTERVAL"),
+		Value:    1 * time.Second,
+	}
 	FinalizationBlockDelayFlag = cli.Uint64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "finalization-block-delay"),
 		Usage:    "Number of blocks to wait before finalizing",
@@ -216,6 +223,7 @@ var optionalFlags = []cli.Flag{
 	MaxNumBlobsPerIterationFlag,
 	OnchainStateRefreshIntervalFlag,
 
+	SignatureTickIntervalFlag,
 	FinalizationBlockDelayFlag,
 	NumRequestRetriesFlag,
 	NumConcurrentDispersalRequestsFlag,

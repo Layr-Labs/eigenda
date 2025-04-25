@@ -15,18 +15,29 @@ import (
 // signatureReceiver is a struct for receiving SigningMessages for a single batch. It should never be instantiated
 // manually: it exists only as a helper struct for the ReceiveSignatures method.
 type signatureReceiver struct {
-	logger               logging.Logger
+	logger logging.Logger
+	// indexedOperatorState contains operator information including pubkeys, stakes, and quorum membership
 	indexedOperatorState *IndexedOperatorState
 
-	signerMap                 map[OperatorID]bool
-	aggregateSignatures       map[QuorumID]*Signature
+	// signerMap tracks which operators have already submitted signatures (prevents duplicates)
+	signerMap map[OperatorID]bool
+	// aggregateSignatures stores the accumulated BLS signatures for each quorum
+	aggregateSignatures map[QuorumID]*Signature
+	// aggregateSignersG2PubKeys stores the accumulated G2 public keys of signers for each quorum
 	aggregateSignersG2PubKeys map[QuorumID]*G2Point
 
+	// stakeSigned tracks the total stake that has signed for each quorum
 	stakeSigned map[QuorumID]*big.Int
 
-	batchHeaderHash    [32]byte
+	// batchHeaderHash is the hash of the batch header that operators are signing
+	batchHeaderHash [32]byte
+	// signingMessageChan is the channel through which SigningMessages are received
 	signingMessageChan chan SigningMessage
-	quorumIDs          []QuorumID
+	// quorumIDs is a sorted list of quorum IDs for which signatures are being collected
+	quorumIDs []QuorumID
+
+	// tickInterval determines how frequently intermediate attestations are yielded
+	tickInterval time.Duration
 }
 
 // ReceiveSignatures receives SigningMessages over the signingMessageChan, and yields QuorumAttestations produced
@@ -47,6 +58,7 @@ func ReceiveSignatures(
 	indexedOperatorState *IndexedOperatorState,
 	batchHeaderHash [32]byte,
 	signingMessageChan chan SigningMessage,
+	tickInterval time.Duration,
 ) (chan *QuorumAttestation, error) {
 	sortedQuorumIDs, err := getSortedQuorumIDs(indexedOperatorState)
 	if err != nil {
@@ -73,6 +85,7 @@ func ReceiveSignatures(
 		batchHeaderHash:           batchHeaderHash,
 		signingMessageChan:        signingMessageChan,
 		quorumIDs:                 sortedQuorumIDs,
+		tickInterval:              tickInterval,
 	}
 
 	attestationChan := make(chan *QuorumAttestation, len(signerMap))
@@ -84,7 +97,7 @@ func ReceiveSignatures(
 // receiveSigningMessages receives SigningMessages, and sends QuorumAttestations to the input attestationChan
 func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attestationChan chan *QuorumAttestation) {
 	// this ticker causes QuorumAttestations to be sent periodically
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(sr.tickInterval)
 	defer ticker.Stop()
 	defer close(attestationChan)
 

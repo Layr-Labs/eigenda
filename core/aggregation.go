@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
@@ -102,7 +103,7 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 	message [32]byte,
 	messageChan chan SigningMessage,
 ) (*QuorumAttestation, error) {
-	attestationChan, err := ReceiveSignatures(ctx, a.Logger, state, message, messageChan)
+	attestationChan, err := ReceiveSignatures(ctx, a.Logger, state, message, messageChan, 1*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("receive signatures: %w", err)
 	}

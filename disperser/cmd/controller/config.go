@@ -84,6 +84,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			FinalizationBlockDelay:  ctx.GlobalUint64(flags.FinalizationBlockDelayFlag.Name),
 			AttestationTimeout:      ctx.GlobalDuration(flags.AttestationTimeoutFlag.Name),
 			BatchAttestationTimeout: ctx.GlobalDuration(flags.BatchAttestationTimeoutFlag.Name),
+			SignatureTickInterval:   ctx.GlobalDuration(flags.SignatureTickIntervalFlag.Name),
 			NumRequestRetries:       ctx.GlobalInt(flags.NumRequestRetriesFlag.Name),
 			MaxBatchSize:            int32(ctx.GlobalInt(flags.MaxBatchSizeFlag.Name)),
 		},

@@ -34,7 +34,10 @@ type DispatcherConfig struct {
 	AttestationTimeout time.Duration
 	// The maximum time permitted to wait for all nodes to provide signatures for a batch.
 	BatchAttestationTimeout time.Duration
-	NumRequestRetries       int
+	// SignatureTickInterval is the interval at which new Attestations will be submitted to the blobMetadataStore,
+	// as signature gathering progresses.
+	SignatureTickInterval time.Duration
+	NumRequestRetries     int
 	// MaxBatchSize is the maximum number of blobs to dispatch in a batch
 	MaxBatchSize int32
 }
@@ -85,6 +88,7 @@ func NewDispatcher(
 	if config.PullInterval == 0 ||
 		config.AttestationTimeout == 0 ||
 		config.BatchAttestationTimeout == 0 ||
+		config.SignatureTickInterval == 0 ||
 		config.MaxBatchSize == 0 {
 		return nil, errors.New("invalid config")
 	}
@@ -364,7 +368,8 @@ func (d *Dispatcher) HandleSignatures(
 		d.logger,
 		batchData.OperatorState,
 		batchData.BatchHeaderHash,
-		sigChan)
+		sigChan,
+		d.DispatcherConfig.SignatureTickInterval)
 	if err != nil {
 		receiveSignaturesErr := fmt.Errorf("receive and validate signatures for batch %s: %w", batchHeaderHash, err)
 
