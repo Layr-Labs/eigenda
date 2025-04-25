@@ -609,9 +609,10 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 
 	copy(batchHeader.BatchRoot[:], tree.Root())
 
-	batchHeaderHash, err := batchHeader.Hash()
 	buildMerkleTreeFinished := time.Now()
 	d.metrics.reportBuildMerkleTreeLatency(buildMerkleTreeFinished.Sub(getBlobCertificatesFinished))
+
+	batchHeaderHash, err := batchHeader.Hash()
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash batch header: %w", err)
 	}
@@ -621,6 +622,17 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	d.metrics.reportPutBatchHeaderLatency(putBatchHeaderFinished.Sub(buildMerkleTreeFinished))
 	if err != nil {
 		return nil, fmt.Errorf("failed to put batch header: %w", err)
+	}
+
+	batch := &corev2.Batch{
+		BatchHeader:      batchHeader,
+		BlobCertificates: certs,
+	}
+	err = d.blobMetadataStore.PutBatch(ctx, batch)
+	putBatchFinished := time.Now()
+	d.metrics.reportPutBatchLatency(putBatchFinished.Sub(putBatchHeaderFinished))
+	if err != nil {
+		return nil, fmt.Errorf("failed to put batch: %w", err)
 	}
 
 	// accumulate inclusion infos in a map to avoid duplicate entries
@@ -649,7 +661,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 	}
 
 	proofGenerationFinished := time.Now()
-	d.metrics.reportProofLatency(proofGenerationFinished.Sub(putBatchHeaderFinished))
+	d.metrics.reportProofLatency(proofGenerationFinished.Sub(putBatchFinished))
 
 	inclusionInfos := make([]*corev2.BlobInclusionInfo, len(inclusionInfoMap))
 	i := 0
@@ -673,10 +685,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 
 	d.logger.Debug("new batch", "referenceBlockNumber", referenceBlockNumber, "numBlobs", len(certs))
 	return &batchData{
-		Batch: &corev2.Batch{
-			BatchHeader:      batchHeader,
-			BlobCertificates: certs,
-		},
+		Batch:           batch,
 		BatchHeaderHash: batchHeaderHash,
 		BlobKeys:        keys,
 		Metadata:        metadataMap,

@@ -48,6 +48,17 @@ var (
 		EnvVar:   common.PrefixEnvVar(envPrefix, "TOP"),
 		Value:    0,
 	}
+	OutputFormatFlag = cli.StringFlag{
+		Name:     "output-format",
+		Usage:    "Output format (table/csv)",
+		Value:    "table",
+		Required: false,
+	}
+	OutputFileFlag = cli.StringFlag{
+		Name:     "output-file",
+		Usage:    "Write output to a file instead of stdout",
+		Required: false,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -59,6 +70,8 @@ var optionalFlags = []cli.Flag{
 	BlockNumberFlag,
 	QuorumIDsFlag,
 	TopNFlag,
+	OutputFormatFlag,
+	OutputFileFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

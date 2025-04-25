@@ -437,8 +437,10 @@ definitions:
         $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader'
       batch_header_hash:
         type: string
-      dispersedAt:
+      dispersed_at:
         type: integer
+      signature:
+        type: string
     type: object
   v2.OperatorDispersalFeedResponse:
     properties:
@@ -463,7 +465,7 @@ definitions:
       operator_id:
         type: string
     type: object
-  v2.OperatorLivenessResponse:
+  v2.OperatorLiveness:
     properties:
       dispersal_online:
         type: boolean
@@ -479,6 +481,13 @@ definitions:
         type: string
       retrieval_status:
         type: string
+    type: object
+  v2.OperatorLivenessResponse:
+    properties:
+      operators:
+        items:
+          $ref: '#/definitions/v2.OperatorLiveness'
+        type: array
     type: object
   v2.OperatorSigningInfo:
     properties:

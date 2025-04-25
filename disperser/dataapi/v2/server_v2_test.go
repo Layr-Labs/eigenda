@@ -106,44 +106,6 @@ var (
 		1: 10,
 		2: 10,
 	})
-
-	operatorInfoV1 = &subgraph.IndexedOperatorInfo{
-		Id:         "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ac",
-		PubkeyG1_X: "1336192159512049190945679273141887248666932624338963482128432381981287252980",
-		PubkeyG1_Y: "25195175002875833468883745675063986308012687914999552116603423331534089122704",
-		PubkeyG2_X: []graphql.String{
-			"31597023645215426396093421944506635812143308313031252511177204078669540440732",
-			"21405255666568400552575831267661419473985517916677491029848981743882451844775",
-		},
-		PubkeyG2_Y: []graphql.String{
-			"8416989242565286095121881312760798075882411191579108217086927390793923664442",
-			"23612061731370453436662267863740141021994163834412349567410746669651828926551",
-		},
-		SocketUpdates: []subgraph.SocketUpdates{
-			{
-				Socket: "23.93.76.1:32005;32006",
-			},
-		},
-	}
-
-	operatorInfoV2 = &subgraph.IndexedOperatorInfo{
-		Id:         "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ac",
-		PubkeyG1_X: "1336192159512049190945679273141887248666932624338963482128432381981287252980",
-		PubkeyG1_Y: "25195175002875833468883745675063986308012687914999552116603423331534089122704",
-		PubkeyG2_X: []graphql.String{
-			"31597023645215426396093421944506635812143308313031252511177204078669540440732",
-			"21405255666568400552575831267661419473985517916677491029848981743882451844775",
-		},
-		PubkeyG2_Y: []graphql.String{
-			"8416989242565286095121881312760798075882411191579108217086927390793923664442",
-			"23612061731370453436662267863740141021994163834412349567410746669651828926551",
-		},
-		SocketUpdates: []subgraph.SocketUpdates{
-			{
-				Socket: "23.93.76.1:31005;31006;32005;32006",
-			},
-		},
-	}
 )
 
 type MockSubgraphClient struct {
@@ -380,6 +342,7 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 
 	dispersedAt := make([]uint64, numRequests)
 	batchHeaders := make([]*corev2.BatchHeader, numRequests)
+	signatures := make([][32]byte, numRequests)
 	dynamoKeys := make([]commondynamodb.Key, numRequests)
 	for i := 0; i < numRequests; i++ {
 		dispersedAt[i] = firstRequestTs + uint64(i)*nanoSecsPerRequest
@@ -394,15 +357,25 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 			DispersedAt:     dispersedAt[i],
 			BatchHeader:     *batchHeaders[i],
 		}
+		signatures[i] = [32]byte{}
+		if i%2 == 0 {
+			signatures[i] = [32]byte{1, 1, uint8(i)}
+		}
+		dispersalResponse := &corev2.DispersalResponse{
+			DispersalRequest: dispersalRequest,
+			RespondedAt:      dispersedAt[i],
+			Signature:        signatures[i],
+			Error:            "",
+		}
 
-		err := blobMetadataStore.PutDispersalRequest(ctx, dispersalRequest)
+		err := blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
 		require.NoError(t, err)
 
 		bhh, err := dispersalRequest.BatchHeader.Hash()
 		require.NoError(t, err)
 		dynamoKeys[i] = commondynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
-			"SK": &types.AttributeValueMemberS{Value: "DispersalRequest#" + opID.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID.Hex()},
 		}
 	}
 	defer deleteItems(t, dynamoKeys)
@@ -516,6 +489,11 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 			assert.Equal(t, dispersedAt[1+i], response.Dispersals[i].DispersedAt)
 			assert.Equal(t, batchHeaders[1+i].ReferenceBlockNumber, response.Dispersals[i].BatchHeader.ReferenceBlockNumber)
 			assert.Equal(t, batchHeaders[1+i].BatchRoot, response.Dispersals[i].BatchHeader.BatchRoot)
+			if (1+i)%2 == 0 {
+				assert.Equal(t, hex.EncodeToString(signatures[1+i][:]), response.Dispersals[i].Signature)
+			} else {
+				assert.Equal(t, "", response.Dispersals[i].Signature)
+			}
 		}
 	})
 
@@ -2188,21 +2166,22 @@ func TestCheckOperatorsLiveness(t *testing.T) {
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
 
-	operatorId := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
-	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfoV2, nil)
+	mockIndexedChainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
 
 	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
 
+	operatorId := core.OperatorID{1}.Hex()
 	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId)
 	w := executeRequest(t, r, http.MethodGet, reqStr)
-	response := decodeResponseBody[dataapi.OperatorPortCheckResponse](t, w)
+	response := decodeResponseBody[serverv2.OperatorLivenessResponse](t, w)
 
-	assert.Equal(t, "23.93.76.1:32005", response.DispersalSocket)
-	assert.Equal(t, false, response.DispersalOnline)
-	assert.Equal(t, "v2 dispersal port closed or unreachable", response.DispersalStatus)
-	assert.Equal(t, "23.93.76.1:32006", response.RetrievalSocket)
-	assert.Equal(t, false, response.RetrievalOnline)
-	assert.Equal(t, "v2 retrieval port closed or unreachable", response.RetrievalStatus)
+	assert.Equal(t, 1, len(response.Operators))
+	assert.Equal(t, "0.0.0.0:3004", response.Operators[0].DispersalSocket)
+	assert.Equal(t, false, response.Operators[0].DispersalOnline)
+	assert.Equal(t, "", response.Operators[0].DispersalStatus)
+	assert.Equal(t, "0.0.0.0:3005", response.Operators[0].RetrievalSocket)
+	assert.Equal(t, false, response.Operators[0].RetrievalOnline)
+	assert.Equal(t, "", response.Operators[0].RetrievalStatus)
 
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
@@ -2214,21 +2193,36 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil
 
-	operatorId := "0xa96bfb4a7ca981ad365220f336dc5a3de0816ebd5130b79bbc85aca94bc9b6ab"
-	mockSubgraphApi.On("QueryOperatorInfoByOperatorIdAtBlockNumber").Return(operatorInfoV1, nil)
+	operatorId := core.OperatorID{1}
+	ios := &core.IndexedOperatorState{
+		IndexedOperators: map[core.OperatorID]*core.IndexedOperatorInfo{
+			operatorId: &core.IndexedOperatorInfo{
+				Socket: "1.2.3.4:3004:3005",
+			},
+		},
+	}
+
+	mockIcs := &coremock.MockIndexedChainState{}
+
+	mockIcs.On("GetCurrentBlockNumber").Return(uint(1), nil)
+	mockIcs.On("GetIndexedOperatorState").Return(ios, nil)
+
+	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIcs, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
+	require.NoError(t, err)
 
 	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
 
-	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId)
+	reqStr := fmt.Sprintf("/v2/operators/liveness?operator_id=%v", operatorId.Hex())
 	w := executeRequest(t, r, http.MethodGet, reqStr)
-	response := decodeResponseBody[dataapi.OperatorPortCheckResponse](t, w)
+	response := decodeResponseBody[serverv2.OperatorLivenessResponse](t, w)
 
-	assert.Equal(t, "", response.DispersalSocket)
-	assert.Equal(t, false, response.DispersalOnline)
-	assert.Equal(t, "v2 dispersal port is not registered", response.DispersalStatus)
-	assert.Equal(t, "", response.RetrievalSocket)
-	assert.Equal(t, false, response.RetrievalOnline)
-	assert.Equal(t, "v2 retrieval port is not registered", response.RetrievalStatus)
+	assert.Equal(t, 1, len(response.Operators))
+	assert.Equal(t, "", response.Operators[0].DispersalSocket)
+	assert.Equal(t, false, response.Operators[0].DispersalOnline)
+	assert.Equal(t, "v2 dispersal port is not registered", response.Operators[0].DispersalStatus)
+	assert.Equal(t, "", response.Operators[0].RetrievalSocket)
+	assert.Equal(t, false, response.Operators[0].RetrievalOnline)
+	assert.Equal(t, "v2 retrieval port is not registered", response.Operators[0].RetrievalStatus)
 
 	mockSubgraphApi.ExpectedCalls = nil
 	mockSubgraphApi.Calls = nil

@@ -55,13 +55,13 @@ func checkAttestationsDesc(t *testing.T, items []*corev2.Attestation) {
 	}
 }
 
-func checkDispersalsAsc(t *testing.T, items []*corev2.DispersalRequest) {
+func checkDispersalsAsc(t *testing.T, items []*corev2.DispersalResponse) {
 	if len(items) > 1 {
 		for i := 1; i < len(items); i++ {
 			assert.Less(
 				t,
-				items[i-1].DispersedAt, // previous should be less
-				items[i].DispersedAt,   // than current
+				items[i-1].RespondedAt, // previous should be less
+				items[i].RespondedAt,   // than current
 				"DispersalRequests should be in ascending order",
 			)
 
@@ -69,12 +69,12 @@ func checkDispersalsAsc(t *testing.T, items []*corev2.DispersalRequest) {
 	}
 }
 
-func checkDispersalsDesc(t *testing.T, items []*corev2.DispersalRequest) {
+func checkDispersalsDesc(t *testing.T, items []*corev2.DispersalResponse) {
 	for i := 1; i < len(items); i++ {
 		assert.Greater(
 			t,
-			items[i-1].DispersedAt, // previous should be greater
-			items[i].DispersedAt,   // than current
+			items[i-1].RespondedAt, // previous should be greater
+			items[i].RespondedAt,   // than current
 			"DispersalRequests should be in descending order",
 		)
 	}
@@ -1681,7 +1681,7 @@ func TestBlobMetadataStoreDispersals(t *testing.T) {
 	})
 }
 
-func TestBlobMetadataStoreDispersalsByDispersedAt(t *testing.T) {
+func TestBlobMetadataStoreDispersalsByRespondedAt(t *testing.T) {
 	ctx := context.Background()
 
 	numRequests := 60
@@ -1690,29 +1690,35 @@ func TestBlobMetadataStoreDispersalsByDispersedAt(t *testing.T) {
 	firstRequestTs := now - uint64(int64(numRequests)*time.Second.Nanoseconds())
 	nanoSecsPerRequest := uint64(time.Second.Nanoseconds()) // 1 batch/s
 
-	dispersedAt := make([]uint64, numRequests)
+	respondedAt := make([]uint64, numRequests)
 	dynamoKeys := make([]commondynamodb.Key, numRequests)
 	for i := 0; i < numRequests; i++ {
-		dispersedAt[i] = firstRequestTs + uint64(i)*nanoSecsPerRequest
+		respondedAt[i] = firstRequestTs + uint64(i)*nanoSecsPerRequest
 		dispersalRequest := &corev2.DispersalRequest{
 			OperatorID:      opID,
 			OperatorAddress: gethcommon.HexToAddress("0x1234567"),
 			Socket:          "socket",
-			DispersedAt:     dispersedAt[i],
+			DispersedAt:     respondedAt[i] - 10,
 			BatchHeader: corev2.BatchHeader{
 				BatchRoot:            [32]byte{1, 2, 3},
 				ReferenceBlockNumber: uint64(i + 100),
 			},
 		}
+		dispersalResponse := &corev2.DispersalResponse{
+			DispersalRequest: dispersalRequest,
+			RespondedAt:      respondedAt[i],
+			Signature:        [32]byte{1, 1, 1},
+			Error:            "error",
+		}
 
-		err := blobMetadataStore.PutDispersalRequest(ctx, dispersalRequest)
+		err := blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
 		require.NoError(t, err)
 
 		bhh, err := dispersalRequest.BatchHeader.Hash()
 		require.NoError(t, err)
 		dynamoKeys[i] = commondynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
-			"SK": &types.AttributeValueMemberS{Value: "DispersalRequest#" + opID.Hex()},
+			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID.Hex()},
 		}
 	}
 	defer deleteItems(t, dynamoKeys)
@@ -1720,16 +1726,16 @@ func TestBlobMetadataStoreDispersalsByDispersedAt(t *testing.T) {
 	// Test empty range
 	t.Run("empty range", func(t *testing.T) {
 		// Test invalid time range
-		_, err := blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, 1, 1, 0, true)
+		_, err := blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, 1, 1, 0, true)
 		require.Error(t, err)
 		assert.Equal(t, "no time point in exclusive time range (1, 1)", err.Error())
 
-		_, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, 1, 2, 0, true)
+		_, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, 1, 2, 0, true)
 		require.Error(t, err)
 		assert.Equal(t, "no time point in exclusive time range (1, 2)", err.Error())
 
 		// Test empty range
-		dispersals, err := blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, now, now+1024, 0, true)
+		dispersals, err := blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, now, now+1024, 0, true)
 		require.NoError(t, err)
 		assert.Equal(t, 0, len(dispersals))
 	})
@@ -1737,23 +1743,23 @@ func TestBlobMetadataStoreDispersalsByDispersedAt(t *testing.T) {
 	// Test full range query
 	t.Run("ascending full range", func(t *testing.T) {
 		// Test without limit
-		dispersals, err := blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs-1, now, 0, true)
+		dispersals, err := blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs-1, now, 0, true)
 		require.NoError(t, err)
 		require.Equal(t, numRequests, len(dispersals))
 		checkDispersalsAsc(t, dispersals)
 
 		// Test with limit
-		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs-1, now, 10, true)
+		dispersals, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs-1, now, 10, true)
 		require.NoError(t, err)
 		require.Equal(t, 10, len(dispersals))
 		checkDispersalsAsc(t, dispersals)
 
 		// Test min/max timestamp range
-		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, 0, now, 0, true)
+		dispersals, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, 0, now, 0, true)
 		require.NoError(t, err)
 		require.Equal(t, numRequests, len(dispersals))
 		checkDispersalsAsc(t, dispersals)
-		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs-1, math.MaxInt64, 0, true)
+		dispersals, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs-1, math.MaxInt64, 0, true)
 		require.NoError(t, err)
 		require.Equal(t, numRequests, len(dispersals))
 		checkDispersalsAsc(t, dispersals)
@@ -1762,23 +1768,23 @@ func TestBlobMetadataStoreDispersalsByDispersedAt(t *testing.T) {
 	// Test full range query
 	t.Run("descending full range", func(t *testing.T) {
 		// Test without limit
-		dispersals, err := blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs-1, now, 0, false)
+		dispersals, err := blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs-1, now, 0, false)
 		require.NoError(t, err)
 		require.Equal(t, numRequests, len(dispersals))
 		checkDispersalsDesc(t, dispersals)
 
 		// Test with limit
-		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs, now, 10, false)
+		dispersals, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs, now, 10, false)
 		require.NoError(t, err)
 		require.Equal(t, 10, len(dispersals))
 		checkDispersalsDesc(t, dispersals)
 
 		// Test min/max timestamp range
-		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, 0, now, 0, false)
+		dispersals, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, 0, now, 0, false)
 		require.NoError(t, err)
 		require.Equal(t, numRequests, len(dispersals))
 		checkDispersalsDesc(t, dispersals)
-		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs-1, math.MaxInt64, 0, false)
+		dispersals, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs-1, math.MaxInt64, 0, false)
 		require.NoError(t, err)
 		require.Equal(t, numRequests, len(dispersals))
 		checkDispersalsDesc(t, dispersals)
@@ -1787,57 +1793,85 @@ func TestBlobMetadataStoreDispersalsByDispersedAt(t *testing.T) {
 	// Test range boundaries
 	t.Run("ascending range boundaries", func(t *testing.T) {
 		// Test exclusive start
-		dispersals, err := blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs, now, 0, true)
+		dispersals, err := blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs, now, 0, true)
 		require.NoError(t, err)
 		require.Equal(t, numRequests-1, len(dispersals))
-		assert.Equal(t, dispersedAt[1], dispersals[0].DispersedAt)
-		assert.Equal(t, dispersedAt[numRequests-1], dispersals[numRequests-2].DispersedAt)
+		assert.Equal(t, respondedAt[1], dispersals[0].RespondedAt)
+		assert.Equal(t, respondedAt[numRequests-1], dispersals[numRequests-2].RespondedAt)
 		checkDispersalsAsc(t, dispersals)
 
 		// Test exclusive end
-		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs-1, dispersedAt[4], 0, true)
+		dispersals, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs-1, respondedAt[4], 0, true)
 		require.NoError(t, err)
 		require.Equal(t, 4, len(dispersals))
-		assert.Equal(t, dispersedAt[0], dispersals[0].DispersedAt)
-		assert.Equal(t, dispersedAt[3], dispersals[3].DispersedAt)
+		assert.Equal(t, respondedAt[0], dispersals[0].RespondedAt)
+		assert.Equal(t, respondedAt[3], dispersals[3].RespondedAt)
 		checkDispersalsAsc(t, dispersals)
 	})
 
 	// Test range boundaries
 	t.Run("descending range boundaries", func(t *testing.T) {
 		// Test exclusive start
-		dispersals, err := blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs, now, 0, false)
+		dispersals, err := blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs, now, 0, false)
 		require.NoError(t, err)
 		require.Equal(t, numRequests-1, len(dispersals))
-		assert.Equal(t, dispersedAt[numRequests-1], dispersals[0].DispersedAt)
-		assert.Equal(t, dispersedAt[1], dispersals[numRequests-2].DispersedAt)
+		assert.Equal(t, respondedAt[numRequests-1], dispersals[0].RespondedAt)
+		assert.Equal(t, respondedAt[1], dispersals[numRequests-2].RespondedAt)
 		checkDispersalsDesc(t, dispersals)
 
 		// Test exclusive end
-		dispersals, err = blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, firstRequestTs-1, dispersedAt[4], 0, false)
+		dispersals, err = blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, firstRequestTs-1, respondedAt[4], 0, false)
 		require.NoError(t, err)
 		require.Equal(t, 4, len(dispersals))
-		assert.Equal(t, dispersedAt[3], dispersals[0].DispersedAt)
-		assert.Equal(t, dispersedAt[0], dispersals[3].DispersedAt)
+		assert.Equal(t, respondedAt[3], dispersals[0].RespondedAt)
+		assert.Equal(t, respondedAt[0], dispersals[3].RespondedAt)
 		checkDispersalsDesc(t, dispersals)
 	})
 
 	// Test pagination
 	t.Run("pagination", func(t *testing.T) {
 		for i := 1; i < numRequests; i++ {
-			dispersals, err := blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, dispersedAt[i-1], dispersedAt[i]+1, 0, true)
+			dispersals, err := blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, respondedAt[i-1], respondedAt[i]+1, 0, true)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(dispersals))
-			assert.Equal(t, dispersedAt[i], dispersals[0].DispersedAt)
+			assert.Equal(t, respondedAt[i], dispersals[0].RespondedAt)
 		}
 
 		for i := 1; i < numRequests; i++ {
-			dispersals, err := blobMetadataStore.GetDispersalRequestByDispersedAt(ctx, opID, dispersedAt[i-1], dispersedAt[i]+1, 0, false)
+			dispersals, err := blobMetadataStore.GetDispersalsByRespondedAt(ctx, opID, respondedAt[i-1], respondedAt[i]+1, 0, false)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(dispersals))
-			assert.Equal(t, dispersedAt[i], dispersals[0].DispersedAt)
+			assert.Equal(t, respondedAt[i], dispersals[0].RespondedAt)
 		}
 	})
+}
+
+func TestBlobMetadataStoreBatch(t *testing.T) {
+	ctx := context.Background()
+	_, blobHeader := newBlob(t)
+	blobCert := &corev2.BlobCertificate{
+		BlobHeader: blobHeader,
+		Signature:  []byte("signature"),
+		RelayKeys:  []corev2.RelayKey{0, 2, 4},
+	}
+
+	batchHeader := &corev2.BatchHeader{
+		BatchRoot:            [32]byte{1, 2, 3},
+		ReferenceBlockNumber: 1024,
+	}
+	bhh, err := batchHeader.Hash()
+	assert.NoError(t, err)
+
+	batch := &corev2.Batch{
+		BatchHeader:      batchHeader,
+		BlobCertificates: []*corev2.BlobCertificate{blobCert},
+	}
+	err = blobMetadataStore.PutBatch(ctx, batch)
+	require.NoError(t, err)
+
+	b, err := blobMetadataStore.GetBatch(ctx, bhh)
+	require.NoError(t, err)
+	assert.Equal(t, batch, b)
 }
 
 func TestBlobMetadataStoreBlobAttestationInfo(t *testing.T) {

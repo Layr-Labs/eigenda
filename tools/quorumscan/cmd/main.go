@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"log"
@@ -103,7 +104,26 @@ func RunScan(ctx *cli.Context) error {
 	}
 
 	quorumMetrics := quorumscan.QuorumScan(operators, operatorState, logger)
-	displayResults(quorumMetrics, operatorIdToAddress, config.TopN)
+
+	// Handle file output if specified
+	if config.OutputFile != "" {
+		file, err := os.Create(config.OutputFile)
+		if err != nil {
+			return fmt.Errorf("failed to create output file: %v", err)
+		}
+		defer file.Close()
+
+		err = displayResultsToWriter(quorumMetrics, operatorIdToAddress, config.TopN, config.OutputFormat, bufio.NewWriter(file))
+		if err != nil {
+			return fmt.Errorf("failed to write to output file: %v", err)
+		}
+
+		logger.Info("Output written to file", "path", config.OutputFile)
+	} else {
+		// Display to stdout
+		displayResults(quorumMetrics, operatorIdToAddress, config.TopN, config.OutputFormat)
+	}
+
 	return nil
 }
 
@@ -119,7 +139,18 @@ func humanizeEth(value *big.Float) string {
 	}
 }
 
-func displayResults(results map[uint8]*quorumscan.QuorumMetrics, operatorIdToAddress map[string]string, topN uint) {
+// displayResults outputs to stdout
+func displayResults(results map[uint8]*quorumscan.QuorumMetrics, operatorIdToAddress map[string]string, topN uint, outputFormat string) {
+	// Use standard output
+	writer := bufio.NewWriter(os.Stdout)
+	err := displayResultsToWriter(results, operatorIdToAddress, topN, outputFormat, writer)
+	if err != nil {
+		log.Fatalf("Error writing to stdout: %v", err)
+	}
+}
+
+// displayResultsToWriter outputs to the provided writer
+func displayResultsToWriter(results map[uint8]*quorumscan.QuorumMetrics, operatorIdToAddress map[string]string, topN uint, outputFormat string, writer *bufio.Writer) error {
 	weiToEth := new(big.Float).SetFloat64(1e18)
 
 	// Create sorted list of quorums
@@ -131,14 +162,47 @@ func displayResults(results map[uint8]*quorumscan.QuorumMetrics, operatorIdToAdd
 		return quorums[i] < quorums[j]
 	})
 
-	for _, quorum := range quorums {
-		tw := table.NewWriter()
-		rowAutoMerge := table.RowConfig{AutoMerge: true}
-		operatorHeader := "OPERATOR"
-		if topN > 0 {
-			operatorHeader = "TOP " + strconv.Itoa(int(topN)) + " OPERATORS"
+	// Get block number from the first quorum's metrics
+	var blockNumber uint
+	if len(results) > 0 {
+		blockNumber = results[quorums[0]].BlockNumber
+	}
+
+	// Display block number at the top
+	if outputFormat == "table" {
+		_, err := writer.WriteString(fmt.Sprintf("Block Number: %d\n\n", blockNumber))
+		if err != nil {
+			return err
 		}
-		tw.AppendHeader(table.Row{"QUORUM", operatorHeader, "ADDRESS", "STAKE", "STAKE"}, rowAutoMerge)
+	} else if outputFormat == "csv" {
+		// Print CSV header with block number in first row
+		_, err := writer.WriteString(fmt.Sprintf("BLOCK_NUMBER,%d\n", blockNumber))
+		if err != nil {
+			return err
+		}
+		_, err = writer.WriteString("QUORUM,OPERATOR,ADDRESS,SOCKET,STAKE,STAKE_PERCENTAGE\n")
+		if err != nil {
+			return err
+		}
+	} else {
+		// For any other format, still display the block number
+		_, err := writer.WriteString(fmt.Sprintf("Block Number: %d\n\n", blockNumber))
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, quorum := range quorums {
+		var tw table.Writer
+		if outputFormat == "table" {
+			tw = table.NewWriter()
+			rowAutoMerge := table.RowConfig{AutoMerge: true}
+			operatorHeader := "OPERATOR"
+			if topN > 0 {
+				operatorHeader = "TOP " + strconv.Itoa(int(topN)) + " OPERATORS"
+			}
+			tw.AppendHeader(table.Row{"QUORUM", operatorHeader, "ADDRESS", "SOCKET", "STAKE", "STAKE"}, rowAutoMerge)
+		}
 
 		total_operators := 0
 		total_stake_pct := 0.0
@@ -169,13 +233,51 @@ func displayResults(results map[uint8]*quorumscan.QuorumMetrics, operatorIdToAdd
 			total_stake.Add(total_stake, stakeInEth)
 			total_stake_pct += op.pct
 
-			tw.AppendRow(table.Row{quorum, op.id, operatorIdToAddress[op.id], humanizeEth(stakeInEth), fmt.Sprintf("%.2f%%", op.pct)})
+			socket := metrics.OperatorSocket[op.id]
+			if socket == "" {
+				socket = "N/A"
+			}
+
+			if outputFormat == "csv" {
+				_, err := writer.WriteString(fmt.Sprintf("%d,%s,%s,%s,%s,%.2f%%\n",
+					quorum,
+					op.id,
+					operatorIdToAddress[op.id],
+					socket,
+					humanizeEth(stakeInEth),
+					op.pct))
+				if err != nil {
+					return err
+				}
+			} else {
+				tw.AppendRow(table.Row{quorum, op.id, operatorIdToAddress[op.id], socket, humanizeEth(stakeInEth), fmt.Sprintf("%.2f%%", op.pct)})
+			}
 		}
-		total_stake.SetPrec(64)
-		tw.AppendFooter(table.Row{"TOTAL", total_operators, total_operators, humanizeEth(total_stake), fmt.Sprintf("%.2f%%", total_stake_pct)})
-		tw.SetColumnConfigs([]table.ColumnConfig{
-			{Number: 1, AutoMerge: true},
-		})
-		fmt.Println(tw.Render())
+
+		if outputFormat == "table" {
+			total_stake.SetPrec(64)
+			tw.AppendFooter(table.Row{"TOTAL", total_operators, total_operators, total_operators, humanizeEth(total_stake), fmt.Sprintf("%.2f%%", total_stake_pct)})
+			tw.SetColumnConfigs([]table.ColumnConfig{
+				{Number: 1, AutoMerge: true},
+			})
+			_, err := writer.WriteString(tw.Render() + "\n")
+			if err != nil {
+				return err
+			}
+		} else if outputFormat == "csv" && total_operators > 0 {
+			// Add total row for CSV
+			_, err := writer.WriteString(fmt.Sprintf("TOTAL,%d,%d,%d,%s,%.2f%%\n",
+				total_operators,
+				total_operators,
+				total_operators,
+				humanizeEth(total_stake),
+				total_stake_pct))
+			if err != nil {
+				return err
+			}
+		}
 	}
+
+	// Make sure to flush the writer to ensure all data is written
+	return writer.Flush()
 }

@@ -52,10 +52,10 @@ func (s *ServerV2) FetchOperatorDispersalFeed(c *gin.Context) {
 		return
 	}
 
-	var dispersals []*corev2.DispersalRequest
+	var dispersals []*corev2.DispersalResponse
 
 	if params.direction == "forward" {
-		dispersals, err = s.blobMetadataStore.GetDispersalRequestByDispersedAt(
+		dispersals, err = s.blobMetadataStore.GetDispersalsByRespondedAt(
 			c.Request.Context(),
 			operatorId,
 			uint64(params.afterTime.UnixNano()),
@@ -64,7 +64,7 @@ func (s *ServerV2) FetchOperatorDispersalFeed(c *gin.Context) {
 			true, // ascending=true
 		)
 	} else {
-		dispersals, err = s.blobMetadataStore.GetDispersalRequestByDispersedAt(
+		dispersals, err = s.blobMetadataStore.GetDispersalsByRespondedAt(
 			c.Request.Context(),
 			operatorId,
 			uint64(params.afterTime.UnixNano()),
@@ -88,10 +88,15 @@ func (s *ServerV2) FetchOperatorDispersalFeed(c *gin.Context) {
 			errorResponse(c, fmt.Errorf("failed to compute batch header hash from batch header: %w", err))
 			return
 		}
+		var sig string
+		if d.Signature != [32]byte{} {
+			sig = hex.EncodeToString(d.Signature[:])
+		}
 		batches[i] = &OperatorDispersal{
 			BatchHeaderHash: hex.EncodeToString(batchHeaderHash[:]),
 			BatchHeader:     &d.BatchHeader,
 			DispersedAt:     d.DispersedAt,
+			Signature:       sig,
 		}
 	}
 
@@ -396,7 +401,7 @@ func (s *ServerV2) CheckOperatorsLiveness(c *gin.Context) {
 
 	operatorId := c.DefaultQuery("operator_id", "")
 	s.logger.Info("checking operator ports", "operatorId", operatorId)
-	portCheckResponse, err := s.operatorHandler.ProbeV2OperatorPorts(c.Request.Context(), operatorId)
+	result, err := s.operatorHandler.ProbeV2OperatorsLiveness(c.Request.Context(), operatorId)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			err = errNotFound
@@ -410,10 +415,26 @@ func (s *ServerV2) CheckOperatorsLiveness(c *gin.Context) {
 		return
 	}
 
+	operators := make([]*OperatorLiveness, len(result))
+	for i := 0; i < len(result); i++ {
+		operators[i] = &OperatorLiveness{
+			OperatorId:      result[i].OperatorId,
+			DispersalSocket: result[i].DispersalSocket,
+			DispersalOnline: result[i].DispersalOnline,
+			DispersalStatus: result[i].DispersalStatus,
+			RetrievalSocket: result[i].RetrievalSocket,
+			RetrievalOnline: result[i].RetrievalOnline,
+			RetrievalStatus: result[i].RetrievalStatus,
+		}
+	}
+	response := OperatorLivenessResponse{
+		Operators: operators,
+	}
+
 	s.metrics.IncrementSuccessfulRequestNum("CheckOperatorsLiveness")
 	s.metrics.ObserveLatency("CheckOperatorsLiveness", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxOperatorPortCheckAge))
-	c.JSON(http.StatusOK, portCheckResponse)
+	c.JSON(http.StatusOK, response)
 }
 
 func (s *ServerV2) computeOperatorsSigningInfo(
