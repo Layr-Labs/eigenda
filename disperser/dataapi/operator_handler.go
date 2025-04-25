@@ -10,9 +10,16 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
 	"github.com/Layr-Labs/eigenda/operators"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/gammazero/workerpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection/grpc_reflection_v1"
+)
+
+var defaultQuorumIds = []uint8{0, 1, 2}
+
+const (
+	livenessCheckPoolSize = 64
 )
 
 // OperatorHandler handles operations to collect and process operators info.
@@ -88,53 +95,77 @@ func NewOperatorHandler(logger logging.Logger, metrics *Metrics, chainReader cor
 	}
 }
 
-func (oh *OperatorHandler) ProbeV2OperatorPorts(ctx context.Context, operatorId string) (*OperatorPortCheckResponse, error) {
-	operatorInfo, err := oh.subgraphClient.QueryOperatorInfoByOperatorId(ctx, operatorId)
+func (oh *OperatorHandler) ProbeV2OperatorsLiveness(ctx context.Context, operatorId string) ([]*OperatorLiveness, error) {
+	currentBlock, err := oh.indexedChainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
-		oh.logger.Warn("failed to fetch operator info", "operatorId", operatorId, "error", err)
-		return &OperatorPortCheckResponse{}, err
+		return nil, err
+	}
+	state, err := oh.indexedChainState.GetIndexedOperatorState(ctx, uint(currentBlock), defaultQuorumIds)
+	if err != nil {
+		return nil, err
 	}
 
-	operatorSocket := core.OperatorSocket(operatorInfo.Socket)
-
-	retrievalOnline, retrievalStatus := false, "v2 retrieval port closed or unreachable"
-	retrievalSocket := operatorSocket.GetV2RetrievalSocket()
-	if retrievalSocket == "" {
-		retrievalStatus = "v2 retrieval port is not registered"
-	} else {
-		retrievalPortOpen := checkIsOperatorPortOpen(retrievalSocket, 3, oh.logger)
-		if retrievalPortOpen {
-			retrievalOnline, retrievalStatus = checkServiceOnline(ctx, "validator.Retrieval", retrievalSocket, 3*time.Second)
+	numResults := 1
+	if len(operatorId) == 0 {
+		numResults = len(state.IndexedOperators)
+	}
+	resultCh := make(chan *OperatorLiveness, numResults)
+	wp := workerpool.New(livenessCheckPoolSize)
+	for opID, opInfo := range state.IndexedOperators {
+		opID, opInfo := opID, opInfo
+		if len(operatorId) > 0 && opID.Hex() != operatorId {
+			continue
 		}
+		wp.Submit(func() {
+			var (
+				dispersalOnline bool
+				dispersalStatus string
+				retrievalOnline bool
+				retrievalStatus string
+			)
+
+			operatorSocket := core.OperatorSocket(opInfo.Socket)
+
+			retrievalSocket := operatorSocket.GetV2RetrievalSocket()
+			if retrievalSocket == "" {
+				retrievalStatus = "v2 retrieval port is not registered"
+			} else {
+				if ValidOperatorIP(retrievalSocket, oh.logger) {
+					retrievalOnline, retrievalStatus = checkServiceOnline(ctx, "validator.Retrieval", retrievalSocket, 2*time.Second)
+				}
+			}
+
+			dispersalSocket := operatorSocket.GetV2DispersalSocket()
+			if dispersalSocket == "" {
+				dispersalStatus = "v2 dispersal port is not registered"
+			} else {
+				if ValidOperatorIP(retrievalSocket, oh.logger) {
+					dispersalOnline, dispersalStatus = checkServiceOnline(ctx, "validator.Dispersal", dispersalSocket, 2*time.Second)
+				}
+			}
+
+			opLiveness := &OperatorLiveness{
+				OperatorId:      opID.Hex(),
+				DispersalSocket: dispersalSocket,
+				DispersalStatus: dispersalStatus,
+				DispersalOnline: dispersalOnline,
+				RetrievalSocket: retrievalSocket,
+				RetrievalOnline: retrievalOnline,
+				RetrievalStatus: retrievalStatus,
+			}
+			resultCh <- opLiveness
+		})
 	}
 
-	dispersalOnline, dispersalStatus := false, "v2 dispersal port closed or unreachable"
-	dispersalSocket := operatorSocket.GetV2DispersalSocket()
-	if dispersalSocket == "" {
-		dispersalStatus = "v2 dispersal port is not registered"
-	} else {
-		dispersalPortOpen := checkIsOperatorPortOpen(dispersalSocket, 3, oh.logger)
-		if dispersalPortOpen {
-			dispersalOnline, dispersalStatus = checkServiceOnline(ctx, "validator.Dispersal", dispersalSocket, 3*time.Second)
-		}
+	wp.StopWait()
+	close(resultCh)
+
+	results := make([]*OperatorLiveness, 0, numResults)
+	for res := range resultCh {
+		results = append(results, res)
 	}
 
-	// Create the metadata regardless of online status
-	portCheckResponse := &OperatorPortCheckResponse{
-		OperatorId:      operatorId,
-		DispersalSocket: dispersalSocket,
-		DispersalStatus: dispersalStatus,
-		DispersalOnline: dispersalOnline,
-		RetrievalSocket: retrievalSocket,
-		RetrievalOnline: retrievalOnline,
-		RetrievalStatus: retrievalStatus,
-	}
-
-	// Log the online status
-	oh.logger.Info("v2 operator port check response", "response", portCheckResponse)
-
-	// Send the metadata to the results channel
-	return portCheckResponse, nil
+	return results, nil
 }
 
 func (oh *OperatorHandler) ProbeV1OperatorPorts(ctx context.Context, operatorId string) (*OperatorPortCheckResponse, error) {

@@ -452,6 +452,63 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "/metrics/timeseries/network-signing-rate": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Metrics"
+                ],
+                "summary": "Fetch network signing rate time series in the specified time range",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Fetch network signing rate up to the end time (ISO 8601 format: 2006-01-02T15:04:05Z) [default: now]",
+                        "name": "end",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Fetch network signing rate starting from an interval (in seconds) before the end time [default: 3600]",
+                        "name": "interval",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated list of quorum IDs to filter (e.g., 0,1) [default: 0,1]",
+                        "name": "quorums",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.NetworkSigningRateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/metrics/timeseries/throughput": {
             "get": {
                 "produces": [
@@ -1422,6 +1479,17 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "v2.NetworkSigningRateResponse": {
+            "type": "object",
+            "properties": {
+                "quorum_signing_rates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.QuorumSigningRateData"
+                    }
+                }
+            }
+        },
         "v2.OperatorDispersal": {
             "type": "object",
             "properties": {
@@ -1431,8 +1499,11 @@ const docTemplateV2 = `{
                 "batch_header_hash": {
                     "type": "string"
                 },
-                "dispersedAt": {
+                "dispersed_at": {
                     "type": "integer"
+                },
+                "signature": {
+                    "type": "string"
                 }
             }
         },
@@ -1472,7 +1543,7 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "v2.OperatorLivenessResponse": {
+        "v2.OperatorLiveness": {
             "type": "object",
             "properties": {
                 "dispersal_online": {
@@ -1495,6 +1566,17 @@ const docTemplateV2 = `{
                 },
                 "retrieval_status": {
                     "type": "string"
+                }
+            }
+        },
+        "v2.OperatorLivenessResponse": {
+            "type": "object",
+            "properties": {
+                "operators": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.OperatorLiveness"
+                    }
                 }
             }
         },
@@ -1587,6 +1669,20 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "v2.QuorumSigningRateData": {
+            "type": "object",
+            "properties": {
+                "data_points": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.SigningRateDataPoint"
+                    }
+                },
+                "quorum_id": {
+                    "type": "string"
+                }
+            }
+        },
         "v2.SemverReportResponse": {
             "type": "object",
             "properties": {
@@ -1595,6 +1691,17 @@ const docTemplateV2 = `{
                     "additionalProperties": {
                         "$ref": "#/definitions/semver.SemverMetrics"
                     }
+                }
+            }
+        },
+        "v2.SigningRateDataPoint": {
+            "type": "object",
+            "properties": {
+                "signing_rate": {
+                    "type": "number"
+                },
+                "timestamp": {
+                    "type": "integer"
                 }
             }
         },

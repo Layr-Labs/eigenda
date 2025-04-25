@@ -11,7 +11,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/relay/auth"
-	"github.com/Layr-Labs/eigenda/relay/mock"
 
 	"github.com/Layr-Labs/eigenda/relay/limiter"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
+	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/stretchr/testify/require"
@@ -130,7 +130,7 @@ func TestReadWriteBlobs(t *testing.T) {
 	blobStore := buildBlobStore(t, logger)
 	chainReader := newMockChainReader()
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
@@ -218,7 +218,7 @@ func TestReadNonExistentBlob(t *testing.T) {
 	metadataStore := buildMetadataStore(t)
 	blobStore := buildBlobStore(t, logger)
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
@@ -281,7 +281,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 		}
 	}
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	operatorInfo := make(map[core.OperatorID]*core.IndexedOperatorInfo)
@@ -423,7 +423,7 @@ func TestReadWriteChunks(t *testing.T) {
 		}
 	}
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
@@ -653,7 +653,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 		}
 	}
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
@@ -802,7 +802,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 		}
 	}
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)
@@ -1107,7 +1107,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 		}
 	}
 
-	ics := &mock.IndexedChainState{}
+	ics := &coremock.MockIndexedChainState{}
 	blockNumber := uint(rand.Uint32())
 	ics.Mock.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	ics.Mock.On("GetIndexedOperators", blockNumber).Return(operatorInfo, nil)

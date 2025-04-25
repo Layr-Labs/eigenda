@@ -140,7 +140,8 @@ type (
 	OperatorDispersal struct {
 		BatchHeaderHash string              `json:"batch_header_hash"`
 		BatchHeader     *corev2.BatchHeader `json:"batch_header"`
-		DispersedAt     uint64
+		DispersedAt     uint64              `json:"dispersed_at"`
+		Signature       string              `json:"signature"`
 	}
 	OperatorDispersalFeedResponse struct {
 		OperatorIdentity OperatorIdentity     `json:"operator_identity"`
@@ -191,7 +192,7 @@ type (
 		Response *corev2.DispersalResponse `json:"operator_dispersal_response"`
 	}
 
-	OperatorLivenessResponse struct {
+	OperatorLiveness struct {
 		OperatorId      string `json:"operator_id"`
 		DispersalSocket string `json:"dispersal_socket"`
 		DispersalOnline bool   `json:"dispersal_online"`
@@ -199,6 +200,9 @@ type (
 		RetrievalSocket string `json:"retrieval_socket"`
 		RetrievalOnline bool   `json:"retrieval_online"`
 		RetrievalStatus string `json:"retrieval_status"`
+	}
+	OperatorLivenessResponse struct {
+		Operators []*OperatorLiveness `json:"operators"`
 	}
 
 	AccountBlobFeedResponse struct {
@@ -217,6 +221,18 @@ type (
 	Throughput struct {
 		Throughput float64 `json:"throughput"`
 		Timestamp  uint64  `json:"timestamp"`
+	}
+
+	SigningRateDataPoint struct {
+		SigningRate float64 `json:"signing_rate"`
+		Timestamp   uint64  `json:"timestamp"`
+	}
+	QuorumSigningRateData struct {
+		QuorumId   string                 `json:"quorum_id"`
+		DataPoints []SigningRateDataPoint `json:"data_points"`
+	}
+	NetworkSigningRateResponse struct {
+		QuorumSigningRates []QuorumSigningRateData `json:"quorum_signing_rates"`
 	}
 )
 
@@ -394,6 +410,7 @@ func (s *ServerV2) Start() error {
 		{
 			metrics.GET("/summary", s.FetchMetricsSummary)
 			metrics.GET("/timeseries/throughput", s.FetchMetricsThroughputTimeseries)
+			metrics.GET("/timeseries/network-signing-rate", s.FetchNetworkSigningRate)
 		}
 		swagger := v2.Group("/swagger")
 		{

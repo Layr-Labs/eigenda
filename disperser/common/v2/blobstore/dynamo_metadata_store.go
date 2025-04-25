@@ -43,6 +43,7 @@ const (
 	dispersalRequestSKPrefix  = "DispersalRequest#"
 	dispersalResponseSKPrefix = "DispersalResponse#"
 	batchHeaderSK             = "BatchHeader"
+	batchSK                   = "BatchInfo"
 	attestationSK             = "Attestation"
 
 	// The number of nanoseconds for a requestedAt bucket (1h).
@@ -945,27 +946,28 @@ func (s *BlobMetadataStore) GetDispersalRequest(ctx context.Context, batchHeader
 	return req, nil
 }
 
-// GetDispersalRequestByDispersedAt returns DispersalRequest within time range (start, end)
-// (both exclusive), retrieved and ordered by DispersedAt timestamp in specified order.
+// GetDispersalsByRespondedAt returns dispersals (in DispersalResponse, which has joined
+// request and response together) to the given operator, within time range (start, end)
+// (both exclusive), retrieved and ordered by RespondedAt timestamp in the specified order.
 //
 // If specified order is ascending (`ascending` is true), retrieve data from the oldest (`start`)
 // to the newest (`end`); otherwise retrieve by the opposite direction.
 //
 // If limit > 0, returns at most that many dispersals. If limit <= 0, returns all results
 // in the time range.
-func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
+func (s *BlobMetadataStore) GetDispersalsByRespondedAt(
 	ctx context.Context,
 	operatorId core.OperatorID,
 	start uint64,
 	end uint64,
 	limit int,
 	ascending bool,
-) ([]*corev2.DispersalRequest, error) {
+) ([]*corev2.DispersalResponse, error) {
 	if start+1 > end-1 {
 		return nil, fmt.Errorf("no time point in exclusive time range (%d, %d)", start, end)
 	}
 
-	dispersals := make([]*corev2.DispersalRequest, 0)
+	dispersals := make([]*corev2.DispersalResponse, 0)
 	var lastEvaledKey map[string]types.AttributeValue
 	adjustedStart, adjustedEnd := start+1, end-1
 
@@ -981,10 +983,10 @@ func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
 		res, err := s.dynamoDBClient.QueryIndexWithPagination(
 			ctx,
 			s.tableName,
-			OperatorDispersalIndexName,
-			"OperatorID = :pk AND DispersedAt BETWEEN :start AND :end",
+			OperatorResponseIndexName,
+			"OperatorID = :pk AND RespondedAt BETWEEN :start AND :end",
 			commondynamodb.ExpressionValues{
-				":pk":    &types.AttributeValueMemberS{Value: dispersalRequestSKPrefix + operatorId.Hex()},
+				":pk":    &types.AttributeValueMemberS{Value: dispersalResponseSKPrefix + operatorId.Hex()},
 				":start": &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedStart), 10)},
 				":end":   &types.AttributeValueMemberN{Value: strconv.FormatInt(int64(adjustedEnd), 10)},
 			},
@@ -998,9 +1000,9 @@ func (s *BlobMetadataStore) GetDispersalRequestByDispersedAt(
 
 		// Collect results
 		for _, item := range res.Items {
-			it, err := UnmarshalDispersalRequest(item)
+			it, err := UnmarshalDispersalResponse(item)
 			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal DispersalRequest: %w", err)
+				return nil, fmt.Errorf("failed to unmarshal DispersalResponse: %w", err)
 			}
 			dispersals = append(dispersals, it)
 
@@ -1088,6 +1090,46 @@ func (s *BlobMetadataStore) GetDispersalResponses(ctx context.Context, batchHead
 	}
 
 	return responses, nil
+}
+
+func (s *BlobMetadataStore) PutBatch(ctx context.Context, batch *corev2.Batch) error {
+	item, err := MarshalBatch(batch)
+	if err != nil {
+		return err
+	}
+
+	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	if errors.Is(err, commondynamodb.ErrConditionFailed) {
+		return common.ErrAlreadyExists
+	}
+
+	return err
+}
+
+func (s *BlobMetadataStore) GetBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.Batch, error) {
+	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+		"PK": &types.AttributeValueMemberS{
+			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+		},
+		"SK": &types.AttributeValueMemberS{
+			Value: batchSK,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if item == nil {
+		return nil, fmt.Errorf("%w: batch info not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+	}
+
+	batch, err := UnmarshalBatch(item)
+	if err != nil {
+		return nil, err
+	}
+
+	return batch, nil
 }
 
 func (s *BlobMetadataStore) PutBatchHeader(ctx context.Context, batchHeader *corev2.BatchHeader) error {
@@ -1813,6 +1855,34 @@ func UnmarshalBatchHeader(item commondynamodb.Item) (*corev2.BatchHeader, error)
 	}
 
 	return &header, nil
+}
+
+func MarshalBatch(batch *corev2.Batch) (commondynamodb.Item, error) {
+	fields, err := attributevalue.MarshalMap(batch)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal batch: %w", err)
+	}
+
+	hash, err := batch.BatchHeader.Hash()
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash batch header: %w", err)
+	}
+	hashstr := hex.EncodeToString(hash[:])
+
+	fields["PK"] = &types.AttributeValueMemberS{Value: batchHeaderKeyPrefix + hashstr}
+	fields["SK"] = &types.AttributeValueMemberS{Value: batchSK}
+
+	return fields, nil
+}
+
+func UnmarshalBatch(item commondynamodb.Item) (*corev2.Batch, error) {
+	batch := corev2.Batch{}
+	err := attributevalue.UnmarshalMap(item, &batch)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal batch: %w", err)
+	}
+
+	return &batch, nil
 }
 
 func MarshalBlobInclusionInfo(inclusionInfo *corev2.BlobInclusionInfo) (commondynamodb.Item, error) {

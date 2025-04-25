@@ -171,7 +171,12 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 				}
 			}
 
-			aq, err := agg.ReceiveSignatures(context.Background(), state.IndexedOperatorState, message, update)
+			aq, err := agg.ReceiveSignatures(
+				context.Background(),
+				context.Background(),
+				state.IndexedOperatorState,
+				message,
+				update)
 			assert.NoError(t, err)
 			assert.Len(t, aq.SignerMap, numOpr-int(tt.adversaryCount))
 			assert.Len(t, aq.AggSignature, 2)
@@ -214,7 +219,12 @@ func TestSortNonsigners(t *testing.T) {
 
 	quorums := []core.QuorumID{0}
 
-	aq, err := agg.ReceiveSignatures(context.Background(), state.IndexedOperatorState, message, update)
+	aq, err := agg.ReceiveSignatures(
+		context.Background(),
+		context.Background(),
+		state.IndexedOperatorState,
+		message,
+		update)
 	assert.NoError(t, err)
 	sigAgg, err := agg.AggregateSignatures(context.Background(), dat, 0, aq, quorums)
 	assert.NoError(t, err)
@@ -247,7 +257,12 @@ func TestFilterQuorums(t *testing.T) {
 		}
 	}
 
-	aq, err := agg.ReceiveSignatures(context.Background(), state.IndexedOperatorState, message, update)
+	aq, err := agg.ReceiveSignatures(
+		context.Background(),
+		context.Background(),
+		state.IndexedOperatorState,
+		message,
+		update)
 	assert.NoError(t, err)
 	assert.Len(t, aq.SignerMap, numOpr-advCount)
 	assert.Equal(t, aq.SignerMap, map[core.OperatorID]bool{
