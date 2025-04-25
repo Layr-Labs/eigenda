@@ -233,14 +233,33 @@ func (sr *signatureReceiver) submitAttestation(attestationChan chan *QuorumAttes
 		quorumResults[quorumID] = quorumResult
 	}
 
-	attestationChan <- &QuorumAttestation{
+	// Make copies of the maps that are populated while receiving signatures. The yielded QuorumAttestation will be
+	// handled by a separate routine, so it's important that we don't mutate these maps after they are yielded.
+	quorumAggPubKeyCopy := make(map[QuorumID]*G1Point, len(sr.indexedOperatorState.AggKeys))
+	for quorumID, g1Point := range sr.indexedOperatorState.AggKeys {
 		// TODO: is this ok? semantics are changed from before: we used to exclude aggregate keys of quorums that had no
-		//  signatures, but I don't see why that case should be special
-		QuorumAggPubKey:  sr.indexedOperatorState.AggKeys,
-		SignersAggPubKey: sr.aggregateSignersG2PubKeys,
-		AggSignature:     sr.aggregateSignatures,
+		//  signatures, but I don't see why that case should be special.
+		quorumAggPubKeyCopy[quorumID] = g1Point
+	}
+	aggregateSignersG2PubKeysCopy := make(map[QuorumID]*G2Point, len(sr.aggregateSignersG2PubKeys))
+	for quorumID, aggregatePubkey := range sr.aggregateSignersG2PubKeys {
+		aggregateSignersG2PubKeysCopy[quorumID] = aggregatePubkey
+	}
+	aggregateSignaturesCopy := make(map[QuorumID]*Signature, len(sr.aggregateSignatures))
+	for quorumID, aggregateSignature := range sr.aggregateSignatures {
+		aggregateSignaturesCopy[quorumID] = aggregateSignature
+	}
+	signerMapCopy := make(map[OperatorID]bool, len(sr.signerMap))
+	for operatorID, signed := range sr.signerMap {
+		signerMapCopy[operatorID] = signed
+	}
+
+	attestationChan <- &QuorumAttestation{
+		QuorumAggPubKey:  quorumAggPubKeyCopy,
+		SignersAggPubKey: aggregateSignersG2PubKeysCopy,
+		AggSignature:     aggregateSignaturesCopy,
 		QuorumResults:    quorumResults,
-		SignerMap:        sr.signerMap,
+		SignerMap:        signerMapCopy,
 	}
 }
 
@@ -302,7 +321,7 @@ func getSignedPercentage(signedStake *big.Int, totalStake *big.Int) uint8 {
 		return 0
 	}
 
-	// calculation being performed here is: signedStake * 100 / totalStake
+	// the calculation being performed here is: signedStake * 100 / totalStake
 
 	signedStakeNumerator := new(big.Int).Mul(signedStake, new(big.Int).SetUint64(percentMultiplier))
 	quorumThreshold := uint8(new(big.Int).Div(signedStakeNumerator, totalStake).Uint64())
