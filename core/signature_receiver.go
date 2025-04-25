@@ -75,7 +75,7 @@ func ReceiveSignatures(
 		quorumIDs:                 sortedQuorumIDs,
 	}
 
-	attestationChan := make(chan *QuorumAttestation)
+	attestationChan := make(chan *QuorumAttestation, len(signerMap))
 	go receiver.receiveSigningMessages(ctx, attestationChan)
 
 	return attestationChan, nil
