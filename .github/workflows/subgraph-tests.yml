@@ -13,8 +13,12 @@ on:
 
 jobs:
   test-subgraphs:
-    name: Test Subgraphs
+    name: Test ${{ matrix.subgraph }}
     runs-on: ubuntu-22.04 # https://github.com/graphprotocol/graph-tooling/issues/1546#issuecomment-2589680195
+    strategy:
+      matrix:
+        subgraph: [eigenda-operator-state, eigenda-batch-metadata]
+      fail-fast: false
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,20 +33,13 @@ jobs:
       - name: Install global dependencies
         run: |
           yarn global add @graphprotocol/graph-cli@0.60.0
-
-      - name: Test eigenda-operator-state subgraph
-        working-directory: subgraphs/eigenda-operator-state
-        run: |
-          # Copy template files
-          cp ./templates/subgraph.yaml .
-          cp ./templates/networks.json .
           
-          yarn install
-          yarn codegen
-          yarn test
+      - name: Output Graph version
+        run: |
+          graph --version
 
-      - name: Test eigenda-batch-metadata subgraph
-        working-directory: subgraphs/eigenda-batch-metadata
+      - name: Test ${{ matrix.subgraph }} subgraph
+        working-directory: subgraphs/${{ matrix.subgraph }}
         run: |
           # Copy template files
           cp ./templates/subgraph.yaml .
