@@ -184,7 +184,9 @@ func (d *db) DropTable(name string) error {
 
 	table, ok := d.tables[name]
 	if !ok {
-		return fmt.Errorf("table %s does not exist", name)
+		// Table does not exist, nothing to do.
+		d.logger.Infof("table %s does not exist, cannot drop", name)
+		return nil
 	}
 
 	d.logger.Infof("dropping table %s", name)
