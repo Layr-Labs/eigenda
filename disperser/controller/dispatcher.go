@@ -351,7 +351,7 @@ func (d *Dispatcher) HandleSignatures(
 	if err != nil {
 		// this error isn't fatal: a subsequent PutAttestation attempt might succeed
 		// TODO: this used to cause the HandleSignatures method to fail entirely. Is it ok to continue trying here?
-		d.logger.Error("put attestation",
+		d.logger.Error("error calling PutAttestation",
 			"err", err,
 			"batchHeaderHash", batchHeaderHash)
 	}
@@ -384,7 +384,7 @@ func (d *Dispatcher) HandleSignatures(
 	for receivedQuorumAttestation := range attestationChan {
 		err := d.submitAttestation(ctx, batchData, receivedQuorumAttestation)
 		if err != nil {
-			d.logger.Warnf("submit attestation for batch %s: %v", batchHeaderHash, err)
+			d.logger.Warnf("error submitting attestation for batch %s: %v", batchHeaderHash, err)
 			continue
 		}
 
@@ -459,7 +459,7 @@ func (d *Dispatcher) submitAttestation(
 	putAttestationStartTime := time.Now()
 	err = d.blobMetadataStore.PutAttestation(ctx, attestation)
 	if err != nil {
-		return fmt.Errorf("put attestation: %w", err)
+		return fmt.Errorf("error calling PutAttestation: %w", err)
 	}
 	d.metrics.reportPutAttestationLatency(time.Since(putAttestationStartTime))
 

@@ -224,7 +224,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 				var thresholdNotMetErr *thresholdNotMetError
 				if !errors.As(err, &thresholdNotMetErr) {
 					// an error occurred which was unrelated to an unmet threshold: something went wrong while checking!
-					pd.logger.Warnf("check thresholds: %v", err)
+					pd.logger.Warnf("error checking thresholds: %v", err)
 				}
 
 				// thresholds weren't met yet. that's ok, since signature gathering is still in progress
