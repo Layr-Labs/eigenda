@@ -44,7 +44,6 @@ type signatureReceiver struct {
 func ReceiveSignatures(
 	ctx context.Context,
 	logger logging.Logger,
-	// TODO: consider implications of using this structure at various times throughout signature gathering. what if it changes???
 	indexedOperatorState *IndexedOperatorState,
 	batchHeaderHash [32]byte,
 	signingMessageChan chan SigningMessage,

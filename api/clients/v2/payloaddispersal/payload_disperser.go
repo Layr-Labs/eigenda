@@ -224,12 +224,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 				var thresholdNotMetErr *thresholdNotMetError
 				if !errors.As(err, &thresholdNotMetErr) {
 					// an error occurred which was unrelated to an unmet threshold: something went wrong while checking!
-					//
-					// TODO (litt3): with the current disperser implementation, it's expected that the blobStatusReply
-					//  will be nil while gathering signatures, so this case will *always* be triggered. Once the
-					//  disperser has been updated to return a non-nil blobStatusReply while gathering signatures,
-					//  this case will no longer be expected to occur, so a warning should be logged here.
-					continue
+					pd.logger.Warnf("check thresholds: %v", err)
 				}
 
 				// thresholds weren't met yet. that's ok, since signature gathering is still in progress
