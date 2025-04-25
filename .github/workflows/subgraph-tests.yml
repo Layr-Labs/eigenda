@@ -1,0 +1,45 @@
+name: subgraph-tests
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'subgraphs/**'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'subgraphs/**'
+
+jobs:
+  test-subgraphs:
+    name: Test Subgraphs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: 'subgraphs/yarn.lock'
+
+      - name: Install global dependencies
+        run: |
+          yarn global add @graphprotocol/graph-cli@0.60.0
+
+      - name: Test eigenda-operator-state subgraph
+        working-directory: subgraphs/eigenda-operator-state
+        run: |
+          yarn install
+          yarn codegen
+          yarn test
+
+      - name: Test eigenda-batch-metadata subgraph
+        working-directory: subgraphs/eigenda-batch-metadata
+        run: |
+          yarn install
+          yarn codegen
+          yarn test 
