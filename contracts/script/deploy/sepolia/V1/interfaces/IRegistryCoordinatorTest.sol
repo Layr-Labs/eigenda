@@ -5,6 +5,11 @@ interface IRegistryCoordinatorTest {
     function stakeRegistry() external view returns (address);
     function indexRegistry() external view returns (address);
     function blsApkRegistry() external view returns (address);
+    function createQuorum(
+        OperatorSetParam memory operatorSetParams,
+        uint96 minimumStake,
+        StrategyParams[] memory strategyParams
+    ) external;
 
     struct OperatorSetParam {
         uint32 maxOperatorCount;

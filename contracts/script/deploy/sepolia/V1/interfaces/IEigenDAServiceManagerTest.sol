@@ -5,6 +5,7 @@ interface IEigenDAServiceManagerTest {
     function registryCoordinator() external view returns (address);
     function avsDirectory() external view returns (address);
 
+    function setBatchConfirmer(address _batchConfirmer) external;
     function initialize(
         address _pauserRegistry,
         uint256 _initialPausedStatus,
