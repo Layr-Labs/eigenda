@@ -157,11 +157,11 @@ func (c *validatorClient) GetBlobWithProbe(
 		assignments,
 		totalChunkCount,
 		minimumChunkCount,
-		encodingParams,
+		&encodingParams,
 		quorumID,
 		blobKey,
 		c.verifier,
-		blobCommitments,
+		&blobCommitments,
 		probe)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create retrieval worker: %w", err)

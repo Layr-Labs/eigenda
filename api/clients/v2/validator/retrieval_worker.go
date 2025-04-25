@@ -108,7 +108,7 @@ type retrievalWorker struct {
 	operatorInfo map[core.OperatorID]*core.OperatorInfo
 
 	// The encoding parameters for the blob.
-	encodingParams encoding.EncodingParams
+	encodingParams *encoding.EncodingParams
 
 	// The assignments for the operators, i.e. which operators are responsible for which chunks.
 	assignments map[core.OperatorID]v2.Assignment
@@ -123,7 +123,7 @@ type retrievalWorker struct {
 	verifier encoding.Verifier
 
 	// The commitments for the blob.
-	blobCommitments encoding.BlobCommitments
+	blobCommitments *encoding.BlobCommitments
 
 	// When a thread begins downloading chunk data, it will send a message to the downloadStartedChan.
 	downloadStartedChan chan *downloadStarted
@@ -234,11 +234,11 @@ func newRetrievalWorker(
 	assignments map[core.OperatorID]v2.Assignment,
 	totalChunkCount uint32,
 	minimumChunkCount uint32,
-	encodingParams encoding.EncodingParams,
+	encodingParams *encoding.EncodingParams,
 	quorumID core.QuorumID,
 	blobKey v2.BlobKey,
 	verifier encoding.Verifier,
-	blobCommitments encoding.BlobCommitments,
+	blobCommitments *encoding.BlobCommitments,
 	probe *common.SequenceProbe,
 ) (*retrievalWorker, error) {
 	if config.DownloadPessimism < 1.0 {
@@ -664,7 +664,7 @@ func (w *retrievalWorker) standardDeserializeAndVerify(
 		assignmentIndices[i] = uint(index)
 	}
 
-	err := w.verifier.VerifyFrames(chunks, assignmentIndices, w.blobCommitments, w.encodingParams)
+	err := w.verifier.VerifyFrames(chunks, assignmentIndices, *w.blobCommitments, *w.encodingParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify chunks from operator %s: %w", operatorID.Hex(), err)
 	}
@@ -697,6 +697,6 @@ func (w *retrievalWorker) standardDecodeBlob(
 	return w.verifier.Decode(
 		chunks,
 		indices,
-		w.encodingParams,
+		*w.encodingParams,
 		uint64(w.blobCommitments.Length)*encoding.BYTES_PER_SYMBOL)
 }
