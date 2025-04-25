@@ -14,7 +14,7 @@ on:
 jobs:
   test-subgraphs:
     name: Test Subgraphs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04 # https://github.com/graphprotocol/graph-tooling/issues/1546#issuecomment-2589680195
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
