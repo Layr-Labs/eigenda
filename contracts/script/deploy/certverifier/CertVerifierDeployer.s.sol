@@ -4,7 +4,6 @@ pragma solidity =0.8.12;
 import {EigenDACertVerifier} from "src/core/EigenDACertVerifier.sol";
 import {RegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
-import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {IEigenDAServiceManager} from "src/interfaces/IEigenDAServiceManager.sol";
 import {EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
@@ -26,7 +25,6 @@ contract CertVerifierDeployer is Script, Test {
     address eigenDAThresholdRegistry;
     address eigenDARelayRegistry;
     address registryCoordinator;
-    address operatorStateRetriever;
 
     SecurityThresholds defaultSecurityThresholds;
     bytes quorumNumbersRequired;
@@ -47,9 +45,6 @@ contract CertVerifierDeployer is Script, Test {
         raw = stdJson.parseRaw(data, ".registryCoordinator");
         registryCoordinator = abi.decode(raw, (address));
 
-        raw = stdJson.parseRaw(data, ".operatorStateRetriever");
-        operatorStateRetriever = abi.decode(raw, (address));
-
         raw = stdJson.parseRaw(data, ".defaultSecurityThresholds");
         defaultSecurityThresholds = abi.decode(raw, (SecurityThresholds));
 
@@ -63,7 +58,6 @@ contract CertVerifierDeployer is Script, Test {
                 IEigenDAThresholdRegistry(eigenDAThresholdRegistry),
                 IEigenDABatchMetadataStorage(eigenDAServiceManager),
                 IEigenDASignatureVerifier(eigenDAServiceManager),
-                OperatorStateRetriever(operatorStateRetriever),
                 IRegistryCoordinator(registryCoordinator),
                 defaultSecurityThresholds,
                 quorumNumbersRequired

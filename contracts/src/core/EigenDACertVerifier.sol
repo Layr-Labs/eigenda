@@ -22,7 +22,6 @@ contract EigenDACertVerifier is EigenDACertVerifierV1, EigenDACertVerifierV2 {
         IEigenDAThresholdRegistry _eigenDAThresholdRegistry,
         IEigenDABatchMetadataStorage _eigenDABatchMetadataStorage,
         IEigenDASignatureVerifier _eigenDASignatureVerifier,
-        OperatorStateRetriever _operatorStateRetriever,
         IRegistryCoordinator _registryCoordinator,
         SecurityThresholds memory _securityThresholdsV2,
         bytes memory _quorumNumbersRequiredV2
@@ -31,7 +30,6 @@ contract EigenDACertVerifier is EigenDACertVerifierV1, EigenDACertVerifierV2 {
         EigenDACertVerifierV2(
             _eigenDAThresholdRegistry,
             _eigenDASignatureVerifier,
-            _operatorStateRetriever,
             _registryCoordinator,
             _securityThresholdsV2,
             _quorumNumbersRequiredV2
@@ -59,7 +57,7 @@ contract EigenDACertVerifier is EigenDACertVerifierV1, EigenDACertVerifierV2 {
         returns (NonSignerStakesAndSignature memory)
     {
         (NonSignerStakesAndSignature memory nonSignerStakesAndSignature,) =
-            CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetrieverV2, registryCoordinatorV2, signedBatch);
+            CertV2Lib.getNonSignerStakesAndSignature(registryCoordinatorV2, signedBatch);
         return nonSignerStakesAndSignature;
     }
 

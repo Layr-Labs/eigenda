@@ -8,8 +8,9 @@ import {EigenDAHasher} from "src/libraries/EigenDAHasher.sol";
 import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
 import {Merkle} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/libraries/Merkle.sol";
 import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
-import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
+import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
+import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
 
 import {
     BatchHeaderV2,
@@ -91,7 +92,6 @@ library EigenDACertVerificationV2Lib {
     function verifyDACertV2FromSignedBatch(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
-        OperatorStateRetriever operatorStateRetriever,
         IRegistryCoordinator registryCoordinator,
         SignedBatch memory signedBatch,
         BlobInclusionInfo memory blobInclusionInfo,
@@ -99,7 +99,7 @@ library EigenDACertVerificationV2Lib {
         bytes memory requiredQuorumNumbers
     ) internal view {
         (NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
-            getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
+            getNonSignerStakesAndSignature(registryCoordinator, signedBatch);
 
         verifyDACertV2(
             eigenDAThresholdRegistry,
@@ -310,17 +310,12 @@ library EigenDACertVerificationV2Lib {
 
     /**
      * @notice Gets nonSignerStakesAndSignature for a given signed batch
-     * @param operatorStateRetriever The operator state retriever contract
      * @param registryCoordinator The registry coordinator contract
      * @param signedBatch The signed batch
      * @return nonSignerStakesAndSignature The non-signer stakes and signature
      * @return signedQuorumNumbers The signed quorum numbers
      */
-    function getNonSignerStakesAndSignature(
-        OperatorStateRetriever operatorStateRetriever,
-        IRegistryCoordinator registryCoordinator,
-        SignedBatch memory signedBatch
-    )
+    function getNonSignerStakesAndSignature(IRegistryCoordinator registryCoordinator, SignedBatch memory signedBatch)
         internal
         view
         returns (NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers)
@@ -334,8 +329,7 @@ library EigenDACertVerificationV2Lib {
             signedQuorumNumbers = abi.encodePacked(signedQuorumNumbers, uint8(signedBatch.attestation.quorumNumbers[i]));
         }
 
-        OperatorStateRetriever.CheckSignaturesIndices memory checkSignaturesIndices = operatorStateRetriever
-            .getCheckSignaturesIndices(
+        CheckSignaturesIndices memory checkSignaturesIndices = getCheckSignaturesIndices(
             registryCoordinator, signedBatch.batchHeader.referenceBlockNumber, signedQuorumNumbers, nonSignerOperatorIds
         );
 
@@ -376,5 +370,88 @@ library EigenDACertVerificationV2Lib {
         } else {
             revert("Unknown error code");
         }
+    }
+
+    struct CheckSignaturesIndices {
+        uint32[] nonSignerQuorumBitmapIndices;
+        uint32[] quorumApkIndices;
+        uint32[] totalStakeIndices;
+        uint32[][] nonSignerStakeIndices; // nonSignerStakeIndices[quorumNumberIndex][nonSignerIndex]
+    }
+
+    /**
+     * @notice copied from OperatorStateRetriever.sol (which should probably be a library in the first place)
+     * @param registryCoordinator is the registry coordinator to fetch the AVS registry information from
+     * @param referenceBlockNumber is the block number to get the indices for
+     * @param quorumNumbers are the ids of the quorums to get the operator state for
+     * @param nonSignerOperatorIds are the ids of the nonsigning operators
+     * @return 1) the indices of the quorumBitmaps for each of the operators in the @param nonSignerOperatorIds array at the given blocknumber
+     *         2) the indices of the total stakes entries for the given quorums at the given blocknumber
+     *         3) the indices of the stakes of each of the nonsigners in each of the quorums they were a
+     *            part of (for each nonsigner, an array of length the number of quorums they were a part of
+     *            that are also part of the provided quorumNumbers) at the given blocknumber
+     *         4) the indices of the quorum apks for each of the provided quorums at the given blocknumber
+     */
+    function getCheckSignaturesIndices(
+        IRegistryCoordinator registryCoordinator,
+        uint32 referenceBlockNumber,
+        bytes memory quorumNumbers,
+        bytes32[] memory nonSignerOperatorIds
+    ) internal view returns (CheckSignaturesIndices memory) {
+        IStakeRegistry stakeRegistry = registryCoordinator.stakeRegistry();
+        CheckSignaturesIndices memory checkSignaturesIndices;
+
+        // get the indices of the quorumBitmap updates for each of the operators in the nonSignerOperatorIds array
+        checkSignaturesIndices.nonSignerQuorumBitmapIndices =
+            registryCoordinator.getQuorumBitmapIndicesAtBlockNumber(referenceBlockNumber, nonSignerOperatorIds);
+
+        // get the indices of the totalStake updates for each of the quorums in the quorumNumbers array
+        checkSignaturesIndices.totalStakeIndices =
+            stakeRegistry.getTotalStakeIndicesAtBlockNumber(referenceBlockNumber, quorumNumbers);
+
+        checkSignaturesIndices.nonSignerStakeIndices = new uint32[][](quorumNumbers.length);
+        for (uint8 quorumNumberIndex = 0; quorumNumberIndex < quorumNumbers.length; quorumNumberIndex++) {
+            uint256 numNonSignersForQuorum = 0;
+            // this array's length will be at most the number of nonSignerOperatorIds, this will be trimmed after it is filled
+            checkSignaturesIndices.nonSignerStakeIndices[quorumNumberIndex] = new uint32[](nonSignerOperatorIds.length);
+
+            for (uint256 i = 0; i < nonSignerOperatorIds.length; i++) {
+                // get the quorumBitmap for the operator at the given blocknumber and index
+                uint192 nonSignerQuorumBitmap = registryCoordinator.getQuorumBitmapAtBlockNumberByIndex(
+                    nonSignerOperatorIds[i],
+                    referenceBlockNumber,
+                    checkSignaturesIndices.nonSignerQuorumBitmapIndices[i]
+                );
+
+                require(
+                    nonSignerQuorumBitmap != 0,
+                    "EigenDACertVerificationV2Lib.getCheckSignaturesIndices: operator must be registered at blocknumber"
+                );
+
+                // if the operator was a part of the quorum and the quorum is a part of the provided quorumNumbers
+                if ((nonSignerQuorumBitmap >> uint8(quorumNumbers[quorumNumberIndex])) & 1 == 1) {
+                    // get the index of the stake update for the operator at the given blocknumber and quorum number
+                    checkSignaturesIndices.nonSignerStakeIndices[quorumNumberIndex][numNonSignersForQuorum] =
+                    stakeRegistry.getStakeUpdateIndexAtBlockNumber(
+                        nonSignerOperatorIds[i], uint8(quorumNumbers[quorumNumberIndex]), referenceBlockNumber
+                    );
+                    numNonSignersForQuorum++;
+                }
+            }
+
+            // resize the array to the number of nonSigners for this quorum
+            uint32[] memory nonSignerStakeIndicesForQuorum = new uint32[](numNonSignersForQuorum);
+            for (uint256 i = 0; i < numNonSignersForQuorum; i++) {
+                nonSignerStakeIndicesForQuorum[i] = checkSignaturesIndices.nonSignerStakeIndices[quorumNumberIndex][i];
+            }
+            checkSignaturesIndices.nonSignerStakeIndices[quorumNumberIndex] = nonSignerStakeIndicesForQuorum;
+        }
+
+        IBLSApkRegistry blsApkRegistry = registryCoordinator.blsApkRegistry();
+        // get the indices of the quorum apks for each of the provided quorums at the given blocknumber
+        checkSignaturesIndices.quorumApkIndices =
+            blsApkRegistry.getApkIndicesAtBlockNumber(quorumNumbers, referenceBlockNumber);
+
+        return checkSignaturesIndices;
     }
 }
