@@ -2,7 +2,7 @@
 pragma solidity =0.8.12;
 
 import {Script} from "forge-std/Script.sol";
-import {DeployV1Contracts} from "./DeployV1Contracts.s.sol";
+import {DeployV1Contracts} from "./00_DeployV1Contracts.s.sol";
 import {ConfigV1Lib} from "./ConfigV1Lib.sol";
 import {IStakeRegistryTest} from "./interfaces/IStakeRegistryTest.sol";
 import {IIndexRegistryTest} from "./interfaces/IIndexRegistryTest.sol";

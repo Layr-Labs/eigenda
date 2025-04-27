@@ -16,23 +16,55 @@ library ConfigV1Lib {
 
     // Basic configuration fields
     function delegationManager(string memory config) internal pure returns (address) {
-        return stdToml.readAddress(config, ".initParams.shared.delegationManager");
+        return stdToml.readAddress(config, ".initParams.existing.delegationManager");
     }
 
     function avsDirectory(string memory config) internal pure returns (address) {
-        return stdToml.readAddress(config, ".initParams.shared.avsDirectory");
+        return stdToml.readAddress(config, ".initParams.existing.avsDirectory");
     }
 
     function rewardsCoordinator(string memory config) internal pure returns (address) {
-        return stdToml.readAddress(config, ".initParams.shared.rewardsCoordinator");
+        return stdToml.readAddress(config, ".initParams.existing.rewardsCoordinator");
+    }
+
+    function daProxyAdmin(string memory config) internal pure returns (address) {
+        return stdToml.readAddress(config, ".initParams.existing.daProxyAdmin");
+    }
+
+    function registryCoordinator(string memory config) internal pure returns (address) {
+        return stdToml.readAddress(config, ".initParams.existing.registryCoordinator");
+    }
+
+    function stakeRegistry(string memory config) internal pure returns (address) {
+        return stdToml.readAddress(config, ".initParams.existing.stakeRegistry");
+    }
+
+    function serviceManager(string memory config) internal pure returns (address) {
+        return stdToml.readAddress(config, ".initParams.existing.serviceManager");
+    }
+
+    function blsApkRegistry(string memory config) internal pure returns (address) {
+        return stdToml.readAddress(config, ".initParams.existing.blsApkRegistry");
+    }
+
+    function indexRegistry(string memory config) internal pure returns (address) {
+        return stdToml.readAddress(config, ".initParams.existing.indexRegistry");
+    }
+
+    function socketRegistry(string memory config) internal pure returns (address) {
+        return stdToml.readAddress(config, ".initParams.existing.socketRegistry");
+    }
+
+    function ejectionManager(string memory config) internal pure returns (address) {
+        return stdToml.readAddress(config, ".initParams.existing.ejectionManager");
     }
 
     function initialOwner(string memory config) internal pure returns (address) {
-        return stdToml.readAddress(config, ".initialOwner");
+        return stdToml.readAddress(config, ".owner");
     }
 
     function initialPausedStatus(string memory config) internal pure returns (uint256) {
-        return stdToml.readUint(config, ".initParams.shared.initialPausedStatus");
+        return stdToml.readUint(config, ".initParams.core.pauserRegistry.initialPausedStatus");
     }
 
     // Contract sources

@@ -5,19 +5,43 @@
 # Only this address can finalize the deployment and be the owner of the deployed contracts.
 # For now, this and most admin params are controlled by the deployer, 
 # and should be transferred over to other accounts as appropriate after the upgrade path is tested.
-initialOwner = "0xDF291ebfe90eF9187c3f45609603E366a21a16Ea" 
+owner = "0xDF291ebfe90eF9187c3f45609603E366a21a16Ea" 
 
-# EigenLayer core contracts - shared dependencies
-[initParams.shared]
+[initParams.existing]
 avsDirectory = "0xa789c91ECDdae96865913130B786140Ee17aF545"
 delegationManager = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
 rewardsCoordinator = "0x5ae8152fb88c26ff9ca5C014c94fca3c68029349"
-initialPausedStatus = 0
+daProxyAdmin = "0x562480eBb8B43474BCD864d827E7fA511D929F16"
+registryCoordinator = "0xAF21d3811B5d23D5466AC83BA7a9c34c261A8D81"
+stakeRegistry = "0x2743FaA0df103f7c6D5c339f85c8eE51147C462e"
+serviceManager = "0x3a5acf46ba6890B8536420F4900AC9BC45Df4764"
+blsApkRegistry = "0xA8fF891E5b8cA255A0e884129bc14977F7A742BC"
+indexRegistry = "0xE42Da83ddff0F1864F0d1F6d0d69ad066635DDFC"
+socketRegistry = "0x61Bc357f044da9c4323BeAD52834aEb1aA53ad05"
+ejectionManager = "0xc9d4541C409f15C0408c022D7e8C3F37Ac960f66"
+
+# Parameters for the Threshold Registry contract
+[initParams.thresholdRegistry]
+quorumAdversaryThresholdPercentages = "0x2121"
+quorumConfirmationThresholdPercentages = "0x3737"
+quorumNumbersRequired = "0x0001"
+versionedBlobParams = [
+    { 0_maxNumOperators = 3537, 1_numChunks = 8192, 2_codingRate = 8 }
+]
+
+[initParams.paymentVault]
+minNumSymbols = 4096
+pricePerSymbol = 447000000
+priceUpdateCooldown = 1
+globalSymbolsPerPeriod = 131072
+reservationPeriodInterval = 300
+globalRatePeriodInterval = 30
 
 # Parameters for the pauser registry contract
 [initParams.core.pauserRegistry]
 pausers = []
 unpauser = "0xDF291ebfe90eF9187c3f45609603E366a21a16Ea"
+initialPausedStatus = 0
 
 # Source contract directories and artifacts
 [sources]
