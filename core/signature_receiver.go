@@ -19,8 +19,11 @@ type signatureReceiver struct {
 	// indexedOperatorState contains operator information including pubkeys, stakes, and quorum membership
 	indexedOperatorState *IndexedOperatorState
 
-	// signerMap tracks which operators have already submitted signatures (prevents duplicates)
-	signerMap map[OperatorID]bool
+	// validSignerMap tracks which operators have already submitted valid signatures
+	validSignerMap map[OperatorID]bool
+	// signatureMessageReceived tracks which operators have submitted signature messages, whether valid or invalid.
+	// this is tracked separately from signerMap, since signerMap only includes valid signatures
+	signatureMessageReceived map[OperatorID]bool
 	// aggregateSignatures stores the accumulated BLS signatures for each quorum
 	aggregateSignatures map[QuorumID]*Signature
 	// aggregateSignersG2PubKeys stores the accumulated G2 public keys of signers for each quorum
@@ -65,7 +68,8 @@ func ReceiveSignatures(
 		return nil, fmt.Errorf("get sorted quorum ids: %w", err)
 	}
 
-	signerMap := make(map[OperatorID]bool)
+	validSignerMap := make(map[OperatorID]bool)
+	signatureMessageReceived := make(map[OperatorID]bool)
 	aggregateSignatures := make(map[QuorumID]*Signature, len(sortedQuorumIDs))
 	aggregateSignersG2PubKeys := make(map[QuorumID]*G2Point, len(sortedQuorumIDs))
 
@@ -79,7 +83,8 @@ func ReceiveSignatures(
 		logger:                    logger,
 		indexedOperatorState:      indexedOperatorState,
 		aggregateSignatures:       aggregateSignatures,
-		signerMap:                 signerMap,
+		validSignerMap:            validSignerMap,
+		signatureMessageReceived:  signatureMessageReceived,
 		aggregateSignersG2PubKeys: aggregateSignersG2PubKeys,
 		stakeSigned:               stakeSigned,
 		batchHeaderHash:           batchHeaderHash,
@@ -88,7 +93,7 @@ func ReceiveSignatures(
 		tickInterval:              tickInterval,
 	}
 
-	attestationChan := make(chan *QuorumAttestation, len(signerMap))
+	attestationChan := make(chan *QuorumAttestation, len(indexedOperatorState.IndexedOperators))
 	go receiver.receiveSigningMessages(ctx, attestationChan)
 
 	return attestationChan, nil
@@ -102,32 +107,64 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 	defer close(attestationChan)
 
 	operatorCount := len(sr.indexedOperatorState.IndexedOperators)
-	signingMessageCount := 0
 	errorCount := 0
 	newSignaturesGathered := false
 
 	// we expect a single SigningMessage from each operator
-	for signingMessageCount < operatorCount {
+	for len(sr.signatureMessageReceived) < operatorCount {
 		contextExpired := false
 		select {
 		case <-ctx.Done():
 			sr.logger.Infof(
-				`global batch attestation timeout exceeded for batch %s. Recieved and processed %d/%d signing
-						messages. %d of the signing messages caused an error during processing`,
-				hex.EncodeToString(sr.batchHeaderHash[:]), signingMessageCount, operatorCount, errorCount)
+				"global batch attestation timeout exceeded for batch %s. Received and processed %d/%d signing "+
+					"messages. %d of the signing messages caused an error during processing",
+				hex.EncodeToString(sr.batchHeaderHash[:]), len(sr.signatureMessageReceived), operatorCount, errorCount)
 			contextExpired = true
-		case signingMessage := <-sr.signingMessageChan:
-			signingMessageCount++
-			err := sr.processSigningMessage(signingMessage)
+		case signingMessage, ok := <-sr.signingMessageChan:
+			if !ok {
+				sr.logger.Errorf(
+					"signing message channel closed for batch %s. Received and processed %d/%d signing "+
+						"messages. %d of the signing messages caused an error during processing",
+					hex.EncodeToString(sr.batchHeaderHash[:]),
+					len(sr.signatureMessageReceived),
+					operatorCount,
+					errorCount)
+				contextExpired = true
+				continue
+			}
+			indexedOperatorInfo, found := sr.indexedOperatorState.IndexedOperators[signingMessage.Operator]
+			if !found {
+				sr.logger.Warn("operator not found in state",
+					"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
+					"operatorID", signingMessage.Operator.Hex(),
+					"attestationLatencyMs", signingMessage.AttestationLatencyMs)
+				continue
+			}
+
+			if seen := sr.signatureMessageReceived[signingMessage.Operator]; seen {
+				sr.logger.Warn("duplicate message from operator",
+					"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
+					"operatorID", signingMessage.Operator.Hex(),
+					"attestationLatencyMs", signingMessage.AttestationLatencyMs)
+				continue
+			}
+
+			// this map records messages received, whether the messages are valid or not
+			sr.signatureMessageReceived[signingMessage.Operator] = true
+
+			err := sr.processSigningMessage(signingMessage, indexedOperatorInfo)
 			if err != nil {
 				errorCount++
-				sr.logger.Warn("process signing message",
+				sr.logger.Warn("error processing signing message",
 					"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
 					"operatorID", signingMessage.Operator.Hex(),
 					"attestationLatencyMs", signingMessage.AttestationLatencyMs,
 					"error", err)
 				continue
 			}
+
+			// record that we've received a valid message from this operator
+			sr.validSignerMap[signingMessage.Operator] = true
 			newSignaturesGathered = true
 		// The ticker case is intentionally ordered after the message receiving case. If there are SigningMessages
 		// waiting to be handled, we shouldn't delay their processing for the sake of yielding a QuorumAttestation.
@@ -168,14 +205,18 @@ func getSortedQuorumIDs(state *IndexedOperatorState) ([]QuorumID, error) {
 }
 
 // processSigningMessage accepts a SigningMessage, verifies it, and updates the signatureReceiver aggregates accordingly
-func (sr *signatureReceiver) processSigningMessage(signingMessage SigningMessage) error {
-	indexedOperatorInfo, err := sr.checkSigningMessage(signingMessage)
-	if err != nil {
-		return fmt.Errorf("check signing message: %w", err)
+func (sr *signatureReceiver) processSigningMessage(
+	signingMessage SigningMessage,
+	indexedOperatorInfo *IndexedOperatorInfo,
+) error {
+	if signingMessage.Err != nil {
+		return fmt.Errorf("signingMessage contained error: %w", signingMessage.Err)
 	}
 
-	// record that we've received a message from this operator
-	sr.signerMap[signingMessage.Operator] = true
+	operatorPubkey := indexedOperatorInfo.PubkeyG2
+	if !signingMessage.Signature.Verify(operatorPubkey, sr.batchHeaderHash) {
+		return fmt.Errorf("signature verification with pubkey %s", hex.EncodeToString(operatorPubkey.Serialize()))
+	}
 
 	for _, quorumID := range sr.quorumIDs {
 		quorumOperators := sr.indexedOperatorState.Operators[quorumID]
@@ -200,35 +241,11 @@ func (sr *signatureReceiver) processSigningMessage(signingMessage SigningMessage
 	return nil
 }
 
-// checkSigningMessage checks the input SigningMessage, and returns an error if any check fails
-func (sr *signatureReceiver) checkSigningMessage(signingMessage SigningMessage) (*IndexedOperatorInfo, error) {
-	if seen := sr.signerMap[signingMessage.Operator]; seen {
-		return nil, fmt.Errorf("duplicate message from operator")
-	}
-
-	if signingMessage.Err != nil {
-		return nil, signingMessage.Err
-	}
-
-	indexedOperatorInfo, found := sr.indexedOperatorState.IndexedOperators[signingMessage.Operator]
-	if !found {
-		return nil, fmt.Errorf("operator not found in state")
-	}
-
-	operatorPubkey := indexedOperatorInfo.PubkeyG2
-	if !signingMessage.Signature.Verify(operatorPubkey, sr.batchHeaderHash) {
-		return nil, fmt.Errorf("signature verification for pubkey %s",
-			hex.EncodeToString(operatorPubkey.Serialize()))
-	}
-
-	return indexedOperatorInfo, nil
-}
-
 // submitAttestation aggregates and submits a QuorumAttestation representing the most up-to-date aggregates
 func (sr *signatureReceiver) submitAttestation(attestationChan chan *QuorumAttestation) {
 	nonSignerMap := make(map[OperatorID]*G1Point)
 	for operatorID, operatorInfo := range sr.indexedOperatorState.IndexedOperators {
-		_, found := sr.signerMap[operatorID]
+		_, found := sr.validSignerMap[operatorID]
 		if !found {
 			nonSignerMap[operatorID] = operatorInfo.PubkeyG1
 		}
@@ -239,7 +256,9 @@ func (sr *signatureReceiver) submitAttestation(attestationChan chan *QuorumAttes
 		quorumResult, err := sr.computeQuorumResult(quorumID, nonSignerMap)
 		if err != nil {
 			sr.logger.Error("compute quorum result",
-				"quorumID", quorumID, "batchHeaderHash", sr.batchHeaderHash)
+				"quorumID", quorumID,
+				"batchHeaderHash", sr.batchHeaderHash,
+				"error", err)
 			continue
 		}
 		quorumResults[quorumID] = quorumResult
@@ -251,19 +270,19 @@ func (sr *signatureReceiver) submitAttestation(attestationChan chan *QuorumAttes
 	for quorumID, g1Point := range sr.indexedOperatorState.AggKeys {
 		// TODO: is this ok? semantics are changed from before: we used to exclude aggregate keys of quorums that had no
 		//  signatures, but I don't see why that case should be special.
-		quorumAggPubKeyCopy[quorumID] = g1Point
+		quorumAggPubKeyCopy[quorumID] = g1Point.Clone()
 	}
 	aggregateSignersG2PubKeysCopy := make(map[QuorumID]*G2Point, len(sr.aggregateSignersG2PubKeys))
 	for quorumID, aggregatePubkey := range sr.aggregateSignersG2PubKeys {
-		aggregateSignersG2PubKeysCopy[quorumID] = aggregatePubkey
+		aggregateSignersG2PubKeysCopy[quorumID] = aggregatePubkey.Clone()
 	}
 	aggregateSignaturesCopy := make(map[QuorumID]*Signature, len(sr.aggregateSignatures))
 	for quorumID, aggregateSignature := range sr.aggregateSignatures {
-		aggregateSignaturesCopy[quorumID] = aggregateSignature
+		aggregateSignaturesCopy[quorumID] = &Signature{aggregateSignature.Clone()}
 	}
-	signerMapCopy := make(map[OperatorID]bool, len(sr.signerMap))
-	for operatorID, signed := range sr.signerMap {
-		signerMapCopy[operatorID] = signed
+	validSignerMapCopy := make(map[OperatorID]bool, len(sr.validSignerMap))
+	for operatorID, signed := range sr.validSignerMap {
+		validSignerMapCopy[operatorID] = signed
 	}
 
 	attestationChan <- &QuorumAttestation{
@@ -271,7 +290,7 @@ func (sr *signatureReceiver) submitAttestation(attestationChan chan *QuorumAttes
 		SignersAggPubKey: aggregateSignersG2PubKeysCopy,
 		AggSignature:     aggregateSignaturesCopy,
 		QuorumResults:    quorumResults,
-		SignerMap:        signerMapCopy,
+		SignerMap:        validSignerMapCopy,
 	}
 }
 
@@ -285,15 +304,17 @@ func (sr *signatureReceiver) computeQuorumResult(
 		sr.indexedOperatorState.Totals[quorumID].Stake)
 
 	if signedPercentage == 0 {
-		return nil, fmt.Errorf("quorum %v has 0%% signed percentage", quorumID)
+		return &QuorumResult{
+			QuorumID:      quorumID,
+			PercentSigned: 0,
+		}, nil
 	}
 
 	// clone the quorum aggregate G1 pubkey, so that we can safely subtract non-signer pubkeys to yield the aggregate
 	// G1 pubkey of all the signers
 	aggregateSignersG1PubKey := sr.indexedOperatorState.AggKeys[quorumID].Clone()
-	for nonSignerOperatorID, nonSignerPubKey := range nonSignerMap {
-		quorumOperatorInfo := sr.indexedOperatorState.Operators[quorumID]
-		if _, ok := quorumOperatorInfo[nonSignerOperatorID]; ok {
+	for operatorID := range sr.indexedOperatorState.Operators[quorumID] {
+		if nonSignerPubKey, ok := nonSignerMap[operatorID]; ok {
 			aggregateSignersG1PubKey.Sub(nonSignerPubKey)
 		}
 	}
