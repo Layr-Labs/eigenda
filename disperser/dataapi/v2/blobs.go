@@ -32,7 +32,7 @@ import (
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/blobs/feed [get]
 func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
-	handlerStart := time.Now()
+	handlerStart := core.NowWithNtpOffset()
 	var err error
 
 	// Validate direction
@@ -177,7 +177,7 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/blobs/{blob_key} [get]
 func (s *ServerV2) FetchBlob(c *gin.Context) {
-	handlerStart := time.Now()
+	handlerStart := core.NowWithNtpOffset()
 
 	blobKey, err := corev2.HexToBlobKey(c.Param("blob_key"))
 	if err != nil {
@@ -228,7 +228,7 @@ func (s *ServerV2) FetchBlob(c *gin.Context) {
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/blobs/{blob_key}/certificate [get]
 func (s *ServerV2) FetchBlobCertificate(c *gin.Context) {
-	handlerStart := time.Now()
+	handlerStart := core.NowWithNtpOffset()
 
 	blobKey, err := corev2.HexToBlobKey(c.Param("blob_key"))
 	if err != nil {
@@ -269,7 +269,7 @@ func (s *ServerV2) FetchBlobCertificate(c *gin.Context) {
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/blobs/{blob_key}/attestation-info [get]
 func (s *ServerV2) FetchBlobAttestationInfo(c *gin.Context) {
-	handlerStart := time.Now()
+	handlerStart := core.NowWithNtpOffset()
 
 	ctx := c.Request.Context()
 	blobKey, err := corev2.HexToBlobKey(c.Param("blob_key"))

@@ -102,7 +102,7 @@ func (c *dispatcher) sendAllChunks(
 				return
 			}
 
-			requestedAt := time.Now()
+			requestedAt := core.NowWithNtpOffset()
 			sig, err := c.sendChunks(ctx, blobMessages, batchHeader, &op)
 			latencyMs := float64(time.Since(requestedAt).Milliseconds())
 			if err != nil {
@@ -156,7 +156,7 @@ func (c *dispatcher) sendChunks(
 	gc := node.NewDispersalClient(conn)
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
-	start := time.Now()
+	start := core.NowWithNtpOffset()
 	request, totalSize, err := GetStoreChunksRequest(blobs, batchHeader, c.EnableGnarkBundleEncoding)
 	if err != nil {
 		return nil, err

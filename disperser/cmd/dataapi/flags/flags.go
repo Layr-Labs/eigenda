@@ -1,6 +1,8 @@
 package flags
 
 import (
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -139,6 +141,20 @@ var (
 		Value:    1,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DATA_API_VERSION"),
 	}
+	NtpServerFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ntp-server"),
+		Usage:    "NTP server for time synchronization",
+		Required: false,
+		Value:    "pool.ntp.org",
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NTP_SERVER"),
+	}
+	NtpSyncIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "ntp-sync-interval"),
+		Usage:    "Interval for NTP synchronization",
+		Required: false,
+		Value:    5 * time.Minute,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NTP_SYNC_INTERVAL"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -164,6 +180,8 @@ var optionalFlags = []cli.Flag{
 	ServerModeFlag,
 	MetricsHTTPPort,
 	DataApiServerVersionFlag,
+	NtpServerFlag,
+	NtpSyncIntervalFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

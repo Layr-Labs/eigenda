@@ -21,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/ratelimit"
 	"github.com/Layr-Labs/eigenda/common/store"
+	"github.com/Layr-Labs/eigenda/core"
 	authv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -64,6 +65,17 @@ func RunDisperserServer(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// Set default NTP server and interval if not provided
+	if config.NtpServer == "" {
+		config.NtpServer = "pool.ntp.org"
+	}
+	if config.NtpSyncInterval == 0 {
+		config.NtpSyncInterval = 5 * time.Minute
+	}
+
+	// Start NTP sync
+	core.StartNtpSync(context.Background(), config.NtpServer, config.NtpSyncInterval, logger)
 
 	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {

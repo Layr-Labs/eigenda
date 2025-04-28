@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/gin-gonic/gin"
@@ -23,7 +24,7 @@ type FeedParams struct {
 
 // ParseFeedParams parses and validates common feed query parameters
 func ParseFeedParams(c *gin.Context, metrics *dataapi.Metrics, handlerName string) (*FeedParams, error) {
-	now := time.Now()
+	now := core.NowWithNtpOffset()
 	oldestTime := now.Add(-maxBlobAge)
 	params := &FeedParams{}
 
@@ -111,7 +112,7 @@ func ParseFeedParams(c *gin.Context, metrics *dataapi.Metrics, handlerName strin
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/batches/feed [get]
 func (s *ServerV2) FetchBatchFeed(c *gin.Context) {
-	handlerStart := time.Now()
+	handlerStart := core.NowWithNtpOffset()
 	var err error
 
 	params, err := ParseFeedParams(c, s.metrics, "FetchBatchFeed")
@@ -186,7 +187,7 @@ func (s *ServerV2) FetchBatchFeed(c *gin.Context) {
 //	@Failure	500					{object}	ErrorResponse	"error: Server error"
 //	@Router		/batches/{batch_header_hash} [get]
 func (s *ServerV2) FetchBatch(c *gin.Context) {
-	handlerStart := time.Now()
+	handlerStart := core.NowWithNtpOffset()
 	ctx := c.Request.Context()
 
 	batchHeaderHashHex := c.Param("batch_header_hash")

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -116,7 +117,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 			Value: strconv.Itoa(int(status)),
 		},
 		":expiry": &types.AttributeValueMemberN{
-			Value: strconv.FormatInt(time.Now().Unix(), 10),
+			Value: strconv.FormatInt(core.NowWithNtpOffset().Unix(), 10),
 		}})
 	if err != nil {
 		return nil, err
@@ -142,7 +143,7 @@ func (s *BlobMetadataStore) GetBlobMetadataCountByStatus(ctx context.Context, st
 			Value: strconv.Itoa(int(status)),
 		},
 		":expiry": &types.AttributeValueMemberN{
-			Value: strconv.FormatInt(time.Now().Unix(), 10),
+			Value: strconv.FormatInt(core.NowWithNtpOffset().Unix(), 10),
 		},
 	})
 	if err != nil {
@@ -175,7 +176,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusWithPagination(ctx context.Co
 			Value: strconv.Itoa(int(status)),
 		},
 		":expiry": &types.AttributeValueMemberN{
-			Value: strconv.FormatInt(time.Now().Unix(), 10),
+			Value: strconv.FormatInt(core.NowWithNtpOffset().Unix(), 10),
 		},
 	}, limit, attributeMap, true)
 

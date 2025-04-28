@@ -19,7 +19,7 @@ import (
 )
 
 func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
-	start := time.Now()
+	start := core.NowWithNtpOffset()
 	defer func() {
 		s.metrics.reportDisperseBlobLatency(time.Since(start))
 	}()
@@ -43,14 +43,14 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		return nil, err
 	}
 
-	finishedValidation := time.Now()
+	finishedValidation := core.NowWithNtpOffset()
 	s.metrics.reportValidateDispersalRequestLatency(finishedValidation.Sub(start))
 
 	blob := req.GetBlob()
 	s.metrics.reportDisperseBlobSize(len(blob))
 	s.logger.Debug("received a new blob dispersal request", "blobSizeBytes", len(blob), "quorums", req.GetBlobHeader().GetQuorumNumbers())
 
-	blobKey, err := s.StoreBlob(ctx, blob, blobHeader, req.GetSignature(), time.Now(), onchainState.TTL)
+	blobKey, err := s.StoreBlob(ctx, blob, blobHeader, req.GetSignature(), start, onchainState.TTL)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func (s *DispersalServerV2) checkPaymentMeter(ctx context.Context, req *pb.Dispe
 		CumulativePayment: cumulativePayment,
 	}
 
-	symbolsCharged, err := s.meterer.MeterRequest(ctx, paymentHeader, uint64(blobLength), blobHeader.QuorumNumbers, receivedAt)
+	symbolsCharged, err := s.meterer.MeterRequest(ctx, paymentHeader, uint64(blobLength), blobHeader.QuorumNumbers, core.NowWithNtpOffset())
 	if err != nil {
 		return api.NewErrorResourceExhausted(err.Error())
 	}

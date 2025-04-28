@@ -74,3 +74,7 @@ The [assignment module](./architecture/assignment.md) is nothing more than a rul
 
 This section is under construction. 
 
+## Protocol Time Synchronization
+
+All protocol-level timing, expiry, and cross-node coordination in EigenDA use a consistent, NTP-synchronized time source. This is implemented via `core.NowWithNtpOffset()`, which ensures that all nodes, dispersers, and relays agree on time-sensitive operations (such as batch expiry, request validation, and protocol deadlines) regardless of local clock drift. Using NTP-synchronized time is critical for protocol correctness, as it prevents subtle bugs and disagreements that can arise from relying on local system clocks.
+

@@ -118,6 +118,8 @@ type Config struct {
 
 	// A special test only setting. If true, then littDB will throw an error if the same data is written twice.
 	LittDBDoubleWriteProtection bool
+	NtpServer                   string
+	NtpSyncInterval             time.Duration
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -341,5 +343,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
 		LittDBEnabled:                       ctx.GlobalBool(flags.LittDBEnabledFlag.Name),
 		DownloadPoolSize:                    ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
+		NtpServer:                           ctx.GlobalString(flags.NtpServerFlag.Name),
+		NtpSyncInterval:                     ctx.GlobalDuration(flags.NtpSyncIntervalFlag.Name),
 	}, nil
 }

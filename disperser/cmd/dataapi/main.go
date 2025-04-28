@@ -7,11 +7,13 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	"github.com/Layr-Labs/eigenda/core"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/dataapi/flags"
@@ -65,6 +67,16 @@ func RunDataApi(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// Set default NTP server and interval if not provided
+	if config.NtpServer == "" {
+		config.NtpServer = "pool.ntp.org"
+	}
+	if config.NtpSyncInterval == 0 {
+		config.NtpSyncInterval = 5 * time.Minute
+	}
+	// Start NTP sync
+	core.StartNtpSync(context.Background(), config.NtpServer, config.NtpSyncInterval, logger)
 
 	s3Client, err := s3.NewClient(context.Background(), config.AwsClientConfig, logger)
 	if err != nil {
