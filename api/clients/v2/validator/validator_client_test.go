@@ -82,6 +82,7 @@ func TestBasicWorkflow(t *testing.T) {
 	// a set of operators that have provided chunks
 	downloadSet := sync.Map{}
 	config.UnsafeDownloadChunksFunction = func(
+		ctx context.Context,
 		key v2.BlobKey,
 		operatorID core.OperatorID,
 	) (*grpcnode.GetChunksReply, error) {
@@ -108,6 +109,7 @@ func TestBasicWorkflow(t *testing.T) {
 	// the set of operators we have verified the chunks of
 	verificationSet := sync.Map{}
 	config.UnsafeDeserializeAndVerifyFunction = func(
+		ctx context.Context,
 		key v2.BlobKey,
 		operatorID core.OperatorID,
 		getChunksReply *grpcnode.GetChunksReply,
@@ -149,6 +151,7 @@ func TestBasicWorkflow(t *testing.T) {
 	decodedBytes := rand.PrintableBytes(32)
 	framesSentToDecoding := atomic.Uint32{}
 	config.UnsafeDecodeBlobFunction = func(
+		ctx context.Context,
 		key v2.BlobKey,
 		chunks []*encoding.Frame,
 		indices []uint,
@@ -201,7 +204,7 @@ func TestBasicWorkflow(t *testing.T) {
 	require.GreaterOrEqual(t, maxToVerify, framesSentToDecoding.Load())
 }
 
-func TestPessimisticTimeout(t *testing.T) {
+func TestDownloadTimeout(t *testing.T) {
 	rand := testrandom.NewTestRandom()
 	start := rand.Time()
 
@@ -257,11 +260,14 @@ func TestPessimisticTimeout(t *testing.T) {
 	// The number of chunks needed to reconstruct the blob
 	minimumChunkCount := uint32(rand.Float64Range(1.0/8.0, 1.0/8.0) * float64(totalChunkCount))
 
+	// TODO future cody: handle when context is cancelled in a download
+
 	// the number of chunks downloaded
 	chunksDownloaded := atomic.Uint32{}
 	// a set of operators that have provided chunks
 	downloadSet := sync.Map{}
 	config.UnsafeDownloadChunksFunction = func(
+		ctx context.Context,
 		key v2.BlobKey,
 		operatorID core.OperatorID,
 	) (*grpcnode.GetChunksReply, error) {
@@ -290,6 +296,7 @@ func TestPessimisticTimeout(t *testing.T) {
 	// the set of operators we have verified the chunks of
 	verificationSet := sync.Map{}
 	config.UnsafeDeserializeAndVerifyFunction = func(
+		ctx context.Context,
 		key v2.BlobKey,
 		operatorID core.OperatorID,
 		getChunksReply *grpcnode.GetChunksReply,
@@ -331,6 +338,7 @@ func TestPessimisticTimeout(t *testing.T) {
 	decodedBytes := rand.PrintableBytes(32)
 	framesSentToDecoding := atomic.Uint32{}
 	config.UnsafeDecodeBlobFunction = func(
+		ctx context.Context,
 		key v2.BlobKey,
 		chunks []*encoding.Frame,
 		indices []uint,

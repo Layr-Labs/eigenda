@@ -497,7 +497,7 @@ func (w *retrievalWorker) scheduleVerifications() {
 		w.updateChunkStatus(operatorID, verifying)
 
 		w.computePool.Submit(func() {
-			w.deserializeAndVerifyChunks(operatorID, reply)
+			w.deserializeAndVerifyChunks(w.ctx, operatorID, reply)
 		})
 	}
 }
@@ -561,7 +561,7 @@ func (w *retrievalWorker) downloadChunks(operatorID core.OperatorID) {
 	}
 
 	// Unless this has been overridden for testing, this is just a call to standardDownloadChunks().
-	reply, err := w.downloadChunksFunction(w.blobKey, operatorID)
+	reply, err := w.downloadChunksFunction(w.ctx, w.blobKey, operatorID)
 
 	w.downloadCompletedChan <- &validatorDownloadCompleted{
 		OperatorID: operatorID,
@@ -573,6 +573,7 @@ func (w *retrievalWorker) downloadChunks(operatorID core.OperatorID) {
 // downloadChunksFunction is the default function used to download chunks from a validator node. This may not
 // be called if
 func (w *retrievalWorker) standardDownloadChunks(
+	_ context.Context,
 	_ v2.BlobKey,
 	operatorID core.OperatorID,
 ) (*grpcnode.GetChunksReply, error) {
@@ -618,6 +619,7 @@ func (w *retrievalWorker) standardDownloadChunks(
 
 // deserializeAndVerifyChunks deserializes the chunks from the GetChunksReply and sends them to the chunksChan.
 func (w *retrievalWorker) deserializeAndVerifyChunks(
+	_ context.Context,
 	operatorID core.OperatorID,
 	getChunksReply *grpcnode.GetChunksReply,
 ) {
@@ -634,7 +636,7 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 	}
 
 	// Unless this has been overridden for testing, this is just a call to standardDeserializeAndVerify().
-	chunks, err := w.deserializeAndVerifyFunction(w.blobKey, operatorID, getChunksReply)
+	chunks, err := w.deserializeAndVerifyFunction(w.ctx, w.blobKey, operatorID, getChunksReply)
 
 	w.verificationCompleteChan <- &verificationCompleted{
 		OperatorID: operatorID,
@@ -645,6 +647,7 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 
 // standardDeserializeAndVerify is a standard implementation of the DeserializeAndVerifyFunction.
 func (w *retrievalWorker) standardDeserializeAndVerify(
+	_ context.Context,
 	_ v2.BlobKey,
 	operatorID core.OperatorID,
 	getChunksReply *grpcnode.GetChunksReply,
@@ -682,7 +685,7 @@ func (w *retrievalWorker) decodeBlob(chunks []*encoding.Frame, indices []uint) {
 	}
 
 	// Unless this has been overridden for testing, this is just a call to standardDecodeBlob().
-	blob, err := w.decodeBlobFunction(w.blobKey, chunks, indices)
+	blob, err := w.decodeBlobFunction(w.ctx, w.blobKey, chunks, indices)
 
 	w.decodeResponseChan <- &decodeResult{
 		Blob: blob,
@@ -692,6 +695,7 @@ func (w *retrievalWorker) decodeBlob(chunks []*encoding.Frame, indices []uint) {
 
 // decodeBlobFunction is the default function used to decode the blob from the chunks.
 func (w *retrievalWorker) standardDecodeBlob(
+	_ context.Context,
 	_ v2.BlobKey,
 	chunks []*encoding.Frame,
 	indices []uint,

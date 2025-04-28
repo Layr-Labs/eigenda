@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"context"
 	"runtime"
 	"time"
 
@@ -92,12 +93,14 @@ type ValidatorClientConfig struct {
 
 // DownloadChunksFunction is a function that downloads chunks from a validator node.
 type DownloadChunksFunction func(
+	ctx context.Context,
 	blobKey v2.BlobKey,
 	operatorID core.OperatorID,
 ) (*grpcnode.GetChunksReply, error)
 
 // DeserializeAndVerifyFunction is a function that deserializes and verifies chunks from a validator node.
 type DeserializeAndVerifyFunction func(
+	ctx context.Context,
 	blobKey v2.BlobKey,
 	operatorID core.OperatorID,
 	getChunksReply *grpcnode.GetChunksReply,
@@ -105,6 +108,7 @@ type DeserializeAndVerifyFunction func(
 
 // DecodeBlobFunction is a function that decodes a blob from the chunks received from a validator node.
 type DecodeBlobFunction func(
+	ctx context.Context,
 	blobKey v2.BlobKey,
 	chunks []*encoding.Frame,
 	indices []uint,
