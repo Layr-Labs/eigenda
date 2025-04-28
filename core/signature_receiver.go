@@ -132,6 +132,7 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 				breakLoop = true
 				break
 			}
+
 			indexedOperatorInfo, found := sr.indexedOperatorState.IndexedOperators[signingMessage.Operator]
 			if !found {
 				sr.logger.Warn("operator not found in state",
@@ -191,7 +192,7 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 
 // getSortedQuorumIDs returns a sorted slice of QuorumIDs from the state
 func getSortedQuorumIDs(state *IndexedOperatorState) ([]QuorumID, error) {
-	quorumIDs := make([]QuorumID, 0, len(state.AggKeys))
+	quorumIDs := make([]QuorumID, 0, len(state.Operators))
 	for quorumID := range state.Operators {
 		quorumIDs = append(quorumIDs, quorumID)
 	}
@@ -244,6 +245,7 @@ func (sr *signatureReceiver) processSigningMessage(
 // submitAttestation aggregates and submits a QuorumAttestation representing the most up-to-date aggregates
 func (sr *signatureReceiver) submitAttestation(attestationChan chan *QuorumAttestation) {
 	nonSignerMap := make(map[OperatorID]*G1Point)
+	// operators that aren't in the validSignerMap are "non-signers"
 	for operatorID, operatorInfo := range sr.indexedOperatorState.IndexedOperators {
 		_, found := sr.validSignerMap[operatorID]
 		if !found {
@@ -346,7 +348,7 @@ func (sr *signatureReceiver) computeQuorumResult(
 	}, nil
 }
 
-// getSignedPercentage the amount is signedStake, and the totalStake. It returns a uint8 representing the percentage
+// getSignedPercentage accepts the signedStake and the totalStake. It returns a uint8 representing the percentage
 // of the total stake that has signed.
 func getSignedPercentage(signedStake *big.Int, totalStake *big.Int) uint8 {
 	if totalStake.Cmp(big.NewInt(0)) == 0 {
