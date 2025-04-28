@@ -403,6 +403,19 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_ENABLE_SYNC_WRITES_V2"),
 	}
+	LittDBEnabledFlag = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-enabled"),
+		Usage:    "Enable LittDB instead of LevelDB",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_ENABLED"),
+	}
+	DownloadPoolSizeFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
+		Usage:    "The size of the download pool. The default value is 16.",
+		Required: false,
+		Value:    16,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DOWNLOAD_POOL_SIZE"),
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -527,6 +540,8 @@ var optionalFlags = []cli.Flag{
 	LevelDBEnableSyncWritesV1Flag,
 	LevelDBDisableSeeksCompactionV2Flag,
 	LevelDBEnableSyncWritesV2Flag,
+	LittDBEnabledFlag,
+	DownloadPoolSizeFlag,
 }
 
 func init() {

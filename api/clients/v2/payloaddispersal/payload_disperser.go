@@ -49,12 +49,13 @@ func NewPayloadDisperser(
 		return nil, fmt.Errorf("check and set PayloadDisperserConfig defaults: %w", err)
 	}
 
+	stageTimer := common.NewStageTimer(registry, "PayloadDisperser", "SendPayload", false)
 	return &PayloadDisperser{
 		logger:          logger,
 		config:          payloadDisperserConfig,
 		disperserClient: disperserClient,
 		certVerifier:    certVerifier,
-		stageTimer:      common.NewStageTimer(registry, "PayloadDisperser", "SendPayload"),
+		stageTimer:      stageTimer,
 	}, nil
 }
 
@@ -72,8 +73,9 @@ func (pd *PayloadDisperser) SendPayload(
 	payload *coretypes.Payload,
 ) (*coretypes.EigenDACert, error) {
 
-	probe := pd.stageTimer.NewSequence("convert_to_blob")
+	probe := pd.stageTimer.NewSequence()
 	defer probe.End()
+	probe.SetStage("convert_to_blob")
 
 	blob, err := payload.ToBlob(pd.config.PayloadPolynomialForm)
 	if err != nil {

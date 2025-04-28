@@ -122,6 +122,7 @@ type Config struct {
 	MetricsRegistry *prometheus.Registry
 
 	// The port to use for the metrics server. Ignored if MetricsEnabled is false or MetricsRegistry is not nil.
+	// The default is 9101.
 	MetricsPort int
 
 	// The interval at which various DB metrics are updated. The default is 1 second.
@@ -162,7 +163,7 @@ func DefaultConfig(paths ...string) (*Config, error) {
 		DoubleWriteProtection:    false,
 		MetricsEnabled:           false,
 		MetricsNamespace:         "litt",
-		MetricsPort:              8080,
+		MetricsPort:              9101,
 		MetricsUpdateInterval:    time.Second,
 	}, nil
 }
