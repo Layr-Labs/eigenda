@@ -414,6 +414,72 @@
         
           
           <li>
+            <a href="#encoder%2fencoder.proto">encoder/encoder.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#encoder.BlobCommitment"><span class="badge">M</span>BlobCommitment</a>
+                </li>
+              
+                <li>
+                  <a href="#encoder.EncodeBlobReply"><span class="badge">M</span>EncodeBlobReply</a>
+                </li>
+              
+                <li>
+                  <a href="#encoder.EncodeBlobRequest"><span class="badge">M</span>EncodeBlobRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#encoder.EncodingParams"><span class="badge">M</span>EncodingParams</a>
+                </li>
+              
+              
+                <li>
+                  <a href="#encoder.ChunkEncodingFormat"><span class="badge">E</span>ChunkEncodingFormat</a>
+                </li>
+              
+              
+              
+                <li>
+                  <a href="#encoder.Encoder"><span class="badge">S</span>Encoder</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
+            <a href="#encoder%2fv2%2fencoder.proto">encoder/v2/encoder.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#encoder.v2.EncodeBlobReply"><span class="badge">M</span>EncodeBlobReply</a>
+                </li>
+              
+                <li>
+                  <a href="#encoder.v2.EncodeBlobRequest"><span class="badge">M</span>EncodeBlobRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#encoder.v2.EncodingParams"><span class="badge">M</span>EncodingParams</a>
+                </li>
+              
+                <li>
+                  <a href="#encoder.v2.FragmentInfo"><span class="badge">M</span>FragmentInfo</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#encoder.v2.Encoder"><span class="badge">S</span>Encoder</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
             <a href="#node%2fnode.proto">node/node.proto</a>
             <ul>
               
@@ -2661,6 +2727,372 @@ The accounting rules are simple and can be updated locally, but periodic checks 
 
 For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
 https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298</p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="encoder/encoder.proto">encoder/encoder.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="encoder.BlobCommitment">BlobCommitment</h3>
+        <p>BlobCommitments contains the blob's commitment, degree proof, and the actual degree</p><p>DEPRECATED: use common.BlobCommitment instead</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>commitment</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>length_commitment</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>length_proof</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>length</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="encoder.EncodeBlobReply">EncodeBlobReply</h3>
+        <p>EncodeBlobReply returns all encoded chunks along with BlobCommitment for the same,</p><p>where Chunk is the smallest unit that is distributed to DA nodes</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>commitment</td>
+                  <td><a href="#encoder.BlobCommitment">BlobCommitment</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>chunks</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>chunk_encoding_format</td>
+                  <td><a href="#encoder.ChunkEncodingFormat">ChunkEncodingFormat</a></td>
+                  <td></td>
+                  <td><p>How the above chunks are encoded. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="encoder.EncodeBlobRequest">EncodeBlobRequest</h3>
+        <p>EncodeBlobRequest contains data and pre-computed encoding params provided to Encoder</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>data</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>encoding_params</td>
+                  <td><a href="#encoder.EncodingParams">EncodingParams</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="encoder.EncodingParams">EncodingParams</h3>
+        <p>Parameters needed by Encoder for encoding</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>chunk_length</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>num_chunks</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+        <h3 id="encoder.ChunkEncodingFormat">ChunkEncodingFormat</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>UNKNOWN</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>GNARK</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>GOB</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+
+      
+        <h3 id="encoder.Encoder">Encoder</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>EncodeBlob</td>
+                <td><a href="#encoder.EncodeBlobRequest">EncodeBlobRequest</a></td>
+                <td><a href="#encoder.EncodeBlobReply">EncodeBlobReply</a></td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
+    
+      
+      <div class="file-heading">
+        <h2 id="encoder/v2/encoder.proto">encoder/v2/encoder.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="encoder.v2.EncodeBlobReply">EncodeBlobReply</h3>
+        <p>EncodeBlobReply contains metadata about the encoded chunks</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>fragment_info</td>
+                  <td><a href="#encoder.v2.FragmentInfo">FragmentInfo</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="encoder.v2.EncodeBlobRequest">EncodeBlobRequest</h3>
+        <p>EncodeBlobRequest contains the reference to the blob to be encoded and the encoding parameters</p><p>determined by the control plane.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>blob_key</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>encoding_params</td>
+                  <td><a href="#encoder.v2.EncodingParams">EncodingParams</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blob_size</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="encoder.v2.EncodingParams">EncodingParams</h3>
+        <p>EncodingParams specifies how the blob should be encoded into chunks</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>chunk_length</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>num_chunks</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="encoder.v2.FragmentInfo">FragmentInfo</h3>
+        <p>FragmentInfo contains metadata about the encoded fragments</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>total_chunk_size_bytes</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>fragment_size_bytes</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="encoder.v2.Encoder">Encoder</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>EncodeBlob</td>
+                <td><a href="#encoder.v2.EncodeBlobRequest">EncodeBlobRequest</a></td>
+                <td><a href="#encoder.v2.EncodeBlobReply">EncodeBlobReply</a></td>
+                <td><p>EncodeBlob encodes a blob into chunks using specified encoding parameters.
+The blob is retrieved using the provided blob key and the encoded chunks
+are persisted for later retrieval.</p></td>
               </tr>
             
           </tbody>
