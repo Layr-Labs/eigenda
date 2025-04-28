@@ -3,7 +3,6 @@ package dataapi
 import (
 	"context"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,7 +24,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
 	docsv1 "github.com/Layr-Labs/eigenda/disperser/dataapi/docs/v1"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/logger"
 	"github.com/gin-gonic/gin"
@@ -204,17 +202,6 @@ type (
 		Error string `json:"error"`
 	}
 
-	ClockDriftPayload struct {
-		OperatorAddress string  `json:"operator_address"`
-		Timestamp       string  `json:"timestamp"`
-		OffsetSeconds   float64 `json:"offset_seconds"`
-	}
-
-	ClockDriftRequest struct {
-		Payload   ClockDriftPayload `json:"payload"`
-		Signature string            `json:"signature"`
-	}
-
 	server struct {
 		serverMode        string
 		socketAddr        string
@@ -338,9 +325,6 @@ func (s *server) Start() error {
 			swagger.GET("/*any", ginswagger.WrapHandler(swaggerfiles.Handler, ginswagger.InstanceName("V1"), ginswagger.URL("/api/v1/swagger/doc.json")))
 		}
 	}
-
-	// Register the clock drift handler
-	router.POST("/api/v1/clock_drift", s.ClockDriftHandler)
 
 	router.GET("/", func(g *gin.Context) {
 		g.JSON(http.StatusAccepted, gin.H{"status": "OK"})
@@ -1159,63 +1143,6 @@ func (s *server) FetchBatcherAvailability(c *gin.Context) {
 		},
 		Data: availabilityStatuses,
 	})
-}
-
-// Handler for clock drift reporting
-func (s *server) ClockDriftHandler(c *gin.Context) {
-	var driftReq ClockDriftRequest
-	if err := c.ShouldBindJSON(&driftReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format"})
-		return
-	}
-	payload := driftReq.Payload
-	signature := driftReq.Signature
-
-	// TODO: Verify operator is registered (mock for now)
-	if payload.OperatorAddress == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing operator address"})
-		return
-	}
-
-	// Verify signature
-	message := fmt.Sprintf("%s|%s|%f", payload.OperatorAddress, payload.Timestamp, payload.OffsetSeconds)
-	msg := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(message), message)
-	sig, err := hexToBytes(signature)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid signature encoding"})
-		return
-	}
-	pubKey, err := crypto.SigToPub(crypto.Keccak256Hash([]byte(msg)).Bytes(), sig)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Signature verification failed"})
-		return
-	}
-	derivedAddr := crypto.PubkeyToAddress(*pubKey).Hex()
-	if !strings.EqualFold(derivedAddr, payload.OperatorAddress) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Signature does not match operator address"})
-		return
-	}
-
-	// Verify timestamp freshness (within 5 minutes for now)
-	reportTime, err := time.Parse(time.RFC3339, payload.Timestamp)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid timestamp format"})
-		return
-	}
-	if time.Since(reportTime).Abs() > 5*time.Minute {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Timestamp expired"})
-		return
-	}
-
-	s.logger.Info("[Clock Drift]", "operator", payload.OperatorAddress, "offset", payload.OffsetSeconds, "timestamp", payload.Timestamp)
-	c.JSON(http.StatusOK, gin.H{"status": "success"})
-}
-
-func hexToBytes(str string) ([]byte, error) {
-	if strings.HasPrefix(str, "0x") {
-		str = str[2:]
-	}
-	return hex.DecodeString(str)
 }
 
 func errorResponse(c *gin.Context, err error) {
