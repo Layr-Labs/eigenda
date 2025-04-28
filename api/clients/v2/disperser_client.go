@@ -22,6 +22,8 @@ type DisperserClientConfig struct {
 	Hostname          string
 	Port              string
 	UseSecureGrpcFlag bool
+	NtpServer         string
+	NtpSyncInterval   time.Duration
 }
 
 // DisperserClient manages communication with the disperser server.
@@ -94,6 +96,21 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 	if signer == nil {
 		return nil, api.NewErrorInvalidArg("signer must be provided")
 	}
+
+	// Set default NTP config if not provided
+	if config.NtpServer == "" {
+		config.NtpServer = "pool.ntp.org"
+	}
+	if config.NtpSyncInterval == 0 {
+		config.NtpSyncInterval = 5 * time.Minute
+	}
+
+	// Start NTP sync
+	logger, err := common.NewLogger(common.LoggerConfig{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create logger: %w", err)
+	}
+	core.StartNtpSync(context.Background(), config.NtpServer, config.NtpSyncInterval, logger)
 
 	return &disperserClient{
 		config:     config,
@@ -186,7 +203,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	}
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(ctx, time.Now().UnixNano(), uint64(symbolLength), quorums)
+	payment, err := c.accountant.AccountBlob(ctx, core.NowWithNtpOffset().UnixNano(), uint64(symbolLength), quorums)
 	if err != nil {
 		c.accountantLock.Unlock()
 		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)
@@ -292,9 +309,9 @@ func (c *disperserClient) DisperseBlobWithProbe(
 //
 // This function returns nil if the verification succeeds, and otherwise returns an error describing the failure
 func verifyReceivedBlobKey(
-// the blob header which was constructed locally and sent to the disperser
+	// the blob header which was constructed locally and sent to the disperser
 	blobHeader *corev2.BlobHeader,
-// the reply received back from the disperser
+	// the reply received back from the disperser
 	disperserReply *disperser_rpc.DisperseBlobReply,
 ) error {
 
@@ -343,7 +360,7 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		return nil, fmt.Errorf("error getting signer's account ID: %w", err)
 	}
 
-	timestamp := uint64(time.Now().UnixNano())
+	timestamp := uint64(core.NowWithNtpOffset().UnixNano())
 
 	signature, err := c.signer.SignPaymentStateRequest(timestamp)
 	if err != nil {
