@@ -9,6 +9,7 @@ import (
 	"math/rand"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/gammazero/workerpool"
@@ -33,8 +34,17 @@ type RawBundles struct {
 	Bundles         map[core.QuorumID][]byte
 }
 
-func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch, operatorState *core.OperatorState) ([]*corev2.BlobShard, []*RawBundles, error) {
+func (n *Node) DownloadBundles(
+	ctx context.Context,
+	batch *corev2.Batch,
+	operatorState *core.OperatorState,
+	probe *common.SequenceProbe,
+) ([]*corev2.BlobShard, []*RawBundles, error) {
+
+	probe.SetStage("prepare_to_download")
+
 	relayClient, ok := n.RelayClient.Load().(relay.RelayClient)
+
 	if !ok || relayClient == nil {
 		return nil, nil, fmt.Errorf("relay client is not set")
 	}
@@ -74,7 +84,8 @@ func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch, operato
 
 			if _, ok := operatorState.Operators[quorum]; !ok {
 				// operator is not part of the quorum or the quorum is not valid
-				n.Logger.Debug("operator is not part of the quorum or the quorum is not valid", "quorum", quorum)
+				n.Logger.Debug("operator is not part of the quorum or the quorum is not valid",
+					"quorum", quorum)
 				continue
 			}
 
@@ -105,12 +116,13 @@ func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch, operato
 		}
 	}
 
-	pool := workerpool.New(len(requests))
+	probe.SetStage("download")
+
 	bundleChan := make(chan response, len(requests))
 	for relayKey := range requests {
 		relayKey := relayKey
 		req := requests[relayKey]
-		pool.Submit(func() {
+		n.DownloadPool.Submit(func() {
 			ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
 			defer cancel()
 			bundles, err := relayClient.GetChunksByRange(ctxTimeout, relayKey, req.chunkRequests)
@@ -130,12 +142,19 @@ func (n *Node) DownloadBundles(ctx context.Context, batch *corev2.Batch, operato
 			}
 		})
 	}
-	pool.StopWait()
+
+	responses := make([]response, len(requests))
+	for i := 0; i < len(requests); i++ {
+		responses[i] = <-bundleChan
+	}
+
+	probe.SetStage("deserialize")
 
 	var err error
 	for i := 0; i < len(requests); i++ {
-		resp := <-bundleChan
+		resp := responses[i]
 		if resp.err != nil {
+			// TODO (cody-littley) this is flaky, and will fail if any relay fails. We should retry failures
 			return nil, nil, fmt.Errorf("failed to get chunks from relays: %v", resp.err)
 		}
 		for i, bundle := range resp.bundles {
