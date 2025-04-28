@@ -466,7 +466,7 @@ func (n *Node) ProcessBatch(
 	rawBlobs []*node.Blob,
 ) (*core.Signature, error) {
 
-	start := core.NowWithNtpOffset()
+	start := time.Now()
 	log := n.Logger
 
 	batchHeaderHash, err := header.GetBatchHeaderHash()
@@ -518,7 +518,7 @@ func (n *Node) ProcessBatch(
 	}
 	storeChan := make(chan storeResult)
 	go func(n *Node) {
-		start := core.NowWithNtpOffset()
+		start := time.Now()
 		keys, err := n.Store.StoreBatch(ctx, header, blobs, rawBlobs)
 		if err != nil {
 			// If batch already exists, we don't store it again, but we should not
@@ -538,7 +538,7 @@ func (n *Node) ProcessBatch(
 	}(n)
 
 	// Validate batch.
-	stageTimer := core.NowWithNtpOffset()
+	stageTimer := time.Now()
 	err = n.ValidateBatch(ctx, header, blobs)
 	if err != nil {
 		// If we have already stored the batch into database, but it's not valid, we
@@ -576,7 +576,7 @@ func (n *Node) ProcessBatch(
 	}
 
 	// Sign batch header hash if all validation checks pass and data items are written to database.
-	stageTimer = core.NowWithNtpOffset()
+	stageTimer = time.Now()
 	signature, err := n.SignMessage(ctx, batchHeaderHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign batch: %w", err)
@@ -607,7 +607,7 @@ func (n *Node) SignMessage(ctx context.Context, data [32]byte) (*core.Signature,
 }
 
 func (n *Node) ValidateBatch(ctx context.Context, header *core.BatchHeader, blobs []*core.BlobMessage) error {
-	start := core.NowWithNtpOffset()
+	start := time.Now()
 	operatorState, err := n.ChainState.GetOperatorStateByOperator(ctx, header.ReferenceBlockNumber, n.Config.ID)
 	if err != nil {
 		return err

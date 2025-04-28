@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/core"
@@ -97,7 +98,7 @@ func (s *SharedBlobStore) StoreBlob(ctx context.Context, blob *core.Blob, reques
 	// don't expire if ttl is 0
 	expiry := uint64(0)
 	if s.blobMetadataStore.ttl > 0 {
-		expiry = uint64(core.NowWithNtpOffset().Add(s.blobMetadataStore.ttl).Unix())
+		expiry = uint64(time.Now().Add(s.blobMetadataStore.ttl).Unix())
 	}
 	metadata := disperser.BlobMetadata{
 		BlobHash:     blobHash,
@@ -154,7 +155,7 @@ func (s *SharedBlobStore) MarkBlobConfirmed(ctx context.Context, existingMetadat
 	}
 	newMetadata := *existingMetadata
 	// Update the TTL if needed
-	ttlFromNow := core.NowWithNtpOffset().Add(s.blobMetadataStore.ttl)
+	ttlFromNow := time.Now().Add(s.blobMetadataStore.ttl)
 	if existingMetadata.Expiry < uint64(ttlFromNow.Unix()) {
 		newMetadata.Expiry = uint64(ttlFromNow.Unix())
 	}

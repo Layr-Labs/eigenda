@@ -269,7 +269,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 	}))
 	defer timer.ObserveDuration()
 
-	dispersalStart := core.NowWithNtpOffset()
+	dispersalStart := time.Now()
 
 	securityParams := blob.RequestHeader.SecurityParams
 	securityParamsStrings := make([]string, len(securityParams))
@@ -306,7 +306,7 @@ func (s *DispersalServer) disperseBlob(ctx context.Context, blob *core.Blob, aut
 		}
 	}
 
-	requestedAt := uint64(core.NowWithNtpOffset().UnixNano())
+	requestedAt := uint64(time.Now().UnixNano())
 	metadataKey, err := s.blobStore.StoreBlob(ctx, blob, requestedAt)
 	if ctxErr := contextError(err); ctxErr != nil {
 		return nil, ctxErr
@@ -705,7 +705,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	}))
 	defer timer.ObserveDuration()
 
-	retrievalStart := core.NowWithNtpOffset()
+	retrievalStart := time.Now()
 
 	origin, err := common.GetClientAddress(ctx, s.rateConfig.ClientIPHeader, 2, true)
 	if err != nil {
@@ -714,7 +714,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		return nil, api.NewErrorInvalidArg(err.Error())
 	}
 
-	stageTimer := core.NowWithNtpOffset()
+	stageTimer := time.Now()
 	// Check blob rate limit
 	if s.ratelimiter != nil {
 		allowed, param, err := s.ratelimiter.AllowRequest(ctx, []common.RequestParams{
@@ -750,7 +750,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 
 	blobIndex := req.GetBlobIndex()
 
-	stageTimer = core.NowWithNtpOffset()
+	stageTimer = time.Now()
 	blobMetadata, err := s.blobStore.GetMetadataInBatch(ctx, batchHeaderHash32, blobIndex)
 	if err != nil {
 		if errors.Is(err, dispcommon.ErrMetadataNotFound) {
@@ -765,7 +765,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 		return nil, api.NewErrorInternal("failed to get blob metadata, please retry")
 	}
 
-	if blobMetadata.Expiry < uint64(core.NowWithNtpOffset().Unix()) {
+	if blobMetadata.Expiry < uint64(time.Now().Unix()) {
 		s.metrics.HandleNotFoundRpcRequest("RetrieveBlob")
 		s.metrics.HandleNotFoundRequest("RetrieveBlob")
 		return nil, api.NewErrorNotFound("no metadata found for the given batch header hash and blob index")
@@ -773,7 +773,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 
 	s.logger.Debug("fetched blob metadata", "batchHeaderHash", req.BatchHeaderHash, "blobIndex", req.BlobIndex, "duration", time.Since(stageTimer).String())
 
-	stageTimer = core.NowWithNtpOffset()
+	stageTimer = time.Now()
 	// Check throughout rate limit
 	blobSize := encoding.GetBlobSize(blobMetadata.ConfirmationInfo.BlobCommitment.Length)
 
@@ -803,7 +803,7 @@ func (s *DispersalServer) RetrieveBlob(ctx context.Context, req *pb.RetrieveBlob
 	}
 	s.logger.Debug("checked retrieval throughput rate limiting", "requesterID", fmt.Sprintf("%s:%s", origin, RetrievalThroughputType.Plug()), "duration (ms)", time.Since(stageTimer).String())
 
-	stageTimer = core.NowWithNtpOffset()
+	stageTimer = time.Now()
 	data, err := s.blobStore.GetBlobContent(ctx, blobMetadata.BlobHash)
 	if err != nil {
 		s.logger.Error("Failed to retrieve blob", "err", err)

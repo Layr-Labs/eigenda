@@ -163,7 +163,7 @@ func NewBatcher(
 
 func (b *Batcher) RecoverState(ctx context.Context) error {
 	b.logger.Info("Recovering state...")
-	start := core.NowWithNtpOffset()
+	start := time.Now()
 	metas, err := b.Queue.GetBlobMetadataByStatus(ctx, disperser.Dispersing)
 	if err != nil {
 		return fmt.Errorf("failed to get blobs in dispersing state: %w", err)
@@ -171,7 +171,7 @@ func (b *Batcher) RecoverState(ctx context.Context) error {
 	expired := 0
 	processing := 0
 	for _, meta := range metas {
-		if meta.Expiry == 0 || meta.Expiry < uint64(core.NowWithNtpOffset().Unix()) {
+		if meta.Expiry == 0 || meta.Expiry < uint64(time.Now().Unix()) {
 			err = b.Queue.MarkBlobFailed(ctx, meta.GetBlobKey())
 			if err != nil {
 				return fmt.Errorf("failed to mark blob (%s) as failed: %w", meta.GetBlobKey(), err)
@@ -757,7 +757,7 @@ func isBlobAttested(signedQuorums map[core.QuorumID]*core.QuorumResult, header *
 
 func (b *Batcher) signalLiveness() {
 	select {
-	case b.HeartbeatChan <- core.NowWithNtpOffset(): // Use NTP-synchronized time for protocol-level heartbeat
+	case b.HeartbeatChan <- time.Now():
 		b.logger.Info("Heartbeat signal sent")
 	default:
 		// This case happens if there's no receiver ready to consume the heartbeat signal.

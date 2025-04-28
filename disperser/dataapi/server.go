@@ -575,7 +575,7 @@ func (s *server) FetchMetricsHandler(c *gin.Context) {
 		s.metrics.ObserveLatency("FetchMetrics", time.Since(handlerStart))
 	}()
 
-	now := core.NowWithNtpOffset()
+	now := time.Now()
 	start, err := strconv.ParseInt(c.DefaultQuery("start", "0"), 10, 64)
 	if err != nil || start == 0 {
 		start = now.Add(-time.Hour * 1).Unix()
@@ -616,7 +616,7 @@ func (s *server) FetchMetricsThroughputHandler(c *gin.Context) {
 		s.metrics.ObserveLatency("FetchMetricsTroughput", time.Since(handlerStart))
 	}()
 
-	now := core.NowWithNtpOffset()
+	now := time.Now()
 	start, err := strconv.ParseInt(c.DefaultQuery("start", "0"), 10, 64)
 	if err != nil || start == 0 {
 		start = now.Add(-time.Hour * 1).Unix()
@@ -691,7 +691,7 @@ func (s *server) FetchOperatorsNonsigningPercentageHandler(c *gin.Context) {
 		s.metrics.ObserveLatency("FetchOperatorsNonsigningPercentageHandler", time.Since(handlerStart))
 	}()
 
-	endTime := core.NowWithNtpOffset()
+	endTime := time.Now()
 	if c.Query("end") != "" {
 
 		var err error

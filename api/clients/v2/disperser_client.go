@@ -106,10 +106,12 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 	}
 
 	// Start NTP sync
-	logger, err := common.NewLogger(common.LoggerConfig{})
+	loggerConfig := common.DefaultLoggerConfig()
+	logger, err := common.NewLogger(loggerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
+	logger = logger.With("component", "DisperserClient")
 	core.StartNtpSync(context.Background(), config.NtpServer, config.NtpSyncInterval, logger)
 
 	return &disperserClient{
@@ -360,7 +362,7 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		return nil, fmt.Errorf("error getting signer's account ID: %w", err)
 	}
 
-	timestamp := uint64(core.NowWithNtpOffset().UnixNano())
+	timestamp := uint64(time.Now().UnixNano())
 
 	signature, err := c.signer.SignPaymentStateRequest(timestamp)
 	if err != nil {

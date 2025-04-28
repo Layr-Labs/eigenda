@@ -292,7 +292,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
 
 	// off-chain account specific payment state
-	now := core.NowWithNtpOffset().Unix()
+	now := time.Now().Unix()
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
 	periodRecords, err := s.meterer.OffchainStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod)
 	if err != nil {

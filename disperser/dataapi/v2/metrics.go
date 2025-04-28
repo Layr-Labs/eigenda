@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,7 +24,7 @@ import (
 //	@Failure	500		{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/summary  [get]
 func (s *ServerV2) FetchMetricsSummary(c *gin.Context) {
-	handlerStart := core.NowWithNtpOffset()
+	handlerStart := time.Now()
 
 	now := handlerStart
 	start, err := strconv.ParseInt(c.DefaultQuery("start", "0"), 10, 64)
@@ -74,7 +73,7 @@ func (s *ServerV2) FetchMetricsSummary(c *gin.Context) {
 //	@Failure	500		{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/timeseries/throughput  [get]
 func (s *ServerV2) FetchMetricsThroughputTimeseries(c *gin.Context) {
-	handlerStart := core.NowWithNtpOffset()
+	handlerStart := time.Now()
 
 	now := handlerStart
 	start, err := strconv.ParseInt(c.DefaultQuery("start", "0"), 10, 64)
@@ -114,7 +113,7 @@ func (s *ServerV2) FetchMetricsThroughputTimeseries(c *gin.Context) {
 //	@Failure	500			{object}	ErrorResponse	"error: Server error"
 //	@Router		/metrics/timeseries/network-signing-rate [get]
 func (s *ServerV2) FetchNetworkSigningRate(c *gin.Context) {
-	handlerStart := core.NowWithNtpOffset()
+	handlerStart := time.Now()
 	var err error
 
 	now := handlerStart

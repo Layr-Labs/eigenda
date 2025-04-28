@@ -19,7 +19,6 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/flags"
 	nodegrpc "github.com/Layr-Labs/eigenda/node/grpc"
@@ -59,17 +58,6 @@ func NodeMain(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
-	// Set default NTP server and interval if not provided
-	if config.NtpServer == "" {
-		config.NtpServer = "pool.ntp.org"
-	}
-	if config.NtpSyncInterval == 0 {
-		config.NtpSyncInterval = 5 * time.Minute
-	}
-
-	// Start NTP sync
-	core.StartNtpSync(context.Background(), config.NtpServer, config.NtpSyncInterval, logger)
 
 	pubIPProvider := pubip.ProviderOrDefault(logger, config.PubIPProviders...)
 

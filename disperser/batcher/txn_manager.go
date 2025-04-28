@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/core"
 	walletsdk "github.com/Layr-Labs/eigensdk-go/chainio/clients/wallet"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum"
@@ -105,8 +104,7 @@ func NewTxnRequest(tx *types.Transaction, tag string, value *big.Int, metadata i
 		Value:    value,
 		Metadata: metadata,
 
-		// Use NTP-synchronized time for protocol-level timestamping to ensure cross-node agreement.
-		requestedAt: core.NowWithNtpOffset(),
+		requestedAt: time.Now(),
 		txAttempts:  make([]*transaction, 0),
 	}
 }
@@ -190,8 +188,7 @@ func (t *txnManager) ProcessTransaction(ctx context.Context, req *TxnRequest) er
 	req.txAttempts = append(req.txAttempts, &transaction{
 		TxID:        txID,
 		Transaction: txn,
-		// Use NTP-synchronized time for protocol-level timestamping to ensure cross-node agreement.
-		requestedAt: core.NowWithNtpOffset(),
+		requestedAt: time.Now(),
 	})
 
 	t.requestChan <- req
@@ -370,8 +367,6 @@ func (t *txnManager) monitorTransaction(ctx context.Context, req *TxnRequest) (*
 			req.txAttempts = append(req.txAttempts, &transaction{
 				TxID:        txID,
 				Transaction: newTx,
-				// Use NTP-synchronized time for protocol-level timestamping to ensure cross-node agreement.
-				requestedAt: core.NowWithNtpOffset(),
 			})
 			numSpeedUps++
 		} else {

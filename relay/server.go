@@ -141,7 +141,7 @@ func NewServer(
 	}
 
 	replayGuardian := replay.NewReplayGuardian(
-		core.NowWithNtpOffset,
+		time.Now,
 		config.GetChunksRequestMaxPastAge,
 		config.GetChunksRequestMaxPastAge)
 
@@ -161,7 +161,7 @@ func NewServer(
 
 // GetBlob retrieves a blob stored by the relay.
 func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.GetBlobReply, error) {
-	start := core.NowWithNtpOffset()
+	start := time.Now()
 
 	if s.config.Timeouts.GetBlobTimeout > 0 {
 		var cancel context.CancelFunc
@@ -176,7 +176,7 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	}
 	s.logger.Debug("GetBlob request received", "key", key.Hex())
 
-	err = s.blobRateLimiter.BeginGetBlobOperation(core.NowWithNtpOffset())
+	err = s.blobRateLimiter.BeginGetBlobOperation(time.Now())
 	if err != nil {
 		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("rate limit exceeded: %v", err))
 	}
@@ -193,11 +193,11 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 		return nil, api.NewErrorNotFound("blob not found")
 	}
 
-	finishedFetchingMetadata := core.NowWithNtpOffset()
+	finishedFetchingMetadata := time.Now()
 	s.metrics.ReportBlobMetadataLatency(finishedFetchingMetadata.Sub(start))
 
 	s.metrics.ReportBlobRequestedBandwidthUsage(int(metadata.blobSizeBytes))
-	err = s.blobRateLimiter.RequestGetBlobBandwidth(core.NowWithNtpOffset(), metadata.blobSizeBytes)
+	err = s.blobRateLimiter.RequestGetBlobBandwidth(time.Now(), metadata.blobSizeBytes)
 	if err != nil {
 		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("bandwidth limit exceeded: %v", err))
 	}
@@ -208,8 +208,8 @@ func (s *Server) GetBlob(ctx context.Context, request *pb.GetBlobRequest) (*pb.G
 	}
 
 	s.metrics.ReportBlobBandwidthUsage(len(data))
-	s.metrics.ReportBlobDataLatency(finishedFetchingMetadata.Sub(start))
-	s.metrics.ReportBlobLatency(finishedFetchingMetadata.Sub(start))
+	s.metrics.ReportBlobDataLatency(time.Since(finishedFetchingMetadata))
+	s.metrics.ReportBlobLatency(time.Since(start))
 
 	reply := &pb.GetBlobReply{
 		Blob: data,
@@ -240,7 +240,7 @@ func (s *Server) validateGetChunksRequest(request *pb.GetChunksRequest) error {
 
 // GetChunks retrieves chunks from blobs stored by the relay.
 func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*pb.GetChunksReply, error) {
-	start := core.NowWithNtpOffset()
+	start := time.Now()
 
 	if s.config.Timeouts.GetChunksTimeout > 0 {
 		var cancel context.CancelFunc
@@ -278,13 +278,13 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		s.logger.Debug("received authenticated GetChunks request", "client", clientAddress)
 	}
 
-	finishedAuthenticating := core.NowWithNtpOffset()
+	finishedAuthenticating := time.Now()
 	if s.authenticator != nil {
 		s.metrics.ReportChunkAuthenticationLatency(finishedAuthenticating.Sub(start))
 	}
 
 	clientID := string(request.OperatorId)
-	err = s.chunkRateLimiter.BeginGetChunkOperation(core.NowWithNtpOffset(), clientID)
+	err = s.chunkRateLimiter.BeginGetChunkOperation(time.Now(), clientID)
 	if err != nil {
 		return nil, api.NewErrorResourceExhausted(fmt.Sprintf("rate limit exceeded: %v", err))
 	}
@@ -302,7 +302,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 			"error fetching metadata for blob, check if blob exists and is assigned to this relay: %v", err))
 	}
 
-	finishedFetchingMetadata := core.NowWithNtpOffset()
+	finishedFetchingMetadata := time.Now()
 	s.metrics.ReportChunkMetadataLatency(finishedFetchingMetadata.Sub(finishedAuthenticating))
 
 	requiredBandwidth, err := computeChunkRequestRequiredBandwidth(request, mMap)
@@ -310,7 +310,7 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		return nil, api.NewErrorInternal(fmt.Sprintf("error computing required bandwidth: %v", err))
 	}
 	s.metrics.ReportGetChunksRequestedBandwidthUsage(requiredBandwidth)
-	err = s.chunkRateLimiter.RequestGetChunkBandwidth(core.NowWithNtpOffset(), clientID, requiredBandwidth)
+	err = s.chunkRateLimiter.RequestGetChunkBandwidth(time.Now(), clientID, requiredBandwidth)
 	if err != nil {
 		if strings.Contains(err.Error(), "internal error") {
 			return nil, api.NewErrorInternal(err.Error())
@@ -329,8 +329,8 @@ func (s *Server) GetChunks(ctx context.Context, request *pb.GetChunksRequest) (*
 		return nil, api.NewErrorInternal(fmt.Sprintf("error gathering chunk data: %v", err))
 	}
 
-	s.metrics.ReportChunkDataLatency(finishedFetchingMetadata.Sub(finishedAuthenticating))
-	s.metrics.ReportChunkLatency(finishedFetchingMetadata.Sub(start))
+	s.metrics.ReportChunkDataLatency(time.Since(finishedFetchingMetadata))
+	s.metrics.ReportChunkLatency(time.Since(start))
 
 	return &pb.GetChunksReply{
 		Data: bytesToSend,

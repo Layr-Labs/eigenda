@@ -474,20 +474,6 @@ var (
 	// 2. Document their purpose and impact
 	/////////////////////////////////////////////////////////////////////////////
 
-	NtpServerFlag = cli.StringFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "ntp-server"),
-		Usage:    "NTP server to use for clock synchronization",
-		Required: false,
-		Value:    "pool.ntp.org",
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "NTP_SERVER"),
-	}
-	NtpSyncIntervalFlag = cli.DurationFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "ntp-sync-interval"),
-		Usage:    "Interval for NTP synchronization",
-		Required: false,
-		Value:    5 * time.Minute,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "NTP_SYNC_INTERVAL"),
-	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -556,8 +542,6 @@ var optionalFlags = []cli.Flag{
 	LevelDBEnableSyncWritesV2Flag,
 	LittDBEnabledFlag,
 	DownloadPoolSizeFlag,
-	NtpServerFlag,
-	NtpSyncIntervalFlag,
 }
 
 func init() {
