@@ -1,5 +1,3 @@
-
-
 dt := $(shell date '+%YY-%mM-%dD-%HH-%MM-%SS')
 
 setup-geth:
@@ -13,7 +11,7 @@ stop-geth:
 	cd geth && docker compose down
 
 
-.PHONY: new-anvil new-docker-anvil chain localstack exp deploy-all stop-infra run-e2e run-e2e-nochurner run-e2e-nograph clean
+.PHONY: new-anvil new-docker-anvil chain localstack exp deploy-all stop-infra run-e2e run-e2e-nochurner run-e2e-nograph clean test
 
 new-anvil:
 	mkdir -p "testdata/$(dt)"
@@ -56,3 +54,6 @@ run-e2e-nograph:
 
 clean:
 	rm -rf testdata/*
+
+test:
+	go test -v ./tests/... ./tests/clock_drift_integration_test.go
