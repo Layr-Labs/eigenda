@@ -132,6 +132,7 @@ func (p *SequenceProbe) End() {
 	if p == nil || p.ended {
 		return
 	}
+	p.ended = true
 
 	now := time.Now()
 	elapsed := ToMilliseconds(now.Sub(p.currentStageStart))
