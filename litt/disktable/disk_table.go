@@ -212,14 +212,18 @@ func NewDiskTable(
 	} else {
 		nextSegmentIndex = highestSegmentIndex + 1
 	}
+	salt := [16]byte{}
+	_, err = config.SaltShaker.Read(salt[:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to read salt: %w", err)
+	}
 	mutableSegment, err := segment.CreateSegment(
 		config.Logger,
 		fatalErrorHandler,
 		nextSegmentIndex,
 		segDirs,
-		config.Clock(),
 		metadata.GetShardingFactor(),
-		config.SaltShaker.Uint32(),
+		([16]byte)(salt),
 		config.Fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mutable segment: %w", err)

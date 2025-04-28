@@ -95,9 +95,8 @@ func CreateSegment(
 	fatalErrorHandler *util.FatalErrorHandler,
 	index uint32,
 	parentDirectories []string,
-	now time.Time,
 	shardingFactor uint32,
-	salt uint32,
+	salt [16]byte,
 	fsync bool) (*Segment, error) {
 
 	if len(parentDirectories) == 0 {
@@ -314,6 +313,10 @@ func (s *Segment) GetShard(key []byte) uint32 {
 	if s.metadata.shardingFactor == 1 {
 		// Shortcut: if we have one shard, we don't need to hash the key to figure out the mapping.
 		return 0
+	}
+
+	if s.metadata.serializationVersion == OldHashFunctionSerializationVersion {
+		return util.LegacyHashKey(key, s.metadata.legacySalt)
 	}
 
 	return util.HashKey(key, s.metadata.salt) % s.metadata.shardingFactor

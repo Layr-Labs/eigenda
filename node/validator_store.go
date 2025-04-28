@@ -3,9 +3,9 @@ package node
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"math/rand"
 	"os"
 	"path"
 	"strconv"
@@ -109,7 +109,7 @@ type validatorStore struct {
 	duplicateRequestLock *common.IndexLock
 
 	// The salt used to prevent an attacker from causing hash collisions in the duplicate request lock.
-	duplicateRequestSalt uint32
+	duplicateRequestSalt [16]byte
 
 	// A flag indicating whether the migration is complete. Used to prevent a double migration race condition
 	// (which is possible only in a unit test).
@@ -282,6 +282,12 @@ func NewValidatorStore(
 		}
 	}
 
+	salt := [16]byte{}
+	_, err = rand.Read(salt[:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random salt: %v", err)
+	}
+
 	store := &validatorStore{
 		logger:                logger,
 		timeSource:            timeSource,
@@ -294,7 +300,7 @@ func NewValidatorStore(
 		ttl:                   ttl,
 		migrationCompleteTime: migrationComplete,
 		duplicateRequestLock:  common.NewIndexLock(1024),
-		duplicateRequestSalt:  rand.Uint32(),
+		duplicateRequestSalt:  salt,
 	}
 
 	if config.LittDBEnabled && levelDBExists {
