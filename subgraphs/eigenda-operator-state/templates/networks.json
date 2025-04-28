@@ -169,15 +169,15 @@
       "startBlock": 8153008
     },
     "EjectionManager": {
-      "address": "0x399dc61317b0Cd533f931bCf23E1d646bF51C09B",
+      "address": "0xc9d4541C409f15C0408c022D7e8C3F37Ac960f66",
       "startBlock": 8153008
     },
     "RegistryCoordinator": {
-      "address": "0xD8110B4A0465366140D4233772Bc383128e892Ca",
+      "address": "0xAF21d3811B5d23D5466AC83BA7a9c34c261A8D81",
       "startBlock": 8153008
     },
     "RegistryCoordinator_Operator": {
-      "address": "0xD8110B4A0465366140D4233772Bc383128e892Ca",
+      "address": "0xAF21d3811B5d23D5466AC83BA7a9c34c261A8D81",
       "startBlock": 8153008
     }
   },
