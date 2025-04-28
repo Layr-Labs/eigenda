@@ -384,7 +384,7 @@ func TestReceiveSignatures_Concurrency(t *testing.T) {
 			signingMessage := createSigningMessage(boundID, operatorKeys[boundID], hashToSign, withError)
 			signingMessageChan <- signingMessage
 
-			if !withError {
+			if !withError && hashToSign == batchHeaderHash {
 				signatureMapMutex.Lock()
 				defer signatureMapMutex.Unlock()
 				operatorSignatures[boundID] = signingMessage.Signature
