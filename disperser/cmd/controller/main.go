@@ -38,9 +38,9 @@ var (
 	gitCommit string
 	gitDate   string
 
-	controllerReadinessProbePath string        = "/tmp/controller-ready"
-	controllerHealthProbePath    string        = "/tmp/controller-health"
-	controllerMaxStallDuration   time.Duration = 240 * time.Second
+	controllerReadinessProbePath = "/tmp/controller-ready"
+	controllerHealthProbePath    = "/tmp/controller-health"
+	controllerMaxStallDuration   = 240 * time.Second
 )
 
 func main() {
@@ -63,7 +63,12 @@ func main() {
 
 	controllerLivenessChan := make(chan healthcheck.HeartbeatMessage, 10)
 	// Start heartbeat monitor
-	go healthcheck.HeartbeatMonitor(controllerHealthProbePath, controllerMaxStallDuration, controllerLivenessChan)
+	go func() {
+		err := healthcheck.HeartbeatMonitor(controllerHealthProbePath, controllerMaxStallDuration, controllerLivenessChan)
+		if err != nil {
+			log.Printf("Failed to start heartbeatMonitor: %v", err)
+		}
+	}()
 
 	select {}
 }
