@@ -21,11 +21,13 @@ lint:
       - proto/disperser/v2/disperser_v2.proto
       - proto/node/node.proto
       - proto/validator/node_v2.proto
+      - proto/encoder/encoder.proto
     ENUM_ZERO_VALUE_SUFFIX:
       - proto/disperser/disperser.proto
       - proto/disperser/v2/disperser_v2.proto
       - proto/node/node.proto
       - proto/validator/node_v2.proto
+      - proto/encoder/encoder.proto
     FIELD_LOWER_SNAKE_CASE:
       - proto/validator/node_v2.proto
     PACKAGE_VERSION_SUFFIX:
@@ -36,6 +38,7 @@ lint:
       - proto/relay/relay.proto
       - proto/retriever/retriever.proto
       - proto/validator/node_v2.proto
+      - proto/encoder/encoder.proto
     RPC_REQUEST_RESPONSE_UNIQUE:
       - proto/node/node.proto
       - proto/validator/node_v2.proto
@@ -53,6 +56,8 @@ lint:
       - proto/retriever/retriever.proto
       - proto/retriever/v2/retriever_v2.proto
       - proto/validator/node_v2.proto
+      - proto/encoder/encoder.proto
+      - proto/encoder/v2/encoder.proto
     SERVICE_SUFFIX:
       - proto/churner/churner.proto
       - proto/disperser/disperser.proto
@@ -62,6 +67,8 @@ lint:
       - proto/retriever/retriever.proto
       - proto/retriever/v2/retriever_v2.proto
       - proto/validator/node_v2.proto
+      - proto/encoder/encoder.proto
+      - proto/encoder/v2/encoder.proto
 breaking:
   use:
     - FILE
