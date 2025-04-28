@@ -103,7 +103,9 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 	message [32]byte,
 	messageChan chan SigningMessage,
 ) (*QuorumAttestation, error) {
-	attestationChan, err := ReceiveSignatures(ctx, a.Logger, state, message, messageChan, 1*time.Second)
+	// tick interval is very long, since we don't actually need periodic attestation updates in this case. we only
+	// care about the very last attestation returned.
+	attestationChan, err := ReceiveSignatures(ctx, a.Logger, state, message, messageChan, 1*time.Minute)
 	if err != nil {
 		return nil, fmt.Errorf("receive signatures: %w", err)
 	}

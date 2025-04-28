@@ -332,7 +332,7 @@ func (d *Dispatcher) HandleSignatures(
 	for _, key := range batchData.BlobKeys {
 		err := d.blobMetadataStore.UpdateBlobStatus(ctx, key, v2.GatheringSignatures)
 		if err != nil {
-			d.logger.Error("update blob status to 'gathering signatures'",
+			d.logger.Error("failed to update blob status to 'gathering signatures'",
 				"blobKey", key.Hex(),
 				"batchHeaderHash", batchHeaderHash,
 				"err", err)
@@ -383,7 +383,7 @@ func (d *Dispatcher) HandleSignatures(
 		return receiveSignaturesErr
 	}
 
-	// keep track of the final attestation, since that's the attestation which will determine to final batch status
+	// keep track of the final attestation, since that's the attestation which will determine the final batch status
 	finalAttestation := &core.QuorumAttestation{}
 	// continue receiving attestations from the channel until it's closed
 	for receivedQuorumAttestation := range attestationChan {
@@ -401,10 +401,10 @@ func (d *Dispatcher) HandleSignatures(
 	updateBatchStatusStartTime := time.Now()
 	_, quorumPercentages := d.parseAndLogQuorumPercentages(batchHeaderHash, finalAttestation.QuorumResults)
 	err = d.updateBatchStatus(ctx, batchData, quorumPercentages)
+	d.metrics.reportUpdateBatchStatusLatency(time.Since(updateBatchStatusStartTime))
 	if err != nil {
 		return fmt.Errorf("update batch status: %w", err)
 	}
-	d.metrics.reportUpdateBatchStatusLatency(time.Since(updateBatchStatusStartTime))
 
 	// Track attestation metrics
 	operatorCount := make(map[core.QuorumID]int)
@@ -463,10 +463,10 @@ func (d *Dispatcher) submitAttestation(
 
 	putAttestationStartTime := time.Now()
 	err = d.blobMetadataStore.PutAttestation(ctx, attestation)
+	d.metrics.reportPutAttestationLatency(time.Since(putAttestationStartTime))
 	if err != nil {
 		return fmt.Errorf("error calling PutAttestation: %w", err)
 	}
-	d.metrics.reportPutAttestationLatency(time.Since(putAttestationStartTime))
 
 	return nil
 }

@@ -112,14 +112,14 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 
 	// we expect a single SigningMessage from each operator
 	for len(sr.signatureMessageReceived) < operatorCount {
-		contextExpired := false
+		breakLoop := false
 		select {
 		case <-ctx.Done():
 			sr.logger.Infof(
 				"global batch attestation timeout exceeded for batch %s. Received and processed %d/%d signing "+
 					"messages. %d of the signing messages caused an error during processing",
 				hex.EncodeToString(sr.batchHeaderHash[:]), len(sr.signatureMessageReceived), operatorCount, errorCount)
-			contextExpired = true
+			breakLoop = true
 		case signingMessage, ok := <-sr.signingMessageChan:
 			if !ok {
 				sr.logger.Errorf(
@@ -129,8 +129,8 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 					len(sr.signatureMessageReceived),
 					operatorCount,
 					errorCount)
-				contextExpired = true
-				continue
+				breakLoop = true
+				break
 			}
 			indexedOperatorInfo, found := sr.indexedOperatorState.IndexedOperators[signingMessage.Operator]
 			if !found {
@@ -179,7 +179,7 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 			newSignaturesGathered = false
 		}
 
-		if contextExpired {
+		if breakLoop {
 			break
 		}
 	}
