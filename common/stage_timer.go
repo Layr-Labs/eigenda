@@ -40,6 +40,8 @@ type SequenceProbe struct {
 	// a history of operations, concatenate and log if a lifecycle description is needed.
 	// If nil, then no history is captured.
 	history *strings.Builder
+	// true if End() has been called.
+	ended bool
 }
 
 // NewStageTimer creates a new stageTimer with the given prefix and name.
@@ -125,8 +127,9 @@ func (p *SequenceProbe) SetStage(stage string) {
 }
 
 // End completes the current sequence. It is important to call this before discarding the sequenceProbe.
+// This function has no effect if called more than once.
 func (p *SequenceProbe) End() {
-	if p == nil {
+	if p == nil || p.ended {
 		return
 	}
 
