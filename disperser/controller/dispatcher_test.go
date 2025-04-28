@@ -613,6 +613,7 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 		FinalizationBlockDelay:  finalizationBlockDelay,
 		AttestationTimeout:      1 * time.Second,
 		BatchAttestationTimeout: 2 * time.Second,
+		SignatureTickInterval:   1 * time.Second,
 		NumRequestRetries:       3,
 		MaxBatchSize:            maxBatchSize,
 	}, blobMetadataStore, pool, mockChainState, agg, nodeClientManager, logger, prometheus.NewRegistry(), beforeDispatch, blobSet)
