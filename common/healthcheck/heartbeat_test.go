@@ -1,6 +1,7 @@
-package test
+package healthcheck_test
 
 import (
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
@@ -8,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,12 +39,16 @@ func TestHeartbeatMonitor_WritesSummaryAndStops(t *testing.T) {
 	dir := t.TempDir()
 	fpath := filepath.Join(dir, "hb.txt")
 
+	loggerConfig := common.DefaultLoggerConfig()
+	logger, err := common.NewLogger(loggerConfig)
+	assert.NoError(t, err)
+
 	// Make a liveness channel and start the monitor.
 	ch := make(chan healthcheck.HeartbeatMessage)
 	done := make(chan error, 1)
 	go func() {
 		// monitor will exit when channel is closed
-		err := healthcheck.HeartbeatMonitor(fpath, 50*time.Millisecond, ch)
+		err := healthcheck.HeartbeatMonitor(fpath, 50*time.Millisecond, ch, logger)
 		done <- err
 	}()
 
@@ -78,10 +82,14 @@ func TestHeartbeatMonitor_StallWarning(t *testing.T) {
 	dir := t.TempDir()
 	fpath := filepath.Join(dir, "hb-stall.txt")
 
+	loggerConfig := common.DefaultLoggerConfig()
+	logger, err := common.NewLogger(loggerConfig)
+	assert.NoError(t, err)
+
 	ch := make(chan healthcheck.HeartbeatMessage)
 	done := make(chan error, 1)
 	go func() {
-		err := healthcheck.HeartbeatMonitor(fpath, 20*time.Millisecond, ch)
+		err := healthcheck.HeartbeatMonitor(fpath, 20*time.Millisecond, ch, logger)
 		done <- err
 	}()
 
@@ -99,6 +107,6 @@ func TestHeartbeatMonitor_StallWarning(t *testing.T) {
 
 	// since no heartbeats arrived and nothing was written to file, the file may not exist
 	// ensure no panic and exit.
-	_, err := os.Stat(fpath)
+	_, err = os.Stat(fpath)
 	require.True(t, os.IsNotExist(err) || err == nil)
 }

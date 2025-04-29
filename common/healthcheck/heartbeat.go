@@ -2,7 +2,6 @@ package healthcheck
 
 import (
 	"fmt"
-	"github.com/Layr-Labs/eigenda/common"
 	"os"
 	"strings"
 	"time"
@@ -17,13 +16,7 @@ type HeartbeatMessage struct {
 
 // HeartbeatMonitor listens for heartbeat messages from different components, updates their last seen timestamps,
 // writes a summary to the specified file, and logs warnings if any component stalls.
-func HeartbeatMonitor(filePath string, maxStallDuration time.Duration, livenessChan <-chan HeartbeatMessage) error {
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err := common.NewLogger(loggerConfig)
-	if err != nil {
-		return fmt.Errorf("heartbeat monitor: could not create logger: %w", err)
-	}
-
+func HeartbeatMonitor(filePath string, maxStallDuration time.Duration, livenessChan <-chan HeartbeatMessage, logger logging.Logger) error {
 	// Map to keep track of last heartbeat per component
 	lastHeartbeats := make(map[string]time.Time)
 	// Create a timer that periodically checks for stalls
@@ -33,7 +26,7 @@ func HeartbeatMonitor(filePath string, maxStallDuration time.Duration, livenessC
 		select {
 		case hb, ok := <-livenessChan:
 			if !ok {
-				logger.Info("livenessChan closed, stopping health probe.")
+				logger.Warn("livenessChan closed, stopping health probe.")
 				return nil
 			}
 
@@ -78,8 +71,8 @@ func HeartbeatMonitor(filePath string, maxStallDuration time.Duration, livenessC
 	}
 }
 
-// SignalHeartbeat sends a non-blocking heartbeat message (with component identifier and timestamp) on the given channel.
-func SignalHeartbeat(component string, livenessChan chan HeartbeatMessage, logger logging.Logger) {
+// SignalHeartbeat sends a non-blocking heartbeat message (with component identifier and timestamp) to the given send-only channel.
+func SignalHeartbeat(component string, livenessChan chan<- HeartbeatMessage, logger logging.Logger) {
 	hb := HeartbeatMessage{
 		Component: component,
 		Timestamp: time.Now(),

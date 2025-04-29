@@ -56,20 +56,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("application failed: %v", err)
 	}
-
-	if _, err := os.Create(controllerHealthProbePath); err != nil {
-		log.Printf("Failed to create healthProbe file: %v", err)
-	}
-
-	controllerLivenessChan := make(chan healthcheck.HeartbeatMessage, 10)
-	// Start heartbeat monitor
-	go func() {
-		err := healthcheck.HeartbeatMonitor(controllerHealthProbePath, controllerMaxStallDuration, controllerLivenessChan)
-		if err != nil {
-			log.Printf("Failed to start heartbeatMonitor: %v", err)
-		}
-	}()
-
 	select {}
 }
 
@@ -142,7 +128,7 @@ func RunController(ctx *cli.Context) error {
 		logger,
 		metricsRegistry,
 		encodingManagerBlobSet,
-		func() { healthcheck.SignalHeartbeat("encodingManager", controllerLivenessChan, logger) },
+		controllerLivenessChan,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create encoding manager: %v", err)
@@ -216,7 +202,7 @@ func RunController(ctx *cli.Context) error {
 		metricsRegistry,
 		beforeDispatch,
 		dispatcherBlobSet,
-		func() { healthcheck.SignalHeartbeat("dispatcher", controllerLivenessChan, logger) },
+		controllerLivenessChan,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create dispatcher: %v", err)
@@ -250,6 +236,18 @@ func RunController(ctx *cli.Context) error {
 	if _, err := os.Create(controllerReadinessProbePath); err != nil {
 		logger.Warn("Failed to create readiness file", "error", err, "path", controllerReadinessProbePath)
 	}
+
+	if _, err := os.Create(controllerHealthProbePath); err != nil {
+		logger.Warn("Failed to create healthProbe file: %v", err)
+	}
+
+	// Start heartbeat monitor
+	go func() {
+		err := healthcheck.HeartbeatMonitor(controllerHealthProbePath, controllerMaxStallDuration, controllerLivenessChan, logger)
+		if err != nil {
+			logger.Warn("Failed to start heartbeatMonitor: %v", err)
+		}
+	}()
 
 	return nil
 }
