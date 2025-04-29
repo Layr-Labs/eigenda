@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -37,6 +38,8 @@ type LoadGenerator struct {
 	finishedChan chan struct{}
 	// The metrics for the load generator.
 	metrics *loadGeneratorMetrics
+	// Pool of random number generators
+	randPool *sync.Pool
 }
 
 // ReadConfigFile loads a LoadGeneratorConfig from a file.
@@ -87,6 +90,13 @@ func NewLoadGenerator(
 
 	client.SetCertVerifierAddress(client.GetConfig().EigenDACertVerifierAddressQuorums0_1)
 
+	// Initialize a pool for random number generators
+	randPool := &sync.Pool{
+		New: func() interface{} {
+			return random.NewTestRandomNoPrint()
+		},
+	}
+
 	return &LoadGenerator{
 		ctx:               ctx,
 		cancel:            cancel,
@@ -98,6 +108,7 @@ func NewLoadGenerator(
 		alive:             atomic.Bool{},
 		finishedChan:      make(chan struct{}),
 		metrics:           metrics,
+		randPool:          randPool,
 	}
 }
 
@@ -129,7 +140,10 @@ func (l *LoadGenerator) run() {
 }
 
 func (l *LoadGenerator) readAndWriteBlob() {
-	rand := random.NewTestRandomNoPrint()
+	// Get a random generator from the pool
+	randObj := l.randPool.Get()
+	rand := randObj.(*random.TestRandom)
+	defer l.randPool.Put(randObj) // Return to pool when done
 
 	l.submissionLimiter <- struct{}{}
 	blobKey, payload, eigenDACert, err := l.submitBlob(rand)
