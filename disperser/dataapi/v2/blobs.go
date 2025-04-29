@@ -337,7 +337,7 @@ func (s *ServerV2) getBlobAttestationInfoResponse(ctx context.Context, blobKey c
 	return &BlobAttestationInfoResponse{
 		BlobKey:         blobKey.Hex(),
 		BatchHeaderHash: hex.EncodeToString(batchHeaderHash[:]),
-		InclusionInfo:   attestationInfo.InclusionInfo,
+		InclusionInfo:   createBlobInclusionInfo(attestationInfo.InclusionInfo),
 		AttestationInfo: &AttestationInfo{
 			Attestation: attestationInfo.Attestation,
 			Signers:     blobSigners,

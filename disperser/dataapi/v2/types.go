@@ -9,7 +9,7 @@ import (
 	disperserv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 )
 
-// Base types
+// Base types shared acorss various API response types
 type (
 	OperatorIdentity struct {
 		OperatorId      string `json:"operator_id"`
@@ -25,6 +25,13 @@ type (
 	BatchHeader struct {
 		BatchRoot            string `json:"batch_root"`
 		ReferenceBlockNumber uint64 `json:"reference_block_number"`
+	}
+
+	BlobInclusionInfo struct {
+		BatchHeader    *BatchHeader `json:"batch_header"`
+		BlobKey        string       `json:"blob_key"`
+		BlobIndex      uint32       `json:"blob_index"`
+		InclusionProof string       `json:"inclusion_proof"`
 	}
 )
 
@@ -109,10 +116,10 @@ type (
 	}
 
 	BlobAttestationInfoResponse struct {
-		BlobKey         string                    `json:"blob_key"`
-		BatchHeaderHash string                    `json:"batch_header_hash"`
-		InclusionInfo   *corev2.BlobInclusionInfo `json:"blob_inclusion_info"`
-		AttestationInfo *AttestationInfo          `json:"attestation_info"`
+		BlobKey         string             `json:"blob_key"`
+		BatchHeaderHash string             `json:"batch_header_hash"`
+		InclusionInfo   *BlobInclusionInfo `json:"blob_inclusion_info"`
+		AttestationInfo *AttestationInfo   `json:"attestation_info"`
 	}
 
 	BlobInfo struct {
@@ -133,11 +140,11 @@ type (
 	}
 
 	BatchResponse struct {
-		BatchHeaderHash    string                      `json:"batch_header_hash"`
-		SignedBatch        *SignedBatch                `json:"signed_batch"`
-		BlobKeys           []string                    `json:"blob_key"`
-		BlobInclusionInfos []*corev2.BlobInclusionInfo `json:"blob_inclusion_infos"`
-		BlobCertificates   []*corev2.BlobCertificate   `json:"blob_certificates"`
+		BatchHeaderHash    string                    `json:"batch_header_hash"`
+		SignedBatch        *SignedBatch              `json:"signed_batch"`
+		BlobKeys           []string                  `json:"blob_key"`
+		BlobInclusionInfos []*BlobInclusionInfo      `json:"blob_inclusion_infos"`
+		BlobCertificates   []*corev2.BlobCertificate `json:"blob_certificates"`
 	}
 
 	BatchInfo struct {
@@ -196,5 +203,14 @@ func createBatchHeader(bh *corev2.BatchHeader) *BatchHeader {
 	return &BatchHeader{
 		BatchRoot:            hex.EncodeToString(bh.BatchRoot[:]),
 		ReferenceBlockNumber: bh.ReferenceBlockNumber,
+	}
+}
+
+func createBlobInclusionInfo(bi *corev2.BlobInclusionInfo) *BlobInclusionInfo {
+	return &BlobInclusionInfo{
+		BatchHeader:    createBatchHeader(bi.BatchHeader),
+		BlobKey:        hex.EncodeToString(bi.BlobKey[:]),
+		BlobIndex:      bi.BlobIndex,
+		InclusionProof: hex.EncodeToString(bi.InclusionProof),
 	}
 }
