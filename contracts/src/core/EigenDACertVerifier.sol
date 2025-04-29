@@ -36,6 +36,11 @@ contract EigenDACertVerifier is EigenDACertVerifierV1, EigenDACertVerifierV2 {
         )
     {}
 
+    /**
+     * @notice Verifies the security parameters for a blob cert
+     * @param blobParams The blob params to verify
+     * @param securityThresholds The security thresholds to verify against
+     */
     function verifyDACertSecurityParams(
         VersionedBlobParams memory blobParams,
         SecurityThresholds memory securityThresholds
