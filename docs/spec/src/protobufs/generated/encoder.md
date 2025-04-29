@@ -3,90 +3,84 @@
 
 ## Table of Contents
 
-- [encoder/encoder.proto](#encoder_encoder-proto)
-    - [BlobCommitment](#encoder-BlobCommitment)
-    - [EncodeBlobReply](#encoder-EncodeBlobReply)
-    - [EncodeBlobRequest](#encoder-EncodeBlobRequest)
-    - [EncodingParams](#encoder-EncodingParams)
+- [encoder/v2/encoder.proto](#encoder_v2_encoder-proto)
+    - [EncodeBlobReply](#encoder-v2-EncodeBlobReply)
+    - [EncodeBlobRequest](#encoder-v2-EncodeBlobRequest)
+    - [EncodingParams](#encoder-v2-EncodingParams)
+    - [FragmentInfo](#encoder-v2-FragmentInfo)
   
-    - [ChunkEncodingFormat](#encoder-ChunkEncodingFormat)
-  
-    - [Encoder](#encoder-Encoder)
+    - [Encoder](#encoder-v2-Encoder)
   
 - [Scalar Value Types](#scalar-value-types)
 
 
 
-<a name="encoder_encoder-proto"></a>
+<a name="encoder_v2_encoder-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## encoder/encoder.proto
+## encoder/v2/encoder.proto
 
 
 
-<a name="encoder-BlobCommitment"></a>
-
-### BlobCommitment
-BlobCommitments contains the blob&#39;s commitment, degree proof, and the actual degree
-DEPRECATED: use common.BlobCommitment instead
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| commitment | [bytes](#bytes) |  |  |
-| length_commitment | [bytes](#bytes) |  |  |
-| length_proof | [bytes](#bytes) |  |  |
-| length | [uint32](#uint32) |  |  |
-
-
-
-
-
-
-<a name="encoder-EncodeBlobReply"></a>
+<a name="encoder-v2-EncodeBlobReply"></a>
 
 ### EncodeBlobReply
-EncodeBlobReply returns all encoded chunks along with BlobCommitment for the same,
-where Chunk is the smallest unit that is distributed to DA nodes
+EncodeBlobReply contains metadata about the encoded chunks
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| commitment | [BlobCommitment](#encoder-BlobCommitment) |  |  |
-| chunks | [bytes](#bytes) | repeated |  |
-| chunk_encoding_format | [ChunkEncodingFormat](#encoder-ChunkEncodingFormat) |  | How the above chunks are encoded. |
+| fragment_info | [FragmentInfo](#encoder-v2-FragmentInfo) |  |  |
 
 
 
 
 
 
-<a name="encoder-EncodeBlobRequest"></a>
+<a name="encoder-v2-EncodeBlobRequest"></a>
 
 ### EncodeBlobRequest
-EncodeBlobRequest contains data and pre-computed encoding params provided to Encoder
+EncodeBlobRequest contains the reference to the blob to be encoded and the encoding parameters
+determined by the control plane.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| data | [bytes](#bytes) |  |  |
-| encoding_params | [EncodingParams](#encoder-EncodingParams) |  |  |
+| blob_key | [bytes](#bytes) |  |  |
+| encoding_params | [EncodingParams](#encoder-v2-EncodingParams) |  |  |
+| blob_size | [uint64](#uint64) |  |  |
 
 
 
 
 
 
-<a name="encoder-EncodingParams"></a>
+<a name="encoder-v2-EncodingParams"></a>
 
 ### EncodingParams
-Parameters needed by Encoder for encoding
+EncodingParams specifies how the blob should be encoded into chunks
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| chunk_length | [uint32](#uint32) |  |  |
-| num_chunks | [uint32](#uint32) |  |  |
+| chunk_length | [uint64](#uint64) |  |  |
+| num_chunks | [uint64](#uint64) |  |  |
+
+
+
+
+
+
+<a name="encoder-v2-FragmentInfo"></a>
+
+### FragmentInfo
+FragmentInfo contains metadata about the encoded fragments
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| total_chunk_size_bytes | [uint32](#uint32) |  |  |
+| fragment_size_bytes | [uint32](#uint32) |  |  |
 
 
 
@@ -94,32 +88,19 @@ Parameters needed by Encoder for encoding
 
  
 
-
-<a name="encoder-ChunkEncodingFormat"></a>
-
-### ChunkEncodingFormat
-
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| UNKNOWN | 0 |  |
-| GNARK | 1 |  |
-| GOB | 2 |  |
-
-
  
 
  
 
 
-<a name="encoder-Encoder"></a>
+<a name="encoder-v2-Encoder"></a>
 
 ### Encoder
 
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
-| EncodeBlob | [EncodeBlobRequest](#encoder-EncodeBlobRequest) | [EncodeBlobReply](#encoder-EncodeBlobReply) |  |
+| EncodeBlob | [EncodeBlobRequest](#encoder-v2-EncodeBlobRequest) | [EncodeBlobReply](#encoder-v2-EncodeBlobReply) | EncodeBlob encodes a blob into chunks using specified encoding parameters. The blob is retrieved using the provided blob key and the encoded chunks are persisted for later retrieval. |
 
  
 
