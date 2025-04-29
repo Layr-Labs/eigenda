@@ -34,6 +34,8 @@ type LoadGenerator struct {
 	relayReadLimiter chan struct{}
 	// The channel to limit the number of parallel blob reads sent to the validators.
 	validatorReadLimiter chan struct{}
+	// The channel to limit the number of blobs in all phases of the read/write lifecycle.
+	lifecycleLimiter chan struct{}
 	// if true, the load generator is running.
 	alive atomic.Bool
 	// The channel to signal when the load generator is finished.
@@ -79,6 +81,10 @@ func NewLoadGenerator(
 	submissionLimiter := make(chan struct{}, config.SubmissionParallelism)
 	relayReadLimiter := make(chan struct{}, config.RelayReadParallelism)
 	validatorReadLimiter := make(chan struct{}, config.ValidatorReadParallelism)
+	lifecycleLimiter := make(chan struct{},
+		config.SubmissionParallelism+
+			config.RelayReadParallelism+
+			config.ValidatorReadParallelism)
 
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
@@ -108,6 +114,7 @@ func NewLoadGenerator(
 		submissionPeriod:     submissionPeriodAsDuration,
 		submissionLimiter:    submissionLimiter,
 		relayReadLimiter:     relayReadLimiter,
+		lifecycleLimiter:     lifecycleLimiter,
 		validatorReadLimiter: validatorReadLimiter,
 		alive:                atomic.Bool{},
 		finishedChan:         make(chan struct{}),
@@ -139,7 +146,10 @@ func (l *LoadGenerator) run() {
 	ticker := time.NewTicker(l.submissionPeriod)
 	for l.alive.Load() {
 		<-ticker.C
+
+		l.lifecycleLimiter <- struct{}{}
 		go l.readAndWriteBlob()
+		<-l.lifecycleLimiter
 	}
 }
 
