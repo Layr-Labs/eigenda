@@ -230,14 +230,15 @@ func (l *LoadGenerator) readBlobFromRelays(
 	}()
 
 	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
-
 	timeout := time.Duration(l.config.RelayReadTimeout) * time.Second
 
+	relayKeys := eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys
+
 	for i := 0; i < relayReadCount; i++ {
-		err := l.client.ReadBlobFromRelays(
+		err := l.client.ReadBlobFromRelay(
 			context.Background(),
 			*blobKey,
-			eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys,
+			relayKeys[i%len(relayKeys)],
 			payload,
 			blobLengthSymbols,
 			timeout)
