@@ -234,7 +234,7 @@ func (l *LoadGenerator) readBlobFromRelays(
 
 	relayKeys := eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys
 
-	readStartIndex := rand.Int32Range(0, int32(len(relayKeys)-1))
+	readStartIndex := rand.Int32Range(0, int32(len(relayKeys)))
 
 	for i := 0; i < relayReadCount; i++ {
 		err := l.client.ReadBlobFromRelay(
@@ -295,7 +295,7 @@ func (l *LoadGenerator) readBlobFromValidators(
 		return
 	}
 
-	readStartIndex := rand.Int32Range(0, int32(len(quorums)-1))
+	readStartIndex := rand.Int32Range(0, int32(len(quorums)))
 
 	for i := 0; i < validatorReadCount; i++ {
 		err = l.client.ReadBlobFromValidatorsInQuorum(
