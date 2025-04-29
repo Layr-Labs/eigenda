@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"slices"
 	"sort"
+	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -31,6 +32,7 @@ type SigningMessage struct {
 	BatchHeaderHash [32]byte
 	// Undefined if this value <= 0.
 	AttestationLatencyMs float64
+	TimeReceived         time.Time
 	Err                  error
 }
 

@@ -187,6 +187,7 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 				Operator:             opID,
 				BatchHeaderHash:      batchData.BatchHeaderHash,
 				AttestationLatencyMs: 0,
+				TimeReceived:         time.Now(),
 				Err:                  fmt.Errorf("failed to parse operator socket (%s): %w", op.Socket, err),
 			}
 			continue
@@ -204,6 +205,7 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 				Operator:             opID,
 				BatchHeaderHash:      batchData.BatchHeaderHash,
 				AttestationLatencyMs: 0,
+				TimeReceived:         time.Now(),
 				Err:                  err,
 			}
 			continue
@@ -230,6 +232,7 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 					Operator:             opID,
 					BatchHeaderHash:      batchData.BatchHeaderHash,
 					AttestationLatencyMs: 0,
+					TimeReceived:         time.Now(),
 					Err:                  err,
 				}
 				return
@@ -263,6 +266,7 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 						Operator:             opID,
 						BatchHeaderHash:      batchData.BatchHeaderHash,
 						AttestationLatencyMs: float64(time.Since(sendChunksStart)),
+						TimeReceived:         time.Now(),
 						Err:                  nil,
 					}
 					break
@@ -297,6 +301,7 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 					Operator:             opID,
 					BatchHeaderHash:      batchData.BatchHeaderHash,
 					AttestationLatencyMs: 0,
+					TimeReceived:         time.Now(),
 					Err:                  lastErr,
 				}
 			}

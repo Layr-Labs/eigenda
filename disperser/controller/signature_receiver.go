@@ -138,6 +138,15 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 				break
 			}
 
+			if signingMessage.TimeReceived.IsZero() {
+				sr.logger.Errorf("signing message from %s time received is zero in batch %s. "+
+					"This shouldn't be possible.",
+					signingMessage.Operator.Hex(),
+					hex.EncodeToString(sr.batchHeaderHash[:]))
+			} else {
+				sr.metrics.reportSigningMessageChannelLatency(time.Since(signingMessage.TimeReceived))
+			}
+
 			indexedOperatorInfo, found := sr.indexedOperatorState.IndexedOperators[signingMessage.Operator]
 			if !found {
 				sr.logger.Warn("operator not found in state",

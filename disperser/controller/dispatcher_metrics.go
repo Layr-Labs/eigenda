@@ -32,6 +32,7 @@ type dispatcherMetrics struct {
 	putDispersalResponseLatency  *prometheus.SummaryVec
 	handleSignaturesLatency      *prometheus.SummaryVec
 	processSigningMessageLatency *prometheus.SummaryVec
+	signingMessageChannelLatency *prometheus.SummaryVec
 	receiveSignaturesLatency     *prometheus.SummaryVec
 	aggregateSignaturesLatency   *prometheus.SummaryVec
 	putAttestationLatency        *prometheus.SummaryVec
@@ -224,6 +225,16 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
+	signingMessageChannelLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  dispatcherNamespace,
+			Name:       "signing_message_channel_latency_ms",
+			Help:       "The time a signing message sits in the channel waiting to be processed (part of HandleSignatures()).",
+			Objectives: objectives,
+		},
+		[]string{},
+	)
+
 	receiveSignaturesLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
@@ -310,6 +321,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		putDispersalResponseLatency:  putDispersalResponseLatency,
 		handleSignaturesLatency:      handleSignaturesLatency,
 		processSigningMessageLatency: processSigningMessageLatency,
+		signingMessageChannelLatency: signingMessageChannelLatency,
 		receiveSignaturesLatency:     receiveSignaturesLatency,
 		aggregateSignaturesLatency:   aggregateSignaturesLatency,
 		putAttestationLatency:        putAttestationLatency,
@@ -387,6 +399,10 @@ func (m *dispatcherMetrics) reportHandleSignaturesLatency(duration time.Duration
 
 func (m *dispatcherMetrics) reportProcessSigningMessageLatency(duration time.Duration) {
 	m.processSigningMessageLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
+func (m *dispatcherMetrics) reportSigningMessageChannelLatency(duration time.Duration) {
+	m.signingMessageChannelLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *dispatcherMetrics) reportReceiveSignaturesLatency(duration time.Duration) {
