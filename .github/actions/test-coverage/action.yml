@@ -22,10 +22,10 @@ runs:
   using: "composite"
   steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Checkout wiki
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: ${{github.repository}}.wiki
         token: ${{ github.token }}
