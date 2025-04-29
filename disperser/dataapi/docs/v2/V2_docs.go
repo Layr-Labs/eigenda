@@ -1275,10 +1275,22 @@ const docTemplateV2 = `{
                 "batch_header_hash": {
                     "type": "string"
                 },
+                "blob_certificates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobCertificate"
+                    }
+                },
                 "blob_inclusion_infos": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo"
+                    }
+                },
+                "blob_key": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
                     }
                 },
                 "signed_batch": {

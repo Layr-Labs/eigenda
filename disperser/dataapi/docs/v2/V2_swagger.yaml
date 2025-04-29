@@ -283,9 +283,17 @@ definitions:
     properties:
       batch_header_hash:
         type: string
+      blob_certificates:
+        items:
+          $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobCertificate'
+        type: array
       blob_inclusion_infos:
         items:
           $ref: '#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo'
+        type: array
+      blob_key:
+        items:
+          type: string
         type: array
       signed_batch:
         $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch'

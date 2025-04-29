@@ -1,7 +1,7 @@
 syntax = "proto3";
+package encoder;
 
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/encoder";
-package encoder;
 
 service Encoder {
   rpc EncodeBlob(EncodeBlobRequest) returns (EncodeBlobReply) {}
@@ -29,9 +29,9 @@ message EncodeBlobRequest {
 }
 
 enum ChunkEncodingFormat {
-	UNKNOWN = 0;
-	GNARK = 1;
-	GOB = 2;
+  UNKNOWN = 0;
+  GNARK = 1;
+  GOB = 2;
 }
 
 // EncodeBlobReply returns all encoded chunks along with BlobCommitment for the same,
