@@ -342,7 +342,9 @@ func (sr *signatureReceiver) submitAttestation(attestationChan chan *core.Quorum
 		SignerMap:        validSignerMapCopy,
 	}
 
-	sr.metrics.reportAttestationUpdateLatency(time.Since(sr.attestationUpdateStart))
+	if sr.metrics != nil {
+		sr.metrics.reportAttestationUpdateLatency(time.Since(sr.attestationUpdateStart))
+	}
 	sr.attestationUpdateStart = time.Now()
 }
 
