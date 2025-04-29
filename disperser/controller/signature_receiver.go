@@ -215,7 +215,7 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 				continue
 			}
 
-			sr.submitAttestation(attestationChan)
+			sr.buildAndSubmitAttestation(attestationChan)
 			newSignaturesGathered = false
 		}
 
@@ -225,7 +225,7 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 	}
 
 	if newSignaturesGathered {
-		sr.submitAttestation(attestationChan)
+		sr.buildAndSubmitAttestation(attestationChan)
 	}
 }
 
@@ -290,8 +290,15 @@ func (sr *signatureReceiver) processSigningMessage(
 	return nil
 }
 
-// submitAttestation aggregates and submits a QuorumAttestation representing the most up-to-date aggregates
-func (sr *signatureReceiver) submitAttestation(attestationChan chan *core.QuorumAttestation) {
+// buildAndSubmitAttestation aggregates and submits a QuorumAttestation representing the most up-to-date aggregates
+func (sr *signatureReceiver) buildAndSubmitAttestation(attestationChan chan *core.QuorumAttestation) {
+	submitAttestationStart := time.Now()
+	defer func() {
+		if sr.metrics != nil {
+			sr.metrics.reportAttestationBuildingLatency(time.Since(submitAttestationStart))
+		}
+	}()
+
 	nonSignerMap := make(map[core.OperatorID]*core.G1Point)
 	// operators that aren't in the validSignerMap are "non-signers"
 	for operatorID, operatorInfo := range sr.indexedOperatorState.IndexedOperators {

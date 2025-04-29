@@ -34,6 +34,7 @@ type dispatcherMetrics struct {
 	processSigningMessageLatency *prometheus.SummaryVec
 	signingMessageChannelLatency *prometheus.SummaryVec
 	attestationUpdateLatency     *prometheus.SummaryVec
+	attestationBuildingLatency   *prometheus.SummaryVec
 	thresholdSignedToDoneLatency *prometheus.SummaryVec
 	receiveSignaturesLatency     *prometheus.SummaryVec
 	aggregateSignaturesLatency   *prometheus.SummaryVec
@@ -241,7 +242,17 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
 			Name:       "attestation_update_latency_ms",
-			Help:       "The time it takes for the signature receiver to yield a new attestation (part of HandleSignatures()).",
+			Help:       "The time between the signature receiver yielding attestations (part of HandleSignatures()).",
+			Objectives: objectives,
+		},
+		[]string{},
+	)
+
+	attestationBuildingLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  dispatcherNamespace,
+			Name:       "attestation_building_latency_ms",
+			Help:       "The time it takes for the signature receiver to build and send a single attestation (part of HandleSignatures()).",
 			Objectives: objectives,
 		},
 		[]string{},
@@ -346,6 +357,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		processSigningMessageLatency: processSigningMessageLatency,
 		signingMessageChannelLatency: signingMessageChannelLatency,
 		attestationUpdateLatency:     attestationUpdateLatency,
+		attestationBuildingLatency:   attestationBuildingLatency,
 		thresholdSignedToDoneLatency: thresholdSignedToDoneLatency,
 		receiveSignaturesLatency:     receiveSignaturesLatency,
 		aggregateSignaturesLatency:   aggregateSignaturesLatency,
@@ -432,6 +444,10 @@ func (m *dispatcherMetrics) reportSigningMessageChannelLatency(duration time.Dur
 
 func (m *dispatcherMetrics) reportAttestationUpdateLatency(duration time.Duration) {
 	m.attestationUpdateLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
+func (m *dispatcherMetrics) reportAttestationBuildingLatency(duration time.Duration) {
+	m.attestationBuildingLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *dispatcherMetrics) reportThresholdSignedToDoneLatency(quorumID core.QuorumID, duration time.Duration) {
