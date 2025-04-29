@@ -34,6 +34,7 @@ type dispatcherMetrics struct {
 	processSigningMessageLatency *prometheus.SummaryVec
 	signingMessageChannelLatency *prometheus.SummaryVec
 	attestationUpdateLatency     *prometheus.SummaryVec
+	thresholdSignedToDoneLatency *prometheus.SummaryVec
 	receiveSignaturesLatency     *prometheus.SummaryVec
 	aggregateSignaturesLatency   *prometheus.SummaryVec
 	putAttestationLatency        *prometheus.SummaryVec
@@ -41,7 +42,6 @@ type dispatcherMetrics struct {
 	blobE2EDispersalLatency      *prometheus.SummaryVec
 	completedBlobs               *prometheus.CounterVec
 	attestation                  *prometheus.GaugeVec
-	thresholdSignedToDoneLatency *prometheus.GaugeVec
 	blobSetSize                  *prometheus.GaugeVec
 }
 
@@ -56,16 +56,6 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 			Help:      "number of signers and non-signers for the batch",
 		},
 		[]string{"type", "quorum"},
-	)
-
-	thresholdSignedToDoneLatency := promauto.With(registry).NewGaugeVec(
-		prometheus.GaugeOpts{
-			Namespace: dispatcherNamespace,
-			Name:      "threshold_signed_to_done_latency_ms",
-			Help: "the time elapsed between the signing percentage reaching a configured threshold, and the end " +
-				"of signature gathering",
-		},
-		[]string{"quorum"},
 	)
 
 	handleBatchLatency := promauto.With(registry).NewSummaryVec(
@@ -257,6 +247,17 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
+	thresholdSignedToDoneLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace: dispatcherNamespace,
+			Name:      "threshold_signed_to_done_latency_ms",
+			Help: "the time elapsed between the signing percentage reaching a configured threshold, and the end " +
+				"of signature gathering",
+			Objectives: objectives,
+		},
+		[]string{"quorum"},
+	)
+
 	receiveSignaturesLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
@@ -345,6 +346,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		processSigningMessageLatency: processSigningMessageLatency,
 		signingMessageChannelLatency: signingMessageChannelLatency,
 		attestationUpdateLatency:     attestationUpdateLatency,
+		thresholdSignedToDoneLatency: thresholdSignedToDoneLatency,
 		receiveSignaturesLatency:     receiveSignaturesLatency,
 		aggregateSignaturesLatency:   aggregateSignaturesLatency,
 		putAttestationLatency:        putAttestationLatency,
@@ -352,7 +354,6 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		blobE2EDispersalLatency:      blobE2EDispersalLatency,
 		completedBlobs:               completedBlobs,
 		attestation:                  attestation,
-		thresholdSignedToDoneLatency: thresholdSignedToDoneLatency,
 		blobSetSize:                  blobSetSize,
 	}
 }
@@ -433,6 +434,11 @@ func (m *dispatcherMetrics) reportAttestationUpdateLatency(duration time.Duratio
 	m.attestationUpdateLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
+func (m *dispatcherMetrics) reportThresholdSignedToDoneLatency(quorumID core.QuorumID, duration time.Duration) {
+	m.thresholdSignedToDoneLatency.WithLabelValues(fmt.Sprintf("%d", quorumID)).Observe(
+		common.ToMilliseconds(duration))
+}
+
 func (m *dispatcherMetrics) reportReceiveSignaturesLatency(duration time.Duration) {
 	m.receiveSignaturesLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
@@ -490,9 +496,4 @@ func (m *dispatcherMetrics) reportAttestation(operatorCount map[core.QuorumID]in
 		m.attestation.WithLabelValues("non_signers", quorumStr).Set(float64(nonSigners))
 		m.attestation.WithLabelValues("percent_signed", quorumStr).Set(float64(quorumResult.PercentSigned))
 	}
-}
-
-func (m *dispatcherMetrics) reportThresholdSignedToDoneLatency(quorumID core.QuorumID, duration time.Duration) {
-	m.thresholdSignedToDoneLatency.WithLabelValues(fmt.Sprintf("%d", quorumID)).Set(
-		common.ToMilliseconds(duration))
 }

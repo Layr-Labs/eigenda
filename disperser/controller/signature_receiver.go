@@ -17,6 +17,7 @@ import (
 // manually: it exists only as a helper struct for the ReceiveSignatures method.
 type signatureReceiver struct {
 	logger  logging.Logger
+	// metrics may be nil, in which case no metrics will be reported
 	metrics *dispatcherMetrics
 
 	// indexedOperatorState contains operator information including pubkeys, stakes, and quorum membership
