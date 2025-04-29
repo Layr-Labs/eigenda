@@ -41,6 +41,11 @@ contract EigenDACertVerifier is EigenDACertVerifierV1, EigenDACertVerifierV2 {
         )
     {}
 
+    /**
+     * @notice Verifies the security parameters for a blob cert
+     * @param blobParams The blob params to verify
+     * @param securityThresholds The security thresholds to verify against
+     */
     function verifyDACertSecurityParams(
         VersionedBlobParams memory blobParams,
         SecurityThresholds memory securityThresholds
@@ -50,6 +55,11 @@ contract EigenDACertVerifier is EigenDACertVerifierV1, EigenDACertVerifierV2 {
         CertV2Lib.revertOnError(status, statusParams);
     }
 
+    /**
+     * @notice Verifies the security parameters for a blob cert
+     * @param version The version of the blob to verify
+     * @param securityThresholds The security thresholds to verify against
+     */
     function verifyDACertSecurityParams(uint16 version, SecurityThresholds memory securityThresholds) external view {
         (CertV2Lib.StatusCode status, bytes memory statusParams) =
             CertV2Lib.checkSecurityParams(getBlobParams(version), securityThresholds);

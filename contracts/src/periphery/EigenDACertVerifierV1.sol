@@ -14,7 +14,6 @@ import "../interfaces/IEigenDAStructs.sol";
 
 /**
  * @title A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates
- * @notice For V2 verification this contract is deployed with immutable security thresholds and required quorum numbers,
  *         to change these values or verification behavior a new CertVerifier must be deployed
  */
 contract EigenDACertVerifierV1 is IEigenDACertVerifierV1 {
