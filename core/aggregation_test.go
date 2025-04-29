@@ -173,6 +173,7 @@ func TestAggregateSignaturesStatus(t *testing.T) {
 
 			aq, err := agg.ReceiveSignatures(
 				context.Background(),
+				context.Background(),
 				state.IndexedOperatorState,
 				message,
 				update)
@@ -220,6 +221,7 @@ func TestSortNonsigners(t *testing.T) {
 
 	aq, err := agg.ReceiveSignatures(
 		context.Background(),
+		context.Background(),
 		state.IndexedOperatorState,
 		message,
 		update)
@@ -256,6 +258,7 @@ func TestFilterQuorums(t *testing.T) {
 	}
 
 	aq, err := agg.ReceiveSignatures(
+		context.Background(),
 		context.Background(),
 		state.IndexedOperatorState,
 		message,
