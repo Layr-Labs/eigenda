@@ -1,4 +1,4 @@
-package core_test
+package controller_test
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/stretchr/testify/require"
 )
 
@@ -185,7 +186,7 @@ func TestReceiveSignatures_Basic(t *testing.T) {
 	batchHeaderHash := createBatchHeaderHash(testRandom)
 	signingMessageChan := make(chan core.SigningMessage, 3)
 
-	attestationChan, err := core.ReceiveSignatures(
+	attestationChan, err := controller.ReceiveSignatures(
 		context.Background(),
 		testutils.GetLogger(),
 		indexedOperatorState,
@@ -219,7 +220,7 @@ func TestReceiveSignatures_WithError(t *testing.T) {
 	batchHeaderHash := createBatchHeaderHash(testRandom)
 	signingMessageChan := make(chan core.SigningMessage, operatorCount)
 
-	attestationChan, err := core.ReceiveSignatures(
+	attestationChan, err := controller.ReceiveSignatures(
 		context.Background(),
 		testutils.GetLogger(),
 		indexedOperatorState,
@@ -256,7 +257,7 @@ func TestReceiveSignatures_DuplicateMessage(t *testing.T) {
 	batchHeaderHash := createBatchHeaderHash(testRandom)
 	signingMessageChan := make(chan core.SigningMessage, operatorCount+1) // One extra for duplicate
 
-	attestationChan, err := core.ReceiveSignatures(
+	attestationChan, err := controller.ReceiveSignatures(
 		context.Background(),
 		testutils.GetLogger(),
 		indexedOperatorState,
@@ -297,7 +298,7 @@ func TestReceiveSignatures_ContextCancellation(t *testing.T) {
 	signingMessageChan := make(chan core.SigningMessage, operatorCount)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	attestationChan, err := core.ReceiveSignatures(
+	attestationChan, err := controller.ReceiveSignatures(
 		ctx,
 		testutils.GetLogger(),
 		indexedOperatorState,
@@ -334,7 +335,7 @@ func TestReceiveSignatures_Concurrency(t *testing.T) {
 	batchHeaderHash := createBatchHeaderHash(testRandom)
 	signingMessageChan := make(chan core.SigningMessage, operatorCount)
 
-	attestationChan, err := core.ReceiveSignatures(
+	attestationChan, err := controller.ReceiveSignatures(
 		context.Background(),
 		testutils.GetLogger(),
 		indexedOperatorState,

@@ -1,4 +1,4 @@
-package core
+package controller
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -17,27 +18,27 @@ import (
 type signatureReceiver struct {
 	logger logging.Logger
 	// indexedOperatorState contains operator information including pubkeys, stakes, and quorum membership
-	indexedOperatorState *IndexedOperatorState
+	indexedOperatorState *core.IndexedOperatorState
 
 	// validSignerMap tracks which operators have already submitted valid signatures
-	validSignerMap map[OperatorID]bool
+	validSignerMap map[core.OperatorID]bool
 	// signatureMessageReceived tracks which operators have submitted signature messages, whether valid or invalid.
 	// this is tracked separately from signerMap, since signerMap only includes valid signatures
-	signatureMessageReceived map[OperatorID]bool
+	signatureMessageReceived map[core.OperatorID]bool
 	// aggregateSignatures stores the accumulated BLS signatures for each quorum
-	aggregateSignatures map[QuorumID]*Signature
+	aggregateSignatures map[core.QuorumID]*core.Signature
 	// aggregateSignersG2PubKeys stores the accumulated G2 public keys of signers for each quorum
-	aggregateSignersG2PubKeys map[QuorumID]*G2Point
+	aggregateSignersG2PubKeys map[core.QuorumID]*core.G2Point
 
 	// stakeSigned tracks the total stake that has signed for each quorum
-	stakeSigned map[QuorumID]*big.Int
+	stakeSigned map[core.QuorumID]*big.Int
 
 	// batchHeaderHash is the hash of the batch header that operators are signing
 	batchHeaderHash [32]byte
 	// signingMessageChan is the channel through which SigningMessages are received
-	signingMessageChan chan SigningMessage
+	signingMessageChan chan core.SigningMessage
 	// quorumIDs is a sorted list of quorum IDs for which signatures are being collected
-	quorumIDs []QuorumID
+	quorumIDs []core.QuorumID
 
 	// tickInterval determines how frequently intermediate attestations are yielded
 	tickInterval time.Duration
@@ -58,23 +59,23 @@ type signatureReceiver struct {
 func ReceiveSignatures(
 	ctx context.Context,
 	logger logging.Logger,
-	indexedOperatorState *IndexedOperatorState,
+	indexedOperatorState *core.IndexedOperatorState,
 	batchHeaderHash [32]byte,
-	signingMessageChan chan SigningMessage,
+	signingMessageChan chan core.SigningMessage,
 	tickInterval time.Duration,
-) (chan *QuorumAttestation, error) {
+) (chan *core.QuorumAttestation, error) {
 	sortedQuorumIDs, err := getSortedQuorumIDs(indexedOperatorState)
 	if err != nil {
 		return nil, fmt.Errorf("get sorted quorum ids: %w", err)
 	}
 
-	validSignerMap := make(map[OperatorID]bool)
-	signatureMessageReceived := make(map[OperatorID]bool)
-	aggregateSignatures := make(map[QuorumID]*Signature, len(sortedQuorumIDs))
-	aggregateSignersG2PubKeys := make(map[QuorumID]*G2Point, len(sortedQuorumIDs))
+	validSignerMap := make(map[core.OperatorID]bool)
+	signatureMessageReceived := make(map[core.OperatorID]bool)
+	aggregateSignatures := make(map[core.QuorumID]*core.Signature, len(sortedQuorumIDs))
+	aggregateSignersG2PubKeys := make(map[core.QuorumID]*core.G2Point, len(sortedQuorumIDs))
 
 	// initialized stakeSigned map with 0 stake signed for each quorum
-	stakeSigned := make(map[QuorumID]*big.Int, len(sortedQuorumIDs))
+	stakeSigned := make(map[core.QuorumID]*big.Int, len(sortedQuorumIDs))
 	for _, quorumID := range sortedQuorumIDs {
 		stakeSigned[quorumID] = big.NewInt(0)
 	}
@@ -93,14 +94,14 @@ func ReceiveSignatures(
 		tickInterval:              tickInterval,
 	}
 
-	attestationChan := make(chan *QuorumAttestation, len(indexedOperatorState.IndexedOperators))
+	attestationChan := make(chan *core.QuorumAttestation, len(indexedOperatorState.IndexedOperators))
 	go receiver.receiveSigningMessages(ctx, attestationChan)
 
 	return attestationChan, nil
 }
 
 // receiveSigningMessages receives SigningMessages, and sends QuorumAttestations to the input attestationChan
-func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attestationChan chan *QuorumAttestation) {
+func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attestationChan chan *core.QuorumAttestation) {
 	// this ticker causes QuorumAttestations to be sent periodically
 	ticker := time.NewTicker(sr.tickInterval)
 	defer ticker.Stop()
@@ -191,8 +192,8 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 }
 
 // getSortedQuorumIDs returns a sorted slice of QuorumIDs from the state
-func getSortedQuorumIDs(state *IndexedOperatorState) ([]QuorumID, error) {
-	quorumIDs := make([]QuorumID, 0, len(state.Operators))
+func getSortedQuorumIDs(state *core.IndexedOperatorState) ([]core.QuorumID, error) {
+	quorumIDs := make([]core.QuorumID, 0, len(state.Operators))
 	for quorumID := range state.Operators {
 		quorumIDs = append(quorumIDs, quorumID)
 	}
@@ -207,8 +208,8 @@ func getSortedQuorumIDs(state *IndexedOperatorState) ([]QuorumID, error) {
 
 // processSigningMessage accepts a SigningMessage, verifies it, and updates the signatureReceiver aggregates accordingly
 func (sr *signatureReceiver) processSigningMessage(
-	signingMessage SigningMessage,
-	indexedOperatorInfo *IndexedOperatorInfo,
+	signingMessage core.SigningMessage,
+	indexedOperatorInfo *core.IndexedOperatorInfo,
 ) error {
 	if signingMessage.Err != nil {
 		return fmt.Errorf("signingMessage contained error: %w", signingMessage.Err)
@@ -231,7 +232,7 @@ func (sr *signatureReceiver) processSigningMessage(
 		sr.stakeSigned[quorumID].Add(sr.stakeSigned[quorumID], quorumOperatorInfo.Stake)
 
 		if sr.aggregateSignatures[quorumID] == nil {
-			sr.aggregateSignatures[quorumID] = &Signature{signingMessage.Signature.Clone()}
+			sr.aggregateSignatures[quorumID] = &core.Signature{G1Point: signingMessage.Signature.Clone()}
 			sr.aggregateSignersG2PubKeys[quorumID] = indexedOperatorInfo.PubkeyG2.Clone()
 		} else {
 			sr.aggregateSignatures[quorumID].Add(signingMessage.Signature.G1Point)
@@ -243,8 +244,8 @@ func (sr *signatureReceiver) processSigningMessage(
 }
 
 // submitAttestation aggregates and submits a QuorumAttestation representing the most up-to-date aggregates
-func (sr *signatureReceiver) submitAttestation(attestationChan chan *QuorumAttestation) {
-	nonSignerMap := make(map[OperatorID]*G1Point)
+func (sr *signatureReceiver) submitAttestation(attestationChan chan *core.QuorumAttestation) {
+	nonSignerMap := make(map[core.OperatorID]*core.G1Point)
 	// operators that aren't in the validSignerMap are "non-signers"
 	for operatorID, operatorInfo := range sr.indexedOperatorState.IndexedOperators {
 		_, found := sr.validSignerMap[operatorID]
@@ -253,7 +254,7 @@ func (sr *signatureReceiver) submitAttestation(attestationChan chan *QuorumAttes
 		}
 	}
 
-	quorumResults := make(map[QuorumID]*QuorumResult)
+	quorumResults := make(map[core.QuorumID]*core.QuorumResult)
 	for _, quorumID := range sr.quorumIDs {
 		quorumResult, err := sr.computeQuorumResult(quorumID, nonSignerMap)
 		if err != nil {
@@ -268,26 +269,26 @@ func (sr *signatureReceiver) submitAttestation(attestationChan chan *QuorumAttes
 
 	// Make copies of the maps that are populated while receiving signatures. The yielded QuorumAttestation will be
 	// handled by a separate routine, so it's important that we don't mutate these maps after they are yielded.
-	quorumAggPubKeyCopy := make(map[QuorumID]*G1Point, len(sr.indexedOperatorState.AggKeys))
+	quorumAggPubKeyCopy := make(map[core.QuorumID]*core.G1Point, len(sr.indexedOperatorState.AggKeys))
 	for quorumID, g1Point := range sr.indexedOperatorState.AggKeys {
 		// TODO: is this ok? semantics are changed from before: we used to exclude aggregate keys of quorums that had no
 		//  signatures, but I don't see why that case should be special.
 		quorumAggPubKeyCopy[quorumID] = g1Point.Clone()
 	}
-	aggregateSignersG2PubKeysCopy := make(map[QuorumID]*G2Point, len(sr.aggregateSignersG2PubKeys))
+	aggregateSignersG2PubKeysCopy := make(map[core.QuorumID]*core.G2Point, len(sr.aggregateSignersG2PubKeys))
 	for quorumID, aggregatePubkey := range sr.aggregateSignersG2PubKeys {
 		aggregateSignersG2PubKeysCopy[quorumID] = aggregatePubkey.Clone()
 	}
-	aggregateSignaturesCopy := make(map[QuorumID]*Signature, len(sr.aggregateSignatures))
+	aggregateSignaturesCopy := make(map[core.QuorumID]*core.Signature, len(sr.aggregateSignatures))
 	for quorumID, aggregateSignature := range sr.aggregateSignatures {
-		aggregateSignaturesCopy[quorumID] = &Signature{aggregateSignature.Clone()}
+		aggregateSignaturesCopy[quorumID] = &core.Signature{G1Point: aggregateSignature.Clone()}
 	}
-	validSignerMapCopy := make(map[OperatorID]bool, len(sr.validSignerMap))
+	validSignerMapCopy := make(map[core.OperatorID]bool, len(sr.validSignerMap))
 	for operatorID, signed := range sr.validSignerMap {
 		validSignerMapCopy[operatorID] = signed
 	}
 
-	attestationChan <- &QuorumAttestation{
+	attestationChan <- &core.QuorumAttestation{
 		QuorumAggPubKey:  quorumAggPubKeyCopy,
 		SignersAggPubKey: aggregateSignersG2PubKeysCopy,
 		AggSignature:     aggregateSignaturesCopy,
@@ -298,15 +299,15 @@ func (sr *signatureReceiver) submitAttestation(attestationChan chan *QuorumAttes
 
 // computeQuorumResult creates a QuorumResult for a given quorum
 func (sr *signatureReceiver) computeQuorumResult(
-	quorumID QuorumID,
-	nonSignerMap map[OperatorID]*G1Point,
-) (*QuorumResult, error) {
+	quorumID core.QuorumID,
+	nonSignerMap map[core.OperatorID]*core.G1Point,
+) (*core.QuorumResult, error) {
 	signedPercentage := getSignedPercentage(
 		sr.stakeSigned[quorumID],
 		sr.indexedOperatorState.Totals[quorumID].Stake)
 
 	if signedPercentage == 0 {
-		return &QuorumResult{
+		return &core.QuorumResult{
 			QuorumID:      quorumID,
 			PercentSigned: 0,
 		}, nil
@@ -342,7 +343,7 @@ func (sr *signatureReceiver) computeQuorumResult(
 		return nil, errors.New("aggregated signature is not valid")
 	}
 
-	return &QuorumResult{
+	return &core.QuorumResult{
 		QuorumID:      quorumID,
 		PercentSigned: signedPercentage,
 	}, nil
@@ -358,7 +359,7 @@ func getSignedPercentage(signedStake *big.Int, totalStake *big.Int) uint8 {
 
 	// the calculation being performed here is: signedStake * 100 / totalStake
 
-	signedStakeNumerator := new(big.Int).Mul(signedStake, new(big.Int).SetUint64(percentMultiplier))
+	signedStakeNumerator := new(big.Int).Mul(signedStake, new(big.Int).SetUint64(core.PercentMultiplier))
 	quorumThreshold := uint8(new(big.Int).Div(signedStakeNumerator, totalStake).Uint64())
 
 	return quorumThreshold

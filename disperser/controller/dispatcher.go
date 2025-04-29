@@ -363,7 +363,7 @@ func (d *Dispatcher) HandleSignatures(
 	// This channel will remain open until the attestationTimeout triggers, or until signatures from all validators
 	// have been received and processed. It will periodically yield QuorumAttestations with the latest set of received
 	// signatures.
-	attestationChan, err := core.ReceiveSignatures(
+	attestationChan, err := ReceiveSignatures(
 		attestationCtx,
 		d.logger,
 		batchData.OperatorState,
