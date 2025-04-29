@@ -189,6 +189,7 @@ func TestReceiveSignatures_Basic(t *testing.T) {
 	attestationChan, err := controller.ReceiveSignatures(
 		context.Background(),
 		testutils.GetLogger(),
+		nil,
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
@@ -223,6 +224,7 @@ func TestReceiveSignatures_WithError(t *testing.T) {
 	attestationChan, err := controller.ReceiveSignatures(
 		context.Background(),
 		testutils.GetLogger(),
+		nil,
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
@@ -260,6 +262,7 @@ func TestReceiveSignatures_DuplicateMessage(t *testing.T) {
 	attestationChan, err := controller.ReceiveSignatures(
 		context.Background(),
 		testutils.GetLogger(),
+		nil,
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
@@ -301,6 +304,7 @@ func TestReceiveSignatures_ContextCancellation(t *testing.T) {
 	attestationChan, err := controller.ReceiveSignatures(
 		ctx,
 		testutils.GetLogger(),
+		nil,
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
@@ -338,6 +342,7 @@ func TestReceiveSignatures_Concurrency(t *testing.T) {
 	attestationChan, err := controller.ReceiveSignatures(
 		context.Background(),
 		testutils.GetLogger(),
+		nil,
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,

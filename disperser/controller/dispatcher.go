@@ -366,6 +366,7 @@ func (d *Dispatcher) HandleSignatures(
 	attestationChan, err := ReceiveSignatures(
 		attestationCtx,
 		d.logger,
+		d.metrics,
 		batchData.OperatorState,
 		batchData.BatchHeaderHash,
 		sigChan,

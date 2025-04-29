@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	common "github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,30 +15,31 @@ const dispatcherNamespace = "eigenda_dispatcher"
 
 // dispatcherMetrics is a struct that holds the metrics for the dispatcher.
 type dispatcherMetrics struct {
-	handleBatchLatency          *prometheus.SummaryVec
-	newBatchLatency             *prometheus.SummaryVec
-	getBlobMetadataLatency      *prometheus.SummaryVec
-	getOperatorStateLatency     *prometheus.SummaryVec
-	getBlobCertificatesLatency  *prometheus.SummaryVec
-	buildMerkleTreeLatency      *prometheus.SummaryVec
-	putBatchHeaderLatency       *prometheus.SummaryVec
-	putBatchLatency             *prometheus.SummaryVec
-	proofLatency                *prometheus.SummaryVec
-	putInclusionInfosLatency    *prometheus.SummaryVec
-	poolSubmissionLatency       *prometheus.SummaryVec
-	putDispersalRequestLatency  *prometheus.SummaryVec
-	sendChunksLatency           *prometheus.SummaryVec
-	sendChunksRetryCount        *prometheus.GaugeVec
-	putDispersalResponseLatency *prometheus.SummaryVec
-	handleSignaturesLatency     *prometheus.SummaryVec
-	receiveSignaturesLatency    *prometheus.SummaryVec
-	aggregateSignaturesLatency  *prometheus.SummaryVec
-	putAttestationLatency       *prometheus.SummaryVec
-	updateBatchStatusLatency    *prometheus.SummaryVec
-	blobE2EDispersalLatency     *prometheus.SummaryVec
-	completedBlobs              *prometheus.CounterVec
-	attestation                 *prometheus.GaugeVec
-	blobSetSize                 *prometheus.GaugeVec
+	handleBatchLatency           *prometheus.SummaryVec
+	newBatchLatency              *prometheus.SummaryVec
+	getBlobMetadataLatency       *prometheus.SummaryVec
+	getOperatorStateLatency      *prometheus.SummaryVec
+	getBlobCertificatesLatency   *prometheus.SummaryVec
+	buildMerkleTreeLatency       *prometheus.SummaryVec
+	putBatchHeaderLatency        *prometheus.SummaryVec
+	putBatchLatency              *prometheus.SummaryVec
+	proofLatency                 *prometheus.SummaryVec
+	putInclusionInfosLatency     *prometheus.SummaryVec
+	poolSubmissionLatency        *prometheus.SummaryVec
+	putDispersalRequestLatency   *prometheus.SummaryVec
+	sendChunksLatency            *prometheus.SummaryVec
+	sendChunksRetryCount         *prometheus.GaugeVec
+	putDispersalResponseLatency  *prometheus.SummaryVec
+	handleSignaturesLatency      *prometheus.SummaryVec
+	processSigningMessageLatency *prometheus.SummaryVec
+	receiveSignaturesLatency     *prometheus.SummaryVec
+	aggregateSignaturesLatency   *prometheus.SummaryVec
+	putAttestationLatency        *prometheus.SummaryVec
+	updateBatchStatusLatency     *prometheus.SummaryVec
+	blobE2EDispersalLatency      *prometheus.SummaryVec
+	completedBlobs               *prometheus.CounterVec
+	attestation                  *prometheus.GaugeVec
+	blobSetSize                  *prometheus.GaugeVec
 }
 
 // NewDispatcherMetrics sets up metrics for the dispatcher.
@@ -213,6 +214,16 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
+	processSigningMessageLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  dispatcherNamespace,
+			Name:       "process_signing_message_latency_ms",
+			Help:       "The time required to process a single signing message (part of HandleSignatures()).",
+			Objectives: objectives,
+		},
+		[]string{},
+	)
+
 	receiveSignaturesLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
@@ -282,30 +293,31 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 	)
 
 	return &dispatcherMetrics{
-		handleBatchLatency:          handleBatchLatency,
-		newBatchLatency:             newBatchLatency,
-		getBlobMetadataLatency:      getBlobMetadataLatency,
-		getOperatorStateLatency:     getOperatorStateLatency,
-		getBlobCertificatesLatency:  getBlobCertificatesLatency,
-		buildMerkleTreeLatency:      buildMerkleTreeLatency,
-		putBatchHeaderLatency:       putBatchHeaderLatency,
-		putBatchLatency:             putBatchLatency,
-		proofLatency:                proofLatency,
-		putInclusionInfosLatency:    putInclusionInfosLatency,
-		poolSubmissionLatency:       poolSubmissionLatency,
-		putDispersalRequestLatency:  putDispersalRequestLatency,
-		sendChunksLatency:           sendChunksLatency,
-		sendChunksRetryCount:        sendChunksRetryCount,
-		putDispersalResponseLatency: putDispersalResponseLatency,
-		handleSignaturesLatency:     handleSignaturesLatency,
-		receiveSignaturesLatency:    receiveSignaturesLatency,
-		aggregateSignaturesLatency:  aggregateSignaturesLatency,
-		putAttestationLatency:       putAttestationLatency,
-		updateBatchStatusLatency:    updateBatchStatusLatency,
-		blobE2EDispersalLatency:     blobE2EDispersalLatency,
-		completedBlobs:              completedBlobs,
-		attestation:                 attestation,
-		blobSetSize:                 blobSetSize,
+		handleBatchLatency:           handleBatchLatency,
+		newBatchLatency:              newBatchLatency,
+		getBlobMetadataLatency:       getBlobMetadataLatency,
+		getOperatorStateLatency:      getOperatorStateLatency,
+		getBlobCertificatesLatency:   getBlobCertificatesLatency,
+		buildMerkleTreeLatency:       buildMerkleTreeLatency,
+		putBatchHeaderLatency:        putBatchHeaderLatency,
+		putBatchLatency:              putBatchLatency,
+		proofLatency:                 proofLatency,
+		putInclusionInfosLatency:     putInclusionInfosLatency,
+		poolSubmissionLatency:        poolSubmissionLatency,
+		putDispersalRequestLatency:   putDispersalRequestLatency,
+		sendChunksLatency:            sendChunksLatency,
+		sendChunksRetryCount:         sendChunksRetryCount,
+		putDispersalResponseLatency:  putDispersalResponseLatency,
+		handleSignaturesLatency:      handleSignaturesLatency,
+		processSigningMessageLatency: processSigningMessageLatency,
+		receiveSignaturesLatency:     receiveSignaturesLatency,
+		aggregateSignaturesLatency:   aggregateSignaturesLatency,
+		putAttestationLatency:        putAttestationLatency,
+		updateBatchStatusLatency:     updateBatchStatusLatency,
+		blobE2EDispersalLatency:      blobE2EDispersalLatency,
+		completedBlobs:               completedBlobs,
+		attestation:                  attestation,
+		blobSetSize:                  blobSetSize,
 	}
 }
 
@@ -371,6 +383,10 @@ func (m *dispatcherMetrics) reportPutDispersalResponseLatency(duration time.Dura
 
 func (m *dispatcherMetrics) reportHandleSignaturesLatency(duration time.Duration) {
 	m.handleSignaturesLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
+func (m *dispatcherMetrics) reportProcessSigningMessageLatency(duration time.Duration) {
+	m.processSigningMessageLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *dispatcherMetrics) reportReceiveSignaturesLatency(duration time.Duration) {

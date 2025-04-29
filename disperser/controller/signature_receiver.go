@@ -16,7 +16,9 @@ import (
 // signatureReceiver is a struct for receiving SigningMessages for a single batch. It should never be instantiated
 // manually: it exists only as a helper struct for the ReceiveSignatures method.
 type signatureReceiver struct {
-	logger logging.Logger
+	logger  logging.Logger
+	metrics *dispatcherMetrics
+
 	// indexedOperatorState contains operator information including pubkeys, stakes, and quorum membership
 	indexedOperatorState *core.IndexedOperatorState
 
@@ -59,6 +61,7 @@ type signatureReceiver struct {
 func ReceiveSignatures(
 	ctx context.Context,
 	logger logging.Logger,
+	metrics *dispatcherMetrics,
 	indexedOperatorState *core.IndexedOperatorState,
 	batchHeaderHash [32]byte,
 	signingMessageChan chan core.SigningMessage,
@@ -82,6 +85,7 @@ func ReceiveSignatures(
 
 	receiver := &signatureReceiver{
 		logger:                    logger,
+		metrics:                   metrics,
 		indexedOperatorState:      indexedOperatorState,
 		aggregateSignatures:       aggregateSignatures,
 		validSignerMap:            validSignerMap,
@@ -211,6 +215,11 @@ func (sr *signatureReceiver) processSigningMessage(
 	signingMessage core.SigningMessage,
 	indexedOperatorInfo *core.IndexedOperatorInfo,
 ) error {
+	processSigningMessageStart := time.Now()
+	defer func() {
+		sr.metrics.reportProcessSigningMessageLatency(time.Since(processSigningMessageStart))
+	}()
+
 	if signingMessage.Err != nil {
 		return fmt.Errorf("signingMessage contained error: %w", signingMessage.Err)
 	}
