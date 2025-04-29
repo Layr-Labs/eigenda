@@ -48,6 +48,17 @@ type signatureReceiver struct {
 	// attestationUpdateStart is initialized when we first start receiving signatures, and is updated each time an
 	// attestation is yielded. This is used to track how long it takes to yield each attestation.
 	attestationUpdateStart time.Time
+
+	// significantSigningThresholdPercentage is a configurable "important" signing threshold. Right now, it's being
+	// used to track signing metrics, to understand system performance. If the value is 0, then special handling for
+	// the threshold is disabled.
+	// TODO (litt3): this might eventually be used to cause special case handling at an "important" threshold, e.g.
+	//  "update the attestation as soon as the threshold is reached."
+	significantSigningThresholdPercentage uint8
+
+	// significantSigningThresholdReachedTime tracks when each quorum's signing percentage first reached or exceeded the
+	// significantSigningThresholdPercentage
+	significantSigningThresholdReachedTime map[core.QuorumID]time.Time
 }
 
 // ReceiveSignatures receives SigningMessages over the signingMessageChan, and yields QuorumAttestations produced
@@ -70,6 +81,7 @@ func ReceiveSignatures(
 	batchHeaderHash [32]byte,
 	signingMessageChan chan core.SigningMessage,
 	tickInterval time.Duration,
+	significantSigningThresholdPercentage uint8,
 ) (chan *core.QuorumAttestation, error) {
 	sortedQuorumIDs, err := getSortedQuorumIDs(indexedOperatorState)
 	if err != nil {
@@ -87,19 +99,23 @@ func ReceiveSignatures(
 		stakeSigned[quorumID] = big.NewInt(0)
 	}
 
+	significantSigningThresholdReachedTime := make(map[core.QuorumID]time.Time, len(sortedQuorumIDs))
+
 	receiver := &signatureReceiver{
-		logger:                    logger,
-		metrics:                   metrics,
-		indexedOperatorState:      indexedOperatorState,
-		aggregateSignatures:       aggregateSignatures,
-		validSignerMap:            validSignerMap,
-		signatureMessageReceived:  signatureMessageReceived,
-		aggregateSignersG2PubKeys: aggregateSignersG2PubKeys,
-		stakeSigned:               stakeSigned,
-		batchHeaderHash:           batchHeaderHash,
-		signingMessageChan:        signingMessageChan,
-		quorumIDs:                 sortedQuorumIDs,
-		tickInterval:              tickInterval,
+		logger:                                 logger,
+		metrics:                                metrics,
+		indexedOperatorState:                   indexedOperatorState,
+		aggregateSignatures:                    aggregateSignatures,
+		validSignerMap:                         validSignerMap,
+		signatureMessageReceived:               signatureMessageReceived,
+		aggregateSignersG2PubKeys:              aggregateSignersG2PubKeys,
+		stakeSigned:                            stakeSigned,
+		batchHeaderHash:                        batchHeaderHash,
+		signingMessageChan:                     signingMessageChan,
+		quorumIDs:                              sortedQuorumIDs,
+		tickInterval:                           tickInterval,
+		significantSigningThresholdPercentage:  significantSigningThresholdPercentage,
+		significantSigningThresholdReachedTime: significantSigningThresholdReachedTime,
 	}
 
 	attestationChan := make(chan *core.QuorumAttestation, len(indexedOperatorState.IndexedOperators))
@@ -114,6 +130,9 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 	ticker := time.NewTicker(sr.tickInterval)
 	defer ticker.Stop()
 	defer close(attestationChan)
+	defer func() {
+		sr.reportThresholdSignedToDoneLatency()
+	}()
 
 	operatorCount := len(sr.indexedOperatorState.IndexedOperators)
 	errorCount := 0
@@ -148,7 +167,7 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 					"This shouldn't be possible.",
 					signingMessage.Operator.Hex(),
 					hex.EncodeToString(sr.batchHeaderHash[:]))
-			} else {
+			} else if sr.metrics != nil {
 				sr.metrics.reportSigningMessageChannelLatency(time.Since(signingMessage.TimeReceived))
 			}
 
@@ -231,7 +250,9 @@ func (sr *signatureReceiver) processSigningMessage(
 ) error {
 	processSigningMessageStart := time.Now()
 	defer func() {
-		sr.metrics.reportProcessSigningMessageLatency(time.Since(processSigningMessageStart))
+		if sr.metrics != nil {
+			sr.metrics.reportProcessSigningMessageLatency(time.Since(processSigningMessageStart))
+		}
 	}()
 
 	if signingMessage.Err != nil {
@@ -261,6 +282,8 @@ func (sr *signatureReceiver) processSigningMessage(
 			sr.aggregateSignatures[quorumID].Add(signingMessage.Signature.G1Point)
 			sr.aggregateSignersG2PubKeys[quorumID].Add(indexedOperatorInfo.PubkeyG2)
 		}
+
+		sr.checkSigningPercentage(quorumID)
 	}
 
 	return nil
@@ -389,4 +412,43 @@ func getSignedPercentage(signedStake *big.Int, totalStake *big.Int) uint8 {
 	quorumThreshold := uint8(new(big.Int).Div(signedStakeNumerator, totalStake).Uint64())
 
 	return quorumThreshold
+}
+
+// checkSigningPercentage checks if the signing percentage for a quorum meets or exceeds the configured
+// significantSigningThresholdPercentage, and records the time when the threshold was first crossed
+func (sr *signatureReceiver) checkSigningPercentage(quorumID core.QuorumID) {
+	if sr.significantSigningThresholdPercentage == 0 || sr.metrics == nil {
+		// if significantSigningThresholdPercentage is 0, or if metrics is nil, skip
+		return
+	}
+
+	if !sr.significantSigningThresholdReachedTime[quorumID].IsZero() {
+		// if significantSigningThresholdReachedTime[quorumID] has already been set, there is no need to check signing
+		// percentage again, since the time has already been recorded
+		return
+	}
+
+	signedPercentage := getSignedPercentage(sr.stakeSigned[quorumID], sr.indexedOperatorState.Totals[quorumID].Stake)
+	// check if the significantSigningThresholdPercentage has been crossed, and record the time if it has
+	if signedPercentage >= sr.significantSigningThresholdPercentage {
+		// Record the time when the threshold was first crossed
+		sr.significantSigningThresholdReachedTime[quorumID] = time.Now()
+	}
+}
+
+// reportThresholdSignedToDoneLatency calculates and reports the latency between the time when the
+// significantSigningThresholdPercentage was first crossed, and now
+func (sr *signatureReceiver) reportThresholdSignedToDoneLatency() {
+	if sr.metrics == nil {
+		return
+	}
+
+	for _, quorumID := range sr.quorumIDs {
+		thresholdReachedTime := sr.significantSigningThresholdReachedTime[quorumID]
+		if thresholdReachedTime.IsZero() {
+			continue
+		}
+
+		sr.metrics.reportThresholdSignedToDoneLatency(quorumID, time.Since(thresholdReachedTime))
+	}
 }

@@ -41,6 +41,7 @@ type dispatcherMetrics struct {
 	blobE2EDispersalLatency      *prometheus.SummaryVec
 	completedBlobs               *prometheus.CounterVec
 	attestation                  *prometheus.GaugeVec
+	thresholdSignedToDoneLatency *prometheus.GaugeVec
 	blobSetSize                  *prometheus.GaugeVec
 }
 
@@ -55,6 +56,16 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 			Help:      "number of signers and non-signers for the batch",
 		},
 		[]string{"type", "quorum"},
+	)
+
+	thresholdSignedToDoneLatency := promauto.With(registry).NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: dispatcherNamespace,
+			Name:      "threshold_signed_to_done_latency_ms",
+			Help: "the time elapsed between the signing percentage reaching a configured threshold, and the end " +
+				"of signature gathering",
+		},
+		[]string{"quorum"},
 	)
 
 	handleBatchLatency := promauto.With(registry).NewSummaryVec(
@@ -341,6 +352,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		blobE2EDispersalLatency:      blobE2EDispersalLatency,
 		completedBlobs:               completedBlobs,
 		attestation:                  attestation,
+		thresholdSignedToDoneLatency: thresholdSignedToDoneLatency,
 		blobSetSize:                  blobSetSize,
 	}
 }
@@ -478,4 +490,9 @@ func (m *dispatcherMetrics) reportAttestation(operatorCount map[core.QuorumID]in
 		m.attestation.WithLabelValues("non_signers", quorumStr).Set(float64(nonSigners))
 		m.attestation.WithLabelValues("percent_signed", quorumStr).Set(float64(quorumResult.PercentSigned))
 	}
+}
+
+func (m *dispatcherMetrics) reportThresholdSignedToDoneLatency(quorumID core.QuorumID, duration time.Duration) {
+	m.thresholdSignedToDoneLatency.WithLabelValues(fmt.Sprintf("%d", quorumID)).Set(
+		common.ToMilliseconds(duration))
 }

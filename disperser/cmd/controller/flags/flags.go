@@ -197,6 +197,14 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_KMS_KEY_ID"),
 	}
+	SignificantSigningThresholdPercentageFlag = cli.UintFlag{
+		Name: common.PrefixFlag(FlagPrefix, "significant-signing-threshold-percentage"),
+		Usage: "Percentage of stake that represents a 'significant' signing threshold. Currently used to track" +
+			" metrics to better understand signing behavior.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_THRESHOLD_PERCENTAGE"),
+		Value:    55,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -232,6 +240,7 @@ var optionalFlags = []cli.Flag{
 	MetricsPortFlag,
 	DisperserStoreChunksSigningDisabledFlag,
 	DisperserKMSKeyIDFlag,
+	SignificantSigningThresholdPercentageFlag,
 }
 
 var Flags []cli.Flag

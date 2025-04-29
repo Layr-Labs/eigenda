@@ -193,7 +193,8 @@ func TestReceiveSignatures_Basic(t *testing.T) {
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
-		50*time.Millisecond)
+		50*time.Millisecond,
+		55)
 	require.NoError(t, err)
 
 	// send signing messages from each operator
@@ -228,7 +229,8 @@ func TestReceiveSignatures_WithError(t *testing.T) {
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
-		50*time.Millisecond)
+		50*time.Millisecond,
+		55)
 	require.NoError(t, err)
 
 	// Send signing messages with one error
@@ -266,7 +268,8 @@ func TestReceiveSignatures_DuplicateMessage(t *testing.T) {
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
-		50*time.Millisecond)
+		50*time.Millisecond,
+		55)
 	require.NoError(t, err)
 
 	// Send signing messages from each operator
@@ -308,7 +311,8 @@ func TestReceiveSignatures_ContextCancellation(t *testing.T) {
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
-		50*time.Millisecond)
+		50*time.Millisecond,
+		55)
 	require.NoError(t, err)
 
 	// Send only 1 signing message
@@ -346,7 +350,8 @@ func TestReceiveSignatures_Concurrency(t *testing.T) {
 		indexedOperatorState,
 		batchHeaderHash,
 		signingMessageChan,
-		1*time.Millisecond)
+		1*time.Millisecond,
+		55)
 	require.NoError(t, err)
 
 	attestationCount := atomic.Int32{}

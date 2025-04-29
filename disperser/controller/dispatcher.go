@@ -40,6 +40,12 @@ type DispatcherConfig struct {
 	NumRequestRetries     int
 	// MaxBatchSize is the maximum number of blobs to dispatch in a batch
 	MaxBatchSize int32
+	// SignificantSigningThresholdPercentage is a configurable "important" signing threshold. Right now, it's being
+	// used to track signing metrics, to understand system performance. If the value is 0, then special handling for
+	// the threshold is disabled.
+	// TODO (litt3): this might eventually be used to cause special case handling at an "important" threshold, e.g.
+	//  "update the attestation as soon as the threshold is reached."
+	SignificantSigningThresholdPercentage uint8
 }
 
 type Dispatcher struct {
@@ -375,7 +381,8 @@ func (d *Dispatcher) HandleSignatures(
 		batchData.OperatorState,
 		batchData.BatchHeaderHash,
 		sigChan,
-		d.DispatcherConfig.SignatureTickInterval)
+		d.DispatcherConfig.SignatureTickInterval,
+		d.DispatcherConfig.SignificantSigningThresholdPercentage)
 	if err != nil {
 		receiveSignaturesErr := fmt.Errorf("receive and validate signatures for batch %s: %w", batchHeaderHash, err)
 
