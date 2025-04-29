@@ -74,7 +74,7 @@
   
     - [Encoder](#encoder-Encoder)
   
-- [encoder/v2/encoder.proto](#encoder_v2_encoder-proto)
+- [encoder/v2/encoder_v2.proto](#encoder_v2_encoder_v2-proto)
     - [EncodeBlobReply](#encoder-v2-EncodeBlobReply)
     - [EncodeBlobRequest](#encoder-v2-EncodeBlobRequest)
     - [EncodingParams](#encoder-v2-EncodingParams)
@@ -1183,10 +1183,10 @@ Parameters needed by Encoder for encoding
 
 
 
-<a name="encoder_v2_encoder-proto"></a>
+<a name="encoder_v2_encoder_v2-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
-## encoder/v2/encoder.proto
+## encoder/v2/encoder_v2.proto
 
 
 
