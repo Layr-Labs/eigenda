@@ -465,7 +465,7 @@ func (d *Dispatcher) submitAttestation(
 	err = d.blobMetadataStore.PutAttestation(ctx, attestation)
 	d.metrics.reportPutAttestationLatency(time.Since(putAttestationStartTime))
 	if err != nil {
-		return fmt.Errorf("error calling PutAttestation: %w", err)
+		return fmt.Errorf("put attestation: %w", err)
 	}
 
 	return nil
