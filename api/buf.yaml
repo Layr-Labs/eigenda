@@ -57,7 +57,7 @@ lint:
       - proto/retriever/v2/retriever_v2.proto
       - proto/validator/node_v2.proto
       - proto/encoder/encoder.proto
-      - proto/encoder/v2/encoder.proto
+      - proto/encoder/v2/encoder_v2.proto
     SERVICE_SUFFIX:
       - proto/churner/churner.proto
       - proto/disperser/disperser.proto
@@ -68,7 +68,7 @@ lint:
       - proto/retriever/v2/retriever_v2.proto
       - proto/validator/node_v2.proto
       - proto/encoder/encoder.proto
-      - proto/encoder/v2/encoder.proto
+      - proto/encoder/v2/encoder_v2.proto
 breaking:
   use:
     - FILE
