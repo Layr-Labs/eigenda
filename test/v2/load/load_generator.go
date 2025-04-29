@@ -213,6 +213,10 @@ func (l *LoadGenerator) readBlobFromRelays(
 	eigenDACert *coretypes.EigenDACert,
 ) {
 
+	timeout := time.Duration(l.config.RelayReadTimeout) * time.Second
+	ctx, cancel := context.WithTimeout(l.ctx, timeout)
+	defer cancel()
+
 	var relayReadCount int
 	if l.config.RelayReadAmplification < 1 {
 		if rand.Float64() < l.config.RelayReadAmplification {
@@ -230,20 +234,17 @@ func (l *LoadGenerator) readBlobFromRelays(
 	}()
 
 	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
-	timeout := time.Duration(l.config.RelayReadTimeout) * time.Second
-
 	relayKeys := eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys
-
 	readStartIndex := rand.Int32Range(0, int32(len(relayKeys)))
 
 	for i := 0; i < relayReadCount; i++ {
 		err := l.client.ReadBlobFromRelay(
-			context.Background(),
+			ctx,
 			*blobKey,
 			relayKeys[(int(readStartIndex)+i)%len(relayKeys)],
 			payload,
 			blobLengthSymbols,
-			timeout)
+			0)
 		if err == nil {
 			l.metrics.reportRelayReadSuccess()
 		} else {
@@ -259,6 +260,10 @@ func (l *LoadGenerator) readBlobFromValidators(
 	blobKey *corev2.BlobKey,
 	payload []byte,
 	eigenDACert *coretypes.EigenDACert) {
+
+	timeout := time.Duration(l.config.ValidatorReadTimeout) * time.Second
+	ctx, cancel := context.WithTimeout(l.ctx, timeout)
+	defer cancel()
 
 	var validatorReadCount int
 	if l.config.ValidatorReadAmplification < 1 {
@@ -284,11 +289,9 @@ func (l *LoadGenerator) readBlobFromValidators(
 		return
 	}
 
-	timeout := time.Duration(l.config.ValidatorReadTimeout) * time.Second
-
 	quorums := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers
 
-	currentBlockNumber, err := l.client.GetCurrentBlockNumber(context.Background())
+	currentBlockNumber, err := l.client.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		l.metrics.reportValidatorReadFailure()
 		l.client.GetLogger().Errorf("failed to get current block number: %v", err)
@@ -299,14 +302,14 @@ func (l *LoadGenerator) readBlobFromValidators(
 
 	for i := 0; i < validatorReadCount; i++ {
 		err = l.client.ReadBlobFromValidatorsInQuorum(
-			context.Background(),
+			ctx,
 			*blobKey,
 			blobHeader.Version,
 			*commitment,
 			quorums[(int(readStartIndex)+i)%len(quorums)],
 			currentBlockNumber,
 			payload,
-			timeout)
+			0)
 		if err == nil {
 			l.metrics.reportValidatorReadSuccess()
 		} else {
