@@ -43,6 +43,7 @@ func createSigningMessage(
 		Operator:             operatorID,
 		BatchHeaderHash:      headerHash,
 		AttestationLatencyMs: 10.0,
+		TimeReceived:         time.Now(),
 		Err:                  err,
 	}
 }
