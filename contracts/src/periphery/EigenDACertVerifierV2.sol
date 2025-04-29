@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDACertVerifierV2} from "src/interfaces/IEigenDACertVerifierV2.sol";
 import {IEigenDAThresholdRegistry} from "src/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "src/interfaces/IEigenDASignatureVerifier.sol";
@@ -21,7 +20,7 @@ import {
  * @notice For V2 verification this contract is deployed with immutable security thresholds and required quorum numbers,
  *         to change these values or verification behavior a new CertVerifier must be deployed
  */
-contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
+contract EigenDACertVerifierV2 {
     error InvalidSecurityThresholds();
 
     /// @notice The EigenDAThresholdRegistry contract address
