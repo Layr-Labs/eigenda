@@ -587,6 +587,15 @@ func (c *TestClient) ReadBlobFromRelay(
 	return nil
 }
 
+// GetCurrentBlockNumber retrieves the current block number from the indexed chain state.
+func (c *TestClient) GetCurrentBlockNumber(ctx context.Context) (uint64, error) {
+	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get current block number: %w", err)
+	}
+	return uint64(currentBlockNumber), nil
+}
+
 // ReadBlobFromValidators reads a blob from the validators and compares it to the given payload.
 func (c *TestClient) ReadBlobFromValidators(
 	ctx context.Context,

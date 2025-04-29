@@ -277,19 +277,30 @@ func (l *LoadGenerator) readBlobFromValidators(
 	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
 	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
 	if err != nil {
+		l.metrics.reportValidatorReadFailure()
 		l.client.GetLogger().Errorf("failed to bind blob commitments: %v", err)
 		return
 	}
 
 	timeout := time.Duration(l.config.ValidatorReadTimeout) * time.Second
 
+	quorums := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers
+
+	currentBlockNumber, err := l.client.GetCurrentBlockNumber(context.Background())
+	if err != nil {
+		l.metrics.reportValidatorReadFailure()
+		l.client.GetLogger().Errorf("failed to get current block number: %v", err)
+		return
+	}
+
 	for i := 0; i < validatorReadCount; i++ {
-		err = l.client.ReadBlobFromValidators(
+		err = l.client.ReadBlobFromValidatorsInQuorum(
 			context.Background(),
 			*blobKey,
 			blobHeader.Version,
 			*commitment,
-			eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+			quorums[i%len(quorums)],
+			currentBlockNumber,
 			payload,
 			timeout)
 		if err == nil {
