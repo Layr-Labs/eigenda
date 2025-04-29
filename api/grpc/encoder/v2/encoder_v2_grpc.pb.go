@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             v4.23.4
-// source: encoder/v2/encoder.proto
+// source: encoder/v2/encoder_v2.proto
 
 package v2
 
@@ -111,5 +111,5 @@ var Encoder_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "encoder/v2/encoder.proto",
+	Metadata: "encoder/v2/encoder_v2.proto",
 }
