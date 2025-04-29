@@ -5,11 +5,9 @@ import {IEigenDACertVerifierV2} from "src/interfaces/IEigenDACertVerifierV2.sol"
 import {IEigenDAThresholdRegistry} from "src/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "src/interfaces/IEigenDASignatureVerifier.sol";
+import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/libraries/EigenDACertVerificationV1Lib.sol";
 import {EigenDACertVerificationV2Lib as CertV2Lib} from "src/libraries/EigenDACertVerificationV2Lib.sol";
-import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
-import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
-import {IEigenDARelayRegistry} from "src/interfaces/IEigenDARelayRegistry.sol";
 import {
     BatchHeaderV2,
     BlobInclusionInfo,
@@ -24,7 +22,7 @@ import {
  * @notice For V2 verification this contract is deployed with immutable security thresholds and required quorum numbers,
  *         to change these values or verification behavior a new CertVerifier must be deployed
  */
-contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
+contract EigenDACertVerifierV2 {
     error InvalidSecurityThresholds();
 
     /// @notice The EigenDAThresholdRegistry contract address

@@ -108,6 +108,16 @@ type Config struct {
 	DispersalAuthenticationKeyCacheSize int
 	// the timeout for disperser keys (after which the disperser key is reloaded from the chain)
 	DisperserKeyTimeout time.Duration
+
+	// The size of the pool where chunks are downloaded from the relay network.
+	DownloadPoolSize int
+
+	// If true, use littDB instead of levelDB for v2 storage. Once enabled, cannot be disabled. That is,
+	// once littDB is turned on, turning it off again is not supported.
+	LittDBEnabled bool
+
+	// A special test only setting. If true, then littDB will throw an error if the same data is written twice.
+	LittDBDoubleWriteProtection bool
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -329,5 +339,7 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DisperserKeyTimeout:                 ctx.GlobalDuration(flags.DisperserKeyTimeoutFlag.Name),
 		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),
 		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
+		LittDBEnabled:                       ctx.GlobalBool(flags.LittDBEnabledFlag.Name),
+		DownloadPoolSize:                    ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
 	}, nil
 }

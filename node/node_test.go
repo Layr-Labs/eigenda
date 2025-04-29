@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/docker/go-units"
+	"github.com/gammazero/workerpool"
 
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	"github.com/Layr-Labs/eigenda/common"
@@ -68,7 +69,7 @@ func newComponents(t *testing.T, operatorID [32]byte) *components {
 
 	err = os.MkdirAll(config.DbPath, os.ModePerm)
 	if err != nil {
-		panic("failed to create a directory for db")
+		panic("failed to create a directory for levelDB")
 	}
 	tx := &coremock.MockWriter{}
 
@@ -94,14 +95,15 @@ func newComponents(t *testing.T, operatorID [32]byte) *components {
 	}
 	defer os.Remove(dbPath)
 	n := &node.Node{
-		Config:     config,
-		Logger:     logger,
-		KeyPair:    keyPair,
-		Metrics:    nil,
-		Store:      store,
-		ChainState: chainState,
-		Validator:  mockVal,
-		Transactor: tx,
+		Config:       config,
+		Logger:       logger,
+		KeyPair:      keyPair,
+		Metrics:      nil,
+		Store:        store,
+		ChainState:   chainState,
+		Validator:    mockVal,
+		Transactor:   tx,
+		DownloadPool: workerpool.New(1),
 	}
 	n.BlobVersionParams.Store(v2.NewBlobVersionParameterMap(blobParamsMap))
 	return &components{

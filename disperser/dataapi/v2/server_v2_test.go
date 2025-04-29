@@ -1227,6 +1227,22 @@ func TestFetchBatch(t *testing.T) {
 	require.NoError(t, err)
 	batchHeaderHash := hex.EncodeToString(batchHeaderHashBytes[:])
 
+	// Set up batch in metadata store
+	blobHeader := makeBlobHeaderV2(t)
+	blobKey, err := blobHeader.BlobKey()
+	require.NoError(t, err)
+	blobCert := &corev2.BlobCertificate{
+		BlobHeader: blobHeader,
+		Signature:  []byte{0, 1, 2, 3, 4},
+		RelayKeys:  []corev2.RelayKey{0, 2, 4},
+	}
+	batch := &corev2.Batch{
+		BatchHeader:      batchHeader,
+		BlobCertificates: []*corev2.BlobCertificate{blobCert},
+	}
+	err = blobMetadataStore.PutBatch(context.Background(), batch)
+	require.NoError(t, err)
+
 	// Set up attestation in metadata store
 	keyPair, err := core.GenRandomBlsKeys()
 	assert.NoError(t, err)
@@ -1319,6 +1335,10 @@ func TestFetchBatch(t *testing.T) {
 	assert.Equal(t, batchHeader.ReferenceBlockNumber, response.SignedBatch.BatchHeader.ReferenceBlockNumber)
 	assert.Equal(t, attestation.AttestedAt, response.SignedBatch.AttestationInfo.Attestation.AttestedAt)
 	assert.Equal(t, attestation.QuorumNumbers, response.SignedBatch.AttestationInfo.Attestation.QuorumNumbers)
+	assert.Equal(t, 1, len(response.BlobKeys))
+	assert.Equal(t, blobKey.Hex(), response.BlobKeys[0])
+	assert.Equal(t, 1, len(response.BlobCertificates))
+	assert.Equal(t, []byte{0, 1, 2, 3, 4}, response.BlobCertificates[0].Signature)
 
 	signers := map[uint8][]serverv2.OperatorIdentity{
 		0: []serverv2.OperatorIdentity{
@@ -1377,6 +1397,10 @@ func TestFetchBatch(t *testing.T) {
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
+			"SK": &types.AttributeValueMemberS{Value: "BatchInfo"},
 		},
 	})
 }

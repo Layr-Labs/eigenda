@@ -169,17 +169,16 @@ func (c *cacheAccessor[K, V]) fetchResult(ctx context.Context, key K, result *ac
 			c.concurrencyLimiter <- struct{}{}
 		}
 
-		value, err := c.accessor(key)
-
-		if c.concurrencyLimiter != nil {
-			<-c.concurrencyLimiter
-		}
-
 		if c.metrics != nil {
 			start := time.Now()
 			defer func() {
 				c.metrics.ReportCacheMissLatency(time.Since(start))
 			}()
+		}
+		value, err := c.accessor(key)
+
+		if c.concurrencyLimiter != nil {
+			<-c.concurrencyLimiter
 		}
 
 		c.cacheLock.Lock()
