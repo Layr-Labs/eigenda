@@ -1,6 +1,8 @@
 package v2
 
 import (
+	"encoding/hex"
+
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/semver"
@@ -19,15 +21,20 @@ type (
 		Nonsigners  map[uint8][]OperatorIdentity `json:"nonsigners"`
 		Signers     map[uint8][]OperatorIdentity `json:"signers"`
 	}
+
+	BatchHeader struct {
+		BatchRoot            string `json:"batch_root"`
+		ReferenceBlockNumber uint64 `json:"reference_block_number"`
+	}
 )
 
 // Operator types
 type (
 	OperatorDispersal struct {
-		BatchHeaderHash string              `json:"batch_header_hash"`
-		BatchHeader     *corev2.BatchHeader `json:"batch_header"`
-		DispersedAt     uint64              `json:"dispersed_at"`
-		Signature       string              `json:"signature"`
+		BatchHeaderHash string       `json:"batch_header_hash"`
+		BatchHeader     *BatchHeader `json:"batch_header"`
+		DispersedAt     uint64       `json:"dispersed_at"`
+		Signature       string       `json:"signature"`
 	}
 	OperatorDispersalFeedResponse struct {
 		OperatorIdentity OperatorIdentity     `json:"operator_identity"`
@@ -121,8 +128,8 @@ type (
 // Batch types
 type (
 	SignedBatch struct {
-		BatchHeader     *corev2.BatchHeader `json:"batch_header"`
-		AttestationInfo *AttestationInfo    `json:"attestation_info"`
+		BatchHeader     *BatchHeader     `json:"batch_header"`
+		AttestationInfo *AttestationInfo `json:"attestation_info"`
 	}
 
 	BatchResponse struct {
@@ -135,7 +142,7 @@ type (
 
 	BatchInfo struct {
 		BatchHeaderHash         string                  `json:"batch_header_hash"`
-		BatchHeader             *corev2.BatchHeader     `json:"batch_header"`
+		BatchHeader             *BatchHeader            `json:"batch_header"`
 		AttestedAt              uint64                  `json:"attested_at"`
 		AggregatedSignature     *core.Signature         `json:"aggregated_signature"`
 		QuorumNumbers           []core.QuorumID         `json:"quorum_numbers"`
@@ -184,3 +191,10 @@ type (
 		QuorumSigningRates []QuorumSigningRateData `json:"quorum_signing_rates"`
 	}
 )
+
+func createBatchHeader(bh *corev2.BatchHeader) *BatchHeader {
+	return &BatchHeader{
+		BatchRoot:            hex.EncodeToString(bh.BatchRoot[:]),
+		ReferenceBlockNumber: bh.ReferenceBlockNumber,
+	}
+}
