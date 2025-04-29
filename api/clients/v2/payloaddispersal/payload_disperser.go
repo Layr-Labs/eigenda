@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -117,8 +118,8 @@ func (pd *PayloadDisperser) SendPayload(
 	if err != nil {
 		return nil, fmt.Errorf("poll blob status until signed: %w", err)
 	}
-	pd.logger.Debug("Blob status COMPLETE", "blobKey", blobKey.Hex())
 
+	pd.logSigningPercentages(blobKey, blobStatusReply)
 	probe.SetStage("build_cert")
 
 	eigenDACert, err := pd.buildEigenDACert(ctx, blobKey, blobStatusReply)
@@ -138,6 +139,23 @@ func (pd *PayloadDisperser) SendPayload(
 	pd.logger.Debug("EigenDACert verified", "blobKey", blobKey.Hex())
 
 	return eigenDACert, nil
+}
+
+// logSigningPercentages logs the signing percentage of each quorum for a blob that has been dispersed and satisfied
+// required signing thresholds
+func (pd *PayloadDisperser) logSigningPercentages(blobKey core.BlobKey, blobStatusReply *dispgrpc.BlobStatusReply) {
+	quorumPercentagesBuilder := strings.Builder{}
+	quorumPercentagesBuilder.WriteString("(")
+
+	attestation := blobStatusReply.GetSignedBatch().GetAttestation()
+	for index, quorumNumber := range attestation.GetQuorumNumbers() {
+		quorumPercentagesBuilder.WriteString(
+			fmt.Sprintf("quorum_%d: %d%%, ", quorumNumber, attestation.GetQuorumSignedPercentages()[index]))
+	}
+	quorumPercentagesBuilder.WriteString(")")
+
+	pd.logger.Debug("Blob signed",
+		"blobKey", blobKey.Hex(), "quorumPercentages", quorumPercentagesBuilder.String())
 }
 
 // Close is responsible for calling close on all internal clients. This method will do its best to close all internal
