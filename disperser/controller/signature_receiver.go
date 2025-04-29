@@ -44,6 +44,10 @@ type signatureReceiver struct {
 
 	// tickInterval determines how frequently intermediate attestations are yielded
 	tickInterval time.Duration
+
+	// attestationUpdateStart is initialized when we first start receiving signatures, and is updated each time an
+	// attestation is yielded. This is used to track how long it takes to yield each attestation.
+	attestationUpdateStart time.Time
 }
 
 // ReceiveSignatures receives SigningMessages over the signingMessageChan, and yields QuorumAttestations produced
@@ -114,6 +118,7 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 	operatorCount := len(sr.indexedOperatorState.IndexedOperators)
 	errorCount := 0
 	newSignaturesGathered := false
+	sr.attestationUpdateStart = time.Now()
 
 	// we expect a single SigningMessage from each operator
 	for len(sr.signatureMessageReceived) < operatorCount {
@@ -313,6 +318,9 @@ func (sr *signatureReceiver) submitAttestation(attestationChan chan *core.Quorum
 		QuorumResults:    quorumResults,
 		SignerMap:        validSignerMapCopy,
 	}
+
+	sr.metrics.reportAttestationUpdateLatency(time.Since(sr.attestationUpdateStart))
+	sr.attestationUpdateStart = time.Now()
 }
 
 // computeQuorumResult creates a QuorumResult for a given quorum
