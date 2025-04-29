@@ -136,6 +136,13 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BATCH_ATTESTATION_TIMEOUT"),
 	}
+	SignatureTickIntervalFlag = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "signature-tick-interval"),
+		Usage:    "Interval at which new Attestations will be submitted as signature gathering progresses",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNATURE_TICK_INTERVAL"),
+		Value:    1 * time.Second,
+	}
 	FinalizationBlockDelayFlag = cli.Uint64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "finalization-block-delay"),
 		Usage:    "Number of blocks to wait before finalizing",
@@ -190,6 +197,14 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_KMS_KEY_ID"),
 	}
+	SignificantSigningThresholdPercentageFlag = cli.UintFlag{
+		Name: common.PrefixFlag(FlagPrefix, "significant-signing-threshold-percentage"),
+		Usage: "Percentage of stake that represents a 'significant' signing threshold. Currently used to track" +
+			" metrics to better understand signing behavior.",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_THRESHOLD_PERCENTAGE"),
+		Value:    55,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -216,6 +231,7 @@ var optionalFlags = []cli.Flag{
 	MaxNumBlobsPerIterationFlag,
 	OnchainStateRefreshIntervalFlag,
 
+	SignatureTickIntervalFlag,
 	FinalizationBlockDelayFlag,
 	NumRequestRetriesFlag,
 	NumConcurrentDispersalRequestsFlag,
@@ -224,6 +240,7 @@ var optionalFlags = []cli.Flag{
 	MetricsPortFlag,
 	DisperserStoreChunksSigningDisabledFlag,
 	DisperserKMSKeyIDFlag,
+	SignificantSigningThresholdPercentageFlag,
 }
 
 var Flags []cli.Flag

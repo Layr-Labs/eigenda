@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	common "github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,30 +15,34 @@ const dispatcherNamespace = "eigenda_dispatcher"
 
 // dispatcherMetrics is a struct that holds the metrics for the dispatcher.
 type dispatcherMetrics struct {
-	handleBatchLatency          *prometheus.SummaryVec
-	newBatchLatency             *prometheus.SummaryVec
-	getBlobMetadataLatency      *prometheus.SummaryVec
-	getOperatorStateLatency     *prometheus.SummaryVec
-	getBlobCertificatesLatency  *prometheus.SummaryVec
-	buildMerkleTreeLatency      *prometheus.SummaryVec
-	putBatchHeaderLatency       *prometheus.SummaryVec
-	putBatchLatency             *prometheus.SummaryVec
-	proofLatency                *prometheus.SummaryVec
-	putInclusionInfosLatency    *prometheus.SummaryVec
-	poolSubmissionLatency       *prometheus.SummaryVec
-	putDispersalRequestLatency  *prometheus.SummaryVec
-	sendChunksLatency           *prometheus.SummaryVec
-	sendChunksRetryCount        *prometheus.GaugeVec
-	putDispersalResponseLatency *prometheus.SummaryVec
-	handleSignaturesLatency     *prometheus.SummaryVec
-	receiveSignaturesLatency    *prometheus.SummaryVec
-	aggregateSignaturesLatency  *prometheus.SummaryVec
-	putAttestationLatency       *prometheus.SummaryVec
-	updateBatchStatusLatency    *prometheus.SummaryVec
-	blobE2EDispersalLatency     *prometheus.SummaryVec
-	completedBlobs              *prometheus.CounterVec
-	attestation                 *prometheus.GaugeVec
-	blobSetSize                 *prometheus.GaugeVec
+	handleBatchLatency           *prometheus.SummaryVec
+	newBatchLatency              *prometheus.SummaryVec
+	getBlobMetadataLatency       *prometheus.SummaryVec
+	getOperatorStateLatency      *prometheus.SummaryVec
+	getBlobCertificatesLatency   *prometheus.SummaryVec
+	buildMerkleTreeLatency       *prometheus.SummaryVec
+	putBatchHeaderLatency        *prometheus.SummaryVec
+	putBatchLatency              *prometheus.SummaryVec
+	proofLatency                 *prometheus.SummaryVec
+	putInclusionInfosLatency     *prometheus.SummaryVec
+	poolSubmissionLatency        *prometheus.SummaryVec
+	putDispersalRequestLatency   *prometheus.SummaryVec
+	sendChunksLatency            *prometheus.SummaryVec
+	sendChunksRetryCount         *prometheus.GaugeVec
+	putDispersalResponseLatency  *prometheus.SummaryVec
+	handleSignaturesLatency      *prometheus.SummaryVec
+	processSigningMessageLatency *prometheus.SummaryVec
+	signingMessageChannelLatency *prometheus.SummaryVec
+	attestationUpdateLatency     *prometheus.SummaryVec
+	receiveSignaturesLatency     *prometheus.SummaryVec
+	aggregateSignaturesLatency   *prometheus.SummaryVec
+	putAttestationLatency        *prometheus.SummaryVec
+	updateBatchStatusLatency     *prometheus.SummaryVec
+	blobE2EDispersalLatency      *prometheus.SummaryVec
+	completedBlobs               *prometheus.CounterVec
+	attestation                  *prometheus.GaugeVec
+	thresholdSignedToDoneLatency *prometheus.GaugeVec
+	blobSetSize                  *prometheus.GaugeVec
 }
 
 // NewDispatcherMetrics sets up metrics for the dispatcher.
@@ -52,6 +56,16 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 			Help:      "number of signers and non-signers for the batch",
 		},
 		[]string{"type", "quorum"},
+	)
+
+	thresholdSignedToDoneLatency := promauto.With(registry).NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: dispatcherNamespace,
+			Name:      "threshold_signed_to_done_latency_ms",
+			Help: "the time elapsed between the signing percentage reaching a configured threshold, and the end " +
+				"of signature gathering",
+		},
+		[]string{"quorum"},
 	)
 
 	handleBatchLatency := promauto.With(registry).NewSummaryVec(
@@ -213,6 +227,36 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
+	processSigningMessageLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  dispatcherNamespace,
+			Name:       "process_signing_message_latency_ms",
+			Help:       "The time required to process a single signing message (part of HandleSignatures()).",
+			Objectives: objectives,
+		},
+		[]string{},
+	)
+
+	signingMessageChannelLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  dispatcherNamespace,
+			Name:       "signing_message_channel_latency_ms",
+			Help:       "The time a signing message sits in the channel waiting to be processed (part of HandleSignatures()).",
+			Objectives: objectives,
+		},
+		[]string{},
+	)
+
+	attestationUpdateLatency := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  dispatcherNamespace,
+			Name:       "attestation_update_latency_ms",
+			Help:       "The time it takes for the signature receiver to yield a new attestation (part of HandleSignatures()).",
+			Objectives: objectives,
+		},
+		[]string{},
+	)
+
 	receiveSignaturesLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace:  dispatcherNamespace,
@@ -282,30 +326,34 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 	)
 
 	return &dispatcherMetrics{
-		handleBatchLatency:          handleBatchLatency,
-		newBatchLatency:             newBatchLatency,
-		getBlobMetadataLatency:      getBlobMetadataLatency,
-		getOperatorStateLatency:     getOperatorStateLatency,
-		getBlobCertificatesLatency:  getBlobCertificatesLatency,
-		buildMerkleTreeLatency:      buildMerkleTreeLatency,
-		putBatchHeaderLatency:       putBatchHeaderLatency,
-		putBatchLatency:             putBatchLatency,
-		proofLatency:                proofLatency,
-		putInclusionInfosLatency:    putInclusionInfosLatency,
-		poolSubmissionLatency:       poolSubmissionLatency,
-		putDispersalRequestLatency:  putDispersalRequestLatency,
-		sendChunksLatency:           sendChunksLatency,
-		sendChunksRetryCount:        sendChunksRetryCount,
-		putDispersalResponseLatency: putDispersalResponseLatency,
-		handleSignaturesLatency:     handleSignaturesLatency,
-		receiveSignaturesLatency:    receiveSignaturesLatency,
-		aggregateSignaturesLatency:  aggregateSignaturesLatency,
-		putAttestationLatency:       putAttestationLatency,
-		updateBatchStatusLatency:    updateBatchStatusLatency,
-		blobE2EDispersalLatency:     blobE2EDispersalLatency,
-		completedBlobs:              completedBlobs,
-		attestation:                 attestation,
-		blobSetSize:                 blobSetSize,
+		handleBatchLatency:           handleBatchLatency,
+		newBatchLatency:              newBatchLatency,
+		getBlobMetadataLatency:       getBlobMetadataLatency,
+		getOperatorStateLatency:      getOperatorStateLatency,
+		getBlobCertificatesLatency:   getBlobCertificatesLatency,
+		buildMerkleTreeLatency:       buildMerkleTreeLatency,
+		putBatchHeaderLatency:        putBatchHeaderLatency,
+		putBatchLatency:              putBatchLatency,
+		proofLatency:                 proofLatency,
+		putInclusionInfosLatency:     putInclusionInfosLatency,
+		poolSubmissionLatency:        poolSubmissionLatency,
+		putDispersalRequestLatency:   putDispersalRequestLatency,
+		sendChunksLatency:            sendChunksLatency,
+		sendChunksRetryCount:         sendChunksRetryCount,
+		putDispersalResponseLatency:  putDispersalResponseLatency,
+		handleSignaturesLatency:      handleSignaturesLatency,
+		processSigningMessageLatency: processSigningMessageLatency,
+		signingMessageChannelLatency: signingMessageChannelLatency,
+		attestationUpdateLatency:     attestationUpdateLatency,
+		receiveSignaturesLatency:     receiveSignaturesLatency,
+		aggregateSignaturesLatency:   aggregateSignaturesLatency,
+		putAttestationLatency:        putAttestationLatency,
+		updateBatchStatusLatency:     updateBatchStatusLatency,
+		blobE2EDispersalLatency:      blobE2EDispersalLatency,
+		completedBlobs:               completedBlobs,
+		attestation:                  attestation,
+		thresholdSignedToDoneLatency: thresholdSignedToDoneLatency,
+		blobSetSize:                  blobSetSize,
 	}
 }
 
@@ -373,6 +421,18 @@ func (m *dispatcherMetrics) reportHandleSignaturesLatency(duration time.Duration
 	m.handleSignaturesLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
+func (m *dispatcherMetrics) reportProcessSigningMessageLatency(duration time.Duration) {
+	m.processSigningMessageLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
+func (m *dispatcherMetrics) reportSigningMessageChannelLatency(duration time.Duration) {
+	m.signingMessageChannelLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
+func (m *dispatcherMetrics) reportAttestationUpdateLatency(duration time.Duration) {
+	m.attestationUpdateLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
 func (m *dispatcherMetrics) reportReceiveSignaturesLatency(duration time.Duration) {
 	m.receiveSignaturesLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
@@ -430,4 +490,9 @@ func (m *dispatcherMetrics) reportAttestation(operatorCount map[core.QuorumID]in
 		m.attestation.WithLabelValues("non_signers", quorumStr).Set(float64(nonSigners))
 		m.attestation.WithLabelValues("percent_signed", quorumStr).Set(float64(quorumResult.PercentSigned))
 	}
+}
+
+func (m *dispatcherMetrics) reportThresholdSignedToDoneLatency(quorumID core.QuorumID, duration time.Duration) {
+	m.thresholdSignedToDoneLatency.WithLabelValues(fmt.Sprintf("%d", quorumID)).Set(
+		common.ToMilliseconds(duration))
 }
