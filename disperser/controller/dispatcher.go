@@ -238,6 +238,8 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to refresh onchain state: %w", err)
 		}
+		// reload the fresh snapshot
+		cachedOnChainState = d.cachedOnchainState.Load().(*CachedOnchainState)
 	}
 
 	// Get a batch of blobs to dispatch
