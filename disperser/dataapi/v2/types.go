@@ -33,6 +33,15 @@ type (
 		BlobIndex      uint32       `json:"blob_index"`
 		InclusionProof string       `json:"inclusion_proof"`
 	}
+
+	BlobMetadata struct {
+		BlobHeader    *corev2.BlobHeader `json:"blob_header"`
+		Signature     string             `json:"signature"`
+		BlobStatus    string             `json:"blob_status"`
+		BlobSizeBytes uint64             `json:"blob_size_bytes"`
+		RequestedAt   uint64             `json:"requested_at"`
+		ExpiryUnixSec uint64             `json:"expiry_unix_sec"`
+	}
 )
 
 // Operator types
@@ -123,8 +132,8 @@ type (
 	}
 
 	BlobInfo struct {
-		BlobKey      string                    `json:"blob_key"`
-		BlobMetadata *disperserv2.BlobMetadata `json:"blob_metadata"`
+		BlobKey      string        `json:"blob_key"`
+		BlobMetadata *BlobMetadata `json:"blob_metadata"`
 	}
 	BlobFeedResponse struct {
 		Blobs  []BlobInfo `json:"blobs"`
@@ -209,8 +218,19 @@ func createBatchHeader(bh *corev2.BatchHeader) *BatchHeader {
 func createBlobInclusionInfo(bi *corev2.BlobInclusionInfo) *BlobInclusionInfo {
 	return &BlobInclusionInfo{
 		BatchHeader:    createBatchHeader(bi.BatchHeader),
-		BlobKey:        hex.EncodeToString(bi.BlobKey[:]),
+		BlobKey:        bi.BlobKey.Hex(),
 		BlobIndex:      bi.BlobIndex,
 		InclusionProof: hex.EncodeToString(bi.InclusionProof),
+	}
+}
+
+func createBlobMetadata(bm *disperserv2.BlobMetadata) *BlobMetadata {
+	return &BlobMetadata{
+		BlobHeader:    bm.BlobHeader,
+		Signature:     hex.EncodeToString(bm.Signature[:]),
+		BlobStatus:    bm.BlobStatus.String(),
+		BlobSizeBytes: bm.BlobSize,
+		RequestedAt:   bm.RequestedAt,
+		ExpiryUnixSec: bm.Expiry,
 	}
 }

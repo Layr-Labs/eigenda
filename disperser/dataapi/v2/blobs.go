@@ -446,7 +446,7 @@ func (s *ServerV2) sendBlobFeedResponse(
 			return
 		}
 		blobInfo[i].BlobKey = bk.Hex()
-		blobInfo[i].BlobMetadata = blobs[i]
+		blobInfo[i].BlobMetadata = createBlobMetadata(blobs[i])
 	}
 	response := &BlobFeedResponse{
 		Blobs:  blobInfo,
