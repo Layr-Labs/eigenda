@@ -458,7 +458,10 @@ func (sr *signatureReceiver) computeQuorumResult(
 		"quorumID", quorumID,
 		"totalStateOperatorCount", stateOperatorCount,
 		"quorumOperatorCount", quorumOperatorCount,
-		"quorumAggregateG1PubKey", sr.indexedOperatorState.AggKeys[quorumID].Serialize())
+		"quorumAggregateG1PubKey", sr.indexedOperatorState.AggKeys[quorumID].Serialize(),
+		"signerCount", signerCount,
+		"nonSignerCount", nonSignerCount,
+		"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]))
 
 	if sr.aggregateSignersG2PubKeys[quorumID] == nil {
 		return nil, errors.New("nil aggregate signer G2 public key")
