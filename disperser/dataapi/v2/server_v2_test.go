@@ -2576,7 +2576,7 @@ func TestFetchMetricsSummary(t *testing.T) {
 	r := setUpRouter()
 
 	s := new(model.SampleStream)
-	err := s.UnmarshalJSON([]byte(mockPrometheusResponse))
+	err := s.UnmarshalJSON([]byte(mockPrometheusRespAvgThroughput))
 	assert.NoError(t, err)
 
 	matrix := make(model.Matrix, 0)
@@ -2588,7 +2588,7 @@ func TestFetchMetricsSummary(t *testing.T) {
 	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/summary")
 	response := decodeResponseBody[serverv2.MetricSummary](t, w)
 
-	assert.Equal(t, 16555.555555555555, response.AverageBytesPerSecond)
+	assert.Equal(t, 10422.560745809731, response.AverageBytesPerSecond)
 }
 
 func TestFetchMetricsThroughputTimeseries(t *testing.T) {
