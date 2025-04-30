@@ -203,7 +203,8 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 			// If this call fails to return in a timely fashion, the timeout configured for the poll loop will trigger
 			blobStatusReply, err := pd.disperserClient.GetBlobStatus(ctx, blobKey)
 			if err != nil {
-				pd.logger.Warn("get blob status", "err", err, "blobKey", blobKey.Hex())
+				// this is expected to fail multiple times before we get a valid response, so only do a Debug log
+				pd.logger.Debug("get blob status", "err", err, "blobKey", blobKey.Hex())
 				continue
 			}
 
