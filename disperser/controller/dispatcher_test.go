@@ -66,10 +66,8 @@ func createCachedState(t *testing.T, ctx context.Context, blockNum uint64) *cont
 	state, err := mockChainState.GetIndexedOperatorState(ctx, uint(blockNum), []core.QuorumID{0, 1})
 	require.NoError(t, err)
 	return &controller.CachedOnchainState{
-		CurrentBlockNumber:   blockNum + finalizationBlockDelay,
 		ReferenceBlockNumber: blockNum,
 		OperatorState:        state,
-		QuorumIDs:            []core.QuorumID{0, 1},
 		LastRefreshed:        time.Now(),
 	}
 }
@@ -620,6 +618,7 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 	pool := workerpool.New(5)
 
 	chainReader := &coremock.MockWriter{}
+	chainReader.On("GetRequiredQuorumNumbers").Return([]core.QuorumID{0, 1}, nil)
 	chainReader.On("OperatorIDToAddress").Return(gethcommon.Address{0}, nil)
 	agg, err := core.NewStdSignatureAggregator(logger, chainReader)
 	require.NoError(t, err)
@@ -633,14 +632,20 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 	blobSet := &controller.MockBlobSet{}
 	blobSet.On("Size", mock.Anything).Return(0)
 	d, err := controller.NewDispatcher(&controller.DispatcherConfig{
-		PullInterval:            1 * time.Second,
-		FinalizationBlockDelay:  finalizationBlockDelay,
-		AttestationTimeout:      1 * time.Second,
-		BatchAttestationTimeout: 2 * time.Second,
-		NumRequestRetries:       3,
-		MaxBatchSize:            maxBatchSize,
+		PullInterval:                1 * time.Second,
+		FinalizationBlockDelay:      finalizationBlockDelay,
+		AttestationTimeout:          1 * time.Second,
+		BatchAttestationTimeout:     2 * time.Second,
+		NumRequestRetries:           3,
+		MaxBatchSize:                maxBatchSize,
+		OnchainStateRefreshInterval: 1 * time.Second,
 	}, blobMetadataStore, pool, chainReader, mockChainState, agg, nodeClientManager, logger, prometheus.NewRegistry(), beforeDispatch, blobSet)
 	require.NoError(t, err)
+
+	// bootstrap the cache
+	err = d.Start(context.Background())
+	require.NoError(t, err)
+
 	return &dispatcherComponents{
 		Dispatcher:        d,
 		BlobMetadataStore: blobMetadataStore,
