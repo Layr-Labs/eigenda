@@ -380,14 +380,85 @@ func (sr *signatureReceiver) computeQuorumResult(
 		}, nil
 	}
 
+	// this is a debug measure. we are recomputing the aggregate G1 pubkey of all the operators, and then verifying that
+	// our computed aggregate matches the aggregate that is stored in the indexed operator state
+	var recomputedG1PubKeyAggregate *core.G1Point
+	// here we are recomputing the aggregate G1 pubkey of all the signers, and then verifying that our computed aggregate
+	// matches the aggregate computed by subtraction
+	var recomputedSignerG1PubKeyAggregate *core.G1Point
+
+	signerCount := 0
+
 	// clone the quorum aggregate G1 pubkey, so that we can safely subtract non-signer pubkeys to yield the aggregate
 	// G1 pubkey of all the signers
 	aggregateSignersG1PubKey := sr.indexedOperatorState.AggKeys[quorumID].Clone()
 	for operatorID := range sr.indexedOperatorState.Operators[quorumID] {
+		operatorPubkey := sr.indexedOperatorState.IndexedOperators[operatorID].PubkeyG1
+
+		// compute the total pubkey aggregate, irrespective of signing status
+		if recomputedG1PubKeyAggregate == nil {
+			recomputedG1PubKeyAggregate = operatorPubkey.Clone()
+		} else {
+			recomputedG1PubKeyAggregate.Add(operatorPubkey)
+		}
+
 		if nonSignerPubKey, ok := nonSignerMap[operatorID]; ok {
 			aggregateSignersG1PubKey.Sub(nonSignerPubKey)
+
+			if !nonSignerPubKey.G1Affine.Equal(operatorPubkey.G1Affine) {
+				sr.logger.Error("non-signer pubkey stored in non-signer map does not match indexed operator state pubkey",
+					"pubkeyFromNonSignerMap", nonSignerPubKey.Serialize(),
+					"pubkeyFromState", operatorPubkey.Serialize(),
+				)
+			}
+		} else {
+			// operator ID isn't in non signer map, so add the pubkey to the signers aggregate
+			signerCount++
+			if recomputedSignerG1PubKeyAggregate == nil {
+				recomputedSignerG1PubKeyAggregate = operatorPubkey.Clone()
+			} else {
+				recomputedSignerG1PubKeyAggregate.Add(operatorPubkey)
+			}
 		}
 	}
+
+	if recomputedG1PubKeyAggregate == nil {
+		sr.logger.Error("recomputed aggregate G1 pubkey is nil. this shouldn't be possible")
+	} else if !recomputedG1PubKeyAggregate.G1Affine.Equal(sr.indexedOperatorState.AggKeys[quorumID].G1Affine) {
+		sr.logger.Error("recomputed aggregate G1 pubkey does not match indexed operator state aggregate G1 pubkey",
+			"recomputedG1PubKeyAggregate", recomputedG1PubKeyAggregate.Serialize(),
+			"indexedOperatorStateAggregateG1PubKey", sr.indexedOperatorState.AggKeys[quorumID].Serialize(),
+			"quorumID", quorumID,
+			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]))
+	}
+
+	if recomputedSignerG1PubKeyAggregate == nil {
+		sr.logger.Error("recomputed aggregate signer G1 pubkey is nil. this shouldn't be possible")
+	} else if !recomputedSignerG1PubKeyAggregate.G1Affine.Equal(aggregateSignersG1PubKey.G1Affine) {
+		sr.logger.Error("recomputed aggregate signer G1 pubkey does not match key computed via subtraction",
+			"recomputedSignerG1PubKeyAggregate", recomputedSignerG1PubKeyAggregate.Serialize(),
+			"pubkeyComputedViaSubtraction", aggregateSignersG1PubKey.Serialize(),
+		)
+	}
+
+	quorumOperatorCount := len(sr.indexedOperatorState.Operators[quorumID])
+	nonSignerCount := len(nonSignerMap)
+
+	if signerCount != quorumOperatorCount-nonSignerCount {
+		sr.logger.Error("number of signers does not match number of operators in quorum - non signers",
+			"quorumID", quorumID,
+			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
+			"signerCount", signerCount,
+			"quorumOperatorCount", quorumOperatorCount,
+			"nonSignerCount", nonSignerCount)
+	}
+
+	stateOperatorCount := len(sr.indexedOperatorState.IndexedOperators)
+	sr.logger.Debug("State details for quorum",
+		"quorumID", quorumID,
+		"totalStateOperatorCount", stateOperatorCount,
+		"quorumOperatorCount", quorumOperatorCount,
+		"quorumAggregateG1PubKey", sr.indexedOperatorState.AggKeys[quorumID].Serialize())
 
 	if sr.aggregateSignersG2PubKeys[quorumID] == nil {
 		return nil, errors.New("nil aggregate signer G2 public key")
