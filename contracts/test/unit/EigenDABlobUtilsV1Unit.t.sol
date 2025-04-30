@@ -3,7 +3,7 @@ pragma solidity =0.8.12;
 
 import "../MockEigenDADeployer.sol";
 import {EigenDACertVerifierV1} from "src/periphery/EigenDACertVerifierV1.sol";
-import {EigenDACertVerificationV1Lib as CertV1Lib } from "src/libraries/V1/EigenDACertVerificationV1Lib.sol";
+import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/libraries/V1/EigenDACertVerificationV1Lib.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/libraries/V1/EigenDATypesV1.sol";
 import {IEigenDABatchMetadataStorage} from "src/interfaces/IEigenDABatchMetadataStorage.sol";
 
@@ -19,7 +19,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
 
     function setUp() public virtual {
         _deployDA();
-        
+
         eigenDACertVerifierV1 = new EigenDACertVerifierV1(
             IEigenDAThresholdRegistry(address(eigenDAServiceManager)),
             IEigenDABatchMetadataStorage(address(eigenDAServiceManager))
