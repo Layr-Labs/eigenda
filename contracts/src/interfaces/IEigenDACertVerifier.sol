@@ -4,7 +4,16 @@ pragma solidity ^0.8.9;
 import {IEigenDAThresholdRegistry} from "./IEigenDAThresholdRegistry.sol";
 import "./IEigenDAStructs.sol";
 
-interface IEigenDACertVerifier {
+interface IEigenDACertVerifierBase {
+    /// @notice Check a DA cert's validity, and revert if invalid.
+    function verifyDACert(bytes calldata certBytes) external view;
+
+    /// @notice Check a DA cert's validity
+    /// @return status An enum value. Success is always mapped to 1, and other values are errors specific to each CertVerifier.
+    function checkDACert(bytes calldata certBytes) external view returns (uint8 status);
+}
+
+interface IEigenDACertVerifier is IEigenDACertVerifierBase {
     /// @notice Check a DA cert's validity, and revert if invalid.
     function verifyDACert(bytes calldata certBytes) external view;
 
