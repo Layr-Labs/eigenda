@@ -320,10 +320,12 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 	return sigChan, batchData, nil
 }
 
-// HandleSignatures receives signatures from operators, validates, and aggregates them.
+// HandleSignatures receives SigningMessages from operators for a given batch through the input sigChan. The signatures
+// are validated, aggregated, and used to put an Attestation for the batch into the blobMetadataStore. The Attestation
+// is periodically updated as additional signatures are gathered.
 //
-// This method updates Attestations in the blobMetadataStore, containing signing data from the SigningMessages received
-// through the sigChan. It periodically updates the stored Attestation as signatures are gathered.
+// This method will continue gathering signatures until a SigningMessage has been received from every operator, or until
+// the global attestationCtx times out.
 func (d *Dispatcher) HandleSignatures(
 	ctx context.Context,
 	attestationCtx context.Context,
