@@ -352,26 +352,7 @@ func (d *Dispatcher) HandleSignatures(
 		}
 	}
 
-	// write an empty attestation before starting to gather signatures.
-	// the attestation will be periodically updated as signatures are gathered.
-	attestation := &corev2.Attestation{
-		BatchHeader:      batchData.Batch.BatchHeader,
-		AttestedAt:       uint64(time.Now().UnixNano()),
-		NonSignerPubKeys: nil,
-		APKG2:            nil,
-		QuorumAPKs:       nil,
-		Sigma:            nil,
-		QuorumNumbers:    nil,
-		QuorumResults:    nil,
-	}
-	err := d.blobMetadataStore.PutAttestation(ctx, attestation)
-	if err != nil {
-		// this error isn't fatal: a subsequent PutAttestation attempt might succeed
-		// TODO: this used to cause the HandleSignatures method to fail entirely. Is it ok to continue trying here?
-		d.logger.Error("error calling PutAttestation",
-			"err", err,
-			"batchHeaderHash", batchHeaderHash)
-	}
+	// TODO: I removed the initial empty attestation update. Is that ok?
 
 	// This channel will remain open until the attestationTimeout triggers, or until signatures from all validators
 	// have been received and processed. It will periodically yield QuorumAttestations with the latest set of received
