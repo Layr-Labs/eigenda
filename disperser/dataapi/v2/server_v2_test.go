@@ -55,9 +55,6 @@ import (
 )
 
 var (
-	//go:embed testdata/prometheus-response-sample.json
-	mockPrometheusResponse string
-
 	//go:embed testdata/prometheus-resp-avg-throughput.json
 	mockPrometheusRespAvgThroughput string
 
