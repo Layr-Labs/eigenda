@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.12;
 
-import {EigenDACertVerifierV2} from "src/periphery/EigenDACertVerifierV2.sol";
+import {EigenDACertVerifierV3} from "src/periphery/EigenDACertVerifierV3.sol";
 import {RegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
@@ -16,6 +16,7 @@ import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 import "src/interfaces/IEigenDAStructs.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/libraries/V1/EigenDATypesV1.sol";
 
 //forge script script/deploy/certverifier/CertVerifierDeployer.s.sol:CertVerifierDeployer --sig "run(string, string)" <config.json> <output.json> --rpc-url $RPC --private-key $PRIVATE_KEY -vvvv --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast
 contract CertVerifierDeployer is Script, Test {
@@ -26,7 +27,7 @@ contract CertVerifierDeployer is Script, Test {
     address eigenDARelayRegistry;
     address registryCoordinator;
 
-    SecurityThresholds defaultSecurityThresholds;
+    DATypesV1.SecurityThresholds defaultSecurityThresholds;
     bytes quorumNumbersRequired;
 
     function run(string memory inputJSONFile, string memory outputJSONFile) external {
@@ -46,7 +47,7 @@ contract CertVerifierDeployer is Script, Test {
         registryCoordinator = abi.decode(raw, (address));
 
         raw = stdJson.parseRaw(data, ".defaultSecurityThresholds");
-        defaultSecurityThresholds = abi.decode(raw, (SecurityThresholds));
+        defaultSecurityThresholds = abi.decode(raw, (DATypesV1.SecurityThresholds));
 
         raw = stdJson.parseRaw(data, ".quorumNumbersRequired");
         quorumNumbersRequired = abi.decode(raw, (bytes));
@@ -54,7 +55,7 @@ contract CertVerifierDeployer is Script, Test {
         vm.startBroadcast();
 
         eigenDACertVerifier = address(
-            new EigenDACertVerifierV2(
+            new EigenDACertVerifierV3(
                 IEigenDAThresholdRegistry(eigenDAThresholdRegistry),
                 IEigenDASignatureVerifier(eigenDAServiceManager),
                 IRegistryCoordinator(registryCoordinator),

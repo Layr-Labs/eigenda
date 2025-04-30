@@ -4,7 +4,7 @@ pragma solidity =0.8.12;
 import {IRegistryCoordinator, RegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {VersionedBlobParams} from "src/interfaces/IEigenDAStructs.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/libraries/V1/EigenDATypesV1.sol";
 import {IPauserRegistry} from
     "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
 import "forge-std/StdToml.sol";
@@ -26,7 +26,7 @@ struct CalldataThresholdRegistryParams {
     bytes quorumAdversaryThresholdPercentages;
     bytes quorumConfirmationThresholdPercentages;
     bytes quorumNumbersRequired;
-    VersionedBlobParams[] versionedBlobParams;
+    DATypesV1.VersionedBlobParams[] versionedBlobParams;
 }
 
 struct CalldataServiceManagerParams {
@@ -186,10 +186,10 @@ library InitParamsLib {
         return stdToml.readBytes(configData, ".initParams.eigenDA.thresholdRegistry.quorumNumbersRequired");
     }
 
-    function versionedBlobParams(string memory configData) internal pure returns (VersionedBlobParams[] memory) {
+    function versionedBlobParams(string memory configData) internal pure returns (DATypesV1.VersionedBlobParams[] memory) {
         bytes memory versionedBlobParamsRaw =
             stdToml.parseRaw(configData, ".initParams.eigenDA.thresholdRegistry.versionedBlobParams");
-        return abi.decode(versionedBlobParamsRaw, (VersionedBlobParams[]));
+        return abi.decode(versionedBlobParamsRaw, (DATypesV1.VersionedBlobParams[]));
     }
 
     function batchConfirmers(string memory configData) internal pure returns (address[] memory) {

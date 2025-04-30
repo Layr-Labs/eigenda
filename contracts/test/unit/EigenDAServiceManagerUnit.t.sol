@@ -2,11 +2,11 @@
 pragma solidity =0.8.12;
 
 import "../MockEigenDADeployer.sol";
+import {EigenDATypesV1 as DATypesV1} from "../../src/libraries/V1/EigenDATypesV1.sol";
+import {EigenDACertVerificationV1Lib} from "../../src/libraries/V1/EigenDACertVerificationV1Lib.sol";
 
 contract EigenDAServiceManagerUnit is MockEigenDADeployer {
     using BN254 for BN254.G1Point;
-    using EigenDAHasher for BatchHeader;
-    using EigenDAHasher for ReducedBatchHeader;
 
     event BatchConfirmed(bytes32 indexed batchHeaderHash, uint32 batchId);
 
@@ -16,12 +16,12 @@ contract EigenDAServiceManagerUnit is MockEigenDADeployer {
 
     function testConfirmBatch_AllSigning_Valid(uint256 pseudoRandomNumber) public {
         (
-            BatchHeader memory batchHeader,
+            DATypesV1.BatchHeader memory batchHeader,
             BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
         ) = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
 
         uint32 batchIdToConfirm = eigenDAServiceManager.batchId();
-        bytes32 batchHeaderHash = batchHeader.hashBatchHeaderToReducedBatchHeader();
+        bytes32 batchHeaderHash = EigenDACertVerificationV1Lib.hashBatchHeaderToReducedBatchHeader(batchHeader);
 
         cheats.prank(confirmer, confirmer);
         cheats.expectEmit(true, true, true, true, address(eigenDAServiceManager));
@@ -36,7 +36,7 @@ contract EigenDAServiceManagerUnit is MockEigenDADeployer {
 
     function testConfirmBatch_Revert_NotEOA(uint256 pseudoRandomNumber) public {
         (
-            BatchHeader memory batchHeader,
+            DATypesV1.BatchHeader memory batchHeader,
             BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
         ) = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
 
@@ -47,7 +47,7 @@ contract EigenDAServiceManagerUnit is MockEigenDADeployer {
 
     function testConfirmBatch_Revert_NotConfirmer(uint256 pseudoRandomNumber) public {
         (
-            BatchHeader memory batchHeader,
+            DATypesV1.BatchHeader memory batchHeader,
             BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
         ) = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
 
@@ -63,10 +63,10 @@ contract EigenDAServiceManagerUnit is MockEigenDADeployer {
         (, BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature) =
             _registerSignatoriesAndGetNonSignerStakeAndSignatureRandom(pseudoRandomNumber, 0, quorumBitmap);
 
-        BatchHeader memory batchHeader =
+        DATypesV1.BatchHeader memory batchHeader =
             _getRandomBatchHeader(pseudoRandomNumber, quorumNumbers, uint32(block.number + 1), 100);
 
-        bytes32 batchHeaderHash = batchHeader.hashBatchHeaderMemory();
+        bytes32 batchHeaderHash = EigenDACertVerificationV1Lib.hashBatchHeaderMemory(batchHeader);
         nonSignerStakesAndSignature.sigma = BN254.hashToG1(batchHeaderHash).scalar_mul(aggSignerPrivKey);
 
         cheats.expectRevert(bytes("specified referenceBlockNumber is in future"));
@@ -76,7 +76,7 @@ contract EigenDAServiceManagerUnit is MockEigenDADeployer {
 
     function testConfirmBatch_Revert_PastBlocknumber(uint256 pseudoRandomNumber) public {
         (
-            BatchHeader memory batchHeader,
+            DATypesV1.BatchHeader memory batchHeader,
             BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
         ) = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
 
@@ -88,7 +88,7 @@ contract EigenDAServiceManagerUnit is MockEigenDADeployer {
 
     function testConfirmBatch_Revert_Threshold(uint256 pseudoRandomNumber) public {
         (
-            BatchHeader memory batchHeader,
+            DATypesV1.BatchHeader memory batchHeader,
             BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
         ) = _getHeaderandNonSigners(1, pseudoRandomNumber, 100);
 
@@ -99,12 +99,12 @@ contract EigenDAServiceManagerUnit is MockEigenDADeployer {
 
     function testConfirmBatch_NonSigner_Valid(uint256 pseudoRandomNumber) public {
         (
-            BatchHeader memory batchHeader,
+            DATypesV1.BatchHeader memory batchHeader,
             BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
         ) = _getHeaderandNonSigners(1, pseudoRandomNumber, 75);
 
         uint32 batchIdToConfirm = eigenDAServiceManager.batchId();
-        bytes32 batchHeaderHash = batchHeader.hashBatchHeaderToReducedBatchHeader();
+        bytes32 batchHeaderHash = EigenDACertVerificationV1Lib.hashBatchHeaderToReducedBatchHeader(batchHeader);
 
         cheats.prank(confirmer, confirmer);
         cheats.expectEmit(true, true, true, true, address(eigenDAServiceManager));
@@ -119,7 +119,7 @@ contract EigenDAServiceManagerUnit is MockEigenDADeployer {
 
     function testConfirmBatch_Revert_LengthMismatch(uint256 pseudoRandomNumber) public {
         (
-            BatchHeader memory batchHeader,
+            DATypesV1.BatchHeader memory batchHeader,
             BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
         ) = _getHeaderandNonSigners(0, pseudoRandomNumber, 100);
         batchHeader.signedStakeForQuorums = new bytes(0);

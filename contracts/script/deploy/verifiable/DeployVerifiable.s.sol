@@ -29,7 +29,7 @@ import {
     PauserRegistry
 } from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
 import {IServiceManager} from "src/core/EigenDAServiceManager.sol";
-import {VersionedBlobParams} from "src/interfaces/IEigenDAStructs.sol";
+import {EigenDATypesV2 as DATypesV2} from "src/libraries/V2/EigenDATypesV2.sol";
 
 import {MockStakeRegistry} from "./mocks/MockStakeRegistry.sol";
 import {MockRegistryCoordinator} from "./mocks/MockRegistryCoordinator.sol";

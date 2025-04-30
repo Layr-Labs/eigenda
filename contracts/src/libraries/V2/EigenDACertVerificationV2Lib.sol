@@ -4,25 +4,16 @@ pragma solidity ^0.8.9;
 import {IEigenDAThresholdRegistry} from "src/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDASignatureVerifier} from "src/interfaces/IEigenDASignatureVerifier.sol";
 import {IEigenDARelayRegistry} from "src/interfaces/IEigenDARelayRegistry.sol";
-import {EigenDAHasher} from "src/libraries/EigenDAHasher.sol";
 import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
 import {Merkle} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/libraries/Merkle.sol";
 import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
-import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
 
-import {
-    BatchHeaderV2,
-    BlobInclusionInfo,
-    NonSignerStakesAndSignature,
-    SecurityThresholds,
-    QuorumStakeTotals,
-    VersionedBlobParams,
-    SignedBatch,
-    EigenDACertV2
-} from "src/interfaces/IEigenDAStructs.sol";
+import {NonSignerStakesAndSignature, QuorumStakeTotals} from "src/interfaces/IEigenDAStructs.sol";
+import {EigenDATypesV2 as DATypesV2} from "src/libraries/V2/EigenDATypesV2.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/libraries/V1/EigenDATypesV1.sol";
 
 /**
  * @title EigenDACertVerificationV2Lib - EigenDA V2 certificate verification library
@@ -71,60 +62,106 @@ library EigenDACertVerificationV2Lib {
     function verifyDACertV2(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
-        EigenDACertV2 calldata cert,
-        SecurityThresholds memory securityThresholds,
+        DATypesV2.BatchHeaderV2 memory batchHeader,
+        DATypesV2.BlobInclusionInfo memory blobInclusionInfo,
+        NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
+        DATypesV1.SecurityThresholds memory securityThresholds,
+        bytes memory requiredQuorumNumbers,
+        bytes memory signedQuorumNumbers
+    ) internal view {
+        (StatusCode err, bytes memory errParams) = checkDACertV2(
+            eigenDAThresholdRegistry,
+            signatureVerifier,
+            batchHeader,
+            blobInclusionInfo,
+            nonSignerStakesAndSignature,
+            securityThresholds,
+            requiredQuorumNumbers,
+            signedQuorumNumbers
+        );
+        revertOnError(err, errParams);
+    }
+
+    function verifyDACertV2FromSignedBatch(
+        IEigenDAThresholdRegistry eigenDAThresholdRegistry,
+        IEigenDASignatureVerifier signatureVerifier,
+        IRegistryCoordinator registryCoordinator,
+        DATypesV2.SignedBatch memory signedBatch,
+        DATypesV2.BlobInclusionInfo memory blobInclusionInfo,
+        DATypesV1.SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
-        (StatusCode status, bytes memory statusParams) =
-            checkDACertV2(eigenDAThresholdRegistry, signatureVerifier, cert, securityThresholds, requiredQuorumNumbers);
-        revertOnError(status, statusParams);
+        (NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
+            getNonSignerStakesAndSignature(registryCoordinator, signedBatch);
+
+        verifyDACertV2(
+            eigenDAThresholdRegistry,
+            signatureVerifier,
+            signedBatch.batchHeader,
+            blobInclusionInfo,
+            nonSignerStakesAndSignature,
+            securityThresholds,
+            requiredQuorumNumbers,
+            signedQuorumNumbers
+        );
     }
 
     /**
      * @notice Checks a complete blob certificate for V2 in a single call
      * @param eigenDAThresholdRegistry The threshold registry contract
      * @param signatureVerifier The signature verifier contract
-     * @param cert The blob certificate to verify
+     * @param batchHeader The batch header
+     * @param blobInclusionInfo The blob inclusion info
+     * @param nonSignerStakesAndSignature The non-signer stakes and signature
      * @param securityThresholds The security thresholds to verify against
      * @param requiredQuorumNumbers The required quorum numbers
-     * @return status Error code (SUCCESS if verification succeeded)
-     * @return statusParams Additional error parameters
+     * @param signedQuorumNumbers The signed quorum numbers
+     * @return err Error code (SUCCESS if verification succeeded)
+     * @return errParams Additional error parameters
      */
     function checkDACertV2(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
-        EigenDACertV2 calldata cert,
-        SecurityThresholds memory securityThresholds,
-        bytes memory requiredQuorumNumbers
-    ) internal view returns (StatusCode status, bytes memory statusParams) {
-        (status, statusParams) = checkBlobInclusion(cert.batchHeader, cert.blobInclusionInfo);
-        if (status != StatusCode.SUCCESS) {
-            return (status, statusParams);
+        DATypesV2.BatchHeaderV2 memory batchHeader,
+        DATypesV2.BlobInclusionInfo memory blobInclusionInfo,
+        NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
+        DATypesV1.SecurityThresholds memory securityThresholds,
+        bytes memory requiredQuorumNumbers,
+        bytes memory signedQuorumNumbers
+    ) internal view returns (StatusCode err, bytes memory errParams) {
+        (err, errParams) = checkBlobInclusion(batchHeader, blobInclusionInfo);
+        if (err != StatusCode.SUCCESS) {
+            return (err, errParams);
         }
 
-        (status, statusParams) = checkSecurityParams(
-            eigenDAThresholdRegistry.getBlobParams(cert.blobInclusionInfo.blobCertificate.blobHeader.version),
+        (err, errParams) = checkSecurityParams(
+            eigenDAThresholdRegistry.getBlobParams(blobInclusionInfo.blobCertificate.blobHeader.version),
             securityThresholds
         );
-        if (status != StatusCode.SUCCESS) {
-            return (status, statusParams);
+        if (err != StatusCode.SUCCESS) {
+            return (err, errParams);
         }
 
         // Verify signatures and build confirmed quorums bitmap
         uint256 confirmedQuorumsBitmap;
-        (status, statusParams, confirmedQuorumsBitmap) =
-            checkSignaturesAndBuildConfirmedQuorums(signatureVerifier, cert, securityThresholds);
-        if (status != StatusCode.SUCCESS) {
-            return (status, statusParams);
+        (err, errParams, confirmedQuorumsBitmap) = checkSignaturesAndBuildConfirmedQuorums(
+            signatureVerifier,
+            hashBatchHeaderV2(batchHeader),
+            signedQuorumNumbers,
+            batchHeader.referenceBlockNumber,
+            nonSignerStakesAndSignature,
+            securityThresholds
+        );
+        if (err != StatusCode.SUCCESS) {
+            return (err, errParams);
         }
 
         // Verify blob quorums are a subset of confirmed quorums
         uint256 blobQuorumsBitmap;
-        (status, statusParams, blobQuorumsBitmap) = checkBlobQuorumsSubset(
-            cert.blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers, confirmedQuorumsBitmap
-        );
-        if (status != StatusCode.SUCCESS) {
-            return (status, statusParams);
+        (err, errParams, blobQuorumsBitmap) =
+            checkBlobQuorumsSubset(blobInclusionInfo.blobCertificate.blobHeader.quorumNumbers, confirmedQuorumsBitmap);
+        if (err != StatusCode.SUCCESS) {
+            return (err, errParams);
         }
 
         // Verify required quorums are a subset of blob quorums
@@ -135,15 +172,15 @@ library EigenDACertVerificationV2Lib {
      * @notice Checks blob inclusion in the batch using Merkle proof
      * @param batchHeader The batch header
      * @param blobInclusionInfo The blob inclusion info
-     * @return status Error code (SUCCESS if verification succeeded)
-     * @return statusParams Additional error parameters
+     * @return err Error code (SUCCESS if verification succeeded)
+     * @return errParams Additional error parameters
      */
-    function checkBlobInclusion(BatchHeaderV2 memory batchHeader, BlobInclusionInfo memory blobInclusionInfo)
+    function checkBlobInclusion(DATypesV2.BatchHeaderV2 memory batchHeader, DATypesV2.BlobInclusionInfo memory blobInclusionInfo)
         internal
         pure
-        returns (StatusCode status, bytes memory statusParams)
+        returns (StatusCode err, bytes memory errParams)
     {
-        bytes32 blobCertHash = EigenDAHasher.hashBlobCertificate(blobInclusionInfo.blobCertificate);
+        bytes32 blobCertHash = hashBlobCertificate(blobInclusionInfo.blobCertificate);
         bytes32 encodedBlobHash = keccak256(abi.encodePacked(blobCertHash));
         bytes32 rootHash = batchHeader.batchRoot;
 
@@ -163,13 +200,13 @@ library EigenDACertVerificationV2Lib {
      * @notice Checks the security parameters for a blob cert
      * @param blobParams The blob params to verify
      * @param securityThresholds The security thresholds to verify against
-     * @return status Error code (SUCCESS if verification succeeded)
-     * @return statusParams Additional error parameters
+     * @return err Error code (SUCCESS if verification succeeded)
+     * @return errParams Additional error parameters
      */
-    function checkSecurityParams(VersionedBlobParams memory blobParams, SecurityThresholds memory securityThresholds)
+    function checkSecurityParams(DATypesV1.VersionedBlobParams memory blobParams, DATypesV1.SecurityThresholds memory securityThresholds)
         internal
         pure
-        returns (StatusCode status, bytes memory statusParams)
+        returns (StatusCode err, bytes memory errParams)
     {
         uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
         uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
@@ -185,35 +222,36 @@ library EigenDACertVerificationV2Lib {
     /**
      * @notice Checks quorum signatures and builds a bitmap of confirmed quorums
      * @param signatureVerifier The signature verifier contract
-     * @param cert The blob certificate to verify
+     * @param batchHashRoot The hash of the batch header
+     * @param signedQuorumNumbers The signed quorum numbers
+     * @param referenceBlockNumber The reference block number
+     * @param nonSignerStakesAndSignature The non-signer stakes and signature
      * @param securityThresholds The security thresholds to verify against
-     * @return status Error code (SUCCESS if verification succeeded)
-     * @return statusParams Additional error parameters
+     * @return err Error code (SUCCESS if verification succeeded)
+     * @return errParams Additional error parameters
      * @return confirmedQuorumsBitmap The bitmap of confirmed quorums
      */
     function checkSignaturesAndBuildConfirmedQuorums(
         IEigenDASignatureVerifier signatureVerifier,
-        EigenDACertV2 calldata cert,
-        SecurityThresholds memory securityThresholds
-    ) internal view returns (StatusCode status, bytes memory statusParams, uint256 confirmedQuorumsBitmap) {
-        bytes32 batchHashRoot = EigenDAHasher.hashBatchHeaderV2(cert.batchHeader);
-
+        bytes32 batchHashRoot,
+        bytes memory signedQuorumNumbers,
+        uint32 referenceBlockNumber,
+        NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
+        DATypesV1.SecurityThresholds memory securityThresholds
+    ) internal view returns (StatusCode err, bytes memory errParams, uint256 confirmedQuorumsBitmap) {
         (QuorumStakeTotals memory quorumStakeTotals,) = signatureVerifier.checkSignatures(
-            batchHashRoot,
-            cert.signedQuorumNumbers,
-            cert.batchHeader.referenceBlockNumber,
-            cert.nonSignerStakesAndSignature
+            batchHashRoot, signedQuorumNumbers, referenceBlockNumber, nonSignerStakesAndSignature
         );
 
         confirmedQuorumsBitmap = 0;
 
         // Record confirmed quorums where signatories own at least the threshold percentage of the quorum
-        for (uint256 i = 0; i < cert.signedQuorumNumbers.length; i++) {
+        for (uint256 i = 0; i < signedQuorumNumbers.length; i++) {
             if (
                 quorumStakeTotals.signedStakeForQuorum[i] * THRESHOLD_DENOMINATOR
                     >= quorumStakeTotals.totalStakeForQuorum[i] * securityThresholds.confirmationThreshold
             ) {
-                confirmedQuorumsBitmap = BitmapUtils.setBit(confirmedQuorumsBitmap, uint8(cert.signedQuorumNumbers[i]));
+                confirmedQuorumsBitmap = BitmapUtils.setBit(confirmedQuorumsBitmap, uint8(signedQuorumNumbers[i]));
             }
         }
 
@@ -224,14 +262,14 @@ library EigenDACertVerificationV2Lib {
      * @notice Checks that blob quorums are a subset of confirmed quorums
      * @param blobQuorumNumbers The blob quorum numbers
      * @param confirmedQuorumsBitmap The bitmap of confirmed quorums
-     * @return status Error code (SUCCESS if verification succeeded)
-     * @return statusParams Additional error parameters
+     * @return err Error code (SUCCESS if verification succeeded)
+     * @return errParams Additional error parameters
      * @return blobQuorumsBitmap The bitmap of blob quorums
      */
     function checkBlobQuorumsSubset(bytes memory blobQuorumNumbers, uint256 confirmedQuorumsBitmap)
         internal
         pure
-        returns (StatusCode status, bytes memory statusParams, uint256 blobQuorumsBitmap)
+        returns (StatusCode err, bytes memory errParams, uint256 blobQuorumsBitmap)
     {
         blobQuorumsBitmap = BitmapUtils.orderedBytesArrayToBitmap(blobQuorumNumbers);
 
@@ -246,13 +284,13 @@ library EigenDACertVerificationV2Lib {
      * @notice Checks that required quorums are a subset of blob quorums
      * @param requiredQuorumNumbers The required quorum numbers
      * @param blobQuorumsBitmap The bitmap of blob quorums
-     * @return status Error code (SUCCESS if verification succeeded)
-     * @return statusParams Additional error parameters
+     * @return err Error code (SUCCESS if verification succeeded)
+     * @return errParams Additional error parameters
      */
     function checkRequiredQuorumsSubset(bytes memory requiredQuorumNumbers, uint256 blobQuorumsBitmap)
         internal
         pure
-        returns (StatusCode status, bytes memory statusParams)
+        returns (StatusCode err, bytes memory errParams)
     {
         uint256 requiredQuorumsBitmap = BitmapUtils.orderedBytesArrayToBitmap(requiredQuorumNumbers);
 
@@ -270,7 +308,7 @@ library EigenDACertVerificationV2Lib {
      * @return nonSignerStakesAndSignature The non-signer stakes and signature
      * @return signedQuorumNumbers The signed quorum numbers
      */
-    function getNonSignerStakesAndSignature(IRegistryCoordinator registryCoordinator, SignedBatch memory signedBatch)
+    function getNonSignerStakesAndSignature(IRegistryCoordinator registryCoordinator, DATypesV2.SignedBatch memory signedBatch)
         internal
         view
         returns (NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers)
@@ -302,26 +340,25 @@ library EigenDACertVerificationV2Lib {
 
     /**
      * @notice Handles error codes by reverting with appropriate custom errors
-     * @param status The error code
-     * @param statusParams The error parameters
+     * @param err The error code
+     * @param errParams The error parameters
      */
-    function revertOnError(StatusCode status, bytes memory statusParams) internal pure {
-        if (status == StatusCode.SUCCESS) {
+    function revertOnError(StatusCode err, bytes memory errParams) internal pure {
+        if (err == StatusCode.SUCCESS) {
             return; // No error to handle
         }
 
-        if (status == StatusCode.INVALID_INCLUSION_PROOF) {
-            (uint256 blobIndex, bytes32 blobHash, bytes32 rootHash) =
-                abi.decode(statusParams, (uint256, bytes32, bytes32));
+        if (err == StatusCode.INVALID_INCLUSION_PROOF) {
+            (uint256 blobIndex, bytes32 blobHash, bytes32 rootHash) = abi.decode(errParams, (uint256, bytes32, bytes32));
             revert InvalidInclusionProof(blobIndex, blobHash, rootHash);
-        } else if (status == StatusCode.SECURITY_ASSUMPTIONS_NOT_MET) {
-            (uint256 gamma, uint256 n, uint256 minRequired) = abi.decode(statusParams, (uint256, uint256, uint256));
+        } else if (err == StatusCode.SECURITY_ASSUMPTIONS_NOT_MET) {
+            (uint256 gamma, uint256 n, uint256 minRequired) = abi.decode(errParams, (uint256, uint256, uint256));
             revert SecurityAssumptionsNotMet(gamma, n, minRequired);
-        } else if (status == StatusCode.BLOB_QUORUMS_NOT_SUBSET) {
-            (uint256 blobQuorumsBitmap, uint256 confirmedQuorumsBitmap) = abi.decode(statusParams, (uint256, uint256));
+        } else if (err == StatusCode.BLOB_QUORUMS_NOT_SUBSET) {
+            (uint256 blobQuorumsBitmap, uint256 confirmedQuorumsBitmap) = abi.decode(errParams, (uint256, uint256));
             revert BlobQuorumsNotSubset(blobQuorumsBitmap, confirmedQuorumsBitmap);
-        } else if (status == StatusCode.REQUIRED_QUORUMS_NOT_SUBSET) {
-            (uint256 requiredQuorumsBitmap, uint256 blobQuorumsBitmap) = abi.decode(statusParams, (uint256, uint256));
+        } else if (err == StatusCode.REQUIRED_QUORUMS_NOT_SUBSET) {
+            (uint256 requiredQuorumsBitmap, uint256 blobQuorumsBitmap) = abi.decode(errParams, (uint256, uint256));
             revert RequiredQuorumsNotSubset(requiredQuorumsBitmap, blobQuorumsBitmap);
         } else {
             revert("Unknown error code");
@@ -409,5 +446,39 @@ library EigenDACertVerificationV2Lib {
             blsApkRegistry.getApkIndicesAtBlockNumber(quorumNumbers, referenceBlockNumber);
 
         return checkSignaturesIndices;
+    }
+
+    
+    /**
+     * @notice hashes the given V2 batch header
+     * @param batchHeader the V2 batch header to hash
+     */
+    function hashBatchHeaderV2(DATypesV2.BatchHeaderV2 memory batchHeader) internal pure returns (bytes32) {
+        return keccak256(abi.encode(batchHeader));
+    }
+
+    /**
+     * @notice hashes the given V2 blob header
+     * @param blobHeader the V2 blob header to hash
+     */
+    function hashBlobHeaderV2(DATypesV2.BlobHeaderV2 memory blobHeader) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                keccak256(abi.encode(blobHeader.version, blobHeader.quorumNumbers, blobHeader.commitment)),
+                blobHeader.paymentHeaderHash
+            )
+        );
+    }
+
+    /**
+     * @notice hashes the given V2 blob certificate
+     * @param blobCertificate the V2 blob certificate to hash
+     */
+    function hashBlobCertificate(DATypesV2.BlobCertificate memory blobCertificate) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                hashBlobHeaderV2(blobCertificate.blobHeader), blobCertificate.signature, blobCertificate.relayKeys
+            )
+        );
     }
 }

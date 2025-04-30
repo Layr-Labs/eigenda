@@ -1,21 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDACertVerifierV2} from "src/interfaces/IEigenDACertVerifierV2.sol";
 import {IEigenDAThresholdRegistry} from "src/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "src/interfaces/IEigenDASignatureVerifier.sol";
+import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/libraries/V1/EigenDACertVerificationV1Lib.sol";
+import {EigenDACertVerificationV2Lib as CertV2Lib} from "src/libraries/V2/EigenDACertVerificationV2Lib.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
-import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/libraries/EigenDACertVerificationV1Lib.sol";
-import {EigenDACertVerificationV2Lib as CertV2Lib} from "src/libraries/EigenDACertVerificationV2Lib.sol";
-import {
-    BatchHeaderV2,
-    BlobInclusionInfo,
-    NonSignerStakesAndSignature,
-    SignedBatch,
-    SecurityThresholds,
-    EigenDACertV2
-} from "src/interfaces/IEigenDAStructs.sol";
+import {NonSignerStakesAndSignature} from "src/interfaces/IEigenDAStructs.sol";
+import {EigenDATypesV2 as DATypesV2} from "src/libraries/V2/EigenDATypesV2.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/libraries/V1/EigenDATypesV1.sol";
 
 /**
  * @title A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates
@@ -34,7 +28,7 @@ contract EigenDACertVerifierV2 {
     /// @notice The EigenDA middleware RegistryCoordinator contract address
     IRegistryCoordinator public immutable registryCoordinatorV2;
 
-    SecurityThresholds public securityThresholdsV2;
+    DATypesV1.SecurityThresholds public securityThresholdsV2;
 
     bytes public quorumNumbersRequiredV2;
 
@@ -49,7 +43,7 @@ contract EigenDACertVerifierV2 {
         IEigenDAThresholdRegistry _eigenDAThresholdRegistryV2,
         IEigenDASignatureVerifier _eigenDASignatureVerifierV2,
         IRegistryCoordinator _registryCoordinatorV2,
-        SecurityThresholds memory _securityThresholdsV2,
+        DATypesV1.SecurityThresholds memory _securityThresholdsV2,
         bytes memory _quorumNumbersRequiredV2
     ) {
         if (_securityThresholdsV2.confirmationThreshold <= _securityThresholdsV2.adversaryThreshold) {
@@ -64,11 +58,46 @@ contract EigenDACertVerifierV2 {
 
     /**
      * @notice Verifies a blob cert using the immutable required quorums and security thresholds set in the constructor
-     * @param cert The EigenDACertV2 to verify
+     * @param batchHeader The batch header of the blob
+     * @param blobInclusionInfo The inclusion proof for the blob cert
+     * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob cert against
+     * @param signedQuorumNumbers The signed quorum numbers corresponding to the nonSignerStakesAndSignature
      */
-    function verifyDACertV2(EigenDACertV2 calldata cert) external view {
+    function verifyDACertV2(
+        DATypesV2.BatchHeaderV2 calldata batchHeader,
+        DATypesV2.BlobInclusionInfo calldata blobInclusionInfo,
+        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
+        bytes memory signedQuorumNumbers
+    ) external view {
         CertV2Lib.verifyDACertV2(
-            _thresholdRegistry(), _signatureVerifier(), cert, _securityThresholds(), _quorumNumbersRequired()
+            _thresholdRegistry(),
+            _signatureVerifier(),
+            batchHeader,
+            blobInclusionInfo,
+            nonSignerStakesAndSignature,
+            _securityThresholds(),
+            _quorumNumbersRequired(),
+            signedQuorumNumbers
+        );
+    }
+
+    /**
+     * @notice Verifies a blob cert using the immutable required quorums and security thresholds set in the constructor
+     * @param signedBatch The signed batch to verify the blob cert against
+     * @param blobInclusionInfo The inclusion proof for the blob cert
+     */
+    function verifyDACertV2FromSignedBatch(
+        DATypesV2.SignedBatch calldata signedBatch,
+        DATypesV2.BlobInclusionInfo calldata blobInclusionInfo
+    ) external view {
+        CertV2Lib.verifyDACertV2FromSignedBatch(
+            _thresholdRegistry(),
+            _signatureVerifier(),
+            _registryCoordinator(),
+            signedBatch,
+            blobInclusionInfo,
+            _securityThresholds(),
+            _quorumNumbersRequired()
         );
     }
 
@@ -76,13 +105,28 @@ contract EigenDACertVerifierV2 {
      * @notice Thin try/catch wrapper around verifyDACertV2 that returns false instead of panicing
      * @dev The Steel library (https://github.com/risc0/risc0-ethereum/tree/main/crates/steel)
      *      currently has a limitation that it can only create zk proofs for functions that return a value
-     * @param cert The EigenDACertV2 to verify
+     * @param batchHeader The batch header of the blob
+     * @param blobInclusionInfo The inclusion proof for the blob cert
+     * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob cert against
+     * @param signedQuorumNumbers The signed quorum numbers corresponding to the nonSignerStakesAndSignature
      */
-    function checkDACert(EigenDACertV2 calldata cert) external view returns (bool) {
-        (CertV2Lib.StatusCode err,) = CertV2Lib.checkDACertV2(
-            _thresholdRegistry(), _signatureVerifier(), cert, _securityThresholds(), _quorumNumbersRequired()
+    function verifyDACertV2ForZKProof(
+        DATypesV2.BatchHeaderV2 calldata batchHeader,
+        DATypesV2.BlobInclusionInfo calldata blobInclusionInfo,
+        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
+        bytes memory signedQuorumNumbers
+    ) external view returns (bool) {
+        (CertV2Lib.StatusCode status,) = CertV2Lib.checkDACertV2(
+            _thresholdRegistry(),
+            _signatureVerifier(),
+            batchHeader,
+            blobInclusionInfo,
+            nonSignerStakesAndSignature,
+            _securityThresholds(),
+            _quorumNumbersRequired(),
+            signedQuorumNumbers
         );
-        if (err == CertV2Lib.StatusCode.SUCCESS) {
+        if (status == CertV2Lib.StatusCode.SUCCESS) {
             return true;
         } else {
             return false;
@@ -121,7 +165,7 @@ contract EigenDACertVerifierV2 {
      * @return The SecurityThresholds struct with confirmation and adversary thresholds
      * @dev Can be overridden by derived contracts
      */
-    function _securityThresholds() internal view virtual returns (SecurityThresholds memory) {
+    function _securityThresholds() internal view virtual returns (DATypesV1.SecurityThresholds memory) {
         return securityThresholdsV2;
     }
 

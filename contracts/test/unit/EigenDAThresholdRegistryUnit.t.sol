@@ -2,9 +2,11 @@
 pragma solidity =0.8.12;
 
 import "../MockEigenDADeployer.sol";
+import {EigenDATypesV2 as DATypesV2} from "../../src/libraries/V2/EigenDATypesV2.sol";
+import {EigenDATypesV1 as DATypesV1} from "../../src/libraries/V1/EigenDATypesV1.sol";
 
 contract EigenDAThresholdRegistryUnit is MockEigenDADeployer {
-    event VersionedBlobParamsAdded(uint16 indexed version, VersionedBlobParams versionedBlobParams);
+    event VersionedBlobParamsAdded(uint16 indexed version, DATypesV1.VersionedBlobParams versionedBlobParams);
     event QuorumAdversaryThresholdPercentagesUpdated(
         bytes previousQuorumAdversaryThresholdPercentages, bytes newQuorumAdversaryThresholdPercentages
     );
@@ -13,7 +15,7 @@ contract EigenDAThresholdRegistryUnit is MockEigenDADeployer {
     );
     event QuorumNumbersRequiredUpdated(bytes previousQuorumNumbersRequired, bytes newQuorumNumbersRequired);
     event DefaultSecurityThresholdsV2Updated(
-        SecurityThresholds previousDefaultSecurityThresholdsV2, SecurityThresholds newDefaultSecurityThresholdsV2
+        DATypesV1.SecurityThresholds previousDefaultSecurityThresholdsV2, DATypesV1.SecurityThresholds newDefaultSecurityThresholdsV2
     );
 
     function setUp() public virtual {
@@ -21,8 +23,8 @@ contract EigenDAThresholdRegistryUnit is MockEigenDADeployer {
     }
 
     function test_initalize() public {
-        VersionedBlobParams memory _versionedBlobParams =
-            VersionedBlobParams({maxNumOperators: 3537, numChunks: 8192, codingRate: 8});
+        DATypesV1.VersionedBlobParams memory _versionedBlobParams =
+            DATypesV1.VersionedBlobParams({maxNumOperators: 3537, numChunks: 8192, codingRate: 8});
 
         assertEq(eigenDAThresholdRegistry.owner(), registryCoordinatorOwner);
         assertEq(
@@ -42,7 +44,7 @@ contract EigenDAThresholdRegistryUnit is MockEigenDADeployer {
         assertEq(numChunks, _versionedBlobParams.numChunks);
         assertEq(codingRate, _versionedBlobParams.codingRate);
 
-        VersionedBlobParams[] memory versionedBlobParams = new VersionedBlobParams[](1);
+        DATypesV1.VersionedBlobParams[] memory versionedBlobParams = new DATypesV1.VersionedBlobParams[](1);
         versionedBlobParams[0] = _versionedBlobParams;
         vm.expectRevert("Initializable: contract is already initialized");
         eigenDAThresholdRegistry.initialize(
@@ -55,8 +57,8 @@ contract EigenDAThresholdRegistryUnit is MockEigenDADeployer {
     }
 
     function test_addVersionedBlobParams() public {
-        VersionedBlobParams memory _versionedBlobParams =
-            VersionedBlobParams({maxNumOperators: 999, numChunks: 999, codingRate: 9});
+        DATypesV1.VersionedBlobParams memory _versionedBlobParams =
+            DATypesV1.VersionedBlobParams({maxNumOperators: 999, numChunks: 999, codingRate: 9});
         vm.expectEmit(address(eigenDAThresholdRegistry));
         emit VersionedBlobParamsAdded(1, _versionedBlobParams);
         vm.prank(registryCoordinatorOwner);
@@ -72,7 +74,7 @@ contract EigenDAThresholdRegistryUnit is MockEigenDADeployer {
     function test_revert_onlyOwner() public {
         vm.expectRevert("Ownable: caller is not the owner");
         eigenDAThresholdRegistry.addVersionedBlobParams(
-            VersionedBlobParams({maxNumOperators: 999, numChunks: 999, codingRate: 9})
+            DATypesV1.VersionedBlobParams({maxNumOperators: 999, numChunks: 999, codingRate: 9})
         );
     }
 
@@ -103,11 +105,11 @@ contract EigenDAThresholdRegistryUnit is MockEigenDADeployer {
     }
 
     function test_getBlobParams() public {
-        VersionedBlobParams memory _versionedBlobParams =
-            VersionedBlobParams({maxNumOperators: 999, numChunks: 999, codingRate: 9});
+        DATypesV1.VersionedBlobParams memory _versionedBlobParams =
+            DATypesV1.VersionedBlobParams({maxNumOperators: 999, numChunks: 999, codingRate: 9});
         vm.prank(registryCoordinatorOwner);
         uint16 version = eigenDAThresholdRegistry.addVersionedBlobParams(_versionedBlobParams);
-        VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(version);
+        DATypesV1.VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(version);
         assertEq(blobParams.maxNumOperators, _versionedBlobParams.maxNumOperators);
         assertEq(blobParams.numChunks, _versionedBlobParams.numChunks);
         assertEq(blobParams.codingRate, _versionedBlobParams.codingRate);

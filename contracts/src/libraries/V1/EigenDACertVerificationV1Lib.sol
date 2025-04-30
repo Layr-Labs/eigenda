@@ -4,13 +4,12 @@ pragma solidity ^0.8.9;
 
 import {Merkle} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/libraries/Merkle.sol";
 import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
-import {EigenDAHasher} from "src/libraries/EigenDAHasher.sol";
 import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
 import {IEigenDABatchMetadataStorage} from "src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDAThresholdRegistry} from "src/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDASignatureVerifier} from "src/interfaces/IEigenDASignatureVerifier.sol";
 
-import {BlobHeader, BlobVerificationProof} from "src/interfaces/IEigenDAStructs.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/libraries/V1/EigenDATypesV1.sol";
 
 /**
  * @title Library of functions to be used by smart contracts wanting to verify submissions of blob certificates on EigenDA.
@@ -20,12 +19,12 @@ library EigenDACertVerificationV1Lib {
     function _verifyDACertV1ForQuorums(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDABatchMetadataStorage batchMetadataStorage,
-        BlobHeader calldata blobHeader,
-        BlobVerificationProof calldata blobVerificationProof,
+        DATypesV1.BlobHeader calldata blobHeader,
+        DATypesV1.BlobVerificationProof calldata blobVerificationProof,
         bytes memory requiredQuorumNumbers
     ) internal view {
         require(
-            EigenDAHasher.hashBatchMetadata(blobVerificationProof.batchMetadata)
+            hashBatchMetadata(blobVerificationProof.batchMetadata)
                 == IEigenDABatchMetadataStorage(batchMetadataStorage).batchIdToBatchMetadataHash(
                     blobVerificationProof.batchId
                 ),
@@ -36,7 +35,7 @@ library EigenDACertVerificationV1Lib {
             Merkle.verifyInclusionKeccak(
                 blobVerificationProof.inclusionProof,
                 blobVerificationProof.batchMetadata.batchHeader.blobHeadersRoot,
-                keccak256(abi.encodePacked(EigenDAHasher.hashBlobHeader(blobHeader))),
+                keccak256(abi.encodePacked(hashBlobHeader(blobHeader))),
                 blobVerificationProof.blobIndex
             ),
             "EigenDACertVerificationV1Lib._verifyDACertForQuorums: inclusion proof is invalid"
@@ -90,8 +89,8 @@ library EigenDACertVerificationV1Lib {
     function _verifyDACertsV1ForQuorums(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDABatchMetadataStorage batchMetadataStorage,
-        BlobHeader[] calldata blobHeaders,
-        BlobVerificationProof[] calldata blobVerificationProofs,
+        DATypesV1.BlobHeader[] calldata blobHeaders,
+        DATypesV1.BlobVerificationProof[] calldata blobVerificationProofs,
         bytes memory requiredQuorumNumbers
     ) internal view {
         require(
@@ -104,7 +103,7 @@ library EigenDACertVerificationV1Lib {
 
         for (uint256 i = 0; i < blobHeaders.length; ++i) {
             require(
-                EigenDAHasher.hashBatchMetadata(blobVerificationProofs[i].batchMetadata)
+                hashBatchMetadata(blobVerificationProofs[i].batchMetadata)
                     == IEigenDABatchMetadataStorage(batchMetadataStorage).batchIdToBatchMetadataHash(
                         blobVerificationProofs[i].batchId
                     ),
@@ -115,7 +114,7 @@ library EigenDACertVerificationV1Lib {
                 Merkle.verifyInclusionKeccak(
                     blobVerificationProofs[i].inclusionProof,
                     blobVerificationProofs[i].batchMetadata.batchHeader.blobHeadersRoot,
-                    keccak256(abi.encodePacked(EigenDAHasher.hashBlobHeader(blobHeaders[i]))),
+                    keccak256(abi.encodePacked(hashBlobHeader(blobHeaders[i]))),
                     blobVerificationProofs[i].blobIndex
                 ),
                 "EigenDACertVerificationV1Lib._verifyDACertsForQuorums: inclusion proof is invalid"
@@ -165,5 +164,101 @@ library EigenDACertVerificationV1Lib {
                 "EigenDACertVerificationV1Lib._verifyDACertsForQuorums: required quorums are not a subset of the confirmed quorums"
             );
         }
+    }
+
+    
+    /**
+     * @notice hashes the given metdata into the commitment that will be stored in the contract
+     * @param batchHeaderHash the hash of the batchHeader
+     * @param signatoryRecordHash the hash of the signatory record
+     * @param blockNumber the block number at which the batch was confirmed
+     */
+    function hashBatchHashedMetadata(bytes32 batchHeaderHash, bytes32 signatoryRecordHash, uint32 blockNumber)
+        internal
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encodePacked(batchHeaderHash, signatoryRecordHash, blockNumber));
+    }
+
+    /**
+     * @notice hashes the given metdata into the commitment that will be stored in the contract
+     * @param batchHeaderHash the hash of the batchHeader
+     * @param confirmationData the confirmation data of the batch
+     * @param blockNumber the block number at which the batch was confirmed
+     */
+    function hashBatchHashedMetadata(bytes32 batchHeaderHash, bytes memory confirmationData, uint32 blockNumber)
+        internal
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encodePacked(batchHeaderHash, confirmationData, blockNumber));
+    }
+
+    /**
+     * @notice given the batchHeader in the provided metdata, calculates the hash of the batchMetadata
+     * @param batchMetadata the metadata of the batch
+     */
+    function hashBatchMetadata(DATypesV1.BatchMetadata memory batchMetadata) internal pure returns (bytes32) {
+        return hashBatchHashedMetadata(
+            keccak256(abi.encode(batchMetadata.batchHeader)),
+            batchMetadata.signatoryRecordHash,
+            batchMetadata.confirmationBlockNumber
+        );
+    }
+
+    /**
+     * @notice hashes the given batch header
+     * @param batchHeader the batch header to hash
+     */
+    function hashBatchHeaderMemory(DATypesV1.BatchHeader memory batchHeader) internal pure returns (bytes32) {
+        return keccak256(abi.encode(batchHeader));
+    }
+
+    /**
+     * @notice hashes the given batch header
+     * @param batchHeader the batch header to hash
+     */
+    function hashBatchHeader(DATypesV1.BatchHeader calldata batchHeader) internal pure returns (bytes32) {
+        return keccak256(abi.encode(batchHeader));
+    }
+
+    /**
+     * @notice hashes the given reduced batch header
+     * @param reducedBatchHeader the reduced batch header to hash
+     */
+    function hashReducedBatchHeader(DATypesV1.ReducedBatchHeader memory reducedBatchHeader) internal pure returns (bytes32) {
+        return keccak256(abi.encode(reducedBatchHeader));
+    }
+
+    /**
+     * @notice hashes the given blob header
+     * @param blobHeader the blob header to hash
+     */
+    function hashBlobHeader(DATypesV1.BlobHeader memory blobHeader) internal pure returns (bytes32) {
+        return keccak256(abi.encode(blobHeader));
+    }
+
+    /**
+     * @notice converts a batch header to a reduced batch header
+     * @param batchHeader the batch header to convert
+     */
+    function convertBatchHeaderToReducedBatchHeader(DATypesV1.BatchHeader memory batchHeader)
+        internal
+        pure
+        returns (DATypesV1.ReducedBatchHeader memory)
+    {
+        return DATypesV1.ReducedBatchHeader({
+            blobHeadersRoot: batchHeader.blobHeadersRoot,
+            referenceBlockNumber: batchHeader.referenceBlockNumber
+        });
+    }
+
+    /**
+     * @notice converts the given batch header to a reduced batch header and then hashes it
+     * @param batchHeader the batch header to hash
+     */
+    function hashBatchHeaderToReducedBatchHeader(DATypesV1.BatchHeader memory batchHeader) internal pure returns (bytes32) {
+        return keccak256(abi.encode(convertBatchHeaderToReducedBatchHeader(batchHeader)));
     }
 }

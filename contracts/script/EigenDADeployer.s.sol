@@ -16,9 +16,10 @@ import {IStakeRegistry, IDelegationManager} from "../lib/eigenlayer-middleware/s
 import {IServiceManager} from "../lib/eigenlayer-middleware/src/interfaces/IServiceManager.sol";
 import {IBLSApkRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
 import {EigenDAServiceManager, IAVSDirectory, IRewardsCoordinator} from "../src/core/EigenDAServiceManager.sol";
-import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDAThresholdRegistry} from "../src/core/EigenDAThresholdRegistry.sol";
-import {EigenDACertVerifierV2} from "src/periphery/EigenDACertVerifierV2.sol";
+import {EigenDACertVerifierV3} from "src/periphery/EigenDACertVerifierV3.sol";
+import {EigenDATypesV1 as DATypesV1} from "../src/libraries/V1/EigenDATypesV1.sol";
+import {EigenDATypesV2 as DATypesV2} from "../src/libraries/V2/EigenDATypesV2.sol";
 import {IEigenDAThresholdRegistry} from "../src/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "../src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../src/interfaces/IEigenDASignatureVerifier.sol";
@@ -53,7 +54,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     BLSApkRegistry public apkRegistry;
     EigenDAServiceManager public eigenDAServiceManager;
     EigenDAThresholdRegistry public eigenDAThresholdRegistry;
-    EigenDACertVerifierV2 public eigenDACertVerifier;
+    EigenDACertVerifierV3 public eigenDACertVerifier;
     RegistryCoordinator public registryCoordinator;
     IIndexRegistry public indexRegistry;
     IStakeRegistry public stakeRegistry;
@@ -298,8 +299,8 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         eigenDAThresholdRegistryImplementation = new EigenDAThresholdRegistry();
 
-        VersionedBlobParams[] memory versionedBlobParams = new VersionedBlobParams[](0);
-        SecurityThresholds memory defaultSecurityThresholds = SecurityThresholds(55, 33);
+        DATypesV1.VersionedBlobParams[] memory versionedBlobParams = new DATypesV1.VersionedBlobParams[](0);
+        DATypesV1.SecurityThresholds memory defaultSecurityThresholds = DATypesV1.SecurityThresholds(55, 33);
 
         eigenDAProxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(eigenDAThresholdRegistry))),
@@ -316,7 +317,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         operatorStateRetriever = new OperatorStateRetriever();
 
-        eigenDACertVerifier = new EigenDACertVerifierV2(
+        eigenDACertVerifier = new EigenDACertVerifierV3(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             IRegistryCoordinator(address(registryCoordinator)),
