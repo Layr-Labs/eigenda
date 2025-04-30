@@ -39,6 +39,7 @@ type dispatcherMetrics struct {
 	receiveSignaturesLatency     *prometheus.SummaryVec
 	aggregateSignaturesLatency   *prometheus.SummaryVec
 	putAttestationLatency        *prometheus.SummaryVec
+	attestationUpdateCount       *prometheus.SummaryVec
 	updateBatchStatusLatency     *prometheus.SummaryVec
 	blobE2EDispersalLatency      *prometheus.SummaryVec
 	completedBlobs               *prometheus.CounterVec
@@ -258,6 +259,16 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
+	attestationUpdateCount := promauto.With(registry).NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  dispatcherNamespace,
+			Name:       "attestation_update_count",
+			Help:       "The number of updates to the batch attestation throughout the signature gathering process.",
+			Objectives: objectives,
+		},
+		[]string{},
+	)
+
 	thresholdSignedToDoneLatency := promauto.With(registry).NewSummaryVec(
 		prometheus.SummaryOpts{
 			Namespace: dispatcherNamespace,
@@ -362,6 +373,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		receiveSignaturesLatency:     receiveSignaturesLatency,
 		aggregateSignaturesLatency:   aggregateSignaturesLatency,
 		putAttestationLatency:        putAttestationLatency,
+		attestationUpdateCount:       attestationUpdateCount,
 		updateBatchStatusLatency:     updateBatchStatusLatency,
 		blobE2EDispersalLatency:      blobE2EDispersalLatency,
 		completedBlobs:               completedBlobs,
@@ -465,6 +477,10 @@ func (m *dispatcherMetrics) reportAggregateSignaturesLatency(duration time.Durat
 
 func (m *dispatcherMetrics) reportPutAttestationLatency(duration time.Duration) {
 	m.putAttestationLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
+}
+
+func (m *dispatcherMetrics) reportAttestationUpdateCount(attestationCount float64) {
+	m.attestationUpdateCount.WithLabelValues().Observe(attestationCount)
 }
 
 func (m *dispatcherMetrics) reportUpdateBatchStatusLatency(duration time.Duration) {

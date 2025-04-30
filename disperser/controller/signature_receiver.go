@@ -131,8 +131,14 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 	ticker := time.NewTicker(sr.tickInterval)
 	defer ticker.Stop()
 	defer close(attestationChan)
+
+	// the number of attestations submitted by this method
+	attestationUpdateCount := 0
 	defer func() {
-		sr.reportThresholdSignedToDoneLatency()
+		if sr.metrics != nil {
+			sr.reportThresholdSignedToDoneLatency()
+			sr.metrics.reportAttestationUpdateCount(float64(attestationUpdateCount))
+		}
 	}()
 
 	operatorCount := len(sr.indexedOperatorState.IndexedOperators)
@@ -216,6 +222,7 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 			}
 
 			sr.buildAndSubmitAttestation(attestationChan)
+			attestationUpdateCount++
 			newSignaturesGathered = false
 		}
 
@@ -226,6 +233,7 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 
 	if newSignaturesGathered {
 		sr.buildAndSubmitAttestation(attestationChan)
+		attestationUpdateCount++
 	}
 }
 
