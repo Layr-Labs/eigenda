@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "../src/interfaces/IEigenDAServiceManager.sol";
+import "src/interfaces/IEigenDAServiceManager.sol";
 
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
-import "../src/interfaces/IEigenDAStructs.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/libraries/V1/EigenDATypesV1.sol";
+import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
 
 // # To generate the hashes needed for core/serialization_test.go:
 // forge script script/GenerateUnitTestHashes.s.sol  -v
@@ -14,9 +15,9 @@ contract GenerateHashes is Script {
     string deployConfigPath = "script/input/eigenda_deploy_config.json";
 
     function run() external pure {
-        QuorumBlobParam[] memory quorumBlobParam = new QuorumBlobParam[](1);
+        DATypesV1.QuorumBlobParam[] memory quorumBlobParam = new DATypesV1.QuorumBlobParam[](1);
 
-        quorumBlobParam[0] = QuorumBlobParam({
+        quorumBlobParam[0] = DATypesV1.QuorumBlobParam({
             quorumNumber: 0,
             adversaryThresholdPercentage: 80,
             confirmationThresholdPercentage: 100,
@@ -28,15 +29,15 @@ contract GenerateHashes is Script {
 
         BN254.G1Point memory commitment = BN254.G1Point({X: 1, Y: 2});
 
-        quorumBlobParam[0] = QuorumBlobParam({
+        quorumBlobParam[0] = DATypesV1.QuorumBlobParam({
             quorumNumber: 1,
             adversaryThresholdPercentage: 80,
             confirmationThresholdPercentage: 100,
             chunkLength: 10
         });
 
-        BlobHeader memory header =
-            BlobHeader({commitment: commitment, dataLength: 10, quorumBlobParams: quorumBlobParam});
+        DATypesV1.BlobHeader memory header =
+            DATypesV1.BlobHeader({commitment: commitment, dataLength: 10, quorumBlobParams: quorumBlobParam});
 
         console.logBytes(abi.encode(header));
 

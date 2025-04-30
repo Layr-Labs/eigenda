@@ -18,8 +18,10 @@ import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry
 import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
 import {IEigenDADisperserRegistry} from "../interfaces/IEigenDADisperserRegistry.sol";
+import {EigenDACertVerificationV1Lib} from "src/libraries/V1/EigenDACertVerificationV1Lib.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/libraries/V1/EigenDATypesV1.sol";
+import {EigenDATypesV2 as DATypesV2} from "src/libraries/V2/EigenDATypesV2.sol";
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
-import {EigenDAHasher} from "../libraries/EigenDAHasher.sol";
 import "../interfaces/IEigenDAStructs.sol";
 
 /**
@@ -31,9 +33,6 @@ import "../interfaces/IEigenDAStructs.sol";
  * - freezing operators as the result of various "challenges"
  */
 contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBase, BLSSignatureChecker, Pausable {
-    using EigenDAHasher for BatchHeader;
-    using EigenDAHasher for ReducedBatchHeader;
-
     uint8 internal constant PAUSED_CONFIRM_BATCH = 0;
 
     /// @notice when applied to a function, ensures that the function is only callable by the `batchConfirmer`.
@@ -86,7 +85,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
      * - and check whether quorum has been achieved or not.
      */
     function confirmBatch(
-        BatchHeader calldata batchHeader,
+        DATypesV1.BatchHeader calldata batchHeader,
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature
     ) external onlyWhenNotPaused(PAUSED_CONFIRM_BATCH) onlyBatchConfirmer {
         // make sure the information needed to derive the non-signers and batch is in calldata to avoid emitting events
@@ -106,7 +105,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         );
 
         // calculate reducedBatchHeaderHash which nodes signed
-        bytes32 reducedBatchHeaderHash = batchHeader.hashBatchHeaderToReducedBatchHeader();
+        bytes32 reducedBatchHeaderHash = EigenDACertVerificationV1Lib.hashBatchHeaderToReducedBatchHeader(batchHeader);
 
         // check the signature
         (QuorumStakeTotals memory quorumStakeTotals, bytes32 signatoryRecordHash) = checkSignatures(
@@ -129,9 +128,10 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
 
         // store the metadata hash
         uint32 batchIdMemory = batchId;
-        bytes32 batchHeaderHash = batchHeader.hashBatchHeader();
-        batchIdToBatchMetadataHash[batchIdMemory] =
-            EigenDAHasher.hashBatchHashedMetadata(batchHeaderHash, signatoryRecordHash, uint32(block.number));
+        bytes32 batchHeaderHash = EigenDACertVerificationV1Lib.hashBatchHeader(batchHeader);
+        batchIdToBatchMetadataHash[batchIdMemory] = EigenDACertVerificationV1Lib.hashBatchHashedMetadata(
+            batchHeaderHash, signatoryRecordHash, uint32(block.number)
+        );
 
         emit BatchConfirmed(reducedBatchHeaderHash, batchIdMemory);
 
@@ -190,7 +190,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
     }
 
     /// @notice Returns the blob params for a given blob version
-    function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {
+    function getBlobParams(uint16 version) external view returns (DATypesV1.VersionedBlobParams memory) {
         return eigenDAThresholdRegistry.getBlobParams(version);
     }
 }

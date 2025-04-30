@@ -5,6 +5,7 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {EigenDADisperserRegistryStorage} from "./EigenDADisperserRegistryStorage.sol";
 import {IEigenDADisperserRegistry} from "../interfaces/IEigenDADisperserRegistry.sol";
 import "../interfaces/IEigenDAStructs.sol";
+import {EigenDATypesV2} from "../libraries/V2/EigenDATypesV2.sol";
 
 /**
  * @title Registry for EigenDA disperser info
@@ -19,7 +20,10 @@ contract EigenDADisperserRegistry is OwnableUpgradeable, EigenDADisperserRegistr
         _transferOwnership(_initialOwner);
     }
 
-    function setDisperserInfo(uint32 _disperserKey, DisperserInfo memory _disperserInfo) external onlyOwner {
+    function setDisperserInfo(uint32 _disperserKey, EigenDATypesV2.DisperserInfo memory _disperserInfo)
+        external
+        onlyOwner
+    {
         disperserKeyToInfo[_disperserKey] = _disperserInfo;
         emit DisperserAdded(_disperserKey, _disperserInfo.disperserAddress);
     }

@@ -5,6 +5,7 @@ import {IServiceManager} from "../../lib/eigenlayer-middleware/src/interfaces/IS
 import {BLSSignatureChecker} from "../../lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
 import {BN254} from "../../lib/eigenlayer-middleware/src/libraries/BN254.sol";
 import {IEigenDAThresholdRegistry} from "./IEigenDAThresholdRegistry.sol";
+import {EigenDATypesV1 as DATypesV1} from "../libraries/V1/EigenDATypesV1.sol";
 import "./IEigenDAStructs.sol";
 
 interface IEigenDAServiceManager is IServiceManager, IEigenDAThresholdRegistry {
@@ -31,7 +32,7 @@ interface IEigenDAServiceManager is IServiceManager, IEigenDAThresholdRegistry {
      * - and check whether quorum has been achieved or not.
      */
     function confirmBatch(
-        BatchHeader calldata batchHeader,
+        DATypesV1.BatchHeader calldata batchHeader,
         BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
     ) external;
 

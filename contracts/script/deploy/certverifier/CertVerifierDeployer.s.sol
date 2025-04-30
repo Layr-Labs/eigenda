@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.12;
 
-import {EigenDACertVerifier} from "src/core/EigenDACertVerifier.sol";
+import {EigenDACertVerifierV2} from "src/periphery/EigenDACertVerifierV2.sol";
 import {RegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
@@ -17,6 +17,7 @@ import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 import "src/interfaces/IEigenDAStructs.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/libraries/V1/EigenDATypesV1.sol";
 
 //forge script script/deploy/certverifier/CertVerifierDeployer.s.sol:CertVerifierDeployer --sig "run(string, string)" <config.json> <output.json> --rpc-url $RPC --private-key $PRIVATE_KEY -vvvv --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast
 contract CertVerifierDeployer is Script, Test {
@@ -28,7 +29,7 @@ contract CertVerifierDeployer is Script, Test {
     address registryCoordinator;
     address operatorStateRetriever;
 
-    SecurityThresholds defaultSecurityThresholds;
+    DATypesV1.SecurityThresholds defaultSecurityThresholds;
     bytes quorumNumbersRequired;
 
     function run(string memory inputJSONFile, string memory outputJSONFile) external {
@@ -51,7 +52,7 @@ contract CertVerifierDeployer is Script, Test {
         operatorStateRetriever = abi.decode(raw, (address));
 
         raw = stdJson.parseRaw(data, ".defaultSecurityThresholds");
-        defaultSecurityThresholds = abi.decode(raw, (SecurityThresholds));
+        defaultSecurityThresholds = abi.decode(raw, (DATypesV1.SecurityThresholds));
 
         raw = stdJson.parseRaw(data, ".quorumNumbersRequired");
         quorumNumbersRequired = abi.decode(raw, (bytes));
@@ -59,9 +60,8 @@ contract CertVerifierDeployer is Script, Test {
         vm.startBroadcast();
 
         eigenDACertVerifier = address(
-            new EigenDACertVerifier(
+            new EigenDACertVerifierV2(
                 IEigenDAThresholdRegistry(eigenDAThresholdRegistry),
-                IEigenDABatchMetadataStorage(eigenDAServiceManager),
                 IEigenDASignatureVerifier(eigenDAServiceManager),
                 OperatorStateRetriever(operatorStateRetriever),
                 IRegistryCoordinator(registryCoordinator),

@@ -6,6 +6,7 @@ import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry
 import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
 import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
 import "../interfaces/IEigenDAStructs.sol";
+import {EigenDATypesV1 as DATypesV1} from "../libraries/V1/EigenDATypesV1.sol";
 
 /**
  * @title The `EigenDAThresholdRegistry` contract.
@@ -21,7 +22,7 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         bytes memory _quorumAdversaryThresholdPercentages,
         bytes memory _quorumConfirmationThresholdPercentages,
         bytes memory _quorumNumbersRequired,
-        VersionedBlobParams[] memory _versionedBlobParams
+        DATypesV1.VersionedBlobParams[] memory _versionedBlobParams
     ) external initializer {
         _transferOwnership(_initialOwner);
 
@@ -34,7 +35,7 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         }
     }
 
-    function addVersionedBlobParams(VersionedBlobParams memory _versionedBlobParams)
+    function addVersionedBlobParams(DATypesV1.VersionedBlobParams memory _versionedBlobParams)
         external
         onlyOwner
         returns (uint16)
@@ -42,7 +43,10 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         return _addVersionedBlobParams(_versionedBlobParams);
     }
 
-    function _addVersionedBlobParams(VersionedBlobParams memory _versionedBlobParams) internal returns (uint16) {
+    function _addVersionedBlobParams(DATypesV1.VersionedBlobParams memory _versionedBlobParams)
+        internal
+        returns (uint16)
+    {
         versionedBlobParams[nextBlobVersion] = _versionedBlobParams;
         emit VersionedBlobParamsAdded(nextBlobVersion, _versionedBlobParams);
         return nextBlobVersion++;
@@ -83,7 +87,7 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
     ///////////////////////// V2 ///////////////////////////////
 
     /// @notice Returns the blob params for a given blob version
-    function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory) {
+    function getBlobParams(uint16 version) external view returns (DATypesV1.VersionedBlobParams memory) {
         return versionedBlobParams[version];
     }
 }

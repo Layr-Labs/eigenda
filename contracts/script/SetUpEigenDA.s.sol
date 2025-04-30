@@ -13,7 +13,6 @@ import {IIndexRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IIndex
 import {EigenDAServiceManager} from "../src/core/EigenDAServiceManager.sol";
 import {PaymentVault} from "../src/payments/PaymentVault.sol";
 import {IPaymentVault} from "../src/interfaces/IPaymentVault.sol";
-import {EigenDAHasher} from "../src/libraries/EigenDAHasher.sol";
 import {EigenDADeployer} from "./EigenDADeployer.s.sol";
 import {EigenLayerUtils} from "./EigenLayerUtils.s.sol";
 

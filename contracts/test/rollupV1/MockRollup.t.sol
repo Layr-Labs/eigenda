@@ -4,13 +4,11 @@ pragma solidity ^0.8.9;
 
 import {MockRollup} from "./MockRollup.sol";
 import "../MockEigenDADeployer.sol";
+import {EigenDATypesV1 as DATypesV1} from "../../src/libraries/V1/EigenDATypesV1.sol";
+import {EigenDACertVerificationV1Lib} from "../../src/libraries/V1/EigenDACertVerificationV1Lib.sol";
 
 contract MockRollupTest is MockEigenDADeployer {
     using BN254 for BN254.G1Point;
-    using EigenDAHasher for BatchHeader;
-    using EigenDAHasher for ReducedBatchHeader;
-    using EigenDAHasher for BlobHeader;
-    using EigenDAHasher for BatchMetadata;
     using stdStorage for StdStorage;
 
     address alice = address(0x101);
@@ -43,7 +41,7 @@ contract MockRollupTest is MockEigenDADeployer {
 
     function testChallenge(uint256 pseudoRandomNumber) public {
         //get commitment with illegal value
-        (BlobHeader memory blobHeader, BlobVerificationProof memory blobVerificationProof) =
+        (DATypesV1.BlobHeader memory blobHeader, DATypesV1.BlobVerificationProof memory blobVerificationProof) =
             _getCommitment(pseudoRandomNumber);
 
         mockRollup.postCommitment(blobHeader, blobVerificationProof);
@@ -62,17 +60,17 @@ contract MockRollupTest is MockEigenDADeployer {
 
     function _getCommitment(uint256 pseudoRandomNumber)
         internal
-        returns (BlobHeader memory, BlobVerificationProof memory)
+        returns (DATypesV1.BlobHeader memory, DATypesV1.BlobVerificationProof memory)
     {
         uint256 numQuorumBlobParams = 2;
-        BlobHeader[] memory blobHeader = new BlobHeader[](2);
+        DATypesV1.BlobHeader[] memory blobHeader = new DATypesV1.BlobHeader[](2);
         blobHeader[0] = _generateBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
         blobHeader[1] = _generateBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
-        BatchHeader memory batchHeader;
-        bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
-        bytes memory secondBlobHash = abi.encodePacked(blobHeader[1].hashBlobHeader());
+        DATypesV1.BatchHeader memory batchHeader;
+        bytes memory firstBlobHash = abi.encodePacked(EigenDACertVerificationV1Lib.hashBlobHeader(blobHeader[0]));
+        bytes memory secondBlobHash = abi.encodePacked(EigenDACertVerificationV1Lib.hashBlobHeader(blobHeader[1]));
         batchHeader.blobHeadersRoot = keccak256(abi.encodePacked(keccak256(firstBlobHash), keccak256(secondBlobHash)));
         // add dummy quorum numbers and quorum threshold percentages making sure confirmationThresholdPercentage = adversaryThresholdPercentage + defaultCodingRatioPercentage
         for (uint256 i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
@@ -85,16 +83,16 @@ contract MockRollupTest is MockEigenDADeployer {
         batchHeader.referenceBlockNumber = uint32(block.number);
 
         // add dummy batch metadata
-        BatchMetadata memory batchMetadata;
+        DATypesV1.BatchMetadata memory batchMetadata;
         batchMetadata.batchHeader = batchHeader;
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
 
         stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
             defaultBatchId
-        ).checked_write(batchMetadata.hashBatchMetadata());
+        ).checked_write(EigenDACertVerificationV1Lib.hashBatchMetadata(batchMetadata));
 
-        BlobVerificationProof memory blobVerificationProof;
+        DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -109,19 +107,19 @@ contract MockRollupTest is MockEigenDADeployer {
 
     function _generateBlobHeader(uint256 pseudoRandomNumber, uint256 numQuorumsBlobParams)
         internal
-        returns (BlobHeader memory)
+        returns (DATypesV1.BlobHeader memory)
     {
         if (pseudoRandomNumber == 0) {
             pseudoRandomNumber = 1;
         }
 
-        BlobHeader memory blobHeader;
+        DATypesV1.BlobHeader memory blobHeader;
         blobHeader.commitment = _getIllegalCommitment();
 
         blobHeader.dataLength =
             uint32(uint256(keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.dataLength"))));
 
-        blobHeader.quorumBlobParams = new QuorumBlobParam[](numQuorumsBlobParams);
+        blobHeader.quorumBlobParams = new DATypesV1.QuorumBlobParam[](numQuorumsBlobParams);
         for (uint256 i = 0; i < numQuorumsBlobParams; i++) {
             if (i < 2) {
                 blobHeader.quorumBlobParams[i].quorumNumber = uint8(i);
@@ -141,14 +139,14 @@ contract MockRollupTest is MockEigenDADeployer {
                 }
                 quorumNumbersUsed[blobHeader.quorumBlobParams[i].quorumNumber] = true;
             }
-            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage =
-                eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
+            blobHeader.quorumBlobParams[i].adversaryThresholdPercentage = eigenDAThresholdRegistry
+                .getQuorumAdversaryThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
             blobHeader.quorumBlobParams[i].chunkLength = uint32(
                 uint256(
                     keccak256(abi.encodePacked(pseudoRandomNumber, "blobHeader.quorumBlobParams[i].chunkLength", i))
                 )
             );
-            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDACertVerifier
+            blobHeader.quorumBlobParams[i].confirmationThresholdPercentage = eigenDAThresholdRegistry
                 .getQuorumConfirmationThresholdPercentage(blobHeader.quorumBlobParams[i].quorumNumber);
         }
         // mark all quorum numbers as unused
