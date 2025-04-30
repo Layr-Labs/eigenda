@@ -311,6 +311,8 @@ func (l *LoadGenerator) readBlobFromValidators(
 	readStartIndex := rand.Int32Range(0, int32(len(quorums)))
 
 	for i := 0; i < validatorReadCount; i++ {
+		validateAndDecode := rand.Float64() < l.config.ValidatorVerificationFraction
+
 		err = l.client.ReadBlobFromValidatorsInQuorum(
 			ctx,
 			*blobKey,
@@ -319,7 +321,9 @@ func (l *LoadGenerator) readBlobFromValidators(
 			quorums[(int(readStartIndex)+i)%len(quorums)],
 			currentBlockNumber,
 			payload,
-			0)
+			0,
+			validateAndDecode,
+		)
 		if err == nil {
 			l.metrics.reportValidatorReadSuccess()
 		} else {

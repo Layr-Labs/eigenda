@@ -16,6 +16,7 @@ import (
 	relayv2 "github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
+	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
@@ -56,6 +57,9 @@ type TestClient struct {
 	indexedChainState           core.IndexedChainState
 	retrievalClient             validator.ValidatorClient
 	validatorPayloadRetriever   *payloadretrieval.ValidatorPayloadRetriever
+	// For fetching blobs from the validators without verifying or decoding them. Useful for load testing
+	// validator downloads with limited CPU resources.
+	onlyDownloadRetrievalClient validator.ValidatorClient
 	certVerifier                *verification.CertVerifier
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
@@ -290,6 +294,32 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create validator payload retriever: %w", err)
 	}
 
+	// Create a client that only downloads the blob and does not verify it. Useful for load testing validator downloads
+	// with limited CPU resources.
+	onlyDownloadClientConfig := validator.DefaultClientConfig()
+	onlyDownloadClientConfig.UnsafeDeserializeAndVerifyFunction = func(
+		ctx context.Context,
+		blobKey corev2.BlobKey,
+		operatorID core.OperatorID,
+		getChunksReply *grpc.GetChunksReply) ([]*encoding.Frame, error) {
+
+		return nil, nil
+	}
+	onlyDownloadClientConfig.UnsafeDecodeBlobFunction = func(
+		ctx context.Context,
+		blobKey corev2.BlobKey,
+		chunks []*encoding.Frame,
+		indices []uint,
+	) ([]byte, error) {
+		return nil, nil
+	}
+	onlyDownloadRetrievalClient := validator.NewValidatorClient(
+		logger,
+		ethReader,
+		indexedChainState,
+		blobVerifier,
+		onlyDownloadClientConfig)
+
 	return &TestClient{
 		config:                      config,
 		payloadClientConfig:         payloadClientConfig,
@@ -302,6 +332,7 @@ func NewTestClient(
 		indexedChainState:           indexedChainState,
 		retrievalClient:             retrievalClient,
 		validatorPayloadRetriever:   validatorPayloadRetriever,
+		onlyDownloadRetrievalClient: onlyDownloadRetrievalClient,
 		certVerifier:                certVerifier,
 		privateKey:                  privateKey,
 		metricsRegistry:             registry,
@@ -493,7 +524,8 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		*commitment,
 		eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
 		payload,
-		0)
+		0,
+		true)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from validators: %w", err)
 	}
@@ -604,7 +636,8 @@ func (c *TestClient) ReadBlobFromValidators(
 	blobCommitments encoding.BlobCommitments,
 	quorums []core.QuorumID,
 	expectedPayloadBytes []byte,
-	timeout time.Duration) error {
+	timeout time.Duration,
+	validateAndDecode bool) error {
 
 	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
@@ -620,7 +653,8 @@ func (c *TestClient) ReadBlobFromValidators(
 			quorumID,
 			uint64(currentBlockNumber),
 			expectedPayloadBytes,
-			timeout)
+			timeout,
+			validateAndDecode)
 		if err != nil {
 			return fmt.Errorf("failed to read blob from validators in quorum %d: %w", quorumID, err)
 		}
@@ -639,9 +673,8 @@ func (c *TestClient) ReadBlobFromValidatorsInQuorum(
 	quorumID core.QuorumID,
 	currentBlockNumber uint64,
 	expectedPayloadBytes []byte,
-	timeout time.Duration) error {
-
-	start := time.Now()
+	timeout time.Duration,
+	validateAndDecode bool) error {
 
 	if timeout > 0 {
 		var cancel context.CancelFunc
@@ -649,40 +682,58 @@ func (c *TestClient) ReadBlobFromValidatorsInQuorum(
 		defer cancel()
 	}
 
-	var probe *common.SequenceProbe
-	if c.metrics != nil {
-		probe = c.metrics.validatorReadTimer.NewSequence()
-	}
+	if validateAndDecode {
+		start := time.Now()
 
-	retrievedBlobBytes, err := c.retrievalClient.GetBlobWithProbe(
-		ctx,
-		blobKey,
-		blobVersion,
-		blobCommitments,
-		currentBlockNumber,
-		quorumID,
-		probe)
-	probe.End()
-	if err != nil {
-		return fmt.Errorf("failed to read blob from validators, %s: %w", probe.History(), err)
-	}
+		var probe *common.SequenceProbe
+		if c.metrics != nil {
+			probe = c.metrics.validatorReadTimer.NewSequence()
+		}
 
-	c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
+		retrievedBlobBytes, err := c.retrievalClient.GetBlobWithProbe(
+			ctx,
+			blobKey,
+			blobVersion,
+			blobCommitments,
+			currentBlockNumber,
+			quorumID,
+			probe)
+		probe.End()
+		if err != nil {
+			return fmt.Errorf("failed to read blob from validators, %s: %w", probe.History(), err)
+		}
 
-	blobLengthSymbols := uint32(blobCommitments.Length)
-	blob, err := coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
-	if err != nil {
-		return fmt.Errorf("failed to deserialize blob: %w", err)
-	}
+		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
 
-	retrievedPayload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
-	if err != nil {
-		return fmt.Errorf("failed to convert blob to payload: %w", err)
-	}
+		blobLengthSymbols := uint32(blobCommitments.Length)
+		blob, err := coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
+		if err != nil {
+			return fmt.Errorf("failed to deserialize blob: %w", err)
+		}
 
-	payloadBytes := retrievedPayload.Serialize()
-	if !bytes.Equal(payloadBytes, expectedPayloadBytes) {
-		return fmt.Errorf("payloads do not match")
+		retrievedPayload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
+		if err != nil {
+			return fmt.Errorf("failed to convert blob to payload: %w", err)
+		}
+
+		payloadBytes := retrievedPayload.Serialize()
+		if !bytes.Equal(payloadBytes, expectedPayloadBytes) {
+			return fmt.Errorf("payloads do not match")
+		}
+	} else {
+
+		// Just download the blob without validating or decoding. Don't report timing metrics for this operation.
+
+		_, err := c.onlyDownloadRetrievalClient.GetBlob(
+			ctx,
+			blobKey,
+			blobVersion,
+			blobCommitments,
+			currentBlockNumber,
+			quorumID)
+		if err != nil {
+			return fmt.Errorf("failed to read blob from validators: %w", err)
+		}
 	}
 
 	return nil

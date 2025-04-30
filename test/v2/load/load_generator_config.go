@@ -19,6 +19,9 @@ type LoadGeneratorConfig struct {
 	// then this value is treated as a probability. For example, if this is set to 0.5, then
 	// each chunk is read back from validators with a 50% chance.
 	ValidatorReadAmplification float64
+	// A number between 0 and 1.0 that specifies the fraction of blobs that are verified by the validator.
+	// If 1.0, all blobs are verified. If 0.0, no blobs are verified. If 0.5, half of the blobs are verified.
+	ValidatorVerificationFraction float64
 	// The maximum number of parallel blobs submissions in flight.
 	SubmissionParallelism uint64
 	// The maximum number of parallel blob relay read operations in flight.
