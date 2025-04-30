@@ -30,9 +30,10 @@ contract MockRollup {
      * @param blobHeader the blob header
      * @param blobVerificationProof the blob verification proof
      */
-    function postCommitment(DATypesV1.BlobHeader memory blobHeader, DATypesV1.BlobVerificationProof memory blobVerificationProof)
-        external
-    {
+    function postCommitment(
+        DATypesV1.BlobHeader memory blobHeader,
+        DATypesV1.BlobVerificationProof memory blobVerificationProof
+    ) external {
         // require commitment has not already been posted
         // require(commitments[block.timestamp].confirmer == address(0), "MockRollup.postCommitment: Commitment already posted");
 

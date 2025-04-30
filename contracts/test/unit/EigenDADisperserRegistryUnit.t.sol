@@ -2,6 +2,7 @@
 pragma solidity =0.8.12;
 
 import "../MockEigenDADeployer.sol";
+import {EigenDATypesV2} from "../../src/libraries/V2/EigenDATypesV2.sol";
 
 contract EigenDADisperserRegistryUnit is MockEigenDADeployer {
     event DisperserAdded(uint32 indexed key, address indexed disperser);
@@ -19,7 +20,7 @@ contract EigenDADisperserRegistryUnit is MockEigenDADeployer {
     function test_setDisperserInfo() public {
         uint32 disperserKey = 1;
         address disperserAddress = address(uint160(uint256(keccak256(abi.encodePacked("disperser")))));
-        DisperserInfo memory disperserInfo = DisperserInfo({disperserAddress: disperserAddress});
+        EigenDATypesV2.DisperserInfo memory disperserInfo = EigenDATypesV2.DisperserInfo({disperserAddress: disperserAddress});
 
         vm.expectEmit(address(eigenDADisperserRegistry));
         emit DisperserAdded(disperserKey, disperserAddress);
@@ -32,7 +33,7 @@ contract EigenDADisperserRegistryUnit is MockEigenDADeployer {
     function test_setDisperserInfo_revert_notOwner() public {
         uint32 disperserKey = 1;
         address disperserAddress = address(uint160(uint256(keccak256(abi.encodePacked("disperser")))));
-        DisperserInfo memory disperserInfo = DisperserInfo({disperserAddress: disperserAddress});
+        EigenDATypesV2.DisperserInfo memory disperserInfo = EigenDATypesV2.DisperserInfo({disperserAddress: disperserAddress});
 
         vm.expectRevert("Ownable: caller is not the owner");
         eigenDADisperserRegistry.setDisperserInfo(disperserKey, disperserInfo);

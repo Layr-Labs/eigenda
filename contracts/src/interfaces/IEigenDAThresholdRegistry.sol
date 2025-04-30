@@ -19,7 +19,8 @@ interface IEigenDAThresholdRegistry {
     event QuorumNumbersRequiredUpdated(bytes previousQuorumNumbersRequired, bytes newQuorumNumbersRequired);
 
     event DefaultSecurityThresholdsV2Updated(
-        DATypesV1.SecurityThresholds previousDefaultSecurityThresholdsV2, DATypesV1.SecurityThresholds newDefaultSecurityThresholdsV2
+        DATypesV1.SecurityThresholds previousDefaultSecurityThresholdsV2,
+        DATypesV1.SecurityThresholds newDefaultSecurityThresholdsV2
     );
 
     ///////////////////////// V1 ///////////////////////////////

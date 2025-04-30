@@ -9,12 +9,12 @@ library EigenDATypesV1 {
         uint32 numChunks;
         uint8 codingRate;
     }
-    
+
     struct SecurityThresholds {
         uint8 confirmationThreshold;
         uint8 adversaryThreshold;
     }
-    
+
     struct QuorumBlobParam {
         uint8 quorumNumber;
         uint8 adversaryThresholdPercentage;

@@ -43,7 +43,10 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         return _addVersionedBlobParams(_versionedBlobParams);
     }
 
-    function _addVersionedBlobParams(DATypesV1.VersionedBlobParams memory _versionedBlobParams) internal returns (uint16) {
+    function _addVersionedBlobParams(DATypesV1.VersionedBlobParams memory _versionedBlobParams)
+        internal
+        returns (uint16)
+    {
         versionedBlobParams[nextBlobVersion] = _versionedBlobParams;
         emit VersionedBlobParamsAdded(nextBlobVersion, _versionedBlobParams);
         return nextBlobVersion++;

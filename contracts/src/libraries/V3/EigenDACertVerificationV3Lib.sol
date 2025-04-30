@@ -9,9 +9,7 @@ import {IEigenDAThresholdRegistry} from "src/interfaces/IEigenDAThresholdRegistr
 import {IEigenDASignatureVerifier} from "src/interfaces/IEigenDASignatureVerifier.sol";
 
 library EigenDACertVerificationV3Lib {
-    function decodeCert(bytes calldata data) internal pure returns (
-        EigenDAV3Cert calldata cert
-    ) {
+    function decodeCert(bytes calldata data) internal pure returns (EigenDAV3Cert calldata cert) {
         assembly {
             cert := data.offset
         }

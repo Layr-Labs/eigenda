@@ -33,7 +33,6 @@ import "../interfaces/IEigenDAStructs.sol";
  * - freezing operators as the result of various "challenges"
  */
 contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBase, BLSSignatureChecker, Pausable {
-
     uint8 internal constant PAUSED_CONFIRM_BATCH = 0;
 
     /// @notice when applied to a function, ensures that the function is only callable by the `batchConfirmer`.
@@ -130,8 +129,9 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         // store the metadata hash
         uint32 batchIdMemory = batchId;
         bytes32 batchHeaderHash = EigenDACertVerificationV1Lib.hashBatchHeader(batchHeader);
-        batchIdToBatchMetadataHash[batchIdMemory] =
-            EigenDACertVerificationV1Lib.hashBatchHashedMetadata(batchHeaderHash, signatoryRecordHash, uint32(block.number));
+        batchIdToBatchMetadataHash[batchIdMemory] = EigenDACertVerificationV1Lib.hashBatchHashedMetadata(
+            batchHeaderHash, signatoryRecordHash, uint32(block.number)
+        );
 
         emit BatchConfirmed(reducedBatchHeaderHash, batchIdMemory);
 

@@ -5,6 +5,7 @@ import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contrac
 import {EigenDARelayRegistryStorage} from "./EigenDARelayRegistryStorage.sol";
 import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
 import "../interfaces/IEigenDAStructs.sol";
+import {EigenDATypesV2} from "../libraries/V2/EigenDATypesV2.sol";
 
 /**
  * @title Registry for EigenDA relay keys
@@ -19,7 +20,7 @@ contract EigenDARelayRegistry is OwnableUpgradeable, EigenDARelayRegistryStorage
         _transferOwnership(_initialOwner);
     }
 
-    function addRelayInfo(RelayInfo memory relayInfo) external onlyOwner returns (uint32) {
+    function addRelayInfo(EigenDATypesV2.RelayInfo memory relayInfo) external onlyOwner returns (uint32) {
         relayKeyToInfo[nextRelayKey] = relayInfo;
         emit RelayAdded(relayInfo.relayAddress, nextRelayKey, relayInfo.relayURL);
         return nextRelayKey++;

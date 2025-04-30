@@ -40,10 +40,10 @@ contract EigenDACertVerifierV1 {
      * @param blobHeader The blob header to verify
      * @param blobVerificationProof The blob cert verification proof to verify
      */
-    function verifyDACertV1(DATypesV1.BlobHeader calldata blobHeader, DATypesV1.BlobVerificationProof calldata blobVerificationProof)
-        external
-        view
-    {
+    function verifyDACertV1(
+        DATypesV1.BlobHeader calldata blobHeader,
+        DATypesV1.BlobVerificationProof calldata blobVerificationProof
+    ) external view {
         CertV1Lib._verifyDACertV1ForQuorums(
             _thresholdRegistry(), _batchMetadataStorage(), blobHeader, blobVerificationProof, quorumNumbersRequired()
         );
@@ -54,10 +54,10 @@ contract EigenDACertVerifierV1 {
      * @param blobHeaders The blob headers to verify
      * @param blobVerificationProofs The blob cert verification proofs to verify against
      */
-    function verifyDACertsV1(DATypesV1.BlobHeader[] calldata blobHeaders, DATypesV1.BlobVerificationProof[] calldata blobVerificationProofs)
-        external
-        view
-    {
+    function verifyDACertsV1(
+        DATypesV1.BlobHeader[] calldata blobHeaders,
+        DATypesV1.BlobVerificationProof[] calldata blobVerificationProofs
+    ) external view {
         CertV1Lib._verifyDACertsV1ForQuorums(
             _thresholdRegistry(), _batchMetadataStorage(), blobHeaders, blobVerificationProofs, quorumNumbersRequired()
         );

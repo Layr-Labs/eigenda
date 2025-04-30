@@ -4,7 +4,6 @@ pragma solidity ^0.8.9;
 import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
 
 library EigenDATypesV2 {
-
     struct RelayInfo {
         address relayAddress;
         string relayURL;

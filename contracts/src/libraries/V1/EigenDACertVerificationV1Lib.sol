@@ -166,7 +166,6 @@ library EigenDACertVerificationV1Lib {
         }
     }
 
-    
     /**
      * @notice hashes the given metdata into the commitment that will be stored in the contract
      * @param batchHeaderHash the hash of the batchHeader
@@ -227,7 +226,11 @@ library EigenDACertVerificationV1Lib {
      * @notice hashes the given reduced batch header
      * @param reducedBatchHeader the reduced batch header to hash
      */
-    function hashReducedBatchHeader(DATypesV1.ReducedBatchHeader memory reducedBatchHeader) internal pure returns (bytes32) {
+    function hashReducedBatchHeader(DATypesV1.ReducedBatchHeader memory reducedBatchHeader)
+        internal
+        pure
+        returns (bytes32)
+    {
         return keccak256(abi.encode(reducedBatchHeader));
     }
 
@@ -258,7 +261,11 @@ library EigenDACertVerificationV1Lib {
      * @notice converts the given batch header to a reduced batch header and then hashes it
      * @param batchHeader the batch header to hash
      */
-    function hashBatchHeaderToReducedBatchHeader(DATypesV1.BatchHeader memory batchHeader) internal pure returns (bytes32) {
+    function hashBatchHeaderToReducedBatchHeader(DATypesV1.BatchHeader memory batchHeader)
+        internal
+        pure
+        returns (bytes32)
+    {
         return keccak256(abi.encode(convertBatchHeaderToReducedBatchHeader(batchHeader)));
     }
 }

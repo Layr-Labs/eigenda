@@ -56,5 +56,4 @@ contract EigenDACertVerifierV3 is IEigenDACertVerifier {
         );
         return uint8(status);
     }
-
 }

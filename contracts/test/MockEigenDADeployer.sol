@@ -11,6 +11,7 @@ import {EigenDATypesV2 as DATypesV2} from "../src/libraries/V2/EigenDATypesV2.so
 import {EigenDACertVerificationV1Lib} from "../src/libraries/V1/EigenDACertVerificationV1Lib.sol";
 import {IEigenDAServiceManager} from "../src/interfaces/IEigenDAServiceManager.sol";
 import {EigenDACertVerifierV3} from "src/periphery/EigenDACertVerifierV3.sol";
+import {EigenDACertVerifierV2} from "src/periphery/EigenDACertVerifierV2.sol";
 import {EigenDAThresholdRegistry, IEigenDAThresholdRegistry} from "../src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "../src/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "../src/interfaces/IEigenDASignatureVerifier.sol";
@@ -43,6 +44,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
     PaymentVault paymentVault;
     PaymentVault paymentVaultImplementation;
     EigenDACertVerifierV3 eigenDACertVerifier;
+    EigenDACertVerifierV2 eigenDACertVerifierV2;
 
     ERC20 mockToken;
 
@@ -178,6 +180,14 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
         mockToken = new ERC20("Mock Token", "MOCK");
 
         eigenDACertVerifier = new EigenDACertVerifierV3(
+            IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
+            IEigenDASignatureVerifier(address(eigenDAServiceManager)),
+            IRegistryCoordinator(address(registryCoordinator)),
+            defaultSecurityThresholds,
+            quorumNumbersRequired
+        );
+
+        eigenDACertVerifierV2 = new EigenDACertVerifierV2(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             IRegistryCoordinator(address(registryCoordinator)),

@@ -186,7 +186,11 @@ library InitParamsLib {
         return stdToml.readBytes(configData, ".initParams.eigenDA.thresholdRegistry.quorumNumbersRequired");
     }
 
-    function versionedBlobParams(string memory configData) internal pure returns (DATypesV1.VersionedBlobParams[] memory) {
+    function versionedBlobParams(string memory configData)
+        internal
+        pure
+        returns (DATypesV1.VersionedBlobParams[] memory)
+    {
         bytes memory versionedBlobParamsRaw =
             stdToml.parseRaw(configData, ".initParams.eigenDA.thresholdRegistry.versionedBlobParams");
         return abi.decode(versionedBlobParamsRaw, (DATypesV1.VersionedBlobParams[]));

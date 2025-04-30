@@ -175,11 +175,10 @@ library EigenDACertVerificationV2Lib {
      * @return err Error code (SUCCESS if verification succeeded)
      * @return errParams Additional error parameters
      */
-    function checkBlobInclusion(DATypesV2.BatchHeaderV2 memory batchHeader, DATypesV2.BlobInclusionInfo memory blobInclusionInfo)
-        internal
-        pure
-        returns (StatusCode err, bytes memory errParams)
-    {
+    function checkBlobInclusion(
+        DATypesV2.BatchHeaderV2 memory batchHeader,
+        DATypesV2.BlobInclusionInfo memory blobInclusionInfo
+    ) internal pure returns (StatusCode err, bytes memory errParams) {
         bytes32 blobCertHash = hashBlobCertificate(blobInclusionInfo.blobCertificate);
         bytes32 encodedBlobHash = keccak256(abi.encodePacked(blobCertHash));
         bytes32 rootHash = batchHeader.batchRoot;
@@ -203,11 +202,10 @@ library EigenDACertVerificationV2Lib {
      * @return err Error code (SUCCESS if verification succeeded)
      * @return errParams Additional error parameters
      */
-    function checkSecurityParams(DATypesV1.VersionedBlobParams memory blobParams, DATypesV1.SecurityThresholds memory securityThresholds)
-        internal
-        pure
-        returns (StatusCode err, bytes memory errParams)
-    {
+    function checkSecurityParams(
+        DATypesV1.VersionedBlobParams memory blobParams,
+        DATypesV1.SecurityThresholds memory securityThresholds
+    ) internal pure returns (StatusCode err, bytes memory errParams) {
         uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
         uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
         uint256 minRequired = blobParams.maxNumOperators * 10000;
@@ -308,7 +306,10 @@ library EigenDACertVerificationV2Lib {
      * @return nonSignerStakesAndSignature The non-signer stakes and signature
      * @return signedQuorumNumbers The signed quorum numbers
      */
-    function getNonSignerStakesAndSignature(IRegistryCoordinator registryCoordinator, DATypesV2.SignedBatch memory signedBatch)
+    function getNonSignerStakesAndSignature(
+        IRegistryCoordinator registryCoordinator,
+        DATypesV2.SignedBatch memory signedBatch
+    )
         internal
         view
         returns (NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers)
@@ -448,7 +449,6 @@ library EigenDACertVerificationV2Lib {
         return checkSignaturesIndices;
     }
 
-    
     /**
      * @notice hashes the given V2 batch header
      * @param batchHeader the V2 batch header to hash
