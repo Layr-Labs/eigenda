@@ -333,8 +333,6 @@ func (sr *signatureReceiver) buildAndSubmitAttestation(attestationChan chan *cor
 	// handled by a separate routine, so it's important that we don't mutate these maps after they are yielded.
 	quorumAggPubKeyCopy := make(map[core.QuorumID]*core.G1Point, len(sr.indexedOperatorState.AggKeys))
 	for quorumID, g1Point := range sr.indexedOperatorState.AggKeys {
-		// TODO: is this ok? semantics are changed from before: we used to exclude aggregate keys of quorums that had no
-		//  signatures, but I don't see why that case should be special.
 		quorumAggPubKeyCopy[quorumID] = g1Point.Clone()
 	}
 	aggregateSignersG2PubKeysCopy := make(map[core.QuorumID]*core.G2Point, len(sr.aggregateSignersG2PubKeys))

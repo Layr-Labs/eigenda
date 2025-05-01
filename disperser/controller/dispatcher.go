@@ -352,8 +352,6 @@ func (d *Dispatcher) HandleSignatures(
 		}
 	}
 
-	// TODO: I removed the initial empty attestation update. Is that ok?
-
 	// This channel will remain open until the attestationTimeout triggers, or until signatures from all validators
 	// have been received and processed. It will periodically yield QuorumAttestations with the latest set of received
 	// signatures.
