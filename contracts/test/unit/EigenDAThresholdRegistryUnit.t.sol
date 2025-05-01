@@ -2,8 +2,6 @@
 pragma solidity =0.8.12;
 
 import "../MockEigenDADeployer.sol";
-import {EigenDATypesV2 as DATypesV2} from "../../src/libraries/V2/EigenDATypesV2.sol";
-import {EigenDATypesV1 as DATypesV1} from "../../src/libraries/V1/EigenDATypesV1.sol";
 
 contract EigenDAThresholdRegistryUnit is MockEigenDADeployer {
     event VersionedBlobParamsAdded(uint16 indexed version, DATypesV1.VersionedBlobParams versionedBlobParams);

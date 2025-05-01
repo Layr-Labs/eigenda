@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDAThresholdRegistry} from "./IEigenDAThresholdRegistry.sol";
-import "./IEigenDAStructs.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
+import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
 interface IEigenDACertVerifier {
     /// @notice Check a DA cert's validity, and revert if invalid.

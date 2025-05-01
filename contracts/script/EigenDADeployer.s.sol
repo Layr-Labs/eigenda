@@ -15,20 +15,20 @@ import {StakeRegistry, IStrategy} from "../lib/eigenlayer-middleware/src/StakeRe
 import {IStakeRegistry, IDelegationManager} from "../lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {IServiceManager} from "../lib/eigenlayer-middleware/src/interfaces/IServiceManager.sol";
 import {IBLSApkRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
-import {EigenDAServiceManager, IAVSDirectory, IRewardsCoordinator} from "../src/core/EigenDAServiceManager.sol";
-import {EigenDAThresholdRegistry} from "../src/core/EigenDAThresholdRegistry.sol";
-import {EigenDACertVerifierV2} from "src/periphery/EigenDACertVerifierV2.sol";
-import {EigenDATypesV1 as DATypesV1} from "../src/libraries/V1/EigenDATypesV1.sol";
-import {EigenDATypesV2 as DATypesV2} from "../src/libraries/V2/EigenDATypesV2.sol";
-import {IEigenDAThresholdRegistry} from "../src/interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDABatchMetadataStorage} from "../src/interfaces/IEigenDABatchMetadataStorage.sol";
-import {IEigenDASignatureVerifier} from "../src/interfaces/IEigenDASignatureVerifier.sol";
-import {IEigenDARelayRegistry} from "../src/interfaces/IEigenDARelayRegistry.sol";
-import {IPaymentVault} from "../src/interfaces/IPaymentVault.sol";
-import {PaymentVault} from "../src/payments/PaymentVault.sol";
-import {EigenDADisperserRegistry} from "../src/core/EigenDADisperserRegistry.sol";
-import {IEigenDADisperserRegistry} from "../src/interfaces/IEigenDADisperserRegistry.sol";
-import {EigenDARelayRegistry} from "../src/core/EigenDARelayRegistry.sol";
+import {EigenDAServiceManager, IAVSDirectory, IRewardsCoordinator} from "src/core/EigenDAServiceManager.sol";
+import {EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
+import {EigenDACertVerifierV2} from "src/periphery/cert/v2/EigenDACertVerifierV2.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDABatchMetadataStorage} from "src/core/interfaces/IEigenDABatchMetadataStorage.sol";
+import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
+import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
+import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
+import {PaymentVault} from "src/core/PaymentVault.sol";
+import {EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
+import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
+import {EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {ISocketRegistry, SocketRegistry} from "../lib/eigenlayer-middleware/src/SocketRegistry.sol";
 import {
     DeployOpenEigenLayer,
@@ -40,7 +40,6 @@ import {
 import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
-import "../src/interfaces/IEigenDAStructs.sol";
 
 // # To load the variables in the .env file
 // source .env

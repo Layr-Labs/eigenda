@@ -5,11 +5,11 @@ pragma solidity ^0.8.9;
 import {Merkle} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/libraries/Merkle.sol";
 import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
 import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
-import {IEigenDABatchMetadataStorage} from "src/interfaces/IEigenDABatchMetadataStorage.sol";
-import {IEigenDAThresholdRegistry} from "src/interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDASignatureVerifier} from "src/interfaces/IEigenDASignatureVerifier.sol";
+import {IEigenDABatchMetadataStorage} from "src/core/interfaces/IEigenDABatchMetadataStorage.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
 
-import {EigenDATypesV1 as DATypesV1} from "src/libraries/V1/EigenDATypesV1.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
 /**
  * @title Library of functions to be used by smart contracts wanting to verify submissions of blob certificates on EigenDA.

@@ -2,10 +2,10 @@
 pragma solidity ^0.8.9;
 
 import {EigenDARollupUtils} from "./EigenDARollupUtils.sol";
-import {EigenDAServiceManager} from "../../src/core/EigenDAServiceManager.sol";
-import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
+import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
+import {IEigenDAServiceManager} from "src/core/interfaces/IEigenDAServiceManager.sol";
 import {BN254} from "../../lib/eigenlayer-middleware/src/libraries/BN254.sol";
-import {EigenDATypesV1 as DATypesV1} from "../../src/libraries/V1/EigenDATypesV1.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
 struct Commitment {
     address confirmer; // confirmer who posted the commitment

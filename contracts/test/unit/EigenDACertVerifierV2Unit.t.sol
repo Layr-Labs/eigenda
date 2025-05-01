@@ -2,9 +2,9 @@
 pragma solidity =0.8.12;
 
 import "../MockEigenDADeployer.sol";
-import {EigenDACertVerificationV2Lib as CertV2Lib} from "src/libraries/V2/EigenDACertVerificationV2Lib.sol";
-import {EigenDATypesV2} from "src/libraries/V2/EigenDATypesV2.sol";
-import {EigenDATypesV1} from "src/libraries/V1/EigenDATypesV1.sol";
+import {EigenDACertVerificationV2Lib as CertV2Lib} from "src/periphery/cert/v2/EigenDACertVerificationV2Lib.sol";
+import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
+import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
 contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     using stdStorage for StdStorage;
@@ -25,7 +25,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
             BLSSignatureChecker.NonSignerStakesAndSignature memory nssas
         ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
 
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
+        EigenDATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
         nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = nssas.nonSignerQuorumBitmapIndices;
         nonSignerStakesAndSignature.nonSignerPubkeys = nssas.nonSignerPubkeys;
         nonSignerStakesAndSignature.quorumApks = nssas.quorumApks;
@@ -37,7 +37,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
 
         eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
 
-        (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
+        (DATypesV1.NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
             CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
         eigenDACertVerifier.verifyDACertV2(
             signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers
@@ -51,7 +51,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
             BLSSignatureChecker.NonSignerStakesAndSignature memory nssas
         ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
 
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
+        EigenDATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
         nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = nssas.nonSignerQuorumBitmapIndices;
         nonSignerStakesAndSignature.nonSignerPubkeys = nssas.nonSignerPubkeys;
         nonSignerStakesAndSignature.quorumApks = nssas.quorumApks;
@@ -61,7 +61,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         nonSignerStakesAndSignature.totalStakeIndices = nssas.totalStakeIndices;
         nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
 
-        (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
+        (DATypesV1.NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
             CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
         bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(
             signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers
@@ -77,7 +77,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
         signedBatch.batchHeader.batchRoot = keccak256("bad root");
 
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
+        EigenDATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
         nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = nssas.nonSignerQuorumBitmapIndices;
         nonSignerStakesAndSignature.nonSignerPubkeys = nssas.nonSignerPubkeys;
         nonSignerStakesAndSignature.quorumApks = nssas.quorumApks;
@@ -87,7 +87,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         nonSignerStakesAndSignature.totalStakeIndices = nssas.totalStakeIndices;
         nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
 
-        (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
+        (DATypesV1.NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
             CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
         bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(
             signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers
