@@ -144,10 +144,17 @@ func (pd *PayloadDisperser) SendPayload(
 // logSigningPercentages logs the signing percentage of each quorum for a blob that has been dispersed and satisfied
 // required signing thresholds
 func (pd *PayloadDisperser) logSigningPercentages(blobKey core.BlobKey, blobStatusReply *dispgrpc.BlobStatusReply) {
+	attestation := blobStatusReply.GetSignedBatch().GetAttestation()
+	if len(attestation.GetQuorumNumbers()) != len(attestation.GetQuorumSignedPercentages()) {
+		pd.logger.Error("quorum number count and signed percentage count don't match. This should never happen",
+			"blobKey", blobKey.Hex(),
+			"quorumNumberCount", len(attestation.GetQuorumNumbers()),
+			"signedPercentageCount", len(attestation.GetQuorumSignedPercentages()))
+	}
+
 	quorumPercentagesBuilder := strings.Builder{}
 	quorumPercentagesBuilder.WriteString("(")
 
-	attestation := blobStatusReply.GetSignedBatch().GetAttestation()
 	for index, quorumNumber := range attestation.GetQuorumNumbers() {
 		quorumPercentagesBuilder.WriteString(
 			fmt.Sprintf("quorum_%d: %d%%, ", quorumNumber, attestation.GetQuorumSignedPercentages()[index]))
