@@ -444,15 +444,6 @@ func (sr *signatureReceiver) computeQuorumResult(
 	quorumOperatorCount := len(sr.indexedOperatorState.Operators[quorumID])
 	nonSignerCount := len(nonSignerMap)
 
-	if signerCount != quorumOperatorCount-nonSignerCount {
-		sr.logger.Error("number of signers does not match number of operators in quorum - non signers",
-			"quorumID", quorumID,
-			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
-			"signerCount", signerCount,
-			"quorumOperatorCount", quorumOperatorCount,
-			"nonSignerCount", nonSignerCount)
-	}
-
 	stateOperatorCount := len(sr.indexedOperatorState.IndexedOperators)
 	sr.logger.Debug("State details for quorum",
 		"quorumID", quorumID,
