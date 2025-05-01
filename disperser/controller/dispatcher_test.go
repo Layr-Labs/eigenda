@@ -267,8 +267,9 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 
 	sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx)
 	require.NoError(t, err)
+
 	err = components.Dispatcher.HandleSignatures(ctx, ctx, batchData, sigChan)
-	require.ErrorContains(t, err, "all quorums received no attestation")
+	require.NoError(t, err)
 
 	// Test that the blob metadata status are updated
 	for _, blobKey := range objsInBothQuorum.blobKeys {
@@ -289,15 +290,11 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 	bhh, err := vis[0].BatchHeader.Hash()
 	require.NoError(t, err)
 
-	// Test that empty attestation is written
-	att, err := components.BlobMetadataStore.GetAttestation(ctx, bhh)
-	require.NoError(t, err)
-	require.Nil(t, att.APKG2)
-	require.Len(t, att.QuorumAPKs, 0)
-	require.Nil(t, att.Sigma)
-	require.Len(t, att.QuorumNumbers, 0)
-	require.Len(t, att.QuorumResults, 0)
-	require.Len(t, att.NonSignerPubKeys, 0)
+	// When all operators fail to sign, no attestation is written
+	// so we expect a metadata not found error
+	_, err = components.BlobMetadataStore.GetAttestation(ctx, bhh)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "metadata not found")
 
 	deleteBlobs(t, components.BlobMetadataStore, objsInBothQuorum.blobKeys, [][32]byte{bhh})
 	deleteBlobs(t, components.BlobMetadataStore, objsInQuorum1.blobKeys, [][32]byte{bhh})
@@ -612,6 +609,7 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 		FinalizationBlockDelay:  finalizationBlockDelay,
 		AttestationTimeout:      1 * time.Second,
 		BatchAttestationTimeout: 2 * time.Second,
+		SignatureTickInterval:   1 * time.Second,
 		NumRequestRetries:       3,
 		MaxBatchSize:            maxBatchSize,
 	}, blobMetadataStore, pool, mockChainState, agg, nodeClientManager, logger, prometheus.NewRegistry(), beforeDispatch, blobSet)
