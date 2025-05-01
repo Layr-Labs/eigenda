@@ -35,10 +35,10 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
-	UseGraphFlag = cli.BoolFlag{
+	UseGraphFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-graph"),
 		Usage:    "Whether to use the graph node",
-		Required: true,
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USE_GRAPH"),
 	}
 	IndexerDataDirFlag = cli.StringFlag{
@@ -52,7 +52,8 @@ var (
 	EncodingPullIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "encoding-pull-interval"),
 		Usage:    "Interval at which to pull from the queue",
-		Required: true,
+		Required: false,
+		Value:    2 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ENCODING_PULL_INTERVAL"),
 	}
 	AvailableRelaysFlag = cli.IntSliceFlag{
@@ -121,19 +122,22 @@ var (
 	DispatcherPullIntervalFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "dispatcher-pull-interval"),
 		Usage:    "Interval at which to pull from the queue",
-		Required: true,
+		Required: false,
+		Value:    50 * time.Millisecond,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPATCHER_PULL_INTERVAL"),
 	}
 	AttestationTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "attestation-timeout"),
 		Usage:    "Timeout for node requests",
-		Required: true,
+		Required: false,
+		Value:    45 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ATTESTATION_TIMEOUT"),
 	}
 	BatchAttestationTimeoutFlag = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "batch-attestation-timeout"),
 		Usage:    "Timeout for batch attestation requests",
-		Required: true,
+		Required: false,
+		Value:    55 * time.Second,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "BATCH_ATTESTATION_TIMEOUT"),
 	}
 	FinalizationBlockDelayFlag = cli.Uint64Flag{
@@ -148,7 +152,7 @@ var (
 		Usage:    "Number of retries for node requests",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NUM_REQUEST_RETRIES"),
-		Value:    3,
+		Value:    0,
 	}
 	NumConcurrentDispersalRequestsFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "num-concurrent-dispersal-requests"),
