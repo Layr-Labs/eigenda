@@ -141,6 +141,16 @@ contract EigenDACertVerifierV2 {
         }
     }
 
+    function getNonSignerStakesAndSignature(DATypesV2.SignedBatch calldata signedBatch)
+        external
+        view
+        returns (NonSignerStakesAndSignature memory)
+    {
+        (NonSignerStakesAndSignature memory nonSignerStakesAndSignature,) =
+            CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetrieverV2, registryCoordinatorV2, signedBatch);
+        return nonSignerStakesAndSignature;
+    }
+
     /**
      * @notice Returns the threshold registry contract
      * @return The IEigenDAThresholdRegistry contract
