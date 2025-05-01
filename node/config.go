@@ -120,7 +120,7 @@ type Config struct {
 	LittDBDoubleWriteProtection bool
 
 	// The size of the cache for storing chunks in littDB, in gigabytes.
-	LittDBChunkCacheSizeGB float64 // TODO flag
+	LittDBChunkCacheSizeGB float64
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
