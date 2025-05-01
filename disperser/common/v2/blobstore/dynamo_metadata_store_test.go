@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"strings"
 	"testing"
 	"time"
 
@@ -1895,10 +1894,18 @@ func TestBlobMetadataStoreBlobAttestationInfo(t *testing.T) {
 	err = blobMetadataStore.PutBlobInclusionInfo(ctx, inclusionInfo)
 	assert.NoError(t, err)
 
-	// Test 1: the batch isn't signed yet, so there is no attestation info
-	_, err = blobMetadataStore.GetBlobAttestationInfo(ctx, blobKey)
-	assert.Error(t, err)
-	assert.True(t, strings.Contains(err.Error(), "no attestation info found"))
+	// Test 1: the batch isn't signed yet, but we should still get attestation info with an empty attestation object
+	attestationInfo, err := blobMetadataStore.GetBlobAttestationInfo(ctx, blobKey)
+	require.NoError(t, err)
+	assert.Equal(t, inclusionInfo, attestationInfo.InclusionInfo)
+	assert.NotNil(t, attestationInfo.Attestation)
+	assert.Equal(t, batchHeader, attestationInfo.Attestation.BatchHeader)
+	assert.Nil(t, attestationInfo.Attestation.NonSignerPubKeys)
+	assert.Nil(t, attestationInfo.Attestation.APKG2)
+	assert.Nil(t, attestationInfo.Attestation.QuorumAPKs)
+	assert.Nil(t, attestationInfo.Attestation.Sigma)
+	assert.Nil(t, attestationInfo.Attestation.QuorumNumbers)
+	assert.Nil(t, attestationInfo.Attestation.QuorumResults)
 
 	keyPair, err := core.GenRandomBlsKeys()
 	assert.NoError(t, err)
