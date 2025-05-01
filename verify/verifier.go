@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
-	"github.com/Layr-Labs/eigenda/encoding"
 	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 )
@@ -56,7 +54,7 @@ type Verifier struct {
 	holesky bool
 }
 
-func NewVerifier(cfg *Config, kzgConfig kzg.KzgConfig, l logging.Logger) (*Verifier, error) {
+func NewVerifier(cfg *Config, kzgVerifier *kzgverifier.Verifier, l logging.Logger) (*Verifier, error) {
 	var cv *CertVerifier
 	var err error
 
@@ -71,18 +69,6 @@ func NewVerifier(cfg *Config, kzgConfig kzg.KzgConfig, l logging.Logger) (*Verif
 			cfg.EthConfirmationDepth)
 	} else {
 		log.Warn("Certificate verification against Ethereum state disabled")
-	}
-
-	// The verifier doesn't support loading trailing g2 points from a separate file. If LoadG2Points is true, and
-	// the user is using a slimmed down g2 SRS file, the verifier will encounter an error while trying to load g2
-	// points. Since the verifier doesn't actually need g2 points, it's safe to force LoadG2Points to false, to
-	// sidestep the issue entirely.
-	kzgConfig.LoadG2Points = false
-
-	log.Info("Creating blob KZG verifier")
-	kzgVerifier, err := kzgverifier.NewVerifier(&kzgConfig, encoding.DefaultConfig())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create kzg verifier: %w", err)
 	}
 
 	return &Verifier{

@@ -32,21 +32,28 @@ type ProxyConfig struct {
 
 // ReadProxyConfig ... parses the Config from the provided flags or environment variables.
 func ReadProxyConfig(ctx *cli.Context) (ProxyConfig, error) {
-	clientConfigV1, err := eigendaflags.ReadClientConfigV1(ctx)
-	if err != nil {
-		return ProxyConfig{}, fmt.Errorf("read client config v1: %w", err)
-	}
-
-	verifierConfigV1 := verify.ReadConfig(ctx, clientConfigV1)
-
-	clientConfigV2, err := eigendaflags_v2.ReadClientConfigV2(ctx)
-	if err != nil {
-		return ProxyConfig{}, fmt.Errorf("read client config v2: %w", err)
-	}
-
 	storageConfig, err := store.ReadConfig(ctx)
 	if err != nil {
 		return ProxyConfig{}, fmt.Errorf("read storage config: %w", err)
+	}
+
+	var clientConfigV1 common.ClientConfigV1
+	var verifierConfigV1 verify.Config
+	if slices.Contains(storageConfig.BackendsToEnable, common.V1EigenDABackend) {
+		clientConfigV1, err = eigendaflags.ReadClientConfigV1(ctx)
+		if err != nil {
+			return ProxyConfig{}, fmt.Errorf("read client config v1: %w", err)
+		}
+
+		verifierConfigV1 = verify.ReadConfig(ctx, clientConfigV1)
+	}
+
+	var clientConfigV2 common.ClientConfigV2
+	if slices.Contains(storageConfig.BackendsToEnable, common.V2EigenDABackend) {
+		clientConfigV2, err = eigendaflags_v2.ReadClientConfigV2(ctx)
+		if err != nil {
+			return ProxyConfig{}, fmt.Errorf("read client config v2: %w", err)
+		}
 	}
 
 	var maxBlobSizeBytes uint64

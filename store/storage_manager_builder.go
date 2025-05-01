@@ -26,9 +26,11 @@ import (
 	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	core_v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	geth_common "github.com/ethereum/go-ethereum/common"
@@ -118,9 +120,27 @@ func (smb *StorageManagerBuilder) Build(ctx context.Context) (*Manager, error) {
 		return nil, fmt.Errorf("dispersal backend is set to V1, but V1 backend is not enabled")
 	}
 
+	var kzgVerifier *kzgverifier.Verifier
+	// there are two cases in which we need to construct the kzgVerifier:
+	// 1. V1
+	// 2. V2, when validator retrieval is enabled
+	if v1Enabled || v2Enabled && slices.Contains(smb.v2ClientCfg.RetrieversToEnable, common.ValidatorRetrieverType) {
+		// The verifier doesn't support loading trailing g2 points from a separate file. If LoadG2Points is true, and
+		// the user is using a slimmed down g2 SRS file, the verifier will encounter an error while trying to load g2
+		// points. Since the verifier doesn't actually need g2 points, it's safe to force LoadG2Points to false, to
+		// sidestep the issue entirely.
+		kzgConfig := smb.kzgConfig
+		kzgConfig.LoadG2Points = false
+
+		kzgVerifier, err = kzgverifier.NewVerifier(&kzgConfig, nil)
+		if err != nil {
+			return nil, fmt.Errorf("new kzg verifier: %w", err)
+		}
+	}
+
 	if v1Enabled {
 		smb.log.Info("Building EigenDA v1 storage backend")
-		eigenDAV1Store, err = smb.buildEigenDAV1Backend(ctx)
+		eigenDAV1Store, err = smb.buildEigenDAV1Backend(ctx, kzgVerifier)
 		if err != nil {
 			return nil, fmt.Errorf("build v1 backend: %w", err)
 		}
@@ -128,7 +148,7 @@ func (smb *StorageManagerBuilder) Build(ctx context.Context) (*Manager, error) {
 
 	if v2Enabled {
 		smb.log.Info("Building EigenDA v2 storage backend")
-		eigenDAV2Store, err = smb.buildEigenDAV2Backend(ctx)
+		eigenDAV2Store, err = smb.buildEigenDAV2Backend(ctx, kzgVerifier)
 		if err != nil {
 			return nil, fmt.Errorf("build v2 backend: %w", err)
 		}
@@ -192,7 +212,10 @@ func (smb *StorageManagerBuilder) buildSecondaries(
 }
 
 // buildEigenDAV2Backend ... Builds EigenDA V2 storage backend
-func (smb *StorageManagerBuilder) buildEigenDAV2Backend(ctx context.Context) (common.GeneratedKeyStore, error) {
+func (smb *StorageManagerBuilder) buildEigenDAV2Backend(
+	ctx context.Context,
+	kzgVerifier *kzgverifier.Verifier,
+) (common.GeneratedKeyStore, error) {
 	// This is a bit of a hack. The kzg config is used by both v1 AND v2, but the `LoadG2Points` field has special
 	// requirements. For v1, it must always be false. For v2, it must always be true. Ideally, we would modify
 	// the underlying core library to be more flexible, but that is a larger change for another time. As a stopgap, we
@@ -223,13 +246,37 @@ func (smb *StorageManagerBuilder) buildEigenDAV2Backend(ctx context.Context) (co
 		return nil, fmt.Errorf("new cert verifier: %w", err)
 	}
 
-	relayRegistryAddress, err := certVerifier.GetRelayRegistryAddress(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get relay registry address: %w", err)
+	var retrievers []clients_v2.PayloadRetriever
+	for _, retrieverType := range smb.v2ClientCfg.RetrieversToEnable {
+		switch retrieverType {
+		case common.RelayRetrieverType:
+			smb.log.Info("Initializing relay payload retriever")
+			relayRegistryAddress, err := certVerifier.GetRelayRegistryAddress(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("get relay registry address: %w", err)
+			}
+			relayPayloadRetriever, err := smb.buildRelayPayloadRetriever(
+				ethClient, kzgProver.Srs.G1, *relayRegistryAddress)
+			if err != nil {
+				return nil, fmt.Errorf("build relay payload retriever: %w", err)
+			}
+			retrievers = append(retrievers, relayPayloadRetriever)
+		case common.ValidatorRetrieverType:
+			smb.log.Info("Initializing validator payload retriever")
+			validatorPayloadRetriever, err := smb.buildValidatorPayloadRetriever(
+				ethClient, kzgVerifier, kzgProver.Srs.G1)
+			if err != nil {
+				return nil, fmt.Errorf("build validator payload retriever: %w", err)
+			}
+			retrievers = append(retrievers, validatorPayloadRetriever)
+		default:
+			return nil, fmt.Errorf("unknown retriever type: %s", retrieverType)
+		}
 	}
-	relayPayloadRetriever, err := smb.buildRelayPayloadRetriever(ethClient, kzgProver.Srs.G1, *relayRegistryAddress)
-	if err != nil {
-		return nil, fmt.Errorf("build relay payload retriever: %w", err)
+
+	// Ensure at least one retriever is configured
+	if len(retrievers) == 0 {
+		return nil, fmt.Errorf("no payload retrievers enabled, please enable at least one retriever type")
 	}
 
 	payloadDisperser, err := smb.buildPayloadDisperser(ctx, ethClient, kzgProver, certVerifier)
@@ -241,7 +288,7 @@ func (smb *StorageManagerBuilder) buildEigenDAV2Backend(ctx context.Context) (co
 		smb.log,
 		smb.v2ClientCfg.PutTries,
 		payloadDisperser,
-		relayPayloadRetriever,
+		retrievers,
 		certVerifier)
 	if err != nil {
 		return nil, fmt.Errorf("create v2 store: %w", err)
@@ -251,8 +298,11 @@ func (smb *StorageManagerBuilder) buildEigenDAV2Backend(ctx context.Context) (co
 }
 
 // buildEigenDAV1Backend ... Builds EigenDA V1 storage backend
-func (smb *StorageManagerBuilder) buildEigenDAV1Backend(ctx context.Context) (common.GeneratedKeyStore, error) {
-	verifier, err := verify.NewVerifier(&smb.v1VerifierCfg, smb.kzgConfig, smb.log)
+func (smb *StorageManagerBuilder) buildEigenDAV1Backend(
+	ctx context.Context,
+	kzgVerifier *kzgverifier.Verifier,
+) (common.GeneratedKeyStore, error) {
+	verifier, err := verify.NewVerifier(&smb.v1VerifierCfg, kzgVerifier, smb.log)
 	if err != nil {
 		return nil, fmt.Errorf("new verifier: %w", err)
 	}
@@ -354,6 +404,56 @@ func (smb *StorageManagerBuilder) buildRelayClient(
 	return relayClient, nil
 }
 
+// buildValidatorPayloadRetriever constructs a ValidatorPayloadRetriever for retrieving
+// payloads directly from EigenDA validators
+func (smb *StorageManagerBuilder) buildValidatorPayloadRetriever(
+	ethClient common_eigenda.EthClient,
+	kzgVerifier *kzgverifier.Verifier,
+	g1Srs []bn254.G1Affine,
+) (*payloadretrieval.ValidatorPayloadRetriever, error) {
+	ethReader, err := smb.buildEthReader(ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("build eth reader: %w", err)
+	}
+
+	chainState := eth.NewChainState(ethReader, ethClient)
+
+	retrievalClient := clients_v2.NewRetrievalClient(
+		smb.log,
+		ethReader,
+		chainState,
+		kzgVerifier,
+		20, // Default connection count
+	)
+
+	// Create validator payload retriever
+	validatorRetriever, err := payloadretrieval.NewValidatorPayloadRetriever(
+		smb.log,
+		smb.v2ClientCfg.ValidatorPayloadRetrieverCfg,
+		retrievalClient,
+		g1Srs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new validator payload retriever: %w", err)
+	}
+
+	return validatorRetriever, nil
+}
+
+func (smb *StorageManagerBuilder) buildEthReader(ethClient common_eigenda.EthClient) (*eth.Reader, error) {
+	ethReader, err := eth.NewReader(
+		smb.log,
+		ethClient,
+		smb.v2ClientCfg.BLSOperatorStateRetrieverAddr,
+		smb.v2ClientCfg.EigenDAServiceManagerAddr,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new reader: %w", err)
+	}
+
+	return ethReader, nil
+}
+
 func (smb *StorageManagerBuilder) buildPayloadDisperser(
 	ctx context.Context,
 	ethClient common_eigenda.EthClient,
@@ -374,7 +474,8 @@ func (smb *StorageManagerBuilder) buildPayloadDisperser(
 		smb.log,
 		smb.v2ClientCfg.PayloadDisperserCfg,
 		disperserClient,
-		certVerifier)
+		certVerifier,
+		nil)
 	if err != nil {
 		return nil, fmt.Errorf("new payload disperser: %w", err)
 	}

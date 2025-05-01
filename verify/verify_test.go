@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 	"github.com/stretchr/testify/require"
 )
@@ -38,13 +39,17 @@ func TestCommitmentVerification(t *testing.T) {
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    false,
 	}
+
+	kzgVerifier, err := kzgverifier.NewVerifier(&kzgConfig, nil)
+	require.NoError(t, err)
 
 	cfg := &Config{
 		VerifyCerts: false,
 	}
 
-	v, err := NewVerifier(cfg, kzgConfig, nil)
+	v, err := NewVerifier(cfg, kzgVerifier, nil)
 	require.NoError(t, err)
 
 	// Happy path verification
@@ -76,13 +81,17 @@ func TestCommitmentWithTooLargeBlob(t *testing.T) {
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    false,
 	}
+
+	kzgVerifier, err := kzgverifier.NewVerifier(&kzgConfig, nil)
+	require.NoError(t, err)
 
 	cfg := &Config{
 		VerifyCerts: false,
 	}
 
-	v, err := NewVerifier(cfg, kzgConfig, nil)
+	v, err := NewVerifier(cfg, kzgVerifier, nil)
 	require.NoError(t, err)
 
 	// Some wrong commitment just to pass in function

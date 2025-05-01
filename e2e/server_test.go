@@ -510,3 +510,21 @@ func testMaxBlobSize(t *testing.T, dispersalBackend common.EigenDABackend) {
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(int(maxPayloadSize)))
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
 }
+
+// TestV2ValidatorRetrieverOnly tests that retrieval works when only the validator retriever is enabled
+func TestV2ValidatorRetrieverOnly(t *testing.T) {
+	if testutils.GetBackend() == testutils.MemstoreBackend {
+		t.Skip("Don't run for memstore backend, since memstore tests don't actually hit the retrievers")
+	}
+
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), common.V2EigenDABackend, nil)
+	// Modify the test config to only use the validator retriever
+	testCfg.Retrievers = []common.RetrieverType{common.ValidatorRetrieverType}
+
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
+	defer kill()
+
+	requireStandardClientSetGet(t, ts, testutils.RandBytes(1000))
+	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
+}

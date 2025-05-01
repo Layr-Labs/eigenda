@@ -20,16 +20,20 @@ var (
 	BlobStatusPollIntervalFlagName  = withFlagPrefix("blob-status-poll-interval")
 	PointEvaluationDisabledFlagName = withFlagPrefix("disable-point-evaluation")
 
-	PutRetriesFlagName           = withFlagPrefix("put-retries")
-	SignerPaymentKeyHexFlagName  = withFlagPrefix("signer-payment-key-hex")
-	DisperseBlobTimeoutFlagName  = withFlagPrefix("disperse-blob-timeout")
-	BlobCertifiedTimeoutFlagName = withFlagPrefix("blob-certified-timeout")
-	CertVerifierAddrFlagName     = withFlagPrefix("cert-verifier-addr")
-	RelayTimeoutFlagName         = withFlagPrefix("relay-timeout")
-	ContractCallTimeoutFlagName  = withFlagPrefix("contract-call-timeout")
-	BlobParamsVersionFlagName    = withFlagPrefix("blob-version")
-	EthRPCURLFlagName            = withFlagPrefix("eth-rpc")
-	MaxBlobLengthFlagName        = withFlagPrefix("max-blob-length")
+	PutRetriesFlagName                = withFlagPrefix("put-retries")
+	SignerPaymentKeyHexFlagName       = withFlagPrefix("signer-payment-key-hex")
+	DisperseBlobTimeoutFlagName       = withFlagPrefix("disperse-blob-timeout")
+	BlobCertifiedTimeoutFlagName      = withFlagPrefix("blob-certified-timeout")
+	CertVerifierAddrFlagName          = withFlagPrefix("cert-verifier-addr")
+	ServiceManagerAddrFlagName        = withFlagPrefix("service-manager-addr")
+	BLSOperatorStateRetrieverFlagName = withFlagPrefix("bls-operator-state-retriever-addr")
+	RelayTimeoutFlagName              = withFlagPrefix("relay-timeout")
+	ValidatorTimeoutFlagName          = withFlagPrefix("validator-timeout")
+	ContractCallTimeoutFlagName       = withFlagPrefix("contract-call-timeout")
+	BlobParamsVersionFlagName         = withFlagPrefix("blob-version")
+	EthRPCURLFlagName                 = withFlagPrefix("eth-rpc")
+	MaxBlobLengthFlagName             = withFlagPrefix("max-blob-length")
+	NetworkFlagName                   = withFlagPrefix("network")
 )
 
 func withFlagPrefix(s string) string {
@@ -107,6 +111,20 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Category: category,
 			Required: false,
 		},
+		&cli.StringFlag{
+			Name:     ServiceManagerAddrFlagName,
+			Usage:    "Address of the EigenDA service manager contract.",
+			EnvVars:  []string{withEnvPrefix(envPrefix, "SERVICE_MANAGER_ADDR")},
+			Category: category,
+			Required: false,
+		},
+		&cli.StringFlag{
+			Name:     BLSOperatorStateRetrieverFlagName,
+			Usage:    "Address of the BLS operator state retriever contract.",
+			EnvVars:  []string{withEnvPrefix(envPrefix, "BLS_OPERATOR_STATE_RETRIEVER_ADDR")},
+			Category: category,
+			Required: false,
+		},
 		&cli.DurationFlag{
 			Name:     ContractCallTimeoutFlagName,
 			Usage:    "Timeout used when performing smart contract call operation (i.e, eth_call).",
@@ -124,6 +142,15 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 			Required: false,
 		},
 		&cli.DurationFlag{
+			Name: ValidatorTimeoutFlagName,
+			Usage: "Timeout used when retrieving chunks directly from EigenDA validators. " +
+				"This is a secondary retrieval method, in case retrieval from the relay network fails.",
+			EnvVars:  []string{withEnvPrefix(envPrefix, "VALIDATOR_TIMEOUT")},
+			Category: category,
+			Value:    2 * time.Minute,
+			Required: false,
+		},
+		&cli.DurationFlag{
 			Name:     BlobStatusPollIntervalFlagName,
 			Usage:    "Duration to query for blob status updates during dispersal.",
 			EnvVars:  []string{withEnvPrefix(envPrefix, "BLOB_STATUS_POLL_INTERVAL")},
@@ -133,10 +160,8 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 		},
 		&cli.UintFlag{
 			Name: BlobParamsVersionFlagName,
-			Usage: `Blob params version used when dispersing. 
-					   This refers to a global version maintained by EigenDA governance 
-					   and is injected in the BlobHeader before dispersing.
-					   Currently only supports (0).`,
+			Usage: `Blob params version used when dispersing. This refers to a global version maintained by EigenDA
+						governance and is injected in the BlobHeader before dispersing. Currently only supports (0).`,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "BLOB_PARAMS_VERSION")},
 			Category: category,
 			Value:    uint(0),
@@ -149,6 +174,22 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 						slightly exceeds 1GB.`,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "MAX_BLOB_LENGTH")},
 			Value:    "16MiB",
+			Category: category,
+		},
+		&cli.StringFlag{
+			Name: NetworkFlagName,
+			Usage: fmt.Sprintf(`The EigenDA network that is being used. This is an optional flag, to configure
+						default values for %s, %s, %s, and %s. If all of these fields are explicitly configured, the
+						network flag may be omitted. If some or all of these fields are configured, and the network
+						is also configured, then the explicitly defined field values will take precedence. Permitted
+						EigenDANetwork values include %s, and %s.`,
+				DisperserFlagName,
+				CertVerifierAddrFlagName,
+				ServiceManagerAddrFlagName,
+				BLSOperatorStateRetrieverFlagName,
+				common.HoleskyTestnetEigenDANetwork,
+				common.HoleskyPreprodEigenDANetwork),
+			EnvVars:  []string{withEnvPrefix(envPrefix, "NETWORK")},
 			Category: category,
 		},
 	}
@@ -167,13 +208,58 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 			"parse max blob length flag \"%v\": %w", maxBlobLengthFlagContents, err)
 	}
 
+	var eigenDANetwork common.EigenDANetwork
+	networkString := ctx.String(NetworkFlagName)
+	if networkString != "" {
+		eigenDANetwork, err = common.EigenDANetworkFromString(networkString)
+		if err != nil {
+			return common.ClientConfigV2{}, fmt.Errorf("parse eigenDANetwork: %w", err)
+		}
+	}
+
+	serviceManagerAddress := ctx.String(ServiceManagerAddrFlagName)
+	if serviceManagerAddress == "" {
+		serviceManagerAddress, err = eigenDANetwork.GetServiceManagerAddress()
+		if err != nil {
+			return common.ClientConfigV2{}, fmt.Errorf(
+				"service manager address wasn't specified, and failed to get it from the specified network: %w", err)
+		}
+	}
+
+	blsOperatorStateRetrieverAddress := ctx.String(BLSOperatorStateRetrieverFlagName)
+	if blsOperatorStateRetrieverAddress == "" {
+		blsOperatorStateRetrieverAddress, err = eigenDANetwork.GetBLSOperatorStateRetrieverAddress()
+		if err != nil {
+			return common.ClientConfigV2{}, fmt.Errorf(
+				`BLS operator state retriever address wasn't specified, and failed to get it from the
+							specified network : %w`, err)
+		}
+	}
+
+	certVerifierAddress := ctx.String(CertVerifierAddrFlagName)
+	if certVerifierAddress == "" {
+		certVerifierAddress, err = eigenDANetwork.GetCertVerifierAddress()
+		if err != nil {
+			return common.ClientConfigV2{}, fmt.Errorf(
+				"cert verifier address wasn't specified, and failed to get it from the specified network: %w", err)
+		}
+	}
+
 	return common.ClientConfigV2{
-		DisperserClientCfg:         disperserConfig,
-		PayloadDisperserCfg:        readPayloadDisperserCfg(ctx),
-		RelayPayloadRetrieverCfg:   readRetrievalConfig(ctx),
-		PutTries:                   ctx.Int(PutRetriesFlagName),
-		MaxBlobSizeBytes:           maxBlobLengthBytes,
-		EigenDACertVerifierAddress: ctx.String(CertVerifierAddrFlagName),
+		DisperserClientCfg:            disperserConfig,
+		PayloadDisperserCfg:           readPayloadDisperserCfg(ctx),
+		RelayPayloadRetrieverCfg:      readRelayRetrievalConfig(ctx),
+		ValidatorPayloadRetrieverCfg:  readValidatorRetrievalConfig(ctx),
+		PutTries:                      ctx.Int(PutRetriesFlagName),
+		MaxBlobSizeBytes:              maxBlobLengthBytes,
+		EigenDACertVerifierAddress:    certVerifierAddress,
+		BLSOperatorStateRetrieverAddr: blsOperatorStateRetrieverAddress,
+		EigenDAServiceManagerAddr:     serviceManagerAddress,
+		// we don't expose this configuration to users, as all production use cases should have
+		// both retrieval methods enabled. This could be exposed in the future, if necessary.
+		// Note the order of these retrievers, which is significant: the relay retriever will be
+		// tried first, and the validator retriever will only be tried if the relay retriever fails
+		RetrieversToEnable: []common.RetrieverType{common.RelayRetrieverType, common.ValidatorRetrieverType},
 	}, nil
 }
 
@@ -206,7 +292,7 @@ func readPayloadDisperserCfg(ctx *cli.Context) payloaddispersal.PayloadDisperser
 	return payloaddispersal.PayloadDisperserConfig{
 		PayloadClientConfig:    payCfg,
 		DisperseBlobTimeout:    ctx.Duration(DisperseBlobTimeoutFlagName),
-		BlobCertifiedTimeout:   ctx.Duration(BlobCertifiedTimeoutFlagName),
+		BlobCompleteTimeout:    ctx.Duration(BlobCertifiedTimeoutFlagName),
 		BlobStatusPollInterval: ctx.Duration(BlobStatusPollIntervalFlagName),
 		ContractCallTimeout:    ctx.Duration(ContractCallTimeoutFlagName),
 	}
@@ -216,12 +302,27 @@ func readDisperserCfg(ctx *cli.Context) (clients_v2.DisperserClientConfig, error
 	disperserAddressString := ctx.String(DisperserFlagName)
 
 	if disperserAddressString == "" {
-		return clients_v2.DisperserClientConfig{}, nil
+		networkString := ctx.String(NetworkFlagName)
+		if networkString == "" {
+			return clients_v2.DisperserClientConfig{},
+				fmt.Errorf("either disperser address or EigenDANetwork must be specified")
+		}
+
+		eigenDANetwork, err := common.EigenDANetworkFromString(networkString)
+		if err != nil {
+			return clients_v2.DisperserClientConfig{}, fmt.Errorf("parse eigenDANetwork: %w", err)
+		}
+
+		disperserAddressString, err = eigenDANetwork.GetDisperserAddress()
+		if err != nil {
+			return clients_v2.DisperserClientConfig{}, fmt.Errorf("get disperser address: %w", err)
+		}
 	}
 
 	hostStr, portStr, err := net.SplitHostPort(disperserAddressString)
 	if err != nil {
-		return clients_v2.DisperserClientConfig{}, fmt.Errorf("split host port '%s': %w", disperserAddressString, err)
+		return clients_v2.DisperserClientConfig{},
+			fmt.Errorf("split host port '%s': %w", disperserAddressString, err)
 	}
 
 	return clients_v2.DisperserClientConfig{
@@ -231,9 +332,16 @@ func readDisperserCfg(ctx *cli.Context) (clients_v2.DisperserClientConfig, error
 	}, nil
 }
 
-func readRetrievalConfig(ctx *cli.Context) payloadretrieval.RelayPayloadRetrieverConfig {
+func readRelayRetrievalConfig(ctx *cli.Context) payloadretrieval.RelayPayloadRetrieverConfig {
 	return payloadretrieval.RelayPayloadRetrieverConfig{
 		PayloadClientConfig: readPayloadClientConfig(ctx),
 		RelayTimeout:        ctx.Duration(RelayTimeoutFlagName),
+	}
+}
+
+func readValidatorRetrievalConfig(ctx *cli.Context) payloadretrieval.ValidatorPayloadRetrieverConfig {
+	return payloadretrieval.ValidatorPayloadRetrieverConfig{
+		PayloadClientConfig: readPayloadClientConfig(ctx),
+		RetrievalTimeout:    ctx.Duration(ValidatorTimeoutFlagName),
 	}
 }

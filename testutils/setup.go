@@ -41,13 +41,15 @@ const (
 	host             = "127.0.0.1"
 	disperserPort    = "443"
 
-	disperserPreprodHostname   = "disperser-preprod-holesky.eigenda.xyz"
-	preprodCertVerifierAddress = "0xd973fA62E22BC2779F8489258F040C0344B03C21"
-	preprodSvcManagerAddress   = "0x54A03db2784E3D0aCC08344D05385d0b62d4F432"
+	disperserPreprodHostname                = "disperser-preprod-holesky.eigenda.xyz"
+	preprodCertVerifierAddress              = "0xd973fA62E22BC2779F8489258F040C0344B03C21"
+	preprodSvcManagerAddress                = "0x54A03db2784E3D0aCC08344D05385d0b62d4F432"
+	preprodBLSOperatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
 
-	disperserTestnetHostname   = "disperser-testnet-holesky.eigenda.xyz"
-	testnetCertVerifierAddress = "0xFe52fE1940858DCb6e12153E2104aD0fDFbE1162"
-	testnetSvcManagerAddress   = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
+	disperserTestnetHostname                = "disperser-testnet-holesky.eigenda.xyz"
+	testnetCertVerifierAddress              = "0xFe52fE1940858DCb6e12153E2104aD0fDFbE1162"
+	testnetSvcManagerAddress                = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
+	testnetBLSOperatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
 )
 
 var (
@@ -151,6 +153,7 @@ type TestConfig struct {
 	BackendsToEnable []common.EigenDABackend
 	DispersalBackend common.EigenDABackend
 	Backend          Backend
+	Retrievers       []common.RetrieverType
 	Expiration       time.Duration
 	MaxBlobLength    string
 	WriteThreadCount int
@@ -180,6 +183,7 @@ func NewTestConfig(
 		BackendsToEnable:   backendsToEnable,
 		DispersalBackend:   dispersalBackend,
 		Backend:            backend,
+		Retrievers:         []common.RetrieverType{common.RelayRetrieverType, common.ValidatorRetrieverType},
 		Expiration:         14 * 24 * time.Hour,
 		UseKeccak256ModeS3: false,
 		UseS3Caching:       false,
@@ -249,6 +253,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	var disperserHostname string
 	var certVerifierAddress string
 	var svcManagerAddress string
+	var blsOperatorStateRetrieverAddress string
 	switch testCfg.Backend {
 	case MemstoreBackend:
 		break // no need to set these fields for local tests
@@ -256,19 +261,19 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		disperserHostname = disperserPreprodHostname
 		certVerifierAddress = preprodCertVerifierAddress
 		svcManagerAddress = preprodSvcManagerAddress
+		blsOperatorStateRetrieverAddress = preprodBLSOperatorStateRetrieverAddress
 	case TestnetBackend:
 		disperserHostname = disperserTestnetHostname
 		certVerifierAddress = testnetCertVerifierAddress
 		svcManagerAddress = testnetSvcManagerAddress
+		blsOperatorStateRetrieverAddress = testnetBLSOperatorStateRetrieverAddress
 	default:
 		panic("Unsupported backend")
 	}
-
 	payloadClientConfig := clientsv2.PayloadClientConfig{
 		PayloadPolynomialForm: codecs.PolynomialFormEval,
 		BlobVersion:           0,
 	}
-
 	proxyConfig := config.ProxyConfig{
 		ServerConfig: config.ServerConfig{
 			Host: host,
@@ -319,7 +324,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			PayloadDisperserCfg: payloaddispersal.PayloadDisperserConfig{
 				PayloadClientConfig:    payloadClientConfig,
 				DisperseBlobTimeout:    5 * time.Minute,
-				BlobCertifiedTimeout:   5 * time.Minute,
+				BlobCompleteTimeout:    5 * time.Minute,
 				BlobStatusPollInterval: 1 * time.Second,
 				ContractCallTimeout:    5 * time.Second,
 			},
@@ -327,9 +332,12 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 				PayloadClientConfig: payloadClientConfig,
 				RelayTimeout:        5 * time.Second,
 			},
-			PutTries:                   3,
-			MaxBlobSizeBytes:           maxBlobLengthBytes,
-			EigenDACertVerifierAddress: certVerifierAddress,
+			PutTries:                      3,
+			MaxBlobSizeBytes:              maxBlobLengthBytes,
+			EigenDACertVerifierAddress:    certVerifierAddress,
+			BLSOperatorStateRetrieverAddr: blsOperatorStateRetrieverAddress,
+			EigenDAServiceManagerAddr:     svcManagerAddress,
+			RetrieversToEnable:            testCfg.Retrievers,
 		},
 		StorageConfig: store.Config{
 			AsyncPutWorkers:  testCfg.WriteThreadCount,
@@ -337,13 +345,11 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			DispersalBackend: testCfg.DispersalBackend,
 		},
 	}
-
 	if useMemory {
 		proxyConfig.ClientConfigV1.EdaClientCfg.SignerPrivateKeyHex =
 			"0000000000000000000100000000000000000000000000000000000000000000"
 		proxyConfig.ClientConfigV1.EdaClientCfg.SvcManagerAddr = "0x00000000069"
 	}
-
 	switch {
 	case testCfg.UseKeccak256ModeS3:
 		proxyConfig.StorageConfig = createS3Config(proxyConfig.StorageConfig)
@@ -357,26 +363,22 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		proxyConfig.StorageConfig.CacheTargets = []string{"redis"}
 		proxyConfig.StorageConfig = createRedisConfig(proxyConfig.StorageConfig)
 	}
-
 	secretConfig := common.SecretConfigV2{
 		SignerPaymentKey: pk,
 		EthRPCURL:        ethRPC,
 	}
-
 	return config.AppConfig{
 		EigenDAConfig: proxyConfig,
 		SecretConfig:  secretConfig,
 		MetricsConfig: proxy_metrics.Config{},
 	}
 }
-
 func createS3Bucket(bucketName string) {
 	// Initialize minio client object.
 	endpoint := minioEndpoint
 	accessKeyID := minioAdmin
 	secretAccessKey := minioAdmin
 	useSSL := false
-
 	minioClient, err := minio.New(
 		endpoint, &minio.Options{
 			Creds:  credentials.NewStaticV4(accessKeyID, secretAccessKey, ""),
@@ -385,9 +387,7 @@ func createS3Bucket(bucketName string) {
 	if err != nil {
 		panic(err)
 	}
-
 	location := "us-east-1"
-
 	ctx := context.Background()
 	err = minioClient.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{Region: location})
 	if err != nil {
@@ -402,7 +402,6 @@ func createS3Bucket(bucketName string) {
 		log.Info(fmt.Sprintf("Successfully created %s\n", bucketName))
 	}
 }
-
 func RandStr(n int) string {
 	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
 	b := make([]rune, n)
@@ -411,7 +410,6 @@ func RandStr(n int) string {
 	}
 	return string(b)
 }
-
 func RandBytes(n int) []byte {
 	return []byte(RandStr(n))
 }

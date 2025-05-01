@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
+	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
 )
@@ -46,9 +47,13 @@ func TestGetSet(t *testing.T) {
 		SRSOrder:        3000,
 		SRSNumberToLoad: 3000,
 		NumWorker:       uint64(runtime.GOMAXPROCS(0)),
+		LoadG2Points:    false,
 	}
 
-	verifier, err := verify.NewVerifier(verifierConfig, kzgConfig, nil)
+	kzgVerifier, err := kzgverifier.NewVerifier(&kzgConfig, nil)
+	require.NoError(t, err)
+
+	verifier, err := verify.NewVerifier(verifierConfig, kzgVerifier, nil)
 	require.NoError(t, err)
 
 	ms, err := New(
