@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EigenDA Resource Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .calculator {
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        label {
+            display: inline-block;
+            width: 250px;
+            font-weight: bold;
+        }
+        input {
+            width: 120px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            margin-left: 10px;
+            cursor: help;
+        }
+        .tooltip-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            background-color: #2c7873;
+            color: white;
+            border-radius: 50%;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .tooltip-text {
+            visibility: hidden;
+            width: 300px;
+            background-color: #555;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 1;
+            left: 125%;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-weight: normal;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 0.95;
+        }
+        .results {
+            margin-top: 30px;
+            background-color: #e9f7ef;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .result-item {
+            margin-bottom: 10px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+        }
+        .value {
+            font-weight: bold;
+            color: #2c7873;
+            margin-right: 10px;
+        }
+        button {
+            background-color: #2c7873;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            display: block;
+            margin: 20px auto;
+        }
+        button:hover {
+            background-color: #1f5f5b;
+        }
+        .reset {
+            background-color: #888;
+            margin-left: 10px;
+        }
+        .reset:hover {
+            background-color: #666;
+        }
+        .button-group {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>EigenDA Resource Calculator</h1>
+    
+    <div class="calculator">
+        <div class="input-group">
+            <label for="maxThroughput">Max Throughput (MB/s):</label>
+            <input type="number" id="maxThroughput" value="50" step="0.1" min="0">
+            <div class="tooltip">
+                <div class="tooltip-icon">?</div>
+                <span class="tooltip-text">The maximum throughput supported by EigenDA.</span>
+            </div>
+        </div>
+        
+        <div class="input-group">
+            <label for="sumOfStake">Sum of Stake Across All Quorums:</label>
+            <input type="number" id="sumOfStake" value="0.125" step="0.001" min="0" max="1">
+            <div class="tooltip">
+                <div class="tooltip-icon">?</div>
+                <span class="tooltip-text">The sum of an operator's stake across all quorums. 1.0 means 100% stake for one quorum, 2.0 means 100% stake across two quorums. For example, if an operator has 10% stake in 3 quorums, the sum of stake across all quorums is 30%, and so you'd use 0.3 for field.</span>
+            </div>
+        </div>
+        
+        <div class="input-group">
+            <label for="encodingRate">Encoding Rate:</label>
+            <input type="number" id="encodingRate" value="8.0" step="0.1" min="0">
+            <div class="tooltip">
+                <div class="tooltip-icon">?</div>
+                <span class="tooltip-text">The kzg encoding rate.</span>
+            </div>
+        </div>
+        
+        <div class="input-group">
+            <label for="downloadPessimism">Download Pessimism:</label>
+            <input type="number" id="downloadPessimism" value="2.0" step="0.1" min="0">
+            <div class="tooltip">
+                <div class="tooltip-icon">?</div>
+                <span class="tooltip-text">Controls the extra amount of chunk data validator clients download in case some validators do not return data in a timely manner.</span>
+            </div>
+        </div>
+        
+        <div class="input-group">
+            <label for="readAmplification">Read Amplification:</label>
+            <input type="number" id="readAmplification" value="20.0" step="0.1" min="0">
+            <div class="tooltip">
+                <div class="tooltip-icon">?</div>
+                <span class="tooltip-text">The number of times each blob is read after it is written.</span>
+            </div>
+        </div>
+        
+        <div class="input-group">
+            <label for="dataRetention">Data Retention Period (days):</label>
+            <input type="number" id="dataRetention" value="14" step="1" min="0">
+            <div class="tooltip">
+                <div class="tooltip-icon">?</div>
+                <span class="tooltip-text">The length of time that validator nodes retain chunk data.</span>
+            </div>
+        </div>
+        
+        <div class="input-group">
+            <label for="diskSafetyMargin">Disk Safety Margin:</label>
+            <input type="number" id="diskSafetyMargin" value="1.2" step="0.1" min="0">
+            <div class="tooltip">
+                <div class="tooltip-icon">?</div>
+                <span class="tooltip-text">Adds a safety buffer to the disk space needed.</span>
+            </div>
+        </div>
+        
+        <div class="input-group">
+            <label for="downloadSafetyMargin">Download Safety Margin:</label>
+            <input type="number" id="downloadSafetyMargin" value="1.2" step="0.1" min="0">
+            <div class="tooltip">
+                <div class="tooltip-icon">?</div>
+                <span class="tooltip-text">Adds a safety buffer to the download bandwidth.</span>
+            </div>
+        </div>
+        
+        <div class="input-group">
+            <label for="uploadSafetyMargin">Upload Safety Margin:</label>
+            <input type="number" id="uploadSafetyMargin" value="1.2" step="0.1" min="0">
+            <div class="tooltip">
+                <div class="tooltip-icon">?</div>
+                <span class="tooltip-text">Adds a safety buffer to the upload bandwidth.</span>
+            </div>
+        </div>
+        
+        <div class="button-group">
+            <button id="calculate">Calculate</button>
+            <button id="reset" class="reset">Reset to Defaults</button>
+        </div>
+        
+        <div class="results">
+            <div class="result-item">
+                Storage Space Needed: <span id="storageSpace" class="value">0</span> TB
+                <div class="tooltip">
+                    <div class="tooltip-icon">?</div>
+                    <span class="tooltip-text">Formula: (Max Throughput MB/s) × (Data Retention Period in days) × (Encoding Rate) × (Sum of Stake) × (Disk Safety Margin) × (86400 seconds/day) ÷ (1024*1024 MB/TB)<br>Unit: Terabytes (TB)</span>
+                </div>
+            </div>
+            <div class="result-item">
+                Download Bandwidth: <span id="downloadBandwidth" class="value">0</span> MB/s
+                <div class="tooltip">
+                    <div class="tooltip-icon">?</div>
+                    <span class="tooltip-text">Formula: (Max Throughput) × (Encoding Rate) × (Sum of Stake) × (Download Safety Margin)<br>Unit: Megabytes per second (MB/s)</span>
+                </div>
+            </div>
+            <div class="result-item">
+                Upload Bandwidth: <span id="uploadBandwidth" class="value">0</span> MB/s
+                <div class="tooltip">
+                    <div class="tooltip-icon">?</div>
+                    <span class="tooltip-text">Formula: (Max Throughput) × (Sum of Stake) × (Read Amplification) × (Download Pessimism) × (Upload Safety Margin)<br>Unit: Megabytes per second (MB/s)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Confetti function for the easter egg
+        function createConfetti() {
+            const confettiContainer = document.createElement('div');
+            confettiContainer.style.position = 'fixed';
+            confettiContainer.style.top = '0';
+            confettiContainer.style.left = '0';
+            confettiContainer.style.width = '100%';
+            confettiContainer.style.height = '100%';
+            confettiContainer.style.pointerEvents = 'none';
+            confettiContainer.style.zIndex = '1000';
+            document.body.appendChild(confettiContainer);
+            
+            // Create 150 confetti particles
+            for (let i = 0; i < 150; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    
+                    // Random confetti style
+                    const size = Math.random() * 10 + 5;
+                    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
+                    
+                    confetti.style.position = 'absolute';
+                    confetti.style.width = `${size}px`;
+                    confetti.style.height = `${size}px`;
+                    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+                    confetti.style.left = `${Math.random() * 100}%`;
+                    confetti.style.top = '-20px';
+                    confetti.style.opacity = Math.random() * 0.7 + 0.3;
+                    confetti.style.transform = `rotate(${Math.random() * 360}deg)`;
+                    
+                    // Append confetti to container
+                    confettiContainer.appendChild(confetti);
+                    
+                    // Animate falling
+                    const animationDuration = Math.random() * 3 + 2;
+                    const horizontalMovement = (Math.random() - 0.5) * 15;
+                    
+                    confetti.animate([
+                        { transform: `translate(0, 0) rotate(0deg)` },
+                        { transform: `translate(${horizontalMovement}vw, 100vh) rotate(${Math.random() * 720}deg)` }
+                    ], {
+                        duration: animationDuration * 1000,
+                        easing: 'cubic-bezier(0.37, 0, 0.63, 1)'
+                    });
+                    
+                    // Remove confetti after animation
+                    setTimeout(() => {
+                        confetti.remove();
+                    }, animationDuration * 1000);
+                }, Math.random() * 2000); // Stagger confetti generation
+            }
+            
+            // Remove container after all confetti are done
+            setTimeout(() => {
+                confettiContainer.remove();
+            }, 6000);
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get DOM elements
+            const maxThroughputInput = document.getElementById('maxThroughput');
+            const sumOfStakeInput = document.getElementById('sumOfStake');
+            const encodingRateInput = document.getElementById('encodingRate');
+            const downloadPessimismInput = document.getElementById('downloadPessimism');
+            const readAmplificationInput = document.getElementById('readAmplification');
+            const dataRetentionInput = document.getElementById('dataRetention');
+            
+            const storageSpaceOutput = document.getElementById('storageSpace');
+            const downloadBandwidthOutput = document.getElementById('downloadBandwidth');
+            const uploadBandwidthOutput = document.getElementById('uploadBandwidth');
+            
+            const calculateButton = document.getElementById('calculate');
+            const resetButton = document.getElementById('reset');
+            
+            // Default values
+            const defaults = {
+                maxThroughput: 50,
+                sumOfStake: 0.125, // 1/8
+                encodingRate: 8.0,
+                downloadPessimism: 2.0,
+                readAmplification: 20.0,
+                dataRetention: 14,
+                diskSafetyMargin: 1.2,
+                downloadSafetyMargin: 1.2,
+                uploadSafetyMargin: 1.2
+            };
+            
+            // Track if confetti has been shown for this session
+            let confettiShown = false;
+            
+            // Calculate function
+            function calculate() {
+                // Get input values
+                const maxThroughput = parseFloat(maxThroughputInput.value);
+                const sumOfStake = parseFloat(sumOfStakeInput.value);
+                const encodingRate = parseFloat(encodingRateInput.value);
+                const downloadPessimism = parseFloat(downloadPessimismInput.value);
+                const readAmplification = parseFloat(readAmplificationInput.value);
+                const dataRetention = parseFloat(dataRetentionInput.value);
+                const diskSafetyMargin = parseFloat(document.getElementById('diskSafetyMargin').value);
+                const downloadSafetyMargin = parseFloat(document.getElementById('downloadSafetyMargin').value);
+                const uploadSafetyMargin = parseFloat(document.getElementById('uploadSafetyMargin').value);
+                
+                // Easter egg: Show confetti when Max Throughput reaches 100 MB/s or higher
+                // Only trigger if we haven't shown confetti in this calculate session to avoid spamming
+                if (maxThroughput >= 100 && !confettiShown) {
+                    createConfetti();
+                    confettiShown = true;
+                    
+                    // Reset confetti shown flag after a few seconds to allow triggering again
+                    setTimeout(() => {
+                        confettiShown = false;
+                    }, 8000);
+                }
+                
+                // Calculate storage space in terabytes
+                // storage space needed = (max throughput) * (data retention period) * (encoding rate) * (sum of stake across all quorums) * (disk safety margin)
+                // Convert MB/s to TB/day: MB/s * (86400 seconds/day) / (1024*1024) MB/TB
+                const secondsPerDay = 86400;
+                const mbPerTb = 1024 * 1024;
+                
+                const storageSpace = maxThroughput * dataRetention * encodingRate * sumOfStake * diskSafetyMargin * secondsPerDay / mbPerTb;
+                
+                // Calculate download bandwidth in MB/s
+                // download bandwidth = (max throughput) * (encoding rate) * (sum of stake across all quorums) * (download safety margin)
+                const downloadBandwidth = maxThroughput * encodingRate * sumOfStake * downloadSafetyMargin;
+                
+                // Calculate upload bandwidth in MB/s
+                // upload bandwidth = (max throughput) * (sum of stake across all quorums) * (read amplification) * (download pessimism) * (upload safety margin)
+                const uploadBandwidth = maxThroughput * sumOfStake * readAmplification * downloadPessimism * uploadSafetyMargin;
+                
+                // Update results
+                storageSpaceOutput.textContent = storageSpace.toFixed(2);
+                downloadBandwidthOutput.textContent = downloadBandwidth.toFixed(2);
+                uploadBandwidthOutput.textContent = uploadBandwidth.toFixed(2);
+            }
+            
+            // Reset function
+            function reset() {
+                maxThroughputInput.value = defaults.maxThroughput;
+                sumOfStakeInput.value = defaults.sumOfStake;
+                encodingRateInput.value = defaults.encodingRate;
+                downloadPessimismInput.value = defaults.downloadPessimism;
+                readAmplificationInput.value = defaults.readAmplification;
+                dataRetentionInput.value = defaults.dataRetention;
+                document.getElementById('diskSafetyMargin').value = defaults.diskSafetyMargin;
+                document.getElementById('downloadSafetyMargin').value = defaults.downloadSafetyMargin;
+                document.getElementById('uploadSafetyMargin').value = defaults.uploadSafetyMargin;
+                
+                calculate();
+            }
+            
+            // Add event listeners
+            calculateButton.addEventListener('click', calculate);
+            resetButton.addEventListener('click', reset);
+            
+            // Calculate initially with default values
+            calculate();
+            
+            // Add input event listeners for real-time updates
+            const inputs = [
+                maxThroughputInput, 
+                sumOfStakeInput, 
+                encodingRateInput,
+                downloadPessimismInput,
+                readAmplificationInput,
+                dataRetentionInput,
+                document.getElementById('diskSafetyMargin'),
+                document.getElementById('downloadSafetyMargin'),
+                document.getElementById('uploadSafetyMargin')
+            ];
+            
+            inputs.forEach(input => {
+                input.addEventListener('input', calculate);
+            });
+        });
+    </script>
+</body>
+</html>

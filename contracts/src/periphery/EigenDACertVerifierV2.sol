@@ -9,7 +9,6 @@ import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/libraries/EigenDACe
 import {EigenDACertVerificationV2Lib as CertV2Lib} from "src/libraries/EigenDACertVerificationV2Lib.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
-import {IEigenDARelayRegistry} from "src/interfaces/IEigenDARelayRegistry.sol";
 import {
     BatchHeaderV2,
     BlobInclusionInfo,
@@ -32,9 +31,6 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
     /// @notice The EigenDASignatureVerifier contract address
     IEigenDASignatureVerifier public immutable eigenDASignatureVerifierV2;
 
-    /// @notice The EigenDARelayRegistry contract address
-    IEigenDARelayRegistry public immutable eigenDARelayRegistryV2;
-
     /// @notice The EigenDA middleware OperatorStateRetriever contract address
     OperatorStateRetriever public immutable operatorStateRetrieverV2;
 
@@ -49,7 +45,6 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
      * @notice Constructor for the EigenDA V2 certificate verifier
      * @param _eigenDAThresholdRegistryV2 The address of the EigenDAThresholdRegistry contract
      * @param _eigenDASignatureVerifierV2 The address of the EigenDASignatureVerifier contract
-     * @param _eigenDARelayRegistryV2 The address of the EigenDARelayRegistry contract
      * @param _operatorStateRetrieverV2 The address of the OperatorStateRetriever contract
      * @param _registryCoordinatorV2 The address of the RegistryCoordinator contract
      * @param _securityThresholdsV2 The security thresholds for verification
@@ -57,15 +52,16 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
     constructor(
         IEigenDAThresholdRegistry _eigenDAThresholdRegistryV2,
         IEigenDASignatureVerifier _eigenDASignatureVerifierV2,
-        IEigenDARelayRegistry _eigenDARelayRegistryV2,
         OperatorStateRetriever _operatorStateRetrieverV2,
         IRegistryCoordinator _registryCoordinatorV2,
         SecurityThresholds memory _securityThresholdsV2,
         bytes memory _quorumNumbersRequiredV2
     ) {
+        if (_securityThresholdsV2.confirmationThreshold <= _securityThresholdsV2.adversaryThreshold) {
+            revert InvalidSecurityThresholds();
+        }
         eigenDAThresholdRegistryV2 = _eigenDAThresholdRegistryV2;
         eigenDASignatureVerifierV2 = _eigenDASignatureVerifierV2;
-        eigenDARelayRegistryV2 = _eigenDARelayRegistryV2;
         operatorStateRetrieverV2 = _operatorStateRetrieverV2;
         registryCoordinatorV2 = _registryCoordinatorV2;
         securityThresholdsV2 = _securityThresholdsV2;
@@ -88,7 +84,6 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
         CertV2Lib.verifyDACertV2(
             _thresholdRegistry(),
             _signatureVerifier(),
-            _relayRegistry(),
             batchHeader,
             blobInclusionInfo,
             nonSignerStakesAndSignature,
@@ -110,7 +105,6 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
         CertV2Lib.verifyDACertV2FromSignedBatch(
             _thresholdRegistry(),
             _signatureVerifier(),
-            _relayRegistry(),
             _operatorStateRetriever(),
             _registryCoordinator(),
             signedBatch,
@@ -138,7 +132,6 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
         (CertV2Lib.StatusCode status,) = CertV2Lib.checkDACertV2(
             _thresholdRegistry(),
             _signatureVerifier(),
-            _relayRegistry(),
             batchHeader,
             blobInclusionInfo,
             nonSignerStakesAndSignature,
@@ -169,15 +162,6 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
      */
     function _signatureVerifier() internal view virtual returns (IEigenDASignatureVerifier) {
         return eigenDASignatureVerifierV2;
-    }
-
-    /**
-     * @notice Returns the relay registry contract
-     * @return The IEigenDARelayRegistry contract
-     * @dev Can be overridden by derived contracts
-     */
-    function _relayRegistry() internal view virtual returns (IEigenDARelayRegistry) {
-        return eigenDARelayRegistryV2;
     }
 
     /**
