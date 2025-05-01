@@ -39,11 +39,6 @@ library EigenDACertVerificationV2Lib {
     /// @param rootHash The root hash of the merkle tree
     error InvalidInclusionProof(uint256 blobIndex, bytes32 blobHash, bytes32 rootHash);
 
-    /// @notice Thrown when threshold percentages are not valid
-    /// @param confirmationThreshold The confirmation threshold percentage
-    /// @param adversaryThreshold The adversary threshold percentage
-    error InvalidThresholdPercentages(uint8 confirmationThreshold, uint8 adversaryThreshold);
-
     /// @notice Thrown when security assumptions are not met
     /// @param gamma The difference between confirmation and adversary thresholds
     /// @param n The calculated security parameter
@@ -60,26 +55,19 @@ library EigenDACertVerificationV2Lib {
     /// @param blobQuorumsBitmap The bitmap of blob quorums
     error RequiredQuorumsNotSubset(uint256 requiredQuorumsBitmap, uint256 blobQuorumsBitmap);
 
-    /// @notice Thrown when a relay key is not set
-    /// @param relayKey The relay key that is not set
-    error RelayKeyNotSet(uint32 relayKey);
-
     /// @notice Status codes for certificate verification results
     enum StatusCode {
         SUCCESS, // Verification succeeded
         INVALID_INCLUSION_PROOF, // Merkle inclusion proof is invalid
-        INVALID_THRESHOLD_PERCENTAGES, // Threshold percentages are invalid
         SECURITY_ASSUMPTIONS_NOT_MET, // Security assumptions not met
         BLOB_QUORUMS_NOT_SUBSET, // Blob quorums not a subset of confirmed quorums
-        REQUIRED_QUORUMS_NOT_SUBSET, // Required quorums not a subset of blob quorums
-        RELAY_KEY_NOT_SET // Relay key not set
+        REQUIRED_QUORUMS_NOT_SUBSET // Required quorums not a subset of blob quorums
 
     }
 
     function verifyDACertV2(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
-        IEigenDARelayRegistry relayRegistry,
         BatchHeaderV2 memory batchHeader,
         BlobInclusionInfo memory blobInclusionInfo,
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
@@ -90,7 +78,6 @@ library EigenDACertVerificationV2Lib {
         (StatusCode err, bytes memory errParams) = checkDACertV2(
             eigenDAThresholdRegistry,
             signatureVerifier,
-            relayRegistry,
             batchHeader,
             blobInclusionInfo,
             nonSignerStakesAndSignature,
@@ -104,7 +91,6 @@ library EigenDACertVerificationV2Lib {
     function verifyDACertV2FromSignedBatch(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
-        IEigenDARelayRegistry relayRegistry,
         OperatorStateRetriever operatorStateRetriever,
         IRegistryCoordinator registryCoordinator,
         SignedBatch memory signedBatch,
@@ -118,7 +104,6 @@ library EigenDACertVerificationV2Lib {
         verifyDACertV2(
             eigenDAThresholdRegistry,
             signatureVerifier,
-            relayRegistry,
             signedBatch.batchHeader,
             blobInclusionInfo,
             nonSignerStakesAndSignature,
@@ -132,7 +117,6 @@ library EigenDACertVerificationV2Lib {
      * @notice Checks a complete blob certificate for V2 in a single call
      * @param eigenDAThresholdRegistry The threshold registry contract
      * @param signatureVerifier The signature verifier contract
-     * @param relayRegistry The relay registry contract
      * @param batchHeader The batch header
      * @param blobInclusionInfo The blob inclusion info
      * @param nonSignerStakesAndSignature The non-signer stakes and signature
@@ -145,7 +129,6 @@ library EigenDACertVerificationV2Lib {
     function checkDACertV2(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
-        IEigenDARelayRegistry relayRegistry,
         BatchHeaderV2 memory batchHeader,
         BlobInclusionInfo memory blobInclusionInfo,
         NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
@@ -154,11 +137,6 @@ library EigenDACertVerificationV2Lib {
         bytes memory signedQuorumNumbers
     ) internal view returns (StatusCode err, bytes memory errParams) {
         (err, errParams) = checkBlobInclusion(batchHeader, blobInclusionInfo);
-        if (err != StatusCode.SUCCESS) {
-            return (err, errParams);
-        }
-
-        (err, errParams) = checkRelayKeysSet(relayRegistry, blobInclusionInfo.blobCertificate.relayKeys);
         if (err != StatusCode.SUCCESS) {
             return (err, errParams);
         }
@@ -237,12 +215,6 @@ library EigenDACertVerificationV2Lib {
         pure
         returns (StatusCode err, bytes memory errParams)
     {
-        if (securityThresholds.confirmationThreshold <= securityThresholds.adversaryThreshold) {
-            return (
-                StatusCode.INVALID_THRESHOLD_PERCENTAGES,
-                abi.encode(securityThresholds.confirmationThreshold, securityThresholds.adversaryThreshold)
-            );
-        }
         uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
         uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
         uint256 minRequired = blobParams.maxNumOperators * 10000;
@@ -252,26 +224,6 @@ library EigenDACertVerificationV2Lib {
         } else {
             return (StatusCode.SECURITY_ASSUMPTIONS_NOT_MET, abi.encode(gamma, n, minRequired));
         }
-    }
-
-    /**
-     * @notice Checks that all relay keys are set
-     * @param relayRegistry The relay registry contract
-     * @param relayKeys Array of relay keys to verify
-     * @return err Error code (SUCCESS if verification succeeded)
-     * @return errParams Additional error parameters
-     */
-    function checkRelayKeysSet(IEigenDARelayRegistry relayRegistry, uint32[] memory relayKeys)
-        internal
-        view
-        returns (StatusCode err, bytes memory errParams)
-    {
-        for (uint256 i = 0; i < relayKeys.length; ++i) {
-            if (relayRegistry.relayKeyToAddress(relayKeys[i]) == address(0)) {
-                return (StatusCode.RELAY_KEY_NOT_SET, abi.encode(relayKeys[i]));
-            }
-        }
-        return (StatusCode.SUCCESS, "");
     }
 
     /**
@@ -412,9 +364,6 @@ library EigenDACertVerificationV2Lib {
         if (err == StatusCode.INVALID_INCLUSION_PROOF) {
             (uint256 blobIndex, bytes32 blobHash, bytes32 rootHash) = abi.decode(errParams, (uint256, bytes32, bytes32));
             revert InvalidInclusionProof(blobIndex, blobHash, rootHash);
-        } else if (err == StatusCode.INVALID_THRESHOLD_PERCENTAGES) {
-            (uint8 confirmationThreshold, uint8 adversaryThreshold) = abi.decode(errParams, (uint8, uint8));
-            revert InvalidThresholdPercentages(confirmationThreshold, adversaryThreshold);
         } else if (err == StatusCode.SECURITY_ASSUMPTIONS_NOT_MET) {
             (uint256 gamma, uint256 n, uint256 minRequired) = abi.decode(errParams, (uint256, uint256, uint256));
             revert SecurityAssumptionsNotMet(gamma, n, minRequired);
@@ -424,9 +373,6 @@ library EigenDACertVerificationV2Lib {
         } else if (err == StatusCode.REQUIRED_QUORUMS_NOT_SUBSET) {
             (uint256 requiredQuorumsBitmap, uint256 blobQuorumsBitmap) = abi.decode(errParams, (uint256, uint256));
             revert RequiredQuorumsNotSubset(requiredQuorumsBitmap, blobQuorumsBitmap);
-        } else if (err == StatusCode.RELAY_KEY_NOT_SET) {
-            uint32 relayKey = abi.decode(errParams, (uint32));
-            revert RelayKeyNotSet(relayKey);
         } else {
             revert("Unknown error code");
         }
