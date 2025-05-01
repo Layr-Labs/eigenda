@@ -21,7 +21,6 @@ import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
 import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
 import {EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
-// Removed import of IEigenDAStructs.sol as it's no longer needed
 import "forge-std/StdStorage.sol";
 
 contract MockEigenDADeployer is BLSMockAVSDeployer {

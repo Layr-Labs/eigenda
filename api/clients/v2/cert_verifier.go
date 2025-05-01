@@ -20,7 +20,7 @@ type ICertVerifier interface {
 	GetNonSignerStakesAndSignature(
 		ctx context.Context,
 		signedBatch *disperser.SignedBatch,
-	) (*verifierBindings.NonSignerStakesAndSignature, error)
+	) (*verifierBindings.EigenDATypesV1NonSignerStakesAndSignature, error)
 
 	// GetQuorumNumbersRequired queries the cert verifier contract for the configured set of quorum numbers that must
 	// be set in the BlobHeader, and verified in VerifyDACertV2 and verifyDACertV2FromSignedBatch

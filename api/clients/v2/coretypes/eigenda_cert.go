@@ -14,14 +14,14 @@ import (
 type EigenDACert struct {
 	BlobInclusionInfo           contractEigenDACertVerifier.EigenDATypesV2BlobInclusionInfo
 	BatchHeader                 contractEigenDACertVerifier.EigenDATypesV2BatchHeaderV2
-	NonSignerStakesAndSignature contractEigenDACertVerifier.NonSignerStakesAndSignature
+	NonSignerStakesAndSignature contractEigenDACertVerifier.EigenDATypesV1NonSignerStakesAndSignature
 	SignedQuorumNumbers         []byte
 }
 
 // BuildEigenDACert creates a new EigenDACert from a BlobStatusReply, and NonSignerStakesAndSignature
 func BuildEigenDACert(
 	blobStatusReply *disperser.BlobStatusReply,
-	nonSignerStakesAndSignature *contractEigenDACertVerifier.NonSignerStakesAndSignature,
+	nonSignerStakesAndSignature *contractEigenDACertVerifier.EigenDATypesV1NonSignerStakesAndSignature,
 ) (*EigenDACert, error) {
 
 	bindingInclusionInfo, err := InclusionInfoProtoToBinding(blobStatusReply.GetBlobInclusionInfo())
