@@ -180,7 +180,7 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 
 			indexedOperatorInfo, found := sr.indexedOperatorState.IndexedOperators[signingMessage.Operator]
 			if !found {
-				sr.logger.Warn("operator not found in state",
+				sr.logger.Error("operator not found in state",
 					"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
 					"operatorID", signingMessage.Operator.Hex(),
 					"attestationLatencyMs", signingMessage.AttestationLatencyMs)
@@ -188,7 +188,7 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 			}
 
 			if seen := sr.signatureMessageReceived[signingMessage.Operator]; seen {
-				sr.logger.Warn("duplicate message from operator",
+				sr.logger.Error("duplicate message from operator",
 					"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
 					"operatorID", signingMessage.Operator.Hex(),
 					"attestationLatencyMs", signingMessage.AttestationLatencyMs)
