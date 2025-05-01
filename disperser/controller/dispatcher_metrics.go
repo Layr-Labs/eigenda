@@ -15,17 +15,6 @@ const dispatcherNamespace = "eigenda_dispatcher"
 
 // dispatcherMetrics is a struct that holds the metrics for the dispatcher.
 type dispatcherMetrics struct {
-	handleBatchLatency           *prometheus.SummaryVec
-	newBatchLatency              *prometheus.SummaryVec
-	getBlobMetadataLatency       *prometheus.SummaryVec
-	getOperatorStateLatency      *prometheus.SummaryVec
-	getBlobCertificatesLatency   *prometheus.SummaryVec
-	buildMerkleTreeLatency       *prometheus.SummaryVec
-	putBatchHeaderLatency        *prometheus.SummaryVec
-	putBatchLatency              *prometheus.SummaryVec
-	proofLatency                 *prometheus.SummaryVec
-	putInclusionInfosLatency     *prometheus.SummaryVec
-	poolSubmissionLatency        *prometheus.SummaryVec
 	putDispersalRequestLatency   *prometheus.SummaryVec
 	sendChunksLatency            *prometheus.SummaryVec
 	sendChunksRetryCount         *prometheus.GaugeVec
@@ -45,6 +34,7 @@ type dispatcherMetrics struct {
 	completedBlobs               *prometheus.CounterVec
 	attestation                  *prometheus.GaugeVec
 	blobSetSize                  *prometheus.GaugeVec
+	batchStageTimer              *common.StageTimer
 }
 
 // NewDispatcherMetrics sets up metrics for the dispatcher.
@@ -58,116 +48,6 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 			Help:      "number of signers and non-signers for the batch",
 		},
 		[]string{"type", "quorum"},
-	)
-
-	handleBatchLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "handle_batch_latency_ms",
-			Help:       "The time required to handle a batch.",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	newBatchLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "new_batch_latency_ms",
-			Help:       "The time required to create a new batch (part of HandleBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	getBlobMetadataLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "get_blob_metadata_latency_ms",
-			Help:       "The time required to get blob metadata (part of NewBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	getOperatorStateLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "get_operator_state_latency_ms",
-			Help:       "The time required to get the operator state (part of NewBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	getBlobCertificatesLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "get_blob_certificates_latency_ms",
-			Help:       "The time required to get blob certificates (part of NewBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	buildMerkleTreeLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "build_merkle_tree_latency_ms",
-			Help:       "The time required to build the Merkle tree (part of NewBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	putBatchHeaderLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "put_batch_header_latency_ms",
-			Help:       "The time required to put the batch header (part of NewBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	putBatchLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "put_batch_latency_ms",
-			Help:       "The time required to put the batch (part of NewBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	proofLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "proof_latency_ms",
-			Help:       "The time required to generate the proof (part of NewBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	putInclusionInfosLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "put_verification_infos_latency_ms",
-			Help:       "The time required to put the inclusion infos (part of NewBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	poolSubmissionLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "pool_submission_latency_ms",
-			Help:       "The time required to submit a batch to the worker pool (part of HandleBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
 	)
 
 	putDispersalRequestLatency := promauto.With(registry).NewSummaryVec(
@@ -348,18 +228,9 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{},
 	)
 
+	batchStageTimer := common.NewStageTimer(registry, dispatcherNamespace, "batch", false)
+
 	return &dispatcherMetrics{
-		handleBatchLatency:           handleBatchLatency,
-		newBatchLatency:              newBatchLatency,
-		getBlobMetadataLatency:       getBlobMetadataLatency,
-		getOperatorStateLatency:      getOperatorStateLatency,
-		getBlobCertificatesLatency:   getBlobCertificatesLatency,
-		buildMerkleTreeLatency:       buildMerkleTreeLatency,
-		putBatchHeaderLatency:        putBatchHeaderLatency,
-		putBatchLatency:              putBatchLatency,
-		proofLatency:                 proofLatency,
-		putInclusionInfosLatency:     putInclusionInfosLatency,
-		poolSubmissionLatency:        poolSubmissionLatency,
 		putDispersalRequestLatency:   putDispersalRequestLatency,
 		sendChunksLatency:            sendChunksLatency,
 		sendChunksRetryCount:         sendChunksRetryCount,
@@ -379,51 +250,8 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		completedBlobs:               completedBlobs,
 		attestation:                  attestation,
 		blobSetSize:                  blobSetSize,
+		batchStageTimer:              batchStageTimer,
 	}
-}
-
-func (m *dispatcherMetrics) reportHandleBatchLatency(duration time.Duration) {
-	m.handleBatchLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportNewBatchLatency(duration time.Duration) {
-	m.newBatchLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportGetBlobMetadataLatency(duration time.Duration) {
-	m.getBlobMetadataLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportGetOperatorStateLatency(duration time.Duration) {
-	m.getOperatorStateLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportGetBlobCertificatesLatency(duration time.Duration) {
-	m.getBlobCertificatesLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportBuildMerkleTreeLatency(duration time.Duration) {
-	m.buildMerkleTreeLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportPutBatchHeaderLatency(duration time.Duration) {
-	m.putBatchHeaderLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportPutBatchLatency(duration time.Duration) {
-	m.putBatchLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportProofLatency(duration time.Duration) {
-	m.proofLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportPutInclusionInfosLatency(duration time.Duration) {
-	m.putInclusionInfosLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportPoolSubmissionLatency(duration time.Duration) {
-	m.poolSubmissionLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *dispatcherMetrics) reportPutDispersalRequestLatency(duration time.Duration) {
@@ -528,4 +356,8 @@ func (m *dispatcherMetrics) reportAttestation(operatorCount map[core.QuorumID]in
 		m.attestation.WithLabelValues("non_signers", quorumStr).Set(float64(nonSigners))
 		m.attestation.WithLabelValues("percent_signed", quorumStr).Set(float64(quorumResult.PercentSigned))
 	}
+}
+
+func (m *dispatcherMetrics) newBatchProbe() *common.SequenceProbe {
+	return m.batchStageTimer.NewSequence()
 }

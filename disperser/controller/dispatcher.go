@@ -131,8 +131,9 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 			case <-ticker.C:
 
 				attestationCtx, cancel := context.WithTimeout(ctx, d.BatchAttestationTimeout)
+				probe := d.metrics.newBatchProbe()
 
-				sigChan, batchData, err := d.HandleBatch(attestationCtx)
+				sigChan, batchData, err := d.HandleBatch(attestationCtx, probe)
 				if err != nil {
 					if errors.Is(err, errNoBlobsToDispatch) {
 						d.logger.Debug("no blobs to dispatch")
@@ -140,6 +141,7 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 						d.logger.Error("failed to process a batch", "err", err)
 					}
 					cancel()
+					probe.End()
 					continue
 				}
 				go func() {
@@ -148,6 +150,7 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 						d.logger.Error("failed to handle signatures", "err", err)
 					}
 					cancel()
+					probe.End()
 				}()
 			}
 		}
@@ -157,12 +160,12 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 
 }
 
-func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage, *batchData, error) {
-	start := time.Now()
-	defer func() {
-		d.metrics.reportHandleBatchLatency(time.Since(start))
-	}()
+func (d *Dispatcher) HandleBatch(
+	ctx context.Context,
+	probe *common.SequenceProbe,
+) (chan core.SigningMessage, *batchData, error) {
 
+	probe.SetStage("get_reference_block")
 	currentBlockNumber, err := d.chainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get current block number: %w", err)
@@ -171,10 +174,12 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 
 	// Get a batch of blobs to dispatch
 	// This also writes a batch header and blob inclusion info for each blob in metadata store
-	batchData, err := d.NewBatch(ctx, referenceBlockNumber)
+	batchData, err := d.NewBatch(ctx, referenceBlockNumber, probe)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	probe.SetStage("gather_signatures")
 
 	batch := batchData.Batch
 	state := batchData.OperatorState
@@ -216,8 +221,6 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 			}
 			continue
 		}
-
-		submissionStart := time.Now()
 
 		d.pool.Submit(func() {
 
@@ -313,8 +316,6 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 			}
 			d.metrics.reportSendChunksRetryCount(float64(i))
 		})
-
-		d.metrics.reportPoolSubmissionLatency(time.Since(submissionStart))
 	}
 
 	return sigChan, batchData, nil
@@ -518,19 +519,19 @@ func (d *Dispatcher) dedupBlobs(blobs []*v2.BlobMetadata) []*v2.BlobMetadata {
 
 // NewBatch creates a batch of blobs to dispatch
 // Warning: This function is not thread-safe
-func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) (*batchData, error) {
-	newBatchStart := time.Now()
-	defer func() {
-		d.metrics.reportNewBatchLatency(time.Since(newBatchStart))
-	}()
+func (d *Dispatcher) NewBatch(
+	ctx context.Context,
+	referenceBlockNumber uint64,
+	probe *common.SequenceProbe,
+) (*batchData, error) {
+
+	probe.SetStage("get_blob_metadata")
 	blobMetadatas, cursor, err := d.blobMetadataStore.GetBlobMetadataByStatusPaginated(
 		ctx,
 		v2.Encoded,
 		d.cursor,
 		d.MaxBatchSize,
 	)
-	getBlobMetadataFinished := time.Now()
-	d.metrics.reportGetBlobMetadataLatency(getBlobMetadataFinished.Sub(newBatchStart))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get blob metadata by status: %w", err)
 	}
@@ -544,9 +545,8 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		"numBlobs", len(blobMetadatas),
 		"referenceBlockNumber", referenceBlockNumber)
 
+	probe.SetStage("get_operator_state")
 	state, err := d.GetOperatorState(ctx, blobMetadatas, referenceBlockNumber)
-	getOperatorStateFinished := time.Now()
-	d.metrics.reportGetOperatorStateLatency(getOperatorStateFinished.Sub(getBlobMetadataFinished))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get operator state at block %d: %w", referenceBlockNumber, err)
 	}
@@ -572,9 +572,8 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		}
 	}
 
+	probe.SetStage("get_blob_certs")
 	certs, _, err := d.blobMetadataStore.GetBlobCertificates(ctx, keys)
-	getBlobCertificatesFinished := time.Now()
-	d.metrics.reportGetBlobCertificatesLatency(getBlobCertificatesFinished.Sub(getOperatorStateFinished))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get blob certificates: %w", err)
 	}
@@ -607,6 +606,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		ReferenceBlockNumber: referenceBlockNumber,
 	}
 
+	probe.SetStage("build_merkle_tree")
 	tree, err := corev2.BuildMerkleTree(certs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build merkle tree: %w", err)
@@ -614,32 +614,28 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 
 	copy(batchHeader.BatchRoot[:], tree.Root())
 
-	buildMerkleTreeFinished := time.Now()
-	d.metrics.reportBuildMerkleTreeLatency(buildMerkleTreeFinished.Sub(getBlobCertificatesFinished))
-
 	batchHeaderHash, err := batchHeader.Hash()
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash batch header: %w", err)
 	}
 
+	probe.SetStage("put_batch_header")
 	err = d.blobMetadataStore.PutBatchHeader(ctx, batchHeader)
-	putBatchHeaderFinished := time.Now()
-	d.metrics.reportPutBatchHeaderLatency(putBatchHeaderFinished.Sub(buildMerkleTreeFinished))
 	if err != nil {
 		return nil, fmt.Errorf("failed to put batch header: %w", err)
 	}
 
+	probe.SetStage("put_batch")
 	batch := &corev2.Batch{
 		BatchHeader:      batchHeader,
 		BlobCertificates: certs,
 	}
 	err = d.blobMetadataStore.PutBatch(ctx, batch)
-	putBatchFinished := time.Now()
-	d.metrics.reportPutBatchLatency(putBatchFinished.Sub(putBatchHeaderFinished))
 	if err != nil {
 		return nil, fmt.Errorf("failed to put batch: %w", err)
 	}
 
+	probe.SetStage("generate_proof")
 	// accumulate inclusion infos in a map to avoid duplicate entries
 	// batch write operation fails if there are duplicate entries
 	inclusionInfoMap := make(map[corev2.BlobKey]*corev2.BlobInclusionInfo)
@@ -665,9 +661,7 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		}
 	}
 
-	proofGenerationFinished := time.Now()
-	d.metrics.reportProofLatency(proofGenerationFinished.Sub(putBatchFinished))
-
+	probe.SetStage("put_inclusion_info")
 	inclusionInfos := make([]*corev2.BlobInclusionInfo, len(inclusionInfoMap))
 	i := 0
 	for _, v := range inclusionInfoMap {
@@ -675,8 +669,6 @@ func (d *Dispatcher) NewBatch(ctx context.Context, referenceBlockNumber uint64) 
 		i++
 	}
 	err = d.blobMetadataStore.PutBlobInclusionInfos(ctx, inclusionInfos)
-	putBlobInclusionInfosFinished := time.Now()
-	d.metrics.reportPutInclusionInfosLatency(putBlobInclusionInfosFinished.Sub(proofGenerationFinished))
 	if err != nil {
 		return nil, fmt.Errorf("failed to put blob inclusion infos: %w", err)
 	}
