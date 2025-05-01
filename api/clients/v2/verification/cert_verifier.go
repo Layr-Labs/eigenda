@@ -117,7 +117,7 @@ func (cv *CertVerifier) VerifyCertV2(ctx context.Context, eigenDACert *coretypes
 func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 	ctx context.Context,
 	signedBatch *disperser.SignedBatch,
-) (*verifierBindings.NonSignerStakesAndSignature, error) {
+) (*verifierBindings.EigenDATypesV1NonSignerStakesAndSignature, error) {
 	signedBatchBinding, err := coretypes.SignedBatchProtoToBinding(signedBatch)
 	if err != nil {
 		return nil, fmt.Errorf("convert signed batch: %w", err)
