@@ -66,8 +66,8 @@ var (
 		v2.Queued:              {},
 		v2.Encoded:             {v2.Queued},
 		v2.GatheringSignatures: {v2.Encoded},
-		v2.Complete: {v2.GatheringSignatures},
-		v2.Failed:   {v2.Queued, v2.Encoded, v2.GatheringSignatures},
+		v2.Complete:            {v2.GatheringSignatures},
+		v2.Failed:              {v2.Queued, v2.Encoded, v2.GatheringSignatures},
 	}
 	ErrInvalidStateTransition = errors.New("invalid state transition")
 )
@@ -1411,17 +1411,7 @@ func (s *BlobMetadataStore) GetSignedBatch(ctx context.Context, batchHeaderHash 
 	}
 
 	if attestation == nil {
-		// if no attestation is found, return an empty attestation
-		attestation = &corev2.Attestation{
-			BatchHeader:      header,
-			AttestedAt:       uint64(time.Now().UnixNano()),
-			NonSignerPubKeys: nil,
-			APKG2:            nil,
-			QuorumAPKs:       nil,
-			Sigma:            nil,
-			QuorumNumbers:    nil,
-			QuorumResults:    nil,
-		}
+		return nil, nil, fmt.Errorf("%w: attestation not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
 	}
 
 	return header, attestation, nil
