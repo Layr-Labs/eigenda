@@ -6,7 +6,11 @@ import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.
 
 /// @title EigenDACertTypes
 /// @notice This library defines the types for each EigenDA certificate version.
+/// @dev It is required that RBN be located in positions 60:63 in the ABI encoded certificate.
 library EigenDACertTypes {
+    /// @dev This struct is the same as the types used in CertVerifierV2's verifyDACertV2 function.
+    ///      As part of the EigenDACertVerifierRouter design, it is required to be able to find the
+    ///      reference block number in the ABI encoded certificate by the router.
     struct EigenDACertV3 {
         DATypesV2.BatchHeaderV2 batchHeader;
         DATypesV2.BlobInclusionInfo blobInclusionInfo;

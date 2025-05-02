@@ -7,12 +7,12 @@ import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contrac
 
 contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgradeable {
     mapping(uint32 => address) public certVerifiers;
-    uint32[] public certVerifierRBNs;
+    uint32[] public certVerifierABNs;
 
     event CertVerifierAdded(uint32 indexed rbn, address indexed certVerifier);
 
-    error RBNNotInFuture(uint32 rbn);
-    error RBNNotGreaterThanLast(uint32 rbn);
+    error ABNNotInFuture(uint32 abn);
+    error ABNNotGreaterThanLast(uint32 abn);
     error InvalidCertLength();
     error NoCertVerifierAvailable();
     error NoCertVerifierFound(uint32 rbn);
@@ -23,8 +23,8 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
         return IEigenDACertVerifier(getCertVerifierAt(_getRBN(certBytes))).checkDACert(certBytes);
     }
 
-    function getCertVerifierAt(uint32 rbn) public view returns (address) {
-        return certVerifiers[_findClosestRegisteredRBN(rbn)];
+    function getCertVerifierAt(uint32 abn) public view returns (address) {
+        return certVerifiers[_findClosestRegisteredABN(abn)];
     }
 
     /// ADMIN ///
@@ -33,43 +33,44 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
         _transferOwnership(_initialOwner);
     }
 
-    function addCertVerifier(uint32 rbn, address certVerifier) external onlyOwner {
-        if (rbn <= block.number) {
-            revert RBNNotInFuture(rbn);
+    function addCertVerifier(uint32 abn, address certVerifier) external onlyOwner {
+        if (abn <= block.number) {
+            revert ABNNotInFuture(abn);
         }
-        if (certVerifierRBNs.length > 0 && rbn <= certVerifierRBNs[certVerifierRBNs.length - 1]) {
-            revert RBNNotGreaterThanLast(rbn);
+        if (certVerifierABNs.length > 0 && abn <= certVerifierABNs[certVerifierABNs.length - 1]) {
+            revert ABNNotGreaterThanLast(abn);
         }
-        certVerifiers[rbn] = certVerifier;
-        certVerifierRBNs.push(rbn);
-        emit CertVerifierAdded(rbn, certVerifier);
+        certVerifiers[abn] = certVerifier;
+        certVerifierABNs.push(abn);
+        emit CertVerifierAdded(abn, certVerifier);
     }
 
     /// INTERNAL ///
 
     function _getRBN(bytes calldata certBytes) internal pure returns (uint32) {
-        if (certBytes.length < 36) {
+        if (certBytes.length < 64) {
             revert InvalidCertLength();
         }
-        return abi.decode(certBytes[32:36], (uint32));
+        return abi.decode(certBytes[32:64], (uint32));
     }
 
-    /// @notice Given an RBN, find the closest RBN registered in this contract that is less than or equal to the given RBN.
-    /// @param referenceBlockNumber The reference block number to find the closest RBN for
-    /// @return closestRBN The closest RBN registered in this contract that is less than or equal to the given RBN.
-    function _findClosestRegisteredRBN(uint32 referenceBlockNumber) internal view returns (uint32) {
-        // It is assumed that the latest RBNs are the most likely to be used.
-        if (certVerifierRBNs.length == 0) {
+    /// @notice Given a reference block number, find the closest activation block number
+    ///         registered in this contract that is less than or equal to the given reference block number.
+    /// @param rbn The reference block number to find the closest ABN for
+    /// @return The closest ABN registered in this contract that is less than or equal to the given ABN.
+    function _findClosestRegisteredABN(uint32 rbn) internal view returns (uint32) {
+        // It is assumed that the latest ABN are the most likely to be used.
+        if (certVerifierABNs.length == 0) {
             revert NoCertVerifierAvailable();
         }
 
-        uint256 rbnMaxIndex = certVerifierRBNs.length - 1; // cache to memory
-        for (uint256 i; i < certVerifierRBNs.length; i++) {
-            uint32 certVerifierRBNMem = certVerifierRBNs[rbnMaxIndex - i];
-            if (certVerifierRBNMem <= referenceBlockNumber) {
-                return certVerifierRBNMem;
+        uint256 abnMaxIndex = certVerifierABNs.length - 1; // cache to memory
+        for (uint256 i; i < certVerifierABNs.length; i++) {
+            uint32 certVerifierABNMem = certVerifierABNs[abnMaxIndex - i];
+            if (certVerifierABNMem <= rbn) {
+                return certVerifierABNMem;
             }
         }
-        revert NoCertVerifierFound(referenceBlockNumber);
+        revert NoCertVerifierFound(rbn);
     }
 }

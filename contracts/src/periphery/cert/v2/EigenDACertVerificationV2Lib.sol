@@ -50,7 +50,7 @@ library EigenDACertVerificationV2Lib {
 
     /// @notice Status codes for certificate verification results
     enum StatusCode {
-        NULL_ERROR, // Unused error code for a safe default error code that denotes a failure.
+        NULL_ERROR, // Unused error code. If this is returned, there is a bug in the code.
         SUCCESS, // Verification succeeded
         INVALID_INCLUSION_PROOF, // Merkle inclusion proof is invalid
         SECURITY_ASSUMPTIONS_NOT_MET, // Security assumptions not met
