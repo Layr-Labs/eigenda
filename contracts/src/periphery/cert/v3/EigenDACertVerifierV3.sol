@@ -23,7 +23,7 @@ contract EigenDACertVerifierV3 is IEigenDACertVerifier {
 
     bytes public quorumNumbersRequired;
 
-    uint8 public constant CERT_VERSION = 3;
+    uint8 internal constant CERT_VERSION = 3;
 
     constructor(
         IEigenDAThresholdRegistry _eigenDAThresholdRegistry,
@@ -45,5 +45,9 @@ contract EigenDACertVerifierV3 is IEigenDACertVerifier {
             eigenDAThresholdRegistry, eigenDASignatureVerifier, certBytes, securityThresholds, quorumNumbersRequired
         );
         return uint8(status);
+    }
+
+    function certVersion() external pure returns (uint8) {
+        return CERT_VERSION;
     }
 }

@@ -302,6 +302,7 @@ library EigenDACertVerificationV2Lib {
 
     /**
      * @notice Gets nonSignerStakesAndSignature for a given signed batch
+     * @param operatorStateRetriever The operator state retriever contract
      * @param registryCoordinator The registry coordinator contract
      * @param signedBatch The signed batch
      * @return nonSignerStakesAndSignature The non-signer stakes and signature

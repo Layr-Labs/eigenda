@@ -5,5 +5,5 @@ import {IEigenDACertVerifierBase} from "src/periphery/cert/interfaces/IEigenDACe
 
 interface IEigenDACertVerifier is IEigenDACertVerifierBase {
     /// @notice Returns the certificate version. Used off-chain to identify how to encode a certificate for this CertVerifier.
-    function CERT_VERSION() external view returns (uint8);
+    function certVersion() external view returns (uint8);
 }
