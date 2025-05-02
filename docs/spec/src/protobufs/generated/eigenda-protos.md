@@ -64,6 +64,24 @@
   
     - [Disperser](#disperser-v2-Disperser)
   
+- [encoder/encoder.proto](#encoder_encoder-proto)
+    - [BlobCommitment](#encoder-BlobCommitment)
+    - [EncodeBlobReply](#encoder-EncodeBlobReply)
+    - [EncodeBlobRequest](#encoder-EncodeBlobRequest)
+    - [EncodingParams](#encoder-EncodingParams)
+  
+    - [ChunkEncodingFormat](#encoder-ChunkEncodingFormat)
+  
+    - [Encoder](#encoder-Encoder)
+  
+- [encoder/v2/encoder_v2.proto](#encoder_v2_encoder_v2-proto)
+    - [EncodeBlobReply](#encoder-v2-EncodeBlobReply)
+    - [EncodeBlobRequest](#encoder-v2-EncodeBlobRequest)
+    - [EncodingParams](#encoder-v2-EncodingParams)
+    - [FragmentInfo](#encoder-v2-FragmentInfo)
+  
+    - [Encoder](#encoder-v2-Encoder)
+  
 - [node/node.proto](#node_node-proto)
     - [AttestBatchReply](#node-AttestBatchReply)
     - [AttestBatchRequest](#node-AttestBatchRequest)
@@ -1052,6 +1070,205 @@ For an example usage, see how our disperser_client makes a call to this endpoint
 | GetPaymentState | [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest) | [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply) | GetPaymentState is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting. A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser. That typically only needs to be done once, and the state can be updated locally as the client disperses blobs. The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
 
 For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298 |
+
+ 
+
+
+
+<a name="encoder_encoder-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## encoder/encoder.proto
+
+
+
+<a name="encoder-BlobCommitment"></a>
+
+### BlobCommitment
+BlobCommitments contains the blob&#39;s commitment, degree proof, and the actual degree
+DEPRECATED: use common.BlobCommitment instead
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| commitment | [bytes](#bytes) |  |  |
+| length_commitment | [bytes](#bytes) |  |  |
+| length_proof | [bytes](#bytes) |  |  |
+| length | [uint32](#uint32) |  |  |
+
+
+
+
+
+
+<a name="encoder-EncodeBlobReply"></a>
+
+### EncodeBlobReply
+EncodeBlobReply returns all encoded chunks along with BlobCommitment for the same,
+where Chunk is the smallest unit that is distributed to DA nodes
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| commitment | [BlobCommitment](#encoder-BlobCommitment) |  |  |
+| chunks | [bytes](#bytes) | repeated |  |
+| chunk_encoding_format | [ChunkEncodingFormat](#encoder-ChunkEncodingFormat) |  | How the above chunks are encoded. |
+
+
+
+
+
+
+<a name="encoder-EncodeBlobRequest"></a>
+
+### EncodeBlobRequest
+EncodeBlobRequest contains data and pre-computed encoding params provided to Encoder
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| data | [bytes](#bytes) |  |  |
+| encoding_params | [EncodingParams](#encoder-EncodingParams) |  |  |
+
+
+
+
+
+
+<a name="encoder-EncodingParams"></a>
+
+### EncodingParams
+Parameters needed by Encoder for encoding
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| chunk_length | [uint32](#uint32) |  |  |
+| num_chunks | [uint32](#uint32) |  |  |
+
+
+
+
+
+ 
+
+
+<a name="encoder-ChunkEncodingFormat"></a>
+
+### ChunkEncodingFormat
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| UNKNOWN | 0 |  |
+| GNARK | 1 |  |
+| GOB | 2 |  |
+
+
+ 
+
+ 
+
+
+<a name="encoder-Encoder"></a>
+
+### Encoder
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| EncodeBlob | [EncodeBlobRequest](#encoder-EncodeBlobRequest) | [EncodeBlobReply](#encoder-EncodeBlobReply) |  |
+
+ 
+
+
+
+<a name="encoder_v2_encoder_v2-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## encoder/v2/encoder_v2.proto
+
+
+
+<a name="encoder-v2-EncodeBlobReply"></a>
+
+### EncodeBlobReply
+EncodeBlobReply contains metadata about the encoded chunks
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| fragment_info | [FragmentInfo](#encoder-v2-FragmentInfo) |  |  |
+
+
+
+
+
+
+<a name="encoder-v2-EncodeBlobRequest"></a>
+
+### EncodeBlobRequest
+EncodeBlobRequest contains the reference to the blob to be encoded and the encoding parameters
+determined by the control plane.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| blob_key | [bytes](#bytes) |  |  |
+| encoding_params | [EncodingParams](#encoder-v2-EncodingParams) |  |  |
+| blob_size | [uint64](#uint64) |  |  |
+
+
+
+
+
+
+<a name="encoder-v2-EncodingParams"></a>
+
+### EncodingParams
+EncodingParams specifies how the blob should be encoded into chunks
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| chunk_length | [uint64](#uint64) |  |  |
+| num_chunks | [uint64](#uint64) |  |  |
+
+
+
+
+
+
+<a name="encoder-v2-FragmentInfo"></a>
+
+### FragmentInfo
+FragmentInfo contains metadata about the encoded fragments
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| total_chunk_size_bytes | [uint32](#uint32) |  |  |
+| fragment_size_bytes | [uint32](#uint32) |  |  |
+
+
+
+
+
+ 
+
+ 
+
+ 
+
+
+<a name="encoder-v2-Encoder"></a>
+
+### Encoder
+
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| EncodeBlob | [EncodeBlobRequest](#encoder-v2-EncodeBlobRequest) | [EncodeBlobReply](#encoder-v2-EncodeBlobReply) | EncodeBlob encodes a blob into chunks using specified encoding parameters. The blob is retrieved using the provided blob key and the encoded chunks are persisted for later retrieval. |
 
  
 

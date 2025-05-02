@@ -104,19 +104,18 @@ func (s *ServerV2) GetNodeInfo(ctx context.Context, in *pb.GetNodeInfoRequest) (
 }
 
 func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (*pb.StoreChunksReply, error) {
-	start := time.Now()
-
 	if !s.config.EnableV2 {
 		return nil, api.NewErrorInvalidArg("v2 API is disabled")
-	}
-
-	if s.node.StoreV2 == nil {
-		return nil, api.NewErrorInternal("v2 store not initialized")
 	}
 
 	if s.node.BLSSigner == nil {
 		return nil, api.NewErrorInternal("missing bls signer")
 	}
+
+	probe := s.metrics.GetStoreChunksProbe()
+	defer probe.End()
+
+	probe.SetStage("validate")
 
 	// Validate the request parameters (which is cheap) before starting any further
 	// processing of the request.
@@ -143,18 +142,92 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		}
 	}
 
-	s.logger.Info("new StoreChunks request", "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]), "numBlobs", len(batch.BlobCertificates), "referenceBlockNumber", batch.BatchHeader.ReferenceBlockNumber)
-	operatorState, err := s.node.ChainState.GetOperatorStateByOperator(ctx, uint(batch.BatchHeader.ReferenceBlockNumber), s.node.Config.ID)
+	probe.SetStage("get_operator_state")
+	s.logger.Info("new StoreChunks request",
+		"batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]),
+		"numBlobs", len(batch.BlobCertificates),
+		"referenceBlockNumber", batch.BatchHeader.ReferenceBlockNumber)
+	operatorState, err := s.node.ChainState.GetOperatorStateByOperator(
+		ctx,
+		uint(batch.BatchHeader.ReferenceBlockNumber),
+		s.node.Config.ID)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
 
-	stageTimer := time.Now()
-	blobShards, rawBundles, err := s.node.DownloadBundles(ctx, batch, operatorState)
+	blobShards, rawBundles, err := s.node.DownloadBundles(ctx, batch, operatorState, probe)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
-	s.metrics.ReportStoreChunksLatency("download", time.Since(stageTimer))
+
+	err = s.validateAndStoreChunks(ctx, batch, blobShards, rawBundles, operatorState, batchHeaderHash, probe)
+	if err != nil {
+		return nil, err
+	}
+
+	probe.SetStage("sign")
+	sig, err := s.node.BLSSigner.Sign(ctx, batchHeaderHash[:])
+	if err != nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to sign batch: %v", err))
+	}
+
+	return &pb.StoreChunksReply{
+		Signature: sig,
+	}, nil
+}
+
+func (s *ServerV2) validateAndStoreChunks(
+	ctx context.Context,
+	batch *corev2.Batch,
+	blobShards []*corev2.BlobShard,
+	rawBundles []*node.RawBundles,
+	operatorState *core.OperatorState,
+	batchHeaderHash [32]byte,
+	probe *common.SequenceProbe,
+) error {
+
+	batchData := make([]*node.BundleToStore, 0, len(rawBundles))
+	for _, bundles := range rawBundles {
+		blobKey, err := bundles.BlobCertificate.BlobHeader.BlobKey()
+		if err != nil {
+			return api.NewErrorInternal("failed to get blob key")
+		}
+
+		for quorum, bundle := range bundles.Bundles {
+			bundleKey, err := node.BundleKey(blobKey, quorum)
+			if err != nil {
+				return api.NewErrorInternal("failed to get bundle key")
+			}
+
+			batchData = append(batchData, &node.BundleToStore{
+				BundleKey:   bundleKey,
+				BundleBytes: bundle,
+			})
+		}
+	}
+
+	if s.config.LittDBEnabled {
+		return s.validateAndStoreChunksLittDB(
+			ctx,
+			batch,
+			blobShards,
+			batchData,
+			operatorState,
+			batchHeaderHash,
+			probe)
+	} else {
+		probe.SetStage("validate_and_store")
+		return s.validateAndStoreChunksLevelDB(ctx, batch, blobShards, batchData, operatorState, batchHeaderHash)
+	}
+}
+
+func (s *ServerV2) validateAndStoreChunksLevelDB(
+	ctx context.Context,
+	batch *corev2.Batch,
+	blobShards []*corev2.BlobShard,
+	batchData []*node.BundleToStore,
+	operatorState *core.OperatorState,
+	batchHeaderHash [32]byte) error {
 
 	type storeResult struct {
 		keys []kvstore.Key
@@ -162,8 +235,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	}
 	storeChan := make(chan storeResult)
 	go func() {
-		storageStart := time.Now()
-		keys, size, err := s.node.StoreV2.StoreBatch(batch, rawBundles)
+		keys, size, err := s.node.ValidatorStore.StoreBatch(batchHeaderHash[:], batchData)
 		if err != nil {
 			storeChan <- storeResult{
 				keys: nil,
@@ -173,41 +245,60 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		}
 
 		s.metrics.ReportStoreChunksRequestSize(size)
-		s.metrics.ReportStoreChunksLatency("storage", time.Since(storageStart))
 		storeChan <- storeResult{
 			keys: keys,
 			err:  nil,
 		}
 	}()
 
-	stageTimer = time.Now()
-	err = s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
+	err := s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
 	if err != nil {
 		res := <-storeChan
 		if len(res.keys) > 0 {
-			if deleteErr := s.node.StoreV2.DeleteKeys(res.keys); deleteErr != nil {
-				s.logger.Error("failed to delete keys", "err", deleteErr, "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]))
+			if deleteErr := s.node.ValidatorStore.DeleteKeys(res.keys); deleteErr != nil {
+				s.logger.Error(
+					"failed to delete keys",
+					"err", deleteErr,
+					"batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]))
 			}
 		}
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to validate batch: %v", err))
+		return api.NewErrorInternal(fmt.Sprintf("failed to validate batch: %v", err))
 	}
-	s.metrics.ReportStoreChunksLatency("validation", time.Since(stageTimer))
 
 	res := <-storeChan
 	if res.err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to store batch: %v", res.err))
+		return api.NewErrorInternal(fmt.Sprintf("failed to store batch: %v", res.err))
 	}
 
-	sig, err := s.node.BLSSigner.Sign(ctx, batchHeaderHash[:])
+	return nil
+}
+
+func (s *ServerV2) validateAndStoreChunksLittDB(
+	ctx context.Context,
+	batch *corev2.Batch,
+	blobShards []*corev2.BlobShard,
+	batchData []*node.BundleToStore,
+	operatorState *core.OperatorState,
+	batchHeaderHash [32]byte,
+	probe *common.SequenceProbe,
+) error {
+	probe.SetStage("validate")
+	err := s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
 	if err != nil {
-		return nil, api.NewErrorInternal(fmt.Sprintf("failed to sign batch: %v", err))
+		return api.NewErrorInternal(
+			fmt.Sprintf("failed to validate batch %s: %v", hex.EncodeToString(batchHeaderHash[:]), err))
 	}
 
-	s.metrics.ReportStoreChunksLatency("total", time.Since(start))
+	probe.SetStage("store")
+	_, size, err := s.node.ValidatorStore.StoreBatch(batchHeaderHash[:], batchData)
+	if err != nil {
+		return api.NewErrorInternal(
+			fmt.Sprintf("failed to store batch %s: %v", hex.EncodeToString(batchHeaderHash[:]), err))
+	}
 
-	return &pb.StoreChunksReply{
-		Signature: sig,
-	}, nil
+	s.metrics.ReportStoreChunksRequestSize(size)
+
+	return nil
 }
 
 // validateStoreChunksRequest validates the StoreChunksRequest and returns deserialized batch in the request
@@ -238,10 +329,6 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 		return nil, api.NewErrorInvalidArg("v2 API is disabled")
 	}
 
-	if s.node.StoreV2 == nil {
-		return nil, api.NewErrorInternal("v2 store not initialized")
-	}
-
 	blobKey, err := corev2.BytesToBlobKey(in.GetBlobKey())
 	if err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("invalid blob key: %v", err))
@@ -251,9 +338,20 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 		return nil, api.NewErrorInvalidArg("invalid quorum ID")
 	}
 	quorumID := core.QuorumID(in.GetQuorumId())
-	chunks, err := s.node.StoreV2.GetChunks(blobKey, quorumID)
+
+	bundleKey, err := node.BundleKey(blobKey, quorumID)
+	if err != nil {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to get bundle key: %v", err))
+	}
+
+	bundleData, err := s.node.ValidatorStore.GetBundleData(bundleKey)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get chunks: %v", err))
+	}
+
+	chunks, _, err := node.DecodeChunks(bundleData)
+	if err != nil {
+		return nil, api.NewErrorInternal(fmt.Sprintf("failed to decode chunks: %v", err))
 	}
 
 	size := 0

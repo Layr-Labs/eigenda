@@ -12,12 +12,19 @@
 name: Buf Proto
 on:
   push:
+    paths:
+      - "api/proto/**"
+      - "api/buf.yaml"
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
-  delete:
+    paths:
+      - "api/proto/**"
+      - "api/buf.yaml"
+
 permissions:
   contents: read
   pull-requests: write
+
 jobs:
   buf:
     runs-on: ubuntu-latest

@@ -285,8 +285,9 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 
 	sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx)
 	require.NoError(t, err)
+
 	err = components.Dispatcher.HandleSignatures(ctx, ctx, batchData, sigChan)
-	require.ErrorContains(t, err, "all quorums received no attestation")
+	require.NoError(t, err)
 
 	// Test that the blob metadata status are updated
 	for _, blobKey := range objsInBothQuorum.blobKeys {
@@ -615,7 +616,6 @@ func deleteBlobs(t *testing.T, blobMetadataStore *blobstore.BlobMetadataStore, k
 }
 
 func newDispatcherComponents(t *testing.T) *dispatcherComponents {
-
 	// logger := testutils.GetLogger()
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -636,12 +636,13 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 	blobSet := &controller.MockBlobSet{}
 	blobSet.On("Size", mock.Anything).Return(0)
 	d, err := controller.NewDispatcher(&controller.DispatcherConfig{
-		PullInterval:                1 * time.Second,
-		FinalizationBlockDelay:      finalizationBlockDelay,
-		AttestationTimeout:          1 * time.Second,
-		BatchAttestationTimeout:     2 * time.Second,
-		NumRequestRetries:           3,
-		MaxBatchSize:                maxBatchSize,
+		PullInterval:            1 * time.Second,
+		FinalizationBlockDelay:  finalizationBlockDelay,
+		AttestationTimeout:      1 * time.Second,
+		BatchAttestationTimeout: 2 * time.Second,
+		SignatureTickInterval:   1 * time.Second,
+		NumRequestRetries:       3,
+		MaxBatchSize:            maxBatchSize,
 		OnchainStateRefreshInterval: 1 * time.Second,
 	}, blobMetadataStore, pool, chainReader, mockChainState, agg, nodeClientManager, logger, prometheus.NewRegistry(), beforeDispatch, blobSet)
 	require.NoError(t, err)

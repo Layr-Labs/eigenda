@@ -22,7 +22,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
-	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
+	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"

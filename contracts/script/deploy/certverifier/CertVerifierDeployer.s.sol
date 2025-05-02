@@ -63,7 +63,6 @@ contract CertVerifierDeployer is Script, Test {
                 IEigenDAThresholdRegistry(eigenDAThresholdRegistry),
                 IEigenDABatchMetadataStorage(eigenDAServiceManager),
                 IEigenDASignatureVerifier(eigenDAServiceManager),
-                IEigenDARelayRegistry(eigenDARelayRegistry),
                 OperatorStateRetriever(operatorStateRetriever),
                 IRegistryCoordinator(registryCoordinator),
                 defaultSecurityThresholds,

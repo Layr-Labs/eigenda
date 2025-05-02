@@ -43,6 +43,7 @@ const (
 	dispersalRequestSKPrefix  = "DispersalRequest#"
 	dispersalResponseSKPrefix = "DispersalResponse#"
 	batchHeaderSK             = "BatchHeader"
+	batchSK                   = "BatchInfo"
 	attestationSK             = "Attestation"
 
 	// The number of nanoseconds for a requestedAt bucket (1h).
@@ -65,9 +66,8 @@ var (
 		v2.Queued:              {},
 		v2.Encoded:             {v2.Queued},
 		v2.GatheringSignatures: {v2.Encoded},
-		// TODO: when GatheringSignatures is fully supported, remove v2.Encoded from below
-		v2.Complete: {v2.Encoded, v2.GatheringSignatures},
-		v2.Failed:   {v2.Queued, v2.Encoded, v2.GatheringSignatures},
+		v2.Complete:            {v2.GatheringSignatures},
+		v2.Failed:              {v2.Queued, v2.Encoded, v2.GatheringSignatures},
 	}
 	ErrInvalidStateTransition = errors.New("invalid state transition")
 )
@@ -1091,6 +1091,46 @@ func (s *BlobMetadataStore) GetDispersalResponses(ctx context.Context, batchHead
 	return responses, nil
 }
 
+func (s *BlobMetadataStore) PutBatch(ctx context.Context, batch *corev2.Batch) error {
+	item, err := MarshalBatch(batch)
+	if err != nil {
+		return err
+	}
+
+	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	if errors.Is(err, commondynamodb.ErrConditionFailed) {
+		return common.ErrAlreadyExists
+	}
+
+	return err
+}
+
+func (s *BlobMetadataStore) GetBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.Batch, error) {
+	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+		"PK": &types.AttributeValueMemberS{
+			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+		},
+		"SK": &types.AttributeValueMemberS{
+			Value: batchSK,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if item == nil {
+		return nil, fmt.Errorf("%w: batch info not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+	}
+
+	batch, err := UnmarshalBatch(item)
+	if err != nil {
+		return nil, err
+	}
+
+	return batch, nil
+}
+
 func (s *BlobMetadataStore) PutBatchHeader(ctx context.Context, batchHeader *corev2.BatchHeader) error {
 	item, err := MarshalBatchHeader(batchHeader)
 	if err != nil {
@@ -1156,15 +1196,20 @@ func (s *BlobMetadataStore) PutAttestation(ctx context.Context, attestation *cor
 }
 
 func (s *BlobMetadataStore) GetAttestation(ctx context.Context, batchHeaderHash [32]byte) (*corev2.Attestation, error) {
-	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
-		"PK": &types.AttributeValueMemberS{
-			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+	input := &dynamodb.GetItemInput{
+		TableName: aws.String(s.tableName),
+		Key: map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{
+				Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+			},
+			"SK": &types.AttributeValueMemberS{
+				Value: attestationSK,
+			},
 		},
-		"SK": &types.AttributeValueMemberS{
-			Value: attestationSK,
-		},
-	})
+		ConsistentRead: aws.Bool(true), // Use strongly consistent read to prevent race conditions
+	}
 
+	item, err := s.dynamoDBClient.GetItemWithInput(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -1321,12 +1366,18 @@ func (s *BlobMetadataStore) GetBlobInclusionInfos(ctx context.Context, blobKey c
 }
 
 func (s *BlobMetadataStore) GetSignedBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.BatchHeader, *corev2.Attestation, error) {
-	items, err := s.dynamoDBClient.Query(ctx, s.tableName, "PK = :pk", commondynamodb.ExpressionValues{
-		":pk": &types.AttributeValueMemberS{
-			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+	input := &dynamodb.QueryInput{
+		TableName:              aws.String(s.tableName),
+		KeyConditionExpression: aws.String("PK = :pk"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":pk": &types.AttributeValueMemberS{
+				Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+			},
 		},
-	})
+		ConsistentRead: aws.Bool(true), // Use strongly consistent read to prevent race conditions
+	}
 
+	items, err := s.dynamoDBClient.QueryWithInput(ctx, input)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1814,6 +1865,34 @@ func UnmarshalBatchHeader(item commondynamodb.Item) (*corev2.BatchHeader, error)
 	}
 
 	return &header, nil
+}
+
+func MarshalBatch(batch *corev2.Batch) (commondynamodb.Item, error) {
+	fields, err := attributevalue.MarshalMap(batch)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal batch: %w", err)
+	}
+
+	hash, err := batch.BatchHeader.Hash()
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash batch header: %w", err)
+	}
+	hashstr := hex.EncodeToString(hash[:])
+
+	fields["PK"] = &types.AttributeValueMemberS{Value: batchHeaderKeyPrefix + hashstr}
+	fields["SK"] = &types.AttributeValueMemberS{Value: batchSK}
+
+	return fields, nil
+}
+
+func UnmarshalBatch(item commondynamodb.Item) (*corev2.Batch, error) {
+	batch := corev2.Batch{}
+	err := attributevalue.UnmarshalMap(item, &batch)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal batch: %w", err)
+	}
+
+	return &batch, nil
 }
 
 func MarshalBlobInclusionInfo(inclusionInfo *corev2.BlobInclusionInfo) (commondynamodb.Item, error) {

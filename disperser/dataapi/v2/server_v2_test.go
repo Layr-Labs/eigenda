@@ -55,9 +55,6 @@ import (
 )
 
 var (
-	//go:embed testdata/prometheus-response-sample.json
-	mockPrometheusResponse string
-
 	//go:embed testdata/prometheus-resp-avg-throughput.json
 	mockPrometheusRespAvgThroughput string
 
@@ -1227,6 +1224,22 @@ func TestFetchBatch(t *testing.T) {
 	require.NoError(t, err)
 	batchHeaderHash := hex.EncodeToString(batchHeaderHashBytes[:])
 
+	// Set up batch in metadata store
+	blobHeader := makeBlobHeaderV2(t)
+	blobKey, err := blobHeader.BlobKey()
+	require.NoError(t, err)
+	blobCert := &corev2.BlobCertificate{
+		BlobHeader: blobHeader,
+		Signature:  []byte{0, 1, 2, 3, 4},
+		RelayKeys:  []corev2.RelayKey{0, 2, 4},
+	}
+	batch := &corev2.Batch{
+		BatchHeader:      batchHeader,
+		BlobCertificates: []*corev2.BlobCertificate{blobCert},
+	}
+	err = blobMetadataStore.PutBatch(context.Background(), batch)
+	require.NoError(t, err)
+
 	// Set up attestation in metadata store
 	keyPair, err := core.GenRandomBlsKeys()
 	assert.NoError(t, err)
@@ -1319,6 +1332,10 @@ func TestFetchBatch(t *testing.T) {
 	assert.Equal(t, batchHeader.ReferenceBlockNumber, response.SignedBatch.BatchHeader.ReferenceBlockNumber)
 	assert.Equal(t, attestation.AttestedAt, response.SignedBatch.AttestationInfo.Attestation.AttestedAt)
 	assert.Equal(t, attestation.QuorumNumbers, response.SignedBatch.AttestationInfo.Attestation.QuorumNumbers)
+	assert.Equal(t, 1, len(response.BlobKeys))
+	assert.Equal(t, blobKey.Hex(), response.BlobKeys[0])
+	assert.Equal(t, 1, len(response.BlobCertificates))
+	assert.Equal(t, []byte{0, 1, 2, 3, 4}, response.BlobCertificates[0].Signature)
 
 	signers := map[uint8][]serverv2.OperatorIdentity{
 		0: []serverv2.OperatorIdentity{
@@ -1377,6 +1394,10 @@ func TestFetchBatch(t *testing.T) {
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
+		},
+		{
+			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
+			"SK": &types.AttributeValueMemberS{Value: "BatchInfo"},
 		},
 	})
 }
@@ -2552,7 +2573,7 @@ func TestFetchMetricsSummary(t *testing.T) {
 	r := setUpRouter()
 
 	s := new(model.SampleStream)
-	err := s.UnmarshalJSON([]byte(mockPrometheusResponse))
+	err := s.UnmarshalJSON([]byte(mockPrometheusRespAvgThroughput))
 	assert.NoError(t, err)
 
 	matrix := make(model.Matrix, 0)
@@ -2564,7 +2585,7 @@ func TestFetchMetricsSummary(t *testing.T) {
 	w := executeRequest(t, r, http.MethodGet, "/v2/metrics/summary")
 	response := decodeResponseBody[serverv2.MetricSummary](t, w)
 
-	assert.Equal(t, 16555.555555555555, response.AverageBytesPerSecond)
+	assert.Equal(t, 10422.560745809731, response.AverageBytesPerSecond)
 }
 
 func TestFetchMetricsThroughputTimeseries(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
-	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder"
+	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
