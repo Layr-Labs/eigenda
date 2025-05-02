@@ -128,13 +128,16 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 		ticker := time.NewTicker(d.PullInterval)
 		defer ticker.Stop()
 		for {
+			d.metrics.mainLoopSequenceProbe.SetStage("idle")
 			select {
 			case <-ctx.Done():
+				d.metrics.mainLoopSequenceProbe.End()
 				return
 			case <-ticker.C:
+				d.metrics.mainLoopSequenceProbe.SetStage("handle_batch")
 
 				count := concurrentBatchCount.Add(1)
-				d.logger.Debugf("concurrent batch count: %d", count)
+				d.logger.Debugf("concurrent batch count: %d, pull interval: %s", count, d.PullInterval)
 
 				attestationCtx, cancel := context.WithTimeout(ctx, d.BatchAttestationTimeout)
 				probe := d.metrics.newBatchProbe()
@@ -149,6 +152,7 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 					cancel()
 					probe.End()
 					concurrentBatchCount.Add(-1)
+					d.metrics.mainLoopSequenceProbe.SetStage("idle")
 					continue
 				}
 				go func() {
