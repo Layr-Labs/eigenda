@@ -37,6 +37,8 @@ type SequenceProbe struct {
 	currentStage string
 	// the time when the current stage started
 	currentStageStart time.Time
+	// true after End() is called
+	ended bool
 	// a history of operations, concatenate and log if a lifecycle description is needed.
 	// If nil, then no history is captured.
 	history *strings.Builder
@@ -89,12 +91,10 @@ func (s *StageTimer) NewSequence() *SequenceProbe {
 	}
 }
 
-// SetStage updates the stage of the current sequence.
+// SetStage updates the stage of the current sequence. This method is a no-op if the new stage is the same as
+// the current stage or if the sequenceProbe has already ended.
 func (p *SequenceProbe) SetStage(stage string) {
-	if p == nil {
-		return
-	}
-	if p.currentStage == stage {
+	if p == nil || p.ended || p.currentStage == stage {
 		return
 	}
 
@@ -125,10 +125,12 @@ func (p *SequenceProbe) SetStage(stage string) {
 }
 
 // End completes the current sequence. It is important to call this before discarding the sequenceProbe.
+// This method is a no-op if called more than once.
 func (p *SequenceProbe) End() {
-	if p == nil {
+	if p == nil || p.ended {
 		return
 	}
+	p.ended = true
 
 	now := time.Now()
 	elapsed := ToMilliseconds(now.Sub(p.currentStageStart))
