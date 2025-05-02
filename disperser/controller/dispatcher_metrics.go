@@ -16,13 +16,11 @@ const dispatcherNamespace = "eigenda_dispatcher"
 // dispatcherMetrics is a struct that holds the metrics for the dispatcher.
 type dispatcherMetrics struct {
 	sendChunksRetryCount         *prometheus.GaugeVec
-	handleSignaturesLatency      *prometheus.SummaryVec
 	processSigningMessageLatency *prometheus.SummaryVec
 	signingMessageChannelLatency *prometheus.SummaryVec
 	attestationUpdateLatency     *prometheus.SummaryVec
 	attestationBuildingLatency   *prometheus.SummaryVec
 	thresholdSignedToDoneLatency *prometheus.SummaryVec
-	receiveSignaturesLatency     *prometheus.SummaryVec
 	aggregateSignaturesLatency   *prometheus.SummaryVec
 	putAttestationLatency        *prometheus.SummaryVec
 	attestationUpdateCount       *prometheus.SummaryVec
@@ -53,16 +51,6 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 			Namespace: dispatcherNamespace,
 			Name:      "send_chunks_retry_count",
 			Help:      "The number of times chunks were retried to be sent (part of HandleBatch()).",
-		},
-		[]string{},
-	)
-
-	handleSignaturesLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "handle_signatures_latency_ms",
-			Help:       "The time required to handle signatures (part of HandleBatch()).",
-			Objectives: objectives,
 		},
 		[]string{},
 	)
@@ -126,16 +114,6 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 			Objectives: objectives,
 		},
 		[]string{"quorum"},
-	)
-
-	receiveSignaturesLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "receive_signatures_latency_ms",
-			Help:       "The time required to receive signatures (part of HandleSignatures()).",
-			Objectives: objectives,
-		},
-		[]string{},
 	)
 
 	aggregateSignaturesLatency := promauto.With(registry).NewSummaryVec(
@@ -205,13 +183,11 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 
 	return &dispatcherMetrics{
 		sendChunksRetryCount:         sendChunksRetryCount,
-		handleSignaturesLatency:      handleSignaturesLatency,
 		processSigningMessageLatency: processSigningMessageLatency,
 		signingMessageChannelLatency: signingMessageChannelLatency,
 		attestationUpdateLatency:     attestationUpdateLatency,
 		attestationBuildingLatency:   attestationBuildingLatency,
 		thresholdSignedToDoneLatency: thresholdSignedToDoneLatency,
-		receiveSignaturesLatency:     receiveSignaturesLatency,
 		aggregateSignaturesLatency:   aggregateSignaturesLatency,
 		putAttestationLatency:        putAttestationLatency,
 		attestationUpdateCount:       attestationUpdateCount,
@@ -227,10 +203,6 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 
 func (m *dispatcherMetrics) reportSendChunksRetryCount(retries float64) {
 	m.sendChunksRetryCount.WithLabelValues().Set(retries)
-}
-
-func (m *dispatcherMetrics) reportHandleSignaturesLatency(duration time.Duration) {
-	m.handleSignaturesLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *dispatcherMetrics) reportProcessSigningMessageLatency(duration time.Duration) {
@@ -252,10 +224,6 @@ func (m *dispatcherMetrics) reportAttestationBuildingLatency(duration time.Durat
 func (m *dispatcherMetrics) reportThresholdSignedToDoneLatency(quorumID core.QuorumID, duration time.Duration) {
 	m.thresholdSignedToDoneLatency.WithLabelValues(fmt.Sprintf("%d", quorumID)).Observe(
 		common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportReceiveSignaturesLatency(duration time.Duration) {
-	m.receiveSignaturesLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *dispatcherMetrics) reportAggregateSignaturesLatency(duration time.Duration) {
