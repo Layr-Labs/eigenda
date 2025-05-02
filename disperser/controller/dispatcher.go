@@ -193,6 +193,10 @@ func (d *Dispatcher) HandleBatch(
 	state := batchData.OperatorState
 	sigChan := make(chan core.SigningMessage, len(state.IndexedOperators))
 	for opID, op := range state.IndexedOperators {
+
+		validatorProbe := d.metrics.newSendToValidatorProbe()
+		validatorProbe.SetStage("get_client")
+
 		opID := opID
 		op := op
 		host, _, _, v2DispersalPort, _, err := core.ParseOperatorSocket(op.Socket)
@@ -230,7 +234,11 @@ func (d *Dispatcher) HandleBatch(
 			continue
 		}
 
+		validatorProbe.SetStage("pool_submission")
+
 		d.pool.Submit(func() {
+			defer probe.End()
+			validatorProbe.SetStage("put_dispersal_request")
 
 			req := &corev2.DispersalRequest{
 				OperatorID: opID,
@@ -240,7 +248,6 @@ func (d *Dispatcher) HandleBatch(
 				DispersedAt:     uint64(time.Now().UnixNano()),
 				BatchHeader:     *batch.BatchHeader,
 			}
-			putDispersalRequestStart := time.Now()
 			err := d.blobMetadataStore.PutDispersalRequest(ctx, req)
 			if err != nil {
 				d.logger.Error("failed to put dispersal request", "err", err)
@@ -248,24 +255,22 @@ func (d *Dispatcher) HandleBatch(
 					Signature:            nil,
 					Operator:             opID,
 					BatchHeaderHash:      batchData.BatchHeaderHash,
-					AttestationLatencyMs: 0,
+					AttestationLatencyMs: -1,
 					TimeReceived:         time.Now(),
 					Err:                  err,
 				}
 				return
 			}
 
-			d.metrics.reportPutDispersalRequestLatency(time.Since(putDispersalRequestStart))
-
 			var i int
 			var lastErr error
 			for i = 0; i < d.NumRequestRetries+1; i++ {
-				sendChunksStart := time.Now()
+				validatorProbe.SetStage("send_chunks")
+
 				sig, err := d.sendChunks(ctx, client, batch)
 				lastErr = err
-				sendChunksFinished := time.Now()
-				d.metrics.reportSendChunksLatency(sendChunksFinished.Sub(sendChunksStart))
 				if err == nil {
+					validatorProbe.SetStage("put_dispersal_response")
 					storeErr := d.blobMetadataStore.PutDispersalResponse(ctx, &corev2.DispersalResponse{
 						DispersalRequest: req,
 						RespondedAt:      uint64(time.Now().UnixNano()),
@@ -276,13 +281,11 @@ func (d *Dispatcher) HandleBatch(
 						d.logger.Error("failed to store a succeeded dispersal response", "err", storeErr)
 					}
 
-					d.metrics.reportPutDispersalResponseLatency(time.Since(sendChunksFinished))
-
 					sigChan <- core.SigningMessage{
 						Signature:            sig,
 						Operator:             opID,
 						BatchHeaderHash:      batchData.BatchHeaderHash,
-						AttestationLatencyMs: float64(time.Since(sendChunksStart)),
+						AttestationLatencyMs: -1,
 						TimeReceived:         time.Now(),
 						Err:                  nil,
 					}

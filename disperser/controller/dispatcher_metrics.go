@@ -15,10 +15,7 @@ const dispatcherNamespace = "eigenda_dispatcher"
 
 // dispatcherMetrics is a struct that holds the metrics for the dispatcher.
 type dispatcherMetrics struct {
-	putDispersalRequestLatency   *prometheus.SummaryVec
-	sendChunksLatency            *prometheus.SummaryVec
 	sendChunksRetryCount         *prometheus.GaugeVec
-	putDispersalResponseLatency  *prometheus.SummaryVec
 	handleSignaturesLatency      *prometheus.SummaryVec
 	processSigningMessageLatency *prometheus.SummaryVec
 	signingMessageChannelLatency *prometheus.SummaryVec
@@ -35,6 +32,7 @@ type dispatcherMetrics struct {
 	attestation                  *prometheus.GaugeVec
 	blobSetSize                  *prometheus.GaugeVec
 	batchStageTimer              *common.StageTimer
+	sendToValidatorStageTimer    *common.StageTimer
 }
 
 // NewDispatcherMetrics sets up metrics for the dispatcher.
@@ -50,41 +48,11 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		[]string{"type", "quorum"},
 	)
 
-	putDispersalRequestLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "put_dispersal_latency_ms",
-			Help:       "The time required to put the dispersal request (part of HandleBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
-	sendChunksLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "send_chunks_latency_ms",
-			Help:       "The time required to send chunks (part of HandleBatch()).",
-			Objectives: objectives,
-		},
-		[]string{},
-	)
-
 	sendChunksRetryCount := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: dispatcherNamespace,
 			Name:      "send_chunks_retry_count",
 			Help:      "The number of times chunks were retried to be sent (part of HandleBatch()).",
-		},
-		[]string{},
-	)
-
-	putDispersalResponseLatency := promauto.With(registry).NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  dispatcherNamespace,
-			Name:       "put_dispersal_response_latency_ms",
-			Help:       "The time required to put the dispersal response (part of HandleBatch()).",
-			Objectives: objectives,
 		},
 		[]string{},
 	)
@@ -229,12 +197,14 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 	)
 
 	batchStageTimer := common.NewStageTimer(registry, dispatcherNamespace, "batch", false)
+	sendToValidatorStageTimer := common.NewStageTimer(
+		registry,
+		dispatcherNamespace,
+		"send_to_validator",
+		false)
 
 	return &dispatcherMetrics{
-		putDispersalRequestLatency:   putDispersalRequestLatency,
-		sendChunksLatency:            sendChunksLatency,
 		sendChunksRetryCount:         sendChunksRetryCount,
-		putDispersalResponseLatency:  putDispersalResponseLatency,
 		handleSignaturesLatency:      handleSignaturesLatency,
 		processSigningMessageLatency: processSigningMessageLatency,
 		signingMessageChannelLatency: signingMessageChannelLatency,
@@ -251,23 +221,12 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		attestation:                  attestation,
 		blobSetSize:                  blobSetSize,
 		batchStageTimer:              batchStageTimer,
+		sendToValidatorStageTimer:    sendToValidatorStageTimer,
 	}
-}
-
-func (m *dispatcherMetrics) reportPutDispersalRequestLatency(duration time.Duration) {
-	m.putDispersalRequestLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
-}
-
-func (m *dispatcherMetrics) reportSendChunksLatency(duration time.Duration) {
-	m.sendChunksLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *dispatcherMetrics) reportSendChunksRetryCount(retries float64) {
 	m.sendChunksRetryCount.WithLabelValues().Set(retries)
-}
-
-func (m *dispatcherMetrics) reportPutDispersalResponseLatency(duration time.Duration) {
-	m.putDispersalResponseLatency.WithLabelValues().Observe(common.ToMilliseconds(duration))
 }
 
 func (m *dispatcherMetrics) reportHandleSignaturesLatency(duration time.Duration) {
@@ -360,4 +319,8 @@ func (m *dispatcherMetrics) reportAttestation(operatorCount map[core.QuorumID]in
 
 func (m *dispatcherMetrics) newBatchProbe() *common.SequenceProbe {
 	return m.batchStageTimer.NewSequence()
+}
+
+func (m *dispatcherMetrics) newSendToValidatorProbe() *common.SequenceProbe {
+	return m.sendToValidatorStageTimer.NewSequence()
 }
