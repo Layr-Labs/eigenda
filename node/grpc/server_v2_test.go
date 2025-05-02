@@ -133,7 +133,7 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 func TestV2NodeInfoRequest(t *testing.T) {
 	c := newTestComponents(t, makeConfig(t))
 	resp, err := c.server.GetNodeInfo(context.Background(), &validator.GetNodeInfoRequest{})
-	assert.True(t, resp.Semver == "0.0.0")
+	assert.True(t, resp.Semver == ">=0.9.0-rc.1")
 	assert.True(t, err == nil)
 }
 
