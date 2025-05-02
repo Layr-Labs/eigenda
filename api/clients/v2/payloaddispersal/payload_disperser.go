@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -117,8 +118,8 @@ func (pd *PayloadDisperser) SendPayload(
 	if err != nil {
 		return nil, fmt.Errorf("poll blob status until signed: %w", err)
 	}
-	pd.logger.Debug("Blob status COMPLETE", "blobKey", blobKey.Hex())
 
+	pd.logSigningPercentages(blobKey, blobStatusReply)
 	probe.SetStage("build_cert")
 
 	eigenDACert, err := pd.buildEigenDACert(ctx, blobKey, blobStatusReply)
@@ -138,6 +139,30 @@ func (pd *PayloadDisperser) SendPayload(
 	pd.logger.Debug("EigenDACert verified", "blobKey", blobKey.Hex())
 
 	return eigenDACert, nil
+}
+
+// logSigningPercentages logs the signing percentage of each quorum for a blob that has been dispersed and satisfied
+// required signing thresholds
+func (pd *PayloadDisperser) logSigningPercentages(blobKey core.BlobKey, blobStatusReply *dispgrpc.BlobStatusReply) {
+	attestation := blobStatusReply.GetSignedBatch().GetAttestation()
+	if len(attestation.GetQuorumNumbers()) != len(attestation.GetQuorumSignedPercentages()) {
+		pd.logger.Error("quorum number count and signed percentage count don't match. This should never happen",
+			"blobKey", blobKey.Hex(),
+			"quorumNumberCount", len(attestation.GetQuorumNumbers()),
+			"signedPercentageCount", len(attestation.GetQuorumSignedPercentages()))
+	}
+
+	quorumPercentagesBuilder := strings.Builder{}
+	quorumPercentagesBuilder.WriteString("(")
+
+	for index, quorumNumber := range attestation.GetQuorumNumbers() {
+		quorumPercentagesBuilder.WriteString(
+			fmt.Sprintf("quorum_%d: %d%%, ", quorumNumber, attestation.GetQuorumSignedPercentages()[index]))
+	}
+	quorumPercentagesBuilder.WriteString(")")
+
+	pd.logger.Debug("Blob signed",
+		"blobKey", blobKey.Hex(), "quorumPercentages", quorumPercentagesBuilder.String())
 }
 
 // Close is responsible for calling close on all internal clients. This method will do its best to close all internal
@@ -185,7 +210,8 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 			// If this call fails to return in a timely fashion, the timeout configured for the poll loop will trigger
 			blobStatusReply, err := pd.disperserClient.GetBlobStatus(ctx, blobKey)
 			if err != nil {
-				pd.logger.Warn("get blob status", "err", err, "blobKey", blobKey.Hex())
+				// this is expected to fail multiple times before we get a valid response, so only do a Debug log
+				pd.logger.Debug("get blob status", "err", err, "blobKey", blobKey.Hex())
 				continue
 			}
 
@@ -226,12 +252,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 				var thresholdNotMetErr *thresholdNotMetError
 				if !errors.As(err, &thresholdNotMetErr) {
 					// an error occurred which was unrelated to an unmet threshold: something went wrong while checking!
-					//
-					// TODO (litt3): with the current disperser implementation, it's expected that the blobStatusReply
-					//  will be nil while gathering signatures, so this case will *always* be triggered. Once the
-					//  disperser has been updated to return a non-nil blobStatusReply while gathering signatures,
-					//  this case will no longer be expected to occur, so a warning should be logged here.
-					continue
+					pd.logger.Warnf("error checking thresholds: %v", err)
 				}
 
 				// thresholds weren't met yet. that's ok, since signature gathering is still in progress
