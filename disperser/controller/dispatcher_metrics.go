@@ -31,6 +31,7 @@ type dispatcherMetrics struct {
 	blobSetSize                  *prometheus.GaugeVec
 	batchStageTimer              *common.StageTimer
 	sendToValidatorStageTimer    *common.StageTimer
+	mainLoopSequenceProbe        *common.SequenceProbe
 }
 
 // NewDispatcherMetrics sets up metrics for the dispatcher.
@@ -181,6 +182,10 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		"send_to_validator",
 		false)
 
+	// TODO back this one out prior to merging
+	mainLoopStageTimer := common.NewStageTimer(registry, dispatcherNamespace, "main_loop", false)
+	mainLoopProbe := mainLoopStageTimer.NewSequence()
+
 	return &dispatcherMetrics{
 		sendChunksRetryCount:         sendChunksRetryCount,
 		processSigningMessageLatency: processSigningMessageLatency,
@@ -198,6 +203,7 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		blobSetSize:                  blobSetSize,
 		batchStageTimer:              batchStageTimer,
 		sendToValidatorStageTimer:    sendToValidatorStageTimer,
+		mainLoopSequenceProbe:        mainLoopProbe,
 	}
 }
 
