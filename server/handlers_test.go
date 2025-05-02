@@ -19,9 +19,9 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/mocks"
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/golang/mock/gomock"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

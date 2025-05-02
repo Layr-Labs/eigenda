@@ -166,7 +166,7 @@ linters:
     - rowserrcheck # checks whether Err of rows is checked successfully
     - sqlclosecheck # checks that sql.Rows and sql.Stmt are closed
     - stylecheck # is a replacement for golint
-    - tenv # detects using os.Setenv instead of t.Setenv since Go1.17
+    - usetesting
     - testableexamples # checks if examples are testable (have an expected output)
     - testpackage # makes you use a separate _test package
     - tparallel # detects inappropriate usage of t.Parallel() method in your Go test codes
@@ -210,7 +210,7 @@ issues:
     # Allow certain patterns to be ignored by lll (long lines)
     - source: '".{120,}"' # Ignores double-quoted strings longer than 120 chars
       linters: [lll]
-    - source: '// https?://' # This pattern matches comments containing URLs
+    - source: "// https?://" # This pattern matches comments containing URLs
       linters: [lll]
 
     - path: "_test\\.go"

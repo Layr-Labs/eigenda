@@ -13,7 +13,6 @@ require (
 	github.com/ethereum-optimism/optimism v1.9.5
 	github.com/ethereum/go-ethereum v1.14.11
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/golang/mock v1.2.0
 	github.com/gorilla/mux v1.8.0
 	github.com/joho/godotenv v1.5.1
 	github.com/minio/minio-go/v7 v7.0.80
@@ -23,6 +22,7 @@ require (
 	github.com/testcontainers/testcontainers-go/modules/redis v0.33.0
 	github.com/urfave/cli/v2 v2.27.5
 	github.com/wealdtech/go-merkletree/v2 v2.6.0
+	go.uber.org/mock v0.4.0
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
 	google.golang.org/grpc v1.64.1
 )
@@ -283,7 +283,6 @@ require (
 	go.uber.org/automaxprocs v1.5.2 // indirect
 	go.uber.org/dig v1.18.0 // indirect
 	go.uber.org/fx v1.22.2 // indirect
-	go.uber.org/mock v0.4.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.31.0 // indirect

@@ -48,27 +48,13 @@ test-fuzz:
 
 .PHONY: lint
 lint:
-	@if ! command -v golangci-lint  &> /dev/null; \
-	then \
-    	echo "golangci-lint command could not be found...."; \
-		echo "You can install via 'go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest'"; \
-		echo "or visit https://golangci-lint.run/welcome/install/ for other installation methods."; \
-    	exit 1; \
-	fi
-	@golangci-lint run
+	golangci-lint run
 
 .PHONY: format
 format:
 	# We also format line lengths. The length here should match that in the lll linter in .golangci.yml
-	@if ! command -v golines  &> /dev/null; \
-	then \
-    	echo "golines command could not be found...."; \
-		echo "You can install via 'go install github.com/segmentio/golines@latest'"; \
-		echo "or visit https://github.com/segmentio/golines for other installation methods."; \
-    	exit 1; \
-	fi
-	@go fmt ./...
-	@golines --write-output --shorten-comments --max-len 120 .
+	go fmt ./...
+	golines --write-output --shorten-comments --max-len 120 .
 
 ## calls --help on binary and routes output to file while ignoring dynamic fields specific
 ## to indivdual builds (e.g, version)
@@ -76,7 +62,7 @@ gen-static-help-output: build
 	@echo "Storing binary output to docs/help_out.txt"
 	@./bin/eigenda-proxy --help | sed '/^VERSION:/ {N;d;}' > docs/help_out.txt
 
-go-gen-mocks:
+mocks:
 	@echo "generating go mocks..."
 	@GO111MODULE=on go generate --run "mockgen*" ./...
 
@@ -88,6 +74,6 @@ benchmark:
 	go test -benchmem -run=^$ -bench . ./benchmark -test.parallel 4
 
 deps:
-	go install gotest.tools/gotestsum@latest
+	mise install
 
-.PHONY: build clean docker-build test lint format benchmark deps
+.PHONY: build clean docker-build test lint format benchmark deps mocks

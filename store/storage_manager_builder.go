@@ -500,7 +500,9 @@ func (smb *StorageManagerBuilder) buildLocalSigner(
 	}
 
 	accountID := crypto.PubkeyToAddress(signer.PrivateKey.PublicKey)
-	pendingBalance, err := ethClient.PendingBalanceAt(ctx, accountID)
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	pendingBalance, err := ethClient.PendingBalanceAt(ctxWithTimeout, accountID)
 
 	switch {
 	case err != nil:

@@ -7,37 +7,37 @@ on:
     branches: ["main"]
 
 env:
-  GO_VERSION: "1.22"
+  MISE_VERSION: 2024.12.14
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
         with:
-          go-version: ${{ env.GO_VERSION}}
-      # TODO: fix the local/ci drift... locally we use `make lint`.
-      # We should probably use mise to install golangci-lint and other dependencies,
-      # and then we could run make commands in CI.
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.61
-          args: --timeout 3m
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+      - run: make lint
 
   # This checks that the flags in .env.exampleV1.holesky, .env.exampleV2.holesky, and .env.exampleV1AndV2.holesky are
   # valid, and allow the proxy to start.
   flags:
     strategy:
       matrix:
-        env-file: [ .env.exampleV1.holesky, .env.exampleV2.holesky, .env.exampleV1AndV2.holesky]
+        env-file:
+          [
+            .env.exampleV1.holesky,
+            .env.exampleV2.holesky,
+            .env.exampleV1AndV2.holesky,
+          ]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
         with:
-          go-version: ${{ env.GO_VERSION}}
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
       - name: Run flag test
         run: ${{ github.workspace }}/scripts/test-proxy-startup-with-env-vars.sh ${{ matrix.env-file }}
 
@@ -45,21 +45,23 @@ jobs:
   help-output-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
         with:
-          go-version: ${{ env.GO_VERSION }}
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
       - run: make gen-static-help-output && git diff --exit-code
 
   unit-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
-      - uses: actions/setup-go@v3
+      - uses: jdx/mise-action@v2
         with:
-          go-version: ${{ env.GO_VERSION }}
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
       - name: Install dependencies
         run: make deps
       - run: go mod download
@@ -68,12 +70,13 @@ jobs:
   e2e-tests-local:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
-      - uses: actions/setup-go@v3
+      - uses: jdx/mise-action@v2
         with:
-          go-version: ${{ env.GO_VERSION }}
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
       - name: Install dependencies
         run: make deps
       - run: go mod download
@@ -82,12 +85,13 @@ jobs:
   e2e-tests-testnet:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
-      - uses: actions/setup-go@v3
+      - uses: jdx/mise-action@v2
         with:
-          go-version: ${{ env.GO_VERSION }}
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
       - name: Install dependencies
         run: make deps
       - run: go mod download
@@ -99,12 +103,13 @@ jobs:
   e2e-tests-preprod:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
-      - uses: actions/setup-go@v3
+      - uses: jdx/mise-action@v2
         with:
-          go-version: ${{ env.GO_VERSION }}
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
       - name: Install dependencies
         run: make deps
       - run: go mod download
@@ -116,28 +121,30 @@ jobs:
   fuzz:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
-      - uses: actions/setup-go@v3
+      - uses: jdx/mise-action@v2
         with:
-          go-version: ${{ env.GO_VERSION }}
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
       - run: go mod download
       - run: make test-fuzz
 
   build-binary:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
         with:
-          go-version: ${{ env.GO_VERSION }}
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
       - run: make build
 
   build-docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: docker/build-push-action@v5
         with:
           push: false

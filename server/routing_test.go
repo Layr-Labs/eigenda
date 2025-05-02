@@ -8,9 +8,9 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/mocks"
-	"github.com/golang/mock/gomock"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 // TestRouting tests that the routes were properly encoded.
@@ -93,15 +93,15 @@ func TestRouting(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(
-			tt.name, func(t *testing.T) {
-				req := httptest.NewRequest(tt.method, tt.url, nil)
-				rec := httptest.NewRecorder()
-				server.httpServer.Handler.ServeHTTP(rec, req)
+		t.Run(tt.name, func(t *testing.T) {
+			t.Log(tt.name)
+			req := httptest.NewRequest(tt.method, tt.url, nil)
+			rec := httptest.NewRecorder()
+			server.httpServer.Handler.ServeHTTP(rec, req)
 
-				require.Equal(t, tt.expectedCode, rec.Code)
-				require.Equal(t, tt.expectedBody, rec.Body.String())
+			require.Equal(t, tt.expectedCode, rec.Code)
+			require.Equal(t, tt.expectedBody, rec.Body.String())
 
-			})
+		})
 	}
 }
