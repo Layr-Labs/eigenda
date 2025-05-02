@@ -15,6 +15,7 @@ import (
 // Used to capture the status code of the response, so that we can use it in middlewares.
 // See https://github.com/golang/go/issues/18997
 // TODO: right now instantiating a separate scw for logging and metrics... is there a better way?
+// TODO: should we capture more information about the response, like GET vs POST, etc?
 type statusCaptureWriter struct {
 	http.ResponseWriter
 	status int
@@ -51,20 +52,25 @@ func withMetrics(
 		if err != nil {
 			commitMode := "unknown"
 			certVersion := "unknown"
-			var metaErr MetaError
-			if errors.As(err, &metaErr) {
-				commitMode = string(metaErr.Meta.Mode)
-				certVersion = string(metaErr.Meta.Version)
+			var getErr GETError
+			if errors.As(err, &getErr) {
+				commitMode = string(getErr.Mode)
+				certVersion = string(getErr.CertVersion)
 			}
+			var postErr POSTError
+			if errors.As(err, &postErr) {
+				commitMode = string(postErr.Mode)
+			}
+			// Prob should use different metric for POST and GET errors.
 			recordDur(strconv.Itoa(scw.status), commitMode, certVersion)
 			return err
 		}
-		versionByte, err := parseVersionByte(w, r)
+		certVersion, err := parseCertVersion(w, r)
 		if err != nil {
 			recordDur(strconv.Itoa(scw.status), string(mode), "unknown")
 			return fmt.Errorf("metrics middleware: parsing version byte: %w", err)
 		}
-		recordDur(strconv.Itoa(scw.status), string(mode), string(versionByte))
+		recordDur(strconv.Itoa(scw.status), string(mode), string(certVersion))
 		return nil
 	}
 }
@@ -89,9 +95,9 @@ func withLogging(
 		if err != nil {
 			args = append(args, "err", err)
 		}
-		var metaErr MetaError
-		if errors.As(err, &metaErr) {
-			args = append(args, "commitment_mode", metaErr.Meta.Mode, "cert_version", metaErr.Meta.Version)
+		var getErr GETError
+		if errors.As(err, &getErr) {
+			args = append(args, "commitment_mode", getErr.Mode, "cert_version", getErr.CertVersion)
 		}
 		log.Info("request", args...)
 	}

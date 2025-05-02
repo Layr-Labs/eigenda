@@ -63,7 +63,7 @@ type MemStore struct {
 	codec codecs.BlobCodec
 }
 
-var _ common.GeneratedKeyStore = (*MemStore)(nil)
+var _ common.EigenDAStore = (*MemStore)(nil)
 
 // New ... constructor
 func New(

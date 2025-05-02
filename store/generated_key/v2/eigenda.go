@@ -32,7 +32,7 @@ type Store struct {
 	verifier   clients.ICertVerifier
 }
 
-var _ common.GeneratedKeyStore = (*Store)(nil)
+var _ common.EigenDAStore = (*Store)(nil)
 
 func NewStore(
 	log logging.Logger,

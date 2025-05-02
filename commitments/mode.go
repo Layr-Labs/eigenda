@@ -4,51 +4,64 @@ import (
 	"fmt"
 )
 
-type CommitmentMeta struct {
-	Mode CommitmentMode
-	// version is shared for all modes and denotes version of the EigenDA certificate
-	Version EigenDACommitmentType
-}
-
 type CommitmentMode string
 
 const (
-	OptimismKeccak  CommitmentMode = "optimism_keccak256"
-	OptimismGeneric CommitmentMode = "optimism_generic"
-	Standard        CommitmentMode = "standard"
+	OptimismKeccakCommitmentMode  CommitmentMode = "optimism_keccak256"
+	OptimismGenericCommitmentMode CommitmentMode = "optimism_generic"
+	StandardCommitmentMode        CommitmentMode = "standard"
 )
 
 func StringToCommitmentMode(s string) (CommitmentMode, error) {
 	switch s {
-	case string(OptimismKeccak):
-		return OptimismKeccak, nil
-	case string(OptimismGeneric):
-		return OptimismGeneric, nil
-	case string(Standard):
-		return Standard, nil
+	case string(OptimismKeccakCommitmentMode):
+		return OptimismKeccakCommitmentMode, nil
+	case string(OptimismGenericCommitmentMode):
+		return OptimismGenericCommitmentMode, nil
+	case string(StandardCommitmentMode):
+		return StandardCommitmentMode, nil
 	default:
 		return "", fmt.Errorf("unknown commitment mode: %s", s)
 	}
 }
 
 func EncodeCommitment(
-	bytes []byte,
+	versionedCert EigenDAVersionedCert,
 	commitmentMode CommitmentMode,
-	commitmentType EigenDACommitmentType,
 ) ([]byte, error) {
-	switch commitmentMode {
-	case OptimismKeccak:
-		return Keccak256Commitment(bytes).Encode(), nil
+	serializedCert := versionedCert.SerializedCert
+	certVersion := versionedCert.Version
 
-	case OptimismGeneric:
-		certCommit := NewEigenDACommitment(bytes, commitmentType).Encode()
+	switch commitmentMode {
+	case OptimismKeccakCommitmentMode:
+		return Keccak256Commitment(serializedCert).Encode(), nil
+
+	case OptimismGenericCommitmentMode:
+		certCommit := NewEigenDAVersionedCert(serializedCert, certVersion).Encode()
 		svcCommit := EigenDASvcCommitment(certCommit).Encode()
 		altDACommit := NewGenericCommitment(svcCommit).Encode()
+		// Proxy returns an altDACommitment, which doesn't contain the first op version_byte
+		// (from https://specs.optimism.io/experimental/alt-da.html#example-commitments)
+		// This is because it's added by op-alt-da when calling TxData() right before submitting the tx:
+		// https://github.com/Layr-Labs/optimism/blob/89ac40d0fddba2e06854b253b9f0266f36350af2/op-alt-da/commitment.go#L158-L160
 		return altDACommit, nil
 
-	case Standard:
-		return NewEigenDACommitment(bytes, commitmentType).Encode(), nil
+	case StandardCommitmentMode:
+		return NewEigenDAVersionedCert(serializedCert, certVersion).Encode(), nil
 	}
 
 	return nil, fmt.Errorf("unknown commitment mode")
+}
+
+type DAServiceOPCommitmentType byte
+
+const (
+	EigenDAOPCommitmentType DAServiceOPCommitmentType = 0
+)
+
+type EigenDASvcCommitment []byte
+
+// Encode adds a commitment type prefix self describing the commitment.
+func (c EigenDASvcCommitment) Encode() []byte {
+	return append([]byte{byte(EigenDAOPCommitmentType)}, c...)
 }

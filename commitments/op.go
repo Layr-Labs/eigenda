@@ -17,6 +17,16 @@ var ErrCommitmentMismatch = errors.New("commitment mismatch")
 // OPCommitmentType is the commitment type prefix.
 type OPCommitmentType byte
 
+// CommitmentType describes the binary format of the commitment.
+// KeccakCommitmentStringType is the default commitment type for optimism's centralized DA storage.
+// GenericCommitmentType indicates an opaque bytestring that the op-node never opens.
+const (
+	Keccak256CommitmentType OPCommitmentType = 0
+	GenericCommitmentType   OPCommitmentType = 1
+	KeccakCommitmentString  string           = "KeccakCommitment"
+	GenericCommitmentString string           = "GenericCommitment"
+)
+
 func CommitmentTypeFromString(s string) (OPCommitmentType, error) {
 	switch s {
 	case KeccakCommitmentString:
@@ -27,16 +37,6 @@ func CommitmentTypeFromString(s string) (OPCommitmentType, error) {
 		return 0, fmt.Errorf("invalid commitment type: %s", s)
 	}
 }
-
-// CommitmentType describes the binary format of the commitment.
-// KeccakCommitmentStringType is the default commitment type for the centralized DA storage.
-// GenericCommitmentType indicates an opaque bytestring that the op-node never opens.
-const (
-	Keccak256CommitmentType OPCommitmentType = 0
-	GenericCommitmentType   OPCommitmentType = 1
-	KeccakCommitmentString  string           = "KeccakCommitment"
-	GenericCommitmentString string           = "GenericCommitment"
-)
 
 // OPCommitment is the binary representation of a commitment.
 type OPCommitment interface {

@@ -188,7 +188,7 @@ func testOptimismKeccak256Commitment(t *testing.T, dispersalBackend common.Eigen
 	requireDispersalRetrievalEigenDA(
 		t,
 		proxyTS.Metrics.HTTPServerRequestsTotal,
-		commitments.OptimismKeccak)
+		commitments.OptimismKeccakCommitmentMode)
 }
 
 func TestOptimismGenericCommitmentV1(t *testing.T) {
@@ -214,7 +214,7 @@ func testOptimismGenericCommitment(t *testing.T, dispersalBackend common.EigenDA
 	requireDispersalRetrievalEigenDA(
 		t,
 		proxyTS.Metrics.HTTPServerRequestsTotal,
-		commitments.OptimismGeneric)
+		commitments.OptimismGenericCommitmentMode)
 }
 
 func exerciseGenericCommitments(
@@ -285,7 +285,7 @@ func TestOptimismGenericCommitmentMigration(t *testing.T) {
 	requireDispersalRetrievalEigenDACounts(
 		t,
 		proxyTS.Metrics.HTTPServerRequestsTotal,
-		commitments.OptimismGeneric,
+		commitments.OptimismGenericCommitmentMode,
 		expectedWriteCount,
 		expectedReadCount)
 
@@ -297,7 +297,7 @@ func TestOptimismGenericCommitmentMigration(t *testing.T) {
 	requireDispersalRetrievalEigenDACounts(
 		t,
 		proxyTS.Metrics.HTTPServerRequestsTotal,
-		commitments.OptimismGeneric,
+		commitments.OptimismGenericCommitmentMode,
 		expectedWriteCount,
 		expectedReadCount)
 }

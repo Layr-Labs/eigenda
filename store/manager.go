@@ -15,7 +15,7 @@ import (
 
 // IManager ... read/write interface
 type IManager interface {
-	Get(ctx context.Context, key []byte, cm commitments.CommitmentMeta) ([]byte, error)
+	Get(ctx context.Context, versionedCert commitments.EigenDAVersionedCert, cm commitments.CommitmentMode) ([]byte, error)
 	Put(ctx context.Context, cm commitments.CommitmentMode, key, value []byte) ([]byte, error)
 	SetDispersalBackend(backend common.EigenDABackend)
 	GetDispersalBackend() common.EigenDABackend
@@ -27,9 +27,9 @@ type Manager struct {
 
 	s3 common.PrecomputedKeyStore // for op keccak256 commitment
 	// For op generic commitments & standard commitments
-	eigenda          common.GeneratedKeyStore // v0 da commitment version
-	eigendaV2        common.GeneratedKeyStore // v1 da commitment version
-	dispersalBackend atomic.Value             // stores the EigenDABackend to write blobs to
+	eigenda          common.EigenDAStore // v0 da commitment version
+	eigendaV2        common.EigenDAStore // v1 da commitment version
+	dispersalBackend atomic.Value        // stores the EigenDABackend to write blobs to
 
 	// secondary storage backends (caching and fallbacks)
 	secondary ISecondary
@@ -55,8 +55,8 @@ func (m *Manager) SetDispersalBackend(backend common.EigenDABackend) {
 
 // NewManager ... Init
 func NewManager(
-	eigenda common.GeneratedKeyStore,
-	eigenDAV2 common.GeneratedKeyStore,
+	eigenda common.EigenDAStore,
+	eigenDAV2 common.EigenDAStore,
 	s3 common.PrecomputedKeyStore,
 	l logging.Logger,
 	secondary ISecondary,
@@ -83,37 +83,41 @@ func NewManager(
 }
 
 // Get ... fetches a value from a storage backend based on the (commitment mode, type)
-func (m *Manager) Get(ctx context.Context, key []byte, cm commitments.CommitmentMeta) ([]byte, error) {
-	switch cm.Mode {
-	case commitments.OptimismKeccak:
-
+func (m *Manager) Get(ctx context.Context,
+	versionedCert commitments.EigenDAVersionedCert,
+	cm commitments.CommitmentMode,
+) ([]byte, error) {
+	switch cm {
+	case commitments.OptimismKeccakCommitmentMode:
 		if m.s3 == nil {
 			return nil, errors.New("expected S3 backend for OP keccak256 commitment type, but none configured")
 		}
 
 		// 1 - read blob from S3 backend
 		m.log.Debug("Retrieving data from S3 backend")
-		value, err := m.s3.Get(ctx, key)
+		// Using only the serialized cert without the version byte, since that is how we originally
+		// implemented this feature before we had versioned certs, and need to remain backwards compatible.
+		value, err := m.s3.Get(ctx, versionedCert.SerializedCert)
 		if err != nil {
 			return nil, err
 		}
 
 		// 2 - verify blob hash against commitment key digest
-		err = m.s3.Verify(ctx, key, value)
+		err = m.s3.Verify(ctx, versionedCert.SerializedCert, value)
 		if err != nil {
 			return nil, err
 		}
 		return value, nil
 
-	case commitments.Standard, commitments.OptimismGeneric:
-		if cm.Version == commitments.CertV0 && m.eigenda == nil {
+	case commitments.StandardCommitmentMode, commitments.OptimismGenericCommitmentMode:
+		if versionedCert.Version == commitments.CertV0 && m.eigenda == nil {
 			return nil, errors.New("expected EigenDA V1 backend for DA commitment type with CertV0")
 		}
-		if cm.Version == commitments.CertV1 && m.eigendaV2 == nil {
+		if versionedCert.Version == commitments.CertV1 && m.eigendaV2 == nil {
 			return nil, errors.New("expected EigenDA V2 backend for DA commitment type with CertV1")
 		}
 
-		verifyMethod, err := m.getVerifyMethod(cm.Version)
+		verifyMethod, err := m.getVerifyMethod(versionedCert.Version)
 		if err != nil {
 			return nil, fmt.Errorf("get verify method: %w", err)
 		}
@@ -121,7 +125,7 @@ func (m *Manager) Get(ctx context.Context, key []byte, cm commitments.Commitment
 		// 1 - read blob from cache if enabled
 		if m.secondary.CachingEnabled() {
 			m.log.Debug("Retrieving data from cached backends")
-			data, err := m.secondary.MultiSourceRead(ctx, key, false, verifyMethod)
+			data, err := m.secondary.MultiSourceRead(ctx, versionedCert.SerializedCert, false, verifyMethod)
 			if err == nil {
 				return data, nil
 			}
@@ -130,7 +134,7 @@ func (m *Manager) Get(ctx context.Context, key []byte, cm commitments.Commitment
 		}
 
 		// 2 - read blob from EigenDA
-		data, err := m.getEigenDAMode(ctx, cm.Version, key)
+		data, err := m.getFromCorrectEigenDABackend(ctx, versionedCert)
 		if err == nil {
 			return data, nil
 		}
@@ -139,7 +143,7 @@ func (m *Manager) Get(ctx context.Context, key []byte, cm commitments.Commitment
 
 		// 3 - read blob from fallbacks if enabled and data is non-retrievable from EigenDA
 		if m.secondary.FallbackEnabled() {
-			data, err = m.secondary.MultiSourceRead(ctx, key, true, verifyMethod)
+			data, err = m.secondary.MultiSourceRead(ctx, versionedCert.SerializedCert, true, verifyMethod)
 			if err != nil {
 				m.log.Error("Failed to read from fallback targets", "err", err)
 				return nil, err
@@ -161,9 +165,9 @@ func (m *Manager) Put(ctx context.Context, cm commitments.CommitmentMode, key, v
 
 	// 1 - Put blob into primary storage backend
 	switch cm {
-	case commitments.OptimismKeccak: // caching and fallbacks are unsupported for this commitment mode
+	case commitments.OptimismKeccakCommitmentMode: // caching and fallbacks are unsupported for this commitment mode
 		return m.putKeccak256Mode(ctx, key, value)
-	case commitments.OptimismGeneric, commitments.Standard:
+	case commitments.OptimismGenericCommitmentMode, commitments.StandardCommitmentMode:
 		commit, err = m.putEigenDAMode(ctx, value)
 	default:
 		return nil, fmt.Errorf("unknown commitment mode")
@@ -194,7 +198,7 @@ func (m *Manager) Put(ctx context.Context, cm commitments.CommitmentMode, key, v
 }
 
 // getVerifyMethod returns the correct verify method based on commitment type
-func (m *Manager) getVerifyMethod(commitmentType commitments.EigenDACommitmentType) (
+func (m *Manager) getVerifyMethod(commitmentType commitments.EigenDACertVersion) (
 	func(context.Context, []byte, []byte) error,
 	error,
 ) {
@@ -233,18 +237,17 @@ func (m *Manager) putEigenDAMode(ctx context.Context, value []byte) ([]byte, err
 	return nil, fmt.Errorf("unsupported dispersal backend: %v", backend)
 }
 
-func (m *Manager) getEigenDAMode(
+func (m *Manager) getFromCorrectEigenDABackend(
 	ctx context.Context,
-	commitmentType commitments.EigenDACommitmentType,
-	key []byte,
+	versionedCert commitments.EigenDAVersionedCert,
 ) ([]byte, error) {
-	switch commitmentType {
+	switch versionedCert.Version {
 	case commitments.CertV0:
 		m.log.Debug("Reading blob from EigenDAV1 backend")
-		data, err := m.eigenda.Get(ctx, key)
+		data, err := m.eigenda.Get(ctx, versionedCert.SerializedCert)
 		if err == nil {
 			// verify v1 (payload, cert)
-			err = m.eigenda.Verify(ctx, key, data)
+			err = m.eigenda.Verify(ctx, versionedCert.SerializedCert, data)
 			if err != nil {
 				return nil, err
 			}
@@ -254,22 +257,22 @@ func (m *Manager) getEigenDAMode(
 		return nil, err
 
 	case commitments.CertV1:
-		// the cert must be verified before attempting to get the data, since the get logic assumes the cert is valid
-		// verify v2 doesn't require a value, the "key" is the full cert
-		err := m.eigendaV2.Verify(ctx, key, nil)
+		// The cert must be verified before attempting to get the data, since the GET logic
+		// assumes the cert is valid. Verify v2 doesn't require a payload.
+		err := m.eigendaV2.Verify(ctx, versionedCert.SerializedCert, nil)
 		if err != nil {
 			return nil, fmt.Errorf("verify EigenDACert: %w", err)
 		}
 
 		m.log.Debug("Reading blob from EigenDAV2 backend")
-		data, err := m.eigendaV2.Get(ctx, key)
+		data, err := m.eigendaV2.Get(ctx, versionedCert.SerializedCert)
 		if err != nil {
 			return nil, fmt.Errorf("get data from V2 backend: %w", err)
 		}
 
 		return data, nil
 	default:
-		return nil, fmt.Errorf("commitment version unknown: %b", commitmentType)
+		return nil, fmt.Errorf("cert version unknown: %b", versionedCert.Version)
 	}
 }
 

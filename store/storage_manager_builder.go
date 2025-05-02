@@ -93,7 +93,7 @@ func (smb *StorageManagerBuilder) Build(ctx context.Context) (*Manager, error) {
 	var err error
 	var s3Store *s3.Store
 	var redisStore *redis.Store
-	var eigenDAV1Store, eigenDAV2Store common.GeneratedKeyStore
+	var eigenDAV1Store, eigenDAV2Store common.EigenDAStore
 
 	if smb.managerCfg.S3Config.Bucket != "" {
 		smb.log.Info("Using S3 storage backend")
@@ -215,7 +215,7 @@ func (smb *StorageManagerBuilder) buildSecondaries(
 func (smb *StorageManagerBuilder) buildEigenDAV2Backend(
 	ctx context.Context,
 	kzgVerifier *kzgverifier.Verifier,
-) (common.GeneratedKeyStore, error) {
+) (common.EigenDAStore, error) {
 	// This is a bit of a hack. The kzg config is used by both v1 AND v2, but the `LoadG2Points` field has special
 	// requirements. For v1, it must always be false. For v2, it must always be true. Ideally, we would modify
 	// the underlying core library to be more flexible, but that is a larger change for another time. As a stopgap, we
@@ -301,7 +301,7 @@ func (smb *StorageManagerBuilder) buildEigenDAV2Backend(
 func (smb *StorageManagerBuilder) buildEigenDAV1Backend(
 	ctx context.Context,
 	kzgVerifier *kzgverifier.Verifier,
-) (common.GeneratedKeyStore, error) {
+) (common.EigenDAStore, error) {
 	verifier, err := verify.NewVerifier(&smb.v1VerifierCfg, kzgVerifier, smb.log)
 	if err != nil {
 		return nil, fmt.Errorf("new verifier: %w", err)

@@ -133,7 +133,7 @@ func testOptimismClientWithGenericCommitment(t *testing.T, dispersalBackend comm
 	defer kill()
 
 	requireOPClientSetGet(t, ts, testutils.RandBytes(100), false)
-	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.OptimismGeneric)
+	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.OptimismGenericCommitmentMode)
 }
 
 func TestProxyClientServerIntegrationV1(t *testing.T) {
@@ -271,7 +271,7 @@ func testProxyClientWriteRead(t *testing.T, dispersalBackend common.EigenDABacke
 	defer kill()
 
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(100))
-	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
+	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
 }
 
 func TestProxyCachingV1(t *testing.T) {
@@ -297,7 +297,7 @@ func testProxyCaching(t *testing.T, dispersalBackend common.EigenDABackend) {
 
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(1_000_000))
 	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, common.S3BackendType)
-	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
+	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
 }
 
 func TestProxyCachingWithRedisV1(t *testing.T) {
@@ -320,7 +320,7 @@ func testProxyCachingWithRedis(t *testing.T, dispersalBackend common.EigenDABack
 
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(1_000_000))
 	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, common.RedisBackendType)
-	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
+	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
 }
 
 func TestProxyReadFallbackV1(t *testing.T) {
@@ -370,7 +370,7 @@ func testProxyReadFallback(t *testing.T, dispersalBackend common.EigenDABackend)
 
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(1_000_000))
 	requireWriteReadSecondary(t, ts.Metrics.SecondaryRequestsTotal, common.S3BackendType)
-	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
+	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
 }
 
 func TestProxyMemConfigClientCanGetAndPatchV1(t *testing.T) {
@@ -477,7 +477,7 @@ func TestInterleavedVersions(t *testing.T) {
 	require.Equal(t, payload2b, fetchedPayload2b)
 
 	requireStandardClientSetGet(t, testSuite, testRandom.Bytes(100))
-	requireDispersalRetrievalEigenDA(t, testSuite.Metrics.HTTPServerRequestsTotal, commitments.Standard)
+	requireDispersalRetrievalEigenDA(t, testSuite.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
 }
 
 func TestMaxBlobSizeV1(t *testing.T) {
@@ -508,7 +508,7 @@ func testMaxBlobSize(t *testing.T, dispersalBackend common.EigenDABackend) {
 	require.NoError(t, err)
 
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(int(maxPayloadSize)))
-	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
+	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
 }
 
 // TestV2ValidatorRetrieverOnly tests that retrieval works when only the validator retriever is enabled
@@ -526,5 +526,5 @@ func TestV2ValidatorRetrieverOnly(t *testing.T) {
 	defer kill()
 
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(1000))
-	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.Standard)
+	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
 }

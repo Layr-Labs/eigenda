@@ -1,40 +1,42 @@
 package commitments
 
-type EigenDACommitmentType byte
+import "fmt"
+
+type EigenDACertVersion byte
 
 const (
 	// EigenDA V1
-	CertV0 EigenDACommitmentType = iota
-	// EigenDA V2
+	CertV0 EigenDACertVersion = iota
+	// All future CertVersions will be against EigenDA V2 Blazar (https://docs.eigenda.xyz/releases/blazar)
 	CertV1
 )
 
-// CertCommitment is the binary representation of a commitment.
-type CertCommitment interface {
-	CommitmentType() EigenDACommitmentType
-	Encode() []byte
-	Verify(input []byte) error
-}
-
-type EigenDACommitment struct {
-	prefix EigenDACommitmentType
-	b      []byte
-}
-
-// NewEigenDACommitment creates a new commitment from the given input.
-func NewEigenDACommitment(input []byte, commitmentType EigenDACommitmentType) EigenDACommitment {
-	return EigenDACommitment{
-		prefix: commitmentType,
-		b:      input,
+func ByteToEigenDACertVersion(b byte) (EigenDACertVersion, error) {
+	switch b {
+	case byte(CertV0):
+		return CertV0, nil
+	case byte(CertV1):
+		return CertV1, nil
+	default:
+		return 0, fmt.Errorf("unknown EigenDA cert version: %d", b)
 	}
 }
 
-// CommitmentType returns the commitment type of EigenDACommitment.
-func (c EigenDACommitment) CommitmentType() EigenDACommitmentType {
-	return c.prefix
+type EigenDAVersionedCert struct {
+	Version        EigenDACertVersion
+	SerializedCert []byte
+}
+
+// NewEigenDAVersionedCert creates a new EigenDAVersionedCert that holds the certVersion
+// and a serialized certificate of that version.
+func NewEigenDAVersionedCert(serializedCert []byte, certVersion EigenDACertVersion) EigenDAVersionedCert {
+	return EigenDAVersionedCert{
+		Version:        certVersion,
+		SerializedCert: serializedCert,
+	}
 }
 
 // Encode adds a commitment type prefix self describing the commitment.
-func (c EigenDACommitment) Encode() []byte {
-	return append([]byte{byte(c.prefix)}, c.b...)
+func (c EigenDAVersionedCert) Encode() []byte {
+	return append([]byte{byte(c.Version)}, c.SerializedCert...)
 }
