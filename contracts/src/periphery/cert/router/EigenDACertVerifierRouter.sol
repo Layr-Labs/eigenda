@@ -48,6 +48,9 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
     /// INTERNAL ///
 
     function _getRBN(bytes calldata certBytes) internal pure returns (uint32) {
+        // 0:32 is the data offset
+        // 32:64 is the batch header root
+        // 64:96 is the RBN
         if (certBytes.length < 96) {
             revert InvalidCertLength();
         }

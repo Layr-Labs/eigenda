@@ -8,6 +8,8 @@ import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDACertTypes as CertTypes} from "src/periphery/cert/EigenDACertTypes.sol";
 import {EigenDACertVerifierV3} from "src/periphery/cert/v3/EigenDACertVerifierV3.sol";
 
+import {console2} from "forge-std/console2.sol";
+
 contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     using stdStorage for StdStorage;
     using BN254 for BN254.G1Point;
@@ -58,10 +60,10 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         );
 
         assertEq(certVerifierV3.checkDACert(certBytes), 1);
-        assertEq(this.dummy(certBytes), signedBatch.batchHeader.referenceBlockNumber);
+        assertEq(this.getRBNExternal(certBytes), signedBatch.batchHeader.referenceBlockNumber);
     }
 
-    function dummy(bytes calldata cert) external pure returns (uint32) {
+    function getRBNExternal(bytes calldata cert) external pure returns (uint32) {
         return abi.decode(cert[64:96], (uint32));
     }
 
