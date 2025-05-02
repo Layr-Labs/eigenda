@@ -66,8 +66,8 @@ var (
 		v2.Queued:              {},
 		v2.Encoded:             {v2.Queued},
 		v2.GatheringSignatures: {v2.Encoded},
-		v2.Complete: {v2.GatheringSignatures},
-		v2.Failed:   {v2.Queued, v2.Encoded, v2.GatheringSignatures},
+		v2.Complete:            {v2.GatheringSignatures},
+		v2.Failed:              {v2.Queued, v2.Encoded, v2.GatheringSignatures},
 	}
 	ErrInvalidStateTransition = errors.New("invalid state transition")
 )
