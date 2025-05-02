@@ -8,6 +8,7 @@ import (
 	"math"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -115,6 +116,8 @@ func NewDispatcher(
 	}, nil
 }
 
+var concurrentBatchCount = atomic.Int64{} // TODO don't merge into master with this enabled
+
 func (d *Dispatcher) Start(ctx context.Context) error {
 	err := d.chainState.Start(ctx)
 	if err != nil {
@@ -130,6 +133,9 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 				return
 			case <-ticker.C:
 
+				count := concurrentBatchCount.Add(1)
+				d.logger.Debug("concurrent batch count: %d", count)
+
 				attestationCtx, cancel := context.WithTimeout(ctx, d.BatchAttestationTimeout)
 				probe := d.metrics.newBatchProbe()
 
@@ -142,6 +148,7 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 					}
 					cancel()
 					probe.End()
+					concurrentBatchCount.Add(-1)
 					continue
 				}
 				go func() {
@@ -150,6 +157,7 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 						d.logger.Error("failed to handle signatures", "err", err)
 					}
 					cancel()
+					concurrentBatchCount.Add(-1)
 					probe.End()
 				}()
 			}
