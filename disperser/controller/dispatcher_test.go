@@ -345,7 +345,7 @@ func TestDispatcherMaxBatchSize(t *testing.T) {
 	}
 
 	for _, key := range objs.blobKeys {
-		err := blobMetadataStore.UpdateBlobStatus(ctx, key, v2.GatheringSignatures)
+		err := components.BlobMetadataStore.UpdateBlobStatus(ctx, key, v2.GatheringSignatures)
 		require.NoError(t, err)
 	}
 
@@ -491,7 +491,7 @@ func TestDispatcherDedupBlobs(t *testing.T) {
 	components.BlobSet.On("RemoveBlob", mock.Anything).Return(nil)
 	objs := setupBlobCerts(t, components.BlobMetadataStore, []core.QuorumID{0, 1}, 1)
 	// It should be dedup'd
-	components.BlobSet.On("Contains", objs.blobKeys[0]).Return(true)
+	components.BlobSet.On("Contains", mock.Anything).Return(true)
 
 	ctx := context.Background()
 	blockNumber := uint64(100)
@@ -636,13 +636,13 @@ func newDispatcherComponents(t *testing.T) *dispatcherComponents {
 	blobSet := &controller.MockBlobSet{}
 	blobSet.On("Size", mock.Anything).Return(0)
 	d, err := controller.NewDispatcher(&controller.DispatcherConfig{
-		PullInterval:            1 * time.Second,
-		FinalizationBlockDelay:  finalizationBlockDelay,
-		AttestationTimeout:      1 * time.Second,
-		BatchAttestationTimeout: 2 * time.Second,
-		SignatureTickInterval:   1 * time.Second,
-		NumRequestRetries:       3,
-		MaxBatchSize:            maxBatchSize,
+		PullInterval:                1 * time.Second,
+		FinalizationBlockDelay:      finalizationBlockDelay,
+		AttestationTimeout:          1 * time.Second,
+		BatchAttestationTimeout:     2 * time.Second,
+		SignatureTickInterval:       1 * time.Second,
+		NumRequestRetries:           3,
+		MaxBatchSize:                maxBatchSize,
 		OnchainStateRefreshInterval: 1 * time.Second,
 	}, blobMetadataStore, pool, chainReader, mockChainState, agg, nodeClientManager, logger, prometheus.NewRegistry(), beforeDispatch, blobSet)
 	require.NoError(t, err)
