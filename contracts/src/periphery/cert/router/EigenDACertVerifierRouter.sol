@@ -48,10 +48,10 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
     /// INTERNAL ///
 
     function _getRBN(bytes calldata certBytes) internal pure returns (uint32) {
-        if (certBytes.length < 64) {
+        if (certBytes.length < 96) {
             revert InvalidCertLength();
         }
-        return abi.decode(certBytes[32:64], (uint32));
+        return abi.decode(certBytes[64:96], (uint32));
     }
 
     /// @notice Given a reference block number, find the closest activation block number

@@ -48,13 +48,21 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         (DATypesV1.NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
             CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
 
-        CertTypes.EigenDACertV3 memory cert = CertTypes.EigenDACertV3({
-            batchHeader: signedBatch.batchHeader,
-            blobInclusionInfo: blobInclusionInfo,
-            nonSignerStakesAndSignature: _nonSignerStakesAndSignature,
-            signedQuorumNumbers: signedQuorumNumbers
-        });
-        assertEq(certVerifierV3.checkDACert(abi.encode(cert)), 1);
+        bytes memory certBytes = abi.encode(
+            CertTypes.EigenDACertV3({
+                batchHeader: signedBatch.batchHeader,
+                blobInclusionInfo: blobInclusionInfo,
+                nonSignerStakesAndSignature: _nonSignerStakesAndSignature,
+                signedQuorumNumbers: signedQuorumNumbers
+            })
+        );
+
+        assertEq(certVerifierV3.checkDACert(certBytes), 1);
+        assertEq(this.dummy(certBytes), signedBatch.batchHeader.referenceBlockNumber);
+    }
+
+    function dummy(bytes calldata cert) external pure returns (uint32) {
+        return abi.decode(cert[64:96], (uint32));
     }
 
     function _getSignedBatchAndBlobVerificationProof(uint256 pseudoRandomNumber, uint8 version)
