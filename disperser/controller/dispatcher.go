@@ -134,7 +134,7 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 			case <-ticker.C:
 
 				count := concurrentBatchCount.Add(1)
-				d.logger.Debug("concurrent batch count: %d", count)
+				d.logger.Debugf("concurrent batch count: %d", count)
 
 				attestationCtx, cancel := context.WithTimeout(ctx, d.BatchAttestationTimeout)
 				probe := d.metrics.newBatchProbe()
