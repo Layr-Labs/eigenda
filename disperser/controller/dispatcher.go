@@ -237,7 +237,7 @@ func (d *Dispatcher) HandleBatch(
 		validatorProbe.SetStage("pool_submission")
 
 		d.pool.Submit(func() {
-			defer probe.End()
+			defer validatorProbe.End()
 			validatorProbe.SetStage("put_dispersal_request")
 
 			req := &corev2.DispersalRequest{
