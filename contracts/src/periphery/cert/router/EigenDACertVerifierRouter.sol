@@ -9,7 +9,7 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
     mapping(uint32 => address) public certVerifiers;
     uint32[] public certVerifierABNs;
 
-    event CertVerifierAdded(uint32 indexed rbn, address indexed certVerifier);
+    event CertVerifierAdded(uint32 indexed abn, address indexed certVerifier);
 
     error ABNNotInFuture(uint32 abn);
     error ABNNotGreaterThanLast(uint32 abn);
