@@ -4,8 +4,6 @@ pragma solidity ^0.8.9;
 
 import {MockRollup} from "./MockRollup.sol";
 import "../MockEigenDADeployer.sol";
-import {EigenDATypesV1 as DATypesV1} from "../../src/libraries/V1/EigenDATypesV1.sol";
-import {EigenDACertVerificationV1Lib} from "../../src/libraries/V1/EigenDACertVerificationV1Lib.sol";
 
 contract MockRollupTest is MockEigenDADeployer {
     using BN254 for BN254.G1Point;

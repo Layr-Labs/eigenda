@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDAThresholdRegistry} from "src/interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDASignatureVerifier} from "src/interfaces/IEigenDASignatureVerifier.sol";
-import {IEigenDARelayRegistry} from "src/interfaces/IEigenDARelayRegistry.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
+import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
 import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
 import {Merkle} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/libraries/Merkle.sol";
 import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
@@ -11,9 +11,8 @@ import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStat
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
-import {NonSignerStakesAndSignature, QuorumStakeTotals} from "src/interfaces/IEigenDAStructs.sol";
-import {EigenDATypesV2 as DATypesV2} from "src/libraries/V2/EigenDATypesV2.sol";
-import {EigenDATypesV1 as DATypesV1} from "src/libraries/V1/EigenDATypesV1.sol";
+import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
 /**
  * @title EigenDACertVerificationV2Lib - EigenDA V2 certificate verification library
@@ -65,7 +64,7 @@ library EigenDACertVerificationV2Lib {
         IEigenDASignatureVerifier signatureVerifier,
         DATypesV2.BatchHeaderV2 memory batchHeader,
         DATypesV2.BlobInclusionInfo memory blobInclusionInfo,
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
+        DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         DATypesV1.SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers,
         bytes memory signedQuorumNumbers
@@ -93,7 +92,7 @@ library EigenDACertVerificationV2Lib {
         DATypesV1.SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
-        (NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
+        (DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
             getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
 
         verifyDACertV2(
@@ -126,7 +125,7 @@ library EigenDACertVerificationV2Lib {
         IEigenDASignatureVerifier signatureVerifier,
         DATypesV2.BatchHeaderV2 memory batchHeader,
         DATypesV2.BlobInclusionInfo memory blobInclusionInfo,
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
+        DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         DATypesV1.SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers,
         bytes memory signedQuorumNumbers
@@ -236,10 +235,10 @@ library EigenDACertVerificationV2Lib {
         bytes32 batchHashRoot,
         bytes memory signedQuorumNumbers,
         uint32 referenceBlockNumber,
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
+        DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
         DATypesV1.SecurityThresholds memory securityThresholds
     ) internal view returns (StatusCode err, bytes memory errParams, uint256 confirmedQuorumsBitmap) {
-        (QuorumStakeTotals memory quorumStakeTotals,) = signatureVerifier.checkSignatures(
+        (DATypesV1.QuorumStakeTotals memory quorumStakeTotals,) = signatureVerifier.checkSignatures(
             batchHashRoot, signedQuorumNumbers, referenceBlockNumber, nonSignerStakesAndSignature
         );
 
@@ -315,7 +314,10 @@ library EigenDACertVerificationV2Lib {
     )
         internal
         view
-        returns (NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers)
+        returns (
+            DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
+            bytes memory signedQuorumNumbers
+        )
     {
         bytes32[] memory nonSignerOperatorIds = new bytes32[](signedBatch.attestation.nonSignerPubkeys.length);
         for (uint256 i = 0; i < signedBatch.attestation.nonSignerPubkeys.length; ++i) {

@@ -2,18 +2,14 @@
 pragma solidity =0.8.12;
 
 import "../MockEigenDADeployer.sol";
-import {EigenDACertVerifierV1} from "src/periphery/EigenDACertVerifierV1.sol";
-import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/libraries/V1/EigenDACertVerificationV1Lib.sol";
-import {EigenDATypesV1 as DATypesV1} from "src/libraries/V1/EigenDATypesV1.sol";
-import {IEigenDABatchMetadataStorage} from "src/interfaces/IEigenDABatchMetadataStorage.sol";
+import {EigenDACertVerifierV1} from "src/periphery/cert/v1/EigenDACertVerifierV1.sol";
+import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/periphery/cert/v1/EigenDACertVerificationV1Lib.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {IEigenDABatchMetadataStorage} from "src/core/interfaces/IEigenDABatchMetadataStorage.sol";
 
 contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
     using stdStorage for StdStorage;
     using BN254 for BN254.G1Point;
-    using CertV1Lib for DATypesV1.BatchHeader;
-    using CertV1Lib for DATypesV1.ReducedBatchHeader;
-    using CertV1Lib for DATypesV1.BlobHeader;
-    using CertV1Lib for DATypesV1.BatchMetadata;
 
     EigenDACertVerifierV1 eigenDACertVerifierV1;
 
@@ -34,8 +30,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
         DATypesV1.BatchHeader memory batchHeader;
-        bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
-        bytes memory secondBlobHash = abi.encodePacked(blobHeader[1].hashBlobHeader());
+        bytes memory firstBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[0]));
+        bytes memory secondBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[1]));
         batchHeader.blobHeadersRoot = keccak256(abi.encodePacked(keccak256(firstBlobHash), keccak256(secondBlobHash)));
         for (uint256 i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
             batchHeader.quorumNumbers =
@@ -54,7 +50,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
 
         stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
             defaultBatchId
-        ).checked_write(batchMetadata.hashBatchMetadata());
+        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
 
         DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
@@ -79,8 +75,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
         blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
         DATypesV1.BatchHeader memory batchHeader;
-        bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
-        bytes memory secondBlobHash = abi.encodePacked(blobHeader[1].hashBlobHeader());
+        bytes memory firstBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[0]));
+        bytes memory secondBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[1]));
         batchHeader.blobHeadersRoot = keccak256(abi.encodePacked(keccak256(firstBlobHash), keccak256(secondBlobHash)));
         // add dummy quorum numbers and quorum threshold percentages making sure confirmationThresholdPercentage = adversaryThresholdPercentage + defaultCodingRatioPercentage
         for (uint256 i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
@@ -98,7 +94,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
         stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
             defaultBatchId
-        ).checked_write(batchMetadata.hashBatchMetadata());
+        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
         DATypesV1.BlobVerificationProof[] memory blobVerificationProofs = new DATypesV1.BlobVerificationProof[](2);
         blobVerificationProofs[0].batchId = defaultBatchId;
         blobVerificationProofs[1].batchId = defaultBatchId;
@@ -148,7 +144,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
 
         stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
             defaultBatchId
-        ).checked_write(batchMetadata.hashBatchMetadata());
+        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
 
         DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
@@ -168,8 +164,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
         DATypesV1.BatchHeader memory batchHeader;
-        bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
-        bytes memory secondBlobHash = abi.encodePacked(blobHeader[1].hashBlobHeader());
+        bytes memory firstBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[0]));
+        bytes memory secondBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[1]));
         batchHeader.blobHeadersRoot = keccak256(abi.encodePacked(keccak256(firstBlobHash), keccak256(secondBlobHash)));
         for (uint256 i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
             batchHeader.quorumNumbers =
@@ -188,7 +184,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
 
         stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
             defaultBatchId
-        ).checked_write(batchMetadata.hashBatchMetadata());
+        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
 
         DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
@@ -214,8 +210,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
         DATypesV1.BatchHeader memory batchHeader;
-        bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
-        bytes memory secondBlobHash = abi.encodePacked(blobHeader[1].hashBlobHeader());
+        bytes memory firstBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[0]));
+        bytes memory secondBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[1]));
         batchHeader.blobHeadersRoot = keccak256(abi.encodePacked(keccak256(firstBlobHash), keccak256(secondBlobHash)));
         for (uint256 i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
             batchHeader.quorumNumbers =
@@ -234,7 +230,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
 
         stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
             defaultBatchId
-        ).checked_write(batchMetadata.hashBatchMetadata());
+        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
 
         DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
@@ -259,8 +255,8 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
         DATypesV1.BatchHeader memory batchHeader;
-        bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
-        bytes memory secondBlobHash = abi.encodePacked(blobHeader[1].hashBlobHeader());
+        bytes memory firstBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[0]));
+        bytes memory secondBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[1]));
         batchHeader.blobHeadersRoot = keccak256(abi.encodePacked(keccak256(firstBlobHash), keccak256(secondBlobHash)));
         // add dummy quorum numbers and quorum threshold percentages making sure confirmationThresholdPercentage = 100
         for (uint256 i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
@@ -280,7 +276,7 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
 
         stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
             defaultBatchId
-        ).checked_write(batchMetadata.hashBatchMetadata());
+        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
 
         DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;

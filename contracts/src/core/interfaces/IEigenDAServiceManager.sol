@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IServiceManager} from "../../lib/eigenlayer-middleware/src/interfaces/IServiceManager.sol";
-import {BLSSignatureChecker} from "../../lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
-import {BN254} from "../../lib/eigenlayer-middleware/src/libraries/BN254.sol";
-import {IEigenDAThresholdRegistry} from "./IEigenDAThresholdRegistry.sol";
-import {EigenDATypesV1 as DATypesV1} from "../libraries/V1/EigenDATypesV1.sol";
-import "./IEigenDAStructs.sol";
+import {IServiceManager} from "lib/eigenlayer-middleware/src/interfaces/IServiceManager.sol";
+import {BLSSignatureChecker} from "lib/eigenlayer-middleware/src/BLSSignatureChecker.sol";
+import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
 interface IEigenDAServiceManager is IServiceManager, IEigenDAThresholdRegistry {
     // EVENTS

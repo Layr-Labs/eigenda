@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 )
 
@@ -12,16 +12,16 @@ import (
 //
 // This struct represents the composition of a eigenDA blob certificate, as it would exist in a rollup inbox.
 type EigenDACert struct {
-	BlobInclusionInfo           contractEigenDACertVerifier.BlobInclusionInfo
-	BatchHeader                 contractEigenDACertVerifier.BatchHeaderV2
-	NonSignerStakesAndSignature contractEigenDACertVerifier.NonSignerStakesAndSignature
+	BlobInclusionInfo           contractEigenDACertVerifier.EigenDATypesV2BlobInclusionInfo
+	BatchHeader                 contractEigenDACertVerifier.EigenDATypesV2BatchHeaderV2
+	NonSignerStakesAndSignature contractEigenDACertVerifier.EigenDATypesV1NonSignerStakesAndSignature
 	SignedQuorumNumbers         []byte
 }
 
 // BuildEigenDACert creates a new EigenDACert from a BlobStatusReply, and NonSignerStakesAndSignature
 func BuildEigenDACert(
 	blobStatusReply *disperser.BlobStatusReply,
-	nonSignerStakesAndSignature *contractEigenDACertVerifier.NonSignerStakesAndSignature,
+	nonSignerStakesAndSignature *contractEigenDACertVerifier.EigenDATypesV1NonSignerStakesAndSignature,
 ) (*EigenDACert, error) {
 
 	bindingInclusionInfo, err := InclusionInfoProtoToBinding(blobStatusReply.GetBlobInclusionInfo())

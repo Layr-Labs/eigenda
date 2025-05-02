@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDAThresholdRegistry} from "src/interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDABatchMetadataStorage} from "src/interfaces/IEigenDABatchMetadataStorage.sol";
-import {IEigenDASignatureVerifier} from "src/interfaces/IEigenDASignatureVerifier.sol";
-import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/libraries/V1/EigenDACertVerificationV1Lib.sol";
-import {EigenDACertVerificationV2Lib as CertV2Lib} from "src/libraries/V2/EigenDACertVerificationV2Lib.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDABatchMetadataStorage} from "src/core/interfaces/IEigenDABatchMetadataStorage.sol";
+import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
+import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/periphery/cert/v1/EigenDACertVerificationV1Lib.sol";
+import {EigenDACertVerificationV2Lib as CertV2Lib} from "src/periphery/cert/v2/EigenDACertVerificationV2Lib.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
-import {NonSignerStakesAndSignature} from "src/interfaces/IEigenDAStructs.sol";
-import {EigenDATypesV2 as DATypesV2} from "src/libraries/V2/EigenDATypesV2.sol";
-import {EigenDATypesV1 as DATypesV1} from "src/libraries/V1/EigenDATypesV1.sol";
+import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
 /**
  * @title A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates
@@ -73,7 +72,7 @@ contract EigenDACertVerifierV2 {
     function verifyDACertV2(
         DATypesV2.BatchHeaderV2 calldata batchHeader,
         DATypesV2.BlobInclusionInfo calldata blobInclusionInfo,
-        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
+        DATypesV1.NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
         bytes memory signedQuorumNumbers
     ) external view {
         CertV2Lib.verifyDACertV2(
@@ -121,7 +120,7 @@ contract EigenDACertVerifierV2 {
     function verifyDACertV2ForZKProof(
         DATypesV2.BatchHeaderV2 calldata batchHeader,
         DATypesV2.BlobInclusionInfo calldata blobInclusionInfo,
-        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
+        DATypesV1.NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
         bytes memory signedQuorumNumbers
     ) external view returns (bool) {
         (CertV2Lib.StatusCode status,) = CertV2Lib.checkDACertV2(
@@ -139,6 +138,16 @@ contract EigenDACertVerifierV2 {
         } else {
             return false;
         }
+    }
+
+    function getNonSignerStakesAndSignature(DATypesV2.SignedBatch calldata signedBatch)
+        external
+        view
+        returns (DATypesV1.NonSignerStakesAndSignature memory)
+    {
+        (DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,) =
+            CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetrieverV2, registryCoordinatorV2, signedBatch);
+        return nonSignerStakesAndSignature;
     }
 
     /**

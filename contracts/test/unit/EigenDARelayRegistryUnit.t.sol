@@ -2,7 +2,6 @@
 pragma solidity =0.8.12;
 
 import "../MockEigenDADeployer.sol";
-import {EigenDATypesV2} from "../../src/libraries/V2/EigenDATypesV2.sol";
 
 contract EigenDARelayRegistryUnit is MockEigenDADeployer {
     event RelayAdded(address indexed relay, uint32 indexed key, string relayURL);
@@ -18,7 +17,7 @@ contract EigenDARelayRegistryUnit is MockEigenDADeployer {
     }
 
     function test_addRelayInfo() public {
-        EigenDATypesV2.RelayInfo memory relayInfo = EigenDATypesV2.RelayInfo({
+        DATypesV2.RelayInfo memory relayInfo = DATypesV2.RelayInfo({
             relayAddress: address(uint160(uint256(keccak256(abi.encodePacked("relay"))))),
             relayURL: "https://relay.com"
         });
@@ -35,7 +34,7 @@ contract EigenDARelayRegistryUnit is MockEigenDADeployer {
     }
 
     function test_addRelayInfo_revert_notOwner() public {
-        EigenDATypesV2.RelayInfo memory relayInfo = EigenDATypesV2.RelayInfo({
+        DATypesV2.RelayInfo memory relayInfo = DATypesV2.RelayInfo({
             relayAddress: address(uint160(uint256(keccak256(abi.encodePacked("relay"))))),
             relayURL: "https://relay.com"
         });

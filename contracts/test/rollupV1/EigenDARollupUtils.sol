@@ -4,10 +4,10 @@ pragma solidity ^0.8.9;
 
 import {Merkle} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/libraries/Merkle.sol";
 import {BN254} from "../../lib/eigenlayer-middleware/src/libraries/BN254.sol";
-import {EigenDACertVerificationV1Lib} from "../../src/libraries/V1/EigenDACertVerificationV1Lib.sol";
-import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
+import {EigenDACertVerificationV1Lib} from "src/periphery/cert/v1/EigenDACertVerificationV1Lib.sol";
+import {IEigenDAServiceManager} from "src/core/interfaces/IEigenDAServiceManager.sol";
 import {BitmapUtils} from "../../lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
-import {EigenDATypesV1 as DATypesV1} from "../../src/libraries/V1/EigenDATypesV1.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
 /**
  * @title Library of functions to be used by smart contracts wanting to prove blobs on EigenDA and open KZG commitments.

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "src/interfaces/IEigenDAServiceManager.sol";
+import "src/core/interfaces/IEigenDAServiceManager.sol";
 
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
-import {EigenDATypesV1 as DATypesV1} from "src/libraries/V1/EigenDATypesV1.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
 
 // # To generate the hashes needed for core/serialization_test.go:
