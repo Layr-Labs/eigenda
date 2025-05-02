@@ -152,6 +152,7 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 					continue
 				}
 				go func() {
+					probe.SetStage("handle_signatures")
 					err := d.HandleSignatures(ctx, attestationCtx, batchData, sigChan)
 					if err != nil {
 						d.logger.Error("failed to handle signatures", "err", err)
@@ -170,10 +171,10 @@ func (d *Dispatcher) Start(ctx context.Context) error {
 
 func (d *Dispatcher) HandleBatch(
 	ctx context.Context,
-	probe *common.SequenceProbe,
+	batchProbe *common.SequenceProbe,
 ) (chan core.SigningMessage, *batchData, error) {
 
-	probe.SetStage("get_reference_block")
+	batchProbe.SetStage("get_reference_block")
 	currentBlockNumber, err := d.chainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get current block number: %w", err)
@@ -182,12 +183,12 @@ func (d *Dispatcher) HandleBatch(
 
 	// Get a batch of blobs to dispatch
 	// This also writes a batch header and blob inclusion info for each blob in metadata store
-	batchData, err := d.NewBatch(ctx, referenceBlockNumber, probe)
+	batchData, err := d.NewBatch(ctx, referenceBlockNumber, batchProbe)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	probe.SetStage("gather_signatures")
+	batchProbe.SetStage("send_requests")
 
 	batch := batchData.Batch
 	state := batchData.OperatorState
@@ -329,6 +330,8 @@ func (d *Dispatcher) HandleBatch(
 		})
 	}
 
+	batchProbe.SetStage("await_responses")
+
 	return sigChan, batchData, nil
 }
 
@@ -347,11 +350,6 @@ func (d *Dispatcher) HandleSignatures(
 	if batchData == nil {
 		return errors.New("batchData is required")
 	}
-
-	handleSignaturesStart := time.Now()
-	defer func() {
-		d.metrics.reportHandleSignaturesLatency(time.Since(handleSignaturesStart))
-	}()
 
 	batchHeaderHash := hex.EncodeToString(batchData.BatchHeaderHash[:])
 	for _, key := range batchData.BlobKeys {
@@ -421,8 +419,6 @@ func (d *Dispatcher) HandleSignatures(
 
 		finalAttestation = receivedQuorumAttestation
 	}
-
-	d.metrics.reportReceiveSignaturesLatency(time.Since(handleSignaturesStart))
 
 	updateBatchStatusStartTime := time.Now()
 	_, quorumPercentages := d.parseQuorumPercentages(finalAttestation.QuorumResults)
