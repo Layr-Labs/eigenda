@@ -70,10 +70,10 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL including Trail of Bits Go Queries
-      uses: github/codeql-action/init@dd746615b3b9d728a6a37ca2045b68ca76d4841a #3.28.8
+      uses: github/codeql-action/init@28deaeda66b76a05916b6923827895f2b14ab387 #3.28.16
       with:
         languages: go
         packs: trailofbits/go-queries
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@dd746615b3b9d728a6a37ca2045b68ca76d4841a #3.28.8
+      uses: github/codeql-action/analyze@28deaeda66b76a05916b6923827895f2b14ab387 #3.28.8
