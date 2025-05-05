@@ -595,8 +595,9 @@ func (d *DiskTable) CacheAwareGet(
 		}()
 	}
 
-	// First, check if the key is in the unflushed data map.
-	// If so, return it from there.
+	// First, check if the key is in the unflushed data map. If so, return it from there.
+	// Performance wise, this has equivalent semantics to reading the value from
+	// a cache, so we'd might as well count it as a cache hit.
 	var rawValue any
 	if rawValue, exists = d.unflushedDataCache.Load(util.UnsafeBytesToString(key)); exists {
 		value = rawValue.([]byte)
@@ -729,7 +730,16 @@ func (d *DiskTable) Flush() error {
 	return nil
 }
 
-func (d *DiskTable) SetCacheSize(_ uint64) error {
+func (d *DiskTable) SetWriteCacheSize(size uint64) error {
+	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+		return fmt.Errorf("Cannot process SetCacheSize() request, DB is in panicked state due to error: %w", err)
+	}
+
+	// this implementation does not provide a cache, if a cache is needed then it must be provided by a wrapper
+	return nil
+}
+
+func (d *DiskTable) SetReadCacheSize(size uint64) error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
 		return fmt.Errorf("Cannot process SetCacheSize() request, DB is in panicked state due to error: %w", err)
 	}

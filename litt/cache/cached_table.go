@@ -14,15 +14,24 @@ var _ litt.ManagedTable = &cachedTable{}
 
 // cachedTable wraps a table and adds caching functionality.
 type cachedTable struct {
-	base  litt.ManagedTable
-	cache cache.Cache[string, []byte]
+	// The base table to wrap.
+	base litt.ManagedTable
+	// This cache holds values that were recently written to the table.
+	writeCache cache.Cache[string, []byte]
+	// This cache holds values that were recently read from the base table.
+	readCache cache.Cache[string, []byte]
 }
 
-// NewCachedTable creates a new table out of a base table and a cache.
-func NewCachedTable(base litt.ManagedTable, cache cache.Cache[string, []byte]) litt.ManagedTable {
+// NewCachedTable creates wrapper around a table that caches recently written and read values.
+func NewCachedTable(
+	base litt.ManagedTable,
+	writeCache cache.Cache[string, []byte],
+	readCache cache.Cache[string, []byte],
+) litt.ManagedTable {
 	return &cachedTable{
-		base:  base,
-		cache: cache,
+		base:       base,
+		writeCache: writeCache,
+		readCache:  readCache,
 	}
 }
 
@@ -43,7 +52,7 @@ func (c *cachedTable) Put(key []byte, value []byte) error {
 	if err != nil {
 		return err
 	}
-	c.cache.Put(string(key), value)
+	c.writeCache.Put(string(key), value)
 	return nil
 }
 
@@ -53,7 +62,7 @@ func (c *cachedTable) PutBatch(batch []*types.KVPair) error {
 		return err
 	}
 	for _, kv := range batch {
-		c.cache.Put(util.UnsafeBytesToString(kv.Key), kv.Value)
+		c.writeCache.Put(util.UnsafeBytesToString(kv.Key), kv.Value)
 	}
 	return nil
 }
@@ -69,10 +78,11 @@ func (c *cachedTable) Get(key []byte) (value []byte, exists bool, err error) {
 // "best effort" optimization, and so it's not worth adding extra locking in order to prevent this edge case.
 //
 // Scenario:
-// - Thread A calls Put() on key K
-// - Thread B calls CacheAwareGet() on key K with onlyReadFromCache set to true
-// - Thread B checks the cache, and finds that the value is not there
-// - Thread A finishes the Put() and returns. LittDB flushes the value out to disk.
+// - Thread A calls Put() on key K, and Put() does not return right away.
+// - Thread B calls CacheAwareGet() on key K with onlyReadFromCache set to true.
+// - Thread B checks the cache, and finds that the value is not there.
+// - LittDB flushes the value out to disk before thread A's Put() returns, specifically before thread A inserts
+//   the value into the write cache. The timing of this is exceptionally unlikely, but not impossible.
 // - Thread A gets to the part of CacheAwareGet() where it checks the base table for the value. Since the
 //   base table has flushed the value out to disk, it says that the value exists but does not fetch it since
 //   onlyReadFromCache is true.
@@ -84,10 +94,16 @@ func (c *cachedTable) CacheAwareGet(
 
 	stringKey := util.UnsafeBytesToString(key)
 
-	value, exists = c.cache.Get(stringKey)
+	value, exists = c.writeCache.Get(stringKey)
 	if exists {
-		// The value is in the cache
+		// The value was recently written
 		return value, true, true, nil
+	} else {
+		value, exists = c.readCache.Get(stringKey)
+		if exists {
+			// The value was recently read
+			return value, true, true, nil
+		}
 	}
 
 	value, exists, hot, err = c.base.CacheAwareGet(key, onlyReadFromCache)
@@ -96,14 +112,19 @@ func (c *cachedTable) CacheAwareGet(
 	}
 
 	if exists {
-		c.cache.Put(stringKey, value)
+		c.readCache.Put(stringKey, value)
 	}
 
 	return value, exists, hot, nil
 }
 
 func (c *cachedTable) Exists(key []byte) (exists bool, err error) {
-	_, exists = c.cache.Get(util.UnsafeBytesToString(key))
+	_, exists = c.writeCache.Get(util.UnsafeBytesToString(key))
+	if exists {
+		return true, nil
+	}
+
+	_, exists = c.readCache.Get(util.UnsafeBytesToString(key))
 	if exists {
 		return true, nil
 	}
@@ -119,9 +140,18 @@ func (c *cachedTable) SetTTL(ttl time.Duration) error {
 	return c.base.SetTTL(ttl)
 }
 
-func (c *cachedTable) SetCacheSize(size uint64) error {
-	c.cache.SetMaxWeight(size)
-	err := c.base.SetCacheSize(size)
+func (c *cachedTable) SetWriteCacheSize(size uint64) error {
+	c.writeCache.SetMaxWeight(size)
+	err := c.base.SetWriteCacheSize(size)
+	if err != nil {
+		return fmt.Errorf("failed to set base table cache size: %w", err)
+	}
+	return nil
+}
+
+func (c *cachedTable) SetReadCacheSize(size uint64) error {
+	c.readCache.SetMaxWeight(size)
+	err := c.base.SetReadCacheSize(size)
 	if err != nil {
 		return fmt.Errorf("failed to set base table cache size: %w", err)
 	}

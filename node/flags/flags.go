@@ -409,12 +409,19 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_ENABLED"),
 	}
-	LittDBCacheSizeGBFlag = cli.IntFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "litt-db-cache-size-gb"),
-		Usage:    "The size of the LittDB cache in gigabytes.",
+	LittDBWriteCacheSizeGBFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-gb"),
+		Usage:    "The size of the LittDB write cache in gigabytes.",
 		Required: false,
 		Value:    16 * units.GiB,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_CACHE_SIZE_GB"),
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_GB"),
+	}
+	LittDBReadCacheSizeGBFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-read-cache-size-gb"),
+		Usage:    "The size of the LittDB write cache in gigabytes.",
+		Required: false,
+		Value:    1 * units.GiB,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_GB"),
 	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
@@ -549,6 +556,8 @@ var optionalFlags = []cli.Flag{
 	LevelDBEnableSyncWritesV2Flag,
 	LittDBEnabledFlag,
 	DownloadPoolSizeFlag,
+	LittDBWriteCacheSizeGBFlag,
+	LittDBReadCacheSizeGBFlag,
 }
 
 func init() {

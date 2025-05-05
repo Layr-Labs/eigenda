@@ -173,8 +173,11 @@ func (m *memTable) Close() error {
 	return nil
 }
 
-func (m *memTable) SetCacheSize(size uint64) error {
-	// The memory table doesn't have a cache... it's already one giant cache.
+func (m *memTable) SetWriteCacheSize(size uint64) error {
+	return nil
+}
+
+func (m *memTable) SetReadCacheSize(size uint64) error {
 	return nil
 }
 

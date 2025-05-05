@@ -95,15 +95,25 @@ type Table interface {
 	// writes that can be performed.
 	SetShardingFactor(shardingFactor uint32) error
 
-	// SetCacheSize sets the cache size, in bytes, for the table. For table implementations without a cache, this
-	// method does nothing. The cache is used to store recently inserted or accessed data. When reading from the table,
-	// if the requested data is present in the cache, the cache is used instead of reading from disk. Reading from the
+	// SetWriteCacheSize sets the write cache size, in bytes, for the table. For table implementations without a cache,
+	// this method does nothing. The cache is used to store recently written data. When reading from the table,
+	// if the requested data is present in this cache, the cache is used instead of reading from disk. Reading from the
 	// cache is significantly faster than reading from the disk.
 	//
 	// If the cache size is set to 0 (default), the cache is disabled. The size of each cache entry is equal to the sum
 	// of key length and the value length. Note that the actual in-memory footprint of the cache will be slightly
 	// larger than the cache size due to implementation overhead (e.g. pointers, slice headers, map entries, etc.).
-	SetCacheSize(size uint64) error
+	SetWriteCacheSize(size uint64) error
+
+	// SetReadCacheSize sets the read cache size, in bytes, for the table. For table implementations without a cache,
+	// this method does nothing. The cache is used to store recently read data. When reading from the table,
+	// if the requested data is present in this cache, the cache is used instead of reading from disk. Reading from the
+	// cache is significantly faster than reading from the disk.
+	//
+	// If the cache size is set to 0 (default), the cache is disabled. The size of each cache entry is equal to the sum
+	// of key length and the value length. Note that the actual in-memory footprint of the cache will be slightly
+	// larger than the cache size due to implementation overhead (e.g. pointers, slice headers, map entries, etc.).
+	SetReadCacheSize(size uint64) error
 }
 
 // ManagedTable is a Table that can perform garbage collection on its data. This type should not be directly used
