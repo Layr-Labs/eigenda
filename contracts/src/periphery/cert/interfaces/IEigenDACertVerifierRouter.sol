@@ -5,5 +5,5 @@ import {IEigenDACertVerifierBase} from "src/periphery/cert/interfaces/IEigenDACe
 
 interface IEigenDACertVerifierRouter is IEigenDACertVerifierBase {
     /// @notice Returns the address for a cert verifier at a given ABN.
-    function getCertVerifierAt(uint32 abn) external view returns (address);
+    function getCertVerifierAt(uint32 rbn) external view returns (address);
 }

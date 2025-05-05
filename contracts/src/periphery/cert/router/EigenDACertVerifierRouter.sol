@@ -23,8 +23,8 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
         return IEigenDACertVerifier(getCertVerifierAt(_getRBN(certBytes))).checkDACert(certBytes);
     }
 
-    function getCertVerifierAt(uint32 abn) public view returns (address) {
-        return certVerifiers[_findClosestRegisteredABN(abn)];
+    function getCertVerifierAt(uint32 rbn) public view returns (address) {
+        return certVerifiers[_findClosestRegisteredABN(rbn)];
     }
 
     /// ADMIN ///
