@@ -21,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/docker/go-units"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -267,6 +268,11 @@ func NewValidatorStore(
 		chunkTable, err = littDB.GetTable(chunksTableName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get chunks table: %w", err)
+		}
+
+		err = chunkTable.SetCacheSize(uint64(config.LittDBChunkCacheSizeGB * units.GiB))
+		if err != nil {
+			return nil, fmt.Errorf("failed to set cache size for chunks table: %w", err)
 		}
 
 		// A prior implementation stored data here. Delete it if it exists.
