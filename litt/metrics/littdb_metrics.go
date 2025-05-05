@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/cache"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -21,9 +22,6 @@ import (
 //  - average segment span (i.e. difference in time between first and last values written to a segment)
 //  - segment creation rate
 //  - used/unused segment space (useful for detecting shard assignment issues)
-//  - cache size, entry count
-//  - cache size, byte count
-//  - lifespan of cache entries
 
 // LittDBMetrics encapsulates metrics for a LittDB.
 type LittDBMetrics struct {
@@ -75,6 +73,12 @@ type LittDBMetrics struct {
 
 	// The latency of garbage collection operations.1
 	garbageCollectionLatency *prometheus.SummaryVec
+
+	// Metrics for the write cache.
+	writeCacheMetrics *cache.CacheMetrics
+
+	// Metrics for the read cache.
+	readCacheMetrics *cache.CacheMetrics
 }
 
 // NewLittDBMetrics creates a new LittDBMetrics instance.
@@ -239,6 +243,18 @@ func NewLittDBMetrics(registry *prometheus.Registry, namespace string) *LittDBMe
 		[]string{"table"},
 	)
 
+	writeCacheMetrics := cache.NewCacheMetrics(
+		registry,
+		namespace,
+		"chunk_write",
+	)
+
+	readCacheMetrics := cache.NewCacheMetrics(
+		registry,
+		namespace,
+		"chunk_read",
+	)
+
 	return &LittDBMetrics{
 		tableSizeInBytes:         tableSizeInBytes,
 		tableKeyCount:            tableKeyCount,
@@ -256,6 +272,8 @@ func NewLittDBMetrics(registry *prometheus.Registry, namespace string) *LittDBMe
 		garbageCollectionLatency: garbageCollectionLatency,
 		segmentFlushLatency:      segmentFlushLatency,
 		keymapFlushLatency:       keymapFlushLatency,
+		writeCacheMetrics:        writeCacheMetrics,
+		readCacheMetrics:         readCacheMetrics,
 	}
 }
 
@@ -351,4 +369,18 @@ func (m *LittDBMetrics) ReportGarbageCollectionLatency(tableName string, latency
 	}
 
 	m.garbageCollectionLatency.WithLabelValues(tableName).Observe(common.ToMilliseconds(latency))
+}
+
+func (m *LittDBMetrics) GetWriteCacheMetrics() *cache.CacheMetrics {
+	if m == nil {
+		return nil
+	}
+	return m.writeCacheMetrics
+}
+
+func (m *LittDBMetrics) GetReadCacheMetrics() *cache.CacheMetrics {
+	if m == nil {
+		return nil
+	}
+	return m.readCacheMetrics
 }

@@ -226,10 +226,10 @@ func buildCachedMemTable(
 
 	writeCache := cache.NewFIFOCache[string, []byte](500, func(k string, v []byte) uint64 {
 		return uint64(len(k) + len(v))
-	})
+	}, nil)
 	readCache := cache.NewFIFOCache[string, []byte](500, func(k string, v []byte) uint64 {
 		return uint64(len(k) + len(v))
-	})
+	}, nil)
 
 	return tablecache.NewCachedTable(baseTable, writeCache, readCache), nil
 }
@@ -246,10 +246,10 @@ func buildCachedMemKeyDiskTable(
 
 	writeCache := cache.NewFIFOCache[string, []byte](500, func(k string, v []byte) uint64 {
 		return uint64(len(k) + len(v))
-	})
+	}, nil)
 	readCache := cache.NewFIFOCache[string, []byte](500, func(k string, v []byte) uint64 {
 		return uint64(len(k) + len(v))
-	})
+	}, nil)
 
 	return tablecache.NewCachedTable(baseTable, writeCache, readCache), nil
 }
@@ -266,10 +266,10 @@ func buildCachedLevelDBKeyDiskTable(
 
 	writeCache := cache.NewFIFOCache[string, []byte](500, func(k string, v []byte) uint64 {
 		return uint64(len(k) + len(v))
-	})
+	}, nil)
 	readCache := cache.NewFIFOCache[string, []byte](500, func(k string, v []byte) uint64 {
 		return uint64(len(k) + len(v))
-	})
+	}, nil)
 
 	return tablecache.NewCachedTable(baseTable, writeCache, readCache), nil
 }
