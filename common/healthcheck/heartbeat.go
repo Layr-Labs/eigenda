@@ -20,7 +20,8 @@ func HeartbeatMonitor(filePath string, maxStallDuration time.Duration, livenessC
 	// Map to keep track of last heartbeat per component
 	lastHeartbeats := make(map[string]time.Time)
 	// Create a timer that periodically checks for stalls
-	stallTimer := time.NewTimer(maxStallDuration)
+	stallTicker := time.NewTicker(maxStallDuration)
+	defer stallTicker.Stop()
 
 	for {
 		select {
@@ -46,9 +47,9 @@ func HeartbeatMonitor(filePath string, maxStallDuration time.Duration, livenessC
 				logger.Info("Wrote heartbeat file", "path", filePath)
 			}
 
-			stallTimer.Reset(maxStallDuration)
+			stallTicker.Reset(maxStallDuration)
 
-		case <-stallTimer.C:
+		case <-stallTicker.C:
 			// Check for components that haven't sent a heartbeat recently
 			now := time.Now()
 			var staleComponents []string
@@ -66,7 +67,6 @@ func HeartbeatMonitor(filePath string, maxStallDuration time.Duration, livenessC
 			} else {
 				logger.Warn("No heartbeat received recently, but no components are stale")
 			}
-			stallTimer.Reset(maxStallDuration)
 		}
 	}
 }

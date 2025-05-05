@@ -190,6 +190,20 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_KMS_KEY_ID"),
 	}
+	ControllerReadinessProbePathFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "controller-readiness-probe-path"),
+		Usage:    "The path to the file that collects readiness signals of controller",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_READINESS_PROBE_PATH"),
+		Value:    "/tmp/controller-ready",
+	}
+	ControllerHealthProbePathFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "controller-health-probe-path"),
+		Usage:    "The path to the file that collects health signals of controller",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_HEALTH_PROBE_PATH"),
+		Value:    "/tmp/controller-health",
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -224,6 +238,8 @@ var optionalFlags = []cli.Flag{
 	MetricsPortFlag,
 	DisperserStoreChunksSigningDisabledFlag,
 	DisperserKMSKeyIDFlag,
+	ControllerReadinessProbePathFlag,
+	ControllerHealthProbePathFlag,
 }
 
 var Flags []cli.Flag

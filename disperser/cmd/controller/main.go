@@ -38,9 +38,7 @@ var (
 	gitCommit string
 	gitDate   string
 
-	controllerReadinessProbePath = "/tmp/controller-ready"
-	controllerHealthProbePath    = "/tmp/controller-health"
-	controllerMaxStallDuration   = 240 * time.Second
+	controllerMaxStallDuration = 240 * time.Second
 )
 
 func main() {
@@ -71,8 +69,8 @@ func RunController(ctx *cli.Context) error {
 	}
 
 	// Reset readiness probe upon start-up
-	if err := os.Remove(controllerReadinessProbePath); err != nil {
-		logger.Warn("Failed to clean up readiness file", "error", err, "path", controllerReadinessProbePath)
+	if err := os.Remove(config.ControllerReadinessProbePath); err != nil {
+		logger.Warn("Failed to clean up readiness file", "error", err, "path", config.ControllerReadinessProbePath)
 	}
 
 	dynamoClient, err := dynamodb.NewClient(config.AwsClientConfig, logger)
@@ -233,17 +231,17 @@ func RunController(ctx *cli.Context) error {
 	}()
 
 	// Create readiness probe file once the controller starts successfully
-	if _, err := os.Create(controllerReadinessProbePath); err != nil {
-		logger.Warn("Failed to create readiness file", "error", err, "path", controllerReadinessProbePath)
+	if _, err := os.Create(config.ControllerReadinessProbePath); err != nil {
+		logger.Warn("Failed to create readiness file", "error", err, "path", config.ControllerReadinessProbePath)
 	}
 
-	if _, err := os.Create(controllerHealthProbePath); err != nil {
+	if _, err := os.Create(config.ControllerHealthProbePath); err != nil {
 		logger.Warn("Failed to create healthProbe file: %v", err)
 	}
 
 	// Start heartbeat monitor
 	go func() {
-		err := healthcheck.HeartbeatMonitor(controllerHealthProbePath, controllerMaxStallDuration, controllerLivenessChan, logger)
+		err := healthcheck.HeartbeatMonitor(config.ControllerHealthProbePath, controllerMaxStallDuration, controllerLivenessChan, logger)
 		if err != nil {
 			logger.Warn("Failed to start heartbeatMonitor: %v", err)
 		}
