@@ -23,8 +23,8 @@ import (
 /*
 	                        ...........................................
 	                        .    chunk downloading/verification       .
-	                        .          happens in parallel   	      .
-	                        .         (for different chunks)  	      .
+	                        .          happens in parallel            .
+	                        .         (for different chunks)          .
 	                        ...........................................
 	                                 |                      |
 	                                 v                      v
