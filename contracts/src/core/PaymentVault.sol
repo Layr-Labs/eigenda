@@ -1,150 +1,72 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {PaymentVaultStorage} from "./PaymentVaultStorage.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {AccessControlLib} from "src/core/libraries/AccessControlLib.sol";
+import {PaymentVaultLib, PaymentVaultStorage} from "src/core/libraries/v3/PaymentVaultLib.sol";
+import {EigenDATypesV3} from "src/core/libraries/v3/EigenDATypesV3.sol";
+import {Constants} from "src/core/libraries/Constants.sol";
+import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 
-/**
- * @title Entrypoint for making reservations and on demand payments for EigenDA.
- * @author Layr Labs, Inc.
- *
- */
-contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
-    constructor() {
-        _disableInitializers();
+contract PaymentVault is IPaymentVault {
+    modifier onlyOwner() {
+        _onlyOwner();
+        _;
     }
 
-    receive() external payable {
-        _deposit(msg.sender, msg.value);
+    modifier onlyQuorumOwner(uint64 quorumId) {
+        _onlyQuorumOwner(quorumId);
+        _;
     }
 
-    fallback() external payable {
-        _deposit(msg.sender, msg.value);
+    // TODO: ADD INITIALIZER MODIFIER
+    function initialize(address owner, uint64 schedulePeriod) external {
+        AccessControlLib.grantRole(Constants.OWNER_ROLE, owner);
+        PaymentVaultStorage.layout().schedulePeriod = schedulePeriod;
     }
 
-    function initialize(
-        address _initialOwner,
-        uint64 _minNumSymbols,
-        uint64 _pricePerSymbol,
-        uint64 _priceUpdateCooldown,
-        uint64 _globalSymbolsPerPeriod,
-        uint64 _reservationPeriodInterval,
-        uint64 _globalRatePeriodInterval
-    ) public initializer {
-        _transferOwnership(_initialOwner);
-
-        minNumSymbols = _minNumSymbols;
-        pricePerSymbol = _pricePerSymbol;
-        priceUpdateCooldown = _priceUpdateCooldown;
-        lastPriceUpdateTime = uint64(block.timestamp);
-
-        globalSymbolsPerPeriod = _globalSymbolsPerPeriod;
-        reservationPeriodInterval = _reservationPeriodInterval;
-        globalRatePeriodInterval = _globalRatePeriodInterval;
-    }
-
-    /**
-     * @notice This function is called by EigenDA governance to store reservations
-     * @param _account is the address to submit the reservation for
-     * @param _reservation is the Reservation struct containing details of the reservation
-     */
-    function setReservation(address _account, Reservation memory _reservation) external onlyOwner {
-        _checkQuorumSplit(_reservation.quorumNumbers, _reservation.quorumSplits);
-        require(
-            _reservation.endTimestamp > _reservation.startTimestamp,
-            "end timestamp must be greater than start timestamp"
-        );
-        reservations[_account] = _reservation;
-        emit ReservationUpdated(_account, _reservation);
-    }
-
-    /**
-     * @notice This function is called to deposit funds for on demand payment
-     * @param _account is the address to deposit the funds for
-     */
-    function depositOnDemand(address _account) external payable {
-        _deposit(_account, msg.value);
-    }
-
-    function setPriceParams(uint64 _minNumSymbols, uint64 _pricePerSymbol, uint64 _priceUpdateCooldown)
+    function createReservation(uint64 quorumId, EigenDATypesV3.Reservation memory reservation)
         external
-        onlyOwner
+        onlyQuorumOwner(quorumId)
     {
-        require(block.timestamp >= lastPriceUpdateTime + priceUpdateCooldown, "price update cooldown not surpassed");
-
-        emit PriceParamsUpdated(
-            minNumSymbols, _minNumSymbols, pricePerSymbol, _pricePerSymbol, priceUpdateCooldown, _priceUpdateCooldown
+        PaymentVaultLib.createReservation(
+            quorumId, msg.sender, reservation, PaymentVaultStorage.layout().schedulePeriod
         );
-
-        pricePerSymbol = _pricePerSymbol;
-        minNumSymbols = _minNumSymbols;
-        priceUpdateCooldown = _priceUpdateCooldown;
-        lastPriceUpdateTime = uint64(block.timestamp);
     }
 
-    function setGlobalSymbolsPerPeriod(uint64 _globalSymbolsPerPeriod) external onlyOwner {
-        emit GlobalSymbolsPerPeriodUpdated(globalSymbolsPerPeriod, _globalSymbolsPerPeriod);
-        globalSymbolsPerPeriod = _globalSymbolsPerPeriod;
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "New owner is the zero address");
+        AccessControlLib.transferRole(Constants.OWNER_ROLE, msg.sender, newOwner);
     }
 
-    function setReservationPeriodInterval(uint64 _reservationPeriodInterval) external onlyOwner {
-        emit ReservationPeriodIntervalUpdated(reservationPeriodInterval, _reservationPeriodInterval);
-        reservationPeriodInterval = _reservationPeriodInterval;
+    function initializeQuorum(
+        uint64 quorumId,
+        address newOwner,
+        EigenDATypesV3.QuorumPaymentProtocolConfig memory protocolCfg
+    ) external onlyOwner {
+        require(
+            AccessControlLib.getRoleMemberCount(Constants.QUORUM_OWNER_ROLE(quorumId)) == 0, "Quorum owner already set"
+        );
+        AccessControlLib.grantRole(Constants.QUORUM_OWNER_ROLE(quorumId), newOwner);
+        PaymentVaultStorage.layout().quorum[quorumId].protocolCfg = protocolCfg;
     }
 
-    function setGlobalRatePeriodInterval(uint64 _globalRatePeriodInterval) external onlyOwner {
-        emit GlobalRatePeriodIntervalUpdated(globalRatePeriodInterval, _globalRatePeriodInterval);
-        globalRatePeriodInterval = _globalRatePeriodInterval;
+    function setQuorumPaymentConfig(uint64 quorumId, EigenDATypesV3.QuorumPaymentConfig memory paymentConfig)
+        external
+        onlyQuorumOwner(quorumId)
+    {
+        PaymentVaultStorage.layout().quorum[quorumId].cfg = paymentConfig;
     }
 
-    function withdraw(uint256 _amount) external onlyOwner {
-        (bool success,) = payable(owner()).call{value: _amount}("");
-        require(success);
+    function transferQuorumOwnership(uint64 quorumId, address newOwner) external onlyQuorumOwner(quorumId) {
+        require(newOwner != address(0), "New owner is the zero address");
+        AccessControlLib.transferRole(Constants.QUORUM_OWNER_ROLE(quorumId), msg.sender, newOwner);
     }
 
-    function withdrawERC20(IERC20 _token, uint256 _amount) external onlyOwner {
-        _token.transfer(owner(), _amount);
+    function _onlyOwner() internal view virtual {
+        require(AccessControlLib.hasRole(Constants.OWNER_ROLE, msg.sender), "Not owner");
     }
 
-    function _checkQuorumSplit(bytes memory _quorumNumbers, bytes memory _quorumSplits) internal pure {
-        require(_quorumNumbers.length == _quorumSplits.length, "arrays must have the same length");
-        uint8 total;
-        for (uint256 i; i < _quorumSplits.length; ++i) {
-            total += uint8(_quorumSplits[i]);
-        }
-        require(total == 100, "sum of quorumSplits must be 100");
-    }
-
-    function _deposit(address _account, uint256 _amount) internal {
-        require(_amount <= type(uint80).max, "amount must be less than or equal to 80 bits");
-        onDemandPayments[_account].totalDeposit += uint80(_amount);
-        emit OnDemandPaymentUpdated(_account, uint80(_amount), onDemandPayments[_account].totalDeposit);
-    }
-
-    /// @notice Fetches the current reservation for an account
-    function getReservation(address _account) external view returns (Reservation memory) {
-        return reservations[_account];
-    }
-
-    /// @notice Fetches the current reservations for a set of accounts
-    function getReservations(address[] memory _accounts) external view returns (Reservation[] memory _reservations) {
-        _reservations = new Reservation[](_accounts.length);
-        for (uint256 i; i < _accounts.length; ++i) {
-            _reservations[i] = reservations[_accounts[i]];
-        }
-    }
-
-    /// @notice Fetches the current total on demand balance of an account
-    function getOnDemandTotalDeposit(address _account) external view returns (uint80) {
-        return onDemandPayments[_account].totalDeposit;
-    }
-
-    /// @notice Fetches the current total on demand balances for a set of accounts
-    function getOnDemandTotalDeposits(address[] memory _accounts) external view returns (uint80[] memory _payments) {
-        _payments = new uint80[](_accounts.length);
-        for (uint256 i; i < _accounts.length; ++i) {
-            _payments[i] = onDemandPayments[_accounts[i]].totalDeposit;
-        }
+    function _onlyQuorumOwner(uint64 quorumId) internal view virtual {
+        require(AccessControlLib.hasRole(Constants.QUORUM_OWNER_ROLE(quorumId), msg.sender), "Not quorum owner");
     }
 }
