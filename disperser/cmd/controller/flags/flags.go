@@ -203,18 +203,18 @@ var (
 	}
 	ControllerReadinessProbePathFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "controller-readiness-probe-path"),
-		Usage:    "The path to the file that collects readiness signals of controller",
+		Usage:    "File path for the readiness probe; created once the controller is fully started and ready to serve traffic",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_READINESS_PROBE_PATH"),
 		Value:    "/tmp/controller-ready",
 	}
 	ControllerHealthProbePathFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "controller-health-probe-path"),
-		Usage:    "The path to the file that collects health signals of controller",
+		Usage:    "File path for the liveness (health) probe; updated regularly to indicate the controller is still alive and healthy",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_HEALTH_PROBE_PATH"),
 		Value:    "/tmp/controller-health",
-  }
+	}
 	SignificantSigningThresholdPercentageFlag = cli.UintFlag{
 		Name: common.PrefixFlag(FlagPrefix, "significant-signing-threshold-percentage"),
 		Usage: "Percentage of stake that represents a 'significant' signing threshold. Currently used to track" +
