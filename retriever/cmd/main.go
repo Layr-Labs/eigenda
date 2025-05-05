@@ -64,9 +64,9 @@ func RetrieverMain(ctx *cli.Context) error {
 	gs := grpc.NewServer(
 		opt,
 		grpc.ChainUnaryInterceptor(
-		// TODO(ian-shim): Add interceptors
-		// correlation.UnaryServerInterceptor(),
-		// logger.UnaryServerInterceptor(*s.logger.Logger),
+			// TODO(ian-shim): Add interceptors
+			// correlation.UnaryServerInterceptor(),
+			// logger.UnaryServerInterceptor(*s.logger.Logger),
 		),
 	)
 
@@ -129,7 +129,7 @@ func RetrieverMain(ctx *cli.Context) error {
 		clientConfig := validator.DefaultClientConfig()
 		clientConfig.ConnectionPoolSize = config.NumConnections
 
-		retrievalClient := clientsv2.NewValidatorClient(logger, tx, cs, v, clientConfig)
+		retrievalClient := clientsv2.NewValidatorClient(logger, tx, cs, v, clientConfig, nil)
 		retrieverServiceServer := retrieverv2.NewServer(config, logger, retrievalClient, cs)
 		retrieverServiceServer.Start(context.Background())
 

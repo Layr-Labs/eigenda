@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -135,13 +136,15 @@ func createValidatorPayloadRetriever() (*payloadretrieval.ValidatorPayloadRetrie
 		return nil, fmt.Errorf("create kzg verifier: %w", err)
 	}
 
+	clientConfig := validator.DefaultClientConfig()
+
 	// Create the retrieval client for fetching blobs from DA nodes
-	retrievalClient := clients.NewRetrievalClient(
+	retrievalClient := validator.NewValidatorClient(
 		logger,
 		ethReader,
 		chainState,
 		kzgVerifier,
-		10, // Number of concurrent connections to validators
+		clientConfig,
 	)
 
 	// Create the ValidatorPayloadRetriever config
@@ -161,8 +164,8 @@ func createRelayClient(
 	logger logging.Logger,
 	ethClient common.EthClient,
 	relayRegistryAddress gethcommon.Address,
-) (clients.RelayClient, error) {
-	config := &clients.RelayClientConfig{
+) (relay.RelayClient, error) {
+	config := &relay.RelayClientConfig{
 		UseSecureGrpcFlag:  true,
 		MaxGRPCMessageSize: 100 * 1024 * 1024, // 100 MB message size limit
 	}
@@ -172,7 +175,7 @@ func createRelayClient(
 		return nil, fmt.Errorf("create relay url provider: %w", err)
 	}
 
-	return clients.NewRelayClient(
+	return relay.NewRelayClient(
 		config,
 		logger,
 		relayUrlProvider)

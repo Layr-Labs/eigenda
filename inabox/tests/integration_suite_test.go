@@ -214,7 +214,7 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		return err
 	}
 	clientConfig := validator.DefaultClientConfig()
-	retrievalClientV2 = clientsv2.NewValidatorClient(logger, chainReader, cs, v, clientConfig)
+	retrievalClientV2 = clientsv2.NewValidatorClient(logger, chainReader, cs, v, clientConfig, nil)
 
 	return nil
 }

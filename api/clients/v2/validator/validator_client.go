@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // ValidatorClient is an object that can retrieve blobs from the validator nodes.
@@ -25,18 +26,6 @@ type ValidatorClient interface {
 		referenceBlockNumber uint64,
 		quorumID core.QuorumID,
 	) ([]byte, error)
-
-	// GetBlobWithProbe is the same as GetBlob, but it also takes a probe object to capture metrics. No metrics are
-	// captured if the probe is nil.
-	GetBlobWithProbe(
-		ctx context.Context,
-		blobKey corev2.BlobKey,
-		blobVersion corev2.BlobVersion,
-		blobCommitments encoding.BlobCommitments,
-		referenceBlockNumber uint64,
-		quorumID core.QuorumID,
-		probe *common.SequenceProbe,
-	) ([]byte, error)
 }
 
 type validatorClient struct {
@@ -47,6 +36,7 @@ type validatorClient struct {
 	config         *ValidatorClientConfig
 	connectionPool *workerpool.WorkerPool
 	computePool    *workerpool.WorkerPool
+	stageTimer     *common.StageTimer
 }
 
 var _ ValidatorClient = &validatorClient{}
@@ -58,6 +48,7 @@ func NewValidatorClient(
 	chainState core.ChainState,
 	verifier encoding.Verifier,
 	config *ValidatorClientConfig,
+	registry *prometheus.Registry,
 ) ValidatorClient {
 
 	if config.ConnectionPoolSize <= 0 {
@@ -67,6 +58,8 @@ func NewValidatorClient(
 		config.ComputePoolSize = 1
 	}
 
+	stageTimer := common.NewStageTimer(registry, "RetrievalClient", "GetBlob", false)
+
 	return &validatorClient{
 		logger:         logger.With("component", "ValidatorClient"),
 		ethClient:      ethClient,
@@ -75,6 +68,7 @@ func NewValidatorClient(
 		config:         config,
 		connectionPool: workerpool.New(config.ConnectionPoolSize),
 		computePool:    workerpool.New(config.ComputePoolSize),
+		stageTimer:     stageTimer,
 	}
 }
 
@@ -86,18 +80,8 @@ func (c *validatorClient) GetBlob(
 	referenceBlockNumber uint64,
 	quorumID core.QuorumID,
 ) ([]byte, error) {
-	return c.GetBlobWithProbe(ctx, blobKey, blobVersion, blobCommitments, referenceBlockNumber, quorumID, nil)
-}
 
-func (c *validatorClient) GetBlobWithProbe(
-	ctx context.Context,
-	blobKey corev2.BlobKey,
-	blobVersion corev2.BlobVersion,
-	blobCommitments encoding.BlobCommitments,
-	referenceBlockNumber uint64,
-	quorumID core.QuorumID,
-	probe *common.SequenceProbe,
-) ([]byte, error) {
+	probe := c.stageTimer.NewSequence()
 
 	probe.SetStage("verify_commitment")
 	commitmentBatch := []encoding.BlobCommitments{blobCommitments}

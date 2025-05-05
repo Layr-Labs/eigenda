@@ -131,7 +131,7 @@ func TestBasicWorkflow(t *testing.T) {
 		}
 
 		frames := make([]*encoding.Frame, len(chunks))
-		for i, _ := range chunks {
+		for i := range chunks {
 			// Unfortunately, it's complicated to generate random frame data.
 			// So just use placeholders.
 			frames[i] = &encoding.Frame{}
@@ -181,6 +181,7 @@ func TestBasicWorkflow(t *testing.T) {
 	require.NoError(t, err)
 
 	blob, err := worker.downloadBlobFromValidators()
+	require.NoError(t, err)
 	require.Equal(t, decodedBytes, blob)
 
 	// The number of downloads should exceed the pessimistic threshold by no more than the
@@ -321,7 +322,7 @@ func TestDownloadTimeout(t *testing.T) {
 		}
 
 		frames := make([]*encoding.Frame, len(chunks))
-		for i, _ := range chunks {
+		for i := range chunks {
 			// Unfortunately, it's complicated to generate random frame data.
 			// So just use placeholders.
 			frames[i] = &encoding.Frame{}
@@ -571,7 +572,7 @@ func TestFailedVerification(t *testing.T) {
 		}
 
 		frames := make([]*encoding.Frame, len(chunks))
-		for i, _ := range chunks {
+		for i := range chunks {
 			// Unfortunately, it's complicated to generate random frame data.
 			// So just use placeholders.
 			frames[i] = &encoding.Frame{}
@@ -621,6 +622,7 @@ func TestFailedVerification(t *testing.T) {
 	require.NoError(t, err)
 
 	blob, err := worker.downloadBlobFromValidators()
+	require.NoError(t, err)
 	require.Equal(t, decodedBytes, blob)
 
 	// The number of downloads should exceed the pessimistic threshold by no more than the

@@ -17,7 +17,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -283,7 +282,8 @@ func NewTestClient(
 		ethReader,
 		indexedChainState,
 		blobVerifier,
-		clientConfig)
+		clientConfig,
+		registry)
 
 	validatorPayloadRetriever, err := payloadretrieval.NewValidatorPayloadRetriever(
 		logger,
@@ -318,7 +318,8 @@ func NewTestClient(
 		ethReader,
 		indexedChainState,
 		blobVerifier,
-		onlyDownloadClientConfig)
+		onlyDownloadClientConfig,
+		registry)
 
 	return &TestClient{
 		config:                      config,
@@ -540,15 +541,10 @@ func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (
 
 	payload := coretypes.NewPayload(payloadBytes)
 
-	var probe *common.SequenceProbe
-	if c.metrics != nil {
-		probe = c.metrics.dispersalTimer.NewSequence()
-	}
-	cert, err := c.GetPayloadDisperser().SendPayloadWithProbe(ctx, payload, probe)
-	probe.End()
+	cert, err := c.GetPayloadDisperser().SendPayload(ctx, payload)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to disperse payload, %s: %w", probe.History(), err)
+		return nil, fmt.Errorf("failed to disperse payload, %s", err)
 	}
 
 	c.metrics.reportDispersalTime(time.Since(start))
@@ -685,22 +681,15 @@ func (c *TestClient) ReadBlobFromValidatorsInQuorum(
 	if validateAndDecode {
 		start := time.Now()
 
-		var probe *common.SequenceProbe
-		if c.metrics != nil {
-			probe = c.metrics.validatorReadTimer.NewSequence()
-		}
-
-		retrievedBlobBytes, err := c.retrievalClient.GetBlobWithProbe(
+		retrievedBlobBytes, err := c.retrievalClient.GetBlob(
 			ctx,
 			blobKey,
 			blobVersion,
 			blobCommitments,
 			currentBlockNumber,
-			quorumID,
-			probe)
-		probe.End()
+			quorumID)
 		if err != nil {
-			return fmt.Errorf("failed to read blob from validators, %s: %w", probe.History(), err)
+			return fmt.Errorf("failed to read blob from validators, %s", err)
 		}
 
 		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)

@@ -24,6 +24,7 @@ type PayloadDisperser struct {
 	config          PayloadDisperserConfig
 	disperserClient clients.DisperserClient
 	certVerifier    clients.ICertVerifier
+	stageTimer      *common.StageTimer
 }
 
 // NewPayloadDisperser creates a PayloadDisperser from subcomponents that have already been constructed and initialized.
@@ -49,11 +50,14 @@ func NewPayloadDisperser(
 		return nil, fmt.Errorf("check and set PayloadDisperserConfig defaults: %w", err)
 	}
 
+	stageTimer := common.NewStageTimer(registry, "PayloadDisperser", "SendPayload", false)
+
 	return &PayloadDisperser{
 		logger:          logger,
 		config:          payloadDisperserConfig,
 		disperserClient: disperserClient,
 		certVerifier:    certVerifier,
+		stageTimer:      stageTimer,
 	}, nil
 }
 
@@ -70,18 +74,8 @@ func (pd *PayloadDisperser) SendPayload(
 	// payload is the raw data to be stored on eigenDA
 	payload *coretypes.Payload,
 ) (*coretypes.EigenDACert, error) {
-	return pd.SendPayloadWithProbe(ctx, payload, nil)
-}
 
-// SendPayloadWithProbe is the same as SendPayload, but allows the caller to pass in a probe for collecting metrics.
-// If the probe is nil then no metrics will be collected.
-func (pd *PayloadDisperser) SendPayloadWithProbe(
-	ctx context.Context,
-	// payload is the raw data to be stored on eigenDA
-	payload *coretypes.Payload,
-	probe *common.SequenceProbe,
-) (*coretypes.EigenDACert, error) {
-
+	probe := pd.stageTimer.NewSequence()
 	probe.SetStage("convert_to_blob")
 
 	blob, err := payload.ToBlob(pd.config.PayloadPolynomialForm)
