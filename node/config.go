@@ -36,9 +36,6 @@ var (
 		0: "eth_quorum",
 		1: "eignen_quorum",
 	}
-	SemVer    = "0.0.0"
-	GitCommit = ""
-	GitDate   = ""
 )
 
 // Config contains all of the configuration information for a DA node.
