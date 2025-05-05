@@ -124,6 +124,22 @@ type Config struct {
 
 	// The size of the cache for storing recently read chunks in littDB, in gigabytes.
 	LittDBReadCacheSizeGB float64
+
+	// The rate limit for the number of bytes served by the GetChunks API if the data is in the cache.
+	// Unit is in megabytes per second.
+	GetChunksHotCacheReadLimitMB float64
+
+	// The burst limit for the number of bytes served by the GetChunks API if the data is in the cache.
+	// Unit is in megabytes.
+	GetChunksHotBurstLimitMB float64
+
+	// The rate limit for the number of bytes served by the GetChunks API if the data is not in the cache.
+	// Unit is in megabytes per second.
+	GetChunksColdCacheReadLimitMB float64
+
+	// The burst limit for the number of bytes served by the GetChunks API if the data is not in the cache.
+	// Unit is in megabytes.
+	GetChunksColdBurstLimitMB float64
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -349,5 +365,9 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		LittDBWriteCacheSizeGB:              ctx.GlobalFloat64(flags.LittDBWriteCacheSizeGBFlag.Name),
 		LittDBReadCacheSizeGB:               ctx.GlobalFloat64(flags.LittDBReadCacheSizeGBFlag.Name),
 		DownloadPoolSize:                    ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
+		GetChunksHotCacheReadLimitMB:        ctx.GlobalFloat64(flags.GetChunksHotCacheReadLimitMBFlag.Name),
+		GetChunksHotBurstLimitMB:            ctx.GlobalFloat64(flags.GetChunksHotBurstLimitMBFlag.Name),
+		GetChunksColdCacheReadLimitMB:       ctx.GlobalFloat64(flags.GetChunksColdCacheReadLimitMBFlag.Name),
+		GetChunksColdBurstLimitMB:           ctx.GlobalFloat64(flags.GetChunksColdBurstLimitMBFlag.Name),
 	}, nil
 }

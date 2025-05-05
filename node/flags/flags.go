@@ -430,6 +430,31 @@ var (
 		Value:    16,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DOWNLOAD_POOL_SIZE"),
 	}
+	GetChunksHotCacheReadLimitMBFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-hot-cache-read-limit-mb"),
+		Usage:    "The size of the hot cache read limit in megabytes / second.",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_HOT_CACHE_READ_LIMIT_MB"),
+	}
+	GetChunksHotBurstLimitMBFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-hot-burst-limit-mb"),
+		Usage:    "The size of the hot burst limit in megabytes.",
+		Required: false,
+		Value:    1024,
+	}
+	GetChunksColdCacheReadLimitMBFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-cold-cache-read-limit-mb"),
+		Usage:    "The size of the cold cache read limit in megabytes / second.",
+		Required: false,
+		Value:    32,
+	}
+	GetChunksColdBurstLimitMBFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-cold-burst-limit-MB"),
+		Usage:    "The size of the cold burst limit in megabytes.",
+		Required: false,
+		Value:    32,
+	}
 
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
@@ -558,6 +583,10 @@ var optionalFlags = []cli.Flag{
 	DownloadPoolSizeFlag,
 	LittDBWriteCacheSizeGBFlag,
 	LittDBReadCacheSizeGBFlag,
+	GetChunksHotCacheReadLimitMBFlag,
+	GetChunksHotBurstLimitMBFlag,
+	GetChunksColdCacheReadLimitMBFlag,
+	GetChunksColdBurstLimitMBFlag,
 }
 
 func init() {
