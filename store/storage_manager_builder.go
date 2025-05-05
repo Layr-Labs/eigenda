@@ -246,17 +246,18 @@ func (smb *StorageManagerBuilder) buildEigenDAV2Backend(
 		return nil, fmt.Errorf("new cert verifier: %w", err)
 	}
 
+	ethReader, err := smb.buildEthReader(ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("build eth reader: %w", err)
+	}
+
 	var retrievers []clients_v2.PayloadRetriever
 	for _, retrieverType := range smb.v2ClientCfg.RetrieversToEnable {
 		switch retrieverType {
 		case common.RelayRetrieverType:
 			smb.log.Info("Initializing relay payload retriever")
-			relayRegistryAddress, err := certVerifier.GetRelayRegistryAddress(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("get relay registry address: %w", err)
-			}
 			relayPayloadRetriever, err := smb.buildRelayPayloadRetriever(
-				ethClient, kzgProver.Srs.G1, *relayRegistryAddress)
+				ethClient, kzgProver.Srs.G1, ethReader.GetRelayRegistryAddress())
 			if err != nil {
 				return nil, fmt.Errorf("build relay payload retriever: %w", err)
 			}
@@ -264,7 +265,7 @@ func (smb *StorageManagerBuilder) buildEigenDAV2Backend(
 		case common.ValidatorRetrieverType:
 			smb.log.Info("Initializing validator payload retriever")
 			validatorPayloadRetriever, err := smb.buildValidatorPayloadRetriever(
-				ethClient, kzgVerifier, kzgProver.Srs.G1)
+				ethClient, ethReader, kzgVerifier, kzgProver.Srs.G1)
 			if err != nil {
 				return nil, fmt.Errorf("build validator payload retriever: %w", err)
 			}
@@ -408,14 +409,10 @@ func (smb *StorageManagerBuilder) buildRelayClient(
 // payloads directly from EigenDA validators
 func (smb *StorageManagerBuilder) buildValidatorPayloadRetriever(
 	ethClient common_eigenda.EthClient,
+	ethReader *eth.Reader,
 	kzgVerifier *kzgverifier.Verifier,
 	g1Srs []bn254.G1Affine,
 ) (*payloadretrieval.ValidatorPayloadRetriever, error) {
-	ethReader, err := smb.buildEthReader(ethClient)
-	if err != nil {
-		return nil, fmt.Errorf("build eth reader: %w", err)
-	}
-
 	chainState := eth.NewChainState(ethReader, ethClient)
 
 	retrievalClient := clients_v2.NewRetrievalClient(
