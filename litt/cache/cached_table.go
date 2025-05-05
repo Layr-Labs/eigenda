@@ -111,7 +111,7 @@ func (c *cachedTable) CacheAwareGet(
 		return nil, false, false, err
 	}
 
-	if exists {
+	if exists && value != nil {
 		c.readCache.Put(stringKey, value)
 	}
 

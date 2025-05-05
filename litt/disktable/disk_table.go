@@ -618,7 +618,7 @@ func (d *DiskTable) CacheAwareGet(
 
 	if onlyReadFromCache {
 		// The value exists but we are not allowed to read it from disk.
-		return nil, true, true, nil
+		return nil, true, false, nil
 	}
 
 	// Reserve the segment that contains the data.
@@ -667,6 +667,12 @@ func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 		}
 		if len(kv.Value) > math.MaxUint32 {
 			return fmt.Errorf("value is too large, length must not exceed 2^32 bytes: %d bytes", len(kv.Value))
+		}
+		if kv.Key == nil {
+			return fmt.Errorf("nil keys are not supported")
+		}
+		if kv.Value == nil {
+			return fmt.Errorf("nil values are not supported")
 		}
 
 		d.unflushedDataCache.Store(util.UnsafeBytesToString(kv.Key), kv.Value)
