@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -25,11 +26,21 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		s.metrics.reportDisperseBlobLatency(time.Since(start))
 	}()
 
-	// Validate the request
+	// Enforce per-quorum rollout ready boolean if enabled
 	onchainState := s.onchainState.Load()
 	if onchainState == nil {
 		return nil, api.NewErrorInternal("onchain state is nil")
 	}
+	if s.operatorVersionCheck {
+		if s.operatorSetRolloutReadyByQuorum == nil || s.currentRolloutStakePctByQuorum == nil {
+			s.periodicOperatorNodeInfoCheck(ctx)
+		}
+		if err := s.checkQuorumRolloutReady(req); err != nil {
+			return nil, err
+		}
+	}
+
+	// Validate the request
 	blobHeader, err := s.validateDispersalRequest(req, onchainState)
 	if err != nil {
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate the request: %v", err))
@@ -241,5 +252,31 @@ func (s *DispersalServerV2) checkBlobExistence(ctx context.Context, blobHeader *
 		return api.NewErrorAlreadyExists(fmt.Sprintf("blob already exists: %s", blobKey.Hex()))
 	}
 
+	return nil
+}
+
+func (s *DispersalServerV2) checkQuorumRolloutReady(req *pb.DisperseBlobRequest) error {
+	if s.operatorSetRolloutReadyByQuorum == nil || s.currentRolloutStakePctByQuorum == nil {
+		return api.NewErrorResourceExhausted("Operator rollout readiness state is not yet initialized. Please try again shortly.")
+	}
+	notReady := make([]string, 0)
+	for _, quorum := range req.GetBlobHeader().GetQuorumNumbers() {
+		qid := core.QuorumID(quorum)
+		ready := s.operatorSetRolloutReadyByQuorum[qid]
+		if !ready {
+			pct := s.currentRolloutStakePctByQuorum[qid] * 100
+			threshold := requiredNodeVersionStakeThreshold * 100
+			notReady = append(notReady, fmt.Sprintf("quorum %d: %.2f%% of %.2f%% upgraded", quorum, pct, threshold))
+		}
+	}
+	if len(notReady) > 0 {
+		return api.NewErrorResourceExhausted(
+			fmt.Sprintf(
+				"Operator new version %s rollout is in progress for: %s. Please be patient for the decentralized network to coordinate disperser and operator versions.",
+				requiredNodeVersion,
+				strings.Join(notReady, "; "),
+			),
+		)
+	}
 	return nil
 }

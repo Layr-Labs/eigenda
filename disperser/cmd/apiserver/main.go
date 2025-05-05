@@ -199,6 +199,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			reg,
 			config.MetricsConfig,
 			ntpClock,
+			true,
 		)
 		if err != nil {
 			return err

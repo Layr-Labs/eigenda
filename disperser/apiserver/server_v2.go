@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 	"sync/atomic"
 	"time"
@@ -14,6 +15,7 @@ import (
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pbv1 "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	pbvalidator "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -28,11 +30,26 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
+// Hardcoded required node version and threshold
+const requiredNodeVersion = "0.8.6"
+const requiredNodeVersionStakeThreshold = 0.8 // 80%
+
 type OnchainState struct {
 	QuorumCount           uint8
 	RequiredQuorums       []core.QuorumID
 	BlobVersionParameters *corev2.BlobVersionParameterMap
 	TTL                   time.Duration
+	OperatorState         map[core.OperatorID]*OperatorOnchainState
+}
+
+// OperatorOnchainState holds operator info for apiserver
+type OperatorOnchainState struct {
+	OperatorID core.OperatorID
+	Address    gethcommon.Address
+	Socket     string
+	Stake      *big.Int
+	NodeInfo   *pbvalidator.GetNodeInfoReply // NodeInfo from api/grpc/validator/node_v2.pb.go
+	Quorums    []core.QuorumID               // Quorums this operator is a member of
 }
 
 // Include disperser v1 protos to support grpcurl/reflection of v1 APIs
@@ -61,7 +78,10 @@ type DispersalServerV2 struct {
 	metricsConfig disperser.MetricsConfig
 	metrics       *metricsV2
 
-	ntpClock *core.NTPSyncedClock
+	ntpClock                        *core.NTPSyncedClock
+	operatorSetRolloutReadyByQuorum map[core.QuorumID]bool
+	currentRolloutStakePctByQuorum  map[core.QuorumID]float64 // for diagnostics and error messages
+	operatorVersionCheck            bool                      // If true, enforce node version rollout check
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
@@ -79,6 +99,7 @@ func NewDispersalServerV2(
 	registry *prometheus.Registry,
 	metricsConfig disperser.MetricsConfig,
 	ntpClock *core.NTPSyncedClock,
+	operatorVersionCheck ...bool, // variadic for backward compatibility
 ) (*DispersalServerV2, error) {
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")
@@ -107,24 +128,28 @@ func NewDispersalServerV2(
 
 	logger := _logger.With("component", "DispersalServerV2")
 
+	check := true
+	if len(operatorVersionCheck) > 0 {
+		check = operatorVersionCheck[0]
+	}
+
 	return &DispersalServerV2{
-		serverConfig:      serverConfig,
-		blobStore:         blobStore,
-		blobMetadataStore: blobMetadataStore,
-
-		chainReader:              chainReader,
-		blobRequestAuthenticator: blobRequestAuthenticator,
-		meterer:                  meterer,
-		prover:                   prover,
-		logger:                   logger,
-
+		serverConfig:                serverConfig,
+		blobStore:                   blobStore,
+		blobMetadataStore:           blobMetadataStore,
+		chainReader:                 chainReader,
+		blobRequestAuthenticator:    blobRequestAuthenticator,
+		meterer:                     meterer,
+		prover:                      prover,
+		logger:                      logger,
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
 
 		metricsConfig: metricsConfig,
 		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
 
-		ntpClock: ntpClock,
+		ntpClock:             ntpClock,
+		operatorVersionCheck: check,
 	}, nil
 }
 
@@ -173,6 +198,22 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 			}
 		}
 	}()
+
+	// Periodic operator node info check (every hour)
+	if s.operatorVersionCheck {
+		go func() {
+			ticker := time.NewTicker(time.Hour)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					s.periodicOperatorNodeInfoCheck(ctx)
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
 
 	s.logger.Info("GRPC Listening", "port", s.serverConfig.GrpcPort, "address", listener.Addr().String())
 
@@ -226,9 +267,6 @@ func (s *DispersalServerV2) GetBlobCommitment(ctx context.Context, req *pb.BlobC
 		}}, nil
 }
 
-// refreshOnchainState refreshes the onchain quorum state.
-// It should be called periodically to keep the state up to date.
-// **Note** that there is no lock. If the state is being updated concurrently, it may lead to inconsistent state.
 func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 	s.logger.Debug("Refreshing onchain quorum state")
 
@@ -258,11 +296,23 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get blob version parameters: %w", err)
 	}
+
+	var operatorState map[core.OperatorID]*OperatorOnchainState
+	if s.operatorVersionCheck {
+		operatorState, err = s.buildOperatorState(ctx, quorumCount, uint64(currentBlock))
+		if err != nil {
+			return err
+		}
+	} else {
+		operatorState = make(map[core.OperatorID]*OperatorOnchainState)
+	}
+
 	onchainState := &OnchainState{
 		QuorumCount:           quorumCount,
 		RequiredQuorums:       requiredQuorums,
 		BlobVersionParameters: v2.NewBlobVersionParameterMap(blobParams),
 		TTL:                   time.Duration((storeDurationBlocks+blockStaleMeasure)*12) * time.Second,
+		OperatorState:         operatorState,
 	}
 
 	s.onchainState.Store(onchainState)
@@ -359,4 +409,144 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		OnchainCumulativePayment: onchainCumulativePaymentBytes,
 	}
 	return reply, nil
+}
+
+// periodicOperatorNodeInfoCheck is a placeholder for the logic to fetch all operator endpoints and ping them for node info.
+func (s *DispersalServerV2) periodicOperatorNodeInfoCheck(ctx context.Context) {
+	s.logger.Info("Periodic operator node info check triggered: using cached onchain state")
+
+	onchainState := s.onchainState.Load()
+	if onchainState == nil {
+		s.logger.Error("onchain state is nil during operator node info check")
+		return
+	}
+
+	// Update NodeInfo for each operator
+	for _, opState := range onchainState.OperatorState {
+		nodeInfo, err := getNodeInfoFromEndpoint(ctx, opState.Socket)
+		if err != nil {
+			s.logger.Warn("Failed to fetch node info", "operator", opState.OperatorID.Hex(), "socket", opState.Socket, "err", err)
+			continue
+		}
+		opState.NodeInfo = nodeInfo
+	}
+
+	pctByQuorum, rolloutReady := CalculateQuorumRolloutReadiness(
+		onchainState.OperatorState,
+		requiredNodeVersion,
+		requiredNodeVersionStakeThreshold,
+	)
+	for quorum, pct := range pctByQuorum {
+		s.logger.Info("Operator version rollout check", "quorum", quorum, "required_version", requiredNodeVersion, "stake_pct", pct, "threshold", requiredNodeVersionStakeThreshold, "rollout_ready", rolloutReady[quorum])
+	}
+	s.currentRolloutStakePctByQuorum = pctByQuorum
+	s.operatorSetRolloutReadyByQuorum = rolloutReady
+}
+
+// getNodeInfoFromEndpoint pings the operator's endpoint and returns NodeInfoReply
+func getNodeInfoFromEndpoint(ctx context.Context, endpoint string) (*pbvalidator.GetNodeInfoReply, error) {
+	conn, err := grpc.NewClient(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	client := pbvalidator.NewDispersalClient(conn)
+	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	resp, err := client.GetNodeInfo(ctxTimeout, &pbvalidator.GetNodeInfoRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+// CalculateQuorumRolloutReadiness computes the stake percentage and readiness for each quorum.
+func CalculateQuorumRolloutReadiness(
+	ops map[core.OperatorID]*OperatorOnchainState,
+	requiredVersion string,
+	threshold float64,
+) (map[core.QuorumID]float64, map[core.QuorumID]bool) {
+	totalStakeByQuorum := make(map[core.QuorumID]*big.Int)
+	upgradedStakeByQuorum := make(map[core.QuorumID]*big.Int)
+	for _, opState := range ops {
+		if opState.NodeInfo == nil {
+			continue
+		}
+		for _, quorum := range opState.Quorums {
+			if totalStakeByQuorum[quorum] == nil {
+				totalStakeByQuorum[quorum] = big.NewInt(0)
+			}
+			totalStakeByQuorum[quorum].Add(totalStakeByQuorum[quorum], opState.Stake)
+			if opState.NodeInfo.Semver == requiredVersion {
+				if upgradedStakeByQuorum[quorum] == nil {
+					upgradedStakeByQuorum[quorum] = big.NewInt(0)
+				}
+				upgradedStakeByQuorum[quorum].Add(upgradedStakeByQuorum[quorum], opState.Stake)
+			}
+		}
+	}
+	pctByQuorum := make(map[core.QuorumID]float64)
+	readyByQuorum := make(map[core.QuorumID]bool)
+	for quorum, total := range totalStakeByQuorum {
+		upgraded := upgradedStakeByQuorum[quorum]
+		pct := 0.0
+		if total.Cmp(big.NewInt(0)) > 0 && upgraded != nil {
+			pct, _ = new(big.Rat).SetFrac(upgraded, total).Float64()
+		}
+		pctByQuorum[quorum] = pct
+		readyByQuorum[quorum] = pct >= threshold
+	}
+	return pctByQuorum, readyByQuorum
+}
+
+// buildOperatorState build the operator state map
+func (s *DispersalServerV2) buildOperatorState(ctx context.Context, quorumCount uint8, currentBlock uint64) (map[core.OperatorID]*OperatorOnchainState, error) {
+	operatorState := make(map[core.OperatorID]*OperatorOnchainState)
+	quorums := make([]core.QuorumID, quorumCount)
+	for i := 0; i < int(quorumCount); i++ {
+		quorums[i] = core.QuorumID(i)
+	}
+	stakesWithSocket, err := s.chainReader.GetOperatorStakesWithSocketForQuorums(ctx, quorums, uint32(currentBlock))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get operator stakes with socket: %w", err)
+	}
+	seen := make(map[core.OperatorID]struct{})
+
+	// Build a map from OperatorID to set of quorums
+	operatorQuorums := make(map[core.OperatorID]map[core.QuorumID]struct{})
+	for quorum, ops := range stakesWithSocket {
+		for _, op := range ops {
+			if operatorQuorums[op.OperatorID] == nil {
+				operatorQuorums[op.OperatorID] = make(map[core.QuorumID]struct{})
+			}
+			operatorQuorums[op.OperatorID][quorum] = struct{}{}
+		}
+	}
+	for _, ops := range stakesWithSocket {
+		for _, op := range ops {
+			if _, ok := seen[op.OperatorID]; ok {
+				continue
+			}
+			seen[op.OperatorID] = struct{}{}
+			address, err := s.chainReader.OperatorIDToAddress(ctx, op.OperatorID)
+			if err != nil {
+				s.logger.Warn("Failed to get operator address", "operator", op.OperatorID.Hex(), "err", err)
+				continue
+			}
+			// Collect all quorums for this operator
+			quorums := make([]core.QuorumID, 0, len(operatorQuorums[op.OperatorID]))
+			for q := range operatorQuorums[op.OperatorID] {
+				quorums = append(quorums, q)
+			}
+			operatorState[op.OperatorID] = &OperatorOnchainState{
+				OperatorID: op.OperatorID,
+				Address:    address,
+				Socket:     string(op.Socket),
+				Stake:      op.Stake,
+				NodeInfo:   nil, // To be filled by periodic pings
+				Quorums:    quorums,
+			}
+		}
+	}
+	return operatorState, nil
 }
