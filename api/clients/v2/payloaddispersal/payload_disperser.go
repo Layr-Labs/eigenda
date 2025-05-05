@@ -2,7 +2,9 @@ package payloaddispersal
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -48,12 +50,13 @@ func NewPayloadDisperser(
 		return nil, fmt.Errorf("check and set PayloadDisperserConfig defaults: %w", err)
 	}
 
+	stageTimer := common.NewStageTimer(registry, "PayloadDisperser", "SendPayload", false)
 	return &PayloadDisperser{
 		logger:          logger,
 		config:          payloadDisperserConfig,
 		disperserClient: disperserClient,
 		certVerifier:    certVerifier,
-		stageTimer:      common.NewStageTimer(registry, "PayloadDisperser", "SendPayload"),
+		stageTimer:      stageTimer,
 	}, nil
 }
 
@@ -71,8 +74,9 @@ func (pd *PayloadDisperser) SendPayload(
 	payload *coretypes.Payload,
 ) (*coretypes.EigenDACert, error) {
 
-	probe := pd.stageTimer.NewSequence("convert_to_blob")
+	probe := pd.stageTimer.NewSequence()
 	defer probe.End()
+	probe.SetStage("convert_to_blob")
 
 	blob, err := payload.ToBlob(pd.config.PayloadPolynomialForm)
 	if err != nil {
@@ -110,12 +114,12 @@ func (pd *PayloadDisperser) SendPayload(
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCompleteTimeout)
 	defer cancel()
-	blobStatusReply, err := pd.pollBlobStatusUntilComplete(timeoutCtx, blobKey, blobStatus.ToProfobuf(), probe)
+	blobStatusReply, err := pd.pollBlobStatusUntilSigned(timeoutCtx, blobKey, blobStatus.ToProfobuf(), probe)
 	if err != nil {
-		return nil, fmt.Errorf("poll blob status until complete: %w", err)
+		return nil, fmt.Errorf("poll blob status until signed: %w", err)
 	}
-	pd.logger.Debug("Blob status COMPLETE", "blobKey", blobKey.Hex())
 
+	pd.logSigningPercentages(blobKey, blobStatusReply)
 	probe.SetStage("build_cert")
 
 	eigenDACert, err := pd.buildEigenDACert(ctx, blobKey, blobStatusReply)
@@ -137,6 +141,30 @@ func (pd *PayloadDisperser) SendPayload(
 	return eigenDACert, nil
 }
 
+// logSigningPercentages logs the signing percentage of each quorum for a blob that has been dispersed and satisfied
+// required signing thresholds
+func (pd *PayloadDisperser) logSigningPercentages(blobKey core.BlobKey, blobStatusReply *dispgrpc.BlobStatusReply) {
+	attestation := blobStatusReply.GetSignedBatch().GetAttestation()
+	if len(attestation.GetQuorumNumbers()) != len(attestation.GetQuorumSignedPercentages()) {
+		pd.logger.Error("quorum number count and signed percentage count don't match. This should never happen",
+			"blobKey", blobKey.Hex(),
+			"quorumNumberCount", len(attestation.GetQuorumNumbers()),
+			"signedPercentageCount", len(attestation.GetQuorumSignedPercentages()))
+	}
+
+	quorumPercentagesBuilder := strings.Builder{}
+	quorumPercentagesBuilder.WriteString("(")
+
+	for index, quorumNumber := range attestation.GetQuorumNumbers() {
+		quorumPercentagesBuilder.WriteString(
+			fmt.Sprintf("quorum_%d: %d%%, ", quorumNumber, attestation.GetQuorumSignedPercentages()[index]))
+	}
+	quorumPercentagesBuilder.WriteString(")")
+
+	pd.logger.Debug("Blob signed",
+		"blobKey", blobKey.Hex(), "quorumPercentages", quorumPercentagesBuilder.String())
+}
+
 // Close is responsible for calling close on all internal clients. This method will do its best to close all internal
 // clients, even if some closes fail.
 //
@@ -152,11 +180,12 @@ func (pd *PayloadDisperser) Close() error {
 	return nil
 }
 
-// pollBlobStatusUntilComplete polls the disperser for the status of a blob that has been dispersed
+// pollBlobStatusUntilSigned polls the disperser for the status of a blob that has been dispersed
 //
-// This method will only return a non-nil BlobStatusReply if the blob is reported to be COMPLETE prior to the timeout.
-// In all other cases, this method will return a nil BlobStatusReply, along with an error describing the failure.
-func (pd *PayloadDisperser) pollBlobStatusUntilComplete(
+// This method will only return a non-nil BlobStatusReply if all quorums meet the required confirmation threshold prior
+// to timeout. In all other cases, this method will return a nil BlobStatusReply, along with an error describing the
+// failure.
+func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 	ctx context.Context,
 	blobKey core.BlobKey,
 	initialStatus dispgrpc.BlobStatus,
@@ -181,7 +210,8 @@ func (pd *PayloadDisperser) pollBlobStatusUntilComplete(
 			// If this call fails to return in a timely fashion, the timeout configured for the poll loop will trigger
 			blobStatusReply, err := pd.disperserClient.GetBlobStatus(ctx, blobKey)
 			if err != nil {
-				pd.logger.Warn("get blob status", "err", err, "blobKey", blobKey.Hex())
+				// this is expected to fail multiple times before we get a valid response, so only do a Debug log
+				pd.logger.Debug("get blob status", "err", err, "blobKey", blobKey.Hex())
 				continue
 			}
 
@@ -198,13 +228,34 @@ func (pd *PayloadDisperser) pollBlobStatusUntilComplete(
 			// TODO: we'll need to add more in-depth response status processing to derive failover errors
 			switch newStatus {
 			case dispgrpc.BlobStatus_COMPLETE:
-				return blobStatusReply, nil
-			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED, dispgrpc.BlobStatus_GATHERING_SIGNATURES:
-				// TODO (litt): check signing percentage when we are gathering signatures, potentially break
-				//  out of this loop early if we have enough signatures
+				err := checkThresholds(ctx, pd.certVerifier, blobStatusReply, blobKey.Hex())
+				if err != nil {
+					// returned error is verbose enough, no need to wrap it with additional context
+					return nil, err
+				}
 
+				return blobStatusReply, nil
+			case dispgrpc.BlobStatus_QUEUED, dispgrpc.BlobStatus_ENCODED:
 				// Report all non-terminal statuses to the probe. Repeat reports are no-ops.
 				probe.SetStage(newStatus.String())
+				continue
+			case dispgrpc.BlobStatus_GATHERING_SIGNATURES:
+				// Report all non-terminal statuses to the probe. Repeat reports are no-ops.
+				probe.SetStage(newStatus.String())
+
+				err := checkThresholds(ctx, pd.certVerifier, blobStatusReply, blobKey.Hex())
+				if err == nil {
+					// If there's no error, then all thresholds are met, so we can stop polling
+					return blobStatusReply, nil
+				}
+
+				var thresholdNotMetErr *thresholdNotMetError
+				if !errors.As(err, &thresholdNotMetErr) {
+					// an error occurred which was unrelated to an unmet threshold: something went wrong while checking!
+					pd.logger.Warnf("error checking thresholds: %v", err)
+				}
+
+				// thresholds weren't met yet. that's ok, since signature gathering is still in progress
 				continue
 			default:
 				return nil, fmt.Errorf(

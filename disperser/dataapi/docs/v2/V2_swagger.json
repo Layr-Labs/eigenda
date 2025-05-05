@@ -1272,10 +1272,22 @@
                 "batch_header_hash": {
                     "type": "string"
                 },
+                "blob_certificates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobCertificate"
+                    }
+                },
                 "blob_inclusion_infos": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo"
+                    }
+                },
+                "blob_key": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
                     }
                 },
                 "signed_batch": {
@@ -1496,8 +1508,11 @@
                 "batch_header_hash": {
                     "type": "string"
                 },
-                "dispersedAt": {
+                "dispersed_at": {
                     "type": "integer"
+                },
+                "signature": {
+                    "type": "string"
                 }
             }
         },
@@ -1537,7 +1552,7 @@
                 }
             }
         },
-        "v2.OperatorLivenessResponse": {
+        "v2.OperatorLiveness": {
             "type": "object",
             "properties": {
                 "dispersal_online": {
@@ -1560,6 +1575,17 @@
                 },
                 "retrieval_status": {
                     "type": "string"
+                }
+            }
+        },
+        "v2.OperatorLivenessResponse": {
+            "type": "object",
+            "properties": {
+                "operators": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.OperatorLiveness"
+                    }
                 }
             }
         },

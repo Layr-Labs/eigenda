@@ -27,6 +27,8 @@ type CertVerifier struct {
 	verifierCallers sync.Map
 	// maps contract address to set of required quorums specified in the contract at that address
 	requiredQuorums sync.Map
+	// maps contract address to the confirmation threshold required by that address
+	confirmationThresholds sync.Map
 }
 
 var _ clients.ICertVerifier = &CertVerifier{}
@@ -182,26 +184,6 @@ func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context) ([]uint8, 
 	return quorumNumbersRequired, nil
 }
 
-// GetRelayRegistryAddress returns the address of the EigenDARelayRegistry contract
-func (cv *CertVerifier) GetRelayRegistryAddress(ctx context.Context) (*gethcommon.Address, error) {
-	blockNumber, err := cv.ethClient.BlockNumber(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("fetch block number from eth client: %w", err)
-	}
-
-	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, blockNumber)
-	if err != nil {
-		return nil, fmt.Errorf("get verifier caller from block number: %w", err)
-	}
-
-	relayRegistryAddress, err := certVerifierCaller.EigenDARelayRegistry(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return nil, fmt.Errorf("get relay registry address: %w", err)
-	}
-
-	return &relayRegistryAddress, nil
-}
-
 // getVerifierCallerFromBlockNumber returns a ContractEigenDACertVerifierCaller that corresponds to the input reference
 // block number.
 //
@@ -244,4 +226,41 @@ func (cv *CertVerifier) getVerifierCallerFromAddress(
 
 	cv.verifierCallers.Store(certVerifierAddress, certVerifierCaller)
 	return certVerifierCaller, nil
+}
+
+// GetConfirmationThreshold returns the ConfirmationThreshold that corresponds to the input reference block number.
+//
+// This method will return the confirmation threshold from an internal cache if it is already known for the cert
+// verifier which corresponds to the input reference block number. Otherwise, this method will query the confirmation
+// threshold and cache the result for future use.
+func (cv *CertVerifier) GetConfirmationThreshold(ctx context.Context, referenceBlockNumber uint64) (uint8, error) {
+	certVerifierAddress, err := cv.certVerifierAddressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
+	if err != nil {
+		return 0, fmt.Errorf("get cert verifier address: %w", err)
+	}
+
+	// if the confirmation threshold for the active cert verifier address has already been cached, return it immediately
+	cachedThreshold, ok := cv.confirmationThresholds.Load(certVerifierAddress)
+	if ok {
+		castThreshold, ok := cachedThreshold.(uint8)
+		if !ok {
+			return 0, fmt.Errorf("expected confirmation threshold to be uint8")
+		}
+		return castThreshold, nil
+	}
+
+	// confirmation threshold wasn't cached, so proceed to fetch it
+	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, referenceBlockNumber)
+	if err != nil {
+		return 0, fmt.Errorf("get verifier caller from block number: %w", err)
+	}
+
+	securityThresholds, err := certVerifierCaller.SecurityThresholdsV2(&bind.CallOpts{Context: ctx})
+	if err != nil {
+		return 0, fmt.Errorf("get security thresholds via contract call: %w", err)
+	}
+
+	cv.confirmationThresholds.Store(certVerifierAddress, securityThresholds.ConfirmationThreshold)
+
+	return securityThresholds.ConfirmationThreshold, nil
 }

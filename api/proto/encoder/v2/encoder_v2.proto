@@ -1,7 +1,7 @@
 syntax = "proto3";
+package encoder.v2;
 
 option go_package = "github.com/Layr-Labs/eigenda/api/grpc/encoder/v2";
-package encoder.v2;
 
 service Encoder {
   // EncodeBlob encodes a blob into chunks using specified encoding parameters.

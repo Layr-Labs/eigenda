@@ -1275,10 +1275,22 @@ const docTemplateV2 = `{
                 "batch_header_hash": {
                     "type": "string"
                 },
+                "blob_certificates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobCertificate"
+                    }
+                },
                 "blob_inclusion_infos": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo"
+                    }
+                },
+                "blob_key": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
                     }
                 },
                 "signed_batch": {
@@ -1499,8 +1511,11 @@ const docTemplateV2 = `{
                 "batch_header_hash": {
                     "type": "string"
                 },
-                "dispersedAt": {
+                "dispersed_at": {
                     "type": "integer"
+                },
+                "signature": {
+                    "type": "string"
                 }
             }
         },
@@ -1540,7 +1555,7 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "v2.OperatorLivenessResponse": {
+        "v2.OperatorLiveness": {
             "type": "object",
             "properties": {
                 "dispersal_online": {
@@ -1563,6 +1578,17 @@ const docTemplateV2 = `{
                 },
                 "retrieval_status": {
                     "type": "string"
+                }
+            }
+        },
+        "v2.OperatorLivenessResponse": {
+            "type": "object",
+            "properties": {
+                "operators": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.OperatorLiveness"
+                    }
                 }
             }
         },
