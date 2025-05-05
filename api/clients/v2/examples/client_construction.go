@@ -145,6 +145,7 @@ func createValidatorPayloadRetriever() (*payloadretrieval.ValidatorPayloadRetrie
 		chainState,
 		kzgVerifier,
 		clientConfig,
+		nil,
 	)
 
 	// Create the ValidatorPayloadRetriever config
