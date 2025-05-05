@@ -409,6 +409,13 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_ENABLED"),
 	}
+	LittDBCacheSizeGBFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-cache-size-gb"),
+		Usage:    "The size of the LittDB cache in gigabytes.",
+		Required: false,
+		Value:    16 * units.GiB,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_CACHE_SIZE_GB"),
+	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
 		Usage:    "The size of the download pool. The default value is 16.",

@@ -17,6 +17,7 @@ import (
 // manually: it exists only as a helper struct for the ReceiveSignatures method.
 type signatureReceiver struct {
 	logger  logging.Logger
+	// metrics may be nil, in which case no metrics will be reported
 	metrics *dispatcherMetrics
 
 	// indexedOperatorState contains operator information including pubkeys, stakes, and quorum membership
@@ -130,8 +131,14 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 	ticker := time.NewTicker(sr.tickInterval)
 	defer ticker.Stop()
 	defer close(attestationChan)
+
+	// the number of attestations submitted by this method
+	attestationUpdateCount := 0
 	defer func() {
-		sr.reportThresholdSignedToDoneLatency()
+		if sr.metrics != nil {
+			sr.reportThresholdSignedToDoneLatency()
+			sr.metrics.reportAttestationUpdateCount(float64(attestationUpdateCount))
+		}
 	}()
 
 	operatorCount := len(sr.indexedOperatorState.IndexedOperators)
@@ -173,7 +180,7 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 
 			indexedOperatorInfo, found := sr.indexedOperatorState.IndexedOperators[signingMessage.Operator]
 			if !found {
-				sr.logger.Warn("operator not found in state",
+				sr.logger.Error("operator not found in state",
 					"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
 					"operatorID", signingMessage.Operator.Hex(),
 					"attestationLatencyMs", signingMessage.AttestationLatencyMs)
@@ -181,7 +188,7 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 			}
 
 			if seen := sr.signatureMessageReceived[signingMessage.Operator]; seen {
-				sr.logger.Warn("duplicate message from operator",
+				sr.logger.Error("duplicate message from operator",
 					"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
 					"operatorID", signingMessage.Operator.Hex(),
 					"attestationLatencyMs", signingMessage.AttestationLatencyMs)
@@ -214,7 +221,8 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 				continue
 			}
 
-			sr.submitAttestation(attestationChan)
+			sr.buildAndSubmitAttestation(attestationChan)
+			attestationUpdateCount++
 			newSignaturesGathered = false
 		}
 
@@ -224,7 +232,8 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 	}
 
 	if newSignaturesGathered {
-		sr.submitAttestation(attestationChan)
+		sr.buildAndSubmitAttestation(attestationChan)
+		attestationUpdateCount++
 	}
 }
 
@@ -289,8 +298,15 @@ func (sr *signatureReceiver) processSigningMessage(
 	return nil
 }
 
-// submitAttestation aggregates and submits a QuorumAttestation representing the most up-to-date aggregates
-func (sr *signatureReceiver) submitAttestation(attestationChan chan *core.QuorumAttestation) {
+// buildAndSubmitAttestation aggregates and submits a QuorumAttestation representing the most up-to-date aggregates
+func (sr *signatureReceiver) buildAndSubmitAttestation(attestationChan chan *core.QuorumAttestation) {
+	submitAttestationStart := time.Now()
+	defer func() {
+		if sr.metrics != nil {
+			sr.metrics.reportAttestationBuildingLatency(time.Since(submitAttestationStart))
+		}
+	}()
+
 	nonSignerMap := make(map[core.OperatorID]*core.G1Point)
 	// operators that aren't in the validSignerMap are "non-signers"
 	for operatorID, operatorInfo := range sr.indexedOperatorState.IndexedOperators {
@@ -317,8 +333,6 @@ func (sr *signatureReceiver) submitAttestation(attestationChan chan *core.Quorum
 	// handled by a separate routine, so it's important that we don't mutate these maps after they are yielded.
 	quorumAggPubKeyCopy := make(map[core.QuorumID]*core.G1Point, len(sr.indexedOperatorState.AggKeys))
 	for quorumID, g1Point := range sr.indexedOperatorState.AggKeys {
-		// TODO: is this ok? semantics are changed from before: we used to exclude aggregate keys of quorums that had no
-		//  signatures, but I don't see why that case should be special.
 		quorumAggPubKeyCopy[quorumID] = g1Point.Clone()
 	}
 	aggregateSignersG2PubKeysCopy := make(map[core.QuorumID]*core.G2Point, len(sr.aggregateSignersG2PubKeys))

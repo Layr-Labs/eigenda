@@ -34,7 +34,7 @@ type DispatcherConfig struct {
 	AttestationTimeout time.Duration
 	// The maximum time permitted to wait for all nodes to provide signatures for a batch.
 	BatchAttestationTimeout time.Duration
-	// SignatureTickInterval is the interval at which new Attestations will be submitted to the blobMetadataStore,
+	// SignatureTickInterval is the interval at which Attestations will be updated in the blobMetadataStore,
 	// as signature gathering progresses.
 	SignatureTickInterval time.Duration
 	NumRequestRetries     int
@@ -320,10 +320,12 @@ func (d *Dispatcher) HandleBatch(ctx context.Context) (chan core.SigningMessage,
 	return sigChan, batchData, nil
 }
 
-// HandleSignatures receives signatures from operators, validates, and aggregates them.
+// HandleSignatures receives SigningMessages from operators for a given batch through the input sigChan. The signatures
+// are validated, aggregated, and used to put an Attestation for the batch into the blobMetadataStore. The Attestation
+// is periodically updated as additional signatures are gathered.
 //
-// This method submits Attestations to the blobMetadataStore, containing signing data from the SigningMessages received
-// through the sigChan. It periodically submits Attestations, as signatures are gathered.
+// This method will continue gathering signatures until a SigningMessage has been received from every operator, or until
+// the global attestationCtx times out.
 func (d *Dispatcher) HandleSignatures(
 	ctx context.Context,
 	attestationCtx context.Context,
@@ -350,8 +352,8 @@ func (d *Dispatcher) HandleSignatures(
 		}
 	}
 
-	// submit an empty attestation before starting to gather signatures.
-	// a new attestation will be periodically resubmitted as signatures are gathered.
+	// write an empty attestation before starting to gather signatures, so that it can be queried right away.
+	// the attestation will be periodically updated as signatures are gathered.
 	attestation := &corev2.Attestation{
 		BatchHeader:      batchData.Batch.BatchHeader,
 		AttestedAt:       uint64(time.Now().UnixNano()),
@@ -365,7 +367,6 @@ func (d *Dispatcher) HandleSignatures(
 	err := d.blobMetadataStore.PutAttestation(ctx, attestation)
 	if err != nil {
 		// this error isn't fatal: a subsequent PutAttestation attempt might succeed
-		// TODO: this used to cause the HandleSignatures method to fail entirely. Is it ok to continue trying here?
 		d.logger.Error("error calling PutAttestation",
 			"err", err,
 			"batchHeaderHash", batchHeaderHash)
@@ -400,9 +401,9 @@ func (d *Dispatcher) HandleSignatures(
 	finalAttestation := &core.QuorumAttestation{}
 	// continue receiving attestations from the channel until it's closed
 	for receivedQuorumAttestation := range attestationChan {
-		err := d.submitAttestation(ctx, batchData, receivedQuorumAttestation)
+		err := d.updateAttestation(ctx, batchData, receivedQuorumAttestation)
 		if err != nil {
-			d.logger.Warnf("error submitting attestation for batch %s: %v", batchHeaderHash, err)
+			d.logger.Warnf("error updating attestation for batch %s: %v", batchHeaderHash, err)
 			continue
 		}
 
@@ -412,7 +413,7 @@ func (d *Dispatcher) HandleSignatures(
 	d.metrics.reportReceiveSignaturesLatency(time.Since(handleSignaturesStart))
 
 	updateBatchStatusStartTime := time.Now()
-	_, quorumPercentages := d.parseAndLogQuorumPercentages(batchHeaderHash, finalAttestation.QuorumResults)
+	_, quorumPercentages := d.parseQuorumPercentages(finalAttestation.QuorumResults)
 	err = d.updateBatchStatus(ctx, batchData, quorumPercentages)
 	d.metrics.reportUpdateBatchStatusLatency(time.Since(updateBatchStatusStartTime))
 	if err != nil {
@@ -438,15 +439,13 @@ func (d *Dispatcher) HandleSignatures(
 	return nil
 }
 
-// submitAttestation submits a QuorumAttestation to the blobMetadataStore
-func (d *Dispatcher) submitAttestation(
+// updateAttestation updates the QuorumAttestation in the blobMetadataStore
+func (d *Dispatcher) updateAttestation(
 	ctx context.Context,
 	batchData *batchData,
 	quorumAttestation *core.QuorumAttestation,
 ) error {
-	sortedNonZeroQuorums, quorumPercentages := d.parseAndLogQuorumPercentages(
-		hex.EncodeToString(batchData.BatchHeaderHash[:]),
-		quorumAttestation.QuorumResults)
+	sortedNonZeroQuorums, quorumPercentages := d.parseQuorumPercentages(quorumAttestation.QuorumResults)
 	if len(sortedNonZeroQuorums) == 0 {
 		return errors.New("all quorums received no attestation for batch")
 	}
@@ -481,37 +480,45 @@ func (d *Dispatcher) submitAttestation(
 		return fmt.Errorf("put attestation: %w", err)
 	}
 
+	d.logAttestationUpdate(hex.EncodeToString(batchData.BatchHeaderHash[:]), quorumAttestation.QuorumResults)
+
 	return nil
 }
 
-// parseAndLogQuorumPercentages iterates over the map of QuorumResults, and logs the signing percentages of each quorum.
-//
-// This method returns a sorted slice of nonZeroQuorums (quorums with >0 signing percentage), and a map from QuorumID to
-// signing percentage.
-func (d *Dispatcher) parseAndLogQuorumPercentages(
-	batchHeaderHash string,
+// parseQuorumPercentages iterates over the map of QuorumResults, and returns a sorted slice of nonZeroQuorums
+// (quorums with >0 signing percentage), and a map from QuorumID to signing percentage.
+func (d *Dispatcher) parseQuorumPercentages(
 	quorumResults map[core.QuorumID]*core.QuorumResult,
 ) ([]core.QuorumID, map[core.QuorumID]uint8) {
 	nonZeroQuorums := make([]core.QuorumID, 0)
 	quorumPercentages := make(map[core.QuorumID]uint8)
 
-	messageBuilder := strings.Builder{}
-	messageBuilder.WriteString(fmt.Sprintf("batchHeaderHash: %s (quorumID, percentSigned)", batchHeaderHash))
-
 	for quorumID, quorumResult := range quorumResults {
-		messageBuilder.WriteString(fmt.Sprintf("\n%d, %d%%", quorumID, quorumResult.PercentSigned))
-
 		if quorumResult.PercentSigned > 0 {
 			nonZeroQuorums = append(nonZeroQuorums, quorumID)
 			quorumPercentages[quorumID] = quorumResult.PercentSigned
 		}
 	}
 
-	d.logger.Debug(messageBuilder.String())
-
 	slices.Sort(nonZeroQuorums)
 
 	return nonZeroQuorums, quorumPercentages
+}
+
+// logAttestationUpdate logs the attestation details, including batch header hash and quorum signing percentages
+func (d *Dispatcher) logAttestationUpdate(batchHeaderHash string, quorumResults map[core.QuorumID]*core.QuorumResult) {
+	quorumPercentagesBuilder := strings.Builder{}
+	quorumPercentagesBuilder.WriteString("(")
+
+	for quorumID, quorumResult := range quorumResults {
+		quorumPercentagesBuilder.WriteString(
+			fmt.Sprintf("quorum_%d: %d%%, ", quorumID, quorumResult.PercentSigned))
+	}
+	quorumPercentagesBuilder.WriteString(")")
+
+	d.logger.Debug("attestation updated",
+		"batchHeaderHash", batchHeaderHash,
+		"quorumPercentages", quorumPercentagesBuilder.String())
 }
 
 func (d *Dispatcher) dedupBlobs(blobs []*v2.BlobMetadata) []*v2.BlobMetadata {
