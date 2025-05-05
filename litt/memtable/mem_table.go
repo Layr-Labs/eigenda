@@ -122,23 +122,28 @@ func (m *memTable) PutBatch(batch []*types.KVPair) error {
 	return nil
 }
 
-func (m *memTable) Get(key []byte) ([]byte, bool, error) {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-
-	value, ok := m.data[string(key)]
-	if !ok {
-		return nil, false, nil
-	}
-
-	return value, true, nil
+func (m *memTable) Get(key []byte) (value []byte, exists bool, err error) {
+	value, exists, _, err = m.CacheAwareGet(key, false)
+	return value, exists, err
 }
 
-func (m *memTable) Exists(key []byte) (bool, error) {
+func (m *memTable) CacheAwareGet(key []byte, _ bool) (value []byte, exists bool, hot bool, err error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
-	_, ok := m.data[string(key)]
-	return ok, nil
+
+	value, exists = m.data[string(key)]
+	if !exists {
+		return nil, false, false, nil
+	}
+
+	return value, true, true, nil
+}
+
+func (m *memTable) Exists(key []byte) (exists bool, err error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	_, exists = m.data[string(key)]
+	return exists, nil
 }
 
 func (m *memTable) Flush() error {

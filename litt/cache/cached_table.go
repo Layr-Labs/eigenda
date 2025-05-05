@@ -58,29 +58,53 @@ func (c *cachedTable) PutBatch(batch []*types.KVPair) error {
 	return nil
 }
 
-func (c *cachedTable) Get(key []byte) ([]byte, bool, error) {
+func (c *cachedTable) Get(key []byte) (value []byte, exists bool, err error) {
+	value, exists, _, err = c.CacheAwareGet(key, false)
+	return value, exists, err
+}
+
+// In theory, there is a race condition here where call to CacheAwareGet() made concurrently with a call to Put()
+// might find the data to exist but not to be hot. This is not a problem though, since it will be hard to trigger and
+// since it is not a violation of the consistency/correctness guarantees made by LittDB. Caching is inherently a
+// "best effort" optimization, and so it's not worth adding extra locking in order to prevent this edge case.
+//
+// Scenario:
+// - Thread A calls Put() on key K
+// - Thread B calls CacheAwareGet() on key K with onlyReadFromCache set to true
+// - Thread B checks the cache, and finds that the value is not there
+// - Thread A finishes the Put() and returns. LittDB flushes the value out to disk.
+// - Thread A gets to the part of CacheAwareGet() where it checks the base table for the value. Since the
+//   base table has flushed the value out to disk, it says that the value exists but does not fetch it since
+//   onlyReadFromCache is true.
+
+func (c *cachedTable) CacheAwareGet(
+	key []byte,
+	onlyReadFromCache bool,
+) (value []byte, exists bool, hot bool, err error) {
+
 	stringKey := util.UnsafeBytesToString(key)
 
-	value, ok := c.cache.Get(stringKey)
-	if ok {
-		return value, true, nil
+	value, exists = c.cache.Get(stringKey)
+	if exists {
+		// The value is in the cache
+		return value, true, true, nil
 	}
 
-	value, ok, err := c.base.Get(key)
+	value, exists, hot, err = c.base.CacheAwareGet(key, onlyReadFromCache)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 
-	if ok {
+	if exists {
 		c.cache.Put(stringKey, value)
 	}
 
-	return value, ok, nil
+	return value, exists, hot, nil
 }
 
-func (c *cachedTable) Exists(key []byte) (bool, error) {
-	_, ok := c.cache.Get(util.UnsafeBytesToString(key))
-	if ok {
+func (c *cachedTable) Exists(key []byte) (exists bool, err error) {
+	_, exists = c.cache.Get(util.UnsafeBytesToString(key))
+	if exists {
 		return true, nil
 	}
 

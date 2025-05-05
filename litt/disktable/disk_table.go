@@ -521,7 +521,7 @@ func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
 	return nil
 }
 
-func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
+func (d *DiskTable) Get(key []byte) (value []byte, exists bool, err error) {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
 		return nil, false, fmt.Errorf(
 			"Cannot process Get() request, DB is in panicked state due to error: %w", err)
@@ -572,6 +572,70 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 	dataSize = uint64(len(data))
 
 	return data, true, nil
+}
+
+func (d *DiskTable) CacheAwareGet(
+	key []byte,
+	onlyReadFromCache bool,
+) (value []byte, exists bool, hot bool, err error) {
+
+	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+		return nil, false, false, fmt.Errorf(
+			"Cannot process Get() request, DB is in panicked state due to error: %w", err)
+	}
+
+	var cacheHit bool
+	var dataSize uint64
+	if d.metrics != nil {
+		start := d.clock()
+		defer func() {
+			end := d.clock()
+			delta := end.Sub(start)
+			d.metrics.ReportReadOperation(d.name, delta, dataSize, cacheHit)
+		}()
+	}
+
+	// First, check if the key is in the unflushed data map.
+	// If so, return it from there.
+	var rawValue any
+	if rawValue, exists = d.unflushedDataCache.Load(util.UnsafeBytesToString(key)); exists {
+		value = rawValue.([]byte)
+		cacheHit = true
+		dataSize = uint64(len(value))
+		return value, true, true, nil
+	}
+
+	// Look up the address of the data.
+	var address types.Address
+	address, exists, err = d.keymap.Get(key)
+	if err != nil {
+		return nil, false, false, fmt.Errorf("failed to get address: %w", err)
+	}
+	if !exists {
+		return nil, false, false, nil
+	}
+
+	if onlyReadFromCache {
+		// The value exists but we are not allowed to read it from disk.
+		return nil, true, true, nil
+	}
+
+	// Reserve the segment that contains the data.
+	seg, ok := d.controlLoop.getReservedSegment(address.Index())
+	if !ok {
+		return nil, false, false, nil
+	}
+	defer seg.Release()
+
+	// Read the data from disk.
+	value, err = seg.Read(key, address)
+	if err != nil {
+		return nil, false, false, fmt.Errorf("failed to read data: %w", err)
+	}
+
+	dataSize = uint64(len(value))
+
+	return value, true, false, nil
 }
 
 func (d *DiskTable) Put(key []byte, value []byte) error {
