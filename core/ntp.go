@@ -54,7 +54,7 @@ func (c *NTPSyncedClock) runSyncLoop(ctx context.Context, server string, interva
 	}
 }
 
-// syncOnce performs a single NTP sync and updates the offset. If logSuccess is true, logs at Info level, else at Debug.
+// syncOnce performs a single NTP sync and updates the offset.
 func (c *NTPSyncedClock) syncOnce(server string) error {
 	offset, err := ntpOffset(server)
 	if err != nil {
@@ -70,16 +70,6 @@ func (c *NTPSyncedClock) syncOnce(server string) error {
 func (c *NTPSyncedClock) Now() time.Time {
 	offset := atomic.LoadInt64(&c.offset)
 	return time.Now().Add(time.Duration(offset))
-}
-
-// Stop terminates the background NTP synchronization.
-func (c *NTPSyncedClock) Stop() {
-	c.cancel()
-}
-
-// GetOffset returns the current NTP offset in nanoseconds.
-func (c *NTPSyncedClock) GetOffset() time.Duration {
-	return time.Duration(atomic.LoadInt64(&c.offset))
 }
 
 // ntpOffset fetches the offset between NTP and local time (in nanoseconds).
