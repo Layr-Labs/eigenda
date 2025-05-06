@@ -580,7 +580,7 @@ func (w *retrievalWorker) standardDownloadChunks(
 	ctx, cancel := context.WithTimeout(w.downloadAndVerifyCtx, w.config.DownloadTimeout)
 	defer cancel()
 
-	// TODO we can get a tighter bound?
+	// TODO(cody.littley) we can get a tighter bound?
 	maxBlobSize := 16 * units.MiB // maximum size of the original blob
 	encodingRate := 8             // worst case scenario if one validator has 100% stake
 	fudgeFactor := units.MiB      // to allow for some overhead from things like protobuf encoding
@@ -602,13 +602,13 @@ func (w *retrievalWorker) standardDownloadChunks(
 		return nil, fmt.Errorf("failed to create connection to operator %s: %w", operatorID.Hex(), err)
 	}
 
-	n := grpcnode.NewRetrievalClient(conn)
+	client := grpcnode.NewRetrievalClient(conn)
 	request := &grpcnode.GetChunksRequest{
 		BlobKey:  w.blobKey[:],
 		QuorumId: uint32(w.quorumID),
 	}
 
-	reply, err := n.GetChunks(ctx, request)
+	reply, err := client.GetChunks(ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chunks from operator %s: %w", operatorID.Hex(), err)
 	}

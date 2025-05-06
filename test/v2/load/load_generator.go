@@ -148,8 +148,10 @@ func (l *LoadGenerator) run() {
 		<-ticker.C
 
 		l.lifecycleLimiter <- struct{}{}
-		go l.readAndWriteBlob()
-		<-l.lifecycleLimiter
+		go func() {
+			l.readAndWriteBlob()
+			<-l.lifecycleLimiter
+		}()
 	}
 }
 

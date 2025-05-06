@@ -128,8 +128,7 @@ func (c *validatorClient) GetBlob(
 
 	// TODO verify technical accuracy of this
 	totalChunkCount := uint32(encodingParams.NumChunks)
-	availableChunkCount := uint32(encodingParams.NumChunks)
-	minimumChunkCount := availableChunkCount / blobParams.CodingRate
+	minimumChunkCount := uint32(encodingParams.NumChunks) / blobParams.CodingRate
 
 	worker, err := newRetrievalWorker(
 		ctx,
