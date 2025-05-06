@@ -16,8 +16,8 @@ import {BLSApkRegistry} from "lib/eigenlayer-middleware/src/BLSApkRegistry.sol";
 import {RegistryCoordinator, IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {IEigenDAThresholdRegistry, EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry, EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
-import {PaymentVault} from "src/payments/PaymentVault.sol";
-import {IPaymentVault} from "src/interfaces/IPaymentVault.sol";
+import {PaymentVault} from "src/core/PaymentVault.sol";
+import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {IEigenDADisperserRegistry, EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
 import {EigenDAServiceManager, IServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {IAVSDirectory} from
@@ -28,8 +28,8 @@ import {
     IPauserRegistry,
     PauserRegistry
 } from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
-import {IServiceManager} from "src/core/EigenDAServiceManager.sol";
-import {VersionedBlobParams} from "src/interfaces/IEigenDAStructs.sol";
+import {IServiceManager} from "lib/eigenlayer-middleware/src/interfaces/IServiceManager.sol";
+import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 
 import {MockStakeRegistry} from "./mocks/MockStakeRegistry.sol";
 import {MockRegistryCoordinator} from "./mocks/MockRegistryCoordinator.sol";

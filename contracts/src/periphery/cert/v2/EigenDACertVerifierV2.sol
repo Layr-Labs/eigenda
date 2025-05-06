@@ -1,28 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDACertVerifierV2} from "src/interfaces/IEigenDACertVerifierV2.sol";
-import {IEigenDAThresholdRegistry} from "src/interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDABatchMetadataStorage} from "src/interfaces/IEigenDABatchMetadataStorage.sol";
-import {IEigenDASignatureVerifier} from "src/interfaces/IEigenDASignatureVerifier.sol";
-import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/libraries/EigenDACertVerificationV1Lib.sol";
-import {EigenDACertVerificationV2Lib as CertV2Lib} from "src/libraries/EigenDACertVerificationV2Lib.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDABatchMetadataStorage} from "src/core/interfaces/IEigenDABatchMetadataStorage.sol";
+import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
+import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/periphery/cert/v1/EigenDACertVerificationV1Lib.sol";
+import {EigenDACertVerificationV2Lib as CertV2Lib} from "src/periphery/cert/v2/EigenDACertVerificationV2Lib.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
-import {
-    BatchHeaderV2,
-    BlobInclusionInfo,
-    NonSignerStakesAndSignature,
-    SignedBatch,
-    SecurityThresholds
-} from "src/interfaces/IEigenDAStructs.sol";
+import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
 /**
  * @title A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates
  * @notice For V2 verification this contract is deployed with immutable security thresholds and required quorum numbers,
  *         to change these values or verification behavior a new CertVerifier must be deployed
  */
-contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
+contract EigenDACertVerifierV2 {
     error InvalidSecurityThresholds();
 
     /// @notice The EigenDAThresholdRegistry contract address
@@ -37,7 +31,7 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
     /// @notice The EigenDA middleware RegistryCoordinator contract address
     IRegistryCoordinator public immutable registryCoordinatorV2;
 
-    SecurityThresholds public securityThresholdsV2;
+    DATypesV1.SecurityThresholds public securityThresholdsV2;
 
     bytes public quorumNumbersRequiredV2;
 
@@ -54,7 +48,7 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
         IEigenDASignatureVerifier _eigenDASignatureVerifierV2,
         OperatorStateRetriever _operatorStateRetrieverV2,
         IRegistryCoordinator _registryCoordinatorV2,
-        SecurityThresholds memory _securityThresholdsV2,
+        DATypesV1.SecurityThresholds memory _securityThresholdsV2,
         bytes memory _quorumNumbersRequiredV2
     ) {
         if (_securityThresholdsV2.confirmationThreshold <= _securityThresholdsV2.adversaryThreshold) {
@@ -76,9 +70,9 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
      * @param signedQuorumNumbers The signed quorum numbers corresponding to the nonSignerStakesAndSignature
      */
     function verifyDACertV2(
-        BatchHeaderV2 calldata batchHeader,
-        BlobInclusionInfo calldata blobInclusionInfo,
-        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
+        DATypesV2.BatchHeaderV2 calldata batchHeader,
+        DATypesV2.BlobInclusionInfo calldata blobInclusionInfo,
+        DATypesV1.NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
         bytes memory signedQuorumNumbers
     ) external view {
         CertV2Lib.verifyDACertV2(
@@ -99,8 +93,8 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
      * @param blobInclusionInfo The inclusion proof for the blob cert
      */
     function verifyDACertV2FromSignedBatch(
-        SignedBatch calldata signedBatch,
-        BlobInclusionInfo calldata blobInclusionInfo
+        DATypesV2.SignedBatch calldata signedBatch,
+        DATypesV2.BlobInclusionInfo calldata blobInclusionInfo
     ) external view {
         CertV2Lib.verifyDACertV2FromSignedBatch(
             _thresholdRegistry(),
@@ -124,9 +118,9 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
      * @param signedQuorumNumbers The signed quorum numbers corresponding to the nonSignerStakesAndSignature
      */
     function verifyDACertV2ForZKProof(
-        BatchHeaderV2 calldata batchHeader,
-        BlobInclusionInfo calldata blobInclusionInfo,
-        NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
+        DATypesV2.BatchHeaderV2 calldata batchHeader,
+        DATypesV2.BlobInclusionInfo calldata blobInclusionInfo,
+        DATypesV1.NonSignerStakesAndSignature calldata nonSignerStakesAndSignature,
         bytes memory signedQuorumNumbers
     ) external view returns (bool) {
         (CertV2Lib.StatusCode status,) = CertV2Lib.checkDACertV2(
@@ -144,6 +138,16 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
         } else {
             return false;
         }
+    }
+
+    function getNonSignerStakesAndSignature(DATypesV2.SignedBatch calldata signedBatch)
+        external
+        view
+        returns (DATypesV1.NonSignerStakesAndSignature memory)
+    {
+        (DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,) =
+            CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetrieverV2, registryCoordinatorV2, signedBatch);
+        return nonSignerStakesAndSignature;
     }
 
     /**
@@ -187,7 +191,7 @@ contract EigenDACertVerifierV2 is IEigenDACertVerifierV2 {
      * @return The SecurityThresholds struct with confirmation and adversary thresholds
      * @dev Can be overridden by derived contracts
      */
-    function _securityThresholds() internal view virtual returns (SecurityThresholds memory) {
+    function _securityThresholds() internal view virtual returns (DATypesV1.SecurityThresholds memory) {
         return securityThresholdsV2;
     }
 
