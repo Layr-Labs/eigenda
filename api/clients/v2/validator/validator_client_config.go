@@ -1,12 +1,8 @@
 package validator
 
 import (
-	"context"
 	"runtime"
 	"time"
-
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
 )
 
 // ValidatorClientConfig contains the configuration for the validator retrieval client.
@@ -78,20 +74,10 @@ type ValidatorClientConfig struct {
 	// This should not be considered a stable API.
 	UnsafeChunkDeserializerFactory ChunkDeserializerFactory
 
-	// A function that overrides the default blob decoder. This is intended for testing purposes, and should not
-	// be used in production code. This should not be considered a public API.
-	//
-	// The default is nil (i.e. the standard blob decoder is used).
-	UnsafeDecodeBlobFunction DecodeBlobFunction
+	// A function used to build a BlobDecoder. Potentially useful for testing purposes.
+	// This should not be considered a stable API.
+	UnsafeBlobDecoderFactory BlobDecoderFactory
 }
-
-// DecodeBlobFunction is a function that decodes a blob from the chunks received from a validator node.
-type DecodeBlobFunction func(
-	ctx context.Context,
-	blobKey v2.BlobKey,
-	chunks []*encoding.Frame,
-	indices []uint,
-) ([]byte, error)
 
 // DefaultClientConfig returns the default configuration for the validator retrieval client.
 func DefaultClientConfig() *ValidatorClientConfig {
@@ -107,6 +93,6 @@ func DefaultClientConfig() *ValidatorClientConfig {
 		TimeSource:                        time.Now,
 		UnsafeValidatorGRPCManagerFactory: NewValidatorGRPCManager,
 		UnsafeChunkDeserializerFactory:    NewChunkDeserializer,
-		UnsafeDecodeBlobFunction:          nil,
+		UnsafeBlobDecoderFactory:          NewBlobDecoder,
 	}
 }

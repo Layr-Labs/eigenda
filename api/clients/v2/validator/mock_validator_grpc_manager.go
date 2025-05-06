@@ -35,10 +35,10 @@ func (m *MockValidatorGRPCManager) DownloadChunks(
 // NewMockValidatorGRPCManager creates a new ValidatorGRPCManager instance with the provided download function.
 func NewMockValidatorGRPCManager(
 	downloadChunksFunction func(ctx context.Context,
-	key v2.BlobKey,
-	operatorID core.OperatorID,
-	quorumID core.QuorumID,
-) (*grpcnode.GetChunksReply, error),
+		key v2.BlobKey,
+		operatorID core.OperatorID,
+		quorumID core.QuorumID,
+	) (*grpcnode.GetChunksReply, error),
 ) ValidatorGRPCManager {
 	return &MockValidatorGRPCManager{
 		DownloadChunksFunction: downloadChunksFunction,

@@ -109,6 +109,9 @@ type retrievalWorker struct {
 	// Responsible for deserializing and verifying chunk data.
 	chunkDeserializer ChunkDeserializer
 
+	// The function used to decode the blob from the chunks.
+	blobDecoder BlobDecoder
+
 	// A pool of workers for network intensive operations (e.g. downloading blob data).
 	connectionPool *workerpool.WorkerPool
 
@@ -144,10 +147,6 @@ type retrievalWorker struct {
 
 	// When a thread completes decoding chunk data, it will send a message to the decodeResponseChan.
 	decodeResponseChan chan *decodeCompleted
-
-	// The function used to decode the blob from the chunks. This can be set to a custom function
-	// for testing purposes.
-	decodeBlobFunction DecodeBlobFunction
 
 	// Used to collect metrics.
 	probe *common.SequenceProbe
@@ -226,6 +225,7 @@ func newRetrievalWorker(
 	computePool *workerpool.WorkerPool,
 	validatorGRPCManager ValidatorGRPCManager,
 	chunkDeserializer ChunkDeserializer,
+	blobDecoder BlobDecoder,
 	assignments map[core.OperatorID]v2.Assignment,
 	totalChunkCount uint32,
 	minimumChunkCount uint32,
@@ -300,11 +300,7 @@ func newRetrievalWorker(
 		targetVerifiedCount:       targetVerifiedCount,
 		validatorGRPCManager:      validatorGRPCManager,
 		chunkDeserializer:         chunkDeserializer,
-		decodeBlobFunction:        config.UnsafeDecodeBlobFunction,
-	}
-
-	if worker.decodeBlobFunction == nil {
-		worker.decodeBlobFunction = worker.standardDecodeBlob
+		blobDecoder:               blobDecoder,
 	}
 
 	return worker, nil
@@ -600,26 +596,10 @@ func (w *retrievalWorker) decodeBlob(chunks []*encoding.Frame, indices []uint) {
 		w.logger.Debug("decoding blob", "blobKey", w.blobKey.Hex())
 	}
 
-	// Unless this has been overridden for testing, this is just a call to standardDecodeBlob().
-	blob, err := w.decodeBlobFunction(w.ctx, w.blobKey, chunks, indices)
+	blob, err := w.blobDecoder.DecodeBlob(w.blobKey, chunks, indices, w.encodingParams, w.blobCommitments)
 
 	w.decodeResponseChan <- &decodeCompleted{
 		Blob: blob,
 		Err:  err,
 	}
-}
-
-// decodeBlobFunction is the default function used to decode the blob from the chunks.
-func (w *retrievalWorker) standardDecodeBlob(
-	_ context.Context,
-	_ v2.BlobKey,
-	chunks []*encoding.Frame,
-	indices []uint,
-) ([]byte, error) {
-
-	return w.verifier.Decode(
-		chunks,
-		indices,
-		*w.encodingParams,
-		uint64(w.blobCommitments.Length)*encoding.BYTES_PER_SYMBOL)
 }

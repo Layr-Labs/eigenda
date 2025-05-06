@@ -25,7 +25,7 @@ import (
 // A list of config files that this test runs against
 var environments = []string{
 	client.PreprodEnv,
-	//client.TestnetEnv, // TODO
+	client.TestnetEnv,
 }
 
 // getEnvironmentName takes an environment string as listed in environments (aka a path to a config file describing

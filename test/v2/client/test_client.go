@@ -298,15 +298,8 @@ func NewTestClient(
 	onlyDownloadClientConfig := validator.DefaultClientConfig()
 	onlyDownloadClientConfig.UnsafeChunkDeserializerFactory =
 		validator.NewMockChunkDeserializerFactory(&validator.MockChunkDeserializer{})
-
-	onlyDownloadClientConfig.UnsafeDecodeBlobFunction = func(
-		ctx context.Context,
-		blobKey corev2.BlobKey,
-		chunks []*encoding.Frame,
-		indices []uint,
-	) ([]byte, error) {
-		return nil, nil
-	}
+	onlyDownloadClientConfig.UnsafeBlobDecoderFactory =
+		validator.NewMockBlobDecoderFactory(&validator.MockBlobDecoder{})
 
 	onlyDownloadValidatorClient := validator.NewValidatorClient(
 		logger,

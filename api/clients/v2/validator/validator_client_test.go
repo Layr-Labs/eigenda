@@ -147,11 +147,14 @@ func TestBasicWorkflow(t *testing.T) {
 	decodeCalled := atomic.Bool{}
 	decodedBytes := rand.PrintableBytes(32)
 	framesSentToDecoding := atomic.Uint32{}
-	config.UnsafeDecodeBlobFunction = func(
-		ctx context.Context,
+
+	mockDecoder := &MockBlobDecoder{}
+	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
 		chunks []*encoding.Frame,
 		indices []uint,
+		encodingParams *encoding.EncodingParams,
+		blobCommitments *encoding.BlobCommitments,
 	) ([]byte, error) {
 
 		// verify we have the expected blob key
@@ -174,6 +177,7 @@ func TestBasicWorkflow(t *testing.T) {
 		computePool,
 		mockGRPCManager,
 		mockDeserializer,
+		mockDecoder,
 		assignments,
 		totalChunkCount,
 		minimumChunkCount,
@@ -343,11 +347,13 @@ func TestDownloadTimeout(t *testing.T) {
 	decodeCalled := atomic.Bool{}
 	decodedBytes := rand.PrintableBytes(32)
 	framesSentToDecoding := atomic.Uint32{}
-	config.UnsafeDecodeBlobFunction = func(
-		ctx context.Context,
+	mockDecoder := &MockBlobDecoder{}
+	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
 		chunks []*encoding.Frame,
 		indices []uint,
+		encodingParams *encoding.EncodingParams,
+		blobCommitments *encoding.BlobCommitments,
 	) ([]byte, error) {
 
 		// verify we have the expected blob key
@@ -370,6 +376,7 @@ func TestDownloadTimeout(t *testing.T) {
 		computePool,
 		mockGRPCManager,
 		mockDeserializer,
+		mockDecoder,
 		assignments,
 		totalChunkCount,
 		minimumChunkCount,
@@ -598,11 +605,13 @@ func TestFailedVerification(t *testing.T) {
 	decodeCalled := atomic.Bool{}
 	decodedBytes := rand.PrintableBytes(32)
 	framesSentToDecoding := atomic.Uint32{}
-	config.UnsafeDecodeBlobFunction = func(
-		ctx context.Context,
+	mockDecoder := &MockBlobDecoder{}
+	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
 		chunks []*encoding.Frame,
 		indices []uint,
+		encodingParams *encoding.EncodingParams,
+		blobCommitments *encoding.BlobCommitments,
 	) ([]byte, error) {
 
 		// verify we have the expected blob key
@@ -625,6 +634,7 @@ func TestFailedVerification(t *testing.T) {
 		computePool,
 		mockGRPCManager,
 		mockDeserializer,
+		mockDecoder,
 		assignments,
 		totalChunkCount,
 		minimumChunkCount,
