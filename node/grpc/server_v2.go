@@ -180,30 +180,29 @@ func (s *ServerV2) validateAndStoreChunks(
 	ctx context.Context,
 	batch *corev2.Batch,
 	blobShards []*corev2.BlobShard,
-	rawBundles []*node.RawBundles,
+	rawBundles []*node.RawBundle,
 	operatorState *core.OperatorState,
 	batchHeaderHash [32]byte,
 	probe *common.SequenceProbe,
 ) error {
 
 	batchData := make([]*node.BundleToStore, 0, len(rawBundles))
-	for _, bundles := range rawBundles {
-		blobKey, err := bundles.BlobCertificate.BlobHeader.BlobKey()
+	for _, bundle := range rawBundles {
+		blobKey, err := bundle.BlobCertificate.BlobHeader.BlobKey()
 		if err != nil {
 			return api.NewErrorInternal("failed to get blob key")
 		}
 
-		for quorum, bundle := range bundles.Bundles {
-			bundleKey, err := node.BundleKey(blobKey, quorum)
-			if err != nil {
-				return api.NewErrorInternal("failed to get bundle key")
-			}
-
-			batchData = append(batchData, &node.BundleToStore{
-				BundleKey:   bundleKey,
-				BundleBytes: bundle,
-			})
+		quorum := core.QuorumID(0)
+		bundleKey, err := node.BundleKey(blobKey, quorum)
+		if err != nil {
+			return api.NewErrorInternal("failed to get bundle key")
 		}
+
+		batchData = append(batchData, &node.BundleToStore{
+			BundleKey:   bundleKey,
+			BundleBytes: bundle.Bundle,
+		})
 	}
 
 	if s.config.LittDBEnabled {
@@ -337,7 +336,10 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 	if corev2.MaxQuorumID < in.GetQuorumId() {
 		return nil, api.NewErrorInvalidArg("invalid quorum ID")
 	}
-	quorumID := core.QuorumID(in.GetQuorumId())
+
+	// Ignore the quorum ID and always return the bundle for quorum 0
+	// quorumID := core.QuorumID(in.GetQuorumId())
+	quorumID := core.QuorumID(0)
 
 	bundleKey, err := node.BundleKey(blobKey, quorumID)
 	if err != nil {
