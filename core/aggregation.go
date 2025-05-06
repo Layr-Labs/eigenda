@@ -206,7 +206,8 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 				"operatorAddress", operatorAddr,
 				"socket", socket,
 				"batchHeaderHash", batchHeaderHashHex,
-				"err", r.Err)
+				"err", r.Err,
+				"attestationLatencyMs", r.AttestationLatencyMs)
 			continue
 		}
 
