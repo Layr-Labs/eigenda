@@ -5,11 +5,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
+	pbvalidator "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -243,4 +246,21 @@ func (v *shardValidator) verifyBlobLengthWorker(blobCommitments encoding.BlobCom
 	}
 
 	out <- nil
+}
+
+// GetNodeInfoFromEndpoint pings the operator's endpoint and returns NodeInfoReply
+func GetNodeInfoFromEndpoint(ctx context.Context, endpoint string) (*pbvalidator.GetNodeInfoReply, error) {
+	conn, err := grpc.NewClient(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	client := pbvalidator.NewDispersalClient(conn)
+	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	resp, err := client.GetNodeInfo(ctxTimeout, &pbvalidator.GetNodeInfoRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
 }

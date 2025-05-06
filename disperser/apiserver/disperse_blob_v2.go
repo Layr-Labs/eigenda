@@ -256,9 +256,6 @@ func (s *DispersalServerV2) checkBlobExistence(ctx context.Context, blobHeader *
 }
 
 func (s *DispersalServerV2) checkQuorumRolloutReady(req *pb.DisperseBlobRequest) error {
-	if s.operatorSetRolloutReadyByQuorum == nil || s.currentRolloutStakePctByQuorum == nil {
-		return api.NewErrorResourceExhausted("Operator rollout readiness state is not yet initialized. Please try again shortly.")
-	}
 	notReady := make([]string, 0)
 	for _, quorum := range req.GetBlobHeader().GetQuorumNumbers() {
 		qid := core.QuorumID(quorum)

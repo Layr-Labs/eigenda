@@ -24,6 +24,7 @@ import (
 	socketreg "github.com/Layr-Labs/eigenda/contracts/bindings/SocketRegistry"
 	stakereg "github.com/Layr-Labs/eigenda/contracts/bindings/StakeRegistry"
 	"github.com/Layr-Labs/eigenda/core"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -996,4 +997,47 @@ func (t *Reader) GetDisperserAddress(ctx context.Context, disperserID uint32) (g
 
 func (t *Reader) GetRelayRegistryAddress() gethcommon.Address {
 	return t.bindings.RelayRegistryAddress
+}
+
+// GetOperatorStakesForQuorums returns the stakes of all operators within the supplied quorums. The returned stakes are for the block number supplied.
+// The indices of the operators within each quorum are also returned.
+func (t *Reader) GetOperatorVerboseState(ctx context.Context, quorums []core.QuorumID, blockNumber uint32) (core.OperatorStateVerbose, error) {
+	quorumBytes := make([]byte, len(quorums))
+	for ind, quorum := range quorums {
+		quorumBytes[ind] = byte(uint8(quorum))
+	}
+
+	// result is a struct{Operators [][]opstateretriever.OperatorStateRetrieverOperator; Sockets [][]string}
+	// Operators is a [][]*opstateretriever.OperatorStake with the same length and order as quorumBytes, and then indexed by operator index
+	// Sockets is a [][]string with the same length and order as quorumBytes, and then indexed by operator index
+	// By contract definition, Operators and Sockets are parallel arrays
+	result, err := t.bindings.OpStateRetriever.GetOperatorStateWithSocket(&bind.CallOpts{
+		Context: ctx,
+	}, t.bindings.RegCoordinatorAddr, quorumBytes, blockNumber)
+	if err != nil {
+		t.logger.Errorf("Failed to fetch operator state: %s", err)
+		return nil, fmt.Errorf("failed to fetch operator state: %w", err)
+	}
+
+	state := make(core.OperatorStateVerbose, len(result.Operators))
+	for i := range result.Operators {
+		quorumID := quorums[i]
+		state[quorumID] = make(map[core.OperatorIndex]core.OperatorInfoVerbose, len(result.Operators[i]))
+		for j, op := range result.Operators[i] {
+			nodeVersion, err := v2.GetNodeInfoFromEndpoint(ctx, result.Sockets[i][j])
+			if err != nil {
+				t.logger.Errorf("Failed to fetch node version: %s", err)
+				return nil, fmt.Errorf("failed to fetch node version: %w", err)
+			}
+			operatorIndex := core.OperatorIndex(j)
+			state[quorumID][operatorIndex] = core.OperatorInfoVerbose{
+				OperatorID: op.OperatorId,
+				Socket:     core.OperatorSocket(result.Sockets[i][j]),
+				Stake:      op.Stake,
+				NodeInfo:   nodeVersion,
+			}
+		}
+	}
+
+	return state, nil
 }

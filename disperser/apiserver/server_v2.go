@@ -413,26 +413,25 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 
 // periodicOperatorNodeInfoCheck is a placeholder for the logic to fetch all operator endpoints and ping them for node info.
 func (s *DispersalServerV2) periodicOperatorNodeInfoCheck(ctx context.Context) {
-	s.logger.Info("Periodic operator node info check triggered: using cached onchain state")
-
-	onchainState := s.onchainState.Load()
-	if onchainState == nil {
-		s.logger.Error("onchain state is nil during operator node info check")
+	s.logger.Info("Periodic operator node info check")
+	quorumCount := s.onchainState.Load().QuorumCount
+	currentBlock, err := s.chainReader.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		s.logger.Error("failed to get current block number", "err", err)
+		return
+	}
+	quorumIds := make([]core.QuorumID, quorumCount)
+	for i := 0; i < int(quorumCount); i++ {
+		quorumIds[i] = core.QuorumID(i)
+	}
+	operatorState, err := s.chainReader.GetOperatorVerboseState(ctx, quorumIds, currentBlock)
+	if err != nil {
+		s.logger.Error("failed to get operator info for quorums", "err", err)
 		return
 	}
 
-	// Update NodeInfo for each operator
-	for _, opState := range onchainState.OperatorState {
-		nodeInfo, err := getNodeInfoFromEndpoint(ctx, opState.Socket)
-		if err != nil {
-			s.logger.Warn("Failed to fetch node info", "operator", opState.OperatorID.Hex(), "socket", opState.Socket, "err", err)
-			continue
-		}
-		opState.NodeInfo = nodeInfo
-	}
-
 	pctByQuorum, rolloutReady := CalculateQuorumRolloutReadiness(
-		onchainState.OperatorState,
+		operatorState,
 		requiredNodeVersion,
 		requiredNodeVersionStakeThreshold,
 	)
@@ -443,48 +442,31 @@ func (s *DispersalServerV2) periodicOperatorNodeInfoCheck(ctx context.Context) {
 	s.operatorSetRolloutReadyByQuorum = rolloutReady
 }
 
-// getNodeInfoFromEndpoint pings the operator's endpoint and returns NodeInfoReply
-func getNodeInfoFromEndpoint(ctx context.Context, endpoint string) (*pbvalidator.GetNodeInfoReply, error) {
-	conn, err := grpc.NewClient(endpoint)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-	client := pbvalidator.NewDispersalClient(conn)
-	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	resp, err := client.GetNodeInfo(ctxTimeout, &pbvalidator.GetNodeInfoRequest{})
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
-}
-
 // CalculateQuorumRolloutReadiness computes the stake percentage and readiness for each quorum.
 func CalculateQuorumRolloutReadiness(
-	ops map[core.OperatorID]*OperatorOnchainState,
+	ops core.OperatorStateVerbose,
 	requiredVersion string,
 	threshold float64,
 ) (map[core.QuorumID]float64, map[core.QuorumID]bool) {
 	totalStakeByQuorum := make(map[core.QuorumID]*big.Int)
 	upgradedStakeByQuorum := make(map[core.QuorumID]*big.Int)
-	for _, opState := range ops {
-		if opState.NodeInfo == nil {
-			continue
-		}
-		for _, quorum := range opState.Quorums {
-			if totalStakeByQuorum[quorum] == nil {
-				totalStakeByQuorum[quorum] = big.NewInt(0)
+
+	for quorumID, opMap := range ops {
+		totalStake := big.NewInt(0)
+		upgradedStake := big.NewInt(0)
+		for _, opState := range opMap {
+			if opState.Stake == nil {
+				continue
 			}
-			totalStakeByQuorum[quorum].Add(totalStakeByQuorum[quorum], opState.Stake)
-			if opState.NodeInfo.Semver == requiredVersion {
-				if upgradedStakeByQuorum[quorum] == nil {
-					upgradedStakeByQuorum[quorum] = big.NewInt(0)
-				}
-				upgradedStakeByQuorum[quorum].Add(upgradedStakeByQuorum[quorum], opState.Stake)
+			totalStake.Add(totalStake, opState.Stake)
+			if opState.NodeInfo != nil && opState.NodeInfo.Semver == requiredVersion {
+				upgradedStake.Add(upgradedStake, opState.Stake)
 			}
 		}
+		totalStakeByQuorum[quorumID] = totalStake
+		upgradedStakeByQuorum[quorumID] = upgradedStake
 	}
+
 	pctByQuorum := make(map[core.QuorumID]float64)
 	readyByQuorum := make(map[core.QuorumID]bool)
 	for quorum, total := range totalStakeByQuorum {
