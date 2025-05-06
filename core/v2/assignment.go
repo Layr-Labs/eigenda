@@ -2,14 +2,91 @@ package v2
 
 import (
 	"fmt"
+	"math"
 	"math/big"
-	"sort"
+	"math/rand"
+
+	"encoding/binary"
 
 	"github.com/Layr-Labs/eigenda/core"
 )
 
+type SampleConfig struct {
+	NumUnits       uint32
+	SamplesPerUnit uint32
+}
+
+var DefaultSampleConfig = SampleConfig{
+	NumUnits:       393,
+	SamplesPerUnit: 20,
+}
+
+// getMaxStakePercentage calculates the maximum stake percentage across specified quorums for a specific operator. The function assumes that it will be passed an operator state that contains the quorums for which the operator is a member. Therefore, it does not return an error if a quorum is not found in the state.
+func getMaxStakePercentage(state *core.OperatorState, blobParams *core.BlobVersionParameters, quorums []core.QuorumID, id core.OperatorID) (*big.Float, error) {
+	maxStakePercentage := new(big.Float)
+	found := false
+
+	for _, q := range quorums {
+		total, ok := state.Totals[q]
+		if !ok {
+			continue
+		}
+
+		ops, ok := state.Operators[q]
+		if !ok || len(ops) == 0 {
+			return nil, fmt.Errorf("no operators found for quorum %d", q)
+		}
+
+		numOps := len(ops)
+		if uint32(numOps) > blobParams.MaxNumOperators {
+			return nil, fmt.Errorf("too many operators (%d) to get assignments: max number of operators is %d", numOps, blobParams.MaxNumOperators)
+		}
+
+		// Get the stake for this operator in this quorum
+		stake, ok := ops[id]
+		if !ok {
+			continue // Skip if operator is not in this quorum
+		}
+
+		found = true
+		stakePercentage := new(big.Float).Quo(
+			new(big.Float).SetInt(stake.Stake),
+			new(big.Float).SetInt(total.Stake),
+		)
+		if maxStakePercentage.Cmp(stakePercentage) < 0 {
+			maxStakePercentage = stakePercentage
+		}
+	}
+
+	if !found {
+		return nil, ErrNotFound
+	}
+
+	return maxStakePercentage, nil
+}
+
+// getRelevantOperators gets all of the operators that are relevant to the blob
+func getRelevantOperators(state *core.OperatorState, quorums []core.QuorumID) (map[core.OperatorID]struct{}, error) {
+	if state == nil {
+		return nil, fmt.Errorf("state cannot be nil")
+	}
+
+	operators := make(map[core.OperatorID]struct{}, 0)
+	for _, q := range quorums {
+		ops, ok := state.Operators[q]
+		if !ok || len(ops) == 0 {
+			return nil, fmt.Errorf("no operators found for quorum %d", q)
+		}
+
+		for id := range ops {
+			operators[id] = struct{}{}
+		}
+	}
+	return operators, nil
+}
+
 // GetAssignments calculates chunk assignments for operators in a quorum based on their stake
-func GetAssignments(state *core.OperatorState, blobParams *core.BlobVersionParameters, quorum uint8) (map[core.OperatorID]Assignment, error) {
+func GetAssignments(state *core.OperatorState, blobParams *core.BlobVersionParameters, quorums []core.QuorumID, blobKey []byte) (map[core.OperatorID]Assignment, error) {
 	if state == nil {
 		return nil, fmt.Errorf("state cannot be nil")
 	}
@@ -18,106 +95,80 @@ func GetAssignments(state *core.OperatorState, blobParams *core.BlobVersionParam
 		return nil, fmt.Errorf("blob params cannot be nil")
 	}
 
-	ops, ok := state.Operators[quorum]
-	if !ok {
-		return nil, fmt.Errorf("no operators found for quorum %d", quorum)
+	ops, err := getRelevantOperators(state, quorums)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get relevant operators: %w", err)
 	}
 
 	numOps := len(ops)
-	if uint32(numOps) > blobParams.MaxNumOperators {
-		return nil, fmt.Errorf("too many operators (%d) to get assignments: max number of operators is %d", numOps, blobParams.MaxNumOperators)
-	}
 
 	// Early return for empty operator set
 	if numOps == 0 {
 		return make(map[core.OperatorID]Assignment), nil
 	}
 
-	type operatorAssignment struct {
-		id     core.OperatorID
-		index  uint32
-		chunks uint32
-		stake  *big.Int
-	}
-
-	numOperatorsBig := big.NewInt(int64(numOps))
-	numChunksBig := big.NewInt(int64(blobParams.NumChunks))
-	totalStake := state.Totals[quorum].Stake
-
-	// Calculate number of chunks - numOperators once and reuse
-	diffChunksOps := new(big.Int).Sub(numChunksBig, numOperatorsBig)
-	chunkAssignments := make([]operatorAssignment, 0, numOps)
-	// Calculate initial chunk assignments based on stake
-	totalCalculatedChunks := uint32(0)
-	for ID, r := range ops {
-		// Calculate chunks for this operator: (stake * (numChunks - numOperators)) / totalStake (rounded up)
-		num := new(big.Int).Mul(r.Stake, diffChunksOps)
-		chunks := uint32(core.RoundUpDivideBig(num, totalStake).Uint64())
-
-		chunkAssignments = append(chunkAssignments, operatorAssignment{
-			id:     ID,
-			index:  uint32(r.Index),
-			chunks: chunks,
-			stake:  r.Stake,
-		})
-
-		totalCalculatedChunks += chunks
-	}
-
-	// Sort by stake (decreasing) with index as tie-breaker
-	sort.Slice(chunkAssignments, func(i, j int) bool {
-		stakeCmp := chunkAssignments[i].stake.Cmp(chunkAssignments[j].stake)
-		if stakeCmp == 0 {
-			return chunkAssignments[i].index < chunkAssignments[j].index
-		}
-		return stakeCmp > 0 // Sort in descending order
-	})
-
-	// Distribute any remaining chunks
-	delta := int(blobParams.NumChunks) - int(totalCalculatedChunks)
-	if delta < 0 {
-		return nil, fmt.Errorf("total chunks %d exceeds maximum %d", totalCalculatedChunks, blobParams.NumChunks)
-	}
-
 	assignments := make(map[core.OperatorID]Assignment, numOps)
-	index := uint32(0)
-
-	// Assign chunks to operators
-	for i, a := range chunkAssignments {
-		// Add remaining chunks to operators with highest stake first
-		if i < delta {
-			a.chunks++
+	for id := range ops {
+		assignment, err := GetAssignment(state, blobParams, quorums, blobKey, id)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get assignment for operator %v: %w", id, err)
 		}
-
-		// Always add operators to the assignments map, even with zero chunks
-		assignments[a.id] = Assignment{
-			StartIndex: index,
-			NumChunks:  a.chunks,
-		}
-
-		index += a.chunks
+		assignments[id] = assignment
 	}
 
 	return assignments, nil
 }
 
 // GetAssignment returns the assignment for a specific operator
-func GetAssignment(state *core.OperatorState, blobParams *core.BlobVersionParameters, quorum core.QuorumID, id core.OperatorID) (Assignment, error) {
+func GetAssignment(state *core.OperatorState, blobParams *core.BlobVersionParameters, quorums []core.QuorumID, blobKey []byte, id core.OperatorID) (Assignment, error) {
+	if state == nil {
+		return Assignment{}, fmt.Errorf("state cannot be nil")
+	}
+
 	if blobParams == nil {
 		return Assignment{}, fmt.Errorf("blob params cannot be nil")
 	}
 
-	assignments, err := GetAssignments(state, blobParams, quorum)
+	maxStakePercentage, err := getMaxStakePercentage(state, blobParams, quorums, id)
 	if err != nil {
-		return Assignment{}, err
+		return Assignment{}, fmt.Errorf("failed to get max stake percentage: %w", err)
 	}
 
-	assignment, ok := assignments[id]
-	if !ok {
-		return Assignment{}, ErrNotFound
+	if maxStakePercentage.Cmp(big.NewFloat(0)) == 0 {
+		return Assignment{}, fmt.Errorf("max stake percentage is zero")
 	}
 
-	return assignment, nil
+	// Calculate number of samples based on max stake percentage
+	maxStakeFloat, _ := maxStakePercentage.Float64()
+	numSamples := uint32(math.Ceil(maxStakeFloat * float64(DefaultSampleConfig.NumUnits*DefaultSampleConfig.SamplesPerUnit)))
+
+	// Create a deterministic random number generator using the blob key as seed
+	// We also mix in the operator ID to ensure different operators get different assignments
+	seed := make([]byte, 40) // 32 bytes for blob key + 8 bytes for operator ID
+	copy(seed[:32], blobKey[:])
+	copy(seed[32:], id[:])
+	rng := rand.New(rand.NewSource(int64(binary.BigEndian.Uint64(seed[:8]))))
+
+	// Generate random indices without replacement for this operator
+	indices := make([]uint32, numSamples)
+	available := make([]uint32, blobParams.NumChunks)
+	for i := uint32(0); i < blobParams.NumChunks; i++ {
+		available[i] = i
+	}
+
+	// Select numSamples indices randomly without replacement
+	for i := uint32(0); i < numSamples && i < blobParams.NumChunks; i++ {
+		// Pick a random index from remaining available indices
+		j := rng.Intn(len(available))
+		indices[i] = available[j]
+		// Remove the selected index by swapping with the last element and reducing slice length
+		available[j] = available[len(available)-1]
+		available = available[:len(available)-1]
+	}
+
+	return Assignment{
+		Indices: indices,
+	}, nil
 }
 
 // GetChunkLength calculates the chunk length based on blob length and parameters

@@ -19,17 +19,16 @@ type BlobVersion = uint16
 
 // Assignment contains information about the set of chunks that a specific node will receive
 type Assignment struct {
-	StartIndex uint32
-	NumChunks  uint32
+	Indices []uint32
 }
 
 // GetIndices generates the list of ChunkIndices associated with a given assignment
 func (c *Assignment) GetIndices() []uint32 {
-	indices := make([]uint32, c.NumChunks)
-	for ind := range indices {
-		indices[ind] = c.StartIndex + uint32(ind)
-	}
-	return indices
+	return c.Indices
+}
+
+func (c *Assignment) NumChunks() uint32 {
+	return uint32(len(c.Indices))
 }
 
 // BlobKey is the unique identifier for a blob dispersal.
