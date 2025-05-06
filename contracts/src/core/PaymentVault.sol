@@ -6,8 +6,11 @@ import {PaymentVaultLib, PaymentVaultStorage} from "src/core/libraries/v3/Paymen
 import {EigenDATypesV3} from "src/core/libraries/v3/EigenDATypesV3.sol";
 import {Constants} from "src/core/libraries/Constants.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
+import {InitializableLib} from "src/core/libraries/InitializableLib.sol";
 
 contract PaymentVault is IPaymentVault {
+    uint64 public immutable SCHEDULE_PERIOD;
+
     modifier onlyOwner() {
         _onlyOwner();
         _;
@@ -18,20 +21,31 @@ contract PaymentVault is IPaymentVault {
         _;
     }
 
-    // TODO: ADD INITIALIZER MODIFIER
-    function initialize(address owner, uint64 schedulePeriod) external {
-        AccessControlLib.grantRole(Constants.OWNER_ROLE, owner);
-        PaymentVaultStorage.layout().schedulePeriod = schedulePeriod;
+    modifier initializer() {
+        InitializableLib.setInitializedVersion(1);
+        _;
     }
 
-    function createReservation(uint64 quorumId, EigenDATypesV3.Reservation memory reservation)
-        external
-        onlyQuorumOwner(quorumId)
-    {
-        PaymentVaultLib.createReservation(
-            quorumId, msg.sender, reservation, PaymentVaultStorage.layout().schedulePeriod
-        );
+    constructor(uint64 schedulePeriod) {
+        require(schedulePeriod > 0, "Schedule period must be greater than 0");
+        SCHEDULE_PERIOD = schedulePeriod;
     }
+
+    function initialize(address owner) external {
+        AccessControlLib.grantRole(Constants.OWNER_ROLE, owner);
+    }
+
+    /// USER
+
+    function decreaseReservation(uint64 quorumId, EigenDATypesV3.Reservation memory reservation) external {
+        PaymentVaultLib.decreaseReservation(quorumId, msg.sender, reservation, SCHEDULE_PERIOD);
+    }
+
+    function depositOnDemand(uint64 quorumId, uint256 amount) external {
+        PaymentVaultLib.depositOnDemand(quorumId, msg.sender, amount);
+    }
+
+    /// OWNER
 
     function transferOwnership(address newOwner) external onlyOwner {
         require(newOwner != address(0), "New owner is the zero address");
@@ -47,19 +61,82 @@ contract PaymentVault is IPaymentVault {
             AccessControlLib.getRoleMemberCount(Constants.QUORUM_OWNER_ROLE(quorumId)) == 0, "Quorum owner already set"
         );
         AccessControlLib.grantRole(Constants.QUORUM_OWNER_ROLE(quorumId), newOwner);
-        PaymentVaultStorage.layout().quorum[quorumId].protocolCfg = protocolCfg;
+        ps().quorum[quorumId].protocolCfg = protocolCfg;
+    }
+
+    function setReservationAdvanceWindow(uint64 quorumId, EigenDATypesV3.QuorumPaymentProtocolConfig memory protocolCfg)
+        external
+        onlyQuorumOwner(quorumId)
+    {
+        ps().quorum[quorumId].protocolCfg.reservationAdvanceWindow = protocolCfg.reservationAdvanceWindow;
+    }
+
+    /// QUORUM OWNER
+
+    function createReservation(uint64 quorumId, address account, EigenDATypesV3.Reservation memory reservation)
+        external
+        onlyQuorumOwner(quorumId)
+    {
+        PaymentVaultLib.addReservation(quorumId, account, reservation, SCHEDULE_PERIOD);
+    }
+
+    function increaseReservation(uint64 quorumId, address account, EigenDATypesV3.Reservation memory reservation)
+        external
+        onlyQuorumOwner(quorumId)
+    {
+        PaymentVaultLib.increaseReservation(quorumId, account, reservation, SCHEDULE_PERIOD);
     }
 
     function setQuorumPaymentConfig(uint64 quorumId, EigenDATypesV3.QuorumPaymentConfig memory paymentConfig)
         external
         onlyQuorumOwner(quorumId)
     {
-        PaymentVaultStorage.layout().quorum[quorumId].cfg = paymentConfig;
+        ps().quorum[quorumId].cfg = paymentConfig;
     }
 
     function transferQuorumOwnership(uint64 quorumId, address newOwner) external onlyQuorumOwner(quorumId) {
         require(newOwner != address(0), "New owner is the zero address");
         AccessControlLib.transferRole(Constants.QUORUM_OWNER_ROLE(quorumId), msg.sender, newOwner);
+    }
+
+    /// GETTERS
+
+    function getOnDemandDeposit(uint64 quorumId, address account) external view returns (uint256) {
+        return ps().quorum[quorumId].user[account].deposit;
+    }
+
+    function getReservation(uint64 quorumId, address account)
+        external
+        view
+        returns (EigenDATypesV3.Reservation memory)
+    {
+        return ps().quorum[quorumId].user[account].reservation;
+    }
+
+    function getQuorumProtocolConfig(uint64 quorumId)
+        external
+        view
+        returns (EigenDATypesV3.QuorumPaymentProtocolConfig memory)
+    {
+        return ps().quorum[quorumId].protocolCfg;
+    }
+
+    function getQuorumPaymentConfig(uint64 quorumId)
+        external
+        view
+        returns (EigenDATypesV3.QuorumPaymentConfig memory)
+    {
+        return ps().quorum[quorumId].cfg;
+    }
+
+    function getQuorumReservedSymbols(uint64 quorumId, uint64 period) external view returns (uint64) {
+        return ps().quorum[quorumId].reservedSymbols[period];
+    }
+
+    /// HELPER
+
+    function ps() internal pure returns (PaymentVaultStorage.Layout storage) {
+        return PaymentVaultStorage.layout();
     }
 
     function _onlyOwner() internal view virtual {

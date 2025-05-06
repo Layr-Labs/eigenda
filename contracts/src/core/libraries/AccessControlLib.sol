@@ -36,7 +36,7 @@ library AccessControlLib {
 
     error MissingRole(bytes32 role, address account);
 
-    function acs() internal pure returns (AccessControlStorage.Layout storage) {
+    function acs() private pure returns (AccessControlStorage.Layout storage) {
         return AccessControlStorage.layout();
     }
 

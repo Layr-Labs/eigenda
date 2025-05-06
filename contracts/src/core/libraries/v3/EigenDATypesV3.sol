@@ -12,7 +12,7 @@ library EigenDATypesV3 {
     }
 
     struct QuorumPaymentConfig {
-        address tokenAddress; // the address of the token used for on-demand payments.
+        address token; // the address of the token used for on-demand payments.
         address recipient; // the address of the recipient of the on-demand payments.
         uint64 reservationSymbolsPerSecond;
         uint64 onDemandSymbolsPerPeriod;
@@ -21,7 +21,6 @@ library EigenDATypesV3 {
 
     struct QuorumPaymentProtocolConfig {
         uint64 reservationAdvanceWindow;
-        uint64 reservationSchedulingPeriod;
     }
 
     struct Reservation {
