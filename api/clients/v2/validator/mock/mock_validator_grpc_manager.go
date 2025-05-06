@@ -1,14 +1,15 @@
-package validator
+package mock
 
 import (
 	"context"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/internal"
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 )
 
-var _ ValidatorGRPCManager = (*MockValidatorGRPCManager)(nil)
+var _ internal.ValidatorGRPCManager = (*MockValidatorGRPCManager)(nil)
 
 // MockValidatorGRPCManager is a mock implementation of the ValidatorGRPCManager interface.
 type MockValidatorGRPCManager struct {
@@ -39,7 +40,7 @@ func NewMockValidatorGRPCManager(
 		operatorID core.OperatorID,
 		quorumID core.QuorumID,
 	) (*grpcnode.GetChunksReply, error),
-) ValidatorGRPCManager {
+) internal.ValidatorGRPCManager {
 	return &MockValidatorGRPCManager{
 		DownloadChunksFunction: downloadChunksFunction,
 	}

@@ -1,4 +1,4 @@
-package validator
+package internal
 
 import (
 	v2 "github.com/Layr-Labs/eigenda/core/v2"

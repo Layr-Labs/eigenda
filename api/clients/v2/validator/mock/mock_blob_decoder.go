@@ -1,11 +1,12 @@
-package validator
+package mock
 
 import (
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/internal"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 )
 
-var _ BlobDecoder = &MockBlobDecoder{}
+var _ internal.BlobDecoder = &MockBlobDecoder{}
 
 // MockBlobDecoder is a mock implementation of the BlobDecoder interface.
 type MockBlobDecoder struct {
@@ -33,8 +34,8 @@ func (m MockBlobDecoder) DecodeBlob(
 }
 
 // NewMockBlobDecoderFactory creates a new BlobDecoderFactory that returns the provided decoder.
-func NewMockBlobDecoderFactory(decoder BlobDecoder) BlobDecoderFactory {
-	return func(verifier encoding.Verifier) BlobDecoder {
+func NewMockBlobDecoderFactory(decoder internal.BlobDecoder) internal.BlobDecoderFactory {
+	return func(verifier encoding.Verifier) internal.BlobDecoder {
 		return decoder
 	}
 }

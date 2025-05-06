@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils"
@@ -74,7 +75,7 @@ func TestBasicWorkflow(t *testing.T) {
 	chunksDownloaded := atomic.Uint32{}
 	// a set of operators that have provided chunks
 	downloadSet := sync.Map{}
-	mockGRPCManager := &MockValidatorGRPCManager{}
+	mockGRPCManager := &mock.MockValidatorGRPCManager{}
 	mockGRPCManager.DownloadChunksFunction = func(
 		ctx context.Context,
 		key v2.BlobKey,
@@ -103,7 +104,7 @@ func TestBasicWorkflow(t *testing.T) {
 
 	// the set of operators we have verified the chunks of
 	verificationSet := sync.Map{}
-	mockDeserializer := &MockChunkDeserializer{}
+	mockDeserializer := &mock.MockChunkDeserializer{}
 	mockDeserializer.DeserializeAndVerifyFunction = func(
 		blobKey v2.BlobKey,
 		operatorID core.OperatorID,
@@ -148,7 +149,7 @@ func TestBasicWorkflow(t *testing.T) {
 	decodedBytes := rand.PrintableBytes(32)
 	framesSentToDecoding := atomic.Uint32{}
 
-	mockDecoder := &MockBlobDecoder{}
+	mockDecoder := &mock.MockBlobDecoder{}
 	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
 		chunks []*encoding.Frame,
@@ -268,7 +269,7 @@ func TestDownloadTimeout(t *testing.T) {
 	timedOutDownloads := atomic.Uint32{}
 	// a set of operators that have provided chunks
 	downloadSet := sync.Map{}
-	mockGRPCManager := &MockValidatorGRPCManager{}
+	mockGRPCManager := &mock.MockValidatorGRPCManager{}
 	mockGRPCManager.DownloadChunksFunction = func(
 		ctx context.Context,
 		key v2.BlobKey,
@@ -303,7 +304,7 @@ func TestDownloadTimeout(t *testing.T) {
 
 	// the set of operators we have verified the chunks of
 	verificationSet := sync.Map{}
-	mockDeserializer := &MockChunkDeserializer{}
+	mockDeserializer := &mock.MockChunkDeserializer{}
 	mockDeserializer.DeserializeAndVerifyFunction = func(
 		blobKey v2.BlobKey,
 		operatorID core.OperatorID,
@@ -347,7 +348,7 @@ func TestDownloadTimeout(t *testing.T) {
 	decodeCalled := atomic.Bool{}
 	decodedBytes := rand.PrintableBytes(32)
 	framesSentToDecoding := atomic.Uint32{}
-	mockDecoder := &MockBlobDecoder{}
+	mockDecoder := &mock.MockBlobDecoder{}
 	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
 		chunks []*encoding.Frame,
@@ -520,7 +521,7 @@ func TestFailedVerification(t *testing.T) {
 	chunksDownloaded := atomic.Uint32{}
 	// a set of operators that have provided chunks
 	downloadSet := sync.Map{}
-	mockGRPCManager := &MockValidatorGRPCManager{}
+	mockGRPCManager := &mock.MockValidatorGRPCManager{}
 	mockGRPCManager.DownloadChunksFunction = func(
 		ctx context.Context,
 		key v2.BlobKey,
@@ -557,7 +558,7 @@ func TestFailedVerification(t *testing.T) {
 
 	// the set of operators we have verified the chunks of
 	verificationSet := sync.Map{}
-	mockDeserializer := &MockChunkDeserializer{}
+	mockDeserializer := &mock.MockChunkDeserializer{}
 	mockDeserializer.DeserializeAndVerifyFunction = func(
 		blobKey v2.BlobKey,
 		operatorID core.OperatorID,
@@ -605,7 +606,7 @@ func TestFailedVerification(t *testing.T) {
 	decodeCalled := atomic.Bool{}
 	decodedBytes := rand.PrintableBytes(32)
 	framesSentToDecoding := atomic.Uint32{}
-	mockDecoder := &MockBlobDecoder{}
+	mockDecoder := &mock.MockBlobDecoder{}
 	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
 		chunks []*encoding.Frame,

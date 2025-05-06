@@ -3,6 +3,8 @@ package validator
 import (
 	"runtime"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/internal"
 )
 
 // ValidatorClientConfig contains the configuration for the validator retrieval client.
@@ -68,15 +70,15 @@ type ValidatorClientConfig struct {
 
 	// A function that creates a new ValidatorGRPCManager. Potentially useful for testing purposes.
 	// This should not be considered a stable API.
-	UnsafeValidatorGRPCManagerFactory ValidatorGRPCManagerFactory
+	UnsafeValidatorGRPCManagerFactory internal.ValidatorGRPCManagerFactory
 
 	// A function used to build a ChunkDeserializer. Potentially useful for testing purposes.
 	// This should not be considered a stable API.
-	UnsafeChunkDeserializerFactory ChunkDeserializerFactory
+	UnsafeChunkDeserializerFactory internal.ChunkDeserializerFactory
 
 	// A function used to build a BlobDecoder. Potentially useful for testing purposes.
 	// This should not be considered a stable API.
-	UnsafeBlobDecoderFactory BlobDecoderFactory
+	UnsafeBlobDecoderFactory internal.BlobDecoderFactory
 }
 
 // DefaultClientConfig returns the default configuration for the validator retrieval client.
@@ -91,8 +93,8 @@ func DefaultClientConfig() *ValidatorClientConfig {
 		ConnectionPoolSize:                32,
 		ComputePoolSize:                   runtime.NumCPU(),
 		TimeSource:                        time.Now,
-		UnsafeValidatorGRPCManagerFactory: NewValidatorGRPCManager,
-		UnsafeChunkDeserializerFactory:    NewChunkDeserializer,
-		UnsafeBlobDecoderFactory:          NewBlobDecoder,
+		UnsafeValidatorGRPCManagerFactory: internal.NewValidatorGRPCManager,
+		UnsafeChunkDeserializerFactory:    internal.NewChunkDeserializer,
+		UnsafeBlobDecoderFactory:          internal.NewBlobDecoder,
 	}
 }

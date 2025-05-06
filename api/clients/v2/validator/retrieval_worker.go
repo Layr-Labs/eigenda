@@ -6,6 +6,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/internal"
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
@@ -104,13 +105,13 @@ type retrievalWorker struct {
 	config               *ValidatorClientConfig
 
 	// Responsible for talking to the validator nodes via gRPCs.
-	validatorGRPCManager ValidatorGRPCManager
+	validatorGRPCManager internal.ValidatorGRPCManager
 
 	// Responsible for deserializing and verifying chunk data.
-	chunkDeserializer ChunkDeserializer
+	chunkDeserializer internal.ChunkDeserializer
 
 	// The function used to decode the blob from the chunks.
-	blobDecoder BlobDecoder
+	blobDecoder internal.BlobDecoder
 
 	// A pool of workers for network intensive operations (e.g. downloading blob data).
 	connectionPool *workerpool.WorkerPool
@@ -223,9 +224,9 @@ func newRetrievalWorker(
 	config *ValidatorClientConfig,
 	connectionPool *workerpool.WorkerPool,
 	computePool *workerpool.WorkerPool,
-	validatorGRPCManager ValidatorGRPCManager,
-	chunkDeserializer ChunkDeserializer,
-	blobDecoder BlobDecoder,
+	validatorGRPCManager internal.ValidatorGRPCManager,
+	chunkDeserializer internal.ChunkDeserializer,
+	blobDecoder internal.BlobDecoder,
 	assignments map[core.OperatorID]v2.Assignment,
 	totalChunkCount uint32,
 	minimumChunkCount uint32,

@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
@@ -297,9 +298,9 @@ func NewTestClient(
 	// with limited CPU resources.
 	onlyDownloadClientConfig := validator.DefaultClientConfig()
 	onlyDownloadClientConfig.UnsafeChunkDeserializerFactory =
-		validator.NewMockChunkDeserializerFactory(&validator.MockChunkDeserializer{})
+		mock.NewMockChunkDeserializerFactory(&mock.MockChunkDeserializer{})
 	onlyDownloadClientConfig.UnsafeBlobDecoderFactory =
-		validator.NewMockBlobDecoderFactory(&validator.MockBlobDecoder{})
+		mock.NewMockBlobDecoderFactory(&mock.MockBlobDecoder{})
 
 	onlyDownloadValidatorClient := validator.NewValidatorClient(
 		logger,
