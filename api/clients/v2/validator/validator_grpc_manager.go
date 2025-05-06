@@ -13,8 +13,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// TODO factory?
-
 // A ValidatorGRPCManager is responsible for maintaining gRPC client connections with the validator nodes.
 type ValidatorGRPCManager interface {
 
@@ -27,6 +25,12 @@ type ValidatorGRPCManager interface {
 	) (*grpcnode.GetChunksReply, error)
 }
 
+// ValidatorGRPCManagerFactory is a function that creates a new ValidatorGRPCManager instance.
+type ValidatorGRPCManagerFactory func(
+	logger logging.Logger,
+	operatorInfo map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo,
+) ValidatorGRPCManager
+
 var _ ValidatorGRPCManager = (*validatorGRPCManager)(nil)
 
 // validatorGRPCManager is a standalone implementation of the ValidatorGRPCManager interface.
@@ -36,6 +40,8 @@ type validatorGRPCManager struct {
 	// Information about the operators for each quorum.
 	operatorInfo map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo
 }
+
+var _ ValidatorGRPCManagerFactory = NewValidatorGRPCManager
 
 // NewValidatorGRPCManager creates a new ValidatorGRPCManager instance.
 func NewValidatorGRPCManager(

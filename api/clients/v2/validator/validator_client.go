@@ -132,7 +132,7 @@ func (c *validatorClient) GetBlob(
 		c.config,
 		c.connectionPool,
 		c.computePool,
-		NewValidatorGRPCManager(c.logger, operatorState.Operators),
+		c.config.UnsafeValidatorGRPCManagerFactory(c.logger, operatorState.Operators),
 		c.config.UnsafeChunkDeserializerFactory(assignments, c.verifier),
 		assignments,
 		totalChunkCount,

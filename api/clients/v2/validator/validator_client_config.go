@@ -70,8 +70,12 @@ type ValidatorClientConfig struct {
 	// The default is time.Now.
 	TimeSource func() time.Time
 
+	// A function that creates a new ValidatorGRPCManager. Potentially useful for testing purposes.
+	// This should not be considered a stable API.
+	UnsafeValidatorGRPCManagerFactory ValidatorGRPCManagerFactory
+
 	// A function used to build a ChunkDeserializer. Potentially useful for testing purposes.
-	// This should not be considered a public API.
+	// This should not be considered a stable API.
 	UnsafeChunkDeserializerFactory ChunkDeserializerFactory
 
 	// A function that overrides the default blob decoder. This is intended for testing purposes, and should not
@@ -92,16 +96,17 @@ type DecodeBlobFunction func(
 // DefaultClientConfig returns the default configuration for the validator retrieval client.
 func DefaultClientConfig() *ValidatorClientConfig {
 	return &ValidatorClientConfig{
-		DownloadPessimism:              2.0,
-		VerificationPessimism:          1.0,
-		PessimisticTimeout:             10 * time.Second,
-		DownloadTimeout:                120 * time.Second,
-		ControlLoopPeriod:              1 * time.Second,
-		DetailedLogging:                false,
-		ConnectionPoolSize:             32,
-		ComputePoolSize:                runtime.NumCPU(),
-		TimeSource:                     time.Now,
-		UnsafeChunkDeserializerFactory: NewChunkDeserializer,
-		UnsafeDecodeBlobFunction:       nil,
+		DownloadPessimism:                 2.0,
+		VerificationPessimism:             1.0,
+		PessimisticTimeout:                10 * time.Second,
+		DownloadTimeout:                   120 * time.Second,
+		ControlLoopPeriod:                 1 * time.Second,
+		DetailedLogging:                   false,
+		ConnectionPoolSize:                32,
+		ComputePoolSize:                   runtime.NumCPU(),
+		TimeSource:                        time.Now,
+		UnsafeValidatorGRPCManagerFactory: NewValidatorGRPCManager,
+		UnsafeChunkDeserializerFactory:    NewChunkDeserializer,
+		UnsafeDecodeBlobFunction:          nil,
 	}
 }
