@@ -264,7 +264,7 @@ func (l *LoadGenerator) readBlobFromRelays(
 	}
 }
 
-// readBlobFromValidators reads a blob from the validators using the distributed retrieval client.
+// readBlobFromValidators reads a blob from the validators using the validator retrieval client.
 func (l *LoadGenerator) readBlobFromValidators(
 	rand *random.TestRandom,
 	blobKey *corev2.BlobKey,

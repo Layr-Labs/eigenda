@@ -76,6 +76,7 @@ func (pd *PayloadDisperser) SendPayload(
 ) (*coretypes.EigenDACert, error) {
 
 	probe := pd.stageTimer.NewSequence()
+	defer probe.End()
 	probe.SetStage("convert_to_blob")
 
 	blob, err := payload.ToBlob(pd.config.PayloadPolynomialForm)

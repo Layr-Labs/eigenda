@@ -70,7 +70,7 @@ type ValidatorClientConfig struct {
 	// A function that returns the current time.
 	//
 	// The default is time.Now.
-	timeSource func() time.Time
+	TimeSource func() time.Time
 
 	// A function that overrides the default chunk downloader. This is intended for testing purposes, and should
 	// not be used in production code. This should not be considered a public API.
@@ -125,7 +125,7 @@ func DefaultClientConfig() *ValidatorClientConfig {
 		DetailedLogging:                    false,
 		ConnectionPoolSize:                 32,
 		ComputePoolSize:                    runtime.NumCPU(),
-		timeSource:                         time.Now,
+		TimeSource:                         time.Now,
 		UnsafeDownloadChunksFunction:       nil,
 		UnsafeDeserializeAndVerifyFunction: nil,
 		UnsafeDecodeBlobFunction:           nil,

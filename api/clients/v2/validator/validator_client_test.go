@@ -32,7 +32,7 @@ func TestBasicWorkflow(t *testing.T) {
 
 	config := DefaultClientConfig()
 	config.ControlLoopPeriod = 50 * time.Microsecond
-	config.timeSource = func() time.Time {
+	config.TimeSource = func() time.Time {
 		return *fakeClock.Load()
 	}
 	config.DownloadPessimism = rand.Float64Range(1.0, 8.0)
@@ -210,7 +210,7 @@ func TestDownloadTimeout(t *testing.T) {
 
 	config := DefaultClientConfig()
 	config.ControlLoopPeriod = 50 * time.Microsecond
-	config.timeSource = func() time.Time {
+	config.TimeSource = func() time.Time {
 		return *fakeClock.Load()
 	}
 	config.DownloadPessimism = rand.Float64Range(1.0, 2.0)
@@ -461,7 +461,7 @@ func TestFailedVerification(t *testing.T) {
 
 	config := DefaultClientConfig()
 	config.ControlLoopPeriod = 50 * time.Microsecond
-	config.timeSource = func() time.Time {
+	config.TimeSource = func() time.Time {
 		return *fakeClock.Load()
 	}
 	config.DownloadPessimism = rand.Float64Range(1.0, 8.0)

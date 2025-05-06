@@ -13,7 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
-	relayv2 "github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
 	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
@@ -51,14 +51,14 @@ type TestClient struct {
 	certVerifierAddressProvider *test.TestCertVerifierAddressProvider
 	disperserClient             clients.DisperserClient
 	payloadDisperser            *payloaddispersal.PayloadDisperser
-	relayClient                 relayv2.RelayClient
+	relayClient                 relay.RelayClient
 	relayPayloadRetriever       *payloadretrieval.RelayPayloadRetriever
 	indexedChainState           core.IndexedChainState
-	retrievalClient             validator.ValidatorClient
+	validatorClient             validator.ValidatorClient
 	validatorPayloadRetriever   *payloadretrieval.ValidatorPayloadRetriever
 	// For fetching blobs from the validators without verifying or decoding them. Useful for load testing
 	// validator downloads with limited CPU resources.
-	onlyDownloadRetrievalClient validator.ValidatorClient
+	onlyDownloadValidatorClient validator.ValidatorClient
 	certVerifier                *verification.CertVerifier
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
@@ -218,23 +218,23 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to generate BLS keypair: %w", err)
 	}
 
-	var fakeSigner relayv2.MessageSigner = func(ctx context.Context, data [32]byte) (*core.Signature, error) {
+	var fakeSigner relay.MessageSigner = func(ctx context.Context, data [32]byte) (*core.Signature, error) {
 		return keypair.SignMessage(data), nil
 	}
 
-	relayConfig := &relayv2.RelayClientConfig{
+	relayConfig := &relay.RelayClientConfig{
 		UseSecureGrpcFlag:  true,
 		MaxGRPCMessageSize: units.GiB,
 		OperatorID:         &core.OperatorID{0},
 		MessageSigner:      fakeSigner,
 	}
 
-	relayUrlProvider, err := relayv2.NewRelayUrlProvider(ethClient, ethReader.GetRelayRegistryAddress())
+	relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, ethReader.GetRelayRegistryAddress())
 	if err != nil {
 		return nil, fmt.Errorf("create relay url provider: %w", err)
 	}
 
-	relayClient, err := relayv2.NewRelayClient(relayConfig, logger, relayUrlProvider)
+	relayClient, err := relay.NewRelayClient(relayConfig, logger, relayUrlProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create relay client: %w", err)
 	}
@@ -313,7 +313,7 @@ func NewTestClient(
 	) ([]byte, error) {
 		return nil, nil
 	}
-	onlyDownloadRetrievalClient := validator.NewValidatorClient(
+	onlyDownloadValidatorClient := validator.NewValidatorClient(
 		logger,
 		ethReader,
 		indexedChainState,
@@ -331,9 +331,9 @@ func NewTestClient(
 		relayClient:                 relayClient,
 		relayPayloadRetriever:       relayPayloadRetriever,
 		indexedChainState:           indexedChainState,
-		retrievalClient:             retrievalClient,
+		validatorClient:             retrievalClient,
 		validatorPayloadRetriever:   validatorPayloadRetriever,
-		onlyDownloadRetrievalClient: onlyDownloadRetrievalClient,
+		onlyDownloadValidatorClient: onlyDownloadValidatorClient,
 		certVerifier:                certVerifier,
 		privateKey:                  privateKey,
 		metricsRegistry:             registry,
@@ -418,7 +418,7 @@ func (c *TestClient) GetPayloadDisperser() *payloaddispersal.PayloadDisperser {
 }
 
 // GetRelayClient returns the test client's relay client.
-func (c *TestClient) GetRelayClient() relayv2.RelayClient {
+func (c *TestClient) GetRelayClient() relay.RelayClient {
 	return c.relayClient
 }
 
@@ -432,9 +432,9 @@ func (c *TestClient) GetIndexedChainState() core.IndexedChainState {
 	return c.indexedChainState
 }
 
-// GetRetrievalClient returns the test client's retrieval client.
-func (c *TestClient) GetRetrievalClient() validator.ValidatorClient {
-	return c.retrievalClient
+// GetValidatorClient returns the test client's validator client.
+func (c *TestClient) GetValidatorClient() validator.ValidatorClient {
+	return c.validatorClient
 }
 
 // GetValidatorPayloadRetriever returns the test client's validator payload retriever.
@@ -553,6 +553,8 @@ func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (
 }
 
 // ReadBlobFromRelays reads a blob from the relays and compares it to the given payload.
+//
+// The timeout provided is a timeout for each individual relay read, not all reads as a whole.
 func (c *TestClient) ReadBlobFromRelays(
 	ctx context.Context,
 	key corev2.BlobKey,
@@ -625,6 +627,8 @@ func (c *TestClient) GetCurrentBlockNumber(ctx context.Context) (uint64, error) 
 }
 
 // ReadBlobFromValidators reads a blob from the validators and compares it to the given payload.
+//
+// The timeout provided is a timeout for each read from a quorum, not all reads as a whole.
 func (c *TestClient) ReadBlobFromValidators(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
@@ -681,7 +685,7 @@ func (c *TestClient) ReadBlobFromValidatorsInQuorum(
 	if validateAndDecode {
 		start := time.Now()
 
-		retrievedBlobBytes, err := c.retrievalClient.GetBlob(
+		retrievedBlobBytes, err := c.validatorClient.GetBlob(
 			ctx,
 			blobKey,
 			blobVersion,
@@ -713,7 +717,7 @@ func (c *TestClient) ReadBlobFromValidatorsInQuorum(
 
 		// Just download the blob without validating or decoding. Don't report timing metrics for this operation.
 
-		_, err := c.onlyDownloadRetrievalClient.GetBlob(
+		_, err := c.onlyDownloadValidatorClient.GetBlob(
 			ctx,
 			blobKey,
 			blobVersion,
