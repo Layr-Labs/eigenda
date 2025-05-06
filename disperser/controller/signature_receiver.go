@@ -318,7 +318,17 @@ func (sr *signatureReceiver) buildAndSubmitAttestation(attestationChan chan *cor
 
 	quorumResults := make(map[core.QuorumID]*core.QuorumResult)
 	for _, quorumID := range sr.quorumIDs {
-		quorumResult, err := sr.computeQuorumResult(quorumID, nonSignerMap)
+		signedPercentage := getSignedPercentage(
+			sr.stakeSigned[quorumID],
+			sr.indexedOperatorState.Totals[quorumID].Stake)
+
+		if signedPercentage == 0 {
+			// don't include results for quorums with signed percentage <1%
+			// the dispatcher relies on this behavior, to distinguish between the `complete` and `failed` statuses
+			continue
+		}
+
+		quorumResult, err := sr.computeQuorumResult(quorumID, nonSignerMap, signedPercentage)
 		if err != nil {
 			sr.logger.Error("compute quorum result",
 				"quorumID", quorumID,
@@ -366,18 +376,8 @@ func (sr *signatureReceiver) buildAndSubmitAttestation(attestationChan chan *cor
 func (sr *signatureReceiver) computeQuorumResult(
 	quorumID core.QuorumID,
 	nonSignerMap map[core.OperatorID]*core.G1Point,
+	signedPercentage uint8,
 ) (*core.QuorumResult, error) {
-	signedPercentage := getSignedPercentage(
-		sr.stakeSigned[quorumID],
-		sr.indexedOperatorState.Totals[quorumID].Stake)
-
-	if signedPercentage == 0 {
-		return &core.QuorumResult{
-			QuorumID:      quorumID,
-			PercentSigned: 0,
-		}, nil
-	}
-
 	// clone the quorum aggregate G1 pubkey, so that we can safely subtract non-signer pubkeys to yield the aggregate
 	// G1 pubkey of all the signers
 	aggregateSignersG1PubKey := sr.indexedOperatorState.AggKeys[quorumID].Clone()
