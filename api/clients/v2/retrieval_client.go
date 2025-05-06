@@ -25,11 +25,8 @@ type RetrievalClient interface {
 	// GetBlob downloads chunks of a blob from operator network and reconstructs the blob.
 	GetBlob(
 		ctx context.Context,
-		blobKey corev2.BlobKey,
-		blobVersion corev2.BlobVersion,
-		blobCommitments encoding.BlobCommitments,
+		blobHeader *corev2.BlobHeaderWithoutPayment,
 		referenceBlockNumber uint64,
-		quorums []core.QuorumID,
 	) ([]byte, error)
 }
 
@@ -76,20 +73,17 @@ func getFlattenedSockets(
 
 func (r *retrievalClient) GetBlob(
 	ctx context.Context,
-	blobKey corev2.BlobKey,
-	blobVersion corev2.BlobVersion,
-	blobCommitments encoding.BlobCommitments,
+	header *corev2.BlobHeaderWithoutPayment,
 	referenceBlockNumber uint64,
-	quorums []core.QuorumID,
 ) ([]byte, error) {
 
-	commitmentBatch := []encoding.BlobCommitments{blobCommitments}
+	commitmentBatch := []encoding.BlobCommitments{header.BlobCommitments}
 	err := r.verifier.VerifyCommitEquivalenceBatch(commitmentBatch)
 	if err != nil {
 		return nil, err
 	}
 
-	operatorState, err := r.chainState.GetOperatorStateWithSocket(ctx, uint(referenceBlockNumber), quorums)
+	operatorState, err := r.chainState.GetOperatorStateWithSocket(ctx, uint(referenceBlockNumber), header.QuorumNumbers)
 	if err != nil {
 		return nil, err
 	}
@@ -104,17 +98,22 @@ func (r *retrievalClient) GetBlob(
 		return nil, err
 	}
 
-	blobParam, ok := blobVersions[blobVersion]
+	blobParam, ok := blobVersions[header.BlobVersion]
 	if !ok {
-		return nil, fmt.Errorf("invalid blob version %d", blobVersion)
+		return nil, fmt.Errorf("invalid blob version %d", header.BlobVersion)
 	}
 
-	encodingParams, err := corev2.GetEncodingParams(blobCommitments.Length, blobParam)
+	encodingParams, err := corev2.GetEncodingParams(header.BlobCommitments.Length, blobParam)
 	if err != nil {
 		return nil, err
 	}
 
-	assignments, err := corev2.GetAssignments(operatorState, blobParam, quorums, blobKey[:])
+	blobKey, err := header.BlobKey()
+	if err != nil {
+		return nil, err
+	}
+
+	assignments, err := corev2.GetAssignments(operatorState, blobParam, header.QuorumNumbers, blobKey[:])
 	if err != nil {
 		return nil, errors.New("failed to get assignments")
 	}
@@ -154,7 +153,7 @@ func (r *retrievalClient) GetBlob(
 			assignmentIndices[i] = uint(index)
 		}
 
-		err = r.verifier.VerifyFrames(reply.Chunks, assignmentIndices, blobCommitments, encodingParams)
+		err = r.verifier.VerifyFrames(reply.Chunks, assignmentIndices, header.BlobCommitments, encodingParams)
 		if err != nil {
 			r.logger.Warn("failed to verify chunks from operator", "operator", reply.OperatorID.Hex(), "err", err)
 			continue
@@ -174,7 +173,7 @@ func (r *retrievalClient) GetBlob(
 		chunks,
 		indices,
 		encodingParams,
-		uint64(blobCommitments.Length)*encoding.BYTES_PER_SYMBOL,
+		uint64(header.BlobCommitments.Length)*encoding.BYTES_PER_SYMBOL,
 	)
 }
 

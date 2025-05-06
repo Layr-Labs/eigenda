@@ -250,50 +250,26 @@ var _ = Describe("Inabox v2 Integration", func() {
 			}
 		}
 
-		blob1Key, err := blobCert1.BlobHeader.BlobKey()
+		blob1HeaderWithoutPayment, err := blobCert1.BlobHeader.GetBlobHeaderWithoutPayment()
 		Expect(err).To(BeNil())
 
-		blob2Key, err := blobCert2.BlobHeader.BlobKey()
+		blob2HeaderWithoutPayment, err := blobCert2.BlobHeader.GetBlobHeaderWithoutPayment()
 		Expect(err).To(BeNil())
 
 		// Test retrieval from DA network
 		b, err := retrievalClientV2.GetBlob(
 			ctx,
-			blob1Key,
-			blobCert1.BlobHeader.BlobVersion,
-			blobCert1.BlobHeader.BlobCommitments,
+			blob1HeaderWithoutPayment,
 			batchHeader1.ReferenceBlockNumber,
-			0)
+		)
 		Expect(err).To(BeNil())
 		restored := bytes.TrimRight(b, "\x00")
 		Expect(restored).To(Equal(paddedData1))
 		b, err = retrievalClientV2.GetBlob(
 			ctx,
-			blob1Key,
-			blobCert1.BlobHeader.BlobVersion,
-			blobCert1.BlobHeader.BlobCommitments,
-			batchHeader1.ReferenceBlockNumber,
-			1)
-		restored = bytes.TrimRight(b, "\x00")
-		Expect(err).To(BeNil())
-		Expect(restored).To(Equal(paddedData1))
-		b, err = retrievalClientV2.GetBlob(
-			ctx,
-			blob2Key,
-			blobCert2.BlobHeader.BlobVersion,
-			blobCert2.BlobHeader.BlobCommitments,
+			blob2HeaderWithoutPayment,
 			batchHeader2.ReferenceBlockNumber,
-			0)
-		restored = bytes.TrimRight(b, "\x00")
-		Expect(err).To(BeNil())
-		Expect(restored).To(Equal(paddedData2))
-		b, err = retrievalClientV2.GetBlob(
-			ctx,
-			blob2Key,
-			blobCert2.BlobHeader.BlobVersion,
-			blobCert2.BlobHeader.BlobCommitments,
-			batchHeader2.ReferenceBlockNumber,
-			1)
+		)
 		restored = bytes.TrimRight(b, "\x00")
 		Expect(err).To(BeNil())
 		Expect(restored).To(Equal(paddedData2))

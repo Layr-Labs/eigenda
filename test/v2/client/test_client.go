@@ -15,7 +15,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	relayv2 "github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
@@ -474,19 +473,17 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		return fmt.Errorf("failed to read blob from relays: %w", err)
 	}
 
-	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
-	if err != nil {
-		return fmt.Errorf("failed to convert blob commitments: %w", err)
-	}
+	// blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
+	// commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to convert blob commitments: %w", err)
+	// }
+	blobHeader, err := coretypes.BlobHeaderBindingToInternal(&eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader)
 
 	// read blob from ALL quorums
 	err = c.ReadBlobFromValidators(
 		ctx,
-		*blobKey,
-		blobHeader.Version,
-		*commitment,
-		eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+		blobHeader,
 		payload)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from validators: %w", err)
@@ -554,10 +551,7 @@ func (c *TestClient) ReadBlobFromRelays(
 // ReadBlobFromValidators reads a blob from the validators and compares it to the given payload.
 func (c *TestClient) ReadBlobFromValidators(
 	ctx context.Context,
-	blobKey corev2.BlobKey,
-	blobVersion corev2.BlobVersion,
-	blobCommitments encoding.BlobCommitments,
-	quorums []core.QuorumID,
+	header *corev2.BlobHeaderWithoutPayment,
 	expectedPayloadBytes []byte) error {
 
 	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber(ctx)
@@ -565,40 +559,36 @@ func (c *TestClient) ReadBlobFromValidators(
 		return fmt.Errorf("failed to get current block number: %w", err)
 	}
 
-	for _, quorumID := range quorums {
-		c.logger.Debugf("Reading blob from validators for quorum %d", quorumID)
+	// quorum loop starts
+	start := time.Now()
 
-		start := time.Now()
-
-		retrievedBlobBytes, err := c.retrievalClient.GetBlob(
-			ctx,
-			blobKey,
-			blobVersion,
-			blobCommitments,
-			uint64(currentBlockNumber),
-			quorumID)
-		if err != nil {
-			return fmt.Errorf("failed to read blob from validators: %w", err)
-		}
-
-		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
-
-		blobLengthSymbols := uint32(blobCommitments.Length)
-		blob, err := coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
-		if err != nil {
-			return fmt.Errorf("failed to deserialize blob: %w", err)
-		}
-
-		retrievedPayload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
-		if err != nil {
-			return fmt.Errorf("failed to convert blob to payload: %w", err)
-		}
-
-		payloadBytes := retrievedPayload.Serialize()
-		if !bytes.Equal(payloadBytes, expectedPayloadBytes) {
-			return fmt.Errorf("payloads do not match")
-		}
+	retrievedBlobBytes, err := c.retrievalClient.GetBlob(
+		ctx,
+		header,
+		uint64(currentBlockNumber),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to read blob from validators: %w", err)
 	}
+
+	c.metrics.reportValidatorReadTime(time.Since(start), 0)
+
+	blobLengthSymbols := uint32(header.BlobCommitments.Length)
+	blob, err := coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
+	if err != nil {
+		return fmt.Errorf("failed to deserialize blob: %w", err)
+	}
+
+	retrievedPayload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
+	if err != nil {
+		return fmt.Errorf("failed to convert blob to payload: %w", err)
+	}
+
+	payloadBytes := retrievedPayload.Serialize()
+	if !bytes.Equal(payloadBytes, expectedPayloadBytes) {
+		return fmt.Errorf("payloads do not match")
+	}
+	// quorum loop ends
 
 	return nil
 }

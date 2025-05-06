@@ -82,6 +82,17 @@ type BlobHeader struct {
 	PaymentMetadata core.PaymentMetadata
 }
 
+type BlobHeaderWithoutPayment struct {
+	BlobVersion BlobVersion
+
+	BlobCommitments encoding.BlobCommitments
+
+	// QuorumNumbers contains the quorums the blob is dispersed to
+	QuorumNumbers []core.QuorumID
+
+	PaymentMetadataHash [32]byte
+}
+
 func BlobHeaderFromProtobuf(proto *commonpb.BlobHeader) (*BlobHeader, error) {
 	commitment, err := new(encoding.G1Commitment).Deserialize(proto.GetCommitment().GetCommitment())
 	if err != nil {

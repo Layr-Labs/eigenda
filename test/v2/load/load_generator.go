@@ -236,10 +236,9 @@ func (l *LoadGenerator) readBlob(
 		}
 	}
 
-	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
+	blobHeader, err := coretypes.BlobHeaderBindingToInternal(&eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader)
 	if err != nil {
-		l.client.GetLogger().Errorf("failed to bind blob commitments: %v", err)
+		l.client.GetLogger().Errorf("failed to bind blob header: %v", err)
 		return
 	}
 
@@ -255,10 +254,7 @@ func (l *LoadGenerator) readBlob(
 	for i := 0; i < validatorReadCount; i++ {
 		err = l.client.ReadBlobFromValidators(
 			ctx,
-			*blobKey,
-			blobHeader.Version,
-			*commitment,
-			eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+			blobHeader,
 			payload)
 		if err == nil {
 			l.metrics.reportValidatorReadSuccess()

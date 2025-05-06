@@ -10,6 +10,7 @@ import (
 	disperserv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/Layr-Labs/eigenda/core"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
@@ -303,6 +304,27 @@ func BlobCommitmentsBindingToInternal(
 	}
 
 	return blobCommitment, nil
+}
+
+// BlobHeaderBindingToInternal converts a blob header from an eigenDA cert into the internal
+// corev2.BlobHeaderWithoutPayment type
+func BlobHeaderBindingToInternal(
+	blobHeaderBinding *contractEigenDACertVerifier.BlobHeaderV2,
+) (*corev2.BlobHeaderWithoutPayment, error) {
+
+	commitment, err := BlobCommitmentsBindingToInternal(&blobHeaderBinding.Commitment)
+	if err != nil {
+		return nil, fmt.Errorf("blob commitments binding to internal: %w", err)
+	}
+
+	blobHeader := corev2.BlobHeaderWithoutPayment{
+		BlobVersion:         uint16(blobHeaderBinding.Version),
+		QuorumNumbers:       blobHeaderBinding.QuorumNumbers,
+		BlobCommitments:     *commitment,
+		PaymentMetadataHash: blobHeaderBinding.PaymentHeaderHash,
+	}
+
+	return &blobHeader, nil
 }
 
 // QuorumNumbersUint32ToUint8 accepts an array of uint32 quorum numbers, and converts it into an array of uint8 quorum
