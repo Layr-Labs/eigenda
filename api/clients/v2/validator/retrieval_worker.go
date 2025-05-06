@@ -12,12 +12,9 @@ import (
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/docker/go-units"
 	"github.com/emirpasic/gods/queues"
 	"github.com/emirpasic/gods/queues/linkedlistqueue"
 	"github.com/gammazero/workerpool"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 /*
@@ -92,6 +89,11 @@ const (
 	pessimisticTimeout
 )
 
+// TODO(cody.littley): the following improvements can be made in the future
+//  - the ability to download a blob from multiple quorums at once (useful if many validators are offline)
+//  - check to see if it's faster to send the bare minimum number of chunks to decoding, modify code accordingly
+//  - more granular metrics via sequence probe (requires sequence probe enhancements)
+
 // retrievalWorker implements the distributed retrieval process for a specified blob (i.e. reading the blobs from
 // validators). It is responsible for coordinating the lifecycle of this retrieval workflow.
 type retrievalWorker struct {
@@ -101,14 +103,14 @@ type retrievalWorker struct {
 	logger               logging.Logger
 	config               *ValidatorClientConfig
 
+	// Responsible for talking to the validator nodes via gRPCs.
+	validatorGRPCManager ValidatorGRPCManager
+
 	// A pool of workers for network intensive operations (e.g. downloading blob data).
 	connectionPool *workerpool.WorkerPool
 
 	// A pool of workers for CPU intensive operations (e.g. deserializing and verifying blob data).
 	computePool *workerpool.WorkerPool
-
-	// Information about the operators in the quorum.
-	operatorInfo map[core.OperatorID]*core.OperatorInfo
 
 	// The encoding parameters for the blob.
 	encodingParams *encoding.EncodingParams
@@ -139,10 +141,6 @@ type retrievalWorker struct {
 
 	// When a thread completes decoding chunk data, it will send a message to the decodeResponseChan.
 	decodeResponseChan chan *decodeCompleted
-
-	// The function used to download chunks from the validators. This can be set to a custom function
-	// for testing purposes.
-	downloadChunksFunction DownloadChunksFunction
 
 	// The function used to deserialize and verify chunks from the validators. This can be set to a custom function
 	// for testing purposes.
@@ -227,7 +225,7 @@ func newRetrievalWorker(
 	config *ValidatorClientConfig,
 	connectionPool *workerpool.WorkerPool,
 	computePool *workerpool.WorkerPool,
-	operatorInfo map[core.OperatorID]*core.OperatorInfo,
+	validatorGRPCManager ValidatorGRPCManager,
 	assignments map[core.OperatorID]v2.Assignment,
 	totalChunkCount uint32,
 	minimumChunkCount uint32,
@@ -279,7 +277,6 @@ func newRetrievalWorker(
 		config:                       config,
 		connectionPool:               connectionPool,
 		computePool:                  computePool,
-		operatorInfo:                 operatorInfo,
 		encodingParams:               encodingParams,
 		assignments:                  assignments,
 		quorumID:                     quorumID,
@@ -301,14 +298,11 @@ func newRetrievalWorker(
 		chunkStatusCounts:            chunkStatusCounts,
 		targetDownloadCount:          targetDownloadCount,
 		targetVerifiedCount:          targetVerifiedCount,
-		downloadChunksFunction:       config.UnsafeDownloadChunksFunction,
+		validatorGRPCManager:         validatorGRPCManager,
 		deserializeAndVerifyFunction: config.UnsafeDeserializeAndVerifyFunction,
 		decodeBlobFunction:           config.UnsafeDecodeBlobFunction,
 	}
 
-	if worker.downloadChunksFunction == nil {
-		worker.downloadChunksFunction = worker.standardDownloadChunks
-	}
 	if worker.deserializeAndVerifyFunction == nil {
 		worker.deserializeAndVerifyFunction = worker.standardDeserializeAndVerify
 	}
@@ -374,7 +368,7 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 		case <-w.downloadAndVerifyCtx.Done():
 			return nil, fmt.Errorf(
 				"retrieval worker context cancelled, blobKey: %s: %w",
-				w.blobKey.Hex(), w.ctx.Err())
+				w.blobKey.Hex(), w.downloadAndVerifyCtx.Err())
 		case message := <-w.downloadStartedChan:
 			w.downloadsInProgressQueue.Enqueue(message)
 		case <-controlLoopTicker.C:
@@ -559,61 +553,16 @@ func (w *retrievalWorker) downloadChunks(operatorID core.OperatorID) {
 		downloadStart: w.config.TimeSource(),
 	}
 
-	// Unless this has been overridden for testing, this is just a call to standardDownloadChunks().
-	reply, err := w.downloadChunksFunction(w.ctx, w.blobKey, operatorID)
+	ctx, cancel := context.WithTimeout(w.downloadAndVerifyCtx, w.config.DownloadTimeout)
+	defer cancel()
+
+	reply, err := w.validatorGRPCManager.DownloadChunks(ctx, w.blobKey, operatorID, w.quorumID)
 
 	w.downloadCompletedChan <- &downloadCompleted{
 		OperatorID: operatorID,
 		Reply:      reply,
 		Err:        err,
 	}
-}
-
-// downloadChunksFunction is the default function used to download chunks from a validator node. This may not
-// be called if the function is overridden for testing purposes.
-func (w *retrievalWorker) standardDownloadChunks(
-	_ context.Context,
-	_ v2.BlobKey,
-	operatorID core.OperatorID,
-) (*grpcnode.GetChunksReply, error) {
-
-	ctx, cancel := context.WithTimeout(w.downloadAndVerifyCtx, w.config.DownloadTimeout)
-	defer cancel()
-
-	// TODO(cody.littley) we can get a tighter bound?
-	maxBlobSize := 16 * units.MiB // maximum size of the original blob
-	encodingRate := 8             // worst case scenario if one validator has 100% stake
-	fudgeFactor := units.MiB      // to allow for some overhead from things like protobuf encoding
-	maxMessageSize := maxBlobSize*encodingRate + fudgeFactor
-
-	opInfo := w.operatorInfo[operatorID]
-	conn, err := grpc.NewClient(
-		opInfo.Socket.GetV2RetrievalSocket(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMessageSize)),
-	)
-	defer func() {
-		err := conn.Close()
-		if err != nil {
-			w.logger.Error("validator retriever failed to close connection", "err", err)
-		}
-	}()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create connection to operator %s: %w", operatorID.Hex(), err)
-	}
-
-	client := grpcnode.NewRetrievalClient(conn)
-	request := &grpcnode.GetChunksRequest{
-		BlobKey:  w.blobKey[:],
-		QuorumId: uint32(w.quorumID),
-	}
-
-	reply, err := client.GetChunks(ctx, request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get chunks from operator %s: %w", operatorID.Hex(), err)
-	}
-
-	return reply, nil
 }
 
 // deserializeAndVerifyChunks deserializes the chunks from the GetChunksReply and sends them to the chunksChan.

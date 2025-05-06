@@ -98,10 +98,6 @@ func (c *validatorClient) GetBlob(
 	if err != nil {
 		return nil, err
 	}
-	operators, ok := operatorState.Operators[quorumID]
-	if !ok {
-		return nil, fmt.Errorf("no quorum with ID: %d", quorumID)
-	}
 
 	probe.SetStage("get_blob_versions")
 	blobVersions, err := c.ethClient.GetAllVersionedBlobParams(ctx)
@@ -136,7 +132,7 @@ func (c *validatorClient) GetBlob(
 		c.config,
 		c.connectionPool,
 		c.computePool,
-		operators,
+		NewValidatorGRPCManager(c.logger, operatorState.Operators),
 		assignments,
 		totalChunkCount,
 		minimumChunkCount,

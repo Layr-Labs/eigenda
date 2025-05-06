@@ -20,6 +20,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var _ ValidatorGRPCManager = (*mockValidatorGRPCManager)(nil)
+
+type mockValidatorGRPCManager struct {
+	downloadChunks func(ctx context.Context,
+		key v2.BlobKey,
+		operatorID core.OperatorID,
+		quorumID core.QuorumID,
+	) (*grpcnode.GetChunksReply, error)
+}
+
+func (m *mockValidatorGRPCManager) DownloadChunks(
+	ctx context.Context,
+	key v2.BlobKey,
+	operatorID core.OperatorID,
+	quorumID core.QuorumID,
+) (*grpcnode.GetChunksReply, error) {
+	return m.downloadChunks(ctx, key, operatorID, quorumID)
+}
+
 func TestBasicWorkflow(t *testing.T) {
 	rand := testrandom.NewTestRandom()
 	start := rand.Time()
@@ -74,10 +93,12 @@ func TestBasicWorkflow(t *testing.T) {
 	chunksDownloaded := atomic.Uint32{}
 	// a set of operators that have provided chunks
 	downloadSet := sync.Map{}
-	config.UnsafeDownloadChunksFunction = func(
+	mockGRPCManager := &mockValidatorGRPCManager{}
+	mockGRPCManager.downloadChunks = func(
 		ctx context.Context,
 		key v2.BlobKey,
 		operatorID core.OperatorID,
+		quorumID core.QuorumID,
 	) (*grpcnode.GetChunksReply, error) {
 
 		// verify we have the expected blob key
@@ -168,7 +189,7 @@ func TestBasicWorkflow(t *testing.T) {
 		config,
 		connectionPool,
 		computePool,
-		nil,
+		mockGRPCManager,
 		assignments,
 		totalChunkCount,
 		minimumChunkCount,
@@ -259,10 +280,12 @@ func TestDownloadTimeout(t *testing.T) {
 	timedOutDownloads := atomic.Uint32{}
 	// a set of operators that have provided chunks
 	downloadSet := sync.Map{}
-	config.UnsafeDownloadChunksFunction = func(
+	mockGRPCManager := &mockValidatorGRPCManager{}
+	mockGRPCManager.downloadChunks = func(
 		ctx context.Context,
 		key v2.BlobKey,
 		operatorID core.OperatorID,
+		quorumID core.QuorumID,
 	) (*grpcnode.GetChunksReply, error) {
 		// verify we have the expected blob key
 		require.Equal(t, blobKey, key)
@@ -359,7 +382,7 @@ func TestDownloadTimeout(t *testing.T) {
 		config,
 		connectionPool,
 		computePool,
-		nil,
+		mockGRPCManager,
 		assignments,
 		totalChunkCount,
 		minimumChunkCount,
@@ -503,10 +526,12 @@ func TestFailedVerification(t *testing.T) {
 	chunksDownloaded := atomic.Uint32{}
 	// a set of operators that have provided chunks
 	downloadSet := sync.Map{}
-	config.UnsafeDownloadChunksFunction = func(
+	mockGRPCManager := &mockValidatorGRPCManager{}
+	mockGRPCManager.downloadChunks = func(
 		ctx context.Context,
 		key v2.BlobKey,
 		operatorID core.OperatorID,
+		quorumID core.QuorumID,
 	) (*grpcnode.GetChunksReply, error) {
 
 		// verify we have the expected blob key
@@ -609,7 +634,7 @@ func TestFailedVerification(t *testing.T) {
 		config,
 		connectionPool,
 		computePool,
-		nil,
+		mockGRPCManager,
 		assignments,
 		totalChunkCount,
 		minimumChunkCount,

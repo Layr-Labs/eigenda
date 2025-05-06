@@ -72,12 +72,6 @@ type ValidatorClientConfig struct {
 	// The default is time.Now.
 	TimeSource func() time.Time
 
-	// A function that overrides the default chunk downloader. This is intended for testing purposes, and should
-	// not be used in production code. This should not be considered a public API.
-	//
-	// The default is nil (i.e. the standard chunk downloader is used).
-	UnsafeDownloadChunksFunction DownloadChunksFunction
-
 	// A function that overrides the default chunk validation and deserialization logic. This is intended for testing
 	// purposes, and should not be used in production code. This should not be considered a public API.
 	//
@@ -90,13 +84,6 @@ type ValidatorClientConfig struct {
 	// The default is nil (i.e. the standard blob decoder is used).
 	UnsafeDecodeBlobFunction DecodeBlobFunction
 }
-
-// DownloadChunksFunction is a function that downloads chunks from a validator node.
-type DownloadChunksFunction func(
-	ctx context.Context,
-	blobKey v2.BlobKey,
-	operatorID core.OperatorID,
-) (*grpcnode.GetChunksReply, error)
 
 // DeserializeAndVerifyFunction is a function that deserializes and verifies chunks from a validator node.
 type DeserializeAndVerifyFunction func(
@@ -126,7 +113,6 @@ func DefaultClientConfig() *ValidatorClientConfig {
 		ConnectionPoolSize:                 32,
 		ComputePoolSize:                    runtime.NumCPU(),
 		TimeSource:                         time.Now,
-		UnsafeDownloadChunksFunction:       nil,
 		UnsafeDeserializeAndVerifyFunction: nil,
 		UnsafeDecodeBlobFunction:           nil,
 	}
