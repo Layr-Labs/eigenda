@@ -221,6 +221,10 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	c.tx.On("GetAllVersionedBlobParams", mock.Anything).Return(nil, assert.AnError)
 	c.relayClient.On("GetSockets").Return(nil)
 	c.tx.On("GetRelayURLs", mock.Anything).Return(nil, assert.AnError)
+	c.tx.On("GetCurrentBlockNumber", mock.Anything).Return(uint32(10), nil)
+	c.tx.On("GetQuorumCount", mock.Anything).Return(uint8(2), nil)
+	c.tx.On("GetMinNumSymbols", mock.Anything).Return(uint64(4096), nil)
+
 	err := c.node.RefreshOnchainState(newCtx)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	bp, ok = c.node.BlobVersionParams.Load().Get(0)
@@ -230,6 +234,10 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	require.False(t, ok)
 	newRelayClient := c.node.RelayClient.Load().(clients.RelayClient)
 	require.Same(t, relayClient, newRelayClient)
+	quorumCount := c.node.QuorumCount.Load()
+	require.Equal(t, quorumCount, uint32(2))
+	minNumSymbols := c.node.MinNumSymbolsPerBlob.Load()
+	require.Equal(t, minNumSymbols, uint64(4096))
 
 	// Same relay URLs shouldn't trigger update
 	newCtx1, cancel1 := context.WithTimeout(ctx, c.node.Config.OnchainStateRefreshInterval*2)
@@ -241,10 +249,18 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	}
 	c.relayClient.On("GetSockets").Return(relayURLs).Once()
 	c.tx.On("GetRelayURLs", mock.Anything).Return(relayURLs, nil)
+	c.tx.On("GetCurrentBlockNumber", mock.Anything).Return(uint32(10), nil)
+	c.tx.On("GetQuorumCount", mock.Anything).Return(uint8(3), nil)
+	c.tx.On("GetMinNumSymbols", mock.Anything).Return(uint64(40), nil)
+
 	err = c.node.RefreshOnchainState(newCtx1)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	newRelayClient = c.node.RelayClient.Load().(clients.RelayClient)
 	require.Same(t, relayClient, newRelayClient)
+	quorumCount = c.node.QuorumCount.Load()
+	require.Equal(t, quorumCount, uint32(2))
+	minNumSymbols = c.node.MinNumSymbolsPerBlob.Load()
+	require.Equal(t, minNumSymbols, uint64(4096))
 }
 
 func TestRefreshOnchainStateSuccess(t *testing.T) {
@@ -289,6 +305,9 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 		0: blobParams,
 		1: blobParams2,
 	}, nil)
+	c.tx.On("GetCurrentBlockNumber", mock.Anything).Return(uint32(10), nil)
+	c.tx.On("GetQuorumCount", mock.Anything).Return(uint8(2), nil)
+	c.tx.On("GetMinNumSymbols", mock.Anything).Return(uint64(4096), nil)
 
 	err = c.node.RefreshOnchainState(newCtx)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
@@ -298,6 +317,10 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	bp, ok = c.node.BlobVersionParams.Load().Get(1)
 	require.True(t, ok)
 	require.Equal(t, bp, blobParams2)
+	quorumCount := c.node.QuorumCount.Load()
+	require.Equal(t, quorumCount, uint32(2))
+	minNumSymbols := c.node.MinNumSymbolsPerBlob.Load()
+	require.Equal(t, minNumSymbols, uint64(4096))
 }
 
 func bundleEqual(t *testing.T, expected, actual core.Bundle) {

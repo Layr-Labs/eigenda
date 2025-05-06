@@ -307,3 +307,9 @@ func (t *MockWriter) GetRelayRegistryAddress() gethcommon.Address {
 	result := args.Get(0)
 	return result.(gethcommon.Address)
 }
+
+func (t *MockWriter) GetMinNumSymbols(ctx context.Context, blockNumber uint32) (uint64, error) {
+	args := t.Called(blockNumber)
+	result := args.Get(0)
+	return result.(uint64), args.Error(1)
+}

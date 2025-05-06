@@ -86,6 +86,12 @@ type Node struct {
 	// BlobVersionParams is a map of blob version parameters loaded from the chain.
 	// It is used to determine blob parameters based on the version number.
 	BlobVersionParams atomic.Pointer[corev2.BlobVersionParameterMap]
+
+	// QuorumCount is the number of quorums in the network.
+	QuorumCount atomic.Uint32
+
+	// MinNumSymbolsPerBlob is the minimum number of symbols per blob.
+	MinNumSymbolsPerBlob atomic.Uint64
 }
 
 // NewNode creates a new Node with the provided config.
@@ -241,14 +247,15 @@ func NewNode(
 
 	var blobVersionParams *corev2.BlobVersionParameterMap
 	if config.EnableV2 {
+		ctx := context.Background()
 		// 12s per block
 		ttl := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second
-		n.ValidatorStore, err = NewValidatorStore(context.Background(), logger, config, time.Now, ttl, reg)
+		n.ValidatorStore, err = NewValidatorStore(ctx, logger, config, time.Now, ttl, reg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new store v2: %w", err)
 		}
 
-		blobParams, err := tx.GetAllVersionedBlobParams(context.Background())
+		blobParams, err := tx.GetAllVersionedBlobParams(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get versioned blob parameters: %w", err)
 		}
@@ -272,6 +279,22 @@ func NewNode(
 		}
 
 		n.RelayClient.Store(relayClient)
+
+		blockNumber, err := tx.GetCurrentBlockNumber(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get block number: %w", err)
+		}
+		quorumCount, err := tx.GetQuorumCount(ctx, blockNumber)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get quorum count: %w", err)
+		}
+		n.QuorumCount.Store(uint32(quorumCount))
+
+		minNumSymbolsPerBlob, err := tx.GetMinNumSymbols(ctx, blockNumber)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get min num symbols per blob: %w", err)
+		}
+		n.MinNumSymbolsPerBlob.Store(minNumSymbolsPerBlob)
 	}
 
 	n.BlobVersionParams.Store(blobVersionParams)
@@ -442,6 +465,23 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 				}
 			} else {
 				n.Logger.Error("error fetching blob params", "err", err)
+			}
+			blockNumber, err := n.Transactor.GetCurrentBlockNumber(ctx)
+			if err == nil {
+				quorumCount, err := n.Transactor.GetQuorumCount(ctx, blockNumber)
+				if err == nil {
+					n.QuorumCount.Store(uint32(quorumCount))
+				} else {
+					n.Logger.Error("error fetching quorum count", "err", err)
+				}
+				minNumSymbolsPerBlob, err := n.Transactor.GetMinNumSymbols(ctx, blockNumber)
+				if err == nil {
+					n.MinNumSymbolsPerBlob.Store(minNumSymbolsPerBlob)
+				} else {
+					n.Logger.Error("error fetching min num symbols per blob", "err", err)
+				}
+			} else {
+				n.Logger.Error("error fetching block number", "err", err)
 			}
 		case <-ctx.Done():
 			return ctx.Err()
