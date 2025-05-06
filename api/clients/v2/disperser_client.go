@@ -114,7 +114,6 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 	}
 	logger = logger.With("component", "DisperserClient")
 
-	// Start NTP sync - this initializes the global clock
 	ntpClock, err := core.NewNTPSyncedClock(context.Background(), config.NtpServer, config.NtpSyncInterval, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create NTP clock: %w", err)
