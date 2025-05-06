@@ -17,7 +17,7 @@ RUN echo "deb http://ppa.launchpad.net/ethereum/ethereum/ubuntu bionic main\n" \
 
 # [Optional] Uncomment this section to install additional OS packages.
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
-     && apt-get -y install --no-install-recommends netcat \
+     && apt-get -y install --no-install-recommends netcat-traditional \
      && apt-get -y install protobuf-compiler
 
 # [Optional] Uncomment the next lines to use go get to install anything else you need

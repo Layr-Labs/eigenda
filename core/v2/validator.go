@@ -52,10 +52,12 @@ func (v *shardValidator) validateBlobParams(blob *BlobShard, blobParams *core.Bl
 	if err != nil {
 		return nil, nil, err
 	}
+
 	assignment, err := GetAssignment(operatorState, blobParams, blob.BlobHeader.QuorumNumbers, blobKey[:], v.operatorID)
 	if err != nil {
 		return nil, nil, err
 	}
+	v.logger.Debug("Validating", "blob key", blobKey[:], "quorum numbers", blob.BlobHeader.QuorumNumbers, "assgn", assignment.Indices)
 
 	// Validate the number of chunks
 	if assignment.NumChunks() == 0 {
@@ -131,6 +133,8 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 
 		// TODO: Define params for the blob
 		params, err := GetEncodingParams(blob.BlobHeader.BlobCommitments.Length, blobParams)
+
+		v.logger.Debug("blob params", "coding rate", blobParams.CodingRate, "num chunks", blobParams.NumChunks)
 
 		if err != nil {
 			return err

@@ -12,11 +12,13 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/gammazero/workerpool"
 )
 
 type requestMetadata struct {
 	blobShardIndex int
+	assignment     corev2.Assignment
 }
 type relayRequest struct {
 	chunkRequests []*clients.ChunkRequestByIndex
@@ -80,6 +82,9 @@ func (n *Node) DownloadBundles(
 		}
 
 		assgn, err := corev2.GetAssignment(operatorState, blobParams, cert.BlobHeader.QuorumNumbers, blobKey[:], n.Config.ID)
+
+		n.Logger.Debug("Downloading", "blob key", blobKey[:], "quorum numbers", cert.BlobHeader.QuorumNumbers, "assgn", assgn.Indices)
+
 		if err != nil {
 			n.Logger.Errorf("failed to get assignment: %v", err)
 			continue
@@ -100,6 +105,7 @@ func (n *Node) DownloadBundles(
 		})
 		req.metadata = append(req.metadata, &requestMetadata{
 			blobShardIndex: i,
+			assignment:     assgn,
 		})
 
 		// Old quorum loop ended here
@@ -153,6 +159,27 @@ func (n *Node) DownloadBundles(
 				return nil, nil, fmt.Errorf("failed to deserialize bundle: %v", err)
 			}
 			rawBundles[metadata.blobShardIndex].Bundle = bundle
+
+			cert := batch.BlobCertificates[metadata.blobShardIndex]
+
+			blobParams := &core.BlobVersionParameters{
+				CodingRate:      8,
+				MaxNumOperators: 300,
+				NumChunks:       8192,
+			}
+
+			encodingParams, err := corev2.GetEncodingParams(cert.BlobHeader.BlobCommitments.Length, blobParams)
+			if err != nil {
+				return nil, nil, fmt.Errorf("coudln't get encoding params")
+			}
+			indices := []encoding.ChunkNumber{uint(metadata.assignment.Indices[0])}
+			err = n.verifier.VerifyFrames(blobShards[metadata.blobShardIndex].Bundle[0:1], indices, cert.BlobHeader.BlobCommitments, encodingParams)
+			if err != nil {
+				n.Logger.Error("verify frames failed")
+			} else {
+				n.Logger.Debug("verify frames succeeded")
+			}
+
 		}
 	}
 

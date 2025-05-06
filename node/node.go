@@ -86,6 +86,8 @@ type Node struct {
 	// BlobVersionParams is a map of blob version parameters loaded from the chain.
 	// It is used to determine blob parameters based on the version number.
 	BlobVersionParams atomic.Pointer[corev2.BlobVersionParameterMap]
+
+	verifier *verifier.Verifier
 }
 
 // NewNode creates a new Node with the provided config.
@@ -233,6 +235,7 @@ func NewNode(
 		ChainID:                 chainID,
 		BLSSigner:               blsSigner,
 		DownloadPool:            downloadPool,
+		verifier:                v,
 	}
 
 	if !config.EnableV2 {
