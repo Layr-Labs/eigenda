@@ -20,25 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var _ ValidatorGRPCManager = (*mockValidatorGRPCManager)(nil)
-
-type mockValidatorGRPCManager struct {
-	downloadChunks func(ctx context.Context,
-		key v2.BlobKey,
-		operatorID core.OperatorID,
-		quorumID core.QuorumID,
-	) (*grpcnode.GetChunksReply, error)
-}
-
-func (m *mockValidatorGRPCManager) DownloadChunks(
-	ctx context.Context,
-	key v2.BlobKey,
-	operatorID core.OperatorID,
-	quorumID core.QuorumID,
-) (*grpcnode.GetChunksReply, error) {
-	return m.downloadChunks(ctx, key, operatorID, quorumID)
-}
-
 func TestBasicWorkflow(t *testing.T) {
 	rand := testrandom.NewTestRandom()
 	start := rand.Time()
@@ -93,8 +74,8 @@ func TestBasicWorkflow(t *testing.T) {
 	chunksDownloaded := atomic.Uint32{}
 	// a set of operators that have provided chunks
 	downloadSet := sync.Map{}
-	mockGRPCManager := &mockValidatorGRPCManager{}
-	mockGRPCManager.downloadChunks = func(
+	mockGRPCManager := &MockValidatorGRPCManager{}
+	mockGRPCManager.DownloadChunksFunction = func(
 		ctx context.Context,
 		key v2.BlobKey,
 		operatorID core.OperatorID,
@@ -122,15 +103,17 @@ func TestBasicWorkflow(t *testing.T) {
 
 	// the set of operators we have verified the chunks of
 	verificationSet := sync.Map{}
-	config.UnsafeDeserializeAndVerifyFunction = func(
-		ctx context.Context,
-		key v2.BlobKey,
+	mockDeserializer := &MockChunkDeserializer{}
+	mockDeserializer.DeserializeAndVerifyFunction = func(
+		blobKey v2.BlobKey,
 		operatorID core.OperatorID,
 		getChunksReply *grpcnode.GetChunksReply,
+		blobCommitments *encoding.BlobCommitments,
+		encodingParams *encoding.EncodingParams,
 	) ([]*encoding.Frame, error) {
 
 		// verify we have the expected blob key
-		require.Equal(t, blobKey, key)
+		require.Equal(t, blobKey, blobKey)
 
 		// make sure this is for a valid operator ID
 		chunks, ok := operatorChunks[operatorID]
@@ -190,6 +173,7 @@ func TestBasicWorkflow(t *testing.T) {
 		connectionPool,
 		computePool,
 		mockGRPCManager,
+		mockDeserializer,
 		assignments,
 		totalChunkCount,
 		minimumChunkCount,
@@ -280,8 +264,8 @@ func TestDownloadTimeout(t *testing.T) {
 	timedOutDownloads := atomic.Uint32{}
 	// a set of operators that have provided chunks
 	downloadSet := sync.Map{}
-	mockGRPCManager := &mockValidatorGRPCManager{}
-	mockGRPCManager.downloadChunks = func(
+	mockGRPCManager := &MockValidatorGRPCManager{}
+	mockGRPCManager.DownloadChunksFunction = func(
 		ctx context.Context,
 		key v2.BlobKey,
 		operatorID core.OperatorID,
@@ -315,15 +299,17 @@ func TestDownloadTimeout(t *testing.T) {
 
 	// the set of operators we have verified the chunks of
 	verificationSet := sync.Map{}
-	config.UnsafeDeserializeAndVerifyFunction = func(
-		ctx context.Context,
-		key v2.BlobKey,
+	mockDeserializer := &MockChunkDeserializer{}
+	mockDeserializer.DeserializeAndVerifyFunction = func(
+		blobKey v2.BlobKey,
 		operatorID core.OperatorID,
 		getChunksReply *grpcnode.GetChunksReply,
+		blobCommitments *encoding.BlobCommitments,
+		encodingParams *encoding.EncodingParams,
 	) ([]*encoding.Frame, error) {
 
 		// verify we have the expected blob key
-		require.Equal(t, blobKey, key)
+		require.Equal(t, blobKey, blobKey)
 
 		// make sure this is for a valid operator ID
 		chunks, ok := operatorChunks[operatorID]
@@ -383,6 +369,7 @@ func TestDownloadTimeout(t *testing.T) {
 		connectionPool,
 		computePool,
 		mockGRPCManager,
+		mockDeserializer,
 		assignments,
 		totalChunkCount,
 		minimumChunkCount,
@@ -526,8 +513,8 @@ func TestFailedVerification(t *testing.T) {
 	chunksDownloaded := atomic.Uint32{}
 	// a set of operators that have provided chunks
 	downloadSet := sync.Map{}
-	mockGRPCManager := &mockValidatorGRPCManager{}
-	mockGRPCManager.downloadChunks = func(
+	mockGRPCManager := &MockValidatorGRPCManager{}
+	mockGRPCManager.DownloadChunksFunction = func(
 		ctx context.Context,
 		key v2.BlobKey,
 		operatorID core.OperatorID,
@@ -563,15 +550,17 @@ func TestFailedVerification(t *testing.T) {
 
 	// the set of operators we have verified the chunks of
 	verificationSet := sync.Map{}
-	config.UnsafeDeserializeAndVerifyFunction = func(
-		ctx context.Context,
-		key v2.BlobKey,
+	mockDeserializer := &MockChunkDeserializer{}
+	mockDeserializer.DeserializeAndVerifyFunction = func(
+		blobKey v2.BlobKey,
 		operatorID core.OperatorID,
 		getChunksReply *grpcnode.GetChunksReply,
+		blobCommitments *encoding.BlobCommitments,
+		encodingParams *encoding.EncodingParams,
 	) ([]*encoding.Frame, error) {
 
 		// verify we have the expected blob key
-		require.Equal(t, blobKey, key)
+		require.Equal(t, blobKey, blobKey)
 
 		// make sure this is for a valid operator ID
 		chunks, ok := operatorChunks[operatorID]
@@ -635,6 +624,7 @@ func TestFailedVerification(t *testing.T) {
 		connectionPool,
 		computePool,
 		mockGRPCManager,
+		mockDeserializer,
 		assignments,
 		totalChunkCount,
 		minimumChunkCount,

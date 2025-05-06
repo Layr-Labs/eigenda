@@ -1,0 +1,33 @@
+package validator
+
+import (
+	"context"
+
+	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
+	"github.com/Layr-Labs/eigenda/core"
+	v2 "github.com/Layr-Labs/eigenda/core/v2"
+)
+
+var _ ValidatorGRPCManager = (*MockValidatorGRPCManager)(nil)
+
+// MockValidatorGRPCManager is a mock implementation of the ValidatorGRPCManager interface.
+type MockValidatorGRPCManager struct {
+	// A lambda function to be called when DownloadChunks is called.
+	DownloadChunksFunction func(ctx context.Context,
+		key v2.BlobKey,
+		operatorID core.OperatorID,
+		quorumID core.QuorumID,
+	) (*grpcnode.GetChunksReply, error)
+}
+
+func (m *MockValidatorGRPCManager) DownloadChunks(
+	ctx context.Context,
+	key v2.BlobKey,
+	operatorID core.OperatorID,
+	quorumID core.QuorumID,
+) (*grpcnode.GetChunksReply, error) {
+	if m.DownloadChunksFunction == nil {
+		return nil, nil
+	}
+	return m.DownloadChunksFunction(ctx, key, operatorID, quorumID)
+}

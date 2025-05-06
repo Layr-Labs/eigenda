@@ -106,6 +106,9 @@ type retrievalWorker struct {
 	// Responsible for talking to the validator nodes via gRPCs.
 	validatorGRPCManager ValidatorGRPCManager
 
+	// Responsible for deserializing and verifying chunk data.
+	chunkDeserializer ChunkDeserializer
+
 	// A pool of workers for network intensive operations (e.g. downloading blob data).
 	connectionPool *workerpool.WorkerPool
 
@@ -141,10 +144,6 @@ type retrievalWorker struct {
 
 	// When a thread completes decoding chunk data, it will send a message to the decodeResponseChan.
 	decodeResponseChan chan *decodeCompleted
-
-	// The function used to deserialize and verify chunks from the validators. This can be set to a custom function
-	// for testing purposes.
-	deserializeAndVerifyFunction DeserializeAndVerifyFunction
 
 	// The function used to decode the blob from the chunks. This can be set to a custom function
 	// for testing purposes.
@@ -226,6 +225,7 @@ func newRetrievalWorker(
 	connectionPool *workerpool.WorkerPool,
 	computePool *workerpool.WorkerPool,
 	validatorGRPCManager ValidatorGRPCManager,
+	chunkDeserializer ChunkDeserializer,
 	assignments map[core.OperatorID]v2.Assignment,
 	totalChunkCount uint32,
 	minimumChunkCount uint32,
@@ -270,42 +270,39 @@ func newRetrievalWorker(
 	targetVerifiedCount := uint32(math.Ceil(float64(minimumChunkCount) * config.VerificationPessimism))
 
 	worker := &retrievalWorker{
-		ctx:                          ctx,
-		downloadAndVerifyCtx:         downloadAndVerifyCtx,
-		cancel:                       cancel,
-		logger:                       logger,
-		config:                       config,
-		connectionPool:               connectionPool,
-		computePool:                  computePool,
-		encodingParams:               encodingParams,
-		assignments:                  assignments,
-		quorumID:                     quorumID,
-		blobKey:                      blobKey,
-		verifier:                     verifier,
-		blobCommitments:              blobCommitments,
-		downloadStartedChan:          make(chan *downloadStarted, len(assignments)),
-		downloadCompletedChan:        make(chan *downloadCompleted, len(assignments)),
-		verificationCompletedChan:    make(chan *verificationCompleted, len(assignments)),
-		decodeResponseChan:           make(chan *decodeCompleted, 1),
-		probe:                        probe,
-		minimumChunkCount:            minimumChunkCount,
-		downloadsInProgressQueue:     linkedlistqueue.New(),
-		downloadedChunksQueue:        linkedlistqueue.New(),
-		verifiedChunksQueue:          linkedlistqueue.New(),
-		downloadOrder:                downloadOrder,
-		totalChunkCount:              totalChunkCount,
-		chunkStatusMap:               chunkStatusMap,
-		chunkStatusCounts:            chunkStatusCounts,
-		targetDownloadCount:          targetDownloadCount,
-		targetVerifiedCount:          targetVerifiedCount,
-		validatorGRPCManager:         validatorGRPCManager,
-		deserializeAndVerifyFunction: config.UnsafeDeserializeAndVerifyFunction,
-		decodeBlobFunction:           config.UnsafeDecodeBlobFunction,
+		ctx:                       ctx,
+		downloadAndVerifyCtx:      downloadAndVerifyCtx,
+		cancel:                    cancel,
+		logger:                    logger,
+		config:                    config,
+		connectionPool:            connectionPool,
+		computePool:               computePool,
+		encodingParams:            encodingParams,
+		assignments:               assignments,
+		quorumID:                  quorumID,
+		blobKey:                   blobKey,
+		verifier:                  verifier,
+		blobCommitments:           blobCommitments,
+		downloadStartedChan:       make(chan *downloadStarted, len(assignments)),
+		downloadCompletedChan:     make(chan *downloadCompleted, len(assignments)),
+		verificationCompletedChan: make(chan *verificationCompleted, len(assignments)),
+		decodeResponseChan:        make(chan *decodeCompleted, 1),
+		probe:                     probe,
+		minimumChunkCount:         minimumChunkCount,
+		downloadsInProgressQueue:  linkedlistqueue.New(),
+		downloadedChunksQueue:     linkedlistqueue.New(),
+		verifiedChunksQueue:       linkedlistqueue.New(),
+		downloadOrder:             downloadOrder,
+		totalChunkCount:           totalChunkCount,
+		chunkStatusMap:            chunkStatusMap,
+		chunkStatusCounts:         chunkStatusCounts,
+		targetDownloadCount:       targetDownloadCount,
+		targetVerifiedCount:       targetVerifiedCount,
+		validatorGRPCManager:      validatorGRPCManager,
+		chunkDeserializer:         chunkDeserializer,
+		decodeBlobFunction:        config.UnsafeDecodeBlobFunction,
 	}
 
-	if worker.deserializeAndVerifyFunction == nil {
-		worker.deserializeAndVerifyFunction = worker.standardDeserializeAndVerify
-	}
 	if worker.decodeBlobFunction == nil {
 		worker.decodeBlobFunction = worker.standardDecodeBlob
 	}
@@ -583,47 +580,18 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 			"blobKey", w.blobKey.Hex())
 	}
 
-	// Unless this has been overridden for testing, this is just a call to standardDeserializeAndVerify().
-	chunks, err := w.deserializeAndVerifyFunction(w.ctx, w.blobKey, operatorID, getChunksReply)
+	chunks, err := w.chunkDeserializer.DeserializeAndVerify(
+		w.blobKey,
+		operatorID,
+		getChunksReply,
+		w.blobCommitments,
+		w.encodingParams)
 
 	w.verificationCompletedChan <- &verificationCompleted{
 		OperatorID: operatorID,
 		chunks:     chunks,
 		Err:        err,
 	}
-}
-
-// standardDeserializeAndVerify is a standard implementation of the DeserializeAndVerifyFunction.
-func (w *retrievalWorker) standardDeserializeAndVerify(
-	_ context.Context,
-	_ v2.BlobKey,
-	operatorID core.OperatorID,
-	getChunksReply *grpcnode.GetChunksReply,
-) ([]*encoding.Frame, error) {
-
-	chunks := make([]*encoding.Frame, len(getChunksReply.GetChunks()))
-	for i, data := range getChunksReply.GetChunks() {
-		chunk, err := new(encoding.Frame).DeserializeGnark(data)
-		if err != nil {
-			return nil, fmt.Errorf("failed to deserialize chunk from operator %s: %w", operatorID.Hex(), err)
-		}
-
-		chunks[i] = chunk
-	}
-
-	assignment := w.assignments[operatorID]
-
-	assignmentIndices := make([]uint, len(assignment.GetIndices()))
-	for i, index := range assignment.GetIndices() {
-		assignmentIndices[i] = uint(index)
-	}
-
-	err := w.verifier.VerifyFrames(chunks, assignmentIndices, *w.blobCommitments, *w.encodingParams)
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify chunks from operator %s: %w", operatorID.Hex(), err)
-	}
-
-	return chunks, nil
 }
 
 // decodeBlob decodes the blob from the chunks and indices.

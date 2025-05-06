@@ -16,7 +16,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
-	grpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -297,14 +296,9 @@ func NewTestClient(
 	// Create a client that only downloads the blob and does not verify it. Useful for load testing validator downloads
 	// with limited CPU resources.
 	onlyDownloadClientConfig := validator.DefaultClientConfig()
-	onlyDownloadClientConfig.UnsafeDeserializeAndVerifyFunction = func(
-		ctx context.Context,
-		blobKey corev2.BlobKey,
-		operatorID core.OperatorID,
-		getChunksReply *grpc.GetChunksReply) ([]*encoding.Frame, error) {
+	onlyDownloadClientConfig.UnsafeChunkDeserializerFactory =
+		validator.NewMockChunkDeserializerFactory(&validator.MockChunkDeserializer{})
 
-		return nil, nil
-	}
 	onlyDownloadClientConfig.UnsafeDecodeBlobFunction = func(
 		ctx context.Context,
 		blobKey corev2.BlobKey,
@@ -313,6 +307,7 @@ func NewTestClient(
 	) ([]byte, error) {
 		return nil, nil
 	}
+
 	onlyDownloadValidatorClient := validator.NewValidatorClient(
 		logger,
 		ethReader,

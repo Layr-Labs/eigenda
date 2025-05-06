@@ -13,6 +13,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// TODO factory?
+
 // A ValidatorGRPCManager is responsible for maintaining gRPC client connections with the validator nodes.
 type ValidatorGRPCManager interface {
 
