@@ -89,7 +89,7 @@ func (s *ServerV2) FetchAccountBlobFeed(c *gin.Context) {
 			return
 		}
 		blobInfo[i].BlobKey = bk.Hex()
-		blobInfo[i].BlobMetadata = blobs[i]
+		blobInfo[i].BlobMetadata = createBlobMetadata(blobs[i])
 	}
 
 	response := &AccountBlobFeedResponse{

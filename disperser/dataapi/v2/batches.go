@@ -156,7 +156,7 @@ func (s *ServerV2) FetchBatchFeed(c *gin.Context) {
 		}
 		batches[i] = &BatchInfo{
 			BatchHeaderHash:         hex.EncodeToString(batchHeaderHash[:]),
-			BatchHeader:             at.BatchHeader,
+			BatchHeader:             createBatchHeader(at.BatchHeader),
 			AttestedAt:              at.AttestedAt,
 			AggregatedSignature:     at.Sigma,
 			QuorumNumbers:           at.QuorumNumbers,
@@ -217,7 +217,7 @@ func (s *ServerV2) FetchBatch(c *gin.Context) {
 		}
 
 		signedBatch := &SignedBatch{
-			BatchHeader: batchHeader,
+			BatchHeader: createBatchHeader(batchHeader),
 			AttestationInfo: &AttestationInfo{
 				Attestation: attestation,
 				Signers:     signers,
