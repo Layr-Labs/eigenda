@@ -74,9 +74,6 @@ func RunDisperserServer(ctx *cli.Context) error {
 		config.NtpSyncInterval = 5 * time.Minute
 	}
 
-	// Start NTP sync
-	core.StartNtpSync(context.Background(), config.NtpServer, config.NtpSyncInterval, logger)
-
 	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
 	if err != nil {
 		logger.Error("Cannot create chain.Client", "err", err)
@@ -107,6 +104,11 @@ func RunDisperserServer(ctx *cli.Context) error {
 	}
 
 	reg := prometheus.NewRegistry()
+
+	ntpClock, err := core.NewNTPSyncedClock(context.Background(), config.NtpServer, config.NtpSyncInterval, logger)
+	if err != nil {
+		return fmt.Errorf("failed to create NTP clock: %w", err)
+	}
 
 	var meterer *mt.Meterer
 	if config.EnablePaymentMeterer {
@@ -196,6 +198,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			logger,
 			reg,
 			config.MetricsConfig,
+			ntpClock,
 		)
 		if err != nil {
 			return err

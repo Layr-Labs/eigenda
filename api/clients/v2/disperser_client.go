@@ -59,6 +59,7 @@ type disperserClient struct {
 	prover             encoding.Prover
 	accountant         *Accountant
 	accountantLock     sync.Mutex
+	ntpClock           *core.NTPSyncedClock
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -105,20 +106,26 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 		config.NtpSyncInterval = 5 * time.Minute
 	}
 
-	// Start NTP sync
+	// Initialize NTP synced clock
 	loggerConfig := common.DefaultLoggerConfig()
 	logger, err := common.NewLogger(loggerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 	logger = logger.With("component", "DisperserClient")
-	core.StartNtpSync(context.Background(), config.NtpServer, config.NtpSyncInterval, logger)
+
+	// Start NTP sync - this initializes the global clock
+	ntpClock, err := core.NewNTPSyncedClock(context.Background(), config.NtpServer, config.NtpSyncInterval, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create NTP clock: %w", err)
+	}
 
 	return &disperserClient{
 		config:     config,
 		signer:     signer,
 		prover:     prover,
 		accountant: accountant,
+		ntpClock:   ntpClock,
 		// conn and client are initialized lazily
 	}, nil
 }
@@ -205,7 +212,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	}
 
 	symbolLength := encoding.GetBlobLengthPowerOf2(uint(len(data)))
-	payment, err := c.accountant.AccountBlob(ctx, core.NowWithNtpOffset().UnixNano(), uint64(symbolLength), quorums)
+	payment, err := c.accountant.AccountBlob(ctx, c.ntpClock.Now().UnixNano(), uint64(symbolLength), quorums)
 	if err != nil {
 		c.accountantLock.Unlock()
 		return nil, [32]byte{}, fmt.Errorf("error accounting blob: %w", err)

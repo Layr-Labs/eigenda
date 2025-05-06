@@ -20,7 +20,7 @@ import (
 
 func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
 	start := time.Now()
-	metererSyncTime := core.NowWithNtpOffset()
+	metererSyncTime := s.ntpClock.Now() // Using NTP-synced time for metering
 	defer func() {
 		s.metrics.reportDisperseBlobLatency(time.Since(start))
 	}()

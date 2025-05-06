@@ -544,6 +544,12 @@ func newTestServerV2(t *testing.T) *testComponents {
 		},
 	}, nil)
 
+	// Start NTP sync
+	ntpClock, err := core.NewNTPSyncedClock(context.Background(), "pool.ntp.org", 10*time.Second, logger)
+	if err != nil {
+		panic("failed to create NTP clock: " + err.Error())
+	}
+
 	s, err := apiserver.NewDispersalServerV2(
 		disperser.ServerConfig{
 			GrpcPort:    "51002",
@@ -563,6 +569,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 			HTTPPort:      "9094",
 			EnableMetrics: false,
 		},
+		ntpClock,
 	)
 	assert.NoError(t, err)
 
