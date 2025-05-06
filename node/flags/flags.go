@@ -418,7 +418,7 @@ var (
 	}
 	LittDBReadCacheSizeGBFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "litt-db-read-cache-size-gb"),
-		Usage:    "The size of the LittDB write cache in gigabytes.",
+		Usage:    "The size of the LittDB read cache in gigabytes.",
 		Required: false,
 		Value:    1 * units.GiB,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_GB"),
@@ -432,26 +432,26 @@ var (
 	}
 	GetChunksHotCacheReadLimitMBFlag = cli.Float64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-hot-cache-read-limit-mb"),
-		Usage:    "The size of the hot cache read limit in megabytes / second.",
+		Usage:    "The rate limit for GetChunks() calls that hit the cache, unit is MB/s.",
 		Required: false,
 		Value:    1024,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_HOT_CACHE_READ_LIMIT_MB"),
 	}
 	GetChunksHotBurstLimitMBFlag = cli.Float64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-hot-burst-limit-mb"),
-		Usage:    "The size of the hot burst limit in megabytes.",
+		Usage:    "The burst limit for GetChunks() calls that hit the cache, unit is MB.",
 		Required: false,
 		Value:    1024,
 	}
 	GetChunksColdCacheReadLimitMBFlag = cli.Float64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-cold-cache-read-limit-mb"),
-		Usage:    "The size of the cold cache read limit in megabytes / second.",
+		Usage:    "The rate limit for GetChunks() calls that miss the cache, unit is MB/s.",
 		Required: false,
 		Value:    32,
 	}
 	GetChunksColdBurstLimitMBFlag = cli.Float64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-cold-burst-limit-MB"),
-		Usage:    "The size of the cold burst limit in megabytes.",
+		Usage:    "The burst limit for GetChunks() calls that miss the cache, unit is MB.",
 		Required: false,
 		Value:    32,
 	}

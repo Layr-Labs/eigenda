@@ -88,13 +88,13 @@ type Config struct {
 	// The size of the cache for tables that have not had their write cache size set. A write cache is used
 	// to store recently written values for fast access. The default is 0 (no cache).
 	// Cache size is in bytes, and includes the size of both the key and the value. Cache size can be set
-	// individually on each table by calling Table.SetCacheSize().
+	// individually on each table by calling Table.SetWriteCacheSize().
 	WriteCacheSize uint64
 
 	// The size of the cache for tables that have not had their read cache size set. A read cache is used
 	// to store recently read values for fast access. The default is 0 (no cache).
 	// Cache size is in bytes, and includes the size of both the key and the value. Cache size can be set
-	// individually on each table by calling Table.SetCacheSize().
+	// individually on each table by calling Table.SetReadCacheSize().
 	ReadCacheSize uint64
 
 	// The time source used by the database. This can be substituted for an artificial time source

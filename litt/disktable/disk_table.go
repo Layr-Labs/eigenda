@@ -581,7 +581,7 @@ func (d *DiskTable) CacheAwareGet(
 
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
 		return nil, false, false, fmt.Errorf(
-			"Cannot process Get() request, DB is in panicked state due to error: %w", err)
+			"Cannot process CacheAwareGet() request, DB is in panicked state due to error: %w", err)
 	}
 
 	var cacheHit bool
@@ -624,6 +624,8 @@ func (d *DiskTable) CacheAwareGet(
 	// Reserve the segment that contains the data.
 	seg, ok := d.controlLoop.getReservedSegment(address.Index())
 	if !ok {
+		// This can happen if there is a race between this thread and the GC thread, i.e.
+		// if we start reading a value just as the garbage collector decides to delete it.
 		return nil, false, false, nil
 	}
 	defer seg.Release()
@@ -738,7 +740,8 @@ func (d *DiskTable) Flush() error {
 
 func (d *DiskTable) SetWriteCacheSize(size uint64) error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process SetCacheSize() request, DB is in panicked state due to error: %w", err)
+		return fmt.Errorf(
+			"Cannot process SetWriteCacheSize() request, DB is in panicked state due to error: %w", err)
 	}
 
 	// this implementation does not provide a cache, if a cache is needed then it must be provided by a wrapper
@@ -747,7 +750,8 @@ func (d *DiskTable) SetWriteCacheSize(size uint64) error {
 
 func (d *DiskTable) SetReadCacheSize(size uint64) error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process SetCacheSize() request, DB is in panicked state due to error: %w", err)
+		return fmt.Errorf(
+			"Cannot process SetReadCacheSize() request, DB is in panicked state due to error: %w", err)
 	}
 
 	// this implementation does not provide a cache, if a cache is needed then it must be provided by a wrapper

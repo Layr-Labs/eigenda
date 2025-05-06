@@ -14,16 +14,16 @@ var _ Cache[string, string] = &FIFOCache[string, string]{}
 type FIFOCache[K comparable, V any] struct {
 	weightCalculator WeightCalculator[K, V]
 
-	currentWeight   uint64
-	maxWeight       uint64
-	data            map[K]V
-	expirationQueue queues.Queue
-	metrics         *CacheMetrics
+	currentWeight uint64
+	maxWeight     uint64
+	data          map[K]V
+	evictionQueue queues.Queue
+	metrics       *CacheMetrics
 }
 
-// expirationRecord is a record of when a key was inserted into the cache, and is used to decide when it should be
+// insertionRecord is a record of when a key was inserted into the cache, and is used to decide when it should be
 // evicted.
-type expirationRecord struct {
+type insertionRecord struct {
 	// The key that was added to the cache.
 	key any
 	// The time at which the key was added to the cache.
@@ -44,7 +44,7 @@ func NewFIFOCache[K comparable, V any](
 		maxWeight:        maxWeight,
 		data:             make(map[K]V),
 		weightCalculator: calculator,
-		expirationQueue:  linkedlistqueue.New(),
+		evictionQueue:    linkedlistqueue.New(),
 		metrics:          metrics,
 	}
 }
@@ -68,7 +68,7 @@ func (f *FIFOCache[K, V]) Put(key K, value V) {
 		oldWeight := f.weightCalculator(key, old)
 		f.currentWeight -= oldWeight
 	} else {
-		f.expirationQueue.Enqueue(&expirationRecord{
+		f.evictionQueue.Enqueue(&insertionRecord{
 			key:       key,
 			timestamp: time.Now(),
 		})
@@ -86,8 +86,8 @@ func (f *FIFOCache[K, V]) evict() {
 	now := time.Now()
 
 	for f.currentWeight > f.maxWeight {
-		next, _ := f.expirationQueue.Dequeue()
-		record := next.(*expirationRecord)
+		next, _ := f.evictionQueue.Dequeue()
+		record := next.(*insertionRecord)
 		keyToEvict := record.key.(K)
 		weightToEvict := f.weightCalculator(keyToEvict, f.data[keyToEvict])
 		delete(f.data, keyToEvict)

@@ -51,7 +51,7 @@ type Table interface {
 	// method.
 	Get(key []byte) (value []byte, exists bool, err error)
 
-	// CacheAwareGet is identical go Get, except that it permits the caller to determine whether the value
+	// CacheAwareGet is identical to Get, except that it permits the caller to determine whether the value
 	// should still be read if it is not present in the cache. If read, it also returns whether the value
 	// was present in the cache. Note that the 'exists' return value is always accurate even if onlyReadFromCache
 	// is true. If onlyReadFromCache is true and the value exists but is not in the cache, the returned values are

@@ -50,7 +50,7 @@ func (c *cachedTable) Name() string {
 func (c *cachedTable) Put(key []byte, value []byte) error {
 	err := c.base.Put(key, value)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to put entry into base table: %w", err)
 	}
 	c.writeCache.Put(string(key), value)
 	return nil
@@ -83,9 +83,31 @@ func (c *cachedTable) Get(key []byte) (value []byte, exists bool, err error) {
 // - Thread B checks the cache, and finds that the value is not there.
 // - LittDB flushes the value out to disk before thread A's Put() returns, specifically before thread A inserts
 //   the value into the write cache. The timing of this is exceptionally unlikely, but not impossible.
-// - Thread A gets to the part of CacheAwareGet() where it checks the base table for the value. Since the
+// - Thread B gets to the part of CacheAwareGet() where it checks the base table for the value. Since the
 //   base table has flushed the value out to disk, it says that the value exists but does not fetch it since
 //   onlyReadFromCache is true.
+// - Thread A finishes calling Put(), and key K is now in the cache.
+//
+//   |                     Thread A                                               Thread B
+//  Time                      |                                                      |
+//   |             Put(key K, ...) starts                                            |
+//   v                        |                                                      |
+//                            |                                 CacheAwareGet(key K, ...) -> value not present
+//                            |                                                      |
+//      K is inserted into the unflushed data map                                    |
+//                            |                                                      |
+//                            |                                 CacheAwareGet(key K, ...) -> present and hot
+//                            |                                                      |
+//     K is flushed to disk and removed from the unflushed data map                  |
+//         (highly irregular but not impossible timing)                              |
+//                            |                                                      |
+//                            |                                 CacheAwareGet(key K, ...) -> present and cold
+//                            |                                                      |
+//           K is inserted into the write cache                                      |
+//                            |                                                      |
+//                            |                                 CacheAwareGet(key K, ...) -> present and hot
+//                            |                                                      |
+//                  Put (key K, ...) returns                                         |
 
 func (c *cachedTable) CacheAwareGet(
 	key []byte,
@@ -144,7 +166,7 @@ func (c *cachedTable) SetWriteCacheSize(size uint64) error {
 	c.writeCache.SetMaxWeight(size)
 	err := c.base.SetWriteCacheSize(size)
 	if err != nil {
-		return fmt.Errorf("failed to set base table cache size: %w", err)
+		return fmt.Errorf("failed to set base table write cache size: %w", err)
 	}
 	return nil
 }
@@ -153,7 +175,7 @@ func (c *cachedTable) SetReadCacheSize(size uint64) error {
 	c.readCache.SetMaxWeight(size)
 	err := c.base.SetReadCacheSize(size)
 	if err != nil {
-		return fmt.Errorf("failed to set base table cache size: %w", err)
+		return fmt.Errorf("failed to set base table read cache size: %w", err)
 	}
 	return nil
 }
