@@ -8,14 +8,15 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/Layr-Labs/eigenda-proxy/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
+	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 // IManager ... read/write interface
 type IManager interface {
-	Get(ctx context.Context, versionedCert commitments.EigenDAVersionedCert, cm commitments.CommitmentMode) ([]byte, error)
+	Get(ctx context.Context, versionedCert certs.VersionedCert, cm commitments.CommitmentMode) ([]byte, error)
 	Put(ctx context.Context, cm commitments.CommitmentMode, key, value []byte) ([]byte, error)
 	SetDispersalBackend(backend common.EigenDABackend)
 	GetDispersalBackend() common.EigenDABackend
@@ -84,7 +85,7 @@ func NewManager(
 
 // Get ... fetches a value from a storage backend based on the (commitment mode, type)
 func (m *Manager) Get(ctx context.Context,
-	versionedCert commitments.EigenDAVersionedCert,
+	versionedCert certs.VersionedCert,
 	cm commitments.CommitmentMode,
 ) ([]byte, error) {
 	switch cm {
@@ -110,10 +111,10 @@ func (m *Manager) Get(ctx context.Context,
 		return value, nil
 
 	case commitments.StandardCommitmentMode, commitments.OptimismGenericCommitmentMode:
-		if versionedCert.Version == commitments.CertV0 && m.eigenda == nil {
+		if versionedCert.Version == certs.V0VersionByte && m.eigenda == nil {
 			return nil, errors.New("expected EigenDA V1 backend for DA commitment type with CertV0")
 		}
-		if versionedCert.Version == commitments.CertV1 && m.eigendaV2 == nil {
+		if versionedCert.Version == certs.V1VersionByte && m.eigendaV2 == nil {
 			return nil, errors.New("expected EigenDA V2 backend for DA commitment type with CertV1")
 		}
 
@@ -198,14 +199,14 @@ func (m *Manager) Put(ctx context.Context, cm commitments.CommitmentMode, key, v
 }
 
 // getVerifyMethod returns the correct verify method based on commitment type
-func (m *Manager) getVerifyMethod(commitmentType commitments.EigenDACertVersion) (
+func (m *Manager) getVerifyMethod(commitmentType certs.VersionByte) (
 	func(context.Context, []byte, []byte) error,
 	error,
 ) {
 	switch commitmentType {
-	case commitments.CertV0:
+	case certs.V0VersionByte:
 		return m.eigenda.Verify, nil
-	case commitments.CertV1:
+	case certs.V1VersionByte:
 		return m.eigendaV2.Verify, nil
 	default:
 		return nil, fmt.Errorf("commitment version unknown: %b", commitmentType)
@@ -239,10 +240,10 @@ func (m *Manager) putEigenDAMode(ctx context.Context, value []byte) ([]byte, err
 
 func (m *Manager) getFromCorrectEigenDABackend(
 	ctx context.Context,
-	versionedCert commitments.EigenDAVersionedCert,
+	versionedCert certs.VersionedCert,
 ) ([]byte, error) {
 	switch versionedCert.Version {
-	case commitments.CertV0:
+	case certs.V0VersionByte:
 		m.log.Debug("Reading blob from EigenDAV1 backend")
 		data, err := m.eigenda.Get(ctx, versionedCert.SerializedCert)
 		if err == nil {
@@ -256,7 +257,7 @@ func (m *Manager) getFromCorrectEigenDABackend(
 
 		return nil, err
 
-	case commitments.CertV1:
+	case certs.V1VersionByte:
 		// The cert must be verified before attempting to get the data, since the GET logic
 		// assumes the cert is valid. Verify v2 doesn't require a payload.
 		err := m.eigendaV2.Verify(ctx, versionedCert.SerializedCert, nil)

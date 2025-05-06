@@ -4,8 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda-proxy/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
+	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
 	"github.com/Layr-Labs/eigenda/api"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -41,11 +42,11 @@ func (me POSTError) Unwrap() error {
 // GETError wraps an error with GET query context (mode and cert version).
 type GETError struct {
 	Err         error
-	CertVersion commitments.EigenDACertVersion
+	CertVersion certs.VersionByte
 	Mode        commitments.CommitmentMode
 }
 
-func NewGETError(err error, certVersion commitments.EigenDACertVersion, mode commitments.CommitmentMode) GETError {
+func NewGETError(err error, certVersion certs.VersionByte, mode commitments.CommitmentMode) GETError {
 	return GETError{
 		Err:         err,
 		CertVersion: certVersion,

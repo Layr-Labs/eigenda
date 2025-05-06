@@ -9,8 +9,9 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/Layr-Labs/eigenda-proxy/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
+	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
 	"github.com/gorilla/mux"
 )
 
@@ -55,7 +56,7 @@ func (svr *Server) handleGetStdCommitment(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		return fmt.Errorf("failed to decode from hex serializedDACert %s: %w", serializedCertHex, err)
 	}
-	versionedCert := commitments.NewEigenDAVersionedCert(serializedCert, certVersion)
+	versionedCert := certs.NewVersionedCert(serializedCert, certVersion)
 
 	return svr.handleGetShared(r.Context(), w, versionedCert, commitments.StandardCommitmentMode)
 }
@@ -80,7 +81,7 @@ func (svr *Server) handleGetOPKeccakCommitment(w http.ResponseWriter, r *http.Re
 	}
 	// We use certV0 arbitrarily here, as it isn't used. Keccak commitments are not versioned.
 	// TODO: We should probably create a new route for this which doesn't require a versionedCert.
-	versionedCert := commitments.NewEigenDAVersionedCert(commitment, commitments.CertV0)
+	versionedCert := certs.NewVersionedCert(commitment, certs.V0VersionByte)
 
 	return svr.handleGetShared(r.Context(), w, versionedCert, commitments.OptimismKeccakCommitmentMode)
 }
@@ -99,7 +100,7 @@ func (svr *Server) handleGetOPGenericCommitment(w http.ResponseWriter, r *http.R
 	if err != nil {
 		return fmt.Errorf("failed to decode from hex serializedDACert %s: %w", serializedCertHex, err)
 	}
-	versionedCert := commitments.NewEigenDAVersionedCert(commitment, certVersion)
+	versionedCert := certs.NewVersionedCert(commitment, certVersion)
 
 	return svr.handleGetShared(r.Context(), w, versionedCert, commitments.OptimismGenericCommitmentMode)
 }
@@ -107,7 +108,7 @@ func (svr *Server) handleGetOPGenericCommitment(w http.ResponseWriter, r *http.R
 func (svr *Server) handleGetShared(
 	ctx context.Context,
 	w http.ResponseWriter,
-	versionedCert commitments.EigenDAVersionedCert,
+	versionedCert certs.VersionedCert,
 	mode commitments.CommitmentMode,
 ) error {
 	serializedCertHex := hex.EncodeToString(versionedCert.SerializedCert)
@@ -214,16 +215,16 @@ func (svr *Server) handlePostShared(
 		return err
 	}
 
-	var certVersion commitments.EigenDACertVersion
+	var certVersion certs.VersionByte
 	switch svr.sm.GetDispersalBackend() {
 	case common.V1EigenDABackend:
-		certVersion = commitments.CertV0
+		certVersion = certs.V0VersionByte
 	case common.V2EigenDABackend:
-		certVersion = commitments.CertV1
+		certVersion = certs.V1VersionByte
 	default:
 		return fmt.Errorf("unknown dispersal backend: %v", svr.sm.GetDispersalBackend())
 	}
-	versionedCert := commitments.NewEigenDAVersionedCert(serializedCert, certVersion)
+	versionedCert := certs.NewVersionedCert(serializedCert, certVersion)
 
 	responseCommit, err := commitments.EncodeCommitment(versionedCert, mode)
 	if err != nil {

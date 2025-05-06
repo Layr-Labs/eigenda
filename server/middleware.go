@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Layr-Labs/eigenda-proxy/commitments"
+	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )

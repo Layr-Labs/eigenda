@@ -13,8 +13,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	commitments "github.com/Layr-Labs/eigenda-proxy/commitments"
 	common "github.com/Layr-Labs/eigenda-proxy/common"
+	certs "github.com/Layr-Labs/eigenda-proxy/common/types/certs"
+	commitments "github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -43,7 +44,7 @@ func (m *MockIManager) EXPECT() *MockIManagerMockRecorder {
 }
 
 // Get mocks base method.
-func (m *MockIManager) Get(ctx context.Context, versionedCert commitments.EigenDAVersionedCert, cm commitments.CommitmentMode) ([]byte, error) {
+func (m *MockIManager) Get(ctx context.Context, versionedCert certs.VersionedCert, cm commitments.CommitmentMode) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", ctx, versionedCert, cm)
 	ret0, _ := ret[0].([]byte)

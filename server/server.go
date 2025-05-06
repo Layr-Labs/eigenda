@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Layr-Labs/eigenda-proxy/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda-proxy/config"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/store"
@@ -159,7 +159,7 @@ func (svr *Server) Port() int {
 	return port
 }
 
-func parseCertVersion(w http.ResponseWriter, r *http.Request) (commitments.EigenDACertVersion, error) {
+func parseCertVersion(w http.ResponseWriter, r *http.Request) (certs.VersionByte, error) {
 	vars := mux.Vars(r)
 	// only GET routes use gorilla parsed vars to separate header bytes from the raw commitment bytes.
 	// POST routes parse them by hand because they neeed to send the entire
@@ -169,7 +169,7 @@ func parseCertVersion(w http.ResponseWriter, r *http.Request) (commitments.Eigen
 	versionByteHex, isGETRoute := vars[routingVarNameVersionByteHex]
 	if !isGETRoute {
 		// TODO: this seems like a bug... used in metrics for POST route, so we'll just always return v0??
-		return commitments.CertV0, nil
+		return certs.V0VersionByte, nil
 	}
 	versionByte, err := hex.DecodeString(versionByteHex)
 	if err != nil {
@@ -178,7 +178,7 @@ func parseCertVersion(w http.ResponseWriter, r *http.Request) (commitments.Eigen
 	if len(versionByte) != 1 {
 		return 0, fmt.Errorf("version byte is not a single byte: %s", versionByteHex)
 	}
-	certVersion, err := commitments.ByteToEigenDACertVersion(versionByte[0])
+	certVersion, err := certs.ByteToVersion(versionByte[0])
 	if err != nil {
 		errWithHexContext := fmt.Errorf("unsupported version byte %x: %w", versionByte, err)
 		http.Error(w, errWithHexContext.Error(), http.StatusBadRequest)
