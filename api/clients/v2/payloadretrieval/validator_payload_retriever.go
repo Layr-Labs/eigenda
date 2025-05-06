@@ -75,7 +75,7 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 			blobHeader.Version,
 			*commitment,
 			eigenDACert.BatchHeader.ReferenceBlockNumber,
-			quorumID)
+			blobHeader.QuorumNumbers)
 
 		if err != nil {
 			pr.logger.Warn(
@@ -128,7 +128,7 @@ func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 	blobVersion corev2.BlobVersion,
 	blobCommitments encoding.BlobCommitments,
 	referenceBlockNumber uint32,
-	quorumID core.QuorumID) (*coretypes.Blob, error) {
+	quorums []core.QuorumID) (*coretypes.Blob, error) {
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.RetrievalTimeout)
 	defer cancel()
@@ -140,7 +140,7 @@ func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 		blobVersion,
 		blobCommitments,
 		uint64(referenceBlockNumber),
-		quorumID)
+		quorums)
 
 	if err != nil {
 		return nil, fmt.Errorf("get blob: %w", err)

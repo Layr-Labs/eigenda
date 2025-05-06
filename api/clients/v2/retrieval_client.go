@@ -29,7 +29,7 @@ type RetrievalClient interface {
 		blobVersion corev2.BlobVersion,
 		blobCommitments encoding.BlobCommitments,
 		referenceBlockNumber uint64,
-		quorumID core.QuorumID,
+		quorums []core.QuorumID,
 	) ([]byte, error)
 }
 
@@ -60,13 +60,27 @@ func NewRetrievalClient(
 	}
 }
 
+func getFlattenedSockets(
+	operatorState *core.OperatorState,
+) (map[core.OperatorID]core.OperatorSocket, error) {
+	sockets := make(map[core.OperatorID]core.OperatorSocket)
+
+	// flatten operator state
+	for _, quorum := range operatorState.Operators {
+		for opID := range quorum {
+			sockets[opID] = quorum[opID].Socket
+		}
+	}
+	return sockets, nil
+}
+
 func (r *retrievalClient) GetBlob(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
 	blobVersion corev2.BlobVersion,
 	blobCommitments encoding.BlobCommitments,
 	referenceBlockNumber uint64,
-	quorumID core.QuorumID,
+	quorums []core.QuorumID,
 ) ([]byte, error) {
 
 	commitmentBatch := []encoding.BlobCommitments{blobCommitments}
@@ -75,13 +89,14 @@ func (r *retrievalClient) GetBlob(
 		return nil, err
 	}
 
-	operatorState, err := r.chainState.GetOperatorStateWithSocket(ctx, uint(referenceBlockNumber), []core.QuorumID{quorumID})
+	operatorState, err := r.chainState.GetOperatorStateWithSocket(ctx, uint(referenceBlockNumber), quorums)
 	if err != nil {
 		return nil, err
 	}
-	operators, ok := operatorState.Operators[quorumID]
-	if !ok {
-		return nil, fmt.Errorf("no quorum with ID: %d", quorumID)
+
+	sockets, err := getFlattenedSockets(operatorState)
+	if err != nil {
+		return nil, errors.New("failed to get sockets")
 	}
 
 	blobVersions, err := r.ethClient.GetAllVersionedBlobParams(ctx)
@@ -99,27 +114,31 @@ func (r *retrievalClient) GetBlob(
 		return nil, err
 	}
 
-	assignments, err := corev2.GetAssignments(operatorState, blobParam, quorumID)
+	assignments, err := corev2.GetAssignments(operatorState, blobParam, quorums, blobKey[:])
 	if err != nil {
 		return nil, errors.New("failed to get assignments")
 	}
 
 	// Fetch chunks from all operators
-	chunksChan := make(chan clients.RetrievedChunks, len(operators))
+	chunksChan := make(chan clients.RetrievedChunks, len(assignments))
 	pool := workerpool.New(r.numConnections)
-	for opID := range operators {
+	for opID := range assignments {
 		// make sure the value doesn't change before being submitted to the pool
 		boundOperatorId := opID
-		opInfo := operatorState.Operators[quorumID][boundOperatorId]
+		socket, ok := sockets[boundOperatorId]
+		if !ok {
+			r.logger.Warn("no socket found for operator", "operator", boundOperatorId.Hex())
+			continue
+		}
 		pool.Submit(func() {
-			r.getChunksFromOperator(ctx, boundOperatorId, opInfo, blobKey, quorumID, chunksChan)
+			r.getChunksFromOperator(ctx, boundOperatorId, socket, blobKey, 0, chunksChan)
 		})
 	}
 
 	var chunks []*encoding.Frame
 	var indices []encoding.ChunkNumber
 	// TODO(ian-shim): if we gathered enough chunks, cancel remaining RPC calls
-	for i := 0; i < len(operators); i++ {
+	for i := 0; i < len(assignments); i++ {
 		reply := <-chunksChan
 		if reply.Err != nil {
 			r.logger.Warn("failed to get chunks from operator", "operator", reply.OperatorID.Hex(), "err", reply.Err)
@@ -162,7 +181,7 @@ func (r *retrievalClient) GetBlob(
 func (r *retrievalClient) getChunksFromOperator(
 	ctx context.Context,
 	opID core.OperatorID,
-	opInfo *core.OperatorInfo,
+	socket core.OperatorSocket,
 	blobKey corev2.BlobKey,
 	quorumID core.QuorumID,
 	chunksChan chan clients.RetrievedChunks,
@@ -178,7 +197,7 @@ func (r *retrievalClient) getChunksFromOperator(
 	maxMessageSize := maxBlobSize*encodingRate + fudgeFactor
 
 	conn, err := grpc.NewClient(
-		core.OperatorSocket(opInfo.Socket).GetV2RetrievalSocket(),
+		socket.GetV2RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMessageSize)),
 	)
