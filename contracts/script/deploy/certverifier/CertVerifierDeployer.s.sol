@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.12;
 
-import {EigenDACertVerifierV2} from "src/periphery/cert/v2/EigenDACertVerifierV2.sol";
+import {EigenDACertVerifierV3} from "src/periphery/cert/v3/EigenDACertVerifierV3.sol";
+
 import {RegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
@@ -41,15 +42,6 @@ contract CertVerifierDeployer is Script, Test {
         raw = stdJson.parseRaw(data, ".eigenDAThresholdRegistry");
         eigenDAThresholdRegistry = abi.decode(raw, (address));
 
-        raw = stdJson.parseRaw(data, ".eigenDARelayRegistry");
-        eigenDARelayRegistry = abi.decode(raw, (address));
-
-        raw = stdJson.parseRaw(data, ".registryCoordinator");
-        registryCoordinator = abi.decode(raw, (address));
-
-        raw = stdJson.parseRaw(data, ".operatorStateRetriever");
-        operatorStateRetriever = abi.decode(raw, (address));
-
         raw = stdJson.parseRaw(data, ".defaultSecurityThresholds");
         defaultSecurityThresholds = abi.decode(raw, (DATypesV1.SecurityThresholds));
 
@@ -59,11 +51,9 @@ contract CertVerifierDeployer is Script, Test {
         vm.startBroadcast();
 
         eigenDACertVerifier = address(
-            new EigenDACertVerifierV2(
+            new EigenDACertVerifierV3(
                 IEigenDAThresholdRegistry(eigenDAThresholdRegistry),
                 IEigenDASignatureVerifier(eigenDAServiceManager),
-                OperatorStateRetriever(operatorStateRetriever),
-                IRegistryCoordinator(registryCoordinator),
                 defaultSecurityThresholds,
                 quorumNumbersRequired
             )
