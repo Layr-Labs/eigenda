@@ -1,38 +1,84 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
 import {EigenDATypesV3} from "src/core/libraries/v3/EigenDATypesV3.sol";
+import {DisperserRegistryLib, DisperserRegistryStorage} from "src/core/libraries/v3/DisperserRegistryLib.sol";
+import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
+import {AccessControlLib} from "src/core/libraries/AccessControlLib.sol";
+
+import {InitializableLib} from "src/core/libraries/InitializableLib.sol";
+import {Constants} from "src/core/libraries/Constants.sol";
 
 /**
  * @title Registry for EigenDA disperser info
  * @author Layr Labs, Inc.
  */
 contract EigenDADisperserRegistry is IEigenDADisperserRegistry {
+    modifier initializer() {
+        InitializableLib.setInitializedVersion(1);
+        _;
+    }
 
-    function setDisperserInfo(uint32 disperserKey, address disperser, string memory disperserURL)
-        external payable
+    modifier onlyOwner() {
+        AccessControlLib.checkRole(Constants.OWNER_ROLE, msg.sender);
+        _;
+    }
+
+    modifier onlyDisperser(uint32 disperserKey) {
+        require(msg.sender == DisperserRegistryLib.getDisperser(disperserKey), "Caller is not the disperser");
+        _;
+    }
+
+    function initialize(address owner, EigenDATypesV3.LockedDisperserDeposit memory depositParams)
+        external
+        initializer
     {
-        _disperserInfo[disperserKey] = EigenDATypesV3.DisperserInfo({
-            disperser: disperser,
-            disperserURL: disperserURL,
-            registered: true,
-            withdrawalUnlock: type(uint64).max
-        });
-        emit DisperserAdded(disperserKey, disperser);
+        AccessControlLib.grantRole(Constants.OWNER_ROLE, owner);
+        DisperserRegistryLib.setDepositParams(depositParams);
     }
 
-    function deregisterDisperser(uint32 _disperserKey) external {
-        require(_disperserInfo[_disperserKey].registered, "Disperser not registered");
-        _disperserInfo[_disperserKey].registered = false;
-        _disperserInfo[_disperserKey].withdrawalUnlock = uint64(block.timestamp + 1 days);
-
+    function registerDisperser(address disperserAddress, string memory disperserURL)
+        external
+        returns (uint32 disperserKey)
+    {
+        return DisperserRegistryLib.registerDisperser(disperserAddress, disperserURL);
     }
 
-    function withdrawDeposit(uint32 _disperserKey) external {
+    /// DISPERSER
+
+    function deregisterDisperser(uint32 disperserKey) external onlyDisperser(disperserKey) {
+        DisperserRegistryLib.deregisterDisperser(disperserKey);
     }
 
-    function disperserInfo(uint32 _key) external view returns (EigenDATypesV3.DisperserInfo memory) {
-        return _disperserInfo[_key];
+    function withdraw(uint32 disperserKey) external onlyDisperser(disperserKey) {
+        DisperserRegistryLib.withdraw(disperserKey);
+    }
+
+    /// OWNER
+
+    function setDepositParams(EigenDATypesV3.LockedDisperserDeposit memory depositParams) external {
+        DisperserRegistryLib.setDepositParams(depositParams);
+    }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        AccessControlLib.transferRole(Constants.OWNER_ROLE, msg.sender, newOwner);
+    }
+
+    /// GETTERS
+
+    function getDepositParams() external view returns (EigenDATypesV3.LockedDisperserDeposit memory) {
+        return DisperserRegistryLib.getDepositParams();
+    }
+
+    function getDisperserInfo(uint32 disperserKey) external view returns (EigenDATypesV3.DisperserInfo memory) {
+        return DisperserRegistryLib.getDisperserInfo(disperserKey);
+    }
+
+    function getLockedDeposit(uint32 disperserKey)
+        external
+        view
+        returns (EigenDATypesV3.LockedDisperserDeposit memory, uint64 unlockTimestamp)
+    {
+        return DisperserRegistryLib.getLockedDeposit(disperserKey);
     }
 }

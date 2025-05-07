@@ -4,9 +4,15 @@ pragma solidity ^0.8.9;
 import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 
 library EigenDATypesV3 {
+    struct LockedDisperserDeposit {
+        uint256 deposit;
+        uint256 refund;
+        address token;
+        uint64 lockPeriod;
+    }
+
     struct DisperserInfo {
         address disperser;
-        uint64 withdrawalUnlock;
         bool registered;
         string disperserURL;
     }

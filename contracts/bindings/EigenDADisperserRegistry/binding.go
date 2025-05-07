@@ -29,15 +29,25 @@ var (
 	_ = abi.ConvertType
 )
 
-// EigenDATypesV2DisperserInfo is an auto generated low-level Go binding around an user-defined struct.
-type EigenDATypesV2DisperserInfo struct {
-	DisperserAddress common.Address
+// EigenDATypesV3DisperserInfo is an auto generated low-level Go binding around an user-defined struct.
+type EigenDATypesV3DisperserInfo struct {
+	Disperser    common.Address
+	Registered   bool
+	DisperserURL string
+}
+
+// EigenDATypesV3LockedDisperserDeposit is an auto generated low-level Go binding around an user-defined struct.
+type EigenDATypesV3LockedDisperserDeposit struct {
+	Deposit    *big.Int
+	Refund     *big.Int
+	Token      common.Address
+	LockPeriod uint64
 }
 
 // ContractEigenDADisperserRegistryMetaData contains all meta data concerning the ContractEigenDADisperserRegistry contract.
 var ContractEigenDADisperserRegistryMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"disperserKeyToAddress\",\"inputs\":[{\"name\":\"_key\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"disperserKeyToInfo\",\"inputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"disperserAddress\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"initialize\",\"inputs\":[{\"name\":\"_initialOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"renounceOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setDisperserInfo\",\"inputs\":[{\"name\":\"_disperserKey\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"_disperserInfo\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.DisperserInfo\",\"components\":[{\"name\":\"disperserAddress\",\"type\":\"address\",\"internalType\":\"address\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"DisperserAdded\",\"inputs\":[{\"name\":\"key\",\"type\":\"uint32\",\"indexed\":true,\"internalType\":\"uint32\"},{\"name\":\"disperser\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Initialized\",\"inputs\":[{\"name\":\"version\",\"type\":\"uint8\",\"indexed\":false,\"internalType\":\"uint8\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"previousOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false}]",
-	Bin: "0x608060405234801561001057600080fd5b5061001961001e565b6100de565b600054610100900460ff161561008a5760405162461bcd60e51b815260206004820152602760248201527f496e697469616c697a61626c653a20636f6e747261637420697320696e697469604482015266616c697a696e6760c81b606482015260840160405180910390fd5b60005460ff90811610156100dc576000805460ff191660ff9081179091556040519081527f7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb38474024989060200160405180910390a15b565b610526806100ed6000396000f3fe608060405234801561001057600080fd5b506004361061007d5760003560e01c80638da5cb5b1161005b5780638da5cb5b146101005780639a0f62a014610111578063c4d66de814610124578063f2fde38b1461013757600080fd5b806307d69fad146100825780631e0bf73c146100cd578063715018a6146100f6575b600080fd5b6100b161009036600461041d565b63ffffffff166000908152606560205260409020546001600160a01b031690565b6040516001600160a01b03909116815260200160405180910390f35b6100b16100db36600461041d565b6065602052600090815260409020546001600160a01b031681565b6100fe61014a565b005b6033546001600160a01b03166100b1565b6100fe61011f366004610456565b61015e565b6100fe6101323660046104d5565b6101c7565b6100fe6101453660046104d5565b6102df565b610152610358565b61015c60006103b2565b565b610166610358565b63ffffffff8216600081815260656020526040808220845181546001600160a01b0319166001600160a01b0390911690811790915590519092917f97fb4432fef273711f9ccc876095cf8e22b00f159658bbd807a8ea80a4c3c85991a35050565b600054610100900460ff16158080156101e75750600054600160ff909116105b806102015750303b158015610201575060005460ff166001145b6102695760405162461bcd60e51b815260206004820152602e60248201527f496e697469616c697a61626c653a20636f6e747261637420697320616c72656160448201526d191e481a5b9a5d1a585b1a5e995960921b60648201526084015b60405180910390fd5b6000805460ff19166001179055801561028c576000805461ff0019166101001790555b610295826103b2565b80156102db576000805461ff0019169055604051600181527f7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb38474024989060200160405180910390a15b5050565b6102e7610358565b6001600160a01b03811661034c5760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b6064820152608401610260565b610355816103b2565b50565b6033546001600160a01b0316331461015c5760405162461bcd60e51b815260206004820181905260248201527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e65726044820152606401610260565b603380546001600160a01b038381166001600160a01b0319831681179093556040519116919082907f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e090600090a35050565b803563ffffffff8116811461041857600080fd5b919050565b60006020828403121561042f57600080fd5b61043882610404565b9392505050565b80356001600160a01b038116811461041857600080fd5b600080828403604081121561046a57600080fd5b61047384610404565b92506020601f198201121561048757600080fd5b506040516020810181811067ffffffffffffffff821117156104b957634e487b7160e01b600052604160045260246000fd5b6040526104c86020850161043f565b8152809150509250929050565b6000602082840312156104e757600080fd5b6104388261043f56fea264697066735822122038156c0e9b55de69eed4e09a8207aa96f6a408ac3dfe5b630571d63fb0f48f9d64736f6c634300080c0033",
+	ABI: "[{\"type\":\"function\",\"name\":\"deregisterDisperser\",\"inputs\":[{\"name\":\"disperserKey\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getDepositParams\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV3.LockedDisperserDeposit\",\"components\":[{\"name\":\"deposit\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"refund\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"lockPeriod\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getDisperserInfo\",\"inputs\":[{\"name\":\"disperserKey\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV3.DisperserInfo\",\"components\":[{\"name\":\"disperser\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"registered\",\"type\":\"bool\",\"internalType\":\"bool\"},{\"name\":\"disperserURL\",\"type\":\"string\",\"internalType\":\"string\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getLockedDeposit\",\"inputs\":[{\"name\":\"disperserKey\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV3.LockedDisperserDeposit\",\"components\":[{\"name\":\"deposit\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"refund\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"lockPeriod\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"name\":\"unlockTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"initialize\",\"inputs\":[{\"name\":\"owner\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"depositParams\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV3.LockedDisperserDeposit\",\"components\":[{\"name\":\"deposit\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"refund\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"lockPeriod\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"registerDisperser\",\"inputs\":[{\"name\":\"disperserAddress\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"disperserURL\",\"type\":\"string\",\"internalType\":\"string\"}],\"outputs\":[{\"name\":\"disperserKey\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setDepositParams\",\"inputs\":[{\"name\":\"depositParams\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV3.LockedDisperserDeposit\",\"components\":[{\"name\":\"deposit\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"refund\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"lockPeriod\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"withdraw\",\"inputs\":[{\"name\":\"disperserKey\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"error\",\"name\":\"AlreadyInitialized\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"MissingRole\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}]}]",
+	Bin: "0x608060405234801561001057600080fd5b50611761806100206000396000f3fe608060405234801561001057600080fd5b50600436106100935760003560e01c80638e1e4829116100665780638e1e48291461010d578063a450815814610122578063aa9224cd14610135578063d5f3e3f214610148578063f2fde38b146101a857600080fd5b80631b4b940a146100985780633fcf1fb4146100c55780634fe5de32146100e55780636923ef3a146100fa575b600080fd5b6100ab6100a636600461136d565b6101bb565b60405163ffffffff90911681526020015b60405180910390f35b6100d86100d3366004611412565b6101d0565b6040516100bc9190611490565b6100f86100f3366004611412565b6101f5565b005b6100f861010836600461154f565b610271565b61011561027d565b6040516100bc919061156b565b6100f86101303660046115a8565b610292565b6100f8610143366004611412565b6102cf565b61015b610156366004611412565b610342565b604080518351815260208085015190820152838201516001600160a01b0316918101919091526060928301516001600160401b03908116938201939093529116608082015260a0016100bc565b6100f86101b63660046115dc565b61035e565b60006101c783836103b3565b90505b92915050565b604080516060808201835260008083526020830152918101919091526101ca82610530565b806101ff81610631565b6001600160a01b0316336001600160a01b0316146102645760405162461bcd60e51b815260206004820152601b60248201527f43616c6c6572206973206e6f742074686520646973706572736572000000000060448201526064015b60405180910390fd5b61026d82610660565b5050565b61027a81610752565b50565b610285611238565b61028d610858565b905090565b61029c60016108b4565b6102c67fe579393920b888b1e4a7e1afdd7d58fa4f3101113547ac874aefa75ff4a960f983610930565b61026d81610752565b806102d981610631565b6001600160a01b0316336001600160a01b0316146103395760405162461bcd60e51b815260206004820152601b60248201527f43616c6c6572206973206e6f7420746865206469737065727365720000000000604482015260640161025b565b61026d8261098c565b61034a611238565b600061035583610aac565b91509150915091565b6103887fe579393920b888b1e4a7e1afdd7d58fa4f3101113547ac874aefa75ff4a960f933610b31565b61027a7fe579393920b888b1e4a7e1afdd7d58fa4f3101113547ac874aefa75ff4a960f93383610b6a565b60006103bd610b83565b905060006103c9610bdf565b63ffffffff831660009081526020919091526040902090506001600160a01b0384166104375760405162461bcd60e51b815260206004820152601960248201527f496e76616c696420646973706572736572206164647265737300000000000000604482015260640161025b565b6104653330610444610bdf565b60010154610450610bdf565b600301546001600160a01b0316929190610be9565b604080516060810182526001600160a01b0386168082526001602080840182905293830187905284546001600160a81b031916909117600160a01b1784558551919284926104b892840191880190611272565b509050506104c4610bdf565b6001810154600280840191909155810154600380840191909155018054600490920180546001600160a01b031981166001600160a01b03909416938417825591546001600160401b03600160a01b9182900416026001600160e01b031990921690921717905592915050565b60408051606080820183526000808352602083015291810191909152610554610bdf565b63ffffffff831660009081526020918252604090819020815160608101835281546001600160a01b0381168252600160a01b900460ff1615159381019390935260018101805491928401916105a8906115f7565b80601f01602080910402602001604051908101604052809291908181526020018280546105d4906115f7565b80156106215780601f106105f657610100808354040283529160200191610621565b820191906000526020600020905b81548152906001019060200180831161060457829003601f168201915b5050505050815250509050919050565b600061063b610bdf565b63ffffffff90921660009081526020929092525060409020546001600160a01b031690565b600061066a610bdf565b63ffffffff8316600090815260209190915260408120915061068a610bdf565b63ffffffff8416600090815260209190915260409020825460029091019150600160a01b900460ff166106ff5760405162461bcd60e51b815260206004820152601860248201527f446973706572736572206e6f7420726567697374657265640000000000000000604482015260640161025b565b815460ff60a01b19168255600281015461072990600160a01b90046001600160401b031642611648565b600592909201805467ffffffffffffffff19166001600160401b03909316929092179091555050565b6020810151815110156107a75760405162461bcd60e51b815260206004820152601f60248201527f4465706f736974206d757374206265206174206c6561737420726566756e6400604482015260640161025b565b60408101516001600160a01b03166107f95760405162461bcd60e51b8152602060048201526015602482015274496e76616c696420746f6b656e206164647265737360581b604482015260640161025b565b80610802610bdf565b81516001820155602082015160028201556040820151600390910180546060909301516001600160401b0316600160a01b026001600160e01b03199093166001600160a01b039092169190911791909117905550565b610860611238565b610868610bdf565b6040805160808101825260018301548152600283015460208201526003909201546001600160a01b03811691830191909152600160a01b90046001600160401b03166060820152919050565b8060ff166108c0610c5a565b5460ff16106108e15760405162dc149f60e41b815260040160405180910390fd5b806108ea610c5a565b805460ff191660ff92831617905560405190821681527f7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb38474024989060200160405180910390a150565b6109518161093c610c64565b60008581526020919091526040902090610c6e565b506040516001600160a01b0382169083907f2ae6a113c0ed5b78a53413ffbb7679881f11145ccfba4fb92e863dfcd5a1d2f390600090a35050565b6000610996610bdf565b63ffffffff831660009081526020919091526040812091506109b6610bdf565b63ffffffff8416600090815260209190915260409020600381015460029091019150610a1d5760405162461bcd60e51b81526020600482015260166024820152754e6f206465706f73697420746f20776974686472617760501b604482015260640161025b565b6005820154426001600160401b039091161115610a7c5760405162461bcd60e51b815260206004820152601760248201527f4465706f736974206973207374696c6c206c6f636b6564000000000000000000604482015260640161025b565b815460018201546002830154610aa0926001600160a01b0391821692911690610c83565b60006001909101555050565b610ab4611238565b600080610abf610bdf565b63ffffffff9094166000908152602094855260409081902060058101548251608081018452600283015481526003830154978101979097526004909101546001600160a01b03811692870192909252600160a01b9091046001600160401b039081166060870152949594169392505050565b610b3b8282610cb3565b61026d576040516301d4003760e61b8152600481018390526001600160a01b038216602482015260440161025b565b610b748383610cd6565b610b7e8382610930565b505050565b600080610b8e610bdf565b6004015463ffffffff169050610ba2610bdf565b600401805463ffffffff16906000610bb983611673565b91906101000a81548163ffffffff021916908363ffffffff160217905550508091505090565b600061028d610d32565b6040516001600160a01b0380851660248301528316604482015260648101829052610c549085906323b872dd60e01b906084015b60408051601f198184030181529190526020810180516001600160e01b03166001600160e01b031990931692909217909152610dd7565b50505050565b600061028d610ea9565b600061028d610ef2565b60006101c7836001600160a01b038416610f3c565b6040516001600160a01b038316602482015260448101829052610b7e90849063a9059cbb60e01b90606401610c1d565b60006101c782610cc1610c64565b60008681526020919091526040902090610f8b565b610cf781610ce2610c64565b60008581526020919091526040902090610fad565b506040516001600160a01b0382169083907f155aaafb6329a2098580462df33ec4b7441b19729b9601c5fc17ae1cf99a8a5290600090a35050565b60008060ff60001b1960016040518060400160405280601b81526020017f656967656e2e64612e6469737065727365722e72656769737472790000000000815250604051602001610d839190611697565b6040516020818303038152906040528051906020012060001c610da691906116b3565b604051602001610db891815260200190565b60408051601f1981840301815291905280516020909101201692915050565b6000610e2c826040518060400160405280602081526020017f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c6564815250856001600160a01b0316610fc29092919063ffffffff16565b805190915015610b7e5780806020019051810190610e4a91906116ca565b610b7e5760405162461bcd60e51b815260206004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e6044820152691bdd081cdd58d8d9595960b21b606482015260840161025b565b60008060ff60001b19600160405180604001604052806015815260200174696e697469616c697a61626c652e73746f7261676560581b815250604051602001610d839190611697565b60008060ff60001b196001604051806040016040528060168152602001756163636573732e636f6e74726f6c2e73746f7261676560501b815250604051602001610d839190611697565b6000818152600183016020526040812054610f83575081546001818101845560008481526020808220909301849055845484825282860190935260409020919091556101ca565b5060006101ca565b6001600160a01b038116600090815260018301602052604081205415156101c7565b60006101c7836001600160a01b038416610fdb565b6060610fd184846000856110ce565b90505b9392505050565b600081815260018301602052604081205480156110c4576000610fff6001836116b3565b8554909150600090611013906001906116b3565b9050818114611078576000866000018281548110611033576110336116ec565b9060005260206000200154905080876000018481548110611056576110566116ec565b6000918252602080832090910192909255918252600188019052604090208390555b855486908061108957611089611702565b6001900381819060005260206000200160009055905585600101600086815260200190815260200160002060009055600193505050506101ca565b60009150506101ca565b60608247101561112f5760405162461bcd60e51b815260206004820152602660248201527f416464726573733a20696e73756666696369656e742062616c616e636520666f6044820152651c8818d85b1b60d21b606482015260840161025b565b6001600160a01b0385163b6111865760405162461bcd60e51b815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e7472616374000000604482015260640161025b565b600080866001600160a01b031685876040516111a29190611697565b60006040518083038185875af1925050503d80600081146111df576040519150601f19603f3d011682016040523d82523d6000602084013e6111e4565b606091505b50915091506111f48282866111ff565b979650505050505050565b6060831561120e575081610fd4565b82511561121e5782518084602001fd5b8160405162461bcd60e51b815260040161025b9190611718565b6040518060800160405280600081526020016000815260200160006001600160a01b0316815260200160006001600160401b031681525090565b82805461127e906115f7565b90600052602060002090601f0160209004810192826112a057600085556112e6565b82601f106112b957805160ff19168380011785556112e6565b828001600101855582156112e6579182015b828111156112e65782518255916020019190600101906112cb565b506112f29291506112f6565b5090565b5b808211156112f257600081556001016112f7565b80356001600160a01b038116811461132257600080fd5b919050565b634e487b7160e01b600052604160045260246000fd5b604051601f8201601f191681016001600160401b038111828210171561136557611365611327565b604052919050565b6000806040838503121561138057600080fd5b6113898361130b565b91506020808401356001600160401b03808211156113a657600080fd5b818601915086601f8301126113ba57600080fd5b8135818111156113cc576113cc611327565b6113de601f8201601f1916850161133d565b915080825287848285010111156113f457600080fd5b80848401858401376000848284010152508093505050509250929050565b60006020828403121561142457600080fd5b813563ffffffff81168114610fd457600080fd5b60005b8381101561145357818101518382015260200161143b565b83811115610c545750506000910152565b6000815180845261147c816020860160208601611438565b601f01601f19169290920160200192915050565b6020815260018060a01b038251166020820152602082015115156040820152600060408301516060808401526114c96080840182611464565b949350505050565b6000608082840312156114e357600080fd5b604051608081016001600160401b03828210818311171561150657611506611327565b8160405282935084358352602085013560208401526115276040860161130b565b604084015260608501359150808216821461154157600080fd5b506060919091015292915050565b60006080828403121561156157600080fd5b6101c783836114d1565b81518152602080830151908201526040808301516001600160a01b0316908201526060808301516001600160401b031690820152608081016101ca565b60008060a083850312156115bb57600080fd5b6115c48361130b565b91506115d384602085016114d1565b90509250929050565b6000602082840312156115ee57600080fd5b6101c78261130b565b600181811c9082168061160b57607f821691505b6020821081141561162c57634e487b7160e01b600052602260045260246000fd5b50919050565b634e487b7160e01b600052601160045260246000fd5b60006001600160401b0380831681851680830382111561166a5761166a611632565b01949350505050565b600063ffffffff8083168181141561168d5761168d611632565b6001019392505050565b600082516116a9818460208701611438565b9190910192915050565b6000828210156116c5576116c5611632565b500390565b6000602082840312156116dc57600080fd5b81518015158114610fd457600080fd5b634e487b7160e01b600052603260045260246000fd5b634e487b7160e01b600052603160045260246000fd5b6020815260006101c7602083018461146456fea2646970667358221220abffb17de5ecdac66da92e6257f4d3009bcb963f09a4717a05f69e9f9678d54064736f6c634300080c0033",
 }
 
 // ContractEigenDADisperserRegistryABI is the input ABI used to generate the binding from.
@@ -207,160 +217,182 @@ func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransac
 	return _ContractEigenDADisperserRegistry.Contract.contract.Transact(opts, method, params...)
 }
 
-// DisperserKeyToAddress is a free data retrieval call binding the contract method 0x07d69fad.
+// GetDepositParams is a free data retrieval call binding the contract method 0x8e1e4829.
 //
-// Solidity: function disperserKeyToAddress(uint32 _key) view returns(address)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryCaller) DisperserKeyToAddress(opts *bind.CallOpts, _key uint32) (common.Address, error) {
+// Solidity: function getDepositParams() view returns((uint256,uint256,address,uint64))
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryCaller) GetDepositParams(opts *bind.CallOpts) (EigenDATypesV3LockedDisperserDeposit, error) {
 	var out []interface{}
-	err := _ContractEigenDADisperserRegistry.contract.Call(opts, &out, "disperserKeyToAddress", _key)
+	err := _ContractEigenDADisperserRegistry.contract.Call(opts, &out, "getDepositParams")
 
 	if err != nil {
-		return *new(common.Address), err
+		return *new(EigenDATypesV3LockedDisperserDeposit), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+	out0 := *abi.ConvertType(out[0], new(EigenDATypesV3LockedDisperserDeposit)).(*EigenDATypesV3LockedDisperserDeposit)
 
 	return out0, err
 
 }
 
-// DisperserKeyToAddress is a free data retrieval call binding the contract method 0x07d69fad.
+// GetDepositParams is a free data retrieval call binding the contract method 0x8e1e4829.
 //
-// Solidity: function disperserKeyToAddress(uint32 _key) view returns(address)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistrySession) DisperserKeyToAddress(_key uint32) (common.Address, error) {
-	return _ContractEigenDADisperserRegistry.Contract.DisperserKeyToAddress(&_ContractEigenDADisperserRegistry.CallOpts, _key)
+// Solidity: function getDepositParams() view returns((uint256,uint256,address,uint64))
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistrySession) GetDepositParams() (EigenDATypesV3LockedDisperserDeposit, error) {
+	return _ContractEigenDADisperserRegistry.Contract.GetDepositParams(&_ContractEigenDADisperserRegistry.CallOpts)
 }
 
-// DisperserKeyToAddress is a free data retrieval call binding the contract method 0x07d69fad.
+// GetDepositParams is a free data retrieval call binding the contract method 0x8e1e4829.
 //
-// Solidity: function disperserKeyToAddress(uint32 _key) view returns(address)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryCallerSession) DisperserKeyToAddress(_key uint32) (common.Address, error) {
-	return _ContractEigenDADisperserRegistry.Contract.DisperserKeyToAddress(&_ContractEigenDADisperserRegistry.CallOpts, _key)
+// Solidity: function getDepositParams() view returns((uint256,uint256,address,uint64))
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryCallerSession) GetDepositParams() (EigenDATypesV3LockedDisperserDeposit, error) {
+	return _ContractEigenDADisperserRegistry.Contract.GetDepositParams(&_ContractEigenDADisperserRegistry.CallOpts)
 }
 
-// DisperserKeyToInfo is a free data retrieval call binding the contract method 0x1e0bf73c.
+// GetDisperserInfo is a free data retrieval call binding the contract method 0x3fcf1fb4.
 //
-// Solidity: function disperserKeyToInfo(uint32 ) view returns(address disperserAddress)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryCaller) DisperserKeyToInfo(opts *bind.CallOpts, arg0 uint32) (common.Address, error) {
+// Solidity: function getDisperserInfo(uint32 disperserKey) view returns((address,bool,string))
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryCaller) GetDisperserInfo(opts *bind.CallOpts, disperserKey uint32) (EigenDATypesV3DisperserInfo, error) {
 	var out []interface{}
-	err := _ContractEigenDADisperserRegistry.contract.Call(opts, &out, "disperserKeyToInfo", arg0)
+	err := _ContractEigenDADisperserRegistry.contract.Call(opts, &out, "getDisperserInfo", disperserKey)
 
 	if err != nil {
-		return *new(common.Address), err
+		return *new(EigenDATypesV3DisperserInfo), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+	out0 := *abi.ConvertType(out[0], new(EigenDATypesV3DisperserInfo)).(*EigenDATypesV3DisperserInfo)
 
 	return out0, err
 
 }
 
-// DisperserKeyToInfo is a free data retrieval call binding the contract method 0x1e0bf73c.
+// GetDisperserInfo is a free data retrieval call binding the contract method 0x3fcf1fb4.
 //
-// Solidity: function disperserKeyToInfo(uint32 ) view returns(address disperserAddress)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistrySession) DisperserKeyToInfo(arg0 uint32) (common.Address, error) {
-	return _ContractEigenDADisperserRegistry.Contract.DisperserKeyToInfo(&_ContractEigenDADisperserRegistry.CallOpts, arg0)
+// Solidity: function getDisperserInfo(uint32 disperserKey) view returns((address,bool,string))
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistrySession) GetDisperserInfo(disperserKey uint32) (EigenDATypesV3DisperserInfo, error) {
+	return _ContractEigenDADisperserRegistry.Contract.GetDisperserInfo(&_ContractEigenDADisperserRegistry.CallOpts, disperserKey)
 }
 
-// DisperserKeyToInfo is a free data retrieval call binding the contract method 0x1e0bf73c.
+// GetDisperserInfo is a free data retrieval call binding the contract method 0x3fcf1fb4.
 //
-// Solidity: function disperserKeyToInfo(uint32 ) view returns(address disperserAddress)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryCallerSession) DisperserKeyToInfo(arg0 uint32) (common.Address, error) {
-	return _ContractEigenDADisperserRegistry.Contract.DisperserKeyToInfo(&_ContractEigenDADisperserRegistry.CallOpts, arg0)
+// Solidity: function getDisperserInfo(uint32 disperserKey) view returns((address,bool,string))
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryCallerSession) GetDisperserInfo(disperserKey uint32) (EigenDATypesV3DisperserInfo, error) {
+	return _ContractEigenDADisperserRegistry.Contract.GetDisperserInfo(&_ContractEigenDADisperserRegistry.CallOpts, disperserKey)
 }
 
-// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+// GetLockedDeposit is a free data retrieval call binding the contract method 0xd5f3e3f2.
 //
-// Solidity: function owner() view returns(address)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
+// Solidity: function getLockedDeposit(uint32 disperserKey) view returns((uint256,uint256,address,uint64), uint64 unlockTimestamp)
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryCaller) GetLockedDeposit(opts *bind.CallOpts, disperserKey uint32) (EigenDATypesV3LockedDisperserDeposit, uint64, error) {
 	var out []interface{}
-	err := _ContractEigenDADisperserRegistry.contract.Call(opts, &out, "owner")
+	err := _ContractEigenDADisperserRegistry.contract.Call(opts, &out, "getLockedDeposit", disperserKey)
 
 	if err != nil {
-		return *new(common.Address), err
+		return *new(EigenDATypesV3LockedDisperserDeposit), *new(uint64), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+	out0 := *abi.ConvertType(out[0], new(EigenDATypesV3LockedDisperserDeposit)).(*EigenDATypesV3LockedDisperserDeposit)
+	out1 := *abi.ConvertType(out[1], new(uint64)).(*uint64)
 
-	return out0, err
+	return out0, out1, err
 
 }
 
-// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+// GetLockedDeposit is a free data retrieval call binding the contract method 0xd5f3e3f2.
 //
-// Solidity: function owner() view returns(address)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistrySession) Owner() (common.Address, error) {
-	return _ContractEigenDADisperserRegistry.Contract.Owner(&_ContractEigenDADisperserRegistry.CallOpts)
+// Solidity: function getLockedDeposit(uint32 disperserKey) view returns((uint256,uint256,address,uint64), uint64 unlockTimestamp)
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistrySession) GetLockedDeposit(disperserKey uint32) (EigenDATypesV3LockedDisperserDeposit, uint64, error) {
+	return _ContractEigenDADisperserRegistry.Contract.GetLockedDeposit(&_ContractEigenDADisperserRegistry.CallOpts, disperserKey)
 }
 
-// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+// GetLockedDeposit is a free data retrieval call binding the contract method 0xd5f3e3f2.
 //
-// Solidity: function owner() view returns(address)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryCallerSession) Owner() (common.Address, error) {
-	return _ContractEigenDADisperserRegistry.Contract.Owner(&_ContractEigenDADisperserRegistry.CallOpts)
+// Solidity: function getLockedDeposit(uint32 disperserKey) view returns((uint256,uint256,address,uint64), uint64 unlockTimestamp)
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryCallerSession) GetLockedDeposit(disperserKey uint32) (EigenDATypesV3LockedDisperserDeposit, uint64, error) {
+	return _ContractEigenDADisperserRegistry.Contract.GetLockedDeposit(&_ContractEigenDADisperserRegistry.CallOpts, disperserKey)
 }
 
-// Initialize is a paid mutator transaction binding the contract method 0xc4d66de8.
+// DeregisterDisperser is a paid mutator transaction binding the contract method 0x4fe5de32.
 //
-// Solidity: function initialize(address _initialOwner) returns()
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransactor) Initialize(opts *bind.TransactOpts, _initialOwner common.Address) (*types.Transaction, error) {
-	return _ContractEigenDADisperserRegistry.contract.Transact(opts, "initialize", _initialOwner)
+// Solidity: function deregisterDisperser(uint32 disperserKey) returns()
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransactor) DeregisterDisperser(opts *bind.TransactOpts, disperserKey uint32) (*types.Transaction, error) {
+	return _ContractEigenDADisperserRegistry.contract.Transact(opts, "deregisterDisperser", disperserKey)
 }
 
-// Initialize is a paid mutator transaction binding the contract method 0xc4d66de8.
+// DeregisterDisperser is a paid mutator transaction binding the contract method 0x4fe5de32.
 //
-// Solidity: function initialize(address _initialOwner) returns()
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistrySession) Initialize(_initialOwner common.Address) (*types.Transaction, error) {
-	return _ContractEigenDADisperserRegistry.Contract.Initialize(&_ContractEigenDADisperserRegistry.TransactOpts, _initialOwner)
+// Solidity: function deregisterDisperser(uint32 disperserKey) returns()
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistrySession) DeregisterDisperser(disperserKey uint32) (*types.Transaction, error) {
+	return _ContractEigenDADisperserRegistry.Contract.DeregisterDisperser(&_ContractEigenDADisperserRegistry.TransactOpts, disperserKey)
 }
 
-// Initialize is a paid mutator transaction binding the contract method 0xc4d66de8.
+// DeregisterDisperser is a paid mutator transaction binding the contract method 0x4fe5de32.
 //
-// Solidity: function initialize(address _initialOwner) returns()
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransactorSession) Initialize(_initialOwner common.Address) (*types.Transaction, error) {
-	return _ContractEigenDADisperserRegistry.Contract.Initialize(&_ContractEigenDADisperserRegistry.TransactOpts, _initialOwner)
+// Solidity: function deregisterDisperser(uint32 disperserKey) returns()
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransactorSession) DeregisterDisperser(disperserKey uint32) (*types.Transaction, error) {
+	return _ContractEigenDADisperserRegistry.Contract.DeregisterDisperser(&_ContractEigenDADisperserRegistry.TransactOpts, disperserKey)
 }
 
-// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
+// Initialize is a paid mutator transaction binding the contract method 0xa4508158.
 //
-// Solidity: function renounceOwnership() returns()
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransactor) RenounceOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _ContractEigenDADisperserRegistry.contract.Transact(opts, "renounceOwnership")
+// Solidity: function initialize(address owner, (uint256,uint256,address,uint64) depositParams) returns()
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransactor) Initialize(opts *bind.TransactOpts, owner common.Address, depositParams EigenDATypesV3LockedDisperserDeposit) (*types.Transaction, error) {
+	return _ContractEigenDADisperserRegistry.contract.Transact(opts, "initialize", owner, depositParams)
 }
 
-// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
+// Initialize is a paid mutator transaction binding the contract method 0xa4508158.
 //
-// Solidity: function renounceOwnership() returns()
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistrySession) RenounceOwnership() (*types.Transaction, error) {
-	return _ContractEigenDADisperserRegistry.Contract.RenounceOwnership(&_ContractEigenDADisperserRegistry.TransactOpts)
+// Solidity: function initialize(address owner, (uint256,uint256,address,uint64) depositParams) returns()
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistrySession) Initialize(owner common.Address, depositParams EigenDATypesV3LockedDisperserDeposit) (*types.Transaction, error) {
+	return _ContractEigenDADisperserRegistry.Contract.Initialize(&_ContractEigenDADisperserRegistry.TransactOpts, owner, depositParams)
 }
 
-// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
+// Initialize is a paid mutator transaction binding the contract method 0xa4508158.
 //
-// Solidity: function renounceOwnership() returns()
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransactorSession) RenounceOwnership() (*types.Transaction, error) {
-	return _ContractEigenDADisperserRegistry.Contract.RenounceOwnership(&_ContractEigenDADisperserRegistry.TransactOpts)
+// Solidity: function initialize(address owner, (uint256,uint256,address,uint64) depositParams) returns()
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransactorSession) Initialize(owner common.Address, depositParams EigenDATypesV3LockedDisperserDeposit) (*types.Transaction, error) {
+	return _ContractEigenDADisperserRegistry.Contract.Initialize(&_ContractEigenDADisperserRegistry.TransactOpts, owner, depositParams)
 }
 
-// SetDisperserInfo is a paid mutator transaction binding the contract method 0x9a0f62a0.
+// RegisterDisperser is a paid mutator transaction binding the contract method 0x1b4b940a.
 //
-// Solidity: function setDisperserInfo(uint32 _disperserKey, (address) _disperserInfo) returns()
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransactor) SetDisperserInfo(opts *bind.TransactOpts, _disperserKey uint32, _disperserInfo EigenDATypesV2DisperserInfo) (*types.Transaction, error) {
-	return _ContractEigenDADisperserRegistry.contract.Transact(opts, "setDisperserInfo", _disperserKey, _disperserInfo)
+// Solidity: function registerDisperser(address disperserAddress, string disperserURL) returns(uint32 disperserKey)
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransactor) RegisterDisperser(opts *bind.TransactOpts, disperserAddress common.Address, disperserURL string) (*types.Transaction, error) {
+	return _ContractEigenDADisperserRegistry.contract.Transact(opts, "registerDisperser", disperserAddress, disperserURL)
 }
 
-// SetDisperserInfo is a paid mutator transaction binding the contract method 0x9a0f62a0.
+// RegisterDisperser is a paid mutator transaction binding the contract method 0x1b4b940a.
 //
-// Solidity: function setDisperserInfo(uint32 _disperserKey, (address) _disperserInfo) returns()
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistrySession) SetDisperserInfo(_disperserKey uint32, _disperserInfo EigenDATypesV2DisperserInfo) (*types.Transaction, error) {
-	return _ContractEigenDADisperserRegistry.Contract.SetDisperserInfo(&_ContractEigenDADisperserRegistry.TransactOpts, _disperserKey, _disperserInfo)
+// Solidity: function registerDisperser(address disperserAddress, string disperserURL) returns(uint32 disperserKey)
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistrySession) RegisterDisperser(disperserAddress common.Address, disperserURL string) (*types.Transaction, error) {
+	return _ContractEigenDADisperserRegistry.Contract.RegisterDisperser(&_ContractEigenDADisperserRegistry.TransactOpts, disperserAddress, disperserURL)
 }
 
-// SetDisperserInfo is a paid mutator transaction binding the contract method 0x9a0f62a0.
+// RegisterDisperser is a paid mutator transaction binding the contract method 0x1b4b940a.
 //
-// Solidity: function setDisperserInfo(uint32 _disperserKey, (address) _disperserInfo) returns()
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransactorSession) SetDisperserInfo(_disperserKey uint32, _disperserInfo EigenDATypesV2DisperserInfo) (*types.Transaction, error) {
-	return _ContractEigenDADisperserRegistry.Contract.SetDisperserInfo(&_ContractEigenDADisperserRegistry.TransactOpts, _disperserKey, _disperserInfo)
+// Solidity: function registerDisperser(address disperserAddress, string disperserURL) returns(uint32 disperserKey)
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransactorSession) RegisterDisperser(disperserAddress common.Address, disperserURL string) (*types.Transaction, error) {
+	return _ContractEigenDADisperserRegistry.Contract.RegisterDisperser(&_ContractEigenDADisperserRegistry.TransactOpts, disperserAddress, disperserURL)
+}
+
+// SetDepositParams is a paid mutator transaction binding the contract method 0x6923ef3a.
+//
+// Solidity: function setDepositParams((uint256,uint256,address,uint64) depositParams) returns()
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransactor) SetDepositParams(opts *bind.TransactOpts, depositParams EigenDATypesV3LockedDisperserDeposit) (*types.Transaction, error) {
+	return _ContractEigenDADisperserRegistry.contract.Transact(opts, "setDepositParams", depositParams)
+}
+
+// SetDepositParams is a paid mutator transaction binding the contract method 0x6923ef3a.
+//
+// Solidity: function setDepositParams((uint256,uint256,address,uint64) depositParams) returns()
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistrySession) SetDepositParams(depositParams EigenDATypesV3LockedDisperserDeposit) (*types.Transaction, error) {
+	return _ContractEigenDADisperserRegistry.Contract.SetDepositParams(&_ContractEigenDADisperserRegistry.TransactOpts, depositParams)
+}
+
+// SetDepositParams is a paid mutator transaction binding the contract method 0x6923ef3a.
+//
+// Solidity: function setDepositParams((uint256,uint256,address,uint64) depositParams) returns()
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransactorSession) SetDepositParams(depositParams EigenDATypesV3LockedDisperserDeposit) (*types.Transaction, error) {
+	return _ContractEigenDADisperserRegistry.Contract.SetDepositParams(&_ContractEigenDADisperserRegistry.TransactOpts, depositParams)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
@@ -384,442 +416,23 @@ func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransac
 	return _ContractEigenDADisperserRegistry.Contract.TransferOwnership(&_ContractEigenDADisperserRegistry.TransactOpts, newOwner)
 }
 
-// ContractEigenDADisperserRegistryDisperserAddedIterator is returned from FilterDisperserAdded and is used to iterate over the raw logs and unpacked data for DisperserAdded events raised by the ContractEigenDADisperserRegistry contract.
-type ContractEigenDADisperserRegistryDisperserAddedIterator struct {
-	Event *ContractEigenDADisperserRegistryDisperserAdded // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *ContractEigenDADisperserRegistryDisperserAddedIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(ContractEigenDADisperserRegistryDisperserAdded)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(ContractEigenDADisperserRegistryDisperserAdded)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractEigenDADisperserRegistryDisperserAddedIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *ContractEigenDADisperserRegistryDisperserAddedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// ContractEigenDADisperserRegistryDisperserAdded represents a DisperserAdded event raised by the ContractEigenDADisperserRegistry contract.
-type ContractEigenDADisperserRegistryDisperserAdded struct {
-	Key       uint32
-	Disperser common.Address
-	Raw       types.Log // Blockchain specific contextual infos
-}
-
-// FilterDisperserAdded is a free log retrieval operation binding the contract event 0x97fb4432fef273711f9ccc876095cf8e22b00f159658bbd807a8ea80a4c3c859.
+// Withdraw is a paid mutator transaction binding the contract method 0xaa9224cd.
 //
-// Solidity: event DisperserAdded(uint32 indexed key, address indexed disperser)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryFilterer) FilterDisperserAdded(opts *bind.FilterOpts, key []uint32, disperser []common.Address) (*ContractEigenDADisperserRegistryDisperserAddedIterator, error) {
-
-	var keyRule []interface{}
-	for _, keyItem := range key {
-		keyRule = append(keyRule, keyItem)
-	}
-	var disperserRule []interface{}
-	for _, disperserItem := range disperser {
-		disperserRule = append(disperserRule, disperserItem)
-	}
-
-	logs, sub, err := _ContractEigenDADisperserRegistry.contract.FilterLogs(opts, "DisperserAdded", keyRule, disperserRule)
-	if err != nil {
-		return nil, err
-	}
-	return &ContractEigenDADisperserRegistryDisperserAddedIterator{contract: _ContractEigenDADisperserRegistry.contract, event: "DisperserAdded", logs: logs, sub: sub}, nil
+// Solidity: function withdraw(uint32 disperserKey) returns()
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransactor) Withdraw(opts *bind.TransactOpts, disperserKey uint32) (*types.Transaction, error) {
+	return _ContractEigenDADisperserRegistry.contract.Transact(opts, "withdraw", disperserKey)
 }
 
-// WatchDisperserAdded is a free log subscription operation binding the contract event 0x97fb4432fef273711f9ccc876095cf8e22b00f159658bbd807a8ea80a4c3c859.
+// Withdraw is a paid mutator transaction binding the contract method 0xaa9224cd.
 //
-// Solidity: event DisperserAdded(uint32 indexed key, address indexed disperser)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryFilterer) WatchDisperserAdded(opts *bind.WatchOpts, sink chan<- *ContractEigenDADisperserRegistryDisperserAdded, key []uint32, disperser []common.Address) (event.Subscription, error) {
-
-	var keyRule []interface{}
-	for _, keyItem := range key {
-		keyRule = append(keyRule, keyItem)
-	}
-	var disperserRule []interface{}
-	for _, disperserItem := range disperser {
-		disperserRule = append(disperserRule, disperserItem)
-	}
-
-	logs, sub, err := _ContractEigenDADisperserRegistry.contract.WatchLogs(opts, "DisperserAdded", keyRule, disperserRule)
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(ContractEigenDADisperserRegistryDisperserAdded)
-				if err := _ContractEigenDADisperserRegistry.contract.UnpackLog(event, "DisperserAdded", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
+// Solidity: function withdraw(uint32 disperserKey) returns()
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistrySession) Withdraw(disperserKey uint32) (*types.Transaction, error) {
+	return _ContractEigenDADisperserRegistry.Contract.Withdraw(&_ContractEigenDADisperserRegistry.TransactOpts, disperserKey)
 }
 
-// ParseDisperserAdded is a log parse operation binding the contract event 0x97fb4432fef273711f9ccc876095cf8e22b00f159658bbd807a8ea80a4c3c859.
+// Withdraw is a paid mutator transaction binding the contract method 0xaa9224cd.
 //
-// Solidity: event DisperserAdded(uint32 indexed key, address indexed disperser)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryFilterer) ParseDisperserAdded(log types.Log) (*ContractEigenDADisperserRegistryDisperserAdded, error) {
-	event := new(ContractEigenDADisperserRegistryDisperserAdded)
-	if err := _ContractEigenDADisperserRegistry.contract.UnpackLog(event, "DisperserAdded", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-// ContractEigenDADisperserRegistryInitializedIterator is returned from FilterInitialized and is used to iterate over the raw logs and unpacked data for Initialized events raised by the ContractEigenDADisperserRegistry contract.
-type ContractEigenDADisperserRegistryInitializedIterator struct {
-	Event *ContractEigenDADisperserRegistryInitialized // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *ContractEigenDADisperserRegistryInitializedIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(ContractEigenDADisperserRegistryInitialized)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(ContractEigenDADisperserRegistryInitialized)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractEigenDADisperserRegistryInitializedIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *ContractEigenDADisperserRegistryInitializedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// ContractEigenDADisperserRegistryInitialized represents a Initialized event raised by the ContractEigenDADisperserRegistry contract.
-type ContractEigenDADisperserRegistryInitialized struct {
-	Version uint8
-	Raw     types.Log // Blockchain specific contextual infos
-}
-
-// FilterInitialized is a free log retrieval operation binding the contract event 0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498.
-//
-// Solidity: event Initialized(uint8 version)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryFilterer) FilterInitialized(opts *bind.FilterOpts) (*ContractEigenDADisperserRegistryInitializedIterator, error) {
-
-	logs, sub, err := _ContractEigenDADisperserRegistry.contract.FilterLogs(opts, "Initialized")
-	if err != nil {
-		return nil, err
-	}
-	return &ContractEigenDADisperserRegistryInitializedIterator{contract: _ContractEigenDADisperserRegistry.contract, event: "Initialized", logs: logs, sub: sub}, nil
-}
-
-// WatchInitialized is a free log subscription operation binding the contract event 0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498.
-//
-// Solidity: event Initialized(uint8 version)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryFilterer) WatchInitialized(opts *bind.WatchOpts, sink chan<- *ContractEigenDADisperserRegistryInitialized) (event.Subscription, error) {
-
-	logs, sub, err := _ContractEigenDADisperserRegistry.contract.WatchLogs(opts, "Initialized")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(ContractEigenDADisperserRegistryInitialized)
-				if err := _ContractEigenDADisperserRegistry.contract.UnpackLog(event, "Initialized", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-// ParseInitialized is a log parse operation binding the contract event 0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498.
-//
-// Solidity: event Initialized(uint8 version)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryFilterer) ParseInitialized(log types.Log) (*ContractEigenDADisperserRegistryInitialized, error) {
-	event := new(ContractEigenDADisperserRegistryInitialized)
-	if err := _ContractEigenDADisperserRegistry.contract.UnpackLog(event, "Initialized", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-// ContractEigenDADisperserRegistryOwnershipTransferredIterator is returned from FilterOwnershipTransferred and is used to iterate over the raw logs and unpacked data for OwnershipTransferred events raised by the ContractEigenDADisperserRegistry contract.
-type ContractEigenDADisperserRegistryOwnershipTransferredIterator struct {
-	Event *ContractEigenDADisperserRegistryOwnershipTransferred // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *ContractEigenDADisperserRegistryOwnershipTransferredIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(ContractEigenDADisperserRegistryOwnershipTransferred)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(ContractEigenDADisperserRegistryOwnershipTransferred)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractEigenDADisperserRegistryOwnershipTransferredIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *ContractEigenDADisperserRegistryOwnershipTransferredIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// ContractEigenDADisperserRegistryOwnershipTransferred represents a OwnershipTransferred event raised by the ContractEigenDADisperserRegistry contract.
-type ContractEigenDADisperserRegistryOwnershipTransferred struct {
-	PreviousOwner common.Address
-	NewOwner      common.Address
-	Raw           types.Log // Blockchain specific contextual infos
-}
-
-// FilterOwnershipTransferred is a free log retrieval operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
-//
-// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*ContractEigenDADisperserRegistryOwnershipTransferredIterator, error) {
-
-	var previousOwnerRule []interface{}
-	for _, previousOwnerItem := range previousOwner {
-		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
-	}
-	var newOwnerRule []interface{}
-	for _, newOwnerItem := range newOwner {
-		newOwnerRule = append(newOwnerRule, newOwnerItem)
-	}
-
-	logs, sub, err := _ContractEigenDADisperserRegistry.contract.FilterLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
-	if err != nil {
-		return nil, err
-	}
-	return &ContractEigenDADisperserRegistryOwnershipTransferredIterator{contract: _ContractEigenDADisperserRegistry.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
-}
-
-// WatchOwnershipTransferred is a free log subscription operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
-//
-// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *ContractEigenDADisperserRegistryOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
-
-	var previousOwnerRule []interface{}
-	for _, previousOwnerItem := range previousOwner {
-		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
-	}
-	var newOwnerRule []interface{}
-	for _, newOwnerItem := range newOwner {
-		newOwnerRule = append(newOwnerRule, newOwnerItem)
-	}
-
-	logs, sub, err := _ContractEigenDADisperserRegistry.contract.WatchLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(ContractEigenDADisperserRegistryOwnershipTransferred)
-				if err := _ContractEigenDADisperserRegistry.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-// ParseOwnershipTransferred is a log parse operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
-//
-// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
-func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryFilterer) ParseOwnershipTransferred(log types.Log) (*ContractEigenDADisperserRegistryOwnershipTransferred, error) {
-	event := new(ContractEigenDADisperserRegistryOwnershipTransferred)
-	if err := _ContractEigenDADisperserRegistry.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
+// Solidity: function withdraw(uint32 disperserKey) returns()
+func (_ContractEigenDADisperserRegistry *ContractEigenDADisperserRegistryTransactorSession) Withdraw(disperserKey uint32) (*types.Transaction, error) {
+	return _ContractEigenDADisperserRegistry.Contract.Withdraw(&_ContractEigenDADisperserRegistry.TransactOpts, disperserKey)
 }

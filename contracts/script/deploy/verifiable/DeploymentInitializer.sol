@@ -178,7 +178,6 @@ contract DeploymentInitializer {
         upgrade(PAYMENT_VAULT, PAYMENT_VAULT_IMPL);
 
         upgrade(DISPERSER_REGISTRY, DISPERSER_REGISTRY_IMPL);
-        EigenDADisperserRegistry(DISPERSER_REGISTRY).initialize(INITIAL_OWNER);
 
         upgrade(SERVICE_MANAGER, SERVICE_MANAGER_IMPL);
         EigenDAServiceManager(SERVICE_MANAGER).initialize(
