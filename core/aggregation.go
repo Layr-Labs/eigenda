@@ -206,8 +206,8 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 				"operatorAddress", operatorAddr,
 				"socket", socket,
 				"batchHeaderHash", batchHeaderHashHex,
-				"err", r.Err,
-				"attestationLatencyMs", r.AttestationLatencyMs)
+				"attestationLatencyMs", r.AttestationLatencyMs,
+				"err", r.Err)
 			continue
 		}
 
@@ -262,7 +262,8 @@ func (a *StdSignatureAggregator) ReceiveSignatures(
 			"operatorAddress", operatorAddr,
 			"socket", socket,
 			"quorumIDs", fmt.Sprint(operatorQuorums),
-			"batchHeaderHash", batchHeaderHashHex)
+			"batchHeaderHash", batchHeaderHashHex,
+			"attestationLatencyMs", r.AttestationLatencyMs)
 	}
 
 	// Aggregate Non signer Pubkey Id
