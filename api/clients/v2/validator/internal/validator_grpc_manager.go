@@ -31,9 +31,9 @@ type ValidatorGRPCManagerFactory func(
 	operatorInfo map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo,
 ) ValidatorGRPCManager
 
-var _ ValidatorGRPCManager = (*validatorGRPCManager)(nil)
+var _ ValidatorGRPCManager = &validatorGRPCManager{}
 
-// validatorGRPCManager is a standalone implementation of the ValidatorGRPCManager interface.
+// validatorGRPCManager is a standard implementation of the ValidatorGRPCManager interface.
 type validatorGRPCManager struct {
 	logger logging.Logger
 

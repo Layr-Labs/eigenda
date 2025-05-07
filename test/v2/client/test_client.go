@@ -513,6 +513,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		blobHeader.Version,
 		*commitment,
 		eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+		eigenDACert.BatchHeader.ReferenceBlockNumber,
 		payload,
 		0,
 		true)
@@ -606,15 +607,6 @@ func (c *TestClient) ReadBlobFromRelay(
 	return nil
 }
 
-// GetCurrentBlockNumber retrieves the current block number from the indexed chain state.
-func (c *TestClient) GetCurrentBlockNumber(ctx context.Context) (uint64, error) {
-	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get current block number: %w", err)
-	}
-	return uint64(currentBlockNumber), nil
-}
-
 // ReadBlobFromValidators reads a blob from the validators and compares it to the given payload.
 //
 // The timeout provided is a timeout for each read from a quorum, not all reads as a whole.
@@ -624,23 +616,19 @@ func (c *TestClient) ReadBlobFromValidators(
 	blobVersion corev2.BlobVersion,
 	blobCommitments encoding.BlobCommitments,
 	quorums []core.QuorumID,
+	referenceBlockNumber uint32,
 	expectedPayloadBytes []byte,
 	timeout time.Duration,
 	validateAndDecode bool) error {
 
-	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get current block number: %w", err)
-	}
-
 	for _, quorumID := range quorums {
-		err = c.ReadBlobFromValidatorsInQuorum(
+		err := c.ReadBlobFromValidatorsInQuorum(
 			ctx,
 			blobKey,
 			blobVersion,
 			blobCommitments,
 			quorumID,
-			uint64(currentBlockNumber),
+			referenceBlockNumber,
 			expectedPayloadBytes,
 			timeout,
 			validateAndDecode)
@@ -660,7 +648,7 @@ func (c *TestClient) ReadBlobFromValidatorsInQuorum(
 	blobVersion corev2.BlobVersion,
 	blobCommitments encoding.BlobCommitments,
 	quorumID core.QuorumID,
-	currentBlockNumber uint64,
+	referenceBlockNumber uint32,
 	expectedPayloadBytes []byte,
 	timeout time.Duration,
 	validateAndDecode bool) error {
@@ -679,7 +667,7 @@ func (c *TestClient) ReadBlobFromValidatorsInQuorum(
 			blobKey,
 			blobVersion,
 			blobCommitments,
-			currentBlockNumber,
+			uint64(referenceBlockNumber),
 			quorumID)
 		if err != nil {
 			return fmt.Errorf("failed to read blob from validators, %s", err)
@@ -711,7 +699,7 @@ func (c *TestClient) ReadBlobFromValidatorsInQuorum(
 			blobKey,
 			blobVersion,
 			blobCommitments,
-			currentBlockNumber,
+			uint64(referenceBlockNumber),
 			quorumID)
 		if err != nil {
 			return fmt.Errorf("failed to read blob from validators: %w", err)

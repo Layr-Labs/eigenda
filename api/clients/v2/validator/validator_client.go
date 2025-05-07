@@ -141,14 +141,13 @@ func (c *validatorClient) GetBlob(
 		&encodingParams,
 		quorumID,
 		blobKey,
-		c.verifier,
 		&blobCommitments,
 		probe)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create retrieval worker: %w", err)
 	}
 
-	data, err := worker.downloadBlobFromValidators()
+	data, err := worker.retrieveBlobFromValidators()
 	if err != nil {
 		return nil, fmt.Errorf("failed to download blob from validators: %w", err)
 	}

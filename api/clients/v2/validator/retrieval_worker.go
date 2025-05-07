@@ -98,11 +98,11 @@ const (
 // retrievalWorker implements the distributed retrieval process for a specified blob (i.e. reading the blobs from
 // validators). It is responsible for coordinating the lifecycle of this retrieval workflow.
 type retrievalWorker struct {
-	ctx                  context.Context
-	downloadAndVerifyCtx context.Context
-	cancel               context.CancelFunc
-	logger               logging.Logger
-	config               *ValidatorClientConfig
+	ctx                     context.Context
+	downloadAndVerifyCtx    context.Context
+	downloadAndVerifyCancel context.CancelFunc
+	logger                  logging.Logger
+	config                  *ValidatorClientConfig
 
 	// Responsible for talking to the validator nodes via gRPCs.
 	validatorGRPCManager internal.ValidatorGRPCManager
@@ -131,9 +131,6 @@ type retrievalWorker struct {
 	// The blob key to download.
 	blobKey v2.BlobKey
 
-	// Verifies chunk data.
-	verifier encoding.Verifier
-
 	// The commitments for the blob.
 	blobCommitments *encoding.BlobCommitments
 
@@ -153,7 +150,7 @@ type retrievalWorker struct {
 	probe *common.SequenceProbe
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////
-	// All variables below this line are for use only on the downloadBlobFromValidators() goroutine  //
+	// All variables below this line are for use only on the retrieveBlobFromValidators() goroutine  //
 	///////////////////////////////////////////////////////////////////////////////////////////////////
 
 	// The order in which to download chunks from the operators.
@@ -199,22 +196,22 @@ type downloadStarted struct {
 
 // downloadCompleted is used to signal that a download of chunk data has completed.
 type downloadCompleted struct {
-	OperatorID core.OperatorID
-	Reply      *grpcnode.GetChunksReply
-	Err        error
+	operatorID core.OperatorID
+	reply      *grpcnode.GetChunksReply
+	err        error
 }
 
 // verificationCompleted is used to signal that verification of chunk data has completed.
 type verificationCompleted struct {
-	OperatorID core.OperatorID
+	operatorID core.OperatorID
 	chunks     []*encoding.Frame
-	Err        error
+	err        error
 }
 
 // decodeCompleted is used to signal that decoding of chunk data has completed.
 type decodeCompleted struct {
-	Blob []byte
-	Err  error
+	blob []byte
+	err  error
 }
 
 // newRetrievalWorker creates a new retrieval worker.
@@ -233,7 +230,6 @@ func newRetrievalWorker(
 	encodingParams *encoding.EncodingParams,
 	quorumID core.QuorumID,
 	blobKey v2.BlobKey,
-	verifier encoding.Verifier,
 	blobCommitments *encoding.BlobCommitments,
 	probe *common.SequenceProbe,
 ) (*retrievalWorker, error) {
@@ -258,7 +254,7 @@ func newRetrievalWorker(
 	// of chunks have been downloaded and verified. This causes all ongoing downloads and verifications to be
 	// aborted (if possible), since they are not needed. There are other operations that require a context after
 	// the downloadAndVerifyCtx is cancelled, so we need to keep a reference the original context as well.
-	downloadAndVerifyCtx, cancel := context.WithCancel(ctx)
+	downloadAndVerifyCtx, downloadAndVerifyCancel := context.WithCancel(ctx)
 
 	chunkStatusMap := make(map[core.OperatorID]chunkStatus)
 	chunkStatusCounts := make(map[chunkStatus]int)
@@ -273,7 +269,7 @@ func newRetrievalWorker(
 	worker := &retrievalWorker{
 		ctx:                       ctx,
 		downloadAndVerifyCtx:      downloadAndVerifyCtx,
-		cancel:                    cancel,
+		downloadAndVerifyCancel:   downloadAndVerifyCancel,
 		logger:                    logger,
 		config:                    config,
 		connectionPool:            connectionPool,
@@ -282,7 +278,6 @@ func newRetrievalWorker(
 		assignments:               assignments,
 		quorumID:                  quorumID,
 		blobKey:                   blobKey,
-		verifier:                  verifier,
 		blobCommitments:           blobCommitments,
 		downloadStartedChan:       make(chan *downloadStarted, len(assignments)),
 		downloadCompletedChan:     make(chan *downloadCompleted, len(assignments)),
@@ -336,11 +331,11 @@ func (w *retrievalWorker) getStatusCount(statuses ...chunkStatus) uint32 {
 	return uint32(total)
 }
 
-// downloadBlobFromValidators downloads the blob from the validators.
-func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
+// retrieveBlobFromValidators downloads the blob from the validators.
+func (w *retrievalWorker) retrieveBlobFromValidators() ([]byte, error) {
 	// Defer a cancellation just in case we return early. There are no negative side effects if the context
 	// is cancelled more than once.
-	defer w.cancel()
+	defer w.downloadAndVerifyCancel()
 
 	w.probe.SetStage("download_and_verify")
 
@@ -375,7 +370,7 @@ func (w *retrievalWorker) downloadBlobFromValidators() ([]byte, error) {
 	}
 
 	// This aborts all unfinished download/verification work.
-	w.cancel()
+	w.downloadAndVerifyCancel()
 
 	verifiedCount := w.getStatusCount(verified)
 	if verifiedCount < w.minimumChunkCount {
@@ -413,41 +408,41 @@ func (w *retrievalWorker) checkPessimisticTimeout() {
 
 // handleCompletedDownload handles the completion of a download.
 func (w *retrievalWorker) handleCompletedDownload(message *downloadCompleted) {
-	if message.Err == nil {
+	if message.err == nil {
 		if w.config.DetailedLogging {
 			w.logger.Debug("downloaded chunks from operator",
-				"operator", message.OperatorID.Hex(),
+				"operator", message.operatorID.Hex(),
 				"blobKey", w.blobKey.Hex())
 		}
 		w.downloadedChunksQueue.Enqueue(message)
-		w.updateChunkStatus(message.OperatorID, downloaded)
+		w.updateChunkStatus(message.operatorID, downloaded)
 	} else {
 		w.logger.Warn("failed to download chunk data",
-			"operator", message.OperatorID.Hex(),
+			"operator", message.operatorID.Hex(),
 			"blobKey", w.blobKey.Hex(),
-			"err", message.Err)
+			"err", message.err)
 
-		w.updateChunkStatus(message.OperatorID, failed)
+		w.updateChunkStatus(message.operatorID, failed)
 	}
 }
 
 // handleVerificationCompleted handles the completion of a verification.
 func (w *retrievalWorker) handleVerificationCompleted(message *verificationCompleted) {
-	if message.Err == nil {
+	if message.err == nil {
 		if w.config.DetailedLogging {
 			w.logger.Debug("verified chunks from operator",
-				"operator", message.OperatorID.Hex(),
+				"operator", message.operatorID.Hex(),
 				"blobKey", w.blobKey.Hex())
 		}
 		w.verifiedChunksQueue.Enqueue(message)
-		w.updateChunkStatus(message.OperatorID, verified)
+		w.updateChunkStatus(message.operatorID, verified)
 	} else {
 		w.logger.Warn("failed to verify chunk data",
-			"operator", message.OperatorID.Hex(),
+			"operator", message.operatorID.Hex(),
 			"blobKey", w.blobKey.Hex(),
-			"err", message.Err)
+			"err", message.err)
 
-		w.updateChunkStatus(message.OperatorID, failed)
+		w.updateChunkStatus(message.operatorID, failed)
 	}
 }
 
@@ -478,13 +473,13 @@ func (w *retrievalWorker) scheduleVerifications() {
 		}
 
 		next, _ := w.downloadedChunksQueue.Dequeue()
-		reply := next.(*downloadCompleted).Reply
-		operatorID := next.(*downloadCompleted).OperatorID
+		reply := next.(*downloadCompleted).reply
+		operatorID := next.(*downloadCompleted).operatorID
 
 		w.updateChunkStatus(operatorID, verifying)
 
 		w.computePool.Submit(func() {
-			w.deserializeAndVerifyChunks(w.ctx, operatorID, reply)
+			w.deserializeAndVerifyChunks(operatorID, reply)
 		})
 	}
 }
@@ -502,18 +497,19 @@ func (w *retrievalWorker) decodeChunks() ([]byte, error) {
 
 	for !w.verifiedChunksQueue.Empty() {
 		next, _ := w.verifiedChunksQueue.Dequeue()
-		operatorID := next.(*verificationCompleted).OperatorID
+		operatorID := next.(*verificationCompleted).operatorID
 		operatorChunks := next.(*verificationCompleted).chunks
 
 		assignment := w.assignments[operatorID]
-		assignmentIndices := make([]uint, len(assignment.GetIndices()))
+		uint32Indices := assignment.GetIndices()
+		uintIndices := make([]uint, len(uint32Indices))
 
-		for i, index := range assignment.GetIndices() {
-			assignmentIndices[i] = uint(index)
+		for i, index := range uint32Indices {
+			uintIndices[i] = uint(index)
 		}
 
 		chunks = append(chunks, operatorChunks...)
-		indices = append(indices, assignmentIndices...)
+		indices = append(indices, uintIndices...)
 	}
 
 	w.computePool.Submit(func() {
@@ -524,10 +520,10 @@ func (w *retrievalWorker) decodeChunks() ([]byte, error) {
 	case <-w.ctx.Done():
 		return nil, fmt.Errorf("retrieval worker context cancelled: %w", w.ctx.Err())
 	case decodeResponse := <-w.decodeResponseChan:
-		if decodeResponse.Err == nil {
-			return decodeResponse.Blob, nil
+		if decodeResponse.err == nil {
+			return decodeResponse.blob, nil
 		} else {
-			return nil, fmt.Errorf("failed to decode blob: %w", decodeResponse.Err)
+			return nil, fmt.Errorf("failed to decode blob: %w", decodeResponse.err)
 		}
 	}
 }
@@ -553,15 +549,14 @@ func (w *retrievalWorker) downloadChunks(operatorID core.OperatorID) {
 	reply, err := w.validatorGRPCManager.DownloadChunks(ctx, w.blobKey, operatorID, w.quorumID)
 
 	w.downloadCompletedChan <- &downloadCompleted{
-		OperatorID: operatorID,
-		Reply:      reply,
-		Err:        err,
+		operatorID: operatorID,
+		reply:      reply,
+		err:        err,
 	}
 }
 
 // deserializeAndVerifyChunks deserializes the chunks from the GetChunksReply and sends them to the chunksChan.
 func (w *retrievalWorker) deserializeAndVerifyChunks(
-	_ context.Context,
 	operatorID core.OperatorID,
 	getChunksReply *grpcnode.GetChunksReply,
 ) {
@@ -585,9 +580,9 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 		w.encodingParams)
 
 	w.verificationCompletedChan <- &verificationCompleted{
-		OperatorID: operatorID,
+		operatorID: operatorID,
 		chunks:     chunks,
-		Err:        err,
+		err:        err,
 	}
 }
 
@@ -600,7 +595,7 @@ func (w *retrievalWorker) decodeBlob(chunks []*encoding.Frame, indices []uint) {
 	blob, err := w.blobDecoder.DecodeBlob(w.blobKey, chunks, indices, w.encodingParams, w.blobCommitments)
 
 	w.decodeResponseChan <- &decodeCompleted{
-		Blob: blob,
-		Err:  err,
+		blob: blob,
+		err:  err,
 	}
 }

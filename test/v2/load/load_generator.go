@@ -303,13 +303,6 @@ func (l *LoadGenerator) readBlobFromValidators(
 
 	quorums := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers
 
-	currentBlockNumber, err := l.client.GetCurrentBlockNumber(ctx)
-	if err != nil {
-		l.metrics.reportValidatorReadFailure()
-		l.client.GetLogger().Errorf("failed to get current block number: %v", err)
-		return
-	}
-
 	readStartIndex := rand.Int32Range(0, int32(len(quorums)))
 
 	for i := 0; i < validatorReadCount; i++ {
@@ -321,7 +314,7 @@ func (l *LoadGenerator) readBlobFromValidators(
 			blobHeader.Version,
 			*commitment,
 			quorums[(int(readStartIndex)+i)%len(quorums)],
-			currentBlockNumber,
+			eigenDACert.BatchHeader.ReferenceBlockNumber,
 			payload,
 			0,
 			validateAndDecode,

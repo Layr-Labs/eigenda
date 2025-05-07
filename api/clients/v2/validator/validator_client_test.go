@@ -186,11 +186,10 @@ func TestBasicWorkflow(t *testing.T) {
 		quorumID,
 		blobKey,
 		nil,
-		nil,
 		nil)
 	require.NoError(t, err)
 
-	blob, err := worker.downloadBlobFromValidators()
+	blob, err := worker.retrieveBlobFromValidators()
 	require.NoError(t, err)
 	require.Equal(t, decodedBytes, blob)
 
@@ -385,7 +384,6 @@ func TestDownloadTimeout(t *testing.T) {
 		quorumID,
 		blobKey,
 		nil,
-		nil,
 		nil)
 	require.NoError(t, err)
 
@@ -393,7 +391,7 @@ func TestDownloadTimeout(t *testing.T) {
 	var downloadFinished bool
 	var blob []byte
 	go func() {
-		blob, err = worker.downloadBlobFromValidators()
+		blob, err = worker.retrieveBlobFromValidators()
 		require.Equal(t, decodedBytes, blob)
 		downloadFinished = true
 		downloadFinishedChan <- struct{}{}
@@ -643,11 +641,10 @@ func TestFailedVerification(t *testing.T) {
 		quorumID,
 		blobKey,
 		nil,
-		nil,
 		nil)
 	require.NoError(t, err)
 
-	blob, err := worker.downloadBlobFromValidators()
+	blob, err := worker.retrieveBlobFromValidators()
 	require.NoError(t, err)
 	require.Equal(t, decodedBytes, blob)
 
