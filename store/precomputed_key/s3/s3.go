@@ -131,18 +131,20 @@ func (s *Store) Put(ctx context.Context, key []byte, value []byte) error {
 		s.putObjectOptions,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("S3 Put: %w", err)
 	}
-
 	return nil
 }
 
+// TODO: this should probably live elsewhere, it's related to op keccak commitments, not to S3.
 func (s *Store) Verify(_ context.Context, key []byte, value []byte) error {
-	h := crypto.Keccak256Hash(value)
-	if !bytes.Equal(h[:], key) {
-		return fmt.Errorf("key does not match value, expected: %s got: %s", hex.EncodeToString(key), h.Hex())
+	keccakedValue := crypto.Keccak256Hash(value)
+	if !bytes.Equal(key, keccakedValue[:]) {
+		return NewKeccak256KeyValueMismatchErr(
+			hex.EncodeToString(key),
+			keccakedValue.Hex(),
+		)
 	}
-
 	return nil
 }
 

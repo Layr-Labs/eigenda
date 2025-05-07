@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	routingVarNamePayloadHex        = "payload_hex"
-	routingVarNameVersionByteHex    = "version_byte_hex"
-	routingVarNameCommitTypeByteHex = "commit_type_byte_hex"
+	routingVarNameKeccakCommitmentHex = "keccak_commitment_hex"
+	routingVarNamePayloadHex          = "payload_hex"
+	routingVarNameVersionByteHex      = "version_byte_hex"
+	routingVarNameCommitTypeByteHex   = "commit_type_byte_hex"
 )
 
 func (svr *Server) RegisterRoutes(r *mux.Router) {
@@ -68,13 +69,8 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 	// op keccak256 commitments (write to S3)
 	subrouterPOST.HandleFunc("/"+
 		"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
-		// TODO: do we need this 0x00 byte? keccak commitments are the only ones that have anything after /put/
 		"{"+routingVarNameCommitTypeByteHex+":00}"+ // 00 for keccak256 commitments
-		// we don't use version_byte for keccak commitments, because not expecting keccak commitments to change,
-		// but perhaps we should (in case we want a v2 to use another hash for eg?)
-		// "{version_byte_hex:[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a
-		// 404
-		"{"+routingVarNamePayloadHex+"}",
+		"{"+routingVarNameKeccakCommitmentHex+"}",
 		withLogging(withMetrics(svr.handlePostOPKeccakCommitment, svr.m, commitments.OptimismKeccakCommitmentMode), svr.log),
 	)
 	// op generic commitments (write to EigenDA)

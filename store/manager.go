@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
+	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/s3"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -20,13 +21,14 @@ type IManager interface {
 	Put(ctx context.Context, cm commitments.CommitmentMode, key, value []byte) ([]byte, error)
 	SetDispersalBackend(backend common.EigenDABackend)
 	GetDispersalBackend() common.EigenDABackend
+	PutOPKeccakPairInS3(ctx context.Context, key []byte, value []byte) error
 }
 
 // Manager ... storage backend routing layer
 type Manager struct {
 	log logging.Logger
 
-	s3 common.PrecomputedKeyStore // for op keccak256 commitment
+	s3 *s3.Store // for op keccak256 commitment
 	// For op generic commitments & standard commitments
 	eigenda          common.EigenDAStore // v0 da commitment version
 	eigendaV2        common.EigenDAStore // v1 da commitment version
@@ -58,7 +60,7 @@ func (m *Manager) SetDispersalBackend(backend common.EigenDABackend) {
 func NewManager(
 	eigenda common.EigenDAStore,
 	eigenDAV2 common.EigenDAStore,
-	s3 common.PrecomputedKeyStore,
+	s3 *s3.Store,
 	l logging.Logger,
 	secondary ISecondary,
 	dispersalBackend common.EigenDABackend,
@@ -166,16 +168,16 @@ func (m *Manager) Put(ctx context.Context, cm commitments.CommitmentMode, key, v
 
 	// 1 - Put blob into primary storage backend
 	switch cm {
-	case commitments.OptimismKeccakCommitmentMode: // caching and fallbacks are unsupported for this commitment mode
-		return m.putKeccak256Mode(ctx, key, value)
 	case commitments.OptimismGenericCommitmentMode, commitments.StandardCommitmentMode:
-		commit, err = m.putEigenDAMode(ctx, value)
+		commit, err = m.putToCorrectEigenDABackend(ctx, value)
+		if err != nil {
+			return nil, err
+		}
+	case commitments.OptimismKeccakCommitmentMode:
+		// TODO: we should refactor the manager to not deal with keccak commitments at all.
+		return nil, fmt.Errorf("INTERNAL BUG: op keccak commitment writing to s3 should not go through here")
 	default:
 		return nil, fmt.Errorf("unknown commitment mode")
-	}
-
-	if err != nil {
-		return nil, err
 	}
 
 	// 2 - Put blob into secondary storage backends
@@ -213,8 +215,8 @@ func (m *Manager) getVerifyMethod(commitmentType certs.VersionByte) (
 	}
 }
 
-// putEigenDAMode ... disperses blob to EigenDA backend
-func (m *Manager) putEigenDAMode(ctx context.Context, value []byte) ([]byte, error) {
+// putToCorrectEigenDABackend ... disperses blob to EigenDA backend
+func (m *Manager) putToCorrectEigenDABackend(ctx context.Context, value []byte) ([]byte, error) {
 	val := m.dispersalBackend.Load()
 	backend, ok := val.(common.EigenDABackend)
 	if !ok {
@@ -277,16 +279,20 @@ func (m *Manager) getFromCorrectEigenDABackend(
 	}
 }
 
-// putKeccak256Mode ... put blob into S3 compatible backend
-func (m *Manager) putKeccak256Mode(ctx context.Context, key []byte, value []byte) ([]byte, error) {
+// PutOPKeccakPairInS3 puts a key/value pair, where key=keccak(value), into S3.
+// If key!=keccak(value), a Keccak256KeyValueMismatchError is returned.
+// This is only used for OP keccak256 commitments.
+func (m *Manager) PutOPKeccakPairInS3(ctx context.Context, key []byte, value []byte) error {
 	if m.s3 == nil {
-		return nil, errors.New("S3 is disabled but is only supported for posting known commitment keys")
+		return errors.New("S3 is disabled but is only supported for posting known commitment keys")
 	}
-
 	err := m.s3.Verify(ctx, key, value)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("s3 verify: %w", err)
 	}
-
-	return key, m.s3.Put(ctx, key, value)
+	err = m.s3.Put(ctx, key, value)
+	if err != nil {
+		return fmt.Errorf("s3 put: %w", err)
+	}
+	return nil
 }

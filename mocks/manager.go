@@ -87,6 +87,20 @@ func (mr *MockIManagerMockRecorder) Put(ctx, cm, key, value any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockIManager)(nil).Put), ctx, cm, key, value)
 }
 
+// PutOPKeccakPairInS3 mocks base method.
+func (m *MockIManager) PutOPKeccakPairInS3(ctx context.Context, key, value []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutOPKeccakPairInS3", ctx, key, value)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PutOPKeccakPairInS3 indicates an expected call of PutOPKeccakPairInS3.
+func (mr *MockIManagerMockRecorder) PutOPKeccakPairInS3(ctx, key, value any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutOPKeccakPairInS3", reflect.TypeOf((*MockIManager)(nil).PutOPKeccakPairInS3), ctx, key, value)
+}
+
 // SetDispersalBackend mocks base method.
 func (m *MockIManager) SetDispersalBackend(backend common.EigenDABackend) {
 	m.ctrl.T.Helper()

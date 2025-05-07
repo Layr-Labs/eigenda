@@ -12,12 +12,13 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
+	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/s3"
 	"github.com/gorilla/mux"
 )
 
 const (
-	// limit requests to only 32 mib to mitigate potential DoS attacks
-	maxRequestBodySize int64 = 1024 * 1024 * 32
+	// limit requests to only 32 MiB to mitigate potential DoS attacks
+	maxPOSTRequestBodySize int64 = 1024 * 1024 * 32
 
 	// HTTP headers
 	headerContentType = "Content-Type"
@@ -63,14 +64,6 @@ func (svr *Server) handleGetStdCommitment(w http.ResponseWriter, r *http.Request
 
 // handleGetOPKeccakCommitment handles the GET request for optimism keccak commitments.
 func (svr *Server) handleGetOPKeccakCommitment(w http.ResponseWriter, r *http.Request) error {
-	// TODO: do we use a version byte in OPKeccak commitments? README seems to say so, but server_test didn't
-	// versionByte, err := parseVersionByte(r)
-	// if err != nil {
-	// 	err = fmt.Errorf("error parsing version byte: %w", err)
-	// 	http.Error(w, err.Error(), http.StatusBadRequest)
-	// 	return err
-	// }
-
 	rawCommitmentHex, ok := mux.Vars(r)[routingVarNamePayloadHex]
 	if !ok {
 		return fmt.Errorf("commitment not found in path: %s", r.URL.Path)
@@ -167,16 +160,35 @@ func (svr *Server) handlePostStdCommitment(w http.ResponseWriter, r *http.Reques
 
 // handlePostOPKeccakCommitment handles the POST request for optimism keccak commitments.
 func (svr *Server) handlePostOPKeccakCommitment(w http.ResponseWriter, r *http.Request) error {
-	rawCommitmentHex, ok := mux.Vars(r)[routingVarNamePayloadHex]
+	keccakCommitmentHex, ok := mux.Vars(r)[routingVarNameKeccakCommitmentHex]
 	if !ok {
-		return fmt.Errorf("commitment not found in path: %s", r.URL.Path)
+		return fmt.Errorf("keccak commitment not found in path: %s", r.URL.Path)
 	}
-	commitment, err := hex.DecodeString(rawCommitmentHex)
+	keccakCommitment, err := hex.DecodeString(keccakCommitmentHex)
 	if err != nil {
-		return fmt.Errorf("failed to decode commitment %s: %w", rawCommitmentHex, err)
+		return fmt.Errorf("failed to decode hex keccak commitment %s: %w", keccakCommitmentHex, err)
 	}
-
-	return svr.handlePostShared(w, r, commitment, commitments.OptimismKeccakCommitmentMode)
+	svr.log.Info("Processing Keccak Commitment POST request",
+		"mode", commitments.OptimismKeccakCommitmentMode, "commitment", keccakCommitmentHex)
+	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxPOSTRequestBodySize))
+	if err != nil {
+		err = NewPOSTError(fmt.Errorf("failed to read request body: %w", err), commitments.OptimismKeccakCommitmentMode)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return err
+	}
+	err = svr.sm.PutOPKeccakPairInS3(r.Context(), keccakCommitment, payload)
+	if err != nil {
+		err = NewPOSTError(
+			fmt.Errorf("keccak POST request failed for commitment %v: %w", keccakCommitmentHex, err),
+			commitments.OptimismKeccakCommitmentMode)
+		var keyValueMismatchErr s3.Keccak256KeyValueMismatchError
+		if errors.As(err, &keyValueMismatchErr) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+	return nil
 }
 
 // handlePostOPGenericCommitment handles the POST request for optimism generic commitments.
@@ -184,6 +196,7 @@ func (svr *Server) handlePostOPGenericCommitment(w http.ResponseWriter, r *http.
 	return svr.handlePostShared(w, r, nil, commitments.OptimismGenericCommitmentMode)
 }
 
+// This is a shared function for handling POST requests for
 func (svr *Server) handlePostShared(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -191,14 +204,14 @@ func (svr *Server) handlePostShared(
 	mode commitments.CommitmentMode,
 ) error {
 	svr.log.Info("Processing POST request", "commitment", hex.EncodeToString(comm), "mode", mode)
-	input, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxRequestBodySize))
+	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxPOSTRequestBodySize))
 	if err != nil {
 		err = NewPOSTError(fmt.Errorf("failed to read request body: %w", err), mode)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return err
 	}
 
-	serializedCert, err := svr.sm.Put(r.Context(), mode, comm, input)
+	serializedCert, err := svr.sm.Put(r.Context(), mode, comm, payload)
 	if err != nil {
 		err = NewPOSTError(fmt.Errorf("post request failed with commitment %v: %w", comm, err), mode)
 		switch {
@@ -234,10 +247,7 @@ func (svr *Server) handlePostShared(
 	}
 
 	svr.log.Info(fmt.Sprintf("response commitment: %x\n", responseCommit))
-	// write commitment to resp body if not in OptimismKeccak mode
-	if mode != commitments.OptimismKeccakCommitmentMode {
-		svr.writeResponse(w, responseCommit)
-	}
+	svr.writeResponse(w, responseCommit)
 	return nil
 }
 

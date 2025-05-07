@@ -17,6 +17,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/config"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/mocks"
+	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/s3"
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
@@ -158,11 +159,9 @@ func TestHandlerPutSuccess(t *testing.T) {
 			url:  fmt.Sprintf("/put/0x00%s", testCommitStr),
 			body: []byte("some data that will successfully be written to EigenDA"),
 			mockBehavior: func() {
-				mockStorageMgr.EXPECT().Put(
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any()).Return([]byte(testCommitStr), nil)
+				mockStorageMgr.EXPECT().
+					PutOPKeccakPairInS3(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil)
 			},
 			expectedCode: http.StatusOK,
 			expectedBody: "",
@@ -210,7 +209,8 @@ func TestHandlerPutSuccess(t *testing.T) {
 }
 
 func TestHandlerPutErrors(t *testing.T) {
-	// Each test is run against all 3 different modes.
+	// Each test is run against all 2 modes.
+	// keccak has separate errors, so is kept in its own function below.
 	modes := []struct {
 		name string
 		url  string
@@ -218,10 +218,6 @@ func TestHandlerPutErrors(t *testing.T) {
 		{
 			name: "OP Mode Alt-DA",
 			url:  "/put",
-		},
-		{
-			name: "OP Mode Keccak256",
-			url:  fmt.Sprintf("/put/0x00%s", testCommitStr),
 		},
 		{
 			name: "Standard Commitment Mode",
@@ -273,9 +269,9 @@ func TestHandlerPutErrors(t *testing.T) {
 		for _, mode := range modes {
 			t.Run(
 				tt.name+" / "+mode.name, func(t *testing.T) {
-					mockStorageMgr.EXPECT().Put(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(
-						nil,
-						tt.mockStorageMgrPutReturnedErr)
+					mockStorageMgr.EXPECT().
+						Put(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(nil, tt.mockStorageMgrPutReturnedErr)
 
 					req := httptest.NewRequest(
 						http.MethodPost,
@@ -294,6 +290,64 @@ func TestHandlerPutErrors(t *testing.T) {
 					require.Equal(t, tt.expectedHTTPCode, rec.Code)
 				})
 		}
+	}
+}
+
+func TestHandlerPutKeccakErrors(t *testing.T) {
+	url := fmt.Sprintf("/put/0x00%s", testCommitStr)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockStorageMgr := mocks.NewMockIManager(ctrl)
+	mockStorageMgr.EXPECT().GetDispersalBackend().AnyTimes().Return(common.V1EigenDABackend)
+
+	tests := []struct {
+		name                         string
+		mockStorageMgrPutReturnedErr error
+		expectedHTTPCode             int
+	}{
+		{
+			// we only test OK status here. Returned commitment is checked in TestHandlerPut
+			name:                         "Success - 200",
+			mockStorageMgrPutReturnedErr: nil,
+			expectedHTTPCode:             http.StatusOK,
+		},
+		{
+			name:                         "Failure - InternalServerError 500",
+			mockStorageMgrPutReturnedErr: fmt.Errorf("internal error"),
+			expectedHTTPCode:             http.StatusInternalServerError,
+		},
+		{
+			// only 400s are due to oversized blobs right now
+			name:                         "Failure - BadRequest 400",
+			mockStorageMgrPutReturnedErr: s3.Keccak256KeyValueMismatchError{Key: "key", KeccakedValue: "value"},
+			expectedHTTPCode:             http.StatusBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(
+			tt.name+" / OP Keccak256 Mode", func(t *testing.T) {
+				mockStorageMgr.EXPECT().
+					PutOPKeccakPairInS3(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(tt.mockStorageMgrPutReturnedErr)
+
+				req := httptest.NewRequest(
+					http.MethodPost,
+					url,
+					strings.NewReader("optional body to be sent to eigenda"))
+				rec := httptest.NewRecorder()
+
+				// To add the vars to the context,
+				// we need to create a router through which we can pass the request.
+				r := mux.NewRouter()
+				// enable this logger to help debug tests
+				server := NewServer(testCfg, mockStorageMgr, testLogger, metrics.NoopMetrics)
+				server.RegisterRoutes(r)
+				r.ServeHTTP(rec, req)
+
+				require.Equal(t, tt.expectedHTTPCode, rec.Code)
+			})
 	}
 }
 
