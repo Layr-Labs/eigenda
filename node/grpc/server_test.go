@@ -345,7 +345,7 @@ func storeChunks(t *testing.T, server *grpc.Server, useGnarkBundleEncoding bool)
 func TestNodeInfoRequest(t *testing.T) {
 	server := newTestServer(t, true)
 	resp, err := server.NodeInfo(context.Background(), &pb.NodeInfoRequest{})
-	assert.True(t, resp.Semver == "0.0.0")
+	assert.True(t, resp.Semver == ">=0.9.0-rc.1")
 	assert.True(t, err == nil)
 }
 
