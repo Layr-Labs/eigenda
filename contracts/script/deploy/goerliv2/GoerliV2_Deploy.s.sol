@@ -12,7 +12,7 @@ import {IndexRegistry} from "../lib/eigenlayer-middleware/IndexRegistry.sol";
 import {IIndexRegistry} from "../lib/eigenlayer-middleware/interfaces/IIndexRegistry.sol";
 import {StakeRegistry} from "../lib/eigenlayer-middleware/StakeRegistry.sol";
 import {IStakeRegistry} from "../lib/eigenlayer-middleware/interfaces/IStakeRegistry.sol";
-import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
+import {EigenDAServiceManager} from "src/core/src/EigenDAServiceManager.sol";
 import {IServiceManager} from "../lib/eigenlayer-middleware/interfaces/IServiceManager.sol";
 import {OperatorStateRetriever} from "../lib/eigenlayer-middleware/OperatorStateRetriever.sol";
 

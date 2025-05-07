@@ -156,7 +156,7 @@ func (s *ServerV2) FetchBatchFeed(c *gin.Context) {
 		}
 		batches[i] = &BatchInfo{
 			BatchHeaderHash:         hex.EncodeToString(batchHeaderHash[:]),
-			BatchHeader:             at.BatchHeader,
+			BatchHeader:             createBatchHeader(at.BatchHeader),
 			AttestedAt:              at.AttestedAt,
 			AggregatedSignature:     at.Sigma,
 			QuorumNumbers:           at.QuorumNumbers,
@@ -196,7 +196,7 @@ func (s *ServerV2) FetchBatch(c *gin.Context) {
 		errorResponse(c, errors.New("invalid batch header hash"))
 		return
 	}
-	signedBatch, found := s.signedBatchCache.Get(batchHeaderHashHex)
+	batchResponse, found := s.batchResponseCache.Get(batchHeaderHashHex)
 	if !found {
 		batchHeader, attestation, err := s.blobMetadataStore.GetSignedBatch(ctx, batchHeaderHash)
 		if err != nil {
@@ -216,23 +216,45 @@ func (s *ServerV2) FetchBatch(c *gin.Context) {
 			return
 		}
 
-		signedBatch = &SignedBatch{
-			BatchHeader: batchHeader,
+		signedBatch := &SignedBatch{
+			BatchHeader: createBatchHeader(batchHeader),
 			AttestationInfo: &AttestationInfo{
 				Attestation: attestation,
 				Signers:     signers,
 				Nonsigners:  nonsigners,
 			},
 		}
-		s.signedBatchCache.Add(batchHeaderHashHex, signedBatch)
+
+		batchInfo, err := s.blobMetadataStore.GetBatch(ctx, batchHeaderHash)
+		if err != nil {
+			s.metrics.IncrementFailedRequestNum("FetchBatch")
+			errorResponse(c, err)
+			return
+		}
+		blobKeys := make([]string, len(batchInfo.BlobCertificates))
+		for i := 0; i < len(blobKeys); i++ {
+			bk, err := batchInfo.BlobCertificates[i].BlobHeader.BlobKey()
+			if err != nil {
+				s.metrics.IncrementFailedRequestNum("FetchBatch")
+				errorResponse(c, err)
+				return
+			}
+			blobKeys[i] = bk.Hex()
+		}
+
+		// TODO: Add blob inclusion info for each comprising blob if needed
+
+		batchResponse = &BatchResponse{
+			BatchHeaderHash:  batchHeaderHashHex,
+			BlobKeys:         blobKeys,
+			SignedBatch:      signedBatch,
+			BlobCertificates: batchInfo.BlobCertificates,
+		}
+		s.batchResponseCache.Add(batchHeaderHashHex, batchResponse)
 	} else {
 		s.metrics.IncrementCacheHit("FetchBatch")
 	}
-	// TODO: support fetch of blob inclusion info
-	batchResponse := &BatchResponse{
-		BatchHeaderHash: batchHeaderHashHex,
-		SignedBatch:     signedBatch,
-	}
+
 	s.metrics.IncrementSuccessfulRequestNum("FetchBatch")
 	s.metrics.ObserveLatency("FetchBatch", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBatchDataAge))

@@ -13,7 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
-	pb "github.com/Layr-Labs/eigenda/disperser/api/grpc/encoder/v2"
+	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"

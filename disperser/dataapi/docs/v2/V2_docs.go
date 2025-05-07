@@ -1032,22 +1032,6 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "github_com_Layr-Labs_eigenda_core_v2.BatchHeader": {
-            "type": "object",
-            "properties": {
-                "batchRoot": {
-                    "description": "BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "referenceBlockNumber": {
-                    "description": "ReferenceBlockNumber is the block number at which all operator information (stakes, indexes, etc.) is taken from",
-                    "type": "integer"
-                }
-            }
-        },
         "github_com_Layr-Labs_eigenda_core_v2.BlobCertificate": {
             "type": "object",
             "properties": {
@@ -1096,53 +1080,56 @@ const docTemplateV2 = `{
                 }
             }
         },
-        "github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo": {
+        "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BatchHeader": {
             "type": "object",
             "properties": {
-                "BlobKey": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                "batch_root": {
+                    "type": "string"
                 },
-                "batchRoot": {
-                    "description": "BatchRoot is the root of a Merkle tree whose leaves are the keys of the blobs in the batch",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "blobIndex": {
-                    "type": "integer"
-                },
-                "inclusionProof": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "referenceBlockNumber": {
-                    "description": "ReferenceBlockNumber is the block number at which all operator information (stakes, indexes, etc.) is taken from",
+                "reference_block_number": {
                     "type": "integer"
                 }
             }
         },
-        "github_com_Layr-Labs_eigenda_disperser_common_v2.BlobStatus": {
-            "type": "integer",
-            "enum": [
-                0,
-                1,
-                2,
-                3,
-                4
-            ],
-            "x-enum-varnames": [
-                "Queued",
-                "Encoded",
-                "GatheringSignatures",
-                "Complete",
-                "Failed"
-            ]
+        "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BlobInclusionInfo": {
+            "type": "object",
+            "properties": {
+                "batch_header": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BatchHeader"
+                },
+                "blob_index": {
+                    "type": "integer"
+                },
+                "blob_key": {
+                    "type": "string"
+                },
+                "inclusion_proof": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BlobMetadata": {
+            "type": "object",
+            "properties": {
+                "blob_header": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader"
+                },
+                "blob_size_bytes": {
+                    "type": "integer"
+                },
+                "blob_status": {
+                    "type": "string"
+                },
+                "expiry_unix_sec": {
+                    "type": "integer"
+                },
+                "requested_at": {
+                    "type": "integer"
+                },
+                "signature": {
+                    "type": "string"
+                }
+            }
         },
         "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch": {
             "type": "object",
@@ -1151,7 +1138,7 @@ const docTemplateV2 = `{
                     "$ref": "#/definitions/v2.AttestationInfo"
                 },
                 "batch_header": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader"
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BatchHeader"
                 }
             }
         },
@@ -1250,7 +1237,7 @@ const docTemplateV2 = `{
                     "type": "integer"
                 },
                 "batch_header": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader"
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BatchHeader"
                 },
                 "batch_header_hash": {
                     "type": "string"
@@ -1275,10 +1262,22 @@ const docTemplateV2 = `{
                 "batch_header_hash": {
                     "type": "string"
                 },
+                "blob_certificates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobCertificate"
+                    }
+                },
                 "blob_inclusion_infos": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo"
+                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BlobInclusionInfo"
+                    }
+                },
+                "blob_key": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
                     }
                 },
                 "signed_batch": {
@@ -1296,7 +1295,7 @@ const docTemplateV2 = `{
                     "type": "string"
                 },
                 "blob_inclusion_info": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobInclusionInfo"
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BlobInclusionInfo"
                 },
                 "blob_key": {
                     "type": "string"
@@ -1332,57 +1331,7 @@ const docTemplateV2 = `{
                     "type": "string"
                 },
                 "blob_metadata": {
-                    "$ref": "#/definitions/v2.BlobMetadata"
-                }
-            }
-        },
-        "v2.BlobMetadata": {
-            "type": "object",
-            "properties": {
-                "blobHeader": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BlobHeader"
-                },
-                "blobSize": {
-                    "description": "BlobSize is the size of the blob in bytes",
-                    "type": "integer"
-                },
-                "blobStatus": {
-                    "description": "BlobStatus indicates the current status of the blob",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_common_v2.BlobStatus"
-                        }
-                    ]
-                },
-                "expiry": {
-                    "description": "Expiry is Unix timestamp of the blob expiry in seconds from epoch",
-                    "type": "integer"
-                },
-                "fragmentSizeBytes": {
-                    "description": "FragmentSizeBytes is the maximum fragment size used to store the chunk coefficients.",
-                    "type": "integer"
-                },
-                "numRetries": {
-                    "description": "NumRetries is the number of times the blob has been retried",
-                    "type": "integer"
-                },
-                "requestedAt": {
-                    "description": "RequestedAt is the Unix timestamp of when the blob was requested in nanoseconds",
-                    "type": "integer"
-                },
-                "signature": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "totalChunkSizeBytes": {
-                    "description": "TotalChunkSizeBytes is the total size of the file containing all chunk coefficients for the blob.",
-                    "type": "integer"
-                },
-                "updatedAt": {
-                    "description": "UpdatedAt is the Unix timestamp of when the blob was last updated in _nanoseconds_",
-                    "type": "integer"
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BlobMetadata"
                 }
             }
         },
@@ -1494,7 +1443,7 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "batch_header": {
-                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_core_v2.BatchHeader"
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.BatchHeader"
                 },
                 "batch_header_hash": {
                     "type": "string"

@@ -9,7 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
-	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -117,7 +117,7 @@ func (cv *CertVerifier) VerifyCertV2(ctx context.Context, eigenDACert *coretypes
 func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 	ctx context.Context,
 	signedBatch *disperser.SignedBatch,
-) (*verifierBindings.NonSignerStakesAndSignature, error) {
+) (*verifierBindings.EigenDATypesV1NonSignerStakesAndSignature, error) {
 	signedBatchBinding, err := coretypes.SignedBatchProtoToBinding(signedBatch)
 	if err != nil {
 		return nil, fmt.Errorf("convert signed batch: %w", err)
@@ -184,26 +184,6 @@ func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context) ([]uint8, 
 	return quorumNumbersRequired, nil
 }
 
-// GetRelayRegistryAddress returns the address of the EigenDARelayRegistry contract
-func (cv *CertVerifier) GetRelayRegistryAddress(ctx context.Context) (*gethcommon.Address, error) {
-	blockNumber, err := cv.ethClient.BlockNumber(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("fetch block number from eth client: %w", err)
-	}
-
-	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, blockNumber)
-	if err != nil {
-		return nil, fmt.Errorf("get verifier caller from block number: %w", err)
-	}
-
-	relayRegistryAddress, err := certVerifierCaller.EigenDARelayRegistry(&bind.CallOpts{Context: ctx})
-	if err != nil {
-		return nil, fmt.Errorf("get relay registry address: %w", err)
-	}
-
-	return &relayRegistryAddress, nil
-}
-
 // getVerifierCallerFromBlockNumber returns a ContractEigenDACertVerifierCaller that corresponds to the input reference
 // block number.
 //
@@ -212,7 +192,7 @@ func (cv *CertVerifier) GetRelayRegistryAddress(ctx context.Context) (*gethcommo
 func (cv *CertVerifier) getVerifierCallerFromBlockNumber(
 	ctx context.Context,
 	referenceBlockNumber uint64,
-) (*verifierBindings.ContractEigenDACertVerifierCaller, error) {
+) (*verifierBindings.ContractEigenDACertVerifierV2Caller, error) {
 	certVerifierAddress, err := cv.certVerifierAddressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("get cert verifier address: %w", err)
@@ -228,10 +208,10 @@ func (cv *CertVerifier) getVerifierCallerFromBlockNumber(
 // and parsing json, and is therefore non-trivially expensive.
 func (cv *CertVerifier) getVerifierCallerFromAddress(
 	certVerifierAddress gethcommon.Address,
-) (*verifierBindings.ContractEigenDACertVerifierCaller, error) {
+) (*verifierBindings.ContractEigenDACertVerifierV2Caller, error) {
 	existingCallerAny, valueExists := cv.verifierCallers.Load(certVerifierAddress)
 	if valueExists {
-		existingCaller, ok := existingCallerAny.(*verifierBindings.ContractEigenDACertVerifierCaller)
+		existingCaller, ok := existingCallerAny.(*verifierBindings.ContractEigenDACertVerifierV2Caller)
 		if !ok {
 			return nil, fmt.Errorf(
 				"value in verifierCallers wasn't of type ContractEigenDACertVerifierCaller. this should be impossible")
@@ -239,7 +219,7 @@ func (cv *CertVerifier) getVerifierCallerFromAddress(
 		return existingCaller, nil
 	}
 
-	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierCaller(certVerifierAddress, cv.ethClient)
+	certVerifierCaller, err := verifierBindings.NewContractEigenDACertVerifierV2Caller(certVerifierAddress, cv.ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
 	}

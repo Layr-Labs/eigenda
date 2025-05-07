@@ -66,9 +66,8 @@ var (
 		v2.Queued:              {},
 		v2.Encoded:             {v2.Queued},
 		v2.GatheringSignatures: {v2.Encoded},
-		// TODO: when GatheringSignatures is fully supported, remove v2.Encoded from below
-		v2.Complete: {v2.Encoded, v2.GatheringSignatures},
-		v2.Failed:   {v2.Queued, v2.Encoded, v2.GatheringSignatures},
+		v2.Complete:            {v2.GatheringSignatures},
+		v2.Failed:              {v2.Queued, v2.Encoded, v2.GatheringSignatures},
 	}
 	ErrInvalidStateTransition = errors.New("invalid state transition")
 )
@@ -1197,15 +1196,20 @@ func (s *BlobMetadataStore) PutAttestation(ctx context.Context, attestation *cor
 }
 
 func (s *BlobMetadataStore) GetAttestation(ctx context.Context, batchHeaderHash [32]byte) (*corev2.Attestation, error) {
-	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
-		"PK": &types.AttributeValueMemberS{
-			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+	input := &dynamodb.GetItemInput{
+		TableName: aws.String(s.tableName),
+		Key: map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{
+				Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+			},
+			"SK": &types.AttributeValueMemberS{
+				Value: attestationSK,
+			},
 		},
-		"SK": &types.AttributeValueMemberS{
-			Value: attestationSK,
-		},
-	})
+		ConsistentRead: aws.Bool(true), // Use strongly consistent read to prevent race conditions
+	}
 
+	item, err := s.dynamoDBClient.GetItemWithInput(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -1362,12 +1366,18 @@ func (s *BlobMetadataStore) GetBlobInclusionInfos(ctx context.Context, blobKey c
 }
 
 func (s *BlobMetadataStore) GetSignedBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.BatchHeader, *corev2.Attestation, error) {
-	items, err := s.dynamoDBClient.Query(ctx, s.tableName, "PK = :pk", commondynamodb.ExpressionValues{
-		":pk": &types.AttributeValueMemberS{
-			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+	input := &dynamodb.QueryInput{
+		TableName:              aws.String(s.tableName),
+		KeyConditionExpression: aws.String("PK = :pk"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":pk": &types.AttributeValueMemberS{
+				Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
+			},
 		},
-	})
+		ConsistentRead: aws.Bool(true), // Use strongly consistent read to prevent race conditions
+	}
 
+	items, err := s.dynamoDBClient.QueryWithInput(ctx, input)
 	if err != nil {
 		return nil, nil, err
 	}

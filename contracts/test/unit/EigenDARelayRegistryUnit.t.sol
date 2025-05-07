@@ -17,7 +17,7 @@ contract EigenDARelayRegistryUnit is MockEigenDADeployer {
     }
 
     function test_addRelayInfo() public {
-        RelayInfo memory relayInfo = RelayInfo({
+        DATypesV2.RelayInfo memory relayInfo = DATypesV2.RelayInfo({
             relayAddress: address(uint160(uint256(keccak256(abi.encodePacked("relay"))))),
             relayURL: "https://relay.com"
         });
@@ -34,7 +34,7 @@ contract EigenDARelayRegistryUnit is MockEigenDADeployer {
     }
 
     function test_addRelayInfo_revert_notOwner() public {
-        RelayInfo memory relayInfo = RelayInfo({
+        DATypesV2.RelayInfo memory relayInfo = DATypesV2.RelayInfo({
             relayAddress: address(uint160(uint256(keccak256(abi.encodePacked("relay"))))),
             relayURL: "https://relay.com"
         });

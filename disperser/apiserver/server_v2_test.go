@@ -381,7 +381,11 @@ func TestV2GetBlobStatus(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, pbv2.BlobStatus_ENCODED, status.Status)
 
-	// Complete blob status
+	// First transition to GatheringSignatures state
+	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.GatheringSignatures)
+	require.NoError(t, err)
+	
+	// Then transition to Complete state
 	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.Complete)
 	require.NoError(t, err)
 	batchHeader := &corev2.BatchHeader{
