@@ -14,15 +14,9 @@ import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkR
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
-/**
- * @title EigenDACertVerificationV2Lib - EigenDA V2 certificate verification library
- * @author Layr Labs, Inc.
- * @notice Library of functions for verifying EigenDA V2 certificates
- * @dev Provides functions for verifying blob certificates, inclusion proofs, signatures, and security parameters
- */
-library EigenDACertVerificationV2Lib {
-    using BN254 for BN254.G1Point;
+import {EigenDACertTypes as CT} from "src/periphery/cert/EigenDACertTypes.sol";
 
+library EigenDACertVerificationLib {
     /// @notice Denominator used for threshold percentage calculations (100 for percentages)
     uint256 internal constant THRESHOLD_DENOMINATOR = 100;
 
@@ -57,6 +51,50 @@ library EigenDACertVerificationV2Lib {
         BLOB_QUORUMS_NOT_SUBSET, // Blob quorums not a subset of confirmed quorums
         REQUIRED_QUORUMS_NOT_SUBSET // Required quorums not a subset of blob quorums
 
+    }
+
+    function decodeCert(bytes calldata data) internal pure returns (CT.EigenDACertV3 memory cert) {
+        return abi.decode(data, (CT.EigenDACertV3));
+    }
+
+    function verifyDACert(
+        IEigenDAThresholdRegistry eigenDAThresholdRegistry,
+        IEigenDASignatureVerifier eigenDASignatureVerifier,
+        bytes calldata certBytes,
+        DATypesV1.SecurityThresholds memory securityThresholds,
+        bytes memory requiredQuorumNumbers
+    ) internal view {
+        CT.EigenDACertV3 memory cert = decodeCert(certBytes);
+        verifyDACertV2(
+            eigenDAThresholdRegistry,
+            eigenDASignatureVerifier,
+            cert.batchHeader,
+            cert.blobInclusionInfo,
+            cert.nonSignerStakesAndSignature,
+            securityThresholds,
+            requiredQuorumNumbers,
+            cert.signedQuorumNumbers
+        );
+    }
+
+    function checkDACert(
+        IEigenDAThresholdRegistry eigenDAThresholdRegistry,
+        IEigenDASignatureVerifier eigenDASignatureVerifier,
+        bytes calldata certBytes,
+        DATypesV1.SecurityThresholds memory securityThresholds,
+        bytes memory requiredQuorumNumbers
+    ) internal view returns (StatusCode, bytes memory) {
+        CT.EigenDACertV3 memory cert = decodeCert(certBytes);
+        return checkDACertV2(
+            eigenDAThresholdRegistry,
+            eigenDASignatureVerifier,
+            cert.batchHeader,
+            cert.blobInclusionInfo,
+            cert.nonSignerStakesAndSignature,
+            securityThresholds,
+            requiredQuorumNumbers,
+            cert.signedQuorumNumbers
+        );
     }
 
     function verifyDACertV2(
