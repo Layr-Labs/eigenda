@@ -2,6 +2,8 @@ package util
 
 import (
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -65,4 +67,76 @@ func Exists(path string) (bool, error) {
 		return false, nil
 	}
 	return false, fmt.Errorf("error checking if path %s exists: %w", path, err)
+}
+
+// CopyDirectoryRecursively creates a deep copy of the directory tree rooted at src and writes it to dst.
+// It preserves file permissions, timestamps, and properly handles symlinks.
+//
+// The function performs a recursive copy of all files and directories, maintaining the same
+// relative path structure and file metadata. If the destination directory exists, it will
+// merge the source content into it, potentially overwriting files with the same names.
+func CopyDirectoryRecursively(src, dst string) error {
+	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return fmt.Errorf("failed to walk path %s: %w", path, err)
+		}
+
+		// Compute the path relative to src, then build the destination path
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return fmt.Errorf("failed to get relative path from %s to %s: %w", src, path, err)
+		}
+		target := filepath.Join(dst, rel)
+
+		info, err := d.Info()
+		if err != nil {
+			return fmt.Errorf("failed to get file info for %s: %w", path, err)
+		}
+
+		switch {
+		case d.IsDir():
+			// Create directory (and parents) with same mode
+			if err := os.MkdirAll(target, info.Mode()); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", target, err)
+			}
+			return nil
+
+		case (info.Mode() & os.ModeSymlink) != 0:
+			// Replicate symlink
+			linkDest, err := os.Readlink(path)
+			if err != nil {
+				return fmt.Errorf("failed to read symlink %s: %w", path, err)
+			}
+			if err := os.Symlink(linkDest, target); err != nil {
+				return fmt.Errorf("failed to create symlink at %s pointing to %s: %w", target, linkDest, err)
+			}
+			return nil
+
+		default:
+			// Regular file: copy contents
+			in, err := os.Open(path)
+			if err != nil {
+				return fmt.Errorf("failed to open source file %s: %w", path, err)
+			}
+			defer in.Close()
+
+			out, err := os.OpenFile(target,
+				os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
+				info.Mode())
+			if err != nil {
+				return fmt.Errorf("failed to create destination file %s: %w", target, err)
+			}
+			defer out.Close()
+
+			if _, err := io.Copy(out, in); err != nil {
+				return fmt.Errorf("failed to copy file content from %s to %s: %w", path, target, err)
+			}
+			
+			// Preserve timestamps
+			if err := os.Chtimes(target, info.ModTime(), info.ModTime()); err != nil {
+				return fmt.Errorf("failed to preserve timestamps for %s: %w", target, err)
+			}
+			return nil
+		}
+	})
 }

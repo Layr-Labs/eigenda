@@ -246,12 +246,17 @@ func (m *metadataFile) serialize() []byte {
 
 // deserialize deserializes the metadata file from a byte array.
 func (m *metadataFile) deserialize(data []byte) error {
-	if len(data) != MetadataSize {
-		return fmt.Errorf("metadata file is not the correct size: %d", len(data))
+	if len(data) < 4 {
+		return fmt.Errorf("metadata file is not the correct size, expected at least 4 bytes, got %d", len(data))
 	}
 
 	m.serializationVersion = binary.BigEndian.Uint32(data[0:4])
 	if m.serializationVersion == OldHashFunctionSerializationVersion {
+		if len(data) != OldMetadataSize {
+			return fmt.Errorf("metadata file is not the correct size, expected %d, got %d",
+				OldMetadataSize, len(data))
+		}
+
 		// TODO (cody.littley): delete this after all data is migrated to the new hash function.
 		m.shardingFactor = binary.BigEndian.Uint32(data[4:8])
 		m.legacySalt = binary.BigEndian.Uint32(data[8:12])
@@ -260,6 +265,11 @@ func (m *metadataFile) deserialize(data []byte) error {
 		return nil
 	} else if m.serializationVersion != CurrentSerializationVersion {
 		return fmt.Errorf("unsupported serialization version: %d", m.serializationVersion)
+	}
+
+	if len(data) != MetadataSize {
+		return fmt.Errorf("metadata file is not the correct size, expected %d, got %d",
+			MetadataSize, len(data))
 	}
 
 	m.shardingFactor = binary.BigEndian.Uint32(data[4:8])
