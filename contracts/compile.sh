@@ -40,6 +40,8 @@ contracts="PaymentVault \
   MockRollup \
   EjectionManager \
   EigenDACertVerifierV2 \
+  EigenDACertVerifierV3 \
+  EigenDACertVerifierRouter \
   IEigenDACertTypeBindings \
   EigenDAThresholdRegistry \
   EigenDARelayRegistry \
