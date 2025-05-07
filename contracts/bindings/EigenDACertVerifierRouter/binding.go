@@ -266,10 +266,10 @@ func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterCalle
 
 // CheckDACert is a free data retrieval call binding the contract method 0x9077193b.
 //
-// Solidity: function checkDACert(bytes abiEncodedCert) view returns(uint8)
-func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterCaller) CheckDACert(opts *bind.CallOpts, abiEncodedCert []byte) (uint8, error) {
+// Solidity: function checkDACert(bytes certBytes) view returns(uint8)
+func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterCaller) CheckDACert(opts *bind.CallOpts, certBytes []byte) (uint8, error) {
 	var out []interface{}
-	err := _ContractEigenDACertVerifierRouter.contract.Call(opts, &out, "checkDACert", abiEncodedCert)
+	err := _ContractEigenDACertVerifierRouter.contract.Call(opts, &out, "checkDACert", certBytes)
 
 	if err != nil {
 		return *new(uint8), err

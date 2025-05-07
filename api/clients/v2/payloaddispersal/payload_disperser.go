@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	cert_type_binding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
+
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
@@ -23,7 +25,9 @@ type PayloadDisperser struct {
 	logger          logging.Logger
 	config          PayloadDisperserConfig
 	disperserClient clients.DisperserClient
-	certVerifier    clients.ICertVerifier
+	ethClient       common.EthClient
+	certVerifierV2  clients.IV2CertVerifier
+	certVerifierV3  clients.IV3CertVerifier
 	stageTimer      *common.StageTimer
 }
 
@@ -40,7 +44,8 @@ func NewPayloadDisperser(
 	//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
 	//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
 	disperserClient clients.DisperserClient,
-	certVerifier clients.ICertVerifier,
+	certVerifierV2 clients.IV2CertVerifier,
+	certVerifierV3 clients.IV3CertVerifier,
 	// if nil, then no metrics will be collected
 	registry *prometheus.Registry,
 ) (*PayloadDisperser, error) {
@@ -56,7 +61,8 @@ func NewPayloadDisperser(
 		logger:          logger,
 		config:          payloadDisperserConfig,
 		disperserClient: disperserClient,
-		certVerifier:    certVerifier,
+		certVerifierV2:  certVerifierV2,
+		certVerifierV3:  certVerifierV3,
 		stageTimer:      stageTimer,
 	}, nil
 }
@@ -73,7 +79,7 @@ func (pd *PayloadDisperser) SendPayload(
 	ctx context.Context,
 	// payload is the raw data to be stored on eigenDA
 	payload *coretypes.Payload,
-) (*coretypes.EigenDACert, error) {
+) ([]byte, error) {
 
 	probe := pd.stageTimer.NewSequence()
 	defer probe.End()
@@ -88,9 +94,53 @@ func (pd *PayloadDisperser) SendPayload(
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	requiredQuorums, err := pd.certVerifier.GetQuorumNumbersRequired(timeoutCtx)
-	if err != nil {
-		return nil, fmt.Errorf("get quorum numbers required: %w", err)
+
+	// cached entries
+	var requiredQuorums []uint8
+	var confirmationThreshold byte
+	var certVersion byte
+
+	if !pd.config.UseRouter {
+		requiredQuorums, err = pd.certVerifierV2.GetQuorumNumbersRequired(timeoutCtx)
+		if err != nil {
+			return nil, fmt.Errorf("get quorum numbers required: %w", err)
+		}
+
+		// since immutable cert verifier using the latest block number shouldn't matter
+		num, err := pd.ethClient.BlockNumber(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("get block number: %w", err)
+		}
+
+		confirmationThreshold, err = pd.certVerifierV2.GetConfirmationThreshold(timeoutCtx, num)
+		if err != nil {
+			return nil, fmt.Errorf("get quorum numbers required: %w", err)
+		}
+
+		certVersion = coretypes.VersionTwoCert // static version definition
+	} else {
+		// NOTE: there is a risk or edge-case here where a cert verifier activation can happen at a new block
+		//       number that's fetched later on
+		requiredQuorums, err = pd.certVerifierV3.GetQuorumNumbersRequired(timeoutCtx)
+		if err != nil {
+			return nil, fmt.Errorf("get quorum numbers required: %w", err)
+		}
+
+		// since immutable cert verifier using the latest block number shouldn't matter
+		num, err := pd.ethClient.BlockNumber(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("get block number: %w", err)
+		}
+
+		confirmationThreshold, err = pd.certVerifierV3.GetConfirmationThreshold(timeoutCtx, num)
+		if err != nil {
+			return nil, fmt.Errorf("get quorum numbers required: %w", err)
+		}
+
+		certVersion, err = pd.certVerifierV3.GetVersion(timeoutCtx, num)
+		if err != nil {
+			return nil, fmt.Errorf("get certificate version: %w", err)
+		}
 	}
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.DisperseBlobTimeout)
@@ -115,31 +165,60 @@ func (pd *PayloadDisperser) SendPayload(
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCompleteTimeout)
 	defer cancel()
-	blobStatusReply, err := pd.pollBlobStatusUntilSigned(timeoutCtx, blobKey, blobStatus.ToProfobuf(), probe)
+	blobStatusReply, err := pd.pollBlobStatusUntilSigned(timeoutCtx, blobKey, confirmationThreshold, blobStatus.ToProfobuf(), probe)
 	if err != nil {
 		return nil, fmt.Errorf("poll blob status until signed: %w", err)
 	}
 
 	pd.logSigningPercentages(blobKey, blobStatusReply)
-	probe.SetStage("build_cert")
 
-	eigenDACert, err := pd.buildEigenDACert(ctx, blobKey, blobStatusReply)
-	if err != nil {
-		// error returned from method is sufficiently descriptive
-		return nil, err
-	}
+	var certBytes []byte
+	if !pd.config.UseRouter {
+		probe.SetStage("build_cert")
+		eigenDAV2Cert, err := pd.buildEigenDAV2Cert(ctx, blobKey, blobStatusReply)
+		if err != nil {
+			// error returned from method is sufficiently descriptive
+			return nil, err
+		}
 
-	probe.SetStage("verify_cert")
+		probe.SetStage("verify_cert")
 
-	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
-	defer cancel()
-	err = pd.certVerifier.VerifyCertV2(timeoutCtx, eigenDACert)
-	if err != nil {
-		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
+		timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
+		defer cancel()
+
+		err = pd.certVerifierV2.VerifyCertV2(timeoutCtx, eigenDAV2Cert)
+		if err != nil {
+			return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
+		}
+	} else if certVersion == coretypes.VersionThreeCert {
+		// TODO: Add switch statement on cert version
+		probe.SetStage("build_cert")
+		eigenDAV3Cert, err := pd.buildEigenDAV3Cert(ctx, blobKey, blobStatusReply)
+		if err != nil {
+			// error returned from method is sufficiently descriptive
+			return nil, err
+		}
+
+		probe.SetStage("verify_cert")
+
+		// Encode v3 certificate into bytes
+		certBytes, err := cert_type_binding.ContractIEigenDACertTypeBindingsABI.Methods["dummyFnCertV3"].Inputs.Pack(eigenDAV3Cert)
+		if err != nil {
+			return nil, fmt.Errorf("encode cert: %w", err)
+		}
+
+		timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
+		defer cancel()
+
+		err = pd.certVerifierV3.CheckDACert(timeoutCtx, certBytes)
+		if err != nil {
+			return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
+		}
+
 	}
 	pd.logger.Debug("EigenDACert verified", "blobKey", blobKey.Hex())
 
-	return eigenDACert, nil
+	return certBytes, nil
 }
 
 // logSigningPercentages logs the signing percentage of each quorum for a blob that has been dispersed and satisfied
@@ -189,6 +268,7 @@ func (pd *PayloadDisperser) Close() error {
 func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 	ctx context.Context,
 	blobKey core.BlobKey,
+	confirmationThreshold byte,
 	initialStatus dispgrpc.BlobStatus,
 	probe *common.SequenceProbe,
 ) (*dispgrpc.BlobStatusReply, error) {
@@ -229,7 +309,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 			// TODO: we'll need to add more in-depth response status processing to derive failover errors
 			switch newStatus {
 			case dispgrpc.BlobStatus_COMPLETE:
-				err := checkThresholds(ctx, pd.certVerifier, blobStatusReply, blobKey.Hex())
+				err := checkThresholds(ctx, confirmationThreshold, blobStatusReply, blobKey.Hex())
 				if err != nil {
 					// returned error is verbose enough, no need to wrap it with additional context
 					return nil, err
@@ -244,7 +324,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 				// Report all non-terminal statuses to the probe. Repeat reports are no-ops.
 				probe.SetStage(newStatus.String())
 
-				err := checkThresholds(ctx, pd.certVerifier, blobStatusReply, blobKey.Hex())
+				err := checkThresholds(ctx, confirmationThreshold, blobStatusReply, blobKey.Hex())
 				if err == nil {
 					// If there's no error, then all thresholds are met, so we can stop polling
 					return blobStatusReply, nil
@@ -268,28 +348,53 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 	}
 }
 
-// buildEigenDACert makes a call to the getNonSignerStakesAndSignature view function on the EigenDACertVerifier
-// contract, and then assembles an EigenDACert
-func (pd *PayloadDisperser) buildEigenDACert(
+// buildEigenDAV2Cert makes a call to the getNonSignerStakesAndSignature view function on the EigenDAV2CertVerifier
+// contract, and then assembles an EigenDAV2Cert
+func (pd *PayloadDisperser) buildEigenDAV2Cert(
 	ctx context.Context,
 	blobKey core.BlobKey,
 	blobStatusReply *dispgrpc.BlobStatusReply,
-) (*coretypes.EigenDACert, error) {
+) (*coretypes.EigenDACertV2, error) {
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	nonSignerStakesAndSignature, err := pd.certVerifier.GetNonSignerStakesAndSignature(
+	nonSignerStakesAndSignature, err := pd.certVerifierV2.GetNonSignerStakesAndSignature(
 		timeoutCtx, blobStatusReply.GetSignedBatch())
 	if err != nil {
 		return nil, fmt.Errorf("get non signer stake and signature: %w", err)
 	}
 	pd.logger.Debug("Retrieved NonSignerStakesAndSignature", "blobKey", blobKey.Hex())
 
-	eigenDACert, err := coretypes.BuildEigenDACert(blobStatusReply, nonSignerStakesAndSignature)
+	eigenDACert, err := coretypes.BuildEigenDACertV2(blobStatusReply, nonSignerStakesAndSignature)
 	if err != nil {
-		return nil, fmt.Errorf("build eigen da cert: %w", err)
+		return nil, fmt.Errorf("build eigenda v3 cert: %w", err)
 	}
-	pd.logger.Debug("Constructed EigenDACert", "blobKey", blobKey.Hex())
+	pd.logger.Debug("Constructed EigenDACertV2", "blobKey", blobKey.Hex())
+
+	return eigenDACert, nil
+}
+
+// buildEigenDAV3Cert
+func (pd *PayloadDisperser) buildEigenDAV3Cert(
+	ctx context.Context,
+	blobKey core.BlobKey,
+	blobStatusReply *dispgrpc.BlobStatusReply,
+) (*coretypes.EigenDACertV3, error) {
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
+	defer cancel()
+	nonSignerStakesAndSignature, err := pd.certVerifierV3.GetNonSignerStakesAndSignature(
+		timeoutCtx, blobStatusReply.GetSignedBatch())
+	if err != nil {
+		return nil, fmt.Errorf("get non signer stake and signature: %w", err)
+	}
+	pd.logger.Debug("Retrieved NonSignerStakesAndSignature", "blobKey", blobKey.Hex())
+
+	eigenDACert, err := coretypes.BuildEigenDACertV3(blobStatusReply, nonSignerStakesAndSignature)
+	if err != nil {
+		return nil, fmt.Errorf("build eigenda v3 cert: %w", err)
+	}
+	pd.logger.Debug("Constructed EigenDACertV3", "blobKey", blobKey.Hex())
 
 	return eigenDACert, nil
 }
