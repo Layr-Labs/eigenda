@@ -51,7 +51,7 @@ contract CertVerifierDeployer is Script, Test {
         vm.startBroadcast();
 
         eigenDACertVerifier = address(
-            new EigenDACertVerifier(
+            new EigenDACertVerifierV3(
                 IEigenDAThresholdRegistry(eigenDAThresholdRegistry),
                 IEigenDASignatureVerifier(eigenDAServiceManager),
                 defaultSecurityThresholds,
