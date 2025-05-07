@@ -56,6 +56,7 @@ library DisperserRegistryLib {
         disperser.info =
             EigenDATypesV3.DisperserInfo({disperser: disperserAddress, registered: true, disperserURL: disperserURL});
         disperser.deposit = s().depositParams;
+        disperser.unlockTimestamp = type(uint64).max;
 
         return disperserKey;
     }
