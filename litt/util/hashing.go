@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/aead/siphash"
 )
@@ -64,15 +65,15 @@ func LegacyHashKey(key []byte, salt uint32) uint32 {
 }
 
 // HashKey hashes a key using perm64 and a salt.
-func HashKey(key []byte, salt [16]byte) uint32 {
+func HashKey(key []byte, salt [16]byte) (uint32, error) {
 	hasher, err := siphash.New64(salt[:])
 	if err != nil {
-		panic(err)
+		return 0, fmt.Errorf("unable to create hasher: %v", err)
 	}
 	hash, err := hasher.Write(key)
 	if err != nil {
-		panic(err)
+		return 0, fmt.Errorf("unable to hash key: %v", err)
 	}
 
-	return uint32(hash)
+	return uint32(hash), nil
 }

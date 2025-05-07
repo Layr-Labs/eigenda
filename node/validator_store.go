@@ -386,7 +386,12 @@ func (s *validatorStore) storeBatchLittDB(batchData []*BundleToStore) (uint64, e
 
 		go func() {
 			// Grab a lock on the hash of the blob. This protects against duplicate writes of the same blob.
-			lockIndex := uint64(util.HashKey(bundleKeyBytes[:], s.duplicateRequestSalt))
+			hash, err := util.HashKey(bundleKeyBytes[:], s.duplicateRequestSalt)
+			if err != nil {
+				writeCompleteChan <- fmt.Errorf("failed to hash key: %v", err)
+				return
+			}
+			lockIndex := uint64(hash)
 			s.duplicateRequestLock.Lock(lockIndex)
 			defer s.duplicateRequestLock.Unlock(lockIndex)
 

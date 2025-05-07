@@ -309,17 +309,22 @@ func (s *Segment) SetNextSegment(nextSegment *Segment) {
 }
 
 // GetShard returns the shard number for a key.
-func (s *Segment) GetShard(key []byte) uint32 {
+func (s *Segment) GetShard(key []byte) (uint32, error) {
 	if s.metadata.shardingFactor == 1 {
 		// Shortcut: if we have one shard, we don't need to hash the key to figure out the mapping.
-		return 0
+		return 0, nil
 	}
 
 	if s.metadata.serializationVersion == OldHashFunctionSerializationVersion {
-		return util.LegacyHashKey(key, s.metadata.legacySalt) % s.metadata.shardingFactor
+		return util.LegacyHashKey(key, s.metadata.legacySalt) % s.metadata.shardingFactor, nil
 	}
 
-	return util.HashKey(key, s.metadata.salt) % s.metadata.shardingFactor
+	hash, err := util.HashKey(key, s.metadata.salt)
+	if err != nil {
+		return 0, fmt.Errorf("failed to hash key: %v", err)
+	}
+
+	return hash % s.metadata.shardingFactor, nil
 }
 
 // Write records a key-value pair in the data segment, returning the maximum size of all shards within this segment.
@@ -331,7 +336,10 @@ func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64
 		return 0, 0, fmt.Errorf("segment is sealed, cannot write data")
 	}
 
-	shard := s.GetShard(data.Key)
+	shard, err := s.GetShard(data.Key)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get shard for key: %v", err)
+	}
 	currentSize := s.shardSizes[shard]
 
 	if currentSize > math.MaxUint32 {
@@ -385,7 +393,10 @@ func (s *Segment) GetMaxShardSize() uint64 {
 //
 // It is only thread safe to read from a segment if the key being read has previously been flushed to disk.
 func (s *Segment) Read(key []byte, dataAddress types.Address) ([]byte, error) {
-	shard := s.GetShard(key)
+	shard, err := s.GetShard(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get shard for key: %v", err)
+	}
 	values := s.shards[shard]
 
 	value, err := values.read(dataAddress.Offset())

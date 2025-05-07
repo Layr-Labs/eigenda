@@ -1222,7 +1222,8 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	diskTable := table.(*DiskTable)
 	nonEmptyShards := make(map[uint32]struct{})
 	for key := range keysInLastFile {
-		keyShard := diskTable.controlLoop.segments[highestSegmentIndex].GetShard(keysInLastFile[key].Key)
+		keyShard, err := diskTable.controlLoop.segments[highestSegmentIndex].GetShard(keysInLastFile[key].Key)
+		require.NoError(t, err)
 		nonEmptyShards[keyShard] = struct{}{}
 	}
 	var shard uint32
@@ -1248,7 +1249,8 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	// Figure out which keys are expected to be missing
 	missingKeys := make(map[string]struct{})
 	for _, key := range keysInLastFile {
-		keyShard := diskTable.controlLoop.segments[diskTable.controlLoop.highestSegmentIndex].GetShard(key.Key)
+		keyShard, err := diskTable.controlLoop.segments[diskTable.controlLoop.highestSegmentIndex].GetShard(key.Key)
+		require.NoError(t, err)
 		if keyShard != shard {
 			// key does not belong to the shard that was truncated
 			continue
