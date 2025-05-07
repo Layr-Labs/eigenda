@@ -35,6 +35,7 @@ type Config struct {
 	EncodingConfig              kzg.KzgConfig
 	EnableRatelimiter           bool
 	EnablePaymentMeterer        bool
+	ReservedOnly                bool
 	ChainReadTimeout            time.Duration
 	ReservationsTableName       string
 	OnDemandTableName           string
@@ -118,6 +119,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EncodingConfig:              encodingConfig,
 		EnableRatelimiter:           ctx.GlobalBool(flags.EnableRatelimiter.Name),
 		EnablePaymentMeterer:        ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
+		ReservedOnly:                ctx.GlobalBoolT(flags.ReservedOnly.Name),
 		ReservationsTableName:       ctx.GlobalString(flags.ReservationsTableName.Name),
 		OnDemandTableName:           ctx.GlobalString(flags.OnDemandTableName.Name),
 		GlobalRateTableName:         ctx.GlobalString(flags.GlobalRateTableName.Name),

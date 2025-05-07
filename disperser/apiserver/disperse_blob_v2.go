@@ -178,6 +178,10 @@ func (s *DispersalServerV2) validateDispersalRequest(
 		return nil, errors.New("payment metadata is required")
 	}
 
+	if s.ReservedOnly && blobHeader.PaymentMetadata.CumulativePayment.Sign() != 0 {
+		return nil, errors.New("on-demand payments are not supported by reserved-only mode disperser")
+	}
+
 	timestampIsNegative := blobHeader.PaymentMetadata.Timestamp < 0
 	paymentIsNegative := blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == -1
 	timestampIsZeroAndPaymentIsZero := blobHeader.PaymentMetadata.Timestamp == 0 && blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == 0
