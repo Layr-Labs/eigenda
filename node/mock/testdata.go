@@ -80,8 +80,6 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 					{5, 6, 7, 8},
 				},
 			},
-		},
-		1: {
 			{
 				Proof: encoding.Proof(*core.NewG1Point(big.NewInt(3), big.NewInt(4)).G1Affine),
 				Coeffs: []fr.Element{
@@ -114,8 +112,6 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 					{37, 38, 39, 40},
 				},
 			},
-		},
-		1: {
 			{
 				Proof: encoding.Proof(*core.NewG1Point(big.NewInt(11), big.NewInt(12)).G1Affine),
 				Coeffs: []fr.Element{
@@ -126,7 +122,7 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 		},
 	}
 	bundles2 := map[core.QuorumID]core.Bundle{
-		1: {
+		0: {
 			{
 				Proof: encoding.Proof(*core.NewG1Point(big.NewInt(13), big.NewInt(14)).G1Affine),
 				Coeffs: []fr.Element{
@@ -141,8 +137,6 @@ func MockBatch(t *testing.T) ([]v2.BlobKey, *v2.Batch, []map[core.QuorumID]core.
 					{61, 62, 63, 64},
 				},
 			},
-		},
-		2: {
 			{
 				Proof: encoding.Proof(*core.NewG1Point(big.NewInt(17), big.NewInt(18)).G1Affine),
 				Coeffs: []fr.Element{
