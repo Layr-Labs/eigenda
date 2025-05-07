@@ -72,6 +72,21 @@ func (mr *MockIManagerMockRecorder) GetDispersalBackend() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDispersalBackend", reflect.TypeOf((*MockIManager)(nil).GetDispersalBackend))
 }
 
+// GetOPKeccakValueFromS3 mocks base method.
+func (m *MockIManager) GetOPKeccakValueFromS3(ctx context.Context, key []byte) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOPKeccakValueFromS3", ctx, key)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetOPKeccakValueFromS3 indicates an expected call of GetOPKeccakValueFromS3.
+func (mr *MockIManagerMockRecorder) GetOPKeccakValueFromS3(ctx, key any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOPKeccakValueFromS3", reflect.TypeOf((*MockIManager)(nil).GetOPKeccakValueFromS3), ctx, key)
+}
+
 // Put mocks base method.
 func (m *MockIManager) Put(ctx context.Context, cm commitments.CommitmentMode, key, value []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
