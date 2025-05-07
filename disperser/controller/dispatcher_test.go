@@ -290,11 +290,15 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 	bhh, err := vis[0].BatchHeader.Hash()
 	require.NoError(t, err)
 
-	// When all operators fail to sign, no attestation is written
-	// so we expect a metadata not found error
-	_, err = components.BlobMetadataStore.GetAttestation(ctx, bhh)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "metadata not found")
+	// Test that empty attestation is written
+	att, err := components.BlobMetadataStore.GetAttestation(ctx, bhh)
+	require.NoError(t, err)
+	require.Nil(t, att.APKG2)
+	require.Len(t, att.QuorumAPKs, 0)
+	require.Nil(t, att.Sigma)
+	require.Len(t, att.QuorumNumbers, 0)
+	require.Len(t, att.QuorumResults, 0)
+	require.Len(t, att.NonSignerPubKeys, 0)
 
 	deleteBlobs(t, components.BlobMetadataStore, objsInBothQuorum.blobKeys, [][32]byte{bhh})
 	deleteBlobs(t, components.BlobMetadataStore, objsInQuorum1.blobKeys, [][32]byte{bhh})
