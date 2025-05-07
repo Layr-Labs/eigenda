@@ -5,7 +5,7 @@ import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 
 library EigenDATypesV3 {
     struct DisperserInfo {
-        address disperserAddress;
+        address disperser;
         uint64 withdrawalUnlock;
         bool registered;
         string disperserURL;

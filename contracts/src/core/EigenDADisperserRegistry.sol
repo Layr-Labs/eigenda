@@ -1,33 +1,38 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {EigenDADisperserRegistryStorage} from "./EigenDADisperserRegistryStorage.sol";
 import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
-import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
+import {EigenDATypesV3} from "src/core/libraries/v3/EigenDATypesV3.sol";
 
 /**
  * @title Registry for EigenDA disperser info
  * @author Layr Labs, Inc.
  */
-contract EigenDADisperserRegistry is OwnableUpgradeable, EigenDADisperserRegistryStorage, IEigenDADisperserRegistry {
-    constructor() {
-        _disableInitializers();
-    }
+contract EigenDADisperserRegistry is IEigenDADisperserRegistry {
 
-    function initialize(address _initialOwner) external initializer {
-        _transferOwnership(_initialOwner);
-    }
-
-    function setDisperserInfo(uint32 _disperserKey, EigenDATypesV2.DisperserInfo memory _disperserInfo)
-        external
-        onlyOwner
+    function setDisperserInfo(uint32 disperserKey, address disperser, string memory disperserURL)
+        external payable
     {
-        disperserKeyToInfo[_disperserKey] = _disperserInfo;
-        emit DisperserAdded(_disperserKey, _disperserInfo.disperserAddress);
+        _disperserInfo[disperserKey] = EigenDATypesV3.DisperserInfo({
+            disperser: disperser,
+            disperserURL: disperserURL,
+            registered: true,
+            withdrawalUnlock: type(uint64).max
+        });
+        emit DisperserAdded(disperserKey, disperser);
     }
 
-    function disperserKeyToAddress(uint32 _key) external view returns (address) {
-        return disperserKeyToInfo[_key].disperserAddress;
+    function deregisterDisperser(uint32 _disperserKey) external {
+        require(_disperserInfo[_disperserKey].registered, "Disperser not registered");
+        _disperserInfo[_disperserKey].registered = false;
+        _disperserInfo[_disperserKey].withdrawalUnlock = uint64(block.timestamp + 1 days);
+
+    }
+
+    function withdrawDeposit(uint32 _disperserKey) external {
+    }
+
+    function disperserInfo(uint32 _key) external view returns (EigenDATypesV3.DisperserInfo memory) {
+        return _disperserInfo[_key];
     }
 }
