@@ -76,8 +76,9 @@ func checkThresholds(
 		return fmt.Errorf("expected non-nil batch header: %v", protoToString(blobStatusReply))
 	}
 
-	// Check if all thresholds are met
-	for _, signedPercentage := range quorumSignedPercentages {
+	// Check if all thresholds are met for the quorums defined in the blob header
+	for _, quorum := range blobQuorumNumbers {
+		signedPercentage := signedPercentagesMap[quorum]
 		if signedPercentage < confirmationThreshold {
 			return &thresholdNotMetError{
 				BlobKey:               blobKey,
