@@ -9,10 +9,9 @@ import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVe
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 
-import {EigenDACertVerificationV2Lib as CertV2Lib} from "src/periphery/cert/v2/EigenDACertVerificationV2Lib.sol";
-import {EigenDACertVerificationV3Lib as CertV3Lib} from "src/periphery/cert/v3/EigenDACertVerificationV3Lib.sol";
+import {EigenDACertVerificationLib as CertLib} from "src/periphery/cert/libraries/EigenDACertVerificationLib.sol";
 
-contract EigenDACertVerifierV3 is IEigenDACertVerifier {
+contract EigenDACertVerifier is IEigenDACertVerifier {
     error InvalidSecurityThresholds();
 
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
@@ -41,7 +40,7 @@ contract EigenDACertVerifierV3 is IEigenDACertVerifier {
     }
 
     function checkDACert(bytes calldata certBytes) external view returns (uint8) {
-        (CertV2Lib.StatusCode status,) = CertV3Lib.checkDACert(
+        (CertLib.StatusCode status,) = CertLib.checkDACert(
             eigenDAThresholdRegistry, eigenDASignatureVerifier, certBytes, securityThresholds, quorumNumbersRequired
         );
         return uint8(status);
