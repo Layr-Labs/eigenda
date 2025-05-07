@@ -12,7 +12,6 @@ import (
 const (
 
 	// OldHashFunctionSerializationVersion is the serialization version for the old hash function.
-	// TODO (cody.littley) before merging, write a unit test that tests migration.
 	OldHashFunctionSerializationVersion = uint32(0)
 
 	// CurrentSerializationVersion is current serialization version. If we ever change how we serialize data,
