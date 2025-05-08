@@ -521,7 +521,7 @@ func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
 	return nil
 }
 
-func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
+func (d *DiskTable) Get(key []byte) (value []byte, exists bool, err error) {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
 		return nil, false, fmt.Errorf(
 			"Cannot process Get() request, DB is in panicked state due to error: %w", err)
@@ -574,6 +574,73 @@ func (d *DiskTable) Get(key []byte) ([]byte, bool, error) {
 	return data, true, nil
 }
 
+func (d *DiskTable) CacheAwareGet(
+	key []byte,
+	onlyReadFromCache bool,
+) (value []byte, exists bool, hot bool, err error) {
+
+	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+		return nil, false, false, fmt.Errorf(
+			"Cannot process CacheAwareGet() request, DB is in panicked state due to error: %w", err)
+	}
+
+	var cacheHit bool
+	var dataSize uint64
+	if d.metrics != nil {
+		start := d.clock()
+		defer func() {
+			end := d.clock()
+			delta := end.Sub(start)
+			d.metrics.ReportReadOperation(d.name, delta, dataSize, cacheHit)
+		}()
+	}
+
+	// First, check if the key is in the unflushed data map. If so, return it from there.
+	// Performance wise, this has equivalent semantics to reading the value from
+	// a cache, so we'd might as well count it as a cache hit.
+	var rawValue any
+	if rawValue, exists = d.unflushedDataCache.Load(util.UnsafeBytesToString(key)); exists {
+		value = rawValue.([]byte)
+		cacheHit = true
+		dataSize = uint64(len(value))
+		return value, true, true, nil
+	}
+
+	// Look up the address of the data.
+	var address types.Address
+	address, exists, err = d.keymap.Get(key)
+	if err != nil {
+		return nil, false, false, fmt.Errorf("failed to get address: %w", err)
+	}
+	if !exists {
+		return nil, false, false, nil
+	}
+
+	if onlyReadFromCache {
+		// The value exists but we are not allowed to read it from disk.
+		return nil, true, false, nil
+	}
+
+	// Reserve the segment that contains the data.
+	seg, ok := d.controlLoop.getReservedSegment(address.Index())
+	if !ok {
+		// This can happen if there is a race between this thread and the GC thread, i.e.
+		// if we start reading a value just as the garbage collector decides to delete it.
+		return nil, false, false, nil
+	}
+	defer seg.Release()
+
+	// Read the data from disk.
+	value, err = seg.Read(key, address)
+	if err != nil {
+		return nil, false, false, fmt.Errorf("failed to read data: %w", err)
+	}
+
+	dataSize = uint64(len(value))
+
+	return value, true, false, nil
+}
+
 func (d *DiskTable) Put(key []byte, value []byte) error {
 	return d.PutBatch([]*types.KVPair{{Key: key, Value: value}})
 }
@@ -602,6 +669,12 @@ func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 		}
 		if len(kv.Value) > math.MaxUint32 {
 			return fmt.Errorf("value is too large, length must not exceed 2^32 bytes: %d bytes", len(kv.Value))
+		}
+		if kv.Key == nil {
+			return fmt.Errorf("nil keys are not supported")
+		}
+		if kv.Value == nil {
+			return fmt.Errorf("nil values are not supported")
 		}
 
 		d.unflushedDataCache.Store(util.UnsafeBytesToString(kv.Key), kv.Value)
@@ -665,9 +738,20 @@ func (d *DiskTable) Flush() error {
 	return nil
 }
 
-func (d *DiskTable) SetCacheSize(_ uint64) error {
+func (d *DiskTable) SetWriteCacheSize(size uint64) error {
 	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
-		return fmt.Errorf("Cannot process SetCacheSize() request, DB is in panicked state due to error: %w", err)
+		return fmt.Errorf(
+			"Cannot process SetWriteCacheSize() request, DB is in panicked state due to error: %w", err)
+	}
+
+	// this implementation does not provide a cache, if a cache is needed then it must be provided by a wrapper
+	return nil
+}
+
+func (d *DiskTable) SetReadCacheSize(size uint64) error {
+	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+		return fmt.Errorf(
+			"Cannot process SetReadCacheSize() request, DB is in panicked state due to error: %w", err)
 	}
 
 	// this implementation does not provide a cache, if a cache is needed then it must be provided by a wrapper

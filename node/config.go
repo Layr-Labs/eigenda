@@ -116,8 +116,27 @@ type Config struct {
 	// A special test only setting. If true, then littDB will throw an error if the same data is written twice.
 	LittDBDoubleWriteProtection bool
 
-	// The size of the cache for storing chunks in littDB, in gigabytes.
-	LittDBChunkCacheSizeGB float64
+	// The size of the cache for storing recently written chunks in littDB, in gigabytes.
+	LittDBWriteCacheSizeGB float64
+
+	// The size of the cache for storing recently read chunks in littDB, in gigabytes.
+	LittDBReadCacheSizeGB float64
+
+	// The rate limit for the number of bytes served by the GetChunks API if the data is in the cache.
+	// Unit is in megabytes per second.
+	GetChunksHotCacheReadLimitMB float64
+
+	// The burst limit for the number of bytes served by the GetChunks API if the data is in the cache.
+	// Unit is in megabytes.
+	GetChunksHotBurstLimitMB float64
+
+	// The rate limit for the number of bytes served by the GetChunks API if the data is not in the cache.
+	// Unit is in megabytes per second.
+	GetChunksColdCacheReadLimitMB float64
+
+	// The burst limit for the number of bytes served by the GetChunks API if the data is not in the cache.
+	// Unit is in megabytes.
+	GetChunksColdBurstLimitMB float64
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -340,7 +359,12 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),
 		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
 		LittDBEnabled:                       ctx.GlobalBool(flags.LittDBEnabledFlag.Name),
-		LittDBChunkCacheSizeGB:              ctx.GlobalFloat64(flags.LittDBCacheSizeGBFlag.Name),
+		LittDBWriteCacheSizeGB:              ctx.GlobalFloat64(flags.LittDBWriteCacheSizeGBFlag.Name),
+		LittDBReadCacheSizeGB:               ctx.GlobalFloat64(flags.LittDBReadCacheSizeGBFlag.Name),
 		DownloadPoolSize:                    ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
+		GetChunksHotCacheReadLimitMB:        ctx.GlobalFloat64(flags.GetChunksHotCacheReadLimitMBFlag.Name),
+		GetChunksHotBurstLimitMB:            ctx.GlobalFloat64(flags.GetChunksHotBurstLimitMBFlag.Name),
+		GetChunksColdCacheReadLimitMB:       ctx.GlobalFloat64(flags.GetChunksColdCacheReadLimitMBFlag.Name),
+		GetChunksColdBurstLimitMB:           ctx.GlobalFloat64(flags.GetChunksColdBurstLimitMBFlag.Name),
 	}, nil
 }
