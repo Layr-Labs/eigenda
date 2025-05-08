@@ -65,21 +65,20 @@ func NewRelayPayloadRetriever(
 // verified prior to calling this method.
 func (pr *RelayPayloadRetriever) GetPayload(
 	ctx context.Context,
-	eigenDACert *coretypes.EigenDACert) (*coretypes.Payload, error) {
+	eigenDACert coretypes.EigenDACert) (*coretypes.Payload, error) {
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	if err != nil {
 		return nil, fmt.Errorf("compute blob key: %w", err)
 	}
 
-	relayKeys := eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys
+	relayKeys := eigenDACert.RelayKeys()
 	relayKeyCount := len(relayKeys)
 	if relayKeyCount == 0 {
 		return nil, errors.New("relay key count is zero")
 	}
 
-	blobCommitments, err := coretypes.BlobCommitmentsBindingToInternal(
-		&eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment)
+	blobCommitments, err := eigenDACert.Commitments()
 
 	if err != nil {
 		return nil, fmt.Errorf("blob commitments binding to internal: %w", err)
@@ -95,7 +94,7 @@ func (pr *RelayPayloadRetriever) GetPayload(
 	for _, val := range indices {
 		relayKey := relayKeys[val]
 
-		blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
+		blobLengthSymbols := uint32(blobCommitments.Length)
 
 		blob, err := pr.retrieveBlobWithTimeout(ctx, relayKey, blobKey, blobLengthSymbols)
 		// if GetBlob returned an error, try calling a different relay

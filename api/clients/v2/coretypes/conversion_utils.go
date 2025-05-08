@@ -9,6 +9,7 @@ import (
 	commonv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	disperserv2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	contractEigenDACertVerifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
+	cert_types_binding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -16,8 +17,8 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func SignedBatchProtoToBinding(inputBatch *disperserv2.SignedBatch) (*contractEigenDACertVerifier.EigenDATypesV2SignedBatch, error) {
-	convertedBatchHeader, err := BatchHeaderProtoToBinding(inputBatch.GetHeader())
+func SignedBatchProtoToV2CertBinding(inputBatch *disperserv2.SignedBatch) (*contractEigenDACertVerifier.EigenDATypesV2SignedBatch, error) {
+	convertedBatchHeader, err := BatchHeaderProtoToV2CertVerifierBinding(inputBatch.GetHeader())
 	if err != nil {
 		return nil, fmt.Errorf("convert batch header: %s", err)
 	}
@@ -35,7 +36,7 @@ func SignedBatchProtoToBinding(inputBatch *disperserv2.SignedBatch) (*contractEi
 	return outputSignedBatch, nil
 }
 
-func BatchHeaderProtoToBinding(inputHeader *commonv2.BatchHeader) (*contractEigenDACertVerifier.EigenDATypesV2BatchHeaderV2, error) {
+func BatchHeaderProtoToV2CertVerifierBinding(inputHeader *commonv2.BatchHeader) (*contractEigenDACertVerifier.EigenDATypesV2BatchHeaderV2, error) {
 	var outputBatchRoot [32]byte
 
 	inputBatchRoot := inputHeader.GetBatchRoot()
@@ -55,6 +56,19 @@ func BatchHeaderProtoToBinding(inputHeader *commonv2.BatchHeader) (*contractEige
 	convertedHeader := &contractEigenDACertVerifier.EigenDATypesV2BatchHeaderV2{
 		BatchRoot:            outputBatchRoot,
 		ReferenceBlockNumber: uint32(inputReferenceBlockNumber),
+	}
+
+	return convertedHeader, nil
+}
+func BatchHeaderProtoToIEigenDATypesBinding(inputHeader *commonv2.BatchHeader) (*cert_types_binding.EigenDATypesV2BatchHeaderV2, error) {
+	verifierBatchHeaderBinding, err := BatchHeaderProtoToV2CertVerifierBinding(inputHeader)
+	if err != nil {
+		return nil, err
+	}
+
+	convertedHeader := &cert_types_binding.EigenDATypesV2BatchHeaderV2{
+		BatchRoot:            verifierBatchHeaderBinding.BatchRoot,
+		ReferenceBlockNumber: verifierBatchHeaderBinding.ReferenceBlockNumber,
 	}
 
 	return convertedHeader, nil
@@ -111,7 +125,37 @@ func attestationProtoToBinding(inputAttestation *disperserv2.Attestation) (*cont
 	return convertedAttestation, nil
 }
 
-func InclusionInfoProtoToBinding(inputInclusionInfo *disperserv2.BlobInclusionInfo) (*contractEigenDACertVerifier.EigenDATypesV2BlobInclusionInfo, error) {
+func InclusionInfoProtoToIEigenDATypesBinding(inputInclusionInfo *disperserv2.BlobInclusionInfo) (*cert_types_binding.EigenDATypesV2BlobInclusionInfo, error) {
+	convertedBlobCertificate, err := blobCertificateProtoToBinding(inputInclusionInfo.GetBlobCertificate())
+	if err != nil {
+		return nil, fmt.Errorf("convert blob certificate: %s", err)
+	}
+
+	blobCertificateTypesBinding := &cert_types_binding.EigenDATypesV2BlobCertificate{
+		BlobHeader: cert_types_binding.EigenDATypesV2BlobHeaderV2{
+			Version: convertedBlobCertificate.BlobHeader.Version,
+			QuorumNumbers: convertedBlobCertificate.BlobHeader.QuorumNumbers,
+			Commitment: cert_types_binding.EigenDATypesV2BlobCommitment{
+				Commitment: cert_types_binding.BN254G1Point(convertedBlobCertificate.BlobHeader.Commitment.Commitment),
+				LengthCommitment: cert_types_binding.BN254G2Point(convertedBlobCertificate.BlobHeader.Commitment.LengthCommitment),
+				LengthProof: cert_types_binding.BN254G2Point(convertedBlobCertificate.BlobHeader.Commitment.LengthProof),
+				Length: convertedBlobCertificate.BlobHeader.Commitment.Length,
+			},
+			PaymentHeaderHash: convertedBlobCertificate.BlobHeader.PaymentHeaderHash,
+		},
+		Signature: convertedBlobCertificate.Signature,
+		RelayKeys: convertedBlobCertificate.RelayKeys,
+	}
+
+
+	return &cert_types_binding.EigenDATypesV2BlobInclusionInfo{
+		BlobCertificate: *blobCertificateTypesBinding,
+		BlobIndex:       inputInclusionInfo.GetBlobIndex(),
+		InclusionProof:  inputInclusionInfo.GetInclusionProof(),
+	}, nil
+}
+
+func InclusionInfoProtoToV2CertVerifierBinding(inputInclusionInfo *disperserv2.BlobInclusionInfo) (*contractEigenDACertVerifier.EigenDATypesV2BlobInclusionInfo, error) {
 	convertedBlobCertificate, err := blobCertificateProtoToBinding(inputInclusionInfo.GetBlobCertificate())
 
 	if err != nil {

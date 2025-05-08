@@ -31,7 +31,7 @@ type CertVerifier struct {
 	confirmationThresholds sync.Map
 }
 
-var _ clients.ICertVerifier = &CertVerifier{}
+var _ clients.IV2CertVerifier = &CertVerifier{}
 
 // NewCertVerifier constructs a CertVerifier
 func NewCertVerifier(
@@ -58,12 +58,12 @@ func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
 	// Contains all necessary information about the blob, so that the cert can be verified.
 	blobInclusionInfo *disperser.BlobInclusionInfo,
 ) error {
-	convertedSignedBatch, err := coretypes.SignedBatchProtoToBinding(signedBatch)
+	convertedSignedBatch, err := coretypes.SignedBatchProtoToV2CertBinding(signedBatch)
 	if err != nil {
 		return fmt.Errorf("convert signed batch: %w", err)
 	}
 
-	convertedBlobInclusionInfo, err := coretypes.InclusionInfoProtoToBinding(blobInclusionInfo)
+	convertedBlobInclusionInfo, err := coretypes.InclusionInfoProtoToV2CertVerifierBinding(blobInclusionInfo)
 	if err != nil {
 		return fmt.Errorf("convert blob inclusion info: %w", err)
 	}
@@ -90,7 +90,7 @@ func (cv *CertVerifier) VerifyCertV2FromSignedBatch(
 // VerifyCertV2 calls the VerifyCertV2 view function on the EigenDACertVerifier contract.
 //
 // This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
-func (cv *CertVerifier) VerifyCertV2(ctx context.Context, eigenDACert *coretypes.EigenDACert) error {
+func (cv *CertVerifier) VerifyCertV2(ctx context.Context, eigenDACert *coretypes.EigenDACertV2) error {
 	referenceBlockNumber := uint64(eigenDACert.BatchHeader.ReferenceBlockNumber)
 
 	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, referenceBlockNumber)
@@ -118,7 +118,7 @@ func (cv *CertVerifier) GetNonSignerStakesAndSignature(
 	ctx context.Context,
 	signedBatch *disperser.SignedBatch,
 ) (*verifierBindings.EigenDATypesV1NonSignerStakesAndSignature, error) {
-	signedBatchBinding, err := coretypes.SignedBatchProtoToBinding(signedBatch)
+	signedBatchBinding, err := coretypes.SignedBatchProtoToV2CertBinding(signedBatch)
 	if err != nil {
 		return nil, fmt.Errorf("convert signed batch: %w", err)
 	}

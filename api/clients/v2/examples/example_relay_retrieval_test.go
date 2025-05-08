@@ -56,7 +56,7 @@ func Example_relayPayloadRetrieval() {
 	fmt.Printf("Successfully retrieved payload\n")
 
 	// Create a cert verifier, to verify the certificate on chain
-	certVerifier, err := createCertVerifier()
+	certVerifier, err := createCertVerifierV2()
 	if err != nil {
 		panic(fmt.Sprintf("create cert verifier: %v", err))
 	}

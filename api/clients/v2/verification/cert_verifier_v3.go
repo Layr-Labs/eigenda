@@ -25,7 +25,7 @@ import (
 type CertVerifierV3 struct {
 	logger                  logging.Logger
 	ethClient               common.EthClient
-	opsrCaller              opsr_binding.ContractOperatorStateRetrieverCaller
+	opsrCaller              *opsr_binding.ContractOperatorStateRetrieverCaller
 	registryCoordinatorAddr gethcommon.Address
 	routerAddressProvider   clients.CertVerifierAddressProvider
 
@@ -97,8 +97,8 @@ func (cv *CertVerifierV3) CheckDACert(
 func (cv *CertVerifierV3) GetNonSignerStakesAndSignature(
 	ctx context.Context,
 	signedBatch *disperser.SignedBatch,
-) (*cert_type_binding.NonSignerStakesAndSignature, error) {
-	signedBatchBinding, err := coretypes.SignedBatchProtoToBinding(signedBatch)
+) (*cert_type_binding.EigenDATypesV1NonSignerStakesAndSignature, error) {
+	signedBatchBinding, err := coretypes.SignedBatchProtoToV2CertBinding(signedBatch)
 	if err != nil {
 		return nil, fmt.Errorf("convert signed batch: %w", err)
 	}
@@ -126,13 +126,42 @@ func (cv *CertVerifierV3) GetNonSignerStakesAndSignature(
 		return nil, fmt.Errorf("check sig indices call: %w", err)
 	}
 
+	// 3 - translate from CertVerifier binding types to cert type
+	// TODO: Should probably put SignedBatch into the types directly to avoid this downstream conversion
+	nonSignerPubKeysBN254 := make([]cert_type_binding.BN254G1Point, len(signedBatchBinding.Attestation.NonSignerPubkeys))
+	for i, pubKeySet := range signedBatchBinding.Attestation.NonSignerPubkeys {
+		nonSignerPubKeysBN254[i] = cert_type_binding.BN254G1Point{
+			X: pubKeySet.X,
+			Y: pubKeySet.Y,
+		}
+	}
+
+	quorumApksBN254 := make([]cert_type_binding.BN254G1Point, len(signedBatchBinding.Attestation.QuorumApks))
+	for i, apkSet := range signedBatchBinding.Attestation.QuorumApks {
+		quorumApksBN254[i] = cert_type_binding.BN254G1Point{
+			X: apkSet.X,
+			Y: apkSet.Y,
+		}
+	}
+
+	apkG2BN254 := cert_type_binding.BN254G2Point{
+		X: signedBatchBinding.Attestation.ApkG2.X,
+		Y: signedBatchBinding.Attestation.ApkG2.Y,
+	}
+
+	sigmaBN254 := cert_type_binding.BN254G1Point{
+		X: signedBatchBinding.Attestation.Sigma.X,
+		Y: signedBatchBinding.Attestation.Sigma.Y,
+	}
+
+
 	// 3 - construct non signer stakes and signature
 	return &cert_type_binding.EigenDATypesV1NonSignerStakesAndSignature{
 		NonSignerQuorumBitmapIndices: checkSigIndices.NonSignerQuorumBitmapIndices,
-		NonSignerPubkeys:             signedBatchBinding.Attestation.NonSignerPubkeys,
-		QuorumApks:                   signedBatchBinding.Attestation.QuorumApks,
-		ApkG2:                        signedBatchBinding.Attestation.ApkG2,
-		Sigma:                        signedBatchBinding.Attestation.Sigma,
+		NonSignerPubkeys:             nonSignerPubKeysBN254,
+		QuorumApks:                   quorumApksBN254,
+		ApkG2:                        apkG2BN254,
+		Sigma:                        sigmaBN254,
 		QuorumApkIndices:             checkSigIndices.QuorumApkIndices,
 		TotalStakeIndices:            checkSigIndices.TotalStakeIndices,
 		NonSignerStakeIndices:        checkSigIndices.NonSignerStakeIndices,
@@ -290,7 +319,7 @@ func (cv *CertVerifierV3) GetVersion(ctx context.Context, referenceBlockNumber u
 		return 0, fmt.Errorf("get verifier caller from block number: %w", err)
 	}
 
-	version, err := certVerifierCaller.Version(&bind.CallOpts{Context: ctx})
+	version, err := certVerifierCaller.CertVersion(&bind.CallOpts{Context: ctx})
 	if err != nil {
 		return 0, fmt.Errorf("get version via contract call: %w", err)
 	}
