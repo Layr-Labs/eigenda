@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var (
@@ -249,7 +250,7 @@ func (v *shardValidator) verifyBlobLengthWorker(blobCommitments encoding.BlobCom
 }
 
 // GetNodeInfoFromEndpoint pings the operator's endpoint and returns NodeInfoReply
-func GetNodeInfoFromEndpoint(ctx context.Context, endpoint string) (*pbvalidator.GetNodeInfoReply, error) {
+func GetNodeInfoFromEndpoint(ctx context.Context, socket string) (*pbvalidator.GetNodeInfoReply, error) {
 
 	loggerConfig := common.DefaultLoggerConfig()
 	logger, err := common.NewLogger(loggerConfig)
@@ -257,9 +258,16 @@ func GetNodeInfoFromEndpoint(ctx context.Context, endpoint string) (*pbvalidator
 		panic(err)
 	}
 	logger = logger.With("component", "GetNodeInfoFromEndpoint")
+	logger.Info("Getting node info from endpoint", "socket", socket)
+
+	host, _, _, v2DispersalPort, _, err := core.ParseOperatorSocket(socket)
+	if err != nil {
+		return nil, err
+	}
+	endpoint := fmt.Sprintf("%s:%s", host, v2DispersalPort)
 	logger.Info("Getting node info from endpoint", "endpoint", endpoint)
 
-	conn, err := grpc.NewClient(endpoint)
+	conn, err := grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		logger.Error("Failed to create GRPC client", "endpoint", endpoint, "error", err)
 		return nil, err

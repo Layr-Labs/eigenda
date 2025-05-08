@@ -41,10 +41,34 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	
 	if s.operatorVersionCheck {
 		s.logger.Info("Operator version check is enabled")
-		if s.operatorSetRolloutReadyByQuorum == nil || s.currentRolloutStakePctByQuorum == nil {
-			s.logger.Info("Rollout state maps are nil, initializing via periodicOperatorNodeInfoCheck")
+		
+		// Initialize the node info checker if not already done
+		// This will happen only once, no matter how many parallel requests come in
+		s.nodeInfoCheckInitOnce.Do(func() {
+			s.logger.Info("First DisperseBlob request received, initializing operator node info and starting periodic check")
+			
+			// Run initial check synchronously
 			s.periodicOperatorNodeInfoCheck(ctx)
-		}
+			
+			// Start periodic check in background
+			go func() {
+				ticker := time.NewTicker(time.Hour)
+				defer ticker.Stop()
+				s.logger.Info("Operator node info check ticker started from DisperseBlob")
+				
+				for {
+					select {
+					case <-ticker.C:
+						s.logger.Info("Operator node info check triggered by ticker")
+						s.periodicOperatorNodeInfoCheck(ctx)
+					case <-ctx.Done():
+						s.logger.Info("Operator node info check goroutine shutting down")
+						return
+					}
+				}
+			}()
+		})
+		
 		if err := s.checkQuorumRolloutReady(req); err != nil {
 			s.logger.Warn("Quorum rollout check failed", "error", err)
 			return nil, err

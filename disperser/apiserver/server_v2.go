@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -32,7 +33,7 @@ import (
 )
 
 // Hardcoded required node version and threshold
-const requiredNodeVersion = "0.8.6"
+const requiredNodeVersion = ">=0.9.0-rc.1"
 const requiredNodeVersionStakeThreshold = 0.8 // 80%
 
 type OnchainState struct {
@@ -83,6 +84,7 @@ type DispersalServerV2 struct {
 	operatorSetRolloutReadyByQuorum map[core.QuorumID]bool
 	currentRolloutStakePctByQuorum  map[core.QuorumID]float64 // for diagnostics and error messages
 	operatorVersionCheck            bool                      // If true, enforce node version rollout check
+	nodeInfoCheckInitOnce           sync.Once                 // Ensures we only initialize the node info check once
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
@@ -211,32 +213,14 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 		}
 	}()
 
-	// Periodic operator node info check (every hour)
+	// We no longer start a periodic check here, it will be triggered on-demand when DisperseBlob is called
 	if s.operatorVersionCheck {
-		go func() {
-			s.logger.Info("Starting operator node info check goroutine", "checkInterval", time.Hour)
-
-			// Do an initial operator version check immediately
-			s.logger.Info("Performing initial operator node info check")
-			s.periodicOperatorNodeInfoCheck(ctx)
-
-			ticker := time.NewTicker(time.Hour)
-			defer ticker.Stop()
-			s.logger.Info("Operator node info check ticker started")
-
-			for {
-				select {
-				case <-ticker.C:
-					s.logger.Info("Operator node info check triggered by ticker")
-					s.periodicOperatorNodeInfoCheck(ctx)
-				case <-ctx.Done():
-					s.logger.Info("Operator node info check goroutine shutting down")
-					return
-				}
-			}
-		}()
+		s.logger.Info("Operator version check is enabled, but periodic check will be started on first DisperseBlob request")
+		// Initialize the maps to avoid nil pointer dereference
+		s.operatorSetRolloutReadyByQuorum = make(map[core.QuorumID]bool)
+		s.currentRolloutStakePctByQuorum = make(map[core.QuorumID]float64)
 	} else {
-		s.logger.Info("Operator version check is disabled, not starting periodic check")
+		s.logger.Info("Operator version check is disabled")
 	}
 
 	s.logger.Info("GRPC Listening", "port", s.serverConfig.GrpcPort, "address", listener.Addr().String())
