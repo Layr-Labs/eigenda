@@ -58,6 +58,7 @@ func NewPayloadDisperser(
 	}
 
 	stageTimer := common.NewStageTimer(registry, "PayloadDisperser", "SendPayload", false)
+
 	return &PayloadDisperser{
 		logger:          logger,
 		ethClient:       ethClient,
@@ -92,7 +93,7 @@ func (pd *PayloadDisperser) SendPayload(
 	// to dictate whether the representation is in coefficient (requires IFFT) or evaluation form
 	blob, err := payload.ToBlob(pd.config.PayloadPolynomialForm)
 	if err != nil {
-		return nil, fmt.Errorf("convert payload to blob: %w", err)
+		return nil, fmt.Errorf("failed to convert payload to blob: %w", err)
 	}
 
 	probe.SetStage("get_quorums")
