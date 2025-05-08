@@ -53,7 +53,7 @@ func NewValidatorPayloadRetriever(
 // payload is returned.
 func (pr *ValidatorPayloadRetriever) GetPayload(
 	ctx context.Context,
-	eigenDACert *coretypes.EigenDACert,
+	eigenDACert *coretypes.EigenDACertV2,
 ) (*coretypes.Payload, error) {
 
 	blobKey, err := eigenDACert.ComputeBlobKey()

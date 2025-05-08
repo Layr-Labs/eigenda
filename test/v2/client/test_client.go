@@ -496,7 +496,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 }
 
 // DispersePayload sends a payload to the disperser. Returns the blob key.
-func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (*coretypes.EigenDACert, error) {
+func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (*coretypes.EigenDACertV3, error) {
 	c.logger.Debugf("Dispersing payload of length %d", len(payloadBytes))
 	start := time.Now()
 

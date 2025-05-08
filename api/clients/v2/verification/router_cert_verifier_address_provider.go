@@ -32,5 +32,5 @@ func BuildRouterAddressProvider(routerAddr gethcommon.Address, ethClient common.
 
 // GetCertVerifierAddress returns the cert verifier address for the given reference block number
 func (rap *RouterAddressProvider) GetCertVerifierAddress(ctx context.Context, referenceBlockNumber uint64) (gethcommon.Address, error) {
-	return rap.routerBinding.GetCertVerifierAt(&bind.CallOpts{Context: ctx}, referenceBlockNumber)
+	return rap.routerBinding.GetCertVerifierAt(&bind.CallOpts{Context: ctx}, uint32(referenceBlockNumber))
 }

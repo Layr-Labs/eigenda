@@ -6,6 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
+	cert_type_binding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 )
 
 // IV2CertVerifier is an interface for interacting with the EigenDACertVerifier contract.
@@ -13,7 +14,7 @@ type IV2CertVerifier interface {
 	// VerifyCertV2 calls the VerifyCertV2 view function on the EigenDACertVerifier contract.
 	//
 	// This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
-	VerifyCertV2(ctx context.Context, eigenDACert *coretypes.EigenDACert) error
+	VerifyCertV2(ctx context.Context, eigenDACert *coretypes.EigenDACertV2) error
 
 	// GetNonSignerStakesAndSignature calls the getNonSignerStakesAndSignature view function on the EigenDACertVerifier
 	// contract, and returns the resulting NonSignerStakesAndSignature object.
@@ -38,14 +39,14 @@ type IV3CertVerifier interface {
 	// CheckDACert calls the CheckDACert view function on the EigenDACertVerifier contract.
 	//
 	// This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
-	CheckDACert(ctx context.Context, daCert []byte) error
+	CheckDACert(ctx context.Context, rbn uint64, daCert []byte) error
 
 	// GetNonSignerStakesAndSignature calls the getNonSignerStakesAndSignature view function on the EigenDACertVerifier
 	// contract, and returns the resulting NonSignerStakesAndSignature object.
 	GetNonSignerStakesAndSignature(
 		ctx context.Context,
 		signedBatch *disperser.SignedBatch,
-	) (*verifierBindings.EigenDATypesV1NonSignerStakesAndSignature, error)
+	) (*cert_type_binding.EigenDATypesV1NonSignerStakesAndSignature, error)
 
 	// GetQuorumNumbersRequired queries the cert verifier contract for the configured set of quorum numbers that must
 	// be set in the BlobHeader, and verified in VerifyDACertV2 and verifyDACertV2FromSignedBatch
@@ -57,5 +58,5 @@ type IV3CertVerifier interface {
 	// "available".
 	GetConfirmationThreshold(ctx context.Context, referenceBlockNumber uint64) (uint8, error)
 
-	GetVersion(ctx ctx.Context, referenceBlockNumber uint64) (uint8, error)
+	GetVersion(ctx context.Context, referenceBlockNumber uint64) (uint8, error)
 }

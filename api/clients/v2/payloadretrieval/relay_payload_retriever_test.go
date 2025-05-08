@@ -85,7 +85,7 @@ func buildBlobAndCert(
 	t *testing.T,
 	tester RelayPayloadRetrieverTester,
 	relayKeys []core.RelayKey,
-) (core.BlobKey, []byte, *coretypes.EigenDACert) {
+) (core.BlobKey, []byte, *coretypes.EigenDACertV2) {
 
 	payloadBytes := tester.Random.Bytes(tester.Random.Intn(maxPayloadBytes))
 	blob, err := coretypes.NewPayload(payloadBytes).ToBlob(tester.PayloadPolynomialForm)
@@ -131,10 +131,10 @@ func buildBlobAndCert(
 		BlobCertificate: blobCertificate,
 	}
 
-	convertedInclusionInfo, err := coretypes.InclusionInfoProtoToBinding(inclusionInfo)
+	convertedInclusionInfo, err := coretypes.InclusionInfoProtoToV2CertVerifierBinding(inclusionInfo)
 	require.NoError(t, err)
 
-	eigenDACert := &coretypes.EigenDACert{
+	eigenDACert := &coretypes.EigenDACertV2{
 		BlobInclusionInfo: *convertedInclusionInfo,
 	}
 
