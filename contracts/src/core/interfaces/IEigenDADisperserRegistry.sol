@@ -8,6 +8,10 @@ interface IEigenDADisperserRegistry {
         external
         returns (uint32 disperserKey);
 
+    function transferDisperserOwnership(uint32 disperserKey, address newOwner) external;
+
+    function updateDisperserURL(uint32 disperserKey, string memory disperserURL) external;
+
     function deregisterDisperser(uint32 disperserKey) external;
 
     function withdraw(uint32 disperserKey) external;

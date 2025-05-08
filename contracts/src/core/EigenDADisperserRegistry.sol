@@ -46,6 +46,17 @@ contract EigenDADisperserRegistry is IEigenDADisperserRegistry {
 
     /// DISPERSER
 
+    function transferDisperserOwnership(uint32 disperserKey, address disperserAddress)
+        external
+        onlyDisperser(disperserKey)
+    {
+        DisperserRegistryLib.transferDisperserOwnership(disperserKey, disperserAddress);
+    }
+
+    function updateDisperserURL(uint32 disperserKey, string memory disperserURL) external onlyDisperser(disperserKey) {
+        DisperserRegistryLib.updateDisperserURL(disperserKey, disperserURL);
+    }
+
     function deregisterDisperser(uint32 disperserKey) external onlyDisperser(disperserKey) {
         DisperserRegistryLib.deregisterDisperser(disperserKey);
     }
