@@ -24,65 +24,80 @@
         }
         /* Common table-like structure for both inputs and results */
         .calculator-table {
-            display: grid;
-            grid-template-columns: minmax(250px, 1fr) 120px 60px 20px;
-            gap: 10px;
-            align-items: center;
+            display: table;
             width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 10px;
         }
         /* Row styles */
-        .calculator-row {
-            display: contents; /* This makes children participate in parent's grid */
+        .calculator-row, .input-row {
+            display: table-row;
         }
         .input-row {
-            padding: 5px 0;
             transition: background-color 0.3s ease;
         }
-        .input-modified {
+        /* Row highlighting for modified values - these styles highlight rows where values differ from defaults */
+        /* For table layout, we need to target all cells in the row */
+        .input-modified td {
             background-color: #f0f8ff; /* Light blue background */
+        }
+        /* Add left border only to the first cell of modified rows */
+        .input-modified .label-column {
             border-left: 3px solid #2c7873; /* Teal left border */
+            padding-left: 5px; /* Add padding to account for border */
         }
         /* Column styles */
+        .label-column, .input-column, .unit-column, .help-column, .value-column {
+            display: table-cell;
+            padding: 8px 6px;
+            vertical-align: middle;
+        }
         .label-column {
             font-weight: bold;
-            grid-column: 1;
+            width: 250px;
         }
         .result-label {
             font-weight: normal;
         }
-        .input-column {
-            grid-column: 2;
+        .input-column, .value-column {
+            width: 120px;
         }
         .value-column {
-            grid-column: 2;
             font-weight: bold;
             color: #2c7873;
             text-align: right;
         }
         .unit-column {
-            grid-column: 3;
+            width: 60px;
             font-weight: normal;
         }
         .help-column {
-            grid-column: 4;
+            width: 20px;
         }
         .divider-row {
-            grid-column: 1 / -1; /* Span all columns */
+            display: table-row;
+            height: 20px;
+        }
+        .divider-row > td {
+            display: table-cell;
             height: 1px;
             background-color: #ddd;
-            margin: 15px 0;
+            padding: 0;
+            position: relative;
+            top: 10px;
         }
         .result-section {
             margin-top: 10px;
         }
         /* Section header */
         .section-header {
-            grid-column: 1 / -1; /* Span all columns */
+            display: table-cell;
             background-color: #e9f7ef;
             padding: 10px;
             margin: 15px 0 10px 0;
             border-radius: 4px;
             font-weight: bold;
+            text-align: left;
         }
         /* Form element styles */
         input {
@@ -201,248 +216,250 @@
     
     <div class="calculator">
         <!-- Unified table structure for both inputs and results -->
-        <div class="calculator-table">
+        <table class="calculator-table">
+            <tbody>
             <!-- Inputs section -->
-            <div class="calculator-row">
-                <div class="section-header">Input Parameters</div>
-            </div>
+            <tr class="calculator-row">
+                <td class="section-header" colspan="4">Input Parameters</td>
+            </tr>
 
             <!-- Max Throughput -->
-            <div class="calculator-row input-row" id="maxThroughput-row">
-                <div class="label-column">Max Throughput (MB/s):</div>
-                <div class="input-column">
+            <tr class="input-row" id="maxThroughput-row">
+                <td class="label-column">Max Throughput (MB/s):</td>
+                <td class="input-column">
                     <input type="number" id="maxThroughput" value="50" step="0.1" min="0">
-                </div>
-                <div class="unit-column">
+                </td>
+                <td class="unit-column">
                     <button class="reset-field" data-field="maxThroughput">
                         ↺
                         <span class="reset-field-tooltip">Reset to default: 50</span>
                     </button>
-                </div>
-                <div class="help-column">
+                </td>
+                <td class="help-column">
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
                         <span class="tooltip-text">The maximum throughput supported by EigenDA.</span>
                     </div>
-                </div>
-            </div>
+                </td>
+            </tr>
             
             <!-- Sum of Stake -->
-            <div class="calculator-row input-row" id="sumOfStake-row">
-                <div class="label-column">Sum of Stake Across All Quorums:</div>
-                <div class="input-column">
+            <tr class="input-row" id="sumOfStake-row">
+                <td class="label-column">Sum of Stake Across All Quorums:</td>
+                <td class="input-column">
                     <input type="number" id="sumOfStake" value="0.125" step="0.001" min="0" max="1">
-                </div>
-                <div class="unit-column">
+                </td>
+                <td class="unit-column">
                     <button class="reset-field" data-field="sumOfStake">
                         ↺
                         <span class="reset-field-tooltip">Reset to default: 0.125</span>
                     </button>
-                </div>
-                <div class="help-column">
+                </td>
+                <td class="help-column">
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
                         <span class="tooltip-text">The sum of an operator's stake across all quorums. 1.0 means 100% stake for one quorum, 2.0 means 100% stake across two quorums. For example, if an operator has 10% stake in 3 quorums, the sum of stake across all quorums is 30%, and so you'd use 0.3 for field.</span>
                     </div>
-                </div>
-            </div>
+                </td>
+            </tr>
             
             <!-- Encoding Rate -->
-            <div class="calculator-row input-row" id="encodingRate-row">
-                <div class="label-column">Encoding Rate:</div>
-                <div class="input-column">
+            <tr class="input-row" id="encodingRate-row">
+                <td class="label-column">Encoding Rate:</td>
+                <td class="input-column">
                     <input type="number" id="encodingRate" value="8.0" step="0.1" min="0">
-                </div>
-                <div class="unit-column">
+                </td>
+                <td class="unit-column">
                     <button class="reset-field" data-field="encodingRate">
                         ↺
                         <span class="reset-field-tooltip">Reset to default: 8.0</span>
                     </button>
-                </div>
-                <div class="help-column">
+                </td>
+                <td class="help-column">
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
                         <span class="tooltip-text">The kzg encoding rate.</span>
                     </div>
-                </div>
-            </div>
+                </td>
+            </tr>
             
             <!-- Download Pessimism -->
-            <div class="calculator-row input-row" id="downloadPessimism-row">
-                <div class="label-column">Download Pessimism:</div>
-                <div class="input-column">
+            <tr class="input-row" id="downloadPessimism-row">
+                <td class="label-column">Download Pessimism:</td>
+                <td class="input-column">
                     <input type="number" id="downloadPessimism" value="2.0" step="0.1" min="0">
-                </div>
-                <div class="unit-column">
+                </td>
+                <td class="unit-column">
                     <button class="reset-field" data-field="downloadPessimism">
                         ↺
                         <span class="reset-field-tooltip">Reset to default: 2.0</span>
                     </button>
-                </div>
-                <div class="help-column">
+                </td>
+                <td class="help-column">
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
                         <span class="tooltip-text">Controls the extra amount of chunk data validator clients download in case some validators do not return data in a timely manner.</span>
                     </div>
-                </div>
-            </div>
+                </td>
+            </tr>
             
             <!-- Read Amplification -->
-            <div class="calculator-row input-row" id="readAmplification-row">
-                <div class="label-column">Read Amplification:</div>
-                <div class="input-column">
+            <tr class="input-row" id="readAmplification-row">
+                <td class="label-column">Read Amplification:</td>
+                <td class="input-column">
                     <input type="number" id="readAmplification" value="20.0" step="0.1" min="0">
-                </div>
-                <div class="unit-column">
+                </td>
+                <td class="unit-column">
                     <button class="reset-field" data-field="readAmplification">
                         ↺
                         <span class="reset-field-tooltip">Reset to default: 20.0</span>
                     </button>
-                </div>
-                <div class="help-column">
+                </td>
+                <td class="help-column">
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
                         <span class="tooltip-text">The number of times each blob is read after it is written.</span>
                     </div>
-                </div>
-            </div>
+                </td>
+            </tr>
             
             <!-- Data Retention -->
-            <div class="calculator-row input-row" id="dataRetention-row">
-                <div class="label-column">Data Retention Period (days):</div>
-                <div class="input-column">
+            <tr class="input-row" id="dataRetention-row">
+                <td class="label-column">Data Retention Period (days):</td>
+                <td class="input-column">
                     <input type="number" id="dataRetention" value="14" step="1" min="0">
-                </div>
-                <div class="unit-column">
+                </td>
+                <td class="unit-column">
                     <button class="reset-field" data-field="dataRetention">
                         ↺
                         <span class="reset-field-tooltip">Reset to default: 14</span>
                     </button>
-                </div>
-                <div class="help-column">
+                </td>
+                <td class="help-column">
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
                         <span class="tooltip-text">The length of time that validator nodes retain chunk data.</span>
                     </div>
-                </div>
-            </div>
+                </td>
+            </tr>
             
             <!-- Disk Safety Margin -->
-            <div class="calculator-row input-row" id="diskSafetyMargin-row">
-                <div class="label-column">Disk Safety Margin:</div>
-                <div class="input-column">
+            <tr class="input-row" id="diskSafetyMargin-row">
+                <td class="label-column">Disk Safety Margin:</td>
+                <td class="input-column">
                     <input type="number" id="diskSafetyMargin" value="1.2" step="0.1" min="0">
-                </div>
-                <div class="unit-column">
+                </td>
+                <td class="unit-column">
                     <button class="reset-field" data-field="diskSafetyMargin">
                         ↺
                         <span class="reset-field-tooltip">Reset to default: 1.2</span>
                     </button>
-                </div>
-                <div class="help-column">
+                </td>
+                <td class="help-column">
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
                         <span class="tooltip-text">Adds a safety buffer to the disk space needed.</span>
                     </div>
-                </div>
-            </div>
+                </td>
+            </tr>
             
             <!-- Download Safety Margin -->
-            <div class="calculator-row input-row" id="downloadSafetyMargin-row">
-                <div class="label-column">Download Safety Margin:</div>
-                <div class="input-column">
+            <tr class="input-row" id="downloadSafetyMargin-row">
+                <td class="label-column">Download Safety Margin:</td>
+                <td class="input-column">
                     <input type="number" id="downloadSafetyMargin" value="1.2" step="0.1" min="0">
-                </div>
-                <div class="unit-column">
+                </td>
+                <td class="unit-column">
                     <button class="reset-field" data-field="downloadSafetyMargin">
                         ↺
                         <span class="reset-field-tooltip">Reset to default: 1.2</span>
                     </button>
-                </div>
-                <div class="help-column">
+                </td>
+                <td class="help-column">
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
                         <span class="tooltip-text">Adds a safety buffer to the download bandwidth.</span>
                     </div>
-                </div>
-            </div>
+                </td>
+            </tr>
             
             <!-- Upload Safety Margin -->
-            <div class="calculator-row input-row" id="uploadSafetyMargin-row">
-                <div class="label-column">Upload Safety Margin:</div>
-                <div class="input-column">
+            <tr class="input-row" id="uploadSafetyMargin-row">
+                <td class="label-column">Upload Safety Margin:</td>
+                <td class="input-column">
                     <input type="number" id="uploadSafetyMargin" value="1.2" step="0.1" min="0">
-                </div>
-                <div class="unit-column">
+                </td>
+                <td class="unit-column">
                     <button class="reset-field" data-field="uploadSafetyMargin">
                         ↺
                         <span class="reset-field-tooltip">Reset to default: 1.2</span>
                     </button>
-                </div>
-                <div class="help-column">
+                </td>
+                <td class="help-column">
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
                         <span class="tooltip-text">Adds a safety buffer to the upload bandwidth.</span>
                     </div>
-                </div>
-            </div>
+                </td>
+            </tr>
             
             <!-- Divider -->
-            <div class="calculator-row">
-                <div class="divider-row"></div>
-            </div>
+            <tr class="divider-row">
+                <td colspan="4"></td>
+            </tr>
             
             <!-- Results section header -->
-            <div class="calculator-row">
-                <div class="section-header">Results</div>
-            </div>
+            <tr class="calculator-row">
+                <td class="section-header" colspan="4">Results</td>
+            </tr>
             
             <!-- Storage Space Result -->
-            <div class="calculator-row">
-                <div class="label-column result-label">Storage Space Needed:</div>
-                <div class="value-column" id="storageSpace">0</div>
-                <div class="unit-column">TB</div>
-                <div class="help-column">
+            <tr class="calculator-row">
+                <td class="label-column result-label">Storage Space Needed:</td>
+                <td class="value-column" id="storageSpace">0</td>
+                <td class="unit-column">TB</td>
+                <td class="help-column">
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
                         <span class="tooltip-text">Formula: (Max Throughput MB/s) × (Data Retention Period in days) × (Encoding Rate) × (Sum of Stake) × (Disk Safety Margin) × (86400 seconds/day) ÷ (1024*1024 MB/TB)<br>Unit: Terabytes (TB)</span>
                     </div>
-                </div>
-            </div>
+                </td>
+            </tr>
             
             <!-- Download Bandwidth Result -->
-            <div class="calculator-row">
-                <div class="label-column result-label">Download Bandwidth:</div>
-                <div class="value-column" id="downloadBandwidth">0</div>
-                <div class="unit-column">MB/s</div>
-                <div class="help-column">
+            <tr class="calculator-row">
+                <td class="label-column result-label">Download Bandwidth:</td>
+                <td class="value-column" id="downloadBandwidth">0</td>
+                <td class="unit-column">MB/s</td>
+                <td class="help-column">
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
                         <span class="tooltip-text">Formula: (Max Throughput) × (Encoding Rate) × (Sum of Stake) × (Download Safety Margin)<br>Unit: Megabytes per second (MB/s)</span>
                     </div>
-                </div>
-            </div>
+                </td>
+            </tr>
             
             <!-- Upload Bandwidth Result -->
-            <div class="calculator-row">
-                <div class="label-column result-label">Upload Bandwidth:</div>
-                <div class="value-column" id="uploadBandwidth">0</div>
-                <div class="unit-column">MB/s</div>
-                <div class="help-column">
+            <tr class="calculator-row">
+                <td class="label-column result-label">Upload Bandwidth:</td>
+                <td class="value-column" id="uploadBandwidth">0</td>
+                <td class="unit-column">MB/s</td>
+                <td class="help-column">
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
                         <span class="tooltip-text">Formula: (Max Throughput) × (Sum of Stake) × (Read Amplification) × (Download Pessimism) × (Upload Safety Margin)<br>Unit: Megabytes per second (MB/s)</span>
                     </div>
-                </div>
-            </div>
+                </td>
+            </tr>
             
             <!-- Reset Button -->
-            <div class="calculator-row" style="margin-top: 20px;">
-                <div style="grid-column: 1 / -1; text-align: center;">
+            <tr class="calculator-row" style="margin-top: 20px;">
+                <td colspan="4" style="text-align: center; padding-top: 20px;">
                     <button id="reset" class="reset">Reset to Defaults</button>
-                </div>
-            </div>
-        </div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
     </div>
 
     <script>
@@ -619,12 +636,17 @@
             // Calculate initially with default values
             calculate();
             
-            // Check if a field is modified from default
+            // Check if a field is modified from default and update row highlighting accordingly
             function checkModifiedStatus(input) {
                 const fieldName = input.id;
                 const defaultValue = defaults[fieldName];
                 const currentValue = parseFloat(input.value);
                 const inputRow = document.getElementById(fieldName + '-row');
+                
+                if (!inputRow) {
+                    console.warn(`Row element not found for ${fieldName}-row`);
+                    return;
+                }
                 
                 if (currentValue !== defaultValue) {
                     inputRow.classList.add('input-modified');
