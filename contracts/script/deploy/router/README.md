@@ -27,11 +27,13 @@ Create a configuration file in the `config/` directory with the following format
 
 ```json
 {
-  "initialOwner": "0x0000000000000000000000000000000000000001"
+  "initialOwner": "0x0000000000000000000000000000000000000001",
+  "initialCertVerifier": "0x0000000000000000000000000000000000000000"
 }
 ```
 
-The `initialOwner` parameter specifies the address that will be set as the owner of the deployed router contract.
+- The `initialOwner` parameter specifies the address that will be set as the owner of the deployed router contract.
+- The `initialCertVerifier` parameter specifies the initial address of the cert verifier initialized at block height 0.
 
 ### Post-Deployment
 
