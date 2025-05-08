@@ -90,10 +90,15 @@
             right: 20px;
             display: flex;
             align-items: center;
+            padding: 8px 12px;
+            background-color: var(--theme-calculator-bg);
+            border-radius: 25px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: background-color 0.3s ease;
         }
         .theme-switch-label {
-            margin-right: 10px;
             color: var(--theme-text-color);
+            margin: 0 10px; /* Equal margins on both sides */
         }
         .switch {
             position: relative;
@@ -134,19 +139,7 @@
         input:checked + .slider:before {
             transform: translateX(26px);
         }
-        .slider-icon {
-            position: absolute;
-            top: 5px;
-            font-size: 14px;
-        }
-        .sun-icon {
-            right: 7px;
-            color: white;
-        }
-        .moon-icon {
-            left: 7px;
-            color: white;
-        }
+        /* Icons removed as requested */
         /* Common table-like structure for both inputs and results */
         .calculator-table {
             display: table;
@@ -391,10 +384,7 @@
         <span class="theme-switch-label">Light</span>
         <label class="switch">
             <input type="checkbox" id="theme-toggle" checked>
-            <span class="slider">
-                <span class="slider-icon sun-icon">☀</span>
-                <span class="slider-icon moon-icon">☾</span>
-            </span>
+            <span class="slider"></span>
         </label>
         <span class="theme-switch-label">Dark</span>
     </div>
