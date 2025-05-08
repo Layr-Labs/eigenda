@@ -399,6 +399,7 @@ func (s *validatorStore) storeBatchLittDB(batchData []*BundleToStore) (uint64, e
 			err = s.chunkTable.Put(bundleKeyBytes, bundleData)
 			if err != nil {
 				writeCompleteChan <- fmt.Errorf("failed to put data: %v", err)
+				return
 			}
 
 			writeCompleteChan <- nil
@@ -407,11 +408,16 @@ func (s *validatorStore) storeBatchLittDB(batchData []*BundleToStore) (uint64, e
 		size += uint64(len(bundleKeyBytes) + len(bundleData))
 	}
 
+	var failedToWrite bool
 	for i := 0; i < len(batchData); i++ {
 		err := <-writeCompleteChan
 		if err != nil {
-			return 0, err
+			failedToWrite = true
+			s.logger.Errorf("failed to write data: %v", err)
 		}
+	}
+	if failedToWrite {
+		return 0, fmt.Errorf("failed to write data")
 	}
 
 	err := s.chunkTable.Flush()
