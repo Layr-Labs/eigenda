@@ -2,6 +2,8 @@ package v2_test
 
 import (
 	"context"
+	"math"
+	"math/big"
 	"math/rand"
 	"testing"
 
@@ -147,6 +149,77 @@ func TestSingleOperator(t *testing.T) {
 	_ = assignment
 }
 
+func TestValidatorSizes(t *testing.T) {
+	thresholdBips := blobParams.ReconstructionThresholdBips
+	thresholdPercentage := float64(thresholdBips) / 10000.0
+
+	testCases := []struct {
+		name              string
+		operatorStake     uint32 // Stake for the operator we're testing
+		otherStake        uint32 // Stake for the other operator(s) in the quorum
+		expectedNumChunks uint32 // Expected number of chunks assigned
+	}{
+		{
+			name:              "Negligible Stake",
+			operatorStake:     1,
+			otherStake:        1000000,                   // Large stake to ensure test operator's percentage is negligible
+			expectedNumChunks: blobParams.SamplesPerUnit, // Minimum assignment
+		},
+		{
+			name:              "Exactly Threshold Stake",
+			operatorStake:     thresholdBips,
+			otherStake:        10000 - thresholdBips, // Ensure we get exactly the threshold percentage
+			expectedNumChunks: blobParams.SamplesPerUnit * uint32(math.Ceil(thresholdPercentage*float64(blobParams.NumUnits))),
+		},
+		{
+			name:          "Double Threshold Stake",
+			operatorStake: thresholdBips * 2,
+			otherStake:    10000 - (thresholdBips * 2), // Ensure percentage is double the threshold
+			// Capped at the threshold
+			expectedNumChunks: blobParams.SamplesPerUnit * uint32(math.Ceil(thresholdPercentage*float64(blobParams.NumUnits))),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create stakes for this test case
+			stakes := map[core.QuorumID]map[core.OperatorID]int{
+				0: {
+					mock.MakeOperatorId(0): int(tc.operatorStake),
+					mock.MakeOperatorId(1): int(tc.otherStake),
+				},
+			}
+
+			dat, err := mock.NewChainDataMock(stakes)
+			assert.NoError(t, err)
+
+			state := dat.GetTotalOperatorState(context.Background(), 0)
+
+			// Get assignment for the test operator
+			assignment, err := corev2.GetAssignment(state.OperatorState, blobParams, []core.QuorumID{0}, blobKey1[:], mock.MakeOperatorId(0))
+			assert.NoError(t, err)
+
+			// Verify the assignment has the expected number of chunks
+			assert.Equal(t, tc.expectedNumChunks, assignment.NumChunks(),
+				"Expected %d chunks assigned, got %d", tc.expectedNumChunks, assignment.NumChunks())
+
+			// Verify all indices are unique
+			uniqueIndices := make(map[uint32]struct{})
+			for _, idx := range assignment.GetIndices() {
+				uniqueIndices[idx] = struct{}{}
+			}
+			assert.Equal(t, int(assignment.NumChunks()), len(uniqueIndices),
+				"All assigned indices should be unique")
+
+			// Verify all indices are within the valid range
+			for _, idx := range assignment.GetIndices() {
+				assert.Less(t, idx, blobParams.NumChunks,
+					"Index %d is out of valid range [0, %d)", idx, blobParams.NumChunks)
+			}
+		})
+	}
+}
+
 func TestDeterministicAssignment(t *testing.T) {
 	state := dat.GetTotalOperatorState(context.Background(), 0)
 	operatorState := state.OperatorState
@@ -209,24 +282,69 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 		assignments, err := corev2.GetAssignments(state.OperatorState, blobParams, []core.QuorumID{0}, blobKey2[:])
 		assert.NoError(t, err)
 
-		// Check that the total number of chunks is correct
-		// totalChunks := uint32(0)
-		// for _, assignment := range assignments {
-		// 	totalChunks += assignment.NumChunks()
-		// }
-		// assert.Equal(t, totalChunks, blobParams.NumChunks)
-
-		// Check that each operator's assignment satisfies the security requirement
-		for operatorID, assignment := range assignments {
-
-			totalStake := uint32(state.Totals[0].Stake.Uint64())
-			myStake := uint32(state.Operators[0][operatorID].Stake.Uint64())
-
-			reconstructionThreshold := 0.22
-			LHS := assignment.NumChunks() * totalStake * blobParams.CodingRate * uint32(reconstructionThreshold*100)
-			RHS := 100 * myStake * blobParams.NumChunks
-
-			assert.GreaterOrEqual(t, LHS, RHS)
+		// Check that the total number of chunks satisfies expected bounds
+		totalChunks := uint32(0)
+		for _, assignment := range assignments {
+			totalChunks += assignment.NumChunks()
 		}
+		assert.GreaterOrEqual(t, totalChunks, blobParams.NumUnits*blobParams.SamplesPerUnit)
+
+		// Sample a random collection of operators whose total stake exceeds the reconstruction threshold and check that they can reconstruct the blob
+
+		// Get the total stake for the quorum
+		totalStake := new(big.Int).Set(state.OperatorState.Totals[0].Stake)
+
+		// Calculate the threshold stake required for reconstruction
+		thresholdPercentage := float64(blobParams.ReconstructionThresholdBips) / 10000.0 // Convert from basis points to percentage
+		thresholdStake := new(big.Int).Mul(totalStake, big.NewInt(int64(thresholdPercentage*10000)))
+		thresholdStake.Div(thresholdStake, big.NewInt(10000))
+
+		// Create a slice of operator IDs to randomly sample from
+		operatorIDs := make([]core.OperatorID, 0, len(stakes[0]))
+		for opID := range stakes[0] {
+			operatorIDs = append(operatorIDs, opID)
+		}
+
+		// Shuffle the operators for random sampling
+		rand.Shuffle(len(operatorIDs), func(i, j int) {
+			operatorIDs[i], operatorIDs[j] = operatorIDs[j], operatorIDs[i]
+		})
+
+		// Sample operators until we exceed the threshold
+		sampledOperators := make([]core.OperatorID, 0)
+		currentStake := big.NewInt(0)
+
+		for _, opID := range operatorIDs {
+			sampledOperators = append(sampledOperators, opID)
+			currentStake.Add(currentStake, state.OperatorState.Operators[0][opID].Stake)
+
+			if currentStake.Cmp(thresholdStake) >= 0 {
+				break
+			}
+		}
+
+		// Verify that the sampled operators' total stake exceeds the threshold
+		assert.True(t, currentStake.Cmp(thresholdStake) >= 0,
+			"Sampled operators' stake (%s) should exceed threshold stake (%s)",
+			currentStake.String(), thresholdStake.String())
+
+		// Collect all unique chunk indices from the sampled operators
+		uniqueChunkIndices := make(map[uint32]struct{})
+		for _, opID := range sampledOperators {
+			assignment, exists := assignments[opID]
+			assert.True(t, exists, "Assignment should exist for sampled operator %s", opID.Hex())
+
+			// Add each chunk index to the set of unique indices
+			for _, index := range assignment.GetIndices() {
+				uniqueChunkIndices[index] = struct{}{}
+			}
+		}
+
+		// Calculate the minimum required unique chunks for reconstruction
+		minChunksNeeded := blobParams.NumUnits / blobParams.CodingRate
+
+		// Assert that the sampled operators have enough unique chunks to reconstruct the blob
+		assert.GreaterOrEqual(t, uint32(len(uniqueChunkIndices)), minChunksNeeded,
+			"Sampled operators should have enough unique chunks to reconstruct the blob")
 	})
 }

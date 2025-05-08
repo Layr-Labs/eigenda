@@ -1,12 +1,11 @@
 package v2
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"math/big"
-	"math/rand"
-
-	"encoding/binary"
 
 	"github.com/Layr-Labs/eigenda/core"
 )
@@ -123,37 +122,119 @@ func GetAssignment(state *core.OperatorState, blobParams *core.BlobVersionParame
 		return Assignment{}, fmt.Errorf("max stake percentage is zero")
 	}
 
-	// Calculate number of samples based on max stake percentage
-	maxStakeFloat, _ := maxStakePercentage.Float64()
-	numSamples := uint32(math.Ceil(maxStakeFloat * float64(blobParams.NumUnits*blobParams.SamplesPerUnit)))
+	// Cap stake using reconstruction threshold
+	stakeCapPercentage := big.NewFloat(float64(blobParams.ReconstructionThresholdBips) / 10000)
+	if maxStakePercentage.Cmp(stakeCapPercentage) > 0 {
+		maxStakePercentage = stakeCapPercentage
+	}
 
-	// Create a deterministic random number generator using the blob key as seed
-	// We also mix in the operator ID to ensure different operators get different assignments
+	maxStakeFloat, _ := maxStakePercentage.Float64()
+
+	numSamples := blobParams.SamplesPerUnit * uint32(math.Ceil(maxStakeFloat*float64(blobParams.NumUnits)))
+
+	// Create a deterministic custom PRNG using the full seed entropy
 	seed := make([]byte, 40) // 32 bytes for blob key + 8 bytes for operator ID
 	copy(seed[:32], blobKey[:])
 	copy(seed[32:], id[:])
-	rng := rand.New(rand.NewSource(int64(binary.BigEndian.Uint64(seed[:8]))))
+
+	// Create a custom random number generator that uses the full seed entropy
+	customRand := NewDeterministicRand(seed)
 
 	// Generate random indices without replacement for this operator
-	indices := make([]uint32, numSamples)
-	available := make([]uint32, blobParams.NumChunks)
-	for i := uint32(0); i < blobParams.NumChunks; i++ {
-		available[i] = i
-	}
+	indices := make([]uint32, 0, numSamples)
 
-	// Select numSamples indices randomly without replacement
-	for i := uint32(0); i < numSamples && i < blobParams.NumChunks; i++ {
-		// Pick a random index from remaining available indices
-		j := rng.Intn(len(available))
-		indices[i] = available[j]
-		// Remove the selected index by swapping with the last element and reducing slice length
-		available[j] = available[len(available)-1]
-		available = available[:len(available)-1]
+	// Use a map to track which indices we've already selected
+	selectedIndices := make(map[uint32]struct{})
+
+	// Keep selecting random indices until we have enough
+	for uint32(len(indices)) < numSamples && uint32(len(indices)) < blobParams.NumChunks {
+		// Generate a random index within the range [0, NumChunks)
+		randomIndex := customRand.Uint32N(blobParams.NumChunks)
+
+		// Check if we've already selected this index
+		if _, exists := selectedIndices[randomIndex]; !exists {
+			indices = append(indices, randomIndex)
+			selectedIndices[randomIndex] = struct{}{}
+		}
 	}
 
 	return Assignment{
 		Indices: indices,
 	}, nil
+}
+
+// DeterministicRand is a deterministic random number generator that uses SHA-256
+// to produce a stream of random bytes from an initial seed
+type DeterministicRand struct {
+	currentHash []byte
+	buffer      []byte
+	bufferPos   int
+}
+
+// NewDeterministicRand creates a new deterministic random number generator from a seed
+func NewDeterministicRand(seed []byte) *DeterministicRand {
+	// Initialize with the seed
+	hasher := sha256.New()
+	hasher.Write(seed)
+	initialHash := hasher.Sum(nil)
+
+	return &DeterministicRand{
+		currentHash: initialHash,
+		buffer:      initialHash,
+		bufferPos:   0,
+	}
+}
+
+// getNextBytes generates the next batch of random bytes
+func (r *DeterministicRand) getNextBytes() {
+	// Use the current hash as input to generate the next hash
+	hasher := sha256.New()
+	hasher.Write(r.currentHash)
+	r.currentHash = hasher.Sum(nil)
+	r.buffer = r.currentHash
+	r.bufferPos = 0
+}
+
+// Uint32 returns a random uint32
+func (r *DeterministicRand) Uint32() uint32 {
+	// If we don't have enough bytes left in the buffer, generate more
+	if r.bufferPos+4 > len(r.buffer) {
+		r.getNextBytes()
+	}
+
+	// Extract 4 bytes from the buffer
+	value := binary.BigEndian.Uint32(r.buffer[r.bufferPos : r.bufferPos+4])
+	r.bufferPos += 4
+	return value
+}
+
+// Uint32N returns a random uint32 in the range [0, n)
+func (r *DeterministicRand) Uint32N(n uint32) uint32 {
+	if n == 0 {
+		return 0
+	}
+
+	// To avoid modulo bias, we need to create a mask of bits that will work
+	// for our range and reject values outside of it
+
+	// Find the smallest power of 2 greater than n
+	mask := uint32(1)
+	for mask < n {
+		mask <<= 1
+	}
+	mask-- // Create a mask with all bits set up to the required number of bits
+
+	// Keep generating random numbers until we get one in the range [0, n)
+	for {
+		// Generate a random number and apply the mask
+		val := r.Uint32() & mask
+
+		// If the value is less than n, return it
+		if val < n {
+			return val
+		}
+		// Otherwise, try again
+	}
 }
 
 // GetChunkLength calculates the chunk length based on blob length and parameters
