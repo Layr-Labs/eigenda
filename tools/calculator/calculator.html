@@ -311,8 +311,9 @@
             visibility: visible;
             opacity: 0.95;
         }
+        /* Hover-based tooltip system */
         .tooltip {
-            position: relative;
+            position: static; /* This makes the tooltip not respect table cell boundaries */
             display: inline-flex;
             cursor: help;
         }
@@ -329,28 +330,41 @@
             font-weight: bold;
             transition: all 0.3s ease;
         }
+        .tooltip-icon:hover {
+            transform: scale(1.1);
+        }
         .tooltip-text {
             visibility: hidden;
-            width: 300px;
+            width: 250px;
             background-color: var(--theme-tooltip-bg);
             color: var(--theme-tooltip-text);
             text-align: left;
             border-radius: 6px;
-            padding: 8px;
-            position: absolute;
-            z-index: 1;
-            left: 125%;
-            top: 50%;
-            transform: translateY(-50%);
+            padding: 10px 12px;
+            position: fixed; /* Changed to fixed position to break out of table container */
+            z-index: 1000;
             opacity: 0;
-            transition: opacity 0.3s;
+            transition: opacity 0.3s, visibility 0.3s;
             font-weight: normal;
             font-size: 14px;
-            line-height: 1.4;
+            line-height: 1.5;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            border-right: 3px solid var(--theme-accent-color); /* Changed to right border */
+            pointer-events: none; /* Prevents the tooltip from interfering with mouse events */
+        }
+        /* Arrow pointing to the help icon */
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 15px;
+            left: -10px; /* Arrow on left side */
+            border-width: 5px 10px 5px 0; /* Changed border direction */
+            border-style: solid;
+            border-color: transparent var(--theme-tooltip-bg) transparent transparent; /* Changed arrow direction */
         }
         .tooltip:hover .tooltip-text {
             visibility: visible;
-            opacity: 0.95;
+            opacity: 1;
         }
         button {
             background-color: var(--theme-button-bg);
@@ -391,6 +405,8 @@
         </label>
         <span class="theme-switch-label">Dark</span>
     </div>
+    
+    <!-- No overlay needed for hover tooltips -->
     
     <h1>EigenDA Resource Calculator</h1>
     
@@ -891,6 +907,28 @@
             
             // Calculate initially
             calculate();
+            
+            // JavaScript for positioning hover tooltips properly
+            function setupTooltips() {
+                const tooltips = document.querySelectorAll('.tooltip');
+                
+                tooltips.forEach(tooltip => {
+                    const tooltipIcon = tooltip.querySelector('.tooltip-icon');
+                    const tooltipText = tooltip.querySelector('.tooltip-text');
+                    
+                    tooltip.addEventListener('mouseenter', function() {
+                        // Get the position of the icon
+                        const rect = tooltipIcon.getBoundingClientRect();
+                        
+                        // Position the tooltip to the right of the icon
+                        tooltipText.style.top = `${rect.top - 15}px`;
+                        tooltipText.style.left = `${rect.right + 15}px`;
+                    });
+                });
+            }
+            
+            // Initialize tooltips
+            setupTooltips();
             
             // URL parameter handling functions
             function loadFromUrl() {
