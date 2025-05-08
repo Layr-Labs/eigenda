@@ -1,12 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
+import {EigenDATypesV3} from "src/core/libraries/v3/EigenDATypesV3.sol";
 
 interface IEigenDADisperserRegistry {
-    event DisperserAdded(uint32 indexed key, address indexed disperser);
+    function registerDisperser(address disperserAddress, string memory disperserURL)
+        external
+        returns (uint32 disperserKey);
 
-    function setDisperserInfo(uint32 _disperserKey, EigenDATypesV2.DisperserInfo memory _disperserInfo) external;
+    function transferDisperserOwnership(uint32 disperserKey, address newOwner) external;
 
-    function disperserKeyToAddress(uint32 key) external view returns (address);
+    function updateDisperserInfo(uint32 disperserKey, address disperser, string memory disperserURL) external;
+
+    function deregisterDisperser(uint32 disperserKey) external;
+
+    function withdraw(uint32 disperserKey) external;
+
+    function getDisperserInfo(uint32 disperserKey) external view returns (EigenDATypesV3.DisperserInfo memory);
+
+    function getLockedDeposit(uint32 disperserKey)
+        external
+        view
+        returns (EigenDATypesV3.LockedDisperserDeposit memory, uint64);
+
+    function getDepositParams() external view returns (EigenDATypesV3.LockedDisperserDeposit memory);
 }
