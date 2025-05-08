@@ -54,7 +54,7 @@ func NewValidatorPayloadRetriever(
 // payload is returned.
 func (pr *ValidatorPayloadRetriever) GetPayload(
 	ctx context.Context,
-	eigenDACert *coretypes.EigenDACertV2,
+	eigenDACert coretypes.EigenDACert,
 ) (*coretypes.Payload, error) {
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
@@ -62,20 +62,19 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 		return nil, fmt.Errorf("compute blob key: %w", err)
 	}
 
-	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
+	commitment, err := eigenDACert.Commitments()
 	if err != nil {
-		return nil, fmt.Errorf("convert commitments binding to internal: %w", err)
+		return nil, fmt.Errorf("get commitments: %w", err)
 	}
 
 	// TODO (litt3): Add a feature which keeps chunks from previous quorums, and just fills in gaps
-	for _, quorumID := range blobHeader.QuorumNumbers {
+	for _, quorumID := range eigenDACert.QuorumNumbers() {
 		blob, err := pr.retrieveBlobWithTimeout(
 			ctx,
 			*blobKey,
-			blobHeader.Version,
+			uint16(eigenDACert.BlobVersion()),
 			*commitment,
-			eigenDACert.BatchHeader.ReferenceBlockNumber,
+			eigenDACert.RBN(),
 			quorumID)
 
 		if err != nil {
@@ -119,7 +118,7 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 		return payload, nil
 	}
 
-	return nil, fmt.Errorf("unable to retrieve payload from quorums %v", blobHeader.QuorumNumbers)
+	return nil, fmt.Errorf("unable to retrieve payload from quorums %v", eigenDACert.QuorumNumbers())
 }
 
 // retrieveBlobWithTimeout attempts to retrieve a blob from a given quorum, and times out based on config.RetrievalTimeout
