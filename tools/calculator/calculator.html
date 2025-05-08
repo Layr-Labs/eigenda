@@ -27,6 +27,13 @@
             position: relative;
             display: flex;
             align-items: center;
+            padding: 5px;
+            border-radius: 4px;
+            transition: background-color 0.3s ease;
+        }
+        .input-modified {
+            background-color: #f0f8ff; /* Light blue background */
+            border-left: 3px solid #2c7873; /* Teal left border */
         }
         .field-group {
             display: flex;
@@ -487,6 +494,7 @@
                 document.getElementById('uploadSafetyMargin').value = defaults.uploadSafetyMargin;
                 
                 calculate();
+                updateAllModifiedStatuses(); // Update highlighting
             }
             
             // Add event listener for main reset button
@@ -504,11 +512,35 @@
                     
                     // Recalculate after reset
                     calculate();
+                    
+                    // Update highlighting for this input
+                    checkModifiedStatus(inputElement);
                 });
             });
             
             // Calculate initially with default values
             calculate();
+            
+            // Check if a field is modified from default
+            function checkModifiedStatus(input) {
+                const fieldName = input.id;
+                const defaultValue = defaults[fieldName];
+                const currentValue = parseFloat(input.value);
+                const inputGroup = input.closest('.input-group');
+                
+                if (currentValue !== defaultValue) {
+                    inputGroup.classList.add('input-modified');
+                } else {
+                    inputGroup.classList.remove('input-modified');
+                }
+            }
+            
+            // Update all input statuses
+            function updateAllModifiedStatuses() {
+                inputs.forEach(input => {
+                    checkModifiedStatus(input);
+                });
+            }
             
             // Add input event listeners for real-time updates
             const inputs = [
@@ -524,8 +556,14 @@
             ];
             
             inputs.forEach(input => {
-                input.addEventListener('input', calculate);
+                input.addEventListener('input', function() {
+                    calculate();
+                    checkModifiedStatus(this);
+                });
             });
+            
+            // Initial check for modified fields
+            updateAllModifiedStatuses();
         });
     </script>
 </body>
