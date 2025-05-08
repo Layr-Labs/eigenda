@@ -5,22 +5,147 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EigenDA Resource Calculator</title>
     <style>
+        :root {
+            /* Light mode colors (for reference) */
+            --light-bg-color: #ffffff;
+            --light-text-color: #333333;
+            --light-calculator-bg: #f5f5f5;
+            --light-header-bg: #e9f7ef;
+            --light-divider-color: #ddd;
+            --light-input-border: #ddd;
+            --light-modified-bg: #f0f8ff;
+            --light-hover-bg: #d9e9ff;
+            --light-accent-color: #2c7873;
+            --light-tooltip-bg: #555;
+            --light-tooltip-text: #fff;
+            --light-button-bg: #2c7873;
+            --light-button-text: #ffffff;
+            --light-table-border: #f0f0f0;
+            --light-reset-button-bg: #888;
+            --light-zebra-stripe-color: #e0e0e0; /* Much darker zebra stripe for light mode to increase contrast */
+            
+            /* Dark mode colors (default) */
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --calculator-bg: #1e1e1e;
+            --header-bg: #2a3b36;
+            --divider-color: #444;
+            --input-border: #444;
+            --modified-bg: #1a2a3f;
+            --hover-bg: #2a4a7a;
+            --accent-color: #4fb3ab;
+            --tooltip-bg: #333;
+            --tooltip-text: #e0e0e0;
+            --button-bg: #2c7873;
+            --button-text: #ffffff;
+            --table-border: #333;
+            --reset-button-bg: #555;
+            --zebra-stripe-color: #262626; /* Subtle zebra stripe for dark mode */
+            
+            /* Active theme (defaults to dark) */
+            --theme-bg-color: var(--bg-color);
+            --theme-text-color: var(--text-color);
+            --theme-calculator-bg: var(--calculator-bg);
+            --theme-header-bg: var(--header-bg);
+            --theme-divider-color: var(--divider-color);
+            --theme-input-border: var(--input-border);
+            --theme-modified-bg: var(--modified-bg);
+            --theme-hover-bg: var(--hover-bg);
+            --theme-accent-color: var(--accent-color);
+            --theme-tooltip-bg: var(--tooltip-bg);
+            --theme-tooltip-text: var(--tooltip-text);
+            --theme-button-bg: var(--button-bg);
+            --theme-button-text: var(--button-text);
+            --theme-table-border: var(--table-border);
+            --theme-reset-button-bg: var(--reset-button-bg);
+            --theme-zebra-stripe-color: var(--zebra-stripe-color);
+        }
+        
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
             line-height: 1.6;
+            background-color: var(--theme-bg-color);
+            color: var(--theme-text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         h1 {
-            color: #333;
+            color: var(--theme-text-color);
             text-align: center;
         }
         .calculator {
-            background-color: #f5f5f5;
+            background-color: var(--theme-calculator-bg);
             border-radius: 8px;
             padding: 20px;
             margin-top: 20px;
+            transition: background-color 0.3s ease;
+        }
+        
+        /* Theme toggle switch */
+        .theme-switch {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+        }
+        .theme-switch-label {
+            margin-right: 10px;
+            color: var(--theme-text-color);
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--theme-accent-color);
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: var(--theme-accent-color);
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        .slider-icon {
+            position: absolute;
+            top: 5px;
+            font-size: 14px;
+        }
+        .sun-icon {
+            right: 7px;
+            color: white;
+        }
+        .moon-icon {
+            left: 7px;
+            color: white;
         }
         /* Common table-like structure for both inputs and results */
         .calculator-table {
@@ -30,11 +155,13 @@
             border-spacing: 0;
             border-radius: 8px;
             overflow: hidden;
+            transition: all 0.3s ease;
         }
         
         /* Add subtle borders between rows for better visual separation */
         .calculator-table tr:not(.divider-row) {
-            border-bottom: 1px solid #f0f0f0;
+            border-bottom: 1px solid var(--theme-table-border);
+            transition: border-color 0.3s ease;
         }
         /* Row styles */
         .calculator-row, .input-row {
@@ -43,33 +170,36 @@
         .input-row {
             transition: background-color 0.3s ease;
         }
-        /* Simplest possible row hover effect with direct tag selection */
+        /* Hover effect with a more noticeable color for all rows */
+        .calculator-table tbody tr td {
+            transition: background-color 0.15s ease;
+        }
         .calculator-table tbody tr:hover td {
-            background-color: #eef6ff !important;
+            background-color: var(--theme-hover-bg) !important;
         }
         
         /* Special highlighting for header rows to preserve their styling */
         .calculator-table tbody tr.header-row:hover td {
-            background-color: #e9f7ef !important;
+            background-color: var(--theme-header-bg) !important;
         }
         
         /* Special highlighting for divider rows */
         .calculator-table tbody tr.divider-row:hover td {
-            background-color: #f8f8f8 !important;
+            background-color: var(--theme-divider-color) !important;
         }
 
         /* Row highlighting for modified values - these styles highlight rows where values differ from defaults */
         /* For table layout, we need to target all cells in the row */
         .calculator-table tr.input-modified td {
-            background-color: #f0f8ff; /* Light blue background */
+            background-color: var(--theme-modified-bg);
         }
         /* Modified rows should have a slightly different hover color */
         .calculator-table tr.input-modified:hover td {
-            background-color: #d9e9ff !important; /* Slightly darker blue on hover with !important to override */
+            background-color: var(--theme-hover-bg) !important;
         }
         /* Add left border only to the first cell of modified rows */
         .calculator-table tr.input-modified td.label-column {
-            border-left: 3px solid #2c7873; /* Teal left border */
+            border-left: 3px solid var(--theme-accent-color);
             padding-left: 5px; /* Add padding to account for border */
         }
         /* Column styles */
@@ -81,7 +211,8 @@
         
         /* Add zebra striping for better row distinction */
         .calculator-table tr:nth-child(even):not(.input-modified):not(.header-row):not(.divider-row) td {
-            background-color: #fafafa;
+            background-color: var(--theme-zebra-stripe-color);
+            transition: background-color 0.3s ease;
         }
         .label-column {
             font-weight: bold;
@@ -112,9 +243,10 @@
         .divider-row > td {
             display: table-cell;
             padding: 15px 0;
-            border-bottom: 2px solid #ddd;
-            border-top: 1px solid #ddd;
-            background-color: #f8f8f8;
+            border-bottom: 2px solid var(--theme-divider-color);
+            border-top: 1px solid var(--theme-divider-color);
+            background-color: var(--theme-calculator-bg);
+            transition: border-color 0.3s ease, background-color 0.3s ease;
         }
         .result-section {
             margin-top: 10px;
@@ -122,44 +254,50 @@
         /* Section header */
         .section-header {
             display: table-cell;
-            background-color: #e9f7ef;
+            background-color: var(--theme-header-bg);
             padding: 12px 10px;
             font-weight: bold;
             text-align: left;
-            border-bottom: 2px solid #2c7873;
+            border-bottom: 2px solid var(--theme-accent-color);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
         }
         /* Adding a class to section header rows for better browser compatibility */
         .header-row {
-            background-color: #e9f7ef;
+            background-color: var(--theme-header-bg);
+            transition: background-color 0.3s ease;
         }
         /* Form element styles */
         input {
             width: 100%;
             padding: 8px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--theme-input-border);
             border-radius: 4px;
             box-sizing: border-box;
+            background-color: var(--theme-calculator-bg);
+            color: var(--theme-text-color);
+            transition: all 0.3s ease;
         }
         .reset-field {
             background: none;
             border: none;
             cursor: pointer;
             padding: 5px;
-            color: #2c7873;
+            color: var(--theme-accent-color);
             font-size: 16px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            transition: all 0.3s ease;
         }
         .reset-field:hover {
-            color: #ffffff;
-            background-color: #2c7873;
+            color: var(--theme-calculator-bg);
+            background-color: var(--theme-accent-color);
             border-radius: 50%;
         }
         .reset-field-tooltip {
             visibility: hidden;
-            background-color: #555;
-            color: #fff;
+            background-color: var(--theme-tooltip-bg);
+            color: var(--theme-tooltip-text);
             text-align: center;
             border-radius: 4px;
             padding: 5px;
@@ -169,7 +307,7 @@
             left: 50%;
             transform: translateX(-50%);
             opacity: 0;
-            transition: opacity 0.3s;
+            transition: all 0.3s;
             white-space: nowrap;
             font-size: 12px;
         }
@@ -188,17 +326,18 @@
             justify-content: center;
             width: 20px;
             height: 20px;
-            background-color: #2c7873;
-            color: white;
+            background-color: var(--theme-accent-color);
+            color: var(--theme-calculator-bg);
             border-radius: 50%;
             font-size: 14px;
             font-weight: bold;
+            transition: all 0.3s ease;
         }
         .tooltip-text {
             visibility: hidden;
             width: 300px;
-            background-color: #555;
-            color: #fff;
+            background-color: var(--theme-tooltip-bg);
+            color: var(--theme-tooltip-text);
             text-align: left;
             border-radius: 6px;
             padding: 8px;
@@ -218,8 +357,8 @@
             opacity: 0.95;
         }
         button {
-            background-color: #2c7873;
-            color: white;
+            background-color: var(--theme-button-bg);
+            color: var(--theme-button-text);
             border: none;
             padding: 10px 15px;
             border-radius: 4px;
@@ -227,16 +366,19 @@
             font-size: 16px;
             display: block;
             margin: 20px auto;
+            transition: background-color 0.3s ease;
         }
         button:hover {
-            background-color: #1f5f5b;
+            background-color: var(--theme-accent-color);
+            filter: brightness(90%);
         }
         .reset {
-            background-color: #888;
+            background-color: var(--theme-reset-button-bg);
             margin-left: 10px;
         }
         .reset:hover {
-            background-color: #666;
+            background-color: var(--theme-reset-button-bg);
+            filter: brightness(90%);
         }
         .button-group {
             display: flex;
@@ -245,6 +387,18 @@
     </style>
 </head>
 <body>
+    <div class="theme-switch">
+        <span class="theme-switch-label">Light</span>
+        <label class="switch">
+            <input type="checkbox" id="theme-toggle" checked>
+            <span class="slider">
+                <span class="slider-icon sun-icon">☀</span>
+                <span class="slider-icon moon-icon">☾</span>
+            </span>
+        </label>
+        <span class="theme-switch-label">Dark</span>
+    </div>
+    
     <h1>EigenDA Resource Calculator</h1>
     
     <div class="calculator">
@@ -496,6 +650,71 @@
     </div>
 
     <script>
+        // Theme switching functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const themeToggle = document.getElementById('theme-toggle');
+            const root = document.documentElement;
+            
+            // Set initial theme from localStorage or use default (dark)
+            const savedTheme = localStorage.getItem('eigenDACalculatorTheme');
+            if (savedTheme === 'light') {
+                setLightTheme();
+                themeToggle.checked = false;
+            } else {
+                setDarkTheme();
+                themeToggle.checked = true;
+            }
+            
+            // Handle theme toggle
+            themeToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    setDarkTheme();
+                    localStorage.setItem('eigenDACalculatorTheme', 'dark');
+                } else {
+                    setLightTheme();
+                    localStorage.setItem('eigenDACalculatorTheme', 'light');
+                }
+            });
+            
+            function setDarkTheme() {
+                root.style.setProperty('--theme-bg-color', 'var(--bg-color)');
+                root.style.setProperty('--theme-text-color', 'var(--text-color)');
+                root.style.setProperty('--theme-calculator-bg', 'var(--calculator-bg)');
+                root.style.setProperty('--theme-header-bg', 'var(--header-bg)');
+                root.style.setProperty('--theme-divider-color', 'var(--divider-color)');
+                root.style.setProperty('--theme-input-border', 'var(--input-border)');
+                root.style.setProperty('--theme-modified-bg', 'var(--modified-bg)');
+                root.style.setProperty('--theme-hover-bg', 'var(--hover-bg)');
+                root.style.setProperty('--theme-accent-color', 'var(--accent-color)');
+                root.style.setProperty('--theme-tooltip-bg', 'var(--tooltip-bg)');
+                root.style.setProperty('--theme-tooltip-text', 'var(--tooltip-text)');
+                root.style.setProperty('--theme-button-bg', 'var(--button-bg)');
+                root.style.setProperty('--theme-button-text', 'var(--button-text)');
+                root.style.setProperty('--theme-table-border', 'var(--table-border)');
+                root.style.setProperty('--theme-reset-button-bg', 'var(--reset-button-bg)');
+                root.style.setProperty('--theme-zebra-stripe-color', 'var(--zebra-stripe-color)');
+            }
+            
+            function setLightTheme() {
+                root.style.setProperty('--theme-bg-color', 'var(--light-bg-color)');
+                root.style.setProperty('--theme-text-color', 'var(--light-text-color)');
+                root.style.setProperty('--theme-calculator-bg', 'var(--light-calculator-bg)');
+                root.style.setProperty('--theme-header-bg', 'var(--light-header-bg)');
+                root.style.setProperty('--theme-divider-color', 'var(--light-divider-color)');
+                root.style.setProperty('--theme-input-border', 'var(--light-input-border)');
+                root.style.setProperty('--theme-modified-bg', 'var(--light-modified-bg)');
+                root.style.setProperty('--theme-hover-bg', 'var(--light-hover-bg)');
+                root.style.setProperty('--theme-accent-color', 'var(--light-accent-color)');
+                root.style.setProperty('--theme-tooltip-bg', 'var(--light-tooltip-bg)');
+                root.style.setProperty('--theme-tooltip-text', 'var(--light-tooltip-text)');
+                root.style.setProperty('--theme-button-bg', 'var(--light-button-bg)');
+                root.style.setProperty('--theme-button-text', 'var(--light-button-text)');
+                root.style.setProperty('--theme-table-border', 'var(--light-table-border)');
+                root.style.setProperty('--theme-reset-button-bg', 'var(--light-reset-button-bg)');
+                root.style.setProperty('--theme-zebra-stripe-color', 'var(--light-zebra-stripe-color)');
+            }
+        });
+        
         // Confetti function for the easter egg
         function createConfetti() {
             const confettiContainer = document.createElement('div');
