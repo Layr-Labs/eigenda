@@ -410,6 +410,16 @@
             background-color: var(--theme-reset-button-bg);
             filter: brightness(90%);
         }
+        
+        /* Do Not Click button styling */
+        .do-not-click {
+            background-color: var(--theme-reset-button-bg);
+            color: var(--theme-button-text);
+        }
+        .do-not-click:hover {
+            background-color: var(--theme-reset-button-bg);
+            filter: brightness(90%);
+        }
         .button-group {
             display: flex;
             justify-content: center;
@@ -668,14 +678,19 @@
                 </td>
             </tr>
             
-            <!-- Reset Button -->
-            <tr class="calculator-row" style="margin-top: 20px;">
-                <td colspan="4" style="text-align: center; padding-top: 20px;">
-                    <button id="reset" class="reset">Reset to Defaults</button>
-                </td>
-            </tr>
             </tbody>
         </table>
+        
+        <!-- Buttons below table -->
+        <div style="margin-top: 20px; width: 100%;">
+            <div style="float: left;">
+                <button id="reset" class="reset">Reset to Defaults</button>
+            </div>
+            <div style="float: right;">
+                <button id="do-not-click" class="do-not-click">Do Not Click</button>
+            </div>
+            <div style="clear: both;"></div>
+        </div>
     </div>
 
     <script>
@@ -903,6 +918,11 @@
             
             // Add event listener for main reset button
             resetButton.addEventListener('click', reset);
+            
+            // Add event listener for "Do Not Click" button - Rickroll
+            document.getElementById('do-not-click').addEventListener('click', function() {
+                window.open('https://www.youtube.com/watch?v=xm3YgoEiEDc', '_blank');
+            });
             
             // Add event listeners for individual field reset buttons
             const resetFieldButtons = document.querySelectorAll('.reset-field');
