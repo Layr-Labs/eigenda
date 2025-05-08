@@ -24,8 +24,8 @@ contract EigenDADisperserRegistry is IEigenDADisperserRegistry {
         _;
     }
 
-    modifier onlyDisperser(uint32 disperserKey) {
-        require(msg.sender == DisperserRegistryLib.getDisperser(disperserKey), "Caller is not the disperser");
+    modifier onlyDisperserOwner(uint32 disperserKey) {
+        require(msg.sender == DisperserRegistryLib.getDisperserOwner(disperserKey), "Caller is not the disperser");
         _;
     }
 
@@ -48,20 +48,23 @@ contract EigenDADisperserRegistry is IEigenDADisperserRegistry {
 
     function transferDisperserOwnership(uint32 disperserKey, address disperserAddress)
         external
-        onlyDisperser(disperserKey)
+        onlyDisperserOwner(disperserKey)
     {
         DisperserRegistryLib.transferDisperserOwnership(disperserKey, disperserAddress);
     }
 
-    function updateDisperserURL(uint32 disperserKey, string memory disperserURL) external onlyDisperser(disperserKey) {
-        DisperserRegistryLib.updateDisperserURL(disperserKey, disperserURL);
+    function updateDisperserInfo(uint32 disperserKey, address disperser, string memory disperserURL)
+        external
+        onlyDisperserOwner(disperserKey)
+    {
+        DisperserRegistryLib.updateDisperserInfo(disperserKey, disperser, disperserURL);
     }
 
-    function deregisterDisperser(uint32 disperserKey) external onlyDisperser(disperserKey) {
+    function deregisterDisperser(uint32 disperserKey) external onlyDisperserOwner(disperserKey) {
         DisperserRegistryLib.deregisterDisperser(disperserKey);
     }
 
-    function withdraw(uint32 disperserKey) external onlyDisperser(disperserKey) {
+    function withdraw(uint32 disperserKey) external onlyDisperserOwner(disperserKey) {
         DisperserRegistryLib.withdraw(disperserKey);
     }
 

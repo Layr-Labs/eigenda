@@ -12,6 +12,7 @@ library DisperserRegistryStorage {
     struct Disperser {
         EigenDATypesV3.DisperserInfo info;
         EigenDATypesV3.LockedDisperserDeposit deposit;
+        address owner;
         uint64 unlockTimestamp;
     }
 
@@ -50,43 +51,38 @@ library DisperserRegistryLib {
     {
         disperserKey = consumeDisperserKey();
         DisperserRegistryStorage.Disperser storage disperser = s().disperser[disperserKey];
+        EigenDATypesV3.LockedDisperserDeposit memory depositParams = s().depositParams; // memory copy for gas efficiency
+
         require(disperserAddress != address(0), "Invalid disperser address");
 
-        address token = s().depositParams.token;
-        uint256 deposit = s().depositParams.deposit;
-        uint256 refund = s().depositParams.refund;
-        if (deposit > 0) {
-            IERC20(token).safeTransferFrom(msg.sender, address(this), deposit);
-            s().excess[token] += deposit - refund; // we've already checked deposit >= refund
+        if (depositParams.deposit > 0) {
+            IERC20(depositParams.token).safeTransferFrom(msg.sender, address(this), depositParams.deposit);
+            s().excess[depositParams.token] += depositParams.deposit - depositParams.refund; // we've already checked deposit >= refund
         }
 
         disperser.info =
             EigenDATypesV3.DisperserInfo({disperser: disperserAddress, registered: true, disperserURL: disperserURL});
-        disperser.deposit = s().depositParams;
+        disperser.deposit = depositParams;
         disperser.unlockTimestamp = type(uint64).max;
 
         return disperserKey;
     }
 
-    function transferDisperserOwnership(uint32 disperserKey, address disperserAddress) internal {
+    function transferDisperserOwnership(uint32 disperserKey, address newOwner) internal {
         DisperserRegistryStorage.Disperser storage disperser = s().disperser[disperserKey];
 
-        address token = s().depositParams.token;
-        uint256 updateFee = s().updateFee;
-        if (updateFee > 0) {
-            IERC20(token).safeTransferFrom(msg.sender, address(this), updateFee);
-            s().excess[token] += updateFee;
-        }
+        require(disperser.info.registered, "Disperser not registered");
+        require(newOwner != address(0), "Invalid new owner");
+
+        disperser.owner = newOwner;
+    }
+
+    function updateDisperserInfo(uint32 disperserKey, address disperserAddress, string memory disperserURL) internal {
+        DisperserRegistryStorage.Disperser storage disperser = s().disperser[disperserKey];
 
         require(disperser.info.registered, "Disperser not registered");
         require(disperserAddress != address(0), "Invalid disperser address");
 
-        disperser.info.disperser = disperserAddress;
-    }
-
-    function updateDisperserURL(uint32 disperserKey, string memory disperserURL) internal {
-        DisperserRegistryStorage.Disperser storage disperser = s().disperser[disperserKey];
-
         address token = s().depositParams.token;
         uint256 updateFee = s().updateFee;
         if (updateFee > 0) {
@@ -94,8 +90,7 @@ library DisperserRegistryLib {
             s().excess[token] += updateFee;
         }
 
-        require(disperser.info.registered, "Disperser not registered");
-
+        disperser.info.disperser = disperserAddress;
         disperser.info.disperserURL = disperserURL;
     }
 
@@ -131,8 +126,8 @@ library DisperserRegistryLib {
         return s().disperser[disperserKey].info;
     }
 
-    function getDisperser(uint32 disperserKey) internal view returns (address) {
-        return s().disperser[disperserKey].info.disperser;
+    function getDisperserOwner(uint32 disperserKey) internal view returns (address) {
+        return s().disperser[disperserKey].owner;
     }
 
     function getLockedDeposit(uint32 disperserKey)
