@@ -139,9 +139,6 @@ type Reader interface {
 	// GetOnDemandPaymentByAccount returns on-demand payment of an account
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*OnDemandPayment, error)
 
-	// GetMinNumSymbols returns the minimum number of symbols per blob
-	GetMinNumSymbols(ctx context.Context, blockNumber uint32) (uint64, error)
-
 	// GetDisperserAddress returns the disperser address with the given ID.
 	GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error)
 

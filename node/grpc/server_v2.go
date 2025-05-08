@@ -389,7 +389,6 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 // - doesn't check every 32 bytes is a valid field element
 func (s *ServerV2) validateDispersalRequest(
 	blobCert *corev2.BlobCertificate,
-	// onchainState *OnchainState
 ) (*corev2.BlobHeader, error) {
 	if len(blobCert.Signature) != 65 {
 		return nil, fmt.Errorf("signature is expected to be 65 bytes, but got %d bytes", len(blobCert.Signature))
@@ -403,10 +402,6 @@ func (s *ServerV2) validateDispersalRequest(
 	commitedBlobLength := blobCert.BlobHeader.BlobCommitments.Length
 	if commitedBlobLength == 0 {
 		return nil, errors.New("blob size must be greater than 0")
-	}
-	// Maximum number of symbols is currently configured by the disperser, not on-chain
-	if commitedBlobLength < uint(s.node.MinNumSymbolsPerBlob.Load()) {
-		return nil, fmt.Errorf("blob size must be greater than %d", s.node.MinNumSymbolsPerBlob.Load())
 	}
 	if commitedBlobLength != encoding.NextPowerOf2(commitedBlobLength) {
 		return nil, errors.New("invalid commitment length, must be a power of 2")

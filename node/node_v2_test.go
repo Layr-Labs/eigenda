@@ -236,8 +236,6 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	require.Same(t, relayClient, newRelayClient)
 	quorumCount := c.node.QuorumCount.Load()
 	require.Equal(t, quorumCount, uint32(2))
-	minNumSymbols := c.node.MinNumSymbolsPerBlob.Load()
-	require.Equal(t, minNumSymbols, uint64(4096))
 
 	// Same relay URLs shouldn't trigger update
 	newCtx1, cancel1 := context.WithTimeout(ctx, c.node.Config.OnchainStateRefreshInterval*2)
@@ -251,7 +249,6 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	c.tx.On("GetRelayURLs", mock.Anything).Return(relayURLs, nil)
 	c.tx.On("GetCurrentBlockNumber", mock.Anything).Return(uint32(10), nil)
 	c.tx.On("GetQuorumCount", mock.Anything).Return(uint8(3), nil)
-	c.tx.On("GetMinNumSymbols", mock.Anything).Return(uint64(40), nil)
 
 	err = c.node.RefreshOnchainState(newCtx1)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
@@ -259,8 +256,6 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	require.Same(t, relayClient, newRelayClient)
 	quorumCount = c.node.QuorumCount.Load()
 	require.Equal(t, quorumCount, uint32(2))
-	minNumSymbols = c.node.MinNumSymbolsPerBlob.Load()
-	require.Equal(t, minNumSymbols, uint64(4096))
 }
 
 func TestRefreshOnchainStateSuccess(t *testing.T) {
@@ -319,8 +314,6 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	require.Equal(t, bp, blobParams2)
 	quorumCount := c.node.QuorumCount.Load()
 	require.Equal(t, quorumCount, uint32(2))
-	minNumSymbols := c.node.MinNumSymbolsPerBlob.Load()
-	require.Equal(t, minNumSymbols, uint64(4096))
 }
 
 func bundleEqual(t *testing.T, expected, actual core.Bundle) {

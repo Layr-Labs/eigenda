@@ -87,11 +87,9 @@ type Node struct {
 	// It is used to determine blob parameters based on the version number.
 	BlobVersionParams atomic.Pointer[corev2.BlobVersionParameterMap]
 
+	// TODO: utilize meterer onchain state later to check quorum ID and minimum payments
 	// QuorumCount is the number of quorums in the network.
 	QuorumCount atomic.Uint32
-
-	// MinNumSymbolsPerBlob is the minimum number of symbols per blob.
-	MinNumSymbolsPerBlob atomic.Uint64
 }
 
 // NewNode creates a new Node with the provided config.
@@ -289,12 +287,6 @@ func NewNode(
 			return nil, fmt.Errorf("failed to get quorum count: %w", err)
 		}
 		n.QuorumCount.Store(uint32(quorumCount))
-
-		minNumSymbolsPerBlob, err := tx.GetMinNumSymbols(ctx, blockNumber)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get min num symbols per blob: %w", err)
-		}
-		n.MinNumSymbolsPerBlob.Store(minNumSymbolsPerBlob)
 	}
 
 	n.BlobVersionParams.Store(blobVersionParams)
@@ -473,12 +465,6 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 					n.QuorumCount.Store(uint32(quorumCount))
 				} else {
 					n.Logger.Error("error fetching quorum count", "err", err)
-				}
-				minNumSymbolsPerBlob, err := n.Transactor.GetMinNumSymbols(ctx, blockNumber)
-				if err == nil {
-					n.MinNumSymbolsPerBlob.Store(minNumSymbolsPerBlob)
-				} else {
-					n.Logger.Error("error fetching min num symbols per blob", "err", err)
 				}
 			} else {
 				n.Logger.Error("error fetching block number", "err", err)
