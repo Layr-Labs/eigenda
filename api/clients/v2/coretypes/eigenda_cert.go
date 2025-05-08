@@ -34,6 +34,9 @@ const (
 )
 
 type EigenDACert interface {
+	BlobVersion() v2.BlobVersion
+	RBN() uint32
+	QuorumNumbers() []byte
 	ComputeBlobKey() (*v2.BlobKey, error)
 	Serialize() ([]byte, error)
 	RelayKeys() []v2.RelayKey
@@ -76,6 +79,18 @@ func BuildEigenDACertV3(
 
 func (c *EigenDACertV3) RelayKeys() []v2.RelayKey {
 	return c.BlobInclusionInfo.BlobCertificate.RelayKeys
+}
+
+func (c *EigenDACertV3) QuorumNumbers() []byte {
+	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers
+}
+
+func (c *EigenDACertV3) RBN() uint32 {
+	return c.BatchHeader.ReferenceBlockNumber
+}
+
+func (c *EigenDACertV3) BlobVersion() v2.BlobVersion {
+	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version
 }
 
 func (c *EigenDACertV3) ComputeBlobKey() (*v2.BlobKey, error) {
@@ -183,6 +198,18 @@ func (c *EigenDACertV2) RelayKeys() []v2.RelayKey {
 func (c *EigenDACertV2) Commitments() (*encoding.BlobCommitments, error) {
 	return BlobCommitmentsBindingToInternal(
 		&c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment)
+}
+
+func (c *EigenDACertV2) RBN() uint32 {
+	return c.BatchHeader.ReferenceBlockNumber
+}
+
+func (c *EigenDACertV2) BlobVersion() v2.BlobVersion {
+	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version
+}
+
+func (c *EigenDACertV2) QuorumNumbers() []byte {
+	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers
 }
 
 func (c *EigenDACertV2) Serialize() ([]byte, error) {
