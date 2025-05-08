@@ -629,6 +629,26 @@
                 </td>
             </tr>
             
+            <!-- Write Cache Size -->
+            <tr class="input-row" id="writeCacheSize-row">
+                <td class="label-column">Write Cache Size (GB):</td>
+                <td class="input-column">
+                    <input type="number" id="writeCacheSize" value="16" step="1" min="0">
+                </td>
+                <td class="unit-column">
+                    <button class="reset-field" data-field="writeCacheSize">
+                        ↺
+                        <span class="reset-field-tooltip">Reset to default: 16</span>
+                    </button>
+                </td>
+                <td class="help-column">
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">The size of the write cache, in GB.</span>
+                    </div>
+                </td>
+            </tr>
+            
             <!-- Divider -->
             <tr class="divider-row">
                 <td colspan="4"></td>
@@ -674,6 +694,19 @@
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
                         <span class="tooltip-text">Formula: (Max Throughput) × (Sum of Stake) × (Read Amplification) × (Download Pessimism) × (Upload Safety Margin)<br>Unit: Megabytes per second (MB/s)</span>
+                    </div>
+                </td>
+            </tr>
+            
+            <!-- Hot Period Result -->
+            <tr class="calculator-row">
+                <td class="label-column result-label">Hot Period:</td>
+                <td class="value-column" id="hotPeriod">0</td>
+                <td class="unit-column">seconds</td>
+                <td class="help-column">
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">Formula: (Write Cache Size in GB) ÷ ((Max Throughput) × (Encoding Rate) × (Sum of Stake))<br>Unit: Seconds</span>
                     </div>
                 </td>
             </tr>
@@ -841,7 +874,8 @@
                 dataRetention: 14,
                 diskSafetyMargin: 1.2,
                 downloadSafetyMargin: 1.2,
-                uploadSafetyMargin: 1.2
+                uploadSafetyMargin: 1.2,
+                writeCacheSize: 16
             };
             
             // Track if confetti has been shown for this session
@@ -888,10 +922,17 @@
                 // upload bandwidth = (max throughput) * (sum of stake across all quorums) * (read amplification) * (download pessimism) * (upload safety margin)
                 const uploadBandwidth = maxThroughput * sumOfStake * readAmplification * downloadPessimism * uploadSafetyMargin;
                 
+                // Calculate hot period in seconds
+                // hot period = (write cache size in GB) / ((max throughput in MB/s) * (encoding rate) * (sum of stake across all quorums))
+                // Using binary representation: 1 GiB = 2^10 MiB = 1024 MiB
+                const writeCacheSizeMB = parseFloat(document.getElementById('writeCacheSize').value) * 1024;
+                const hotPeriod = writeCacheSizeMB / (maxThroughput * encodingRate * sumOfStake);
+                
                 // Update results
                 document.getElementById('storageSpace').textContent = storageSpace.toFixed(2);
                 document.getElementById('downloadBandwidth').textContent = downloadBandwidth.toFixed(2);
                 document.getElementById('uploadBandwidth').textContent = uploadBandwidth.toFixed(2);
+                document.getElementById('hotPeriod').textContent = hotPeriod.toFixed(0);
                 
                 // Update URL with current values for sharing/bookmarking
                 updateUrl();
@@ -1040,7 +1081,8 @@
                 dataRetentionInput,
                 document.getElementById('diskSafetyMargin'),
                 document.getElementById('downloadSafetyMargin'),
-                document.getElementById('uploadSafetyMargin')
+                document.getElementById('uploadSafetyMargin'),
+                document.getElementById('writeCacheSize')
             ];
             
             inputs.forEach(input => {
