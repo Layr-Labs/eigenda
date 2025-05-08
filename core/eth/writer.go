@@ -70,14 +70,17 @@ func (t *Writer) RegisterOperator(
 	operatorToAvsRegistrationSigSalt [32]byte,
 	operatorToAvsRegistrationSigExpiry *big.Int,
 ) error {
+	t.logger.Info("Registering operator", "quorums", fmt.Sprint(quorumIds), "socket", socket)
 
 	params, operatorSignature, err := t.getRegistrationParams(ctx, signer, operatorEcdsaPrivateKey, operatorToAvsRegistrationSigSalt, operatorToAvsRegistrationSigExpiry)
 	if err != nil {
 		t.logger.Error("Failed to get registration params", "err", err)
 		return err
 	}
+	t.logger.Info("Registration params", "params", params, "operatorSignature", operatorSignature)
 
 	quorumNumbers := quorumIDsToQuorumNumbers(quorumIds)
+	t.logger.Info("Quorum numbers", "quorumNumbers", quorumNumbers)
 	opts, err := t.ethClient.GetNoSendTransactOpts()
 	if err != nil {
 		t.logger.Error("Failed to generate transact opts", "err", err)
@@ -90,12 +93,14 @@ func (t *Writer) RegisterOperator(
 		t.logger.Error("Failed to register operator", "err", err)
 		return err
 	}
+	t.logger.Info("Registered operator", "tx", tx.Hash().String())
 
-	_, err = t.ethClient.EstimateGasPriceAndLimitAndSendTx(context.Background(), tx, "RegisterOperatorWithCoordinator1", nil)
+	sentTx, err := t.ethClient.EstimateGasPriceAndLimitAndSendTx(context.Background(), tx, "RegisterOperatorWithCoordinator1", nil)
 	if err != nil {
 		t.logger.Error("Failed to estimate gas price and limit", "err", err)
 		return err
 	}
+	t.logger.Info("!!!!!!!!!!! Sent tx", "block number", sentTx.BlockNumber)
 	return nil
 }
 

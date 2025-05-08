@@ -250,17 +250,33 @@ func (v *shardValidator) verifyBlobLengthWorker(blobCommitments encoding.BlobCom
 
 // GetNodeInfoFromEndpoint pings the operator's endpoint and returns NodeInfoReply
 func GetNodeInfoFromEndpoint(ctx context.Context, endpoint string) (*pbvalidator.GetNodeInfoReply, error) {
+
+	loggerConfig := common.DefaultLoggerConfig()
+	logger, err := common.NewLogger(loggerConfig)
+	if err != nil {
+		panic(err)
+	}
+	logger = logger.With("component", "GetNodeInfoFromEndpoint")
+	logger.Info("Getting node info from endpoint", "endpoint", endpoint)
+
 	conn, err := grpc.NewClient(endpoint)
 	if err != nil {
+		logger.Error("Failed to create GRPC client", "endpoint", endpoint, "error", err)
 		return nil, err
 	}
 	defer conn.Close()
+
 	client := pbvalidator.NewDispersalClient(conn)
 	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+
+	logger.Info("Sending GetNodeInfo request", "endpoint", endpoint)
 	resp, err := client.GetNodeInfo(ctxTimeout, &pbvalidator.GetNodeInfoRequest{})
 	if err != nil {
+		logger.Error("Failed to get node info", "endpoint", endpoint, "error", err)
 		return nil, err
 	}
+
+	logger.Info("Successfully got node info", "endpoint", endpoint, "version", resp.Semver)
 	return resp, nil
 }

@@ -29,15 +29,28 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	// Enforce per-quorum rollout ready boolean if enabled
 	onchainState := s.onchainState.Load()
 	if onchainState == nil {
+		s.logger.Error("onchain state is nil during DisperseBlob")
 		return nil, api.NewErrorInternal("onchain state is nil")
 	}
+	
+	s.logger.Info("DisperseBlob request received", 
+		"quorumNumbers", req.GetBlobHeader().GetQuorumNumbers(), 
+		"operatorVersionCheck", s.operatorVersionCheck,
+		"hasRolloutMap", s.operatorSetRolloutReadyByQuorum != nil,
+		"hasStakePctMap", s.currentRolloutStakePctByQuorum != nil)
+	
 	if s.operatorVersionCheck {
+		s.logger.Info("Operator version check is enabled")
 		if s.operatorSetRolloutReadyByQuorum == nil || s.currentRolloutStakePctByQuorum == nil {
+			s.logger.Info("Rollout state maps are nil, initializing via periodicOperatorNodeInfoCheck")
 			s.periodicOperatorNodeInfoCheck(ctx)
 		}
 		if err := s.checkQuorumRolloutReady(req); err != nil {
+			s.logger.Warn("Quorum rollout check failed", "error", err)
 			return nil, err
 		}
+	} else {
+		s.logger.Info("Operator version check is disabled, skipping quorum rollout check")
 	}
 
 	// Validate the request
@@ -256,24 +269,48 @@ func (s *DispersalServerV2) checkBlobExistence(ctx context.Context, blobHeader *
 }
 
 func (s *DispersalServerV2) checkQuorumRolloutReady(req *pb.DisperseBlobRequest) error {
+	s.logger.Info("Checking quorum rollout readiness", "rolloutReadyMap", s.operatorSetRolloutReadyByQuorum, "stakePctMap", s.currentRolloutStakePctByQuorum)
+
+	// Defensive check - initialize maps if they're nil
+	if s.operatorSetRolloutReadyByQuorum == nil {
+		s.logger.Warn("operatorSetRolloutReadyByQuorum is nil, initializing empty map")
+		s.operatorSetRolloutReadyByQuorum = make(map[core.QuorumID]bool)
+	}
+	if s.currentRolloutStakePctByQuorum == nil {
+		s.logger.Warn("currentRolloutStakePctByQuorum is nil, initializing empty map")
+		s.currentRolloutStakePctByQuorum = make(map[core.QuorumID]float64)
+	}
+
 	notReady := make([]string, 0)
 	for _, quorum := range req.GetBlobHeader().GetQuorumNumbers() {
 		qid := core.QuorumID(quorum)
-		ready := s.operatorSetRolloutReadyByQuorum[qid]
+		ready, exists := s.operatorSetRolloutReadyByQuorum[qid]
+		if !exists {
+			s.logger.Warn("Quorum not found in rollout readiness map", "quorumID", qid)
+			ready = false // Default to not ready if missing
+		}
+
+		pct, pctExists := s.currentRolloutStakePctByQuorum[qid]
+		if !pctExists {
+			s.logger.Warn("Quorum not found in stake percentage map", "quorumID", qid)
+			pct = 0 // Default to 0% if missing
+		}
+
+		s.logger.Info("Checking quorum readiness", "quorumID", qid, "ready", ready, "stakePct", pct)
 		if !ready {
-			pct := s.currentRolloutStakePctByQuorum[qid] * 100
 			threshold := requiredNodeVersionStakeThreshold * 100
-			notReady = append(notReady, fmt.Sprintf("quorum %d: %.2f%% of %.2f%% upgraded", quorum, pct, threshold))
+			notReady = append(notReady, fmt.Sprintf("quorum %d: %.2f%% of %.2f%% upgraded", quorum, pct*100, threshold))
 		}
 	}
 	if len(notReady) > 0 {
-		return api.NewErrorResourceExhausted(
-			fmt.Sprintf(
-				"Operator new version %s rollout is in progress for: %s. Please be patient for the decentralized network to coordinate disperser and operator versions.",
-				requiredNodeVersion,
-				strings.Join(notReady, "; "),
-			),
+		errMsg := fmt.Sprintf(
+			"Operator new version %s rollout is in progress for: %s. Please be patient for the decentralized network to coordinate disperser and operator versions.",
+			requiredNodeVersion,
+			strings.Join(notReady, "; "),
 		)
+		s.logger.Warn("Quorum rollout not ready", "error", errMsg)
+		return api.NewErrorResourceExhausted(errMsg)
 	}
+	s.logger.Info("All quorums are rollout ready")
 	return nil
 }
