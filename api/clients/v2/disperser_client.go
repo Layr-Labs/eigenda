@@ -203,7 +203,7 @@ func (c *disperserClient) DisperseBlobWithProbe(
 	probe.SetStage("acquire_accountant_lock")
 	c.accountantLock.Lock()
 
-	probe.SetStage("prepare_for_dispersal")
+	probe.SetStage("accountant")
 
 	err = c.initOncePopulateAccountant(ctx)
 	if err != nil {
@@ -225,6 +225,8 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		defer c.accountantLock.Unlock()
 	}
 
+	probe.SetStage("verify_field_element")
+
 	// check every 32 bytes of data are within the valid range for a bn254 field element
 	_, err = rs.ToFrArray(data)
 	if err != nil {
@@ -233,6 +235,8 @@ func (c *disperserClient) DisperseBlobWithProbe(
 				"please use the correct format where every 32bytes(big-endian) is less than "+
 				"21888242871839275222246405745257275088548364400416034343698204186575808495617 %w", err)
 	}
+
+	probe.SetStage("get_commitments")
 
 	var blobCommitments encoding.BlobCommitments
 	if c.prover == nil {
@@ -273,6 +277,8 @@ func (c *disperserClient) DisperseBlobWithProbe(
 		QuorumNumbers:   quorums,
 		PaymentMetadata: *payment,
 	}
+
+	probe.SetStage("sign_blob_request")
 
 	sig, err := c.signer.SignBlobRequest(blobHeader)
 	if err != nil {
@@ -405,7 +411,7 @@ func (c *disperserClient) initOnceGrpcConnection() error {
 	var initErr error
 	c.initOnceGrpc.Do(func() {
 		addr := fmt.Sprintf("%v:%v", c.config.Hostname, c.config.Port)
-		dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag, 4*units.MiB)
+		dialOptions := GetGrpcDialOptions(c.config.UseSecureGrpcFlag, 4*units.MiB)
 		conn, err := grpc.NewClient(addr, dialOptions...)
 		if err != nil {
 			initErr = err

@@ -145,7 +145,7 @@ var (
 		Usage:    "Interval at which new Attestations will be submitted as signature gathering progresses",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNATURE_TICK_INTERVAL"),
-		Value:    100 * time.Millisecond,
+		Value:    50 * time.Millisecond,
 	}
 	FinalizationBlockDelayFlag = cli.Uint64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "finalization-block-delay"),
