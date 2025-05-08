@@ -13,12 +13,12 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
     /// @dev The list is sorted in ascending order, and corresponds to the keys of the certVerifiers mapping.
     uint32[] public certVerifierABNs;
 
-    event CertVerifierAdded(uint32 indexed abn, address indexed certVerifier);
+    event CertVerifierAdded(uint32 indexed activationBlockNumber, address indexed certVerifier);
 
-    error ABNNotInFuture(uint32 abn);
-    error ABNNotGreaterThanLast(uint32 abn);
+    error ABNNotInFuture(uint32 activationBlockNumber);
+    error ABNNotGreaterThanLast(uint32 activationBlockNumber);
     error InvalidCertLength();
-    error NoCertVerifierFound(uint32 rbn);
+    error NoCertVerifierFound(uint32 referenceBlockNumber);
 
     /// IEigenDACertVerifierRouter ///
 
@@ -26,8 +26,8 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
         return IEigenDACertVerifier(getCertVerifierAt(_getRBN(certBytes[32:]))).checkDACert(certBytes);
     }
 
-    function getCertVerifierAt(uint32 rbn) public view returns (address) {
-        return certVerifiers[_findPrecedingRegisteredABN(rbn)];
+    function getCertVerifierAt(uint32 referenceBlockNumber) public view returns (address) {
+        return certVerifiers[_findPrecedingRegisteredABN(referenceBlockNumber)];
     }
 
     /// ADMIN ///
@@ -39,22 +39,22 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
         emit CertVerifierAdded(0, certVerifier);
     }
 
-    function addCertVerifier(uint32 abn, address certVerifier) external onlyOwner {
-        if (abn <= block.number) {
-            revert ABNNotInFuture(abn);
+    function addCertVerifier(uint32 activationBlockNumber, address certVerifier) external onlyOwner {
+        if (activationBlockNumber < block.number) {
+            revert ABNNotInFuture(activationBlockNumber);
         }
-        if (abn <= certVerifierABNs[certVerifierABNs.length - 1]) {
-            revert ABNNotGreaterThanLast(abn);
+        if (activationBlockNumber <= certVerifierABNs[certVerifierABNs.length - 1]) {
+            revert ABNNotGreaterThanLast(activationBlockNumber);
         }
-        _addCertVerifier(abn, certVerifier);
+        _addCertVerifier(activationBlockNumber, certVerifier);
     }
 
     /// INTERNAL ///
 
-    function _addCertVerifier(uint32 abn, address certVerifier) internal {
-        certVerifiers[abn] = certVerifier;
-        certVerifierABNs.push(abn);
-        emit CertVerifierAdded(abn, certVerifier);
+    function _addCertVerifier(uint32 activationBlockNumber, address certVerifier) internal {
+        certVerifiers[activationBlockNumber] = certVerifier;
+        certVerifierABNs.push(activationBlockNumber);
+        emit CertVerifierAdded(activationBlockNumber, certVerifier);
     }
 
     function _getRBN(bytes calldata certBytes) internal pure returns (uint32) {
@@ -68,15 +68,19 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
 
     /// @notice Given a reference block number, find the closest activation block number
     ///         registered in this contract that is less than or equal to the given reference block number.
-    /// @param rbn The reference block number to find the closest ABN for
-    /// @return abn The preceding ABN registered in this contract that is less than or equal to the given ABN.
-    function _findPrecedingRegisteredABN(uint32 rbn) internal view returns (uint32 abn) {
+    /// @param referenceBlockNumber The reference block number to find the closest ABN for
+    /// @return activationBlockNumber The preceding ABN registered in this contract that is less than or equal to the given ABN.
+    function _findPrecedingRegisteredABN(uint32 referenceBlockNumber)
+        internal
+        view
+        returns (uint32 activationBlockNumber)
+    {
         // It is assumed that the latest ABN are the most likely to be used.
         uint256 abnMaxIndex = certVerifierABNs.length - 1; // cache to memory
         for (uint256 i; i < certVerifierABNs.length; i++) {
-            abn = certVerifierABNs[abnMaxIndex - i];
-            if (abn <= rbn) {
-                return abn;
+            activationBlockNumber = certVerifierABNs[abnMaxIndex - i];
+            if (activationBlockNumber <= referenceBlockNumber) {
+                return activationBlockNumber;
             }
         }
     }
