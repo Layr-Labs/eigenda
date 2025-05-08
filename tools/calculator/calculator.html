@@ -12,7 +12,7 @@
             --light-calculator-bg: #e2e2e2; /* Darker calculator background to maintain contrast with off-white */
             --light-header-bg: #e9f7ef;
             --light-divider-color: #ddd;
-            --light-input-border: #ddd;
+            --light-input-border: #999; /* Darker input border for better contrast in light mode */
             --light-modified-bg: #f0f8ff;
             --light-hover-bg: #d9e9ff;
             --light-accent-color: #2c7873;
@@ -31,7 +31,7 @@
             --calculator-bg: #1e1e1e;
             --header-bg: #2a3b36;
             --divider-color: #444;
-            --input-border: #444;
+            --input-border: #777; /* Lighter input border for better contrast in dark mode */
             --modified-bg: #1a2a3f;
             --hover-bg: #2a4a7a;
             --accent-color: #4fb3ab;
@@ -266,12 +266,19 @@
         input {
             width: 100%;
             padding: 8px;
-            border: 1px solid var(--theme-input-border);
+            border: 2px solid var(--theme-input-border); /* Increased border width from 1px to 2px */
             border-radius: 4px;
             box-sizing: border-box;
             background-color: var(--theme-calculator-bg);
             color: var(--theme-text-color);
             transition: all 0.3s ease;
+            outline: none; /* Remove default focus outline */
+        }
+        
+        /* Add focus effect with the accent color */
+        input:focus {
+            border-color: var(--theme-accent-color);
+            box-shadow: 0 0 0 1px var(--theme-accent-color);
         }
         
         /* Remove up/down arrows from number inputs */
