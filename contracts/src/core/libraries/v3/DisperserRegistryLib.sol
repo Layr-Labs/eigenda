@@ -111,7 +111,7 @@ library DisperserRegistryLib {
         require(lockedDeposit.refund > 0, "No deposit to withdraw");
         require(disperser.unlockTimestamp <= block.timestamp, "Deposit is still locked");
 
-        IERC20(lockedDeposit.token).safeTransfer(disperser.info.disperser, lockedDeposit.refund);
+        IERC20(lockedDeposit.token).safeTransfer(disperser.owner, lockedDeposit.refund);
         lockedDeposit.refund = 0;
     }
 
