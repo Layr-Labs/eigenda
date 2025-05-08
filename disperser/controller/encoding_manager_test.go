@@ -367,9 +367,11 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 	chainReader.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	chainReader.On("GetAllVersionedBlobParams", mock.Anything).Return(map[v2.BlobVersion]*core.BlobVersionParameters{
 		0: {
-			NumChunks:       8192,
-			CodingRate:      8,
-			MaxNumOperators: 3537,
+			NumChunks:                   8192,
+			CodingRate:                  8,
+			ReconstructionThresholdBips: 1666,
+			NumUnits:                    393,
+			SamplesPerUnit:              20,
 		},
 	}, nil)
 	onchainRefreshInterval := 1 * time.Millisecond

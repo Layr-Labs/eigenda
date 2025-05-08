@@ -11,18 +11,8 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 )
 
-type SampleConfig struct {
-	NumUnits       uint32
-	SamplesPerUnit uint32
-}
-
-var DefaultSampleConfig = SampleConfig{
-	NumUnits:       393,
-	SamplesPerUnit: 20,
-}
-
 // getMaxStakePercentage calculates the maximum stake percentage across specified quorums for a specific operator. The function assumes that it will be passed an operator state that contains the quorums for which the operator is a member. Therefore, it does not return an error if a quorum is not found in the state.
-func getMaxStakePercentage(state *core.OperatorState, blobParams *core.BlobVersionParameters, quorums []core.QuorumID, id core.OperatorID) (*big.Float, error) {
+func getMaxStakePercentage(state *core.OperatorState, quorums []core.QuorumID, id core.OperatorID) (*big.Float, error) {
 	maxStakePercentage := new(big.Float)
 	found := false
 
@@ -35,11 +25,6 @@ func getMaxStakePercentage(state *core.OperatorState, blobParams *core.BlobVersi
 		ops, ok := state.Operators[q]
 		if !ok || len(ops) == 0 {
 			return nil, fmt.Errorf("no operators found for quorum %d", q)
-		}
-
-		numOps := len(ops)
-		if uint32(numOps) > blobParams.MaxNumOperators {
-			return nil, fmt.Errorf("too many operators (%d) to get assignments: max number of operators is %d", numOps, blobParams.MaxNumOperators)
 		}
 
 		// Get the stake for this operator in this quorum
@@ -129,7 +114,7 @@ func GetAssignment(state *core.OperatorState, blobParams *core.BlobVersionParame
 		return Assignment{}, fmt.Errorf("blob params cannot be nil")
 	}
 
-	maxStakePercentage, err := getMaxStakePercentage(state, blobParams, quorums, id)
+	maxStakePercentage, err := getMaxStakePercentage(state, quorums, id)
 	if err != nil {
 		return Assignment{}, fmt.Errorf("failed to get max stake percentage: %w", err)
 	}
@@ -140,7 +125,7 @@ func GetAssignment(state *core.OperatorState, blobParams *core.BlobVersionParame
 
 	// Calculate number of samples based on max stake percentage
 	maxStakeFloat, _ := maxStakePercentage.Float64()
-	numSamples := uint32(math.Ceil(maxStakeFloat * float64(DefaultSampleConfig.NumUnits*DefaultSampleConfig.SamplesPerUnit)))
+	numSamples := uint32(math.Ceil(maxStakeFloat * float64(blobParams.NumUnits*blobParams.SamplesPerUnit)))
 
 	// Create a deterministic random number generator using the blob key as seed
 	// We also mix in the operator ID to ensure different operators get different assignments

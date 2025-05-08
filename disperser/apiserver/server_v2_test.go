@@ -538,9 +538,11 @@ func newTestServerV2(t *testing.T) *testComponents {
 	chainReader.On("GetStoreDurationBlocks", tmock.Anything).Return(uint32(100), nil)
 	chainReader.On("GetAllVersionedBlobParams", tmock.Anything).Return(map[v2.BlobVersion]*core.BlobVersionParameters{
 		0: {
-			NumChunks:       8192,
-			CodingRate:      8,
-			MaxNumOperators: 3537,
+			NumChunks:                   8192,
+			CodingRate:                  8,
+			NumUnits:                    393,
+			SamplesPerUnit:              20,
+			ReconstructionThresholdBips: 1666,
 		},
 	}, nil)
 

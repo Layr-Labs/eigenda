@@ -61,32 +61,6 @@ var blobKey2 = []byte("blobKey2")
 
 // }
 
-func TestAssignmentWithTooManyOperators(t *testing.T) {
-
-	numOperators := blobParams.MaxNumOperators + 1
-
-	stakes := map[core.QuorumID]map[core.OperatorID]int{
-		0: {},
-	}
-	for i := 0; i < int(numOperators); i++ {
-		stakes[0][mock.MakeOperatorId(i)] = rand.Intn(100) + 1
-	}
-
-	dat, err := mock.NewChainDataMock(stakes)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	state := dat.GetTotalOperatorState(context.Background(), 0)
-	assert.Equal(t, len(state.Operators[0]), int(numOperators))
-
-	blobKey := [32]byte{}
-	copy(blobKey[:], []byte("blobKey"))
-
-	_, err = corev2.GetAssignments(state.OperatorState, blobParams, []core.QuorumID{0}, blobKey[:])
-	assert.Error(t, err)
-}
-
 func TestChunkLength(t *testing.T) {
 	pairs := []struct {
 		blobLength  uint32
@@ -212,10 +186,6 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 	for i := 0; i < 100; i++ {
 		f.Add(rand.Intn(2048) + 100)
-	}
-
-	for i := 0; i < 5; i++ {
-		f.Add(int(blobParams.MaxNumOperators))
 	}
 
 	f.Fuzz(func(t *testing.T, numOperators int) {
