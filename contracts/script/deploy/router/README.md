@@ -1,4 +1,4 @@
-# EigenDACertVerifierRouter Deployment
+# EigenDACertVerifierRouter Immutable Deployment
 
 This directory contains the deployment script for the EigenDACertVerifierRouter contract.
 
@@ -8,7 +8,7 @@ The EigenDACertVerifierRouter is a routing contract that directs certification v
 
 ## Deployment
 
-To deploy the EigenDACertVerifierRouter, use the following command:
+To deploy an immutable EigenDACertVerifierRouter, use the following command:
 
 ```shell
 forge script script/deploy/router/CertVerifierRouterDeployer.s.sol:CertVerifierRouterDeployer \
