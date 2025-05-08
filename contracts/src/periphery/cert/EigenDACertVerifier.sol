@@ -2,6 +2,7 @@
 pragma solidity ^0.8.9;
 
 import {IEigenDACertVerifier} from "src/periphery/cert/interfaces/IEigenDACertVerifier.sol";
+import {IEigenDACertVerifierBase} from "src/periphery/cert/interfaces/IEigenDACertVerifierBase.sol";
 
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
@@ -39,6 +40,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         quorumNumbersRequired = _quorumNumbersRequired;
     }
 
+    /// @inheritdoc IEigenDACertVerifierBase
     function checkDACert(bytes calldata certBytes) external view returns (uint8) {
         (CertLib.StatusCode status,) = CertLib.checkDACert(
             eigenDAThresholdRegistry, eigenDASignatureVerifier, certBytes, securityThresholds, quorumNumbersRequired
@@ -46,6 +48,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         return uint8(status);
     }
 
+    /// @inheritdoc IEigenDACertVerifier
     function certVersion() external pure returns (uint64) {
         return CERT_VERSION;
     }
