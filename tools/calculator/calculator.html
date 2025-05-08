@@ -210,7 +210,6 @@
         </div>
         
         <div class="button-group">
-            <button id="calculate">Calculate</button>
             <button id="reset" class="reset">Reset to Defaults</button>
         </div>
         
@@ -312,7 +311,6 @@
             const downloadBandwidthOutput = document.getElementById('downloadBandwidth');
             const uploadBandwidthOutput = document.getElementById('uploadBandwidth');
             
-            const calculateButton = document.getElementById('calculate');
             const resetButton = document.getElementById('reset');
             
             // Default values
@@ -393,8 +391,7 @@
                 calculate();
             }
             
-            // Add event listeners
-            calculateButton.addEventListener('click', calculate);
+            // Add event listener
             resetButton.addEventListener('click', reset);
             
             // Calculate initially with default values
