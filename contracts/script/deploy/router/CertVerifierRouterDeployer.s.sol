@@ -15,7 +15,6 @@ contract CertVerifierRouterDeployer is Script, Test {
     address eigenDACertVerifierRouter;
     address initialOwner;
 
-    // TODO: Consider adding an optional verifier parameter to instantiate one using closely upcoming block
     function run(string memory inputJSONFile, string memory outputJSONFile) external {
         string memory path = string.concat("./script/deploy/router/config/", inputJSONFile);
         string memory data = vm.readFile(path);
@@ -29,10 +28,10 @@ contract CertVerifierRouterDeployer is Script, Test {
 
         // Deploy the EigenDACertVerifierRouter contract
         EigenDACertVerifierRouter router = new EigenDACertVerifierRouter();
-        
+
         // Initialize the router with the initial owner
         router.initialize(initialOwner, initialCertVerifier);
-        
+
         eigenDACertVerifierRouter = address(router);
 
         vm.stopBroadcast();
