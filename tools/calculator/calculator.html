@@ -140,13 +140,29 @@
         .result-item {
             margin-bottom: 10px;
             font-size: 16px;
-            display: flex;
+            display: grid;
+            grid-template-columns: 250px 100px auto;
             align-items: center;
+            gap: 10px;
+        }
+        .result-label {
+            font-weight: normal;
         }
         .value {
             font-weight: bold;
             color: #2c7873;
-            margin-right: 10px;
+            text-align: right;
+        }
+        .result-unit {
+            font-weight: normal;
+            display: flex;
+            align-items: center;
+        }
+        .unit-text {
+            min-width: 40px; /* Fixed width for unit text */
+        }
+        .results .tooltip {
+            margin-left: 10px;
         }
         button {
             background-color: #2c7873;
@@ -320,24 +336,36 @@
         
         <div class="results">
             <div class="result-item">
-                Storage Space Needed: <span id="storageSpace" class="value">0</span> TB
-                <div class="tooltip">
-                    <div class="tooltip-icon">?</div>
-                    <span class="tooltip-text">Formula: (Max Throughput MB/s) × (Data Retention Period in days) × (Encoding Rate) × (Sum of Stake) × (Disk Safety Margin) × (86400 seconds/day) ÷ (1024*1024 MB/TB)<br>Unit: Terabytes (TB)</span>
+                <div class="result-label">Storage Space Needed:</div>
+                <span id="storageSpace" class="value">0</span>
+                <div class="result-unit">
+                    <span class="unit-text">TB</span>
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">Formula: (Max Throughput MB/s) × (Data Retention Period in days) × (Encoding Rate) × (Sum of Stake) × (Disk Safety Margin) × (86400 seconds/day) ÷ (1024*1024 MB/TB)<br>Unit: Terabytes (TB)</span>
+                    </div>
                 </div>
             </div>
             <div class="result-item">
-                Download Bandwidth: <span id="downloadBandwidth" class="value">0</span> MB/s
-                <div class="tooltip">
-                    <div class="tooltip-icon">?</div>
-                    <span class="tooltip-text">Formula: (Max Throughput) × (Encoding Rate) × (Sum of Stake) × (Download Safety Margin)<br>Unit: Megabytes per second (MB/s)</span>
+                <div class="result-label">Download Bandwidth:</div>
+                <span id="downloadBandwidth" class="value">0</span>
+                <div class="result-unit">
+                    <span class="unit-text">MB/s</span>
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">Formula: (Max Throughput) × (Encoding Rate) × (Sum of Stake) × (Download Safety Margin)<br>Unit: Megabytes per second (MB/s)</span>
+                    </div>
                 </div>
             </div>
             <div class="result-item">
-                Upload Bandwidth: <span id="uploadBandwidth" class="value">0</span> MB/s
-                <div class="tooltip">
-                    <div class="tooltip-icon">?</div>
-                    <span class="tooltip-text">Formula: (Max Throughput) × (Sum of Stake) × (Read Amplification) × (Download Pessimism) × (Upload Safety Margin)<br>Unit: Megabytes per second (MB/s)</span>
+                <div class="result-label">Upload Bandwidth:</div>
+                <span id="uploadBandwidth" class="value">0</span>
+                <div class="result-unit">
+                    <span class="unit-text">MB/s</span>
+                    <div class="tooltip">
+                        <div class="tooltip-icon">?</div>
+                        <span class="tooltip-text">Formula: (Max Throughput) × (Sum of Stake) × (Read Amplification) × (Download Pessimism) × (Upload Safety Margin)<br>Unit: Megabytes per second (MB/s)</span>
+                    </div>
                 </div>
             </div>
         </div>
