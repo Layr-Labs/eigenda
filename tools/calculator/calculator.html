@@ -667,7 +667,9 @@
                 <td class="help-column">
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
-                        <span class="tooltip-text">Formula: (Max Throughput MB/s) × (Data Retention Period in days) × (Encoding Rate) × (Sum of Stake) × (Disk Safety Margin) × (86400 seconds/day) ÷ (1024*1024 MB/TB)<br>Unit: Terabytes (TB)</span>
+                        <span class="tooltip-text">The amount of disk space required to store the data for the specified retention period.
+
+Formula: (Max Throughput MB/s) × (Data Retention Period in days) × (Encoding Rate) × (Sum of Stake) × (Disk Safety Margin) × (86400 seconds/day) ÷ (1024*1024 MB/TB)<br>Unit: Terabytes (TB)</span>
                     </div>
                 </td>
             </tr>
@@ -680,7 +682,9 @@
                 <td class="help-column">
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
-                        <span class="tooltip-text">Formula: (Max Throughput) × (Encoding Rate) × (Sum of Stake) × (Download Safety Margin)<br>Unit: Megabytes per second (MB/s)</span>
+                        <span class="tooltip-text">The required download bandwidth for retrieving data from the network.
+
+Formula: (Max Throughput) × (Encoding Rate) × (Sum of Stake) × (Download Safety Margin)<br>Unit: Megabytes per second (MB/s)</span>
                     </div>
                 </td>
             </tr>
@@ -693,7 +697,9 @@
                 <td class="help-column">
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
-                        <span class="tooltip-text">Formula: (Max Throughput) × (Sum of Stake) × (Read Amplification) × (Download Pessimism) × (Upload Safety Margin)<br>Unit: Megabytes per second (MB/s)</span>
+                        <span class="tooltip-text">The required upload bandwidth for serving data to clients, accounting for multiple reads and safety margins.
+
+Formula: (Max Throughput) × (Sum of Stake) × (Read Amplification) × (Download Pessimism) × (Upload Safety Margin)<br>Unit: Megabytes per second (MB/s)</span>
                     </div>
                 </td>
             </tr>
@@ -706,7 +712,9 @@
                 <td class="help-column">
                     <div class="tooltip">
                         <div class="tooltip-icon">?</div>
-                        <span class="tooltip-text">Formula: (Write Cache Size in GB) ÷ ((Max Throughput) × (Encoding Rate) × (Sum of Stake))<br>Unit: Seconds</span>
+                        <span class="tooltip-text">The time it takes to fill the write cache at the current throughput rate, indicating how long data remains in the cache.
+
+Formula: (Write Cache Size in GB) ÷ ((Max Throughput) × (Encoding Rate) × (Sum of Stake))<br>Unit: Seconds</span>
                     </div>
                 </td>
             </tr>
