@@ -302,12 +302,14 @@ func (d *DiskTable) reloadKeymap(
 	lowestSegmentIndex uint32,
 	highestSegmentIndex uint32) error {
 
-	// TODO(cody.littley): there is currently a race condition that may cause key files and value files to
-	//  be inconsistent. This is not a problem as long as the keymap is not reloaded, since this inconsistency
-	//  only hurts us when we are reloading the keymap. This needs to be fixed, but is not urgent since reloading
-	//  the keymap is not a feature currently used in production.
-	d.logger.Errorf("there is currently a race condition in this method, " +
-		"changing keymap type should not be used until fixed")
+	if len(segments) > 0 {
+		// TODO(cody.littley): there is currently a race condition that may cause key files and value files to
+		//  be inconsistent. This is not a problem as long as the keymap is not reloaded, since this inconsistency
+		//  only hurts us when we are reloading the keymap. This needs to be fixed, but is not urgent since reloading
+		//  the keymap is not a feature currently used in production.
+		d.logger.Errorf("there is currently a race condition in this method, " +
+			"changing keymap type should not be used until fixed")
+	}
 
 	start := d.clock()
 	defer func() {
