@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDACertVerifier} from "src/periphery/cert/interfaces/IEigenDACertVerifier.sol";
+import {IEigenDACertVerifierBase, IEigenDACertVerifier} from "src/periphery/cert/interfaces/IEigenDACertVerifier.sol";
 import {IEigenDACertVerifierRouter} from "src/periphery/cert/interfaces/IEigenDACertVerifierRouter.sol";
 import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
 
@@ -22,6 +22,7 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
 
     /// IEigenDACertVerifierRouter ///
 
+    /// @inheritdoc IEigenDACertVerifierBase
     function checkDACert(bytes calldata certBytes) external view returns (uint8) {
         return IEigenDACertVerifier(getCertVerifierAt(_getRBN(certBytes[32:]))).checkDACert(certBytes);
     }
