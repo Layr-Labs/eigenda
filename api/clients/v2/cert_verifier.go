@@ -5,7 +5,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	verifierBindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
 )
 
 // ICertVerifier is an interface for interacting with the EigenDACertVerifier contract.
@@ -20,7 +20,7 @@ type ICertVerifier interface {
 	GetNonSignerStakesAndSignature(
 		ctx context.Context,
 		signedBatch *disperser.SignedBatch,
-	) (*verifierBindings.NonSignerStakesAndSignature, error)
+	) (*verifierBindings.EigenDATypesV1NonSignerStakesAndSignature, error)
 
 	// GetQuorumNumbersRequired queries the cert verifier contract for the configured set of quorum numbers that must
 	// be set in the BlobHeader, and verified in VerifyDACertV2 and verifyDACertV2FromSignedBatch

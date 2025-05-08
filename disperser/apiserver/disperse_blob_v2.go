@@ -20,6 +20,7 @@ import (
 
 func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBlobRequest) (*pb.DisperseBlobReply, error) {
 	start := time.Now()
+	metererSyncTime := s.ntpClock.Now() // Using NTP-synced time for metering
 	defer func() {
 		s.metrics.reportDisperseBlobLatency(time.Since(start))
 	}()
@@ -39,7 +40,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 	}
 
 	// Check against payment meter to make sure there is quota remaining
-	if err := s.checkPaymentMeter(ctx, req, start); err != nil {
+	if err := s.checkPaymentMeter(ctx, req, metererSyncTime); err != nil {
 		return nil, err
 	}
 

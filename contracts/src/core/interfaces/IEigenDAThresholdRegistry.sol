@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import "../interfaces/IEigenDAStructs.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 
 interface IEigenDAThresholdRegistry {
-    event VersionedBlobParamsAdded(uint16 indexed version, VersionedBlobParams versionedBlobParams);
+    event VersionedBlobParamsAdded(uint16 indexed version, DATypesV1.VersionedBlobParams versionedBlobParams);
 
     event QuorumAdversaryThresholdPercentagesUpdated(
         bytes previousQuorumAdversaryThresholdPercentages, bytes newQuorumAdversaryThresholdPercentages
@@ -17,7 +18,8 @@ interface IEigenDAThresholdRegistry {
     event QuorumNumbersRequiredUpdated(bytes previousQuorumNumbersRequired, bytes newQuorumNumbersRequired);
 
     event DefaultSecurityThresholdsV2Updated(
-        SecurityThresholds previousDefaultSecurityThresholdsV2, SecurityThresholds newDefaultSecurityThresholdsV2
+        DATypesV1.SecurityThresholds previousDefaultSecurityThresholdsV2,
+        DATypesV1.SecurityThresholds newDefaultSecurityThresholdsV2
     );
 
     ///////////////////////// V1 ///////////////////////////////
@@ -43,5 +45,5 @@ interface IEigenDAThresholdRegistry {
     ///////////////////////// V2 ///////////////////////////////
 
     /// @notice Returns the blob params for a given blob version
-    function getBlobParams(uint16 version) external view returns (VersionedBlobParams memory);
+    function getBlobParams(uint16 version) external view returns (DATypesV1.VersionedBlobParams memory);
 }
