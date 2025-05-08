@@ -52,8 +52,14 @@ contract EigenDACertVerifierUnit is MockEigenDADeployer {
         assertEq(this.getRBNExternal(certBytes), signedBatch.batchHeader.referenceBlockNumber);
     }
 
+    /// @dev What we are trying to simulate here is having a function accept bytes as calldata,
+    ///      and getting the RBN after removing the first 32 bytes which respresents the data offset.
     function getRBNExternal(bytes calldata cert) external pure returns (uint32) {
-        return abi.decode(cert[64:96], (uint32));
+        return getRBNInternal(cert[32:]);
+    }
+
+    function getRBNInternal(bytes calldata cert) internal pure returns (uint32) {
+        return abi.decode(cert[32:64], (uint32));
     }
 
     function _getSignedBatchAndBlobVerificationProof(uint256 pseudoRandomNumber, uint8 version)
