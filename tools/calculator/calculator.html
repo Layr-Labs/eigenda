@@ -836,6 +836,9 @@
                 document.getElementById('storageSpace').textContent = storageSpace.toFixed(2);
                 document.getElementById('downloadBandwidth').textContent = downloadBandwidth.toFixed(2);
                 document.getElementById('uploadBandwidth').textContent = uploadBandwidth.toFixed(2);
+                
+                // Update URL with current values for sharing/bookmarking
+                updateUrl();
             }
             
             // Reset function
@@ -850,8 +853,11 @@
                 document.getElementById('downloadSafetyMargin').value = defaults.downloadSafetyMargin;
                 document.getElementById('uploadSafetyMargin').value = defaults.uploadSafetyMargin;
                 
-                calculate();
+                calculate(); // This will also update the URL to remove parameters
                 updateAllModifiedStatuses(); // Update highlighting
+                
+                // Clear the URL parameters completely (replace with clean URL)
+                window.history.pushState({}, '', window.location.pathname);
             }
             
             // Add event listener for main reset button
@@ -875,11 +881,45 @@
                 });
             });
             
-            // Calculate initially with default values
+            // Load values from URL parameters if available, otherwise use defaults
+            loadFromUrl();
+            
+            // Calculate initially
             calculate();
             
-            // We're now using CSS for hover effects
-            // JS hover effects have been removed
+            // URL parameter handling functions
+            function loadFromUrl() {
+                const urlParams = new URLSearchParams(window.location.search);
+                
+                // For each parameter in the URL, set the corresponding input value
+                for (const [key, value] of urlParams.entries()) {
+                    const input = document.getElementById(key);
+                    if (input && !isNaN(parseFloat(value))) {
+                        input.value = parseFloat(value);
+                        checkModifiedStatus(input); // Update modified status
+                    }
+                }
+            }
+            
+            function updateUrl() {
+                const urlParams = new URLSearchParams();
+                
+                // Add all non-default values to URL
+                for (const key in defaults) {
+                    const input = document.getElementById(key);
+                    const currentValue = parseFloat(input.value);
+                    
+                    // Only add to URL if value differs from default
+                    if (currentValue !== defaults[key]) {
+                        urlParams.set(key, currentValue);
+                    }
+                }
+                
+                // Update URL without reloading the page
+                const newUrl = window.location.pathname + 
+                    (urlParams.toString() ? '?' + urlParams.toString() : '');
+                window.history.pushState({}, '', newUrl);
+            }
             
             // Check if a field is modified from default and update row highlighting accordingly
             function checkModifiedStatus(input) {
