@@ -28,6 +28,10 @@
             display: flex;
             align-items: center;
         }
+        .field-group {
+            display: flex;
+            align-items: center;
+        }
         label {
             display: inline-block;
             width: 250px;
@@ -39,10 +43,48 @@
             border: 1px solid #ddd;
             border-radius: 4px;
         }
+        .reset-field {
+            background: none;
+            border: none;
+            cursor: pointer;
+            margin-left: 3px;
+            margin-right: 0;
+            padding: 5px;
+            color: #2c7873;
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .reset-field:hover {
+            color: #1f5f5b;
+        }
+        .reset-field-tooltip {
+            visibility: hidden;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 4px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            white-space: nowrap;
+            font-size: 12px;
+        }
+        .reset-field:hover .reset-field-tooltip {
+            visibility: visible;
+            opacity: 0.95;
+        }
         .tooltip {
             position: relative;
             display: inline-block;
-            margin-left: 10px;
+            margin-left: 5px;
             cursor: help;
         }
         .tooltip-icon {
@@ -130,82 +172,136 @@
     <div class="calculator">
         <div class="input-group">
             <label for="maxThroughput">Max Throughput (MB/s):</label>
-            <input type="number" id="maxThroughput" value="50" step="0.1" min="0">
-            <div class="tooltip">
-                <div class="tooltip-icon">?</div>
-                <span class="tooltip-text">The maximum throughput supported by EigenDA.</span>
+            <div class="field-group">
+                <input type="number" id="maxThroughput" value="50" step="0.1" min="0">
+                <button class="reset-field" data-field="maxThroughput">
+                    ↺
+                    <span class="reset-field-tooltip">Reset to default: 50</span>
+                </button>
+                <div class="tooltip">
+                    <div class="tooltip-icon">?</div>
+                    <span class="tooltip-text">The maximum throughput supported by EigenDA.</span>
+                </div>
             </div>
         </div>
         
         <div class="input-group">
             <label for="sumOfStake">Sum of Stake Across All Quorums:</label>
-            <input type="number" id="sumOfStake" value="0.125" step="0.001" min="0" max="1">
-            <div class="tooltip">
-                <div class="tooltip-icon">?</div>
-                <span class="tooltip-text">The sum of an operator's stake across all quorums. 1.0 means 100% stake for one quorum, 2.0 means 100% stake across two quorums. For example, if an operator has 10% stake in 3 quorums, the sum of stake across all quorums is 30%, and so you'd use 0.3 for field.</span>
+            <div class="field-group">
+                <input type="number" id="sumOfStake" value="0.125" step="0.001" min="0" max="1">
+                <button class="reset-field" data-field="sumOfStake">
+                    ↺
+                    <span class="reset-field-tooltip">Reset to default: 0.125</span>
+                </button>
+                <div class="tooltip">
+                    <div class="tooltip-icon">?</div>
+                    <span class="tooltip-text">The sum of an operator's stake across all quorums. 1.0 means 100% stake for one quorum, 2.0 means 100% stake across two quorums. For example, if an operator has 10% stake in 3 quorums, the sum of stake across all quorums is 30%, and so you'd use 0.3 for field.</span>
+                </div>
             </div>
         </div>
         
         <div class="input-group">
             <label for="encodingRate">Encoding Rate:</label>
-            <input type="number" id="encodingRate" value="8.0" step="0.1" min="0">
-            <div class="tooltip">
-                <div class="tooltip-icon">?</div>
-                <span class="tooltip-text">The kzg encoding rate.</span>
+            <div class="field-group">
+                <input type="number" id="encodingRate" value="8.0" step="0.1" min="0">
+                <button class="reset-field" data-field="encodingRate">
+                    ↺
+                    <span class="reset-field-tooltip">Reset to default: 8.0</span>
+                </button>
+                <div class="tooltip">
+                    <div class="tooltip-icon">?</div>
+                    <span class="tooltip-text">The kzg encoding rate.</span>
+                </div>
             </div>
         </div>
         
         <div class="input-group">
             <label for="downloadPessimism">Download Pessimism:</label>
-            <input type="number" id="downloadPessimism" value="2.0" step="0.1" min="0">
-            <div class="tooltip">
-                <div class="tooltip-icon">?</div>
-                <span class="tooltip-text">Controls the extra amount of chunk data validator clients download in case some validators do not return data in a timely manner.</span>
+            <div class="field-group">
+                <input type="number" id="downloadPessimism" value="2.0" step="0.1" min="0">
+                <button class="reset-field" data-field="downloadPessimism">
+                    ↺
+                    <span class="reset-field-tooltip">Reset to default: 2.0</span>
+                </button>
+                <div class="tooltip">
+                    <div class="tooltip-icon">?</div>
+                    <span class="tooltip-text">Controls the extra amount of chunk data validator clients download in case some validators do not return data in a timely manner.</span>
+                </div>
             </div>
         </div>
         
         <div class="input-group">
             <label for="readAmplification">Read Amplification:</label>
-            <input type="number" id="readAmplification" value="20.0" step="0.1" min="0">
-            <div class="tooltip">
-                <div class="tooltip-icon">?</div>
-                <span class="tooltip-text">The number of times each blob is read after it is written.</span>
+            <div class="field-group">
+                <input type="number" id="readAmplification" value="20.0" step="0.1" min="0">
+                <button class="reset-field" data-field="readAmplification">
+                    ↺
+                    <span class="reset-field-tooltip">Reset to default: 20.0</span>
+                </button>
+                <div class="tooltip">
+                    <div class="tooltip-icon">?</div>
+                    <span class="tooltip-text">The number of times each blob is read after it is written.</span>
+                </div>
             </div>
         </div>
         
         <div class="input-group">
             <label for="dataRetention">Data Retention Period (days):</label>
-            <input type="number" id="dataRetention" value="14" step="1" min="0">
-            <div class="tooltip">
-                <div class="tooltip-icon">?</div>
-                <span class="tooltip-text">The length of time that validator nodes retain chunk data.</span>
+            <div class="field-group">
+                <input type="number" id="dataRetention" value="14" step="1" min="0">
+                <button class="reset-field" data-field="dataRetention">
+                    ↺
+                    <span class="reset-field-tooltip">Reset to default: 14</span>
+                </button>
+                <div class="tooltip">
+                    <div class="tooltip-icon">?</div>
+                    <span class="tooltip-text">The length of time that validator nodes retain chunk data.</span>
+                </div>
             </div>
         </div>
         
         <div class="input-group">
             <label for="diskSafetyMargin">Disk Safety Margin:</label>
-            <input type="number" id="diskSafetyMargin" value="1.2" step="0.1" min="0">
-            <div class="tooltip">
-                <div class="tooltip-icon">?</div>
-                <span class="tooltip-text">Adds a safety buffer to the disk space needed.</span>
+            <div class="field-group">
+                <input type="number" id="diskSafetyMargin" value="1.2" step="0.1" min="0">
+                <button class="reset-field" data-field="diskSafetyMargin">
+                    ↺
+                    <span class="reset-field-tooltip">Reset to default: 1.2</span>
+                </button>
+                <div class="tooltip">
+                    <div class="tooltip-icon">?</div>
+                    <span class="tooltip-text">Adds a safety buffer to the disk space needed.</span>
+                </div>
             </div>
         </div>
         
         <div class="input-group">
             <label for="downloadSafetyMargin">Download Safety Margin:</label>
-            <input type="number" id="downloadSafetyMargin" value="1.2" step="0.1" min="0">
-            <div class="tooltip">
-                <div class="tooltip-icon">?</div>
-                <span class="tooltip-text">Adds a safety buffer to the download bandwidth.</span>
+            <div class="field-group">
+                <input type="number" id="downloadSafetyMargin" value="1.2" step="0.1" min="0">
+                <button class="reset-field" data-field="downloadSafetyMargin">
+                    ↺
+                    <span class="reset-field-tooltip">Reset to default: 1.2</span>
+                </button>
+                <div class="tooltip">
+                    <div class="tooltip-icon">?</div>
+                    <span class="tooltip-text">Adds a safety buffer to the download bandwidth.</span>
+                </div>
             </div>
         </div>
         
         <div class="input-group">
             <label for="uploadSafetyMargin">Upload Safety Margin:</label>
-            <input type="number" id="uploadSafetyMargin" value="1.2" step="0.1" min="0">
-            <div class="tooltip">
-                <div class="tooltip-icon">?</div>
-                <span class="tooltip-text">Adds a safety buffer to the upload bandwidth.</span>
+            <div class="field-group">
+                <input type="number" id="uploadSafetyMargin" value="1.2" step="0.1" min="0">
+                <button class="reset-field" data-field="uploadSafetyMargin">
+                    ↺
+                    <span class="reset-field-tooltip">Reset to default: 1.2</span>
+                </button>
+                <div class="tooltip">
+                    <div class="tooltip-icon">?</div>
+                    <span class="tooltip-text">Adds a safety buffer to the upload bandwidth.</span>
+                </div>
             </div>
         </div>
         
@@ -391,8 +487,23 @@
                 calculate();
             }
             
-            // Add event listener
+            // Add event listener for main reset button
             resetButton.addEventListener('click', reset);
+            
+            // Add event listeners for individual field reset buttons
+            const resetFieldButtons = document.querySelectorAll('.reset-field');
+            resetFieldButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const fieldName = this.getAttribute('data-field');
+                    const inputElement = document.getElementById(fieldName);
+                    
+                    // Reset the specific field to its default value
+                    inputElement.value = defaults[fieldName];
+                    
+                    // Recalculate after reset
+                    calculate();
+                });
+            });
             
             // Calculate initially with default values
             calculate();
