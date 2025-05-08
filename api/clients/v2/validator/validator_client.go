@@ -122,7 +122,6 @@ func (c *validatorClient) GetBlob(
 		return nil, errors.New("failed to get assignments")
 	}
 
-	// TODO verify technical accuracy of this
 	totalChunkCount := uint32(encodingParams.NumChunks)
 	minimumChunkCount := uint32(encodingParams.NumChunks) / blobParams.CodingRate
 
