@@ -37,21 +37,26 @@ func (s *ServerV2) FetchMetricsSummary(c *gin.Context) {
 		end = now.Unix()
 	}
 
-	result, err := s.metricsHandler.GetCompleteBlobSize(c.Request.Context(), start, end)
-	if err != nil || len(result.Values) == 0 {
+	ths, err := s.metricsHandler.GetThroughputTimeseries(c.Request.Context(), start, end)
+	if err != nil || len(ths) == 0 {
 		s.metrics.IncrementFailedRequestNum("FetchMetricsSummary")
 		errorResponse(c, err)
 		return
 	}
 
-	size := len(result.Values)
-	totalBytes := result.Values[size-1].Value - result.Values[0].Value
-	timeDuration := result.Values[size-1].Timestamp.Sub(result.Values[0].Timestamp).Seconds()
+	avg := 0.0
+	for i := 0; i < len(ths); i++ {
+		avg += ths[i].Throughput
+	}
+	timeDuration := ths[len(ths)-1].Timestamp - ths[0].Timestamp
+	avg = avg / float64(len(ths))
+	totalBytes := avg * float64(timeDuration)
+
 	metricSummary := &MetricSummary{
 		TotalBytesPosted:      uint64(totalBytes),
-		AverageBytesPerSecond: totalBytes / timeDuration,
-		StartTimestampSec:     result.Values[0].Timestamp.Unix(),
-		EndTimestampSec:       result.Values[size-1].Timestamp.Unix(),
+		AverageBytesPerSecond: avg,
+		StartTimestampSec:     int64(ths[0].Timestamp),
+		EndTimestampSec:       int64(ths[len(ths)-1].Timestamp),
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchMetricsSummary")

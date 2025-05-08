@@ -277,7 +277,7 @@ func (t *Writer) BuildConfirmBatchTxn(ctx context.Context, batchHeader *core.Bat
 	}
 
 	signedStakeForQuorums := serializeSignedStakeForQuorums(quorums)
-	batchH := eigendasrvmg.BatchHeader{
+	batchH := eigendasrvmg.EigenDATypesV1BatchHeader{
 		BlobHeadersRoot:       batchHeader.BatchRoot,
 		QuorumNumbers:         quorumNumbers,
 		SignedStakeForQuorums: signedStakeForQuorums,
@@ -356,7 +356,7 @@ func (t *Writer) SetDisperserAddress(ctx context.Context, address gethcommon.Add
 	transaction, err := registry.SetDisperserInfo(
 		options,
 		api.EigenLabsDisperserID,
-		dreg.DisperserInfo{
+		dreg.EigenDATypesV2DisperserInfo{
 			DisperserAddress: address,
 		})
 	if err != nil {

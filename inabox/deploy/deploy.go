@@ -284,7 +284,7 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 		log.Panicf("Error: %s", err)
 	}
 	for _, blobVersionParam := range env.BlobVersionParams {
-		txn, err := contractThresholdRegistry.AddVersionedBlobParams(opts, thresholdreg.VersionedBlobParams{
+		txn, err := contractThresholdRegistry.AddVersionedBlobParams(opts, thresholdreg.EigenDATypesV1VersionedBlobParams{
 			MaxNumOperators: blobVersionParam.MaxNumOperators,
 			NumChunks:       blobVersionParam.NumChunks,
 			CodingRate:      uint8(blobVersionParam.CodingRate),
@@ -310,7 +310,7 @@ func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 	ethAddr := ethClient.GetAccountAddress()
 	for _, relayVars := range env.Relays {
 		url := fmt.Sprintf("0.0.0.0:%s", relayVars.RELAY_GRPC_PORT)
-		txn, err := contractRelayRegistry.AddRelayInfo(opts, relayreg.RelayInfo{
+		txn, err := contractRelayRegistry.AddRelayInfo(opts, relayreg.EigenDATypesV2RelayInfo{
 			RelayAddress: ethAddr,
 			RelayURL:     url,
 		})

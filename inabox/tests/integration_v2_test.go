@@ -14,7 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -180,8 +180,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 
 		err = verifierContract.VerifyDACertV2FromSignedBatch(
 			&bind.CallOpts{},
-			verifierbindings.SignedBatch{
-				BatchHeader: verifierbindings.BatchHeaderV2{
+			verifierbindings.EigenDATypesV2SignedBatch{
+				BatchHeader: verifierbindings.EigenDATypesV2BatchHeaderV2{
 					BatchRoot:            batchRoot,
 					ReferenceBlockNumber: uint32(batchHeader1.ReferenceBlockNumber),
 				},
@@ -198,8 +198,8 @@ var _ = Describe("Inabox v2 Integration", func() {
 		copy(batchRoot[:], batchHeader2.BatchRoot)
 		err = verifierContract.VerifyDACertV2FromSignedBatch(
 			&bind.CallOpts{},
-			verifierbindings.SignedBatch{
-				BatchHeader: verifierbindings.BatchHeaderV2{
+			verifierbindings.EigenDATypesV2SignedBatch{
+				BatchHeader: verifierbindings.EigenDATypesV2BatchHeaderV2{
 					BatchRoot:            batchRoot,
 					ReferenceBlockNumber: uint32(batchHeader2.ReferenceBlockNumber),
 				},
@@ -209,7 +209,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		)
 		Expect(err).To(BeNil())
 
-		relayClientConfig := &clients.RelayClientConfig{
+		relayClientConfig := &relay.RelayClientConfig{
 			MaxGRPCMessageSize: units.GiB,
 		}
 
@@ -217,7 +217,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		Expect(err).To(BeNil())
 
 		// Test retrieval from relay
-		relayClient, err := clients.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
+		relayClient, err := relay.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
 		Expect(err).To(BeNil())
 
 		blob1Relays := make(map[corev2.RelayKey]struct{}, 0)
@@ -300,7 +300,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 	})
 })
 
-func convertBlobInclusionInfo(inclusionInfo *disperserpb.BlobInclusionInfo) (*verifierbindings.BlobInclusionInfo, error) {
+func convertBlobInclusionInfo(inclusionInfo *disperserpb.BlobInclusionInfo) (*verifierbindings.EigenDATypesV2BlobInclusionInfo, error) {
 	blobCertificate, err := corev2.BlobCertificateFromProtobuf(inclusionInfo.GetBlobCertificate())
 	if err != nil {
 		return nil, err
@@ -333,12 +333,12 @@ func convertBlobInclusionInfo(inclusionInfo *disperserpb.BlobInclusionInfo) (*ve
 	blobCertificate.BlobHeader.BlobCommitments.LengthProof.Y.A0.BigInt(lengthProofY0)
 	lengthProofY1 := big.NewInt(0)
 	blobCertificate.BlobHeader.BlobCommitments.LengthProof.Y.A1.BigInt(lengthProofY1)
-	return &verifierbindings.BlobInclusionInfo{
-		BlobCertificate: verifierbindings.BlobCertificate{
-			BlobHeader: verifierbindings.BlobHeaderV2{
+	return &verifierbindings.EigenDATypesV2BlobInclusionInfo{
+		BlobCertificate: verifierbindings.EigenDATypesV2BlobCertificate{
+			BlobHeader: verifierbindings.EigenDATypesV2BlobHeaderV2{
 				Version:       uint16(blobCertificate.BlobHeader.BlobVersion),
 				QuorumNumbers: blobCertificate.BlobHeader.QuorumNumbers,
-				Commitment: verifierbindings.BlobCommitment{
+				Commitment: verifierbindings.EigenDATypesV2BlobCommitment{
 					Commitment: verifierbindings.BN254G1Point{
 						X: commitX,
 						Y: commitY,
@@ -369,7 +369,7 @@ func convertBlobInclusionInfo(inclusionInfo *disperserpb.BlobInclusionInfo) (*ve
 	}, nil
 }
 
-func convertAttestation(attestation *disperserpb.Attestation) (*verifierbindings.Attestation, error) {
+func convertAttestation(attestation *disperserpb.Attestation) (*verifierbindings.EigenDATypesV2Attestation, error) {
 	if attestation == nil {
 		return nil, fmt.Errorf("attestation is nil")
 	}
@@ -407,7 +407,7 @@ func convertAttestation(attestation *disperserpb.Attestation) (*verifierbindings
 		return nil, err
 	}
 
-	return &verifierbindings.Attestation{
+	return &verifierbindings.EigenDATypesV2Attestation{
 		NonSignerPubkeys: nonSignerPubkeys,
 		QuorumApks:       quorumApks,
 		Sigma:            *sigma,

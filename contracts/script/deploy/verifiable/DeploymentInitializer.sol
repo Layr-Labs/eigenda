@@ -7,7 +7,7 @@ import {IPauserRegistry} from
 import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
 import {IEigenDAThresholdRegistry, EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry, EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
-import {PaymentVault} from "src/payments/PaymentVault.sol";
+import {PaymentVault} from "src/core/PaymentVault.sol";
 import {IEigenDADisperserRegistry, EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {IRewardsCoordinator} from

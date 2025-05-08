@@ -94,7 +94,7 @@ func (s *ServerV2) FetchOperatorDispersalFeed(c *gin.Context) {
 		}
 		batches[i] = &OperatorDispersal{
 			BatchHeaderHash: hex.EncodeToString(batchHeaderHash[:]),
-			BatchHeader:     &d.BatchHeader,
+			BatchHeader:     createBatchHeader(&d.BatchHeader),
 			DispersedAt:     d.DispersedAt,
 			Signature:       sig,
 		}

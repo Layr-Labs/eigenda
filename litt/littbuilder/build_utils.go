@@ -218,9 +218,13 @@ func buildTable(
 		return nil, fmt.Errorf("error creating table: %w", err)
 	}
 
-	tableCache := cache.NewFIFOCache[string, []byte](config.CacheSize, cacheWeight)
-	tableCache = cache.NewThreadSafeCache(tableCache)
-	cachedTable := tablecache.NewCachedTable(table, tableCache)
+	writeCache := cache.NewFIFOCache[string, []byte](config.WriteCacheSize, cacheWeight, metrics.GetWriteCacheMetrics())
+	writeCache = cache.NewThreadSafeCache(writeCache)
+
+	readCache := cache.NewFIFOCache[string, []byte](config.ReadCacheSize, cacheWeight, metrics.GetReadCacheMetrics())
+	readCache = cache.NewThreadSafeCache(readCache)
+
+	cachedTable := tablecache.NewCachedTable(table, writeCache, readCache)
 
 	return cachedTable, nil
 }

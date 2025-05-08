@@ -2,7 +2,9 @@
 pragma solidity =0.8.12;
 
 import "../MockEigenDADeployer.sol";
-import {EigenDACertVerificationV2Lib as CertV2Lib} from "src/libraries/EigenDACertVerificationV2Lib.sol";
+import {EigenDACertVerificationV2Lib as CertV2Lib} from "src/periphery/cert/v2/EigenDACertVerificationV2Lib.sol";
+import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
+import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
 contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     using stdStorage for StdStorage;
@@ -18,12 +20,12 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
 
     function test_verifyDACertV2(uint256 pseudoRandomNumber) public {
         (
-            SignedBatch memory signedBatch,
-            BlobInclusionInfo memory blobInclusionInfo,
+            EigenDATypesV2.SignedBatch memory signedBatch,
+            EigenDATypesV2.BlobInclusionInfo memory blobInclusionInfo,
             BLSSignatureChecker.NonSignerStakesAndSignature memory nssas
         ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
 
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
+        EigenDATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
         nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = nssas.nonSignerQuorumBitmapIndices;
         nonSignerStakesAndSignature.nonSignerPubkeys = nssas.nonSignerPubkeys;
         nonSignerStakesAndSignature.quorumApks = nssas.quorumApks;
@@ -35,7 +37,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
 
         eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
 
-        (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
+        (DATypesV1.NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
             CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
         eigenDACertVerifier.verifyDACertV2(
             signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers
@@ -44,12 +46,12 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
 
     function test_verifyDACertV2ZK_True(uint256 pseudoRandomNumber) public {
         (
-            SignedBatch memory signedBatch,
-            BlobInclusionInfo memory blobInclusionInfo,
+            EigenDATypesV2.SignedBatch memory signedBatch,
+            EigenDATypesV2.BlobInclusionInfo memory blobInclusionInfo,
             BLSSignatureChecker.NonSignerStakesAndSignature memory nssas
         ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
 
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
+        EigenDATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
         nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = nssas.nonSignerQuorumBitmapIndices;
         nonSignerStakesAndSignature.nonSignerPubkeys = nssas.nonSignerPubkeys;
         nonSignerStakesAndSignature.quorumApks = nssas.quorumApks;
@@ -59,7 +61,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         nonSignerStakesAndSignature.totalStakeIndices = nssas.totalStakeIndices;
         nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
 
-        (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
+        (DATypesV1.NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
             CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
         bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(
             signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers
@@ -69,13 +71,13 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
 
     function test_verifyDACertV2ZK_False(uint256 pseudoRandomNumber) public {
         (
-            SignedBatch memory signedBatch,
-            BlobInclusionInfo memory blobInclusionInfo,
+            EigenDATypesV2.SignedBatch memory signedBatch,
+            EigenDATypesV2.BlobInclusionInfo memory blobInclusionInfo,
             BLSSignatureChecker.NonSignerStakesAndSignature memory nssas
         ) = _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
         signedBatch.batchHeader.batchRoot = keccak256("bad root");
 
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
+        EigenDATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature;
         nonSignerStakesAndSignature.nonSignerQuorumBitmapIndices = nssas.nonSignerQuorumBitmapIndices;
         nonSignerStakesAndSignature.nonSignerPubkeys = nssas.nonSignerPubkeys;
         nonSignerStakesAndSignature.quorumApks = nssas.quorumApks;
@@ -85,7 +87,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         nonSignerStakesAndSignature.totalStakeIndices = nssas.totalStakeIndices;
         nonSignerStakesAndSignature.nonSignerStakeIndices = nssas.nonSignerStakeIndices;
 
-        (NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
+        (DATypesV1.NonSignerStakesAndSignature memory _nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
             CertV2Lib.getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
         bool zk = eigenDACertVerifier.verifyDACertV2ForZKProof(
             signedBatch.batchHeader, blobInclusionInfo, _nonSignerStakesAndSignature, signedQuorumNumbers
@@ -94,7 +96,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     }
 
     function test_verifyDACertV2_revert_InclusionProofInvalid(uint256 pseudoRandomNumber) public {
-        (SignedBatch memory signedBatch, BlobInclusionInfo memory blobInclusionInfo,) =
+        (EigenDATypesV2.SignedBatch memory signedBatch, EigenDATypesV2.BlobInclusionInfo memory blobInclusionInfo,) =
             _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 0);
 
         blobInclusionInfo.inclusionProof =
@@ -105,50 +107,45 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     }
 
     function test_verifyDACertV2_revert_BadVersion(uint256 pseudoRandomNumber) public {
-        (SignedBatch memory signedBatch, BlobInclusionInfo memory blobInclusionInfo,) =
+        (EigenDATypesV2.SignedBatch memory signedBatch, EigenDATypesV2.BlobInclusionInfo memory blobInclusionInfo,) =
             _getSignedBatchAndBlobVerificationProof(pseudoRandomNumber, 1);
 
         vm.expectRevert();
         eigenDACertVerifier.verifyDACertV2FromSignedBatch(signedBatch, blobInclusionInfo);
     }
 
-    function test_verifyDACertSecurityParams() public view {
-        VersionedBlobParams memory blobParams = eigenDAThresholdRegistry.getBlobParams(0);
-        (uint8 confirmationThreshold, uint8 adversaryThreshold) = eigenDACertVerifier.securityThresholdsV2();
-        SecurityThresholds memory securityThresholds =
-            SecurityThresholds({confirmationThreshold: confirmationThreshold, adversaryThreshold: adversaryThreshold});
-        eigenDACertVerifier.verifyDACertSecurityParams(blobParams, securityThresholds);
-        eigenDACertVerifier.verifyDACertSecurityParams(0, securityThresholds);
-    }
-
     function _getSignedBatchAndBlobVerificationProof(uint256 pseudoRandomNumber, uint8 version)
         internal
-        returns (SignedBatch memory, BlobInclusionInfo memory, BLSSignatureChecker.NonSignerStakesAndSignature memory)
+        returns (
+            EigenDATypesV2.SignedBatch memory,
+            EigenDATypesV2.BlobInclusionInfo memory,
+            BLSSignatureChecker.NonSignerStakesAndSignature memory
+        )
     {
-        BlobHeaderV2 memory blobHeader1 = _getRandomBlobHeaderV2(pseudoRandomNumber, version);
-        BlobHeaderV2 memory blobHeader2 = _getRandomBlobHeaderV2(pseudoRandomNumber, version);
+        EigenDATypesV2.BlobHeaderV2 memory blobHeader1 = _getRandomBlobHeaderV2(pseudoRandomNumber, version);
+        EigenDATypesV2.BlobHeaderV2 memory blobHeader2 = _getRandomBlobHeaderV2(pseudoRandomNumber, version);
 
         uint32[] memory relayKeys = new uint32[](2);
         relayKeys[0] = 0;
         relayKeys[1] = 1;
 
-        BlobCertificate memory blobCertificate1 =
-            BlobCertificate({blobHeader: blobHeader1, signature: hex"00", relayKeys: relayKeys});
+        EigenDATypesV2.BlobCertificate memory blobCertificate1 =
+            EigenDATypesV2.BlobCertificate({blobHeader: blobHeader1, signature: hex"00", relayKeys: relayKeys});
 
-        BlobCertificate memory blobCertificate2 =
-            BlobCertificate({blobHeader: blobHeader2, signature: hex"0001", relayKeys: relayKeys});
+        EigenDATypesV2.BlobCertificate memory blobCertificate2 =
+            EigenDATypesV2.BlobCertificate({blobHeader: blobHeader2, signature: hex"0001", relayKeys: relayKeys});
 
         bytes32 batchRoot = keccak256(
             abi.encode(
-                keccak256(abi.encode(EigenDAHasher.hashBlobCertificate(blobCertificate1))),
-                keccak256(abi.encode(EigenDAHasher.hashBlobCertificate(blobCertificate2)))
+                keccak256(abi.encode(CertV2Lib.hashBlobCertificate(blobCertificate1))),
+                keccak256(abi.encode(CertV2Lib.hashBlobCertificate(blobCertificate2)))
             )
         );
 
-        BlobInclusionInfo memory blobInclusionInfo = BlobInclusionInfo({
+        EigenDATypesV2.BlobInclusionInfo memory blobInclusionInfo = EigenDATypesV2.BlobInclusionInfo({
             blobCertificate: blobCertificate1,
             blobIndex: 0,
-            inclusionProof: abi.encodePacked(keccak256(abi.encode(EigenDAHasher.hashBlobCertificate(blobCertificate2))))
+            inclusionProof: abi.encodePacked(keccak256(abi.encode(CertV2Lib.hashBlobCertificate(blobCertificate2))))
         });
 
         (
@@ -156,8 +153,8 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
             BLSSignatureChecker.NonSignerStakesAndSignature memory nonSignerStakesAndSignature
         ) = _registerSignatoriesAndGetNonSignerStakeAndSignatureRandom(pseudoRandomNumber, 0, 1);
 
-        BatchHeaderV2 memory batchHeader =
-            BatchHeaderV2({batchRoot: batchRoot, referenceBlockNumber: referenceBlockNumber});
+        EigenDATypesV2.BatchHeaderV2 memory batchHeader =
+            EigenDATypesV2.BatchHeaderV2({batchRoot: batchRoot, referenceBlockNumber: referenceBlockNumber});
 
         nonSignerStakesAndSignature.sigma =
             BN254.hashToG1(keccak256(abi.encode(batchHeader))).scalar_mul(aggSignerPrivKey);
@@ -165,7 +162,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         uint32[] memory quorumNumbers = new uint32[](1);
         quorumNumbers[0] = 0;
 
-        Attestation memory attestation = Attestation({
+        EigenDATypesV2.Attestation memory attestation = EigenDATypesV2.Attestation({
             nonSignerPubkeys: nonSignerStakesAndSignature.nonSignerPubkeys,
             quorumApks: nonSignerStakesAndSignature.quorumApks,
             sigma: nonSignerStakesAndSignature.sigma,
@@ -173,7 +170,8 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
             quorumNumbers: quorumNumbers
         });
 
-        SignedBatch memory signedBatch = SignedBatch({batchHeader: batchHeader, attestation: attestation});
+        EigenDATypesV2.SignedBatch memory signedBatch =
+            EigenDATypesV2.SignedBatch({batchHeader: batchHeader, attestation: attestation});
 
         return (signedBatch, blobInclusionInfo, nonSignerStakesAndSignature);
     }
@@ -181,7 +179,7 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
     function _getRandomBlobHeaderV2(uint256 psuedoRandomNumber, uint8 version)
         internal
         pure
-        returns (BlobHeaderV2 memory)
+        returns (EigenDATypesV2.BlobHeaderV2 memory)
     {
         uint256[2] memory lengthCommitmentX = [
             uint256(keccak256(abi.encode(psuedoRandomNumber, "blobHeader.commitment.lengthCommitment.X"))),
@@ -200,10 +198,10 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
             uint256(keccak256(abi.encode(psuedoRandomNumber, "blobHeader.commitment.lengthProof.Y")))
         ];
 
-        BlobHeaderV2 memory blobHeader = BlobHeaderV2({
+        EigenDATypesV2.BlobHeaderV2 memory blobHeader = EigenDATypesV2.BlobHeaderV2({
             version: version,
             quorumNumbers: hex"00",
-            commitment: BlobCommitment({
+            commitment: EigenDATypesV2.BlobCommitment({
                 commitment: BN254.G1Point(
                     uint256(keccak256(abi.encode(psuedoRandomNumber, "blobHeader.commitment.X"))),
                     uint256(keccak256(abi.encode(psuedoRandomNumber, "blobHeader.commitment.Y")))

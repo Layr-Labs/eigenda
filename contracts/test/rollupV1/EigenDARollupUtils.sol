@@ -4,10 +4,10 @@ pragma solidity ^0.8.9;
 
 import {Merkle} from "../../lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/libraries/Merkle.sol";
 import {BN254} from "../../lib/eigenlayer-middleware/src/libraries/BN254.sol";
-import {EigenDAHasher} from "../../src/libraries/EigenDAHasher.sol";
-import {IEigenDAServiceManager} from "../../src/interfaces/IEigenDAServiceManager.sol";
+import {EigenDACertVerificationV1Lib} from "src/periphery/cert/v1/EigenDACertVerificationV1Lib.sol";
+import {IEigenDAServiceManager} from "src/core/interfaces/IEigenDAServiceManager.sol";
 import {BitmapUtils} from "../../lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
-import "../../src/interfaces/IEigenDAStructs.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
 /**
  * @title Library of functions to be used by smart contracts wanting to prove blobs on EigenDA and open KZG commitments.
@@ -23,12 +23,12 @@ library EigenDARollupUtils {
      * @param blobVerificationProof the relevant data needed to prove inclusion of the blob and that the trust assumptions were as expected
      */
     function verifyBlob(
-        BlobHeader memory blobHeader,
+        DATypesV1.BlobHeader memory blobHeader,
         IEigenDAServiceManager eigenDAServiceManager,
-        BlobVerificationProof memory blobVerificationProof
+        DATypesV1.BlobVerificationProof memory blobVerificationProof
     ) internal view {
         require(
-            EigenDAHasher.hashBatchMetadata(blobVerificationProof.batchMetadata)
+            EigenDACertVerificationV1Lib.hashBatchMetadata(blobVerificationProof.batchMetadata)
                 == eigenDAServiceManager.batchIdToBatchMetadataHash(blobVerificationProof.batchId),
             "EigenDARollupUtils.verifyBlob: batchMetadata does not match stored metadata"
         );
@@ -37,7 +37,7 @@ library EigenDARollupUtils {
             Merkle.verifyInclusionKeccak(
                 blobVerificationProof.inclusionProof,
                 blobVerificationProof.batchMetadata.batchHeader.blobHeadersRoot,
-                keccak256(abi.encodePacked(EigenDAHasher.hashBlobHeader(blobHeader))),
+                keccak256(abi.encodePacked(EigenDACertVerificationV1Lib.hashBlobHeader(blobHeader))),
                 blobVerificationProof.blobIndex
             ),
             "EigenDARollupUtils.verifyBlob: inclusion proof is invalid"
@@ -107,9 +107,9 @@ library EigenDARollupUtils {
      * @param blobVerificationProofs the relevant data needed to prove inclusion of the blobs and that the trust assumptions were as expected
      */
     function verifyBlobs(
-        BlobHeader[] memory blobHeaders,
+        DATypesV1.BlobHeader[] memory blobHeaders,
         IEigenDAServiceManager eigenDAServiceManager,
-        BlobVerificationProof[] memory blobVerificationProofs
+        DATypesV1.BlobVerificationProof[] memory blobVerificationProofs
     ) internal view {
         require(
             blobHeaders.length == blobVerificationProofs.length,
@@ -122,7 +122,7 @@ library EigenDARollupUtils {
 
         for (uint256 i = 0; i < blobHeaders.length; i++) {
             require(
-                EigenDAHasher.hashBatchMetadata(blobVerificationProofs[i].batchMetadata)
+                EigenDACertVerificationV1Lib.hashBatchMetadata(blobVerificationProofs[i].batchMetadata)
                     == eigenDAServiceManager.batchIdToBatchMetadataHash(blobVerificationProofs[i].batchId),
                 "EigenDARollupUtils.verifyBlob: batchMetadata does not match stored metadata"
             );
@@ -131,7 +131,7 @@ library EigenDARollupUtils {
                 Merkle.verifyInclusionKeccak(
                     blobVerificationProofs[i].inclusionProof,
                     blobVerificationProofs[i].batchMetadata.batchHeader.blobHeadersRoot,
-                    keccak256(abi.encodePacked(EigenDAHasher.hashBlobHeader(blobHeaders[i]))),
+                    keccak256(abi.encodePacked(EigenDACertVerificationV1Lib.hashBlobHeader(blobHeaders[i]))),
                     blobVerificationProofs[i].blobIndex
                 ),
                 "EigenDARollupUtils.verifyBlob: inclusion proof is invalid"

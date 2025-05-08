@@ -409,12 +409,51 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_ENABLED"),
 	}
+	LittDBWriteCacheSizeGBFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-gb"),
+		Usage:    "The size of the LittDB write cache in gigabytes.",
+		Required: false,
+		Value:    16 * units.GiB,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_GB"),
+	}
+	LittDBReadCacheSizeGBFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-read-cache-size-gb"),
+		Usage:    "The size of the LittDB read cache in gigabytes.",
+		Required: false,
+		Value:    1 * units.GiB,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_GB"),
+	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
 		Usage:    "The size of the download pool. The default value is 16.",
 		Required: false,
 		Value:    16,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DOWNLOAD_POOL_SIZE"),
+	}
+	GetChunksHotCacheReadLimitMBFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-hot-cache-read-limit-mb"),
+		Usage:    "The rate limit for GetChunks() calls that hit the cache, unit is MB/s.",
+		Required: false,
+		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_HOT_CACHE_READ_LIMIT_MB"),
+	}
+	GetChunksHotBurstLimitMBFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-hot-burst-limit-mb"),
+		Usage:    "The burst limit for GetChunks() calls that hit the cache, unit is MB.",
+		Required: false,
+		Value:    1024,
+	}
+	GetChunksColdCacheReadLimitMBFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-cold-cache-read-limit-mb"),
+		Usage:    "The rate limit for GetChunks() calls that miss the cache, unit is MB/s.",
+		Required: false,
+		Value:    32,
+	}
+	GetChunksColdBurstLimitMBFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-cold-burst-limit-MB"),
+		Usage:    "The burst limit for GetChunks() calls that miss the cache, unit is MB.",
+		Required: false,
+		Value:    32,
 	}
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -542,6 +581,12 @@ var optionalFlags = []cli.Flag{
 	LevelDBEnableSyncWritesV2Flag,
 	LittDBEnabledFlag,
 	DownloadPoolSizeFlag,
+	LittDBWriteCacheSizeGBFlag,
+	LittDBReadCacheSizeGBFlag,
+	GetChunksHotCacheReadLimitMBFlag,
+	GetChunksHotBurstLimitMBFlag,
+	GetChunksColdCacheReadLimitMBFlag,
+	GetChunksColdBurstLimitMBFlag,
 }
 
 func init() {
