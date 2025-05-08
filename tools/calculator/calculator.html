@@ -26,8 +26,15 @@
         .calculator-table {
             display: table;
             width: 100%;
-            border-collapse: separate;
-            border-spacing: 0 10px;
+            border-collapse: collapse;
+            border-spacing: 0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        /* Add subtle borders between rows for better visual separation */
+        .calculator-table tr:not(.divider-row) {
+            border-bottom: 1px solid #f0f0f0;
         }
         /* Row styles */
         .calculator-row, .input-row {
@@ -36,21 +43,45 @@
         .input-row {
             transition: background-color 0.3s ease;
         }
+        /* Simplest possible row hover effect with direct tag selection */
+        .calculator-table tbody tr:hover td {
+            background-color: #eef6ff !important;
+        }
+        
+        /* Special highlighting for header rows to preserve their styling */
+        .calculator-table tbody tr.header-row:hover td {
+            background-color: #e9f7ef !important;
+        }
+        
+        /* Special highlighting for divider rows */
+        .calculator-table tbody tr.divider-row:hover td {
+            background-color: #f8f8f8 !important;
+        }
+
         /* Row highlighting for modified values - these styles highlight rows where values differ from defaults */
         /* For table layout, we need to target all cells in the row */
-        .input-modified td {
+        .calculator-table tr.input-modified td {
             background-color: #f0f8ff; /* Light blue background */
         }
+        /* Modified rows should have a slightly different hover color */
+        .calculator-table tr.input-modified:hover td {
+            background-color: #d9e9ff !important; /* Slightly darker blue on hover with !important to override */
+        }
         /* Add left border only to the first cell of modified rows */
-        .input-modified .label-column {
+        .calculator-table tr.input-modified td.label-column {
             border-left: 3px solid #2c7873; /* Teal left border */
             padding-left: 5px; /* Add padding to account for border */
         }
         /* Column styles */
         .label-column, .input-column, .unit-column, .help-column, .value-column {
             display: table-cell;
-            padding: 8px 6px;
+            padding: 12px 8px;
             vertical-align: middle;
+        }
+        
+        /* Add zebra striping for better row distinction */
+        .calculator-table tr:nth-child(even):not(.input-modified):not(.header-row):not(.divider-row) td {
+            background-color: #fafafa;
         }
         .label-column {
             font-weight: bold;
@@ -76,15 +107,14 @@
         }
         .divider-row {
             display: table-row;
-            height: 20px;
+            height: 30px;
         }
         .divider-row > td {
             display: table-cell;
-            height: 1px;
-            background-color: #ddd;
-            padding: 0;
-            position: relative;
-            top: 10px;
+            padding: 15px 0;
+            border-bottom: 2px solid #ddd;
+            border-top: 1px solid #ddd;
+            background-color: #f8f8f8;
         }
         .result-section {
             margin-top: 10px;
@@ -93,11 +123,14 @@
         .section-header {
             display: table-cell;
             background-color: #e9f7ef;
-            padding: 10px;
-            margin: 15px 0 10px 0;
-            border-radius: 4px;
+            padding: 12px 10px;
             font-weight: bold;
             text-align: left;
+            border-bottom: 2px solid #2c7873;
+        }
+        /* Adding a class to section header rows for better browser compatibility */
+        .header-row {
+            background-color: #e9f7ef;
         }
         /* Form element styles */
         input {
@@ -219,7 +252,7 @@
         <table class="calculator-table">
             <tbody>
             <!-- Inputs section -->
-            <tr class="calculator-row">
+            <tr class="calculator-row header-row">
                 <td class="section-header" colspan="4">Input Parameters</td>
             </tr>
 
@@ -409,7 +442,7 @@
             </tr>
             
             <!-- Results section header -->
-            <tr class="calculator-row">
+            <tr class="calculator-row header-row">
                 <td class="section-header" colspan="4">Results</td>
             </tr>
             
@@ -635,6 +668,9 @@
             
             // Calculate initially with default values
             calculate();
+            
+            // We're now using CSS for hover effects
+            // JS hover effects have been removed
             
             // Check if a field is modified from default and update row highlighting accordingly
             function checkModifiedStatus(input) {
