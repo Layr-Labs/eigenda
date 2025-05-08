@@ -23,6 +23,7 @@
             --light-table-border: #cccccc; /* Darker table borders for better definition */
             --light-reset-button-bg: #888;
             --light-zebra-stripe-color: #d0d0d0; /* Even darker zebra stripe for better contrast in light mode */
+            --light-result-color: #2c7873; /* Original teal color for results in light mode */
             
             /* Dark mode colors (default) */
             --bg-color: #121212;
@@ -41,6 +42,7 @@
             --table-border: #333;
             --reset-button-bg: #555;
             --zebra-stripe-color: #262626; /* Subtle zebra stripe for dark mode */
+            --result-color: #5cedc2; /* Bright mint green color for results in dark mode - high contrast */
             
             /* Active theme (defaults to dark) */
             --theme-bg-color: var(--bg-color);
@@ -59,6 +61,7 @@
             --theme-table-border: var(--table-border);
             --theme-reset-button-bg: var(--reset-button-bg);
             --theme-zebra-stripe-color: var(--zebra-stripe-color);
+            --theme-result-color: var(--result-color);
         }
         
         body {
@@ -219,7 +222,7 @@
         }
         .value-column {
             font-weight: bold;
-            color: #2c7873;
+            color: var(--theme-result-color);
             text-align: right;
         }
         .unit-column {
@@ -683,6 +686,7 @@
                 root.style.setProperty('--theme-table-border', 'var(--table-border)');
                 root.style.setProperty('--theme-reset-button-bg', 'var(--reset-button-bg)');
                 root.style.setProperty('--theme-zebra-stripe-color', 'var(--zebra-stripe-color)');
+                root.style.setProperty('--theme-result-color', 'var(--result-color)');
             }
             
             function setLightTheme() {
@@ -702,6 +706,7 @@
                 root.style.setProperty('--theme-table-border', 'var(--light-table-border)');
                 root.style.setProperty('--theme-reset-button-bg', 'var(--light-reset-button-bg)');
                 root.style.setProperty('--theme-zebra-stripe-color', 'var(--light-zebra-stripe-color)');
+                root.style.setProperty('--theme-result-color', 'var(--light-result-color)');
             }
         });
         
