@@ -198,12 +198,11 @@ func (d *Dispatcher) HandleBatch(
 				"socket", op.Socket,
 				"err", err)
 			sigChan <- core.SigningMessage{
-				Signature:            nil,
-				Operator:             opID,
-				BatchHeaderHash:      batchData.BatchHeaderHash,
-				AttestationLatencyMs: 0,
-				TimeReceived:         time.Now(),
-				Err:                  fmt.Errorf("failed to parse operator socket (%s): %w", op.Socket, err),
+				Signature:       nil,
+				Operator:        opID,
+				BatchHeaderHash: batchData.BatchHeaderHash,
+				TimeReceived:    time.Now(),
+				Err:             fmt.Errorf("failed to parse operator socket (%s): %w", op.Socket, err),
 			}
 			continue
 		}
@@ -216,12 +215,11 @@ func (d *Dispatcher) HandleBatch(
 				"v2DispersalPort", v2DispersalPort,
 				"err", err)
 			sigChan <- core.SigningMessage{
-				Signature:            nil,
-				Operator:             opID,
-				BatchHeaderHash:      batchData.BatchHeaderHash,
-				AttestationLatencyMs: 0,
-				TimeReceived:         time.Now(),
-				Err:                  err,
+				Signature:       nil,
+				Operator:        opID,
+				BatchHeaderHash: batchData.BatchHeaderHash,
+				TimeReceived:    time.Now(),
+				Err:             err,
 			}
 			continue
 		}
@@ -244,12 +242,11 @@ func (d *Dispatcher) HandleBatch(
 			if err != nil {
 				d.logger.Error("failed to put dispersal request", "err", err)
 				sigChan <- core.SigningMessage{
-					Signature:            nil,
-					Operator:             opID,
-					BatchHeaderHash:      batchData.BatchHeaderHash,
-					AttestationLatencyMs: -1,
-					TimeReceived:         time.Now(),
-					Err:                  err,
+					Signature:       nil,
+					Operator:        opID,
+					BatchHeaderHash: batchData.BatchHeaderHash,
+					TimeReceived:    time.Now(),
+					Err:             err,
 				}
 				return
 			}
@@ -274,12 +271,11 @@ func (d *Dispatcher) HandleBatch(
 					}
 
 					sigChan <- core.SigningMessage{
-						Signature:            sig,
-						Operator:             opID,
-						BatchHeaderHash:      batchData.BatchHeaderHash,
-						AttestationLatencyMs: -1,
-						TimeReceived:         time.Now(),
-						Err:                  nil,
+						Signature:       sig,
+						Operator:        opID,
+						BatchHeaderHash: batchData.BatchHeaderHash,
+						TimeReceived:    time.Now(),
+						Err:             nil,
 					}
 					break
 				}
@@ -309,12 +305,11 @@ func (d *Dispatcher) HandleBatch(
 				}
 
 				sigChan <- core.SigningMessage{
-					Signature:            nil,
-					Operator:             opID,
-					BatchHeaderHash:      batchData.BatchHeaderHash,
-					AttestationLatencyMs: 0,
-					TimeReceived:         time.Now(),
-					Err:                  lastErr,
+					Signature:       nil,
+					Operator:        opID,
+					BatchHeaderHash: batchData.BatchHeaderHash,
+					TimeReceived:    time.Now(),
+					Err:             lastErr,
 				}
 			}
 			d.metrics.reportSendChunksRetryCount(float64(i))
