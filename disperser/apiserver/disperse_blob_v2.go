@@ -32,30 +32,30 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		s.logger.Error("onchain state is nil during DisperseBlob")
 		return nil, api.NewErrorInternal("onchain state is nil")
 	}
-	
-	s.logger.Info("DisperseBlob request received", 
-		"quorumNumbers", req.GetBlobHeader().GetQuorumNumbers(), 
+
+	s.logger.Info("DisperseBlob request received",
+		"quorumNumbers", req.GetBlobHeader().GetQuorumNumbers(),
 		"operatorVersionCheck", s.operatorVersionCheck,
 		"hasRolloutMap", s.operatorSetRolloutReadyByQuorum != nil,
 		"hasStakePctMap", s.currentRolloutStakePctByQuorum != nil)
-	
+
 	if s.operatorVersionCheck {
 		s.logger.Info("Operator version check is enabled")
-		
+
 		// Initialize the node info checker if not already done
 		// This will happen only once, no matter how many parallel requests come in
 		s.nodeInfoCheckInitOnce.Do(func() {
 			s.logger.Info("First DisperseBlob request received, initializing operator node info and starting periodic check")
-			
+
 			// Run initial check synchronously
 			s.periodicOperatorNodeInfoCheck(ctx)
-			
+
 			// Start periodic check in background
 			go func() {
-				ticker := time.NewTicker(time.Hour)
+				ticker := time.NewTicker(time.Minute * 10)
 				defer ticker.Stop()
 				s.logger.Info("Operator node info check ticker started from DisperseBlob")
-				
+
 				for {
 					select {
 					case <-ticker.C:
@@ -68,7 +68,7 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 				}
 			}()
 		})
-		
+
 		if err := s.checkQuorumRolloutReady(req); err != nil {
 			s.logger.Warn("Quorum rollout check failed", "error", err)
 			return nil, err

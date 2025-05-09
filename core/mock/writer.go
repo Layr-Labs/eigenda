@@ -307,9 +307,3 @@ func (t *MockWriter) GetRelayRegistryAddress() gethcommon.Address {
 	result := args.Get(0)
 	return result.(gethcommon.Address)
 }
-
-func (t *MockWriter) GetOperatorVerboseState(ctx context.Context, quorums []core.QuorumID, blockNumber uint32) (core.OperatorStateVerbose, error) {
-	args := t.Called()
-	result := args.Get(0)
-	return result.(core.OperatorStateVerbose), args.Error(1)
-}

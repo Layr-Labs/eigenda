@@ -472,7 +472,13 @@ func (s *DispersalServerV2) periodicOperatorNodeInfoCheck(ctx context.Context) {
 	}
 	s.logger.Info("Getting operator verbose state", "quorumIds", quorumIds, "blockNumber", currentBlock)
 
-	operatorState, err := s.chainReader.GetOperatorVerboseState(ctx, quorumIds, currentBlock)
+	stakesWithSocket, err := s.chainReader.GetOperatorStakesWithSocketForQuorums(ctx, quorumIds, uint32(currentBlock))
+	if err != nil {
+		s.logger.Error("failed to get operator stakes with socket", "err", err)
+		return
+	}
+
+	operatorState, err := corev2.GetOperatorVerboseState(ctx, stakesWithSocket, quorumIds, currentBlock)
 	if err != nil {
 		s.logger.Error("failed to get operator info for quorums", "err", err)
 		return
