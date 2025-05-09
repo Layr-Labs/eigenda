@@ -121,7 +121,6 @@ func (c *validatorClient) GetBlob(
 		return nil, errors.New("failed to get assignments")
 	}
 
-	totalChunkCount := uint32(encodingParams.NumChunks)
 	minimumChunkCount := uint32(encodingParams.NumChunks) / blobParams.CodingRate
 
 	worker, err := newRetrievalWorker(
@@ -134,7 +133,6 @@ func (c *validatorClient) GetBlob(
 		c.config.UnsafeChunkDeserializerFactory(assignments, c.verifier),
 		c.config.UnsafeBlobDecoderFactory(c.verifier),
 		assignments,
-		totalChunkCount,
 		minimumChunkCount,
 		&encodingParams,
 		blobHeader,

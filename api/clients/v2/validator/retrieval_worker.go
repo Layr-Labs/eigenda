@@ -226,7 +226,6 @@ func newRetrievalWorker(
 	chunkDeserializer internal.ChunkDeserializer,
 	blobDecoder internal.BlobDecoder,
 	assignments map[core.OperatorID]v2.Assignment,
-	totalChunkCount uint32,
 	minimumChunkCount uint32,
 	encodingParams *encoding.EncodingParams,
 	blobHeader *corev2.BlobHeaderWithoutPayment,
@@ -270,6 +269,8 @@ func newRetrievalWorker(
 		}
 		chunkStatusMap[opID] = available
 	}
+
+	totalChunkCount := uint32(chunkStatusCounts[available])
 
 	targetDownloadCount := uint32(math.Ceil(float64(minimumChunkCount) * config.DownloadPessimism))
 	targetVerifiedCount := uint32(math.Ceil(float64(minimumChunkCount) * config.VerificationPessimism))

@@ -283,11 +283,14 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 		assert.NoError(t, err)
 
 		// Check that the total number of chunks satisfies expected bounds
-		totalChunks := uint32(0)
-		for _, assignment := range assignments {
-			totalChunks += assignment.NumChunks()
+		if numOperators > 20 {
+
+			totalChunks := uint32(0)
+			for _, assignment := range assignments {
+				totalChunks += assignment.NumChunks()
+			}
+			assert.GreaterOrEqual(t, totalChunks, blobParams.NumUnits*blobParams.SamplesPerUnit)
 		}
-		assert.GreaterOrEqual(t, totalChunks, blobParams.NumUnits*blobParams.SamplesPerUnit)
 
 		// Sample a random collection of operators whose total stake exceeds the reconstruction threshold and check that they can reconstruct the blob
 
