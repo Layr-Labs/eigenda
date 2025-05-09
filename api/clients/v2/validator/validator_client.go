@@ -5,13 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gammazero/workerpool"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // ValidatorClient is an object that can retrieve blobs from the validator nodes.
@@ -36,7 +34,7 @@ type validatorClient struct {
 	config         *ValidatorClientConfig
 	connectionPool *workerpool.WorkerPool
 	computePool    *workerpool.WorkerPool
-	stageTimer     *common.StageTimer
+	metrics        *ValidatorClientMetrics
 }
 
 var _ ValidatorClient = &validatorClient{}
@@ -48,7 +46,7 @@ func NewValidatorClient(
 	chainState core.ChainState,
 	verifier encoding.Verifier,
 	config *ValidatorClientConfig,
-	registry *prometheus.Registry,
+	metrics *ValidatorClientMetrics,
 ) ValidatorClient {
 
 	if config.ConnectionPoolSize <= 0 {
@@ -58,8 +56,6 @@ func NewValidatorClient(
 		config.ComputePoolSize = 1
 	}
 
-	stageTimer := common.NewStageTimer(registry, "RetrievalClient", "GetBlob", false)
-
 	return &validatorClient{
 		logger:         logger.With("component", "ValidatorClient"),
 		ethClient:      ethClient,
@@ -68,7 +64,7 @@ func NewValidatorClient(
 		config:         config,
 		connectionPool: workerpool.New(config.ConnectionPoolSize),
 		computePool:    workerpool.New(config.ComputePoolSize),
-		stageTimer:     stageTimer,
+		metrics:        metrics,
 	}
 }
 
@@ -81,7 +77,7 @@ func (c *validatorClient) GetBlob(
 	quorumID core.QuorumID,
 ) ([]byte, error) {
 
-	probe := c.stageTimer.NewSequence()
+	probe := c.metrics.newGetBlobProbe()
 
 	probe.SetStage("verify_commitment")
 	commitmentBatch := []encoding.BlobCommitments{blobCommitments}
