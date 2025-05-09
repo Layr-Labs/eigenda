@@ -413,15 +413,29 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-gb"),
 		Usage:    "The size of the LittDB write cache in gigabytes.",
 		Required: false,
-		Value:    16,
+		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_GB"),
+	}
+	LittDBWriteCacheSizeFractionFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-fraction"),
+		Usage:    "The fraction of the total memory to use for the LittDB write cache.",
+		Required: false,
+		Value:    0.75,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_FRACTION"),
 	}
 	LittDBReadCacheSizeGBFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "litt-db-read-cache-size-gb"),
 		Usage:    "The size of the LittDB read cache in gigabytes.",
 		Required: false,
-		Value:    1,
+		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_GB"),
+	}
+	LittDBReadCacheSizeFractionFlag = cli.Float64Flag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-read-cache-size-fraction"),
+		Usage:    "The fraction of the total memory to use for the LittDB read cache.",
+		Required: false,
+		Value:    0.05,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_FRACTION"),
 	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
