@@ -5,15 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
-	pbvalidator "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 var (
@@ -247,112 +243,4 @@ func (v *shardValidator) verifyBlobLengthWorker(blobCommitments encoding.BlobCom
 	}
 
 	out <- nil
-}
-
-// GetOperatorVerboseState returns the verbose state of all operators within the supplied quorums including their node info.
-// The returned state is for the block number supplied.
-func GetOperatorVerboseState(ctx context.Context, stakesWithSocket core.OperatorStakesWithSocket, quorums []core.QuorumID, blockNumber uint32) (core.OperatorStateVerbose, error) {
-
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err := common.NewLogger(loggerConfig)
-	if err != nil {
-		panic(err)
-	}
-	logger = logger.With("component", "GetOperatorVerboseState")
-	logger.Infof("GetOperatorVerboseState: Starting for quorums %v at block %d", quorums, blockNumber)
-
-	quorumBytes := make([]byte, len(quorums))
-	for ind, quorum := range quorums {
-		quorumBytes[ind] = byte(uint8(quorum))
-	}
-
-	// result is a struct{Operators [][]opstateretriever.OperatorStateRetrieverOperator; Sockets [][]string}
-	// Operators is a [][]*opstateretriever.OperatorStake with the same length and order as quorumBytes, and then indexed by operator index
-	// Sockets is a [][]string with the same length and order as quorumBytes, and then indexed by operator index
-	// By contract definition, Operators and Sockets are parallel arrays
-	logger.Infof("GetOperatorVerboseState: Calling GetOperatorStateWithSocket for %d quorums", len(quorums))
-	state := make(core.OperatorStateVerbose, len(quorums))
-	totalOperators := 0
-	successfulNodeInfoFetches := 0
-	failedNodeInfoFetches := 0
-
-	for _, quorumID := range quorums {
-		state[quorumID] = make(map[core.OperatorIndex]core.OperatorInfoVerbose, len(stakesWithSocket[quorumID]))
-		logger.Infof("GetOperatorVerboseState: Processing %d operators for quorum %d", len(stakesWithSocket[quorumID]), quorumID)
-
-		for j, op := range stakesWithSocket[quorumID] {
-			totalOperators++
-			operatorIndex := core.OperatorIndex(j)
-
-			logger.Infof("GetOperatorVerboseState: Fetching node info for operator %s at %s", op.OperatorID, op.Socket)
-			nodeVersion, err := GetNodeInfoFromSocket(ctx, op.Socket)
-			if err != nil {
-				failedNodeInfoFetches++
-				logger.Warnf("Failed to fetch node version from %s for operator %s: %s", op.Socket, op.OperatorID, err)
-
-				// Instead of failing completely, continue with nil NodeInfo for this operator
-				state[quorumID][operatorIndex] = core.OperatorInfoVerbose{
-					OperatorID: op.OperatorID,
-					Socket:     op.Socket,
-					Stake:      op.Stake,
-					NodeInfo:   nil,
-				}
-				continue
-			}
-			successfulNodeInfoFetches++
-
-			logger.Infof("GetOperatorVerboseState: Got node info %+v for operator %s", nodeVersion, op.OperatorID)
-			state[quorumID][operatorIndex] = core.OperatorInfoVerbose{
-				OperatorID: op.OperatorID,
-				Socket:     op.Socket,
-				Stake:      op.Stake,
-				NodeInfo:   nodeVersion,
-			}
-		}
-	}
-
-	logger.Infof("GetOperatorVerboseState: Completed with %d total operators, %d successful node info fetches, %d failed fetches",
-		totalOperators, successfulNodeInfoFetches, failedNodeInfoFetches)
-	return state, nil
-}
-
-// GetNodeInfoFromSocket pings the operator's endpoint and returns NodeInfoReply
-func GetNodeInfoFromSocket(ctx context.Context, socket core.OperatorSocket) (*pbvalidator.GetNodeInfoReply, error) {
-
-	loggerConfig := common.DefaultLoggerConfig()
-	logger, err := common.NewLogger(loggerConfig)
-	if err != nil {
-		panic(err)
-	}
-	logger = logger.With("component", "GetNodeInfoFromSocket")
-	logger.Info("Getting node info from endpoint", "socket", socket)
-
-	// host, _, _, v2DispersalPort, _, err := core.ParseOperatorSocket(socket)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// endpoint := fmt.Sprintf("%s:%s", host, v2DispersalPort)
-	endpoint := socket.GetV2DispersalSocket()
-	logger.Info("Getting node info from endpoint", "endpoint", endpoint)
-
-	conn, err := grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		logger.Error("Failed to create GRPC client", "endpoint", endpoint, "error", err)
-		return nil, err
-	}
-	defer conn.Close()
-
-	client := pbvalidator.NewDispersalClient(conn)
-	ctxTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	logger.Info("Sending GetNodeInfo request", "endpoint", endpoint)
-	resp, err := client.GetNodeInfo(ctxTimeout, &pbvalidator.GetNodeInfoRequest{})
-	if err != nil {
-		logger.Error("Failed to get node info", "endpoint", endpoint, "error", err)
-		return nil, err
-	}
-
-	logger.Info("Successfully got node info", "endpoint", endpoint, "version", resp.Semver)
-	return resp, nil
 }

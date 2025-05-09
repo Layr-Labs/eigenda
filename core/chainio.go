@@ -6,7 +6,6 @@ import (
 	"math/big"
 
 	"github.com/Layr-Labs/eigenda/api/grpc/churner"
-	pbvalidator "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	blssigner "github.com/Layr-Labs/eigensdk-go/signer/bls"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -35,16 +34,8 @@ type OperatorSetParam struct {
 	ChurnBIPsOfTotalStake    uint16
 }
 
-type OperatorInfoVerbose struct {
-	OperatorID OperatorID
-	Socket     OperatorSocket
-	Stake      *big.Int
-	NodeInfo   *pbvalidator.GetNodeInfoReply
-}
-
 type OperatorStakes map[QuorumID]map[OperatorIndex]OperatorStake
 type OperatorStakesWithSocket map[QuorumID]map[OperatorIndex]OperatorStakeWithSocket
-type OperatorStateVerbose map[QuorumID]map[OperatorIndex]OperatorInfoVerbose
 
 type Reader interface {
 

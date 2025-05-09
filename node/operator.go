@@ -93,7 +93,6 @@ func RegisterOperator(ctx context.Context, operator *Operator, transactor core.W
 		return transactor.RegisterOperatorWithChurn(ctx, operator.Signer, operator.Socket, quorumsToRegister, operator.PrivKey, salt, expiry, churnReply)
 	} else {
 		// other wise just register normally
-		logger.Info("Registering operator", "quorums", fmt.Sprint(quorumsToRegister))
 		return transactor.RegisterOperator(ctx, operator.Signer, operator.Socket, quorumsToRegister, operator.PrivKey, salt, expiry)
 	}
 }
