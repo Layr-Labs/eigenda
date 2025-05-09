@@ -28,29 +28,21 @@ func TestDownloadBundles(t *testing.T) {
 
 	bundles00Bytes, err := bundles[0][0].Serialize()
 	require.NoError(t, err)
-	bundles01Bytes, err := bundles[0][1].Serialize()
-	require.NoError(t, err)
 	bundles10Bytes, err := bundles[1][0].Serialize()
 	require.NoError(t, err)
-	bundles11Bytes, err := bundles[1][1].Serialize()
+	bundles20Bytes, err := bundles[2][0].Serialize()
 	require.NoError(t, err)
-	bundles21Bytes, err := bundles[2][1].Serialize()
-	require.NoError(t, err)
-	bundles22Bytes, err := bundles[2][2].Serialize()
-	require.NoError(t, err)
-	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles01Bytes, bundles21Bytes, bundles22Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByRange)
-		require.Len(t, requests, 4)
-		require.Equal(t, blobKeys[0], requests[0].BlobKey)
-		require.Equal(t, blobKeys[0], requests[1].BlobKey)
-		require.Equal(t, blobKeys[2], requests[2].BlobKey)
-		require.Equal(t, blobKeys[2], requests[3].BlobKey)
-	})
-	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes, bundles11Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByRange)
+
+	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 2)
+		require.Equal(t, blobKeys[0], requests[0].BlobKey)
+		require.Equal(t, blobKeys[2], requests[1].BlobKey)
+	})
+	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
-		require.Equal(t, blobKeys[1], requests[1].BlobKey)
 	})
 	state, err := c.node.ChainState.GetOperatorStateByOperator(ctx, uint(10), op0)
 	require.NoError(t, err)
@@ -60,36 +52,11 @@ func TestDownloadBundles(t *testing.T) {
 	require.Equal(t, blobCerts[0], blobShards[0].BlobCertificate)
 	require.Equal(t, blobCerts[1], blobShards[1].BlobCertificate)
 	require.Equal(t, blobCerts[2], blobShards[2].BlobCertificate)
-	require.Contains(t, blobShards[0].Bundles, core.QuorumID(0))
-	require.Contains(t, blobShards[0].Bundles, core.QuorumID(1))
-	require.Contains(t, blobShards[1].Bundles, core.QuorumID(0))
-	require.Contains(t, blobShards[1].Bundles, core.QuorumID(1))
-	require.Contains(t, blobShards[2].Bundles, core.QuorumID(1))
-	require.Contains(t, blobShards[2].Bundles, core.QuorumID(2))
-	bundleEqual(t, bundles[0][0], blobShards[0].Bundles[0])
-	bundleEqual(t, bundles[0][1], blobShards[0].Bundles[1])
-	bundleEqual(t, bundles[1][0], blobShards[1].Bundles[0])
-	bundleEqual(t, bundles[1][1], blobShards[1].Bundles[1])
-	bundleEqual(t, bundles[2][1], blobShards[2].Bundles[1])
-	bundleEqual(t, bundles[2][2], blobShards[2].Bundles[2])
 
 	require.Len(t, rawBundles, 3)
 	require.Equal(t, blobCerts[0], rawBundles[0].BlobCertificate)
 	require.Equal(t, blobCerts[1], rawBundles[1].BlobCertificate)
 	require.Equal(t, blobCerts[2], rawBundles[2].BlobCertificate)
-	require.Contains(t, rawBundles[0].Bundles, core.QuorumID(0))
-	require.Contains(t, rawBundles[0].Bundles, core.QuorumID(1))
-	require.Contains(t, rawBundles[1].Bundles, core.QuorumID(0))
-	require.Contains(t, rawBundles[1].Bundles, core.QuorumID(1))
-	require.Contains(t, rawBundles[2].Bundles, core.QuorumID(1))
-	require.Contains(t, rawBundles[2].Bundles, core.QuorumID(2))
-
-	require.Equal(t, bundles00Bytes, rawBundles[0].Bundles[0])
-	require.Equal(t, bundles01Bytes, rawBundles[0].Bundles[1])
-	require.Equal(t, bundles10Bytes, rawBundles[1].Bundles[0])
-	require.Equal(t, bundles11Bytes, rawBundles[1].Bundles[1])
-	require.Equal(t, bundles21Bytes, rawBundles[2].Bundles[1])
-	require.Equal(t, bundles22Bytes, rawBundles[2].Bundles[2])
 }
 
 func TestDownloadBundlesFail(t *testing.T) {
@@ -100,26 +67,19 @@ func TestDownloadBundlesFail(t *testing.T) {
 
 	bundles00Bytes, err := bundles[0][0].Serialize()
 	require.NoError(t, err)
-	bundles01Bytes, err := bundles[0][1].Serialize()
+	bundles20Bytes, err := bundles[2][0].Serialize()
 	require.NoError(t, err)
-	bundles21Bytes, err := bundles[2][1].Serialize()
-	require.NoError(t, err)
-	bundles22Bytes, err := bundles[2][2].Serialize()
-	require.NoError(t, err)
-	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles01Bytes, bundles21Bytes, bundles22Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByRange)
-		require.Len(t, requests, 4)
+	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+		require.Len(t, requests, 2)
 		require.Equal(t, blobKeys[0], requests[0].BlobKey)
-		require.Equal(t, blobKeys[0], requests[1].BlobKey)
-		require.Equal(t, blobKeys[2], requests[2].BlobKey)
-		require.Equal(t, blobKeys[2], requests[3].BlobKey)
+		require.Equal(t, blobKeys[2], requests[1].BlobKey)
 	})
 	relayServerError := fmt.Errorf("relay server error")
-	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(1), mock.Anything).Return(nil, relayServerError).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByRange)
-		require.Len(t, requests, 2)
+	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return(nil, relayServerError).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
-		require.Equal(t, blobKeys[1], requests[1].BlobKey)
 	})
 	state, err := c.node.ChainState.GetOperatorState(ctx, uint(10), []core.QuorumID{0, 1, 2})
 	require.NoError(t, err)
@@ -139,27 +99,21 @@ func TestDownloadBundlesOnlyParticipatingQuorums(t *testing.T) {
 
 	bundles00Bytes, err := bundles[0][0].Serialize()
 	require.NoError(t, err)
-	bundles01Bytes, err := bundles[0][1].Serialize()
-	require.NoError(t, err)
 	bundles10Bytes, err := bundles[1][0].Serialize()
 	require.NoError(t, err)
-	bundles11Bytes, err := bundles[1][1].Serialize()
-	require.NoError(t, err)
-	bundles21Bytes, err := bundles[2][1].Serialize()
+	bundles20Bytes, err := bundles[2][0].Serialize()
 	require.NoError(t, err)
 	// there shouldn't be a request to quorum 2 for blobKeys[2]
-	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles01Bytes, bundles21Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByRange)
-		require.Len(t, requests, 3)
-		require.Equal(t, blobKeys[0], requests[0].BlobKey)
-		require.Equal(t, blobKeys[0], requests[1].BlobKey)
-		require.Equal(t, blobKeys[2], requests[2].BlobKey)
-	})
-	c.relayClient.On("GetChunksByRange", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes, bundles11Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*relay.ChunkRequestByRange)
+	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 2)
+		require.Equal(t, blobKeys[0], requests[0].BlobKey)
+		require.Equal(t, blobKeys[2], requests[1].BlobKey)
+	})
+	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
+		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
-		require.Equal(t, blobKeys[1], requests[1].BlobKey)
 	})
 	state, err := c.node.ChainState.GetOperatorStateByOperator(ctx, uint(10), op3)
 	require.NoError(t, err)
@@ -169,34 +123,11 @@ func TestDownloadBundlesOnlyParticipatingQuorums(t *testing.T) {
 	require.Equal(t, blobCerts[0], blobShards[0].BlobCertificate)
 	require.Equal(t, blobCerts[1], blobShards[1].BlobCertificate)
 	require.Equal(t, blobCerts[2], blobShards[2].BlobCertificate)
-	require.Contains(t, blobShards[0].Bundles, core.QuorumID(0))
-	require.Contains(t, blobShards[0].Bundles, core.QuorumID(1))
-	require.Contains(t, blobShards[1].Bundles, core.QuorumID(0))
-	require.Contains(t, blobShards[1].Bundles, core.QuorumID(1))
-	require.Contains(t, blobShards[2].Bundles, core.QuorumID(1))
-	require.Len(t, blobShards[2].Bundles, 1)
-	bundleEqual(t, bundles[0][0], blobShards[0].Bundles[0])
-	bundleEqual(t, bundles[0][1], blobShards[0].Bundles[1])
-	bundleEqual(t, bundles[1][0], blobShards[1].Bundles[0])
-	bundleEqual(t, bundles[1][1], blobShards[1].Bundles[1])
-	bundleEqual(t, bundles[2][1], blobShards[2].Bundles[1])
 
 	require.Len(t, rawBundles, 3)
 	require.Equal(t, blobCerts[0], rawBundles[0].BlobCertificate)
 	require.Equal(t, blobCerts[1], rawBundles[1].BlobCertificate)
 	require.Equal(t, blobCerts[2], rawBundles[2].BlobCertificate)
-	require.Contains(t, rawBundles[0].Bundles, core.QuorumID(0))
-	require.Contains(t, rawBundles[0].Bundles, core.QuorumID(1))
-	require.Contains(t, rawBundles[1].Bundles, core.QuorumID(0))
-	require.Contains(t, rawBundles[1].Bundles, core.QuorumID(1))
-	require.Contains(t, rawBundles[2].Bundles, core.QuorumID(1))
-	require.Len(t, rawBundles[2].Bundles, 1)
-
-	require.Equal(t, bundles00Bytes, rawBundles[0].Bundles[0])
-	require.Equal(t, bundles01Bytes, rawBundles[0].Bundles[1])
-	require.Equal(t, bundles10Bytes, rawBundles[1].Bundles[0])
-	require.Equal(t, bundles11Bytes, rawBundles[1].Bundles[1])
-	require.Equal(t, bundles21Bytes, rawBundles[2].Bundles[1])
 }
 
 func TestRefreshOnchainStateFailure(t *testing.T) {
@@ -281,9 +212,11 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	defer cancel()
 
 	blobParams2 := &core.BlobVersionParameters{
-		NumChunks:       111,
-		CodingRate:      1,
-		MaxNumOperators: 222,
+		NumChunks:                   111,
+		CodingRate:                  1,
+		ReconstructionThresholdBips: 1666,
+		NumUnits:                    393,
+		SamplesPerUnit:              20,
 	}
 	c.tx.On("GetAllVersionedBlobParams", mock.Anything).Return(map[v2.BlobVersion]*core.BlobVersionParameters{
 		0: blobParams,

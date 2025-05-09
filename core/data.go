@@ -649,9 +649,11 @@ type OnDemandPayment struct {
 }
 
 type BlobVersionParameters struct {
-	CodingRate      uint32
-	MaxNumOperators uint32
-	NumChunks       uint32
+	CodingRate                  uint32
+	ReconstructionThresholdBips uint32
+	NumChunks                   uint32
+	NumUnits                    uint32
+	SamplesPerUnit              uint32
 }
 
 // IsActive returns true if the reservation is active at the given timestamp

@@ -212,16 +212,34 @@ func ComputeBlobKey(
 //
 // A BlobKey simply the hash of the BlobHeader
 func (b *BlobHeader) BlobKey() (BlobKey, error) {
-	paymentMetadataHash, err := b.PaymentMetadata.Hash()
+	blobHeaderWithoutPayment, err := b.GetBlobHeaderWithoutPayment()
 	if err != nil {
-		return [32]byte{}, fmt.Errorf("hash payment metadata: %w", err)
+		return BlobKey{}, fmt.Errorf("get blob header without payment: %w", err)
 	}
 
+	return blobHeaderWithoutPayment.BlobKey()
+}
+
+func (b *BlobHeader) GetBlobHeaderWithoutPayment() (*BlobHeaderWithoutPayment, error) {
+	paymentMetadataHash, err := b.PaymentMetadata.Hash()
+	if err != nil {
+		return nil, fmt.Errorf("hash payment metadata: %w", err)
+	}
+
+	return &BlobHeaderWithoutPayment{
+		BlobVersion:         b.BlobVersion,
+		BlobCommitments:     b.BlobCommitments,
+		QuorumNumbers:       b.QuorumNumbers,
+		PaymentMetadataHash: paymentMetadataHash,
+	}, nil
+}
+
+func (b *BlobHeaderWithoutPayment) BlobKey() (BlobKey, error) {
 	return ComputeBlobKey(
 		b.BlobVersion,
 		b.BlobCommitments,
 		b.QuorumNumbers,
-		paymentMetadataHash,
+		b.PaymentMetadataHash,
 	)
 }
 

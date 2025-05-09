@@ -10,6 +10,7 @@ import (
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -125,14 +126,11 @@ type retrievalWorker struct {
 	// The assignments for the operators, i.e. which operators are responsible for which chunks.
 	assignments map[core.OperatorID]v2.Assignment
 
-	// The quorum to download from.
-	quorumID core.QuorumID
+	// The blob header to download.
+	blobHeader *corev2.BlobHeaderWithoutPayment
 
 	// The blob key to download.
 	blobKey v2.BlobKey
-
-	// The commitments for the blob.
-	blobCommitments *encoding.BlobCommitments
 
 	// When a thread begins downloading chunk data, it will send a message to the downloadStartedChan.
 	downloadStartedChan chan *downloadStarted
@@ -186,6 +184,9 @@ type retrievalWorker struct {
 
 	// Counts the number of chunks in each status.
 	chunkStatusCounts map[chunkStatus]int
+
+	// The status of each chunk
+	chunkOwner map[uint32]core.OperatorID
 }
 
 // downloadStarted is used to signal that a download of chunk data has been initiated.
@@ -225,12 +226,10 @@ func newRetrievalWorker(
 	chunkDeserializer internal.ChunkDeserializer,
 	blobDecoder internal.BlobDecoder,
 	assignments map[core.OperatorID]v2.Assignment,
-	totalChunkCount uint32,
 	minimumChunkCount uint32,
 	encodingParams *encoding.EncodingParams,
-	quorumID core.QuorumID,
+	blobHeader *corev2.BlobHeaderWithoutPayment,
 	blobKey v2.BlobKey,
-	blobCommitments *encoding.BlobCommitments,
 	probe *common.SequenceProbe,
 ) (*retrievalWorker, error) {
 	if config.DownloadPessimism < 1.0 {
@@ -257,11 +256,21 @@ func newRetrievalWorker(
 	downloadAndVerifyCtx, downloadAndVerifyCancel := context.WithCancel(ctx)
 
 	chunkStatusMap := make(map[core.OperatorID]chunkStatus)
+	chunkOwner := make(map[uint32]core.OperatorID)
 	chunkStatusCounts := make(map[chunkStatus]int)
+
 	for _, opID := range downloadOrder {
+		for _, index := range assignments[opID].Indices {
+			_, ok := chunkOwner[index]
+			if !ok {
+				chunkStatusCounts[available]++
+				chunkOwner[index] = opID
+			}
+		}
 		chunkStatusMap[opID] = available
-		chunkStatusCounts[available] += int(assignments[opID].NumChunks)
 	}
+
+	totalChunkCount := uint32(chunkStatusCounts[available])
 
 	targetDownloadCount := uint32(math.Ceil(float64(minimumChunkCount) * config.DownloadPessimism))
 	targetVerifiedCount := uint32(math.Ceil(float64(minimumChunkCount) * config.VerificationPessimism))
@@ -276,9 +285,8 @@ func newRetrievalWorker(
 		computePool:               computePool,
 		encodingParams:            encodingParams,
 		assignments:               assignments,
-		quorumID:                  quorumID,
+		blobHeader:                blobHeader,
 		blobKey:                   blobKey,
-		blobCommitments:           blobCommitments,
 		downloadStartedChan:       make(chan *downloadStarted, len(assignments)),
 		downloadCompletedChan:     make(chan *downloadCompleted, len(assignments)),
 		verificationCompletedChan: make(chan *verificationCompleted, len(assignments)),
@@ -292,6 +300,7 @@ func newRetrievalWorker(
 		totalChunkCount:           totalChunkCount,
 		chunkStatusMap:            chunkStatusMap,
 		chunkStatusCounts:         chunkStatusCounts,
+		chunkOwner:                chunkOwner,
 		targetDownloadCount:       targetDownloadCount,
 		targetVerifiedCount:       targetVerifiedCount,
 		validatorGRPCManager:      validatorGRPCManager,
@@ -305,14 +314,25 @@ func newRetrievalWorker(
 // updateChunkStatus updates the status of a chunk from a given operator. It also updates the
 // counts of the various chunk statuses.
 func (w *retrievalWorker) updateChunkStatus(operatorID core.OperatorID, status chunkStatus) {
-	operatorChunks := w.assignments[operatorID].NumChunks
 
 	oldStatus, ok := w.chunkStatusMap[operatorID]
-	if ok {
-		w.chunkStatusCounts[oldStatus] -= int(operatorChunks)
-	}
 	w.chunkStatusMap[operatorID] = status
-	w.chunkStatusCounts[status] += int(operatorChunks)
+
+	numChunks := 0
+	for _, index := range w.assignments[operatorID].Indices {
+		_, ok := w.chunkOwner[index]
+		if !ok {
+			w.chunkOwner[index] = operatorID
+		}
+		if w.chunkOwner[index] == operatorID {
+			numChunks++
+		}
+	}
+
+	if ok {
+		w.chunkStatusCounts[oldStatus] -= numChunks
+	}
+	w.chunkStatusCounts[status] += numChunks
 }
 
 // getChunkStatus returns the status of a chunk from a given operator.
@@ -322,6 +342,7 @@ func (w *retrievalWorker) getChunkStatus(operatorID core.OperatorID) chunkStatus
 
 // getStatusCount returns the number of chunks with one of the given statuses.
 func (w *retrievalWorker) getStatusCount(statuses ...chunkStatus) uint32 {
+
 	total := 0
 	for _, status := range statuses {
 		if count, ok := w.chunkStatusCounts[status]; ok {
@@ -546,7 +567,7 @@ func (w *retrievalWorker) downloadChunks(operatorID core.OperatorID) {
 	ctx, cancel := context.WithTimeout(w.downloadAndVerifyCtx, w.config.DownloadTimeout)
 	defer cancel()
 
-	reply, err := w.validatorGRPCManager.DownloadChunks(ctx, w.blobKey, operatorID, w.quorumID)
+	reply, err := w.validatorGRPCManager.DownloadChunks(ctx, w.blobKey, operatorID, 0)
 
 	w.downloadCompletedChan <- &downloadCompleted{
 		operatorID: operatorID,
@@ -576,7 +597,7 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 		w.blobKey,
 		operatorID,
 		getChunksReply,
-		w.blobCommitments,
+		&w.blobHeader.BlobCommitments,
 		w.encodingParams)
 
 	w.verificationCompletedChan <- &verificationCompleted{
@@ -592,7 +613,7 @@ func (w *retrievalWorker) decodeBlob(chunks []*encoding.Frame, indices []uint) {
 		w.logger.Debug("decoding blob", "blobKey", w.blobKey.Hex())
 	}
 
-	blob, err := w.blobDecoder.DecodeBlob(w.blobKey, chunks, indices, w.encodingParams, w.blobCommitments)
+	blob, err := w.blobDecoder.DecodeBlob(w.blobKey, chunks, indices, w.encodingParams, &w.blobHeader.BlobCommitments)
 
 	w.decodeResponseChan <- &decodeCompleted{
 		blob: blob,

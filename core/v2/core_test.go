@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"math/big"
 	"os"
 	"runtime"
 	"testing"
@@ -35,9 +36,11 @@ var (
 	GETTYSBURG_ADDRESS_BYTES = []byte("Fourscore and seven years ago our fathers brought forth, on this continent, a new nation, conceived in liberty, and dedicated to the proposition that all men are created equal. Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived, and so dedicated, can long endure. We are met on a great battle-field of that war. We have come to dedicate a portion of that field, as a final resting-place for those who here gave their lives, that that nation might live. It is altogether fitting and proper that we should do this. But, in a larger sense, we cannot dedicate, we cannot consecrate—we cannot hallow—this ground. The brave men, living and dead, who struggled here, have consecrated it far above our poor power to add or detract. The world will little note, nor long remember what we say here, but it can never forget what they did here. It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced. It is rather for us to be here dedicated to the great task remaining before us—that from these honored dead we take increased devotion to that cause for which they here gave the last full measure of devotion—that we here highly resolve that these dead shall not have died in vain—that this nation, under God, shall have a new birth of freedom, and that government of the people, by the people, for the people, shall not perish from the earth.")
 
 	blobParams = &core.BlobVersionParameters{
-		NumChunks:       8192,
-		CodingRate:      8,
-		MaxNumOperators: 3537,
+		NumChunks:                   8192,
+		CodingRate:                  8,
+		ReconstructionThresholdBips: 1666,
+		SamplesPerUnit:              20,
+		NumUnits:                    393,
 	}
 	blobParamsMap = v2.NewBlobVersionParameterMap(map[corev2.BlobVersion]*core.BlobVersionParameters{
 		0: blobParams,
@@ -116,6 +119,11 @@ func makeTestBlob(t *testing.T, p encoding.Prover, version corev2.BlobVersion, l
 			BlobVersion:     version,
 			QuorumNumbers:   quorums,
 			BlobCommitments: commitments,
+			PaymentMetadata: core.PaymentMetadata{
+				AccountID:         gethcommon.HexToAddress("0x123"),
+				Timestamp:         5,
+				CumulativePayment: big.NewInt(100),
+			},
 		},
 	}
 
@@ -140,9 +148,10 @@ func prepareBlobs(
 	})
 	assert.NoError(t, err)
 
-	blobsMap := make([]map[core.QuorumID]map[core.OperatorID][]*encoding.Frame, 0, len(certs))
+	blobsMap := make(map[core.OperatorID][]*corev2.BlobShard)
 
-	for z, cert := range certs {
+	for z := range certs {
+		cert := certs[z]
 		blob := blobs[z]
 		header := cert.BlobHeader
 
@@ -152,46 +161,32 @@ func prepareBlobs(
 		require.NoError(t, err)
 		state, err := cst.GetOperatorState(context.Background(), uint(referenceBlockNumber), header.QuorumNumbers)
 		require.NoError(t, err)
-		blobMap := make(map[core.QuorumID]map[core.OperatorID][]*encoding.Frame)
 
-		for _, quorum := range header.QuorumNumbers {
-			assignments, err := corev2.GetAssignments(state, blobParams, quorum)
-			require.NoError(t, err)
+		blobKey, err := header.BlobKey()
+		require.NoError(t, err)
 
-			blobMap[quorum] = make(map[core.OperatorID][]*encoding.Frame)
+		assignments, err := corev2.GetAssignments(state, blobParams, header.QuorumNumbers, blobKey[:])
+		require.NoError(t, err)
 
-			for opID, assignment := range assignments {
-				blobMap[quorum][opID] = chunks[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks]
+		for opID, assignment := range assignments {
+
+			if _, ok := blobsMap[opID]; !ok {
+				blobsMap[opID] = make([]*corev2.BlobShard, 0)
 			}
-		}
 
-		blobsMap = append(blobsMap, blobMap)
-	}
-
-	// Invert the blobsMap
-	inverseMap := make(map[core.OperatorID][]*corev2.BlobShard)
-	for blobIndex, blobMap := range blobsMap {
-		for quorum, operatorMap := range blobMap {
-			for operatorID, frames := range operatorMap {
-
-				if _, ok := inverseMap[operatorID]; !ok {
-					inverseMap[operatorID] = make([]*corev2.BlobShard, 0)
-				}
-				if len(inverseMap[operatorID]) < blobIndex+1 {
-					inverseMap[operatorID] = append(inverseMap[operatorID], &corev2.BlobShard{
-						BlobCertificate: &certs[blobIndex],
-						Bundles:         make(map[core.QuorumID]core.Bundle),
-					})
-				}
-				if len(frames) == 0 {
-					continue
-				}
-				inverseMap[operatorID][blobIndex].Bundles[quorum] = append(inverseMap[operatorID][blobIndex].Bundles[quorum], frames...)
+			shard := &corev2.BlobShard{
+				BlobCertificate: &cert,
+				Bundle:          make([]*encoding.Frame, assignment.NumChunks()),
 			}
+			for i := uint32(0); i < assignment.NumChunks(); i++ {
+				shard.Bundle[i] = chunks[assignment.Indices[i]]
+			}
+
+			blobsMap[opID] = append(blobsMap[opID], shard)
 		}
 	}
 
-	return inverseMap, cst
+	return blobsMap, cst
 
 }
 
@@ -219,7 +214,7 @@ func checkBatchByUniversalVerifier(
 
 func TestValidationSucceeds(t *testing.T) {
 
-	operatorCounts := []uint{1, 10}
+	operatorCounts := []uint{2, 10}
 	numBlob := 1 // must be greater than 0
 	blobLengths := []int{1, 2}
 	bn := uint64(1000)

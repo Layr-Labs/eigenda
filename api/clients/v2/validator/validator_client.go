@@ -18,11 +18,8 @@ type ValidatorClient interface {
 	// GetBlob downloads chunks of a blob from operator network and reconstructs the blob.
 	GetBlob(
 		ctx context.Context,
-		blobKey corev2.BlobKey,
-		blobVersion corev2.BlobVersion,
-		blobCommitments encoding.BlobCommitments,
+		blobHeader *corev2.BlobHeaderWithoutPayment,
 		referenceBlockNumber uint64,
-		quorumID core.QuorumID,
 	) ([]byte, error)
 }
 
@@ -70,18 +67,15 @@ func NewValidatorClient(
 
 func (c *validatorClient) GetBlob(
 	ctx context.Context,
-	blobKey corev2.BlobKey,
-	blobVersion corev2.BlobVersion,
-	blobCommitments encoding.BlobCommitments,
+	blobHeader *corev2.BlobHeaderWithoutPayment,
 	referenceBlockNumber uint64,
-	quorumID core.QuorumID,
 ) ([]byte, error) {
 
 	probe := c.metrics.newGetBlobProbe()
 	defer probe.End()
 
 	probe.SetStage("verify_commitment")
-	commitmentBatch := []encoding.BlobCommitments{blobCommitments}
+	commitmentBatch := []encoding.BlobCommitments{blobHeader.BlobCommitments}
 	err := c.verifier.VerifyCommitEquivalenceBatch(commitmentBatch)
 	if err != nil {
 		return nil, err
@@ -91,7 +85,7 @@ func (c *validatorClient) GetBlob(
 	operatorState, err := c.chainState.GetOperatorStateWithSocket(
 		ctx,
 		uint(referenceBlockNumber),
-		[]core.QuorumID{quorumID})
+		blobHeader.QuorumNumbers)
 	if err != nil {
 		return nil, err
 	}
@@ -102,24 +96,28 @@ func (c *validatorClient) GetBlob(
 		return nil, err
 	}
 
-	blobParams, ok := blobVersions[blobVersion]
+	blobParams, ok := blobVersions[blobHeader.BlobVersion]
 	if !ok {
-		return nil, fmt.Errorf("invalid blob version %d", blobVersion)
+		return nil, fmt.Errorf("invalid blob version %d", blobHeader.BlobVersion)
 	}
 
 	probe.SetStage("get_encoding_params")
-	encodingParams, err := corev2.GetEncodingParams(blobCommitments.Length, blobParams)
+	encodingParams, err := corev2.GetEncodingParams(blobHeader.BlobCommitments.Length, blobParams)
+	if err != nil {
+		return nil, err
+	}
+
+	blobKey, err := blobHeader.BlobKey()
 	if err != nil {
 		return nil, err
 	}
 
 	probe.SetStage("get_assignments")
-	assignments, err := corev2.GetAssignments(operatorState, blobParams, quorumID)
+	assignments, err := corev2.GetAssignments(operatorState, blobParams, blobHeader.QuorumNumbers, blobKey[:])
 	if err != nil {
 		return nil, errors.New("failed to get assignments")
 	}
 
-	totalChunkCount := uint32(encodingParams.NumChunks)
 	minimumChunkCount := uint32(encodingParams.NumChunks) / blobParams.CodingRate
 
 	worker, err := newRetrievalWorker(
@@ -132,12 +130,10 @@ func (c *validatorClient) GetBlob(
 		c.config.UnsafeChunkDeserializerFactory(assignments, c.verifier),
 		c.config.UnsafeBlobDecoderFactory(c.verifier),
 		assignments,
-		totalChunkCount,
 		minimumChunkCount,
 		&encodingParams,
-		quorumID,
+		blobHeader,
 		blobKey,
-		&blobCommitments,
 		probe)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create retrieval worker: %w", err)

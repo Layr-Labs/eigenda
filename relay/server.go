@@ -450,8 +450,8 @@ func selectFrameSubsetByIndex(
 		Chunks:   make([][]byte, 0, len(request.ChunkIndices)),
 	}
 
-	for index := range request.ChunkIndices {
-		if index >= len(frames.Chunks) {
+	for _, index := range request.ChunkIndices {
+		if index >= uint32(len(frames.Chunks)) {
 			return nil, fmt.Errorf(
 				"chunk index %d out of range for key %s, chunk count %d",
 				index, key.Hex(), len(frames.Chunks))
