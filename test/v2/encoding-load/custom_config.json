@@ -1,0 +1,9 @@
+{
+  "MBPerSecond": 1,
+  "AverageBlobSizeMB": 1.0,
+  "BlobSizeStdDev": 1.0,
+  "MaxBlobSize": 16777216,
+  "MaxParallelism": 20,
+  "EnablePprof": true,
+  "PprofHttpPort": 6060
+}
