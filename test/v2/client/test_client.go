@@ -275,6 +275,8 @@ func NewTestClient(
 		RetrievalTimeout:    1337 * time.Hour, // this suite enforces its own timeouts
 	}
 
+	validatorClientMetrics := validator.NewValidatorClientMetrics(registry)
+
 	clientConfig := validator.DefaultClientConfig()
 	retrievalClient := validator.NewValidatorClient(
 		logger,
@@ -282,7 +284,7 @@ func NewTestClient(
 		indexedChainState,
 		blobVerifier,
 		clientConfig,
-		registry)
+		validatorClientMetrics)
 
 	validatorPayloadRetriever, err := payloadretrieval.NewValidatorPayloadRetriever(
 		logger,
@@ -307,7 +309,7 @@ func NewTestClient(
 		indexedChainState,
 		blobVerifier,
 		onlyDownloadClientConfig,
-		registry)
+		validatorClientMetrics)
 
 	return &TestClient{
 		config:                      config,
