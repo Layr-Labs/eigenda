@@ -411,7 +411,7 @@ func unauthorizedGetChunksTest(t *testing.T, environment string) {
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	require.NoError(t, err)
 
-	targetRelay := eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys[0]
+	targetRelay := eigenDACert.RelayKeys()[0]
 
 	chunkRequests := make([]*relay.ChunkRequestByRange, 1)
 	chunkRequests[0] = &relay.ChunkRequestByRange{

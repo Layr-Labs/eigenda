@@ -26,8 +26,8 @@ type PayloadDisperserConfig struct {
 	// The timeout duration for contract calls
 	ContractCallTimeout time.Duration
 
-	// whether to EigenDACertVerifierRouter or historical immutable EigenDACertVerifierV2
-	UseRouter bool
+	// // whether to EigenDACertVerifierRouter or historical immutable EigenDACertVerifierV2
+	// UseRouter bool
 }
 
 // getDefaultPayloadDisperserConfig creates a PayloadDisperserConfig with default values

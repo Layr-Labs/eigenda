@@ -44,12 +44,6 @@ contract CertVerifierDeployer is Script, Test {
         raw = stdJson.parseRaw(data, ".eigenDARelayRegistry");
         eigenDARelayRegistry = abi.decode(raw, (address));
 
-        raw = stdJson.parseRaw(data, ".registryCoordinator");
-        registryCoordinator = abi.decode(raw, (address));
-
-        raw = stdJson.parseRaw(data, ".operatorStateRetriever");
-        operatorStateRetriever = abi.decode(raw, (address));
-
         raw = stdJson.parseRaw(data, ".defaultSecurityThresholds");
         defaultSecurityThresholds = abi.decode(raw, (DATypesV1.SecurityThresholds));
 
@@ -59,11 +53,9 @@ contract CertVerifierDeployer is Script, Test {
         vm.startBroadcast();
 
         eigenDACertVerifier = address(
-            new EigenDACertVerifierV2(
+            new EigenDACertVerifierV3(
                 IEigenDAThresholdRegistry(eigenDAThresholdRegistry),
                 IEigenDASignatureVerifier(eigenDAServiceManager),
-                OperatorStateRetriever(operatorStateRetriever),
-                IRegistryCoordinator(registryCoordinator),
                 defaultSecurityThresholds,
                 quorumNumbersRequired
             )

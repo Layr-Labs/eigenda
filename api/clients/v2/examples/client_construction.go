@@ -53,11 +53,6 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 		return nil, fmt.Errorf("create disperser client: %w", err)
 	}
 
-	certVerifierV2, err := createCertVerifierV2()
-	if err != nil {
-		return nil, fmt.Errorf("create cert verifier: %w", err)
-	}
-
 	certVerifierV3, err := createCertVerifierV3()
 	if err != nil {
 		return nil, fmt.Errorf("create cert verifier: %w", err)
@@ -75,7 +70,6 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 		logger,
 		payloadDisperserConfig,
 		disperserClient,
-		certVerifierV2,
 		certVerifierV3,
 		nil,
 	)
