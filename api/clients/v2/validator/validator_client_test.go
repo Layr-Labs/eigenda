@@ -111,7 +111,8 @@ func TestBasicWorkflow(t *testing.T) {
 	minimumChunkCount := blobParams.NumChunks / blobParams.CodingRate
 
 	// the number of chunks downloaded
-	chunksDownloaded := atomic.Uint32{}
+	chunksDownloaded := sync.Map{}
+	chunksDownloadedCount := atomic.Uint32{}
 	// a set of operators that have provided chunks
 	downloadSet := sync.Map{}
 	mockGRPCManager := &mock.MockValidatorGRPCManager{}
@@ -132,9 +133,21 @@ func TestBasicWorkflow(t *testing.T) {
 		// only permit downloads to happen once per operator
 		_, ok = downloadSet.Load(operatorID)
 		require.False(t, ok)
+
 		downloadSet.Store(operatorID, struct{}{})
 
-		chunksDownloaded.Add(uint32(len(chunks)))
+		// TODO(Claude): Please apply this de-duplication logic to the other tests as well. It also needs to be performed for the
+		// framesSentToDecoding variable.
+		assgn := assignments[operatorID]
+		numChunks := uint32(0)
+		for _, i := range assgn.Indices {
+			_, ok = chunksDownloaded.Load(i)
+			if !ok {
+				chunksDownloaded.Store(i, struct{}{})
+				numChunks++
+			}
+		}
+		chunksDownloadedCount.Add(numChunks)
 
 		return &grpcnode.GetChunksReply{
 			Chunks: chunks,
@@ -186,7 +199,8 @@ func TestBasicWorkflow(t *testing.T) {
 
 	decodeCalled := atomic.Bool{}
 	decodedBytes := rand.PrintableBytes(32)
-	framesSentToDecoding := atomic.Uint32{}
+	framesSentToDecoding := sync.Map{}
+	framesSentToDecodingCount := atomic.Uint32{}
 
 	mockDecoder := &mock.MockBlobDecoder{}
 	mockDecoder.DecodeBlobFunction = func(
@@ -204,7 +218,16 @@ func TestBasicWorkflow(t *testing.T) {
 		require.False(t, decodeCalled.Load())
 		decodeCalled.Store(true)
 
-		framesSentToDecoding.Store(uint32(len(chunks)))
+		// De-duplicate frames when counting
+		frameCount := uint32(0)
+		for _, i := range indices {
+			_, ok := framesSentToDecoding.Load(i)
+			if !ok {
+				framesSentToDecoding.Store(i, struct{}{})
+				frameCount++
+			}
+		}
+		framesSentToDecodingCount.Add(frameCount)
 
 		return decodedBytes, nil
 	}
@@ -242,13 +265,13 @@ func TestBasicWorkflow(t *testing.T) {
 	pessimisticDownloadThreshold := uint32(math.Ceil(float64(minimumChunkCount) * config.DownloadPessimism))
 	maxToDownload := uint32(math.Ceil(float64(pessimisticDownloadThreshold)*config.VerificationPessimism)) +
 		maximumChunksPerValidator
-	require.GreaterOrEqual(t, maxToDownload, chunksDownloaded.Load())
+	require.GreaterOrEqual(t, maxToDownload, chunksDownloadedCount.Load())
 
 	// The number of chunks verified should exceed the pessimistic threshold by no more than the
 	// maximum chunk count of any individual operator
 	pessimisticVerificationThreshold := uint32(math.Ceil(float64(minimumChunkCount) * config.VerificationPessimism))
 	maxToVerify := pessimisticVerificationThreshold + maximumChunksPerValidator
-	require.GreaterOrEqual(t, maxToVerify, framesSentToDecoding.Load())
+	require.GreaterOrEqual(t, maxToVerify, framesSentToDecodingCount.Load())
 }
 
 func TestDownloadTimeout(t *testing.T) {
@@ -304,8 +327,9 @@ func TestDownloadTimeout(t *testing.T) {
 	// The number of chunks needed to reconstruct the blob
 	minimumChunkCount := blobParams.NumChunks / blobParams.CodingRate
 
-	// the number of chunks downloaded
-	chunksDownloaded := atomic.Uint32{}
+	// the number of chunks downloaded (de-duplicated)
+	chunksDownloaded := sync.Map{}
+	chunksDownloadedCount := atomic.Uint32{}
 	timedOutDownloads := atomic.Uint32{}
 	// a set of operators that have provided chunks
 	downloadSet := sync.Map{}
@@ -328,7 +352,17 @@ func TestDownloadTimeout(t *testing.T) {
 		require.False(t, ok)
 		downloadSet.Store(operatorID, struct{}{})
 
-		chunksDownloaded.Add(uint32(len(chunks)))
+		// De-duplicate chunks when counting
+		assgn := assignments[operatorID]
+		numChunks := uint32(0)
+		for _, i := range assgn.Indices {
+			_, ok = chunksDownloaded.Load(i)
+			if !ok {
+				chunksDownloaded.Store(i, struct{}{})
+				numChunks++
+			}
+		}
+		chunksDownloadedCount.Add(numChunks)
 
 		// wait until the download is unlocked
 		select {
@@ -387,7 +421,8 @@ func TestDownloadTimeout(t *testing.T) {
 
 	decodeCalled := atomic.Bool{}
 	decodedBytes := rand.PrintableBytes(32)
-	framesSentToDecoding := atomic.Uint32{}
+	framesSentToDecoding := sync.Map{}
+	framesSentToDecodingCount := atomic.Uint32{}
 	mockDecoder := &mock.MockBlobDecoder{}
 	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
@@ -404,7 +439,16 @@ func TestDownloadTimeout(t *testing.T) {
 		require.False(t, decodeCalled.Load())
 		decodeCalled.Store(true)
 
-		framesSentToDecoding.Store(uint32(len(chunks)))
+		// De-duplicate frames when counting
+		frameCount := uint32(0)
+		for _, i := range indices {
+			_, ok := framesSentToDecoding.Load(i)
+			if !ok {
+				framesSentToDecoding.Store(i, struct{}{})
+				frameCount++
+			}
+		}
+		framesSentToDecodingCount.Add(frameCount)
 
 		return decodedBytes, nil
 	}
@@ -449,12 +493,12 @@ func TestDownloadTimeout(t *testing.T) {
 	testutils.AssertEventuallyTrue(
 		t,
 		func() bool {
-			return chunksDownloaded.Load() >= pessimisticDownloadThreshold
+			return chunksDownloadedCount.Load() >= pessimisticDownloadThreshold
 		},
 		time.Second)
 
 	require.False(t, downloadFinished)
-	initialDownloadsScheduled := chunksDownloaded.Load()
+	initialDownloadsScheduled := chunksDownloadedCount.Load()
 
 	// Advance the clock past the point when pessimistic thresholds trigger for the download.
 	newTime := start.Add(config.PessimisticTimeout + 1*time.Second)
@@ -464,7 +508,7 @@ func TestDownloadTimeout(t *testing.T) {
 	testutils.AssertEventuallyTrue(
 		t,
 		func() bool {
-			return chunksDownloaded.Load()-initialDownloadsScheduled >= pessimisticDownloadThreshold
+			return chunksDownloadedCount.Load()-initialDownloadsScheduled >= pessimisticDownloadThreshold
 		},
 		time.Second)
 
@@ -508,7 +552,7 @@ func TestDownloadTimeout(t *testing.T) {
 	// maximum chunk count of any individual operator
 	pessimisticVerificationThreshold := uint32(math.Ceil(float64(minimumChunkCount) * config.VerificationPessimism))
 	maxToVerify := pessimisticVerificationThreshold + maximumChunksPerValidator
-	require.GreaterOrEqual(t, maxToVerify, framesSentToDecoding.Load())
+	require.GreaterOrEqual(t, maxToVerify, framesSentToDecodingCount.Load())
 }
 
 func TestFailedVerification(t *testing.T) {
@@ -556,8 +600,9 @@ func TestFailedVerification(t *testing.T) {
 	// The number of chunks needed to reconstruct the blob
 	minimumChunkCount := blobParams.NumChunks / blobParams.CodingRate
 
-	// the number of chunks downloaded
-	chunksDownloaded := atomic.Uint32{}
+	// the number of chunks downloaded (de-duplicated)
+	chunksDownloaded := sync.Map{}
+	chunksDownloadedCount := atomic.Uint32{}
 	// a set of operators that have provided chunks
 	downloadSet := sync.Map{}
 	mockGRPCManager := &mock.MockValidatorGRPCManager{}
@@ -580,7 +625,17 @@ func TestFailedVerification(t *testing.T) {
 		require.False(t, ok)
 		downloadSet.Store(operatorID, struct{}{})
 
-		chunksDownloaded.Add(uint32(len(chunks)))
+		// De-duplicate chunks when counting
+		assgn := assignments[operatorID]
+		numChunks := uint32(0)
+		for _, i := range assgn.Indices {
+			_, ok = chunksDownloaded.Load(i)
+			if !ok {
+				chunksDownloaded.Store(i, struct{}{})
+				numChunks++
+			}
+		}
+		chunksDownloadedCount.Add(numChunks)
 
 		return &grpcnode.GetChunksReply{
 			Chunks: chunks,
@@ -644,7 +699,8 @@ func TestFailedVerification(t *testing.T) {
 
 	decodeCalled := atomic.Bool{}
 	decodedBytes := rand.PrintableBytes(32)
-	framesSentToDecoding := atomic.Uint32{}
+	framesSentToDecoding := sync.Map{}
+	framesSentToDecodingCount := atomic.Uint32{}
 	mockDecoder := &mock.MockBlobDecoder{}
 	mockDecoder.DecodeBlobFunction = func(
 		key v2.BlobKey,
@@ -661,7 +717,16 @@ func TestFailedVerification(t *testing.T) {
 		require.False(t, decodeCalled.Load())
 		decodeCalled.Store(true)
 
-		framesSentToDecoding.Store(uint32(len(chunks)))
+		// De-duplicate frames when counting
+		frameCount := uint32(0)
+		for _, i := range indices {
+			_, ok := framesSentToDecoding.Load(i)
+			if !ok {
+				framesSentToDecoding.Store(i, struct{}{})
+				frameCount++
+			}
+		}
+		framesSentToDecodingCount.Add(frameCount)
 
 		return decodedBytes, nil
 	}
@@ -699,13 +764,13 @@ func TestFailedVerification(t *testing.T) {
 	pessimisticDownloadThreshold := uint32(math.Ceil(float64(minimumChunkCount) * config.DownloadPessimism))
 	maxToDownload := uint32(math.Ceil(float64(pessimisticDownloadThreshold)*config.VerificationPessimism)) +
 		maximumChunksPerValidator + failedChunkCount.NumChunks()
-	require.GreaterOrEqual(t, maxToDownload, chunksDownloaded.Load())
+	require.GreaterOrEqual(t, maxToDownload, chunksDownloadedCount.Load())
 
 	// The number of chunks verified should exceed the pessimistic threshold by no more than the
 	// maximum chunk count of any individual operator, plus the number of failed verifications.
 	pessimisticVerificationThreshold := uint32(math.Ceil(float64(minimumChunkCount) * config.VerificationPessimism))
 	maxToVerify := pessimisticVerificationThreshold + maximumChunksPerValidator + failedChunkCount.NumChunks()
-	require.GreaterOrEqual(t, maxToVerify, framesSentToDecoding.Load())
+	require.GreaterOrEqual(t, maxToVerify, framesSentToDecodingCount.Load())
 }
 
 func MockCommitment(t *testing.T) encoding.BlobCommitments {
