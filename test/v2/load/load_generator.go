@@ -181,7 +181,7 @@ func (l *LoadGenerator) readAndWriteBlob() {
 func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 	blobKey *corev2.BlobKey,
 	payload []byte,
-	eigenDACert *coretypes.EigenDACert,
+	eigenDACert coretypes.EigenDACert,
 	err error) {
 
 	payloadSize := int(rand.BoundedGaussian(

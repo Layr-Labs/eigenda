@@ -5,43 +5,60 @@ import (
 
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	v2_cert_verifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
-	v3_cert_verifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV3"
 	cert_types_binding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 var (
-	V3VerifierABI *abi.ABI
+	v3CertTypeEncodeArgs abi.Arguments
 )
 
 func init() {
-	var err error
-	V3VerifierABI, err = v3_cert_verifier.ContractEigenDACertVerifierV3MetaData.GetAbi()
+	// load the ABI and parse the dummy interface methods used to encode the cert
+	// NOTE: the only other way would be defining the certificate using go-ethereum's abi
+	// low level types which would require much boiler plate
+	certTypesBinding, err := cert_types_binding.ContractIEigenDACertTypeBindingsMetaData.GetAbi()
 	if err != nil {
 		panic(err)
 	}
+
+	v3CertTypeEncodeMethod, ok := certTypesBinding.Methods["dummyFnCertV3"]
+	if !ok {
+		panic("dummyFnCertV3 not found in IEigenDACertTypes ABI")
+	}
+
+	v3CertTypeEncodeArgs = v3CertTypeEncodeMethod.Inputs
+
 }
 
+// CertificateVersion denotes the version of the EigenDA certificate
+// and is interpreted from querying the EigenDACertVerifier contract's
+// CertVersion() view function
 type CertificateVersion = byte
 
 const (
-	// we never had a proper definition for a version 1 certificate
-	// in the eigenda-proxy prefix encoding; version 1 certs are mapped to 0x0
+	// starting at two since we never formally defined a V1 cert in the core code
 	VersionTwoCert   = 0x2
 	VersionThreeCert = 0x3
 )
 
 type EigenDACert interface {
 	BlobVersion() v2.BlobVersion
-	RBN() uint32
+	ReferenceBlockNumber() uint64
 	QuorumNumbers() []byte
 	ComputeBlobKey() (*v2.BlobKey, error)
 	Serialize() ([]byte, error)
 	RelayKeys() []v2.RelayKey
 	Commitments() (*encoding.BlobCommitments, error)
+	Version() CertificateVersion
 }
+
+var _ EigenDACert = &EigenDACertV2{}
+var _ EigenDACert = &EigenDACertV3{}
+
 
 // This struct represents the composition of a EigenDA V3 certificate, as it would exist in a rollup inbox.
 type EigenDACertV3 cert_types_binding.EigenDACertTypesEigenDACertV3
@@ -88,8 +105,8 @@ func (c *EigenDACertV3) QuorumNumbers() []byte {
 }
 
 // RBN returns the reference block number
-func (c *EigenDACertV3) RBN() uint32 {
-	return c.BatchHeader.ReferenceBlockNumber
+func (c *EigenDACertV3) ReferenceBlockNumber() uint64 {
+	return uint64(c.BatchHeader.ReferenceBlockNumber)
 }
 
 // BlobVersion returns the blob version of the blob header
@@ -123,7 +140,7 @@ func (c *EigenDACertV3) ComputeBlobKey() (*v2.BlobKey, error) {
 }
 
 func (c *EigenDACertV3) Serialize() ([]byte, error) {
-	certBytes, err := V3VerifierABI.Methods["dummyFnCertV3"].Inputs.Pack(c)
+	certBytes, err := v3CertTypeEncodeArgs.Pack(c)
 	if err != nil {
 		return nil, fmt.Errorf("encode cert: %w", err)
 	}
@@ -158,8 +175,14 @@ func (c *EigenDACertV3) Commitments() (*encoding.BlobCommitments, error) {
 		return blobCommitments, nil
 }
 
+// Version returns the version of the EigenDA certificate
+func (c *EigenDACertV3) Version() CertificateVersion {
+	return VersionThreeCert
+}
 
 // This struct represents the composition of an EigenDA V2 certificate
+// NOTE: This type is hardforked from the V3 type and will no longer
+//       be supported for dispersals after the CertV3 hardfork
 type EigenDACertV2 struct {
 	BlobInclusionInfo           v2_cert_verifier.EigenDATypesV2BlobInclusionInfo
 	BatchHeader                 v2_cert_verifier.EigenDATypesV2BatchHeaderV2
@@ -209,8 +232,8 @@ func (c *EigenDACertV2) Commitments() (*encoding.BlobCommitments, error) {
 }
 
 // RBN returns the reference block number
-func (c *EigenDACertV2) RBN() uint32 {
-	return c.BatchHeader.ReferenceBlockNumber
+func (c *EigenDACertV2) ReferenceBlockNumber() uint64 {
+	return uint64(c.BatchHeader.ReferenceBlockNumber)
 }
 
 // BlobVersion returns the blob version of the blob header
@@ -222,8 +245,14 @@ func (c *EigenDACertV2) QuorumNumbers() []byte {
 	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers
 }
 
+// Serialize serializes the EigenDACertV2 to bytes
 func (c *EigenDACertV2) Serialize() ([]byte, error) {
-	panic("not implemented")
+	b, err := rlp.EncodeToBytes(c)
+	if err != nil {
+		return nil, fmt.Errorf("rlp encode v2 cert: %w", err)
+	}
+
+	return b, nil
 }
 
 
@@ -253,4 +282,9 @@ func (c *EigenDACertV2) ComputeBlobKey() (*v2.BlobKey, error) {
 	}
 
 	return &blobKey, nil
+}
+
+// Version returns the version of the EigenDA certificate
+func (c *EigenDACertV2) Version() CertificateVersion {
+	return VersionTwoCert
 }

@@ -53,10 +53,16 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 		return nil, fmt.Errorf("create disperser client: %w", err)
 	}
 
-	certVerifierV3, err := createCertVerifierV3()
+	genericCertVerifier, err := createGenericCertVerifier()
 	if err != nil {
 		return nil, fmt.Errorf("create cert verifier: %w", err)
 	}
+
+	ethClient, err := createEthClient(logger)
+	if err != nil {
+		return nil, fmt.Errorf("create eth client: %w", err)
+	}
+
 
 	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
 		PayloadClientConfig:    *clients.GetDefaultPayloadClientConfig(),
@@ -69,8 +75,9 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 	return payloaddispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
+		ethClient,
 		disperserClient,
-		certVerifierV3,
+		genericCertVerifier,
 		nil,
 	)
 }
@@ -241,7 +248,7 @@ func createCertVerifierV2() (*verification.CertVerifier, error) {
 		verification.NewStaticCertVerifierAddressProvider(gethcommon.HexToAddress(certVerifierAddress)))
 }
 
-func createCertVerifierV3() (*verification.CertVerifierV3, error) {
+func createGenericCertVerifier() (*verification.GenericCertVerifier, error) {
 	logger, err := createLogger()
 	if err != nil {
 		return nil, fmt.Errorf("create logger: %v", err)
@@ -260,7 +267,7 @@ func createCertVerifierV3() (*verification.CertVerifierV3, error) {
 		return nil, fmt.Errorf("create router address provider: %w", err)
 	}
 
-	return verification.NewV3CertVerifier(
+	return verification.NewGenericCertVerifier(
 		logger,
 		ethClient,
 		routerAddressProvider,

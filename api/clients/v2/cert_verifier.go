@@ -10,6 +10,8 @@ import (
 )
 
 // IV2CertVerifier is an interface for interacting with the EigenDACertVerifier contract.
+// NOTE: This is legacy code and should be removed in the future. Currently its ran on a few
+//       EigenDA blazzar testnets but should be nuked before mainnet.
 type IV2CertVerifier interface {
 	// VerifyCertV2 calls the VerifyCertV2 view function on the EigenDACertVerifier contract.
 	//
@@ -34,8 +36,9 @@ type IV2CertVerifier interface {
 	GetConfirmationThreshold(ctx context.Context, referenceBlockNumber uint64) (uint8, error)
 }
 
-// IV2CertVerifier is an interface for interacting with the EigenDACertVerifier contract.
-type IV3CertVerifier interface {
+// IGenericCertVerifier is an interface for interacting with the updated EigenDACertVerifier contract
+// that takes a low-level bytes interface and is compatible with the EigenDACertVerifierRouter contract.
+type IGenericCertVerifier interface {
 	// CheckDACert calls the CheckDACert view function on the EigenDACertVerifier contract.
 	//
 	// This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
@@ -50,7 +53,7 @@ type IV3CertVerifier interface {
 
 	// GetQuorumNumbersRequired queries the cert verifier contract for the configured set of quorum numbers that must
 	// be set in the BlobHeader, and verified in VerifyDACertV2 and verifyDACertV2FromSignedBatch
-	GetQuorumNumbersRequired(ctx context.Context) ([]uint8, error)
+	GetQuorumNumbersRequired(ctx context.Context, referenceBlockNumber uint64) ([]uint8, error)
 
 	// GetConfirmationThreshold queries the cert verifier contract for the configured ConfirmationThreshold.
 	// The ConfirmationThreshold is an integer value between 0 and 100 (inclusive), where the value represents
@@ -58,5 +61,8 @@ type IV3CertVerifier interface {
 	// "available".
 	GetConfirmationThreshold(ctx context.Context, referenceBlockNumber uint64) (uint8, error)
 
-	GetVersion(ctx context.Context, referenceBlockNumber uint64) (uint8, error)
+	// GetCertVersion queries the cert verifier contract for the configured certificate version.
+	// The version is an integer value that represents the version of the certificate and is used
+	// for different struct encodings.
+	GetCertVersion(ctx context.Context, referenceBlockNumber uint64) (uint8, error)
 }
