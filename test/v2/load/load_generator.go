@@ -161,7 +161,7 @@ func (l *LoadGenerator) readAndWriteBlob() {
 func (l *LoadGenerator) submitBlob(rand *random.TestRandom) (
 	blobKey *corev2.BlobKey,
 	payload []byte,
-	eigenDACert *coretypes.EigenDACert,
+	eigenDACert coretypes.EigenDACert,
 	err error) {
 
 	ctx, cancel := context.WithTimeout(l.ctx, l.config.DispersalTimeout*time.Second)
@@ -201,7 +201,7 @@ func (l *LoadGenerator) readBlob(
 	rand *random.TestRandom,
 	blobKey *corev2.BlobKey,
 	payload []byte,
-	eigenDACert *coretypes.EigenDACert) {
+	eigenDACert coretypes.EigenDACert) {
 
 	ctx, cancel := context.WithTimeout(l.ctx, l.config.ReadTimeout*time.Second)
 	l.metrics.startOperation("read")
@@ -210,7 +210,13 @@ func (l *LoadGenerator) readBlob(
 		cancel()
 	}()
 
-	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
+	commitments, err := eigenDACert.Commitments()
+	if err != nil {
+		l.client.GetLogger().Errorf("failed to get commitments: %v", err)
+		return
+	}
+
+	blobLengthSymbols := uint32(commitments.Length)
 
 	var relayReadCount int
 	if l.config.RelayReadAmplification < 1 {
@@ -225,7 +231,7 @@ func (l *LoadGenerator) readBlob(
 		err := l.client.ReadBlobFromRelays(
 			ctx,
 			*blobKey,
-			eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys,
+			eigenDACert.RelayKeys(),
 			payload,
 			blobLengthSymbols)
 		if err == nil {
@@ -234,13 +240,6 @@ func (l *LoadGenerator) readBlob(
 			l.metrics.reportRelayReadFailure()
 			l.client.GetLogger().Errorf("failed to read blob from relays: %v", err)
 		}
-	}
-
-	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
-	if err != nil {
-		l.client.GetLogger().Errorf("failed to bind blob commitments: %v", err)
-		return
 	}
 
 	var validatorReadCount int
@@ -256,9 +255,9 @@ func (l *LoadGenerator) readBlob(
 		err = l.client.ReadBlobFromValidators(
 			ctx,
 			*blobKey,
-			blobHeader.Version,
-			*commitment,
-			eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+			eigenDACert.BlobVersion(),
+			*commitments,
+			eigenDACert.QuorumNumbers(),
 			payload)
 		if err == nil {
 			l.metrics.reportValidatorReadSuccess()

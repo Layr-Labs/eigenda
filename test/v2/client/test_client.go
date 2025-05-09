@@ -54,7 +54,7 @@ type TestClient struct {
 	indexedChainState           core.IndexedChainState
 	retrievalClient             clients.RetrievalClient
 	validatorPayloadRetriever   *payloadretrieval.ValidatorPayloadRetriever
-	certVerifier                *verification.CertVerifierV3
+	certVerifier                *verification.GenericCertVerifier
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
 	metrics                     *testClientMetrics
@@ -162,14 +162,9 @@ func NewTestClient(
 
 	certVerifierAddressProvider := &test.TestCertVerifierAddressProvider{}
 
-	certVerifier, err := verification.NewV3CertVerifier(logger, ethClient, certVerifierAddressProvider, gethcommon.HexToAddress(config.EigenDARegistryCoordinatorAddress), gethcommon.HexToAddress(config.BLSOperatorStateRetrieverAddr))
+	certVerifier, err := verification.NewGenericCertVerifier(logger, ethClient, certVerifierAddressProvider, gethcommon.HexToAddress(config.EigenDARegistryCoordinatorAddress), gethcommon.HexToAddress(config.BLSOperatorStateRetrieverAddr))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cert verifier: %w", err)
-	}
-
-	blockNumMonitor, err := verification.NewBlockNumberMonitor(logger, ethClient, time.Second*5)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create block number monitor: %w", err)
 	}
 
 	// TODO (litt3): the PayloadPolynomialForm field included inside this config should be tested with different
@@ -191,7 +186,6 @@ func NewTestClient(
 	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
-		blockNumMonitor,
 		ethClient,
 		disperserClient,
 		certVerifier,
@@ -414,7 +408,7 @@ func (c *TestClient) GetValidatorPayloadRetriever() *payloadretrieval.ValidatorP
 }
 
 // GetCertVerifier returns the test client's cert verifier.
-func (c *TestClient) GetCertVerifier() *verification.CertVerifierV3 {
+func (c *TestClient) GetCertVerifier() *verification.GenericCertVerifier {
 	return c.certVerifier
 }
 

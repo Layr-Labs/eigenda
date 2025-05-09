@@ -52,11 +52,11 @@ func checkThresholds(
 	}
 
 	quorumSignedPercentages := blobStatusReply.GetSignedBatch().GetAttestation().GetQuorumSignedPercentages()
-	// if len(quorumSignedPercentages) != len(quorumNumbers) {
-	// 	return fmt.Errorf("expected number of signed percentages to match number of quorums. "+
-	// 		"signed percentages count: %d; quorum count: %d",
-	// 		len(quorumSignedPercentages), len(quorumNumbers))
-	// }
+	if len(quorumSignedPercentages) != len(quorumNumbers) {
+		return fmt.Errorf("expected number of signed percentages to match number of quorums. "+
+			"signed percentages count: %d; quorum count: %d",
+			len(quorumSignedPercentages), len(quorumNumbers))
+	}
 
 	batchHeader := blobStatusReply.GetSignedBatch().GetHeader()
 	if batchHeader == nil {

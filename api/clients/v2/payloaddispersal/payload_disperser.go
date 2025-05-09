@@ -9,7 +9,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	core "github.com/Layr-Labs/eigenda/core/v2"
@@ -24,9 +23,8 @@ type PayloadDisperser struct {
 	logger          logging.Logger
 	config          PayloadDisperserConfig
 	disperserClient clients.DisperserClient
-	blockNumMonitor *verification.BlockNumberMonitor
 	ethClient       common.EthClient
-	certVerifierV3  clients.IV3CertVerifier
+	certVerifier  clients.IGenericCertVerifier
 	stageTimer      *common.StageTimer
 }
 
@@ -35,7 +33,6 @@ type PayloadDisperser struct {
 func NewPayloadDisperser(
 	logger logging.Logger,
 	payloadDisperserConfig PayloadDisperserConfig,
-	blockNumberMonitor *verification.BlockNumberMonitor,
 	ethClient common.EthClient,
 	// IMPORTANT: it is permissible for the disperserClient to be configured without a prover, but operating with this
 	// configuration puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for computing
@@ -45,7 +42,7 @@ func NewPayloadDisperser(
 	//  be implemented. This feature will allow a PayloadDisperser to offload commitment generation onto the
 	//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
 	disperserClient clients.DisperserClient,
-	certVerifierV3 clients.IV3CertVerifier,
+	certVerifier clients.IGenericCertVerifier,
 	// if nil, then no metrics will be collected
 	registry *prometheus.Registry,
 ) (*PayloadDisperser, error) {
@@ -59,10 +56,9 @@ func NewPayloadDisperser(
 	return &PayloadDisperser{
 		logger:          logger,
 		ethClient:       ethClient,
-		blockNumMonitor: blockNumberMonitor,
 		config:          payloadDisperserConfig,
 		disperserClient: disperserClient,
-		certVerifierV3:  certVerifierV3,
+		certVerifier:  certVerifier,
 		stageTimer:      stageTimer,
 	}, nil
 }
@@ -87,6 +83,8 @@ func (pd *PayloadDisperser) SendPayload(
 	defer probe.End()
 	probe.SetStage("convert_to_blob")
 
+	// convert the higher level payload into a low level EigenDA blob using the polynomial form
+	// to dictate whether the representation is in coefficient (requires IFFT) or evaluation form
 	blob, err := payload.ToBlob(pd.config.PayloadPolynomialForm)
 	if err != nil {
 		return nil, fmt.Errorf("convert payload to blob: %w", err)
@@ -97,24 +95,26 @@ func (pd *PayloadDisperser) SendPayload(
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
 
-	// NOTE: there is a risk or edge-case here where a cert verifier activation can happen at a new block
-	//       number that's fetched later on
-	requiredQuorums, err := pd.certVerifierV3.GetQuorumNumbersRequired(timeoutCtx)
-	if err != nil {
-		return nil, fmt.Errorf("get quorum numbers required: %w", err)
-	}
-
+	// NOTE: there is a synchronization edge case where the disperser accredits a RBN that correlates
+	//       to a newly added immutable CertVerifier under the Router contract design. Resulting in 
+	//       in potentially a few failed dispersals until the RBN advances; guaranteeing eventually consistency.
+	//       This is a known issue and will be addressed with future enhancements.
 	num, err := pd.ethClient.BlockNumber(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get block number: %w", err)
 	}
 
-	confirmationThreshold, err := pd.certVerifierV3.GetConfirmationThreshold(timeoutCtx, num)
+	requiredQuorums, err := pd.certVerifier.GetQuorumNumbersRequired(timeoutCtx, num)
 	if err != nil {
 		return nil, fmt.Errorf("get quorum numbers required: %w", err)
 	}
 
-	certVersion, err := pd.certVerifierV3.GetVersion(timeoutCtx, num)
+	confirmationThreshold, err := pd.certVerifier.GetConfirmationThreshold(timeoutCtx, num)
+	if err != nil {
+		return nil, fmt.Errorf("get quorum numbers required: %w", err)
+	}
+
+	certVersion, err := pd.certVerifier.GetCertVersion(timeoutCtx, num)
 	if err != nil {
 		return nil, fmt.Errorf("get certificate version: %w", err)
 	}
@@ -139,6 +139,8 @@ func (pd *PayloadDisperser) SendPayload(
 
 	probe.SetStage("QUEUED")
 
+	// poll the disperser for the status of the blob until its received adequate signatures in regards to
+	// confirmation thresholds, a terminal error, or a timeout
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCompleteTimeout)
 	defer cancel()
 	blobStatusReply, err := pd.pollBlobStatusUntilSigned(timeoutCtx, blobKey, confirmationThreshold, blobStatus.ToProfobuf(), probe)
@@ -150,6 +152,11 @@ func (pd *PayloadDisperser) SendPayload(
 
 	probe.SetStage("build_cert")
 
+	// build the EigenDACert from the blob status reply using the cert version
+	// returned from the latest CertVerifier contract to dictate which certificate 
+	// construction to use
+	// NOTE: This will eventually be exposed as a switch function as more cert versions
+	//       are introduced
 	var eigenDACert coretypes.EigenDACert
 	if certVersion == coretypes.VersionThreeCert {
 		eigenDACert, err = pd.buildEigenDAV3Cert(ctx, blobKey, blobStatusReply)
@@ -163,8 +170,6 @@ func (pd *PayloadDisperser) SendPayload(
 
 	probe.SetStage("verify_cert")
 
-	// Encode v3 certificate into bytes
-
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
 
@@ -174,7 +179,7 @@ func (pd *PayloadDisperser) SendPayload(
 	}
 
 	// TODO: downcast to uint32
-	err = pd.certVerifierV3.CheckDACert(timeoutCtx, uint64(eigenDACert.RBN()), certBytes)
+	err = pd.certVerifier.CheckDACert(timeoutCtx, eigenDACert.ReferenceBlockNumber(), certBytes)
 	if err != nil {
 		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
 	}
@@ -317,15 +322,9 @@ func (pd *PayloadDisperser) buildEigenDAV3Cert(
 	blobKey core.BlobKey,
 	blobStatusReply *dispgrpc.BlobStatusReply,
 ) (*coretypes.EigenDACertV3, error) {
-
-	err := pd.blockNumMonitor.WaitForBlockNumber(ctx, blobStatusReply.SignedBatch.Header.ReferenceBlockNumber)
-	if err != nil {
-		return nil, fmt.Errorf("wait for block number: %w", err)
-	}
-
 	timeoutCtx, cancel := context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
-	nonSignerStakesAndSignature, err := pd.certVerifierV3.GetNonSignerStakesAndSignature(
+	nonSignerStakesAndSignature, err := pd.certVerifier.GetNonSignerStakesAndSignature(
 		timeoutCtx, blobStatusReply.GetSignedBatch())
 	if err != nil {
 		return nil, fmt.Errorf("get non signer stake and signature: %w", err)
