@@ -410,8 +410,9 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_ENABLED"),
 	}
 	LittDBWriteCacheSizeGBFlag = cli.IntFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-gb"),
-		Usage:    "The size of the LittDB write cache in gigabytes.",
+		Name: common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-gb"),
+		Usage: "The size of the LittDB write cache in gigabytes. Overrides " +
+			"LITT_DB_WRITE_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
 		Required: false,
 		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_GB"),
@@ -424,8 +425,9 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_FRACTION"),
 	}
 	LittDBReadCacheSizeGBFlag = cli.IntFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "litt-db-read-cache-size-gb"),
-		Usage:    "The size of the LittDB read cache in gigabytes.",
+		Name: common.PrefixFlag(FlagPrefix, "litt-db-read-cache-size-gb"),
+		Usage: "The size of the LittDB read cache in gigabytes. Overrides " +
+			"LITT_DB_READ_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
 		Required: false,
 		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_GB"),
