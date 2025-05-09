@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	percentMultiplier = 100
+	PercentMultiplier = 100
 
 	// minChunkLength is the minimum chunk length supported. Generally speaking, it doesn't make sense for a chunk to be
 	// smaller than the proof overhead, which is equal to one G1 point.
@@ -116,7 +116,7 @@ func (c *StdAssignmentCoordinator) GetAssignments(state *OperatorState, blobLeng
 	for _, r := range state.Operators[quorum] {
 
 		// m_i = ceil( B*S_i / C \gamma \sum_{j=1}^N S_j )
-		num := new(big.Int).Mul(big.NewInt(int64(blobLength*percentMultiplier)), r.Stake)
+		num := new(big.Int).Mul(big.NewInt(int64(blobLength*PercentMultiplier)), r.Stake)
 
 		gammaChunkLength := big.NewInt(int64(info.ChunkLength) * int64((info.ConfirmationThreshold - info.AdversaryThreshold)))
 		if gammaChunkLength.Cmp(big.NewInt(0)) <= 0 {
@@ -201,11 +201,11 @@ func (c *StdAssignmentCoordinator) ValidateChunkLength(state *OperatorState, blo
 		if totalStake.Cmp(big.NewInt(0)) == 0 {
 			return false, fmt.Errorf("total stake in quorum %d must be greater than 0", info.QuorumID)
 		}
-		num := new(big.Int).Mul(big.NewInt(2*int64(blobLength*percentMultiplier)), minStake)
+		num := new(big.Int).Mul(big.NewInt(2*int64(blobLength*PercentMultiplier)), minStake)
 		denom := new(big.Int).Mul(big.NewInt(int64(info.ConfirmationThreshold-info.AdversaryThreshold)), totalStake)
 		maxChunkLength := uint(RoundUpDivideBig(num, denom).Uint64())
 
-		maxChunkLength2 := RoundUpDivide(2*blobLength*percentMultiplier, MaxRequiredNumChunks*uint(info.ConfirmationThreshold-info.AdversaryThreshold))
+		maxChunkLength2 := RoundUpDivide(2*blobLength*PercentMultiplier, MaxRequiredNumChunks*uint(info.ConfirmationThreshold-info.AdversaryThreshold))
 
 		if maxChunkLength < maxChunkLength2 {
 			maxChunkLength = maxChunkLength2

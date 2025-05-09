@@ -1,25 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDAThresholdRegistry} from "src/interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDASignatureVerifier} from "src/interfaces/IEigenDASignatureVerifier.sol";
-import {IEigenDARelayRegistry} from "src/interfaces/IEigenDARelayRegistry.sol";
-import {EigenDAHasher} from "src/libraries/EigenDAHasher.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
+import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
 import {BN254} from "lib/eigenlayer-middleware/src/libraries/BN254.sol";
 import {Merkle} from "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/libraries/Merkle.sol";
 import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
-
-import {
-    BatchHeaderV2,
-    BlobInclusionInfo,
-    NonSignerStakesAndSignature,
-    SecurityThresholds,
-    QuorumStakeTotals,
-    VersionedBlobParams,
-    SignedBatch
-} from "src/interfaces/IEigenDAStructs.sol";
+import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeRegistry.sol";
+import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
+import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
 /**
  * @title EigenDACertVerificationV2Lib - EigenDA V2 certificate verification library
@@ -68,10 +61,10 @@ library EigenDACertVerificationV2Lib {
     function verifyDACertV2(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
-        BatchHeaderV2 memory batchHeader,
-        BlobInclusionInfo memory blobInclusionInfo,
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
-        SecurityThresholds memory securityThresholds,
+        DATypesV2.BatchHeaderV2 memory batchHeader,
+        DATypesV2.BlobInclusionInfo memory blobInclusionInfo,
+        DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
+        DATypesV1.SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers,
         bytes memory signedQuorumNumbers
     ) internal view {
@@ -93,12 +86,12 @@ library EigenDACertVerificationV2Lib {
         IEigenDASignatureVerifier signatureVerifier,
         OperatorStateRetriever operatorStateRetriever,
         IRegistryCoordinator registryCoordinator,
-        SignedBatch memory signedBatch,
-        BlobInclusionInfo memory blobInclusionInfo,
-        SecurityThresholds memory securityThresholds,
+        DATypesV2.SignedBatch memory signedBatch,
+        DATypesV2.BlobInclusionInfo memory blobInclusionInfo,
+        DATypesV1.SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers
     ) internal view {
-        (NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
+        (DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
             getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
 
         verifyDACertV2(
@@ -129,10 +122,10 @@ library EigenDACertVerificationV2Lib {
     function checkDACertV2(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
         IEigenDASignatureVerifier signatureVerifier,
-        BatchHeaderV2 memory batchHeader,
-        BlobInclusionInfo memory blobInclusionInfo,
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
-        SecurityThresholds memory securityThresholds,
+        DATypesV2.BatchHeaderV2 memory batchHeader,
+        DATypesV2.BlobInclusionInfo memory blobInclusionInfo,
+        DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
+        DATypesV1.SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers,
         bytes memory signedQuorumNumbers
     ) internal view returns (StatusCode err, bytes memory errParams) {
@@ -153,7 +146,7 @@ library EigenDACertVerificationV2Lib {
         uint256 confirmedQuorumsBitmap;
         (err, errParams, confirmedQuorumsBitmap) = checkSignaturesAndBuildConfirmedQuorums(
             signatureVerifier,
-            EigenDAHasher.hashBatchHeaderV2(batchHeader),
+            hashBatchHeaderV2(batchHeader),
             signedQuorumNumbers,
             batchHeader.referenceBlockNumber,
             nonSignerStakesAndSignature,
@@ -182,12 +175,11 @@ library EigenDACertVerificationV2Lib {
      * @return err Error code (SUCCESS if verification succeeded)
      * @return errParams Additional error parameters
      */
-    function checkBlobInclusion(BatchHeaderV2 memory batchHeader, BlobInclusionInfo memory blobInclusionInfo)
-        internal
-        pure
-        returns (StatusCode err, bytes memory errParams)
-    {
-        bytes32 blobCertHash = EigenDAHasher.hashBlobCertificate(blobInclusionInfo.blobCertificate);
+    function checkBlobInclusion(
+        DATypesV2.BatchHeaderV2 memory batchHeader,
+        DATypesV2.BlobInclusionInfo memory blobInclusionInfo
+    ) internal pure returns (StatusCode err, bytes memory errParams) {
+        bytes32 blobCertHash = hashBlobCertificate(blobInclusionInfo.blobCertificate);
         bytes32 encodedBlobHash = keccak256(abi.encodePacked(blobCertHash));
         bytes32 rootHash = batchHeader.batchRoot;
 
@@ -210,11 +202,10 @@ library EigenDACertVerificationV2Lib {
      * @return err Error code (SUCCESS if verification succeeded)
      * @return errParams Additional error parameters
      */
-    function checkSecurityParams(VersionedBlobParams memory blobParams, SecurityThresholds memory securityThresholds)
-        internal
-        pure
-        returns (StatusCode err, bytes memory errParams)
-    {
+    function checkSecurityParams(
+        DATypesV1.VersionedBlobParams memory blobParams,
+        DATypesV1.SecurityThresholds memory securityThresholds
+    ) internal pure returns (StatusCode err, bytes memory errParams) {
         uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
         uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
         uint256 minRequired = blobParams.maxNumOperators * 10000;
@@ -243,10 +234,10 @@ library EigenDACertVerificationV2Lib {
         bytes32 batchHashRoot,
         bytes memory signedQuorumNumbers,
         uint32 referenceBlockNumber,
-        NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
-        SecurityThresholds memory securityThresholds
+        DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
+        DATypesV1.SecurityThresholds memory securityThresholds
     ) internal view returns (StatusCode err, bytes memory errParams, uint256 confirmedQuorumsBitmap) {
-        (QuorumStakeTotals memory quorumStakeTotals,) = signatureVerifier.checkSignatures(
+        (DATypesV1.QuorumStakeTotals memory quorumStakeTotals,) = signatureVerifier.checkSignatures(
             batchHashRoot, signedQuorumNumbers, referenceBlockNumber, nonSignerStakesAndSignature
         );
 
@@ -319,11 +310,14 @@ library EigenDACertVerificationV2Lib {
     function getNonSignerStakesAndSignature(
         OperatorStateRetriever operatorStateRetriever,
         IRegistryCoordinator registryCoordinator,
-        SignedBatch memory signedBatch
+        DATypesV2.SignedBatch memory signedBatch
     )
         internal
         view
-        returns (NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers)
+        returns (
+            DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
+            bytes memory signedQuorumNumbers
+        )
     {
         bytes32[] memory nonSignerOperatorIds = new bytes32[](signedBatch.attestation.nonSignerPubkeys.length);
         for (uint256 i = 0; i < signedBatch.attestation.nonSignerPubkeys.length; ++i) {
@@ -376,5 +370,38 @@ library EigenDACertVerificationV2Lib {
         } else {
             revert("Unknown error code");
         }
+    }
+
+    /**
+     * @notice hashes the given V2 batch header
+     * @param batchHeader the V2 batch header to hash
+     */
+    function hashBatchHeaderV2(DATypesV2.BatchHeaderV2 memory batchHeader) internal pure returns (bytes32) {
+        return keccak256(abi.encode(batchHeader));
+    }
+
+    /**
+     * @notice hashes the given V2 blob header
+     * @param blobHeader the V2 blob header to hash
+     */
+    function hashBlobHeaderV2(DATypesV2.BlobHeaderV2 memory blobHeader) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                keccak256(abi.encode(blobHeader.version, blobHeader.quorumNumbers, blobHeader.commitment)),
+                blobHeader.paymentHeaderHash
+            )
+        );
+    }
+
+    /**
+     * @notice hashes the given V2 blob certificate
+     * @param blobCertificate the V2 blob certificate to hash
+     */
+    function hashBlobCertificate(DATypesV2.BlobCertificate memory blobCertificate) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                hashBlobHeaderV2(blobCertificate.blobHeader), blobCertificate.signature, blobCertificate.relayKeys
+            )
+        );
     }
 }

@@ -182,17 +182,17 @@ var _ = Describe("Inabox Integration", func() {
 	})
 })
 
-func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.BlobHeader {
-	quorums := make([]rollupbindings.QuorumBlobParam, len(blobHeader.GetBlobQuorumParams()))
+func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.EigenDATypesV1BlobHeader {
+	quorums := make([]rollupbindings.EigenDATypesV1QuorumBlobParam, len(blobHeader.GetBlobQuorumParams()))
 	for i, quorum := range blobHeader.GetBlobQuorumParams() {
-		quorums[i] = rollupbindings.QuorumBlobParam{
+		quorums[i] = rollupbindings.EigenDATypesV1QuorumBlobParam{
 			QuorumNumber:                    uint8(quorum.GetQuorumNumber()),
 			AdversaryThresholdPercentage:    uint8(quorum.GetAdversaryThresholdPercentage()),
 			ConfirmationThresholdPercentage: uint8(quorum.GetConfirmationThresholdPercentage()),
 			ChunkLength:                     quorum.ChunkLength,
 		}
 	}
-	return rollupbindings.BlobHeader{
+	return rollupbindings.EigenDATypesV1BlobHeader{
 		Commitment: rollupbindings.BN254G1Point{
 			X: new(big.Int).SetBytes(blobHeader.GetCommitment().X),
 			Y: new(big.Int).SetBytes(blobHeader.GetCommitment().Y),
@@ -202,12 +202,12 @@ func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.Blob
 	}
 }
 
-func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificationProof) rollupbindings.BlobVerificationProof {
+func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificationProof) rollupbindings.EigenDATypesV1BlobVerificationProof {
 	batchMetadataProto := verificationProof.GetBatchMetadata()
 	batchHeaderProto := verificationProof.GetBatchMetadata().GetBatchHeader()
 	var batchRoot [32]byte
 	copy(batchRoot[:], batchHeaderProto.GetBatchRoot())
-	batchHeader := rollupbindings.BatchHeader{
+	batchHeader := rollupbindings.EigenDATypesV1BatchHeader{
 		BlobHeadersRoot:       batchRoot,
 		QuorumNumbers:         batchHeaderProto.GetQuorumNumbers(),
 		SignedStakeForQuorums: batchHeaderProto.GetQuorumSignedPercentages(),
@@ -215,12 +215,12 @@ func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificat
 	}
 	var sig [32]byte
 	copy(sig[:], batchMetadataProto.GetSignatoryRecordHash())
-	batchMetadata := rollupbindings.BatchMetadata{
+	batchMetadata := rollupbindings.EigenDATypesV1BatchMetadata{
 		BatchHeader:             batchHeader,
 		SignatoryRecordHash:     sig,
 		ConfirmationBlockNumber: batchMetadataProto.GetConfirmationBlockNumber(),
 	}
-	return rollupbindings.BlobVerificationProof{
+	return rollupbindings.EigenDATypesV1BlobVerificationProof{
 		BatchId:        verificationProof.GetBatchId(),
 		BlobIndex:      verificationProof.GetBlobIndex(),
 		BatchMetadata:  batchMetadata,

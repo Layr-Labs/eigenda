@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval/test"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/docker/go-units"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -34,13 +34,13 @@ func TestDownloadBundles(t *testing.T) {
 	require.NoError(t, err)
 
 	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByIndex)
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 2)
 		require.Equal(t, blobKeys[0], requests[0].BlobKey)
 		require.Equal(t, blobKeys[2], requests[1].BlobKey)
 	})
 	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByIndex)
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 	})
@@ -70,14 +70,14 @@ func TestDownloadBundlesFail(t *testing.T) {
 	bundles20Bytes, err := bundles[2][0].Serialize()
 	require.NoError(t, err)
 	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByIndex)
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 2)
 		require.Equal(t, blobKeys[0], requests[0].BlobKey)
 		require.Equal(t, blobKeys[2], requests[1].BlobKey)
 	})
 	relayServerError := fmt.Errorf("relay server error")
 	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return(nil, relayServerError).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByIndex)
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 	})
@@ -105,13 +105,13 @@ func TestDownloadBundlesOnlyParticipatingQuorums(t *testing.T) {
 	require.NoError(t, err)
 	// there shouldn't be a request to quorum 2 for blobKeys[2]
 	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByIndex)
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 2)
 		require.Equal(t, blobKeys[0], requests[0].BlobKey)
 		require.Equal(t, blobKeys[2], requests[1].BlobKey)
 	})
 	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByIndex)
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 	})
@@ -141,7 +141,7 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	require.Equal(t, bp, blobParams)
 	_, ok = c.node.BlobVersionParams.Load().Get(1)
 	require.False(t, ok)
-	relayClient, ok := c.node.RelayClient.Load().(clients.RelayClient)
+	relayClient, ok := c.node.RelayClient.Load().(relay.RelayClient)
 	require.True(t, ok)
 	require.NotNil(t, relayClient)
 
@@ -159,7 +159,7 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	require.Equal(t, bp, blobParams)
 	_, ok = c.node.BlobVersionParams.Load().Get(1)
 	require.False(t, ok)
-	newRelayClient := c.node.RelayClient.Load().(clients.RelayClient)
+	newRelayClient := c.node.RelayClient.Load().(relay.RelayClient)
 	require.Same(t, relayClient, newRelayClient)
 
 	// Same relay URLs shouldn't trigger update
@@ -174,7 +174,7 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	c.tx.On("GetRelayURLs", mock.Anything).Return(relayURLs, nil)
 	err = c.node.RefreshOnchainState(newCtx1)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
-	newRelayClient = c.node.RelayClient.Load().(clients.RelayClient)
+	newRelayClient = c.node.RelayClient.Load().(relay.RelayClient)
 	require.Same(t, relayClient, newRelayClient)
 }
 
@@ -190,13 +190,13 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 		return nil, nil
 	}
 
-	relayClientConfig := &clients.RelayClientConfig{
+	relayClientConfig := &relay.RelayClientConfig{
 		OperatorID:         &c.node.Config.ID,
 		MessageSigner:      messageSigner,
 		MaxGRPCMessageSize: units.GiB,
 	}
 
-	relayClient, err := clients.NewRelayClient(relayClientConfig, c.node.Logger, relayUrlProvider)
+	relayClient, err := relay.NewRelayClient(relayClientConfig, c.node.Logger, relayUrlProvider)
 	require.NoError(t, err)
 	// set up non-mock client
 	c.node.RelayClient.Store(relayClient)

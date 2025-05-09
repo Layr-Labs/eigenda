@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IPaymentVault} from "../interfaces/IPaymentVault.sol";
+import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 
 abstract contract PaymentVaultStorage is IPaymentVault {
     /// @notice minimum chargeable size for on-demand payments

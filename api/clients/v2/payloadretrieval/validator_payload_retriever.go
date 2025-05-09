@@ -6,6 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -18,7 +19,7 @@ import (
 type ValidatorPayloadRetriever struct {
 	logger          logging.Logger
 	config          ValidatorPayloadRetrieverConfig
-	retrievalClient clients.RetrievalClient
+	retrievalClient validator.ValidatorClient
 	g1Srs           []bn254.G1Affine
 }
 
@@ -28,7 +29,7 @@ var _ clients.PayloadRetriever = &ValidatorPayloadRetriever{}
 func NewValidatorPayloadRetriever(
 	logger logging.Logger,
 	config ValidatorPayloadRetrieverConfig,
-	retrievalClient clients.RetrievalClient,
+	retrievalClient validator.ValidatorClient,
 	g1Srs []bn254.G1Affine,
 ) (*ValidatorPayloadRetriever, error) {
 	err := config.checkAndSetDefaults()
@@ -72,7 +73,7 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 			eigenDACert.BatchHeader.ReferenceBlockNumber)
 
 		if err != nil {
-			pr.logger.Warn(
+			pr.logger.Error(
 				"blob couldn't be retrieved from quorum",
 				"blobKey", blobKey.Hex(),
 				"quorumId", quorumID,

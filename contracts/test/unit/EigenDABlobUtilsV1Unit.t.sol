@@ -2,29 +2,36 @@
 pragma solidity =0.8.12;
 
 import "../MockEigenDADeployer.sol";
+import {EigenDACertVerifierV1} from "src/periphery/cert/v1/EigenDACertVerifierV1.sol";
+import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/periphery/cert/v1/EigenDACertVerificationV1Lib.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {IEigenDABatchMetadataStorage} from "src/core/interfaces/IEigenDABatchMetadataStorage.sol";
 
 contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
     using stdStorage for StdStorage;
     using BN254 for BN254.G1Point;
-    using EigenDAHasher for BatchHeader;
-    using EigenDAHasher for ReducedBatchHeader;
-    using EigenDAHasher for BlobHeader;
-    using EigenDAHasher for BatchMetadata;
+
+    EigenDACertVerifierV1 eigenDACertVerifierV1;
 
     function setUp() public virtual {
         _deployDA();
+
+        eigenDACertVerifierV1 = new EigenDACertVerifierV1(
+            IEigenDAThresholdRegistry(address(eigenDAServiceManager)),
+            IEigenDABatchMetadataStorage(address(eigenDAServiceManager))
+        );
     }
 
     function testVerifyBlob_TwoQuorums(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = 2;
-        BlobHeader[] memory blobHeader = new BlobHeader[](2);
+        DATypesV1.BlobHeader[] memory blobHeader = new DATypesV1.BlobHeader[](2);
         blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
         blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
-        BatchHeader memory batchHeader;
-        bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
-        bytes memory secondBlobHash = abi.encodePacked(blobHeader[1].hashBlobHeader());
+        DATypesV1.BatchHeader memory batchHeader;
+        bytes memory firstBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[0]));
+        bytes memory secondBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[1]));
         batchHeader.blobHeadersRoot = keccak256(abi.encodePacked(keccak256(firstBlobHash), keccak256(secondBlobHash)));
         for (uint256 i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
             batchHeader.quorumNumbers =
@@ -36,16 +43,16 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         batchHeader.referenceBlockNumber = uint32(block.number);
 
         // add dummy batch metadata
-        BatchMetadata memory batchMetadata;
+        DATypesV1.BatchMetadata memory batchMetadata;
         batchMetadata.batchHeader = batchHeader;
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
 
         stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
             defaultBatchId
-        ).checked_write(batchMetadata.hashBatchMetadata());
+        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
 
-        BlobVerificationProof memory blobVerificationProof;
+        DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -56,20 +63,20 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         }
 
         uint256 gasBefore = gasleft();
-        eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
+        eigenDACertVerifierV1.verifyDACertV1(blobHeader[1], blobVerificationProof);
         uint256 gasAfter = gasleft();
         emit log_named_uint("gas used", gasBefore - gasAfter);
     }
 
     function testVerifyBlobs_TwoBlobs(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = 2;
-        BlobHeader[] memory blobHeader = new BlobHeader[](2);
+        DATypesV1.BlobHeader[] memory blobHeader = new DATypesV1.BlobHeader[](2);
         blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
         blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
-        BatchHeader memory batchHeader;
-        bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
-        bytes memory secondBlobHash = abi.encodePacked(blobHeader[1].hashBlobHeader());
+        DATypesV1.BatchHeader memory batchHeader;
+        bytes memory firstBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[0]));
+        bytes memory secondBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[1]));
         batchHeader.blobHeadersRoot = keccak256(abi.encodePacked(keccak256(firstBlobHash), keccak256(secondBlobHash)));
         // add dummy quorum numbers and quorum threshold percentages making sure confirmationThresholdPercentage = adversaryThresholdPercentage + defaultCodingRatioPercentage
         for (uint256 i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
@@ -81,14 +88,14 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         }
         batchHeader.referenceBlockNumber = uint32(block.number);
         // add dummy batch metadata
-        BatchMetadata memory batchMetadata;
+        DATypesV1.BatchMetadata memory batchMetadata;
         batchMetadata.batchHeader = batchHeader;
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
         stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
             defaultBatchId
-        ).checked_write(batchMetadata.hashBatchMetadata());
-        BlobVerificationProof[] memory blobVerificationProofs = new BlobVerificationProof[](2);
+        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
+        DATypesV1.BlobVerificationProof[] memory blobVerificationProofs = new DATypesV1.BlobVerificationProof[](2);
         blobVerificationProofs[0].batchId = defaultBatchId;
         blobVerificationProofs[1].batchId = defaultBatchId;
         blobVerificationProofs[0].batchMetadata = batchMetadata;
@@ -104,61 +111,61 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
             blobVerificationProofs[1].quorumIndices[i] = bytes1(uint8(i));
         }
         uint256 gasBefore = gasleft();
-        eigenDACertVerifier.verifyDACertsV1(blobHeader, blobVerificationProofs);
+        eigenDACertVerifierV1.verifyDACertsV1(blobHeader, blobVerificationProofs);
         uint256 gasAfter = gasleft();
         emit log_named_uint("gas used", gasBefore - gasAfter);
     }
 
     function testVerifyBlob_InvalidMetadataHash(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = pseudoRandomNumber % 192;
-        BlobHeader[] memory blobHeader = new BlobHeader[](2);
+        DATypesV1.BlobHeader[] memory blobHeader = new DATypesV1.BlobHeader[](2);
         blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
         blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
-        BlobVerificationProof memory blobVerificationProof;
+        DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
 
         cheats.expectRevert(
             "EigenDACertVerificationV1Lib._verifyDACertForQuorums: batchMetadata does not match stored metadata"
         );
-        eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
+        eigenDACertVerifierV1.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
     function testVerifyBlob_InvalidMerkleProof(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = pseudoRandomNumber % 192;
-        BlobHeader[] memory blobHeader = new BlobHeader[](2);
+        DATypesV1.BlobHeader[] memory blobHeader = new DATypesV1.BlobHeader[](2);
         blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
         blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
         // add dummy batch metadata
-        BatchMetadata memory batchMetadata;
+        DATypesV1.BatchMetadata memory batchMetadata;
 
         stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
             defaultBatchId
-        ).checked_write(batchMetadata.hashBatchMetadata());
+        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
 
-        BlobVerificationProof memory blobVerificationProof;
+        DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(bytes32(0));
         blobVerificationProof.blobIndex = 1;
 
         cheats.expectRevert("EigenDACertVerificationV1Lib._verifyDACertForQuorums: inclusion proof is invalid");
-        eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
+        eigenDACertVerifierV1.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
     function testVerifyBlob_RequiredQuorumsNotMet(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = 1;
-        BlobHeader[] memory blobHeader = new BlobHeader[](2);
+        DATypesV1.BlobHeader[] memory blobHeader = new DATypesV1.BlobHeader[](2);
         blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
         blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
-        BatchHeader memory batchHeader;
-        bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
-        bytes memory secondBlobHash = abi.encodePacked(blobHeader[1].hashBlobHeader());
+        DATypesV1.BatchHeader memory batchHeader;
+        bytes memory firstBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[0]));
+        bytes memory secondBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[1]));
         batchHeader.blobHeadersRoot = keccak256(abi.encodePacked(keccak256(firstBlobHash), keccak256(secondBlobHash)));
         for (uint256 i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
             batchHeader.quorumNumbers =
@@ -170,16 +177,16 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         batchHeader.referenceBlockNumber = uint32(block.number);
 
         // add dummy batch metadata
-        BatchMetadata memory batchMetadata;
+        DATypesV1.BatchMetadata memory batchMetadata;
         batchMetadata.batchHeader = batchHeader;
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
 
         stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
             defaultBatchId
-        ).checked_write(batchMetadata.hashBatchMetadata());
+        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
 
-        BlobVerificationProof memory blobVerificationProof;
+        DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -192,19 +199,19 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         cheats.expectRevert(
             "EigenDACertVerificationV1Lib._verifyDACertForQuorums: required quorums are not a subset of the confirmed quorums"
         );
-        eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
+        eigenDACertVerifierV1.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
     function testVerifyBlob_QuorumNumberMismatch(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = 2;
-        BlobHeader[] memory blobHeader = new BlobHeader[](2);
+        DATypesV1.BlobHeader[] memory blobHeader = new DATypesV1.BlobHeader[](2);
         blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
         blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
-        BatchHeader memory batchHeader;
-        bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
-        bytes memory secondBlobHash = abi.encodePacked(blobHeader[1].hashBlobHeader());
+        DATypesV1.BatchHeader memory batchHeader;
+        bytes memory firstBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[0]));
+        bytes memory secondBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[1]));
         batchHeader.blobHeadersRoot = keccak256(abi.encodePacked(keccak256(firstBlobHash), keccak256(secondBlobHash)));
         for (uint256 i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
             batchHeader.quorumNumbers =
@@ -216,16 +223,16 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         batchHeader.referenceBlockNumber = uint32(block.number);
 
         // add dummy batch metadata
-        BatchMetadata memory batchMetadata;
+        DATypesV1.BatchMetadata memory batchMetadata;
         batchMetadata.batchHeader = batchHeader;
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
 
         stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
             defaultBatchId
-        ).checked_write(batchMetadata.hashBatchMetadata());
+        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
 
-        BlobVerificationProof memory blobVerificationProof;
+        DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -237,19 +244,19 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         }
 
         cheats.expectRevert("EigenDACertVerificationV1Lib._verifyDACertForQuorums: quorumNumber does not match");
-        eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
+        eigenDACertVerifierV1.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
     function testVerifyBlob_QuorumThresholdNotMet(uint256 pseudoRandomNumber) public {
         uint256 numQuorumBlobParams = 2;
-        BlobHeader[] memory blobHeader = new BlobHeader[](2);
+        DATypesV1.BlobHeader[] memory blobHeader = new DATypesV1.BlobHeader[](2);
         blobHeader[0] = _generateRandomBlobHeader(pseudoRandomNumber, numQuorumBlobParams);
         uint256 anotherPseudoRandomNumber = uint256(keccak256(abi.encodePacked(pseudoRandomNumber)));
         blobHeader[1] = _generateRandomBlobHeader(anotherPseudoRandomNumber, numQuorumBlobParams);
 
-        BatchHeader memory batchHeader;
-        bytes memory firstBlobHash = abi.encodePacked(blobHeader[0].hashBlobHeader());
-        bytes memory secondBlobHash = abi.encodePacked(blobHeader[1].hashBlobHeader());
+        DATypesV1.BatchHeader memory batchHeader;
+        bytes memory firstBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[0]));
+        bytes memory secondBlobHash = abi.encodePacked(CertV1Lib.hashBlobHeader(blobHeader[1]));
         batchHeader.blobHeadersRoot = keccak256(abi.encodePacked(keccak256(firstBlobHash), keccak256(secondBlobHash)));
         // add dummy quorum numbers and quorum threshold percentages making sure confirmationThresholdPercentage = 100
         for (uint256 i = 0; i < blobHeader[1].quorumBlobParams.length; i++) {
@@ -262,16 +269,16 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         batchHeader.referenceBlockNumber = uint32(block.number);
 
         // add dummy batch metadata
-        BatchMetadata memory batchMetadata;
+        DATypesV1.BatchMetadata memory batchMetadata;
         batchMetadata.batchHeader = batchHeader;
         batchMetadata.signatoryRecordHash = keccak256(abi.encodePacked("signatoryRecordHash"));
         batchMetadata.confirmationBlockNumber = defaultConfirmationBlockNumber;
 
         stdstore.target(address(eigenDAServiceManager)).sig("batchIdToBatchMetadataHash(uint32)").with_key(
             defaultBatchId
-        ).checked_write(batchMetadata.hashBatchMetadata());
+        ).checked_write(CertV1Lib.hashBatchMetadata(batchMetadata));
 
-        BlobVerificationProof memory blobVerificationProof;
+        DATypesV1.BlobVerificationProof memory blobVerificationProof;
         blobVerificationProof.batchId = defaultBatchId;
         blobVerificationProof.batchMetadata = batchMetadata;
         blobVerificationProof.inclusionProof = abi.encodePacked(keccak256(firstBlobHash));
@@ -285,36 +292,36 @@ contract EigenDABlobUtilsV1Unit is MockEigenDADeployer {
         cheats.expectRevert(
             "EigenDACertVerificationV1Lib._verifyDACertForQuorums: confirmationThresholdPercentage is not met"
         );
-        eigenDACertVerifier.verifyDACertV1(blobHeader[1], blobVerificationProof);
+        eigenDACertVerifierV1.verifyDACertV1(blobHeader[1], blobVerificationProof);
     }
 
     function testThresholds() public view {
         require(
-            eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(0) == 33,
+            eigenDACertVerifierV1.getQuorumAdversaryThresholdPercentage(0) == 33,
             "getQuorumAdversaryThresholdPercentage failed"
         );
         require(
-            eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(1) == 33,
+            eigenDACertVerifierV1.getQuorumAdversaryThresholdPercentage(1) == 33,
             "getQuorumAdversaryThresholdPercentage failed"
         );
         require(
-            eigenDACertVerifier.getQuorumAdversaryThresholdPercentage(2) == 33,
+            eigenDACertVerifierV1.getQuorumAdversaryThresholdPercentage(2) == 33,
             "getQuorumAdversaryThresholdPercentage failed"
         );
         require(
-            eigenDACertVerifier.getQuorumConfirmationThresholdPercentage(0) == 55,
+            eigenDACertVerifierV1.getQuorumConfirmationThresholdPercentage(0) == 55,
             "getQuorumConfirmationThresholdPercentage failed"
         );
         require(
-            eigenDACertVerifier.getQuorumConfirmationThresholdPercentage(1) == 55,
+            eigenDACertVerifierV1.getQuorumConfirmationThresholdPercentage(1) == 55,
             "getQuorumConfirmationThresholdPercentage failed"
         );
         require(
-            eigenDACertVerifier.getQuorumConfirmationThresholdPercentage(2) == 55,
+            eigenDACertVerifierV1.getQuorumConfirmationThresholdPercentage(2) == 55,
             "getQuorumConfirmationThresholdPercentage failed"
         );
-        require(eigenDACertVerifier.getIsQuorumRequired(0) == true, "getIsQuorumRequired failed");
-        require(eigenDACertVerifier.getIsQuorumRequired(1) == true, "getIsQuorumRequired failed");
-        require(eigenDACertVerifier.getIsQuorumRequired(2) == false, "getIsQuorumRequired failed");
+        require(eigenDACertVerifierV1.getIsQuorumRequired(0) == true, "getIsQuorumRequired failed");
+        require(eigenDACertVerifierV1.getIsQuorumRequired(1) == true, "getIsQuorumRequired failed");
+        require(eigenDACertVerifierV1.getIsQuorumRequired(2) == false, "getIsQuorumRequired failed");
     }
 }

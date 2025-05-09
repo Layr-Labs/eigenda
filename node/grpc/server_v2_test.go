@@ -8,10 +8,10 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/gammazero/workerpool"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	clientsmock "github.com/Layr-Labs/eigenda/api/clients/v2/mock"
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	"github.com/Layr-Labs/eigenda/api/grpc/validator"
@@ -135,7 +135,7 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 func TestV2NodeInfoRequest(t *testing.T) {
 	c := newTestComponents(t, makeConfig(t))
 	resp, err := c.server.GetNodeInfo(context.Background(), &validator.GetNodeInfoRequest{})
-	assert.True(t, resp.Semver == "0.0.0")
+	assert.True(t, resp.Semver == ">=0.9.0-rc.1")
 	assert.True(t, err == nil)
 }
 
@@ -214,13 +214,13 @@ func TestV2StoreChunksSuccess(t *testing.T) {
 	bundles20Bytes, err := bundles[2][0].Serialize()
 	require.NoError(t, err)
 	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByIndex)
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 2)
 		require.Equal(t, blobKeys[0], requests[0].BlobKey)
 		require.Equal(t, blobKeys[2], requests[1].BlobKey)
 	})
 	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByIndex)
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 	})
@@ -283,13 +283,13 @@ func TestV2StoreChunksStorageFailure(t *testing.T) {
 	bundles20Bytes, err := bundles[2][0].Serialize()
 	require.NoError(t, err)
 	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return([][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByIndex)
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 2)
 		require.Equal(t, blobKeys[0], requests[0].BlobKey)
 		require.Equal(t, blobKeys[2], requests[1].BlobKey)
 	})
 	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return([][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByIndex)
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 	})
@@ -326,14 +326,14 @@ func TestV2StoreChunksLittDBValidationFailure(t *testing.T) {
 	require.NoError(t, err)
 	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return(
 		[][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByIndex)
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 2)
 		require.Equal(t, blobKeys[0], requests[0].BlobKey)
 		require.Equal(t, blobKeys[2], requests[1].BlobKey)
 	})
 	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return(
 		[][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByIndex)
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 	})
@@ -370,14 +370,14 @@ func TestV2StoreChunksLevelDBValidationFailure(t *testing.T) {
 	require.NoError(t, err)
 	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(0), mock.Anything).Return(
 		[][]byte{bundles00Bytes, bundles20Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByIndex)
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 2)
 		require.Equal(t, blobKeys[0], requests[0].BlobKey)
 		require.Equal(t, blobKeys[2], requests[1].BlobKey)
 	})
 	c.relayClient.On("GetChunksByIndex", mock.Anything, v2.RelayKey(1), mock.Anything).Return(
 		[][]byte{bundles10Bytes}, nil).Run(func(args mock.Arguments) {
-		requests := args.Get(2).([]*clients.ChunkRequestByIndex)
+		requests := args.Get(2).([]*relay.ChunkRequestByIndex)
 		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 	})

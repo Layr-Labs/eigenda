@@ -381,7 +381,11 @@ func TestV2GetBlobStatus(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, pbv2.BlobStatus_ENCODED, status.Status)
 
-	// Complete blob status
+	// First transition to GatheringSignatures state
+	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.GatheringSignatures)
+	require.NoError(t, err)
+	
+	// Then transition to Complete state
 	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.Complete)
 	require.NoError(t, err)
 	batchHeader := &corev2.BatchHeader{
@@ -546,6 +550,12 @@ func newTestServerV2(t *testing.T) *testComponents {
 		},
 	}, nil)
 
+	// Start NTP sync
+	ntpClock, err := core.NewNTPSyncedClock(context.Background(), "pool.ntp.org", 10*time.Second, logger)
+	if err != nil {
+		panic("failed to create NTP clock: " + err.Error())
+	}
+
 	s, err := apiserver.NewDispersalServerV2(
 		disperser.ServerConfig{
 			GrpcPort:    "51002",
@@ -565,6 +575,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 			HTTPPort:      "9094",
 			EnableMetrics: false,
 		},
+		ntpClock,
 	)
 	assert.NoError(t, err)
 

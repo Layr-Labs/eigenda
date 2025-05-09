@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDACertVerifierV1} from "src/interfaces/IEigenDACertVerifierV1.sol";
-import {IEigenDAThresholdRegistry} from "../interfaces/IEigenDAThresholdRegistry.sol";
-import {IEigenDABatchMetadataStorage} from "../interfaces/IEigenDABatchMetadataStorage.sol";
-import {IEigenDASignatureVerifier} from "../interfaces/IEigenDASignatureVerifier.sol";
-import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/libraries/EigenDACertVerificationV1Lib.sol";
-import {EigenDACertVerificationV2Lib as CertV2Lib} from "src/libraries/EigenDACertVerificationV2Lib.sol";
-import {OperatorStateRetriever} from "../../lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
-import {IRegistryCoordinator} from "../../lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
-import {IEigenDARelayRegistry} from "../interfaces/IEigenDARelayRegistry.sol";
-import "../interfaces/IEigenDAStructs.sol";
+import {IEigenDACertVerifier} from "src/periphery/cert/interfaces/IEigenDACertVerifier.sol";
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDABatchMetadataStorage} from "src/core/interfaces/IEigenDABatchMetadataStorage.sol";
+import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
+import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/periphery/cert/v1/EigenDACertVerificationV1Lib.sol";
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
+import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
+import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
+import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
 
 /**
  * @title A CertVerifier is an immutable contract that is used by a consumer to verify EigenDA blob certificates
  *         to change these values or verification behavior a new CertVerifier must be deployed
  */
-contract EigenDACertVerifierV1 is IEigenDACertVerifierV1 {
+contract EigenDACertVerifierV1 {
     IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistryV1;
 
     IEigenDABatchMetadataStorage public immutable eigenDABatchMetadataStorageV1;
@@ -39,10 +39,10 @@ contract EigenDACertVerifierV1 is IEigenDACertVerifierV1 {
      * @param blobHeader The blob header to verify
      * @param blobVerificationProof The blob cert verification proof to verify
      */
-    function verifyDACertV1(BlobHeader calldata blobHeader, BlobVerificationProof calldata blobVerificationProof)
-        external
-        view
-    {
+    function verifyDACertV1(
+        DATypesV1.BlobHeader calldata blobHeader,
+        DATypesV1.BlobVerificationProof calldata blobVerificationProof
+    ) external view {
         CertV1Lib._verifyDACertV1ForQuorums(
             _thresholdRegistry(), _batchMetadataStorage(), blobHeader, blobVerificationProof, quorumNumbersRequired()
         );
@@ -53,10 +53,10 @@ contract EigenDACertVerifierV1 is IEigenDACertVerifierV1 {
      * @param blobHeaders The blob headers to verify
      * @param blobVerificationProofs The blob cert verification proofs to verify against
      */
-    function verifyDACertsV1(BlobHeader[] calldata blobHeaders, BlobVerificationProof[] calldata blobVerificationProofs)
-        external
-        view
-    {
+    function verifyDACertsV1(
+        DATypesV1.BlobHeader[] calldata blobHeaders,
+        DATypesV1.BlobVerificationProof[] calldata blobVerificationProofs
+    ) external view {
         CertV1Lib._verifyDACertsV1ForQuorums(
             _thresholdRegistry(), _batchMetadataStorage(), blobHeaders, blobVerificationProofs, quorumNumbersRequired()
         );
@@ -92,7 +92,7 @@ contract EigenDACertVerifierV1 is IEigenDACertVerifierV1 {
     }
 
     /// @notice Returns the blob params for a given blob version
-    function getBlobParams(uint16 version) public view returns (VersionedBlobParams memory) {
+    function getBlobParams(uint16 version) public view returns (DATypesV1.VersionedBlobParams memory) {
         return _thresholdRegistry().getBlobParams(version);
     }
 
