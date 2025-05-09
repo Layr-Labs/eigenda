@@ -157,6 +157,12 @@ func (n *Node) DownloadBundles(
 			// TODO (cody-littley) this is flaky, and will fail if any relay fails. We should retry failures
 			return nil, nil, fmt.Errorf("failed to get chunks from relays: %v", resp.err)
 		}
+
+		if len(resp.bundles) != len(resp.metadata) {
+			return nil, nil, fmt.Errorf("number of bundles and metadata do not match (%d != %d)",
+				len(resp.bundles), len(resp.metadata))
+		}
+
 		for j, bundle := range resp.bundles {
 			metadata := resp.metadata[j]
 			blobShards[metadata.blobShardIndex].Bundles[metadata.quorum], err = new(core.Bundle).Deserialize(bundle)
