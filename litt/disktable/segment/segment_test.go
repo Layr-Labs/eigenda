@@ -47,13 +47,12 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 
 	expectedLargestShardSize := uint64(0)
 
-	salt := rand.Uint32()
+	salt := ([16]byte)(rand.Bytes(16))
 	seg, err := CreateSegment(
 		logger,
 		util.NewFatalErrorHandler(context.Background(), logger, nil),
 		index,
 		[]string{directory},
-		time.Now(),
 		1,
 		salt,
 		false)
@@ -191,13 +190,12 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	// a map from keys to addresses
 	addressMap := make(map[string]types.Address)
 
-	salt := rand.Uint32()
+	salt := ([16]byte)(rand.Bytes(16))
 	seg, err := CreateSegment(
 		logger,
 		util.NewFatalErrorHandler(context.Background(), logger, nil),
 		index,
 		[]string{directory},
-		time.Now(),
 		shardCount,
 		salt,
 		false)
@@ -344,13 +342,12 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	// a map from keys to addresses
 	addressMap := make(map[string]types.Address)
 
-	salt := rand.Uint32()
+	salt := ([16]byte)(rand.Bytes(16))
 	seg, err := CreateSegment(
 		logger,
 		util.NewFatalErrorHandler(context.Background(), logger, nil),
 		index,
 		[]string{directory},
-		time.Now(),
 		shardCount,
 		salt,
 		false)

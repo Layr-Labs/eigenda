@@ -303,14 +303,18 @@ func (c *controlLoop) expandSegments() error {
 	}
 
 	// Create a new segment.
+	salt := [16]byte{}
+	_, err = c.saltShaker.Read(salt[:])
+	if err != nil {
+		return fmt.Errorf("failed to read salt: %w", err)
+	}
 	newSegment, err := segment.CreateSegment(
 		c.logger,
 		c.fatalErrorHandler,
 		c.highestSegmentIndex+1,
 		c.segmentDirectories,
-		now,
 		c.metadata.GetShardingFactor(),
-		c.saltShaker.Uint32(),
+		salt,
 		c.fsync)
 	if err != nil {
 		return err

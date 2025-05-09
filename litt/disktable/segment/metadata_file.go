@@ -10,8 +10,13 @@ import (
 )
 
 const (
-	// The current serialization version. If we ever change how we serialize data, bump this version.
-	currentSerializationVersion = uint32(0)
+
+	// OldHashFunctionSerializationVersion is the serialization version for the old hash function.
+	OldHashFunctionSerializationVersion = uint32(0)
+
+	// CurrentSerializationVersion is current serialization version. If we ever change how we serialize data,
+	// bump this version.
+	CurrentSerializationVersion = uint32(1)
 
 	// MetadataFileExtension is the file extension for the metadata file.
 	MetadataFileExtension = ".metadata"
@@ -22,13 +27,22 @@ const (
 	// deleted.
 	MetadataSwapExtension = ".metadata.swap"
 
-	// MetadataSize is the size of the metadata file in bytes. This is a constant, so it's convenient to have it here.
+	// OldMetadataSize is the size of the format 0 metadata file in bytes.
+	// This is a constant, so it's convenient to have it here.
 	// - 4 bytes for version
 	// - 4 bytes for the sharding factor
 	// - 4 bytes for salt
 	// - 8 bytes for lastValueTimestamp
 	// - and 1 byte for sealed.
-	MetadataSize = 21
+	OldMetadataSize = 21
+
+	// MetadataSize is the size of the metadata file in bytes. This is a constant, so it's convenient to have it here.
+	// - 4 bytes for version
+	// - 4 bytes for the sharding factor
+	// - 16 bytes for salt
+	// - 8 bytes for lastValueTimestamp
+	// - and 1 byte for sealed.
+	MetadataSize = 33
 )
 
 // metadataFile contains metadata about a segment. This file contains metadata about the data segment, such as
@@ -45,8 +59,13 @@ type metadataFile struct {
 	shardingFactor uint32
 
 	// A random number, used to make the sharding hash function hard for an attacker to predict.
+	// This value is encoded in the file. Note: after the hash function change, this value is
+	// only used for data written with the old hash function.
+	legacySalt uint32
+
+	// A random byte array, used to make the sharding hash function hard for an attacker to predict.
 	// This value is encoded in the file.
-	salt uint32
+	salt [16]byte
 
 	// The time when the last value was written into the segment, in nanoseconds since the epoch. A segment can
 	// only be deleted when all values within it are expired, and so we only need to keep track of the lastValueTimestamp of
@@ -68,7 +87,7 @@ type metadataFile struct {
 func createMetadataFile(
 	index uint32,
 	shardingFactor uint32,
-	salt uint32,
+	salt [16]byte,
 	parentDirectory string) (*metadataFile, error) {
 
 	file := &metadataFile{
@@ -76,7 +95,7 @@ func createMetadataFile(
 		parentDirectory: parentDirectory,
 	}
 
-	file.serializationVersion = currentSerializationVersion
+	file.serializationVersion = CurrentSerializationVersion
 	file.shardingFactor = shardingFactor
 	file.salt = salt
 	err := file.write()
@@ -131,7 +150,11 @@ func getMetadataFileIndex(fileName string) (uint32, error) {
 
 // Size returns the size of the metadata file in bytes.
 func (m *metadataFile) Size() uint64 {
-	return MetadataSize
+	if m.serializationVersion == OldHashFunctionSerializationVersion {
+		return OldMetadataSize
+	} else {
+		return MetadataSize
+	}
 }
 
 // Name returns the file name for this metadata file.
@@ -166,9 +189,8 @@ func (m *metadataFile) seal(now time.Time) error {
 	return nil
 }
 
-// serialize serializes the metadata file to a byte array.
-func (m *metadataFile) serialize() []byte {
-	data := make([]byte, MetadataSize)
+func (m *metadataFile) serializeLegacy() []byte {
+	data := make([]byte, OldMetadataSize)
 
 	// Write the version
 	binary.BigEndian.PutUint32(data[0:4], m.serializationVersion)
@@ -177,7 +199,7 @@ func (m *metadataFile) serialize() []byte {
 	binary.BigEndian.PutUint32(data[4:8], m.shardingFactor)
 
 	// Write the salt
-	binary.BigEndian.PutUint32(data[8:12], m.salt)
+	binary.BigEndian.PutUint32(data[8:12], m.legacySalt)
 
 	// Write the lastValueTimestamp
 	binary.BigEndian.PutUint64(data[12:20], m.lastValueTimestamp)
@@ -192,21 +214,68 @@ func (m *metadataFile) serialize() []byte {
 	return data
 }
 
+// serialize serializes the metadata file to a byte array.
+func (m *metadataFile) serialize() []byte {
+	if m.serializationVersion == OldHashFunctionSerializationVersion {
+		return m.serializeLegacy()
+	}
+
+	data := make([]byte, MetadataSize)
+
+	// Write the version
+	binary.BigEndian.PutUint32(data[0:4], m.serializationVersion)
+
+	// Write the sharding factor
+	binary.BigEndian.PutUint32(data[4:8], m.shardingFactor)
+
+	// Write the salt
+	copy(data[8:24], m.salt[:])
+
+	// Write the lastValueTimestamp
+	binary.BigEndian.PutUint64(data[24:32], m.lastValueTimestamp)
+
+	// Write the sealed flag
+	if m.sealed {
+		data[32] = 1
+	} else {
+		data[32] = 0
+	}
+
+	return data
+}
+
 // deserialize deserializes the metadata file from a byte array.
 func (m *metadataFile) deserialize(data []byte) error {
-	if len(data) != MetadataSize {
-		return fmt.Errorf("metadata file is not the correct size: %d", len(data))
+	if len(data) < 4 {
+		return fmt.Errorf("metadata file is not the correct size, expected at least 4 bytes, got %d", len(data))
 	}
 
 	m.serializationVersion = binary.BigEndian.Uint32(data[0:4])
-	if m.serializationVersion != currentSerializationVersion {
+	if m.serializationVersion == OldHashFunctionSerializationVersion {
+		if len(data) != OldMetadataSize {
+			return fmt.Errorf("metadata file is not the correct size, expected %d, got %d",
+				OldMetadataSize, len(data))
+		}
+
+		// TODO (cody.littley): delete this after all data is migrated to the new hash function.
+		m.shardingFactor = binary.BigEndian.Uint32(data[4:8])
+		m.legacySalt = binary.BigEndian.Uint32(data[8:12])
+		m.lastValueTimestamp = binary.BigEndian.Uint64(data[12:20])
+		m.sealed = data[20] == 1
+		return nil
+	} else if m.serializationVersion != CurrentSerializationVersion {
 		return fmt.Errorf("unsupported serialization version: %d", m.serializationVersion)
 	}
 
+	if len(data) != MetadataSize {
+		return fmt.Errorf("metadata file is not the correct size, expected %d, got %d",
+			MetadataSize, len(data))
+	}
+
 	m.shardingFactor = binary.BigEndian.Uint32(data[4:8])
-	m.salt = binary.BigEndian.Uint32(data[8:12])
-	m.lastValueTimestamp = binary.BigEndian.Uint64(data[12:20])
-	m.sealed = data[20] == 1
+	m.salt = [16]byte(data[8:24])
+	m.lastValueTimestamp = binary.BigEndian.Uint64(data[24:32])
+	m.sealed = data[32] == 1
 
 	return nil
 }
