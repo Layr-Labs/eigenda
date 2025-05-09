@@ -24,6 +24,7 @@ type PayloadDisperser struct {
 	logger          logging.Logger
 	config          PayloadDisperserConfig
 	disperserClient clients.DisperserClient
+	blockNumMonitor *verification.BlockNumberMonitor
 	ethClient       common.EthClient
 	blockMonitor  *verification.BlockNumberMonitor
 	certBuilder   *clients.CertBuilder

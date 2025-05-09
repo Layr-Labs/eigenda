@@ -3,6 +3,7 @@ package verification
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -27,13 +28,13 @@ type CertVerifierV3 struct {
 	ethClient               common.EthClient
 	opsrCaller              opsr_binding.ContractOperatorStateRetrieverCaller
 	registryCoordinatorAddr gethcommon.Address
-	routerAddressProvider   clients.CertVerifierAddressProvider
+	addressProvider   clients.CertVerifierAddressProvider
 
 	// Cache maps
-	verifierCallers        sync.Map // maps address -> ContractEigenDACertVerifierV3Caller
-	requiredQuorums        sync.Map // maps address -> []uint8 (quorum numbers)
-	confirmationThresholds sync.Map // maps address -> uint8 (threshold)
-	versions               sync.Map // maps address -> uint8 (version)
+	verifierCallers        sync.Map
+	requiredQuorums        sync.Map
+	confirmationThresholds sync.Map
+	versions               sync.Map
 }
 
 // Ensure CertVerifierV3 implements the ICertVerifier interface
@@ -56,7 +57,7 @@ func NewV3CertVerifier(
 	return &CertVerifierV3{
 		logger:                  logger,
 		ethClient:               ethClient,
-		routerAddressProvider:   certVerifierAddressProvider,
+		addressProvider:   certVerifierAddressProvider,
 		registryCoordinatorAddr: registryCoordinatorAddr,
 		opsrCaller:              opsrCaller,
 	}, nil
@@ -119,7 +120,7 @@ func (cv *CertVerifierV3) GetNonSignerStakesAndSignature(
 	referenceBlockNumber := signedBatch.GetHeader().GetReferenceBlockNumber()
 
 	// 2 - call operator state retriever to fetch signature indices
-	checkSigIndices, err := cv.opsrCaller.GetCheckSignaturesIndices(&bind.CallOpts{Context: ctx},
+	checkSigIndices, err := cv.opsrCaller.GetCheckSignaturesIndices(&bind.CallOpts{Context: ctx, BlockNumber: big.NewInt(int64(referenceBlockNumber))},
 		cv.registryCoordinatorAddr, uint32(referenceBlockNumber), quorumNumbers, nonSignerOperatorIDs)
 
 	if err != nil {
@@ -151,10 +152,13 @@ func (cv *CertVerifierV3) GetQuorumNumbersRequired(ctx context.Context) ([]uint8
 		return nil, fmt.Errorf("fetch block number from eth client: %w", err)
 	}
 
-	certVerifierAddress, err := cv.routerAddressProvider.GetCertVerifierAddress(ctx, blockNumber)
+	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("get cert verifier address: %w", err)
 	}
+
+	// Debug output of address
+	// println(certVerifierAddress.Hex())
 
 	// if the quorum numbers for the active cert verifier address have already been cached, return them immediately
 	cachedQuorumNumbers, ok := cv.requiredQuorums.Load(certVerifierAddress)
@@ -191,7 +195,7 @@ func (cv *CertVerifierV3) getVerifierCallerFromBlockNumber(
 	ctx context.Context,
 	referenceBlockNumber uint64,
 ) (*cv_v3_binding.ContractEigenDACertVerifierV3Caller, error) {
-	certVerifierAddress, err := cv.routerAddressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
+	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("get cert verifier address: %w", err)
 	}
@@ -232,7 +236,7 @@ func (cv *CertVerifierV3) getVerifierCallerFromAddress(
 // verifier which corresponds to the input reference block number. Otherwise, this method will query the confirmation
 // threshold and cache the result for future use.
 func (cv *CertVerifierV3) GetConfirmationThreshold(ctx context.Context, referenceBlockNumber uint64) (uint8, error) {
-	certVerifierAddress, err := cv.routerAddressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
+	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
 	if err != nil {
 		return 0, fmt.Errorf("get cert verifier address: %w", err)
 	}
@@ -269,7 +273,7 @@ func (cv *CertVerifierV3) GetConfirmationThreshold(ctx context.Context, referenc
 // verifier which corresponds to the input reference block number. Otherwise, this method will query the version
 // and cache the result for future use.
 func (cv *CertVerifierV3) GetVersion(ctx context.Context, referenceBlockNumber uint64) (uint8, error) {
-	certVerifierAddress, err := cv.routerAddressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
+	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
 	if err != nil {
 		return 0, fmt.Errorf("get cert verifier address: %w", err)
 	}
