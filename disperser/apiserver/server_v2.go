@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -24,15 +23,12 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
-
-// Hardcoded required node version and threshold
-const requiredNodeVersion = ">=0.9.0-rc.1"
-const requiredNodeVersionStakeThreshold = 0.8 // 80%
 
 type OnchainState struct {
 	QuorumCount           uint8
@@ -69,10 +65,9 @@ type DispersalServerV2 struct {
 
 	ntpClock *core.NTPSyncedClock
 
-	operatorSetRolloutReadyByQuorum map[core.QuorumID]bool
-	currentRolloutStakePctByQuorum  map[core.QuorumID]float64 // for diagnostics and error messages
-	operatorVersionCheck            bool                      // If true, enforce node version rollout check
-	nodeInfoCheckInitOnce           sync.Once                 // Ensures we only initialize the node info check once
+	// Version checking
+	versionChecker        *core.VersionChecker
+	nodeInfoCheckInitOnce sync.Once // Ensures we only initialize the version check loop once
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
@@ -119,6 +114,32 @@ func NewDispersalServerV2(
 
 	logger := _logger.With("component", "DispersalServerV2")
 
+	// Configure version checker if enabled
+	var versionChecker *core.VersionChecker
+	if operatorVersionCheck {
+		// Set defaults if not configured
+		requiredVersion := serverConfig.RequiredNodeVersion
+		if requiredVersion == "" {
+			requiredVersion = node.SemVer // Default version constraint
+		}
+		stakeThreshold := serverConfig.VersionStakeThreshold
+		if stakeThreshold == 0 {
+			stakeThreshold = 0.8
+		}
+		checkInterval := serverConfig.VersionCheckInterval
+		if checkInterval == 0 {
+			checkInterval = 10 * time.Minute
+		}
+		config := core.VersionCheckConfig{
+			RequiredVersion: requiredVersion,
+			StakeThreshold:  stakeThreshold,
+			CheckInterval:   checkInterval,
+			Enabled:         true,
+		}
+
+		versionChecker = core.NewVersionChecker(config, logger, chainReader)
+	}
+
 	return &DispersalServerV2{
 		serverConfig:                serverConfig,
 		blobStore:                   blobStore,
@@ -130,12 +151,12 @@ func NewDispersalServerV2(
 		logger:                      logger,
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
-		operatorVersionCheck:        operatorVersionCheck,
 
 		metricsConfig: metricsConfig,
 		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
 
-		ntpClock: ntpClock,
+		ntpClock:       ntpClock,
+		versionChecker: versionChecker,
 	}, nil
 }
 
@@ -242,7 +263,7 @@ func (s *DispersalServerV2) GetBlobCommitment(ctx context.Context, req *pb.BlobC
 // It should be called periodically to keep the state up to date.
 // **Note** that there is no lock. If the state is being updated concurrently, it may lead to inconsistent state.
 func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
-	s.logger.Debug("RefreshOnchainState: Starting refresh")
+	s.logger.Debug("Refreshing onchain quorum state")
 
 	currentBlock, err := s.chainReader.GetCurrentBlockNumber(ctx)
 	if err != nil {
@@ -270,7 +291,6 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get blob version parameters: %w", err)
 	}
-
 	onchainState := &OnchainState{
 		QuorumCount:           quorumCount,
 		RequiredQuorums:       requiredQuorums,
@@ -374,107 +394,48 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	return reply, nil
 }
 
-// periodicOperatorNodeInfoCheck performs a periodic check of the operator node info, including
-// on-chain registration of operator ID, stake, socket, and offchain self-claimed node version.
-func (s *DispersalServerV2) periodicOperatorNodeInfoCheck(ctx context.Context) {
-	s.logger.Debug("Periodic operator node info check started")
-	onchainState := s.onchainState.Load()
-	if onchainState == nil {
-		s.logger.Error("onchain state is nil during operator node info check")
-		return
-	}
+// initVersionCheck initializes the version check if not already done
+// This will happen only once, no matter how many parallel requests come in
+func (s *DispersalServerV2) initVersionCheck(ctx context.Context) {
+	s.nodeInfoCheckInitOnce.Do(func() {
+		s.logger.Info("First DisperseBlob request received, initializing operator node info and starting periodic check")
 
-	quorumCount := onchainState.QuorumCount
-
-	currentBlock, err := s.chainReader.GetCurrentBlockNumber(ctx)
-	if err != nil {
-		s.logger.Error("failed to get current block number", "err", err)
-		return
-	}
-	quorumIds := make([]core.QuorumID, quorumCount)
-	for i := 0; i < int(quorumCount); i++ {
-		quorumIds[i] = core.QuorumID(i)
-	}
-
-	stakesWithSocket, err := s.chainReader.GetOperatorStakesWithSocketForQuorums(ctx, quorumIds, uint32(currentBlock))
-	if err != nil {
-		s.logger.Error("failed to get operator stakes with socket", "err", err)
-		return
-	}
-
-	operatorState, err := core.GetOperatorVerboseState(ctx, stakesWithSocket, quorumIds, currentBlock)
-	if err != nil {
-		s.logger.Error("failed to get operator info for quorums", "err", err)
-		return
-	}
-
-	pctByQuorum, rolloutReady := core.CalculateQuorumRolloutReadiness(
-		operatorState,
-		requiredNodeVersion,
-		requiredNodeVersionStakeThreshold,
-	)
-
-	// Log detailed results for debugging
-	for quorum, pct := range pctByQuorum {
-		ready := rolloutReady[quorum]
-		s.logger.Debug("Operator version rollout check result",
-			"quorum", quorum,
-			"required_version", requiredNodeVersion,
-			"stake_pct", pct,
-			"threshold", requiredNodeVersionStakeThreshold,
-			"rollout_ready", ready,
-			"upgradedThreshold", pct >= requiredNodeVersionStakeThreshold)
-	}
-
-	// If no quorums were found, log a warning
-	if len(pctByQuorum) == 0 {
-		s.logger.Warn("No quorums found in rollout readiness calculation")
-	}
-
-	// Update the server state with the new data
-	s.currentRolloutStakePctByQuorum = pctByQuorum
-	s.operatorSetRolloutReadyByQuorum = rolloutReady
-}
-
-func (s *DispersalServerV2) checkQuorumRolloutReady(req *pb.DisperseBlobRequest) error {
-	// Defensive check - initialize maps if they're nil
-	if s.operatorSetRolloutReadyByQuorum == nil {
-		s.operatorSetRolloutReadyByQuorum = make(map[core.QuorumID]bool)
-	}
-	if s.currentRolloutStakePctByQuorum == nil {
-		s.currentRolloutStakePctByQuorum = make(map[core.QuorumID]float64)
-	}
-
-	notReady := make([]string, 0)
-	for _, quorum := range req.GetBlobHeader().GetQuorumNumbers() {
-		qid := core.QuorumID(quorum)
-		ready, exists := s.operatorSetRolloutReadyByQuorum[qid]
-		if !exists {
-			s.logger.Warn("Quorum not found in rollout readiness map", "quorumID", qid)
-			ready = false // Default to not ready if missing
+		currentBlock, err := s.chainReader.GetCurrentBlockNumber(ctx)
+		if err != nil {
+			s.logger.Error("failed to get current block number", "err", err)
+			return
+		}
+		quorumCount, err := s.chainReader.GetQuorumCount(ctx, currentBlock)
+		if err != nil {
+			s.logger.Error("failed to get quorum count", "err", err)
+			return
+		}
+		quorumIds := make([]core.QuorumID, quorumCount)
+		for i := 0; i < int(quorumCount); i++ {
+			quorumIds[i] = core.QuorumID(i)
+		}
+		// Run initial check synchronously
+		if err := s.versionChecker.QuorumVersionProbe(ctx, quorumIds); err != nil {
+			s.logger.Error("failed to run initial operator node info check", "err", err)
 		}
 
-		pct, pctExists := s.currentRolloutStakePctByQuorum[qid]
-		if !pctExists {
-			s.logger.Warn("Quorum not found in stake percentage map", "quorumID", qid)
-			pct = 0 // Default to 0% if missing
-		}
+		// Start periodic check in background
+		go func() {
+			ticker := time.NewTicker(time.Minute * 10)
+			defer ticker.Stop()
+			s.logger.Info("Operator node info check ticker started from DisperseBlob")
 
-		s.logger.Info("Checking quorum readiness", "quorumID", qid, "ready", ready, "stakePct", pct)
-		if !ready {
-			threshold := requiredNodeVersionStakeThreshold * 100
-			notReady = append(notReady, fmt.Sprintf("quorum %d: %.2f%% of %.2f%% upgraded", quorum, pct*100, threshold))
-		}
-	}
-	if len(notReady) > 0 {
-		errMsg := fmt.Sprintf(
-			"Operator new version %s rollout is in progress for: %s. Please be patient for the decentralized network to coordinate disperser and operator versions.",
-			requiredNodeVersion,
-			strings.Join(notReady, "; "),
-		)
-		s.logger.Warn("Quorum rollout not ready", "error", errMsg)
-		return api.NewErrorResourceExhausted(errMsg)
-	}
-	s.logger.Info("All quorums are rollout ready")
-	return nil
+			for {
+				select {
+				case <-ticker.C:
+					if err := s.versionChecker.RefreshTrackedQuorums(ctx); err != nil {
+						s.logger.Error("failed to run periodic operator node info check", "err", err)
+					}
+				case <-ctx.Done():
+					s.logger.Info("Operator node info check goroutine shutting down")
+					return
+				}
+			}
+		}()
+	})
 }

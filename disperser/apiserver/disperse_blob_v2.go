@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
@@ -32,41 +33,15 @@ func (s *DispersalServerV2) DisperseBlob(ctx context.Context, req *pb.DisperseBl
 		return nil, api.NewErrorInternal("onchain state is nil")
 	}
 
-	if s.operatorVersionCheck {
+	if s.versionChecker != nil {
 		s.logger.Info("Operator version check is enabled")
 
-		// Initialize the node info checker if not already done
-		// This will happen only once, no matter how many parallel requests come in
-		s.nodeInfoCheckInitOnce.Do(func() {
-			s.logger.Info("First DisperseBlob request received, initializing operator node info and starting periodic check")
-
-			// Run initial check synchronously
-			s.periodicOperatorNodeInfoCheck(ctx)
-
-			// Start periodic check in background
-			go func() {
-				ticker := time.NewTicker(time.Minute * 10)
-				defer ticker.Stop()
-				s.logger.Info("Operator node info check ticker started from DisperseBlob")
-
-				for {
-					select {
-					case <-ticker.C:
-						s.periodicOperatorNodeInfoCheck(ctx)
-					case <-ctx.Done():
-						s.logger.Info("Operator node info check goroutine shutting down")
-						return
-					}
-				}
-			}()
-		})
-
-		if err := s.checkQuorumRolloutReady(req); err != nil {
-			s.logger.Warn("Quorum rollout check failed", "error", err)
+		s.initVersionCheck(ctx)
+		if err := s.quorumRolloutCheck(ctx, req); err != nil {
 			return nil, err
 		}
 	} else {
-		s.logger.Info("Operator version check is disabled, skipping quorum rollout check")
+		s.logger.Debug("Operator version check is disabled, skipping quorum rollout check")
 	}
 
 	// Validate the request
@@ -281,5 +256,34 @@ func (s *DispersalServerV2) checkBlobExistence(ctx context.Context, blobHeader *
 		return api.NewErrorAlreadyExists(fmt.Sprintf("blob already exists: %s", blobKey.Hex()))
 	}
 
+	return nil
+}
+
+func (s *DispersalServerV2) quorumRolloutCheck(ctx context.Context, req *pb.DisperseBlobRequest) error {
+	quorumNumbers := req.GetBlobHeader().GetQuorumNumbers()
+	qm := make([]core.QuorumID, len(quorumNumbers))
+	pctMap, readyMap := s.versionChecker.GetRolloutStatus()
+	_ = pctMap // ignore if unused
+	missingQuorum := make([]core.QuorumID, 0)
+	for i, q := range quorumNumbers {
+		qm[i] = core.QuorumID(q)
+		if _, ok := readyMap[qm[i]]; !ok {
+			missingQuorum = append(missingQuorum, qm[i])
+		}
+	}
+	if len(missingQuorum) > 0 {
+		err := s.versionChecker.QuorumVersionProbe(ctx, missingQuorum)
+		if err != nil {
+			s.logger.Error("failed to probe missing quorum(s) for version check", "err", err)
+		}
+	}
+	ready, notReadyDetails := s.versionChecker.IsQuorumRolloutReady(qm)
+	if !ready {
+		s.logger.Warn("Quorum rollout check failed", "error", notReadyDetails)
+		return api.NewErrorResourceExhausted(fmt.Sprintf("Operator new version %s rollout is in progress for: %s. Please be patient for the decentralized network to coordinate disperser and operator versions.",
+			s.serverConfig.RequiredNodeVersion,
+			strings.Join(notReadyDetails, "; "),
+		))
+	}
 	return nil
 }
