@@ -78,6 +78,7 @@ func (c *validatorClient) GetBlob(
 ) ([]byte, error) {
 
 	probe := c.metrics.newGetBlobProbe()
+	defer probe.End()
 
 	probe.SetStage("verify_commitment")
 	commitmentBatch := []encoding.BlobCommitments{blobCommitments}
