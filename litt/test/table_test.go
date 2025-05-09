@@ -224,11 +224,14 @@ func buildCachedMemTable(
 		return nil, err
 	}
 
-	c := cache.NewFIFOCache[string, []byte](500, func(k string, v []byte) uint64 {
+	writeCache := cache.NewFIFOCache[string, []byte](500, func(k string, v []byte) uint64 {
 		return uint64(len(k) + len(v))
-	})
+	}, nil)
+	readCache := cache.NewFIFOCache[string, []byte](500, func(k string, v []byte) uint64 {
+		return uint64(len(k) + len(v))
+	}, nil)
 
-	return tablecache.NewCachedTable(baseTable, c), nil
+	return tablecache.NewCachedTable(baseTable, writeCache, readCache), nil
 }
 
 func buildCachedMemKeyDiskTable(
@@ -241,11 +244,14 @@ func buildCachedMemKeyDiskTable(
 		return nil, err
 	}
 
-	c := cache.NewFIFOCache[string, []byte](500, func(k string, v []byte) uint64 {
+	writeCache := cache.NewFIFOCache[string, []byte](500, func(k string, v []byte) uint64 {
 		return uint64(len(k) + len(v))
-	})
+	}, nil)
+	readCache := cache.NewFIFOCache[string, []byte](500, func(k string, v []byte) uint64 {
+		return uint64(len(k) + len(v))
+	}, nil)
 
-	return tablecache.NewCachedTable(baseTable, c), nil
+	return tablecache.NewCachedTable(baseTable, writeCache, readCache), nil
 }
 
 func buildCachedLevelDBKeyDiskTable(
@@ -258,11 +264,14 @@ func buildCachedLevelDBKeyDiskTable(
 		return nil, err
 	}
 
-	c := cache.NewFIFOCache[string, []byte](500, func(k string, v []byte) uint64 {
+	writeCache := cache.NewFIFOCache[string, []byte](500, func(k string, v []byte) uint64 {
 		return uint64(len(k) + len(v))
-	})
+	}, nil)
+	readCache := cache.NewFIFOCache[string, []byte](500, func(k string, v []byte) uint64 {
+		return uint64(len(k) + len(v))
+	}, nil)
 
-	return tablecache.NewCachedTable(baseTable, c), nil
+	return tablecache.NewCachedTable(baseTable, writeCache, readCache), nil
 }
 
 func randomTableOperationsTest(t *testing.T, tableBuilder *tableBuilder) {

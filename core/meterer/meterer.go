@@ -259,7 +259,7 @@ func (m *Meterer) SymbolsCharged(numSymbols uint64) uint64 {
 	return roundedUp
 }
 
-// IncrementBinUsage increments the bin usage atomically and checks for overflow
+// IncrementGlobalBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64, receivedAt time.Time) error {
 	globalPeriod := GetReservationPeriod(receivedAt.Unix(), m.ChainPaymentState.GetGlobalRatePeriodInterval())
 

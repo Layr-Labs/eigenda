@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -20,7 +20,7 @@ type requestMetadata struct {
 	quorum         core.QuorumID
 }
 type relayRequest struct {
-	chunkRequests []*clients.ChunkRequestByRange
+	chunkRequests []*relay.ChunkRequestByRange
 	metadata      []*requestMetadata
 }
 type response struct {
@@ -43,7 +43,8 @@ func (n *Node) DownloadBundles(
 
 	probe.SetStage("prepare_to_download")
 
-	relayClient, ok := n.RelayClient.Load().(clients.RelayClient)
+	relayClient, ok := n.RelayClient.Load().(relay.RelayClient)
+
 	if !ok || relayClient == nil {
 		return nil, nil, fmt.Errorf("relay client is not set")
 	}
@@ -97,13 +98,13 @@ func (n *Node) DownloadBundles(
 			req, ok := requests[relayKey]
 			if !ok {
 				req = &relayRequest{
-					chunkRequests: make([]*clients.ChunkRequestByRange, 0),
+					chunkRequests: make([]*relay.ChunkRequestByRange, 0),
 					metadata:      make([]*requestMetadata, 0),
 				}
 				requests[relayKey] = req
 			}
 			// Chunks from one blob are requested to the same relay
-			req.chunkRequests = append(req.chunkRequests, &clients.ChunkRequestByRange{
+			req.chunkRequests = append(req.chunkRequests, &relay.ChunkRequestByRange{
 				BlobKey: blobKey,
 				Start:   assgn.StartIndex,
 				End:     assgn.StartIndex + assgn.NumChunks,
