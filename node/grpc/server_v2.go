@@ -148,9 +148,12 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		}
 	}
 	if s.blobAuthenticator != nil {
+		// TODO: check the latency of request validation later; could be parallelized to avoid significant
+		// impact to the request latency
 		for _, blob := range batch.BlobCertificates {
 			_, err = s.validateDispersalRequest(blob)
 			if err != nil {
+				// TODO: Blacklist the disperser if there's an invalid dispersal request
 				return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
 			}
 		}
@@ -387,6 +390,7 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 // - no encoding prover GetCommitmentsForPaddedLength check
 // - directly take blob lengths (no blob data yet)
 // - doesn't check every 32 bytes is a valid field element
+// Node cannot make these checks because the checks require the blob data
 func (s *ServerV2) validateDispersalRequest(
 	blobCert *corev2.BlobCertificate,
 ) (*corev2.BlobHeader, error) {
@@ -398,7 +402,7 @@ func (s *ServerV2) validateDispersalRequest(
 		return nil, fmt.Errorf("failed to authenticate blob request: %v", err)
 	}
 
-	//this is the length in SYMBOLS (32 byte field elements) of the blob. it must be a power of 2
+	// this is the length in SYMBOLS (32 byte field elements) of the blob. it must be a power of 2
 	commitedBlobLength := blobCert.BlobHeader.BlobCommitments.Length
 	if commitedBlobLength == 0 {
 		return nil, errors.New("blob size must be greater than 0")
