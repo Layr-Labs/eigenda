@@ -14,15 +14,11 @@ import {IBLSApkRegistry} from "lib/eigenlayer-middleware/src/interfaces/IBLSApkR
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
-/**
- * @title EigenDACertVerificationV2Lib - EigenDA V2 certificate verification library
- * @author Layr Labs, Inc.
- * @notice Library of functions for verifying EigenDA V2 certificates
- * @dev Provides functions for verifying blob certificates, inclusion proofs, signatures, and security parameters
- */
-library EigenDACertVerificationV2Lib {
-    using BN254 for BN254.G1Point;
+import {EigenDACertTypes as CT} from "src/periphery/cert/EigenDACertTypes.sol";
 
+/// @title EigenDACertVerificationLib
+/// @notice Library for verifying EigenDA certificates
+library EigenDACertVerificationLib {
     /// @notice Denominator used for threshold percentage calculations (100 for percentages)
     uint256 internal constant THRESHOLD_DENOMINATOR = 100;
 
@@ -50,6 +46,7 @@ library EigenDACertVerificationV2Lib {
 
     /// @notice Status codes for certificate verification results
     enum StatusCode {
+        NULL_ERROR, // Unused error code. If this is returned, there is a bug in the code.
         SUCCESS, // Verification succeeded
         INVALID_INCLUSION_PROOF, // Merkle inclusion proof is invalid
         SECURITY_ASSUMPTIONS_NOT_MET, // Security assumptions not met
@@ -58,51 +55,37 @@ library EigenDACertVerificationV2Lib {
 
     }
 
-    function verifyDACertV2(
-        IEigenDAThresholdRegistry eigenDAThresholdRegistry,
-        IEigenDASignatureVerifier signatureVerifier,
-        DATypesV2.BatchHeaderV2 memory batchHeader,
-        DATypesV2.BlobInclusionInfo memory blobInclusionInfo,
-        DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature,
-        DATypesV1.SecurityThresholds memory securityThresholds,
-        bytes memory requiredQuorumNumbers,
-        bytes memory signedQuorumNumbers
-    ) internal view {
-        (StatusCode err, bytes memory errParams) = checkDACertV2(
-            eigenDAThresholdRegistry,
-            signatureVerifier,
-            batchHeader,
-            blobInclusionInfo,
-            nonSignerStakesAndSignature,
-            securityThresholds,
-            requiredQuorumNumbers,
-            signedQuorumNumbers
-        );
-        revertOnError(err, errParams);
+    /// @notice Decodes a certificate from bytes to an EigenDACertV3
+    function decodeCert(bytes calldata data) internal pure returns (CT.EigenDACertV3 memory cert) {
+        return abi.decode(data, (CT.EigenDACertV3));
     }
 
-    function verifyDACertV2FromSignedBatch(
+    /// @notice Checks a DA certificate using all parameters that a CertVerifier has registered, and returns a status.
+    /// @dev Uses the same verification logic as verifyDACertV2. The only difference is that the certificate is ABI encoded bytes.
+    /// @param eigenDAThresholdRegistry The threshold registry contract
+    /// @param eigenDASignatureVerifier The signature verifier contract
+    /// @param certBytes The certificate bytes
+    /// @param securityThresholds The security thresholds to verify against
+    /// @param requiredQuorumNumbers The required quorum numbers
+    /// @return status Status code (SUCCESS if verification succeeded)
+    /// @return statusParams Additional status parameters
+    function checkDACert(
         IEigenDAThresholdRegistry eigenDAThresholdRegistry,
-        IEigenDASignatureVerifier signatureVerifier,
-        OperatorStateRetriever operatorStateRetriever,
-        IRegistryCoordinator registryCoordinator,
-        DATypesV2.SignedBatch memory signedBatch,
-        DATypesV2.BlobInclusionInfo memory blobInclusionInfo,
+        IEigenDASignatureVerifier eigenDASignatureVerifier,
+        bytes calldata certBytes,
         DATypesV1.SecurityThresholds memory securityThresholds,
         bytes memory requiredQuorumNumbers
-    ) internal view {
-        (DATypesV1.NonSignerStakesAndSignature memory nonSignerStakesAndSignature, bytes memory signedQuorumNumbers) =
-            getNonSignerStakesAndSignature(operatorStateRetriever, registryCoordinator, signedBatch);
-
-        verifyDACertV2(
+    ) internal view returns (StatusCode, bytes memory) {
+        CT.EigenDACertV3 memory cert = decodeCert(certBytes);
+        return checkDACertV2(
             eigenDAThresholdRegistry,
-            signatureVerifier,
-            signedBatch.batchHeader,
-            blobInclusionInfo,
-            nonSignerStakesAndSignature,
+            eigenDASignatureVerifier,
+            cert.batchHeader,
+            cert.blobInclusionInfo,
+            cert.nonSignerStakesAndSignature,
             securityThresholds,
             requiredQuorumNumbers,
-            signedQuorumNumbers
+            cert.signedQuorumNumbers
         );
     }
 

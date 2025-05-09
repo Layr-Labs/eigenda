@@ -8,9 +8,9 @@ import {EigenDAServiceManager, IRewardsCoordinator} from "src/core/EigenDAServic
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
-import {EigenDACertVerificationV1Lib} from "src/periphery/cert/v1/EigenDACertVerificationV1Lib.sol";
+import {EigenDACertVerificationLib} from "src/periphery/cert/libraries/EigenDACertVerificationLib.sol";
 import {IEigenDAServiceManager} from "src/core/interfaces/IEigenDAServiceManager.sol";
-import {EigenDACertVerifierV2} from "src/periphery/cert/v2/EigenDACertVerifierV2.sol";
+import {EigenDACertVerifier} from "src/periphery/cert/EigenDACertVerifier.sol";
 import {EigenDAThresholdRegistry, IEigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "src/core/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
@@ -41,7 +41,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
     EigenDADisperserRegistry eigenDADisperserRegistryImplementation;
     PaymentVault paymentVault;
     PaymentVault paymentVaultImplementation;
-    EigenDACertVerifierV2 eigenDACertVerifier;
+    EigenDACertVerifier eigenDACertVerifier;
 
     ERC20 mockToken;
 
@@ -176,11 +176,9 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
 
         mockToken = new ERC20("Mock Token", "MOCK");
 
-        eigenDACertVerifier = new EigenDACertVerifierV2(
+        eigenDACertVerifier = new EigenDACertVerifier(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
-            OperatorStateRetriever(address(operatorStateRetriever)),
-            IRegistryCoordinator(address(registryCoordinator)),
             defaultSecurityThresholds,
             quorumNumbersRequired
         );
@@ -205,7 +203,14 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             _getRandomBatchHeader(_pseudoRandomNumber, quorumNumbers, referenceBlockNumber, _threshold);
 
         // set batch specific signature
-        bytes32 reducedBatchHeaderHash = EigenDACertVerificationV1Lib.hashBatchHeaderToReducedBatchHeader(batchHeader);
+        bytes32 reducedBatchHeaderHash = keccak256(
+            abi.encode(
+                DATypesV1.ReducedBatchHeader({
+                    blobHeadersRoot: batchHeader.blobHeadersRoot,
+                    referenceBlockNumber: batchHeader.referenceBlockNumber
+                })
+            )
+        );
         nonSignerStakesAndSignature.sigma = BN254.hashToG1(reducedBatchHeaderHash).scalar_mul(aggSignerPrivKey);
 
         return (batchHeader, nonSignerStakesAndSignature);
