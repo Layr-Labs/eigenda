@@ -189,6 +189,13 @@ var (
 		Value:    5 * time.Minute,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "NTP_SYNC_INTERVAL"),
 	}
+	ReservedOnly = cli.BoolTFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "reserved-only"),
+		Usage:    "if true, only reserved dispersal requests are served; on-demand requests are rejected (default: true)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RESERVED_ONLY"),
+		Hidden:   false,
+	}
 )
 
 var kzgFlags = []cli.Flag{
@@ -287,6 +294,7 @@ var optionalFlags = []cli.Flag{
 	AuthPmtStateRequestMaxFutureAge,
 	NtpServerFlag,
 	NtpSyncIntervalFlag,
+	ReservedOnly,
 }
 
 // Flags contains the list of configuration options available to the binary.
