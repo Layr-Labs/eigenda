@@ -9,7 +9,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	core "github.com/Layr-Labs/eigenda/core/v2"
@@ -24,7 +23,6 @@ type PayloadDisperser struct {
 	logger          logging.Logger
 	config          PayloadDisperserConfig
 	disperserClient clients.DisperserClient
-	blockNumMonitor *verification.BlockNumberMonitor
 	ethClient       common.EthClient
 	blockMonitor  *verification.BlockNumberMonitor
 	certBuilder   *clients.CertBuilder

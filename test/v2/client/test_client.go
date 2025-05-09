@@ -172,11 +172,6 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to create cert verifier: %w", err)
 	}
 
-	blockNumMonitor, err := verification.NewBlockNumberMonitor(logger, ethClient, time.Second*5)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create block number monitor: %w", err)
-	}
-
 	// TODO (litt3): the PayloadPolynomialForm field included inside this config should be tested with different
 	//  values, rather than just using the default. Consider a testing strategy that would exercise both encoding
 	//  options.
