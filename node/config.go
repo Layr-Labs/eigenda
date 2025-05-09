@@ -119,7 +119,7 @@ type Config struct {
 	// The percentage of the total memory to use for the write cache in littDB as a fraction of 1.0, where 1.0
 	// means that all available memory will be used for the write cache (don't actually use 1.0, that leaves no buffer
 	// for other stuff). Ignored if LittDBWriteCacheSizeGB is set.
-	LittDBWriteCacheSizeFraction float64 // todo flagify
+	LittDBWriteCacheSizeFraction float64
 
 	// The size of the cache for storing recently written chunks in littDB, in gigabytes. Ignored if 0. If set,
 	// this config value overrides the LittDBWriteCacheSizeFraction value.
