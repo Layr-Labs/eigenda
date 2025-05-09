@@ -29,8 +29,8 @@ type CertificateVersion = byte
 const (
 	// we never had a proper definition for a version 1 certificate
 	// in the eigenda-proxy prefix encoding; version 1 certs are mapped to 0x0
-	VersionTwoCert   = 0x1
-	VersionThreeCert = 0x2
+	VersionTwoCert   = 0x2
+	VersionThreeCert = 0x3
 )
 
 type EigenDACert interface {
@@ -77,22 +77,28 @@ func BuildEigenDACertV3(
 	}, nil
 }
 
+// RelayKeys returns the relay keys used for reading blob contents from disperser relays
 func (c *EigenDACertV3) RelayKeys() []v2.RelayKey {
 	return c.BlobInclusionInfo.BlobCertificate.RelayKeys
 }
 
+// QuorumNumbers returns the quorum numbers requested
 func (c *EigenDACertV3) QuorumNumbers() []byte {
 	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers
 }
 
+// RBN returns the reference block number
 func (c *EigenDACertV3) RBN() uint32 {
 	return c.BatchHeader.ReferenceBlockNumber
 }
 
+// BlobVersion returns the blob version of the blob header
 func (c *EigenDACertV3) BlobVersion() v2.BlobVersion {
 	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version
 }
 
+// ComputeBlobKey computes the blob key used for looking up the blob against an EigenDA network retrieval
+// entrypoint (e.g, a relay or a validator node)
 func (c *EigenDACertV3) ComputeBlobKey() (*v2.BlobKey, error) {
 	blobHeader := c.BlobInclusionInfo.BlobCertificate.BlobHeader
 	blobCommitments, err := c.Commitments()
@@ -125,6 +131,7 @@ func (c *EigenDACertV3) Serialize() ([]byte, error) {
 	return certBytes, nil
 }
 
+// Commitments returns the blob's cryptographic kzg commitments 
 func (c *EigenDACertV3) Commitments() (*encoding.BlobCommitments, error) {
 		// TODO: figure out how to remove this casting entirely
 		commitments := v2_cert_verifier.EigenDATypesV2BlobCommitment{
@@ -190,24 +197,27 @@ func BuildEigenDAV2Cert(
 		SignedQuorumNumbers:         quorumNumbers,
 	}, nil
 }
-
+// RelayKeys returns the relay keys used for reading blob contents from disperser relays
 func (c *EigenDACertV2) RelayKeys() []v2.RelayKey {
 	return c.BlobInclusionInfo.BlobCertificate.RelayKeys
 }
 
+// Commitments returns the blob's cryptographic kzg commitments 
 func (c *EigenDACertV2) Commitments() (*encoding.BlobCommitments, error) {
 	return BlobCommitmentsBindingToInternal(
 		&c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment)
 }
 
+// RBN returns the reference block number
 func (c *EigenDACertV2) RBN() uint32 {
 	return c.BatchHeader.ReferenceBlockNumber
 }
 
+// BlobVersion returns the blob version of the blob header
 func (c *EigenDACertV2) BlobVersion() v2.BlobVersion {
 	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version
 }
-
+// QuorumNumbers returns the quorum numbers requested
 func (c *EigenDACertV2) QuorumNumbers() []byte {
 	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers
 }

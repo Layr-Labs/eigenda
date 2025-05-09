@@ -54,7 +54,7 @@ type TestClient struct {
 	indexedChainState           core.IndexedChainState
 	retrievalClient             clients.RetrievalClient
 	validatorPayloadRetriever   *payloadretrieval.ValidatorPayloadRetriever
-	certVerifier                *verification.CertVerifier
+	certVerifier                *verification.CertVerifierV3
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
 	metrics                     *testClientMetrics
@@ -162,9 +162,14 @@ func NewTestClient(
 
 	certVerifierAddressProvider := &test.TestCertVerifierAddressProvider{}
 
-	certVerifier, err := verification.NewCertVerifier(logger, ethClient, certVerifierAddressProvider)
+	certVerifier, err := verification.NewV3CertVerifier(logger, ethClient, certVerifierAddressProvider, gethcommon.HexToAddress(config.EigenDARegistryCoordinatorAddress), gethcommon.HexToAddress(config.BLSOperatorStateRetrieverAddr))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cert verifier: %w", err)
+	}
+
+	blockNumMonitor, err := verification.NewBlockNumberMonitor(logger, ethClient, time.Second*5)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create block number monitor: %w", err)
 	}
 
 	// TODO (litt3): the PayloadPolynomialForm field included inside this config should be tested with different
@@ -186,6 +191,8 @@ func NewTestClient(
 	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
+		blockNumMonitor,
+		ethClient,
 		disperserClient,
 		certVerifier,
 		registry)
@@ -407,7 +414,7 @@ func (c *TestClient) GetValidatorPayloadRetriever() *payloadretrieval.ValidatorP
 }
 
 // GetCertVerifier returns the test client's cert verifier.
-func (c *TestClient) GetCertVerifier() *verification.CertVerifier {
+func (c *TestClient) GetCertVerifier() *verification.CertVerifierV3 {
 	return c.certVerifier
 }
 
@@ -461,32 +468,32 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		return fmt.Errorf("payloads do not match")
 	}
 
-	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
+	commitment, err := eigenDACert.Commitments()
+	if err != nil {
+		return fmt.Errorf("failed to parse blob commitments: %w", err)
+	}
+
+	blobLengthSymbols := commitment.Length
 
 	// read blob from ALL relays
 	err = c.ReadBlobFromRelays(
 		ctx,
 		*blobKey,
-		eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys,
+		eigenDACert.RelayKeys(),
 		payload,
-		blobLengthSymbols)
+		uint32(blobLengthSymbols))
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relays: %w", err)
 	}
 
-	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
-	if err != nil {
-		return fmt.Errorf("failed to convert blob commitments: %w", err)
-	}
 
 	// read blob from ALL quorums
 	err = c.ReadBlobFromValidators(
 		ctx,
 		*blobKey,
-		blobHeader.Version,
+		eigenDACert.BlobVersion(),
 		*commitment,
-		eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+		eigenDACert.QuorumNumbers(),
 		payload)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from validators: %w", err)
@@ -496,7 +503,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 }
 
 // DispersePayload sends a payload to the disperser. Returns the blob key.
-func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (*coretypes.EigenDACertV3, error) {
+func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (coretypes.EigenDACert, error) {
 	c.logger.Debugf("Dispersing payload of length %d", len(payloadBytes))
 	start := time.Now()
 
