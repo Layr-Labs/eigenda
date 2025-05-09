@@ -16,7 +16,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	testrandom "github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
-	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/gammazero/workerpool"
@@ -43,11 +42,11 @@ var (
 func MakeRandomAssignment(t *testing.T, rand *testrandom.TestRandom, validatorCount int32, quorumID core.QuorumID) map[core.OperatorID]v2.Assignment {
 
 	stakes := map[core.QuorumID]map[core.OperatorID]int{
-		0: {},
+		quorumID: {},
 	}
 	for i := 0; i < int(validatorCount); i++ {
 		operatorID := (core.OperatorID)(rand.PrintableBytes(32))
-		stakes[0][operatorID] = rand.Intn(100) + 1
+		stakes[quorumID][operatorID] = rand.Intn(100) + 1
 	}
 
 	dat, err := coremock.NewChainDataMock(stakes)
@@ -57,7 +56,8 @@ func MakeRandomAssignment(t *testing.T, rand *testrandom.TestRandom, validatorCo
 
 	state := dat.GetTotalOperatorState(context.Background(), 0)
 
-	assignments, err := corev2.GetAssignments(state.OperatorState, blobParams, []core.QuorumID{quorumID}, blobKey1[:])
+	assignments, err := v2.GetAssignments(state.OperatorState, blobParams, []core.QuorumID{quorumID}, blobKey1[:])
+	require.NoError(t, err)
 
 	return assignments
 }
@@ -209,7 +209,7 @@ func TestBasicWorkflow(t *testing.T) {
 		return decodedBytes, nil
 	}
 
-	blobHeader := &corev2.BlobHeaderWithoutPayment{
+	blobHeader := &v2.BlobHeaderWithoutPayment{
 		BlobVersion:         0,
 		QuorumNumbers:       []core.QuorumID{quorumID},
 		BlobCommitments:     MockCommitment(t),
@@ -409,7 +409,7 @@ func TestDownloadTimeout(t *testing.T) {
 		return decodedBytes, nil
 	}
 
-	blobHeader := &corev2.BlobHeaderWithoutPayment{
+	blobHeader := &v2.BlobHeaderWithoutPayment{
 		BlobVersion:         0,
 		QuorumNumbers:       []core.QuorumID{quorumID},
 		BlobCommitments:     MockCommitment(t),
@@ -666,7 +666,7 @@ func TestFailedVerification(t *testing.T) {
 		return decodedBytes, nil
 	}
 
-	blobHeader := &corev2.BlobHeaderWithoutPayment{
+	blobHeader := &v2.BlobHeaderWithoutPayment{
 		BlobVersion:         0,
 		QuorumNumbers:       []core.QuorumID{quorumID},
 		BlobCommitments:     MockCommitment(t),

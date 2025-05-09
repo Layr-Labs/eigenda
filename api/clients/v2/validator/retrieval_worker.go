@@ -186,7 +186,7 @@ type retrievalWorker struct {
 	chunkStatusCounts map[chunkStatus]int
 
 	// The status of each chunk
-	chunksByStatus map[uint32]chunkStatus
+	chunkOwner map[uint32]core.OperatorID
 }
 
 // downloadStarted is used to signal that a download of chunk data has been initiated.
@@ -256,16 +256,16 @@ func newRetrievalWorker(
 	downloadAndVerifyCtx, downloadAndVerifyCancel := context.WithCancel(ctx)
 
 	chunkStatusMap := make(map[core.OperatorID]chunkStatus)
-	chunksByStatus := make(map[uint32]chunkStatus)
+	chunkOwner := make(map[uint32]core.OperatorID)
 	chunkStatusCounts := make(map[chunkStatus]int)
 
 	for _, opID := range downloadOrder {
 		for _, index := range assignments[opID].Indices {
-			_, ok := chunksByStatus[index]
+			_, ok := chunkOwner[index]
 			if !ok {
 				chunkStatusCounts[available]++
+				chunkOwner[index] = opID
 			}
-			chunksByStatus[index] = available
 		}
 		chunkStatusMap[opID] = available
 	}
@@ -300,7 +300,7 @@ func newRetrievalWorker(
 		totalChunkCount:           totalChunkCount,
 		chunkStatusMap:            chunkStatusMap,
 		chunkStatusCounts:         chunkStatusCounts,
-		chunksByStatus:            chunksByStatus,
+		chunkOwner:                chunkOwner,
 		targetDownloadCount:       targetDownloadCount,
 		targetVerifiedCount:       targetVerifiedCount,
 		validatorGRPCManager:      validatorGRPCManager,
@@ -315,14 +315,24 @@ func newRetrievalWorker(
 // counts of the various chunk statuses.
 func (w *retrievalWorker) updateChunkStatus(operatorID core.OperatorID, status chunkStatus) {
 
+	oldStatus, ok := w.chunkStatusMap[operatorID]
 	w.chunkStatusMap[operatorID] = status
+
+	numChunks := 0
 	for _, index := range w.assignments[operatorID].Indices {
-		if status > w.chunksByStatus[index] {
-			w.chunkStatusCounts[w.chunksByStatus[index]]--
-			w.chunkStatusCounts[status]++
-			w.chunksByStatus[index] = status
+		_, ok := w.chunkOwner[index]
+		if !ok {
+			w.chunkOwner[index] = operatorID
+		}
+		if w.chunkOwner[index] == operatorID {
+			numChunks++
 		}
 	}
+
+	if ok {
+		w.chunkStatusCounts[oldStatus] -= numChunks
+	}
+	w.chunkStatusCounts[status] += numChunks
 }
 
 // getChunkStatus returns the status of a chunk from a given operator.
