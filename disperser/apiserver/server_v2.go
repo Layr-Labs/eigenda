@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"google.golang.org/grpc"
@@ -62,6 +64,10 @@ type DispersalServerV2 struct {
 	metrics       *metricsV2
 
 	ntpClock *core.NTPSyncedClock
+
+	// Version checking
+	versionChecker        *core.VersionChecker
+	nodeInfoCheckInitOnce sync.Once // Ensures we only initialize the version check loop once
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
@@ -79,6 +85,7 @@ func NewDispersalServerV2(
 	registry *prometheus.Registry,
 	metricsConfig disperser.MetricsConfig,
 	ntpClock *core.NTPSyncedClock,
+	operatorVersionCheck bool,
 ) (*DispersalServerV2, error) {
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")
@@ -107,24 +114,49 @@ func NewDispersalServerV2(
 
 	logger := _logger.With("component", "DispersalServerV2")
 
+	// Configure version checker if enabled
+	var versionChecker *core.VersionChecker
+	if operatorVersionCheck {
+		// Set defaults if not configured
+		requiredVersion := serverConfig.RequiredNodeVersion
+		if requiredVersion == "" {
+			requiredVersion = node.SemVer // Default version constraint
+		}
+		stakeThreshold := serverConfig.VersionStakeThreshold
+		if stakeThreshold == 0 {
+			stakeThreshold = 0.8
+		}
+		checkInterval := serverConfig.VersionCheckInterval
+		if checkInterval == 0 {
+			checkInterval = 10 * time.Minute
+		}
+		config := core.VersionCheckConfig{
+			RequiredVersion: requiredVersion,
+			StakeThreshold:  stakeThreshold,
+			CheckInterval:   checkInterval,
+			Enabled:         true,
+		}
+
+		versionChecker = core.NewVersionChecker(config, logger, chainReader)
+	}
+
 	return &DispersalServerV2{
-		serverConfig:      serverConfig,
-		blobStore:         blobStore,
-		blobMetadataStore: blobMetadataStore,
-
-		chainReader:              chainReader,
-		blobRequestAuthenticator: blobRequestAuthenticator,
-		meterer:                  meterer,
-		prover:                   prover,
-		logger:                   logger,
-
+		serverConfig:                serverConfig,
+		blobStore:                   blobStore,
+		blobMetadataStore:           blobMetadataStore,
+		chainReader:                 chainReader,
+		blobRequestAuthenticator:    blobRequestAuthenticator,
+		meterer:                     meterer,
+		prover:                      prover,
+		logger:                      logger,
 		maxNumSymbolsPerBlob:        maxNumSymbolsPerBlob,
 		onchainStateRefreshInterval: onchainStateRefreshInterval,
 
 		metricsConfig: metricsConfig,
 		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
 
-		ntpClock: ntpClock,
+		ntpClock:       ntpClock,
+		versionChecker: versionChecker,
 	}, nil
 }
 
@@ -161,6 +193,7 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 	go func() {
 		ticker := time.NewTicker(s.onchainStateRefreshInterval)
 		defer ticker.Stop()
+		s.logger.Info("Onchain state refresh ticker started")
 
 		for {
 			select {
@@ -359,4 +392,50 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		OnchainCumulativePayment: onchainCumulativePaymentBytes,
 	}
 	return reply, nil
+}
+
+// initVersionCheck initializes the version check if not already done
+// This will happen only once, no matter how many parallel requests come in
+func (s *DispersalServerV2) initVersionCheck(ctx context.Context) {
+	s.nodeInfoCheckInitOnce.Do(func() {
+		s.logger.Info("First DisperseBlob request received, initializing operator node info and starting periodic check")
+
+		currentBlock, err := s.chainReader.GetCurrentBlockNumber(ctx)
+		if err != nil {
+			s.logger.Error("failed to get current block number", "err", err)
+			return
+		}
+		quorumCount, err := s.chainReader.GetQuorumCount(ctx, currentBlock)
+		if err != nil {
+			s.logger.Error("failed to get quorum count", "err", err)
+			return
+		}
+		quorumIds := make([]core.QuorumID, quorumCount)
+		for i := 0; i < int(quorumCount); i++ {
+			quorumIds[i] = core.QuorumID(i)
+		}
+		// Run initial check synchronously
+		if err := s.versionChecker.QuorumVersionProbe(ctx, quorumIds); err != nil {
+			s.logger.Error("failed to run initial operator node info check", "err", err)
+		}
+
+		// Start periodic check in background
+		go func() {
+			ticker := time.NewTicker(time.Minute * 10)
+			defer ticker.Stop()
+			s.logger.Info("Operator node info check ticker started from DisperseBlob")
+
+			for {
+				select {
+				case <-ticker.C:
+					if err := s.versionChecker.RefreshTrackedQuorums(ctx); err != nil {
+						s.logger.Error("failed to run periodic operator node info check", "err", err)
+					}
+				case <-ctx.Done():
+					s.logger.Info("Operator node info check goroutine shutting down")
+					return
+				}
+			}
+		}()
+	})
 }
