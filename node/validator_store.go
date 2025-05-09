@@ -23,6 +23,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sys/unix"
 	"golang.org/x/time/rate"
 )
 
@@ -277,12 +278,40 @@ func NewValidatorStore(
 			return nil, fmt.Errorf("failed to get chunks table: %w", err)
 		}
 
-		err = chunkTable.SetWriteCacheSize(uint64(config.LittDBWriteCacheSizeGB * units.GiB))
+		var rlim unix.Rlimit
+		if err := unix.Getrlimit(unix.RLIMIT_AS, &rlim); err != nil {
+			return nil, fmt.Errorf("failed to get rlimit: %w", err)
+		}
+		maxMemory := rlim.Cur
+
+		writeCacheSize := uint64(0)
+		if config.LittDBWriteCacheSizeGB > 0 {
+			writeCacheSize = uint64(config.LittDBWriteCacheSizeGB * units.GiB)
+		} else {
+			writeCacheSize = uint64(config.LittDBWriteCacheSizeFraction * float64(maxMemory))
+		}
+
+		readCacheSize := uint64(0)
+		if config.LittDBReadCacheSizeGB > 0 {
+			readCacheSize = uint64(config.LittDBReadCacheSizeGB * units.GiB)
+		} else {
+			readCacheSize = uint64(config.LittDBReadCacheSizeFraction * float64(maxMemory))
+		}
+
+		if writeCacheSize+readCacheSize >= maxMemory {
+			return nil, fmt.Errorf("Write cache size + read cache size must be less than max memory. "+
+				"Write cache size: %d, read cache size: %d, max memory: %d", writeCacheSize, readCacheSize, maxMemory)
+		}
+
+		logger.Infof("LittDB write cache size: %d, read cache size: %d, total process memory %d",
+			writeCacheSize, readCacheSize, maxMemory)
+
+		err = chunkTable.SetWriteCacheSize(writeCacheSize)
 		if err != nil {
 			return nil, fmt.Errorf("failed to set write cache size for chunks table: %w", err)
 		}
 
-		err = chunkTable.SetReadCacheSize(uint64(config.LittDBReadCacheSizeGB * units.GiB))
+		err = chunkTable.SetReadCacheSize(readCacheSize)
 		if err != nil {
 			return nil, fmt.Errorf("failed to set read cache size for chunks table: %w", err)
 		}
