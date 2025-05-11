@@ -1,7 +1,6 @@
 const fs = require("fs");
 const path = require("path");
 
-// Load wasm_exec.js from same dir as this script
 const goPath = path.resolve(__dirname, "wasm_exec.js");
 require(goPath); // defines global `Go`
 
@@ -14,7 +13,6 @@ go.env = {
 
 go.argv = ["relay.wasm", ...process.argv.slice(2)];
 
-// Read relay.wasm from same dir as script
 const wasmPath = path.resolve(__dirname, "relay.wasm");
 
 (async () => {
