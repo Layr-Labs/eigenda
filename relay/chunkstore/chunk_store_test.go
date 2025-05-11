@@ -1,3 +1,5 @@
+//go:build !js
+// +build !js
 package chunkstore
 
 import (
