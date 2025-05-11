@@ -21,7 +21,10 @@ import (
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/docker/go-units"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sys/unix"
+	"golang.org/x/time/rate"
 )
 
 const (
@@ -114,6 +117,12 @@ type validatorStore struct {
 	// A flag indicating whether the migration is complete. Used to prevent a double migration race condition
 	// (which is possible only in a unit test).
 	migrationComplete bool
+
+	// limits the frequency of hot reads (i.e. reads that hit the cache)
+	hotReadRateLimiter *rate.Limiter
+
+	// limits the frequency of cold reads (i.e. reads that miss the cache)
+	coldReadRateLimiter *rate.Limiter
 }
 
 var _ ValidatorStore = &validatorStore{}
@@ -269,6 +278,44 @@ func NewValidatorStore(
 			return nil, fmt.Errorf("failed to get chunks table: %w", err)
 		}
 
+		var rlim unix.Rlimit
+		if err := unix.Getrlimit(unix.RLIMIT_AS, &rlim); err != nil {
+			return nil, fmt.Errorf("failed to get rlimit: %w", err)
+		}
+		maxMemory := rlim.Cur
+
+		writeCacheSize := uint64(0)
+		if config.LittDBWriteCacheSizeGB > 0 {
+			writeCacheSize = uint64(config.LittDBWriteCacheSizeGB * units.GiB)
+		} else {
+			writeCacheSize = uint64(config.LittDBWriteCacheSizeFraction * float64(maxMemory))
+		}
+
+		readCacheSize := uint64(0)
+		if config.LittDBReadCacheSizeGB > 0 {
+			readCacheSize = uint64(config.LittDBReadCacheSizeGB * units.GiB)
+		} else {
+			readCacheSize = uint64(config.LittDBReadCacheSizeFraction * float64(maxMemory))
+		}
+
+		if writeCacheSize+readCacheSize >= maxMemory {
+			return nil, fmt.Errorf("Write cache size + read cache size must be less than max memory. "+
+				"Write cache size: %d, read cache size: %d, max memory: %d", writeCacheSize, readCacheSize, maxMemory)
+		}
+
+		logger.Infof("LittDB write cache size: %d, read cache size: %d, total process memory %d",
+			writeCacheSize, readCacheSize, maxMemory)
+
+		err = chunkTable.SetWriteCacheSize(writeCacheSize)
+		if err != nil {
+			return nil, fmt.Errorf("failed to set write cache size for chunks table: %w", err)
+		}
+
+		err = chunkTable.SetReadCacheSize(readCacheSize)
+		if err != nil {
+			return nil, fmt.Errorf("failed to set read cache size for chunks table: %w", err)
+		}
+
 		// A prior implementation stored data here. Delete it if it exists.
 		// This is safe to delete once all old validators have been migrated to the new version.
 		err = littDB.DropTable(headersTableName)
@@ -281,6 +328,13 @@ func NewValidatorStore(
 			return nil, fmt.Errorf("failed to set TTL for chunks table: %w", err)
 		}
 	}
+
+	hotReadRateLimiter := rate.NewLimiter(
+		rate.Limit(config.GetChunksHotCacheReadLimitMB*units.MiB),
+		int(config.GetChunksHotBurstLimitMB*units.MiB))
+	coldReadRateLimiter := rate.NewLimiter(
+		rate.Limit(config.GetChunksColdCacheReadLimitMB*units.MiB),
+		int(config.GetChunksColdBurstLimitMB*units.MiB))
 
 	store := &validatorStore{
 		logger:                logger,
@@ -295,6 +349,8 @@ func NewValidatorStore(
 		migrationCompleteTime: migrationComplete,
 		duplicateRequestLock:  common.NewIndexLock(1024),
 		duplicateRequestSalt:  rand.Uint32(),
+		hotReadRateLimiter:    hotReadRateLimiter,
+		coldReadRateLimiter:   coldReadRateLimiter,
 	}
 
 	if config.LittDBEnabled && levelDBExists {
@@ -393,6 +449,7 @@ func (s *validatorStore) storeBatchLittDB(batchData []*BundleToStore) (uint64, e
 			err = s.chunkTable.Put(bundleKeyBytes, bundleData)
 			if err != nil {
 				writeCompleteChan <- fmt.Errorf("failed to put data: %v", err)
+				return
 			}
 
 			writeCompleteChan <- nil
@@ -401,11 +458,16 @@ func (s *validatorStore) storeBatchLittDB(batchData []*BundleToStore) (uint64, e
 		size += uint64(len(bundleKeyBytes) + len(bundleData))
 	}
 
+	var failedToWrite bool
 	for i := 0; i < len(batchData); i++ {
 		err := <-writeCompleteChan
 		if err != nil {
-			return 0, err
+			failedToWrite = true
+			s.logger.Errorf("failed to write data: %v", err)
 		}
+	}
+	if failedToWrite {
+		return 0, fmt.Errorf("failed to write data")
 	}
 
 	err := s.chunkTable.Flush()
@@ -435,12 +497,12 @@ func (s *validatorStore) GetBundleData(bundleKey []byte) ([]byte, error) {
 	}
 
 	// Regardless of migration status, always check littDB first.
-	data, ok, err := s.getChunksLittDB(bundleKey)
+	data, exists, err := s.getChunksLittDB(bundleKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chunks: %v", err)
 	}
 
-	if !ok {
+	if !exists {
 		// The data wasn't found in littDB.
 
 		if s.levelDB == nil {
@@ -476,13 +538,35 @@ func (s *validatorStore) getChunksLevelDB(bundleKey []byte) ([]byte, error) {
 	return bundle, nil
 }
 
-func (s *validatorStore) getChunksLittDB(bundleKey []byte) ([]byte, bool, error) {
-	bundle, ok, err := s.chunkTable.Get(bundleKey)
+func (s *validatorStore) getChunksLittDB(bundleKey []byte) (data []byte, exists bool, err error) {
+
+	hotReadsExhausted := s.hotReadRateLimiter.Tokens() <= 0
+	if hotReadsExhausted {
+		// If hot reads are exhausted we do not allow cold reads either.
+		return nil, false, fmt.Errorf("read rate limit exhausted")
+	}
+
+	coldReadsExhausted := s.coldReadRateLimiter.Tokens() <= 0
+
+	bundle, exists, hot, err := s.chunkTable.CacheAwareGet(bundleKey, coldReadsExhausted)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to get bundle: %v", err)
 	}
-	if !ok {
+	if exists && bundle == nil {
+		// This can happen when the data is on disk but we've exhausted the cold read rate
+		return nil, false, fmt.Errorf("cold read rate limit exhausted")
+	}
+	if !exists {
 		return nil, false, nil
+	}
+
+	// If we read the value, debit the rate limiters. This may cause us to exceed the rate limit, in which
+	// case the number of tokens will be negative. When this happens, we will not be able to read until
+	// we accumulate enough tokens to "pay off the debt".
+	if hot {
+		s.hotReadRateLimiter.ReserveN(time.Now(), len(bundleKey)+len(bundle))
+	} else {
+		s.coldReadRateLimiter.ReserveN(time.Now(), len(bundleKey)+len(bundle))
 	}
 
 	return bundle, true, nil

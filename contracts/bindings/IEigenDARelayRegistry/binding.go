@@ -29,15 +29,15 @@ var (
 	_ = abi.ConvertType
 )
 
-// RelayInfo is an auto generated low-level Go binding around an user-defined struct.
-type RelayInfo struct {
+// EigenDATypesV2RelayInfo is an auto generated low-level Go binding around an user-defined struct.
+type EigenDATypesV2RelayInfo struct {
 	RelayAddress common.Address
 	RelayURL     string
 }
 
 // ContractIEigenDARelayRegistryMetaData contains all meta data concerning the ContractIEigenDARelayRegistry contract.
 var ContractIEigenDARelayRegistryMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"function\",\"name\":\"addRelayInfo\",\"inputs\":[{\"name\":\"relayInfo\",\"type\":\"tuple\",\"internalType\":\"structRelayInfo\",\"components\":[{\"name\":\"relayAddress\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"relayURL\",\"type\":\"string\",\"internalType\":\"string\"}]}],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"relayKeyToAddress\",\"inputs\":[{\"name\":\"key\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"relayKeyToUrl\",\"inputs\":[{\"name\":\"key\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"event\",\"name\":\"RelayAdded\",\"inputs\":[{\"name\":\"relay\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"key\",\"type\":\"uint32\",\"indexed\":true,\"internalType\":\"uint32\"},{\"name\":\"relayURL\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"}],\"anonymous\":false}]",
+	ABI: "[{\"type\":\"function\",\"name\":\"addRelayInfo\",\"inputs\":[{\"name\":\"relayInfo\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.RelayInfo\",\"components\":[{\"name\":\"relayAddress\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"relayURL\",\"type\":\"string\",\"internalType\":\"string\"}]}],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"relayKeyToAddress\",\"inputs\":[{\"name\":\"key\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"relayKeyToUrl\",\"inputs\":[{\"name\":\"key\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"string\",\"internalType\":\"string\"}],\"stateMutability\":\"view\"},{\"type\":\"event\",\"name\":\"RelayAdded\",\"inputs\":[{\"name\":\"relay\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"key\",\"type\":\"uint32\",\"indexed\":true,\"internalType\":\"uint32\"},{\"name\":\"relayURL\",\"type\":\"string\",\"indexed\":false,\"internalType\":\"string\"}],\"anonymous\":false}]",
 }
 
 // ContractIEigenDARelayRegistryABI is the input ABI used to generate the binding from.
@@ -251,21 +251,21 @@ func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryCallerSession
 // AddRelayInfo is a paid mutator transaction binding the contract method 0x2fc35013.
 //
 // Solidity: function addRelayInfo((address,string) relayInfo) returns(uint32)
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryTransactor) AddRelayInfo(opts *bind.TransactOpts, relayInfo RelayInfo) (*types.Transaction, error) {
+func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryTransactor) AddRelayInfo(opts *bind.TransactOpts, relayInfo EigenDATypesV2RelayInfo) (*types.Transaction, error) {
 	return _ContractIEigenDARelayRegistry.contract.Transact(opts, "addRelayInfo", relayInfo)
 }
 
 // AddRelayInfo is a paid mutator transaction binding the contract method 0x2fc35013.
 //
 // Solidity: function addRelayInfo((address,string) relayInfo) returns(uint32)
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistrySession) AddRelayInfo(relayInfo RelayInfo) (*types.Transaction, error) {
+func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistrySession) AddRelayInfo(relayInfo EigenDATypesV2RelayInfo) (*types.Transaction, error) {
 	return _ContractIEigenDARelayRegistry.Contract.AddRelayInfo(&_ContractIEigenDARelayRegistry.TransactOpts, relayInfo)
 }
 
 // AddRelayInfo is a paid mutator transaction binding the contract method 0x2fc35013.
 //
 // Solidity: function addRelayInfo((address,string) relayInfo) returns(uint32)
-func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryTransactorSession) AddRelayInfo(relayInfo RelayInfo) (*types.Transaction, error) {
+func (_ContractIEigenDARelayRegistry *ContractIEigenDARelayRegistryTransactorSession) AddRelayInfo(relayInfo EigenDATypesV2RelayInfo) (*types.Transaction, error) {
 	return _ContractIEigenDARelayRegistry.Contract.AddRelayInfo(&_ContractIEigenDARelayRegistry.TransactOpts, relayInfo)
 }
 

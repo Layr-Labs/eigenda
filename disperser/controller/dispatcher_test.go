@@ -109,8 +109,7 @@ func TestDispatcherHandleBatch(t *testing.T) {
 		}
 		close(done)
 	}()
-
-	sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx)
+	sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx, nil)
 	require.NoError(t, err)
 	for _, key := range objs.blobKeys {
 		components.CallbackBlobSet.AssertCalled(t, "RemoveBlob", key)
@@ -224,8 +223,7 @@ func TestDispatcherInsufficientSignatures(t *testing.T) {
 		}
 		close(done)
 	}()
-
-	sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx)
+	sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx, nil)
 	require.NoError(t, err)
 	err = components.Dispatcher.HandleSignatures(ctx, ctx, batchData, sigChan)
 	require.NoError(t, err)
@@ -327,8 +325,7 @@ func TestDispatcherInsufficientSignatures2(t *testing.T) {
 		}
 		close(done)
 	}()
-
-	sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx)
+	sigChan, batchData, err := components.Dispatcher.HandleBatch(ctx, nil)
 	require.NoError(t, err)
 
 	err = components.Dispatcher.HandleSignatures(ctx, ctx, batchData, sigChan)
@@ -395,7 +392,7 @@ func TestDispatcherMaxBatchSize(t *testing.T) {
 	ctx := context.Background()
 	expectedNumBatches := (numBlobs + int(maxBatchSize) - 1) / int(maxBatchSize)
 	for i := 0; i < expectedNumBatches; i++ {
-		batchData, err := components.Dispatcher.NewBatch(ctx, blockNumber)
+		batchData, err := components.Dispatcher.NewBatch(ctx, blockNumber, nil)
 		require.NoError(t, err)
 		if i < expectedNumBatches-1 {
 			require.Len(t, batchData.Batch.BlobCertificates, int(maxBatchSize))
@@ -409,7 +406,7 @@ func TestDispatcherMaxBatchSize(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	_, err := components.Dispatcher.NewBatch(ctx, blockNumber)
+	_, err := components.Dispatcher.NewBatch(ctx, blockNumber, nil)
 	require.ErrorContains(t, err, "no blobs to dispatch")
 
 	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, nil)
@@ -428,7 +425,7 @@ func TestDispatcherNewBatch(t *testing.T) {
 	require.Len(t, objs.blobCerts, 2)
 	ctx := context.Background()
 
-	batchData, err := components.Dispatcher.NewBatch(ctx, blockNumber)
+	batchData, err := components.Dispatcher.NewBatch(ctx, blockNumber, nil)
 	require.NoError(t, err)
 	batch := batchData.Batch
 	bhh, keys, state := batchData.BatchHeaderHash, batchData.BlobKeys, batchData.OperatorState
@@ -476,7 +473,7 @@ func TestDispatcherNewBatch(t *testing.T) {
 	}
 
 	// Attempt to create a batch with the same blobs
-	_, err = components.Dispatcher.NewBatch(ctx, blockNumber)
+	_, err = components.Dispatcher.NewBatch(ctx, blockNumber, nil)
 	require.ErrorContains(t, err, "no blobs to dispatch")
 
 	deleteBlobs(t, components.BlobMetadataStore, objs.blobKeys, [][32]byte{bhh})
@@ -497,7 +494,7 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 	ctx := context.Background()
 
 	// process one batch to set cursor
-	_, err := components.Dispatcher.NewBatch(ctx, blockNumber)
+	_, err := components.Dispatcher.NewBatch(ctx, blockNumber, nil)
 	require.NoError(t, err)
 	for i := 0; i < int(maxBatchSize); i++ {
 		err = blobMetadataStore.UpdateBlobStatus(ctx, objs.blobKeys[i], v2.GatheringSignatures)
@@ -523,7 +520,7 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	// process another batch (excludes stale blob)
-	batchData, err := components.Dispatcher.NewBatch(ctx, blockNumber)
+	batchData, err := components.Dispatcher.NewBatch(ctx, blockNumber, nil)
 	require.NoError(t, err)
 	require.Len(t, batchData.Batch.BlobCertificates, 1)
 	require.Equal(t, objs.blobKeys[maxBatchSize], batchData.BlobKeys[0])
@@ -531,7 +528,7 @@ func TestDispatcherNewBatchFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	// cursor should be reset and pick up stale blob
-	newBatchData, err := components.Dispatcher.NewBatch(ctx, blockNumber)
+	newBatchData, err := components.Dispatcher.NewBatch(ctx, blockNumber, nil)
 	require.NoError(t, err)
 	require.Len(t, batchData.Batch.BlobCertificates, 1)
 	require.Equal(t, staleKey, newBatchData.BlobKeys[0])
@@ -550,7 +547,7 @@ func TestDispatcherDedupBlobs(t *testing.T) {
 	components.BlobSet.On("Contains", objs.blobKeys[0]).Return(true)
 
 	ctx := context.Background()
-	batchData, err := components.Dispatcher.NewBatch(ctx, blockNumber)
+	batchData, err := components.Dispatcher.NewBatch(ctx, blockNumber, nil)
 	require.ErrorContains(t, err, "no blobs to dispatch")
 	require.Nil(t, batchData)
 

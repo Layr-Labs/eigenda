@@ -50,6 +50,9 @@ type Config struct {
 	EigenDAServiceManagerAddr       string
 	AuthPmtStateRequestMaxPastAge   time.Duration
 	AuthPmtStateRequestMaxFutureAge time.Duration
+
+	NtpServer       string
+	NtpSyncInterval time.Duration
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -130,6 +133,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EigenDAServiceManagerAddr:       ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		AuthPmtStateRequestMaxPastAge:   ctx.GlobalDuration(flags.AuthPmtStateRequestMaxPastAge.Name),
 		AuthPmtStateRequestMaxFutureAge: ctx.GlobalDuration(flags.AuthPmtStateRequestMaxFutureAge.Name),
+		NtpServer:                       ctx.GlobalString(flags.NtpServerFlag.Name),
+		NtpSyncInterval:                 ctx.GlobalDuration(flags.NtpSyncIntervalFlag.Name),
 	}
 	return config, nil
 }

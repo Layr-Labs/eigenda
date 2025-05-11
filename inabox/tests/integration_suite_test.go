@@ -11,10 +11,11 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
-	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
+	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
 	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -46,9 +47,9 @@ var (
 	ethClient           common.EthClient
 	rpcClient           common.RPCEthClient
 	mockRollup          *rollupbindings.ContractMockRollup
-	verifierContract    *verifierbindings.ContractEigenDACertVerifier
+	verifierContract    *verifierbindings.ContractEigenDACertVerifierV2
 	retrievalClient     clients.RetrievalClient
-	retrievalClientV2   clientsv2.RetrievalClient
+	retrievalClientV2   clientsv2.ValidatorClient
 	numConfirmations    int = 3
 	numRetries              = 0
 	chainReader         core.Reader
@@ -144,7 +145,7 @@ var _ = BeforeSuite(func() {
 
 		mockRollup, err = rollupbindings.NewContractMockRollup(gcommon.HexToAddress(testConfig.MockRollup), ethClient)
 		Expect(err).To(BeNil())
-		verifierContract, err = verifierbindings.NewContractEigenDACertVerifier(gcommon.HexToAddress(testConfig.EigenDA.CertVerifier), ethClient)
+		verifierContract, err = verifierbindings.NewContractEigenDACertVerifierV2(gcommon.HexToAddress(testConfig.EigenDA.CertVerifier), ethClient)
 		Expect(err).To(BeNil())
 		err = setupRetrievalClient(testConfig)
 		Expect(err).To(BeNil())
@@ -212,7 +213,8 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	if err != nil {
 		return err
 	}
-	retrievalClientV2 = clientsv2.NewRetrievalClient(logger, chainReader, cs, v, 10)
+	clientConfig := validator.DefaultClientConfig()
+	retrievalClientV2 = clientsv2.NewValidatorClient(logger, chainReader, cs, v, clientConfig, nil)
 
 	return nil
 }

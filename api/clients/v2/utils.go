@@ -8,8 +8,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// getGrpcDialOptions builds the gRPC dial options based on the useSecureGrpcFlag and maxMessageSize.
-func getGrpcDialOptions(useSecureGrpcFlag bool, maxMessageSize uint) []grpc.DialOption {
+// GetGrpcDialOptions builds the gRPC dial options based on the useSecureGrpcFlag and maxMessageSize.
+func GetGrpcDialOptions(useSecureGrpcFlag bool, maxMessageSize uint) []grpc.DialOption {
 	options := []grpc.DialOption{}
 	if useSecureGrpcFlag {
 		options = append(options, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})))
