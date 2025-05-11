@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"math"
 	"slices"
 	"strings"
@@ -65,7 +66,8 @@ type Dispatcher struct {
 	// blobSet keeps track of blobs that are being dispatched
 	// This is used to deduplicate blobs to prevent the same blob from being dispatched multiple times
 	// Blobs are removed from the queue when they are in a terminal state (Complete or Failed)
-	blobSet BlobSet
+	blobSet                BlobSet
+	controllerLivenessChan chan<- healthcheck.HeartbeatMessage
 }
 
 type batchData struct {
@@ -87,6 +89,7 @@ func NewDispatcher(
 	registry *prometheus.Registry,
 	beforeDispatch func(blobKey corev2.BlobKey) error,
 	blobSet BlobSet,
+	controllerLivenessChan chan<- healthcheck.HeartbeatMessage,
 ) (*Dispatcher, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
@@ -109,9 +112,10 @@ func NewDispatcher(
 		logger:            logger.With("component", "Dispatcher"),
 		metrics:           newDispatcherMetrics(registry),
 
-		cursor:         nil,
-		beforeDispatch: beforeDispatch,
-		blobSet:        blobSet,
+		cursor:                 nil,
+		beforeDispatch:         beforeDispatch,
+		blobSet:                blobSet,
+		controllerLivenessChan: controllerLivenessChan,
 	}, nil
 }
 
@@ -164,7 +168,9 @@ func (d *Dispatcher) HandleBatch(
 	ctx context.Context,
 	batchProbe *common.SequenceProbe,
 ) (chan core.SigningMessage, *batchData, error) {
-
+	// Signal Liveness to indicate no stall
+	healthcheck.SignalHeartbeat("dispatcher", d.controllerLivenessChan, d.logger)
+	
 	batchProbe.SetStage("get_reference_block")
 	currentBlockNumber, err := d.chainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
