@@ -170,12 +170,7 @@ func (d *Dispatcher) HandleBatch(
 ) (chan core.SigningMessage, *batchData, error) {
 	// Signal Liveness to indicate no stall
 	healthcheck.SignalHeartbeat("dispatcher", d.controllerLivenessChan, d.logger)
-
-	start := time.Now()
-	defer func() {
-		d.metrics.reportHandleBatchLatency(time.Since(start))
-	}()
-
+	
 	batchProbe.SetStage("get_reference_block")
 	currentBlockNumber, err := d.chainState.GetCurrentBlockNumber(ctx)
 	if err != nil {
