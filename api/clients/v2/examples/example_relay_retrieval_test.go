@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 )
 
 // This example demonstrates how to use the RelayPayloadRetriever to retrieve a payload from EigenDA, running on
@@ -58,23 +56,23 @@ func Example_relayPayloadRetrieval() {
 	fmt.Printf("Successfully retrieved payload\n")
 
 	// Create a cert verifier, to verify the certificate on chain
-	certVerifier, err := createCertVerifierV2()
+	certVerifier, err := createGenericCertVerifier()
 	if err != nil {
 		panic(fmt.Sprintf("create cert verifier: %v", err))
 	}
 
 	verificationCtx, verificationCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer verificationCancel()
-	// VerifyCertV2 is a view-only call to the `EigenDACertVerifier` contract. This call verifies that the provided cert
-	// is valid: if this call doesn't return an error, then the eigenDA network has attested to the availability of the
+	// CheckDACert is a view-only call to the `EigenDACertVerifier` contract. This call verifies that the provided cert
+	// is valid: if this call doesn't return an error, then the EigenDA network has attested to the availability of the
 	// dispersed blob.
 
-	asV2Cert, ok := eigenDACert.(*coretypes.EigenDACertV2)
-	if !ok {
-		panic("eigenDACert is not a V2 cert")
+	certBytes, err := eigenDACert.Serialize()
+	if err != nil {
+		panic(fmt.Sprintf("serialize cert: %v", err))
 	}
 
-	err = certVerifier.VerifyCertV2(verificationCtx, asV2Cert)
+	err = certVerifier.CheckDACert(verificationCtx, eigenDACert.ReferenceBlockNumber(), certBytes)
 	if err != nil {
 		panic(fmt.Sprintf("verify cert: %v", err))
 	}

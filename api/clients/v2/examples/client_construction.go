@@ -231,23 +231,6 @@ func createKzgProver() (*prover.Prover, error) {
 	return kzgProver, nil
 }
 
-func createCertVerifierV2() (*verification.CertVerifier, error) {
-	logger, err := createLogger()
-	if err != nil {
-		return nil, fmt.Errorf("create logger: %v", err)
-	}
-
-	ethClient, err := createEthClient(logger)
-	if err != nil {
-		return nil, fmt.Errorf("create eth client: %w", err)
-	}
-
-	return verification.NewCertVerifier(
-		logger,
-		ethClient,
-		verification.NewStaticCertVerifierAddressProvider(gethcommon.HexToAddress(certVerifierAddress)))
-}
-
 func createGenericCertVerifier() (*verification.GenericCertVerifier, error) {
 	logger, err := createLogger()
 	if err != nil {
