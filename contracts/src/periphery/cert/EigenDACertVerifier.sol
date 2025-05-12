@@ -15,37 +15,57 @@ import {EigenDACertVerificationLib as CertLib} from "src/periphery/cert/librarie
 contract EigenDACertVerifier is IEigenDACertVerifier {
     error InvalidSecurityThresholds();
 
-    IEigenDAThresholdRegistry public immutable eigenDAThresholdRegistry;
+    IEigenDAThresholdRegistry internal immutable _eigenDAThresholdRegistry;
 
-    IEigenDASignatureVerifier public immutable eigenDASignatureVerifier;
+    IEigenDASignatureVerifier internal immutable _eigenDASignatureVerifier;
 
-    DATypesV1.SecurityThresholds public securityThresholds;
+    DATypesV1.SecurityThresholds internal _securityThresholds;
 
-    bytes public quorumNumbersRequired;
+    bytes internal _quorumNumbersRequired;
 
     uint64 internal constant CERT_VERSION = 3;
 
     constructor(
-        IEigenDAThresholdRegistry _eigenDAThresholdRegistry,
-        IEigenDASignatureVerifier _eigenDASignatureVerifier,
-        DATypesV1.SecurityThresholds memory _securityThresholds,
-        bytes memory _quorumNumbersRequired
+        IEigenDAThresholdRegistry initEigenDAThresholdRegistry,
+        IEigenDASignatureVerifier initEigenDASignatureVerifier,
+        DATypesV1.SecurityThresholds memory initSecurityThresholds,
+        bytes memory initQuorumNumbersRequired
     ) {
         if (_securityThresholds.confirmationThreshold <= _securityThresholds.adversaryThreshold) {
             revert InvalidSecurityThresholds();
         }
-        eigenDAThresholdRegistry = _eigenDAThresholdRegistry;
-        eigenDASignatureVerifier = _eigenDASignatureVerifier;
-        securityThresholds = _securityThresholds;
-        quorumNumbersRequired = _quorumNumbersRequired;
+        _eigenDAThresholdRegistry = initEigenDAThresholdRegistry;
+        _eigenDASignatureVerifier = initEigenDASignatureVerifier;
+        _securityThresholds = initSecurityThresholds;
+        _quorumNumbersRequired = initQuorumNumbersRequired;
     }
 
     /// @inheritdoc IEigenDACertVerifierBase
     function checkDACert(bytes calldata certBytes) external view returns (uint8) {
         (CertLib.StatusCode status,) = CertLib.checkDACert(
-            eigenDAThresholdRegistry, eigenDASignatureVerifier, certBytes, securityThresholds, quorumNumbersRequired
+            _eigenDAThresholdRegistry, _eigenDASignatureVerifier, certBytes, _securityThresholds, _quorumNumbersRequired
         );
         return uint8(status);
+    }
+
+    /// @inheritdoc IEigenDACertVerifier
+    function eigenDAThresholdRegistry() external view returns (IEigenDAThresholdRegistry) {
+        return _eigenDAThresholdRegistry;
+    }
+
+    /// @inheritdoc IEigenDACertVerifier
+    function eigenDASignatureVerifier() external view returns (IEigenDASignatureVerifier) {
+        return _eigenDASignatureVerifier;
+    }
+
+    /// @inheritdoc IEigenDACertVerifier
+    function securityThresholds() external view returns (DATypesV1.SecurityThresholds memory) {
+        return _securityThresholds;
+    }
+
+    /// @inheritdoc IEigenDACertVerifier
+    function quorumNumbersRequired() external view returns (bytes memory) {
+        return _quorumNumbersRequired;
     }
 
     /// @inheritdoc IEigenDACertVerifier
