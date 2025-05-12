@@ -31,7 +31,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         DATypesV1.SecurityThresholds memory initSecurityThresholds,
         bytes memory initQuorumNumbersRequired
     ) {
-        if (_securityThresholds.confirmationThreshold <= _securityThresholds.adversaryThreshold) {
+        if (initSecurityThresholds.confirmationThreshold <= initSecurityThresholds.adversaryThreshold) {
             revert InvalidSecurityThresholds();
         }
         _eigenDAThresholdRegistry = initEigenDAThresholdRegistry;
