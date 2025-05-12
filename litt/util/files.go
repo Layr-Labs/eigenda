@@ -70,6 +70,52 @@ func Exists(path string) (bool, error) {
 	return false, fmt.Errorf("error checking if path %s exists: %w", path, err)
 }
 
+// CopyDirectoryRecursively creates a deep copy of the directory tree rooted at source and writes it to destination.
+// It preserves file permissions, timestamps, and properly handles symlinks.
+//
+// The function performs a recursive copy of all files and directories, maintaining the same
+// relative path structure and file metadata. If the destination directory exists, it will
+// merge the source content into it, potentially overwriting files with the same names.
+//
+// The function checks that the destination has appropriate write permissions before starting the copy.
+// If the destination directory doesn't exist, it verifies the parent directory has appropriate permissions.
+// For existing directories, it ensures they have write permissions before attempting to copy files into them.
+func CopyDirectoryRecursively(source string, destination string) error {
+	// Verify the destination is writable (or can be created)
+	if err := verifyDirectoryWritable(filepath.Dir(destination)); err != nil {
+		return err
+	}
+
+	return filepath.WalkDir(source, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return fmt.Errorf("failed to walk path %s: %w", path, err)
+		}
+
+		// Compute the path relative to source, then build the destination path
+		rel, err := filepath.Rel(source, path)
+		if err != nil {
+			return fmt.Errorf("failed to get relative path from %s to %s: %w", source, path, err)
+		}
+		target := filepath.Join(destination, rel)
+
+		info, err := d.Info()
+		if err != nil {
+			return fmt.Errorf("failed to get file info for %s: %w", path, err)
+		}
+
+		switch {
+		case d.IsDir():
+			return ensureDirectoryExists(target, info.Mode())
+
+		case (info.Mode() & os.ModeSymlink) != 0:
+			return copySymlink(path, target)
+
+		default:
+			return copyRegularFile(path, target, info.Mode(), info.ModTime())
+		}
+	})
+}
+
 // verifyDirectoryWritable checks if a directory exists and is writable.
 // Returns nil if the directory is writable, or an error explaining why it's not.
 // If the directory doesn't exist but its parent is writable, returns nil.
@@ -216,50 +262,4 @@ func ensureDirectoryExists(dirPath string, mode os.FileMode) error {
 	}
 
 	return nil
-}
-
-// CopyDirectoryRecursively creates a deep copy of the directory tree rooted at source and writes it to destination.
-// It preserves file permissions, timestamps, and properly handles symlinks.
-//
-// The function performs a recursive copy of all files and directories, maintaining the same
-// relative path structure and file metadata. If the destination directory exists, it will
-// merge the source content into it, potentially overwriting files with the same names.
-//
-// The function checks that the destination has appropriate write permissions before starting the copy.
-// If the destination directory doesn't exist, it verifies the parent directory has appropriate permissions.
-// For existing directories, it ensures they have write permissions before attempting to copy files into them.
-func CopyDirectoryRecursively(source string, destination string) error {
-	// Verify the destination is writable (or can be created)
-	if err := verifyDirectoryWritable(filepath.Dir(destination)); err != nil {
-		return err
-	}
-
-	return filepath.WalkDir(source, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return fmt.Errorf("failed to walk path %s: %w", path, err)
-		}
-
-		// Compute the path relative to source, then build the destination path
-		rel, err := filepath.Rel(source, path)
-		if err != nil {
-			return fmt.Errorf("failed to get relative path from %s to %s: %w", source, path, err)
-		}
-		target := filepath.Join(destination, rel)
-
-		info, err := d.Info()
-		if err != nil {
-			return fmt.Errorf("failed to get file info for %s: %w", path, err)
-		}
-
-		switch {
-		case d.IsDir():
-			return ensureDirectoryExists(target, info.Mode())
-
-		case (info.Mode() & os.ModeSymlink) != 0:
-			return copySymlink(path, target)
-
-		default:
-			return copyRegularFile(path, target, info.Mode(), info.ModTime())
-		}
-	})
 }

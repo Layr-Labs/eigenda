@@ -223,7 +223,7 @@ func NewDiskTable(
 		nextSegmentIndex,
 		segDirs,
 		metadata.GetShardingFactor(),
-		([16]byte)(salt),
+		salt,
 		config.Fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mutable segment: %w", err)
