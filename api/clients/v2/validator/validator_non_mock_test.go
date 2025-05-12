@@ -136,7 +136,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	}
 
 	// Configure the client to use our custom GRPC manager but real deserializer and decoder
-	config.UnsafeValidatorGRPCManagerFactory = func(logger logging.Logger, operators map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo) internal.ValidatorGRPCManager {
+	config.UnsafeValidatorGRPCManagerFactory = func(logger logging.Logger, sockets map[core.OperatorID]core.OperatorSocket) internal.ValidatorGRPCManager {
 		return grpcManager
 	}
 
@@ -266,7 +266,6 @@ func (m *customValidatorGRPCManager) DownloadChunks(
 	ctx context.Context,
 	key v2.BlobKey,
 	operatorID core.OperatorID,
-	quorumID core.QuorumID,
 ) (*grpcnode.GetChunksReply, error) {
 	// Make sure this is for a valid operator ID
 	frames, ok := m.operatorChunks[operatorID]

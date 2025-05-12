@@ -138,13 +138,15 @@ func (c *validatorClient) GetBlob(
 
 	minimumChunkCount := uint32(encodingParams.NumChunks) / blobParams.CodingRate
 
+	sockets := GetFlattenedOperatorSockets(operatorState.Operators)
+
 	worker, err := newRetrievalWorker(
 		ctx,
 		c.logger,
 		c.config,
 		c.connectionPool,
 		c.computePool,
-		c.config.UnsafeValidatorGRPCManagerFactory(c.logger, operatorState.Operators),
+		c.config.UnsafeValidatorGRPCManagerFactory(c.logger, sockets),
 		c.config.UnsafeChunkDeserializerFactory(assignments, c.verifier),
 		c.config.UnsafeBlobDecoderFactory(c.verifier),
 		assignments,
@@ -162,4 +164,17 @@ func (c *validatorClient) GetBlob(
 		return nil, fmt.Errorf("failed to download blob from validators: %w", err)
 	}
 	return data, nil
+}
+
+func GetFlattenedOperatorSockets(operatorsMap map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo) map[core.OperatorID]core.OperatorSocket {
+
+	operatorSockets := make(map[core.OperatorID]core.OperatorSocket)
+	for _, quorumOperators := range operatorsMap {
+		for opID, operator := range quorumOperators {
+			if _, ok := operatorSockets[opID]; !ok {
+				operatorSockets[opID] = operator.Socket
+			}
+		}
+	}
+	return operatorSockets
 }

@@ -193,7 +193,9 @@ func (s *ServerV2) validateAndStoreChunks(
 			return api.NewErrorInternal("failed to get blob key")
 		}
 
+		// The current sampling scheme will store the same chunks for all quorums, so we always use quorum 0 as the quorum key in storage.
 		quorum := core.QuorumID(0)
+
 		bundleKey, err := node.BundleKey(blobKey, quorum)
 		if err != nil {
 			return api.NewErrorInternal("failed to get bundle key")
@@ -337,8 +339,7 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 		return nil, api.NewErrorInvalidArg("invalid quorum ID")
 	}
 
-	// Ignore the quorum ID and always return the bundle for quorum 0
-	// quorumID := core.QuorumID(in.GetQuorumId())
+	// The current sampling scheme will store the same chunks for all quorums, so we always use quorum 0 as the quorum key in storage.
 	quorumID := core.QuorumID(0)
 
 	bundleKey, err := node.BundleKey(blobKey, quorumID)

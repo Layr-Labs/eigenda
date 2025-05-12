@@ -120,7 +120,6 @@ func TestBasicWorkflow(t *testing.T) {
 		ctx context.Context,
 		key v2.BlobKey,
 		operatorID core.OperatorID,
-		quorumID core.QuorumID,
 	) (*grpcnode.GetChunksReply, error) {
 
 		// verify we have the expected blob key
@@ -336,7 +335,6 @@ func TestDownloadTimeout(t *testing.T) {
 		ctx context.Context,
 		key v2.BlobKey,
 		operatorID core.OperatorID,
-		quorumID core.QuorumID,
 	) (*grpcnode.GetChunksReply, error) {
 		// verify we have the expected blob key
 		require.Equal(t, blobKey, key)
@@ -608,7 +606,6 @@ func TestFailedVerification(t *testing.T) {
 		ctx context.Context,
 		key v2.BlobKey,
 		operatorID core.OperatorID,
-		quorumID core.QuorumID,
 	) (*grpcnode.GetChunksReply, error) {
 
 		// verify we have the expected blob key

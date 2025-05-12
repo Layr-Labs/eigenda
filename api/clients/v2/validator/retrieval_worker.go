@@ -572,7 +572,7 @@ func (w *retrievalWorker) downloadChunks(operatorID core.OperatorID) {
 	ctx, cancel := context.WithTimeout(w.downloadAndVerifyCtx, w.config.DownloadTimeout)
 	defer cancel()
 
-	reply, err := w.validatorGRPCManager.DownloadChunks(ctx, w.blobKey, operatorID, 0)
+	reply, err := w.validatorGRPCManager.DownloadChunks(ctx, w.blobKey, operatorID)
 
 	w.downloadCompletedChan <- &downloadCompleted{
 		operatorID: operatorID,
