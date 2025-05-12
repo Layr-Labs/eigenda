@@ -72,14 +72,14 @@ func (s *Server) RetrieveBlob(ctx context.Context, req *pb.BlobRequest) (*pb.Blo
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, s.config.Timeout)
 	defer cancel()
 
-	blobHeaderWithoutPayment, err := blobHeader.GetBlobHeaderWithoutPayment()
+	BlobHeaderWithHashedPayment, err := blobHeader.GetBlobHeaderWithHashedPayment()
 	if err != nil {
 		return nil, err
 	}
 
 	data, err := s.retrievalClient.GetBlob(
 		ctxWithTimeout,
-		blobHeaderWithoutPayment,
+		BlobHeaderWithHashedPayment,
 		uint64(req.GetReferenceBlockNumber()))
 	if err != nil {
 		return nil, err

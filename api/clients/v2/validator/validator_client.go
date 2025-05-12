@@ -18,7 +18,7 @@ type ValidatorClient interface {
 	// GetBlob downloads chunks of a blob from operator network and reconstructs the blob.
 	GetBlob(
 		ctx context.Context,
-		blobHeader *corev2.BlobHeaderWithoutPayment,
+		blobHeader *corev2.BlobHeaderWithHashedPayment,
 		referenceBlockNumber uint64,
 	) ([]byte, error)
 }
@@ -67,7 +67,7 @@ func NewValidatorClient(
 
 func (c *validatorClient) GetBlob(
 	ctx context.Context,
-	blobHeader *corev2.BlobHeaderWithoutPayment,
+	blobHeader *corev2.BlobHeaderWithHashedPayment,
 	referenceBlockNumber uint64,
 ) ([]byte, error) {
 

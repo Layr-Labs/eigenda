@@ -25,7 +25,7 @@ func (_m *MockRetrievalClient) EXPECT() *MockRetrievalClient_Expecter {
 }
 
 // GetBlob provides a mock function for the type MockRetrievalClient
-func (_mock *MockRetrievalClient) GetBlob(ctx context.Context, blobHeader *v2.BlobHeaderWithoutPayment, referenceBlockNumber uint64) ([]byte, error) {
+func (_mock *MockRetrievalClient) GetBlob(ctx context.Context, blobHeader *v2.BlobHeaderWithHashedPayment, referenceBlockNumber uint64) ([]byte, error) {
 	ret := _mock.Called(ctx, blobHeader, referenceBlockNumber)
 
 	if len(ret) == 0 {
@@ -34,17 +34,17 @@ func (_mock *MockRetrievalClient) GetBlob(ctx context.Context, blobHeader *v2.Bl
 
 	var r0 []byte
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *v2.BlobHeaderWithoutPayment, uint64) ([]byte, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v2.BlobHeaderWithHashedPayment, uint64) ([]byte, error)); ok {
 		return returnFunc(ctx, blobHeader, referenceBlockNumber)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *v2.BlobHeaderWithoutPayment, uint64) []byte); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *v2.BlobHeaderWithHashedPayment, uint64) []byte); ok {
 		r0 = returnFunc(ctx, blobHeader, referenceBlockNumber)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *v2.BlobHeaderWithoutPayment, uint64) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *v2.BlobHeaderWithHashedPayment, uint64) error); ok {
 		r1 = returnFunc(ctx, blobHeader, referenceBlockNumber)
 	} else {
 		r1 = ret.Error(1)
@@ -65,9 +65,9 @@ func (_e *MockRetrievalClient_Expecter) GetBlob(ctx interface{}, blobHeader inte
 	return &MockRetrievalClient_GetBlob_Call{Call: _e.mock.On("GetBlob", ctx, blobHeader, referenceBlockNumber)}
 }
 
-func (_c *MockRetrievalClient_GetBlob_Call) Run(run func(ctx context.Context, blobHeader *v2.BlobHeaderWithoutPayment, referenceBlockNumber uint64)) *MockRetrievalClient_GetBlob_Call {
+func (_c *MockRetrievalClient_GetBlob_Call) Run(run func(ctx context.Context, blobHeader *v2.BlobHeaderWithHashedPayment, referenceBlockNumber uint64)) *MockRetrievalClient_GetBlob_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*v2.BlobHeaderWithoutPayment), args[2].(uint64))
+		run(args[0].(context.Context), args[1].(*v2.BlobHeaderWithHashedPayment), args[2].(uint64))
 	})
 	return _c
 }
@@ -77,7 +77,7 @@ func (_c *MockRetrievalClient_GetBlob_Call) Return(bytes []byte, err error) *Moc
 	return _c
 }
 
-func (_c *MockRetrievalClient_GetBlob_Call) RunAndReturn(run func(ctx context.Context, blobHeader *v2.BlobHeaderWithoutPayment, referenceBlockNumber uint64) ([]byte, error)) *MockRetrievalClient_GetBlob_Call {
+func (_c *MockRetrievalClient_GetBlob_Call) RunAndReturn(run func(ctx context.Context, blobHeader *v2.BlobHeaderWithHashedPayment, referenceBlockNumber uint64) ([]byte, error)) *MockRetrievalClient_GetBlob_Call {
 	_c.Call.Return(run)
 	return _c
 }

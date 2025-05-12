@@ -12,7 +12,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/core"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
 	nodemock "github.com/Layr-Labs/eigenda/node/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -231,15 +230,4 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	bp, ok = c.node.BlobVersionParams.Load().Get(1)
 	require.True(t, ok)
 	require.Equal(t, bp, blobParams2)
-}
-
-func bundleEqual(t *testing.T, expected, actual core.Bundle) {
-	for i := range expected {
-		frameEqual(t, expected[i], actual[i])
-	}
-}
-
-func frameEqual(t *testing.T, expected, actual *encoding.Frame) {
-	require.Equal(t, expected.Proof.Bytes(), actual.Proof.Bytes())
-	require.Equal(t, expected.Coeffs, actual.Coeffs)
 }

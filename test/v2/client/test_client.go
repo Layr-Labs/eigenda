@@ -501,11 +501,6 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		return fmt.Errorf("failed to read blob from relays: %w", err)
 	}
 
-	// blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	// commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to convert blob commitments: %w", err)
-	// }
 	blobHeader, err := coretypes.BlobHeaderBindingToInternal(&eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader)
 	if err != nil {
 		return fmt.Errorf("failed to bind blob header: %w", err)
@@ -614,7 +609,7 @@ func (c *TestClient) ReadBlobFromRelay(
 // The timeout provided is a timeout for each read from a quorum, not all reads as a whole.
 func (c *TestClient) ReadBlobFromValidators(
 	ctx context.Context,
-	header *corev2.BlobHeaderWithoutPayment,
+	header *corev2.BlobHeaderWithHashedPayment,
 	referenceBlockNumber uint32,
 	expectedPayloadBytes []byte,
 	timeout time.Duration,
@@ -626,9 +621,9 @@ func (c *TestClient) ReadBlobFromValidators(
 		defer cancel()
 	}
 
-	start := time.Now()
-
 	if validateAndDecode {
+
+		start := time.Now()
 
 		retrievedBlobBytes, err := c.validatorClient.GetBlob(
 			ctx,

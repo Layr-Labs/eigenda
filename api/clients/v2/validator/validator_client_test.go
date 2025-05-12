@@ -136,8 +136,6 @@ func TestBasicWorkflow(t *testing.T) {
 
 		downloadSet.Store(operatorID, struct{}{})
 
-		// TODO(Claude): Please apply this de-duplication logic to the other tests as well. It also needs to be performed for the
-		// framesSentToDecoding variable.
 		assgn := assignments[operatorID]
 		numChunks := uint32(0)
 		for _, i := range assgn.Indices {
@@ -232,7 +230,7 @@ func TestBasicWorkflow(t *testing.T) {
 		return decodedBytes, nil
 	}
 
-	blobHeader := &v2.BlobHeaderWithoutPayment{
+	blobHeader := &v2.BlobHeaderWithHashedPayment{
 		BlobVersion:         0,
 		QuorumNumbers:       []core.QuorumID{quorumID},
 		BlobCommitments:     MockCommitment(t),
@@ -453,7 +451,7 @@ func TestDownloadTimeout(t *testing.T) {
 		return decodedBytes, nil
 	}
 
-	blobHeader := &v2.BlobHeaderWithoutPayment{
+	blobHeader := &v2.BlobHeaderWithHashedPayment{
 		BlobVersion:         0,
 		QuorumNumbers:       []core.QuorumID{quorumID},
 		BlobCommitments:     MockCommitment(t),
@@ -731,7 +729,7 @@ func TestFailedVerification(t *testing.T) {
 		return decodedBytes, nil
 	}
 
-	blobHeader := &v2.BlobHeaderWithoutPayment{
+	blobHeader := &v2.BlobHeaderWithHashedPayment{
 		BlobVersion:         0,
 		QuorumNumbers:       []core.QuorumID{quorumID},
 		BlobCommitments:     MockCommitment(t),

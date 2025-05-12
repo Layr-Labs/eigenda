@@ -250,10 +250,10 @@ var _ = Describe("Inabox v2 Integration", func() {
 			}
 		}
 
-		blob1HeaderWithoutPayment, err := blobCert1.BlobHeader.GetBlobHeaderWithoutPayment()
+		blob1HeaderWithoutPayment, err := blobCert1.BlobHeader.GetBlobHeaderWithHashedPayment()
 		Expect(err).To(BeNil())
 
-		blob2HeaderWithoutPayment, err := blobCert2.BlobHeader.GetBlobHeaderWithoutPayment()
+		blob2HeaderWithoutPayment, err := blobCert2.BlobHeader.GetBlobHeaderWithHashedPayment()
 		Expect(err).To(BeNil())
 
 		// Test retrieval from DA network

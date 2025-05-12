@@ -119,7 +119,7 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 // retrieveBlobWithTimeout attempts to retrieve a blob from a given quorum, and times out based on config.RetrievalTimeout
 func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 	ctx context.Context,
-	header *corev2.BlobHeaderWithoutPayment,
+	header *corev2.BlobHeaderWithHashedPayment,
 	referenceBlockNumber uint32,
 ) (*coretypes.Blob, error) {
 

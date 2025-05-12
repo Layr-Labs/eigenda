@@ -82,7 +82,7 @@ type BlobHeader struct {
 	PaymentMetadata core.PaymentMetadata
 }
 
-type BlobHeaderWithoutPayment struct {
+type BlobHeaderWithHashedPayment struct {
 	BlobVersion BlobVersion
 
 	BlobCommitments encoding.BlobCommitments

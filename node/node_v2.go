@@ -75,7 +75,6 @@ func (n *Node) DownloadBundles(
 		relayIndex := rand.Intn(len(cert.RelayKeys))
 		relayKey := cert.RelayKeys[relayIndex]
 
-		// Old quorum loop started here
 		blobParams, ok := blobVersionParams.Get(cert.BlobHeader.BlobVersion)
 		if !ok {
 			return nil, nil, fmt.Errorf("blob version %d not found", cert.BlobHeader.BlobVersion)
@@ -106,7 +105,6 @@ func (n *Node) DownloadBundles(
 			assignment:     assgn,
 		})
 
-		// Old quorum loop ended here
 	}
 
 	probe.SetStage("download")
@@ -156,8 +154,8 @@ func (n *Node) DownloadBundles(
 				len(resp.bundles), len(resp.metadata))
 		}
 
-		for i, bundle := range resp.bundles {
-			metadata := resp.metadata[i]
+		for j, bundle := range resp.bundles {
+			metadata := resp.metadata[j]
 			blobShards[metadata.blobShardIndex].Bundle, err = new(core.Bundle).Deserialize(bundle)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to deserialize bundle: %v", err)

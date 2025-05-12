@@ -294,6 +294,7 @@ func (l *LoadGenerator) readBlobFromValidators(
 
 	blobHeader, err := coretypes.BlobHeaderBindingToInternal(&eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader)
 	if err != nil {
+		l.metrics.reportValidatorReadFailure()
 		l.client.GetLogger().Errorf("failed to bind blob header: %v", err)
 		return
 	}

@@ -212,21 +212,21 @@ func ComputeBlobKey(
 //
 // A BlobKey simply the hash of the BlobHeader
 func (b *BlobHeader) BlobKey() (BlobKey, error) {
-	blobHeaderWithoutPayment, err := b.GetBlobHeaderWithoutPayment()
+	BlobHeaderWithHashedPayment, err := b.GetBlobHeaderWithHashedPayment()
 	if err != nil {
 		return BlobKey{}, fmt.Errorf("get blob header without payment: %w", err)
 	}
 
-	return blobHeaderWithoutPayment.BlobKey()
+	return BlobHeaderWithHashedPayment.BlobKey()
 }
 
-func (b *BlobHeader) GetBlobHeaderWithoutPayment() (*BlobHeaderWithoutPayment, error) {
+func (b *BlobHeader) GetBlobHeaderWithHashedPayment() (*BlobHeaderWithHashedPayment, error) {
 	paymentMetadataHash, err := b.PaymentMetadata.Hash()
 	if err != nil {
 		return nil, fmt.Errorf("hash payment metadata: %w", err)
 	}
 
-	return &BlobHeaderWithoutPayment{
+	return &BlobHeaderWithHashedPayment{
 		BlobVersion:         b.BlobVersion,
 		BlobCommitments:     b.BlobCommitments,
 		QuorumNumbers:       b.QuorumNumbers,
@@ -234,7 +234,7 @@ func (b *BlobHeader) GetBlobHeaderWithoutPayment() (*BlobHeaderWithoutPayment, e
 	}, nil
 }
 
-func (b *BlobHeaderWithoutPayment) BlobKey() (BlobKey, error) {
+func (b *BlobHeaderWithHashedPayment) BlobKey() (BlobKey, error) {
 	return ComputeBlobKey(
 		b.BlobVersion,
 		b.BlobCommitments,

@@ -27,7 +27,6 @@ func mineAnvilBlocks(numBlocks int) {
 
 var _ = Describe("Inabox Integration", func() {
 	It("test end to end scenario", func() {
-		Skip("Don't run v1 test right now")
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 		defer cancel()
 

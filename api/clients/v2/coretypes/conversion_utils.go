@@ -307,18 +307,18 @@ func BlobCommitmentsBindingToInternal(
 }
 
 // BlobHeaderBindingToInternal converts a blob header from an eigenDA cert into the internal
-// corev2.BlobHeaderWithoutPayment type
+// corev2.BlobHeaderWithHashedPayment type
 func BlobHeaderBindingToInternal(
 	blobHeaderBinding *contractEigenDACertVerifier.EigenDATypesV2BlobHeaderV2,
-) (*corev2.BlobHeaderWithoutPayment, error) {
+) (*corev2.BlobHeaderWithHashedPayment, error) {
 
 	commitment, err := BlobCommitmentsBindingToInternal(&blobHeaderBinding.Commitment)
 	if err != nil {
 		return nil, fmt.Errorf("blob commitments binding to internal: %w", err)
 	}
 
-	blobHeader := corev2.BlobHeaderWithoutPayment{
-		BlobVersion:         uint16(blobHeaderBinding.Version),
+	blobHeader := corev2.BlobHeaderWithHashedPayment{
+		BlobVersion:         blobHeaderBinding.Version,
 		QuorumNumbers:       blobHeaderBinding.QuorumNumbers,
 		BlobCommitments:     *commitment,
 		PaymentMetadataHash: blobHeaderBinding.PaymentHeaderHash,

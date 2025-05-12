@@ -127,7 +127,7 @@ type retrievalWorker struct {
 	assignments map[core.OperatorID]v2.Assignment
 
 	// The blob header to download.
-	blobHeader *corev2.BlobHeaderWithoutPayment
+	blobHeader *corev2.BlobHeaderWithHashedPayment
 
 	// The blob key to download.
 	blobKey v2.BlobKey
@@ -228,7 +228,7 @@ func newRetrievalWorker(
 	assignments map[core.OperatorID]v2.Assignment,
 	minimumChunkCount uint32,
 	encodingParams *encoding.EncodingParams,
-	blobHeader *corev2.BlobHeaderWithoutPayment,
+	blobHeader *corev2.BlobHeaderWithHashedPayment,
 	blobKey v2.BlobKey,
 	probe *common.SequenceProbe,
 ) (*retrievalWorker, error) {
