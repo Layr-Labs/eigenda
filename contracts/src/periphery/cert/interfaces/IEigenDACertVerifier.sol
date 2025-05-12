@@ -19,7 +19,7 @@ interface IEigenDACertVerifier is IEigenDACertVerifierBase {
     /// @return The security thresholds used for certificate verification.
     function securityThresholds() external view returns (DATypesV1.SecurityThresholds memory);
 
-    /// @notice Returns the quorum numbers required for certificate verification.
+    /// @notice Returns the quorum numbers required for certificate verification. All required quorums must meet the stake threshold for a certificate.
     /// @return The quorum numbers required for certificate verification in bytes format.
     function quorumNumbersRequired() external view returns (bytes memory);
 
