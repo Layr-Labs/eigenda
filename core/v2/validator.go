@@ -44,42 +44,41 @@ func NewShardValidator(v encoding.Verifier, operatorID core.OperatorID, logger l
 	}
 }
 
-func (v *shardValidator) validateBlobParams(blob *BlobShard, blobParams *core.BlobVersionParameters, operatorState *core.OperatorState) ([]*encoding.Frame, *Assignment, error) {
+func (v *shardValidator) validateBlobParams(blob *BlobShard, blobParams *core.BlobVersionParameters, operatorState *core.OperatorState) (*Assignment, error) {
 
 	// Get the assignments for the quorum
 
 	blobKey, err := blob.BlobHeader.BlobKey()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	assignment, err := GetAssignment(operatorState, blobParams, blob.BlobHeader.QuorumNumbers, blobKey[:], v.operatorID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Validate the number of chunks
 	if assignment.NumChunks() == 0 {
-		return nil, nil, fmt.Errorf("operator %s has no chunks assigned", v.operatorID.Hex())
+		return nil, fmt.Errorf("operator %s has no chunks assigned", v.operatorID.Hex())
 	}
 	if assignment.NumChunks() != uint32(len(blob.Bundle)) {
-		return nil, nil, fmt.Errorf("number of chunks (%d) does not match assignment (%d)", len(blob.Bundle), assignment.NumChunks())
+		return nil, fmt.Errorf("number of chunks (%d) does not match assignment (%d)", len(blob.Bundle), assignment.NumChunks())
 	}
 
 	// Get the chunk length
 	chunkLength, err := GetChunkLength(uint32(blob.BlobHeader.BlobCommitments.Length), blobParams)
 	if err != nil {
-		return nil, nil, fmt.Errorf("invalid chunk length: %w", err)
+		return nil, fmt.Errorf("invalid chunk length: %w", err)
 	}
 
-	chunks := blob.Bundle
-	for _, chunk := range chunks {
+	for _, chunk := range blob.Bundle {
 		if uint32(chunk.Length()) != chunkLength {
-			return nil, nil, fmt.Errorf("%w: chunk length (%d) does not match quorum header (%d)", ErrChunkLengthMismatch, chunk.Length(), chunkLength)
+			return nil, fmt.Errorf("%w: chunk length (%d) does not match quorum header (%d)", ErrChunkLengthMismatch, chunk.Length(), chunkLength)
 		}
 	}
 
-	return chunks, &assignment, nil
+	return &assignment, nil
 }
 
 func (v *shardValidator) ValidateBatchHeader(ctx context.Context, header *BatchHeader, blobCerts []*BlobCertificate) error {
@@ -125,12 +124,11 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 		if !ok {
 			return fmt.Errorf("blob version %d not found", blob.BlobHeader.BlobVersion)
 		}
-		chunks, assignment, err := v.validateBlobParams(blob, blobParams, state)
+		assignment, err := v.validateBlobParams(blob, blobParams, state)
 		if err != nil {
 			return err
 		}
 
-		// TODO: Define params for the blob
 		params, err := GetEncodingParams(blob.BlobHeader.BlobCommitments.Length, blobParams)
 		if err != nil {
 			return err
@@ -144,6 +142,7 @@ func (v *shardValidator) ValidateBlobs(ctx context.Context, blobs []*BlobShard, 
 		}
 
 		indices := assignment.GetIndices()
+		chunks := blob.Bundle
 		samples := make([]encoding.Sample, len(chunks))
 		for ind := range chunks {
 			samples[ind] = encoding.Sample{

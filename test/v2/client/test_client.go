@@ -633,7 +633,9 @@ func (c *TestClient) ReadBlobFromValidators(
 			return fmt.Errorf("failed to read blob from validators, %s", err)
 		}
 
-		c.metrics.reportValidatorReadTime(time.Since(start), 0)
+		// Since retrieval is now agnostic to quorum ID, we default quorumID parameters to zero.
+		quorumID := core.QuorumID(0)
+		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
 
 		blobLengthSymbols := uint32(header.BlobCommitments.Length)
 		blob, err := coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)

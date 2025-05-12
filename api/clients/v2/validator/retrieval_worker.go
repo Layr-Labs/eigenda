@@ -326,7 +326,11 @@ func (w *retrievalWorker) updateChunkStatus(operatorID core.OperatorID, status c
 	numChunks := 0
 	for _, index := range w.assignments[operatorID].Indices {
 		_, ok := w.chunkOwner[index]
-		if !ok {
+		// If the new status is verified and the oldStatus is anything else, we move the chunk to the current operator
+		// as a new owner.
+		// TODO(@cody-littley): When setting a chunk to failed, if there is any other validator assigned to the chunk with a non-failed status,
+		// we should shift ownership to that validator.
+		if !ok || (status == verified && oldStatus != verified) {
 			w.chunkOwner[index] = operatorID
 		}
 		if w.chunkOwner[index] == operatorID {
