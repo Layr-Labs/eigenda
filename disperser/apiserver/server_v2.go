@@ -60,6 +60,8 @@ type DispersalServerV2 struct {
 
 	metricsConfig disperser.MetricsConfig
 	metrics       *metricsV2
+
+	ntpClock *core.NTPSyncedClock
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
@@ -76,6 +78,7 @@ func NewDispersalServerV2(
 	_logger logging.Logger,
 	registry *prometheus.Registry,
 	metricsConfig disperser.MetricsConfig,
+	ntpClock *core.NTPSyncedClock,
 ) (*DispersalServerV2, error) {
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")
@@ -120,6 +123,8 @@ func NewDispersalServerV2(
 
 		metricsConfig: metricsConfig,
 		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
+
+		ntpClock: ntpClock,
 	}, nil
 }
 

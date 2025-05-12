@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/retriever/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -21,7 +21,7 @@ type Server struct {
 	pb.UnimplementedRetrieverServer
 
 	config          *Config
-	retrievalClient clients.RetrievalClient
+	retrievalClient validator.ValidatorClient
 	chainState      core.ChainState
 	logger          logging.Logger
 	metrics         *retriever.Metrics
@@ -30,7 +30,7 @@ type Server struct {
 func NewServer(
 	config *Config,
 	logger logging.Logger,
-	retrievalClient clients.RetrievalClient,
+	retrievalClient validator.ValidatorClient,
 	chainState core.ChainState,
 ) *Server {
 	metrics := retriever.NewMetrics(config.MetricsConfig.HTTPPort, logger)

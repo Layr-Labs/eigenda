@@ -2,8 +2,11 @@ package util
 
 import (
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // VerifyFileProperties checks if a file has read/write permissions and is a regular file (if it exists),
@@ -65,4 +68,198 @@ func Exists(path string) (bool, error) {
 		return false, nil
 	}
 	return false, fmt.Errorf("error checking if path %s exists: %w", path, err)
+}
+
+// CopyDirectoryRecursively creates a deep copy of the directory tree rooted at source and writes it to destination.
+// It preserves file permissions, timestamps, and properly handles symlinks.
+//
+// The function performs a recursive copy of all files and directories, maintaining the same
+// relative path structure and file metadata. If the destination directory exists, it will
+// merge the source content into it, potentially overwriting files with the same names.
+//
+// The function checks that the destination has appropriate write permissions before starting the copy.
+// If the destination directory doesn't exist, it verifies the parent directory has appropriate permissions.
+// For existing directories, it ensures they have write permissions before attempting to copy files into them.
+func CopyDirectoryRecursively(source string, destination string) error {
+	// Verify the destination is writable (or can be created)
+	if err := verifyDirectoryWritable(filepath.Dir(destination)); err != nil {
+		return err
+	}
+
+	return filepath.WalkDir(source, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return fmt.Errorf("failed to walk path %s: %w", path, err)
+		}
+
+		// Compute the path relative to source, then build the destination path
+		rel, err := filepath.Rel(source, path)
+		if err != nil {
+			return fmt.Errorf("failed to get relative path from %s to %s: %w", source, path, err)
+		}
+		target := filepath.Join(destination, rel)
+
+		info, err := d.Info()
+		if err != nil {
+			return fmt.Errorf("failed to get file info for %s: %w", path, err)
+		}
+
+		switch {
+		case d.IsDir():
+			return ensureDirectoryExists(target, info.Mode())
+
+		case (info.Mode() & os.ModeSymlink) != 0:
+			return copySymlink(path, target)
+
+		default:
+			return copyRegularFile(path, target, info.Mode(), info.ModTime())
+		}
+	})
+}
+
+// verifyDirectoryWritable checks if a directory exists and is writable.
+// Returns nil if the directory is writable, or an error explaining why it's not.
+// If the directory doesn't exist but its parent is writable, returns nil.
+func verifyDirectoryWritable(dirPath string) error {
+	info, err := os.Stat(dirPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Directory doesn't exist, check parent permissions
+			parentDir := filepath.Dir(dirPath)
+			return verifyDirectoryWritable(parentDir)
+		}
+		return fmt.Errorf("failed to access path '%s': %w", dirPath, err)
+	}
+
+	// Path exists, verify it's a directory with write permissions
+	if !info.IsDir() {
+		return fmt.Errorf("path '%s' exists but is not a directory", dirPath)
+	}
+
+	if info.Mode()&0200 == 0 {
+		return fmt.Errorf("directory '%s' is not writable", dirPath)
+	}
+
+	return nil
+}
+
+// ensureParentDirExists ensures the parent directory of the given path exists and is writable.
+// Creates parent directories if they don't exist.
+func ensureParentDirExists(path string) error {
+	parentDir := filepath.Dir(path)
+
+	// Check if parent exists
+	info, err := os.Stat(parentDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Create parent directories if they don't exist
+			if err := os.MkdirAll(parentDir, 0755); err != nil {
+				return fmt.Errorf("failed to create parent directory %s: %w", parentDir, err)
+			}
+			return nil
+		}
+		return fmt.Errorf("failed to check parent directory %s: %w", parentDir, err)
+	}
+
+	// Parent exists, verify it's a directory with write permissions
+	if !info.IsDir() {
+		return fmt.Errorf("parent path %s is not a directory", parentDir)
+	}
+
+	if info.Mode()&0200 == 0 {
+		return fmt.Errorf("parent directory %s is not writable", parentDir)
+	}
+
+	return nil
+}
+
+// copyRegularFile copies a regular file from src to dst, preserving permissions and timestamps.
+func copyRegularFile(src string, dst string, fileMode os.FileMode, modTime time.Time) error {
+	// Ensure parent directory exists
+	if err := ensureParentDirExists(dst); err != nil {
+		return err
+	}
+
+	// Open source file
+	in, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open source file %s: %w", src, err)
+	}
+	defer in.Close()
+
+	// If there is already a file at the destination, remove it.
+	// This ensures we don't have issues with file permissions or existing symlinks
+	if _, err := os.Stat(dst); err == nil {
+		// File exists, remove it
+		if err := os.Remove(dst); err != nil {
+			return fmt.Errorf("failed to remove existing destination file %s: %w", dst, err)
+		}
+	}
+
+	// Create destination file
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, fileMode)
+	if err != nil {
+		return fmt.Errorf("failed to create destination file %s: %w", dst, err)
+	}
+	defer out.Close()
+
+	// Copy content
+	if _, err := io.Copy(out, in); err != nil {
+		return fmt.Errorf("failed to copy file content from %s to %s: %w", src, dst, err)
+	}
+
+	// Preserve timestamps
+	if err := os.Chtimes(dst, modTime, modTime); err != nil {
+		return fmt.Errorf("failed to preserve timestamps for %s: %w", dst, err)
+	}
+
+	return nil
+}
+
+// copySymlink copies a symlink from src to dst, preserving the link destination.
+func copySymlink(src string, dst string) error {
+	// Ensure parent directory exists
+	if err := ensureParentDirExists(dst); err != nil {
+		return err
+	}
+
+	// Read the symlink target
+	linkDest, err := os.Readlink(src)
+	if err != nil {
+		return fmt.Errorf("failed to read symlink %s: %w", src, err)
+	}
+
+	// Create the symlink
+	if err := os.Symlink(linkDest, dst); err != nil {
+		return fmt.Errorf("failed to create symlink at %s pointing to %s: %w", dst, linkDest, err)
+	}
+
+	return nil
+}
+
+// ensureDirectoryExists ensures a directory exists with the given permissions.
+// If the directory already exists, it verifies it has write permissions.
+func ensureDirectoryExists(dirPath string, mode os.FileMode) error {
+	// Check if directory already exists
+	info, err := os.Stat(dirPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Directory doesn't exist, create it
+			if err := os.MkdirAll(dirPath, mode); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", dirPath, err)
+			}
+			return nil
+		}
+		return fmt.Errorf("failed to check directory %s: %w", dirPath, err)
+	}
+
+	// Directory exists, verify it's actually a directory and has write permissions
+	if !info.IsDir() {
+		return fmt.Errorf("path %s exists but is not a directory", dirPath)
+	}
+
+	if info.Mode()&0200 == 0 {
+		return fmt.Errorf("directory %s is not writable", dirPath)
+	}
+
+	return nil
 }

@@ -186,7 +186,12 @@ func (s *ServerV2) validateAndStoreChunks(
 	probe *common.SequenceProbe,
 ) error {
 
-	batchData := make([]*node.BundleToStore, 0, len(rawBundles))
+	bundleCount := 0
+	for _, bundles := range rawBundles {
+		bundleCount += len(bundles.Bundles)
+	}
+
+	batchData := make([]*node.BundleToStore, 0, bundleCount)
 	for _, bundles := range rawBundles {
 		blobKey, err := bundles.BlobCertificate.BlobHeader.BlobKey()
 		if err != nil {
