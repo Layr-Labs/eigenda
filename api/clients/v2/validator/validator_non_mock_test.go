@@ -3,7 +3,6 @@ package validator
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
 	"math"
 	"runtime"
 	"sync"
@@ -40,21 +39,16 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 
 	// Set up test environment
 	rand := testrandom.NewTestRandom()
-	start := rand.Time()
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
-
-	fakeClock := atomic.Pointer[time.Time]{}
-	fakeClock.Store(&start)
-
 	config := DefaultClientConfig()
 	config.ControlLoopPeriod = 50 * time.Microsecond
-	config.TimeSource = func() time.Time {
-		return *fakeClock.Load()
-	}
+
 	config.DownloadPessimism = rand.Float64Range(1.0, 3.0)
-	config.VerificationPessimism = rand.Float64Range(1.0, 3.0)
+	config.VerificationPessimism = rand.Float64Range(1.0, config.DownloadPessimism)
+	config.PessimisticTimeout = time.Hour // we don't want to trigger timeouts in this test
+	config.DownloadTimeout = time.Hour    // we don't want to trigger timeouts in this test
 
 	// Set up workerpools
 	connectionPool := workerpool.New(8)
@@ -129,18 +123,16 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 
 	// Create necessary tracking for downloads
 	chunksDownloaded := sync.Map{}
-	chunksDownloadedCount := atomic.Uint32{}
 	downloadSet := sync.Map{}
 	framesSentToDecoding := sync.Map{}
 	framesSentToDecodingCount := atomic.Uint32{}
 
 	// Create a custom GRPC manager that simulates getting frames from nodes
 	grpcManager := &customValidatorGRPCManager{
-		operatorChunks:        operatorChunks,
-		downloadSet:           &downloadSet,
-		chunksDownloaded:      &chunksDownloaded,
-		chunksDownloadedCount: &chunksDownloadedCount,
-		assignments:           assignments,
+		operatorChunks:   operatorChunks,
+		downloadSet:      &downloadSet,
+		chunksDownloaded: &chunksDownloaded,
+		assignments:      assignments,
 	}
 
 	// Configure the client to use our custom GRPC manager but real deserializer and decoder
@@ -196,15 +188,14 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	// The number of downloads should exceed the pessimistic threshold by no more than the
 	// maximum chunk count of any individual operator
 	pessimisticDownloadThreshold := uint32(math.Ceil(float64(minimumChunkCount) * config.DownloadPessimism))
-	maxToDownload := uint32(math.Ceil(float64(pessimisticDownloadThreshold)*config.VerificationPessimism)) + maximumChunksPerValidator
-	fmt.Println("minimumChunkCount", minimumChunkCount)
-	fmt.Println("config.DownloadPessimism", config.DownloadPessimism)
-	fmt.Println("pessimisticDownloadThreshold", pessimisticDownloadThreshold)
-	fmt.Println("config.VerificationPessimism", config.VerificationPessimism)
-	fmt.Println("maximumChunksPerValidator", maximumChunksPerValidator)
-	fmt.Println("maxToDownload", maxToDownload)
-	fmt.Println("chunksDownloadedCount", chunksDownloadedCount.Load())
-	require.GreaterOrEqual(t, maxToDownload, chunksDownloadedCount.Load())
+	maxToDownload := pessimisticDownloadThreshold + maximumChunksPerValidator
+
+	chunksDownloadedCount := uint32(0)
+	chunksDownloaded.Range(func(k, v interface{}) bool {
+		chunksDownloadedCount++
+		return true
+	})
+	require.GreaterOrEqual(t, maxToDownload, chunksDownloadedCount)
 
 	// The number of chunks verified should exceed the pessimistic threshold by no more than the
 	// maximum chunk count of any individual operator
@@ -265,11 +256,10 @@ func makeTestBlob(t *testing.T, p encoding.Prover, version v2.BlobVersion, lengt
 
 // customValidatorGRPCManager simulates a network of validator nodes with pre-populated chunks
 type customValidatorGRPCManager struct {
-	operatorChunks        map[core.OperatorID][]*encoding.Frame
-	downloadSet           *sync.Map
-	chunksDownloaded      *sync.Map
-	chunksDownloadedCount *atomic.Uint32
-	assignments           map[core.OperatorID]v2.Assignment
+	operatorChunks   map[core.OperatorID][]*encoding.Frame
+	downloadSet      *sync.Map
+	chunksDownloaded *sync.Map
+	assignments      map[core.OperatorID]v2.Assignment
 }
 
 func (m *customValidatorGRPCManager) DownloadChunks(
@@ -293,15 +283,9 @@ func (m *customValidatorGRPCManager) DownloadChunks(
 
 	// De-duplicate chunks when counting
 	assgn := m.assignments[operatorID]
-	numChunks := uint32(0)
 	for _, i := range assgn.Indices {
-		_, ok = m.chunksDownloaded.Load(i)
-		if !ok {
-			m.chunksDownloaded.Store(i, struct{}{})
-			numChunks++
-		}
+		m.chunksDownloaded.Store(i, struct{}{})
 	}
-	m.chunksDownloadedCount.Add(numChunks)
 
 	// Convert frames to bytes for gRPC response
 	chunks := make([][]byte, len(frames))

@@ -53,6 +53,25 @@ func NewValidatorClient(
 		config.ComputePoolSize = 1
 	}
 
+	if config.DownloadPessimism < 1 {
+		logger.Warnf(
+			"Download pessimism %f is less than 1, setting download pessimism to 1", config.DownloadPessimism)
+		config.DownloadPessimism = 1
+	}
+	if config.VerificationPessimism < 1 {
+		logger.Warnf(
+			"Verification pessimism %f is less than 1, setting verification pessimism to 1",
+			config.VerificationPessimism)
+		config.VerificationPessimism = 1
+	}
+
+	if config.DownloadPessimism < config.VerificationPessimism {
+		logger.Warnf(
+			"Download pessimism %f is less than verification pessimism %f, setting download pessimism to %f",
+			config.DownloadPessimism, config.VerificationPessimism, config.VerificationPessimism)
+		config.DownloadPessimism = config.VerificationPessimism
+	}
+
 	return &validatorClient{
 		logger:         logger.With("component", "ValidatorClient"),
 		ethClient:      ethClient,
