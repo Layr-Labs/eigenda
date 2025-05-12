@@ -41,9 +41,13 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
     }
 
     /// @inheritdoc IEigenDACertVerifierBase
-    function checkDACert(bytes calldata certBytes) external view returns (uint8) {
+    function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8) {
         (CertLib.StatusCode status,) = CertLib.checkDACert(
-            _eigenDAThresholdRegistry, _eigenDASignatureVerifier, certBytes, _securityThresholds, _quorumNumbersRequired
+            _eigenDAThresholdRegistry,
+            _eigenDASignatureVerifier,
+            abiEncodedCert,
+            _securityThresholds,
+            _quorumNumbersRequired
         );
         return uint8(status);
     }

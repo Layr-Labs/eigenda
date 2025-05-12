@@ -22,8 +22,8 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
     /// IEigenDACertVerifierRouter ///
 
     /// @inheritdoc IEigenDACertVerifierBase
-    function checkDACert(bytes calldata certBytes) external view returns (uint8) {
-        return IEigenDACertVerifier(getCertVerifierAt(_getRBN(certBytes[32:]))).checkDACert(certBytes);
+    function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8) {
+        return IEigenDACertVerifier(getCertVerifierAt(_getRBN(abiEncodedCert[32:]))).checkDACert(abiEncodedCert);
     }
 
     function getCertVerifierAt(uint32 referenceBlockNumber) public view returns (address) {
