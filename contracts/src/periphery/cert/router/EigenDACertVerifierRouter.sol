@@ -18,7 +18,6 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
     error ABNNotInFuture(uint32 activationBlockNumber);
     error ABNNotGreaterThanLast(uint32 activationBlockNumber);
     error InvalidCertLength();
-    error NoCertVerifierFound(uint32 referenceBlockNumber);
 
     /// IEigenDACertVerifierRouter ///
 
@@ -37,7 +36,6 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
         _transferOwnership(_initialOwner);
         // Add a default cert verifier at block 0, which will be used for all blocks before the first ABN.
         _addCertVerifier(0, certVerifier);
-        emit CertVerifierAdded(0, certVerifier);
     }
 
     function addCertVerifier(uint32 activationBlockNumber, address certVerifier) external onlyOwner {
