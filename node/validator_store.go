@@ -23,7 +23,7 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/sys/unix"
+	"github.com/shirou/gopsutil/mem"
 	"golang.org/x/time/rate"
 )
 
@@ -278,11 +278,17 @@ func NewValidatorStore(
 			return nil, fmt.Errorf("failed to get chunks table: %w", err)
 		}
 
-		var rlim unix.Rlimit
-		if err := unix.Getrlimit(unix.RLIMIT_AS, &rlim); err != nil {
-			return nil, fmt.Errorf("failed to get rlimit: %w", err)
+		//var rlim unix.Rlimit
+		//if err := unix.Getrlimit(unix.RLIMIT_AS, &rlim); err != nil {
+		//	return nil, fmt.Errorf("failed to get rlimit: %w", err)
+		//}
+		//maxMemory := rlim.Cur
+
+		vm, err := mem.VirtualMemory()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get memory statistics: %w", err)
 		}
-		maxMemory := rlim.Cur
+		maxMemory := vm.Total
 
 		writeCacheSize := uint64(0)
 		if config.LittDBWriteCacheSizeGB > 0 {
