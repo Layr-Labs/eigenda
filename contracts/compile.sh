@@ -30,6 +30,7 @@ contracts="PaymentVault \
   DelegationManager \
   BitmapUtils \
   OperatorStateRetriever \
+  EigenDAStateRetriever \
   RegistryCoordinator \
   BLSApkRegistry \
   IIndexRegistry \
