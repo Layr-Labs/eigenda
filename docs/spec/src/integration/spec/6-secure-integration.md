@@ -12,17 +12,24 @@ When deriving a rollup chain by running its derivation pipeline, only EigenDA ce
 
 ### 1. RBN Recency Validation
 
-First, we assume that every rollup stack has a mechanism to force blobs to be included in the rollup’s batcher-inbox in a timely matter, such that the cert's blob is still available on EigenDA for long enough to cover the fraud proof duration (typically 7 days), or long enough to be downloadable by zk rollup participants.
+This check is related to time guarantees. Timing is especially important for optimistic rollups where 
+the blobs need to be available during an interactive fraud proof window in order to 
+protect the rollup's safety.
 
-> For example, optimism has a [sequencerWindow](https://docs.optimism.io/stack/rollup/derivation-pipeline#sequencer-window) which forces batches to land onchain in a timely fashion (12h). This indirectly also forces EigenDA certs to land onchain in a timely fashion. Therefore, it is safe to assume that the certs land onchain < SequencerWindowSize after having been signed.
+![](../../assets/integration/recency-window-timeline.png)
+
+Looking at the timing diagram above, in order for the blobs to be available during the entire challenge period, we need the fraud proof game to start < 7days after the cert is posted to the rollup's batcher inbox. In order to uphold this guarantee, what we need to do is simply to have rollups' derivation pipelines reject certs whose DA availability period started a long time ago. However, from the cert itself, there is no way to know when the cert was signed and made available. The only information available on the cert itself is cert.RBN, the reference block number chosen by the disperser at which to anchor operator stakes. But that happens to be before validators sign, so it is enough to bound how far that can be from the cert's inclusion block.
+
+Rollups must thus enforce that
+```
+cert.L1InclusionBlock - cert.RBN < RecencyWindowSize
+```
+
+This has a second security implication. A malicious EigenDA disperser could have chosen a reference block number (RBN) that is very old, where the stake of operators was very different from the current one, due to operators withdrawing stake for example.
+
+> To give a concrete example with a rollup stack, optimism has a [sequencerWindow](https://docs.optimism.io/stack/rollup/derivation-pipeline#sequencer-window) which forces batches to land onchain in a timely fashion (12h). This filtering however, happens in the [BatchQueue](https://specs.optimism.io/protocol/derivation.html#batch-queue) stage of the derivation pipeline (DP), and doesn't prevent the DP being stalled in the [L1Retrieval](https://specs.optimism.io/protocol/derivation.html#l1-retrieval) stage by an old cert having been submitted whose blob is no longer available on EigenDA. To prevent this, we need the recencyWindow filtering to happen during the L1Retrieval stage of the DP.
 >
-> OP stack rollups thus need to make sure that `SequencerWindow` << 14 days.
-
-This guarantee alone however is not enough, because the EigenDA disperser could have chosen a reference block number (RBN) that is very old, such that the stake of operators does not represent the true current value. Because EigenDA V2 doesn't pessimistically bridge certs onchain like EigenDA V1, enforcing RBN to not be too old is thus the responsibility of the rollup.
-
-> Rollups must enforce that `cert.RBN` > `cert.L1InclusionBlock` - `RecencyWindowSize`
-
-We suggest using the same value as the `SequencerWindowSize` for the `RecencyWindowSize`, namely 12h.
+> Despite its semantics being slightly different, sequencerWindow and recencyWindow are related concepts, and in order to not force another config change on op altda forks, we suggest using the same value as the `SequencerWindowSize` for the `RecencyWindowSize`, namely 12h.
 
 ![image.png](../../assets/integration/cert-rbn-recency-window.png)
 
