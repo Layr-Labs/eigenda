@@ -10,7 +10,6 @@ import (
 	grpcnode "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
-	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -127,7 +126,7 @@ type retrievalWorker struct {
 	assignments map[core.OperatorID]v2.Assignment
 
 	// The blob header to download.
-	blobHeader *corev2.BlobHeaderWithHashedPayment
+	blobHeader *v2.BlobHeaderWithHashedPayment
 
 	// The blob key to download.
 	blobKey v2.BlobKey
@@ -185,7 +184,13 @@ type retrievalWorker struct {
 	// Counts the number of chunks in each status.
 	chunkStatusCounts map[chunkStatus]int
 
-	// The status of each chunk
+	// For the purposes of retrieving this blob, the validator that we have decided to mark as being the "owner".
+	// Although it's possible that a particular chunk might be available from more than one validator, we only
+	// ever attempt to fetch any particular chunk from a single source.
+	// Our assignment scheme allows for chunk indices to be assigned to multiple validators. The retrieval worker
+	// will track only a single status for each chunk index, by assigning each chunk index to a single validator.
+	// When a validator's status is updated, we only update the status for the chunks for which it is the owner.
+	// Redundant chunks may be downloaded and verified by the worker, but they will not count toward status counts.
 	chunkOwner map[uint32]core.OperatorID
 }
 
@@ -228,7 +233,7 @@ func newRetrievalWorker(
 	assignments map[core.OperatorID]v2.Assignment,
 	minimumChunkCount uint32,
 	encodingParams *encoding.EncodingParams,
-	blobHeader *corev2.BlobHeaderWithHashedPayment,
+	blobHeader *v2.BlobHeaderWithHashedPayment,
 	blobKey v2.BlobKey,
 	probe *common.SequenceProbe,
 ) (*retrievalWorker, error) {
