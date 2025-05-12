@@ -67,9 +67,6 @@ type signatureReceiver struct {
 	// The number of attestations received and processed so far.
 	attestationUpdateCount int
 
-	// The number of operators in the indexedOperatorState.
-	operatorCount int
-
 	// A ticker used to periodically yield QuorumAttestations.
 	ticker *time.Ticker
 
@@ -132,7 +129,6 @@ func ReceiveSignatures(
 		tickInterval:                           tickInterval,
 		significantSigningThresholdPercentage:  significantSigningThresholdPercentage,
 		significantSigningThresholdReachedTime: significantSigningThresholdReachedTime,
-		operatorCount:                          len(indexedOperatorState.IndexedOperators),
 		ticker:                                 time.NewTicker(tickInterval),
 	}
 
@@ -157,15 +153,19 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 
 	sr.attestationUpdateStart = time.Now()
 
+	operatorCount := len(sr.indexedOperatorState.IndexedOperators)
+
 	// we expect a single SigningMessage from each operator
-	for len(sr.signatureMessageReceived) < sr.operatorCount {
+	for len(sr.signatureMessageReceived) < operatorCount {
 		breakLoop := false
 		select {
 		case <-ctx.Done():
 			sr.logger.Infof(
 				"global batch attestation timeout exceeded for batch %s. Received and processed %d/%d signing "+
 					"messages. %d of the signing messages caused an error during processing", hex.EncodeToString(
-					sr.batchHeaderHash[:]), len(sr.signatureMessageReceived), sr.operatorCount, sr.errorCount)
+					sr.batchHeaderHash[:]), len(sr.signatureMessageReceived), operatorCount, sr.errorCount)
+			breakLoop = true
+			break
 		case signingMessage, ok := <-sr.signingMessageChan:
 			if !ok {
 				sr.logger.Errorf(
@@ -173,7 +173,7 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 						"messages. %d of the signing messages caused an error during processing",
 					hex.EncodeToString(sr.batchHeaderHash[:]),
 					len(sr.signatureMessageReceived),
-					sr.operatorCount,
+					operatorCount,
 					sr.errorCount)
 				breakLoop = true
 				break
@@ -321,10 +321,11 @@ func (sr *signatureReceiver) processSigningMessage(
 func (sr *signatureReceiver) buildAndSubmitAttestation(attestationChan chan *core.QuorumAttestation) {
 
 	if !sr.newSignaturesGathered {
-		// now work to be done
+		// no work to be done
 		return
 	}
 	sr.newSignaturesGathered = false
+	sr.attestationUpdateCount++
 
 	submitAttestationStart := time.Now()
 	defer func() {
@@ -332,7 +333,6 @@ func (sr *signatureReceiver) buildAndSubmitAttestation(attestationChan chan *cor
 			sr.metrics.reportAttestationBuildingLatency(time.Since(submitAttestationStart))
 		}
 	}()
-	sr.attestationUpdateCount++
 
 	nonSignerMap := make(map[core.OperatorID]*core.G1Point)
 	// operators that aren't in the validSignerMap are "non-signers"
@@ -532,7 +532,7 @@ func getSignedPercentage(signedStake *big.Int, totalStake *big.Int) uint8 {
 // Returns true if the threshold was crossed, false otherwise. If called after the threshold was crossed, this
 // method always returns false.
 func (sr *signatureReceiver) checkSigningPercentage(quorumID core.QuorumID) bool {
-	if sr.significantSigningThresholdPercentage == 0 { // TODO handle nil metrics
+	if sr.significantSigningThresholdPercentage == 0 {
 		// if significantSigningThresholdPercentage is 0, skip
 		return false
 	}
