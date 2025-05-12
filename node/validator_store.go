@@ -3,9 +3,9 @@ package node
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"math/rand"
 	"os"
 	"path"
 	"strconv"
@@ -112,7 +112,7 @@ type validatorStore struct {
 	duplicateRequestLock *common.IndexLock
 
 	// The salt used to prevent an attacker from causing hash collisions in the duplicate request lock.
-	duplicateRequestSalt uint32
+	duplicateRequestSalt [16]byte
 
 	// A flag indicating whether the migration is complete. Used to prevent a double migration race condition
 	// (which is possible only in a unit test).
@@ -329,6 +329,12 @@ func NewValidatorStore(
 		}
 	}
 
+	salt := [16]byte{}
+	_, err = rand.Read(salt[:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random salt: %v", err)
+	}
+
 	hotReadRateLimiter := rate.NewLimiter(
 		rate.Limit(config.GetChunksHotCacheReadLimitMB*units.MiB),
 		int(config.GetChunksHotBurstLimitMB*units.MiB))
@@ -348,7 +354,7 @@ func NewValidatorStore(
 		ttl:                   ttl,
 		migrationCompleteTime: migrationComplete,
 		duplicateRequestLock:  common.NewIndexLock(1024),
-		duplicateRequestSalt:  rand.Uint32(),
+		duplicateRequestSalt:  salt,
 		hotReadRateLimiter:    hotReadRateLimiter,
 		coldReadRateLimiter:   coldReadRateLimiter,
 	}
@@ -430,7 +436,8 @@ func (s *validatorStore) storeBatchLittDB(batchData []*BundleToStore) (uint64, e
 
 		go func() {
 			// Grab a lock on the hash of the blob. This protects against duplicate writes of the same blob.
-			lockIndex := uint64(util.HashKey(bundleKeyBytes[:], s.duplicateRequestSalt))
+			hash := util.HashKey(bundleKeyBytes[:], s.duplicateRequestSalt)
+			lockIndex := uint64(hash)
 			s.duplicateRequestLock.Lock(lockIndex)
 			defer s.duplicateRequestLock.Unlock(lockIndex)
 
