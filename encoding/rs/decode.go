@@ -24,16 +24,27 @@ func (e *Encoder) Decode(frames []FrameCoeffs, indices []uint64, maxInputSize ui
 		return nil, err
 	}
 
-	numSys := encoding.GetNumSys(maxInputSize, g.ChunkLength)
+	if len(frames) != len(indices) {
+		return nil, errors.New("number of frames must equal number of indices")
+	}
 
-	if uint64(len(frames)) < numSys {
+	// Remove duplicates
+	frameMap := make(map[uint64]FrameCoeffs, len(indices))
+	for i, index := range indices {
+		_, ok := frameMap[index]
+		if !ok {
+			frameMap[index] = frames[i]
+		}
+	}
+
+	numSys := encoding.GetNumSys(maxInputSize, g.ChunkLength)
+	if uint64(len(frameMap)) < numSys {
 		return nil, errors.New("number of frame must be sufficient")
 	}
 
 	samples := make([]*fr.Element, g.NumEvaluations())
 	// copy evals based on frame coeffs into samples
-	for i, d := range indices {
-		f := frames[i]
+	for d, f := range frameMap {
 		e, err := GetLeadingCosetIndex(d, g.NumChunks)
 		if err != nil {
 			return nil, err
