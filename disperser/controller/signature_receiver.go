@@ -16,7 +16,7 @@ import (
 // signatureReceiver is a struct for receiving SigningMessages for a single batch. It should never be instantiated
 // manually: it exists only as a helper struct for the ReceiveSignatures method.
 type signatureReceiver struct {
-	logger  logging.Logger
+	logger logging.Logger
 	// metrics may be nil, in which case no metrics will be reported
 	metrics *dispatcherMetrics
 
@@ -60,6 +60,18 @@ type signatureReceiver struct {
 	// significantSigningThresholdReachedTime tracks when each quorum's signing percentage first reached or exceeded the
 	// significantSigningThresholdPercentage
 	significantSigningThresholdReachedTime map[core.QuorumID]time.Time
+
+	// Tracks whether there are new signatures that have been gathered but not aggregated.
+	newSignaturesGathered bool
+
+	// The number of attestations received and processed so far.
+	attestationUpdateCount int
+
+	// A ticker used to periodically yield QuorumAttestations.
+	ticker *time.Ticker
+
+	// The number of errors encountered while processing SigningMessages.
+	errorCount int
 }
 
 // ReceiveSignatures receives SigningMessages over the signingMessageChan, and yields QuorumAttestations produced
@@ -117,6 +129,7 @@ func ReceiveSignatures(
 		tickInterval:                           tickInterval,
 		significantSigningThresholdPercentage:  significantSigningThresholdPercentage,
 		significantSigningThresholdReachedTime: significantSigningThresholdReachedTime,
+		ticker:                                 time.NewTicker(tickInterval),
 	}
 
 	attestationChan := make(chan *core.QuorumAttestation, len(indexedOperatorState.IndexedOperators))
@@ -127,24 +140,20 @@ func ReceiveSignatures(
 
 // receiveSigningMessages receives SigningMessages, and sends QuorumAttestations to the input attestationChan
 func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attestationChan chan *core.QuorumAttestation) {
-	// this ticker causes QuorumAttestations to be sent periodically
-	ticker := time.NewTicker(sr.tickInterval)
-	defer ticker.Stop()
+	defer sr.ticker.Stop()
 	defer close(attestationChan)
 
 	// the number of attestations submitted by this method
-	attestationUpdateCount := 0
 	defer func() {
 		if sr.metrics != nil {
 			sr.reportThresholdSignedToDoneLatency()
-			sr.metrics.reportAttestationUpdateCount(float64(attestationUpdateCount))
+			sr.metrics.reportAttestationUpdateCount(float64(sr.attestationUpdateCount))
 		}
 	}()
 
-	operatorCount := len(sr.indexedOperatorState.IndexedOperators)
-	errorCount := 0
-	newSignaturesGathered := false
 	sr.attestationUpdateStart = time.Now()
+
+	operatorCount := len(sr.indexedOperatorState.IndexedOperators)
 
 	// we expect a single SigningMessage from each operator
 	for len(sr.signatureMessageReceived) < operatorCount {
@@ -153,9 +162,10 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 		case <-ctx.Done():
 			sr.logger.Infof(
 				"global batch attestation timeout exceeded for batch %s. Received and processed %d/%d signing "+
-					"messages. %d of the signing messages caused an error during processing",
-				hex.EncodeToString(sr.batchHeaderHash[:]), len(sr.signatureMessageReceived), operatorCount, errorCount)
+					"messages. %d of the signing messages caused an error during processing", hex.EncodeToString(
+					sr.batchHeaderHash[:]), len(sr.signatureMessageReceived), operatorCount, sr.errorCount)
 			breakLoop = true
+			break
 		case signingMessage, ok := <-sr.signingMessageChan:
 			if !ok {
 				sr.logger.Errorf(
@@ -164,66 +174,19 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 					hex.EncodeToString(sr.batchHeaderHash[:]),
 					len(sr.signatureMessageReceived),
 					operatorCount,
-					errorCount)
+					sr.errorCount)
 				breakLoop = true
 				break
 			}
 
-			if signingMessage.TimeReceived.IsZero() {
-				sr.logger.Errorf("signing message from %s time received is zero in batch %s. "+
-					"This shouldn't be possible.",
-					signingMessage.Operator.Hex(),
-					hex.EncodeToString(sr.batchHeaderHash[:]))
-			} else if sr.metrics != nil {
-				sr.metrics.reportSigningMessageChannelLatency(time.Since(signingMessage.TimeReceived))
-			}
+			sr.handleNextSignature(signingMessage, attestationChan)
 
-			indexedOperatorInfo, found := sr.indexedOperatorState.IndexedOperators[signingMessage.Operator]
-			if !found {
-				sr.logger.Error("operator not found in state",
-					"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
-					"operatorID", signingMessage.Operator.Hex(),
-					"attestationLatencyMs", signingMessage.AttestationLatencyMs)
-				continue
-			}
-
-			if seen := sr.signatureMessageReceived[signingMessage.Operator]; seen {
-				sr.logger.Error("duplicate message from operator",
-					"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
-					"operatorID", signingMessage.Operator.Hex(),
-					"attestationLatencyMs", signingMessage.AttestationLatencyMs)
-				continue
-			}
-
-			// this map records messages received, whether the messages are valid or not
-			sr.signatureMessageReceived[signingMessage.Operator] = true
-
-			err := sr.processSigningMessage(signingMessage, indexedOperatorInfo)
-			if err != nil {
-				errorCount++
-				sr.logger.Warn("error processing signing message",
-					"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
-					"operatorID", signingMessage.Operator.Hex(),
-					"attestationLatencyMs", signingMessage.AttestationLatencyMs,
-					"error", err)
-				continue
-			}
-
-			// record that we've received a valid message from this operator
-			sr.validSignerMap[signingMessage.Operator] = true
-			newSignaturesGathered = true
 		// The ticker case is intentionally ordered after the message receiving case. If there are SigningMessages
 		// waiting to be handled, we shouldn't delay their processing for the sake of yielding a QuorumAttestation.
 		// The most likely time for there to be a backlog of SigningMessages is early-on in the signature gathering
 		// process, when we are unlikely to have reached a threshold of signatures anyway.
-		case <-ticker.C:
-			if !newSignaturesGathered {
-				continue
-			}
-
+		case <-sr.ticker.C:
 			sr.buildAndSubmitAttestation(attestationChan)
-			attestationUpdateCount++
-			newSignaturesGathered = false
 		}
 
 		if breakLoop {
@@ -231,9 +194,63 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 		}
 	}
 
-	if newSignaturesGathered {
+	// Aggregate any remaining signatures and submit an attestation.
+	sr.buildAndSubmitAttestation(attestationChan)
+}
+
+func (sr *signatureReceiver) handleNextSignature(
+	signingMessage core.SigningMessage,
+	attestationChan chan *core.QuorumAttestation,
+) {
+
+	if signingMessage.TimeReceived.IsZero() {
+		sr.logger.Errorf("signing message from %s time received is zero in batch %s. "+
+			"This shouldn't be possible.",
+			signingMessage.Operator.Hex(),
+			hex.EncodeToString(sr.batchHeaderHash[:]))
+	} else if sr.metrics != nil {
+		sr.metrics.reportSigningMessageChannelLatency(time.Since(signingMessage.TimeReceived))
+	}
+
+	indexedOperatorInfo, found := sr.indexedOperatorState.IndexedOperators[signingMessage.Operator]
+	if !found {
+		sr.logger.Error("operator not found in state",
+			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
+			"operatorID", signingMessage.Operator.Hex(),
+			"attestationLatencyMs", signingMessage.AttestationLatencyMs)
+		return
+	}
+
+	if seen := sr.signatureMessageReceived[signingMessage.Operator]; seen {
+		sr.logger.Error("duplicate message from operator",
+			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
+			"operatorID", signingMessage.Operator.Hex(),
+			"attestationLatencyMs", signingMessage.AttestationLatencyMs)
+		return
+	}
+
+	// this map records messages received, whether the messages are valid or not
+	sr.signatureMessageReceived[signingMessage.Operator] = true
+
+	thresholdCrossed, err := sr.processSigningMessage(signingMessage, indexedOperatorInfo)
+	if err != nil {
+		sr.errorCount++
+		sr.logger.Warn("error processing signing message",
+			"batchHeaderHash", hex.EncodeToString(sr.batchHeaderHash[:]),
+			"operatorID", signingMessage.Operator.Hex(),
+			"attestationLatencyMs", signingMessage.AttestationLatencyMs,
+			"error", err)
+		return
+	}
+
+	sr.validSignerMap[signingMessage.Operator] = true
+	sr.newSignaturesGathered = true
+
+	if thresholdCrossed {
+		// Immediately build and submit an attestation.
 		sr.buildAndSubmitAttestation(attestationChan)
-		attestationUpdateCount++
+		// Delay the next tick since we just submitted an attestation.
+		sr.ticker.Reset(sr.tickInterval)
 	}
 }
 
@@ -252,11 +269,12 @@ func getSortedQuorumIDs(state *core.IndexedOperatorState) ([]core.QuorumID, erro
 	return quorumIDs, nil
 }
 
-// processSigningMessage accepts a SigningMessage, verifies it, and updates the signatureReceiver aggregates accordingly
+// processSigningMessage accepts a SigningMessage, verifies it, and updates the signatureReceiver aggregates
+// accordingly. Returns true if any quorums cross their signing threshold as a result of processing this message.
 func (sr *signatureReceiver) processSigningMessage(
 	signingMessage core.SigningMessage,
 	indexedOperatorInfo *core.IndexedOperatorInfo,
-) error {
+) (bool, error) {
 	processSigningMessageStart := time.Now()
 	defer func() {
 		if sr.metrics != nil {
@@ -265,14 +283,15 @@ func (sr *signatureReceiver) processSigningMessage(
 	}()
 
 	if signingMessage.Err != nil {
-		return fmt.Errorf("signingMessage contained error: %w", signingMessage.Err)
+		return false, fmt.Errorf("signingMessage contained error: %w", signingMessage.Err)
 	}
 
 	operatorPubkey := indexedOperatorInfo.PubkeyG2
 	if !signingMessage.Signature.Verify(operatorPubkey, sr.batchHeaderHash) {
-		return fmt.Errorf("signature verification with pubkey %s", hex.EncodeToString(operatorPubkey.Serialize()))
+		return false, fmt.Errorf("signature verification with pubkey %s", hex.EncodeToString(operatorPubkey.Serialize()))
 	}
 
+	thresholdCrossed := false
 	for _, quorumID := range sr.quorumIDs {
 		quorumOperators := sr.indexedOperatorState.Operators[quorumID]
 		quorumOperatorInfo, isOperatorInQuorum := quorumOperators[signingMessage.Operator]
@@ -292,14 +311,22 @@ func (sr *signatureReceiver) processSigningMessage(
 			sr.aggregateSignersG2PubKeys[quorumID].Add(indexedOperatorInfo.PubkeyG2)
 		}
 
-		sr.checkSigningPercentage(quorumID)
+		thresholdCrossed = thresholdCrossed || sr.checkSigningPercentage(quorumID)
 	}
 
-	return nil
+	return thresholdCrossed, nil
 }
 
 // buildAndSubmitAttestation aggregates and submits a QuorumAttestation representing the most up-to-date aggregates
 func (sr *signatureReceiver) buildAndSubmitAttestation(attestationChan chan *core.QuorumAttestation) {
+
+	if !sr.newSignaturesGathered {
+		// no work to be done
+		return
+	}
+	sr.newSignaturesGathered = false
+	sr.attestationUpdateCount++
+
 	submitAttestationStart := time.Now()
 	defer func() {
 		if sr.metrics != nil {
@@ -502,16 +529,18 @@ func getSignedPercentage(signedStake *big.Int, totalStake *big.Int) uint8 {
 
 // checkSigningPercentage checks if the signing percentage for a quorum meets or exceeds the configured
 // significantSigningThresholdPercentage, and records the time when the threshold was first crossed
-func (sr *signatureReceiver) checkSigningPercentage(quorumID core.QuorumID) {
-	if sr.significantSigningThresholdPercentage == 0 || sr.metrics == nil {
-		// if significantSigningThresholdPercentage is 0, or if metrics is nil, skip
-		return
+// Returns true if the threshold was crossed, false otherwise. If called after the threshold was crossed, this
+// method always returns false.
+func (sr *signatureReceiver) checkSigningPercentage(quorumID core.QuorumID) bool {
+	if sr.significantSigningThresholdPercentage == 0 {
+		// if significantSigningThresholdPercentage is 0, skip
+		return false
 	}
 
 	if !sr.significantSigningThresholdReachedTime[quorumID].IsZero() {
 		// if significantSigningThresholdReachedTime[quorumID] has already been set, there is no need to check signing
 		// percentage again, since the time has already been recorded
-		return
+		return false
 	}
 
 	signedPercentage := getSignedPercentage(sr.stakeSigned[quorumID], sr.indexedOperatorState.Totals[quorumID].Stake)
@@ -519,7 +548,10 @@ func (sr *signatureReceiver) checkSigningPercentage(quorumID core.QuorumID) {
 	if signedPercentage >= sr.significantSigningThresholdPercentage {
 		// Record the time when the threshold was first crossed
 		sr.significantSigningThresholdReachedTime[quorumID] = time.Now()
+		return true
 	}
+
+	return false
 }
 
 // reportThresholdSignedToDoneLatency calculates and reports the latency between the time when the
