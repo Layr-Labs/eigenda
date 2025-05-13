@@ -92,6 +92,26 @@ func (cb *CertBuilder) buildEigenDAV3Cert(
 	return eigenDACert, nil
 }
 
+// padTo32Bytes left-pads the input with zeros to ensure it's 32 bytes long.
+func padTo32Bytes(input []byte) []byte {
+	padded := make([]byte, 32)
+	copy(padded[32-len(input):], input)
+	return padded
+}
+
+// HashG1Point returns the keccak256 hash of the G1 point.
+func HashG1Point(p certTypesBinding.BN254G1Point) [32]byte {
+	xBytes := padTo32Bytes(p.X.Bytes())
+	yBytes := padTo32Bytes(p.Y.Bytes())
+
+	var data [64]byte
+	copy(data[:32], xBytes)
+	copy(data[32:], yBytes)
+
+	return crypto.Keccak256Hash(data[:])
+}
+
+
 
 // GetNonSignerStakesAndSignature constructs a NonSignerStakesAndSignature object by calling an
 // onchain OperatorStateRetriever retriever to fetch necessary non-signer metadata
@@ -99,30 +119,23 @@ func (cb *CertBuilder)  getNonSignerStakesAndSignature(
 	ctx context.Context,
 	signedBatch *disperser.SignedBatch,
 ) (*certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature, error) {
-	// 1 - Ensure that RPC node being used is synced
-	//     NOTE: This check is not guaranteed when communicating with node clusters where each node can have
-	//           an alternative view of the chain. Adding a retry to the operator state retriever call 
-	//           can help mitigate partial async failures.
-	// timeoutCtx, cancel := context.WithTimeout(context.Background(), 6*time.Duration(time.Second * 5))
-	// defer cancel()
-	// err := cb.blockNumberMonitor.WaitForBlockNumber(timeoutCtx, signedBatch.GetHeader().GetReferenceBlockNumber())
-	// if err != nil {
-	// 	return nil, fmt.Errorf("wait for block number: %w", err)
-	// }
-
-	// 2 - Pre-process inputs for operator state retriever call
+	// 1 - Pre-process inputs for operator state retriever call
 	signedBatchBinding, err := coretypes.SignedBatchProtoToV2CertBinding(signedBatch)
 	if err != nil {
 		return nil, fmt.Errorf("convert signed batch: %w", err)
 	}
-
-	nonSignerPubKeys := signedBatch.GetAttestation().GetNonSignerPubkeys()
-
+	
+	nonSignerPubKeys := signedBatchBinding.Attestation.NonSignerPubkeys
 
 	// 2a - create operator IDs by hashing non-signer public keys
 	nonSignerOperatorIDs := make([][32]byte, len(nonSignerPubKeys))
 	for i, pubKeySet := range nonSignerPubKeys {
-		nonSignerOperatorIDs[i] = crypto.Keccak256Hash(pubKeySet)
+		point := certTypesBinding.BN254G1Point{
+			X: pubKeySet.X,
+			Y: pubKeySet.Y,
+		}
+
+		nonSignerOperatorIDs[i] = HashG1Point(point)
 	}
 
 	// 2b - cast []uint32 to []byte for quorum numbers
