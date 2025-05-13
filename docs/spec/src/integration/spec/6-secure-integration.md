@@ -12,9 +12,7 @@ When deriving a rollup chain by running its derivation pipeline, only EigenDA ce
 
 ### 1. RBN Recency Validation
 
-This check is related to time guarantees. Timing is especially important for optimistic rollups where 
-the blobs need to be available during an interactive fault proof window in order to 
-protect the rollup's safety.
+This check is related to time guarantees. It is important for both optimistic and zk rollup validators to have sufficient time to download the blob from EigenDA once a cert lands in the batcher inbox.
 
 ![](../../assets/integration/recency-window-timeline.png)
 
