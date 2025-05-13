@@ -176,7 +176,6 @@ func (pd *PayloadDisperser) SendPayload(
 		return nil, fmt.Errorf("serialize cert: %w", err)
 	}
 
-	pd.logger.Info("rbn ",  eigenDACert.ReferenceBlockNumber())
 	err = pd.certVerifier.CheckDACert(timeoutCtx, eigenDACert.ReferenceBlockNumber(), certBytes)
 	if err != nil {
 		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
