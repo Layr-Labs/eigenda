@@ -22,12 +22,13 @@ func GetMaximumAvailableMemory() (uint64, error) {
 
 	// Check if there's a cgroup limit (for Docker/container environments)
 	cgroupLimit, err := getCgroupMemoryLimit()
-	if err == nil && cgroupLimit > 0 {
+	if err == nil && cgroupLimit > 0 && cgroupLimit < systemTotal {
 		// If there's a valid cgroup limit, use it
 		return cgroupLimit, nil
 	}
 
 	// If no cgroup limit is found, cgroup returns 0 (indicating no limit),
+	// or if the cgroup limit exceeds physical memory,
 	// or there was an error reading it, return the total system memory
 	return systemTotal, nil
 }
