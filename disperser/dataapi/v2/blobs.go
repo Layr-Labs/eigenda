@@ -210,6 +210,16 @@ func (s *ServerV2) FetchBlob(c *gin.Context) {
 		DispersedAt:   metadata.RequestedAt,
 		BlobSizeBytes: metadata.BlobSize,
 	}
+
+	// Get batch header hash from attestation info if available
+	attestationInfo, err := s.blobMetadataStore.GetBlobAttestationInfo(c.Request.Context(), blobKey)
+	if err == nil && attestationInfo != nil && attestationInfo.InclusionInfo != nil {
+		batchHeaderHash, err := attestationInfo.InclusionInfo.BatchHeader.Hash()
+		if err == nil {
+			response.BatchHeaderHash = hex.EncodeToString(batchHeaderHash[:])
+		}
+	}
+
 	s.metrics.IncrementSuccessfulRequestNum("FetchBlob")
 	s.metrics.ObserveLatency("FetchBlob", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBlobDataAge))
@@ -447,6 +457,15 @@ func (s *ServerV2) sendBlobFeedResponse(
 		}
 		blobInfo[i].BlobKey = bk.Hex()
 		blobInfo[i].BlobMetadata = createBlobMetadata(blobs[i])
+
+		// Get batch header hash from attestation info if available
+		attestationInfo, err := s.blobMetadataStore.GetBlobAttestationInfo(c.Request.Context(), bk)
+		if err == nil && attestationInfo != nil && attestationInfo.InclusionInfo != nil {
+			batchHeaderHash, err := attestationInfo.InclusionInfo.BatchHeader.Hash()
+			if err == nil {
+				blobInfo[i].BatchHeaderHash = hex.EncodeToString(batchHeaderHash[:])
+			}
+		}
 	}
 	response := &BlobFeedResponse{
 		Blobs:  blobInfo,

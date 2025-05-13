@@ -113,11 +113,12 @@ type (
 // Blob types
 type (
 	BlobResponse struct {
-		BlobKey       string             `json:"blob_key"`
-		BlobHeader    *corev2.BlobHeader `json:"blob_header"`
-		Status        string             `json:"status"`
-		DispersedAt   uint64             `json:"dispersed_at"`
-		BlobSizeBytes uint64             `json:"blob_size_bytes"`
+		BlobKey         string             `json:"blob_key"`
+		BlobHeader      *corev2.BlobHeader `json:"blob_header"`
+		Status          string             `json:"status"`
+		DispersedAt     uint64             `json:"dispersed_at"`
+		BlobSizeBytes   uint64             `json:"blob_size_bytes"`
+		BatchHeaderHash string             `json:"batch_header_hash"`
 	}
 
 	BlobCertificateResponse struct {
@@ -132,8 +133,9 @@ type (
 	}
 
 	BlobInfo struct {
-		BlobKey      string        `json:"blob_key"`
-		BlobMetadata *BlobMetadata `json:"blob_metadata"`
+		BlobKey         string        `json:"blob_key"`
+		BlobMetadata    *BlobMetadata `json:"blob_metadata"`
+		BatchHeaderHash string        `json:"batch_header_hash,omitempty"`
 	}
 	BlobFeedResponse struct {
 		Blobs  []BlobInfo `json:"blobs"`
