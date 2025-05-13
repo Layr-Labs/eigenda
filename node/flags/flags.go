@@ -421,7 +421,7 @@ var (
 		Name:     common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-fraction"),
 		Usage:    "The fraction of the total memory to use for the LittDB write cache.",
 		Required: false,
-		Value:    0.75,
+		Value:    0.45,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_FRACTION"),
 	}
 	LittDBReadCacheSizeGBFlag = cli.IntFlag{
