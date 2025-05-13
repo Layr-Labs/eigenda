@@ -30,6 +30,8 @@ contracts="PaymentVault \
   DelegationManager \
   BitmapUtils \
   EigenDACertVerifier \
+  EigenDACertVerifierV1 \
+  EigenDACertVerifierV2 \
   EigenDACertVerifierRouter \
   OperatorStateRetriever \
   EigenDAStateRetriever \

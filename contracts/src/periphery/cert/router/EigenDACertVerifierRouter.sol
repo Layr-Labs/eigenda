@@ -10,7 +10,8 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
     mapping(uint32 => address) public certVerifiers;
 
     /// @notice The list of Activation Block Numbers (ABNs) for the cert verifiers.
-    /// @dev The list is sorted in ascending order, and corresponds to the keys of the certVerifiers mapping.
+    /// @dev The list is guaranteed to be in ascending order
+    ///      and corresponds to the keys of the certVerifiers mapping.
     uint32[] public certVerifierABNs;
 
     event CertVerifierAdded(uint32 indexed activationBlockNumber, address indexed certVerifier);
@@ -23,7 +24,7 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
 
     /// @inheritdoc IEigenDACertVerifierBase
     function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8) {
-        return IEigenDACertVerifier(getCertVerifierAt(_getRBN(abiEncodedCert[32:]))).checkDACert(abiEncodedCert);
+        return IEigenDACertVerifier(getCertVerifierAt(_getRBN(abiEncodedCert))).checkDACert(abiEncodedCert);
     }
 
     function getCertVerifierAt(uint32 referenceBlockNumber) public view returns (address) {
@@ -57,8 +58,9 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
     }
 
     function _getRBN(bytes calldata certBytes) internal pure returns (uint32) {
-        // 0:32 is the batch header root
-        // 32:64 is the RBN
+        // 0:32 is the pointer to the start of the byte array.
+        // 32:64 is the batch header root
+        // 64:96 is the RBN
         if (certBytes.length < 64) {
             revert InvalidCertLength();
         }
