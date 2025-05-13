@@ -241,6 +241,7 @@ func createGenericCertVerifier() (*verification.GenericCertVerifier, error) {
 	routerAddressProvider, err := verification.BuildRouterAddressProvider(
 		gethcommon.HexToAddress(certVerifierRouterAddress),
 		ethClient,
+		logger,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create router address provider: %w", err)
@@ -250,8 +251,6 @@ func createGenericCertVerifier() (*verification.GenericCertVerifier, error) {
 		logger,
 		ethClient,
 		routerAddressProvider,
-		gethcommon.HexToAddress(certVerifierAddress),
-		gethcommon.HexToAddress(registryCoordinatorAddress),
 	)
 }
 

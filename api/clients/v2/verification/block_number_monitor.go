@@ -12,9 +12,8 @@ import (
 
 // BlockNumberMonitor is a utility for waiting for a certain ethereum block number
 //
-// TODO (litt3): this utility is not currently in use, but DO NOT delete it. It will be necessary for the upcoming
-//
-//	CertVerifierRouter effort
+// This utility is used by the CertVerifierAddressProvider implementations to ensure that the client
+// has reached a sufficient block height before making queries about block-specific state
 type BlockNumberMonitor struct {
 	logger    logging.Logger
 	ethClient common.EthClient

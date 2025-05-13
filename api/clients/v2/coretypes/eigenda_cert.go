@@ -5,7 +5,7 @@ import (
 
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	v2_cert_verifier "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
-	cert_types_binding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
+	certTypesBinding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -20,7 +20,7 @@ func init() {
 	// load the ABI and parse the dummy interface methods used to encode the cert
 	// NOTE: the only other way would be defining the certificate using go-ethereum's abi
 	// low level types which would require much boiler plate
-	certTypesBinding, err := cert_types_binding.ContractIEigenDACertTypeBindingsMetaData.GetAbi()
+	certTypesBinding, err := certTypesBinding.ContractIEigenDACertTypeBindingsMetaData.GetAbi()
 	if err != nil {
 		panic(err)
 	}
@@ -47,13 +47,14 @@ const (
 
 type EigenDACert interface {
 	BlobVersion() v2.BlobVersion
+	RelayKeys() []v2.RelayKey
+	Version() CertificateVersion
 	ReferenceBlockNumber() uint64
 	QuorumNumbers() []byte
+
 	ComputeBlobKey() (*v2.BlobKey, error)
-	Serialize() ([]byte, error)
-	RelayKeys() []v2.RelayKey
 	Commitments() (*encoding.BlobCommitments, error)
-	Version() CertificateVersion
+	Serialize() ([]byte, error)
 }
 
 var _ EigenDACert = &EigenDACertV2{}
@@ -61,12 +62,12 @@ var _ EigenDACert = &EigenDACertV3{}
 
 
 // This struct represents the composition of a EigenDA V3 certificate, as it would exist in a rollup inbox.
-type EigenDACertV3 cert_types_binding.EigenDACertTypesEigenDACertV3
+type EigenDACertV3 certTypesBinding.EigenDACertTypesEigenDACertV3
 
 // BuildEigenDACertV3 creates a new EigenDACertV2 from a BlobStatusReply, and NonSignerStakesAndSignature
 func BuildEigenDACertV3(
 	blobStatusReply *disperser.BlobStatusReply,
-	nonSignerStakesAndSignature *cert_types_binding.EigenDATypesV1NonSignerStakesAndSignature,
+	nonSignerStakesAndSignature *certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature,
 ) (*EigenDACertV3, error) {
 
 	bindingInclusionInfo, err := InclusionInfoProtoToIEigenDATypesBinding(blobStatusReply.GetBlobInclusionInfo())
@@ -140,12 +141,7 @@ func (c *EigenDACertV3) ComputeBlobKey() (*v2.BlobKey, error) {
 }
 
 func (c *EigenDACertV3) Serialize() ([]byte, error) {
-	certBytes, err := v3CertTypeEncodeArgs.Pack(c)
-	if err != nil {
-		return nil, fmt.Errorf("encode cert: %w", err)
-	}
-
-	return certBytes, nil
+	return rlp.EncodeToBytes(c)
 }
 
 // Commitments returns the blob's cryptographic kzg commitments 

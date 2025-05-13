@@ -54,6 +54,7 @@ type TestClient struct {
 	indexedChainState           core.IndexedChainState
 	retrievalClient             clients.RetrievalClient
 	validatorPayloadRetriever   *payloadretrieval.ValidatorPayloadRetriever
+	certBuilder                 *clients.CertBuilder
 	certVerifier                *verification.GenericCertVerifier
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
@@ -162,7 +163,7 @@ func NewTestClient(
 
 	certVerifierAddressProvider := &test.TestCertVerifierAddressProvider{}
 
-	certVerifier, err := verification.NewGenericCertVerifier(logger, ethClient, certVerifierAddressProvider, gethcommon.HexToAddress(config.EigenDARegistryCoordinatorAddress), gethcommon.HexToAddress(config.BLSOperatorStateRetrieverAddr))
+	certVerifier, err := verification.NewGenericCertVerifier(logger, ethClient, certVerifierAddressProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cert verifier: %w", err)
 	}
@@ -183,11 +184,24 @@ func NewTestClient(
 		registry = metrics.registry
 	}
 
+	certBuilder, err := clients.NewCertBuilder(logger, gethcommon.HexToAddress(config.BLSOperatorStateRetrieverAddr), gethcommon.HexToAddress(config.EigenDARegistryCoordinatorAddress), ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cert builder: %w", err)
+	}
+
+	blockMon, err := verification.NewBlockNumberMonitor(
+		logger,
+		ethClient,
+		time.Second * 12,
+	)
+
 	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
 		ethClient,
 		disperserClient,
+		blockMon,
+		certBuilder,
 		certVerifier,
 		registry)
 	if err != nil {
@@ -299,6 +313,7 @@ func NewTestClient(
 		indexedChainState:           indexedChainState,
 		retrievalClient:             retrievalClient,
 		validatorPayloadRetriever:   validatorPayloadRetriever,
+		certBuilder:                 certBuilder,
 		certVerifier:                certVerifier,
 		privateKey:                  privateKey,
 		metricsRegistry:             registry,
@@ -410,6 +425,11 @@ func (c *TestClient) GetValidatorPayloadRetriever() *payloadretrieval.ValidatorP
 // GetCertVerifier returns the test client's cert verifier.
 func (c *TestClient) GetCertVerifier() *verification.GenericCertVerifier {
 	return c.certVerifier
+}
+
+// GetCertBuilder returns the test client's cert builder.
+func (c *TestClient) GetCertBuilder() *clients.CertBuilder {
+	return c.certBuilder
 }
 
 // GetPrivateKey returns the test client's private key.
