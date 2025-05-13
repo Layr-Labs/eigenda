@@ -17,7 +17,7 @@ import {IServiceManager} from "../lib/eigenlayer-middleware/src/interfaces/IServ
 import {IBLSApkRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IBLSApkRegistry.sol";
 import {EigenDAServiceManager, IAVSDirectory, IRewardsCoordinator} from "src/core/EigenDAServiceManager.sol";
 import {EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
-import {EigenDACertVerifierV2} from "src/periphery/cert/legacy/EigenDACertVerifierV2.sol";
+import {EigenDACertVerifierV2} from "src/periphery/cert/legacy/v2/EigenDACertVerifierV2.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
@@ -316,7 +316,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         operatorStateRetriever = new OperatorStateRetriever();
 
-        eigenDACertVerifier = new EigenDACertVerifier(
+        eigenDACertVerifier = new EigenDACertVerifierV2(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             OperatorStateRetriever(address(operatorStateRetriever)),
