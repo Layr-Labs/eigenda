@@ -29,12 +29,8 @@ contracts="PaymentVault \
   AVSDirectory \
   DelegationManager \
   BitmapUtils \
-  EigenDACertVerifier \
-  EigenDACertVerifierV1 \
-  EigenDACertVerifierV2 \
-  EigenDACertVerifierRouter \
-  OperatorStateRetriever \
   EigenDAStateRetriever \
+  OperatorStateRetriever \
   RegistryCoordinator \
   BLSApkRegistry \
   IIndexRegistry \
@@ -42,8 +38,12 @@ contracts="PaymentVault \
   BN254 \
   EigenDAServiceManager \
   IEigenDAServiceManager \
+  MockRollup \
   EjectionManager \
-  IEigenDACertTypeBindings \
+  EigenDACertVerifierV1 \
+  EigenDACertVerifierV2 \
+  EigenDACertVerifier \
+  EigenDACertVerifierRouter \
   EigenDAThresholdRegistry \
   EigenDARelayRegistry \
   IEigenDARelayRegistry \
