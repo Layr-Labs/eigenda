@@ -7,7 +7,6 @@ import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.
 /// @title EigenDACertTypes
 /// @notice This library defines the types for each EigenDA certificate version.
 /// @dev It is required that RBN be located in positions 32:64 (padded) in the ABI encoded certificate.
-///      The reason for this is for backwards compatibility with EigenDACertVerifierV2.
 library EigenDACertTypes {
     struct EigenDACertV3 {
         DATypesV2.BatchHeaderV2 batchHeader;
