@@ -29,6 +29,8 @@ contracts="PaymentVault \
   AVSDirectory \
   DelegationManager \
   BitmapUtils \
+  EigenDACertVerifier \
+  EigenDACertVerifierRouter \
   OperatorStateRetriever \
   EigenDAStateRetriever \
   RegistryCoordinator \
