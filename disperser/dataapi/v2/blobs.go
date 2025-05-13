@@ -211,10 +211,11 @@ func (s *ServerV2) FetchBlob(c *gin.Context) {
 		BlobSizeBytes: metadata.BlobSize,
 	}
 
-	// Get batch header hash from attestation info if available
-	attestationInfo, err := s.blobMetadataStore.GetBlobAttestationInfo(c.Request.Context(), blobKey)
-	if err == nil && attestationInfo != nil && attestationInfo.InclusionInfo != nil {
-		batchHeaderHash, err := attestationInfo.InclusionInfo.BatchHeader.Hash()
+	// Get batch header hash from inclusion info if available
+	inclusionInfos, err := s.blobMetadataStore.GetBlobInclusionInfos(c.Request.Context(), blobKey)
+	if err == nil && len(inclusionInfos) > 0 {
+		// Use the first inclusion info to get the batch header hash
+		batchHeaderHash, err := inclusionInfos[0].BatchHeader.Hash()
 		if err == nil {
 			response.BatchHeaderHash = hex.EncodeToString(batchHeaderHash[:])
 		}
@@ -458,10 +459,11 @@ func (s *ServerV2) sendBlobFeedResponse(
 		blobInfo[i].BlobKey = bk.Hex()
 		blobInfo[i].BlobMetadata = createBlobMetadata(blobs[i])
 
-		// Get batch header hash from attestation info if available
-		attestationInfo, err := s.blobMetadataStore.GetBlobAttestationInfo(c.Request.Context(), bk)
-		if err == nil && attestationInfo != nil && attestationInfo.InclusionInfo != nil {
-			batchHeaderHash, err := attestationInfo.InclusionInfo.BatchHeader.Hash()
+		// Get batch header hash from inclusion info if available
+		inclusionInfos, err := s.blobMetadataStore.GetBlobInclusionInfos(c.Request.Context(), bk)
+		if err == nil && len(inclusionInfos) > 0 {
+			// Use the first inclusion info to get the batch header hash
+			batchHeaderHash, err := inclusionInfos[0].BatchHeader.Hash()
 			if err == nil {
 				blobInfo[i].BatchHeaderHash = hex.EncodeToString(batchHeaderHash[:])
 			}
