@@ -599,6 +599,8 @@ var optionalFlags = []cli.Flag{
 	DownloadPoolSizeFlag,
 	LittDBWriteCacheSizeGBFlag,
 	LittDBReadCacheSizeGBFlag,
+	LittDBWriteCacheSizeFractionFlag,
+	LittDBReadCacheSizeFractionFlag,
 	GetChunksHotCacheReadLimitMBFlag,
 	GetChunksHotBurstLimitMBFlag,
 	GetChunksColdCacheReadLimitMBFlag,
