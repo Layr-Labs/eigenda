@@ -1,10 +1,13 @@
 package memory
 
 import (
+	"fmt"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"strings"
 
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 	"github.com/shirou/gopsutil/mem"
 )
@@ -31,6 +34,35 @@ func GetMaximumAvailableMemory() (uint64, error) {
 	// or if the cgroup limit exceeds physical memory,
 	// or there was an error reading it, return the total system memory
 	return systemTotal, nil
+}
+
+// SetGCMemorySafetyBuffer tells the garbage collector to aggressively garbage collect when there is only safetyBuffer
+// bytes of memory available. Useful for preventing kubernetes from OOM-killing the process.
+func SetGCMemorySafetyBuffer(
+	logger logging.Logger,
+	safetyBuffer uint64,
+) error {
+
+	maxMemory, err := GetMaximumAvailableMemory()
+	if err != nil {
+		return fmt.Errorf("failed to get maximum available memory: %w", err)
+	}
+
+	if safetyBuffer > maxMemory {
+		return fmt.Errorf("buffer space %d exceeds maximum available memory %d", safetyBuffer, maxMemory)
+	}
+
+	limit := maxMemory - safetyBuffer
+
+	debug.SetMemoryLimit(int64(limit))
+
+	logger.Infof("Detected %.2fGB available memory. "+
+		"Setting GC target memory limit to %.2f in order to maintain a safety buffer of %.2fGB",
+		float64(maxMemory)/float64(units.GiB),
+		float64(limit)/float64(units.GiB),
+		float64(safetyBuffer)/float64(units.GiB))
+
+	return nil
 }
 
 // getCgroupMemoryLimit attempts to read the memory limit from cgroups

@@ -458,18 +458,28 @@ var (
 		Usage:    "The burst limit for GetChunks() calls that hit the cache, unit is MB.",
 		Required: false,
 		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_HOT_BURST_LIMIT_MB"),
 	}
 	GetChunksColdCacheReadLimitMBFlag = cli.Float64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-cold-cache-read-limit-mb"),
 		Usage:    "The rate limit for GetChunks() calls that miss the cache, unit is MB/s.",
 		Required: false,
 		Value:    32,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_COLD_CACHE_READ_LIMIT_MB"),
 	}
 	GetChunksColdBurstLimitMBFlag = cli.Float64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-cold-burst-limit-MB"),
 		Usage:    "The burst limit for GetChunks() calls that miss the cache, unit is MB.",
 		Required: false,
 		Value:    32,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_COLD_BURST_LIMIT_MB"),
+	}
+	GCSafetyBufferSizeGBFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-gb"),
+		Usage:    "The size of the safety buffer for garbage collection in gigabytes.",
+		Required: false,
+		Value:    1,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_GB"),
 	}
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -605,6 +615,7 @@ var optionalFlags = []cli.Flag{
 	GetChunksHotBurstLimitMBFlag,
 	GetChunksColdCacheReadLimitMBFlag,
 	GetChunksColdBurstLimitMBFlag,
+	GCSafetyBufferSizeGBFlag,
 }
 
 func init() {

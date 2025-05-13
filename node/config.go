@@ -149,6 +149,11 @@ type Config struct {
 	// The burst limit for the number of bytes served by the GetChunks API if the data is not in the cache.
 	// Unit is in megabytes.
 	GetChunksColdBurstLimitMB float64
+
+	// Defines a safety buffer for the garbage collector. If non-zero, then the garbage collector will be instructed
+	// to aggressively garbage collect so as to keep this amount of memory free. Useful for preventing kubernetes
+	// from OOM-killing the process.
+	GCSafetyBufferSizeGB float64
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
