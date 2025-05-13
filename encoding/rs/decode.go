@@ -30,10 +30,10 @@ func (e *Encoder) Decode(frames []FrameCoeffs, indices []uint64, maxInputSize ui
 
 	// Remove duplicates
 	frameMap := make(map[uint64]FrameCoeffs, len(indices))
-	for i, index := range indices {
-		_, ok := frameMap[index]
+	for i, frameIndex := range indices {
+		_, ok := frameMap[frameIndex]
 		if !ok {
-			frameMap[index] = frames[i]
+			frameMap[frameIndex] = frames[i]
 		}
 	}
 
