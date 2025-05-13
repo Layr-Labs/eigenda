@@ -2,8 +2,7 @@
 pragma solidity ^0.8.9;
 
 import {AccessControlLib} from "src/core/libraries/AccessControlLib.sol";
-import {PaymentVaultLib, PaymentVaultStorage} from "src/core/libraries/v3/PaymentVaultLib.sol";
-import {EigenDATypesV3} from "src/core/libraries/v3/EigenDATypesV3.sol";
+import {PaymentVaultLib, PaymentVaultStorage, PaymentVaultTypes} from "src/core/libraries/v3/PaymentVaultLib.sol";
 import {Constants} from "src/core/libraries/Constants.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {InitializableLib} from "src/core/libraries/InitializableLib.sol";
@@ -37,7 +36,7 @@ contract PaymentVault is IPaymentVault {
 
     /// USER
 
-    function decreaseReservation(uint64 quorumId, EigenDATypesV3.Reservation memory reservation) external {
+    function decreaseReservation(uint64 quorumId, PaymentVaultTypes.Reservation memory reservation) external {
         PaymentVaultLib.decreaseReservation(quorumId, msg.sender, reservation, SCHEDULE_PERIOD);
     }
 
@@ -55,7 +54,7 @@ contract PaymentVault is IPaymentVault {
     function initializeQuorum(
         uint64 quorumId,
         address newOwner,
-        EigenDATypesV3.QuorumPaymentProtocolConfig memory protocolCfg
+        PaymentVaultTypes.QuorumProtocolConfig memory protocolCfg
     ) external onlyOwner {
         require(
             AccessControlLib.getRoleMemberCount(Constants.QUORUM_OWNER_ROLE(quorumId)) == 0, "Quorum owner already set"
@@ -64,30 +63,37 @@ contract PaymentVault is IPaymentVault {
         ps().quorum[quorumId].protocolCfg = protocolCfg;
     }
 
-    function setReservationAdvanceWindow(uint64 quorumId, EigenDATypesV3.QuorumPaymentProtocolConfig memory protocolCfg)
+    function setReservationAdvanceWindow(uint64 quorumId, PaymentVaultTypes.QuorumProtocolConfig memory protocolCfg)
         external
         onlyQuorumOwner(quorumId)
     {
         ps().quorum[quorumId].protocolCfg.reservationAdvanceWindow = protocolCfg.reservationAdvanceWindow;
     }
 
+    function setOnDemandEnabled(uint64 quorumId, PaymentVaultTypes.QuorumProtocolConfig memory protocolCfg)
+        external
+        onlyQuorumOwner(quorumId)
+    {
+        ps().quorum[quorumId].protocolCfg.onDemandEnabled = protocolCfg.onDemandEnabled;
+    }
+
     /// QUORUM OWNER
 
-    function createReservation(uint64 quorumId, address account, EigenDATypesV3.Reservation memory reservation)
+    function createReservation(uint64 quorumId, address account, PaymentVaultTypes.Reservation memory reservation)
         external
         onlyQuorumOwner(quorumId)
     {
         PaymentVaultLib.addReservation(quorumId, account, reservation, SCHEDULE_PERIOD);
     }
 
-    function increaseReservation(uint64 quorumId, address account, EigenDATypesV3.Reservation memory reservation)
+    function increaseReservation(uint64 quorumId, address account, PaymentVaultTypes.Reservation memory reservation)
         external
         onlyQuorumOwner(quorumId)
     {
         PaymentVaultLib.increaseReservation(quorumId, account, reservation, SCHEDULE_PERIOD);
     }
 
-    function setQuorumPaymentConfig(uint64 quorumId, EigenDATypesV3.QuorumPaymentConfig memory paymentConfig)
+    function setQuorumPaymentConfig(uint64 quorumId, PaymentVaultTypes.QuorumConfig memory paymentConfig)
         external
         onlyQuorumOwner(quorumId)
     {
@@ -108,7 +114,7 @@ contract PaymentVault is IPaymentVault {
     function getReservation(uint64 quorumId, address account)
         external
         view
-        returns (EigenDATypesV3.Reservation memory)
+        returns (PaymentVaultTypes.Reservation memory)
     {
         return ps().quorum[quorumId].user[account].reservation;
     }
@@ -116,16 +122,12 @@ contract PaymentVault is IPaymentVault {
     function getQuorumProtocolConfig(uint64 quorumId)
         external
         view
-        returns (EigenDATypesV3.QuorumPaymentProtocolConfig memory)
+        returns (PaymentVaultTypes.QuorumProtocolConfig memory)
     {
         return ps().quorum[quorumId].protocolCfg;
     }
 
-    function getQuorumPaymentConfig(uint64 quorumId)
-        external
-        view
-        returns (EigenDATypesV3.QuorumPaymentConfig memory)
-    {
+    function getQuorumPaymentConfig(uint64 quorumId) external view returns (PaymentVaultTypes.QuorumConfig memory) {
         return ps().quorum[quorumId].cfg;
     }
 

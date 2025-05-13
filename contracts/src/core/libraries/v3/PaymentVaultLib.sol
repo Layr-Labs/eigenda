@@ -1,28 +1,51 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {EigenDATypesV3} from "src/core/libraries/v3/EigenDATypesV3.sol";
 import {SafeERC20, IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+
+library PaymentVaultTypes {
+    struct User {
+        uint256 deposit; // the total on demand deposit of the user
+        Reservation reservation;
+    }
+
+    struct Quorum {
+        QuorumProtocolConfig protocolCfg;
+        QuorumConfig cfg;
+        mapping(address => User) user;
+        mapping(uint64 => uint64) reservedSymbols; // reserved symbols per period in this quorum
+    }
+
+    struct QuorumConfig {
+        address token; // the address of the token used for on-demand payments.
+        address recipient; // the address of the recipient of the on-demand payments.
+        uint64 reservationSymbolsPerSecond;
+        uint64 onDemandSymbolsPerPeriod;
+        uint64 onDemandPricePerSymbol;
+    }
+
+    struct QuorumProtocolConfig {
+        uint64 minNumSymbols;
+        uint64 reservationAdvanceWindow;
+        uint64 reservationRateLimitWindow;
+        uint64 onDemandRateLimitWindow;
+        bool onDemandEnabled;
+    }
+
+    struct Reservation {
+        uint64 symbolsPerSecond;
+        uint64 startTimestamp;
+        uint64 endTimestamp;
+    }
+}
 
 library PaymentVaultStorage {
     string internal constant STORAGE_ID = "eigen.da.payment.vault";
     bytes32 internal constant STORAGE_POSITION =
         keccak256(abi.encode(uint256(keccak256(abi.encodePacked(STORAGE_ID))) - 1)) & ~bytes32(uint256(0xff));
 
-    struct User {
-        uint256 deposit; // the total on demand deposit of the user
-        EigenDATypesV3.Reservation reservation;
-    }
-
-    struct Quorum {
-        EigenDATypesV3.QuorumPaymentProtocolConfig protocolCfg;
-        EigenDATypesV3.QuorumPaymentConfig cfg;
-        mapping(address => User) user;
-        mapping(uint64 => uint64) reservedSymbols; // reserved symbols per period in this quorum
-    }
-
     struct Layout {
-        mapping(uint64 => Quorum) quorum;
+        mapping(uint64 => PaymentVaultTypes.Quorum) quorum;
     }
 
     function layout() internal pure returns (Layout storage s) {
@@ -36,7 +59,9 @@ library PaymentVaultStorage {
 library PaymentVaultLib {
     using SafeERC20 for IERC20;
 
-    event ReservationCreated(uint64 indexed quorumId, address indexed account, EigenDATypesV3.Reservation reservation);
+    event ReservationCreated(
+        uint64 indexed quorumId, address indexed account, PaymentVaultTypes.Reservation reservation
+    );
 
     function s() internal pure returns (PaymentVaultStorage.Layout storage) {
         return PaymentVaultStorage.layout();
@@ -45,7 +70,7 @@ library PaymentVaultLib {
     function addReservation(
         uint64 quorumId,
         address account,
-        EigenDATypesV3.Reservation memory reservation,
+        PaymentVaultTypes.Reservation memory reservation,
         uint64 schedulePeriod
     ) internal {
         checkReservation(quorumId, account, reservation, schedulePeriod);
@@ -65,10 +90,10 @@ library PaymentVaultLib {
     function increaseReservation(
         uint64 quorumId,
         address account,
-        EigenDATypesV3.Reservation memory reservation,
+        PaymentVaultTypes.Reservation memory reservation,
         uint64 schedulePeriod
     ) internal {
-        EigenDATypesV3.Reservation storage currentReservation = s().quorum[quorumId].user[account].reservation;
+        PaymentVaultTypes.Reservation storage currentReservation = s().quorum[quorumId].user[account].reservation;
         checkReservation(quorumId, account, reservation, schedulePeriod);
 
         require(reservation.startTimestamp == currentReservation.startTimestamp, "Invalid start timestamp");
@@ -88,10 +113,10 @@ library PaymentVaultLib {
     function decreaseReservation(
         uint64 quorumId,
         address account,
-        EigenDATypesV3.Reservation memory reservation,
+        PaymentVaultTypes.Reservation memory reservation,
         uint64 schedulePeriod
     ) internal {
-        EigenDATypesV3.Reservation storage currentReservation = s().quorum[quorumId].user[account].reservation;
+        PaymentVaultTypes.Reservation storage currentReservation = s().quorum[quorumId].user[account].reservation;
         checkReservation(quorumId, account, reservation, schedulePeriod);
 
         require(reservation.startTimestamp == currentReservation.startTimestamp, "Invalid start timestamp");
@@ -112,11 +137,11 @@ library PaymentVaultLib {
     function checkReservation(
         uint64 quorumId,
         address account,
-        EigenDATypesV3.Reservation memory reservation,
+        PaymentVaultTypes.Reservation memory reservation,
         uint64 schedulePeriod
     ) internal view returns (uint64 startTimestamp) {
-        PaymentVaultStorage.Quorum storage quorum = s().quorum[quorumId];
-        PaymentVaultStorage.User storage user = quorum.user[account];
+        PaymentVaultTypes.Quorum storage quorum = s().quorum[quorumId];
+        PaymentVaultTypes.User storage user = quorum.user[account];
         require(reservation.startTimestamp % schedulePeriod == 0, "Invalid start timestamp");
         require(reservation.endTimestamp % schedulePeriod == 0, "Invalid end timestamp");
         require(reservation.endTimestamp > reservation.startTimestamp, "Invalid reservation period");
@@ -126,7 +151,7 @@ library PaymentVaultLib {
         );
         // If the reservation is not expired, the reservation can only be updated favorably to the user.
         if (block.timestamp <= reservation.endTimestamp) {
-            EigenDATypesV3.Reservation memory currentReservation = user.reservation;
+            PaymentVaultTypes.Reservation memory currentReservation = user.reservation;
             require(
                 reservation.startTimestamp == currentReservation.startTimestamp
                     && reservation.endTimestamp > currentReservation.endTimestamp,
@@ -139,9 +164,9 @@ library PaymentVaultLib {
     }
 
     function depositOnDemand(uint64 quorumId, address account, uint256 amount) internal {
-        PaymentVaultStorage.Quorum storage quorum = s().quorum[quorumId];
-        PaymentVaultStorage.User storage user = quorum.user[account];
-        EigenDATypesV3.QuorumPaymentConfig storage cfg = quorum.cfg;
+        PaymentVaultTypes.Quorum storage quorum = s().quorum[quorumId];
+        PaymentVaultTypes.User storage user = quorum.user[account];
+        PaymentVaultTypes.QuorumConfig storage cfg = quorum.cfg;
 
         uint256 newAmount = user.deposit + amount;
         require(newAmount <= type(uint80).max, "Amount too large");
@@ -163,7 +188,7 @@ library PaymentVaultLib {
         uint64 startPeriod = startTimestamp / schedulePeriod;
         uint64 endPeriod = endTimestamp / schedulePeriod;
 
-        PaymentVaultStorage.Quorum storage quorum = s().quorum[quorumId];
+        PaymentVaultTypes.Quorum storage quorum = s().quorum[quorumId];
         uint64 maxReservedSymbols = quorum.cfg.reservationSymbolsPerSecond;
         for (uint64 i = startPeriod; i < endPeriod; i++) {
             uint64 reservedSymbols = quorum.reservedSymbols[i] + symbolsPerSecond;
