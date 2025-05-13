@@ -286,24 +286,31 @@ func NewValidatorStore(
 		writeCacheSize := uint64(0)
 		if config.LittDBWriteCacheSizeGB > 0 {
 			writeCacheSize = uint64(config.LittDBWriteCacheSizeGB * units.GiB)
+			logger.Infof("LittDB write cache size configured to use %.2f GB.\n", config.LittDBWriteCacheSizeGB)
 		} else {
 			writeCacheSize = uint64(config.LittDBWriteCacheSizeFraction * float64(maxMemory))
+			logger.Infof("LittDB write cache is configured to use %.1f%% of %.2f GB available (%.2f GB).",
+				config.LittDBWriteCacheSizeFraction*100.0,
+				float64(maxMemory)/float64(units.GiB),
+				float64(writeCacheSize)/float64(units.GiB))
 		}
 
 		readCacheSize := uint64(0)
 		if config.LittDBReadCacheSizeGB > 0 {
 			readCacheSize = uint64(config.LittDBReadCacheSizeGB * units.GiB)
+			logger.Infof("LittDB read cache size configured to use %.2f GB.\n", config.LittDBReadCacheSizeGB)
 		} else {
 			readCacheSize = uint64(config.LittDBReadCacheSizeFraction * float64(maxMemory))
+			logger.Infof("LittDB read cache is configured to use %.1f%% of %.2f GB available (%.2f GB).",
+				config.LittDBReadCacheSizeFraction*100.0,
+				float64(maxMemory)/float64(units.GiB),
+				float64(readCacheSize)/float64(units.GiB))
 		}
 
 		if writeCacheSize+readCacheSize >= maxMemory {
 			return nil, fmt.Errorf("Write cache size + read cache size must be less than max memory. "+
 				"Write cache size: %d, read cache size: %d, max memory: %d", writeCacheSize, readCacheSize, maxMemory)
 		}
-
-		logger.Infof("LittDB write cache size: %d, read cache size: %d, total process memory %d",
-			writeCacheSize, readCacheSize, maxMemory)
 
 		err = chunkTable.SetWriteCacheSize(writeCacheSize)
 		if err != nil {
