@@ -29,7 +29,6 @@ contracts="PaymentVault \
   AVSDirectory \
   DelegationManager \
   BitmapUtils \
-  EigenDAStateRetriever \
   OperatorStateRetriever \
   RegistryCoordinator \
   BLSApkRegistry \
@@ -44,6 +43,7 @@ contracts="PaymentVault \
   EigenDACertVerifierV2 \
   EigenDACertVerifier \
   EigenDACertVerifierRouter \
+  IEigenDACertVerifierLegacy \
   EigenDAThresholdRegistry \
   EigenDARelayRegistry \
   IEigenDARelayRegistry \
