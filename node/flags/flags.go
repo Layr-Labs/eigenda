@@ -414,7 +414,7 @@ var (
 		Usage: "The size of the LittDB write cache in gigabytes. Overrides " +
 			"LITT_DB_WRITE_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
 		Required: false,
-		Value:    0,
+		Value:    3,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_GB"),
 	}
 	LittDBWriteCacheSizeFractionFlag = cli.Float64Flag{
@@ -429,7 +429,7 @@ var (
 		Usage: "The size of the LittDB read cache in gigabytes. Overrides " +
 			"LITT_DB_READ_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
 		Required: false,
-		Value:    0,
+		Value:    1,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_GB"),
 	}
 	LittDBReadCacheSizeFractionFlag = cli.Float64Flag{
