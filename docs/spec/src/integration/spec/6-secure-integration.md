@@ -6,19 +6,19 @@ This page is meant to be read by eigenda and rollup developers who are writing a
 
 EigenDA is a service that assures the availability and integrity of payloads posted to it for 14 days.
 When deriving a rollup chain by running its derivation pipeline, only EigenDA certs that satisfy 3 validity conditions are considered valid and used:
-1. RBN Recency Validation - ensure that the cert's reference block number (RBN) is not too old with respect to the L1 block at which the cert was included in the rollup's batcher-inbox. This ensures that the blob on EigenDA has sufficient availability time left (out of the 14 day period) in order to be downloadable if needed during a rollup fraud proof window.
+1. RBN Recency Validation - ensure that the cert's reference block number (RBN) is not too old with respect to the L1 block at which the cert was included in the rollup's batcher-inbox. This ensures that the blob on EigenDA has sufficient availability time left (out of the 14 day period) in order to be downloadable if needed during a rollup fault proof window.
 2. Cert Validation - ensures sufficient operator stake has signed to make the blob available, for all specified quorums. The stake is obtained onchain at a given reference block number (RBN) specified inside the cert.
 3. Blob Validation - ensures that the blob used is consistent with the KZG commitment inside the Cert.
 
 ### 1. RBN Recency Validation
 
 This check is related to time guarantees. Timing is especially important for optimistic rollups where 
-the blobs need to be available during an interactive fraud proof window in order to 
+the blobs need to be available during an interactive fault proof window in order to 
 protect the rollup's safety.
 
 ![](../../assets/integration/recency-window-timeline.png)
 
-Looking at the timing diagram above, in order for the blobs to be available during the entire challenge period, we need the fraud proof game to start < 7days after the cert is posted to the rollup's batcher inbox. In order to uphold this guarantee, what we need to do is simply to have rollups' derivation pipelines reject certs whose DA availability period started a long time ago. However, from the cert itself, there is no way to know when the cert was signed and made available. The only information available on the cert itself is cert.RBN, the reference block number chosen by the disperser at which to anchor operator stakes. But that happens to be before validators sign, so it is enough to bound how far that can be from the cert's inclusion block.
+Looking at the timing diagram above, in order for the blobs to be available during the entire challenge period, we need the fault proof game to start < 7days after the cert is posted to the rollup's batcher inbox. In order to uphold this guarantee, what we need to do is simply to have rollups' derivation pipelines reject certs whose DA availability period started a long time ago. However, from the cert itself, there is no way to know when the cert was signed and made available. The only information available on the cert itself is cert.RBN, the reference block number chosen by the disperser at which to anchor operator stakes. But that happens to be before validators sign, so it is enough to bound how far that can be from the cert's inclusion block.
 
 Rollups must thus enforce that
 ```
