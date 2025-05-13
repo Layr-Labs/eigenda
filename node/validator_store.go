@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
+	"github.com/Layr-Labs/eigenda/common/memory"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/litt"
@@ -23,7 +24,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/shirou/gopsutil/mem"
 	"golang.org/x/time/rate"
 )
 
@@ -278,17 +278,10 @@ func NewValidatorStore(
 			return nil, fmt.Errorf("failed to get chunks table: %w", err)
 		}
 
-		//var rlim unix.Rlimit
-		//if err := unix.Getrlimit(unix.RLIMIT_AS, &rlim); err != nil {
-		//	return nil, fmt.Errorf("failed to get rlimit: %w", err)
-		//}
-		//maxMemory := rlim.Cur
-
-		vm, err := mem.VirtualMemory()
+		maxMemory, err := memory.GetMaximumAvailableMemory()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get memory statistics: %w", err)
+			return nil, fmt.Errorf("failed to get maximum available memory: %w", err)
 		}
-		maxMemory := vm.Total
 
 		writeCacheSize := uint64(0)
 		if config.LittDBWriteCacheSizeGB > 0 {
