@@ -31,7 +31,7 @@ This has a second security implication. A malicious EigenDA disperser could have
 >
 > Despite its semantics being slightly different, sequencerWindow and recencyWindow are related concepts, and in order to not force another config change on op altda forks, we suggest using the same value as the `SequencerWindowSize` for the `RecencyWindowSize`, namely 12h.
 
-![image.png](../../assets/integration/cert-rbn-recency-window.png)
+![](../../assets/integration/cert-rbn-recency-window.png)
 
 
 ### 2. Cert Validation
