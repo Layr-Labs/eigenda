@@ -134,26 +134,26 @@ func (c *cachedTable) CacheAwareGet(
 	if exists {
 		// The value was recently written
 		hot = true
-		return value, exists, hot, nil
+		return value, exists, hot, err
 	} else {
 		value, exists = c.readCache.Get(stringKey)
 		if exists {
 			// The value was recently read
 			hot = true
-			return value, exists, hot, nil
+			return value, exists, hot, err
 		}
 	}
 
 	value, exists, hot, err = c.base.CacheAwareGet(key, onlyReadFromCache)
 	if err != nil {
-		return nil, false, false, err
+		return value, exists, hot, err
 	}
 
 	if exists && value != nil {
 		c.readCache.Put(stringKey, value)
 	}
 
-	return value, exists, hot, nil
+	return value, exists, hot, err
 }
 
 func (c *cachedTable) Exists(key []byte) (exists bool, err error) {
