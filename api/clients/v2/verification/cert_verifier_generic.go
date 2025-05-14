@@ -8,7 +8,7 @@ import (
 	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/common"
-	genericVerifierBinding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV3"
+	genericVerifierBinding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	opsrbinding "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -117,15 +117,15 @@ func (cv *GenericCertVerifier) GetQuorumNumbersRequired(ctx context.Context, ref
 	return quorumNumbersRequired, nil
 }
 
-// getVerifierCallerFromBlockNumber returns a ContractEigenDACertVerifierV3 that corresponds to the input reference
+// getVerifierCallerFromBlockNumber returns a ContractEigenDACertVerifier that corresponds to the input reference
 // block number.
 //
-// This method caches ContractEigenDACertVerifierV3 instances, since their construction requires acquiring a lock
+// This method caches ContractEigenDACertVerifier instances, since their construction requires acquiring a lock
 // and parsing json, and is therefore non-trivially expensive.
 func (cv *GenericCertVerifier) getVerifierCallerFromBlockNumber(
 	ctx context.Context,
 	referenceBlockNumber uint64,
-) (*genericVerifierBinding.ContractEigenDACertVerifierV3, error) {
+) (*genericVerifierBinding.ContractEigenDACertVerifier, error) {
 	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("get cert verifier address: %w", err)
@@ -134,25 +134,25 @@ func (cv *GenericCertVerifier) getVerifierCallerFromBlockNumber(
 	return cv.getVerifierCallerFromAddress(certVerifierAddress)
 }
 
-// getVerifierCallerFromAddress returns a ContractEigenDACertVerifierV3 that corresponds to the input contract
+// getVerifierCallerFromAddress returns a ContractEigenDACertVerifier that corresponds to the input contract
 // address
 //
-// This method caches ContractEigenDACertVerifierV3 instances, since their construction requires acquiring a lock
+// This method caches ContractEigenDACertVerifier instances, since their construction requires acquiring a lock
 // and parsing json, and is therefore non-trivially expensive.
 func (cv *GenericCertVerifier) getVerifierCallerFromAddress(
 	certVerifierAddress gethcommon.Address,
-) (*genericVerifierBinding.ContractEigenDACertVerifierV3, error) {
+) (*genericVerifierBinding.ContractEigenDACertVerifier, error) {
 	existingCallerAny, valueExists := cv.verifierCallers.Load(certVerifierAddress)
 	if valueExists {
-		existingCaller, ok := existingCallerAny.(*genericVerifierBinding.ContractEigenDACertVerifierV3)
+		existingCaller, ok := existingCallerAny.(*genericVerifierBinding.ContractEigenDACertVerifier)
 		if !ok {
 			return nil, fmt.Errorf(
-				"value in verifierCallers wasn't of type ContractEigenDACertVerifierV3. this should be impossible")
+				"value in verifierCallers wasn't of type ContractEigenDACertVerifier. this should be impossible")
 		}
 		return existingCaller, nil
 	}
 
-	certVerifierCaller, err := genericVerifierBinding.NewContractEigenDACertVerifierV3(certVerifierAddress, cv.ethClient)
+	certVerifierCaller, err := genericVerifierBinding.NewContractEigenDACertVerifier(certVerifierAddress, cv.ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
 	}
@@ -203,7 +203,7 @@ func (cv *GenericCertVerifier) GetConfirmationThreshold(ctx context.Context, ref
 // This method will return the version from an internal cache if it is already known for the cert
 // verifier which corresponds to the input reference block number. Otherwise, this method will query the version
 // and cache the result for future use.
-func (cv *GenericCertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber uint64) (uint8, error) {
+func (cv *GenericCertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber uint64) (uint64, error) {
 	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
 	if err != nil {
 		return 0, fmt.Errorf("get cert verifier address: %w", err)
@@ -212,7 +212,7 @@ func (cv *GenericCertVerifier) GetCertVersion(ctx context.Context, referenceBloc
 	// if the version for the active cert verifier address has already been cached, return it immediately
 	cachedVersion, ok := cv.versions.Load(certVerifierAddress)
 	if ok {
-		castVersion, ok := cachedVersion.(uint8)
+		castVersion, ok := cachedVersion.(uint64)
 		if !ok {
 			return 0, fmt.Errorf("expected version to be uint8")
 		}
