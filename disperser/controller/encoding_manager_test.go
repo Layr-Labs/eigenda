@@ -2,10 +2,12 @@ package controller_test
 
 import (
 	"context"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	commonmock "github.com/Layr-Labs/eigenda/common/mock"
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
@@ -16,7 +18,6 @@ import (
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	dispmock "github.com/Layr-Labs/eigenda/disperser/mock"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/gammazero/workerpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -35,6 +36,7 @@ type testComponents struct {
 	ChainReader     *coremock.MockWriter
 	MockPool        *commonmock.MockWorkerpool
 	BlobSet         *controller.MockBlobSet
+	LivenessChan    chan healthcheck.HeartbeatMessage
 }
 
 func TestGetRelayKeys(t *testing.T) {
@@ -130,11 +132,38 @@ func TestEncodingManagerHandleBatch(t *testing.T) {
 		FragmentSizeBytes:   1024 * 1024 * 4,
 	}, nil)
 
+	// start a goroutine to collect heartbeats
+	var seen []healthcheck.HeartbeatMessage
+	done := make(chan struct{})
+	go func() {
+		for hb := range c.LivenessChan {
+			seen = append(seen, hb)
+		}
+		close(done)
+	}()
+
 	err = c.EncodingManager.HandleBatch(ctx)
 	require.NoError(t, err)
 	c.Pool.StopWait()
 	c.BlobSet.AssertCalled(t, "Contains", blobKey1)
 	c.BlobSet.AssertCalled(t, "AddBlob", blobKey1)
+
+	// give the signals a moment to be sent
+	time.Sleep(10 * time.Millisecond)
+	// signal that we're done listening
+	close(c.LivenessChan)
+	<-done
+
+	// now assert on what we saw
+	require.NotEmpty(t, seen, "expected at least one heartbeat")
+	for _, hb := range seen {
+		require.Equal(t, "encodingManager", hb.Component)
+	}
+	// timestamps are non‐decreasing
+	for i := 1; i < len(seen); i++ {
+		prev, curr := seen[i-1].Timestamp, seen[i].Timestamp
+		require.True(t, !curr.Before(prev), "timestamps should not decrease")
+	}
 
 	fetchedMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, blobKey1)
 	require.NoError(t, err)
@@ -174,11 +203,39 @@ func TestEncodingManagerHandleBatchDedup(t *testing.T) {
 		FragmentSizeBytes:   1024 * 1024 * 4,
 	}, nil)
 
+	// start a goroutine to collect heartbeats
+	var seen []healthcheck.HeartbeatMessage
+	done := make(chan struct{})
+	go func() {
+		for hb := range c.LivenessChan {
+			seen = append(seen, hb)
+		}
+		close(done)
+	}()
+
 	err = c.EncodingManager.HandleBatch(ctx)
 	require.ErrorContains(t, err, "no blobs to encode")
 	c.Pool.StopWait()
 	c.BlobSet.AssertCalled(t, "Contains", blobKey1)
 	c.BlobSet.AssertNotCalled(t, "AddBlob", blobKey1)
+
+	// give the signals a moment to be sent
+	time.Sleep(10 * time.Millisecond)
+	// signal that we're done listening
+	close(c.LivenessChan)
+	<-done
+
+	// now assert on what we saw
+	require.NotEmpty(t, seen, "expected at least one heartbeat")
+	for _, hb := range seen {
+		require.Equal(t, "encodingManager", hb.Component)
+	}
+	// timestamps are non‐decreasing
+	for i := 1; i < len(seen); i++ {
+		prev, curr := seen[i-1].Timestamp, seen[i].Timestamp
+		require.True(t, !curr.Before(prev), "timestamps should not decrease")
+	}
+
 	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{blobKey1}, nil)
 }
 
@@ -209,6 +266,17 @@ func TestEncodingManagerHandleManyBatches(t *testing.T) {
 	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	numIterations := (numBlobs + int(c.EncodingManager.MaxNumBlobsPerIteration) - 1) / int(c.EncodingManager.MaxNumBlobsPerIteration)
 	c.MockPool.On("Submit", mock.Anything).Return(nil).Times(numBlobs + numIterations)
+
+	// start a goroutine to collect heartbeats
+	var seen []healthcheck.HeartbeatMessage
+	done := make(chan struct{})
+	go func() {
+		for hb := range c.LivenessChan {
+			seen = append(seen, hb)
+		}
+		close(done)
+	}()
+
 	expectedNumTasks := 0
 	for i := 0; i < numIterations; i++ {
 		err := c.EncodingManager.HandleBatch(ctx)
@@ -251,10 +319,26 @@ func TestEncodingManagerHandleManyBatches(t *testing.T) {
 		err := blobMetadataStore.UpdateBlobStatus(ctx, keys[numBlobs+i], commonv2.Encoded)
 		require.NoError(t, err)
 	}
-
 	// no more blobs to encode
 	err = c.EncodingManager.HandleBatch(ctx)
 	require.ErrorContains(t, err, "no blobs to encode")
+
+	// give the signals a moment to be sent
+	time.Sleep(10 * time.Millisecond)
+	// signal that we're done listening
+	close(c.LivenessChan)
+	<-done
+
+	// now assert on what we saw
+	require.NotEmpty(t, seen, "expected at least one heartbeat")
+	for _, hb := range seen {
+		require.Equal(t, "encodingManager", hb.Component)
+	}
+	// timestamps are non‐decreasing
+	for i := 1; i < len(seen); i++ {
+		prev, curr := seen[i-1].Timestamp, seen[i].Timestamp
+		require.True(t, !curr.Before(prev), "timestamps should not decrease")
+	}
 
 	deleteBlobs(t, blobMetadataStore, keys, nil)
 }
@@ -263,8 +347,36 @@ func TestEncodingManagerHandleBatchNoBlobs(t *testing.T) {
 	ctx := context.Background()
 	c := newTestComponents(t, false)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+
+	// start a goroutine to collect heartbeats
+	var seen []healthcheck.HeartbeatMessage
+	done := make(chan struct{})
+	go func() {
+		for hb := range c.LivenessChan {
+			seen = append(seen, hb)
+		}
+		close(done)
+	}()
+
 	err := c.EncodingManager.HandleBatch(ctx)
 	require.ErrorContains(t, err, "no blobs to encode")
+
+	// give the signals a moment to be sent
+	time.Sleep(10 * time.Millisecond)
+	// signal that we're done listening
+	close(c.LivenessChan)
+	<-done
+
+	// now assert on what we saw
+	require.NotEmpty(t, seen, "expected at least one heartbeat")
+	for _, hb := range seen {
+		require.Equal(t, "encodingManager", hb.Component)
+	}
+	// timestamps are non‐decreasing
+	for i := 1; i < len(seen); i++ {
+		prev, curr := seen[i-1].Timestamp, seen[i].Timestamp
+		require.True(t, !curr.Before(prev), "timestamps should not decrease")
+	}
 }
 
 func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
@@ -290,6 +402,16 @@ func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 		FragmentSizeBytes:   1024 * 1024 * 4,
 	}, nil)
 
+	// start a goroutine to collect heartbeats
+	var seen []healthcheck.HeartbeatMessage
+	done := make(chan struct{})
+	go func() {
+		for hb := range c.LivenessChan {
+			seen = append(seen, hb)
+		}
+		close(done)
+	}()
+
 	err = c.EncodingManager.HandleBatch(ctx)
 	require.NoError(t, err)
 	c.Pool.StopWait()
@@ -308,6 +430,23 @@ func TestEncodingManagerHandleBatchRetrySuccess(t *testing.T) {
 	require.Equal(t, fetchedFragmentInfo.TotalChunkSizeBytes, uint32(100))
 	require.Equal(t, fetchedFragmentInfo.FragmentSizeBytes, uint32(1024*1024*4))
 	c.EncodingClient.AssertNumberOfCalls(t, "EncodeBlob", 2)
+
+	// give the signals a moment to be sent
+	time.Sleep(10 * time.Millisecond)
+	// signal that we're done listening
+	close(c.LivenessChan)
+	<-done
+
+	// now assert on what we saw
+	require.NotEmpty(t, seen, "expected at least one heartbeat")
+	for _, hb := range seen {
+		require.Equal(t, "encodingManager", hb.Component)
+	}
+	// timestamps are non‐decreasing
+	for i := 1; i < len(seen); i++ {
+		prev, curr := seen[i-1].Timestamp, seen[i].Timestamp
+		require.True(t, !curr.Before(prev), "timestamps should not decrease")
+	}
 
 	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{blobKey1}, nil)
 }
@@ -331,6 +470,16 @@ func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 	c.BlobSet.On("AddBlob", mock.Anything).Return(nil)
 	c.EncodingClient.On("EncodeBlob", mock.Anything, mock.Anything, mock.Anything).Return(nil, assert.AnError).Twice()
 
+	// start a goroutine to collect heartbeats
+	var seen []healthcheck.HeartbeatMessage
+	done := make(chan struct{})
+	go func() {
+		for hb := range c.LivenessChan {
+			seen = append(seen, hb)
+		}
+		close(done)
+	}()
+
 	err = c.EncodingManager.HandleBatch(ctx)
 	require.NoError(t, err)
 	c.Pool.StopWait()
@@ -346,6 +495,23 @@ func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 	require.Nil(t, fetchedCert)
 	require.Nil(t, fetchedFragmentInfo)
 	c.EncodingClient.AssertNumberOfCalls(t, "EncodeBlob", 2)
+
+	// give the signals a moment to be sent
+	time.Sleep(10 * time.Millisecond)
+	// signal that we're done listening
+	close(c.LivenessChan)
+	<-done
+
+	// now assert on what we saw
+	require.NotEmpty(t, seen, "expected at least one heartbeat")
+	for _, hb := range seen {
+		require.Equal(t, "encodingManager", hb.Component)
+	}
+	// timestamps are non‐decreasing
+	for i := 1; i < len(seen); i++ {
+		prev, curr := seen[i-1].Timestamp, seen[i].Timestamp
+		require.True(t, !curr.Before(prev), "timestamps should not decrease")
+	}
 
 	deleteBlobs(t, blobMetadataStore, []corev2.BlobKey{blobKey1}, nil)
 }
@@ -377,6 +543,9 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 	onchainRefreshInterval := 1 * time.Millisecond
 	blobSet := &controller.MockBlobSet{}
 	blobSet.On("Size", mock.Anything).Return(0)
+
+	livenessChan := make(chan healthcheck.HeartbeatMessage, 100)
+
 	em, err := controller.NewEncodingManager(&controller.EncodingManagerConfig{
 		PullInterval:                1 * time.Second,
 		EncodingRequestTimeout:      5 * time.Second,
@@ -386,7 +555,7 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		AvailableRelays:             []corev2.RelayKey{0, 1, 2, 3},
 		MaxNumBlobsPerIteration:     5,
 		OnchainStateRefreshInterval: onchainRefreshInterval,
-	}, blobMetadataStore, pool, encodingClient, chainReader, logger, prometheus.NewRegistry(), blobSet)
+	}, blobMetadataStore, pool, encodingClient, chainReader, logger, prometheus.NewRegistry(), blobSet, livenessChan)
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*onchainRefreshInterval)
@@ -400,5 +569,6 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		ChainReader:     chainReader,
 		MockPool:        mockP,
 		BlobSet:         blobSet,
+		LivenessChan:    livenessChan,
 	}
 }

@@ -3,9 +3,9 @@ package node
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
-	"math/rand"
 	"os"
 	"path"
 	"strconv"
@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/tablestore"
+	"github.com/Layr-Labs/eigenda/common/memory"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/litt"
@@ -111,7 +112,7 @@ type validatorStore struct {
 	duplicateRequestLock *common.IndexLock
 
 	// The salt used to prevent an attacker from causing hash collisions in the duplicate request lock.
-	duplicateRequestSalt uint32
+	duplicateRequestSalt [16]byte
 
 	// A flag indicating whether the migration is complete. Used to prevent a double migration race condition
 	// (which is possible only in a unit test).
@@ -277,12 +278,46 @@ func NewValidatorStore(
 			return nil, fmt.Errorf("failed to get chunks table: %w", err)
 		}
 
-		err = chunkTable.SetWriteCacheSize(uint64(config.LittDBWriteCacheSizeGB * units.GiB))
+		maxMemory, err := memory.GetMaximumAvailableMemory()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get maximum available memory: %w", err)
+		}
+
+		writeCacheSize := uint64(0)
+		if config.LittDBWriteCacheSizeGB > 0 {
+			writeCacheSize = uint64(config.LittDBWriteCacheSizeGB * units.GiB)
+			logger.Infof("LittDB write cache size configured to use %.2f GB.\n", config.LittDBWriteCacheSizeGB)
+		} else {
+			writeCacheSize = uint64(config.LittDBWriteCacheSizeFraction * float64(maxMemory))
+			logger.Infof("LittDB write cache is configured to use %.1f%% of %.2f GB available (%.2f GB).",
+				config.LittDBWriteCacheSizeFraction*100.0,
+				float64(maxMemory)/float64(units.GiB),
+				float64(writeCacheSize)/float64(units.GiB))
+		}
+
+		readCacheSize := uint64(0)
+		if config.LittDBReadCacheSizeGB > 0 {
+			readCacheSize = uint64(config.LittDBReadCacheSizeGB * units.GiB)
+			logger.Infof("LittDB read cache size configured to use %.2f GB.\n", config.LittDBReadCacheSizeGB)
+		} else {
+			readCacheSize = uint64(config.LittDBReadCacheSizeFraction * float64(maxMemory))
+			logger.Infof("LittDB read cache is configured to use %.1f%% of %.2f GB available (%.2f GB).",
+				config.LittDBReadCacheSizeFraction*100.0,
+				float64(maxMemory)/float64(units.GiB),
+				float64(readCacheSize)/float64(units.GiB))
+		}
+
+		if writeCacheSize+readCacheSize >= maxMemory {
+			return nil, fmt.Errorf("Write cache size + read cache size must be less than max memory. "+
+				"Write cache size: %d, read cache size: %d, max memory: %d", writeCacheSize, readCacheSize, maxMemory)
+		}
+
+		err = chunkTable.SetWriteCacheSize(writeCacheSize)
 		if err != nil {
 			return nil, fmt.Errorf("failed to set write cache size for chunks table: %w", err)
 		}
 
-		err = chunkTable.SetReadCacheSize(uint64(config.LittDBReadCacheSizeGB * units.GiB))
+		err = chunkTable.SetReadCacheSize(readCacheSize)
 		if err != nil {
 			return nil, fmt.Errorf("failed to set read cache size for chunks table: %w", err)
 		}
@@ -298,6 +333,12 @@ func NewValidatorStore(
 		if err != nil {
 			return nil, fmt.Errorf("failed to set TTL for chunks table: %w", err)
 		}
+	}
+
+	salt := [16]byte{}
+	_, err = rand.Read(salt[:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random salt: %v", err)
 	}
 
 	hotReadRateLimiter := rate.NewLimiter(
@@ -319,7 +360,7 @@ func NewValidatorStore(
 		ttl:                   ttl,
 		migrationCompleteTime: migrationComplete,
 		duplicateRequestLock:  common.NewIndexLock(1024),
-		duplicateRequestSalt:  rand.Uint32(),
+		duplicateRequestSalt:  salt,
 		hotReadRateLimiter:    hotReadRateLimiter,
 		coldReadRateLimiter:   coldReadRateLimiter,
 	}
@@ -401,7 +442,8 @@ func (s *validatorStore) storeBatchLittDB(batchData []*BundleToStore) (uint64, e
 
 		go func() {
 			// Grab a lock on the hash of the blob. This protects against duplicate writes of the same blob.
-			lockIndex := uint64(util.HashKey(bundleKeyBytes[:], s.duplicateRequestSalt))
+			hash := util.HashKey(bundleKeyBytes[:], s.duplicateRequestSalt)
+			lockIndex := uint64(hash)
 			s.duplicateRequestLock.Lock(lockIndex)
 			defer s.duplicateRequestLock.Unlock(lockIndex)
 

@@ -15,11 +15,11 @@ func TestUnsealedSerialization(t *testing.T) {
 
 	index := rand.Uint32()
 	shardingFactor := rand.Uint32()
-	salt := rand.Uint32()
+	salt := ([16]byte)(rand.Bytes(16))
 	timestamp := rand.Uint64()
 	m := &metadataFile{
 		index:                index,
-		serializationVersion: currentSerializationVersion,
+		serializationVersion: CurrentSerializationVersion,
 		shardingFactor:       shardingFactor,
 		salt:                 salt,
 		lastValueTimestamp:   timestamp,
@@ -58,11 +58,11 @@ func TestSealedSerialization(t *testing.T) {
 
 	index := rand.Uint32()
 	shardingFactor := rand.Uint32()
-	salt := rand.Uint32()
+	salt := ([16]byte)(rand.Bytes(16))
 	timestamp := rand.Uint64()
 	m := &metadataFile{
 		index:                index,
-		serializationVersion: currentSerializationVersion,
+		serializationVersion: CurrentSerializationVersion,
 		shardingFactor:       shardingFactor,
 		salt:                 salt,
 		lastValueTimestamp:   timestamp,
@@ -99,12 +99,14 @@ func TestFreshFileSerialization(t *testing.T) {
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
+	salt := ([16]byte)(rand.Bytes(16))
+
 	index := rand.Uint32()
-	m, err := createMetadataFile(index, 1234, 5678, directory)
+	m, err := createMetadataFile(index, 1234, salt, directory)
 	require.NoError(t, err)
 
 	require.Equal(t, index, m.index)
-	require.Equal(t, currentSerializationVersion, m.serializationVersion)
+	require.Equal(t, CurrentSerializationVersion, m.serializationVersion)
 	require.False(t, m.sealed)
 	require.Zero(t, m.lastValueTimestamp)
 	require.Equal(t, directory, m.parentDirectory)
@@ -136,8 +138,10 @@ func TestSealing(t *testing.T) {
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
+	salt := ([16]byte)(rand.Bytes(16))
+
 	index := rand.Uint32()
-	m, err := createMetadataFile(index, 1234, 5678, directory)
+	m, err := createMetadataFile(index, 1234, salt, directory)
 	require.NoError(t, err)
 
 	// seal the file
@@ -146,7 +150,7 @@ func TestSealing(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, index, m.index)
-	require.Equal(t, currentSerializationVersion, m.serializationVersion)
+	require.Equal(t, CurrentSerializationVersion, m.serializationVersion)
 	require.True(t, m.sealed)
 	require.Equal(t, uint64(sealTime.UnixNano()), m.lastValueTimestamp)
 	require.Equal(t, directory, m.parentDirectory)

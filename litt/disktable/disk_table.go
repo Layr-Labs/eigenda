@@ -212,14 +212,18 @@ func NewDiskTable(
 	} else {
 		nextSegmentIndex = highestSegmentIndex + 1
 	}
+	salt := [16]byte{}
+	_, err = config.SaltShaker.Read(salt[:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to read salt: %w", err)
+	}
 	mutableSegment, err := segment.CreateSegment(
 		config.Logger,
 		fatalErrorHandler,
 		nextSegmentIndex,
 		segDirs,
-		config.Clock(),
 		metadata.GetShardingFactor(),
-		config.SaltShaker.Uint32(),
+		salt,
 		config.Fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create mutable segment: %w", err)
@@ -536,23 +540,10 @@ func (d *DiskTable) Get(key []byte) (value []byte, exists bool, err error) {
 			"Cannot process Get() request, DB is in panicked state due to error: %w", err)
 	}
 
-	var cacheHit bool
-	var dataSize uint64
-	if d.metrics != nil {
-		start := d.clock()
-		defer func() {
-			end := d.clock()
-			delta := end.Sub(start)
-			d.metrics.ReportReadOperation(d.name, delta, dataSize, cacheHit)
-		}()
-	}
-
 	// First, check if the key is in the unflushed data map.
 	// If so, return it from there.
 	if value, ok := d.unflushedDataCache.Load(util.UnsafeBytesToString(key)); ok {
 		bytes := value.([]byte)
-		cacheHit = true
-		dataSize = uint64(len(bytes))
 		return bytes, true, nil
 	}
 
@@ -578,8 +569,6 @@ func (d *DiskTable) Get(key []byte) (value []byte, exists bool, err error) {
 		return nil, false, fmt.Errorf("failed to read data: %w", err)
 	}
 
-	dataSize = uint64(len(data))
-
 	return data, true, nil
 }
 
@@ -593,25 +582,12 @@ func (d *DiskTable) CacheAwareGet(
 			"Cannot process CacheAwareGet() request, DB is in panicked state due to error: %w", err)
 	}
 
-	var cacheHit bool
-	var dataSize uint64
-	if d.metrics != nil {
-		start := d.clock()
-		defer func() {
-			end := d.clock()
-			delta := end.Sub(start)
-			d.metrics.ReportReadOperation(d.name, delta, dataSize, cacheHit)
-		}()
-	}
-
 	// First, check if the key is in the unflushed data map. If so, return it from there.
 	// Performance wise, this has equivalent semantics to reading the value from
 	// a cache, so we'd might as well count it as a cache hit.
 	var rawValue any
 	if rawValue, exists = d.unflushedDataCache.Load(util.UnsafeBytesToString(key)); exists {
 		value = rawValue.([]byte)
-		cacheHit = true
-		dataSize = uint64(len(value))
 		return value, true, true, nil
 	}
 
@@ -644,8 +620,6 @@ func (d *DiskTable) CacheAwareGet(
 	if err != nil {
 		return nil, false, false, fmt.Errorf("failed to read data: %w", err)
 	}
-
-	dataSize = uint64(len(value))
 
 	return value, true, false, nil
 }
