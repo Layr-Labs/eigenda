@@ -14,6 +14,7 @@ import "forge-std/StdJson.sol";
 contract CertVerifierRouterDeployer is Script, Test {
     address eigenDACertVerifierRouter;
     address initialOwner;
+    address initialVerifier;
 
     // TODO: Consider adding an optional verifier parameter to instantiate one using closely upcoming block
     function run(string memory inputJSONFile, string memory outputJSONFile) external {
@@ -23,13 +24,16 @@ contract CertVerifierRouterDeployer is Script, Test {
         bytes memory raw = stdJson.parseRaw(data, ".initialOwner");
         initialOwner = abi.decode(raw, (address));
 
+        raw = stdJson.parseRaw(data, ".initialCertVerifier");
+        initialCertVerifier = abi.decode(raw, (address));
+
         vm.startBroadcast();
 
         // Deploy the EigenDACertVerifierRouter contract
         EigenDACertVerifierRouter router = new EigenDACertVerifierRouter();
         
         // Initialize the router with the initial owner
-        router.initialize(initialOwner);
+        router.initialize(initialOwner, initialCertVerifier);
         
         eigenDACertVerifierRouter = address(router);
 
