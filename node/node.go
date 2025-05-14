@@ -242,7 +242,7 @@ func NewNode(
 	if config.EnableV2 {
 		// 12s per block
 		ttl := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second
-		n.ValidatorStore, err = NewValidatorStore(context.Background(), logger, config, time.Now, ttl, reg)
+		n.ValidatorStore, err = NewValidatorStore(logger, config, time.Now, ttl, reg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new store v2: %w", err)
 		}
