@@ -6,6 +6,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/cache"
 	"github.com/Layr-Labs/eigenda/litt"
+	"github.com/Layr-Labs/eigenda/litt/metrics"
 	"github.com/Layr-Labs/eigenda/litt/types"
 	"github.com/Layr-Labs/eigenda/litt/util"
 )
@@ -20,6 +21,8 @@ type cachedTable struct {
 	writeCache cache.Cache[string, []byte]
 	// This cache holds values that were recently read from the base table.
 	readCache cache.Cache[string, []byte]
+	// Metrics for the table.
+	metrics *metrics.LittDBMetrics
 }
 
 // NewCachedTable creates wrapper around a table that caches recently written and read values.
@@ -27,11 +30,13 @@ func NewCachedTable(
 	base litt.ManagedTable,
 	writeCache cache.Cache[string, []byte],
 	readCache cache.Cache[string, []byte],
+	metrics *metrics.LittDBMetrics,
 ) litt.ManagedTable {
 	return &cachedTable{
 		base:       base,
 		writeCache: writeCache,
 		readCache:  readCache,
+		metrics:    metrics,
 	}
 }
 
@@ -114,17 +119,28 @@ func (c *cachedTable) CacheAwareGet(
 	onlyReadFromCache bool,
 ) (value []byte, exists bool, hot bool, err error) {
 
+	if c.metrics != nil {
+		start := time.Now()
+		defer func() {
+			if exists && value != nil {
+				c.metrics.ReportReadOperation(c.Name(), time.Since(start), uint64(len(value)), hot)
+			}
+		}()
+	}
+
 	stringKey := util.UnsafeBytesToString(key)
 
 	value, exists = c.writeCache.Get(stringKey)
 	if exists {
 		// The value was recently written
-		return value, true, true, nil
+		hot = true
+		return value, exists, hot, nil
 	} else {
 		value, exists = c.readCache.Get(stringKey)
 		if exists {
 			// The value was recently read
-			return value, true, true, nil
+			hot = true
+			return value, exists, hot, nil
 		}
 	}
 
