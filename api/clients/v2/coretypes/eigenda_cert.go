@@ -25,9 +25,9 @@ func init() {
 		panic(err)
 	}
 
-	v3CertTypeEncodeMethod, ok := certTypesBinding.Methods["dummyFnCertV3"]
+	v3CertTypeEncodeMethod, ok := certTypesBinding.Methods["dummyVerifyDACertV3"]
 	if !ok {
-		panic("dummyFnCertV3 not found in IEigenDACertTypes ABI")
+		panic("dummyVerifyDACertV3 not found in IEigenDACertTypes ABI")
 	}
 
 	v3CertTypeEncodeArgs = v3CertTypeEncodeMethod.Inputs
@@ -141,7 +141,7 @@ func (c *EigenDACertV3) ComputeBlobKey() (*v2.BlobKey, error) {
 }
 
 func (c *EigenDACertV3) Serialize() ([]byte, error) {
-	return rlp.EncodeToBytes(c)
+	return v3CertTypeEncodeArgs.Pack(c)
 }
 
 // Commitments returns the blob's cryptographic kzg commitments 

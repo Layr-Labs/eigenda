@@ -24,7 +24,6 @@ type CertBuilder struct {
 	logger 					logging.Logger
 	opsrCaller				*opsrbinding.ContractOperatorStateRetrieverCaller
 	registryCoordinatorAddr gethcommon.Address
-	// blockNumberMonitor 	*verification.BlockNumberMonitor
 }
 
 // NewCertBuilder constructs a new CertBuilder instance used to build EigenDA certificates
