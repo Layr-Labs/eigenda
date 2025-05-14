@@ -36,8 +36,7 @@ contract CertVerifierDeployerV1 is Script, Test {
 
         eigenDACertVerifier = address(
             new EigenDACertVerifierV1(
-                IEigenDAThresholdRegistry(eigenDAThresholdRegistry),
-                IEigenDABatchMetadataStorage(eigenDAServiceManager)
+                IEigenDAThresholdRegistry(eigenDAThresholdRegistry), IEigenDABatchMetadataStorage(eigenDAServiceManager)
             )
         );
 
