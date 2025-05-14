@@ -8,9 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
-	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
@@ -62,21 +60,17 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 		return nil, fmt.Errorf("compute blob key: %w", err)
 	}
 
-	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
+	blobHeader, err := coretypes.BlobHeaderBindingToInternal(&eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader)
 	if err != nil {
-		return nil, fmt.Errorf("convert commitments binding to internal: %w", err)
+		return nil, fmt.Errorf("convert blob header binding to internal: %w", err)
 	}
 
 	// TODO (litt3): Add a feature which keeps chunks from previous quorums, and just fills in gaps
 	for _, quorumID := range blobHeader.QuorumNumbers {
 		blob, err := pr.retrieveBlobWithTimeout(
 			ctx,
-			*blobKey,
-			blobHeader.Version,
-			*commitment,
-			eigenDACert.BatchHeader.ReferenceBlockNumber,
-			quorumID)
+			blobHeader,
+			eigenDACert.BatchHeader.ReferenceBlockNumber)
 
 		if err != nil {
 			pr.logger.Error(
@@ -91,7 +85,7 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 		//  serialization of a blob. Commitment generation operates on field elements, which is how a blob is stored
 		//  under the hood, so it's actually duplicating work to serialize the blob here. I'm declining to make this
 		//  change now, to limit the size of the refactor PR.
-		valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blob.Serialize(), commitment.Commitment)
+		valid, err := verification.GenerateAndCompareBlobCommitment(pr.g1Srs, blob.Serialize(), blobHeader.BlobCommitments.Commitment)
 		if err != nil {
 			pr.logger.Warn(
 				"generate and compare blob commitment",
@@ -125,11 +119,9 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 // retrieveBlobWithTimeout attempts to retrieve a blob from a given quorum, and times out based on config.RetrievalTimeout
 func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 	ctx context.Context,
-	blobKey corev2.BlobKey,
-	blobVersion corev2.BlobVersion,
-	blobCommitments encoding.BlobCommitments,
+	header *corev2.BlobHeaderWithHashedPayment,
 	referenceBlockNumber uint32,
-	quorumID core.QuorumID) (*coretypes.Blob, error) {
+) (*coretypes.Blob, error) {
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, pr.config.RetrievalTimeout)
 	defer cancel()
@@ -137,17 +129,15 @@ func (pr *ValidatorPayloadRetriever) retrieveBlobWithTimeout(
 	// TODO (litt3): eventually, we should make GetBlob return an actual blob object, instead of the serialized bytes.
 	blobBytes, err := pr.retrievalClient.GetBlob(
 		timeoutCtx,
-		blobKey,
-		blobVersion,
-		blobCommitments,
+		header,
 		uint64(referenceBlockNumber),
-		quorumID)
+	)
 
 	if err != nil {
 		return nil, fmt.Errorf("get blob: %w", err)
 	}
 
-	blob, err := coretypes.DeserializeBlob(blobBytes, uint32(blobCommitments.Length))
+	blob, err := coretypes.DeserializeBlob(blobBytes, uint32(header.BlobCommitments.Length))
 	if err != nil {
 		return nil, fmt.Errorf("deserialize blob: %w", err)
 	}

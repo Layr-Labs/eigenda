@@ -21,14 +21,13 @@ type ValidatorGRPCManager interface {
 		ctx context.Context,
 		key v2.BlobKey,
 		operatorID core.OperatorID,
-		quorumID core.QuorumID,
 	) (*grpcnode.GetChunksReply, error)
 }
 
 // ValidatorGRPCManagerFactory is a function that creates a new ValidatorGRPCManager instance.
 type ValidatorGRPCManagerFactory func(
 	logger logging.Logger,
-	operatorInfo map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo,
+	socketMap map[core.OperatorID]core.OperatorSocket,
 ) ValidatorGRPCManager
 
 var _ ValidatorGRPCManager = &validatorGRPCManager{}
@@ -38,7 +37,7 @@ type validatorGRPCManager struct {
 	logger logging.Logger
 
 	// Information about the operators for each quorum.
-	operatorInfo map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo
+	socketMap map[core.OperatorID]core.OperatorSocket
 }
 
 var _ ValidatorGRPCManagerFactory = NewValidatorGRPCManager
@@ -46,11 +45,11 @@ var _ ValidatorGRPCManagerFactory = NewValidatorGRPCManager
 // NewValidatorGRPCManager creates a new ValidatorGRPCManager instance.
 func NewValidatorGRPCManager(
 	logger logging.Logger,
-	operatorInfo map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo,
+	socketMap map[core.OperatorID]core.OperatorSocket,
 ) ValidatorGRPCManager {
 	return &validatorGRPCManager{
-		logger:       logger,
-		operatorInfo: operatorInfo,
+		logger:    logger,
+		socketMap: socketMap,
 	}
 }
 
@@ -58,7 +57,6 @@ func (m *validatorGRPCManager) DownloadChunks(
 	ctx context.Context,
 	key v2.BlobKey,
 	operatorID core.OperatorID,
-	quorumID core.QuorumID,
 ) (*grpcnode.GetChunksReply, error) {
 
 	// TODO(cody.littley) we can get a tighter bound?
@@ -67,17 +65,13 @@ func (m *validatorGRPCManager) DownloadChunks(
 	fudgeFactor := units.MiB      // to allow for some overhead from things like protobuf encoding
 	maxMessageSize := maxBlobSize*encodingRate + fudgeFactor
 
-	quorumOpInfo, ok := m.operatorInfo[quorumID]
+	socket, ok := m.socketMap[operatorID]
 	if !ok {
-		return nil, fmt.Errorf("quorum %d not found", quorumID)
-	}
-	opInfo, ok := quorumOpInfo[operatorID]
-	if !ok {
-		return nil, fmt.Errorf("operator %s not found in quorum %d", operatorID.Hex(), quorumID)
+		return nil, fmt.Errorf("operator %s not found in socket map", operatorID.Hex())
 	}
 
 	conn, err := grpc.NewClient(
-		opInfo.Socket.GetV2RetrievalSocket(),
+		socket.GetV2RetrievalSocket(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMessageSize)),
 	)
@@ -93,8 +87,7 @@ func (m *validatorGRPCManager) DownloadChunks(
 
 	client := grpcnode.NewRetrievalClient(conn)
 	request := &grpcnode.GetChunksRequest{
-		BlobKey:  key[:],
-		QuorumId: uint32(quorumID),
+		BlobKey: key[:],
 	}
 
 	reply, err := client.GetChunks(ctx, request)

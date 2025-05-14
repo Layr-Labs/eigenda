@@ -17,7 +17,6 @@ type MockValidatorGRPCManager struct {
 	DownloadChunksFunction func(ctx context.Context,
 		key v2.BlobKey,
 		operatorID core.OperatorID,
-		quorumID core.QuorumID,
 	) (*grpcnode.GetChunksReply, error)
 }
 
@@ -25,12 +24,11 @@ func (m *MockValidatorGRPCManager) DownloadChunks(
 	ctx context.Context,
 	key v2.BlobKey,
 	operatorID core.OperatorID,
-	quorumID core.QuorumID,
 ) (*grpcnode.GetChunksReply, error) {
 	if m.DownloadChunksFunction == nil {
 		return nil, nil
 	}
-	return m.DownloadChunksFunction(ctx, key, operatorID, quorumID)
+	return m.DownloadChunksFunction(ctx, key, operatorID)
 }
 
 // NewMockValidatorGRPCManager creates a new ValidatorGRPCManager instance with the provided download function.
@@ -38,7 +36,6 @@ func NewMockValidatorGRPCManager(
 	downloadChunksFunction func(ctx context.Context,
 		key v2.BlobKey,
 		operatorID core.OperatorID,
-		quorumID core.QuorumID,
 	) (*grpcnode.GetChunksReply, error),
 ) internal.ValidatorGRPCManager {
 	return &MockValidatorGRPCManager{

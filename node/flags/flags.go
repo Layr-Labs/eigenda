@@ -414,14 +414,14 @@ var (
 		Usage: "The size of the LittDB write cache in gigabytes. Overrides " +
 			"LITT_DB_WRITE_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
 		Required: false,
-		Value:    3,
+		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_GB"),
 	}
 	LittDBWriteCacheSizeFractionFlag = cli.Float64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-fraction"),
 		Usage:    "The fraction of the total memory to use for the LittDB write cache.",
 		Required: false,
-		Value:    0.75,
+		Value:    0.45,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_WRITE_CACHE_SIZE_FRACTION"),
 	}
 	LittDBReadCacheSizeGBFlag = cli.IntFlag{
@@ -429,7 +429,7 @@ var (
 		Usage: "The size of the LittDB read cache in gigabytes. Overrides " +
 			"LITT_DB_READ_CACHE_SIZE_FRACTION if > 0, otherwise is ignored.",
 		Required: false,
-		Value:    1,
+		Value:    0,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_GB"),
 	}
 	LittDBReadCacheSizeFractionFlag = cli.Float64Flag{
@@ -458,18 +458,28 @@ var (
 		Usage:    "The burst limit for GetChunks() calls that hit the cache, unit is MB.",
 		Required: false,
 		Value:    1024,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_HOT_BURST_LIMIT_MB"),
 	}
 	GetChunksColdCacheReadLimitMBFlag = cli.Float64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-cold-cache-read-limit-mb"),
 		Usage:    "The rate limit for GetChunks() calls that miss the cache, unit is MB/s.",
 		Required: false,
 		Value:    32,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_COLD_CACHE_READ_LIMIT_MB"),
 	}
 	GetChunksColdBurstLimitMBFlag = cli.Float64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "get-chunks-cold-burst-limit-MB"),
 		Usage:    "The burst limit for GetChunks() calls that miss the cache, unit is MB.",
 		Required: false,
 		Value:    32,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GET_CHUNKS_COLD_BURST_LIMIT_MB"),
+	}
+	GCSafetyBufferSizeGBFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "gc-safety-buffer-size-gb"),
+		Usage:    "The size of the safety buffer for garbage collection in gigabytes.",
+		Required: false,
+		Value:    1,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_GB"),
 	}
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -599,10 +609,13 @@ var optionalFlags = []cli.Flag{
 	DownloadPoolSizeFlag,
 	LittDBWriteCacheSizeGBFlag,
 	LittDBReadCacheSizeGBFlag,
+	LittDBWriteCacheSizeFractionFlag,
+	LittDBReadCacheSizeFractionFlag,
 	GetChunksHotCacheReadLimitMBFlag,
 	GetChunksHotBurstLimitMBFlag,
 	GetChunksColdCacheReadLimitMBFlag,
 	GetChunksColdBurstLimitMBFlag,
+	GCSafetyBufferSizeGBFlag,
 }
 
 func init() {
