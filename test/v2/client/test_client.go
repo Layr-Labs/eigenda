@@ -280,7 +280,7 @@ func NewTestClient(
 
 	clientConfig := validator.DefaultClientConfig()
 	clientConfig.ConnectionPoolSize = config.ValidatorReadConnectionPoolSize
-	clientConfig.ComputePoolSize = config.validatorReadComputePoolSize
+	clientConfig.ComputePoolSize = config.ValidatorReadComputePoolSize
 	retrievalClient := validator.NewValidatorClient(
 		logger,
 		ethReader,
@@ -302,7 +302,7 @@ func NewTestClient(
 	// with limited CPU resources.
 	onlyDownloadClientConfig := validator.DefaultClientConfig()
 	onlyDownloadClientConfig.ConnectionPoolSize = config.ValidatorReadConnectionPoolSize
-	onlyDownloadClientConfig.ComputePoolSize = config.validatorReadComputePoolSize
+	onlyDownloadClientConfig.ComputePoolSize = config.ValidatorReadComputePoolSize
 	onlyDownloadClientConfig.UnsafeChunkDeserializerFactory =
 		mock.NewMockChunkDeserializerFactory(&mock.MockChunkDeserializer{})
 	onlyDownloadClientConfig.UnsafeBlobDecoderFactory =
