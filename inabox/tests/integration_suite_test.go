@@ -15,8 +15,8 @@ import (
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
-	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
+	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
+	verifierv2bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
@@ -46,8 +46,8 @@ var (
 	logger              logging.Logger
 	ethClient           common.EthClient
 	rpcClient           common.RPCEthClient
-	mockRollup          *rollupbindings.ContractMockRollup
-	verifierContract    *verifierbindings.ContractEigenDACertVerifierV2
+	eigenDACertVerifierV1   *verifierv1bindings.ContractEigenDACertVerifierV1
+	eigenDACertVerifierV2   *verifierv2bindings.ContractEigenDACertVerifierV2
 	retrievalClient     clients.RetrievalClient
 	retrievalClientV2   clientsv2.ValidatorClient
 	numConfirmations    int = 3
@@ -143,9 +143,9 @@ var _ = BeforeSuite(func() {
 		fmt.Println("Starting binaries")
 		testConfig.StartBinaries()
 
-		mockRollup, err = rollupbindings.NewContractMockRollup(gcommon.HexToAddress(testConfig.MockRollup), ethClient)
+		eigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(gcommon.HexToAddress(testConfig.EigenDAV1CertVerifier), ethClient)
 		Expect(err).To(BeNil())
-		verifierContract, err = verifierbindings.NewContractEigenDACertVerifierV2(gcommon.HexToAddress(testConfig.EigenDA.CertVerifier), ethClient)
+		eigenDACertVerifierV2, err = verifierv2bindings.NewContractEigenDACertVerifierV2(gcommon.HexToAddress(testConfig.EigenDAV2CertVerifier), ethClient)
 		Expect(err).To(BeNil())
 		err = setupRetrievalClient(testConfig)
 		Expect(err).To(BeNil())

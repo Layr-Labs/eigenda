@@ -50,6 +50,11 @@ type TelemetryConfig struct {
 	DockerSd   []string `yaml:"dockerSd"`
 }
 
+type V1CertVerifierDeployConfig struct {
+	ThresholdRegistry string `json:"eigenDAThresholdRegistry"`
+	ServiceManager  string `json:"eigenDAServiceManager"`
+}
+
 type EigenDADeployConfig struct {
 	UseDefaults         bool       `json:"useDefaults"`
 	NumStrategies       int        `json:"numStrategies"`
@@ -105,7 +110,6 @@ type EigenDAContract struct {
 	OperatorStateRetreiver string `json:"operatorStateRetriever"`
 	BlsApkRegistry         string `json:"blsApkRegistry"`
 	RegistryCoordinator    string `json:"registryCoordinator"`
-	CertVerifier           string `json:"certVerifier"`
 }
 
 type Stakes struct {
@@ -167,7 +171,8 @@ type Config struct {
 
 	EigenDA           EigenDAContract     `yaml:"eigenda"`
 	BlobVersionParams []*BlobVersionParam `yaml:"blobVersions"`
-	MockRollup        string              `yaml:"mockRollup" json:"mockRollup"`
+	EigenDAV1CertVerifier        string              `yaml:"v1CertVerifier" json:"v1CertVerifier"`
+	EigenDAV2CertVerifier        string              `yaml:"v2CertVerifier" json:"v2CertVerifier"`
 
 	Pks *PkConfig `yaml:"privateKeys"`
 

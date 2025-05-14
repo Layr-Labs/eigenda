@@ -15,6 +15,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	caws "github.com/Layr-Labs/eigenda/common/aws"
+	"github.com/Layr-Labs/eigenda/common/geth"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
@@ -46,6 +47,25 @@ func (env *Config) getKeyString(name string) string {
 		log.Panicf("Error: could not parse key %s", key)
 	}
 	return keyInt.String()
+}
+
+func (env *Config) generateV1CertVerifierDeployConfig(ethClient common.EthClient) V1CertVerifierDeployConfig {
+	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
+	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
+	if err != nil {
+		log.Panicf("Error: %s", err)
+	}
+	thresholdRegistryAddr, err := contractEigenDAServiceManager.EigenDAThresholdRegistry(&bind.CallOpts{})
+	if err != nil {
+		log.Panicf("Error: %s", err)
+	}
+
+	config := V1CertVerifierDeployConfig{
+		ThresholdRegistry: thresholdRegistryAddr.String(),
+		ServiceManager:    env.EigenDA.ServiceManager,
+	}
+
+	return config
 }
 
 func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
@@ -119,16 +139,40 @@ func (env *Config) deployEigenDAContracts() {
 	if err != nil {
 		log.Panicf("Error: %s", err.Error())
 	}
-	execForgeScript("script/MockRollupDeployer.s.sol:MockRollupDeployer", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(address)", env.EigenDA.ServiceManager})
 
-	//add rollup address to path
-	data = readFile("script/output/mock_rollup_deploy_output.json")
-	var rollupAddr struct{ MockRollup string }
-	err = json.Unmarshal(data, &rollupAddr)
+	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	if err != nil {
 		log.Panicf("Error: %s", err.Error())
 	}
-	env.MockRollup = rollupAddr.MockRollup
+
+	ethClient, err := geth.NewClient(geth.EthClientConfig{
+		RPCURLs: 		[]string{deployer.RPC},
+		PrivateKeyString: env.Pks.EcdsaMap[deployer.Name].PrivateKey[2:],
+		NumConfirmations: 0,
+		NumRetries:       0,
+	}, gcommon.Address{}, 0, logger)
+	if err != nil {
+		log.Panicf("Error: %s", err.Error())
+	}
+
+	certVerifierV1DeployCfg := env.generateV1CertVerifierDeployConfig(ethClient)
+	data, err = json.Marshal(&certVerifierV1DeployCfg)
+	if err != nil {
+		log.Panicf("Error: %s", err.Error())
+	}
+
+	writeFile("script/deploy/certverifier/config/inabox_deploy_config.json", data)
+	// TODO: Deploy threshold registry here
+	execForgeScript("script/deploy/certverifier/CertVerifierDeployerV1.s.sol:CertVerifierDeployerV1", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(string, string)", "inabox_deploy_config.json", "out.json"})
+
+	//add v1 cert verifier address to path
+	data = readFile("script/deploy/certverifier/output/out.json")
+	var verifierAddress struct{ eigenDACertVerifier string }
+	err = json.Unmarshal(data, &verifierAddress)
+	if err != nil {
+		log.Panicf("Error: %s", err.Error())
+	}
+	env.EigenDAV1CertVerifier = verifierAddress.eigenDACertVerifier
 }
 
 // Deploys a EigenDA experiment
