@@ -224,7 +224,7 @@ func buildTable(
 	readCache := cache.NewFIFOCache[string, []byte](config.ReadCacheSize, cacheWeight, metrics.GetReadCacheMetrics())
 	readCache = cache.NewThreadSafeCache(readCache)
 
-	cachedTable := tablecache.NewCachedTable(table, writeCache, readCache)
+	cachedTable := tablecache.NewCachedTable(table, writeCache, readCache, metrics)
 
 	return cachedTable, nil
 }
