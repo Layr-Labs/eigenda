@@ -14,27 +14,32 @@ import (
 type thresholdNotMetError struct {
 	BlobKey               string
 	ConfirmationThreshold uint8
-	QuorumNumbers         []uint32
-	SignedPercentages     []uint8
+	// these are the quorum numbers defined in the blob header
+	BlobQuorumNumbers []uint32
+	// map from quorumID to percent signed from the quorum
+	SignedPercentagesMap map[uint32]uint8
 }
 
 // Error implements the error interface and returns a formatted error message
 func (e *thresholdNotMetError) Error() string {
 	stringBuilder := strings.Builder{}
+	stringBuilder.WriteString(fmt.Sprintf(
+		"Blob Key: %s, Confirmation Threshold: %d%% [", e.BlobKey, e.ConfirmationThreshold))
 
-	stringBuilder.WriteString("\nBlob Key: ")
-	stringBuilder.WriteString(e.BlobKey)
-	stringBuilder.WriteString(fmt.Sprintf("\nConfirmation Threshold: %d%%", e.ConfirmationThreshold))
+	for index, quorumID := range e.BlobQuorumNumbers {
+		signedPercentage := e.SignedPercentagesMap[quorumID]
 
-	for index, quorum := range e.QuorumNumbers {
-		signedPercentage := e.SignedPercentages[index]
-
-		stringBuilder.WriteString(fmt.Sprintf("\n  Quorum %d: %d%% signed", quorum, signedPercentage))
+		stringBuilder.WriteString(fmt.Sprintf("quorum_%d: %d%%", quorumID, signedPercentage))
 
 		if signedPercentage < e.ConfirmationThreshold {
 			stringBuilder.WriteString(" (DOES NOT MEET THRESHOLD)")
 		}
+
+		if index < len(e.BlobQuorumNumbers)-1 {
+			stringBuilder.WriteString(", ")
+		}
 	}
+	stringBuilder.WriteString("]")
 
 	return stringBuilder.String()
 }
@@ -46,16 +51,23 @@ func checkThresholds(
 	blobStatusReply *dispgrpc.BlobStatusReply,
 	blobKey string,
 ) error {
-	quorumNumbers := blobStatusReply.GetBlobInclusionInfo().GetBlobCertificate().GetBlobHeader().GetQuorumNumbers()
-	if len(quorumNumbers) == 0 {
-		return fmt.Errorf("expected >0 quorum numbers: %v", protoToString(blobStatusReply))
+	blobQuorumNumbers := blobStatusReply.GetBlobInclusionInfo().GetBlobCertificate().GetBlobHeader().GetQuorumNumbers()
+	if len(blobQuorumNumbers) == 0 {
+		return fmt.Errorf("expected >0 quorum numbers in blob header: %v", protoToString(blobStatusReply))
 	}
 
-	quorumSignedPercentages := blobStatusReply.GetSignedBatch().GetAttestation().GetQuorumSignedPercentages()
-	if len(quorumSignedPercentages) != len(quorumNumbers) {
-		return fmt.Errorf("expected number of signed percentages to match number of quorums. "+
-			"signed percentages count: %d; quorum count: %d",
-			len(quorumSignedPercentages), len(quorumNumbers))
+	attestation := blobStatusReply.GetSignedBatch().GetAttestation()
+	batchQuorumNumbers := attestation.GetQuorumNumbers()
+	batchSignedPercentages := attestation.GetQuorumSignedPercentages()
+
+	if len(batchQuorumNumbers) != len(batchSignedPercentages) {
+		return fmt.Errorf("batch quorum number count and signed percentage count don't match")
+	}
+
+	// map from quorum ID to the percentage stake signed from that quorum
+	signedPercentagesMap := make(map[uint32]uint8, len(batchQuorumNumbers))
+	for index, quorumID := range batchQuorumNumbers {
+		signedPercentagesMap[quorumID] = batchSignedPercentages[index]
 	}
 
 	batchHeader := blobStatusReply.GetSignedBatch().GetHeader()
@@ -63,14 +75,15 @@ func checkThresholds(
 		return fmt.Errorf("expected non-nil batch header: %v", protoToString(blobStatusReply))
 	}
 
-	// Check if all thresholds are met
-	for _, signedPercentage := range quorumSignedPercentages {
+	// Check if all thresholds are met for the quorums defined in the blob header
+	for _, quorum := range blobQuorumNumbers {
+		signedPercentage := signedPercentagesMap[quorum]
 		if signedPercentage < confirmationThreshold {
 			return &thresholdNotMetError{
 				BlobKey:               blobKey,
 				ConfirmationThreshold: confirmationThreshold,
-				QuorumNumbers:         quorumNumbers,
-				SignedPercentages:     quorumSignedPercentages,
+				BlobQuorumNumbers:    blobQuorumNumbers,
+				SignedPercentagesMap: signedPercentagesMap,
 			}
 		}
 	}

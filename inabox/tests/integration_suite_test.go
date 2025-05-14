@@ -11,7 +11,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
-	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
+	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
@@ -48,7 +49,7 @@ var (
 	mockRollup          *rollupbindings.ContractMockRollup
 	verifierContract    *verifierbindings.ContractEigenDACertVerifierV2
 	retrievalClient     clients.RetrievalClient
-	retrievalClientV2   clientsv2.RetrievalClient
+	retrievalClientV2   clientsv2.ValidatorClient
 	numConfirmations    int = 3
 	numRetries              = 0
 	chainReader         core.Reader
@@ -212,7 +213,8 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 	if err != nil {
 		return err
 	}
-	retrievalClientV2 = clientsv2.NewRetrievalClient(logger, chainReader, cs, v, 10)
+	clientConfig := validator.DefaultClientConfig()
+	retrievalClientV2 = clientsv2.NewValidatorClient(logger, chainReader, cs, v, clientConfig, nil)
 
 	return nil
 }

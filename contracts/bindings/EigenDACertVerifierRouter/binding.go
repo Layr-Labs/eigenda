@@ -31,8 +31,8 @@ var (
 
 // ContractEigenDACertVerifierRouterMetaData contains all meta data concerning the ContractEigenDACertVerifierRouter contract.
 var ContractEigenDACertVerifierRouterMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"function\",\"name\":\"addCertVerifier\",\"inputs\":[{\"name\":\"abn\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"certVerifier\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"certVerifierABNs\",\"inputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"certVerifiers\",\"inputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"checkDACert\",\"inputs\":[{\"name\":\"certBytes\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCertVerifierAt\",\"inputs\":[{\"name\":\"rbn\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"initialize\",\"inputs\":[{\"name\":\"_initialOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"renounceOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"CertVerifierAdded\",\"inputs\":[{\"name\":\"abn\",\"type\":\"uint32\",\"indexed\":true,\"internalType\":\"uint32\"},{\"name\":\"certVerifier\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Initialized\",\"inputs\":[{\"name\":\"version\",\"type\":\"uint8\",\"indexed\":false,\"internalType\":\"uint8\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"previousOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"ABNNotGreaterThanLast\",\"inputs\":[{\"name\":\"abn\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"type\":\"error\",\"name\":\"ABNNotInFuture\",\"inputs\":[{\"name\":\"abn\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"type\":\"error\",\"name\":\"InvalidCertLength\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"NoCertVerifierAvailable\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"NoCertVerifierFound\",\"inputs\":[{\"name\":\"rbn\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]}]",
-	Bin: "0x608060405234801561001057600080fd5b50610984806100206000396000f3fe608060405234801561001057600080fd5b50600436106100935760003560e01c80639077193b116100665780639077193b1461010c578063bfda00de14610131578063c4d66de814610144578063f0df66df14610157578063f2fde38b1461017f57600080fd5b80634a4ae0e2146100985780634c046566146100c8578063715018a6146100f15780638da5cb5b146100fb575b600080fd5b6100ab6100a6366004610769565b610192565b6040516001600160a01b0390911681526020015b60405180910390f35b6100ab6100d6366004610769565b6065602052600090815260409020546001600160a01b031681565b6100f96101c7565b005b6033546001600160a01b03166100ab565b61011f61011a366004610784565b6101db565b60405160ff90911681526020016100bf565b6100f961013f36600461080d565b61025f565b6100f9610152366004610840565b6103d0565b61016a61016536600461085b565b6104e3565b60405163ffffffff90911681526020016100bf565b6100f961018d366004610840565b61051d565b6000606560006101a184610596565b63ffffffff1681526020810191909152604001600020546001600160a01b031692915050565b6101cf610665565b6101d960006106bf565b565b60006101ea6100a68484610711565b6001600160a01b0316639077193b84846040518363ffffffff1660e01b8152600401610217929190610874565b602060405180830381865afa158015610234573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061025891906108a3565b9392505050565b610267610665565b438263ffffffff161161029a57604051631549aaf560e21b815263ffffffff831660048201526024015b60405180910390fd5b606654158015906102fc5750606680546102b6906001906108dc565b815481106102c6576102c66108f3565b90600052602060002090600891828204019190066004029054906101000a900463ffffffff1663ffffffff168263ffffffff1611155b156103225760405163faf9cb6960e01b815263ffffffff83166004820152602401610291565b63ffffffff82811660008181526065602052604080822080546001600160a01b0319166001600160a01b038716908117909155606680546001810182559084527f46501879b8ca8525e8c2fd519e2fbfcfa2ebea26501294aa02cbfcfb12e943546008820401805460079092166004026101000a9687021990911695850295909517909455517f3c87ded09f10478b3e4c40df4329a85dc74ce5f77d000d69a438e6af6096b0e29190a35050565b600054610100900460ff16158080156103f05750600054600160ff909116105b8061040a5750303b15801561040a575060005460ff166001145b61046d5760405162461bcd60e51b815260206004820152602e60248201527f496e697469616c697a61626c653a20636f6e747261637420697320616c72656160448201526d191e481a5b9a5d1a585b1a5e995960921b6064820152608401610291565b6000805460ff191660011790558015610490576000805461ff0019166101001790555b610499826106bf565b80156104df576000805461ff0019169055604051600181527f7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb38474024989060200160405180910390a15b5050565b606681815481106104f357600080fd5b9060005260206000209060089182820401919006600402915054906101000a900463ffffffff1681565b610525610665565b6001600160a01b03811661058a5760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b6064820152608401610291565b610593816106bf565b50565b6066546000906105b957604051636bd61b2b60e11b815260040160405180910390fd5b6066546000906105cb906001906108dc565b905060005b60665481101561064357600060666105e883856108dc565b815481106105f8576105f86108f3565b6000918252602090912060088204015460079091166004026101000a900463ffffffff90811691508516811161063057949350505050565b508061063b81610909565b9150506105d0565b50604051633b27bbaf60e11b815263ffffffff84166004820152602401610291565b6033546001600160a01b031633146101d95760405162461bcd60e51b815260206004820181905260248201527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e65726044820152606401610291565b603380546001600160a01b038381166001600160a01b0319831681179093556040519116919082907f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e090600090a35050565b60006060821015610735576040516303af3ba560e51b815260040160405180910390fd5b610743606060408486610924565b8101906102589190610769565b803563ffffffff8116811461076457600080fd5b919050565b60006020828403121561077b57600080fd5b61025882610750565b6000806020838503121561079757600080fd5b823567ffffffffffffffff808211156107af57600080fd5b818501915085601f8301126107c357600080fd5b8135818111156107d257600080fd5b8660208285010111156107e457600080fd5b60209290920196919550909350505050565b80356001600160a01b038116811461076457600080fd5b6000806040838503121561082057600080fd5b61082983610750565b9150610837602084016107f6565b90509250929050565b60006020828403121561085257600080fd5b610258826107f6565b60006020828403121561086d57600080fd5b5035919050565b60208152816020820152818360408301376000818301604090810191909152601f909201601f19160101919050565b6000602082840312156108b557600080fd5b815160ff8116811461025857600080fd5b634e487b7160e01b600052601160045260246000fd5b6000828210156108ee576108ee6108c6565b500390565b634e487b7160e01b600052603260045260246000fd5b600060001982141561091d5761091d6108c6565b5060010190565b6000808585111561093457600080fd5b8386111561094157600080fd5b505082019391909203915056fea26469706673582212206209b5047d259468291753351bd51f2c11368e22e281cc3dbb6d3e9eaa1467c064736f6c634300080c0033",
+	ABI: "[{\"type\":\"function\",\"name\":\"addCertVerifier\",\"inputs\":[{\"name\":\"activationBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"certVerifier\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"certVerifierABNs\",\"inputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"certVerifiers\",\"inputs\":[{\"name\":\"\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"checkDACert\",\"inputs\":[{\"name\":\"abiEncodedCert\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint8\",\"internalType\":\"uint8\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCertVerifierAt\",\"inputs\":[{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"initialize\",\"inputs\":[{\"name\":\"_initialOwner\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"certVerifier\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"renounceOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"CertVerifierAdded\",\"inputs\":[{\"name\":\"activationBlockNumber\",\"type\":\"uint32\",\"indexed\":true,\"internalType\":\"uint32\"},{\"name\":\"certVerifier\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Initialized\",\"inputs\":[{\"name\":\"version\",\"type\":\"uint8\",\"indexed\":false,\"internalType\":\"uint8\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"previousOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"ABNNotGreaterThanLast\",\"inputs\":[{\"name\":\"activationBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"type\":\"error\",\"name\":\"ABNNotInFuture\",\"inputs\":[{\"name\":\"activationBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"type\":\"error\",\"name\":\"InvalidCertLength\",\"inputs\":[]}]",
+	Bin: "0x608060405234801561001057600080fd5b5061096c806100206000396000f3fe608060405234801561001057600080fd5b50600436106100935760003560e01c80638da5cb5b116100665780638da5cb5b1461010e5780639077193b1461011f578063bfda00de14610144578063f0df66df14610157578063f2fde38b1461017f57600080fd5b8063485cc955146100985780634a4ae0e2146100ad5780634c046566146100dd578063715018a614610106575b600080fd5b6100ab6100a6366004610738565b610192565b005b6100c06100bb36600461077f565b6102b6565b6040516001600160a01b0390911681526020015b60405180910390f35b6100c06100eb36600461077f565b6065602052600090815260409020546001600160a01b031681565b6100ab6102eb565b6033546001600160a01b03166100c0565b61013261012d36600461079a565b6102ff565b60405160ff90911681526020016100d4565b6100ab61015236600461080c565b610383565b61016a610165366004610828565b610441565b60405163ffffffff90911681526020016100d4565b6100ab61018d366004610841565b61047b565b600054610100900460ff16158080156101b25750600054600160ff909116105b806101cc5750303b1580156101cc575060005460ff166001145b6102345760405162461bcd60e51b815260206004820152602e60248201527f496e697469616c697a61626c653a20636f6e747261637420697320616c72656160448201526d191e481a5b9a5d1a585b1a5e995960921b60648201526084015b60405180910390fd5b6000805460ff191660011790558015610257576000805461ff0019166101001790555b610260836104f4565b61026b600083610546565b80156102b1576000805461ff0019169055604051600181527f7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb38474024989060200160405180910390a15b505050565b6000606560006102c5846105f4565b63ffffffff1681526020810191909152604001600020546001600160a01b031692915050565b6102f3610683565b6102fd60006104f4565b565b600061030e6100bb84846106dd565b6001600160a01b0316639077193b84846040518363ffffffff1660e01b815260040161033b92919061085c565b602060405180830381865afa158015610358573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061037c919061088b565b9392505050565b61038b610683565b438263ffffffff1610156103ba57604051631549aaf560e21b815263ffffffff8316600482015260240161022b565b606680546103ca906001906108c4565b815481106103da576103da6108db565b90600052602060002090600891828204019190066004029054906101000a900463ffffffff1663ffffffff168263ffffffff16116104335760405163faf9cb6960e01b815263ffffffff8316600482015260240161022b565b61043d8282610546565b5050565b6066818154811061045157600080fd5b9060005260206000209060089182820401919006600402915054906101000a900463ffffffff1681565b610483610683565b6001600160a01b0381166104e85760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b606482015260840161022b565b6104f1816104f4565b50565b603380546001600160a01b038381166001600160a01b0319831681179093556040519116919082907f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e090600090a35050565b63ffffffff82811660008181526065602052604080822080546001600160a01b0319166001600160a01b038716908117909155606680546001810182559084527f46501879b8ca8525e8c2fd519e2fbfcfa2ebea26501294aa02cbfcfb12e943546008820401805460079092166004026101000a9687021990911695850295909517909455517f3c87ded09f10478b3e4c40df4329a85dc74ce5f77d000d69a438e6af6096b0e29190a35050565b6066546000908190610608906001906108c4565b905060005b60665481101561067c57606661062382846108c4565b81548110610633576106336108db565b6000918252602090912060088204015460079091166004026101000a900463ffffffff90811693508416831161066a575050919050565b80610674816108f1565b91505061060d565b5050919050565b6033546001600160a01b031633146102fd5760405162461bcd60e51b815260206004820181905260248201527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e6572604482015260640161022b565b60006040821015610701576040516303af3ba560e51b815260040160405180910390fd5b61070f60406020848661090c565b81019061037c919061077f565b80356001600160a01b038116811461073357600080fd5b919050565b6000806040838503121561074b57600080fd5b6107548361071c565b91506107626020840161071c565b90509250929050565b803563ffffffff8116811461073357600080fd5b60006020828403121561079157600080fd5b61037c8261076b565b600080602083850312156107ad57600080fd5b823567ffffffffffffffff808211156107c557600080fd5b818501915085601f8301126107d957600080fd5b8135818111156107e857600080fd5b8660208285010111156107fa57600080fd5b60209290920196919550909350505050565b6000806040838503121561081f57600080fd5b6107548361076b565b60006020828403121561083a57600080fd5b5035919050565b60006020828403121561085357600080fd5b61037c8261071c565b60208152816020820152818360408301376000818301604090810191909152601f909201601f19160101919050565b60006020828403121561089d57600080fd5b815160ff8116811461037c57600080fd5b634e487b7160e01b600052601160045260246000fd5b6000828210156108d6576108d66108ae565b500390565b634e487b7160e01b600052603260045260246000fd5b6000600019821415610905576109056108ae565b5060010190565b6000808585111561091c57600080fd5b8386111561092957600080fd5b505082019391909203915056fea2646970667358221220c751273a3c6726a15f7a1db1020beb966966017628ac1f1c3322afddbca31c0264736f6c634300080c0033",
 }
 
 // ContractEigenDACertVerifierRouterABI is the input ABI used to generate the binding from.
@@ -266,10 +266,10 @@ func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterCalle
 
 // CheckDACert is a free data retrieval call binding the contract method 0x9077193b.
 //
-// Solidity: function checkDACert(bytes certBytes) view returns(uint8)
-func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterCaller) CheckDACert(opts *bind.CallOpts, certBytes []byte) (uint8, error) {
+// Solidity: function checkDACert(bytes abiEncodedCert) view returns(uint8)
+func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterCaller) CheckDACert(opts *bind.CallOpts, abiEncodedCert []byte) (uint8, error) {
 	var out []interface{}
-	err := _ContractEigenDACertVerifierRouter.contract.Call(opts, &out, "checkDACert", certBytes)
+	err := _ContractEigenDACertVerifierRouter.contract.Call(opts, &out, "checkDACert", abiEncodedCert)
 
 	if err != nil {
 		return *new(uint8), err
@@ -283,24 +283,24 @@ func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterCalle
 
 // CheckDACert is a free data retrieval call binding the contract method 0x9077193b.
 //
-// Solidity: function checkDACert(bytes certBytes) view returns(uint8)
-func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterSession) CheckDACert(certBytes []byte) (uint8, error) {
-	return _ContractEigenDACertVerifierRouter.Contract.CheckDACert(&_ContractEigenDACertVerifierRouter.CallOpts, certBytes)
+// Solidity: function checkDACert(bytes abiEncodedCert) view returns(uint8)
+func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterSession) CheckDACert(abiEncodedCert []byte) (uint8, error) {
+	return _ContractEigenDACertVerifierRouter.Contract.CheckDACert(&_ContractEigenDACertVerifierRouter.CallOpts, abiEncodedCert)
 }
 
 // CheckDACert is a free data retrieval call binding the contract method 0x9077193b.
 //
-// Solidity: function checkDACert(bytes certBytes) view returns(uint8)
-func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterCallerSession) CheckDACert(certBytes []byte) (uint8, error) {
-	return _ContractEigenDACertVerifierRouter.Contract.CheckDACert(&_ContractEigenDACertVerifierRouter.CallOpts, certBytes)
+// Solidity: function checkDACert(bytes abiEncodedCert) view returns(uint8)
+func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterCallerSession) CheckDACert(abiEncodedCert []byte) (uint8, error) {
+	return _ContractEigenDACertVerifierRouter.Contract.CheckDACert(&_ContractEigenDACertVerifierRouter.CallOpts, abiEncodedCert)
 }
 
 // GetCertVerifierAt is a free data retrieval call binding the contract method 0x4a4ae0e2.
 //
-// Solidity: function getCertVerifierAt(uint32 rbn) view returns(address)
-func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterCaller) GetCertVerifierAt(opts *bind.CallOpts, rbn uint32) (common.Address, error) {
+// Solidity: function getCertVerifierAt(uint32 referenceBlockNumber) view returns(address)
+func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterCaller) GetCertVerifierAt(opts *bind.CallOpts, referenceBlockNumber uint32) (common.Address, error) {
 	var out []interface{}
-	err := _ContractEigenDACertVerifierRouter.contract.Call(opts, &out, "getCertVerifierAt", rbn)
+	err := _ContractEigenDACertVerifierRouter.contract.Call(opts, &out, "getCertVerifierAt", referenceBlockNumber)
 
 	if err != nil {
 		return *new(common.Address), err
@@ -314,16 +314,16 @@ func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterCalle
 
 // GetCertVerifierAt is a free data retrieval call binding the contract method 0x4a4ae0e2.
 //
-// Solidity: function getCertVerifierAt(uint32 rbn) view returns(address)
-func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterSession) GetCertVerifierAt(rbn uint32) (common.Address, error) {
-	return _ContractEigenDACertVerifierRouter.Contract.GetCertVerifierAt(&_ContractEigenDACertVerifierRouter.CallOpts, rbn)
+// Solidity: function getCertVerifierAt(uint32 referenceBlockNumber) view returns(address)
+func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterSession) GetCertVerifierAt(referenceBlockNumber uint32) (common.Address, error) {
+	return _ContractEigenDACertVerifierRouter.Contract.GetCertVerifierAt(&_ContractEigenDACertVerifierRouter.CallOpts, referenceBlockNumber)
 }
 
 // GetCertVerifierAt is a free data retrieval call binding the contract method 0x4a4ae0e2.
 //
-// Solidity: function getCertVerifierAt(uint32 rbn) view returns(address)
-func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterCallerSession) GetCertVerifierAt(rbn uint32) (common.Address, error) {
-	return _ContractEigenDACertVerifierRouter.Contract.GetCertVerifierAt(&_ContractEigenDACertVerifierRouter.CallOpts, rbn)
+// Solidity: function getCertVerifierAt(uint32 referenceBlockNumber) view returns(address)
+func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterCallerSession) GetCertVerifierAt(referenceBlockNumber uint32) (common.Address, error) {
+	return _ContractEigenDACertVerifierRouter.Contract.GetCertVerifierAt(&_ContractEigenDACertVerifierRouter.CallOpts, referenceBlockNumber)
 }
 
 // Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
@@ -359,44 +359,44 @@ func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterCalle
 
 // AddCertVerifier is a paid mutator transaction binding the contract method 0xbfda00de.
 //
-// Solidity: function addCertVerifier(uint32 abn, address certVerifier) returns()
-func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterTransactor) AddCertVerifier(opts *bind.TransactOpts, abn uint32, certVerifier common.Address) (*types.Transaction, error) {
-	return _ContractEigenDACertVerifierRouter.contract.Transact(opts, "addCertVerifier", abn, certVerifier)
+// Solidity: function addCertVerifier(uint32 activationBlockNumber, address certVerifier) returns()
+func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterTransactor) AddCertVerifier(opts *bind.TransactOpts, activationBlockNumber uint32, certVerifier common.Address) (*types.Transaction, error) {
+	return _ContractEigenDACertVerifierRouter.contract.Transact(opts, "addCertVerifier", activationBlockNumber, certVerifier)
 }
 
 // AddCertVerifier is a paid mutator transaction binding the contract method 0xbfda00de.
 //
-// Solidity: function addCertVerifier(uint32 abn, address certVerifier) returns()
-func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterSession) AddCertVerifier(abn uint32, certVerifier common.Address) (*types.Transaction, error) {
-	return _ContractEigenDACertVerifierRouter.Contract.AddCertVerifier(&_ContractEigenDACertVerifierRouter.TransactOpts, abn, certVerifier)
+// Solidity: function addCertVerifier(uint32 activationBlockNumber, address certVerifier) returns()
+func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterSession) AddCertVerifier(activationBlockNumber uint32, certVerifier common.Address) (*types.Transaction, error) {
+	return _ContractEigenDACertVerifierRouter.Contract.AddCertVerifier(&_ContractEigenDACertVerifierRouter.TransactOpts, activationBlockNumber, certVerifier)
 }
 
 // AddCertVerifier is a paid mutator transaction binding the contract method 0xbfda00de.
 //
-// Solidity: function addCertVerifier(uint32 abn, address certVerifier) returns()
-func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterTransactorSession) AddCertVerifier(abn uint32, certVerifier common.Address) (*types.Transaction, error) {
-	return _ContractEigenDACertVerifierRouter.Contract.AddCertVerifier(&_ContractEigenDACertVerifierRouter.TransactOpts, abn, certVerifier)
+// Solidity: function addCertVerifier(uint32 activationBlockNumber, address certVerifier) returns()
+func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterTransactorSession) AddCertVerifier(activationBlockNumber uint32, certVerifier common.Address) (*types.Transaction, error) {
+	return _ContractEigenDACertVerifierRouter.Contract.AddCertVerifier(&_ContractEigenDACertVerifierRouter.TransactOpts, activationBlockNumber, certVerifier)
 }
 
-// Initialize is a paid mutator transaction binding the contract method 0xc4d66de8.
+// Initialize is a paid mutator transaction binding the contract method 0x485cc955.
 //
-// Solidity: function initialize(address _initialOwner) returns()
-func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterTransactor) Initialize(opts *bind.TransactOpts, _initialOwner common.Address) (*types.Transaction, error) {
-	return _ContractEigenDACertVerifierRouter.contract.Transact(opts, "initialize", _initialOwner)
+// Solidity: function initialize(address _initialOwner, address certVerifier) returns()
+func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterTransactor) Initialize(opts *bind.TransactOpts, _initialOwner common.Address, certVerifier common.Address) (*types.Transaction, error) {
+	return _ContractEigenDACertVerifierRouter.contract.Transact(opts, "initialize", _initialOwner, certVerifier)
 }
 
-// Initialize is a paid mutator transaction binding the contract method 0xc4d66de8.
+// Initialize is a paid mutator transaction binding the contract method 0x485cc955.
 //
-// Solidity: function initialize(address _initialOwner) returns()
-func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterSession) Initialize(_initialOwner common.Address) (*types.Transaction, error) {
-	return _ContractEigenDACertVerifierRouter.Contract.Initialize(&_ContractEigenDACertVerifierRouter.TransactOpts, _initialOwner)
+// Solidity: function initialize(address _initialOwner, address certVerifier) returns()
+func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterSession) Initialize(_initialOwner common.Address, certVerifier common.Address) (*types.Transaction, error) {
+	return _ContractEigenDACertVerifierRouter.Contract.Initialize(&_ContractEigenDACertVerifierRouter.TransactOpts, _initialOwner, certVerifier)
 }
 
-// Initialize is a paid mutator transaction binding the contract method 0xc4d66de8.
+// Initialize is a paid mutator transaction binding the contract method 0x485cc955.
 //
-// Solidity: function initialize(address _initialOwner) returns()
-func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterTransactorSession) Initialize(_initialOwner common.Address) (*types.Transaction, error) {
-	return _ContractEigenDACertVerifierRouter.Contract.Initialize(&_ContractEigenDACertVerifierRouter.TransactOpts, _initialOwner)
+// Solidity: function initialize(address _initialOwner, address certVerifier) returns()
+func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterTransactorSession) Initialize(_initialOwner common.Address, certVerifier common.Address) (*types.Transaction, error) {
+	return _ContractEigenDACertVerifierRouter.Contract.Initialize(&_ContractEigenDACertVerifierRouter.TransactOpts, _initialOwner, certVerifier)
 }
 
 // RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
@@ -510,26 +510,26 @@ func (it *ContractEigenDACertVerifierRouterCertVerifierAddedIterator) Close() er
 
 // ContractEigenDACertVerifierRouterCertVerifierAdded represents a CertVerifierAdded event raised by the ContractEigenDACertVerifierRouter contract.
 type ContractEigenDACertVerifierRouterCertVerifierAdded struct {
-	Abn          uint32
-	CertVerifier common.Address
-	Raw          types.Log // Blockchain specific contextual infos
+	ActivationBlockNumber uint32
+	CertVerifier          common.Address
+	Raw                   types.Log // Blockchain specific contextual infos
 }
 
 // FilterCertVerifierAdded is a free log retrieval operation binding the contract event 0x3c87ded09f10478b3e4c40df4329a85dc74ce5f77d000d69a438e6af6096b0e2.
 //
-// Solidity: event CertVerifierAdded(uint32 indexed abn, address indexed certVerifier)
-func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterFilterer) FilterCertVerifierAdded(opts *bind.FilterOpts, abn []uint32, certVerifier []common.Address) (*ContractEigenDACertVerifierRouterCertVerifierAddedIterator, error) {
+// Solidity: event CertVerifierAdded(uint32 indexed activationBlockNumber, address indexed certVerifier)
+func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterFilterer) FilterCertVerifierAdded(opts *bind.FilterOpts, activationBlockNumber []uint32, certVerifier []common.Address) (*ContractEigenDACertVerifierRouterCertVerifierAddedIterator, error) {
 
-	var abnRule []interface{}
-	for _, abnItem := range abn {
-		abnRule = append(abnRule, abnItem)
+	var activationBlockNumberRule []interface{}
+	for _, activationBlockNumberItem := range activationBlockNumber {
+		activationBlockNumberRule = append(activationBlockNumberRule, activationBlockNumberItem)
 	}
 	var certVerifierRule []interface{}
 	for _, certVerifierItem := range certVerifier {
 		certVerifierRule = append(certVerifierRule, certVerifierItem)
 	}
 
-	logs, sub, err := _ContractEigenDACertVerifierRouter.contract.FilterLogs(opts, "CertVerifierAdded", abnRule, certVerifierRule)
+	logs, sub, err := _ContractEigenDACertVerifierRouter.contract.FilterLogs(opts, "CertVerifierAdded", activationBlockNumberRule, certVerifierRule)
 	if err != nil {
 		return nil, err
 	}
@@ -538,19 +538,19 @@ func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterFilte
 
 // WatchCertVerifierAdded is a free log subscription operation binding the contract event 0x3c87ded09f10478b3e4c40df4329a85dc74ce5f77d000d69a438e6af6096b0e2.
 //
-// Solidity: event CertVerifierAdded(uint32 indexed abn, address indexed certVerifier)
-func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterFilterer) WatchCertVerifierAdded(opts *bind.WatchOpts, sink chan<- *ContractEigenDACertVerifierRouterCertVerifierAdded, abn []uint32, certVerifier []common.Address) (event.Subscription, error) {
+// Solidity: event CertVerifierAdded(uint32 indexed activationBlockNumber, address indexed certVerifier)
+func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterFilterer) WatchCertVerifierAdded(opts *bind.WatchOpts, sink chan<- *ContractEigenDACertVerifierRouterCertVerifierAdded, activationBlockNumber []uint32, certVerifier []common.Address) (event.Subscription, error) {
 
-	var abnRule []interface{}
-	for _, abnItem := range abn {
-		abnRule = append(abnRule, abnItem)
+	var activationBlockNumberRule []interface{}
+	for _, activationBlockNumberItem := range activationBlockNumber {
+		activationBlockNumberRule = append(activationBlockNumberRule, activationBlockNumberItem)
 	}
 	var certVerifierRule []interface{}
 	for _, certVerifierItem := range certVerifier {
 		certVerifierRule = append(certVerifierRule, certVerifierItem)
 	}
 
-	logs, sub, err := _ContractEigenDACertVerifierRouter.contract.WatchLogs(opts, "CertVerifierAdded", abnRule, certVerifierRule)
+	logs, sub, err := _ContractEigenDACertVerifierRouter.contract.WatchLogs(opts, "CertVerifierAdded", activationBlockNumberRule, certVerifierRule)
 	if err != nil {
 		return nil, err
 	}
@@ -584,7 +584,7 @@ func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterFilte
 
 // ParseCertVerifierAdded is a log parse operation binding the contract event 0x3c87ded09f10478b3e4c40df4329a85dc74ce5f77d000d69a438e6af6096b0e2.
 //
-// Solidity: event CertVerifierAdded(uint32 indexed abn, address indexed certVerifier)
+// Solidity: event CertVerifierAdded(uint32 indexed activationBlockNumber, address indexed certVerifier)
 func (_ContractEigenDACertVerifierRouter *ContractEigenDACertVerifierRouterFilterer) ParseCertVerifierAdded(log types.Log) (*ContractEigenDACertVerifierRouterCertVerifierAdded, error) {
 	event := new(ContractEigenDACertVerifierRouterCertVerifierAdded)
 	if err := _ContractEigenDACertVerifierRouter.contract.UnpackLog(event, "CertVerifierAdded", log); err != nil {

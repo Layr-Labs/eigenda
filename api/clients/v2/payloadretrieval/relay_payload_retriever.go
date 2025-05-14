@@ -8,6 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -24,7 +25,7 @@ type RelayPayloadRetriever struct {
 	// must be evaluated for thread safety.
 	random      *rand.Rand
 	config      RelayPayloadRetrieverConfig
-	relayClient clients.RelayClient
+	relayClient relay.RelayClient
 	g1Srs       []bn254.G1Affine
 }
 
@@ -36,7 +37,7 @@ func NewRelayPayloadRetriever(
 	log logging.Logger,
 	random *rand.Rand,
 	relayPayloadRetrieverConfig RelayPayloadRetrieverConfig,
-	relayClient clients.RelayClient,
+	relayClient relay.RelayClient,
 	g1Srs []bn254.G1Affine) (*RelayPayloadRetriever, error) {
 
 	err := relayPayloadRetrieverConfig.checkAndSetDefaults()
