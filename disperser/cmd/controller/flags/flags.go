@@ -145,7 +145,7 @@ var (
 		Usage:    "Interval at which new Attestations will be submitted as signature gathering progresses",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNATURE_TICK_INTERVAL"),
-		Value:    100 * time.Millisecond,
+		Value:    50 * time.Millisecond,
 	}
 	FinalizationBlockDelayFlag = cli.Uint64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "finalization-block-delay"),
@@ -180,7 +180,7 @@ var (
 		Usage:    "Max number of blobs to disperse in a batch",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "MAX_BATCH_SIZE"),
-		Value:    128,
+		Value:    32,
 	}
 	MetricsPortFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "metrics-port"),
@@ -200,6 +200,20 @@ var (
 		Usage:    "Name of the key used to sign disperser requests (key must be stored in AWS KMS under this name)",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DISPERSER_KMS_KEY_ID"),
+	}
+	ControllerReadinessProbePathFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "controller-readiness-probe-path"),
+		Usage:    "File path for the readiness probe; created once the controller is fully started and ready to serve traffic",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_READINESS_PROBE_PATH"),
+		Value:    "/tmp/controller-ready",
+	}
+	ControllerHealthProbePathFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "controller-health-probe-path"),
+		Usage:    "File path for the liveness (health) probe; updated regularly to indicate the controller is still alive and healthy",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CONTROLLER_HEALTH_PROBE_PATH"),
+		Value:    "/tmp/controller-health",
 	}
 	SignificantSigningThresholdPercentageFlag = cli.UintFlag{
 		Name: common.PrefixFlag(FlagPrefix, "significant-signing-threshold-percentage"),
@@ -244,6 +258,8 @@ var optionalFlags = []cli.Flag{
 	MetricsPortFlag,
 	DisperserStoreChunksSigningDisabledFlag,
 	DisperserKMSKeyIDFlag,
+	ControllerReadinessProbePathFlag,
+	ControllerHealthProbePathFlag,
 	SignificantSigningThresholdPercentageFlag,
 }
 

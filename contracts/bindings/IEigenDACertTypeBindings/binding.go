@@ -49,6 +49,37 @@ type EigenDACertTypesEigenDACertV3 struct {
 	SignedQuorumNumbers         []byte
 }
 
+// EigenDATypesV1BatchHeader is an auto generated low-level Go binding around an user-defined struct.
+type EigenDATypesV1BatchHeader struct {
+	BlobHeadersRoot       [32]byte
+	QuorumNumbers         []byte
+	SignedStakeForQuorums []byte
+	ReferenceBlockNumber  uint32
+}
+
+// EigenDATypesV1BatchMetadata is an auto generated low-level Go binding around an user-defined struct.
+type EigenDATypesV1BatchMetadata struct {
+	BatchHeader             EigenDATypesV1BatchHeader
+	SignatoryRecordHash     [32]byte
+	ConfirmationBlockNumber uint32
+}
+
+// EigenDATypesV1BlobHeader is an auto generated low-level Go binding around an user-defined struct.
+type EigenDATypesV1BlobHeader struct {
+	Commitment       BN254G1Point
+	DataLength       uint32
+	QuorumBlobParams []EigenDATypesV1QuorumBlobParam
+}
+
+// EigenDATypesV1BlobVerificationProof is an auto generated low-level Go binding around an user-defined struct.
+type EigenDATypesV1BlobVerificationProof struct {
+	BatchId        uint32
+	BlobIndex      uint32
+	BatchMetadata  EigenDATypesV1BatchMetadata
+	InclusionProof []byte
+	QuorumIndices  []byte
+}
+
 // EigenDATypesV1NonSignerStakesAndSignature is an auto generated low-level Go binding around an user-defined struct.
 type EigenDATypesV1NonSignerStakesAndSignature struct {
 	NonSignerQuorumBitmapIndices []uint32
@@ -59,6 +90,14 @@ type EigenDATypesV1NonSignerStakesAndSignature struct {
 	QuorumApkIndices             []uint32
 	TotalStakeIndices            []uint32
 	NonSignerStakeIndices        [][]uint32
+}
+
+// EigenDATypesV1QuorumBlobParam is an auto generated low-level Go binding around an user-defined struct.
+type EigenDATypesV1QuorumBlobParam struct {
+	QuorumNumber                    uint8
+	AdversaryThresholdPercentage    uint8
+	ConfirmationThresholdPercentage uint8
+	ChunkLength                     uint32
 }
 
 // EigenDATypesV2BatchHeaderV2 is an auto generated low-level Go binding around an user-defined struct.
@@ -99,7 +138,7 @@ type EigenDATypesV2BlobInclusionInfo struct {
 
 // ContractIEigenDACertTypeBindingsMetaData contains all meta data concerning the ContractIEigenDACertTypeBindings contract.
 var ContractIEigenDACertTypeBindingsMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"function\",\"name\":\"dummyFnCertV3\",\"inputs\":[{\"name\":\"cert\",\"type\":\"tuple\",\"internalType\":\"structEigenDACertTypes.EigenDACertV3\",\"components\":[{\"name\":\"batchHeader\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BatchHeaderV2\",\"components\":[{\"name\":\"batchRoot\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"blobInclusionInfo\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobInclusionInfo\",\"components\":[{\"name\":\"blobCertificate\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobCertificate\",\"components\":[{\"name\":\"blobHeader\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobHeaderV2\",\"components\":[{\"name\":\"version\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"commitment\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobCommitment\",\"components\":[{\"name\":\"commitment\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"lengthCommitment\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"lengthProof\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"length\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"paymentHeaderHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"name\":\"signature\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"relayKeys\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"}]},{\"name\":\"blobIndex\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"inclusionProof\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"nonSignerStakesAndSignature\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV1.NonSignerStakesAndSignature\",\"components\":[{\"name\":\"nonSignerQuorumBitmapIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerPubkeys\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApks\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"apkG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"sigma\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApkIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"totalStakeIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerStakeIndices\",\"type\":\"uint32[][]\",\"internalType\":\"uint32[][]\"}]},{\"name\":\"signedQuorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"outputs\":[],\"stateMutability\":\"view\"}]",
+	ABI: "[{\"type\":\"function\",\"name\":\"dummyVerifyDACertV1\",\"inputs\":[{\"name\":\"blobHeader\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV1.BlobHeader\",\"components\":[{\"name\":\"commitment\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"dataLength\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"quorumBlobParams\",\"type\":\"tuple[]\",\"internalType\":\"structEigenDATypesV1.QuorumBlobParam[]\",\"components\":[{\"name\":\"quorumNumber\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"adversaryThresholdPercentage\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"confirmationThresholdPercentage\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"chunkLength\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]}]},{\"name\":\"blobVerificationProof\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV1.BlobVerificationProof\",\"components\":[{\"name\":\"batchId\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"blobIndex\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"batchMetadata\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV1.BatchMetadata\",\"components\":[{\"name\":\"batchHeader\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV1.BatchHeader\",\"components\":[{\"name\":\"blobHeadersRoot\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"signedStakeForQuorums\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"signatoryRecordHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"confirmationBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"inclusionProof\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"quorumIndices\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"outputs\":[],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"dummyVerifyDACertV3\",\"inputs\":[{\"name\":\"cert\",\"type\":\"tuple\",\"internalType\":\"structEigenDACertTypes.EigenDACertV3\",\"components\":[{\"name\":\"batchHeader\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BatchHeaderV2\",\"components\":[{\"name\":\"batchRoot\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"referenceBlockNumber\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"blobInclusionInfo\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobInclusionInfo\",\"components\":[{\"name\":\"blobCertificate\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobCertificate\",\"components\":[{\"name\":\"blobHeader\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobHeaderV2\",\"components\":[{\"name\":\"version\",\"type\":\"uint16\",\"internalType\":\"uint16\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"commitment\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV2.BlobCommitment\",\"components\":[{\"name\":\"commitment\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"lengthCommitment\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"lengthProof\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"length\",\"type\":\"uint32\",\"internalType\":\"uint32\"}]},{\"name\":\"paymentHeaderHash\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"name\":\"signature\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"relayKeys\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"}]},{\"name\":\"blobIndex\",\"type\":\"uint32\",\"internalType\":\"uint32\"},{\"name\":\"inclusionProof\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]},{\"name\":\"nonSignerStakesAndSignature\",\"type\":\"tuple\",\"internalType\":\"structEigenDATypesV1.NonSignerStakesAndSignature\",\"components\":[{\"name\":\"nonSignerQuorumBitmapIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerPubkeys\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApks\",\"type\":\"tuple[]\",\"internalType\":\"structBN254.G1Point[]\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"apkG2\",\"type\":\"tuple\",\"internalType\":\"structBN254.G2Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"},{\"name\":\"Y\",\"type\":\"uint256[2]\",\"internalType\":\"uint256[2]\"}]},{\"name\":\"sigma\",\"type\":\"tuple\",\"internalType\":\"structBN254.G1Point\",\"components\":[{\"name\":\"X\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"Y\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"name\":\"quorumApkIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"totalStakeIndices\",\"type\":\"uint32[]\",\"internalType\":\"uint32[]\"},{\"name\":\"nonSignerStakeIndices\",\"type\":\"uint32[][]\",\"internalType\":\"uint32[][]\"}]},{\"name\":\"signedQuorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"outputs\":[],\"stateMutability\":\"view\"}]",
 }
 
 // ContractIEigenDACertTypeBindingsABI is the input ABI used to generate the binding from.
@@ -248,12 +287,12 @@ func (_ContractIEigenDACertTypeBindings *ContractIEigenDACertTypeBindingsTransac
 	return _ContractIEigenDACertTypeBindings.Contract.contract.Transact(opts, method, params...)
 }
 
-// DummyFnCertV3 is a free data retrieval call binding the contract method 0xec06d922.
+// DummyVerifyDACertV1 is a free data retrieval call binding the contract method 0x62da1521.
 //
-// Solidity: function dummyFnCertV3(((bytes32,uint32),(((uint16,bytes,((uint256,uint256),(uint256[2],uint256[2]),(uint256[2],uint256[2]),uint32),bytes32),bytes,uint32[]),uint32,bytes),(uint32[],(uint256,uint256)[],(uint256,uint256)[],(uint256[2],uint256[2]),(uint256,uint256),uint32[],uint32[],uint32[][]),bytes) cert) view returns()
-func (_ContractIEigenDACertTypeBindings *ContractIEigenDACertTypeBindingsCaller) DummyFnCertV3(opts *bind.CallOpts, cert EigenDACertTypesEigenDACertV3) error {
+// Solidity: function dummyVerifyDACertV1(((uint256,uint256),uint32,(uint8,uint8,uint8,uint32)[]) blobHeader, (uint32,uint32,((bytes32,bytes,bytes,uint32),bytes32,uint32),bytes,bytes) blobVerificationProof) view returns()
+func (_ContractIEigenDACertTypeBindings *ContractIEigenDACertTypeBindingsCaller) DummyVerifyDACertV1(opts *bind.CallOpts, blobHeader EigenDATypesV1BlobHeader, blobVerificationProof EigenDATypesV1BlobVerificationProof) error {
 	var out []interface{}
-	err := _ContractIEigenDACertTypeBindings.contract.Call(opts, &out, "dummyFnCertV3", cert)
+	err := _ContractIEigenDACertTypeBindings.contract.Call(opts, &out, "dummyVerifyDACertV1", blobHeader, blobVerificationProof)
 
 	if err != nil {
 		return err
@@ -263,16 +302,45 @@ func (_ContractIEigenDACertTypeBindings *ContractIEigenDACertTypeBindingsCaller)
 
 }
 
-// DummyFnCertV3 is a free data retrieval call binding the contract method 0xec06d922.
+// DummyVerifyDACertV1 is a free data retrieval call binding the contract method 0x62da1521.
 //
-// Solidity: function dummyFnCertV3(((bytes32,uint32),(((uint16,bytes,((uint256,uint256),(uint256[2],uint256[2]),(uint256[2],uint256[2]),uint32),bytes32),bytes,uint32[]),uint32,bytes),(uint32[],(uint256,uint256)[],(uint256,uint256)[],(uint256[2],uint256[2]),(uint256,uint256),uint32[],uint32[],uint32[][]),bytes) cert) view returns()
-func (_ContractIEigenDACertTypeBindings *ContractIEigenDACertTypeBindingsSession) DummyFnCertV3(cert EigenDACertTypesEigenDACertV3) error {
-	return _ContractIEigenDACertTypeBindings.Contract.DummyFnCertV3(&_ContractIEigenDACertTypeBindings.CallOpts, cert)
+// Solidity: function dummyVerifyDACertV1(((uint256,uint256),uint32,(uint8,uint8,uint8,uint32)[]) blobHeader, (uint32,uint32,((bytes32,bytes,bytes,uint32),bytes32,uint32),bytes,bytes) blobVerificationProof) view returns()
+func (_ContractIEigenDACertTypeBindings *ContractIEigenDACertTypeBindingsSession) DummyVerifyDACertV1(blobHeader EigenDATypesV1BlobHeader, blobVerificationProof EigenDATypesV1BlobVerificationProof) error {
+	return _ContractIEigenDACertTypeBindings.Contract.DummyVerifyDACertV1(&_ContractIEigenDACertTypeBindings.CallOpts, blobHeader, blobVerificationProof)
 }
 
-// DummyFnCertV3 is a free data retrieval call binding the contract method 0xec06d922.
+// DummyVerifyDACertV1 is a free data retrieval call binding the contract method 0x62da1521.
 //
-// Solidity: function dummyFnCertV3(((bytes32,uint32),(((uint16,bytes,((uint256,uint256),(uint256[2],uint256[2]),(uint256[2],uint256[2]),uint32),bytes32),bytes,uint32[]),uint32,bytes),(uint32[],(uint256,uint256)[],(uint256,uint256)[],(uint256[2],uint256[2]),(uint256,uint256),uint32[],uint32[],uint32[][]),bytes) cert) view returns()
-func (_ContractIEigenDACertTypeBindings *ContractIEigenDACertTypeBindingsCallerSession) DummyFnCertV3(cert EigenDACertTypesEigenDACertV3) error {
-	return _ContractIEigenDACertTypeBindings.Contract.DummyFnCertV3(&_ContractIEigenDACertTypeBindings.CallOpts, cert)
+// Solidity: function dummyVerifyDACertV1(((uint256,uint256),uint32,(uint8,uint8,uint8,uint32)[]) blobHeader, (uint32,uint32,((bytes32,bytes,bytes,uint32),bytes32,uint32),bytes,bytes) blobVerificationProof) view returns()
+func (_ContractIEigenDACertTypeBindings *ContractIEigenDACertTypeBindingsCallerSession) DummyVerifyDACertV1(blobHeader EigenDATypesV1BlobHeader, blobVerificationProof EigenDATypesV1BlobVerificationProof) error {
+	return _ContractIEigenDACertTypeBindings.Contract.DummyVerifyDACertV1(&_ContractIEigenDACertTypeBindings.CallOpts, blobHeader, blobVerificationProof)
+}
+
+// DummyVerifyDACertV3 is a free data retrieval call binding the contract method 0x88cecf6e.
+//
+// Solidity: function dummyVerifyDACertV3(((bytes32,uint32),(((uint16,bytes,((uint256,uint256),(uint256[2],uint256[2]),(uint256[2],uint256[2]),uint32),bytes32),bytes,uint32[]),uint32,bytes),(uint32[],(uint256,uint256)[],(uint256,uint256)[],(uint256[2],uint256[2]),(uint256,uint256),uint32[],uint32[],uint32[][]),bytes) cert) view returns()
+func (_ContractIEigenDACertTypeBindings *ContractIEigenDACertTypeBindingsCaller) DummyVerifyDACertV3(opts *bind.CallOpts, cert EigenDACertTypesEigenDACertV3) error {
+	var out []interface{}
+	err := _ContractIEigenDACertTypeBindings.contract.Call(opts, &out, "dummyVerifyDACertV3", cert)
+
+	if err != nil {
+		return err
+	}
+
+	return err
+
+}
+
+// DummyVerifyDACertV3 is a free data retrieval call binding the contract method 0x88cecf6e.
+//
+// Solidity: function dummyVerifyDACertV3(((bytes32,uint32),(((uint16,bytes,((uint256,uint256),(uint256[2],uint256[2]),(uint256[2],uint256[2]),uint32),bytes32),bytes,uint32[]),uint32,bytes),(uint32[],(uint256,uint256)[],(uint256,uint256)[],(uint256[2],uint256[2]),(uint256,uint256),uint32[],uint32[],uint32[][]),bytes) cert) view returns()
+func (_ContractIEigenDACertTypeBindings *ContractIEigenDACertTypeBindingsSession) DummyVerifyDACertV3(cert EigenDACertTypesEigenDACertV3) error {
+	return _ContractIEigenDACertTypeBindings.Contract.DummyVerifyDACertV3(&_ContractIEigenDACertTypeBindings.CallOpts, cert)
+}
+
+// DummyVerifyDACertV3 is a free data retrieval call binding the contract method 0x88cecf6e.
+//
+// Solidity: function dummyVerifyDACertV3(((bytes32,uint32),(((uint16,bytes,((uint256,uint256),(uint256[2],uint256[2]),(uint256[2],uint256[2]),uint32),bytes32),bytes,uint32[]),uint32,bytes),(uint32[],(uint256,uint256)[],(uint256,uint256)[],(uint256[2],uint256[2]),(uint256,uint256),uint32[],uint32[],uint32[][]),bytes) cert) view returns()
+func (_ContractIEigenDACertTypeBindings *ContractIEigenDACertTypeBindingsCallerSession) DummyVerifyDACertV3(cert EigenDACertTypesEigenDACertV3) error {
+	return _ContractIEigenDACertTypeBindings.Contract.DummyVerifyDACertV3(&_ContractIEigenDACertTypeBindings.CallOpts, cert)
 }

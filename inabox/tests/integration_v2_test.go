@@ -209,7 +209,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		)
 		Expect(err).To(BeNil())
 
-		relayClientConfig := &clients.RelayClientConfig{
+		relayClientConfig := &relay.RelayClientConfig{
 			MaxGRPCMessageSize: units.GiB,
 		}
 
@@ -217,7 +217,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		Expect(err).To(BeNil())
 
 		// Test retrieval from relay
-		relayClient, err := clients.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
+		relayClient, err := relay.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
 		Expect(err).To(BeNil())
 
 		blob1Relays := make(map[corev2.RelayKey]struct{}, 0)
