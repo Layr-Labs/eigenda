@@ -12,6 +12,24 @@ import (
 	"github.com/shirou/gopsutil/mem"
 )
 
+// Variable to allow mocking in tests
+var readFile = os.ReadFile
+
+// potential cgroup paths to check for memory limits
+var cgroupPaths = []string{
+	"/sys/fs/cgroup/memory.max",
+	"/sys/fs/cgroup/memory/memory.limit_in_bytes",
+	"/sys/fs/cgroup/memory/docker/memory.limit_in_bytes",
+}
+
+// unitSuffixes maps common memory unit suffixes to their byte multipliers
+var unitSuffixes = map[string]uint64{
+	"kb": units.KiB,
+	"mb": units.MiB,
+	"gb": units.GiB,
+	"tb": units.TiB,
+}
+
 // GetMaximumAvailableMemory returns the maximum available memory in bytes, i.e. the maximum quantity of memory that
 // this process can allocate before experiencing an out of memory error. Handles artificial limits set by the OS and/or
 // docker container.
@@ -68,22 +86,11 @@ func SetGCMemorySafetyBuffer(
 // getCgroupMemoryLimit attempts to read the memory limit from cgroups
 // This is relevant when running in a Docker container or other containerized environment
 func getCgroupMemoryLimit() (uint64, error) {
-	// Check cgroup v2 first
-	cgroup2Path := "/sys/fs/cgroup/memory.max"
-	if _, err := os.Stat(cgroup2Path); err == nil {
-		return readCgroupFile(cgroup2Path)
-	}
-
-	// Check cgroup v1
-	cgroup1Path := "/sys/fs/cgroup/memory/memory.limit_in_bytes"
-	if _, err := os.Stat(cgroup1Path); err == nil {
-		return readCgroupFile(cgroup1Path)
-	}
-
-	// Also check the Docker-specific path in cgroup v1
-	dockerCgroupPath := "/sys/fs/cgroup/memory/docker/memory.limit_in_bytes"
-	if _, err := os.Stat(dockerCgroupPath); err == nil {
-		return readCgroupFile(dockerCgroupPath)
+	for _, path := range cgroupPaths {
+		if _, err := os.Stat(path); err == nil {
+			// File exists, read it
+			return readCgroupFile(path)
+		}
 	}
 
 	// Try to read from the proc status, which can sometimes have container limits
@@ -92,7 +99,7 @@ func getCgroupMemoryLimit() (uint64, error) {
 
 // readCgroupFile reads and parses a cgroup memory limit file
 func readCgroupFile(path string) (uint64, error) {
-	data, err := os.ReadFile(path)
+	data, err := readFile(path)
 	if err != nil {
 		return 0, err
 	}
@@ -115,7 +122,7 @@ func readCgroupFile(path string) (uint64, error) {
 // readProcStatusMemoryLimit attempts to get the memory limit from /proc/self/status
 // which can reflect container limits
 func readProcStatusMemoryLimit() (uint64, error) {
-	data, err := os.ReadFile("/proc/self/status")
+	data, err := readFile("/proc/self/status")
 	if err != nil {
 		return 0, err
 	}
@@ -125,17 +132,22 @@ func readProcStatusMemoryLimit() (uint64, error) {
 		if strings.HasPrefix(line, "Limit:") {
 			fields := strings.Fields(line)
 			if len(fields) >= 2 {
-				// Parse with support for units like kB
 				valueStr := fields[1]
-				if strings.HasSuffix(valueStr, "kB") {
-					valueStr = strings.TrimSuffix(valueStr, "kB")
-					value, err := strconv.ParseUint(valueStr, 10, 64)
-					if err != nil {
-						return 0, err
+				valueLower := strings.ToLower(valueStr)
+
+				for unitSuffix, multiplier := range unitSuffixes {
+					if strings.HasSuffix(valueLower, unitSuffix) {
+						// Remove the unit suffix and parse the numeric value
+						numStr := valueStr[:len(valueStr)-len(unitSuffix)]
+						value, err := strconv.ParseUint(numStr, 10, 64)
+						if err != nil {
+							continue // Try next suffix if parsing fails
+						}
+						return value * multiplier, nil
 					}
-					return value * 1024, nil
 				}
 
+				// Fallback to the general parser if no explicit unit match was found
 				value, err := units.RAMInBytes(valueStr)
 				if err != nil {
 					return 0, err
