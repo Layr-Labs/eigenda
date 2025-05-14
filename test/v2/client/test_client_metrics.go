@@ -116,6 +116,9 @@ func newTestClientMetrics(logger logging.Logger, port int) *testClientMetrics {
 
 // start starts the metrics server.
 func (m *testClientMetrics) start() {
+	if m == nil {
+		return
+	}
 	go func() {
 		err := m.server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -126,6 +129,9 @@ func (m *testClientMetrics) start() {
 
 // stop stops the metrics server.
 func (m *testClientMetrics) stop() {
+	if m == nil {
+		return
+	}
 	err := m.server.Close()
 	if err != nil {
 		m.logger.Errorf("failed to close metrics server: %v", err)

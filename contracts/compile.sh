@@ -39,6 +39,11 @@ contracts="PaymentVault \
   IEigenDAServiceManager \
   EjectionManager \
   IEigenDACertTypeBindings \
+  EigenDACertVerifierV1 \
+  EigenDACertVerifierV2 \
+  EigenDACertVerifier \
+  EigenDACertVerifierRouter \
+  IEigenDACertVerifierLegacy \
   EigenDAThresholdRegistry \
   EigenDARelayRegistry \
   IEigenDARelayRegistry \

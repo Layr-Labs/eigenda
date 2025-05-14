@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/docker/go-units"
 	"github.com/stretchr/testify/require"
 )
 
@@ -72,7 +73,11 @@ func TestRandomInsertions(t *testing.T) {
 	})
 	t.Run("littDB", func(t *testing.T) {
 		config := &Config{
-			LittDBEnabled: true,
+			LittDBEnabled:                 true,
+			GetChunksHotCacheReadLimitMB:  units.GiB,
+			GetChunksHotBurstLimitMB:      units.GiB,
+			GetChunksColdCacheReadLimitMB: units.GiB,
+			GetChunksColdBurstLimitMB:     units.GiB,
 		}
 		randomInsertionsTest(t, config)
 	})
@@ -150,7 +155,11 @@ func TestRestart(t *testing.T) {
 	})
 	t.Run("littDB", func(t *testing.T) {
 		config := &Config{
-			LittDBEnabled: true,
+			LittDBEnabled:                 true,
+			GetChunksHotCacheReadLimitMB:  units.GiB,
+			GetChunksHotBurstLimitMB:      units.GiB,
+			GetChunksColdCacheReadLimitMB: units.GiB,
+			GetChunksColdBurstLimitMB:     units.GiB,
 		}
 		restartTest(t, config)
 	})
@@ -261,9 +270,13 @@ func TestDoubleInsertionLittDB(t *testing.T) {
 	require.NoError(t, err)
 
 	config := &Config{
-		LittDBEnabled:               true,
-		DbPath:                      testDir,
-		LittDBDoubleWriteProtection: true, // causes littDB to throw if data is written twice
+		LittDBEnabled:                 true,
+		DbPath:                        testDir,
+		LittDBDoubleWriteProtection:   true, // causes littDB to throw if data is written twice
+		GetChunksHotCacheReadLimitMB:  units.GiB,
+		GetChunksHotBurstLimitMB:      units.GiB,
+		GetChunksColdCacheReadLimitMB: units.GiB,
+		GetChunksColdBurstLimitMB:     units.GiB,
 	}
 
 	store, err := NewValidatorStore(context.Background(), logger, config, time.Now, 2*time.Hour, nil)
@@ -350,9 +363,13 @@ func TestMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	config := &Config{
-		LittDBEnabled:             false,
-		ExpirationPollIntervalSec: 1,
-		DbPath:                    testDir,
+		LittDBEnabled:                 false,
+		ExpirationPollIntervalSec:     1,
+		DbPath:                        testDir,
+		GetChunksHotCacheReadLimitMB:  units.GiB,
+		GetChunksHotBurstLimitMB:      units.GiB,
+		GetChunksColdCacheReadLimitMB: units.GiB,
+		GetChunksColdBurstLimitMB:     units.GiB,
 	}
 
 	ttl := 2 * time.Hour

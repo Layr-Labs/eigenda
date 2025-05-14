@@ -1,4 +1,4 @@
-package clients
+package relay
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	relaygrpc "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/api/hashing"
 	"github.com/Layr-Labs/eigenda/core"
@@ -59,7 +59,7 @@ type relayClient struct {
 	logger logging.Logger
 	config *RelayClientConfig
 	// relayLockProvider provides locks that correspond to individual relay keys
-	relayLockProvider *relay.KeyLock[corev2.RelayKey]
+	relayLockProvider *KeyLock[corev2.RelayKey]
 	// relayInitializationStatus maps relay key to a bool `map[corev2.RelayKey]bool`
 	// the boolean value indicates whether the connection to that relay has been initialized
 	relayInitializationStatus sync.Map
@@ -70,7 +70,7 @@ type relayClient struct {
 	// these grpc relay clients are used to communicate with individual relays
 	grpcRelayClients sync.Map
 	// relayUrlProvider knows how to retrieve the relay URLs
-	relayUrlProvider relay.RelayUrlProvider
+	relayUrlProvider RelayUrlProvider
 }
 
 var _ RelayClient = (*relayClient)(nil)
@@ -80,7 +80,7 @@ var _ RelayClient = (*relayClient)(nil)
 func NewRelayClient(
 	config *RelayClientConfig,
 	logger logging.Logger,
-	relayUrlProvider relay.RelayUrlProvider,
+	relayUrlProvider RelayUrlProvider,
 ) (RelayClient, error) {
 
 	if config == nil {
@@ -96,7 +96,7 @@ func NewRelayClient(
 	return &relayClient{
 		config:            config,
 		logger:            logger.With("component", "RelayClient"),
-		relayLockProvider: relay.NewKeyLock[corev2.RelayKey](),
+		relayLockProvider: NewKeyLock[corev2.RelayKey](),
 		relayUrlProvider:  relayUrlProvider,
 	}, nil
 }
@@ -274,7 +274,7 @@ func (c *relayClient) initOnceGrpcConnection(ctx context.Context, key corev2.Rel
 		return fmt.Errorf("get relay url for key %d: %w", key, err)
 	}
 
-	dialOptions := getGrpcDialOptions(c.config.UseSecureGrpcFlag, c.config.MaxGRPCMessageSize)
+	dialOptions := clients.GetGrpcDialOptions(c.config.UseSecureGrpcFlag, c.config.MaxGRPCMessageSize)
 	conn, err := grpc.NewClient(relayUrl, dialOptions...)
 	if err != nil {
 		return fmt.Errorf("create grpc client for key %d: %w", key, err)
