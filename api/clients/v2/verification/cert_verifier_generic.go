@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/common"
 	genericVerifierBinding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV3"
 	opsrbinding "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
@@ -57,7 +58,7 @@ func (cv *GenericCertVerifier) CheckDACert(
 		return fmt.Errorf("get verifier caller: %w", err)
 	}
 
-	// 2 - Call the contract method
+	// 2 - Call the contract method CheckDACert to verify the certificate
 	result, err := certVerifierCaller.CheckDACert(
 		&bind.CallOpts{Context: ctx},
 		certBytes,
@@ -66,10 +67,11 @@ func (cv *GenericCertVerifier) CheckDACert(
 		return fmt.Errorf("verify cert: %w", err)
 	}
 
-	// 3 - Check the result, 1 means success while anything else indicates failure
-	// TODO: Structured error responses by translating response codes
-	if result != 1 {
-		return fmt.Errorf("cert verification failed with status code: %d", result)
+	// 3 - Cast result to structured enum type and check for success
+	verifyResultCode := coretypes.VerifyStatusCode(result)
+
+	if verifyResultCode != coretypes.StatusSuccess {
+		return fmt.Errorf("check da cert error status code: (%d) %s", verifyResultCode, verifyResultCode.String())
 	}
 
 	return nil

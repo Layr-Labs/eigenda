@@ -63,6 +63,15 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 		return nil, fmt.Errorf("create eth client: %w", err)
 	}
 
+	certBuilder, err := createCertBuilder()
+	if err != nil {
+		return nil, fmt.Errorf("create cert builder: %w", err)
+	}
+
+	blockNumMonitor, err := createBlockNumberMonitor()
+	if err != nil {
+		return nil, fmt.Errorf("create block number monitor: %w", err)
+	}
 
 	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
 		PayloadClientConfig:    *clients.GetDefaultPayloadClientConfig(),
@@ -77,6 +86,8 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 		payloadDisperserConfig,
 		ethClient,
 		disperserClient,
+		blockNumMonitor,
+		certBuilder,
 		genericCertVerifier,
 		nil,
 	)
@@ -255,6 +266,43 @@ func createGenericCertVerifier() (*verification.GenericCertVerifier, error) {
 		logger,
 		ethClient,
 		routerAddressProvider,
+	)
+}
+
+func createCertBuilder() (*clients.CertBuilder, error) {
+	logger, err := createLogger()
+	if err != nil {
+		return nil, fmt.Errorf("create logger: %v", err)
+	}
+
+	ethClient, err := createEthClient(logger)
+	if err != nil {
+		return nil, fmt.Errorf("create eth client: %w", err)
+	}
+
+	return clients.NewCertBuilder(
+		logger,
+		gethcommon.HexToAddress(blsOperatorStateRetrieverAddress),
+		gethcommon.HexToAddress(registryCoordinatorAddress),
+		ethClient,
+	)
+}
+
+func createBlockNumberMonitor() (*verification.BlockNumberMonitor, error) {
+	logger, err := createLogger()
+	if err != nil {
+		return nil, fmt.Errorf("create logger: %v", err)
+	}
+
+	ethClient, err := createEthClient(logger)
+	if err != nil {
+		return nil, fmt.Errorf("create eth client: %w", err)
+	}
+
+	return verification.NewBlockNumberMonitor(
+		logger,
+		ethClient,
+		1 * time.Second,
 	)
 }
 
