@@ -11,7 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common"
-	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -211,71 +210,14 @@ func (s *ServerV2) validateAndStoreChunks(
 		}
 	}
 
-	if s.config.LittDBEnabled {
-		return s.validateAndStoreChunksLittDB(
-			ctx,
-			batch,
-			blobShards,
-			batchData,
-			operatorState,
-			batchHeaderHash,
-			probe)
-	} else {
-		probe.SetStage("validate_and_store")
-		return s.validateAndStoreChunksLevelDB(ctx, batch, blobShards, batchData, operatorState, batchHeaderHash)
-	}
-}
-
-func (s *ServerV2) validateAndStoreChunksLevelDB(
-	ctx context.Context,
-	batch *corev2.Batch,
-	blobShards []*corev2.BlobShard,
-	batchData []*node.BundleToStore,
-	operatorState *core.OperatorState,
-	batchHeaderHash [32]byte) error {
-
-	type storeResult struct {
-		keys []kvstore.Key
-		err  error
-	}
-	storeChan := make(chan storeResult)
-	go func() {
-		keys, size, err := s.node.ValidatorStore.StoreBatch(batchHeaderHash[:], batchData)
-		if err != nil {
-			storeChan <- storeResult{
-				keys: nil,
-				err:  err,
-			}
-			return
-		}
-
-		s.metrics.ReportStoreChunksRequestSize(size)
-		storeChan <- storeResult{
-			keys: keys,
-			err:  nil,
-		}
-	}()
-
-	err := s.node.ValidateBatchV2(ctx, batch, blobShards, operatorState)
-	if err != nil {
-		res := <-storeChan
-		if len(res.keys) > 0 {
-			if deleteErr := s.node.ValidatorStore.DeleteKeys(res.keys); deleteErr != nil {
-				s.logger.Error(
-					"failed to delete keys",
-					"err", deleteErr,
-					"batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]))
-			}
-		}
-		return api.NewErrorInternal(fmt.Sprintf("failed to validate batch: %v", err))
-	}
-
-	res := <-storeChan
-	if res.err != nil {
-		return api.NewErrorInternal(fmt.Sprintf("failed to store batch: %v", res.err))
-	}
-
-	return nil
+	return s.validateAndStoreChunksLittDB(
+		ctx,
+		batch,
+		blobShards,
+		batchData,
+		operatorState,
+		batchHeaderHash,
+		probe)
 }
 
 func (s *ServerV2) validateAndStoreChunksLittDB(
@@ -295,7 +237,7 @@ func (s *ServerV2) validateAndStoreChunksLittDB(
 	}
 
 	probe.SetStage("store")
-	_, size, err := s.node.ValidatorStore.StoreBatch(batchHeaderHash[:], batchData)
+	size, err := s.node.ValidatorStore.StoreBatch(batchData)
 	if err != nil {
 		return api.NewErrorInternal(
 			fmt.Sprintf("failed to store batch %s: %v", hex.EncodeToString(batchHeaderHash[:]), err))

@@ -114,7 +114,7 @@ var (
 	}
 	DbPathFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "db-path"),
-		Usage:    "Path for level db",
+		Usage:    "Path for level db. This is only used for V1, and will eventually be removed.",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "DB_PATH"),
 	}
@@ -391,24 +391,6 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_ENABLE_SYNC_WRITES_V1"),
 	}
-	LevelDBDisableSeeksCompactionV2Flag = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "leveldb-disable-seeks-compaction-v2"),
-		Usage:    "Disable seeks compaction for LevelDB for v2",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_DISABLE_SEEKS_COMPACTION_V2"),
-	}
-	LevelDBEnableSyncWritesV2Flag = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "leveldb-enable-sync-writes-v2"),
-		Usage:    "Enable sync writes for LevelDB for v2",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LEVELDB_ENABLE_SYNC_WRITES_V2"),
-	}
-	LittDBEnabledFlag = cli.BoolTFlag{
-		Name:     common.PrefixFlag(FlagPrefix, "litt-db-enabled"),
-		Usage:    "Enable LittDB instead of LevelDB",
-		Required: false,
-		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_ENABLED"),
-	}
 	LittDBWriteCacheSizeGBFlag = cli.IntFlag{
 		Name: common.PrefixFlag(FlagPrefix, "litt-db-write-cache-size-gb"),
 		Usage: "The size of the LittDB write cache in gigabytes. Overrides " +
@@ -438,6 +420,12 @@ var (
 		Required: false,
 		Value:    0.05,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_READ_CACHE_SIZE_FRACTION"),
+	}
+	LittDBStoragePathsFlag = cli.StringSliceFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "litt-db-storage-paths"),
+		Usage:    "Comma separated list of paths to store the LittDB data files. At least one path must be provided.",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_STORAGE_PATHS"),
 	}
 	DownloadPoolSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "download-pool-size"),
@@ -603,14 +591,12 @@ var optionalFlags = []cli.Flag{
 	StoreChunksRequestMaxFutureAgeFlag,
 	LevelDBDisableSeeksCompactionV1Flag,
 	LevelDBEnableSyncWritesV1Flag,
-	LevelDBDisableSeeksCompactionV2Flag,
-	LevelDBEnableSyncWritesV2Flag,
-	LittDBEnabledFlag,
 	DownloadPoolSizeFlag,
 	LittDBWriteCacheSizeGBFlag,
 	LittDBReadCacheSizeGBFlag,
 	LittDBWriteCacheSizeFractionFlag,
 	LittDBReadCacheSizeFractionFlag,
+	LittDBStoragePathsFlag,
 	GetChunksHotCacheReadLimitMBFlag,
 	GetChunksHotBurstLimitMBFlag,
 	GetChunksColdCacheReadLimitMBFlag,

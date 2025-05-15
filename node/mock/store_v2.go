@@ -17,12 +17,12 @@ func NewMockStoreV2() *MockStoreV2 {
 	return &MockStoreV2{}
 }
 
-func (m *MockStoreV2) StoreBatch(batchHeaderHash []byte, batchData []*node.BundleToStore) ([]kvstore.Key, uint64, error) {
-	args := m.Called(batchHeaderHash, batchData)
+func (m *MockStoreV2) StoreBatch(batchData []*node.BundleToStore) (uint64, error) {
+	args := m.Called(batchData)
 	if args.Get(0) == nil {
-		return nil, 0, args.Error(1)
+		return 0, args.Error(1)
 	}
-	return args.Get(0).([]kvstore.Key), 0, args.Error(1)
+	return 0, args.Error(1)
 }
 
 func (m *MockStoreV2) DeleteKeys(keys []kvstore.Key) error {
