@@ -249,8 +249,6 @@ func RunController(ctx *cli.Context) error {
 		)
 		if err != nil {
 			logger.Warn("Heartbeat monitor exited with error", "err", err)
-		} else {
-			logger.Info("Heartbeat monitor stopped cleanly")
 		}
 	}()
 

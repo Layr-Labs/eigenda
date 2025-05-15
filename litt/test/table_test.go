@@ -231,7 +231,7 @@ func buildCachedMemTable(
 		return uint64(len(k) + len(v))
 	}, nil)
 
-	return tablecache.NewCachedTable(baseTable, writeCache, readCache), nil
+	return tablecache.NewCachedTable(baseTable, writeCache, readCache, nil), nil
 }
 
 func buildCachedMemKeyDiskTable(
@@ -251,7 +251,7 @@ func buildCachedMemKeyDiskTable(
 		return uint64(len(k) + len(v))
 	}, nil)
 
-	return tablecache.NewCachedTable(baseTable, writeCache, readCache), nil
+	return tablecache.NewCachedTable(baseTable, writeCache, readCache, nil), nil
 }
 
 func buildCachedLevelDBKeyDiskTable(
@@ -271,7 +271,7 @@ func buildCachedLevelDBKeyDiskTable(
 		return uint64(len(k) + len(v))
 	}, nil)
 
-	return tablecache.NewCachedTable(baseTable, writeCache, readCache), nil
+	return tablecache.NewCachedTable(baseTable, writeCache, readCache, nil), nil
 }
 
 func randomTableOperationsTest(t *testing.T, tableBuilder *tableBuilder) {
