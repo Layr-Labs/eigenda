@@ -16,8 +16,6 @@ import (
 	"google.golang.org/grpc/reflection/grpc_reflection_v1"
 )
 
-var defaultQuorumIds = []uint8{0, 1, 2}
-
 const (
 	livenessCheckPoolSize = 64
 )
@@ -100,7 +98,15 @@ func (oh *OperatorHandler) ProbeV2OperatorsLiveness(ctx context.Context, operato
 	if err != nil {
 		return nil, err
 	}
-	state, err := oh.indexedChainState.GetIndexedOperatorState(ctx, uint(currentBlock), defaultQuorumIds)
+
+	// Get quorum count and generate all quorum IDs
+	quorumCount, err := oh.chainReader.GetQuorumCount(ctx, uint32(currentBlock))
+	if err != nil {
+		return nil, err
+	}
+	quorumIds := eth.GetAllQuorumIDs(quorumCount)
+
+	state, err := oh.indexedChainState.GetIndexedOperatorState(ctx, uint(currentBlock), quorumIds)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +259,14 @@ func checkServiceOnline(ctx context.Context, serviceName string, socket string, 
 }
 
 func (oh *OperatorHandler) GetOperatorsStakeAtBlock(ctx context.Context, operatorId string, currentBlock uint32) (*OperatorsStakeResponse, error) {
-	state, err := oh.chainState.GetOperatorState(ctx, uint(currentBlock), []core.QuorumID{0, 1, 2})
+	// Get quorum count and generate all quorum IDs
+	quorumCount, err := oh.chainReader.GetQuorumCount(ctx, currentBlock)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch quorum count: %w", err)
+	}
+	quorumIds := eth.GetAllQuorumIDs(quorumCount)
+
+	state, err := oh.chainState.GetOperatorState(ctx, uint(currentBlock), quorumIds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch indexed operator state: %w", err)
 	}
@@ -311,7 +324,15 @@ func (s *OperatorHandler) ScanOperatorsHostInfo(ctx context.Context) (*SemverRep
 	}
 
 	s.logger.Info("Queried indexed operators", "operators", len(operators), "block", currentBlock)
-	operatorState, err := s.chainState.GetOperatorState(context.Background(), currentBlock, []core.QuorumID{0, 1, 2})
+
+	// Get quorum count and generate all quorum IDs
+	quorumCount, err := s.chainReader.GetQuorumCount(ctx, uint32(currentBlock))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch quorum count: %w", err)
+	}
+	quorumIds := eth.GetAllQuorumIDs(quorumCount)
+
+	operatorState, err := s.chainState.GetOperatorState(context.Background(), currentBlock, quorumIds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch operator state: %w", err)
 	}
@@ -331,7 +352,6 @@ func (s *OperatorHandler) ScanOperatorsHostInfo(ctx context.Context) (*SemverRep
 
 	s.logger.Info("Semver scan completed", "semverReport", semverReport)
 	return semverReport, nil
-
 }
 
 // CreateOperatorQuorumIntervals creates OperatorQuorumIntervals that are within the

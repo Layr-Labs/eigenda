@@ -152,3 +152,12 @@ func ConvertToReservedPayment(reservation paymentvault.IPaymentVaultReservation)
 		QuorumSplits:     reservation.QuorumSplits,
 	}, nil
 }
+
+// GetAllQuorumIDs returns a slice of all possible QuorumIDs from 0 to quorumCount-1
+func GetAllQuorumIDs(quorumCount uint8) []core.QuorumID {
+	quorumIDs := make([]core.QuorumID, quorumCount)
+	for i := uint8(0); i < quorumCount; i++ {
+		quorumIDs[i] = core.QuorumID(i)
+	}
+	return quorumIDs
+}
