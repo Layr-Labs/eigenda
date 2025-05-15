@@ -206,15 +206,15 @@ library EigenDACertVerificationV2Lib {
         DATypesV1.VersionedBlobParams memory blobParams,
         DATypesV1.SecurityThresholds memory securityThresholds
     ) internal pure returns (StatusCode err, bytes memory errParams) {
-        // uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
-        // uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
+        uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold; 
+        uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
         uint256 minRequired = blobParams.maxNumOperators * 10000;
 
-        // if (n >= minRequired) {
-        return (StatusCode.SUCCESS, "");
-        // } else {
-        //     return (StatusCode.SECURITY_ASSUMPTIONS_NOT_MET, abi.encode(gamma, n, minRequired));
-        // }
+        if (n >= minRequired) {
+            return (StatusCode.SUCCESS, "");
+        } else {
+            return (StatusCode.SECURITY_ASSUMPTIONS_NOT_MET, abi.encode(gamma, n, minRequired));
+        }
     }
 
     /**
