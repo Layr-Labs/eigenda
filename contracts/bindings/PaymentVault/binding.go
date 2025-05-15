@@ -29,19 +29,35 @@ var (
 	_ = abi.ConvertType
 )
 
-// IPaymentVaultReservation is an auto generated low-level Go binding around an user-defined struct.
-type IPaymentVaultReservation struct {
+// PaymentVaultTypesQuorumConfig is an auto generated low-level Go binding around an user-defined struct.
+type PaymentVaultTypesQuorumConfig struct {
+	Token                       common.Address
+	Recipient                   common.Address
+	ReservationSymbolsPerSecond uint64
+	OnDemandSymbolsPerPeriod    uint64
+	OnDemandPricePerSymbol      uint64
+}
+
+// PaymentVaultTypesQuorumProtocolConfig is an auto generated low-level Go binding around an user-defined struct.
+type PaymentVaultTypesQuorumProtocolConfig struct {
+	MinNumSymbols              uint64
+	ReservationAdvanceWindow   uint64
+	ReservationRateLimitWindow uint64
+	OnDemandRateLimitWindow    uint64
+	OnDemandEnabled            bool
+}
+
+// PaymentVaultTypesReservation is an auto generated low-level Go binding around an user-defined struct.
+type PaymentVaultTypesReservation struct {
 	SymbolsPerSecond uint64
 	StartTimestamp   uint64
 	EndTimestamp     uint64
-	QuorumNumbers    []byte
-	QuorumSplits     []byte
 }
 
 // ContractPaymentVaultMetaData contains all meta data concerning the ContractPaymentVault contract.
 var ContractPaymentVaultMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"fallback\",\"stateMutability\":\"payable\"},{\"type\":\"receive\",\"stateMutability\":\"payable\"},{\"type\":\"function\",\"name\":\"depositOnDemand\",\"inputs\":[{\"name\":\"_account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"payable\"},{\"type\":\"function\",\"name\":\"getOnDemandTotalDeposit\",\"inputs\":[{\"name\":\"_account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint80\",\"internalType\":\"uint80\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getOnDemandTotalDeposits\",\"inputs\":[{\"name\":\"_accounts\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[{\"name\":\"_payments\",\"type\":\"uint80[]\",\"internalType\":\"uint80[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getReservation\",\"inputs\":[{\"name\":\"_account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structIPaymentVault.Reservation\",\"components\":[{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"quorumSplits\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getReservations\",\"inputs\":[{\"name\":\"_accounts\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"outputs\":[{\"name\":\"_reservations\",\"type\":\"tuple[]\",\"internalType\":\"structIPaymentVault.Reservation[]\",\"components\":[{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"quorumSplits\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"globalRatePeriodInterval\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"globalSymbolsPerPeriod\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"initialize\",\"inputs\":[{\"name\":\"_initialOwner\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"_minNumSymbols\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"_pricePerSymbol\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"_priceUpdateCooldown\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"_globalSymbolsPerPeriod\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"_reservationPeriodInterval\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"_globalRatePeriodInterval\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"lastPriceUpdateTime\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"minNumSymbols\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"onDemandPayments\",\"inputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"totalDeposit\",\"type\":\"uint80\",\"internalType\":\"uint80\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"pricePerSymbol\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"priceUpdateCooldown\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"renounceOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"reservationPeriodInterval\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"reservations\",\"inputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"quorumSplits\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"setGlobalRatePeriodInterval\",\"inputs\":[{\"name\":\"_globalRatePeriodInterval\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setGlobalSymbolsPerPeriod\",\"inputs\":[{\"name\":\"_globalSymbolsPerPeriod\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setPriceParams\",\"inputs\":[{\"name\":\"_minNumSymbols\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"_pricePerSymbol\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"_priceUpdateCooldown\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setReservation\",\"inputs\":[{\"name\":\"_account\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"_reservation\",\"type\":\"tuple\",\"internalType\":\"structIPaymentVault.Reservation\",\"components\":[{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"quorumSplits\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setReservationPeriodInterval\",\"inputs\":[{\"name\":\"_reservationPeriodInterval\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"withdraw\",\"inputs\":[{\"name\":\"_amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"withdrawERC20\",\"inputs\":[{\"name\":\"_token\",\"type\":\"address\",\"internalType\":\"contractIERC20\"},{\"name\":\"_amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"GlobalRatePeriodIntervalUpdated\",\"inputs\":[{\"name\":\"previousValue\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"newValue\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"GlobalSymbolsPerPeriodUpdated\",\"inputs\":[{\"name\":\"previousValue\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"newValue\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Initialized\",\"inputs\":[{\"name\":\"version\",\"type\":\"uint8\",\"indexed\":false,\"internalType\":\"uint8\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OnDemandPaymentUpdated\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"onDemandPayment\",\"type\":\"uint80\",\"indexed\":false,\"internalType\":\"uint80\"},{\"name\":\"totalDeposit\",\"type\":\"uint80\",\"indexed\":false,\"internalType\":\"uint80\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"previousOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"PriceParamsUpdated\",\"inputs\":[{\"name\":\"previousMinNumSymbols\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"newMinNumSymbols\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"previousPricePerSymbol\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"newPricePerSymbol\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"previousPriceUpdateCooldown\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"newPriceUpdateCooldown\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ReservationPeriodIntervalUpdated\",\"inputs\":[{\"name\":\"previousValue\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"},{\"name\":\"newValue\",\"type\":\"uint64\",\"indexed\":false,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ReservationUpdated\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"reservation\",\"type\":\"tuple\",\"indexed\":false,\"internalType\":\"structIPaymentVault.Reservation\",\"components\":[{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"quorumNumbers\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"quorumSplits\",\"type\":\"bytes\",\"internalType\":\"bytes\"}]}],\"anonymous\":false}]",
-	Bin: "0x608060405234801561001057600080fd5b5061001961001e565b6100de565b600054610100900460ff161561008a5760405162461bcd60e51b815260206004820152602760248201527f496e697469616c697a61626c653a20636f6e747261637420697320696e697469604482015266616c697a696e6760c81b606482015260840160405180910390fd5b60005460ff90811610156100dc576000805460ff191660ff9081179091556040519081527f7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb38474024989060200160405180910390a15b565b611e13806100ed6000396000f3fe60806040526004361061016a5760003560e01c80639aec8640116100d1578063c98d97dd1161008a578063f2fde38b11610064578063f2fde38b146104c2578063f323726a146104e2578063fba2b1d114610509578063fd3dc53a146105295761017b565b8063c98d97dd14610415578063d1c1fdcd14610435578063d996dc991461048c5761017b565b80639aec864014610341578063a16cf88414610361578063a1db978214610381578063aa788bd7146103a1578063b2066f80146103c1578063bff8a3d4146103ee5761017b565b806372228ab21161012357806372228ab21461027f578063761dab89146102a6578063897218fc146102c65780638bec7d02146102e65780638da5cb5b146102f95780639a1bbf37146103215761017b565b8063039f091c14610185578063109f8fe5146101c95780632e1a7d4d146101f65780634184a6741461021657806349b9a7af14610243578063715018a61461026a5761017b565b3661017b57610179333461055a565b005b610179333461055a565b34801561019157600080fd5b506065546101ac90600160801b90046001600160401b031681565b6040516001600160401b0390911681526020015b60405180910390f35b3480156101d557600080fd5b506101e96101e43660046117b1565b610679565b6040516101c09190611913565b34801561020257600080fd5b50610179610211366004611975565b6108cc565b34801561022257600080fd5b506102366102313660046117b1565b610949565b6040516101c0919061198e565b34801561024f57600080fd5b506065546101ac90600160c01b90046001600160401b031681565b34801561027657600080fd5b50610179610a2b565b34801561028b57600080fd5b506066546101ac90600160401b90046001600160401b031681565b3480156102b257600080fd5b506065546101ac906001600160401b031681565b3480156102d257600080fd5b506101796102e13660046119f7565b610a3f565b6101796102f4366004611a19565b610ac7565b34801561030557600080fd5b506033546040516001600160a01b0390911681526020016101c0565b34801561032d57600080fd5b5061017961033c366004611a36565b610ad4565b34801561034d57600080fd5b5061017961035c366004611b2d565b610cfe565b34801561036d57600080fd5b5061017961037c3660046119f7565b610e84565b34801561038d57600080fd5b5061017961039c366004611c05565b610ef6565b3480156103ad57600080fd5b506101796103bc3660046119f7565b610f95565b3480156103cd57600080fd5b506103e16103dc366004611a19565b611018565b6040516101c09190611c31565b3480156103fa57600080fd5b506066546101ac90600160801b90046001600160401b031681565b34801561042157600080fd5b506066546101ac906001600160401b031681565b34801561044157600080fd5b50610474610450366004611a19565b6001600160a01b03166000908152606860205260409020546001600160501b031690565b6040516001600160501b0390911681526020016101c0565b34801561049857600080fd5b506104746104a7366004611a19565b6068602052600090815260409020546001600160501b031681565b3480156104ce57600080fd5b506101796104dd366004611a19565b6111c2565b3480156104ee57600080fd5b506065546101ac90600160401b90046001600160401b031681565b34801561051557600080fd5b50610179610524366004611c44565b611238565b34801561053557600080fd5b50610549610544366004611a19565b6113ae565b6040516101c0959493929190611c87565b6001600160501b038111156105cb5760405162461bcd60e51b815260206004820152602c60248201527f616d6f756e74206d757374206265206c657373207468616e206f72206571756160448201526b6c20746f203830206269747360a01b60648201526084015b60405180910390fd5b6001600160a01b038216600090815260686020526040812080548392906105fc9084906001600160501b0316611ce3565b82546101009290920a6001600160501b038181021990931691831602179091556001600160a01b03841660008181526068602090815260409182902054825187861681529416908401529092507f6fbb447a2c09b8901d70b0d5b9fbce159ee8fda4460e5af2570cab3fe0adf26891015b60405180910390a25050565b606081516001600160401b038111156106945761069461172e565b6040519080825280602002602001820160405280156106ec57816020015b6040805160a08101825260008082526020808301829052928201526060808201819052608082015282526000199092019101816106b25790505b50905060005b82518110156108c6576067600084838151811061071157610711611d0e565b6020908102919091018101516001600160a01b03168252818101929092526040908101600020815160a08101835281546001600160401b038082168352600160401b8204811695830195909552600160801b90049093169183019190915260018101805460608401919061078490611d24565b80601f01602080910402602001604051908101604052809291908181526020018280546107b090611d24565b80156107fd5780601f106107d2576101008083540402835291602001916107fd565b820191906000526020600020905b8154815290600101906020018083116107e057829003601f168201915b5050505050815260200160028201805461081690611d24565b80601f016020809104026020016040519081016040528092919081815260200182805461084290611d24565b801561088f5780601f106108645761010080835404028352916020019161088f565b820191906000526020600020905b81548152906001019060200180831161087257829003601f168201915b5050505050815250508282815181106108aa576108aa611d0e565b6020026020010181905250806108bf90611d59565b90506106f2565b50919050565b6108d4611501565b60006108e86033546001600160a01b031690565b6001600160a01b03168260405160006040518083038185875af1925050503d8060008114610932576040519150601f19603f3d011682016040523d82523d6000602084013e610937565b606091505b505090508061094557600080fd5b5050565b606081516001600160401b038111156109645761096461172e565b60405190808252806020026020018201604052801561098d578160200160208202803683370190505b50905060005b82518110156108c657606860008483815181106109b2576109b2611d0e565b60200260200101516001600160a01b03166001600160a01b0316815260200190815260200160002060000160009054906101000a90046001600160501b0316828281518110610a0357610a03611d0e565b6001600160501b0390921660209283029190910190910152610a2481611d59565b9050610993565b610a33611501565b610a3d600061155b565b565b610a47611501565b606654604080516001600160401b03600160401b9093048316815291831660208301527f1ef4a1ce7d8e50959d15578b346bb20a5b049e5ee1978014a4ba66476265c957910160405180910390a1606680546001600160401b03909216600160401b026fffffffffffffffff000000000000000019909216919091179055565b610ad1813461055a565b50565b600054610100900460ff1615808015610af45750600054600160ff909116105b80610b0e5750303b158015610b0e575060005460ff166001145b610b715760405162461bcd60e51b815260206004820152602e60248201527f496e697469616c697a61626c653a20636f6e747261637420697320616c72656160448201526d191e481a5b9a5d1a585b1a5e995960921b60648201526084016105c2565b6000805460ff191660011790558015610b94576000805461ff0019166101001790555b610b9d8861155b565b86606560006101000a8154816001600160401b0302191690836001600160401b0316021790555085606560086101000a8154816001600160401b0302191690836001600160401b0316021790555084606560106101000a8154816001600160401b0302191690836001600160401b0316021790555042606560186101000a8154816001600160401b0302191690836001600160401b0316021790555083606660006101000a8154816001600160401b0302191690836001600160401b0316021790555082606660086101000a8154816001600160401b0302191690836001600160401b0316021790555081606660106101000a8154816001600160401b0302191690836001600160401b031602179055508015610cf4576000805461ff0019169055604051600181527f7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb38474024989060200160405180910390a15b5050505050505050565b610d06611501565b610d18816060015182608001516115ad565b80602001516001600160401b031681604001516001600160401b031611610d9c5760405162461bcd60e51b815260206004820152603260248201527f656e642074696d657374616d70206d75737420626520677265617465722074686044820152710616e2073746172742074696d657374616d760741b60648201526084016105c2565b6001600160a01b0382166000908152606760209081526040918290208351815483860151948601516001600160401b03908116600160801b0267ffffffffffffffff60801b19968216600160401b026fffffffffffffffffffffffffffffffff199093169190931617179390931692909217825560608301518051849392610e2b926001850192910190611695565b5060808201518051610e47916002840191602090910190611695565b50905050816001600160a01b03167fff3054d138559c39b4c0826c43e94b2b2c6bc9a33ea1d0b74f16c916c7b73ec18260405161066d9190611c31565b610e8c611501565b606654604080516001600160401b03928316815291831660208301527f3edf3b79e74d9e583ff51df95fbabefe15f504d33475b2cc77cffba292268aae910160405180910390a16066805467ffffffffffffffff19166001600160401b0392909216919091179055565b610efe611501565b816001600160a01b031663a9059cbb610f1f6033546001600160a01b031690565b6040516001600160e01b031960e084901b1681526001600160a01b039091166004820152602481018490526044016020604051808303816000875af1158015610f6c573d6000803e3d6000fd5b505050506040513d601f19601f82011682018060405250810190610f909190611d74565b505050565b610f9d611501565b606654604080516001600160401b03600160801b9093048316815291831660208301527f833819c38214ef9f462f88b5c27a21bf201f394572a14da3e63c77ee15f0e93a910160405180910390a1606680546001600160401b03909216600160801b0267ffffffffffffffff60801b19909216919091179055565b6040805160a08082018352600080835260208084018290528385018290526060808501819052608085018190526001600160a01b038716835260678252918590208551938401865280546001600160401b038082168652600160401b8204811693860193909352600160801b90049091169483019490945260018401805493949293918401916110a790611d24565b80601f01602080910402602001604051908101604052809291908181526020018280546110d390611d24565b80156111205780601f106110f557610100808354040283529160200191611120565b820191906000526020600020905b81548152906001019060200180831161110357829003601f168201915b5050505050815260200160028201805461113990611d24565b80601f016020809104026020016040519081016040528092919081815260200182805461116590611d24565b80156111b25780601f10611187576101008083540402835291602001916111b2565b820191906000526020600020905b81548152906001019060200180831161119557829003601f168201915b5050505050815250509050919050565b6111ca611501565b6001600160a01b03811661122f5760405162461bcd60e51b815260206004820152602660248201527f4f776e61626c653a206e6577206f776e657220697320746865207a65726f206160448201526564647265737360d01b60648201526084016105c2565b610ad18161155b565b611240611501565b606554611266906001600160401b03600160801b8204811691600160c01b900416611d96565b6001600160401b03164210156112ca5760405162461bcd60e51b815260206004820152602360248201527f70726963652075706461746520636f6f6c646f776e206e6f74207375727061736044820152621cd95960ea1b60648201526084016105c2565b606554604080516001600160401b0380841682528681166020830152600160401b84048116828401528581166060830152600160801b9093048316608082015291831660a0830152517f9b97ed982ea5820e21bfc9578505e78068a5333487583460ad56ff72defef77a9181900360c00190a160658054426001600160401b03908116600160c01b026001600160c01b03948216600160801b0277ffffffffffffffff0000000000000000ffffffffffffffff19968316600160401b02969096166001600160c01b0319909316929092179516949094179290921716919091179055565b606760205260009081526040902080546001820180546001600160401b0380841694600160401b8504821694600160801b90049091169290916113f090611d24565b80601f016020809104026020016040519081016040528092919081815260200182805461141c90611d24565b80156114695780601f1061143e57610100808354040283529160200191611469565b820191906000526020600020905b81548152906001019060200180831161144c57829003601f168201915b50505050509080600201805461147e90611d24565b80601f01602080910402602001604051908101604052809291908181526020018280546114aa90611d24565b80156114f75780601f106114cc576101008083540402835291602001916114f7565b820191906000526020600020905b8154815290600101906020018083116114da57829003601f168201915b5050505050905085565b6033546001600160a01b03163314610a3d5760405162461bcd60e51b815260206004820181905260248201527f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e657260448201526064016105c2565b603380546001600160a01b038381166001600160a01b0319831681179093556040519116919082907f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e090600090a35050565b80518251146115fe5760405162461bcd60e51b815260206004820181905260248201527f617272617973206d7573742068617665207468652073616d65206c656e67746860448201526064016105c2565b6000805b82518110156116415782818151811061161d5761161d611d0e565b016020015161162f9060f81c83611db8565b915061163a81611d59565b9050611602565b508060ff16606414610f905760405162461bcd60e51b815260206004820152601f60248201527f73756d206f662071756f72756d53706c697473206d757374206265203130300060448201526064016105c2565b8280546116a190611d24565b90600052602060002090601f0160209004810192826116c35760008555611709565b82601f106116dc57805160ff1916838001178555611709565b82800160010185558215611709579182015b828111156117095782518255916020019190600101906116ee565b50611715929150611719565b5090565b5b80821115611715576000815560010161171a565b634e487b7160e01b600052604160045260246000fd5b60405160a081016001600160401b03811182821017156117665761176661172e565b60405290565b604051601f8201601f191681016001600160401b03811182821017156117945761179461172e565b604052919050565b6001600160a01b0381168114610ad157600080fd5b600060208083850312156117c457600080fd5b82356001600160401b03808211156117db57600080fd5b818501915085601f8301126117ef57600080fd5b8135818111156118015761180161172e565b8060051b915061181284830161176c565b818152918301840191848101908884111561182c57600080fd5b938501935b8385101561185657843592506118468361179c565b8282529385019390850190611831565b98975050505050505050565b6000815180845260005b818110156118885760208185018101518683018201520161186c565b8181111561189a576000602083870101525b50601f01601f19169290920160200192915050565b60006001600160401b0380835116845280602084015116602085015280604084015116604085015250606082015160a060608501526118f160a0850182611862565b90506080830151848203608086015261190a8282611862565b95945050505050565b6000602080830181845280855180835260408601915060408160051b870101925083870160005b8281101561196857603f198886030184526119568583516118af565b9450928501929085019060010161193a565b5092979650505050505050565b60006020828403121561198757600080fd5b5035919050565b6020808252825182820181905260009190848201906040850190845b818110156119cf5783516001600160501b0316835292840192918401916001016119aa565b50909695505050505050565b80356001600160401b03811681146119f257600080fd5b919050565b600060208284031215611a0957600080fd5b611a12826119db565b9392505050565b600060208284031215611a2b57600080fd5b8135611a128161179c565b600080600080600080600060e0888a031215611a5157600080fd5b8735611a5c8161179c565b9650611a6a602089016119db565b9550611a78604089016119db565b9450611a86606089016119db565b9350611a94608089016119db565b9250611aa260a089016119db565b9150611ab060c089016119db565b905092959891949750929550565b600082601f830112611acf57600080fd5b81356001600160401b03811115611ae857611ae861172e565b611afb601f8201601f191660200161176c565b818152846020838601011115611b1057600080fd5b816020850160208301376000918101602001919091529392505050565b60008060408385031215611b4057600080fd5b8235611b4b8161179c565b915060208301356001600160401b0380821115611b6757600080fd5b9084019060a08287031215611b7b57600080fd5b611b83611744565b611b8c836119db565b8152611b9a602084016119db565b6020820152611bab604084016119db565b6040820152606083013582811115611bc257600080fd5b611bce88828601611abe565b606083015250608083013582811115611be657600080fd5b611bf288828601611abe565b6080830152508093505050509250929050565b60008060408385031215611c1857600080fd5b8235611c238161179c565b946020939093013593505050565b602081526000611a1260208301846118af565b600080600060608486031215611c5957600080fd5b611c62846119db565b9250611c70602085016119db565b9150611c7e604085016119db565b90509250925092565b60006001600160401b038088168352808716602084015280861660408401525060a06060830152611cbb60a0830185611862565b82810360808401526118568185611862565b634e487b7160e01b600052601160045260246000fd5b60006001600160501b03808316818516808303821115611d0557611d05611ccd565b01949350505050565b634e487b7160e01b600052603260045260246000fd5b600181811c90821680611d3857607f821691505b602082108114156108c657634e487b7160e01b600052602260045260246000fd5b6000600019821415611d6d57611d6d611ccd565b5060010190565b600060208284031215611d8657600080fd5b81518015158114611a1257600080fd5b60006001600160401b03808316818516808303821115611d0557611d05611ccd565b600060ff821660ff84168060ff03821115611dd557611dd5611ccd565b01939250505056fea2646970667358221220f3f2f887f6d13edf240329c75e9e2f57bcc0f0cf787cf8607707dace98f988db64736f6c634300080c0033",
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"schedulePeriod\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"SCHEDULE_PERIOD\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"createReservation\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"reservation\",\"type\":\"tuple\",\"internalType\":\"structPaymentVaultTypes.Reservation\",\"components\":[{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"decreaseReservation\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservation\",\"type\":\"tuple\",\"internalType\":\"structPaymentVaultTypes.Reservation\",\"components\":[{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"depositOnDemand\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getOnDemandDeposit\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getQuorumPaymentConfig\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structPaymentVaultTypes.QuorumConfig\",\"components\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"reservationSymbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandSymbolsPerPeriod\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandPricePerSymbol\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getQuorumProtocolConfig\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structPaymentVaultTypes.QuorumProtocolConfig\",\"components\":[{\"name\":\"minNumSymbols\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservationAdvanceWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservationRateLimitWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandRateLimitWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getQuorumReservedSymbols\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"period\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getReservation\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structPaymentVaultTypes.Reservation\",\"components\":[{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"increaseReservation\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"reservation\",\"type\":\"tuple\",\"internalType\":\"structPaymentVaultTypes.Reservation\",\"components\":[{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"initialize\",\"inputs\":[{\"name\":\"owner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"initializeQuorum\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"protocolCfg\",\"type\":\"tuple\",\"internalType\":\"structPaymentVaultTypes.QuorumProtocolConfig\",\"components\":[{\"name\":\"minNumSymbols\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservationAdvanceWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservationRateLimitWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandRateLimitWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setOnDemandEnabled\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"protocolCfg\",\"type\":\"tuple\",\"internalType\":\"structPaymentVaultTypes.QuorumProtocolConfig\",\"components\":[{\"name\":\"minNumSymbols\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservationAdvanceWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservationRateLimitWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandRateLimitWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setQuorumPaymentConfig\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"paymentConfig\",\"type\":\"tuple\",\"internalType\":\"structPaymentVaultTypes.QuorumConfig\",\"components\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"reservationSymbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandSymbolsPerPeriod\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandPricePerSymbol\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setReservationAdvanceWindow\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"protocolCfg\",\"type\":\"tuple\",\"internalType\":\"structPaymentVaultTypes.QuorumProtocolConfig\",\"components\":[{\"name\":\"minNumSymbols\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservationAdvanceWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservationRateLimitWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandRateLimitWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferQuorumOwnership\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"}]",
+	Bin: "0x60a06040523480156200001157600080fd5b5060405162002197380380620021978339810160408190526200003491620000b3565b6000816001600160401b031611620000a15760405162461bcd60e51b815260206004820152602660248201527f5363686564756c6520706572696f64206d75737420626520677265617465722060448201526507468616e20360d41b606482015260840160405180910390fd5b6001600160401b0316608052620000e5565b600060208284031215620000c657600080fd5b81516001600160401b0381168114620000de57600080fd5b9392505050565b60805161208162000116600039600081816102e0015281816105900152818161080e01526108fb01526120816000f3fe608060405234801561001057600080fd5b506004361061010a5760003560e01c806389a06b35116100a2578063e453a05811610071578063e453a05814610315578063e631f82c14610328578063ecfc2d8e1461033b578063ede57a2d1461034e578063f2fde38b1461036157600080fd5b806389a06b3514610260578063ac990b8a146102c8578063c1eafe51146102db578063c4d66de81461030257600080fd5b8063400c2322116100de578063400c2322146101945780634023a200146101b5578063710f48be146101e05780637a9426ca146101f357600080fd5b8062e691aa1461010f578063063a5d56146101595780631269a9d71461016e5780633b50e8b814610181575b600080fd5b61012261011d366004611a6d565b610374565b6040805182516001600160401b03908116825260208085015182169083015292820151909216908201526060015b60405180910390f35b61016c610167366004611b57565b610403565b005b61016c61017c366004611b9b565b61052e565b61016c61018f366004611c42565b610588565b6101a76101a2366004611a6d565b6105b8565b604051908152602001610150565b6101c86101c3366004611c6d565b6105f7565b6040516001600160401b039091168152602001610150565b61016c6101ee366004611b9b565b610634565b610206610201366004611c97565b61067e565b6040805182516001600160a01b03908116825260208085015190911690820152828201516001600160401b03908116928201929092526060808401518316908201526080928301519091169181019190915260a001610150565b61027361026e366004611c97565b610725565b6040516101509190600060a0820190506001600160401b038084511683528060208501511660208401528060408501511660408401528060608501511660608401525060808301511515608083015292915050565b61016c6102d6366004611cb2565b6107c4565b6101c87f000000000000000000000000000000000000000000000000000000000000000081565b61016c610310366004611cdc565b6107cf565b61016c610323366004611cf7565b6107fc565b61016c610336366004611d32565b610838565b61016c610349366004611cf7565b6108e9565b61016c61035c366004611a6d565b61091f565b61016c61036f366004611cdc565b610997565b6040805160608101825260008082526020820181905291810191909152610399610a20565b6001600160401b038085166000908152602092835260408082206001600160a01b038716835260050184529081902081516060810183526001909101548084168252600160401b8104841694820194909452600160801b9093049091169082015290505b92915050565b61040b610a2f565b61041c61041784610a93565b610ac8565b1561046e5760405162461bcd60e51b815260206004820152601860248201527f51756f72756d206f776e657220616c726561647920736574000000000000000060448201526064015b60405180910390fd5b61048061047a84610a93565b83610ae9565b80610489610a20565b6001600160401b039485166000908152602091825260409081902083518154938501519285015160608601518916600160c01b026001600160c01b03918a16600160801b02919091166fffffffffffffffffffffffffffffffff948a16600160401b026001600160801b03199096169290991691909117939093179190911695909517178455608001516001909301805493151560ff19909416939093179092555050565b8161053881610b45565b8160200151610545610a20565b6001600160401b03948516600090815260209190915260409020805491909416600160401b026fffffffffffffffff000000000000000019909116179092555050565b6105b48233837f0000000000000000000000000000000000000000000000000000000000000000610b96565b5050565b60006105c2610a20565b6001600160401b0384166000908152602091825260408082206001600160a01b03861683526005019092522054905092915050565b6000610601610a20565b6001600160401b038085166000908152602092835260408082208684168352600601909352919091205416905092915050565b8161063e81610b45565b816080015161064b610a20565b6001600160401b039490941660009081526020949094526040909320600101805460ff1916931515939093179092555050565b6040805160a0810182526000808252602082018190529181018290526060810182905260808101919091526106b1610a20565b6001600160401b0392831660009081526020918252604090819020815160a08101835260028201546001600160a01b039081168252600383015490811694820194909452600160a01b909304851691830191909152600401548084166060830152600160401b900490921660808301525090565b6040805160a081018252600080825260208201819052918101829052606081018290526080810191909152610758610a20565b6001600160401b0392831660009081526020918252604090819020815160a08101835281548087168252600160401b8104871694820194909452600160801b8404861692810192909252600160c01b90920490931660608401526001015460ff16151560808301525090565b6105b4823383610d2e565b6107f97fe579393920b888b1e4a7e1afdd7d58fa4f3101113547ac874aefa75ff4a960f982610ae9565b50565b8261080681610b45565b6108328484847f0000000000000000000000000000000000000000000000000000000000000000610df6565b50505050565b8161084281610b45565b8161084b610a20565b6001600160401b039485166000908152602091825260409081902083516002820180546001600160a01b039283166001600160a01b031990911617905592840151600382018054938601518916600160a01b026001600160e01b03199094169190941617919091179091556060820151600490910180546080909301518616600160401b026001600160801b03199093169190951617179092555050565b826108f381610b45565b6108328484847f0000000000000000000000000000000000000000000000000000000000000000610edd565b8161092981610b45565b6001600160a01b03821661097f5760405162461bcd60e51b815260206004820152601d60248201527f4e6577206f776e657220697320746865207a65726f20616464726573730000006044820152606401610465565b61099261098b84610a93565b338461101f565b505050565b61099f610a2f565b6001600160a01b0381166109f55760405162461bcd60e51b815260206004820152601d60248201527f4e6577206f776e657220697320746865207a65726f20616464726573730000006044820152606401610465565b6107f97fe579393920b888b1e4a7e1afdd7d58fa4f3101113547ac874aefa75ff4a960f9338361101f565b6000610a2a611033565b905090565b610a597fe579393920b888b1e4a7e1afdd7d58fa4f3101113547ac874aefa75ff4a960f9336110d1565b610a915760405162461bcd60e51b81526020600482015260096024820152682737ba1037bbb732b960b91b6044820152606401610465565b565b60006103fd6001600160401b0383167f9cb79c1d0fdfada3ea04142fe992963bc303c019dac5ad1fb95c78752893db12611ddf565b60006103fd610ad56110fb565b600084815260209190915260409020611105565b610b0a81610af56110fb565b6000858152602091909152604090209061110f565b506040516001600160a01b0382169083907f2ae6a113c0ed5b78a53413ffbb7679881f11145ccfba4fb92e863dfcd5a1d2f390600090a35050565b610b57610b5182610a93565b336110d1565b6107f95760405162461bcd60e51b815260206004820152601060248201526f2737ba1038bab7b93ab69037bbb732b960811b6044820152606401610465565b6000610ba0610a20565b6001600160401b0386166000908152602091825260408082206001600160a01b0388168352600501909252206001019050610bdd85858585611124565b50805460208401516001600160401b03908116600160401b9092041614610c165760405162461bcd60e51b815260040161046590611df7565b805460408401516001600160401b03600160801b909204821691161115610c4f5760405162461bcd60e51b815260040161046590611e2e565b805483516001600160401b0391821691161115610c7e5760405162461bcd60e51b815260040161046590611e5d565b805460408401518451610ca5928892600160801b9091046001600160401b031691866113cc565b82610cae610a20565b6001600160401b039687166000908152602091825260408082206001600160a01b039098168252600590970182528690208251600190910180549284015193909701518816600160801b0267ffffffffffffffff60801b19938916600160401b026001600160801b03199093169190981617171694909417909255505050565b6000610d38610a20565b6001600160401b0385166000908152602091825260408082206001600160a01b0387168352600581019093528120805492935091600284019190610d7d908690611ddf565b905069ffffffffffffffffffff811115610dcc5760405162461bcd60e51b815260206004820152601060248201526f416d6f756e7420746f6f206c6172676560801b6044820152606401610465565b60018201548254610dec916001600160a01b039182169189911688611576565b9091555050505050565b6000610e00610a20565b6001600160401b0386166000908152602091825260408082206001600160a01b0388168352600501909252206001019050610e3d85858585611124565b50805460208401516001600160401b03908116600160401b9092041614610e765760405162461bcd60e51b815260040161046590611df7565b805460408401516001600160401b03600160801b9092048216911611610eae5760405162461bcd60e51b815260040161046590611e2e565b805483516001600160401b0391821691161015610c7e5760405162461bcd60e51b815260040161046590611e5d565b610ee984848484611124565b50610ef2610a20565b6001600160401b038086166000908152602092835260408082206001600160a01b0388168352600501845290206001015491840151600160801b909204811691161015610f515760405162461bcd60e51b815260040161046590611df7565b4282602001516001600160401b03161015610f7e5760405162461bcd60e51b815260040161046590611df7565b610f9784836020015184604001518560000151856113cc565b81610fa0610a20565b6001600160401b039586166000908152602091825260408082206001600160a01b039097168252600590960182528590208251600190910180549284015193909601518716600160801b0267ffffffffffffffff60801b19938816600160401b026001600160801b031990931691909716171716939093179091555050565b61102983836115d0565b6109928382610ae9565b60008060ff60001b19600160405180604001604052806016815260200175195a59d95b8b99184b9c185e5b595b9d0b9d985d5b1d60521b81525060405160200161107d9190611ec0565b6040516020818303038152906040528051906020012060001c6110a09190611edc565b6040516020016110b291815260200190565b60408051601f1981840301815291905280516020909101201692915050565b60006110f4826110df6110fb565b6000868152602091909152604090209061162c565b9392505050565b6000610a2a61164e565b60006103fd825490565b60006110f4836001600160a01b038416611698565b60008061112f610a20565b6001600160401b0387166000908152602091825260408082206001600160a01b038916835260058101845291209186015190925061116e908590611f09565b6001600160401b0316156111945760405162461bcd60e51b815260040161046590611df7565b8385604001516111a49190611f09565b6001600160401b0316156111ca5760405162461bcd60e51b815260040161046590611e2e565b84602001516001600160401b031685604001516001600160401b0316116112335760405162461bcd60e51b815260206004820152601a60248201527f496e76616c6964207265736572766174696f6e20706572696f640000000000006044820152606401610465565b815460208601516040870151600160401b9092046001600160401b03169161125b9190611f2f565b6001600160401b031611156112b25760405162461bcd60e51b815260206004820152601b60248201527f5265736572766174696f6e20706572696f6420746f6f206c6f6e6700000000006044820152606401610465565b84604001516001600160401b031642116113bb576040805160608101825260018301546001600160401b038082168352600160401b820481166020808501829052600160801b9093048216948401949094529088015191929116148015611332575080604001516001600160401b031686604001516001600160401b0316115b61137e5760405162461bcd60e51b815260206004820152601a60248201527f496e76616c6964207265736572766174696f6e207570646174650000000000006044820152606401610465565b805186516001600160401b03918216911610156113ad5760405162461bcd60e51b815260040161046590611e5d565b6040015192506113c4915050565b50505060208201515b949350505050565b6113d68185611f09565b6001600160401b0316156113fc5760405162461bcd60e51b815260040161046590611df7565b6114068184611f09565b6001600160401b03161561142c5760405162461bcd60e51b815260040161046590611e2e565b60006114388286611f57565b905060006114468386611f57565b90506000611452610a20565b6001600160401b03808a16600090815260209290925260409091206003810154909250600160a01b900416835b836001600160401b0316816001600160401b0316101561156a576001600160401b03808216600090815260068501602052604081205490916114c3918a9116611f7d565b9050826001600160401b0316816001600160401b031611156115275760405162461bcd60e51b815260206004820152601c60248201527f4e6f7420656e6f7567682073796d626f6c7320617661696c61626c65000000006044820152606401610465565b6001600160401b038083166000908152600686016020526040902080549190921667ffffffffffffffff199091161790558061156281611fa8565b91505061147f565b50505050505050505050565b604080516001600160a01b0385811660248301528416604482015260648082018490528251808303909101815260849091019091526020810180516001600160e01b03166323b872dd60e01b1790526108329085906116e7565b6115f1816115dc6110fb565b600085815260209190915260409020906117b9565b506040516001600160a01b0382169083907f155aaafb6329a2098580462df33ec4b7441b19729b9601c5fc17ae1cf99a8a5290600090a35050565b6001600160a01b038116600090815260018301602052604081205415156110f4565b60008060ff60001b196001604051806040016040528060168152602001756163636573732e636f6e74726f6c2e73746f7261676560501b81525060405160200161107d9190611ec0565b60008181526001830160205260408120546116df575081546001818101845560008481526020808220909301849055845484825282860190935260409020919091556103fd565b5060006103fd565b600061173c826040518060400160405280602081526020017f5361666545524332303a206c6f772d6c6576656c2063616c6c206661696c6564815250856001600160a01b03166117ce9092919063ffffffff16565b805190915015610992578080602001905181019061175a9190611fcf565b6109925760405162461bcd60e51b815260206004820152602a60248201527f5361666545524332303a204552433230206f7065726174696f6e20646964206e6044820152691bdd081cdd58d8d9595960b21b6064820152608401610465565b60006110f4836001600160a01b0384166117dd565b60606113c484846000856118d0565b600081815260018301602052604081205480156118c6576000611801600183611edc565b855490915060009061181590600190611edc565b905081811461187a57600086600001828154811061183557611835611fec565b906000526020600020015490508087600001848154811061185857611858611fec565b6000918252602080832090910192909255918252600188019052604090208390555b855486908061188b5761188b612002565b6001900381819060005260206000200160009055905585600101600086815260200190815260200160002060009055600193505050506103fd565b60009150506103fd565b6060824710156119315760405162461bcd60e51b815260206004820152602660248201527f416464726573733a20696e73756666696369656e742062616c616e636520666f6044820152651c8818d85b1b60d21b6064820152608401610465565b6001600160a01b0385163b6119885760405162461bcd60e51b815260206004820152601d60248201527f416464726573733a2063616c6c20746f206e6f6e2d636f6e74726163740000006044820152606401610465565b600080866001600160a01b031685876040516119a49190611ec0565b60006040518083038185875af1925050503d80600081146119e1576040519150601f19603f3d011682016040523d82523d6000602084013e6119e6565b606091505b50915091506119f6828286611a01565b979650505050505050565b60608315611a105750816110f4565b825115611a205782518084602001fd5b8160405162461bcd60e51b81526004016104659190612018565b80356001600160401b0381168114611a5157600080fd5b919050565b80356001600160a01b0381168114611a5157600080fd5b60008060408385031215611a8057600080fd5b611a8983611a3a565b9150611a9760208401611a56565b90509250929050565b60405160a081016001600160401b0381118282101715611ad057634e487b7160e01b600052604160045260246000fd5b60405290565b80151581146107f957600080fd5b600060a08284031215611af657600080fd5b611afe611aa0565b9050611b0982611a3a565b8152611b1760208301611a3a565b6020820152611b2860408301611a3a565b6040820152611b3960608301611a3a565b60608201526080820135611b4c81611ad6565b608082015292915050565b600080600060e08486031215611b6c57600080fd5b611b7584611a3a565b9250611b8360208501611a56565b9150611b928560408601611ae4565b90509250925092565b60008060c08385031215611bae57600080fd5b611bb783611a3a565b9150611a978460208501611ae4565b600060608284031215611bd857600080fd5b604051606081018181106001600160401b0382111715611c0857634e487b7160e01b600052604160045260246000fd5b604052905080611c1783611a3a565b8152611c2560208401611a3a565b6020820152611c3660408401611a3a565b60408201525092915050565b60008060808385031215611c5557600080fd5b611c5e83611a3a565b9150611a978460208501611bc6565b60008060408385031215611c8057600080fd5b611c8983611a3a565b9150611a9760208401611a3a565b600060208284031215611ca957600080fd5b6110f482611a3a565b60008060408385031215611cc557600080fd5b611cce83611a3a565b946020939093013593505050565b600060208284031215611cee57600080fd5b6110f482611a56565b600080600060a08486031215611d0c57600080fd5b611d1584611a3a565b9250611d2360208501611a56565b9150611b928560408601611bc6565b60008082840360c0811215611d4657600080fd5b611d4f84611a3a565b925060a0601f1982011215611d6357600080fd5b50611d6c611aa0565b611d7860208501611a56565b8152611d8660408501611a56565b6020820152611d9760608501611a3a565b6040820152611da860808501611a3a565b6060820152611db960a08501611a3a565b6080820152809150509250929050565b634e487b7160e01b600052601160045260246000fd5b60008219821115611df257611df2611dc9565b500190565b60208082526017908201527f496e76616c69642073746172742074696d657374616d70000000000000000000604082015260600190565b6020808252601590820152740496e76616c696420656e642074696d657374616d7605c1b604082015260600190565b6020808252601a908201527f496e76616c69642073796d626f6c7320706572207365636f6e64000000000000604082015260600190565b60005b83811015611eaf578181015183820152602001611e97565b838111156108325750506000910152565b60008251611ed2818460208701611e94565b9190910192915050565b600082821015611eee57611eee611dc9565b500390565b634e487b7160e01b600052601260045260246000fd5b60006001600160401b0380841680611f2357611f23611ef3565b92169190910692915050565b60006001600160401b0383811690831681811015611f4f57611f4f611dc9565b039392505050565b60006001600160401b0380841680611f7157611f71611ef3565b92169190910492915050565b60006001600160401b03808316818516808303821115611f9f57611f9f611dc9565b01949350505050565b60006001600160401b0380831681811415611fc557611fc5611dc9565b6001019392505050565b600060208284031215611fe157600080fd5b81516110f481611ad6565b634e487b7160e01b600052603260045260246000fd5b634e487b7160e01b600052603160045260246000fd5b6020815260008251806020840152612037816040850160208701611e94565b601f01601f1916919091016040019291505056fea26469706673582212206630f6c411c697d44dec4016f82e31e7707df3372e7f7ac5322e5fe165c032dc64736f6c634300080c0033",
 }
 
 // ContractPaymentVaultABI is the input ABI used to generate the binding from.
@@ -53,7 +69,7 @@ var ContractPaymentVaultABI = ContractPaymentVaultMetaData.ABI
 var ContractPaymentVaultBin = ContractPaymentVaultMetaData.Bin
 
 // DeployContractPaymentVault deploys a new Ethereum contract, binding an instance of ContractPaymentVault to it.
-func DeployContractPaymentVault(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *ContractPaymentVault, error) {
+func DeployContractPaymentVault(auth *bind.TransactOpts, backend bind.ContractBackend, schedulePeriod uint64) (common.Address, *types.Transaction, *ContractPaymentVault, error) {
 	parsed, err := ContractPaymentVaultMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -62,7 +78,7 @@ func DeployContractPaymentVault(auth *bind.TransactOpts, backend bind.ContractBa
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ContractPaymentVaultBin), backend)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ContractPaymentVaultBin), backend, schedulePeriod)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -211,12 +227,43 @@ func (_ContractPaymentVault *ContractPaymentVaultTransactorRaw) Transact(opts *b
 	return _ContractPaymentVault.Contract.contract.Transact(opts, method, params...)
 }
 
-// GetOnDemandTotalDeposit is a free data retrieval call binding the contract method 0xd1c1fdcd.
+// SCHEDULEPERIOD is a free data retrieval call binding the contract method 0xc1eafe51.
 //
-// Solidity: function getOnDemandTotalDeposit(address _account) view returns(uint80)
-func (_ContractPaymentVault *ContractPaymentVaultCaller) GetOnDemandTotalDeposit(opts *bind.CallOpts, _account common.Address) (*big.Int, error) {
+// Solidity: function SCHEDULE_PERIOD() view returns(uint64)
+func (_ContractPaymentVault *ContractPaymentVaultCaller) SCHEDULEPERIOD(opts *bind.CallOpts) (uint64, error) {
 	var out []interface{}
-	err := _ContractPaymentVault.contract.Call(opts, &out, "getOnDemandTotalDeposit", _account)
+	err := _ContractPaymentVault.contract.Call(opts, &out, "SCHEDULE_PERIOD")
+
+	if err != nil {
+		return *new(uint64), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(uint64)).(*uint64)
+
+	return out0, err
+
+}
+
+// SCHEDULEPERIOD is a free data retrieval call binding the contract method 0xc1eafe51.
+//
+// Solidity: function SCHEDULE_PERIOD() view returns(uint64)
+func (_ContractPaymentVault *ContractPaymentVaultSession) SCHEDULEPERIOD() (uint64, error) {
+	return _ContractPaymentVault.Contract.SCHEDULEPERIOD(&_ContractPaymentVault.CallOpts)
+}
+
+// SCHEDULEPERIOD is a free data retrieval call binding the contract method 0xc1eafe51.
+//
+// Solidity: function SCHEDULE_PERIOD() view returns(uint64)
+func (_ContractPaymentVault *ContractPaymentVaultCallerSession) SCHEDULEPERIOD() (uint64, error) {
+	return _ContractPaymentVault.Contract.SCHEDULEPERIOD(&_ContractPaymentVault.CallOpts)
+}
+
+// GetOnDemandDeposit is a free data retrieval call binding the contract method 0x400c2322.
+//
+// Solidity: function getOnDemandDeposit(uint64 quorumId, address account) view returns(uint256)
+func (_ContractPaymentVault *ContractPaymentVaultCaller) GetOnDemandDeposit(opts *bind.CallOpts, quorumId uint64, account common.Address) (*big.Int, error) {
+	var out []interface{}
+	err := _ContractPaymentVault.contract.Call(opts, &out, "getOnDemandDeposit", quorumId, account)
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -228,119 +275,88 @@ func (_ContractPaymentVault *ContractPaymentVaultCaller) GetOnDemandTotalDeposit
 
 }
 
-// GetOnDemandTotalDeposit is a free data retrieval call binding the contract method 0xd1c1fdcd.
+// GetOnDemandDeposit is a free data retrieval call binding the contract method 0x400c2322.
 //
-// Solidity: function getOnDemandTotalDeposit(address _account) view returns(uint80)
-func (_ContractPaymentVault *ContractPaymentVaultSession) GetOnDemandTotalDeposit(_account common.Address) (*big.Int, error) {
-	return _ContractPaymentVault.Contract.GetOnDemandTotalDeposit(&_ContractPaymentVault.CallOpts, _account)
+// Solidity: function getOnDemandDeposit(uint64 quorumId, address account) view returns(uint256)
+func (_ContractPaymentVault *ContractPaymentVaultSession) GetOnDemandDeposit(quorumId uint64, account common.Address) (*big.Int, error) {
+	return _ContractPaymentVault.Contract.GetOnDemandDeposit(&_ContractPaymentVault.CallOpts, quorumId, account)
 }
 
-// GetOnDemandTotalDeposit is a free data retrieval call binding the contract method 0xd1c1fdcd.
+// GetOnDemandDeposit is a free data retrieval call binding the contract method 0x400c2322.
 //
-// Solidity: function getOnDemandTotalDeposit(address _account) view returns(uint80)
-func (_ContractPaymentVault *ContractPaymentVaultCallerSession) GetOnDemandTotalDeposit(_account common.Address) (*big.Int, error) {
-	return _ContractPaymentVault.Contract.GetOnDemandTotalDeposit(&_ContractPaymentVault.CallOpts, _account)
+// Solidity: function getOnDemandDeposit(uint64 quorumId, address account) view returns(uint256)
+func (_ContractPaymentVault *ContractPaymentVaultCallerSession) GetOnDemandDeposit(quorumId uint64, account common.Address) (*big.Int, error) {
+	return _ContractPaymentVault.Contract.GetOnDemandDeposit(&_ContractPaymentVault.CallOpts, quorumId, account)
 }
 
-// GetOnDemandTotalDeposits is a free data retrieval call binding the contract method 0x4184a674.
+// GetQuorumPaymentConfig is a free data retrieval call binding the contract method 0x7a9426ca.
 //
-// Solidity: function getOnDemandTotalDeposits(address[] _accounts) view returns(uint80[] _payments)
-func (_ContractPaymentVault *ContractPaymentVaultCaller) GetOnDemandTotalDeposits(opts *bind.CallOpts, _accounts []common.Address) ([]*big.Int, error) {
+// Solidity: function getQuorumPaymentConfig(uint64 quorumId) view returns((address,address,uint64,uint64,uint64))
+func (_ContractPaymentVault *ContractPaymentVaultCaller) GetQuorumPaymentConfig(opts *bind.CallOpts, quorumId uint64) (PaymentVaultTypesQuorumConfig, error) {
 	var out []interface{}
-	err := _ContractPaymentVault.contract.Call(opts, &out, "getOnDemandTotalDeposits", _accounts)
+	err := _ContractPaymentVault.contract.Call(opts, &out, "getQuorumPaymentConfig", quorumId)
 
 	if err != nil {
-		return *new([]*big.Int), err
+		return *new(PaymentVaultTypesQuorumConfig), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new([]*big.Int)).(*[]*big.Int)
+	out0 := *abi.ConvertType(out[0], new(PaymentVaultTypesQuorumConfig)).(*PaymentVaultTypesQuorumConfig)
 
 	return out0, err
 
 }
 
-// GetOnDemandTotalDeposits is a free data retrieval call binding the contract method 0x4184a674.
+// GetQuorumPaymentConfig is a free data retrieval call binding the contract method 0x7a9426ca.
 //
-// Solidity: function getOnDemandTotalDeposits(address[] _accounts) view returns(uint80[] _payments)
-func (_ContractPaymentVault *ContractPaymentVaultSession) GetOnDemandTotalDeposits(_accounts []common.Address) ([]*big.Int, error) {
-	return _ContractPaymentVault.Contract.GetOnDemandTotalDeposits(&_ContractPaymentVault.CallOpts, _accounts)
+// Solidity: function getQuorumPaymentConfig(uint64 quorumId) view returns((address,address,uint64,uint64,uint64))
+func (_ContractPaymentVault *ContractPaymentVaultSession) GetQuorumPaymentConfig(quorumId uint64) (PaymentVaultTypesQuorumConfig, error) {
+	return _ContractPaymentVault.Contract.GetQuorumPaymentConfig(&_ContractPaymentVault.CallOpts, quorumId)
 }
 
-// GetOnDemandTotalDeposits is a free data retrieval call binding the contract method 0x4184a674.
+// GetQuorumPaymentConfig is a free data retrieval call binding the contract method 0x7a9426ca.
 //
-// Solidity: function getOnDemandTotalDeposits(address[] _accounts) view returns(uint80[] _payments)
-func (_ContractPaymentVault *ContractPaymentVaultCallerSession) GetOnDemandTotalDeposits(_accounts []common.Address) ([]*big.Int, error) {
-	return _ContractPaymentVault.Contract.GetOnDemandTotalDeposits(&_ContractPaymentVault.CallOpts, _accounts)
+// Solidity: function getQuorumPaymentConfig(uint64 quorumId) view returns((address,address,uint64,uint64,uint64))
+func (_ContractPaymentVault *ContractPaymentVaultCallerSession) GetQuorumPaymentConfig(quorumId uint64) (PaymentVaultTypesQuorumConfig, error) {
+	return _ContractPaymentVault.Contract.GetQuorumPaymentConfig(&_ContractPaymentVault.CallOpts, quorumId)
 }
 
-// GetReservation is a free data retrieval call binding the contract method 0xb2066f80.
+// GetQuorumProtocolConfig is a free data retrieval call binding the contract method 0x89a06b35.
 //
-// Solidity: function getReservation(address _account) view returns((uint64,uint64,uint64,bytes,bytes))
-func (_ContractPaymentVault *ContractPaymentVaultCaller) GetReservation(opts *bind.CallOpts, _account common.Address) (IPaymentVaultReservation, error) {
+// Solidity: function getQuorumProtocolConfig(uint64 quorumId) view returns((uint64,uint64,uint64,uint64,bool))
+func (_ContractPaymentVault *ContractPaymentVaultCaller) GetQuorumProtocolConfig(opts *bind.CallOpts, quorumId uint64) (PaymentVaultTypesQuorumProtocolConfig, error) {
 	var out []interface{}
-	err := _ContractPaymentVault.contract.Call(opts, &out, "getReservation", _account)
+	err := _ContractPaymentVault.contract.Call(opts, &out, "getQuorumProtocolConfig", quorumId)
 
 	if err != nil {
-		return *new(IPaymentVaultReservation), err
+		return *new(PaymentVaultTypesQuorumProtocolConfig), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(IPaymentVaultReservation)).(*IPaymentVaultReservation)
+	out0 := *abi.ConvertType(out[0], new(PaymentVaultTypesQuorumProtocolConfig)).(*PaymentVaultTypesQuorumProtocolConfig)
 
 	return out0, err
 
 }
 
-// GetReservation is a free data retrieval call binding the contract method 0xb2066f80.
+// GetQuorumProtocolConfig is a free data retrieval call binding the contract method 0x89a06b35.
 //
-// Solidity: function getReservation(address _account) view returns((uint64,uint64,uint64,bytes,bytes))
-func (_ContractPaymentVault *ContractPaymentVaultSession) GetReservation(_account common.Address) (IPaymentVaultReservation, error) {
-	return _ContractPaymentVault.Contract.GetReservation(&_ContractPaymentVault.CallOpts, _account)
+// Solidity: function getQuorumProtocolConfig(uint64 quorumId) view returns((uint64,uint64,uint64,uint64,bool))
+func (_ContractPaymentVault *ContractPaymentVaultSession) GetQuorumProtocolConfig(quorumId uint64) (PaymentVaultTypesQuorumProtocolConfig, error) {
+	return _ContractPaymentVault.Contract.GetQuorumProtocolConfig(&_ContractPaymentVault.CallOpts, quorumId)
 }
 
-// GetReservation is a free data retrieval call binding the contract method 0xb2066f80.
+// GetQuorumProtocolConfig is a free data retrieval call binding the contract method 0x89a06b35.
 //
-// Solidity: function getReservation(address _account) view returns((uint64,uint64,uint64,bytes,bytes))
-func (_ContractPaymentVault *ContractPaymentVaultCallerSession) GetReservation(_account common.Address) (IPaymentVaultReservation, error) {
-	return _ContractPaymentVault.Contract.GetReservation(&_ContractPaymentVault.CallOpts, _account)
+// Solidity: function getQuorumProtocolConfig(uint64 quorumId) view returns((uint64,uint64,uint64,uint64,bool))
+func (_ContractPaymentVault *ContractPaymentVaultCallerSession) GetQuorumProtocolConfig(quorumId uint64) (PaymentVaultTypesQuorumProtocolConfig, error) {
+	return _ContractPaymentVault.Contract.GetQuorumProtocolConfig(&_ContractPaymentVault.CallOpts, quorumId)
 }
 
-// GetReservations is a free data retrieval call binding the contract method 0x109f8fe5.
+// GetQuorumReservedSymbols is a free data retrieval call binding the contract method 0x4023a200.
 //
-// Solidity: function getReservations(address[] _accounts) view returns((uint64,uint64,uint64,bytes,bytes)[] _reservations)
-func (_ContractPaymentVault *ContractPaymentVaultCaller) GetReservations(opts *bind.CallOpts, _accounts []common.Address) ([]IPaymentVaultReservation, error) {
+// Solidity: function getQuorumReservedSymbols(uint64 quorumId, uint64 period) view returns(uint64)
+func (_ContractPaymentVault *ContractPaymentVaultCaller) GetQuorumReservedSymbols(opts *bind.CallOpts, quorumId uint64, period uint64) (uint64, error) {
 	var out []interface{}
-	err := _ContractPaymentVault.contract.Call(opts, &out, "getReservations", _accounts)
-
-	if err != nil {
-		return *new([]IPaymentVaultReservation), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new([]IPaymentVaultReservation)).(*[]IPaymentVaultReservation)
-
-	return out0, err
-
-}
-
-// GetReservations is a free data retrieval call binding the contract method 0x109f8fe5.
-//
-// Solidity: function getReservations(address[] _accounts) view returns((uint64,uint64,uint64,bytes,bytes)[] _reservations)
-func (_ContractPaymentVault *ContractPaymentVaultSession) GetReservations(_accounts []common.Address) ([]IPaymentVaultReservation, error) {
-	return _ContractPaymentVault.Contract.GetReservations(&_ContractPaymentVault.CallOpts, _accounts)
-}
-
-// GetReservations is a free data retrieval call binding the contract method 0x109f8fe5.
-//
-// Solidity: function getReservations(address[] _accounts) view returns((uint64,uint64,uint64,bytes,bytes)[] _reservations)
-func (_ContractPaymentVault *ContractPaymentVaultCallerSession) GetReservations(_accounts []common.Address) ([]IPaymentVaultReservation, error) {
-	return _ContractPaymentVault.Contract.GetReservations(&_ContractPaymentVault.CallOpts, _accounts)
-}
-
-// GlobalRatePeriodInterval is a free data retrieval call binding the contract method 0xbff8a3d4.
-//
-// Solidity: function globalRatePeriodInterval() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultCaller) GlobalRatePeriodInterval(opts *bind.CallOpts) (uint64, error) {
-	var out []interface{}
-	err := _ContractPaymentVault.contract.Call(opts, &out, "globalRatePeriodInterval")
+	err := _ContractPaymentVault.contract.Call(opts, &out, "getQuorumReservedSymbols", quorumId, period)
 
 	if err != nil {
 		return *new(uint64), err
@@ -352,494 +368,238 @@ func (_ContractPaymentVault *ContractPaymentVaultCaller) GlobalRatePeriodInterva
 
 }
 
-// GlobalRatePeriodInterval is a free data retrieval call binding the contract method 0xbff8a3d4.
+// GetQuorumReservedSymbols is a free data retrieval call binding the contract method 0x4023a200.
 //
-// Solidity: function globalRatePeriodInterval() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultSession) GlobalRatePeriodInterval() (uint64, error) {
-	return _ContractPaymentVault.Contract.GlobalRatePeriodInterval(&_ContractPaymentVault.CallOpts)
+// Solidity: function getQuorumReservedSymbols(uint64 quorumId, uint64 period) view returns(uint64)
+func (_ContractPaymentVault *ContractPaymentVaultSession) GetQuorumReservedSymbols(quorumId uint64, period uint64) (uint64, error) {
+	return _ContractPaymentVault.Contract.GetQuorumReservedSymbols(&_ContractPaymentVault.CallOpts, quorumId, period)
 }
 
-// GlobalRatePeriodInterval is a free data retrieval call binding the contract method 0xbff8a3d4.
+// GetQuorumReservedSymbols is a free data retrieval call binding the contract method 0x4023a200.
 //
-// Solidity: function globalRatePeriodInterval() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultCallerSession) GlobalRatePeriodInterval() (uint64, error) {
-	return _ContractPaymentVault.Contract.GlobalRatePeriodInterval(&_ContractPaymentVault.CallOpts)
+// Solidity: function getQuorumReservedSymbols(uint64 quorumId, uint64 period) view returns(uint64)
+func (_ContractPaymentVault *ContractPaymentVaultCallerSession) GetQuorumReservedSymbols(quorumId uint64, period uint64) (uint64, error) {
+	return _ContractPaymentVault.Contract.GetQuorumReservedSymbols(&_ContractPaymentVault.CallOpts, quorumId, period)
 }
 
-// GlobalSymbolsPerPeriod is a free data retrieval call binding the contract method 0xc98d97dd.
+// GetReservation is a free data retrieval call binding the contract method 0x00e691aa.
 //
-// Solidity: function globalSymbolsPerPeriod() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultCaller) GlobalSymbolsPerPeriod(opts *bind.CallOpts) (uint64, error) {
+// Solidity: function getReservation(uint64 quorumId, address account) view returns((uint64,uint64,uint64))
+func (_ContractPaymentVault *ContractPaymentVaultCaller) GetReservation(opts *bind.CallOpts, quorumId uint64, account common.Address) (PaymentVaultTypesReservation, error) {
 	var out []interface{}
-	err := _ContractPaymentVault.contract.Call(opts, &out, "globalSymbolsPerPeriod")
+	err := _ContractPaymentVault.contract.Call(opts, &out, "getReservation", quorumId, account)
 
 	if err != nil {
-		return *new(uint64), err
+		return *new(PaymentVaultTypesReservation), err
 	}
 
-	out0 := *abi.ConvertType(out[0], new(uint64)).(*uint64)
+	out0 := *abi.ConvertType(out[0], new(PaymentVaultTypesReservation)).(*PaymentVaultTypesReservation)
 
 	return out0, err
 
 }
 
-// GlobalSymbolsPerPeriod is a free data retrieval call binding the contract method 0xc98d97dd.
+// GetReservation is a free data retrieval call binding the contract method 0x00e691aa.
 //
-// Solidity: function globalSymbolsPerPeriod() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultSession) GlobalSymbolsPerPeriod() (uint64, error) {
-	return _ContractPaymentVault.Contract.GlobalSymbolsPerPeriod(&_ContractPaymentVault.CallOpts)
+// Solidity: function getReservation(uint64 quorumId, address account) view returns((uint64,uint64,uint64))
+func (_ContractPaymentVault *ContractPaymentVaultSession) GetReservation(quorumId uint64, account common.Address) (PaymentVaultTypesReservation, error) {
+	return _ContractPaymentVault.Contract.GetReservation(&_ContractPaymentVault.CallOpts, quorumId, account)
 }
 
-// GlobalSymbolsPerPeriod is a free data retrieval call binding the contract method 0xc98d97dd.
+// GetReservation is a free data retrieval call binding the contract method 0x00e691aa.
 //
-// Solidity: function globalSymbolsPerPeriod() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultCallerSession) GlobalSymbolsPerPeriod() (uint64, error) {
-	return _ContractPaymentVault.Contract.GlobalSymbolsPerPeriod(&_ContractPaymentVault.CallOpts)
+// Solidity: function getReservation(uint64 quorumId, address account) view returns((uint64,uint64,uint64))
+func (_ContractPaymentVault *ContractPaymentVaultCallerSession) GetReservation(quorumId uint64, account common.Address) (PaymentVaultTypesReservation, error) {
+	return _ContractPaymentVault.Contract.GetReservation(&_ContractPaymentVault.CallOpts, quorumId, account)
 }
 
-// LastPriceUpdateTime is a free data retrieval call binding the contract method 0x49b9a7af.
+// CreateReservation is a paid mutator transaction binding the contract method 0xecfc2d8e.
 //
-// Solidity: function lastPriceUpdateTime() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultCaller) LastPriceUpdateTime(opts *bind.CallOpts) (uint64, error) {
-	var out []interface{}
-	err := _ContractPaymentVault.contract.Call(opts, &out, "lastPriceUpdateTime")
-
-	if err != nil {
-		return *new(uint64), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(uint64)).(*uint64)
-
-	return out0, err
-
+// Solidity: function createReservation(uint64 quorumId, address account, (uint64,uint64,uint64) reservation) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactor) CreateReservation(opts *bind.TransactOpts, quorumId uint64, account common.Address, reservation PaymentVaultTypesReservation) (*types.Transaction, error) {
+	return _ContractPaymentVault.contract.Transact(opts, "createReservation", quorumId, account, reservation)
 }
 
-// LastPriceUpdateTime is a free data retrieval call binding the contract method 0x49b9a7af.
+// CreateReservation is a paid mutator transaction binding the contract method 0xecfc2d8e.
 //
-// Solidity: function lastPriceUpdateTime() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultSession) LastPriceUpdateTime() (uint64, error) {
-	return _ContractPaymentVault.Contract.LastPriceUpdateTime(&_ContractPaymentVault.CallOpts)
+// Solidity: function createReservation(uint64 quorumId, address account, (uint64,uint64,uint64) reservation) returns()
+func (_ContractPaymentVault *ContractPaymentVaultSession) CreateReservation(quorumId uint64, account common.Address, reservation PaymentVaultTypesReservation) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.CreateReservation(&_ContractPaymentVault.TransactOpts, quorumId, account, reservation)
 }
 
-// LastPriceUpdateTime is a free data retrieval call binding the contract method 0x49b9a7af.
+// CreateReservation is a paid mutator transaction binding the contract method 0xecfc2d8e.
 //
-// Solidity: function lastPriceUpdateTime() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultCallerSession) LastPriceUpdateTime() (uint64, error) {
-	return _ContractPaymentVault.Contract.LastPriceUpdateTime(&_ContractPaymentVault.CallOpts)
+// Solidity: function createReservation(uint64 quorumId, address account, (uint64,uint64,uint64) reservation) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) CreateReservation(quorumId uint64, account common.Address, reservation PaymentVaultTypesReservation) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.CreateReservation(&_ContractPaymentVault.TransactOpts, quorumId, account, reservation)
 }
 
-// MinNumSymbols is a free data retrieval call binding the contract method 0x761dab89.
+// DecreaseReservation is a paid mutator transaction binding the contract method 0x3b50e8b8.
 //
-// Solidity: function minNumSymbols() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultCaller) MinNumSymbols(opts *bind.CallOpts) (uint64, error) {
-	var out []interface{}
-	err := _ContractPaymentVault.contract.Call(opts, &out, "minNumSymbols")
-
-	if err != nil {
-		return *new(uint64), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(uint64)).(*uint64)
-
-	return out0, err
-
+// Solidity: function decreaseReservation(uint64 quorumId, (uint64,uint64,uint64) reservation) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactor) DecreaseReservation(opts *bind.TransactOpts, quorumId uint64, reservation PaymentVaultTypesReservation) (*types.Transaction, error) {
+	return _ContractPaymentVault.contract.Transact(opts, "decreaseReservation", quorumId, reservation)
 }
 
-// MinNumSymbols is a free data retrieval call binding the contract method 0x761dab89.
+// DecreaseReservation is a paid mutator transaction binding the contract method 0x3b50e8b8.
 //
-// Solidity: function minNumSymbols() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultSession) MinNumSymbols() (uint64, error) {
-	return _ContractPaymentVault.Contract.MinNumSymbols(&_ContractPaymentVault.CallOpts)
+// Solidity: function decreaseReservation(uint64 quorumId, (uint64,uint64,uint64) reservation) returns()
+func (_ContractPaymentVault *ContractPaymentVaultSession) DecreaseReservation(quorumId uint64, reservation PaymentVaultTypesReservation) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.DecreaseReservation(&_ContractPaymentVault.TransactOpts, quorumId, reservation)
 }
 
-// MinNumSymbols is a free data retrieval call binding the contract method 0x761dab89.
+// DecreaseReservation is a paid mutator transaction binding the contract method 0x3b50e8b8.
 //
-// Solidity: function minNumSymbols() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultCallerSession) MinNumSymbols() (uint64, error) {
-	return _ContractPaymentVault.Contract.MinNumSymbols(&_ContractPaymentVault.CallOpts)
+// Solidity: function decreaseReservation(uint64 quorumId, (uint64,uint64,uint64) reservation) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) DecreaseReservation(quorumId uint64, reservation PaymentVaultTypesReservation) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.DecreaseReservation(&_ContractPaymentVault.TransactOpts, quorumId, reservation)
 }
 
-// OnDemandPayments is a free data retrieval call binding the contract method 0xd996dc99.
+// DepositOnDemand is a paid mutator transaction binding the contract method 0xac990b8a.
 //
-// Solidity: function onDemandPayments(address ) view returns(uint80 totalDeposit)
-func (_ContractPaymentVault *ContractPaymentVaultCaller) OnDemandPayments(opts *bind.CallOpts, arg0 common.Address) (*big.Int, error) {
-	var out []interface{}
-	err := _ContractPaymentVault.contract.Call(opts, &out, "onDemandPayments", arg0)
-
-	if err != nil {
-		return *new(*big.Int), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
-
-	return out0, err
-
+// Solidity: function depositOnDemand(uint64 quorumId, uint256 amount) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactor) DepositOnDemand(opts *bind.TransactOpts, quorumId uint64, amount *big.Int) (*types.Transaction, error) {
+	return _ContractPaymentVault.contract.Transact(opts, "depositOnDemand", quorumId, amount)
 }
 
-// OnDemandPayments is a free data retrieval call binding the contract method 0xd996dc99.
+// DepositOnDemand is a paid mutator transaction binding the contract method 0xac990b8a.
 //
-// Solidity: function onDemandPayments(address ) view returns(uint80 totalDeposit)
-func (_ContractPaymentVault *ContractPaymentVaultSession) OnDemandPayments(arg0 common.Address) (*big.Int, error) {
-	return _ContractPaymentVault.Contract.OnDemandPayments(&_ContractPaymentVault.CallOpts, arg0)
+// Solidity: function depositOnDemand(uint64 quorumId, uint256 amount) returns()
+func (_ContractPaymentVault *ContractPaymentVaultSession) DepositOnDemand(quorumId uint64, amount *big.Int) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.DepositOnDemand(&_ContractPaymentVault.TransactOpts, quorumId, amount)
 }
 
-// OnDemandPayments is a free data retrieval call binding the contract method 0xd996dc99.
+// DepositOnDemand is a paid mutator transaction binding the contract method 0xac990b8a.
 //
-// Solidity: function onDemandPayments(address ) view returns(uint80 totalDeposit)
-func (_ContractPaymentVault *ContractPaymentVaultCallerSession) OnDemandPayments(arg0 common.Address) (*big.Int, error) {
-	return _ContractPaymentVault.Contract.OnDemandPayments(&_ContractPaymentVault.CallOpts, arg0)
+// Solidity: function depositOnDemand(uint64 quorumId, uint256 amount) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) DepositOnDemand(quorumId uint64, amount *big.Int) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.DepositOnDemand(&_ContractPaymentVault.TransactOpts, quorumId, amount)
 }
 
-// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+// IncreaseReservation is a paid mutator transaction binding the contract method 0xe453a058.
 //
-// Solidity: function owner() view returns(address)
-func (_ContractPaymentVault *ContractPaymentVaultCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
-	err := _ContractPaymentVault.contract.Call(opts, &out, "owner")
-
-	if err != nil {
-		return *new(common.Address), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
-
-	return out0, err
-
+// Solidity: function increaseReservation(uint64 quorumId, address account, (uint64,uint64,uint64) reservation) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactor) IncreaseReservation(opts *bind.TransactOpts, quorumId uint64, account common.Address, reservation PaymentVaultTypesReservation) (*types.Transaction, error) {
+	return _ContractPaymentVault.contract.Transact(opts, "increaseReservation", quorumId, account, reservation)
 }
 
-// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+// IncreaseReservation is a paid mutator transaction binding the contract method 0xe453a058.
 //
-// Solidity: function owner() view returns(address)
-func (_ContractPaymentVault *ContractPaymentVaultSession) Owner() (common.Address, error) {
-	return _ContractPaymentVault.Contract.Owner(&_ContractPaymentVault.CallOpts)
+// Solidity: function increaseReservation(uint64 quorumId, address account, (uint64,uint64,uint64) reservation) returns()
+func (_ContractPaymentVault *ContractPaymentVaultSession) IncreaseReservation(quorumId uint64, account common.Address, reservation PaymentVaultTypesReservation) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.IncreaseReservation(&_ContractPaymentVault.TransactOpts, quorumId, account, reservation)
 }
 
-// Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
+// IncreaseReservation is a paid mutator transaction binding the contract method 0xe453a058.
 //
-// Solidity: function owner() view returns(address)
-func (_ContractPaymentVault *ContractPaymentVaultCallerSession) Owner() (common.Address, error) {
-	return _ContractPaymentVault.Contract.Owner(&_ContractPaymentVault.CallOpts)
+// Solidity: function increaseReservation(uint64 quorumId, address account, (uint64,uint64,uint64) reservation) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) IncreaseReservation(quorumId uint64, account common.Address, reservation PaymentVaultTypesReservation) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.IncreaseReservation(&_ContractPaymentVault.TransactOpts, quorumId, account, reservation)
 }
 
-// PricePerSymbol is a free data retrieval call binding the contract method 0xf323726a.
+// Initialize is a paid mutator transaction binding the contract method 0xc4d66de8.
 //
-// Solidity: function pricePerSymbol() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultCaller) PricePerSymbol(opts *bind.CallOpts) (uint64, error) {
-	var out []interface{}
-	err := _ContractPaymentVault.contract.Call(opts, &out, "pricePerSymbol")
-
-	if err != nil {
-		return *new(uint64), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(uint64)).(*uint64)
-
-	return out0, err
-
+// Solidity: function initialize(address owner) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactor) Initialize(opts *bind.TransactOpts, owner common.Address) (*types.Transaction, error) {
+	return _ContractPaymentVault.contract.Transact(opts, "initialize", owner)
 }
 
-// PricePerSymbol is a free data retrieval call binding the contract method 0xf323726a.
+// Initialize is a paid mutator transaction binding the contract method 0xc4d66de8.
 //
-// Solidity: function pricePerSymbol() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultSession) PricePerSymbol() (uint64, error) {
-	return _ContractPaymentVault.Contract.PricePerSymbol(&_ContractPaymentVault.CallOpts)
+// Solidity: function initialize(address owner) returns()
+func (_ContractPaymentVault *ContractPaymentVaultSession) Initialize(owner common.Address) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.Initialize(&_ContractPaymentVault.TransactOpts, owner)
 }
 
-// PricePerSymbol is a free data retrieval call binding the contract method 0xf323726a.
+// Initialize is a paid mutator transaction binding the contract method 0xc4d66de8.
 //
-// Solidity: function pricePerSymbol() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultCallerSession) PricePerSymbol() (uint64, error) {
-	return _ContractPaymentVault.Contract.PricePerSymbol(&_ContractPaymentVault.CallOpts)
+// Solidity: function initialize(address owner) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) Initialize(owner common.Address) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.Initialize(&_ContractPaymentVault.TransactOpts, owner)
 }
 
-// PriceUpdateCooldown is a free data retrieval call binding the contract method 0x039f091c.
+// InitializeQuorum is a paid mutator transaction binding the contract method 0x063a5d56.
 //
-// Solidity: function priceUpdateCooldown() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultCaller) PriceUpdateCooldown(opts *bind.CallOpts) (uint64, error) {
-	var out []interface{}
-	err := _ContractPaymentVault.contract.Call(opts, &out, "priceUpdateCooldown")
-
-	if err != nil {
-		return *new(uint64), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(uint64)).(*uint64)
-
-	return out0, err
-
+// Solidity: function initializeQuorum(uint64 quorumId, address newOwner, (uint64,uint64,uint64,uint64,bool) protocolCfg) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactor) InitializeQuorum(opts *bind.TransactOpts, quorumId uint64, newOwner common.Address, protocolCfg PaymentVaultTypesQuorumProtocolConfig) (*types.Transaction, error) {
+	return _ContractPaymentVault.contract.Transact(opts, "initializeQuorum", quorumId, newOwner, protocolCfg)
 }
 
-// PriceUpdateCooldown is a free data retrieval call binding the contract method 0x039f091c.
+// InitializeQuorum is a paid mutator transaction binding the contract method 0x063a5d56.
 //
-// Solidity: function priceUpdateCooldown() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultSession) PriceUpdateCooldown() (uint64, error) {
-	return _ContractPaymentVault.Contract.PriceUpdateCooldown(&_ContractPaymentVault.CallOpts)
+// Solidity: function initializeQuorum(uint64 quorumId, address newOwner, (uint64,uint64,uint64,uint64,bool) protocolCfg) returns()
+func (_ContractPaymentVault *ContractPaymentVaultSession) InitializeQuorum(quorumId uint64, newOwner common.Address, protocolCfg PaymentVaultTypesQuorumProtocolConfig) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.InitializeQuorum(&_ContractPaymentVault.TransactOpts, quorumId, newOwner, protocolCfg)
 }
 
-// PriceUpdateCooldown is a free data retrieval call binding the contract method 0x039f091c.
+// InitializeQuorum is a paid mutator transaction binding the contract method 0x063a5d56.
 //
-// Solidity: function priceUpdateCooldown() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultCallerSession) PriceUpdateCooldown() (uint64, error) {
-	return _ContractPaymentVault.Contract.PriceUpdateCooldown(&_ContractPaymentVault.CallOpts)
+// Solidity: function initializeQuorum(uint64 quorumId, address newOwner, (uint64,uint64,uint64,uint64,bool) protocolCfg) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) InitializeQuorum(quorumId uint64, newOwner common.Address, protocolCfg PaymentVaultTypesQuorumProtocolConfig) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.InitializeQuorum(&_ContractPaymentVault.TransactOpts, quorumId, newOwner, protocolCfg)
 }
 
-// ReservationPeriodInterval is a free data retrieval call binding the contract method 0x72228ab2.
+// SetOnDemandEnabled is a paid mutator transaction binding the contract method 0x710f48be.
 //
-// Solidity: function reservationPeriodInterval() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultCaller) ReservationPeriodInterval(opts *bind.CallOpts) (uint64, error) {
-	var out []interface{}
-	err := _ContractPaymentVault.contract.Call(opts, &out, "reservationPeriodInterval")
-
-	if err != nil {
-		return *new(uint64), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(uint64)).(*uint64)
-
-	return out0, err
-
+// Solidity: function setOnDemandEnabled(uint64 quorumId, (uint64,uint64,uint64,uint64,bool) protocolCfg) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactor) SetOnDemandEnabled(opts *bind.TransactOpts, quorumId uint64, protocolCfg PaymentVaultTypesQuorumProtocolConfig) (*types.Transaction, error) {
+	return _ContractPaymentVault.contract.Transact(opts, "setOnDemandEnabled", quorumId, protocolCfg)
 }
 
-// ReservationPeriodInterval is a free data retrieval call binding the contract method 0x72228ab2.
+// SetOnDemandEnabled is a paid mutator transaction binding the contract method 0x710f48be.
 //
-// Solidity: function reservationPeriodInterval() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultSession) ReservationPeriodInterval() (uint64, error) {
-	return _ContractPaymentVault.Contract.ReservationPeriodInterval(&_ContractPaymentVault.CallOpts)
+// Solidity: function setOnDemandEnabled(uint64 quorumId, (uint64,uint64,uint64,uint64,bool) protocolCfg) returns()
+func (_ContractPaymentVault *ContractPaymentVaultSession) SetOnDemandEnabled(quorumId uint64, protocolCfg PaymentVaultTypesQuorumProtocolConfig) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.SetOnDemandEnabled(&_ContractPaymentVault.TransactOpts, quorumId, protocolCfg)
 }
 
-// ReservationPeriodInterval is a free data retrieval call binding the contract method 0x72228ab2.
+// SetOnDemandEnabled is a paid mutator transaction binding the contract method 0x710f48be.
 //
-// Solidity: function reservationPeriodInterval() view returns(uint64)
-func (_ContractPaymentVault *ContractPaymentVaultCallerSession) ReservationPeriodInterval() (uint64, error) {
-	return _ContractPaymentVault.Contract.ReservationPeriodInterval(&_ContractPaymentVault.CallOpts)
+// Solidity: function setOnDemandEnabled(uint64 quorumId, (uint64,uint64,uint64,uint64,bool) protocolCfg) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) SetOnDemandEnabled(quorumId uint64, protocolCfg PaymentVaultTypesQuorumProtocolConfig) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.SetOnDemandEnabled(&_ContractPaymentVault.TransactOpts, quorumId, protocolCfg)
 }
 
-// Reservations is a free data retrieval call binding the contract method 0xfd3dc53a.
+// SetQuorumPaymentConfig is a paid mutator transaction binding the contract method 0xe631f82c.
 //
-// Solidity: function reservations(address ) view returns(uint64 symbolsPerSecond, uint64 startTimestamp, uint64 endTimestamp, bytes quorumNumbers, bytes quorumSplits)
-func (_ContractPaymentVault *ContractPaymentVaultCaller) Reservations(opts *bind.CallOpts, arg0 common.Address) (struct {
-	SymbolsPerSecond uint64
-	StartTimestamp   uint64
-	EndTimestamp     uint64
-	QuorumNumbers    []byte
-	QuorumSplits     []byte
-}, error) {
-	var out []interface{}
-	err := _ContractPaymentVault.contract.Call(opts, &out, "reservations", arg0)
-
-	outstruct := new(struct {
-		SymbolsPerSecond uint64
-		StartTimestamp   uint64
-		EndTimestamp     uint64
-		QuorumNumbers    []byte
-		QuorumSplits     []byte
-	})
-	if err != nil {
-		return *outstruct, err
-	}
-
-	outstruct.SymbolsPerSecond = *abi.ConvertType(out[0], new(uint64)).(*uint64)
-	outstruct.StartTimestamp = *abi.ConvertType(out[1], new(uint64)).(*uint64)
-	outstruct.EndTimestamp = *abi.ConvertType(out[2], new(uint64)).(*uint64)
-	outstruct.QuorumNumbers = *abi.ConvertType(out[3], new([]byte)).(*[]byte)
-	outstruct.QuorumSplits = *abi.ConvertType(out[4], new([]byte)).(*[]byte)
-
-	return *outstruct, err
-
+// Solidity: function setQuorumPaymentConfig(uint64 quorumId, (address,address,uint64,uint64,uint64) paymentConfig) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactor) SetQuorumPaymentConfig(opts *bind.TransactOpts, quorumId uint64, paymentConfig PaymentVaultTypesQuorumConfig) (*types.Transaction, error) {
+	return _ContractPaymentVault.contract.Transact(opts, "setQuorumPaymentConfig", quorumId, paymentConfig)
 }
 
-// Reservations is a free data retrieval call binding the contract method 0xfd3dc53a.
+// SetQuorumPaymentConfig is a paid mutator transaction binding the contract method 0xe631f82c.
 //
-// Solidity: function reservations(address ) view returns(uint64 symbolsPerSecond, uint64 startTimestamp, uint64 endTimestamp, bytes quorumNumbers, bytes quorumSplits)
-func (_ContractPaymentVault *ContractPaymentVaultSession) Reservations(arg0 common.Address) (struct {
-	SymbolsPerSecond uint64
-	StartTimestamp   uint64
-	EndTimestamp     uint64
-	QuorumNumbers    []byte
-	QuorumSplits     []byte
-}, error) {
-	return _ContractPaymentVault.Contract.Reservations(&_ContractPaymentVault.CallOpts, arg0)
+// Solidity: function setQuorumPaymentConfig(uint64 quorumId, (address,address,uint64,uint64,uint64) paymentConfig) returns()
+func (_ContractPaymentVault *ContractPaymentVaultSession) SetQuorumPaymentConfig(quorumId uint64, paymentConfig PaymentVaultTypesQuorumConfig) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.SetQuorumPaymentConfig(&_ContractPaymentVault.TransactOpts, quorumId, paymentConfig)
 }
 
-// Reservations is a free data retrieval call binding the contract method 0xfd3dc53a.
+// SetQuorumPaymentConfig is a paid mutator transaction binding the contract method 0xe631f82c.
 //
-// Solidity: function reservations(address ) view returns(uint64 symbolsPerSecond, uint64 startTimestamp, uint64 endTimestamp, bytes quorumNumbers, bytes quorumSplits)
-func (_ContractPaymentVault *ContractPaymentVaultCallerSession) Reservations(arg0 common.Address) (struct {
-	SymbolsPerSecond uint64
-	StartTimestamp   uint64
-	EndTimestamp     uint64
-	QuorumNumbers    []byte
-	QuorumSplits     []byte
-}, error) {
-	return _ContractPaymentVault.Contract.Reservations(&_ContractPaymentVault.CallOpts, arg0)
+// Solidity: function setQuorumPaymentConfig(uint64 quorumId, (address,address,uint64,uint64,uint64) paymentConfig) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) SetQuorumPaymentConfig(quorumId uint64, paymentConfig PaymentVaultTypesQuorumConfig) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.SetQuorumPaymentConfig(&_ContractPaymentVault.TransactOpts, quorumId, paymentConfig)
 }
 
-// DepositOnDemand is a paid mutator transaction binding the contract method 0x8bec7d02.
+// SetReservationAdvanceWindow is a paid mutator transaction binding the contract method 0x1269a9d7.
 //
-// Solidity: function depositOnDemand(address _account) payable returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactor) DepositOnDemand(opts *bind.TransactOpts, _account common.Address) (*types.Transaction, error) {
-	return _ContractPaymentVault.contract.Transact(opts, "depositOnDemand", _account)
+// Solidity: function setReservationAdvanceWindow(uint64 quorumId, (uint64,uint64,uint64,uint64,bool) protocolCfg) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactor) SetReservationAdvanceWindow(opts *bind.TransactOpts, quorumId uint64, protocolCfg PaymentVaultTypesQuorumProtocolConfig) (*types.Transaction, error) {
+	return _ContractPaymentVault.contract.Transact(opts, "setReservationAdvanceWindow", quorumId, protocolCfg)
 }
 
-// DepositOnDemand is a paid mutator transaction binding the contract method 0x8bec7d02.
+// SetReservationAdvanceWindow is a paid mutator transaction binding the contract method 0x1269a9d7.
 //
-// Solidity: function depositOnDemand(address _account) payable returns()
-func (_ContractPaymentVault *ContractPaymentVaultSession) DepositOnDemand(_account common.Address) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.DepositOnDemand(&_ContractPaymentVault.TransactOpts, _account)
+// Solidity: function setReservationAdvanceWindow(uint64 quorumId, (uint64,uint64,uint64,uint64,bool) protocolCfg) returns()
+func (_ContractPaymentVault *ContractPaymentVaultSession) SetReservationAdvanceWindow(quorumId uint64, protocolCfg PaymentVaultTypesQuorumProtocolConfig) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.SetReservationAdvanceWindow(&_ContractPaymentVault.TransactOpts, quorumId, protocolCfg)
 }
 
-// DepositOnDemand is a paid mutator transaction binding the contract method 0x8bec7d02.
+// SetReservationAdvanceWindow is a paid mutator transaction binding the contract method 0x1269a9d7.
 //
-// Solidity: function depositOnDemand(address _account) payable returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) DepositOnDemand(_account common.Address) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.DepositOnDemand(&_ContractPaymentVault.TransactOpts, _account)
-}
-
-// Initialize is a paid mutator transaction binding the contract method 0x9a1bbf37.
-//
-// Solidity: function initialize(address _initialOwner, uint64 _minNumSymbols, uint64 _pricePerSymbol, uint64 _priceUpdateCooldown, uint64 _globalSymbolsPerPeriod, uint64 _reservationPeriodInterval, uint64 _globalRatePeriodInterval) returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactor) Initialize(opts *bind.TransactOpts, _initialOwner common.Address, _minNumSymbols uint64, _pricePerSymbol uint64, _priceUpdateCooldown uint64, _globalSymbolsPerPeriod uint64, _reservationPeriodInterval uint64, _globalRatePeriodInterval uint64) (*types.Transaction, error) {
-	return _ContractPaymentVault.contract.Transact(opts, "initialize", _initialOwner, _minNumSymbols, _pricePerSymbol, _priceUpdateCooldown, _globalSymbolsPerPeriod, _reservationPeriodInterval, _globalRatePeriodInterval)
-}
-
-// Initialize is a paid mutator transaction binding the contract method 0x9a1bbf37.
-//
-// Solidity: function initialize(address _initialOwner, uint64 _minNumSymbols, uint64 _pricePerSymbol, uint64 _priceUpdateCooldown, uint64 _globalSymbolsPerPeriod, uint64 _reservationPeriodInterval, uint64 _globalRatePeriodInterval) returns()
-func (_ContractPaymentVault *ContractPaymentVaultSession) Initialize(_initialOwner common.Address, _minNumSymbols uint64, _pricePerSymbol uint64, _priceUpdateCooldown uint64, _globalSymbolsPerPeriod uint64, _reservationPeriodInterval uint64, _globalRatePeriodInterval uint64) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.Initialize(&_ContractPaymentVault.TransactOpts, _initialOwner, _minNumSymbols, _pricePerSymbol, _priceUpdateCooldown, _globalSymbolsPerPeriod, _reservationPeriodInterval, _globalRatePeriodInterval)
-}
-
-// Initialize is a paid mutator transaction binding the contract method 0x9a1bbf37.
-//
-// Solidity: function initialize(address _initialOwner, uint64 _minNumSymbols, uint64 _pricePerSymbol, uint64 _priceUpdateCooldown, uint64 _globalSymbolsPerPeriod, uint64 _reservationPeriodInterval, uint64 _globalRatePeriodInterval) returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) Initialize(_initialOwner common.Address, _minNumSymbols uint64, _pricePerSymbol uint64, _priceUpdateCooldown uint64, _globalSymbolsPerPeriod uint64, _reservationPeriodInterval uint64, _globalRatePeriodInterval uint64) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.Initialize(&_ContractPaymentVault.TransactOpts, _initialOwner, _minNumSymbols, _pricePerSymbol, _priceUpdateCooldown, _globalSymbolsPerPeriod, _reservationPeriodInterval, _globalRatePeriodInterval)
-}
-
-// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
-//
-// Solidity: function renounceOwnership() returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactor) RenounceOwnership(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _ContractPaymentVault.contract.Transact(opts, "renounceOwnership")
-}
-
-// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
-//
-// Solidity: function renounceOwnership() returns()
-func (_ContractPaymentVault *ContractPaymentVaultSession) RenounceOwnership() (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.RenounceOwnership(&_ContractPaymentVault.TransactOpts)
-}
-
-// RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
-//
-// Solidity: function renounceOwnership() returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) RenounceOwnership() (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.RenounceOwnership(&_ContractPaymentVault.TransactOpts)
-}
-
-// SetGlobalRatePeriodInterval is a paid mutator transaction binding the contract method 0xaa788bd7.
-//
-// Solidity: function setGlobalRatePeriodInterval(uint64 _globalRatePeriodInterval) returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactor) SetGlobalRatePeriodInterval(opts *bind.TransactOpts, _globalRatePeriodInterval uint64) (*types.Transaction, error) {
-	return _ContractPaymentVault.contract.Transact(opts, "setGlobalRatePeriodInterval", _globalRatePeriodInterval)
-}
-
-// SetGlobalRatePeriodInterval is a paid mutator transaction binding the contract method 0xaa788bd7.
-//
-// Solidity: function setGlobalRatePeriodInterval(uint64 _globalRatePeriodInterval) returns()
-func (_ContractPaymentVault *ContractPaymentVaultSession) SetGlobalRatePeriodInterval(_globalRatePeriodInterval uint64) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.SetGlobalRatePeriodInterval(&_ContractPaymentVault.TransactOpts, _globalRatePeriodInterval)
-}
-
-// SetGlobalRatePeriodInterval is a paid mutator transaction binding the contract method 0xaa788bd7.
-//
-// Solidity: function setGlobalRatePeriodInterval(uint64 _globalRatePeriodInterval) returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) SetGlobalRatePeriodInterval(_globalRatePeriodInterval uint64) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.SetGlobalRatePeriodInterval(&_ContractPaymentVault.TransactOpts, _globalRatePeriodInterval)
-}
-
-// SetGlobalSymbolsPerPeriod is a paid mutator transaction binding the contract method 0xa16cf884.
-//
-// Solidity: function setGlobalSymbolsPerPeriod(uint64 _globalSymbolsPerPeriod) returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactor) SetGlobalSymbolsPerPeriod(opts *bind.TransactOpts, _globalSymbolsPerPeriod uint64) (*types.Transaction, error) {
-	return _ContractPaymentVault.contract.Transact(opts, "setGlobalSymbolsPerPeriod", _globalSymbolsPerPeriod)
-}
-
-// SetGlobalSymbolsPerPeriod is a paid mutator transaction binding the contract method 0xa16cf884.
-//
-// Solidity: function setGlobalSymbolsPerPeriod(uint64 _globalSymbolsPerPeriod) returns()
-func (_ContractPaymentVault *ContractPaymentVaultSession) SetGlobalSymbolsPerPeriod(_globalSymbolsPerPeriod uint64) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.SetGlobalSymbolsPerPeriod(&_ContractPaymentVault.TransactOpts, _globalSymbolsPerPeriod)
-}
-
-// SetGlobalSymbolsPerPeriod is a paid mutator transaction binding the contract method 0xa16cf884.
-//
-// Solidity: function setGlobalSymbolsPerPeriod(uint64 _globalSymbolsPerPeriod) returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) SetGlobalSymbolsPerPeriod(_globalSymbolsPerPeriod uint64) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.SetGlobalSymbolsPerPeriod(&_ContractPaymentVault.TransactOpts, _globalSymbolsPerPeriod)
-}
-
-// SetPriceParams is a paid mutator transaction binding the contract method 0xfba2b1d1.
-//
-// Solidity: function setPriceParams(uint64 _minNumSymbols, uint64 _pricePerSymbol, uint64 _priceUpdateCooldown) returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactor) SetPriceParams(opts *bind.TransactOpts, _minNumSymbols uint64, _pricePerSymbol uint64, _priceUpdateCooldown uint64) (*types.Transaction, error) {
-	return _ContractPaymentVault.contract.Transact(opts, "setPriceParams", _minNumSymbols, _pricePerSymbol, _priceUpdateCooldown)
-}
-
-// SetPriceParams is a paid mutator transaction binding the contract method 0xfba2b1d1.
-//
-// Solidity: function setPriceParams(uint64 _minNumSymbols, uint64 _pricePerSymbol, uint64 _priceUpdateCooldown) returns()
-func (_ContractPaymentVault *ContractPaymentVaultSession) SetPriceParams(_minNumSymbols uint64, _pricePerSymbol uint64, _priceUpdateCooldown uint64) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.SetPriceParams(&_ContractPaymentVault.TransactOpts, _minNumSymbols, _pricePerSymbol, _priceUpdateCooldown)
-}
-
-// SetPriceParams is a paid mutator transaction binding the contract method 0xfba2b1d1.
-//
-// Solidity: function setPriceParams(uint64 _minNumSymbols, uint64 _pricePerSymbol, uint64 _priceUpdateCooldown) returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) SetPriceParams(_minNumSymbols uint64, _pricePerSymbol uint64, _priceUpdateCooldown uint64) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.SetPriceParams(&_ContractPaymentVault.TransactOpts, _minNumSymbols, _pricePerSymbol, _priceUpdateCooldown)
-}
-
-// SetReservation is a paid mutator transaction binding the contract method 0x9aec8640.
-//
-// Solidity: function setReservation(address _account, (uint64,uint64,uint64,bytes,bytes) _reservation) returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactor) SetReservation(opts *bind.TransactOpts, _account common.Address, _reservation IPaymentVaultReservation) (*types.Transaction, error) {
-	return _ContractPaymentVault.contract.Transact(opts, "setReservation", _account, _reservation)
-}
-
-// SetReservation is a paid mutator transaction binding the contract method 0x9aec8640.
-//
-// Solidity: function setReservation(address _account, (uint64,uint64,uint64,bytes,bytes) _reservation) returns()
-func (_ContractPaymentVault *ContractPaymentVaultSession) SetReservation(_account common.Address, _reservation IPaymentVaultReservation) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.SetReservation(&_ContractPaymentVault.TransactOpts, _account, _reservation)
-}
-
-// SetReservation is a paid mutator transaction binding the contract method 0x9aec8640.
-//
-// Solidity: function setReservation(address _account, (uint64,uint64,uint64,bytes,bytes) _reservation) returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) SetReservation(_account common.Address, _reservation IPaymentVaultReservation) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.SetReservation(&_ContractPaymentVault.TransactOpts, _account, _reservation)
-}
-
-// SetReservationPeriodInterval is a paid mutator transaction binding the contract method 0x897218fc.
-//
-// Solidity: function setReservationPeriodInterval(uint64 _reservationPeriodInterval) returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactor) SetReservationPeriodInterval(opts *bind.TransactOpts, _reservationPeriodInterval uint64) (*types.Transaction, error) {
-	return _ContractPaymentVault.contract.Transact(opts, "setReservationPeriodInterval", _reservationPeriodInterval)
-}
-
-// SetReservationPeriodInterval is a paid mutator transaction binding the contract method 0x897218fc.
-//
-// Solidity: function setReservationPeriodInterval(uint64 _reservationPeriodInterval) returns()
-func (_ContractPaymentVault *ContractPaymentVaultSession) SetReservationPeriodInterval(_reservationPeriodInterval uint64) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.SetReservationPeriodInterval(&_ContractPaymentVault.TransactOpts, _reservationPeriodInterval)
-}
-
-// SetReservationPeriodInterval is a paid mutator transaction binding the contract method 0x897218fc.
-//
-// Solidity: function setReservationPeriodInterval(uint64 _reservationPeriodInterval) returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) SetReservationPeriodInterval(_reservationPeriodInterval uint64) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.SetReservationPeriodInterval(&_ContractPaymentVault.TransactOpts, _reservationPeriodInterval)
+// Solidity: function setReservationAdvanceWindow(uint64 quorumId, (uint64,uint64,uint64,uint64,bool) protocolCfg) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) SetReservationAdvanceWindow(quorumId uint64, protocolCfg PaymentVaultTypesQuorumProtocolConfig) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.SetReservationAdvanceWindow(&_ContractPaymentVault.TransactOpts, quorumId, protocolCfg)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
@@ -863,1208 +623,23 @@ func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) TransferOwne
 	return _ContractPaymentVault.Contract.TransferOwnership(&_ContractPaymentVault.TransactOpts, newOwner)
 }
 
-// Withdraw is a paid mutator transaction binding the contract method 0x2e1a7d4d.
+// TransferQuorumOwnership is a paid mutator transaction binding the contract method 0xede57a2d.
 //
-// Solidity: function withdraw(uint256 _amount) returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactor) Withdraw(opts *bind.TransactOpts, _amount *big.Int) (*types.Transaction, error) {
-	return _ContractPaymentVault.contract.Transact(opts, "withdraw", _amount)
+// Solidity: function transferQuorumOwnership(uint64 quorumId, address newOwner) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactor) TransferQuorumOwnership(opts *bind.TransactOpts, quorumId uint64, newOwner common.Address) (*types.Transaction, error) {
+	return _ContractPaymentVault.contract.Transact(opts, "transferQuorumOwnership", quorumId, newOwner)
 }
 
-// Withdraw is a paid mutator transaction binding the contract method 0x2e1a7d4d.
+// TransferQuorumOwnership is a paid mutator transaction binding the contract method 0xede57a2d.
 //
-// Solidity: function withdraw(uint256 _amount) returns()
-func (_ContractPaymentVault *ContractPaymentVaultSession) Withdraw(_amount *big.Int) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.Withdraw(&_ContractPaymentVault.TransactOpts, _amount)
+// Solidity: function transferQuorumOwnership(uint64 quorumId, address newOwner) returns()
+func (_ContractPaymentVault *ContractPaymentVaultSession) TransferQuorumOwnership(quorumId uint64, newOwner common.Address) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.TransferQuorumOwnership(&_ContractPaymentVault.TransactOpts, quorumId, newOwner)
 }
 
-// Withdraw is a paid mutator transaction binding the contract method 0x2e1a7d4d.
+// TransferQuorumOwnership is a paid mutator transaction binding the contract method 0xede57a2d.
 //
-// Solidity: function withdraw(uint256 _amount) returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) Withdraw(_amount *big.Int) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.Withdraw(&_ContractPaymentVault.TransactOpts, _amount)
-}
-
-// WithdrawERC20 is a paid mutator transaction binding the contract method 0xa1db9782.
-//
-// Solidity: function withdrawERC20(address _token, uint256 _amount) returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactor) WithdrawERC20(opts *bind.TransactOpts, _token common.Address, _amount *big.Int) (*types.Transaction, error) {
-	return _ContractPaymentVault.contract.Transact(opts, "withdrawERC20", _token, _amount)
-}
-
-// WithdrawERC20 is a paid mutator transaction binding the contract method 0xa1db9782.
-//
-// Solidity: function withdrawERC20(address _token, uint256 _amount) returns()
-func (_ContractPaymentVault *ContractPaymentVaultSession) WithdrawERC20(_token common.Address, _amount *big.Int) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.WithdrawERC20(&_ContractPaymentVault.TransactOpts, _token, _amount)
-}
-
-// WithdrawERC20 is a paid mutator transaction binding the contract method 0xa1db9782.
-//
-// Solidity: function withdrawERC20(address _token, uint256 _amount) returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) WithdrawERC20(_token common.Address, _amount *big.Int) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.WithdrawERC20(&_ContractPaymentVault.TransactOpts, _token, _amount)
-}
-
-// Fallback is a paid mutator transaction binding the contract fallback function.
-//
-// Solidity: fallback() payable returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactor) Fallback(opts *bind.TransactOpts, calldata []byte) (*types.Transaction, error) {
-	return _ContractPaymentVault.contract.RawTransact(opts, calldata)
-}
-
-// Fallback is a paid mutator transaction binding the contract fallback function.
-//
-// Solidity: fallback() payable returns()
-func (_ContractPaymentVault *ContractPaymentVaultSession) Fallback(calldata []byte) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.Fallback(&_ContractPaymentVault.TransactOpts, calldata)
-}
-
-// Fallback is a paid mutator transaction binding the contract fallback function.
-//
-// Solidity: fallback() payable returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) Fallback(calldata []byte) (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.Fallback(&_ContractPaymentVault.TransactOpts, calldata)
-}
-
-// Receive is a paid mutator transaction binding the contract receive function.
-//
-// Solidity: receive() payable returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactor) Receive(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _ContractPaymentVault.contract.RawTransact(opts, nil) // calldata is disallowed for receive function
-}
-
-// Receive is a paid mutator transaction binding the contract receive function.
-//
-// Solidity: receive() payable returns()
-func (_ContractPaymentVault *ContractPaymentVaultSession) Receive() (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.Receive(&_ContractPaymentVault.TransactOpts)
-}
-
-// Receive is a paid mutator transaction binding the contract receive function.
-//
-// Solidity: receive() payable returns()
-func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) Receive() (*types.Transaction, error) {
-	return _ContractPaymentVault.Contract.Receive(&_ContractPaymentVault.TransactOpts)
-}
-
-// ContractPaymentVaultGlobalRatePeriodIntervalUpdatedIterator is returned from FilterGlobalRatePeriodIntervalUpdated and is used to iterate over the raw logs and unpacked data for GlobalRatePeriodIntervalUpdated events raised by the ContractPaymentVault contract.
-type ContractPaymentVaultGlobalRatePeriodIntervalUpdatedIterator struct {
-	Event *ContractPaymentVaultGlobalRatePeriodIntervalUpdated // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *ContractPaymentVaultGlobalRatePeriodIntervalUpdatedIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(ContractPaymentVaultGlobalRatePeriodIntervalUpdated)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(ContractPaymentVaultGlobalRatePeriodIntervalUpdated)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractPaymentVaultGlobalRatePeriodIntervalUpdatedIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *ContractPaymentVaultGlobalRatePeriodIntervalUpdatedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// ContractPaymentVaultGlobalRatePeriodIntervalUpdated represents a GlobalRatePeriodIntervalUpdated event raised by the ContractPaymentVault contract.
-type ContractPaymentVaultGlobalRatePeriodIntervalUpdated struct {
-	PreviousValue uint64
-	NewValue      uint64
-	Raw           types.Log // Blockchain specific contextual infos
-}
-
-// FilterGlobalRatePeriodIntervalUpdated is a free log retrieval operation binding the contract event 0x833819c38214ef9f462f88b5c27a21bf201f394572a14da3e63c77ee15f0e93a.
-//
-// Solidity: event GlobalRatePeriodIntervalUpdated(uint64 previousValue, uint64 newValue)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) FilterGlobalRatePeriodIntervalUpdated(opts *bind.FilterOpts) (*ContractPaymentVaultGlobalRatePeriodIntervalUpdatedIterator, error) {
-
-	logs, sub, err := _ContractPaymentVault.contract.FilterLogs(opts, "GlobalRatePeriodIntervalUpdated")
-	if err != nil {
-		return nil, err
-	}
-	return &ContractPaymentVaultGlobalRatePeriodIntervalUpdatedIterator{contract: _ContractPaymentVault.contract, event: "GlobalRatePeriodIntervalUpdated", logs: logs, sub: sub}, nil
-}
-
-// WatchGlobalRatePeriodIntervalUpdated is a free log subscription operation binding the contract event 0x833819c38214ef9f462f88b5c27a21bf201f394572a14da3e63c77ee15f0e93a.
-//
-// Solidity: event GlobalRatePeriodIntervalUpdated(uint64 previousValue, uint64 newValue)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) WatchGlobalRatePeriodIntervalUpdated(opts *bind.WatchOpts, sink chan<- *ContractPaymentVaultGlobalRatePeriodIntervalUpdated) (event.Subscription, error) {
-
-	logs, sub, err := _ContractPaymentVault.contract.WatchLogs(opts, "GlobalRatePeriodIntervalUpdated")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(ContractPaymentVaultGlobalRatePeriodIntervalUpdated)
-				if err := _ContractPaymentVault.contract.UnpackLog(event, "GlobalRatePeriodIntervalUpdated", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-// ParseGlobalRatePeriodIntervalUpdated is a log parse operation binding the contract event 0x833819c38214ef9f462f88b5c27a21bf201f394572a14da3e63c77ee15f0e93a.
-//
-// Solidity: event GlobalRatePeriodIntervalUpdated(uint64 previousValue, uint64 newValue)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) ParseGlobalRatePeriodIntervalUpdated(log types.Log) (*ContractPaymentVaultGlobalRatePeriodIntervalUpdated, error) {
-	event := new(ContractPaymentVaultGlobalRatePeriodIntervalUpdated)
-	if err := _ContractPaymentVault.contract.UnpackLog(event, "GlobalRatePeriodIntervalUpdated", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-// ContractPaymentVaultGlobalSymbolsPerPeriodUpdatedIterator is returned from FilterGlobalSymbolsPerPeriodUpdated and is used to iterate over the raw logs and unpacked data for GlobalSymbolsPerPeriodUpdated events raised by the ContractPaymentVault contract.
-type ContractPaymentVaultGlobalSymbolsPerPeriodUpdatedIterator struct {
-	Event *ContractPaymentVaultGlobalSymbolsPerPeriodUpdated // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *ContractPaymentVaultGlobalSymbolsPerPeriodUpdatedIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(ContractPaymentVaultGlobalSymbolsPerPeriodUpdated)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(ContractPaymentVaultGlobalSymbolsPerPeriodUpdated)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractPaymentVaultGlobalSymbolsPerPeriodUpdatedIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *ContractPaymentVaultGlobalSymbolsPerPeriodUpdatedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// ContractPaymentVaultGlobalSymbolsPerPeriodUpdated represents a GlobalSymbolsPerPeriodUpdated event raised by the ContractPaymentVault contract.
-type ContractPaymentVaultGlobalSymbolsPerPeriodUpdated struct {
-	PreviousValue uint64
-	NewValue      uint64
-	Raw           types.Log // Blockchain specific contextual infos
-}
-
-// FilterGlobalSymbolsPerPeriodUpdated is a free log retrieval operation binding the contract event 0x3edf3b79e74d9e583ff51df95fbabefe15f504d33475b2cc77cffba292268aae.
-//
-// Solidity: event GlobalSymbolsPerPeriodUpdated(uint64 previousValue, uint64 newValue)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) FilterGlobalSymbolsPerPeriodUpdated(opts *bind.FilterOpts) (*ContractPaymentVaultGlobalSymbolsPerPeriodUpdatedIterator, error) {
-
-	logs, sub, err := _ContractPaymentVault.contract.FilterLogs(opts, "GlobalSymbolsPerPeriodUpdated")
-	if err != nil {
-		return nil, err
-	}
-	return &ContractPaymentVaultGlobalSymbolsPerPeriodUpdatedIterator{contract: _ContractPaymentVault.contract, event: "GlobalSymbolsPerPeriodUpdated", logs: logs, sub: sub}, nil
-}
-
-// WatchGlobalSymbolsPerPeriodUpdated is a free log subscription operation binding the contract event 0x3edf3b79e74d9e583ff51df95fbabefe15f504d33475b2cc77cffba292268aae.
-//
-// Solidity: event GlobalSymbolsPerPeriodUpdated(uint64 previousValue, uint64 newValue)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) WatchGlobalSymbolsPerPeriodUpdated(opts *bind.WatchOpts, sink chan<- *ContractPaymentVaultGlobalSymbolsPerPeriodUpdated) (event.Subscription, error) {
-
-	logs, sub, err := _ContractPaymentVault.contract.WatchLogs(opts, "GlobalSymbolsPerPeriodUpdated")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(ContractPaymentVaultGlobalSymbolsPerPeriodUpdated)
-				if err := _ContractPaymentVault.contract.UnpackLog(event, "GlobalSymbolsPerPeriodUpdated", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-// ParseGlobalSymbolsPerPeriodUpdated is a log parse operation binding the contract event 0x3edf3b79e74d9e583ff51df95fbabefe15f504d33475b2cc77cffba292268aae.
-//
-// Solidity: event GlobalSymbolsPerPeriodUpdated(uint64 previousValue, uint64 newValue)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) ParseGlobalSymbolsPerPeriodUpdated(log types.Log) (*ContractPaymentVaultGlobalSymbolsPerPeriodUpdated, error) {
-	event := new(ContractPaymentVaultGlobalSymbolsPerPeriodUpdated)
-	if err := _ContractPaymentVault.contract.UnpackLog(event, "GlobalSymbolsPerPeriodUpdated", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-// ContractPaymentVaultInitializedIterator is returned from FilterInitialized and is used to iterate over the raw logs and unpacked data for Initialized events raised by the ContractPaymentVault contract.
-type ContractPaymentVaultInitializedIterator struct {
-	Event *ContractPaymentVaultInitialized // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *ContractPaymentVaultInitializedIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(ContractPaymentVaultInitialized)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(ContractPaymentVaultInitialized)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractPaymentVaultInitializedIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *ContractPaymentVaultInitializedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// ContractPaymentVaultInitialized represents a Initialized event raised by the ContractPaymentVault contract.
-type ContractPaymentVaultInitialized struct {
-	Version uint8
-	Raw     types.Log // Blockchain specific contextual infos
-}
-
-// FilterInitialized is a free log retrieval operation binding the contract event 0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498.
-//
-// Solidity: event Initialized(uint8 version)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) FilterInitialized(opts *bind.FilterOpts) (*ContractPaymentVaultInitializedIterator, error) {
-
-	logs, sub, err := _ContractPaymentVault.contract.FilterLogs(opts, "Initialized")
-	if err != nil {
-		return nil, err
-	}
-	return &ContractPaymentVaultInitializedIterator{contract: _ContractPaymentVault.contract, event: "Initialized", logs: logs, sub: sub}, nil
-}
-
-// WatchInitialized is a free log subscription operation binding the contract event 0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498.
-//
-// Solidity: event Initialized(uint8 version)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) WatchInitialized(opts *bind.WatchOpts, sink chan<- *ContractPaymentVaultInitialized) (event.Subscription, error) {
-
-	logs, sub, err := _ContractPaymentVault.contract.WatchLogs(opts, "Initialized")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(ContractPaymentVaultInitialized)
-				if err := _ContractPaymentVault.contract.UnpackLog(event, "Initialized", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-// ParseInitialized is a log parse operation binding the contract event 0x7f26b83ff96e1f2b6a682f133852f6798a09c465da95921460cefb3847402498.
-//
-// Solidity: event Initialized(uint8 version)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) ParseInitialized(log types.Log) (*ContractPaymentVaultInitialized, error) {
-	event := new(ContractPaymentVaultInitialized)
-	if err := _ContractPaymentVault.contract.UnpackLog(event, "Initialized", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-// ContractPaymentVaultOnDemandPaymentUpdatedIterator is returned from FilterOnDemandPaymentUpdated and is used to iterate over the raw logs and unpacked data for OnDemandPaymentUpdated events raised by the ContractPaymentVault contract.
-type ContractPaymentVaultOnDemandPaymentUpdatedIterator struct {
-	Event *ContractPaymentVaultOnDemandPaymentUpdated // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *ContractPaymentVaultOnDemandPaymentUpdatedIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(ContractPaymentVaultOnDemandPaymentUpdated)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(ContractPaymentVaultOnDemandPaymentUpdated)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractPaymentVaultOnDemandPaymentUpdatedIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *ContractPaymentVaultOnDemandPaymentUpdatedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// ContractPaymentVaultOnDemandPaymentUpdated represents a OnDemandPaymentUpdated event raised by the ContractPaymentVault contract.
-type ContractPaymentVaultOnDemandPaymentUpdated struct {
-	Account         common.Address
-	OnDemandPayment *big.Int
-	TotalDeposit    *big.Int
-	Raw             types.Log // Blockchain specific contextual infos
-}
-
-// FilterOnDemandPaymentUpdated is a free log retrieval operation binding the contract event 0x6fbb447a2c09b8901d70b0d5b9fbce159ee8fda4460e5af2570cab3fe0adf268.
-//
-// Solidity: event OnDemandPaymentUpdated(address indexed account, uint80 onDemandPayment, uint80 totalDeposit)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) FilterOnDemandPaymentUpdated(opts *bind.FilterOpts, account []common.Address) (*ContractPaymentVaultOnDemandPaymentUpdatedIterator, error) {
-
-	var accountRule []interface{}
-	for _, accountItem := range account {
-		accountRule = append(accountRule, accountItem)
-	}
-
-	logs, sub, err := _ContractPaymentVault.contract.FilterLogs(opts, "OnDemandPaymentUpdated", accountRule)
-	if err != nil {
-		return nil, err
-	}
-	return &ContractPaymentVaultOnDemandPaymentUpdatedIterator{contract: _ContractPaymentVault.contract, event: "OnDemandPaymentUpdated", logs: logs, sub: sub}, nil
-}
-
-// WatchOnDemandPaymentUpdated is a free log subscription operation binding the contract event 0x6fbb447a2c09b8901d70b0d5b9fbce159ee8fda4460e5af2570cab3fe0adf268.
-//
-// Solidity: event OnDemandPaymentUpdated(address indexed account, uint80 onDemandPayment, uint80 totalDeposit)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) WatchOnDemandPaymentUpdated(opts *bind.WatchOpts, sink chan<- *ContractPaymentVaultOnDemandPaymentUpdated, account []common.Address) (event.Subscription, error) {
-
-	var accountRule []interface{}
-	for _, accountItem := range account {
-		accountRule = append(accountRule, accountItem)
-	}
-
-	logs, sub, err := _ContractPaymentVault.contract.WatchLogs(opts, "OnDemandPaymentUpdated", accountRule)
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(ContractPaymentVaultOnDemandPaymentUpdated)
-				if err := _ContractPaymentVault.contract.UnpackLog(event, "OnDemandPaymentUpdated", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-// ParseOnDemandPaymentUpdated is a log parse operation binding the contract event 0x6fbb447a2c09b8901d70b0d5b9fbce159ee8fda4460e5af2570cab3fe0adf268.
-//
-// Solidity: event OnDemandPaymentUpdated(address indexed account, uint80 onDemandPayment, uint80 totalDeposit)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) ParseOnDemandPaymentUpdated(log types.Log) (*ContractPaymentVaultOnDemandPaymentUpdated, error) {
-	event := new(ContractPaymentVaultOnDemandPaymentUpdated)
-	if err := _ContractPaymentVault.contract.UnpackLog(event, "OnDemandPaymentUpdated", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-// ContractPaymentVaultOwnershipTransferredIterator is returned from FilterOwnershipTransferred and is used to iterate over the raw logs and unpacked data for OwnershipTransferred events raised by the ContractPaymentVault contract.
-type ContractPaymentVaultOwnershipTransferredIterator struct {
-	Event *ContractPaymentVaultOwnershipTransferred // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *ContractPaymentVaultOwnershipTransferredIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(ContractPaymentVaultOwnershipTransferred)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(ContractPaymentVaultOwnershipTransferred)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractPaymentVaultOwnershipTransferredIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *ContractPaymentVaultOwnershipTransferredIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// ContractPaymentVaultOwnershipTransferred represents a OwnershipTransferred event raised by the ContractPaymentVault contract.
-type ContractPaymentVaultOwnershipTransferred struct {
-	PreviousOwner common.Address
-	NewOwner      common.Address
-	Raw           types.Log // Blockchain specific contextual infos
-}
-
-// FilterOwnershipTransferred is a free log retrieval operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
-//
-// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*ContractPaymentVaultOwnershipTransferredIterator, error) {
-
-	var previousOwnerRule []interface{}
-	for _, previousOwnerItem := range previousOwner {
-		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
-	}
-	var newOwnerRule []interface{}
-	for _, newOwnerItem := range newOwner {
-		newOwnerRule = append(newOwnerRule, newOwnerItem)
-	}
-
-	logs, sub, err := _ContractPaymentVault.contract.FilterLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
-	if err != nil {
-		return nil, err
-	}
-	return &ContractPaymentVaultOwnershipTransferredIterator{contract: _ContractPaymentVault.contract, event: "OwnershipTransferred", logs: logs, sub: sub}, nil
-}
-
-// WatchOwnershipTransferred is a free log subscription operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
-//
-// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *ContractPaymentVaultOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
-
-	var previousOwnerRule []interface{}
-	for _, previousOwnerItem := range previousOwner {
-		previousOwnerRule = append(previousOwnerRule, previousOwnerItem)
-	}
-	var newOwnerRule []interface{}
-	for _, newOwnerItem := range newOwner {
-		newOwnerRule = append(newOwnerRule, newOwnerItem)
-	}
-
-	logs, sub, err := _ContractPaymentVault.contract.WatchLogs(opts, "OwnershipTransferred", previousOwnerRule, newOwnerRule)
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(ContractPaymentVaultOwnershipTransferred)
-				if err := _ContractPaymentVault.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-// ParseOwnershipTransferred is a log parse operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
-//
-// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) ParseOwnershipTransferred(log types.Log) (*ContractPaymentVaultOwnershipTransferred, error) {
-	event := new(ContractPaymentVaultOwnershipTransferred)
-	if err := _ContractPaymentVault.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-// ContractPaymentVaultPriceParamsUpdatedIterator is returned from FilterPriceParamsUpdated and is used to iterate over the raw logs and unpacked data for PriceParamsUpdated events raised by the ContractPaymentVault contract.
-type ContractPaymentVaultPriceParamsUpdatedIterator struct {
-	Event *ContractPaymentVaultPriceParamsUpdated // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *ContractPaymentVaultPriceParamsUpdatedIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(ContractPaymentVaultPriceParamsUpdated)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(ContractPaymentVaultPriceParamsUpdated)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractPaymentVaultPriceParamsUpdatedIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *ContractPaymentVaultPriceParamsUpdatedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// ContractPaymentVaultPriceParamsUpdated represents a PriceParamsUpdated event raised by the ContractPaymentVault contract.
-type ContractPaymentVaultPriceParamsUpdated struct {
-	PreviousMinNumSymbols       uint64
-	NewMinNumSymbols            uint64
-	PreviousPricePerSymbol      uint64
-	NewPricePerSymbol           uint64
-	PreviousPriceUpdateCooldown uint64
-	NewPriceUpdateCooldown      uint64
-	Raw                         types.Log // Blockchain specific contextual infos
-}
-
-// FilterPriceParamsUpdated is a free log retrieval operation binding the contract event 0x9b97ed982ea5820e21bfc9578505e78068a5333487583460ad56ff72defef77a.
-//
-// Solidity: event PriceParamsUpdated(uint64 previousMinNumSymbols, uint64 newMinNumSymbols, uint64 previousPricePerSymbol, uint64 newPricePerSymbol, uint64 previousPriceUpdateCooldown, uint64 newPriceUpdateCooldown)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) FilterPriceParamsUpdated(opts *bind.FilterOpts) (*ContractPaymentVaultPriceParamsUpdatedIterator, error) {
-
-	logs, sub, err := _ContractPaymentVault.contract.FilterLogs(opts, "PriceParamsUpdated")
-	if err != nil {
-		return nil, err
-	}
-	return &ContractPaymentVaultPriceParamsUpdatedIterator{contract: _ContractPaymentVault.contract, event: "PriceParamsUpdated", logs: logs, sub: sub}, nil
-}
-
-// WatchPriceParamsUpdated is a free log subscription operation binding the contract event 0x9b97ed982ea5820e21bfc9578505e78068a5333487583460ad56ff72defef77a.
-//
-// Solidity: event PriceParamsUpdated(uint64 previousMinNumSymbols, uint64 newMinNumSymbols, uint64 previousPricePerSymbol, uint64 newPricePerSymbol, uint64 previousPriceUpdateCooldown, uint64 newPriceUpdateCooldown)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) WatchPriceParamsUpdated(opts *bind.WatchOpts, sink chan<- *ContractPaymentVaultPriceParamsUpdated) (event.Subscription, error) {
-
-	logs, sub, err := _ContractPaymentVault.contract.WatchLogs(opts, "PriceParamsUpdated")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(ContractPaymentVaultPriceParamsUpdated)
-				if err := _ContractPaymentVault.contract.UnpackLog(event, "PriceParamsUpdated", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-// ParsePriceParamsUpdated is a log parse operation binding the contract event 0x9b97ed982ea5820e21bfc9578505e78068a5333487583460ad56ff72defef77a.
-//
-// Solidity: event PriceParamsUpdated(uint64 previousMinNumSymbols, uint64 newMinNumSymbols, uint64 previousPricePerSymbol, uint64 newPricePerSymbol, uint64 previousPriceUpdateCooldown, uint64 newPriceUpdateCooldown)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) ParsePriceParamsUpdated(log types.Log) (*ContractPaymentVaultPriceParamsUpdated, error) {
-	event := new(ContractPaymentVaultPriceParamsUpdated)
-	if err := _ContractPaymentVault.contract.UnpackLog(event, "PriceParamsUpdated", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-// ContractPaymentVaultReservationPeriodIntervalUpdatedIterator is returned from FilterReservationPeriodIntervalUpdated and is used to iterate over the raw logs and unpacked data for ReservationPeriodIntervalUpdated events raised by the ContractPaymentVault contract.
-type ContractPaymentVaultReservationPeriodIntervalUpdatedIterator struct {
-	Event *ContractPaymentVaultReservationPeriodIntervalUpdated // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *ContractPaymentVaultReservationPeriodIntervalUpdatedIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(ContractPaymentVaultReservationPeriodIntervalUpdated)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(ContractPaymentVaultReservationPeriodIntervalUpdated)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractPaymentVaultReservationPeriodIntervalUpdatedIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *ContractPaymentVaultReservationPeriodIntervalUpdatedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// ContractPaymentVaultReservationPeriodIntervalUpdated represents a ReservationPeriodIntervalUpdated event raised by the ContractPaymentVault contract.
-type ContractPaymentVaultReservationPeriodIntervalUpdated struct {
-	PreviousValue uint64
-	NewValue      uint64
-	Raw           types.Log // Blockchain specific contextual infos
-}
-
-// FilterReservationPeriodIntervalUpdated is a free log retrieval operation binding the contract event 0x1ef4a1ce7d8e50959d15578b346bb20a5b049e5ee1978014a4ba66476265c957.
-//
-// Solidity: event ReservationPeriodIntervalUpdated(uint64 previousValue, uint64 newValue)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) FilterReservationPeriodIntervalUpdated(opts *bind.FilterOpts) (*ContractPaymentVaultReservationPeriodIntervalUpdatedIterator, error) {
-
-	logs, sub, err := _ContractPaymentVault.contract.FilterLogs(opts, "ReservationPeriodIntervalUpdated")
-	if err != nil {
-		return nil, err
-	}
-	return &ContractPaymentVaultReservationPeriodIntervalUpdatedIterator{contract: _ContractPaymentVault.contract, event: "ReservationPeriodIntervalUpdated", logs: logs, sub: sub}, nil
-}
-
-// WatchReservationPeriodIntervalUpdated is a free log subscription operation binding the contract event 0x1ef4a1ce7d8e50959d15578b346bb20a5b049e5ee1978014a4ba66476265c957.
-//
-// Solidity: event ReservationPeriodIntervalUpdated(uint64 previousValue, uint64 newValue)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) WatchReservationPeriodIntervalUpdated(opts *bind.WatchOpts, sink chan<- *ContractPaymentVaultReservationPeriodIntervalUpdated) (event.Subscription, error) {
-
-	logs, sub, err := _ContractPaymentVault.contract.WatchLogs(opts, "ReservationPeriodIntervalUpdated")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(ContractPaymentVaultReservationPeriodIntervalUpdated)
-				if err := _ContractPaymentVault.contract.UnpackLog(event, "ReservationPeriodIntervalUpdated", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-// ParseReservationPeriodIntervalUpdated is a log parse operation binding the contract event 0x1ef4a1ce7d8e50959d15578b346bb20a5b049e5ee1978014a4ba66476265c957.
-//
-// Solidity: event ReservationPeriodIntervalUpdated(uint64 previousValue, uint64 newValue)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) ParseReservationPeriodIntervalUpdated(log types.Log) (*ContractPaymentVaultReservationPeriodIntervalUpdated, error) {
-	event := new(ContractPaymentVaultReservationPeriodIntervalUpdated)
-	if err := _ContractPaymentVault.contract.UnpackLog(event, "ReservationPeriodIntervalUpdated", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-// ContractPaymentVaultReservationUpdatedIterator is returned from FilterReservationUpdated and is used to iterate over the raw logs and unpacked data for ReservationUpdated events raised by the ContractPaymentVault contract.
-type ContractPaymentVaultReservationUpdatedIterator struct {
-	Event *ContractPaymentVaultReservationUpdated // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *ContractPaymentVaultReservationUpdatedIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(ContractPaymentVaultReservationUpdated)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(ContractPaymentVaultReservationUpdated)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *ContractPaymentVaultReservationUpdatedIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *ContractPaymentVaultReservationUpdatedIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// ContractPaymentVaultReservationUpdated represents a ReservationUpdated event raised by the ContractPaymentVault contract.
-type ContractPaymentVaultReservationUpdated struct {
-	Account     common.Address
-	Reservation IPaymentVaultReservation
-	Raw         types.Log // Blockchain specific contextual infos
-}
-
-// FilterReservationUpdated is a free log retrieval operation binding the contract event 0xff3054d138559c39b4c0826c43e94b2b2c6bc9a33ea1d0b74f16c916c7b73ec1.
-//
-// Solidity: event ReservationUpdated(address indexed account, (uint64,uint64,uint64,bytes,bytes) reservation)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) FilterReservationUpdated(opts *bind.FilterOpts, account []common.Address) (*ContractPaymentVaultReservationUpdatedIterator, error) {
-
-	var accountRule []interface{}
-	for _, accountItem := range account {
-		accountRule = append(accountRule, accountItem)
-	}
-
-	logs, sub, err := _ContractPaymentVault.contract.FilterLogs(opts, "ReservationUpdated", accountRule)
-	if err != nil {
-		return nil, err
-	}
-	return &ContractPaymentVaultReservationUpdatedIterator{contract: _ContractPaymentVault.contract, event: "ReservationUpdated", logs: logs, sub: sub}, nil
-}
-
-// WatchReservationUpdated is a free log subscription operation binding the contract event 0xff3054d138559c39b4c0826c43e94b2b2c6bc9a33ea1d0b74f16c916c7b73ec1.
-//
-// Solidity: event ReservationUpdated(address indexed account, (uint64,uint64,uint64,bytes,bytes) reservation)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) WatchReservationUpdated(opts *bind.WatchOpts, sink chan<- *ContractPaymentVaultReservationUpdated, account []common.Address) (event.Subscription, error) {
-
-	var accountRule []interface{}
-	for _, accountItem := range account {
-		accountRule = append(accountRule, accountItem)
-	}
-
-	logs, sub, err := _ContractPaymentVault.contract.WatchLogs(opts, "ReservationUpdated", accountRule)
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(ContractPaymentVaultReservationUpdated)
-				if err := _ContractPaymentVault.contract.UnpackLog(event, "ReservationUpdated", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-// ParseReservationUpdated is a log parse operation binding the contract event 0xff3054d138559c39b4c0826c43e94b2b2c6bc9a33ea1d0b74f16c916c7b73ec1.
-//
-// Solidity: event ReservationUpdated(address indexed account, (uint64,uint64,uint64,bytes,bytes) reservation)
-func (_ContractPaymentVault *ContractPaymentVaultFilterer) ParseReservationUpdated(log types.Log) (*ContractPaymentVaultReservationUpdated, error) {
-	event := new(ContractPaymentVaultReservationUpdated)
-	if err := _ContractPaymentVault.contract.UnpackLog(event, "ReservationUpdated", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
+// Solidity: function transferQuorumOwnership(uint64 quorumId, address newOwner) returns()
+func (_ContractPaymentVault *ContractPaymentVaultTransactorSession) TransferQuorumOwnership(quorumId uint64, newOwner common.Address) (*types.Transaction, error) {
+	return _ContractPaymentVault.Contract.TransferQuorumOwnership(&_ContractPaymentVault.TransactOpts, quorumId, newOwner)
 }
