@@ -94,10 +94,10 @@ func (env *Config) generateV2CertVerifierDeployConfig(ethClient common.EthClient
 			ConfirmationThreshold: 45,
 			AdversaryThreshold: 33,
 		},
-		QuorumNumbersRequired: "0x00",
+		QuorumNumbersRequired: "0x0001",
 	}
 
-	log.Printf("%v", config)
+	log.Printf("v2 verifier config: %v", config)
 	return config
 }
 
