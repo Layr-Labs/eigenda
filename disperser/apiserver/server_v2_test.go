@@ -384,7 +384,7 @@ func TestV2GetBlobStatus(t *testing.T) {
 	// First transition to GatheringSignatures state
 	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.GatheringSignatures)
 	require.NoError(t, err)
-	
+
 	// Then transition to Complete state
 	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.Complete)
 	require.NoError(t, err)
@@ -574,6 +574,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 			EnableMetrics: false,
 		},
 		ntpClock,
+		false,
 	)
 	assert.NoError(t, err)
 
