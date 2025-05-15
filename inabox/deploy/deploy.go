@@ -315,8 +315,8 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 	return fmt.Errorf("timed out waiting for disperser address to be set")
 }
 
-// RegisterBlobVersionAndRelays initializes blob versions against ThresholdRegistry contract 
-// and relays against RelayRegistry contract
+// RegisterBlobVersionAndRelays initializes blob versions in ThresholdRegistry contract 
+// and relays in RelayRegistry contract
 func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
