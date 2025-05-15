@@ -10,7 +10,7 @@ import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDACertVerificationV1Lib} from "src/periphery/cert/legacy/v1/EigenDACertVerificationV1Lib.sol";
 import {IEigenDAServiceManager} from "src/core/interfaces/IEigenDAServiceManager.sol";
-import {EigenDACertVerifierV2} from "src/periphery/cert/legacy/v2/EigenDACertVerifierV2.sol";
+import {EigenDACertVerifier} from "src/periphery/cert/EigenDACertVerifier.sol";
 import {EigenDAThresholdRegistry, IEigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "src/core/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
@@ -41,7 +41,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
     EigenDADisperserRegistry eigenDADisperserRegistryImplementation;
     PaymentVault paymentVault;
     PaymentVault paymentVaultImplementation;
-    EigenDACertVerifierV2 eigenDACertVerifier;
+    EigenDACertVerifier eigenDACertVerifier;
 
     ERC20 mockToken;
 
@@ -176,11 +176,9 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
 
         mockToken = new ERC20("Mock Token", "MOCK");
 
-        eigenDACertVerifier = new EigenDACertVerifierV2(
+        eigenDACertVerifier = new EigenDACertVerifier(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
-            OperatorStateRetriever(address(operatorStateRetriever)),
-            IRegistryCoordinator(address(registryCoordinator)),
             defaultSecurityThresholds,
             quorumNumbersRequired
         );
