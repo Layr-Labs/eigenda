@@ -129,17 +129,15 @@ func bitmapToBytesArray(bitmap *big.Int) []byte {
 	return bytesArray
 }
 
-func isZeroValuedReservation(reservation paymentvault.IPaymentVaultReservation) bool {
+func isZeroValuedReservation(reservation paymentvault.PaymentVaultTypesReservation) bool {
 	return reservation.SymbolsPerSecond == 0 &&
 		reservation.StartTimestamp == 0 &&
-		reservation.EndTimestamp == 0 &&
-		len(reservation.QuorumNumbers) == 0 &&
-		len(reservation.QuorumSplits) == 0
+		reservation.EndTimestamp == 0
 }
 
 // ConvertToReservedPayment converts a upstream binding data structure to local definition.
 // Returns an error if the input reservation is zero-valued.
-func ConvertToReservedPayment(reservation paymentvault.IPaymentVaultReservation) (*core.ReservedPayment, error) {
+func ConvertToReservedPayment(reservation paymentvault.PaymentVaultTypesReservation) (*core.ReservedPayment, error) {
 	if isZeroValuedReservation(reservation) {
 		return nil, fmt.Errorf("reservation is not a valid active reservation")
 	}
@@ -148,7 +146,9 @@ func ConvertToReservedPayment(reservation paymentvault.IPaymentVaultReservation)
 		SymbolsPerSecond: reservation.SymbolsPerSecond,
 		StartTimestamp:   reservation.StartTimestamp,
 		EndTimestamp:     reservation.EndTimestamp,
-		QuorumNumbers:    reservation.QuorumNumbers,
-		QuorumSplits:     reservation.QuorumSplits,
+		// Note: QuorumNumbers and QuorumSplits are not part of the new PaymentVaultTypesReservation structure
+		// They are now handled at the quorum level in the new contract design
+		QuorumNumbers:    []byte{},
+		QuorumSplits:     []uint8{},
 	}, nil
 }
