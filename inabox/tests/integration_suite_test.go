@@ -145,7 +145,7 @@ var _ = BeforeSuite(func() {
 
 		eigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(gcommon.HexToAddress(testConfig.EigenDAV1CertVerifier), ethClient)
 		Expect(err).To(BeNil())
-		eigenDACertVerifierV2, err = verifierv2bindings.NewContractEigenDACertVerifierV2(gcommon.HexToAddress(testConfig.EigenDAV2CertVerifier), ethClient)
+		eigenDACertVerifierV2, err = verifierv2bindings.NewContractEigenDACertVerifierV2(gcommon.HexToAddress(testConfig.EigenDA.CertVerifier), ethClient)
 		Expect(err).To(BeNil())
 		err = setupRetrievalClient(testConfig)
 		Expect(err).To(BeNil())

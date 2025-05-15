@@ -208,7 +208,7 @@ library EigenDACertVerificationV2Lib {
     ) internal pure returns (StatusCode err, bytes memory errParams) {
         // uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
         // uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
-        // uint256 minRequired = blobParams.maxNumOperators * 10000;
+        uint256 minRequired = blobParams.maxNumOperators * 10000;
 
         // if (n >= minRequired) {
         return (StatusCode.SUCCESS, "");
