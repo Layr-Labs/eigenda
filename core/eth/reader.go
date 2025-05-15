@@ -805,16 +805,17 @@ func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*cor
 }
 
 func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.ReservedPayment, error) {
+	// Default to quorum 0 for backward compatibility
+	return t.GetReservedPaymentsByQuorum(ctx, accountIDs, 0)
+}
+
+// GetReservedPaymentsByQuorum returns active reservations for multiple accounts for a specific quorum
+func (t *Reader) GetReservedPaymentsByQuorum(ctx context.Context, accountIDs []gethcommon.Address, quorumId uint64) (map[gethcommon.Address]*core.ReservedPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
 	
 	reservationsMap := make(map[gethcommon.Address]*core.ReservedPayment)
-	
-	// In the new API, we need to query reservations per quorum and account
-	// For now, we'll use quorumId 0 as default
-	// TODO: update this to handle multiple quorums
-	quorumId := uint64(0)
 	
 	for _, accountID := range accountIDs {
 		reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
@@ -822,13 +823,13 @@ func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommo
 		}, quorumId, accountID)
 		
 		if err != nil {
-			t.logger.Warn("failed to get reservation", "account", accountID, "err", err)
+			t.logger.Warn("failed to get reservation", "account", accountID, "quorumId", quorumId, "err", err)
 			continue
 		}
 		
 		res, err := ConvertToReservedPayment(reservation)
 		if err != nil {
-			t.logger.Warn("failed to convert reservation", "account", accountID, "err", err)
+			t.logger.Warn("failed to convert reservation", "account", accountID, "quorumId", quorumId, "err", err)
 			continue
 		}
 		
@@ -839,14 +840,15 @@ func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommo
 }
 
 func (t *Reader) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error) {
+	// Default to quorum 0 for backward compatibility
+	return t.GetReservedPaymentByAccountAndQuorum(ctx, accountID, 0)
+}
+
+// GetReservedPaymentByAccountAndQuorum returns active reservation by account ID for a specific quorum
+func (t *Reader) GetReservedPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint64) (*core.ReservedPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
-	
-	// In the new API, we need to specify a quorumId
-	// For now, we'll use quorumId 0 as default
-	// TODO: update this to handle multiple quorums
-	quorumId := uint64(0)
 	
 	reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
 		Context: ctx,
@@ -859,17 +861,64 @@ func (t *Reader) GetReservedPaymentByAccount(ctx context.Context, accountID geth
 	return ConvertToReservedPayment(reservation)
 }
 
+// GetQuorumPaymentConfig retrieves the payment configuration for a specific quorum
+func (t *Reader) GetQuorumPaymentConfig(ctx context.Context, quorumId uint64) (*core.QuorumConfig, error) {
+	if t.bindings.PaymentVault == nil {
+		return nil, errors.New("payment vault not deployed")
+	}
+	
+	config, err := t.bindings.PaymentVault.GetQuorumPaymentConfig(&bind.CallOpts{
+		Context: ctx,
+	}, quorumId)
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	return &core.QuorumConfig{
+		Token:                       config.Token,
+		Recipient:                   config.Recipient,
+		ReservationSymbolsPerSecond: config.ReservationSymbolsPerSecond,
+		OnDemandSymbolsPerPeriod:    config.OnDemandSymbolsPerPeriod,
+		OnDemandPricePerSymbol:      config.OnDemandPricePerSymbol,
+	}, nil
+}
+
+// GetQuorumProtocolConfig retrieves the protocol configuration for a specific quorum
+func (t *Reader) GetQuorumProtocolConfig(ctx context.Context, quorumId uint64) (*core.QuorumProtocolConfig, error) {
+	if t.bindings.PaymentVault == nil {
+		return nil, errors.New("payment vault not deployed")
+	}
+	
+	config, err := t.bindings.PaymentVault.GetQuorumProtocolConfig(&bind.CallOpts{
+		Context: ctx,
+	}, quorumId)
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	return &core.QuorumProtocolConfig{
+		MinNumSymbols:              config.MinNumSymbols,
+		ReservationAdvanceWindow:   config.ReservationAdvanceWindow,
+		ReservationRateLimitWindow: config.ReservationRateLimitWindow,
+		OnDemandRateLimitWindow:    config.OnDemandRateLimitWindow,
+		OnDemandEnabled:            config.OnDemandEnabled,
+	}, nil
+}
+
 func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {
+	// Default to quorum 0 for backward compatibility
+	return t.GetOnDemandPaymentsByQuorum(ctx, accountIDs, 0)
+}
+
+// GetOnDemandPaymentsByQuorum returns on-demand payments for multiple accounts for a specific quorum
+func (t *Reader) GetOnDemandPaymentsByQuorum(ctx context.Context, accountIDs []gethcommon.Address, quorumId uint64) (map[gethcommon.Address]*core.OnDemandPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
 	
 	paymentsMap := make(map[gethcommon.Address]*core.OnDemandPayment)
-	
-	// In the new API, we need to query on-demand deposit per quorum and account
-	// For now, we'll use quorumId 0 as default
-	// TODO: update this to handle multiple quorums
-	quorumId := uint64(0)
 	
 	for _, accountID := range accountIDs {
 		onDemandDeposit, err := t.bindings.PaymentVault.GetOnDemandDeposit(&bind.CallOpts{
@@ -877,12 +926,12 @@ func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommo
 		}, quorumId, accountID)
 		
 		if err != nil {
-			t.logger.Warn("failed to get on-demand deposit", "account", accountID, "err", err)
+			t.logger.Warn("failed to get on-demand deposit", "account", accountID, "quorumId", quorumId, "err", err)
 			continue
 		}
 		
 		if onDemandDeposit.Cmp(big.NewInt(0)) == 0 {
-			t.logger.Debug("on-demand deposit is zero for account", "account", accountID)
+			t.logger.Debug("on-demand deposit is zero for account", "account", accountID, "quorumId", quorumId)
 			continue
 		}
 		
@@ -895,14 +944,15 @@ func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommo
 }
 
 func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
+	// Default to quorum 0 for backward compatibility
+	return t.GetOnDemandPaymentByAccountAndQuorum(ctx, accountID, 0)
+}
+
+// GetOnDemandPaymentByAccountAndQuorum returns on-demand payment of an account for a specific quorum
+func (t *Reader) GetOnDemandPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint64) (*core.OnDemandPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
-	
-	// In the new API, we need to specify a quorumId
-	// For now, we'll use quorumId 0 as default
-	// TODO: update this to handle multiple quorums
-	quorumId := uint64(0)
 	
 	onDemandDeposit, err := t.bindings.PaymentVault.GetOnDemandDeposit(&bind.CallOpts{
 		Context: ctx,
