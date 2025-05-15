@@ -178,7 +178,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		var batchRoot [32]byte
 		copy(batchRoot[:], batchHeader1.BatchRoot)
 
-		err = verifierContract.VerifyDACertV2FromSignedBatch(
+		err = eigenDACertVerifierV2.VerifyDACertV2FromSignedBatch(
 			&bind.CallOpts{},
 			verifierbindings.EigenDATypesV2SignedBatch{
 				BatchHeader: verifierbindings.EigenDATypesV2BatchHeaderV2{
@@ -196,7 +196,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		proof, err = convertBlobInclusionInfo(blobInclusion2)
 		Expect(err).To(BeNil())
 		copy(batchRoot[:], batchHeader2.BatchRoot)
-		err = verifierContract.VerifyDACertV2FromSignedBatch(
+		err = eigenDACertVerifierV2.VerifyDACertV2FromSignedBatch(
 			&bind.CallOpts{},
 			verifierbindings.EigenDATypesV2SignedBatch{
 				BatchHeader: verifierbindings.EigenDATypesV2BatchHeaderV2{
