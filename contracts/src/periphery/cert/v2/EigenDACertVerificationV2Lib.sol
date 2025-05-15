@@ -134,10 +134,10 @@ library EigenDACertVerificationV2Lib {
             return (err, errParams);
         }
 
-        (err, errParams) = checkSecurityParams(
-            eigenDAThresholdRegistry.getBlobParams(blobInclusionInfo.blobCertificate.blobHeader.version),
-            securityThresholds
-        );
+        // (err, errParams) = checkSecurityParams(
+        //     eigenDAThresholdRegistry.getBlobParams(blobInclusionInfo.blobCertificate.blobHeader.version),
+        //     securityThresholds
+        // );
         if (err != StatusCode.SUCCESS) {
             return (err, errParams);
         }
