@@ -278,7 +278,7 @@ func NewServer(
 		batcherHealthEndpt:        config.BatcherHealthEndpt,
 		eigenDAGRPCServiceChecker: eigenDAGRPCServiceChecker,
 		eigenDAHttpServiceChecker: eigenDAHttpServiceChecker,
-		operatorHandler:           NewOperatorHandler(logger, metrics, transactor, chainState, indexedChainState, subgraphClient),
+		operatorHandler:           NewOperatorHandler(logger, metrics, transactor, chainState, indexedChainState, subgraphClient, config.QuorumIds),
 		metricsHandler:            NewMetricsHandler(promClient, V1),
 	}
 }

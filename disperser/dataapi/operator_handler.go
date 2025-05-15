@@ -31,6 +31,7 @@ type OperatorHandler struct {
 	chainState        core.ChainState
 	indexedChainState core.IndexedChainState
 	subgraphClient    SubgraphClient
+	quorumIds         []uint8
 }
 
 // OperatorList wraps a set of operators with their IDs and addresses.
@@ -82,7 +83,7 @@ func (o *OperatorList) GetID(address string) (core.OperatorID, bool) {
 	return id, exists
 }
 
-func NewOperatorHandler(logger logging.Logger, metrics *Metrics, chainReader core.Reader, chainState core.ChainState, indexedChainState core.IndexedChainState, subgraphClient SubgraphClient) *OperatorHandler {
+func NewOperatorHandler(logger logging.Logger, metrics *Metrics, chainReader core.Reader, chainState core.ChainState, indexedChainState core.IndexedChainState, subgraphClient SubgraphClient, quorumIds []uint8) *OperatorHandler {
 	return &OperatorHandler{
 		logger:            logger,
 		metrics:           metrics,
@@ -90,6 +91,7 @@ func NewOperatorHandler(logger logging.Logger, metrics *Metrics, chainReader cor
 		chainState:        chainState,
 		indexedChainState: indexedChainState,
 		subgraphClient:    subgraphClient,
+		quorumIds:         quorumIds,
 	}
 }
 
@@ -99,14 +101,7 @@ func (oh *OperatorHandler) ProbeV2OperatorsLiveness(ctx context.Context, operato
 		return nil, err
 	}
 
-	// Get quorum count and generate all quorum IDs
-	quorumCount, err := oh.chainReader.GetQuorumCount(ctx, uint32(currentBlock))
-	if err != nil {
-		return nil, err
-	}
-	quorumIds := eth.GetAllQuorumIDs(quorumCount)
-
-	state, err := oh.indexedChainState.GetIndexedOperatorState(ctx, uint(currentBlock), quorumIds)
+	state, err := oh.indexedChainState.GetIndexedOperatorState(ctx, uint(currentBlock), oh.quorumIds)
 	if err != nil {
 		return nil, err
 	}
@@ -259,14 +254,8 @@ func checkServiceOnline(ctx context.Context, serviceName string, socket string, 
 }
 
 func (oh *OperatorHandler) GetOperatorsStakeAtBlock(ctx context.Context, operatorId string, currentBlock uint32) (*OperatorsStakeResponse, error) {
-	// Get quorum count and generate all quorum IDs
-	quorumCount, err := oh.chainReader.GetQuorumCount(ctx, currentBlock)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch quorum count: %w", err)
-	}
-	quorumIds := eth.GetAllQuorumIDs(quorumCount)
 
-	state, err := oh.chainState.GetOperatorState(ctx, uint(currentBlock), quorumIds)
+	state, err := oh.chainState.GetOperatorState(ctx, uint(currentBlock), oh.quorumIds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch indexed operator state: %w", err)
 	}
@@ -325,14 +314,7 @@ func (s *OperatorHandler) ScanOperatorsHostInfo(ctx context.Context) (*SemverRep
 
 	s.logger.Info("Queried indexed operators", "operators", len(operators), "block", currentBlock)
 
-	// Get quorum count and generate all quorum IDs
-	quorumCount, err := s.chainReader.GetQuorumCount(ctx, uint32(currentBlock))
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch quorum count: %w", err)
-	}
-	quorumIds := eth.GetAllQuorumIDs(quorumCount)
-
-	operatorState, err := s.chainState.GetOperatorState(context.Background(), currentBlock, quorumIds)
+	operatorState, err := s.chainState.GetOperatorState(context.Background(), currentBlock, s.quorumIds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch operator state: %w", err)
 	}

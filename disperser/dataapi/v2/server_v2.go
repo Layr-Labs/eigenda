@@ -173,7 +173,7 @@ func NewServerV2(
 		chainState:                       chainState,
 		indexedChainState:                indexedChainState,
 		metrics:                          metrics,
-		operatorHandler:                  dataapi.NewOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient),
+		operatorHandler:                  dataapi.NewOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient, config.QuorumIds),
 		metricsHandler:                   dataapi.NewMetricsHandler(promClient, dataapi.V2),
 		batchFeedCache:                   batchFeedCache,
 		blobMetadataCache:                blobMetadataCache,
