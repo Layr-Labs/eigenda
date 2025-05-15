@@ -2188,6 +2188,7 @@ func TestCheckOperatorsLiveness(t *testing.T) {
 	mockSubgraphApi.Calls = nil
 
 	mockIndexedChainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
+	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 
 	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
 
@@ -2515,6 +2516,7 @@ func TestFetchOperatorsStake(t *testing.T) {
 	r := setUpRouter()
 
 	mockIndexedChainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
+	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 
 	addr0 := gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa")
 	addr1 := gethcommon.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
