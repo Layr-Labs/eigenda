@@ -184,10 +184,14 @@ func setup(m *testing.M) {
 		panic("failed to create dynamodb client: " + err.Error())
 	}
 	blobMetadataStore = blobstorev2.NewBlobMetadataStore(dynamoClient, logger, metadataTableName)
+
+	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
+	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
+
 	testDataApiServerV2, err = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
 	if err != nil {
 		teardown()
-		panic("failed to create dynamodb client: " + err.Error())
+		panic("failed to create v2 server: " + err.Error())
 	}
 }
 
@@ -1455,6 +1459,9 @@ func TestFetchBatchFeed(t *testing.T) {
 	}
 	defer deleteItems(t, dynamoKeys)
 
+	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
+	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
+
 	// Create a local server so the internal state (e.g. cache) will be re-created.
 	// This is needed because /v2/operators/signing-info API shares the cache state with
 	// /v2/batches/feed API.
@@ -2188,7 +2195,6 @@ func TestCheckOperatorsLiveness(t *testing.T) {
 	mockSubgraphApi.Calls = nil
 
 	mockIndexedChainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
-	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 
 	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
 
@@ -2228,6 +2234,9 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 
 	mockIcs.On("GetCurrentBlockNumber").Return(uint(1), nil)
 	mockIcs.On("GetIndexedOperatorState").Return(ios, nil)
+
+	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
+	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 
 	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIcs, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
 	require.NoError(t, err)
@@ -2516,7 +2525,6 @@ func TestFetchOperatorsStake(t *testing.T) {
 	r := setUpRouter()
 
 	mockIndexedChainState.On("GetCurrentBlockNumber").Return(uint(1), nil)
-	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 
 	addr0 := gethcommon.HexToAddress("0x00000000219ab540356cbb839cbe05303d7705fa")
 	addr1 := gethcommon.HexToAddress("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")

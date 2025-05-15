@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/dataapi/flags"
@@ -92,17 +91,6 @@ func RunDataApi(ctx *cli.Context) error {
 		return err
 	}
 
-	// Determine valid set of quorum IDs at startup
-	currentBlock, err := tx.GetCurrentBlockNumber(context.Background())
-	if err != nil {
-		return err
-	}
-	quorumCount, err := tx.GetQuorumCount(context.Background(), uint32(currentBlock))
-	if err != nil {
-		return err
-	}
-	quorumIds := eth.GetAllQuorumIDs(quorumCount)
-
 	var (
 		promClient        = dataapi.NewPrometheusClient(promApi, config.PrometheusConfig.Cluster)
 		blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, 0)
@@ -112,29 +100,31 @@ func RunDataApi(ctx *cli.Context) error {
 		chainState        = coreeth.NewChainState(tx, client)
 		indexedChainState = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
 		metrics           = dataapi.NewMetrics(config.ServerVersion, blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
-		server            = dataapi.NewServer(
-			dataapi.Config{
-				ServerMode:         config.ServerMode,
-				SocketAddr:         config.SocketAddr,
-				AllowOrigins:       config.AllowOrigins,
-				DisperserHostname:  config.DisperserHostname,
-				ChurnerHostname:    config.ChurnerHostname,
-				BatcherHealthEndpt: config.BatcherHealthEndpt,
-				QuorumIds:          quorumIds,
-			},
-			sharedStorage,
-			promClient,
-			subgraphClient,
-			tx,
-			chainState,
-			indexedChainState,
-			logger,
-			metrics,
-			nil,
-			nil,
-			nil,
-		)
 	)
+	server, err := dataapi.NewServer(
+		dataapi.Config{
+			ServerMode:         config.ServerMode,
+			SocketAddr:         config.SocketAddr,
+			AllowOrigins:       config.AllowOrigins,
+			DisperserHostname:  config.DisperserHostname,
+			ChurnerHostname:    config.ChurnerHostname,
+			BatcherHealthEndpt: config.BatcherHealthEndpt,
+		},
+		sharedStorage,
+		promClient,
+		subgraphClient,
+		tx,
+		chainState,
+		indexedChainState,
+		logger,
+		metrics,
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create v1 server: %w", err)
+	}
 
 	if config.ServerVersion == 2 {
 		blobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
@@ -147,7 +137,6 @@ func RunDataApi(ctx *cli.Context) error {
 				DisperserHostname:  config.DisperserHostname,
 				ChurnerHostname:    config.ChurnerHostname,
 				BatcherHealthEndpt: config.BatcherHealthEndpt,
-				QuorumIds:          quorumIds,
 			},
 			blobMetadataStorev2,
 			promClient,
@@ -159,7 +148,7 @@ func RunDataApi(ctx *cli.Context) error {
 			metrics,
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create v2 server: %w", err)
 		}
 
 		// Enable Metrics Block

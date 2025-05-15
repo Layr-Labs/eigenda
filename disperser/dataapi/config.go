@@ -7,7 +7,6 @@ type Config struct {
 	DisperserHostname  string
 	ChurnerHostname    string
 	BatcherHealthEndpt string
-	QuorumIds          []uint8
 }
 
 type DataApiVersion uint

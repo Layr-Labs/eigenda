@@ -83,7 +83,18 @@ func (o *OperatorList) GetID(address string) (core.OperatorID, bool) {
 	return id, exists
 }
 
-func NewOperatorHandler(logger logging.Logger, metrics *Metrics, chainReader core.Reader, chainState core.ChainState, indexedChainState core.IndexedChainState, subgraphClient SubgraphClient, quorumIds []uint8) *OperatorHandler {
+func NewOperatorHandler(logger logging.Logger, metrics *Metrics, chainReader core.Reader, chainState core.ChainState, indexedChainState core.IndexedChainState, subgraphClient SubgraphClient) (*OperatorHandler, error) {
+	// Determine valid set of quorum IDs at startup
+	currentBlock, err := chainReader.GetCurrentBlockNumber(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	quorumCount, err := chainReader.GetQuorumCount(context.Background(), uint32(currentBlock))
+	if err != nil {
+		return nil, err
+	}
+	quorumIds := eth.GetAllQuorumIDs(quorumCount)
+
 	return &OperatorHandler{
 		logger:            logger,
 		metrics:           metrics,
@@ -92,7 +103,7 @@ func NewOperatorHandler(logger logging.Logger, metrics *Metrics, chainReader cor
 		indexedChainState: indexedChainState,
 		subgraphClient:    subgraphClient,
 		quorumIds:         quorumIds,
-	}
+	}, nil
 }
 
 func (oh *OperatorHandler) ProbeV2OperatorsLiveness(ctx context.Context, operatorId string) ([]*OperatorLiveness, error) {

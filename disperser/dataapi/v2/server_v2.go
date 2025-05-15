@@ -161,6 +161,11 @@ func NewServerV2(
 		return nil, fmt.Errorf("failed to create batchResponseCache: %w", err)
 	}
 
+	operatorHandler, err := dataapi.NewOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create operatorHandler: %w", err)
+	}
+
 	return &ServerV2{
 		logger:                           l,
 		serverMode:                       config.ServerMode,
@@ -173,7 +178,7 @@ func NewServerV2(
 		chainState:                       chainState,
 		indexedChainState:                indexedChainState,
 		metrics:                          metrics,
-		operatorHandler:                  dataapi.NewOperatorHandler(l, metrics, chainReader, chainState, indexedChainState, subgraphClient, config.QuorumIds),
+		operatorHandler:                  operatorHandler,
 		metricsHandler:                   dataapi.NewMetricsHandler(promClient, dataapi.V2),
 		batchFeedCache:                   batchFeedCache,
 		blobMetadataCache:                blobMetadataCache,
