@@ -38,8 +38,26 @@ func (m *MockOnchainPaymentState) GetReservedPaymentByAccount(ctx context.Contex
 	return value, args.Error(1)
 }
 
+func (m *MockOnchainPaymentState) GetReservedPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint64) (*core.ReservedPayment, error) {
+	args := m.Called(ctx, accountID, quorumId)
+	var value *core.ReservedPayment
+	if args.Get(0) != nil {
+		value = args.Get(0).(*core.ReservedPayment)
+	}
+	return value, args.Error(1)
+}
+
 func (m *MockOnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
 	args := m.Called(ctx, accountID)
+	var value *core.OnDemandPayment
+	if args.Get(0) != nil {
+		value = args.Get(0).(*core.OnDemandPayment)
+	}
+	return value, args.Error(1)
+}
+
+func (m *MockOnchainPaymentState) GetOnDemandPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint64) (*core.OnDemandPayment, error) {
+	args := m.Called(ctx, accountID, quorumId)
 	var value *core.OnDemandPayment
 	if args.Get(0) != nil {
 		value = args.Get(0).(*core.OnDemandPayment)
@@ -56,12 +74,12 @@ func (m *MockOnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) 
 	return value, args.Error(1)
 }
 
-func (m *MockOnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
+func (m *MockOnchainPaymentState) GetOnDemandSymbolsPerSecond() uint64 {
 	args := m.Called()
 	return args.Get(0).(uint64)
 }
 
-func (m *MockOnchainPaymentState) GetGlobalRatePeriodInterval() uint64 {
+func (m *MockOnchainPaymentState) GetOnDemandRatePeriodInterval() uint64 {
 	args := m.Called()
 	return args.Get(0).(uint64)
 }
@@ -79,4 +97,22 @@ func (m *MockOnchainPaymentState) GetPricePerSymbol() uint64 {
 func (m *MockOnchainPaymentState) GetReservationWindow() uint64 {
 	args := m.Called()
 	return args.Get(0).(uint64)
+}
+
+func (m *MockOnchainPaymentState) GetQuorumPaymentConfig(ctx context.Context, quorumId uint64) (*core.QuorumConfig, error) {
+	args := m.Called(ctx, quorumId)
+	var value *core.QuorumConfig
+	if args.Get(0) != nil {
+		value = args.Get(0).(*core.QuorumConfig)
+	}
+	return value, args.Error(1)
+}
+
+func (m *MockOnchainPaymentState) GetQuorumProtocolConfig(ctx context.Context, quorumId uint64) (*core.QuorumProtocolConfig, error) {
+	args := m.Called(ctx, quorumId)
+	var value *core.QuorumProtocolConfig
+	if args.Get(0) != nil {
+		value = args.Get(0).(*core.QuorumProtocolConfig)
+	}
+	return value, args.Error(1)
 }

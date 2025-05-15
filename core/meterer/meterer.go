@@ -261,13 +261,13 @@ func (m *Meterer) SymbolsCharged(numSymbols uint64) uint64 {
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64, receivedAt time.Time) error {
-	globalPeriod := GetReservationPeriod(receivedAt.Unix(), m.ChainPaymentState.GetGlobalRatePeriodInterval())
+	globalPeriod := GetReservationPeriod(receivedAt.Unix(), m.ChainPaymentState.GetOnDemandRatePeriodInterval())
 
 	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalPeriod, symbolsCharged)
 	if err != nil {
 		return fmt.Errorf("failed to increment global bin usage: %w", err)
 	}
-	if newUsage > m.ChainPaymentState.GetGlobalSymbolsPerSecond()*uint64(m.ChainPaymentState.GetGlobalRatePeriodInterval()) {
+	if newUsage > m.ChainPaymentState.GetOnDemandSymbolsPerSecond()*uint64(m.ChainPaymentState.GetOnDemandRatePeriodInterval()) {
 		return fmt.Errorf("global bin usage overflows")
 	}
 	return nil

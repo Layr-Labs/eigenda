@@ -19,11 +19,23 @@ import (
 // OnchainPaymentState is an interface for getting information about the current chain state for payments.
 type OnchainPayment interface {
 	RefreshOnchainPaymentState(ctx context.Context) error
+
+	// Reservation payment methods
 	GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error)
+	GetReservedPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint64) (*core.ReservedPayment, error)
+
+	// On-demand payment methods
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error)
+	GetOnDemandPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint64) (*core.OnDemandPayment, error)
+
+	// Configuration methods
 	GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error)
-	GetGlobalSymbolsPerSecond() uint64
-	GetGlobalRatePeriodInterval() uint64
+	GetQuorumPaymentConfig(ctx context.Context, quorumId uint64) (*core.QuorumConfig, error)
+	GetQuorumProtocolConfig(ctx context.Context, quorumId uint64) (*core.QuorumProtocolConfig, error)
+
+	// Legacy global parameter methods
+	GetOnDemandSymbolsPerSecond() uint64
+	GetOnDemandRatePeriodInterval() uint64
 	GetMinNumSymbols() uint64
 	GetPricePerSymbol() uint64
 	GetReservationWindow() uint64
@@ -82,12 +94,12 @@ func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*Pay
 		return nil, err
 	}
 
-	globalSymbolsPerSecond, err := pcs.tx.GetGlobalSymbolsPerSecond(ctx, blockNumber)
+	globalSymbolsPerSecond, err := pcs.tx.GetOnDemandSymbolsPerSecond(ctx, blockNumber)
 	if err != nil {
 		return nil, err
 	}
 
-	globalRatePeriodInterval, err := pcs.tx.GetGlobalRatePeriodInterval(ctx, blockNumber)
+	globalRatePeriodInterval, err := pcs.tx.GetOnDemandRatePeriodInterval(ctx, blockNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -186,43 +198,69 @@ func (pcs *OnchainPaymentState) refreshOnDemandPayments(ctx context.Context) err
 
 // GetReservedPaymentByAccount returns a pointer to the active reservation for the given account ID; no writes will be made to the reservation
 func (pcs *OnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error) {
-	pcs.ReservationsLock.RLock()
-	if reservation, ok := (pcs.ReservedPayments)[accountID]; ok {
+	// Default to quorum 0 for backward compatibility
+	return pcs.GetReservedPaymentByAccountAndQuorum(ctx, accountID, 0)
+}
+
+// GetReservedPaymentByAccountAndQuorum returns a pointer to the active reservation for the given account ID and quorum; no writes will be made to the reservation
+func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint64) (*core.ReservedPayment, error) {
+	// For now, we're only caching quorum 0 reservations, so we'll use the cache only for quorum 0
+	if quorumId == 0 {
+		pcs.ReservationsLock.RLock()
+		if reservation, ok := (pcs.ReservedPayments)[accountID]; ok {
+			pcs.ReservationsLock.RUnlock()
+			return reservation, nil
+		}
 		pcs.ReservationsLock.RUnlock()
-		return reservation, nil
 	}
-	pcs.ReservationsLock.RUnlock()
 
 	// pulls the chain state
-	res, err := pcs.tx.GetReservedPaymentByAccount(ctx, accountID)
+	res, err := pcs.tx.GetReservedPaymentByAccountAndQuorum(ctx, accountID, quorumId)
 	if err != nil {
 		return nil, err
 	}
-	pcs.ReservationsLock.Lock()
-	(pcs.ReservedPayments)[accountID] = res
-	pcs.ReservationsLock.Unlock()
+
+	// Only cache for quorum 0
+	if quorumId == 0 {
+		pcs.ReservationsLock.Lock()
+		(pcs.ReservedPayments)[accountID] = res
+		pcs.ReservationsLock.Unlock()
+	}
 
 	return res, nil
 }
 
 // GetOnDemandPaymentByAccount returns a pointer to the on-demand payment for the given account ID; no writes will be made to the payment
 func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
-	pcs.OnDemandLocks.RLock()
-	if payment, ok := (pcs.OnDemandPayments)[accountID]; ok {
+	// Default to quorum 0 for backward compatibility
+	return pcs.GetOnDemandPaymentByAccountAndQuorum(ctx, accountID, 0)
+}
+
+// GetOnDemandPaymentByAccountAndQuorum returns a pointer to the on-demand payment for the given account ID and quorum; no writes will be made to the payment
+func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint64) (*core.OnDemandPayment, error) {
+	// For now, we're only caching quorum 0 on-demand payments, so we'll use the cache only for quorum 0
+	if quorumId == 0 {
+		pcs.OnDemandLocks.RLock()
+		if payment, ok := (pcs.OnDemandPayments)[accountID]; ok {
+			pcs.OnDemandLocks.RUnlock()
+			return payment, nil
+		}
 		pcs.OnDemandLocks.RUnlock()
-		return payment, nil
 	}
-	pcs.OnDemandLocks.RUnlock()
 
 	// pulls the chain state
-	res, err := pcs.tx.GetOnDemandPaymentByAccount(ctx, accountID)
+	res, err := pcs.tx.GetOnDemandPaymentByAccountAndQuorum(ctx, accountID, quorumId)
 	if err != nil {
 		return nil, err
 	}
 
-	pcs.OnDemandLocks.Lock()
-	(pcs.OnDemandPayments)[accountID] = res
-	pcs.OnDemandLocks.Unlock()
+	// Only cache for quorum 0
+	if quorumId == 0 {
+		pcs.OnDemandLocks.Lock()
+		(pcs.OnDemandPayments)[accountID] = res
+		pcs.OnDemandLocks.Unlock()
+	}
+
 	return res, nil
 }
 
@@ -248,11 +286,21 @@ func (pcs *OnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([
 	return quorumNumbers, nil
 }
 
-func (pcs *OnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
+// GetQuorumPaymentConfig retrieves the payment configuration for a specific quorum
+func (pcs *OnchainPaymentState) GetQuorumPaymentConfig(ctx context.Context, quorumId uint64) (*core.QuorumConfig, error) {
+	return pcs.tx.GetQuorumPaymentConfig(ctx, quorumId)
+}
+
+// GetQuorumProtocolConfig retrieves the protocol configuration for a specific quorum
+func (pcs *OnchainPaymentState) GetQuorumProtocolConfig(ctx context.Context, quorumId uint64) (*core.QuorumProtocolConfig, error) {
+	return pcs.tx.GetQuorumProtocolConfig(ctx, quorumId)
+}
+
+func (pcs *OnchainPaymentState) GetOnDemandSymbolsPerSecond() uint64 {
 	return pcs.PaymentVaultParams.Load().GlobalSymbolsPerSecond
 }
 
-func (pcs *OnchainPaymentState) GetGlobalRatePeriodInterval() uint64 {
+func (pcs *OnchainPaymentState) GetOnDemandRatePeriodInterval() uint64 {
 	return pcs.PaymentVaultParams.Load().GlobalRatePeriodInterval
 }
 

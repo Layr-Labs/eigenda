@@ -286,7 +286,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 	// on-chain global payment parameters
-	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetGlobalSymbolsPerSecond()
+	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetOnDemandSymbolsPerSecond()
 	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols()
 	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol()
 	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()

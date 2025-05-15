@@ -178,8 +178,8 @@ func teardown() {
 func TestMetererReservations(t *testing.T) {
 	ctx := context.Background()
 	paymentChainState.On("GetReservationWindow", testifymock.Anything).Return(uint64(5), nil)
-	paymentChainState.On("GetGlobalSymbolsPerSecond", testifymock.Anything).Return(uint64(1009), nil)
-	paymentChainState.On("GetGlobalRatePeriodInterval", testifymock.Anything).Return(uint64(1), nil)
+	paymentChainState.On("GetOnDemandSymbolsPerSecond", testifymock.Anything).Return(uint64(1009), nil)
+	paymentChainState.On("GetOnDemandRatePeriodInterval", testifymock.Anything).Return(uint64(1), nil)
 	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint64(3), nil)
 
 	now := time.Now()
