@@ -26,7 +26,7 @@ type Accountant struct {
 
 	// local accounting
 	// contains 3 bins; circular wrapping of indices
-	periodRecords     []PeriodRecord
+	periodRecords     map[uint8][]PeriodRecord
 	usageLock         sync.Mutex
 	cumulativePayment *big.Int
 
@@ -35,15 +35,18 @@ type Accountant struct {
 }
 
 type PeriodRecord struct {
-	Index       uint32
-	Usage       uint64
+	Index        uint32
+	Usage        uint64
 	QuorumNumber uint8
 }
 
 func NewAccountant(accountID gethcommon.Address, reservation map[uint8]*core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint64, pricePerSymbol uint64, minNumSymbols uint64, numBins uint32) *Accountant {
-	periodRecords := make([]PeriodRecord, numBins)
-	for i := range periodRecords {
-		periodRecords[i] = PeriodRecord{Index: uint32(i), Usage: 0, QuorumNumber: 0}
+	periodRecords := make(map[uint8][]PeriodRecord)
+	for quorumNumber := range reservation {
+		periodRecords[quorumNumber] = make([]PeriodRecord, numBins)
+		for i := range periodRecords[quorumNumber] {
+			periodRecords[quorumNumber][i] = PeriodRecord{Index: uint32(i), Usage: 0, QuorumNumber: quorumNumber}
+		}
 	}
 	a := Accountant{
 		accountID:         accountID,
@@ -92,7 +95,7 @@ func (a *Accountant) BlobPaymentInfo(
 		relativePeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod, quorumNumber)
 		// Update usage for this quorum
 		relativePeriodRecord.Usage += symbolUsage
-		
+
 		binLimit := res.SymbolsPerSecond * uint64(a.reservationWindow)
 		if relativePeriodRecord.Usage <= binLimit {
 			// TODO: Check against users's registered quorums; replace requiredQuorums with
@@ -103,7 +106,7 @@ func (a *Accountant) BlobPaymentInfo(
 			return big.NewInt(0), nil
 		}
 
-		overflowPeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod + 2, quorumNumber)
+		overflowPeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod+2, quorumNumber)
 		// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
 		if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
 			// if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
@@ -113,7 +116,7 @@ func (a *Accountant) BlobPaymentInfo(
 			relativePeriodRecord.Usage = binLimit
 			return big.NewInt(0), nil
 		}
-		
+
 		// Rollback usage for this quorum since we couldn't use it
 		relativePeriodRecord.Usage -= symbolUsage
 	}
@@ -176,15 +179,15 @@ func (a *Accountant) SymbolsCharged(numSymbols uint64) uint64 {
 
 func (a *Accountant) GetRelativePeriodRecord(index uint64, quorumNumber uint8) *PeriodRecord {
 	relativeIndex := uint32(index % uint64(a.numBins))
-	if a.periodRecords[relativeIndex].Index != uint32(index) || a.periodRecords[relativeIndex].QuorumNumber != quorumNumber {
-		a.periodRecords[relativeIndex] = PeriodRecord{
-			Index:       uint32(index),
-			Usage:       0,
+	if a.periodRecords[quorumNumber][relativeIndex].Index != uint32(index) {
+		a.periodRecords[quorumNumber][relativeIndex] = PeriodRecord{
+			Index:        uint32(index),
+			Usage:        0,
 			QuorumNumber: quorumNumber,
 		}
 	}
 
-	return &a.periodRecords[relativeIndex]
+	return &a.periodRecords[quorumNumber][relativeIndex]
 }
 
 // SetPaymentState sets the accountant's state from the disperser's response
@@ -233,18 +236,55 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 		}
 	}
 
-	periodRecords := make([]PeriodRecord, len(paymentState.GetPeriodRecords()))
-	for i, record := range paymentState.GetPeriodRecords() {
-		if record == nil {
-			periodRecords[i] = PeriodRecord{Index: 0, Usage: 0, QuorumNumber: 0}
-		} else {
-			periodRecords[i] = PeriodRecord{
-				Index:       record.Index,
-				Usage:       record.Usage,
-				QuorumNumber: uint8(record.QuorumNumber),
+	// Initialize periodRecords map
+	periodRecords := make(map[uint8][]PeriodRecord)
+	
+	// Process all period records and organize them by quorum number
+	quorumRecords := make(map[uint8][]*disperser_rpc.PeriodRecord)
+	for _, record := range paymentState.GetPeriodRecords() {
+		quorumNumber := uint8(record.QuorumNumber)
+		quorumRecords[quorumNumber] = append(quorumRecords[quorumNumber], record)
+	}
+	
+	// Initialize period records for each quorum
+	for quorumNumber, records := range quorumRecords {
+		periodRecords[quorumNumber] = make([]PeriodRecord, a.numBins)
+		
+		// By default, initialize each bin with empty period records
+		for i := range periodRecords[quorumNumber] {
+			periodRecords[quorumNumber][i] = PeriodRecord{
+				Index:        uint32(i),
+				Usage:        0,
+				QuorumNumber: quorumNumber,
+			}
+		}
+		
+		// Process the actual records
+		for _, record := range records {
+			// We need to convert to the right bin index based on reservation period
+			bin := uint32(record.Index % uint32(a.numBins))
+			periodRecords[quorumNumber][bin] = PeriodRecord{
+				Index:        record.Index,
+				Usage:        record.Usage,
+				QuorumNumber: quorumNumber,
 			}
 		}
 	}
+	
+	// Initialize period records for reservations that don't have period records
+	for quorumNumber := range a.reservation {
+		if _, exists := periodRecords[quorumNumber]; !exists {
+			periodRecords[quorumNumber] = make([]PeriodRecord, a.numBins)
+			for i := range periodRecords[quorumNumber] {
+				periodRecords[quorumNumber][i] = PeriodRecord{
+					Index:        uint32(i),
+					Usage:        0,
+					QuorumNumber: quorumNumber,
+				}
+			}
+		}
+	}
+	
 	a.periodRecords = periodRecords
 	return nil
 }

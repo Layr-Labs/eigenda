@@ -48,6 +48,8 @@ type testComponents struct {
 	ChainReader       *mock.MockWriter
 	Signer            *auth.LocalBlobRequestSigner
 	Peer              *peer.Peer
+	MockState         *mock.MockOnchainPaymentState
+	OffchainStore     meterer.OffchainStore
 }
 
 func TestV2DisperseBlob(t *testing.T) {
@@ -511,17 +513,14 @@ func newTestServerV2(t *testing.T) *testComponents {
 	table_names := []string{"reservations_server_" + t.Name(), "ondemand_server_" + t.Name(), "global_server_" + t.Name()}
 	err = meterer.CreateReservationTable(awsConfig, table_names[0])
 	if err != nil {
-		teardown()
 		panic("failed to create reservation table")
 	}
 	err = meterer.CreateOnDemandTable(awsConfig, table_names[1])
 	if err != nil {
-		teardown()
 		panic("failed to create ondemand table")
 	}
 	err = meterer.CreateGlobalReservationTable(awsConfig, table_names[2])
 	if err != nil {
-		teardown()
 		panic("failed to create global reservation table")
 	}
 
@@ -533,7 +532,6 @@ func newTestServerV2(t *testing.T) *testComponents {
 		logger,
 	)
 	if err != nil {
-		teardown()
 		panic("failed to create offchain store")
 	}
 	meterer := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
@@ -591,6 +589,8 @@ func newTestServerV2(t *testing.T) *testComponents {
 		ChainReader:       chainReader,
 		Signer:            signer,
 		Peer:              p,
+		MockState:         mockState,
+		OffchainStore:     store,
 	}
 }
 
