@@ -55,11 +55,6 @@ type V1CertVerifierDeployConfig struct {
 	ServiceManager  string `json:"eigenDAServiceManager"`
 }
 
-type DefaultSecurityThresholds struct {
-	ConfirmationThreshold uint32 `json:"0_confirmationThreshold"`
-	AdversaryThreshold    uint32 `json:"1_adversaryThreshold"`
-}
-
 
 type EigenDADeployConfig struct {
 	UseDefaults         bool       `json:"useDefaults"`

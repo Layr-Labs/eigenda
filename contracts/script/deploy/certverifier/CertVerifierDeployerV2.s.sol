@@ -18,7 +18,7 @@ import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
-//forge script script/deploy/certverifier/CertVerifierDeployerV2.s.sol:CertVerifierDeployer --sig "run(string, string)" <config.json> <output.json> --rpc-url $RPC --private-key $PRIVATE_KEY -vvvv --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast
+//forge script script/deploy/certverifier/CertVerifierDeployerV2.s.sol:CertVerifierDeployerV2 --sig "run(string, string)" <config.json> <output.json> --rpc-url $RPC --private-key $PRIVATE_KEY -vvvv --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast
 contract CertVerifierDeployerV2 is Script, Test {
     address eigenDACertVerifier;
 
@@ -71,7 +71,7 @@ contract CertVerifierDeployerV2 is Script, Test {
 
         vm.stopBroadcast();
 
-        console.log("Deployed new EigenDACertVerifier at address: ", eigenDACertVerifier);
+        console.log("Deployed new EigenDACertVerifierV2 at address: ", eigenDACertVerifier);
 
         string memory outputPath = string.concat("./script/deploy/certverifier/output/", outputJSONFile);
         string memory parent_object = "parent object";

@@ -40,6 +40,7 @@ const (
 	relayImage     = "ghcr.io/layr-labs/eigenda/relay:local"
 )
 
+// getKeyString retrieves a ECDSA private key string for a given Ethereum account
 func (env *Config) getKeyString(name string) string {
 	key, _ := env.getKey(name)
 	keyInt, ok := new(big.Int).SetString(key, 0)
@@ -49,6 +50,8 @@ func (env *Config) getKeyString(name string) string {
 	return keyInt.String()
 }
 
+// generateV1CertVerifierDeployConfig generates the input config used for deploying the V1 CertVerifier
+// NOTE: this will be killed in the future with eventual deprecation of V1
 func (env *Config) generateV1CertVerifierDeployConfig(ethClient common.EthClient) V1CertVerifierDeployConfig {
 	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
@@ -68,6 +71,7 @@ func (env *Config) generateV1CertVerifierDeployConfig(ethClient common.EthClient
 	return config
 }
 
+// generateEigenDADeployConfig generates input config fed into SetUpEigenDA.s.sol foundry script
 func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
 
 	operators := make([]string, 0)
@@ -113,6 +117,7 @@ func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
 
 }
 
+// deployEigenDAContracts deploys EigenDA core system and peripheral contracts on local anvil chain
 func (env *Config) deployEigenDAContracts() {
 	log.Print("Deploy the EigenDA and EigenLayer contracts")
 
@@ -161,11 +166,12 @@ func (env *Config) deployEigenDAContracts() {
 		log.Panicf("Error: %s", err.Error())
 	}
 
+	// NOTE: this is pretty janky and is a short-term solution until V1 contract usage
+	//       can be deprecated.
 	writeFile("script/deploy/certverifier/config/inabox_deploy_config_v1.json", data)
-	execForgeScript("script/deploy/certverifier/CertVerifierDeployerV1.s.sol:CertVerifierDeployerV1", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(string, string)", "inabox_deploy_config_v1.json", "out.json"})
+	execForgeScript("script/deploy/certverifier/CertVerifierDeployerV1.s.sol:CertVerifierDeployerV1", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(string, string)", "inabox_deploy_config_v1.json", "inabox_v1_deploy.json"})
 
-	//add v1 cert verifier address to path
-	data = readFile("script/deploy/certverifier/output/out.json")
+	data = readFile("script/deploy/certverifier/output/inabox_v1_deploy.json")
 	var verifierAddress struct{ EigenDACertVerifier string }
 	err = json.Unmarshal(data, &verifierAddress)
 	if err != nil {
@@ -175,6 +181,7 @@ func (env *Config) deployEigenDAContracts() {
 }
 
 // Deploys a EigenDA experiment
+// TODO: Figure out what necessitates experiment nomenclature
 func (env *Config) DeployExperiment() {
 	changeDirectory(filepath.Join(env.rootPath, "inabox"))
 	defer env.SaveTestConfig()
@@ -308,6 +315,8 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 	return fmt.Errorf("timed out waiting for disperser address to be set")
 }
 
+// RegisterBlobVersionAndRelays initializes blob versions against ThresholdRegistry contract 
+// and relays against RelayRegistry contract
 func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
