@@ -74,6 +74,8 @@ func (m *Meterer) Start(ctx context.Context) {
 // MeterRequest validates a blob header and adds it to the meterer's state
 // TODO: return error if there's a rejection (with reasoning) or internal error (should be very rare)
 func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata, numSymbols uint64, quorumNumbers []uint8, receivedAt time.Time) (uint64, error) {
+	m.logger.Info("MeterRequest")
+	m.logger.Info("MeterRequest", "numSymbols", numSymbols, "quorumNumbers", quorumNumbers)
 	symbolsCharged := m.SymbolsCharged(numSymbols)
 	m.logger.Info("Validating incoming request's payment metadata", "paymentMetadata", header, "numSymbols", numSymbols, "quorumNumbers", quorumNumbers)
 	// Validate against the payment method
@@ -202,7 +204,7 @@ func GetReservationPeriod(timestamp int64, binInterval uint64) uint64 {
 // On-demand requests doesn't have additional quorum settings and should only be
 // allowed by ETH and EIGEN quorums
 func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentMetadata, onDemandPayment *core.OnDemandPayment, symbolsCharged uint64, headerQuorums []uint8, receivedAt time.Time) error {
-	m.logger.Debug("Recording and validating on-demand usage", "header", header, "onDemandPayment", onDemandPayment)
+	m.logger.Info("Recording and validating on-demand usage", "header", header, "onDemandPayment", onDemandPayment)
 	quorumNumbers, err := m.ChainPaymentState.GetOnDemandQuorumNumbers(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get on-demand quorum numbers: %w", err)
@@ -218,6 +220,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 	}
 
 	paymentCharged := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol())
+	m.logger.Info("paymentCharged", "paymentCharged", paymentCharged.String(), "symbolsCharged", symbolsCharged, "pricePerSymbol", m.ChainPaymentState.GetPricePerSymbol())
 	oldPayment, err := m.OffchainStore.AddOnDemandPayment(ctx, header, paymentCharged)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
@@ -276,4 +279,9 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged ui
 // GetReservationBinLimit returns the bin limit for a given reservation
 func (m *Meterer) GetReservationBinLimit(reservation *core.ReservedPayment, reservationWindow uint64) uint64 {
 	return reservation.SymbolsPerSecond * reservationWindow
+}
+
+// GetOffchainStore returns the offchain store instance
+func (m *Meterer) GetOffchainStore() OffchainStore {
+	return m.OffchainStore
 }
