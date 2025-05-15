@@ -9,7 +9,9 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser"
-	rollupbindings "github.com/Layr-Labs/eigenda/contracts/bindings/MockRollup"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+
+	certTypes "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 	"github.com/Layr-Labs/eigenda/core/auth"
 	"github.com/Layr-Labs/eigenda/disperser"
 
@@ -29,9 +31,6 @@ var _ = Describe("Inabox Integration", func() {
 	It("test end to end scenario", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 		defer cancel()
-
-		gasTipCap, gasFeeCap, err := ethClient.GetLatestGasCaps(ctx)
-		Expect(err).To(BeNil())
 
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
 		signer := auth.NewLocalBlobRequestSigner(privateKeyHex)
@@ -91,28 +90,13 @@ var _ = Describe("Inabox Integration", func() {
 				}
 				blobHeader := blobHeaderFromProto(reply1.GetInfo().GetBlobHeader())
 				verificationProof := blobVerificationProofFromProto(reply1.GetInfo().GetBlobVerificationProof())
-				opts, err := ethClient.GetNoSendTransactOpts()
-				Expect(err).To(BeNil())
-				tx, err := mockRollup.PostCommitment(opts, blobHeader, verificationProof)
-				Expect(err).To(BeNil())
-				tx, err = ethClient.UpdateGas(ctx, tx, nil, gasTipCap, gasFeeCap)
-				Expect(err).To(BeNil())
-				err = ethClient.SendTransaction(ctx, tx)
+				err = eigenDACertVerifierV1.VerifyDACertV1(&bind.CallOpts{}, blobHeader, verificationProof)
 				Expect(err).To(BeNil())
 				mineAnvilBlocks(numConfirmations + 1)
-				_, err = ethClient.EnsureTransactionEvaled(ctx, tx, "PostCommitment")
-				Expect(err).To(BeNil())
 
 				blobHeader = blobHeaderFromProto(reply2.GetInfo().GetBlobHeader())
 				verificationProof = blobVerificationProofFromProto(reply2.GetInfo().GetBlobVerificationProof())
-				tx, err = mockRollup.PostCommitment(opts, blobHeader, verificationProof)
-				Expect(err).To(BeNil())
-				tx, err = ethClient.UpdateGas(ctx, tx, nil, gasTipCap, gasFeeCap)
-				Expect(err).To(BeNil())
-				err = ethClient.SendTransaction(ctx, tx)
-				Expect(err).To(BeNil())
-				mineAnvilBlocks(numConfirmations + 1)
-				_, err = ethClient.EnsureTransactionEvaled(ctx, tx, "PostCommitment")
+				err = eigenDACertVerifierV1.VerifyDACertV1(&bind.CallOpts{}, blobHeader, verificationProof)
 				Expect(err).To(BeNil())
 				loop = false
 			}
@@ -181,18 +165,18 @@ var _ = Describe("Inabox Integration", func() {
 	})
 })
 
-func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.EigenDATypesV1BlobHeader {
-	quorums := make([]rollupbindings.EigenDATypesV1QuorumBlobParam, len(blobHeader.GetBlobQuorumParams()))
+func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) certTypes.EigenDATypesV1BlobHeader {
+	quorums := make([]certTypes.EigenDATypesV1QuorumBlobParam, len(blobHeader.GetBlobQuorumParams()))
 	for i, quorum := range blobHeader.GetBlobQuorumParams() {
-		quorums[i] = rollupbindings.EigenDATypesV1QuorumBlobParam{
+		quorums[i] = certTypes.EigenDATypesV1QuorumBlobParam{
 			QuorumNumber:                    uint8(quorum.GetQuorumNumber()),
 			AdversaryThresholdPercentage:    uint8(quorum.GetAdversaryThresholdPercentage()),
 			ConfirmationThresholdPercentage: uint8(quorum.GetConfirmationThresholdPercentage()),
 			ChunkLength:                     quorum.ChunkLength,
 		}
 	}
-	return rollupbindings.EigenDATypesV1BlobHeader{
-		Commitment: rollupbindings.BN254G1Point{
+	return certTypes.EigenDATypesV1BlobHeader{
+		Commitment: certTypes.BN254G1Point{
 			X: new(big.Int).SetBytes(blobHeader.GetCommitment().X),
 			Y: new(big.Int).SetBytes(blobHeader.GetCommitment().Y),
 		},
@@ -201,12 +185,12 @@ func blobHeaderFromProto(blobHeader *disperserpb.BlobHeader) rollupbindings.Eige
 	}
 }
 
-func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificationProof) rollupbindings.EigenDATypesV1BlobVerificationProof {
+func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificationProof) certTypes.EigenDATypesV1BlobVerificationProof {
 	batchMetadataProto := verificationProof.GetBatchMetadata()
 	batchHeaderProto := verificationProof.GetBatchMetadata().GetBatchHeader()
 	var batchRoot [32]byte
 	copy(batchRoot[:], batchHeaderProto.GetBatchRoot())
-	batchHeader := rollupbindings.EigenDATypesV1BatchHeader{
+	batchHeader := certTypes.EigenDATypesV1BatchHeader{
 		BlobHeadersRoot:       batchRoot,
 		QuorumNumbers:         batchHeaderProto.GetQuorumNumbers(),
 		SignedStakeForQuorums: batchHeaderProto.GetQuorumSignedPercentages(),
@@ -214,12 +198,12 @@ func blobVerificationProofFromProto(verificationProof *disperserpb.BlobVerificat
 	}
 	var sig [32]byte
 	copy(sig[:], batchMetadataProto.GetSignatoryRecordHash())
-	batchMetadata := rollupbindings.EigenDATypesV1BatchMetadata{
+	batchMetadata := certTypes.EigenDATypesV1BatchMetadata{
 		BatchHeader:             batchHeader,
 		SignatoryRecordHash:     sig,
 		ConfirmationBlockNumber: batchMetadataProto.GetConfirmationBlockNumber(),
 	}
-	return rollupbindings.EigenDATypesV1BlobVerificationProof{
+	return certTypes.EigenDATypesV1BlobVerificationProof{
 		BatchId:        verificationProof.GetBatchId(),
 		BlobIndex:      verificationProof.GetBlobIndex(),
 		BatchMetadata:  batchMetadata,
