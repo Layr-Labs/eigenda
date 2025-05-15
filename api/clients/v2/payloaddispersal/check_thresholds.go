@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
@@ -48,7 +47,7 @@ func (e *thresholdNotMetError) Error() string {
 // checkThresholds verifies if all quorums meet the confirmation threshold and returns a structured error if they don't
 func checkThresholds(
 	ctx context.Context,
-	certVerifier clients.ICertVerifier,
+	confirmationThreshold byte,
 	blobStatusReply *dispgrpc.BlobStatusReply,
 	blobKey string,
 ) error {
@@ -74,11 +73,6 @@ func checkThresholds(
 	batchHeader := blobStatusReply.GetSignedBatch().GetHeader()
 	if batchHeader == nil {
 		return fmt.Errorf("expected non-nil batch header: %v", protoToString(blobStatusReply))
-	}
-
-	confirmationThreshold, err := certVerifier.GetConfirmationThreshold(ctx, batchHeader.GetReferenceBlockNumber())
-	if err != nil {
-		return fmt.Errorf("get confirmation threshold: %w", err)
 	}
 
 	// Check if all thresholds are met for the quorums defined in the blob header

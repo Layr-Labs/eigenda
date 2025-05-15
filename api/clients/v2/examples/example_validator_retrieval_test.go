@@ -57,7 +57,7 @@ func Example_validatorPayloadRetrieval() {
 	fmt.Printf("Successfully retrieved payload\n")
 
 	// Create a cert verifier, to verify the certificate on chain
-	certVerifier, err := createCertVerifier()
+	certVerifier, err := createGenericCertVerifier()
 	if err != nil {
 		panic(fmt.Sprintf("create cert verifier: %v", err))
 	}
@@ -67,7 +67,13 @@ func Example_validatorPayloadRetrieval() {
 	// VerifyCertV2 is a view-only call to the `EigenDACertVerifier` contract. This call verifies that the provided cert
 	// is valid: if this call doesn't return an error, then the eigenDA network has attested to the availability of the
 	// dispersed blob.
-	err = certVerifier.VerifyCertV2(verificationCtx, eigenDACert)
+
+	certBytes, err := eigenDACert.Serialize()
+	if err != nil {
+		panic(fmt.Sprintf("serialize cert: %v", err))
+	}
+
+	err = certVerifier.CheckDACert(verificationCtx, eigenDACert.ReferenceBlockNumber(), certBytes)
 	if err != nil {
 		panic(fmt.Sprintf("verify cert: %v", err))
 	}

@@ -46,6 +46,8 @@ type TestClientConfig struct {
 	//
 	// If this value is not set, that tests utilizing it will be skipped
 	EigenDACertVerifierAddressQuorums2 string
+	// The contract address of the registry coordinator
+	EigenDARegistryCoordinatorAddress string
 	// The URL/IP of a subgraph to use for the chain state
 	SubgraphURL string
 	// The SRS order to use for the test
