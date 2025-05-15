@@ -167,12 +167,12 @@ func (env *Config) deployEigenDAContracts() {
 
 	//add v1 cert verifier address to path
 	data = readFile("script/deploy/certverifier/output/out.json")
-	var verifierAddress struct{ eigenDACertVerifier string }
+	var verifierAddress struct{ EigenDACertVerifier string }
 	err = json.Unmarshal(data, &verifierAddress)
 	if err != nil {
 		log.Panicf("Error: %s", err.Error())
 	}
-	env.EigenDAV1CertVerifier = verifierAddress.eigenDACertVerifier
+	env.EigenDAV1CertVerifier = verifierAddress.EigenDACertVerifier
 }
 
 // Deploys a EigenDA experiment

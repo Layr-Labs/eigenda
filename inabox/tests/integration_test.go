@@ -90,8 +90,8 @@ var _ = Describe("Inabox Integration", func() {
 				}
 				blobHeader := blobHeaderFromProto(reply1.GetInfo().GetBlobHeader())
 				verificationProof := blobVerificationProofFromProto(reply1.GetInfo().GetBlobVerificationProof())
-				Expect(err).To(BeNil())
 				err = eigenDACertVerifierV1.VerifyDACertV1(&bind.CallOpts{}, blobHeader, verificationProof)
+				Expect(err).To(BeNil())
 				mineAnvilBlocks(numConfirmations + 1)
 
 				blobHeader = blobHeaderFromProto(reply2.GetInfo().GetBlobHeader())
