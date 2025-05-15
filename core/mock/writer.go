@@ -255,25 +255,19 @@ func (t *MockWriter) PubkeyHashToOperator(ctx context.Context, operatorId core.O
 	return result.(gethcommon.Address), args.Error(1)
 }
 
-func (t *MockWriter) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.ReservedPayment, error) {
-	args := t.Called(ctx, accountIDs)
+func (t *MockWriter) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address, quorumIds []uint8) (map[gethcommon.Address]map[uint8]*core.ReservedPayment, error) {
+	args := t.Called(ctx, accountIDs, quorumIds)
 	result := args.Get(0)
-	return result.(map[gethcommon.Address]*core.ReservedPayment), args.Error(1)
+	return result.(map[gethcommon.Address]map[uint8]*core.ReservedPayment), args.Error(1)
 }
 
-func (t *MockWriter) GetReservedPaymentsByQuorum(ctx context.Context, accountIDs []gethcommon.Address, quorumId uint64) (map[gethcommon.Address]*core.ReservedPayment, error) {
-	args := t.Called(ctx, accountIDs, quorumId)
+func (t *MockWriter) GetReservedPaymentsByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumIds []uint8) (map[uint8]*core.ReservedPayment, error) {
+	args := t.Called(ctx, accountID, quorumIds)
 	result := args.Get(0)
-	return result.(map[gethcommon.Address]*core.ReservedPayment), args.Error(1)
+	return result.(map[uint8]*core.ReservedPayment), args.Error(1)
 }
 
-func (t *MockWriter) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error) {
-	args := t.Called(ctx, accountID)
-	result := args.Get(0)
-	return result.(*core.ReservedPayment), args.Error(1)
-}
-
-func (t *MockWriter) GetReservedPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint64) (*core.ReservedPayment, error) {
+func (t *MockWriter) GetReservedPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint8) (*core.ReservedPayment, error) {
 	args := t.Called(ctx, accountID, quorumId)
 	result := args.Get(0)
 	return result.(*core.ReservedPayment), args.Error(1)

@@ -125,6 +125,8 @@ message GetPaymentStateRequest {
   // Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server's clock,
   // request may be rejected.
   uint64 timestamp = 3;
+  // Quorum number to filter the period records. If not set, quorum 0 is used by default.
+  uint32 quorum_number = 4;
 }
 
 // GetPaymentStateReply contains the payment state of an account.
@@ -134,7 +136,7 @@ message GetPaymentStateReply {
   // off-chain account reservation usage records
   repeated PeriodRecord period_records = 2;
   // on-chain account reservation setting
-  Reservation reservation = 3;
+  repeated Reservation reservations = 3;
   // off-chain on-demand payment usage
   bytes cumulative_payment = 4;
   // on-chain on-demand payment deposited
@@ -245,10 +247,8 @@ message Reservation {
   uint32 start_timestamp = 2;
   // end timestamp of the reservation
   uint32 end_timestamp = 3;
-  // quorums allowed to make reserved dispersals
-  repeated uint32 quorum_numbers = 4;
-  // quorum splits describes how the payment is split among the quorums
-  repeated uint32 quorum_splits = 5;
+  // quorum number of the reservation
+  uint32 quorum_number = 4;
 }
 
 // PeriodRecord is the usage record of an account in a bin. The API should return the active bin
@@ -258,4 +258,6 @@ message PeriodRecord {
   uint32 index = 1;
   // symbol usage recorded
   uint64 usage = 2;
+  // quorum number of the reservation
+  uint32 quorum_number = 4;
 }

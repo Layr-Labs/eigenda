@@ -804,23 +804,40 @@ func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*cor
 	return res, nil
 }
 
-func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.ReservedPayment, error) {
-	// Default to quorum 0 for backward compatibility
-	return t.GetReservedPaymentsByQuorum(ctx, accountIDs, 0)
-}
-
-// GetReservedPaymentsByQuorum returns active reservations for multiple accounts for a specific quorum
-func (t *Reader) GetReservedPaymentsByQuorum(ctx context.Context, accountIDs []gethcommon.Address, quorumId uint64) (map[gethcommon.Address]*core.ReservedPayment, error) {
+func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address, quorumIds []uint8) (map[gethcommon.Address]map[uint8]*core.ReservedPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
 
-	reservationsMap := make(map[gethcommon.Address]*core.ReservedPayment)
+	reservationsMap := make(map[gethcommon.Address]map[uint8]*core.ReservedPayment)
 
 	for _, accountID := range accountIDs {
+		accountReservations, err := t.GetReservedPaymentsByAccountAndQuorums(ctx, accountID, quorumIds)
+		if err != nil {
+			t.logger.Warn("failed to get reservations for account", "account", accountID, "err", err)
+			continue
+		}
+
+		if len(accountReservations) > 0 {
+			reservationsMap[accountID] = accountReservations
+		}
+	}
+
+	return reservationsMap, nil
+}
+
+// GetReservedPaymentsByQuorum returns active reservations for multiple accounts for a specific quorum
+func (t *Reader) GetReservedPaymentsByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumIds []uint8) (map[uint8]*core.ReservedPayment, error) {
+	if t.bindings.PaymentVault == nil {
+		return nil, errors.New("payment vault not deployed")
+	}
+
+	reservationsMap := make(map[uint8]*core.ReservedPayment)
+
+	for _, quorumId := range quorumIds {
 		reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
 			Context: ctx,
-		}, quorumId, accountID)
+		}, uint64(quorumId), accountID)
 
 		if err != nil {
 			t.logger.Warn("failed to get reservation", "account", accountID, "quorumId", quorumId, "err", err)
@@ -833,26 +850,21 @@ func (t *Reader) GetReservedPaymentsByQuorum(ctx context.Context, accountIDs []g
 			continue
 		}
 
-		reservationsMap[accountID] = res
+		reservationsMap[quorumId] = res
 	}
 
 	return reservationsMap, nil
 }
 
-func (t *Reader) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error) {
-	// Default to quorum 0 for backward compatibility
-	return t.GetReservedPaymentByAccountAndQuorum(ctx, accountID, 0)
-}
-
 // GetReservedPaymentByAccountAndQuorum returns active reservation by account ID for a specific quorum
-func (t *Reader) GetReservedPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint64) (*core.ReservedPayment, error) {
+func (t *Reader) GetReservedPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint8) (*core.ReservedPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
 
 	reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
 		Context: ctx,
-	}, quorumId, accountID)
+	}, uint64(quorumId), accountID)
 
 	if err != nil {
 		return nil, err

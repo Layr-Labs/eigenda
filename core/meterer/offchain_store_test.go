@@ -80,8 +80,9 @@ func TestUpdateReservationBin(t *testing.T) {
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 	reservationPeriod := uint64(1)
 	size := uint64(1000)
+	quorumNumber := uint8(0)
 
-	binUsage, err := tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, size)
+	binUsage, err := tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, size, quorumNumber)
 	require.NoError(t, err)
 	assert.Equal(t, size, binUsage)
 
@@ -89,6 +90,7 @@ func TestUpdateReservationBin(t *testing.T) {
 	item, err := dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
 		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+		"QuorumNumber":      &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(quorumNumber), 10)},
 	})
 	require.NoError(t, err)
 	binUsageStr := item["BinUsage"].(*types.AttributeValueMemberN).Value
@@ -98,7 +100,7 @@ func TestUpdateReservationBin(t *testing.T) {
 
 	// Test updating existing bin
 	additionalSize := uint64(500)
-	binUsage, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, additionalSize)
+	binUsage, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, additionalSize, quorumNumber)
 	require.NoError(t, err)
 	assert.Equal(t, size+additionalSize, binUsage)
 
@@ -106,6 +108,38 @@ func TestUpdateReservationBin(t *testing.T) {
 	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
 		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+		"QuorumNumber":      &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(quorumNumber), 10)},
+	})
+	require.NoError(t, err)
+	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
+	binUsageVal, err = strconv.ParseUint(binUsageStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, size+additionalSize, binUsageVal)
+	
+	// Test with a different quorum
+	quorumNumber2 := uint8(1)
+	size2 := uint64(2000)
+	binUsage, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, size2, quorumNumber2)
+	require.NoError(t, err)
+	assert.Equal(t, size2, binUsage)
+	
+	// Verify second quorum bin
+	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
+		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+		"QuorumNumber":      &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(quorumNumber2), 10)},
+	})
+	require.NoError(t, err)
+	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
+	binUsageVal, err = strconv.ParseUint(binUsageStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, size2, binUsageVal)
+	
+	// First quorum should remain unchanged
+	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
+		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+		"QuorumNumber":      &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(quorumNumber), 10)},
 	})
 	require.NoError(t, err)
 	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
@@ -336,6 +370,282 @@ func TestRollbackOnDemandPayment(t *testing.T) {
 	// Test case 4: Trying to rollback non-matching payment should not cause an error
 	err = tc.store.RollbackOnDemandPayment(tc.ctx, accountID, big.NewInt(9999), big.NewInt(500))
 	require.NoError(t, err)
+}
+
+// TestGetPeriodRecords tests the GetPeriodRecords function with quorum-specific retrieval
+func TestGetPeriodRecords(t *testing.T) {
+	tc := setupTest(t)
+
+	// Setup: Create several period records with different quorums
+	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
+	reservationPeriod1 := uint64(100)
+	reservationPeriod2 := uint64(101)
+	reservationPeriod3 := uint64(102)
+	
+	// Create data for quorum 0
+	quorum0 := uint8(0)
+	size1Quorum0 := uint64(1000)
+	size2Quorum0 := uint64(1500)
+	size3Quorum0 := uint64(2000)
+	
+	// Create data for quorum 1
+	quorum1 := uint8(1)
+	size1Quorum1 := uint64(3000)
+	size2Quorum1 := uint64(3500)
+	size3Quorum1 := uint64(4000)
+	
+	// Add records for quorum 0
+	_, err := tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod1, size1Quorum0, quorum0)
+	require.NoError(t, err)
+	_, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod2, size2Quorum0, quorum0)
+	require.NoError(t, err)
+	_, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod3, size3Quorum0, quorum0)
+	require.NoError(t, err)
+	
+	// Add records for quorum 1
+	_, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod1, size1Quorum1, quorum1)
+	require.NoError(t, err)
+	_, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod2, size2Quorum1, quorum1)
+	require.NoError(t, err)
+	_, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod3, size3Quorum1, quorum1)
+	require.NoError(t, err)
+	
+	// Test single quorum retrieval - quorum 0
+	records, err := tc.store.GetPeriodRecords(tc.ctx, accountID, reservationPeriod1, quorum0)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(records))
+	
+	// Verify records for quorum 0
+	assert.Equal(t, uint32(reservationPeriod1), records[0].Index)
+	assert.Equal(t, size1Quorum0, records[0].Usage)
+	assert.Equal(t, uint32(quorum0), records[0].QuorumNumber)
+	
+	assert.Equal(t, uint32(reservationPeriod2), records[1].Index)
+	assert.Equal(t, size2Quorum0, records[1].Usage)
+	assert.Equal(t, uint32(quorum0), records[1].QuorumNumber)
+	
+	assert.Equal(t, uint32(reservationPeriod3), records[2].Index)
+	assert.Equal(t, size3Quorum0, records[2].Usage)
+	assert.Equal(t, uint32(quorum0), records[2].QuorumNumber)
+	
+	// Test single quorum retrieval - quorum 1
+	records, err = tc.store.GetPeriodRecords(tc.ctx, accountID, reservationPeriod1, quorum1)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(records))
+	
+	// Verify records for quorum 1
+	assert.Equal(t, uint32(reservationPeriod1), records[0].Index)
+	assert.Equal(t, size1Quorum1, records[0].Usage)
+	assert.Equal(t, uint32(quorum1), records[0].QuorumNumber)
+	
+	assert.Equal(t, uint32(reservationPeriod2), records[1].Index)
+	assert.Equal(t, size2Quorum1, records[1].Usage)
+	assert.Equal(t, uint32(quorum1), records[1].QuorumNumber)
+	
+	assert.Equal(t, uint32(reservationPeriod3), records[2].Index)
+	assert.Equal(t, size3Quorum1, records[2].Usage)
+	assert.Equal(t, uint32(quorum1), records[2].QuorumNumber)
+}
+
+// TestGetPeriodRecordsMultiQuorum tests the GetPeriodRecordsMultiQuorum function
+func TestGetPeriodRecordsMultiQuorum(t *testing.T) {
+	tc := setupTest(t)
+
+	// Setup: Create several period records with different quorums
+	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
+	reservationPeriod1 := uint64(100)
+	reservationPeriod2 := uint64(101)
+	
+	// Create data for quorum 0, 1, and 2
+	quorum0 := uint8(0)
+	quorum1 := uint8(1)
+	quorum2 := uint8(2)
+	
+	// Add records
+	_, err := tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod1, 1000, quorum0)
+	require.NoError(t, err)
+	_, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod1, 2000, quorum1)
+	require.NoError(t, err)
+	_, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod1, 3000, quorum2)
+	require.NoError(t, err)
+	_, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod2, 1500, quorum0)
+	require.NoError(t, err)
+	_, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod2, 2500, quorum1)
+	require.NoError(t, err)
+	_, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod2, 3500, quorum2)
+	require.NoError(t, err)
+	
+	// Test multi-quorum retrieval
+	records, err := tc.store.GetPeriodRecordsMultiQuorum(tc.ctx, accountID, reservationPeriod1, []uint8{quorum0, quorum1})
+	require.NoError(t, err)
+	require.Equal(t, 4, len(records), "Should retrieve 4 records (2 periods × 2 quorums)")
+	
+	// Create a map to verify all expected records are present
+	recordMap := make(map[string]bool)
+	for _, record := range records {
+		key := fmt.Sprintf("%d-%d", record.Index, record.QuorumNumber)
+		recordMap[key] = true
+		
+		// Verify the record values
+		if record.Index == uint32(reservationPeriod1) && record.QuorumNumber == uint32(quorum0) {
+			assert.Equal(t, uint64(1000), record.Usage)
+		} else if record.Index == uint32(reservationPeriod1) && record.QuorumNumber == uint32(quorum1) {
+			assert.Equal(t, uint64(2000), record.Usage)
+		} else if record.Index == uint32(reservationPeriod2) && record.QuorumNumber == uint32(quorum0) {
+			assert.Equal(t, uint64(1500), record.Usage)
+		} else if record.Index == uint32(reservationPeriod2) && record.QuorumNumber == uint32(quorum1) {
+			assert.Equal(t, uint64(2500), record.Usage)
+		}
+	}
+	
+	// Check that all expected records are present
+	assert.True(t, recordMap[fmt.Sprintf("%d-%d", reservationPeriod1, quorum0)])
+	assert.True(t, recordMap[fmt.Sprintf("%d-%d", reservationPeriod1, quorum1)])
+	assert.True(t, recordMap[fmt.Sprintf("%d-%d", reservationPeriod2, quorum0)])
+	assert.True(t, recordMap[fmt.Sprintf("%d-%d", reservationPeriod2, quorum1)])
+	
+	// Quorum2 records should not be present
+	assert.False(t, recordMap[fmt.Sprintf("%d-%d", reservationPeriod1, quorum2)])
+	assert.False(t, recordMap[fmt.Sprintf("%d-%d", reservationPeriod2, quorum2)])
+	
+	// Test with single quorum using multi-quorum API
+	records, err = tc.store.GetPeriodRecordsMultiQuorum(tc.ctx, accountID, reservationPeriod1, []uint8{quorum2})
+	require.NoError(t, err)
+	require.Equal(t, 2, len(records), "Should retrieve 2 records (2 periods × 1 quorum)")
+	
+	// Verify the records
+	for _, record := range records {
+		assert.Equal(t, uint32(quorum2), record.QuorumNumber)
+		if record.Index == uint32(reservationPeriod1) {
+			assert.Equal(t, uint64(3000), record.Usage)
+		} else if record.Index == uint32(reservationPeriod2) {
+			assert.Equal(t, uint64(3500), record.Usage)
+		}
+	}
+	
+	// Test with empty quorum list
+	records, err = tc.store.GetPeriodRecordsMultiQuorum(tc.ctx, accountID, reservationPeriod1, []uint8{})
+	require.NoError(t, err)
+	require.Equal(t, 0, len(records), "Should retrieve 0 records with empty quorum list")
+}
+
+// TestBatchUpdateReservationBins tests the BatchUpdateReservationBins function
+func TestBatchUpdateReservationBins(t *testing.T) {
+	tc := setupTest(t)
+	
+	// Create test data
+	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
+	updates := []meterer.ReservationBinUpdate{
+		{
+			AccountID:         accountID,
+			ReservationPeriod: 100,
+			Size:              1000,
+			QuorumNumber:      0,
+		},
+		{
+			AccountID:         accountID,
+			ReservationPeriod: 101,
+			Size:              2000, 
+			QuorumNumber:      0,
+		},
+		{
+			AccountID:         accountID,
+			ReservationPeriod: 100,
+			Size:              3000,
+			QuorumNumber:      1,
+		},
+	}
+	
+	// Perform batch update
+	results, errors := tc.store.BatchUpdateReservationBins(tc.ctx, updates)
+	require.Equal(t, 0, len(errors), "Should have no errors")
+	require.Equal(t, 3, len(results), "Should have 3 results")
+	
+	// Verify results match expected sizes
+	assert.Equal(t, uint64(1000), results[0])
+	assert.Equal(t, uint64(2000), results[1])
+	assert.Equal(t, uint64(3000), results[2])
+	
+	// Verify records in database
+	item, err := dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
+		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: "100"},
+		"QuorumNumber":      &types.AttributeValueMemberN{Value: "0"},
+	})
+	require.NoError(t, err)
+	binUsageStr := item["BinUsage"].(*types.AttributeValueMemberN).Value
+	binUsageVal, err := strconv.ParseUint(binUsageStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(1000), binUsageVal)
+	
+	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
+		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: "101"},
+		"QuorumNumber":      &types.AttributeValueMemberN{Value: "0"},
+	})
+	require.NoError(t, err)
+	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
+	binUsageVal, err = strconv.ParseUint(binUsageStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(2000), binUsageVal)
+	
+	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
+		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: "100"},
+		"QuorumNumber":      &types.AttributeValueMemberN{Value: "1"},
+	})
+	require.NoError(t, err)
+	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
+	binUsageVal, err = strconv.ParseUint(binUsageStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(3000), binUsageVal)
+	
+	// Test updating existing bins
+	updates = []meterer.ReservationBinUpdate{
+		{
+			AccountID:         accountID,
+			ReservationPeriod: 100,
+			Size:              500,
+			QuorumNumber:      0,
+		},
+		{
+			AccountID:         accountID,
+			ReservationPeriod: 100,
+			Size:              700,
+			QuorumNumber:      1,
+		},
+	}
+	
+	results, errors = tc.store.BatchUpdateReservationBins(tc.ctx, updates)
+	require.Equal(t, 0, len(errors), "Should have no errors")
+	require.Equal(t, 2, len(results), "Should have 2 results")
+	
+	// Verify updated results include previous values
+	assert.Equal(t, uint64(1500), results[0]) // 1000 + 500
+	assert.Equal(t, uint64(3700), results[1]) // 3000 + 700
+	
+	// Verify records in database were updated
+	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
+		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: "100"},
+		"QuorumNumber":      &types.AttributeValueMemberN{Value: "0"},
+	})
+	require.NoError(t, err)
+	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
+	binUsageVal, err = strconv.ParseUint(binUsageStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(1500), binUsageVal)
+	
+	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
+		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"ReservationPeriod": &types.AttributeValueMemberN{Value: "100"},
+		"QuorumNumber":      &types.AttributeValueMemberN{Value: "1"},
+	})
+	require.NoError(t, err)
+	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
+	binUsageVal, err = strconv.ParseUint(binUsageStr, 10, 64)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(3700), binUsageVal)
 }
 
 // TestGetLargestCumulativePayment tests the GetLargestCumulativePayment function

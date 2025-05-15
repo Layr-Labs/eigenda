@@ -597,9 +597,9 @@ which is dispersed separately. </p></td>
                 </tr>
               
                 <tr>
-                  <td>reservation</td>
+                  <td>reservations</td>
                   <td><a href="#disperser.v2.Reservation">Reservation</a></td>
-                  <td></td>
+                  <td>repeated</td>
                   <td><p>on-chain account reservation setting </p></td>
                 </tr>
               
@@ -739,6 +739,13 @@ request may be rejected. </p></td>
                   <td><p>symbol usage recorded </p></td>
                 </tr>
               
+                <tr>
+                  <td>quorum_number</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>quorum number of the reservation </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -778,17 +785,10 @@ request may be rejected. </p></td>
                 </tr>
               
                 <tr>
-                  <td>quorum_numbers</td>
+                  <td>quorum_number</td>
                   <td><a href="#uint32">uint32</a></td>
-                  <td>repeated</td>
-                  <td><p>quorums allowed to make reserved dispersals </p></td>
-                </tr>
-              
-                <tr>
-                  <td>quorum_splits</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td>repeated</td>
-                  <td><p>quorum splits describes how the payment is split among the quorums </p></td>
+                  <td></td>
+                  <td><p>quorum number of the reservation </p></td>
                 </tr>
               
             </tbody>

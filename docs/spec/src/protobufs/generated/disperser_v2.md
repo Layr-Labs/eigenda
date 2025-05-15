@@ -187,7 +187,7 @@ GetPaymentStateReply contains the payment state of an account.
 | ----- | ---- | ----- | ----------- |
 | payment_global_params | [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams) |  | global payment vault parameters |
 | period_records | [PeriodRecord](#disperser-v2-PeriodRecord) | repeated | off-chain account reservation usage records |
-| reservation | [Reservation](#disperser-v2-Reservation) |  | on-chain account reservation setting |
+| reservations | [Reservation](#disperser-v2-Reservation) | repeated | on-chain account reservation setting |
 | cumulative_payment | [bytes](#bytes) |  | off-chain on-demand payment usage |
 | onchain_cumulative_payment | [bytes](#bytes) |  | on-chain on-demand payment deposited |
 
@@ -243,6 +243,7 @@ record and the subsequent two records that contains potential overflows.
 | ----- | ---- | ----- | ----------- |
 | index | [uint32](#uint32) |  | Period index of the reservation |
 | usage | [uint64](#uint64) |  | symbol usage recorded |
+| quorum_number | [uint32](#uint32) |  | quorum number of the reservation |
 
 
 
@@ -260,8 +261,7 @@ Reservation parameters of an account, used to determine the rate limit for the a
 | symbols_per_second | [uint64](#uint64) |  | rate limit for the account |
 | start_timestamp | [uint32](#uint32) |  | start timestamp of the reservation |
 | end_timestamp | [uint32](#uint32) |  | end timestamp of the reservation |
-| quorum_numbers | [uint32](#uint32) | repeated | quorums allowed to make reserved dispersals |
-| quorum_splits | [uint32](#uint32) | repeated | quorum splits describes how the payment is split among the quorums |
+| quorum_number | [uint32](#uint32) |  | quorum number of the reservation |
 
 
 

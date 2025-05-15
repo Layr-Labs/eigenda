@@ -18,10 +18,12 @@ import (
 const numBins = uint32(3)
 
 func TestNewAccountant(t *testing.T) {
-	reservation := &core.ReservedPayment{
-		SymbolsPerSecond: 100,
-		StartTimestamp:   100,
-		EndTimestamp:     200,
+	reservation := map[uint8]*core.ReservedPayment{
+		0: {
+			SymbolsPerSecond: 100,
+			StartTimestamp:   100,
+			EndTimestamp:     200,
+		},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
@@ -46,10 +48,12 @@ func TestNewAccountant(t *testing.T) {
 }
 
 func TestAccountBlob_Reservation(t *testing.T) {
-	reservation := &core.ReservedPayment{
-		SymbolsPerSecond: 200,
-		StartTimestamp:   100,
-		EndTimestamp:     200,
+	reservation := map[uint8]*core.ReservedPayment{
+		0: {
+			SymbolsPerSecond: 200,
+			StartTimestamp:   100,
+			EndTimestamp:     200,
+		},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
@@ -95,10 +99,12 @@ func TestAccountBlob_Reservation(t *testing.T) {
 }
 
 func TestAccountBlob_OnDemand(t *testing.T) {
-	reservation := &core.ReservedPayment{
-		SymbolsPerSecond: 200,
-		StartTimestamp:   100,
-		EndTimestamp:     200,
+	reservation := map[uint8]*core.ReservedPayment{
+		0: {
+			SymbolsPerSecond: 200,
+			StartTimestamp:   100,
+			EndTimestamp:     200,
+		},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1500),
@@ -127,7 +133,7 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 }
 
 func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
-	reservation := &core.ReservedPayment{}
+	reservation := map[uint8]*core.ReservedPayment{} // Empty reservation map
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
 	}
@@ -149,10 +155,12 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 }
 
 func TestAccountBlobCallSeries(t *testing.T) {
-	reservation := &core.ReservedPayment{
-		SymbolsPerSecond: 200,
-		StartTimestamp:   100,
-		EndTimestamp:     200,
+	reservation := map[uint8]*core.ReservedPayment{
+		0: {
+			SymbolsPerSecond: 200,
+			StartTimestamp:   100,
+			EndTimestamp:     200,
+		},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -200,10 +208,12 @@ func TestAccountBlobCallSeries(t *testing.T) {
 }
 
 func TestAccountBlob_BinRotation(t *testing.T) {
-	reservation := &core.ReservedPayment{
-		SymbolsPerSecond: 1000,
-		StartTimestamp:   100,
-		EndTimestamp:     200,
+	reservation := map[uint8]*core.ReservedPayment{
+		0: {
+			SymbolsPerSecond: 1000,
+			StartTimestamp:   100,
+			EndTimestamp:     200,
+		},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -239,10 +249,12 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 }
 
 func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
-	reservation := &core.ReservedPayment{
-		SymbolsPerSecond: 1000,
-		StartTimestamp:   100,
-		EndTimestamp:     200,
+	reservation := map[uint8]*core.ReservedPayment{
+		0: {
+			SymbolsPerSecond: 1000,
+			StartTimestamp:   100,
+			EndTimestamp:     200,
+		},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -280,10 +292,12 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 }
 
 func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
-	reservation := &core.ReservedPayment{
-		SymbolsPerSecond: 200,
-		StartTimestamp:   100,
-		EndTimestamp:     200,
+	reservation := map[uint8]*core.ReservedPayment{
+		0: {
+			SymbolsPerSecond: 200,
+			StartTimestamp:   100,
+			EndTimestamp:     200,
+		},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -325,10 +339,12 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 }
 
 func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
-	reservation := &core.ReservedPayment{
-		SymbolsPerSecond: 1000,
-		StartTimestamp:   100,
-		EndTimestamp:     200,
+	reservation := map[uint8]*core.ReservedPayment{
+		0: {
+			SymbolsPerSecond: 1000,
+			StartTimestamp:   100,
+			EndTimestamp:     200,
+		},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),

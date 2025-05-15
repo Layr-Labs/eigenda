@@ -22,6 +22,10 @@ func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName strin
 				AttributeName: aws.String("ReservationPeriod"),
 				AttributeType: types.ScalarAttributeTypeN,
 			},
+			{
+				AttributeName: aws.String("QuorumNumber"),
+				AttributeType: types.ScalarAttributeTypeN,
+			},
 		},
 		KeySchema: []types.KeySchemaElement{
 			{
