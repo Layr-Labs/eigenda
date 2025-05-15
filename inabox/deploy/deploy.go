@@ -68,6 +68,40 @@ func (env *Config) generateV1CertVerifierDeployConfig(ethClient common.EthClient
 	return config
 }
 
+func (env *Config) generateV2CertVerifierDeployConfig(ethClient common.EthClient) V2CertVerifierDeployConfig {
+	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
+	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(dasmAddr, ethClient)
+	if err != nil {
+		log.Panicf("Error: %s", err)
+	}
+	thresholdRegistryAddr, err := contractEigenDAServiceManager.EigenDAThresholdRegistry(&bind.CallOpts{})
+	if err != nil {
+		log.Panicf("Error: %s", err)
+	}
+
+	relayAddr, err := contractEigenDAServiceManager.EigenDARelayRegistry(&bind.CallOpts{})
+	if err != nil {
+		log.Panicf("Error: %s", err)
+	}
+
+	config := V2CertVerifierDeployConfig{
+		ServiceManager:    env.EigenDA.ServiceManager,
+		ThresholdRegistry: thresholdRegistryAddr.String(),
+		RelayRegistry:     relayAddr.String(),
+		RegistryCoordinator: env.EigenDA.RegistryCoordinator,
+		OperatorStateRetriever: env.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER,
+		DefaultSecurityThresholds: DefaultSecurityThresholds{
+			ConfirmationThreshold: 45,
+			AdversaryThreshold: 33,
+		},
+		QuorumNumbersRequired: "0x0001",
+	}
+
+	log.Print(fmt.Sprintf("%v", config))
+	return config
+}
+
+
 func (env *Config) generateEigenDADeployConfig() EigenDADeployConfig {
 
 	operators := make([]string, 0)
@@ -161,9 +195,8 @@ func (env *Config) deployEigenDAContracts() {
 		log.Panicf("Error: %s", err.Error())
 	}
 
-	writeFile("script/deploy/certverifier/config/inabox_deploy_config.json", data)
-	// TODO: Deploy threshold registry here
-	execForgeScript("script/deploy/certverifier/CertVerifierDeployerV1.s.sol:CertVerifierDeployerV1", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(string, string)", "inabox_deploy_config.json", "out.json"})
+	writeFile("script/deploy/certverifier/config/inabox_deploy_config_v1.json", data)
+	execForgeScript("script/deploy/certverifier/CertVerifierDeployerV1.s.sol:CertVerifierDeployerV1", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(string, string)", "inabox_deploy_config_v1.json", "out.json"})
 
 	//add v1 cert verifier address to path
 	data = readFile("script/deploy/certverifier/output/out.json")
@@ -173,6 +206,25 @@ func (env *Config) deployEigenDAContracts() {
 		log.Panicf("Error: %s", err.Error())
 	}
 	env.EigenDAV1CertVerifier = verifierAddress.EigenDACertVerifier
+
+	certVerifierV2DeployCfg := env.generateV2CertVerifierDeployConfig(ethClient)
+	data, err = json.Marshal(&certVerifierV2DeployCfg)
+	if err != nil {
+		log.Panicf("Error: %s", err.Error())
+	}
+
+	writeFile("script/deploy/certverifier/config/inabox_deploy_config_v2.json", data)
+	execForgeScript("script/deploy/certverifier/CertVerifierDeployerV2.s.sol:CertVerifierDeployerV2", env.Pks.EcdsaMap[deployer.Name].PrivateKey, deployer, []string{"--sig", "run(string, string)", "inabox_deploy_config_v2.json", "out.json"})
+
+	//add v2 cert verifier address to path
+	data = readFile("script/deploy/certverifier/output/out.json")
+	var verifierAddressV2 struct{ EigenDACertVerifier string }
+
+	err = json.Unmarshal(data, &verifierAddressV2)
+	if err != nil {
+		log.Panicf("Error: %s", err.Error())
+	}
+	env.EigenDAV2CertVerifier = verifierAddressV2.EigenDACertVerifier
 }
 
 // Deploys a EigenDA experiment

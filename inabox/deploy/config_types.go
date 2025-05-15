@@ -55,6 +55,21 @@ type V1CertVerifierDeployConfig struct {
 	ServiceManager  string `json:"eigenDAServiceManager"`
 }
 
+type DefaultSecurityThresholds struct {
+	ConfirmationThreshold uint32 `json:"0_confirmationThreshold"`
+	AdversaryThreshold    uint32 `json:"1_adversaryThreshold"`
+}
+
+type V2CertVerifierDeployConfig struct {
+	ServiceManager string `json:"eigenDAServiceManager"`
+	ThresholdRegistry string `json:"eigenDAThresholdRegistry"`
+	RelayRegistry string `json:"eigenDARelayRegistry"`
+	RegistryCoordinator string `json:"registryCoordinator"`
+	OperatorStateRetriever string `json:"operatorStateRetriever"`
+	DefaultSecurityThresholds DefaultSecurityThresholds `json:"defaultSecurityThresholds"`
+	QuorumNumbersRequired string `json:"quorumNumbersRequired"`
+}
+
 type EigenDADeployConfig struct {
 	UseDefaults         bool       `json:"useDefaults"`
 	NumStrategies       int        `json:"numStrategies"`
