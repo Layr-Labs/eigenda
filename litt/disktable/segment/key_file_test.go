@@ -62,7 +62,7 @@ func TestReadWriteKeys(t *testing.T) {
 	}
 
 	// Create a new in-memory instance from the on-disk file and verify that it behaves the same.
-	file2, err := loadKeyFile(logger, index, []string{directory}, ValueSizeInKeyfile)
+	file2, err := loadKeyFile(logger, index, []string{directory}, ValueSizeSegmentVersion)
 	require.NoError(t, err)
 	require.Equal(t, file.Size(), file2.Size())
 

@@ -315,7 +315,7 @@ func (s *Segment) GetShard(key []byte) uint32 {
 		return 0
 	}
 
-	if s.metadata.segmentVersion == OldHashFunctionSerializationVersion {
+	if s.metadata.segmentVersion == OldHashFunctionSegmentVersion {
 		return util.LegacyHashKey(key, s.metadata.legacySalt) % s.metadata.shardingFactor
 	}
 

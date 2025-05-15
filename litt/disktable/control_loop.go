@@ -245,7 +245,7 @@ func (c *controlLoop) getSegments() (map[uint32]*segment.Segment, error) {
 
 // updateCurrentSize updates the size of the table.
 func (c *controlLoop) updateCurrentSize() {
-	size := c.immutableSegmentSize + c.segments[c.highestSegmentIndex].Size() + segment.MetadataSize
+	size := c.immutableSegmentSize + c.segments[c.highestSegmentIndex].Size() + segment.CurrentMetadataSize
 	c.size.Store(size)
 }
 

@@ -52,7 +52,7 @@ func createKeyFile(
 		logger:          logger,
 		index:           index,
 		parentDirectory: parentDirectory,
-		segmentVersion:  ValueSizeInKeyfile,
+		segmentVersion:  ValueSizeSegmentVersion,
 	}
 
 	filePath := keys.path()
@@ -250,7 +250,7 @@ func (k *keyFile) readKeys() ([]*types.ScopedKey, error) {
 		keyLength := int(binary.BigEndian.Uint32(keyBytes[index : index+4]))
 		index += 4
 
-		if k.segmentVersion < ValueSizeInKeyfile {
+		if k.segmentVersion < ValueSizeSegmentVersion {
 			// We need to read the key, as well as the 8 byte address.
 			if index+keyLength+8 > len(keyBytes) {
 				// There are insufficient bytes left in the file to read the key and address.
@@ -271,7 +271,7 @@ func (k *keyFile) readKeys() ([]*types.ScopedKey, error) {
 		index += 8
 
 		var valueSize uint32
-		if k.segmentVersion >= ValueSizeInKeyfile {
+		if k.segmentVersion >= ValueSizeSegmentVersion {
 			valueSize = binary.BigEndian.Uint32(keyBytes[index : index+4])
 			index += 4
 		}
