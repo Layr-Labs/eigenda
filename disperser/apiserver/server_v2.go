@@ -165,6 +165,7 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
+				s.logger.Debug("Refreshing onchain quorum state", "onchainState", s.onchainState.Load())
 				if err := s.RefreshOnchainState(ctx); err != nil {
 					s.logger.Error("failed to refresh onchain quorum state", "err", err)
 				}
@@ -258,6 +259,7 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get blob version parameters: %w", err)
 	}
+
 	onchainState := &OnchainState{
 		QuorumCount:           quorumCount,
 		RequiredQuorums:       requiredQuorums,
