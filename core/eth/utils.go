@@ -146,9 +146,5 @@ func ConvertToReservedPayment(reservation paymentvault.PaymentVaultTypesReservat
 		SymbolsPerSecond: reservation.SymbolsPerSecond,
 		StartTimestamp:   reservation.StartTimestamp,
 		EndTimestamp:     reservation.EndTimestamp,
-		// Note: QuorumNumbers and QuorumSplits are not part of the new PaymentVaultTypesReservation structure
-		// They are now handled at the quorum level in the new contract design
-		QuorumNumbers:    []byte{},
-		QuorumSplits:     []uint8{},
 	}, nil
 }

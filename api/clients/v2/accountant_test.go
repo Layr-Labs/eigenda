@@ -22,8 +22,6 @@ func TestNewAccountant(t *testing.T) {
 		SymbolsPerSecond: 100,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
@@ -52,8 +50,6 @@ func TestAccountBlob_Reservation(t *testing.T) {
 		SymbolsPerSecond: 200,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
@@ -103,8 +99,6 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 		SymbolsPerSecond: 200,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1500),
@@ -159,8 +153,6 @@ func TestAccountBlobCallSeries(t *testing.T) {
 		SymbolsPerSecond: 200,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -212,8 +204,6 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 		SymbolsPerSecond: 1000,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -253,8 +243,6 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 		SymbolsPerSecond: 1000,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -296,8 +284,6 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 		SymbolsPerSecond: 200,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -343,8 +329,6 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 		SymbolsPerSecond: 1000,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),

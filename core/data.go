@@ -637,11 +637,6 @@ type ReservedPayment struct {
 	StartTimestamp uint64
 	// Reservation expiration timestamp
 	EndTimestamp uint64
-
-	// These fields are maintained for backwards compatibility but are no longer
-	// part of the contract's reservation structure - they are now handled at the quorum level
-	QuorumNumbers []uint8
-	QuorumSplits  []uint8
 }
 
 // QuorumConfig represents the payment configuration for a specific quorum
