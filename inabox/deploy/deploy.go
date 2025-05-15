@@ -89,7 +89,7 @@ func (env *Config) generateV2CertVerifierDeployConfig(ethClient common.EthClient
 		ThresholdRegistry: thresholdRegistryAddr.String(),
 		RelayRegistry:     relayAddr.String(),
 		RegistryCoordinator: env.EigenDA.RegistryCoordinator,
-		OperatorStateRetriever: env.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIVER,
+		OperatorStateRetriever: env.EigenDA.OperatorStateRetreiver,
 		DefaultSecurityThresholds: DefaultSecurityThresholds{
 			ConfirmationThreshold: 45,
 			AdversaryThreshold: 33,
