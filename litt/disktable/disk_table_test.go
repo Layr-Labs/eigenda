@@ -811,7 +811,7 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 	// to the files being artificially deleted in this test), the keymap will not hold any value that has not
 	// yet been durably flushed to disk.
 	for key := range missingKeys {
-		err = table.(*DiskTable).keymap.Delete([]*types.KAPair{{Key: []byte(key)}})
+		err = table.(*DiskTable).keymap.Delete([]*types.ScopedKey{{Key: []byte(key)}})
 		require.NoError(t, err)
 	}
 
@@ -1041,7 +1041,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	// to the files being artificially deleted in this test), the keymap will not hold any value that has not
 	// yet been durably flushed to disk.
 	for key := range missingKeys {
-		err = table.(*DiskTable).keymap.Delete([]*types.KAPair{{Key: []byte(key)}})
+		err = table.(*DiskTable).keymap.Delete([]*types.ScopedKey{{Key: []byte(key)}})
 		require.NoError(t, err)
 	}
 
@@ -1281,7 +1281,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	// to the files being artificially deleted in this test), the keymap will not hold any value that has not
 	// yet been durably flushed to disk.
 	for key := range missingKeys {
-		err = table.(*DiskTable).keymap.Delete([]*types.KAPair{{Key: []byte(key)}})
+		err = table.(*DiskTable).keymap.Delete([]*types.ScopedKey{{Key: []byte(key)}})
 		require.NoError(t, err)
 	}
 
@@ -1485,7 +1485,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	// to the files being artificially deleted in this test), the keymap will not hold any value that has not
 	// yet been durably flushed to disk.
 	for key := range missingKeys {
-		err = table.(*DiskTable).keymap.Delete([]*types.KAPair{{Key: []byte(key)}})
+		err = table.(*DiskTable).keymap.Delete([]*types.ScopedKey{{Key: []byte(key)}})
 		require.NoError(t, err)
 	}
 

@@ -36,18 +36,23 @@ type keyFile struct {
 
 	// The size of the key file in bytes.
 	size uint64
+
+	// The segment version. Determines serialization format.
+	segmentVersion SegmentVersion
 }
 
 // newKeyFile creates a new key file.
 func createKeyFile(
 	logger logging.Logger,
 	index uint32,
-	parentDirectory string) (*keyFile, error) {
+	parentDirectory string,
+) (*keyFile, error) {
 
 	keys := &keyFile{
 		logger:          logger,
 		index:           index,
 		parentDirectory: parentDirectory,
+		segmentVersion:  ValueSizeInKeyfile,
 	}
 
 	filePath := keys.path()
@@ -75,7 +80,12 @@ func createKeyFile(
 
 // loadKeyFile loads the key file from disk, looking in the given parent directories until it finds the file.
 // If the file is not found, it returns an error.
-func loadKeyFile(logger logging.Logger, index uint32, parentDirectories []string) (*keyFile, error) {
+func loadKeyFile(
+	logger logging.Logger,
+	index uint32,
+	parentDirectories []string,
+	segmentVersion SegmentVersion,
+) (*keyFile, error) {
 
 	keyFileName := fmt.Sprintf("%d%s", index, KeyFileExtension)
 	keysPath, err := lookForFile(parentDirectories, keyFileName)
@@ -91,6 +101,7 @@ func loadKeyFile(logger logging.Logger, index uint32, parentDirectories []string
 		logger:          logger,
 		index:           index,
 		parentDirectory: parentDirectory,
+		segmentVersion:  segmentVersion,
 	}
 
 	filePath := keys.path()
@@ -127,30 +138,40 @@ func (k *keyFile) path() string {
 }
 
 // write writes a key to the key file.
-func (k *keyFile) write(key []byte, address types.Address) error {
+func (k *keyFile) write(scopedKey *types.ScopedKey) error {
 	if k.writer == nil {
 		return fmt.Errorf("key file is sealed")
 	}
 
-	// First write the length of the key.
-	err := binary.Write(k.writer, binary.BigEndian, uint32(len(key)))
+	// Write the length of the key.
+	err := binary.Write(k.writer, binary.BigEndian, uint32(len(scopedKey.Key)))
 	if err != nil {
 		return fmt.Errorf("failed to write key length to key file: %v", err)
 	}
 
-	// Next, write the key itself.
-	_, err = k.writer.Write(key)
+	// Write the key itself.
+	_, err = k.writer.Write(scopedKey.Key)
 	if err != nil {
 		return fmt.Errorf("failed to write key to key file: %v", err)
 	}
 
-	// Finally, write the address.
-	err = binary.Write(k.writer, binary.BigEndian, address)
+	// Write the address.
+	err = binary.Write(k.writer, binary.BigEndian, scopedKey.Address)
 	if err != nil {
 		return fmt.Errorf("failed to write address to key file: %v", err)
 	}
 
-	k.size += uint64(4 + len(key) + 8)
+	// Write the size of the value.
+	err = binary.Write(k.writer, binary.BigEndian, scopedKey.ValueSize)
+	if err != nil {
+		return fmt.Errorf("failed to write value size to key file: %v", err)
+	}
+
+	k.size += uint64(
+		4 /* uint32 size of key */ +
+			len(scopedKey.Key) +
+			8 /* uint64 address */ +
+			4 /* uint32 size of value */)
 
 	return nil
 }
@@ -196,7 +217,7 @@ func (k *keyFile) seal() error {
 // If there are keys that were only partially written (i.e. keys being written when the process crashed), then
 // those keys may not be returned. If a key is returned, it is guaranteed to be "whole" (i.e. a partial key will
 // never be returned).
-func (k *keyFile) readKeys() ([]*types.KAPair, error) {
+func (k *keyFile) readKeys() ([]*types.ScopedKey, error) {
 	if k.writer != nil {
 		return nil, fmt.Errorf("key file is not sealed")
 	}
@@ -217,7 +238,7 @@ func (k *keyFile) readKeys() ([]*types.KAPair, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read key file: %v", err)
 	}
-	keys := make([]*types.KAPair, 0)
+	keys := make([]*types.ScopedKey, 0)
 
 	index := 0
 	for {
@@ -229,10 +250,18 @@ func (k *keyFile) readKeys() ([]*types.KAPair, error) {
 		keyLength := int(binary.BigEndian.Uint32(keyBytes[index : index+4]))
 		index += 4
 
-		// We need to read the key, as well as the 8 byte address.
-		if index+keyLength+8 > len(keyBytes) {
-			// There are insufficient bytes left in the file to read the key and address.
-			break
+		if k.segmentVersion < ValueSizeInKeyfile {
+			// We need to read the key, as well as the 8 byte address.
+			if index+keyLength+8 > len(keyBytes) {
+				// There are insufficient bytes left in the file to read the key and address.
+				break
+			}
+		} else {
+			// We need to read the key, as well as the 8 byte address and 4 byte value size.
+			if index+keyLength+12 > len(keyBytes) {
+				// There are insufficient bytes left in the file to read the key, address, and value size.
+				break
+			}
 		}
 
 		key := keyBytes[index : index+keyLength]
@@ -241,11 +270,17 @@ func (k *keyFile) readKeys() ([]*types.KAPair, error) {
 		address := types.Address(binary.BigEndian.Uint64(keyBytes[index : index+8]))
 		index += 8
 
-		keys = append(keys,
-			&types.KAPair{
-				Key:     key,
-				Address: address,
-			})
+		var valueSize uint32
+		if k.segmentVersion >= ValueSizeInKeyfile {
+			valueSize = binary.BigEndian.Uint32(keyBytes[index : index+4])
+			index += 4
+		}
+
+		keys = append(keys, &types.ScopedKey{
+			Key:       key,
+			Address:   address,
+			ValueSize: valueSize,
+		})
 	}
 
 	if index != len(keyBytes) {

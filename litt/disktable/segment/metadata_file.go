@@ -11,13 +11,6 @@ import (
 
 const (
 
-	// OldHashFunctionSerializationVersion is the serialization version for the old hash function.
-	OldHashFunctionSerializationVersion = uint32(0)
-
-	// CurrentSerializationVersion is current serialization version. If we ever change how we serialize data,
-	// bump this version.
-	CurrentSerializationVersion = uint32(1)
-
 	// MetadataFileExtension is the file extension for the metadata file.
 	MetadataFileExtension = ".metadata"
 
@@ -53,7 +46,7 @@ type metadataFile struct {
 
 	// The serialization version for this segment, used to permit smooth data migrations.
 	// This value is encoded in the file.
-	serializationVersion uint32
+	segmentVersion SegmentVersion
 
 	// The sharding factor for this segment. This value is encoded in the file.
 	shardingFactor uint32
@@ -95,7 +88,7 @@ func createMetadataFile(
 		parentDirectory: parentDirectory,
 	}
 
-	file.serializationVersion = CurrentSerializationVersion
+	file.segmentVersion = LatestSegmentVersion
 	file.shardingFactor = shardingFactor
 	file.salt = salt
 	err := file.write()
@@ -150,7 +143,7 @@ func getMetadataFileIndex(fileName string) (uint32, error) {
 
 // Size returns the size of the metadata file in bytes.
 func (m *metadataFile) Size() uint64 {
-	if m.serializationVersion == OldHashFunctionSerializationVersion {
+	if m.segmentVersion == OldHashFunctionSerializationVersion {
 		return OldMetadataSize
 	} else {
 		return MetadataSize
@@ -193,7 +186,7 @@ func (m *metadataFile) serializeLegacy() []byte {
 	data := make([]byte, OldMetadataSize)
 
 	// Write the version
-	binary.BigEndian.PutUint32(data[0:4], m.serializationVersion)
+	binary.BigEndian.PutUint32(data[0:4], uint32(m.segmentVersion))
 
 	// Write the sharding factor
 	binary.BigEndian.PutUint32(data[4:8], m.shardingFactor)
@@ -216,14 +209,14 @@ func (m *metadataFile) serializeLegacy() []byte {
 
 // serialize serializes the metadata file to a byte array.
 func (m *metadataFile) serialize() []byte {
-	if m.serializationVersion == OldHashFunctionSerializationVersion {
+	if m.segmentVersion == OldHashFunctionSerializationVersion {
 		return m.serializeLegacy()
 	}
 
 	data := make([]byte, MetadataSize)
 
 	// Write the version
-	binary.BigEndian.PutUint32(data[0:4], m.serializationVersion)
+	binary.BigEndian.PutUint32(data[0:4], uint32(m.segmentVersion))
 
 	// Write the sharding factor
 	binary.BigEndian.PutUint32(data[4:8], m.shardingFactor)
@@ -250,8 +243,12 @@ func (m *metadataFile) deserialize(data []byte) error {
 		return fmt.Errorf("metadata file is not the correct size, expected at least 4 bytes, got %d", len(data))
 	}
 
-	m.serializationVersion = binary.BigEndian.Uint32(data[0:4])
-	if m.serializationVersion == OldHashFunctionSerializationVersion {
+	m.segmentVersion = SegmentVersion(binary.BigEndian.Uint32(data[0:4]))
+	if m.segmentVersion > LatestSegmentVersion {
+		return fmt.Errorf("unsupported serialization version: %d", m.segmentVersion)
+	}
+
+	if m.segmentVersion == OldHashFunctionSerializationVersion {
 		if len(data) != OldMetadataSize {
 			return fmt.Errorf("metadata file is not the correct size, expected %d, got %d",
 				OldMetadataSize, len(data))
@@ -263,8 +260,6 @@ func (m *metadataFile) deserialize(data []byte) error {
 		m.lastValueTimestamp = binary.BigEndian.Uint64(data[12:20])
 		m.sealed = data[20] == 1
 		return nil
-	} else if m.serializationVersion != CurrentSerializationVersion {
-		return fmt.Errorf("unsupported serialization version: %d", m.serializationVersion)
 	}
 
 	if len(data) != MetadataSize {

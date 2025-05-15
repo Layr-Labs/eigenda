@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TODO also verify value size
+
 func TestReadWriteKeys(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
@@ -21,18 +23,19 @@ func TestReadWriteKeys(t *testing.T) {
 	index := rand.Uint32()
 
 	keyCount := rand.Int32Range(100, 200)
-	keys := make([]*types.KAPair, keyCount)
+	keys := make([]*types.ScopedKey, keyCount)
 	for i := 0; i < int(keyCount); i++ {
 		key := rand.VariableBytes(1, 100)
 		address := types.Address(rand.Uint64())
-		keys[i] = &types.KAPair{Key: key, Address: address}
+		valueSize := rand.Uint32()
+		keys[i] = &types.ScopedKey{Key: key, Address: address, ValueSize: valueSize}
 	}
 
 	file, err := createKeyFile(logger, index, directory)
 	require.NoError(t, err)
 
 	for _, key := range keys {
-		err := file.write(key.Key, key.Address)
+		err := file.write(key)
 		require.NoError(t, err)
 	}
 
@@ -59,7 +62,7 @@ func TestReadWriteKeys(t *testing.T) {
 	}
 
 	// Create a new in-memory instance from the on-disk file and verify that it behaves the same.
-	file2, err := loadKeyFile(logger, index, []string{directory})
+	file2, err := loadKeyFile(logger, index, []string{directory}, ValueSizeInKeyfile)
 	require.NoError(t, err)
 	require.Equal(t, file.Size(), file2.Size())
 
@@ -91,18 +94,19 @@ func TestReadingTruncatedKeyFile(t *testing.T) {
 	index := rand.Uint32()
 
 	keyCount := rand.Int32Range(100, 200)
-	keys := make([]*types.KAPair, keyCount)
+	keys := make([]*types.ScopedKey, keyCount)
 	for i := 0; i < int(keyCount); i++ {
 		key := rand.VariableBytes(1, 100)
 		address := types.Address(rand.Uint64())
-		keys[i] = &types.KAPair{Key: key, Address: address}
+		valueSize := rand.Uint32()
+		keys[i] = &types.ScopedKey{Key: key, Address: address, ValueSize: valueSize}
 	}
 
 	file, err := createKeyFile(logger, index, directory)
 	require.NoError(t, err)
 
 	for _, key := range keys {
-		err := file.write(key.Key, key.Address)
+		err := file.write(key)
 		require.NoError(t, err)
 	}
 
@@ -132,8 +136,8 @@ func TestReadingTruncatedKeyFile(t *testing.T) {
 		assert.Equal(t, key, readKeys[i])
 	}
 
-	// Truncate the file. This time, chop off some of the length prefix of the last key.
-	prefixBytesToRemove := rand.Int32Range(1, 4)
+	// Truncate the file. This time, chop off some of the last entry.
+	prefixBytesToRemove := rand.Int32Range(1, 8)
 	bytes = originalBytes[:len(originalBytes)-int(prefixBytesToRemove)]
 
 	err = os.WriteFile(filePath, bytes, 0644)

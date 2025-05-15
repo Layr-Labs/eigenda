@@ -219,7 +219,7 @@ func LoadSegment(logger logging.Logger,
 	}
 
 	// Look for the key file.
-	keys, err := loadKeyFile(logger, index, parentDirectories)
+	keys, err := loadKeyFile(logger, index, parentDirectories, metadata.segmentVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open key file: %v", err)
 	}
@@ -315,7 +315,7 @@ func (s *Segment) GetShard(key []byte) uint32 {
 		return 0
 	}
 
-	if s.metadata.serializationVersion == OldHashFunctionSerializationVersion {
+	if s.metadata.segmentVersion == OldHashFunctionSerializationVersion {
 		return util.LegacyHashKey(key, s.metadata.legacySalt) % s.metadata.shardingFactor
 	}
 
@@ -365,10 +365,12 @@ func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64
 	}
 
 	// Forward the value to the key and its address file control loop, which asynchronously writes it to the key file.
-	keyRequest := &types.KAPair{
-		Key:     data.Key,
-		Address: types.NewAddress(s.index, firstByteIndex),
+	keyRequest := &types.ScopedKey{
+		Key:       data.Key,
+		Address:   types.NewAddress(s.index, firstByteIndex),
+		ValueSize: uint32(len(data.Value)),
 	}
+
 	err = util.SendIfNotFatal(s.fatalErrorHandler, s.keyFileChannel, keyRequest)
 	if err != nil {
 		return 0, 0,
@@ -398,7 +400,7 @@ func (s *Segment) Read(key []byte, dataAddress types.Address) ([]byte, error) {
 }
 
 // GetKeys returns all keys in the data segment. Only permitted to be called after the segment has been sealed.
-func (s *Segment) GetKeys() ([]*types.KAPair, error) {
+func (s *Segment) GetKeys() ([]*types.ScopedKey, error) {
 	if !s.metadata.sealed {
 		return nil, fmt.Errorf("segment is not sealed, cannot read keys")
 	}
@@ -412,7 +414,7 @@ func (s *Segment) GetKeys() ([]*types.KAPair, error) {
 
 // FlushWaitFunction is a function that waits for a flush operation to complete. It returns the addresses of the data
 // that was flushed, or an error if the flush operation failed.
-type FlushWaitFunction func() ([]*types.KAPair, error)
+type FlushWaitFunction func() ([]*types.ScopedKey, error)
 
 // Flush schedules a flush operation. Flush operations are performed serially in the order they are scheduled.
 // This method returns a function that, when called, will block until the flush operation is complete. The function
@@ -448,7 +450,7 @@ func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 		return nil, fmt.Errorf("failed to send flush request to key file: %w", err)
 	}
 
-	return func() ([]*types.KAPair, error) {
+	return func() ([]*types.ScopedKey, error) {
 		// Wait for each shard to finish flushing.
 		for i := range s.shardChannels {
 			_, err := util.AwaitIfNotFatal(s.fatalErrorHandler, shardResponseChannels[i])
@@ -469,7 +471,7 @@ func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 
 // Seal flushes all data to disk and finalizes the metadata. Returns addresses that became durable as a result of
 // this method call. After this method is called, no more data can be written to this segment.
-func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
+func (s *Segment) Seal(now time.Time) ([]*types.ScopedKey, error) {
 	flushWaitFunction, err := s.flush(true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to flush segment: %w", err)
@@ -627,15 +629,15 @@ func (s *Segment) handleShardWrite(shard uint32, data *valueToWrite) {
 }
 
 // handleKeyFileWrite writes a key to the key file.
-func (s *Segment) handleKeyFileWrite(data *types.KAPair) {
-	err := s.keys.write(data.Key, data.Address)
+func (s *Segment) handleKeyFileWrite(data *types.ScopedKey) {
+	err := s.keys.write(data)
 	if err != nil {
 		s.fatalErrorHandler.Panic(fmt.Errorf("failed to write key to key file: %w", err))
 	}
 }
 
 // handleKeyFileFlushRequest handles a request to flush the key file to disk.
-func (s *Segment) handleKeyFileFlushRequest(request *keyFileFlushRequest, unflushedKeys []*types.KAPair) {
+func (s *Segment) handleKeyFileFlushRequest(request *keyFileFlushRequest, unflushedKeys []*types.ScopedKey) {
 	if request.seal {
 		err := s.keys.seal()
 		if err != nil {
@@ -707,13 +709,13 @@ type keyFileFlushRequest struct {
 // keyFileFlushResponse is a message sent from the key file control loop to the caller of Flush to indicate that the
 // key file has been flushed.
 type keyFileFlushResponse struct {
-	addresses []*types.KAPair
+	addresses []*types.ScopedKey
 }
 
 // keyFileControlLoop is the main loop for performing modifications to the key file. This goroutine is responsible
 // for writing key-address pairs to the key file.
 func (s *Segment) keyFileControlLoop() {
-	unflushedKeys := make([]*types.KAPair, 0, unflushedKeysInitialCapacity)
+	unflushedKeys := make([]*types.ScopedKey, 0, unflushedKeysInitialCapacity)
 
 	for {
 		select {
@@ -724,14 +726,14 @@ func (s *Segment) keyFileControlLoop() {
 
 			if flushRequest, ok := operation.(*keyFileFlushRequest); ok {
 				s.handleKeyFileFlushRequest(flushRequest, unflushedKeys)
-				unflushedKeys = make([]*types.KAPair, 0, unflushedKeysInitialCapacity)
+				unflushedKeys = make([]*types.ScopedKey, 0, unflushedKeysInitialCapacity)
 
 				if flushRequest.seal {
 					// After sealing, we can exit the control loop.
 					return
 				}
 
-			} else if data, ok := operation.(*types.KAPair); ok {
+			} else if data, ok := operation.(*types.ScopedKey); ok {
 				s.handleKeyFileWrite(data)
 				unflushedKeys = append(unflushedKeys, data)
 

@@ -27,7 +27,7 @@ type memKeymap struct {
 
 // NewMemKeymap creates a new in-memory keymap.
 func NewMemKeymap(logger logging.Logger,
-	keymapPath string,
+	_ string,
 	doubleWriteProtection bool) (kmap Keymap, requiresReload bool, err error) {
 
 	return &memKeymap{
@@ -37,21 +37,21 @@ func NewMemKeymap(logger logging.Logger,
 	}, true, nil
 }
 
-func (m *memKeymap) Put(pairs []*types.KAPair) error {
+func (m *memKeymap) Put(keys []*types.ScopedKey) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	for _, pair := range pairs {
-		stringKey := util.UnsafeBytesToString(pair.Key)
+	for _, k := range keys {
+		stringKey := util.UnsafeBytesToString(k.Key)
 
 		if m.doubleWriteProtection {
 			_, ok := m.data[stringKey]
 			if ok {
-				return fmt.Errorf("key %s already exists", pair.Key)
+				return fmt.Errorf("key %s already exists", k.Key)
 			}
 		}
 
-		m.data[stringKey] = pair.Address
+		m.data[stringKey] = k.Address
 	}
 	return nil
 }
@@ -64,7 +64,7 @@ func (m *memKeymap) Get(key []byte) (types.Address, bool, error) {
 	return address, ok, nil
 }
 
-func (m *memKeymap) Delete(keys []*types.KAPair) error {
+func (m *memKeymap) Delete(keys []*types.ScopedKey) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 

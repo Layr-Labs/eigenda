@@ -324,7 +324,7 @@ func (d *DiskTable) reloadKeymap(
 	// Read data from the end until the first valid key/value pair is found.
 	isValid := false
 
-	batch := make([]*types.KAPair, 0, keymapReloadBatchSize)
+	batch := make([]*types.ScopedKey, 0, keymapReloadBatchSize)
 
 	for i := highestSegmentIndex; i >= lowestSegmentIndex && i+1 != 0; i-- {
 		if !segments[i].IsSealed() {
@@ -361,7 +361,7 @@ func (d *DiskTable) reloadKeymap(
 					if err != nil {
 						return fmt.Errorf("failed to put keys for segment %d: %w", i, err)
 					}
-					batch = make([]*types.KAPair, 0, keymapReloadBatchSize)
+					batch = make([]*types.ScopedKey, 0, keymapReloadBatchSize)
 				}
 			}
 		}
@@ -766,7 +766,7 @@ func (d *DiskTable) RunGC() error {
 
 // writeKeysToKeymap flushes all keys to the keymap. Once they are flushed, it also removes the keys from the
 // unflushedDataCache.
-func (d *DiskTable) writeKeysToKeymap(keys []*types.KAPair) error {
+func (d *DiskTable) writeKeysToKeymap(keys []*types.ScopedKey) error {
 	if len(keys) == 0 {
 		// Nothing to flush.
 		return nil
