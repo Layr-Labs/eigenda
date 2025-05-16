@@ -6,7 +6,7 @@ import (
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	contractEigenDACertVerifierV2 "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
 	certTypesBinding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
+	coreV2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -84,13 +84,13 @@ func (s VerifyStatusCode) String() string {
 }
 
 type EigenDACert interface {
-	BlobVersion() v2.BlobVersion
-	RelayKeys() []v2.RelayKey
+	BlobVersion()coreV2.BlobVersion
+	RelayKeys() []coreV2.RelayKey
 	Version() CertificateVersion
 	ReferenceBlockNumber() uint64
 	QuorumNumbers() []byte
 
-	ComputeBlobKey() (*v2.BlobKey, error)
+	ComputeBlobKey() (*coreV2.BlobKey, error)
 	Commitments() (*encoding.BlobCommitments, error)
 	Serialize() ([]byte, error)
 }
@@ -134,7 +134,7 @@ func BuildEigenDACertV3(
 }
 
 // RelayKeys returns the relay keys used for reading blob contents from disperser relays
-func (c *EigenDACertV3) RelayKeys() []v2.RelayKey {
+func (c *EigenDACertV3) RelayKeys() []coreV2.RelayKey {
 	return c.BlobInclusionInfo.BlobCertificate.RelayKeys
 }
 
@@ -149,20 +149,20 @@ func (c *EigenDACertV3) ReferenceBlockNumber() uint64 {
 }
 
 // BlobVersion returns the blob version of the blob header
-func (c *EigenDACertV3) BlobVersion() v2.BlobVersion {
+func (c *EigenDACertV3) BlobVersion()coreV2.BlobVersion {
 	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version
 }
 
 // ComputeBlobKey computes the blob key used for looking up the blob against an EigenDA network retrieval
 // entrypoint (e.g, a relay or a validator node)
-func (c *EigenDACertV3) ComputeBlobKey() (*v2.BlobKey, error) {
+func (c *EigenDACertV3) ComputeBlobKey() (*coreV2.BlobKey, error) {
 	blobHeader := c.BlobInclusionInfo.BlobCertificate.BlobHeader
 	blobCommitments, err := c.Commitments()
 	if err != nil {
 		return nil, fmt.Errorf("blob commitments from protobuf: %w", err)
 	}
 
-	blobKeyBytes, err := v2.ComputeBlobKey(
+	blobKeyBytes, err :=coreV2.ComputeBlobKey(
 		blobHeader.Version,
 		*blobCommitments,
 		blobHeader.QuorumNumbers,
@@ -171,7 +171,7 @@ func (c *EigenDACertV3) ComputeBlobKey() (*v2.BlobKey, error) {
 	if err != nil {
 		return nil, fmt.Errorf("compute blob key: %w", err)
 	}
-	blobKey, err := v2.BytesToBlobKey(blobKeyBytes[:])
+	blobKey, err :=coreV2.BytesToBlobKey(blobKeyBytes[:])
 	if err != nil {
 		return nil, fmt.Errorf("bytes to blob key: %w", err)
 	}
@@ -255,7 +255,7 @@ func BuildEigenDAV2Cert(
 	}, nil
 }
 // RelayKeys returns the relay keys used for reading blob contents from disperser relays
-func (c *EigenDACertV2) RelayKeys() []v2.RelayKey {
+func (c *EigenDACertV2) RelayKeys() []coreV2.RelayKey {
 	return c.BlobInclusionInfo.BlobCertificate.RelayKeys
 }
 
@@ -271,7 +271,7 @@ func (c *EigenDACertV2) ReferenceBlockNumber() uint64 {
 }
 
 // BlobVersion returns the blob version of the blob header
-func (c *EigenDACertV2) BlobVersion() v2.BlobVersion {
+func (c *EigenDACertV2) BlobVersion()coreV2.BlobVersion {
 	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version
 }
 // QuorumNumbers returns the quorum numbers requested
@@ -291,7 +291,7 @@ func (c *EigenDACertV2) Serialize() ([]byte, error) {
 
 
 // ComputeBlobKey computes the BlobKey of the blob that belongs to the EigenDACertV2
-func (c *EigenDACertV2) ComputeBlobKey() (*v2.BlobKey, error) {
+func (c *EigenDACertV2) ComputeBlobKey() (*coreV2.BlobKey, error) {
 	blobHeader := c.BlobInclusionInfo.BlobCertificate.BlobHeader
 
 	blobCommitments, err := BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
@@ -299,7 +299,7 @@ func (c *EigenDACertV2) ComputeBlobKey() (*v2.BlobKey, error) {
 		return nil, fmt.Errorf("blob commitments from protobuf: %w", err)
 	}
 
-	blobKeyBytes, err := v2.ComputeBlobKey(
+	blobKeyBytes, err :=coreV2.ComputeBlobKey(
 		blobHeader.Version,
 		*blobCommitments,
 		blobHeader.QuorumNumbers,
@@ -310,7 +310,7 @@ func (c *EigenDACertV2) ComputeBlobKey() (*v2.BlobKey, error) {
 		return nil, fmt.Errorf("compute blob key: %w", err)
 	}
 
-	blobKey, err := v2.BytesToBlobKey(blobKeyBytes[:])
+	blobKey, err :=coreV2.BytesToBlobKey(blobKeyBytes[:])
 	if err != nil {
 		return nil, fmt.Errorf("bytes to blob key: %w", err)
 	}
