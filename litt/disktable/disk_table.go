@@ -198,6 +198,10 @@ func NewDiskTable(
 		return nil, fmt.Errorf("failed to gather segment files: %w", err)
 	}
 
+	// TODO write unit test for size after restart
+	table.size.Store(0)     // TODO
+	table.keyCount.Store(0) // TODO
+
 	immutableSegmentSize := uint64(0)
 	for _, seg := range segments {
 		immutableSegmentSize += seg.Size()
@@ -282,6 +286,7 @@ func NewDiskTable(
 		keymap:                  keymap,
 		flushLoop:               fLoop,
 		garbageCollectionPeriod: config.GCPeriod,
+		immutableSegmentSize:    immutableSegmentSize,
 	}
 	cLoop.threadsafeHighestSegmentIndex.Store(highestSegmentIndex)
 	table.controlLoop = cLoop

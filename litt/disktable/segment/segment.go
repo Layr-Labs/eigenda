@@ -351,7 +351,7 @@ func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64
 		s.maxShardSize = s.shardSizes[shard]
 	}
 	s.keyCount++
-	s.keyFileSize += uint64(len(data.Key)) + 4 /* uint32 length */ + 8 /* uint64 Address */
+	s.keyFileSize += uint64(len(data.Key)) + 4 /* uint32 length */ + 8 /* uint64 Address */ + 4 /* uint32 ValueSize */
 
 	// Forward the value to the shard control loop, which asynchronously writes it to the value file.
 	shardRequest := &valueToWrite{

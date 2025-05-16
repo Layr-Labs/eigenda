@@ -2183,7 +2183,62 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 	err = table.RunGC()
 	require.NoError(t, err)
 
+	// disable garbage collection
+	err = table.SetTTL(0)
+	require.NoError(t, err)
+	err = table.Flush()
+	require.NoError(t, err)
+
+	// Write some data that won't expire, just to be sure that the table is not empty.
+	for i := 0; i < 10; i++ {
+		key := rand.PrintableVariableBytes(32, 64)
+		value := rand.PrintableVariableBytes(1, 128)
+		err = table.Put(key, value)
+		require.NoError(t, err)
+		expectedValues[string(key)] = value
+	}
+
+	err = table.Flush()
+	require.NoError(t, err)
+
 	reportedSize := table.Size()
+
+	err = table.Close()
+	require.NoError(t, err)
+
+	// Walk the "directory" file tree and calculate the actual size of the table.
+	// There is some asynchrony in file deletion, so we retry a reasonable number of times.
+	testutils.AssertEventuallyTrue(t, func() bool {
+		actualSize := uint64(0)
+
+		err = filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				// files may be deleted in the middle of the walk
+				return nil
+			}
+			if info.IsDir() {
+				// directory sizes are not factored into the table size
+				return nil
+			}
+			if strings.Contains(path, "keymap") {
+				// table size does not currently include the keymap size
+				return nil
+			}
+			actualSize += uint64(info.Size())
+			return nil
+		})
+		require.NoError(t, err)
+		return actualSize == reportedSize
+	}, time.Second)
+
+	// Restart the table. The size should be accurately reported.
+	table, err = tableBuilder.builder(clock, tableName, []string{directory})
+	require.NoError(t, err)
+
+	newReportedSize := table.Size()
+
+	// New size should be greater than the old size, since GC is disabled and
+	// we will have started a new segment upon restart.
 
 	err = table.Close()
 	require.NoError(t, err)
@@ -2211,8 +2266,7 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 		})
 		require.NoError(t, err)
 
-		return actualSize == reportedSize
-		//require.Equal(t, actualSize, reportedSize, "delta: %d", int(actualSize)-int(reportedSize))
+		return actualSize == newReportedSize
 	}, time.Second)
 }
 
