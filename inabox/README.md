@@ -32,6 +32,12 @@ Notice: The scripts for setting up a local geth chain are currently broken. The 
    ```
    $ npm install --global yarn
    ```
+- Install contracts
+  ```
+  cd contracts
+  yarn install
+  cd ..
+  ```
 - The Graph is installed
    ```
    $ npm install -g @graphprotocol/graph-cli@latest
