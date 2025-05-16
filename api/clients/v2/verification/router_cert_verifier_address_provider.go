@@ -14,7 +14,7 @@ import (
 )
 
 // RouterAddressProvider is a dynamic provider which fetches cert verifier addresses by making eth_calls
-// against the EigenDACertVerifierRouter contract on the given reference block number.
+// against the EigenDACertVerifierRouter contract at the given reference block number.
 type RouterAddressProvider struct {
 	routerBinding      *binding.ContractEigenDACertVerifierRouterCaller
 	blockNumberMonitor *BlockNumberMonitor
