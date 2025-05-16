@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDACertVerifier} from "src/periphery/cert/interfaces/IEigenDACertVerifier.sol";
+import {IVersionedEigenDACertVerifier} from "src/periphery/cert/interfaces/IVersionedEigenDACertVerifier.sol";
 import {IEigenDACertVerifierBase} from "src/periphery/cert/interfaces/IEigenDACertVerifierBase.sol";
 
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
@@ -12,7 +12,7 @@ import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.
 
 import {EigenDACertVerificationLib as CertLib} from "src/periphery/cert/libraries/EigenDACertVerificationLib.sol";
 
-contract EigenDACertVerifier is IEigenDACertVerifier {
+contract EigenDACertVerifier is IEigenDACertVerifierBase, IVersionedEigenDACertVerifier {
     error InvalidSecurityThresholds();
 
     IEigenDAThresholdRegistry internal immutable _eigenDAThresholdRegistry;
@@ -52,27 +52,27 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         return uint8(status);
     }
 
-    /// @inheritdoc IEigenDACertVerifier
+    /// @notice Returns the EigenDAThresholdRegistry contract.
     function eigenDAThresholdRegistry() external view returns (IEigenDAThresholdRegistry) {
         return _eigenDAThresholdRegistry;
     }
 
-    /// @inheritdoc IEigenDACertVerifier
+    /// @notice Returns the EigenDASignatureVerifier contract.
     function eigenDASignatureVerifier() external view returns (IEigenDASignatureVerifier) {
         return _eigenDASignatureVerifier;
     }
 
-    /// @inheritdoc IEigenDACertVerifier
+    /// @notice Returns the security thresholds required for EigenDA certificate verification.
     function securityThresholds() external view returns (DATypesV1.SecurityThresholds memory) {
         return _securityThresholds;
     }
 
-    /// @inheritdoc IEigenDACertVerifier
+    /// @notice Returns the quorum numbers required in bytes format for certificate verification.
     function quorumNumbersRequired() external view returns (bytes memory) {
         return _quorumNumbersRequired;
     }
 
-    /// @inheritdoc IEigenDACertVerifier
+    /// @inheritdoc IVersionedEigenDACertVerifier
     function certVersion() external pure returns (uint64) {
         return CERT_VERSION;
     }

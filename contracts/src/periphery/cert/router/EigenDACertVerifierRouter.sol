@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDACertVerifierBase, IEigenDACertVerifier} from "src/periphery/cert/interfaces/IEigenDACertVerifier.sol";
+import {IEigenDACertVerifierBase} from "src/periphery/cert/interfaces/IEigenDACertVerifierBase.sol";
+import {IVersionedEigenDACertVerifier} from "src/periphery/cert/interfaces/IVersionedEigenDACertVerifier.sol";
 import {IEigenDACertVerifierRouter} from "src/periphery/cert/interfaces/IEigenDACertVerifierRouter.sol";
 import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
 
@@ -24,7 +25,7 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
 
     /// @inheritdoc IEigenDACertVerifierBase
     function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8) {
-        return IEigenDACertVerifier(getCertVerifierAt(_getRBN(abiEncodedCert))).checkDACert(abiEncodedCert);
+        return IEigenDACertVerifierBase(getCertVerifierAt(_getRBN(abiEncodedCert))).checkDACert(abiEncodedCert);
     }
 
     function getCertVerifierAt(uint32 referenceBlockNumber) public view returns (address) {
@@ -61,10 +62,10 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
         // 0:32 is the pointer to the start of the byte array.
         // 32:64 is the batch header root
         // 64:96 is the RBN
-        if (certBytes.length < 64) {
+        if (certBytes.length < 96) {
             revert InvalidCertLength();
         }
-        return abi.decode(certBytes[32:64], (uint32));
+        return abi.decode(certBytes[64:96], (uint32));
     }
 
     /// @notice Given a reference block number, find the closest activation block number
