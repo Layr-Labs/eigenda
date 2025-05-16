@@ -318,13 +318,9 @@ func (d *DiskTable) reloadKeymap(
 		d.logger.Infof("spent %v reloading keymap", d.clock().Sub(start))
 	}()
 
-	// It's possible that some of the data written near the end of the previous session was corrupted.
-	// Read data from the end until the first valid key/value pair is found.
-	isValid := false
-
 	batch := make([]*types.ScopedKey, 0, keymapReloadBatchSize)
 
-	for i := highestSegmentIndex; i >= lowestSegmentIndex && i+1 != 0; i-- {
+	for i := lowestSegmentIndex; i <= highestSegmentIndex; i++ {
 		if !segments[i].IsSealed() {
 			// ignore unsealed segment, this will have been created in the current session and will not
 			// yet contain any data.
@@ -338,32 +334,15 @@ func (d *DiskTable) reloadKeymap(
 		for keyIndex := len(keys) - 1; keyIndex >= 0; keyIndex-- {
 			key := keys[keyIndex]
 
-			if !isValid {
-				_, err = segments[i].Read(key.Key, key.Address)
-				if err == nil {
-					// we found a valid key/value pair. All subsequent keys are valid.
-					isValid = true
-				} else {
-					// This is not cause for alarm (probably).
-					// This can happen when the database is not cleanly shut down,
-					// and just means that some data near the end was not fully committed.
-					d.logger.Infof("truncated value for key %s with address %s for segment %d",
-						key.Key, key.Address, i)
+			batch = append(batch, key)
+			if len(batch) == keymapReloadBatchSize {
+				err = d.keymap.Put(batch)
+				if err != nil {
+					return fmt.Errorf("failed to put keys for segment %d: %w", i, err)
 				}
-			}
-
-			if isValid {
-				batch = append(batch, key)
-				if len(batch) == keymapReloadBatchSize {
-					err = d.keymap.Put(batch)
-					if err != nil {
-						return fmt.Errorf("failed to put keys for segment %d: %w", i, err)
-					}
-					batch = make([]*types.ScopedKey, 0, keymapReloadBatchSize)
-				}
+				batch = make([]*types.ScopedKey, 0, keymapReloadBatchSize)
 			}
 		}
-
 	}
 
 	if len(batch) > 0 {
