@@ -628,19 +628,44 @@ func ConvertToPaymentMetadata(ph *commonpbv2.PaymentHeader) (*PaymentMetadata, e
 	}, nil
 }
 
-// ReservedPayment contains information the onchain state about a reserved payment
+// ReservedPayment contains information about the onchain state of a reserved payment
+// This follows the PaymentVaultTypesReservation structure in the contract
 type ReservedPayment struct {
-	// reserve number of symbols per second
+	// Reserve number of symbols per second
 	SymbolsPerSecond uint64
-	// reservation activation timestamp
+	// Reservation activation timestamp
 	StartTimestamp uint64
-	// reservation expiration timestamp
+	// Reservation expiration timestamp
 	EndTimestamp uint64
+}
 
-	// allowed quorums
-	QuorumNumbers []uint8
-	// ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
-	QuorumSplits []byte
+// QuorumConfig represents the payment configuration for a specific quorum
+type QuorumConfig struct {
+	// The ERC20 token used for payments
+	Token gethcommon.Address
+	// The recipient of payments
+	Recipient gethcommon.Address
+	// Maximum symbols per second for reservations
+	ReservationSymbolsPerSecond uint64
+	// Maximum symbols per second for on-demand
+	OnDemandSymbolsPerSecond uint64
+	// Price per symbol for on-demand
+	OnDemandPricePerSymbol uint64
+}
+
+// QuorumProtocolConfig represents the protocol configuration for a specific quorum
+type QuorumProtocolConfig struct {
+	// Minimum number of symbols required for dispersal
+	MinNumSymbols uint64
+	// Window for advance reservation
+	ReservationAdvanceWindow uint64
+	// Rate limit window for reservations
+	ReservationRateLimitWindow uint64
+	// Rate limit window for on-demand
+	OnDemandRateLimitWindow uint64
+	// Whether on-demand dispersal is enabled; We assume quorum 0 is the only quorum that supports on-demand dispersal
+	// This field will only be used when on-demand is supported for multiple quorums
+	OnDemandEnabled bool
 }
 
 type OnDemandPayment struct {

@@ -48,6 +48,8 @@ type testComponents struct {
 	ChainReader       *mock.MockWriter
 	Signer            *auth.LocalBlobRequestSigner
 	Peer              *peer.Peer
+	MockState         *mock.MockOnchainPaymentState
+	OffchainStore     meterer.OffchainStore
 }
 
 func TestV2DisperseBlob(t *testing.T) {
@@ -384,7 +386,7 @@ func TestV2GetBlobStatus(t *testing.T) {
 	// First transition to GatheringSignatures state
 	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.GatheringSignatures)
 	require.NoError(t, err)
-	
+
 	// Then transition to Complete state
 	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.Complete)
 	require.NoError(t, err)
@@ -493,12 +495,15 @@ func newTestServerV2(t *testing.T) *testComponents {
 	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil).Maybe()
 	mockState.On("GetReservationWindow", tmock.Anything).Return(uint64(1), nil)
 	mockState.On("GetPricePerSymbol", tmock.Anything).Return(uint64(2), nil)
-	mockState.On("GetGlobalSymbolsPerSecond", tmock.Anything).Return(uint64(1009), nil)
-	mockState.On("GetGlobalRatePeriodInterval", tmock.Anything).Return(uint64(1), nil)
+	mockState.On("GetOnDemandSymbolsPerSecond", tmock.Anything).Return(uint64(1009), nil)
+	mockState.On("GetOnDemandRatePeriodInterval", tmock.Anything).Return(uint64(1), nil)
 	mockState.On("GetMinNumSymbols", tmock.Anything).Return(uint64(3), nil)
 
 	now := uint64(time.Now().Unix())
-	mockState.On("GetReservedPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.ReservedPayment{SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
+	mockState.On("GetReservedPaymentByAccountAndQuorums", tmock.Anything, tmock.Anything, tmock.Anything).Return(map[uint8]*core.ReservedPayment{
+		0: {SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800},
+		1: {SymbolsPerSecond: 100, StartTimestamp: now + 1200, EndTimestamp: now + 1800},
+	}, nil)
 	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}, nil)
 	mockState.On("GetOnDemandQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
 
@@ -508,17 +513,14 @@ func newTestServerV2(t *testing.T) *testComponents {
 	table_names := []string{"reservations_server_" + t.Name(), "ondemand_server_" + t.Name(), "global_server_" + t.Name()}
 	err = meterer.CreateReservationTable(awsConfig, table_names[0])
 	if err != nil {
-		teardown()
 		panic("failed to create reservation table")
 	}
 	err = meterer.CreateOnDemandTable(awsConfig, table_names[1])
 	if err != nil {
-		teardown()
 		panic("failed to create ondemand table")
 	}
 	err = meterer.CreateGlobalReservationTable(awsConfig, table_names[2])
 	if err != nil {
-		teardown()
 		panic("failed to create global reservation table")
 	}
 
@@ -530,7 +532,6 @@ func newTestServerV2(t *testing.T) *testComponents {
 		logger,
 	)
 	if err != nil {
-		teardown()
 		panic("failed to create offchain store")
 	}
 	meterer := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
@@ -588,6 +589,8 @@ func newTestServerV2(t *testing.T) *testComponents {
 		ChainReader:       chainReader,
 		Signer:            signer,
 		Peer:              p,
+		MockState:         mockState,
+		OffchainStore:     store,
 	}
 }
 

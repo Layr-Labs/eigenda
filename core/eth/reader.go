@@ -804,156 +804,173 @@ func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*cor
 	return res, nil
 }
 
-func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.ReservedPayment, error) {
+func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address, quorumIds []uint8) (map[gethcommon.Address]map[uint8]*core.ReservedPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
-	reservationsMap := make(map[gethcommon.Address]*core.ReservedPayment)
-	reservations, err := t.bindings.PaymentVault.GetReservations(&bind.CallOpts{
-		Context: ctx,
-	}, accountIDs)
-	if err != nil {
-		return nil, err
-	}
 
-	// since reservations are returned in the same order as the accountIDs, we can directly map them
-	for i, reservation := range reservations {
-		res, err := ConvertToReservedPayment(reservation)
+	reservationsMap := make(map[gethcommon.Address]map[uint8]*core.ReservedPayment)
+
+	for _, accountID := range accountIDs {
+		accountReservations, err := t.GetReservedPaymentsByAccountAndQuorums(ctx, accountID, quorumIds)
 		if err != nil {
-			t.logger.Warn("failed to get active reservation", "account", accountIDs[i], "err", err)
+			t.logger.Warn("failed to get reservations for account", "account", accountID, "err", err)
 			continue
 		}
 
-		reservationsMap[accountIDs[i]] = res
+		if len(accountReservations) > 0 {
+			reservationsMap[accountID] = accountReservations
+		}
 	}
 
 	return reservationsMap, nil
 }
 
-func (t *Reader) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error) {
+// GetReservedPaymentsByQuorum returns active reservations for multiple accounts for a specific quorum
+func (t *Reader) GetReservedPaymentsByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumIds []uint8) (map[uint8]*core.ReservedPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
+
+	reservationsMap := make(map[uint8]*core.ReservedPayment)
+
+	for _, quorumId := range quorumIds {
+		reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
+			Context: ctx,
+		}, uint64(quorumId), accountID)
+
+		if err != nil {
+			t.logger.Warn("failed to get reservation", "account", accountID, "quorumId", quorumId, "err", err)
+			continue
+		}
+
+		res, err := ConvertToReservedPayment(reservation)
+		if err != nil {
+			t.logger.Warn("failed to convert reservation", "account", accountID, "quorumId", quorumId, "err", err)
+			continue
+		}
+
+		reservationsMap[quorumId] = res
+	}
+
+	return reservationsMap, nil
+}
+
+// GetReservedPaymentByAccountAndQuorum returns active reservation by account ID for a specific quorum
+func (t *Reader) GetReservedPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint8) (*core.ReservedPayment, error) {
+	if t.bindings.PaymentVault == nil {
+		return nil, errors.New("payment vault not deployed")
+	}
+
 	reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
 		Context: ctx,
-	}, accountID)
+	}, uint64(quorumId), accountID)
+
 	if err != nil {
 		return nil, err
 	}
+
 	return ConvertToReservedPayment(reservation)
 }
 
-func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {
+// GetQuorumPaymentConfig retrieves the payment configuration for a specific quorum
+func (t *Reader) GetQuorumPaymentConfig(ctx context.Context, quorumId uint64) (*core.QuorumConfig, error) {
+	if t.bindings.PaymentVault == nil {
+		return nil, errors.New("payment vault not deployed")
+	}
+
+	config, err := t.bindings.PaymentVault.GetQuorumPaymentConfig(&bind.CallOpts{
+		Context: ctx,
+	}, quorumId)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &core.QuorumConfig{
+		Token:                       config.Token,
+		Recipient:                   config.Recipient,
+		ReservationSymbolsPerSecond: config.ReservationSymbolsPerSecond,
+		OnDemandSymbolsPerSecond:    config.OnDemandSymbolsPerSecond,
+		OnDemandPricePerSymbol:      config.OnDemandPricePerSymbol,
+	}, nil
+}
+
+// GetQuorumProtocolConfig retrieves the protocol configuration for a specific quorum
+func (t *Reader) GetQuorumProtocolConfig(ctx context.Context, quorumId uint64) (*core.QuorumProtocolConfig, error) {
+	if t.bindings.PaymentVault == nil {
+		return nil, errors.New("payment vault not deployed")
+	}
+
+	config, err := t.bindings.PaymentVault.GetQuorumProtocolConfig(&bind.CallOpts{
+		Context: ctx,
+	}, quorumId)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &core.QuorumProtocolConfig{
+		MinNumSymbols:              config.MinNumSymbols,
+		ReservationAdvanceWindow:   config.ReservationAdvanceWindow,
+		ReservationRateLimitWindow: config.ReservationRateLimitWindow,
+		OnDemandRateLimitWindow:    config.OnDemandRateLimitWindow,
+		OnDemandEnabled:            config.OnDemandEnabled,
+	}, nil
+}
+
+// GetOnDemandPayments returns on-demand payments for multiple accounts for a specific quorum;
+// Only quorum 0 is enabled for on-demand payments so we don't need a nested map
+func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address, quorumId uint64) (map[gethcommon.Address]*core.OnDemandPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
 	paymentsMap := make(map[gethcommon.Address]*core.OnDemandPayment)
-	payments, err := t.bindings.PaymentVault.GetOnDemandTotalDeposits(&bind.CallOpts{
-		Context: ctx}, accountIDs)
-	if err != nil {
-		return nil, err
-	}
 
-	// since payments are returned in the same order as the accountIDs, we can directly map them
-	for i, payment := range payments {
-		if payment.Cmp(big.NewInt(0)) == 0 {
-			t.logger.Warn("failed to get on demand payment for account", "account", accountIDs[i])
+	for _, accountID := range accountIDs {
+		onDemandDeposit, err := t.bindings.PaymentVault.GetOnDemandDeposit(&bind.CallOpts{
+			Context: ctx,
+		}, quorumId, accountID)
+
+		if err != nil {
+			t.logger.Warn("failed to get on-demand deposit", "account", accountID, "quorumId", quorumId, "err", err)
 			continue
 		}
-		paymentsMap[accountIDs[i]] = &core.OnDemandPayment{
-			CumulativePayment: payment,
+
+		if onDemandDeposit.Cmp(big.NewInt(0)) == 0 {
+			t.logger.Debug("on-demand deposit is zero for account", "account", accountID, "quorumId", quorumId)
+			continue
+		}
+
+		paymentsMap[accountID] = &core.OnDemandPayment{
+			CumulativePayment: onDemandDeposit,
 		}
 	}
 
 	return paymentsMap, nil
 }
 
-func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
+// GetOnDemandPaymentByAccountAndQuorum returns on-demand payment of an account for a specific quorum
+func (t *Reader) GetOnDemandPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint64) (*core.OnDemandPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
-	onDemandPayment, err := t.bindings.PaymentVault.GetOnDemandTotalDeposit(&bind.CallOpts{
+
+	onDemandDeposit, err := t.bindings.PaymentVault.GetOnDemandDeposit(&bind.CallOpts{
 		Context: ctx,
-	}, accountID)
+	}, quorumId, accountID)
+
 	if err != nil {
 		return nil, err
 	}
-	if onDemandPayment.Cmp(big.NewInt(0)) == 0 {
-		return nil, errors.New("ondemand payment does not exist for given account")
+
+	if onDemandDeposit.Cmp(big.NewInt(0)) == 0 {
+		return nil, errors.New("on-demand deposit does not exist for given account")
 	}
+
 	return &core.OnDemandPayment{
-		CumulativePayment: onDemandPayment,
+		CumulativePayment: onDemandDeposit,
 	}, nil
-}
-
-func (t *Reader) GetGlobalSymbolsPerSecond(ctx context.Context, blockNumber uint32) (uint64, error) {
-	if t.bindings.PaymentVault == nil {
-		return 0, errors.New("payment vault not deployed")
-	}
-	globalSymbolsPerSecond, err := t.bindings.PaymentVault.GlobalSymbolsPerPeriod(&bind.CallOpts{
-		Context:     ctx,
-		BlockNumber: big.NewInt(int64(blockNumber)),
-	})
-	if err != nil {
-		return 0, err
-	}
-	return globalSymbolsPerSecond, nil
-}
-
-func (t *Reader) GetGlobalRatePeriodInterval(ctx context.Context, blockNumber uint32) (uint64, error) {
-	if t.bindings.PaymentVault == nil {
-		return 0, errors.New("payment vault not deployed")
-	}
-	globalRateBinInterval, err := t.bindings.PaymentVault.GlobalRatePeriodInterval(&bind.CallOpts{
-		Context:     ctx,
-		BlockNumber: big.NewInt(int64(blockNumber)),
-	})
-	if err != nil {
-		return 0, err
-	}
-	return globalRateBinInterval, nil
-}
-
-func (t *Reader) GetMinNumSymbols(ctx context.Context, blockNumber uint32) (uint64, error) {
-	if t.bindings.PaymentVault == nil {
-		return 0, errors.New("payment vault not deployed")
-	}
-	minNumSymbols, err := t.bindings.PaymentVault.MinNumSymbols(&bind.CallOpts{
-		Context:     ctx,
-		BlockNumber: big.NewInt(int64(blockNumber)),
-	})
-	if err != nil {
-		return 0, err
-	}
-	return minNumSymbols, nil
-}
-
-func (t *Reader) GetPricePerSymbol(ctx context.Context, blockNumber uint32) (uint64, error) {
-	if t.bindings.PaymentVault == nil {
-		return 0, errors.New("payment vault not deployed")
-	}
-	pricePerSymbol, err := t.bindings.PaymentVault.PricePerSymbol(&bind.CallOpts{
-		Context:     ctx,
-		BlockNumber: big.NewInt(int64(blockNumber)),
-	})
-	if err != nil {
-		return 0, err
-	}
-	return pricePerSymbol, nil
-}
-
-func (t *Reader) GetReservationWindow(ctx context.Context, blockNumber uint32) (uint64, error) {
-	if t.bindings.PaymentVault == nil {
-		return 0, errors.New("payment vault not deployed")
-	}
-	reservationWindow, err := t.bindings.PaymentVault.ReservationPeriodInterval(&bind.CallOpts{
-		Context:     ctx,
-		BlockNumber: big.NewInt(int64(blockNumber)),
-	})
-	if err != nil {
-		return 0, err
-	}
-	return reservationWindow, nil
 }
 
 func (t *Reader) GetOperatorSocket(ctx context.Context, operatorId core.OperatorID) (string, error) {

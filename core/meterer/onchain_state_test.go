@@ -17,7 +17,6 @@ var (
 		SymbolsPerSecond: 100,
 		StartTimestamp:   1000,
 		EndTimestamp:     2000,
-		QuorumSplits:     []byte{50, 50},
 	}
 	dummyOnDemandPayment = &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -45,11 +44,12 @@ func TestGetCurrentBlockNumber(t *testing.T) {
 func TestGetReservedPaymentByAccount(t *testing.T) {
 	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
-	mockState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(dummyReservedPayment, nil)
+	expectedReservations := map[uint8]*core.ReservedPayment{0: dummyReservedPayment}
+	mockState.On("GetReservedPaymentByAccountAndQuorums", testifymock.Anything, testifymock.Anything, testifymock.Anything).Return(expectedReservations, nil)
 
-	reservation, err := mockState.GetReservedPaymentByAccount(ctx, gethcommon.Address{})
+	reservations, err := mockState.GetReservedPaymentByAccountAndQuorums(ctx, gethcommon.Address{}, []uint8{0})
 	assert.NoError(t, err)
-	assert.Equal(t, dummyReservedPayment, reservation)
+	assert.Equal(t, expectedReservations, reservations)
 }
 
 func TestGetOnDemandPaymentByAccount(t *testing.T) {

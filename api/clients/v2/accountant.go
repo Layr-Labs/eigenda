@@ -18,7 +18,7 @@ var requiredQuorums = []uint8{0, 1}
 type Accountant struct {
 	// on-chain states
 	accountID         gethcommon.Address
-	reservation       *core.ReservedPayment
+	reservation       map[uint8]*core.ReservedPayment
 	onDemand          *core.OnDemandPayment
 	reservationWindow uint64
 	pricePerSymbol    uint64
@@ -26,7 +26,7 @@ type Accountant struct {
 
 	// local accounting
 	// contains 3 bins; circular wrapping of indices
-	periodRecords     []PeriodRecord
+	periodRecords     map[uint8][]PeriodRecord
 	usageLock         sync.Mutex
 	cumulativePayment *big.Int
 
@@ -35,14 +35,18 @@ type Accountant struct {
 }
 
 type PeriodRecord struct {
-	Index uint32
-	Usage uint64
+	Index        uint32
+	Usage        uint64
+	QuorumNumber uint8
 }
 
-func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint64, pricePerSymbol uint64, minNumSymbols uint64, numBins uint32) *Accountant {
-	periodRecords := make([]PeriodRecord, numBins)
-	for i := range periodRecords {
-		periodRecords[i] = PeriodRecord{Index: uint32(i), Usage: 0}
+func NewAccountant(accountID gethcommon.Address, reservation map[uint8]*core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint64, pricePerSymbol uint64, minNumSymbols uint64, numBins uint32) *Accountant {
+	periodRecords := make(map[uint8][]PeriodRecord)
+	for quorumNumber := range reservation {
+		periodRecords[quorumNumber] = make([]PeriodRecord, numBins)
+		for i := range periodRecords[quorumNumber] {
+			periodRecords[quorumNumber][i] = PeriodRecord{Index: uint32(i), Usage: 0, QuorumNumber: quorumNumber}
+		}
 	}
 	a := Accountant{
 		accountID:         accountID,
@@ -73,37 +77,55 @@ func (a *Accountant) BlobPaymentInfo(
 	numSymbols uint64,
 	quorumNumbers []uint8,
 	timestamp int64) (*big.Int, error) {
+	if len(quorumNumbers) == 0 {
+		return big.NewInt(0), fmt.Errorf("no quorum numbers provided")
+	}
 
 	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, a.reservationWindow)
 	symbolUsage := a.SymbolsCharged(numSymbols)
 
 	a.usageLock.Lock()
 	defer a.usageLock.Unlock()
-	relativePeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod)
-	relativePeriodRecord.Usage += symbolUsage
 
-	// first attempt to use the active reservation
-	binLimit := a.reservation.SymbolsPerSecond * uint64(a.reservationWindow)
-	if relativePeriodRecord.Usage <= binLimit {
-		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
-			return big.NewInt(0), err
+	// first attempt to use the active reservation for each quorum
+	reservationsSufficient := true
+	for _, quorumNumber := range quorumNumbers {
+		res, exists := a.reservation[quorumNumber]
+		if !exists {
+			// at least one quorum does not have a reservation, break
+			reservationsSufficient = false
+			break
 		}
+
+		// Get period record specific to this quorum
+		relativePeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod, quorumNumber)
+		// Update usage for this quorum
+		relativePeriodRecord.Usage += symbolUsage
+
+		binLimit := res.SymbolsPerSecond * uint64(a.reservationWindow)
+		if relativePeriodRecord.Usage <= binLimit {
+			continue
+		}
+
+		overflowPeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod+2, quorumNumber)
+		// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
+		if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
+			overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
+			continue
+		}
+
+		// Rollback usage for this quorum since we couldn't use it
+		relativePeriodRecord.Usage -= symbolUsage
+		reservationsSufficient = false
+		break
+	}
+	if reservationsSufficient {
 		return big.NewInt(0), nil
 	}
 
-	overflowPeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod + 2)
-	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
-	if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
-		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
-			return big.NewInt(0), err
-		}
-		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
-		return big.NewInt(0), nil
-	}
-
-	// reservation not available, rollback reservation records, attempt on-demand
-	//todo: rollback on-demand if disperser respond with some type of rejection?
-	relativePeriodRecord.Usage -= symbolUsage
+	// reservation not available for the target quorums, attempt on-demand
+	// on-demand can be applied to required quorums only, but on-chain record is only on quorum 0
+	//todo: rollback on-demand if disperser respond with some ratelimit rejection
 	incrementRequired := big.NewInt(int64(a.PaymentCharged(numSymbols)))
 
 	resultingPayment := big.NewInt(0)
@@ -116,8 +138,8 @@ func (a *Accountant) BlobPaymentInfo(
 		return a.cumulativePayment, nil
 	}
 	return big.NewInt(0), fmt.Errorf(
-		"no bandwidth reservation found for account %s, and current cumulativePayment balance insufficient "+
-			"to make an on-demand dispersal. Consider depositing more eth to the PaymentVault contract.", a.accountID.Hex())
+		"no reservation found for account %s for quorums %v, and current cumulativePayment balance insufficient "+
+			"to make an on-demand dispersal. Consider depositing more eth to the PaymentVault contract.", a.accountID.Hex(), quorumNumbers)
 }
 
 // AccountBlob accountant provides and records payment information
@@ -157,16 +179,17 @@ func (a *Accountant) SymbolsCharged(numSymbols uint64) uint64 {
 	return core.RoundUpDivide(numSymbols, a.minNumSymbols) * a.minNumSymbols
 }
 
-func (a *Accountant) GetRelativePeriodRecord(index uint64) *PeriodRecord {
+func (a *Accountant) GetRelativePeriodRecord(index uint64, quorumNumber uint8) *PeriodRecord {
 	relativeIndex := uint32(index % uint64(a.numBins))
-	if a.periodRecords[relativeIndex].Index != uint32(index) {
-		a.periodRecords[relativeIndex] = PeriodRecord{
-			Index: uint32(index),
-			Usage: 0,
+	if a.periodRecords[quorumNumber][relativeIndex].Index != uint32(index) {
+		a.periodRecords[quorumNumber][relativeIndex] = PeriodRecord{
+			Index:        uint32(index),
+			Usage:        0,
+			QuorumNumber: quorumNumber,
 		}
 	}
 
-	return &a.periodRecords[relativeIndex]
+	return &a.periodRecords[quorumNumber][relativeIndex]
 }
 
 // SetPaymentState sets the accountant's state from the disperser's response
@@ -175,7 +198,7 @@ func (a *Accountant) GetRelativePeriodRecord(index uint64) *PeriodRecord {
 // dummy values that disable accountant from using the corresponding payment method.
 // If off-chain fields are not present, we assume the account has no payment history
 // and set accoutant state to use initial values.
-func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentStateReply) error {
+func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetQuorumSpecificPaymentStateReply) error {
 	if paymentState == nil {
 		return fmt.Errorf("payment state cannot be nil")
 	} else if paymentState.GetPaymentGlobalParams() == nil {
@@ -202,44 +225,43 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 		a.cumulativePayment = new(big.Int).SetBytes(paymentState.GetCumulativePayment())
 	}
 
-	if paymentState.GetReservation() == nil {
-		a.reservation = &core.ReservedPayment{
-			SymbolsPerSecond: 0,
-			StartTimestamp:   0,
-			EndTimestamp:     0,
-			QuorumNumbers:    []uint8{},
-			QuorumSplits:     []byte{},
-		}
+	if paymentState.GetReservations() == nil {
+		a.reservation = make(map[uint8]*core.ReservedPayment)
 	} else {
-		quorumNumbers := make([]uint8, len(paymentState.GetReservation().GetQuorumNumbers()))
-		for i, quorum := range paymentState.GetReservation().GetQuorumNumbers() {
-			quorumNumbers[i] = uint8(quorum)
-		}
-		quorumSplits := make([]uint8, len(paymentState.GetReservation().GetQuorumSplits()))
-		for i, quorum := range paymentState.GetReservation().GetQuorumSplits() {
-			quorumSplits[i] = uint8(quorum)
-		}
-		a.reservation = &core.ReservedPayment{
-			SymbolsPerSecond: uint64(paymentState.GetReservation().GetSymbolsPerSecond()),
-			StartTimestamp:   uint64(paymentState.GetReservation().GetStartTimestamp()),
-			EndTimestamp:     uint64(paymentState.GetReservation().GetEndTimestamp()),
-			QuorumNumbers:    quorumNumbers,
-			QuorumSplits:     quorumSplits,
-		}
-	}
-
-	periodRecords := make([]PeriodRecord, len(paymentState.GetPeriodRecords()))
-	for i, record := range paymentState.GetPeriodRecords() {
-		if record == nil {
-			periodRecords[i] = PeriodRecord{Index: 0, Usage: 0}
-		} else {
-			periodRecords[i] = PeriodRecord{
-				Index: record.Index,
-				Usage: record.Usage,
+		a.reservation = make(map[uint8]*core.ReservedPayment)
+		for _, reservation := range paymentState.GetReservations() {
+			a.reservation[uint8(reservation.QuorumNumber)] = &core.ReservedPayment{
+				SymbolsPerSecond: uint64(reservation.GetSymbolsPerSecond()),
+				StartTimestamp:   uint64(reservation.GetStartTimestamp()),
+				EndTimestamp:     uint64(reservation.GetEndTimestamp()),
 			}
 		}
 	}
+
+	periodRecords := make(map[uint8][]PeriodRecord)
+	for _, record := range paymentState.GetPeriodRecords() {
+		quorumNumber := uint8(record.QuorumNumber)
+		if _, exists := periodRecords[quorumNumber]; !exists {
+			periodRecords[quorumNumber] = make([]PeriodRecord, a.numBins)
+			// Initialize all records for this quorum
+			for i := uint32(0); i < a.numBins; i++ {
+				periodRecords[quorumNumber][i] = PeriodRecord{
+					Index:        i,
+					Usage:        0,
+					QuorumNumber: quorumNumber,
+				}
+			}
+		}
+		// Update the specific record
+		idx := record.Index % a.numBins
+		periodRecords[quorumNumber][idx] = PeriodRecord{
+			Index:        record.Index,
+			Usage:        record.Usage,
+			QuorumNumber: quorumNumber,
+		}
+	}
 	a.periodRecords = periodRecords
+
 	return nil
 }
 
@@ -250,7 +272,7 @@ func QuorumCheck(quorumNumbers []uint8, allowedNumbers []uint8) error {
 	}
 	for _, quorum := range quorumNumbers {
 		if !slices.Contains(allowedNumbers, quorum) {
-			return fmt.Errorf("provided quorum number %v not allowed", quorum)
+			return fmt.Errorf("user does not have a reservation for quorum number %v", quorum)
 		}
 	}
 	return nil

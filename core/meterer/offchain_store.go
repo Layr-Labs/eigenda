@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"strings"
+	"sync"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
@@ -65,12 +67,18 @@ func NewOffchainStore(
 	}, nil
 }
 
-func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, size uint64) (uint64, error) {
+// UpdateReservationBin incrementally updates the bin usage for a specific account, period, and quorum.
+// Returns the updated bin usage after the increment.
+func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, size uint64, quorumNumber uint8) (uint64, error) {
+	// Create a composite key combining AccountID and QuorumNumber as the hash key
+	accountAndQuorum := fmt.Sprintf("%s_%d", accountID.Hex(), quorumNumber)
+	
 	key := map[string]types.AttributeValue{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"AccountAndQuorum":  &types.AttributeValueMemberS{Value: accountAndQuorum},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 	}
-
+	
+	// Increment the BinUsage directly (the QuorumNumber is already part of the AccountAndQuorum composite key)
 	res, err := s.dynamoClient.IncrementBy(ctx, s.reservationTableName, key, "BinUsage", size)
 	if err != nil {
 		return 0, fmt.Errorf("failed to increment bin usage: %w", err)
@@ -92,6 +100,90 @@ func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID geth
 	}
 
 	return binUsageValue, nil
+}
+
+// ReservationBinUpdate represents a single update to a reservation bin
+type ReservationBinUpdate struct {
+	// AccountID is the Ethereum address of the account
+	AccountID gethcommon.Address
+	// ReservationPeriod is the time period for the reservation
+	ReservationPeriod uint64
+	// Size is the amount to increment the bin usage by
+	Size uint64
+	// QuorumNumber is the quorum number for this update
+	QuorumNumber uint8
+}
+
+// BatchUpdateReservationBins performs multiple bin updates in a single operation for efficiency.
+// Returns a map of update indices to their new bin usage values, or errors if any occurred.
+func (s *OffchainStore) BatchUpdateReservationBins(ctx context.Context, updates []ReservationBinUpdate) (map[int]uint64, map[int]error) {
+	if len(updates) == 0 {
+		return map[int]uint64{}, map[int]error{}
+	}
+
+	// For small numbers of updates, it's more efficient to use individual operations
+	if len(updates) <= 2 {
+		results := make(map[int]uint64, len(updates))
+		errors := make(map[int]error, len(updates))
+
+		for i, update := range updates {
+			newUsage, err := s.UpdateReservationBin(ctx, update.AccountID, update.ReservationPeriod, update.Size, update.QuorumNumber)
+			if err != nil {
+				errors[i] = err
+			} else {
+				results[i] = newUsage
+			}
+		}
+
+		return results, errors
+	}
+
+	// With larger update batches, optimize further with concurrent operations
+	results := make(map[int]uint64, len(updates))
+	errors := make(map[int]error, len(updates))
+
+	// Use a wait group to manage concurrency
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	// Execute updates concurrently with a reasonable limit on concurrency
+	// to avoid overwhelming the DynamoDB connection pool
+	concurrencyLimit := 10
+	if len(updates) < concurrencyLimit {
+		concurrencyLimit = len(updates)
+	}
+	semaphore := make(chan struct{}, concurrencyLimit)
+
+	for i, update := range updates {
+		wg.Add(1)
+
+		// Capture loop variables
+		idx := i
+		upd := update
+
+		go func() {
+			defer wg.Done()
+
+			// Acquire semaphore slot
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			// Use the updated UpdateReservationBin method which now works with the composite key
+			newUsage, err := s.UpdateReservationBin(ctx, upd.AccountID, upd.ReservationPeriod, upd.Size, upd.QuorumNumber)
+
+			mu.Lock()
+			defer mu.Unlock()
+
+			if err != nil {
+				errors[idx] = err
+			} else {
+				results[idx] = newUsage
+			}
+		}()
+	}
+
+	wg.Wait()
+	return results, errors
 }
 
 func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error) {
@@ -232,33 +324,115 @@ func (s *OffchainStore) RollbackOnDemandPayment(ctx context.Context, accountID g
 	return nil
 }
 
-func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error) {
-	// Fetch the 3 bins start from the current bin
+// GetPeriodRecords retrieves up to MinNumBins period records for a specific account and quorum number.
+// The records are sorted by reservation period in ascending order, starting from the given period.
+func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, quorumNumber uint8) ([MinNumBins]*pb.QuorumPeriodRecord, error) {
+	// Create the composite hash key combining AccountID and QuorumNumber
+	accountAndQuorum := fmt.Sprintf("%s_%d", accountID.Hex(), quorumNumber)
+	
+	// Fetch the 3 bins starting from the current bin for the specific account and quorum
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.reservationTableName),
-		KeyConditionExpression: aws.String("AccountID = :account AND ReservationPeriod >= :reservationPeriod"),
-		ExpressionAttributeValues: commondynamodb.ExpressionValues{
-			":account":           &types.AttributeValueMemberS{Value: accountID.Hex()},
+		KeyConditionExpression: aws.String("AccountAndQuorum = :accountAndQuorum AND ReservationPeriod >= :reservationPeriod"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":accountAndQuorum":  &types.AttributeValueMemberS{Value: accountAndQuorum},
 			":reservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 		},
 		ScanIndexForward: aws.Bool(true),
-		Limit:            aws.Int32(MinNumBins),
-	}
-	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
-	if err != nil {
-		return [MinNumBins]*pb.PeriodRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
+		Limit:            aws.Int32(MinNumBins), // No need for extra filtering now
 	}
 
-	records := [MinNumBins]*pb.PeriodRecord{}
+	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
+	if err != nil {
+		return [MinNumBins]*pb.QuorumPeriodRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
+	}
+
+	records := [MinNumBins]*pb.QuorumPeriodRecord{}
 	for i := 0; i < len(bins) && i < int(MinNumBins); i++ {
-		periodRecord, err := parsePeriodRecord(bins[i])
+		periodRecord, err := parseQuorumPeriodRecord(bins[i])
 		if err != nil {
-			return [MinNumBins]*pb.PeriodRecord{}, fmt.Errorf("failed to parse bin %d record: %w", i, err)
+			return [MinNumBins]*pb.QuorumPeriodRecord{}, fmt.Errorf("failed to parse bin %d record: %w", i, err)
 		}
 		records[i] = periodRecord
 	}
 
 	return records, nil
+}
+
+// GetPeriodRecordsMultiQuorum retrieves period records for multiple quorums efficiently.
+// This function is optimized for retrieving period records for all quorums in a single database operation.
+// Returns an array of PeriodRecords up to MinNumBins in length, with records for each requested quorum.
+func (s *OffchainStore) GetPeriodRecordsMultiQuorum(
+	ctx context.Context,
+	accountID gethcommon.Address,
+	reservationPeriod uint64,
+	quorumNumbers []uint8,
+) ([]*pb.QuorumPeriodRecord, error) {
+	if len(quorumNumbers) == 0 {
+		return []*pb.QuorumPeriodRecord{}, nil
+	}
+
+	// For multiple quorums, run parallel queries for each AccountAndQuorum composite key
+	results := make([]*pb.QuorumPeriodRecord, 0)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	errChan := make(chan error, len(quorumNumbers))
+
+	for _, quorumNumber := range quorumNumbers {
+		wg.Add(1)
+		go func(qNum uint8) {
+			defer wg.Done()
+			
+			// Create composite key for this account and quorum
+			accountAndQuorum := fmt.Sprintf("%s_%d", accountID.Hex(), qNum)
+			
+			// Query for this specific account and quorum
+			queryInput := &dynamodb.QueryInput{
+				TableName:              aws.String(s.reservationTableName),
+				KeyConditionExpression: aws.String("AccountAndQuorum = :accountAndQuorum AND ReservationPeriod >= :reservationPeriod"),
+				ExpressionAttributeValues: map[string]types.AttributeValue{
+					":accountAndQuorum":  &types.AttributeValueMemberS{Value: accountAndQuorum},
+					":reservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+				},
+				ScanIndexForward: aws.Bool(true),
+				Limit:            aws.Int32(MinNumBins),
+			}
+
+			bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
+			if err != nil {
+				errChan <- fmt.Errorf("failed to query payments for quorum %d: %w", qNum, err)
+				return
+			}
+
+			// Parse records and add to results
+			quorumRecords := make([]*pb.QuorumPeriodRecord, 0, len(bins))
+			for _, bin := range bins {
+				periodRecord, err := parseQuorumPeriodRecord(bin)
+				if err != nil {
+					s.logger.Debug("Failed to parse period record", "err", err, "quorum", qNum)
+					continue
+				}
+				quorumRecords = append(quorumRecords, periodRecord)
+			}
+
+			// Add records to the combined result under lock
+			mu.Lock()
+			results = append(results, quorumRecords...)
+			mu.Unlock()
+		}(quorumNumber)
+	}
+
+	// Wait for all queries to complete
+	wg.Wait()
+	close(errChan)
+
+	// Check if any errors occurred
+	if len(errChan) > 0 {
+		err := <-errChan
+		return results, fmt.Errorf("error in one or more quorum queries: %w", err)
+	}
+
+	return results, nil
 }
 
 func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
@@ -297,7 +471,8 @@ func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, account
 	return payment, nil
 }
 
-func parsePeriodRecord(bin map[string]types.AttributeValue) (*pb.PeriodRecord, error) {
+func parseQuorumPeriodRecord(bin map[string]types.AttributeValue) (*pb.QuorumPeriodRecord, error) {
+	// Parse ReservationPeriod from the response
 	reservationPeriod, ok := bin["ReservationPeriod"]
 	if !ok {
 		return nil, errors.New("ReservationPeriod is not present in the response")
@@ -313,6 +488,7 @@ func parsePeriodRecord(bin map[string]types.AttributeValue) (*pb.PeriodRecord, e
 		return nil, fmt.Errorf("failed to parse ReservationPeriod: %w", err)
 	}
 
+	// Parse BinUsage from the response
 	binUsage, ok := bin["BinUsage"]
 	if !ok {
 		return nil, errors.New("BinUsage is not present in the response")
@@ -328,8 +504,25 @@ func parsePeriodRecord(bin map[string]types.AttributeValue) (*pb.PeriodRecord, e
 		return nil, fmt.Errorf("failed to parse BinUsage: %w", err)
 	}
 
-	return &pb.PeriodRecord{
-		Index: uint32(reservationPeriodValue),
-		Usage: uint64(binUsageValue),
+	// Extract QuorumNumber from the AccountAndQuorum composite key
+	var quorumNumber uint32 = 0 // Default to 0 if not extractable
+	accountAndQuorum, ok := bin["AccountAndQuorum"]
+	if ok {
+		accountAndQuorumStr, ok := accountAndQuorum.(*types.AttributeValueMemberS)
+		if ok {
+			// Parse quorum number from the composite key format "accountID_quorumNumber"
+			parts := strings.Split(accountAndQuorumStr.Value, "_")
+			if len(parts) == 2 {
+				if qNum, err := strconv.ParseUint(parts[1], 10, 32); err == nil {
+					quorumNumber = uint32(qNum)
+				}
+			}
+		}
+	}
+
+	return &pb.QuorumPeriodRecord{
+		Index:        uint32(reservationPeriodValue),
+		Usage:        uint64(binUsageValue),
+		QuorumNumber: quorumNumber,
 	}, nil
 }
