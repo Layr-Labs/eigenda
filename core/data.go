@@ -647,8 +647,8 @@ type QuorumConfig struct {
 	Recipient gethcommon.Address
 	// Maximum symbols per second for reservations
 	ReservationSymbolsPerSecond uint64
-	// Maximum symbols per period for on-demand
-	OnDemandSymbolsPerPeriod uint64
+	// Maximum symbols per second for on-demand
+	OnDemandSymbolsPerSecond uint64
 	// Price per symbol for on-demand
 	OnDemandPricePerSymbol uint64
 }
@@ -663,7 +663,8 @@ type QuorumProtocolConfig struct {
 	ReservationRateLimitWindow uint64
 	// Rate limit window for on-demand
 	OnDemandRateLimitWindow uint64
-	// Whether on-demand dispersal is enabled
+	// Whether on-demand dispersal is enabled; We assume quorum 0 is the only quorum that supports on-demand dispersal
+	// This field will only be used when on-demand is supported for multiple quorums
 	OnDemandEnabled bool
 }
 

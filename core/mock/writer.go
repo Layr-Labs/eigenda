@@ -291,13 +291,7 @@ func (t *MockWriter) GetQuorumProtocolConfig(ctx context.Context, quorumId uint6
 	return result.(*core.QuorumProtocolConfig), args.Error(1)
 }
 
-func (t *MockWriter) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {
-	args := t.Called(ctx, accountIDs)
-	result := args.Get(0)
-	return result.(map[gethcommon.Address]*core.OnDemandPayment), args.Error(1)
-}
-
-func (t *MockWriter) GetOnDemandPaymentsByQuorum(ctx context.Context, accountIDs []gethcommon.Address, quorumId uint64) (map[gethcommon.Address]*core.OnDemandPayment, error) {
+func (t *MockWriter) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address, quorumId uint64) (map[gethcommon.Address]*core.OnDemandPayment, error) {
 	args := t.Called(ctx, accountIDs, quorumId)
 	result := args.Get(0)
 	return result.(map[gethcommon.Address]*core.OnDemandPayment), args.Error(1)

@@ -127,7 +127,7 @@ type Reader interface {
 	// GetAllVersionedBlobParams returns the blob version parameters for all blob versions at the given block number.
 	GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*BlobVersionParameters, error)
 
-	// GetReservedPayments returns active reservations for multiple accounts (defaults to quorum 0)
+	// GetReservedPayments returns active reservations for multiple accounts and quorums
 	GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address, quorumIds []uint8) (map[gethcommon.Address]map[uint8]*ReservedPayment, error)
 
 	// GetReservedPaymentsByAccountAndQuorums returns active reservations for a specific account for multiple quorums
@@ -142,14 +142,8 @@ type Reader interface {
 	// GetQuorumProtocolConfig retrieves the protocol configuration for a specific quorum
 	GetQuorumProtocolConfig(ctx context.Context, quorumId uint64) (*QuorumProtocolConfig, error)
 
-	// GetOnDemandPayments returns all on-demand payments for multiple accounts (defaults to quorum 0)
-	GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*OnDemandPayment, error)
-
-	// GetOnDemandPaymentsByQuorum returns on-demand payments for multiple accounts for a specific quorum
-	GetOnDemandPaymentsByQuorum(ctx context.Context, accountIDs []gethcommon.Address, quorumId uint64) (map[gethcommon.Address]*OnDemandPayment, error)
-
-	// GetOnDemandPaymentByAccount returns on-demand payment of an account (defaults to quorum 0)
-	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*OnDemandPayment, error)
+	// GetOnDemandPayments returns all on-demand payments for multiple accounts and quorums
+	GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address, quorumId uint64) (map[gethcommon.Address]*OnDemandPayment, error)
 
 	// GetOnDemandPaymentByAccountAndQuorum returns on-demand payment of an account for a specific quorum
 	GetOnDemandPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint64) (*OnDemandPayment, error)

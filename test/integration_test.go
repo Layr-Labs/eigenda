@@ -230,16 +230,16 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	// Legacy method (non-quorum specific) - Points to quorum 0
 	mockState.On("GetReservedPaymentByAccount", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == publicKey
-	})).Return(&core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
+	})).Return(&core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32}, nil)
 	mockState.On("GetReservedPaymentByAccount", mock.Anything, mock.Anything).Return(&core.ReservedPayment{}, errors.New("reservation not found"))
 
 	// New quorum-specific method
 	mockState.On("GetReservedPaymentByAccountAndQuorum", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == publicKey
-	}), uint64(0)).Return(&core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
+	}), uint64(0)).Return(&core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32}, nil)
 	mockState.On("GetReservedPaymentByAccountAndQuorum", mock.Anything, mock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == publicKey
-	}), uint64(1)).Return(&core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32, QuorumSplits: []byte{50, 50}, QuorumNumbers: []uint8{0, 1}}, nil)
+	}), uint64(1)).Return(&core.ReservedPayment{SymbolsPerSecond: reservationLimit, StartTimestamp: 0, EndTimestamp: math.MaxUint32}, nil)
 	mockState.On("GetReservedPaymentByAccountAndQuorum", mock.Anything, mock.Anything, mock.Anything).Return(&core.ReservedPayment{}, errors.New("reservation not found"))
 
 	// Legacy method (non-quorum specific) - Points to quorum 0
@@ -264,21 +264,21 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 
 	// Quorum-specific configurations
 	quorumConfig := &core.QuorumConfig{
-		Token:                      gethcommon.Address{1},
-		Recipient:                  gethcommon.Address{2},
+		Token:                       gethcommon.Address{1},
+		Recipient:                   gethcommon.Address{2},
 		ReservationSymbolsPerSecond: 1024,
-		OnDemandSymbolsPerPeriod:    1024,
+		OnDemandSymbolsPerSecond:    1024,
 		OnDemandPricePerSymbol:      1,
 	}
 	mockState.On("GetQuorumPaymentConfig", mock.Anything, uint64(0)).Return(quorumConfig, nil)
 	mockState.On("GetQuorumPaymentConfig", mock.Anything, uint64(1)).Return(quorumConfig, nil)
-	
+
 	quorumProtocolConfig := &core.QuorumProtocolConfig{
-		MinNumSymbols:            128,
-		ReservationAdvanceWindow: 60,
+		MinNumSymbols:              128,
+		ReservationAdvanceWindow:   60,
 		ReservationRateLimitWindow: 60,
-		OnDemandRateLimitWindow: 60, 
-		OnDemandEnabled: true,
+		OnDemandRateLimitWindow:    60,
+		OnDemandEnabled:            true,
 	}
 	mockState.On("GetQuorumProtocolConfig", mock.Anything, uint64(0)).Return(quorumProtocolConfig, nil)
 	mockState.On("GetQuorumProtocolConfig", mock.Anything, uint64(1)).Return(quorumProtocolConfig, nil)

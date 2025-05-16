@@ -891,7 +891,7 @@ func (t *Reader) GetQuorumPaymentConfig(ctx context.Context, quorumId uint64) (*
 		Token:                       config.Token,
 		Recipient:                   config.Recipient,
 		ReservationSymbolsPerSecond: config.ReservationSymbolsPerSecond,
-		OnDemandSymbolsPerPeriod:    config.OnDemandSymbolsPerPeriod,
+		OnDemandSymbolsPerSecond:    config.OnDemandSymbolsPerSecond,
 		OnDemandPricePerSymbol:      config.OnDemandPricePerSymbol,
 	}, nil
 }
@@ -919,17 +919,12 @@ func (t *Reader) GetQuorumProtocolConfig(ctx context.Context, quorumId uint64) (
 	}, nil
 }
 
-func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {
-	// Default to quorum 0 for backward compatibility
-	return t.GetOnDemandPaymentsByQuorum(ctx, accountIDs, 0)
-}
-
-// GetOnDemandPaymentsByQuorum returns on-demand payments for multiple accounts for a specific quorum
-func (t *Reader) GetOnDemandPaymentsByQuorum(ctx context.Context, accountIDs []gethcommon.Address, quorumId uint64) (map[gethcommon.Address]*core.OnDemandPayment, error) {
+// GetOnDemandPayments returns on-demand payments for multiple accounts for a specific quorum;
+// Only quorum 0 is enabled for on-demand payments so we don't need a nested map
+func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address, quorumId uint64) (map[gethcommon.Address]*core.OnDemandPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")
 	}
-
 	paymentsMap := make(map[gethcommon.Address]*core.OnDemandPayment)
 
 	for _, accountID := range accountIDs {
@@ -955,11 +950,6 @@ func (t *Reader) GetOnDemandPaymentsByQuorum(ctx context.Context, accountIDs []g
 	return paymentsMap, nil
 }
 
-func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
-	// Default to quorum 0 for backward compatibility
-	return t.GetOnDemandPaymentByAccountAndQuorum(ctx, accountID, 0)
-}
-
 // GetOnDemandPaymentByAccountAndQuorum returns on-demand payment of an account for a specific quorum
 func (t *Reader) GetOnDemandPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint64) (*core.OnDemandPayment, error) {
 	if t.bindings.PaymentVault == nil {
@@ -981,118 +971,6 @@ func (t *Reader) GetOnDemandPaymentByAccountAndQuorum(ctx context.Context, accou
 	return &core.OnDemandPayment{
 		CumulativePayment: onDemandDeposit,
 	}, nil
-}
-
-func (t *Reader) GetOnDemandSymbolsPerSecond(ctx context.Context, blockNumber uint32) (uint64, error) {
-	if t.bindings.PaymentVault == nil {
-		return 0, errors.New("payment vault not deployed")
-	}
-
-	// In the new PaymentVault contract, we need to get payment config per quorum
-	// For now, we'll use quorumId 0 as default
-	// TODO: update this to handle multiple quorums or make quorum ID a parameter
-	quorumId := uint64(0)
-
-	quorumConfig, err := t.bindings.PaymentVault.GetQuorumPaymentConfig(&bind.CallOpts{
-		Context:     ctx,
-		BlockNumber: big.NewInt(int64(blockNumber)),
-	}, quorumId)
-
-	if err != nil {
-		return 0, err
-	}
-
-	// Return the global on-demand symbols per second from quorum config
-	return quorumConfig.OnDemandSymbolsPerPeriod, nil
-}
-
-func (t *Reader) GetOnDemandRatePeriodInterval(ctx context.Context, blockNumber uint32) (uint64, error) {
-	if t.bindings.PaymentVault == nil {
-		return 0, errors.New("payment vault not deployed")
-	}
-
-	// In the new PaymentVault contract, period information is part of quorum protocol config
-	// For now, we'll use quorumId 0 as default
-	// TODO: update this to handle multiple quorums or make quorum ID a parameter
-	quorumId := uint64(0)
-
-	protocolConfig, err := t.bindings.PaymentVault.GetQuorumProtocolConfig(&bind.CallOpts{
-		Context:     ctx,
-		BlockNumber: big.NewInt(int64(blockNumber)),
-	}, quorumId)
-
-	if err != nil {
-		return 0, err
-	}
-
-	// Return the on-demand rate limit window
-	return protocolConfig.OnDemandRateLimitWindow, nil
-}
-
-func (t *Reader) GetMinNumSymbols(ctx context.Context, blockNumber uint32) (uint64, error) {
-	if t.bindings.PaymentVault == nil {
-		return 0, errors.New("payment vault not deployed")
-	}
-
-	// In the new PaymentVault contract, min num symbols is part of quorum protocol config
-	// For now, we'll use quorumId 0 as default
-	// TODO: update this to handle multiple quorums or make quorum ID a parameter
-	quorumId := uint64(0)
-
-	protocolConfig, err := t.bindings.PaymentVault.GetQuorumProtocolConfig(&bind.CallOpts{
-		Context:     ctx,
-		BlockNumber: big.NewInt(int64(blockNumber)),
-	}, quorumId)
-
-	if err != nil {
-		return 0, err
-	}
-
-	return protocolConfig.MinNumSymbols, nil
-}
-
-func (t *Reader) GetPricePerSymbol(ctx context.Context, blockNumber uint32) (uint64, error) {
-	if t.bindings.PaymentVault == nil {
-		return 0, errors.New("payment vault not deployed")
-	}
-
-	// In the new PaymentVault contract, price per symbol is part of quorum payment config
-	// For now, we'll use quorumId 0 as default
-	// TODO: update this to handle multiple quorums or make quorum ID a parameter
-	quorumId := uint64(0)
-
-	quorumConfig, err := t.bindings.PaymentVault.GetQuorumPaymentConfig(&bind.CallOpts{
-		Context:     ctx,
-		BlockNumber: big.NewInt(int64(blockNumber)),
-	}, quorumId)
-
-	if err != nil {
-		return 0, err
-	}
-
-	return quorumConfig.OnDemandPricePerSymbol, nil
-}
-
-func (t *Reader) GetReservationWindow(ctx context.Context, blockNumber uint32) (uint64, error) {
-	if t.bindings.PaymentVault == nil {
-		return 0, errors.New("payment vault not deployed")
-	}
-
-	// In the new PaymentVault contract, reservation window is part of quorum protocol config
-	// For now, we'll use quorumId 0 as default
-	// TODO: update this to handle multiple quorums or make quorum ID a parameter
-	quorumId := uint64(0)
-
-	protocolConfig, err := t.bindings.PaymentVault.GetQuorumProtocolConfig(&bind.CallOpts{
-		Context:     ctx,
-		BlockNumber: big.NewInt(int64(blockNumber)),
-	}, quorumId)
-
-	if err != nil {
-		return 0, err
-	}
-
-	return protocolConfig.ReservationRateLimitWindow, nil
 }
 
 func (t *Reader) GetOperatorSocket(ctx context.Context, operatorId core.OperatorID) (string, error) {

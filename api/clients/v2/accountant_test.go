@@ -477,21 +477,21 @@ func TestQuorumCheck(t *testing.T) {
 			quorumNumbers:  []uint8{0, 2},
 			allowedNumbers: []uint8{0, 1},
 			expectError:    true,
-			errorMessage:   "provided quorum number 2 not allowed",
+			errorMessage:   "user does not have a reservation for quorum number 2",
 		},
 		{
 			name:           "empty allowed numbers",
 			quorumNumbers:  []uint8{0},
 			allowedNumbers: []uint8{},
 			expectError:    true,
-			errorMessage:   "provided quorum number 0 not allowed",
+			errorMessage:   "user does not have a reservation for quorum number 0",
 		},
 		{
 			name:           "multiple invalid quorums",
 			quorumNumbers:  []uint8{2, 3, 4},
 			allowedNumbers: []uint8{0, 1},
 			expectError:    true,
-			errorMessage:   "provided quorum number 2 not allowed",
+			errorMessage:   "user does not have a reservation for quorum number 2",
 		},
 	}
 

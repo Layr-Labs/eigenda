@@ -25,7 +25,7 @@ service Disperser {
   // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166
   rpc GetBlobCommitment(BlobCommitmentRequest) returns (BlobCommitmentReply) {}
 
-  // GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
+  // [Deprecated] GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
   // EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
   // A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
   // That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
@@ -35,11 +35,8 @@ service Disperser {
   // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
   rpc GetPaymentState(GetPaymentStateRequest) returns (GetPaymentStateReply) {}
 
-  // GetQuorumSpecificPaymentState is a utility method to get the payment state of a given account, at a given disperser.
-  // EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
-  // A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
-  // That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
-  // The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
+  // GetQuorumSpecificPaymentState is an evolution of GetPaymentState that include quorum specific reservations and
+  // corresponding usages. Other fields and usages are the same as GetPaymentState.
   //
   // For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
   // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
@@ -126,7 +123,7 @@ message BlobCommitmentReply {
   common.BlobCommitment blob_commitment = 1;
 }
 
-// GetPaymentStateRequest contains parameters to query the payment state of an account.
+// [Deprecated] GetPaymentStateRequest contains parameters to query the payment state of an account.
 message GetPaymentStateRequest {
   // The ID of the account being queried. This account ID is an eth wallet address of the user.
   string account_id = 1;
@@ -150,7 +147,7 @@ message GetQuorumSpecificPaymentStateRequest {
   uint32 quorum_number = 4;
 }
 
-// GetPaymentStateReply contains the payment state of an account.
+// [Deprecated] GetPaymentStateReply contains the payment state of an account.
 message GetPaymentStateReply {
   // global payment vault parameters
   PaymentGlobalParams payment_global_params = 1;
@@ -176,18 +173,6 @@ message GetQuorumSpecificPaymentStateReply {
   bytes cumulative_payment = 4;
   // on-chain on-demand payment deposited
   bytes onchain_cumulative_payment = 5;
-}
-
-// Reservation parameters of an account, used to determine the rate limit for the account.
-message QuorumReservation {
-  // rate limit for the account
-  uint64 symbols_per_second = 1;
-  // start timestamp of the reservation
-  uint32 start_timestamp = 2;
-  // end timestamp of the reservation
-  uint32 end_timestamp = 3;
-  // quorum number of the reservation
-  uint32 quorum_number = 4;
 }
 
 // Data Types
@@ -286,6 +271,7 @@ message PaymentGlobalParams {
   repeated uint32 on_demand_quorum_numbers = 5;
 }
 
+// [Deprecated] Reservation parameters of an account, used to determine the rate limit for the account.
 message Reservation {
   // rate limit for the account
   uint64 symbols_per_second = 1;
@@ -299,7 +285,7 @@ message Reservation {
   repeated uint32 quorum_splits = 5;
 }
 
-// PeriodRecord is the usage record of an account in a bin. The API should return the active bin
+// [Deprecated] PeriodRecord is the usage record of an account in a bin. The API should return the active bin
 // record and the subsequent two records that contains potential overflows.
 message PeriodRecord {
   // Period index of the reservation
@@ -310,6 +296,20 @@ message PeriodRecord {
   uint32 quorum_number = 4;
 }
 
+// QuorumReservation parameters of an account on a quorum, used to determine the rate limit for the account.
+message QuorumReservation {
+  // rate limit for the account
+  uint64 symbols_per_second = 1;
+  // start timestamp of the reservation
+  uint32 start_timestamp = 2;
+  // end timestamp of the reservation
+  uint32 end_timestamp = 3;
+  // quorum number of the reservation
+  uint32 quorum_number = 4;
+}
+
+// QuorumPeriodRecord is the usage record of an account in a bin for each quorum. The API should return the active bin
+// record and the subsequent two records that contains potential overflows, for every quorum the user has registration on.
 message QuorumPeriodRecord {
   // Period index of the reservation
   uint32 index = 1;

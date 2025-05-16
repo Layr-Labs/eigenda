@@ -77,6 +77,9 @@ func (a *Accountant) BlobPaymentInfo(
 	numSymbols uint64,
 	quorumNumbers []uint8,
 	timestamp int64) (*big.Int, error) {
+	if len(quorumNumbers) == 0 {
+		return big.NewInt(0), fmt.Errorf("no quorum numbers provided")
+	}
 
 	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, a.reservationWindow)
 	symbolUsage := a.SymbolsCharged(numSymbols)
@@ -85,10 +88,13 @@ func (a *Accountant) BlobPaymentInfo(
 	defer a.usageLock.Unlock()
 
 	// first attempt to use the active reservation for each quorum
+	reservationsSufficient := true
 	for _, quorumNumber := range quorumNumbers {
 		res, exists := a.reservation[quorumNumber]
 		if !exists {
-			continue
+			// at least one quorum does not have a reservation, break
+			reservationsSufficient = false
+			break
 		}
 
 		// Get period record specific to this quorum
@@ -98,30 +104,26 @@ func (a *Accountant) BlobPaymentInfo(
 
 		binLimit := res.SymbolsPerSecond * uint64(a.reservationWindow)
 		if relativePeriodRecord.Usage <= binLimit {
-			// TODO: Check against users's registered quorums; replace requiredQuorums with
-			// the user's registered quorums numbers
-			// if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
-			// 	return big.NewInt(0), err
-			// }
-			return big.NewInt(0), nil
+			continue
 		}
 
 		overflowPeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod+2, quorumNumber)
 		// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
 		if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
-			// if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
-			// 	return big.NewInt(0), err
-			// }
 			overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
-			relativePeriodRecord.Usage = binLimit
-			return big.NewInt(0), nil
+			continue
 		}
 
 		// Rollback usage for this quorum since we couldn't use it
 		relativePeriodRecord.Usage -= symbolUsage
+		reservationsSufficient = false
+		break
+	}
+	if reservationsSufficient {
+		return big.NewInt(0), nil
 	}
 
-	// reservation not available for any quorums, attempt on-demand
+	// reservation not available for the target quorums, attempt on-demand
 	// on-demand can be applied to required quorums only, but on-chain record is only on quorum 0
 	//todo: rollback on-demand if disperser respond with some ratelimit rejection
 	incrementRequired := big.NewInt(int64(a.PaymentCharged(numSymbols)))

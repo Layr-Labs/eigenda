@@ -20,7 +20,7 @@ library PaymentVaultTypes {
         address token; // the address of the token used for on-demand payments.
         address recipient; // the address of the recipient of the on-demand payments.
         uint64 reservationSymbolsPerSecond;
-        uint64 onDemandSymbolsPerPeriod;
+        uint64 onDemandSymbolsPerSecond;
         uint64 onDemandPricePerSymbol;
     }
 
