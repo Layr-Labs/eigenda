@@ -20,6 +20,8 @@ const unflushedKeysInitialCapacity = 128
 // shardControlChannelCapacity is the capacity of the channel used to send messages to the shard control loop.
 const shardControlChannelCapacity = 32
 
+// TODO look for unclosed tickers
+
 // Segment is a chunk of data stored on disk. All data in a particular data segment is expired at the same time.
 //
 // This struct is not safe for operations that mutate the segment, access control must be handled by the caller.
@@ -131,7 +133,7 @@ func CreateSegment(
 		// By default, put the key file in the first parent directory.
 		keysDirectory = parentDirectories[0]
 	}
-	keys, err := createKeyFile(logger, index, keysDirectory)
+	keys, err := createKeyFile(logger, index, keysDirectory, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open key file: %v", err)
 	}
@@ -210,16 +212,6 @@ func LoadSegment(logger logging.Logger,
 		return nil, fmt.Errorf("failed to open metadata file: %w", err)
 	}
 
-	keyCount := uint32(0) // TODO count the number of keys!
-
-	// seal the segment if it is unsealed
-	if !metadata.sealed {
-		err = metadata.seal(now, keyCount)
-		if err != nil {
-			return nil, fmt.Errorf("failed to seal segment: %w", err)
-		}
-	}
-
 	// Look for the key file.
 	keys, err := loadKeyFile(logger, index, parentDirectories, metadata.segmentVersion)
 	if err != nil {
@@ -253,9 +245,83 @@ func LoadSegment(logger logging.Logger,
 	// have a reference to the segment.
 	segment.reservationCount.Store(1)
 
-	return segment, nil
+	if !metadata.sealed {
+		err = segment.sealLoadedSegment(now)
+		if err != nil {
+			return nil, fmt.Errorf("failed to seal segment: %w", err)
+		}
+	}
 
+	return segment, nil
 }
+
+// sealLoadedSegment is responsible for sealing a segment loaded from disk that is not already sealed.
+// While doing this, it is responsible for making the key file consistent with the values present in the
+// value files.
+func (s *Segment) sealLoadedSegment(now time.Time) error {
+	scopedKeys, err := s.keys.readKeys()
+	if err != nil {
+		return fmt.Errorf("failed to read keys: %w", err)
+	}
+
+	// keys with values that are not present in the value files
+	goodKeys := make([]*types.ScopedKey, 0, len(scopedKeys))
+
+	// keys with values that weren't flushed out to the value files before the DB crashed
+	badKeys := make([]*types.ScopedKey, 0, len(scopedKeys))
+
+	for _, scopedKey := range scopedKeys {
+		shard := s.GetShard(scopedKey.Key)
+
+		requiredValueFileLength := uint64(scopedKey.Address.Offset()) +
+			4 /* value size uint32 */ +
+			uint64(scopedKey.ValueSize)
+
+		if s.shards[shard].Size() < requiredValueFileLength {
+			badKeys = append(badKeys, scopedKey)
+		} else {
+			goodKeys = append(goodKeys, scopedKey)
+		}
+	}
+
+	if len(badKeys) > 0 {
+		// We have at least one bad key. Rewrite the keyfile with only the good keys.
+		s.logger.Warnf("segment %d has %d unflushed value(s)",
+			s.index, len(badKeys))
+
+		swapFile, err := createKeyFile(s.logger, s.index, s.keys.parentDirectory, true)
+		if err != nil {
+			return fmt.Errorf("failed to create swap key file: %w", err)
+		}
+
+		for _, scopedKey := range goodKeys {
+			err = swapFile.write(scopedKey)
+			if err != nil {
+				return fmt.Errorf("failed to write key to swap file: %w", err)
+			}
+		}
+		err = swapFile.seal()
+		if err != nil {
+			return fmt.Errorf("failed to seal swap file: %w", err)
+		}
+
+		err = swapFile.atomicSwap()
+		if err != nil {
+			return fmt.Errorf("failed to swap key file: %w", err)
+		}
+
+		s.keys = swapFile
+	}
+
+	err = s.metadata.seal(now, uint32(len(goodKeys)))
+	if err != nil {
+		return fmt.Errorf("failed to seal metadata file: %w", err)
+	}
+
+	return nil
+}
+
+// TODO figure out if empty value files at DB close time causes problems
 
 // Size returns the size of the segment in bytes. Counts bytes that are on disk or that will eventually end up on disk.
 // This method is not thread safe, and should not be called concurrently with methods that modify the segment.

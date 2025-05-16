@@ -31,7 +31,7 @@ func TestReadWriteKeys(t *testing.T) {
 		keys[i] = &types.ScopedKey{Key: key, Address: address, ValueSize: valueSize}
 	}
 
-	file, err := createKeyFile(logger, index, directory)
+	file, err := createKeyFile(logger, index, directory, false)
 	require.NoError(t, err)
 
 	for _, key := range keys {
@@ -102,7 +102,7 @@ func TestReadingTruncatedKeyFile(t *testing.T) {
 		keys[i] = &types.ScopedKey{Key: key, Address: address, ValueSize: valueSize}
 	}
 
-	file, err := createKeyFile(logger, index, directory)
+	file, err := createKeyFile(logger, index, directory, false)
 	require.NoError(t, err)
 
 	for _, key := range keys {
@@ -162,3 +162,5 @@ func TestReadingTruncatedKeyFile(t *testing.T) {
 	_, err = os.Stat(filePath)
 	require.True(t, os.IsNotExist(err))
 }
+
+// TODO test swapping

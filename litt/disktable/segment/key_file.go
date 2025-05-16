@@ -17,6 +17,10 @@ import (
 // and is used for performing garbage collection on the keymap. It can also be used to rebuild the keymap.
 const KeyFileExtension = ".keys"
 
+// KeyFileSwapExtension is the file extension for the keys swap file. This file is used to atomically
+// update key files.
+const KeyFileSwapExtension = ".keys.swap" // TODO check for these files and delete them if found
+
 // keyFile tracks the keys in a segment. It is used to do garbage collection on the keymap.
 //
 // This struct is NOT goroutine safe. It is unsafe to concurrently call write, flush, or seal on the same key file.
@@ -39,6 +43,10 @@ type keyFile struct {
 
 	// The segment version. Determines serialization format.
 	segmentVersion SegmentVersion
+
+	// If true, then this key file is intended to replace another key file. It is written to a temporary
+	// file, and then atomically renamed to the final file name.
+	swap bool
 }
 
 // newKeyFile creates a new key file.
@@ -46,6 +54,7 @@ func createKeyFile(
 	logger logging.Logger,
 	index uint32,
 	parentDirectory string,
+	swap bool,
 ) (*keyFile, error) {
 
 	keys := &keyFile{
@@ -53,6 +62,7 @@ func createKeyFile(
 		index:           index,
 		parentDirectory: parentDirectory,
 		segmentVersion:  ValueSizeSegmentVersion,
+		swap:            swap,
 	}
 
 	filePath := keys.path()
@@ -129,12 +139,35 @@ func (k *keyFile) Size() uint64 {
 
 // name returns the name of the key file.
 func (k *keyFile) name() string {
-	return fmt.Sprintf("%d%s", k.index, KeyFileExtension)
+	extension := KeyFileExtension
+	if k.swap {
+		extension = KeyFileSwapExtension
+	}
+
+	return fmt.Sprintf("%d%s", k.index, extension)
 }
 
 // path returns the full path to the key file.
 func (k *keyFile) path() string {
 	return path.Join(k.parentDirectory, k.name())
+}
+
+// atomicSwap atomically replaces the key file, replacing the old one.
+func (k *keyFile) atomicSwap() error {
+	if !k.swap {
+		return fmt.Errorf("key file is not a swap file")
+	}
+
+	swapPath := k.path()
+	k.swap = false
+	newPath := k.path()
+
+	err := os.Rename(swapPath, newPath)
+	if err != nil {
+		return fmt.Errorf("failed to rename key file: %v", err)
+	}
+
+	return nil
 }
 
 // write writes a key to the key file.
