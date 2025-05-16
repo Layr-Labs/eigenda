@@ -1,0 +1,50 @@
+name: subgraph-tests
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'subgraphs/**'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'subgraphs/**'
+
+jobs:
+  test-subgraphs:
+    name: Test ${{ matrix.subgraph }}
+    runs-on: ubuntu-22.04 # https://github.com/graphprotocol/graph-tooling/issues/1546#issuecomment-2589680195
+    strategy:
+      matrix:
+        subgraph: [eigenda-operator-state, eigenda-batch-metadata]
+      fail-fast: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: 'subgraphs/yarn.lock'
+
+      - name: Install global dependencies
+        run: |
+          yarn global add @graphprotocol/graph-cli@0.60.0
+          
+      - name: Output Graph version
+        run: |
+          graph --version
+
+      - name: Test ${{ matrix.subgraph }} subgraph
+        working-directory: subgraphs/${{ matrix.subgraph }}
+        run: |
+          # Copy template files
+          cp ./templates/subgraph.yaml .
+          cp ./templates/networks.json .
+          
+          yarn install
+          yarn codegen
+          yarn test 
