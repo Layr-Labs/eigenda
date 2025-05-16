@@ -102,7 +102,7 @@ var _ EigenDACert = &EigenDACertV3{}
 // This struct represents the composition of a EigenDA V3 certificate, as it would exist in a rollup inbox.
 type EigenDACertV3 certTypesBinding.EigenDACertTypesEigenDACertV3
 
-// BuildEigenDACertV3 creates a new EigenDACertV2 from a BlobStatusReply, and NonSignerStakesAndSignature
+// BuildEigenDACertV3 creates a new EigenDACertV3 from a BlobStatusReply, and NonSignerStakesAndSignature
 func BuildEigenDACertV3(
 	blobStatusReply *disperser.BlobStatusReply,
 	nonSignerStakesAndSignature *certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature,
