@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	contractEigenDACertVerifierV2 "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
 	certTypesBinding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -184,16 +185,16 @@ func (c *EigenDACertV3) Serialize() ([]byte, error) {
 // Commitments returns the blob's cryptographic kzg commitments 
 func (c *EigenDACertV3) Commitments() (*encoding.BlobCommitments, error) {
 		// TODO: figure out how to remove this casting entirely
-		commitments := certTypesBinding.EigenDATypesV2BlobCommitment{
-			Commitment: certTypesBinding.BN254G1Point{
+		commitments := contractEigenDACertVerifierV2.EigenDATypesV2BlobCommitment{
+			Commitment: contractEigenDACertVerifierV2.BN254G1Point{
 				X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment.X,
 				Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment.Y,
 			},
-			LengthCommitment: certTypesBinding.BN254G2Point{
+			LengthCommitment: contractEigenDACertVerifierV2.BN254G2Point{
 				X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthCommitment.X,
 				Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthCommitment.Y,
 			},
-			LengthProof: certTypesBinding.BN254G2Point{
+			LengthProof: contractEigenDACertVerifierV2.BN254G2Point{
 				X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthProof.X,
 				Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthProof.Y,
 			},
@@ -217,16 +218,16 @@ func (c *EigenDACertV3) Version() CertificateVersion {
 // NOTE: This type is hardforked from the V3 type and will no longer
 //       be supported for dispersals after the CertV3 hardfork
 type EigenDACertV2 struct {
-	BlobInclusionInfo           certTypesBinding.EigenDATypesV2BlobInclusionInfo
-	BatchHeader                 certTypesBinding.EigenDATypesV2BatchHeaderV2
-	NonSignerStakesAndSignature certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature
+	BlobInclusionInfo           contractEigenDACertVerifierV2.EigenDATypesV2BlobInclusionInfo
+	BatchHeader                 contractEigenDACertVerifierV2.EigenDATypesV2BatchHeaderV2
+	NonSignerStakesAndSignature contractEigenDACertVerifierV2.EigenDATypesV1NonSignerStakesAndSignature
 	SignedQuorumNumbers         []byte
 }
 
 // BuildEigenDAV2Cert creates a new EigenDACertV2 from a BlobStatusReply, and NonSignerStakesAndSignature
 func BuildEigenDAV2Cert(
 	blobStatusReply *disperser.BlobStatusReply,
-	nonSignerStakesAndSignature *certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature,
+	nonSignerStakesAndSignature *contractEigenDACertVerifierV2.EigenDATypesV1NonSignerStakesAndSignature,
 ) (*EigenDACertV2, error) {
 
 	bindingInclusionInfo, err := InclusionInfoProtoToV2CertVerifierBinding(blobStatusReply.GetBlobInclusionInfo())

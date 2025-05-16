@@ -27,7 +27,7 @@ type PayloadDisperser struct {
 	ethClient       common.EthClient
 	blockMonitor  *verification.BlockNumberMonitor
 	certBuilder   *clients.CertBuilder
-	certVerifier  *verification.GenericCertVerifier
+	certVerifier  *verification.CertVerifier
 	stageTimer      *common.StageTimer
 }
 
@@ -47,7 +47,7 @@ func NewPayloadDisperser(
 	disperserClient clients.DisperserClient,
 	blockMonitor *verification.BlockNumberMonitor,
 	certBuilder  *clients.CertBuilder,
-	certVerifier *verification.GenericCertVerifier,
+	certVerifier *verification.CertVerifier,
 	// if nil, then no metrics will be collected
 	registry *prometheus.Registry,
 ) (*PayloadDisperser, error) {
@@ -115,11 +115,6 @@ func (pd *PayloadDisperser) SendPayload(
 		return nil, fmt.Errorf("get quorum numbers required: %w", err)
 	}
 
-	confirmationThreshold, err := pd.certVerifier.GetConfirmationThreshold(timeoutCtx, num)
-	if err != nil {
-		return nil, fmt.Errorf("get quorum numbers required: %w", err)
-	}
-
 	certVersion, err := pd.certVerifier.GetCertVersion(timeoutCtx, num)
 	if err != nil {
 		return nil, fmt.Errorf("get certificate version: %w", err)
@@ -149,7 +144,7 @@ func (pd *PayloadDisperser) SendPayload(
 	// confirmation thresholds, a terminal error, or a timeout
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCompleteTimeout)
 	defer cancel()
-	blobStatusReply, err := pd.pollBlobStatusUntilSigned(timeoutCtx, blobKey, confirmationThreshold, blobStatus.ToProfobuf(), probe)
+	blobStatusReply, err := pd.pollBlobStatusUntilSigned(timeoutCtx, blobKey, blobStatus.ToProfobuf(), probe)
 	if err != nil {
 		return nil, fmt.Errorf("poll blob status until signed: %w", err)
 	}
@@ -235,7 +230,6 @@ func (pd *PayloadDisperser) Close() error {
 func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 	ctx context.Context,
 	blobKey core.BlobKey,
-	confirmationThreshold byte,
 	initialStatus dispgrpc.BlobStatus,
 	probe *common.SequenceProbe,
 ) (*dispgrpc.BlobStatusReply, error) {
@@ -276,7 +270,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 			// TODO: we'll need to add more in-depth response status processing to derive failover errors
 			switch newStatus {
 			case dispgrpc.BlobStatus_COMPLETE:
-				err := checkThresholds(ctx, confirmationThreshold, blobStatusReply, blobKey.Hex())
+				err := checkThresholds(ctx, pd.certVerifier, blobStatusReply, blobKey.Hex())
 				if err != nil {
 					// returned error is verbose enough, no need to wrap it with additional context
 					return nil, err
@@ -291,7 +285,7 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 				// Report all non-terminal statuses to the probe. Repeat reports are no-ops.
 				probe.SetStage(newStatus.String())
 
-				err := checkThresholds(ctx, confirmationThreshold, blobStatusReply, blobKey.Hex())
+				err := checkThresholds(ctx, pd.certVerifier, blobStatusReply, blobKey.Hex())
 				if err == nil {
 					// If there's no error, then all thresholds are met, so we can stop polling
 					return blobStatusReply, nil

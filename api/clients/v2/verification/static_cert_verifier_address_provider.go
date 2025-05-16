@@ -3,7 +3,7 @@ package verification
 import (
 	"context"
 
-	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/ethereum/go-ethereum/common"
 )
 

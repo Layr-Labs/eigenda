@@ -53,7 +53,7 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 		return nil, fmt.Errorf("create disperser client: %w", err)
 	}
 
-	genericCertVerifier, err := createGenericCertVerifier()
+	certVerifier, err := createGenericCertVerifier()
 	if err != nil {
 		return nil, fmt.Errorf("create cert verifier: %w", err)
 	}
@@ -88,7 +88,7 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 		disperserClient,
 		blockNumMonitor,
 		certBuilder,
-		genericCertVerifier,
+		certVerifier,
 		nil,
 	)
 }
@@ -242,7 +242,7 @@ func createKzgProver() (*prover.Prover, error) {
 	return kzgProver, nil
 }
 
-func createGenericCertVerifier() (*verification.GenericCertVerifier, error) {
+func createGenericCertVerifier() (*verification.CertVerifier, error) {
 	logger, err := createLogger()
 	if err != nil {
 		return nil, fmt.Errorf("create logger: %v", err)

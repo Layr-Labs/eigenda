@@ -14,26 +14,27 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-// CertVerifier is responsible for making eth calls against the CertVerifier contract to ensure cryptographic and
-// structural integrity of V2 certificates
+// LegacyCertVerifier is responsible for making eth calls against the LegacyCertVerifier contract to ensure cryptographic and
+// structural integrity of V2 certificates. Currently this only used for eigenda v2 rollup tesnets using initial v2 release of eigenda-proxy.
+// This will get deprecated in a future core release.
 //
-// The cert verifier contract is located at https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/core/EigenDACertVerifier.sol
-type CertVerifier struct {
+// The legacy cert verifier contract is located at https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/periphery/cert/legacy/v2/EigenDACertVerifierV2.sol
+type LegacyCertVerifier struct {
 	logger                      logging.Logger
 	ethClient                   common.EthClient
 	certVerifierAddressProvider clients.CertVerifierAddressProvider
-	// maps contract address to a ContractEigenDACertVerifierCaller object
+	// maps contract address to a ContractEigenDACertVerifierV2Caller object
 	verifierCallers sync.Map
 }
 
-// NewCertVerifier constructs a CertVerifier
-func NewCertVerifier(
+// NewLegacyCertVerifier constructs a CertVerifier
+func NewLegacyCertVerifier(
 	logger logging.Logger,
 	// the eth client, which should already be set up
 	ethClient common.EthClient,
 	certVerifierAddressProvider clients.CertVerifierAddressProvider,
-) (*CertVerifier, error) {
-	return &CertVerifier{
+) (*LegacyCertVerifier, error) {
+	return &LegacyCertVerifier{
 		logger:                      logger,
 		ethClient:                   ethClient,
 		certVerifierAddressProvider: certVerifierAddressProvider,
@@ -43,7 +44,7 @@ func NewCertVerifier(
 // VerifyCertV2 calls the VerifyCertV2 view function on the EigenDACertVerifier contract.
 //
 // This method returns nil if the cert is successfully verified. Otherwise, it returns an error.
-func (cv *CertVerifier) VerifyCertV2(ctx context.Context, eigenDACert *coretypes.EigenDACertV2) error {
+func (cv *LegacyCertVerifier) VerifyCertV2(ctx context.Context, eigenDACert *coretypes.EigenDACertV2) error {
 	referenceBlockNumber := uint64(eigenDACert.BatchHeader.ReferenceBlockNumber)
 
 	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, referenceBlockNumber)
@@ -66,12 +67,12 @@ func (cv *CertVerifier) VerifyCertV2(ctx context.Context, eigenDACert *coretypes
 }
 
 
-// getVerifierCallerFromBlockNumber returns a ContractEigenDACertVerifierCaller that corresponds to the input reference
+// getVerifierCallerFromBlockNumber returns a ContractEigenDACertVerifierV2Caller that corresponds to the input reference
 // block number.
 //
-// This method caches ContractEigenDACertVerifierCaller instances, since their construction requires acquiring a lock
+// This method caches ContractEigenDACertVerifierV2Caller instances, since their construction requires acquiring a lock
 // and parsing json, and is therefore non-trivially expensive.
-func (cv *CertVerifier) getVerifierCallerFromBlockNumber(
+func (cv *LegacyCertVerifier) getVerifierCallerFromBlockNumber(
 	ctx context.Context,
 	referenceBlockNumber uint64,
 ) (*verifierBindings.ContractEigenDACertVerifierV2Caller, error) {
@@ -83,12 +84,12 @@ func (cv *CertVerifier) getVerifierCallerFromBlockNumber(
 	return cv.getVerifierCallerFromAddress(certVerifierAddress)
 }
 
-// getVerifierCallerFromAddress returns a ContractEigenDACertVerifierCaller that corresponds to the input contract
+// getVerifierCallerFromAddress returns a ContractEigenDACertVerifierV2Caller that corresponds to the input contract
 // address
 //
-// This method caches ContractEigenDACertVerifierCaller instances, since their construction requires acquiring a lock
+// This method caches ContractEigenDACertVerifierV2Caller instances, since their construction requires acquiring a lock
 // and parsing json, and is therefore non-trivially expensive.
-func (cv *CertVerifier) getVerifierCallerFromAddress(
+func (cv *LegacyCertVerifier) getVerifierCallerFromAddress(
 	certVerifierAddress gethcommon.Address,
 ) (*verifierBindings.ContractEigenDACertVerifierV2Caller, error) {
 	existingCallerAny, valueExists := cv.verifierCallers.Load(certVerifierAddress)
@@ -96,7 +97,7 @@ func (cv *CertVerifier) getVerifierCallerFromAddress(
 		existingCaller, ok := existingCallerAny.(*verifierBindings.ContractEigenDACertVerifierV2Caller)
 		if !ok {
 			return nil, fmt.Errorf(
-				"value in verifierCallers wasn't of type ContractEigenDACertVerifierCaller. this should be impossible")
+				"value in verifierCallers wasn't of type ContractEigenDACertVerifierV2Caller. this should be impossible")
 		}
 		return existingCaller, nil
 	}

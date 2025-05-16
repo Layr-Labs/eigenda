@@ -7,16 +7,17 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	coreEth "github.com/Layr-Labs/eigenda/core/eth"
 
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	certTypesBinding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 	opsrbinding "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
-	core "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/core"
+	coreV2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 
@@ -55,7 +56,7 @@ func NewCertBuilder(
 func (cb *CertBuilder) BuildCert(
 	ctx context.Context,
 	certVersion coretypes.CertificateVersion,
-	blobKey core.BlobKey,
+	blobKey coreV2.BlobKey,
 	blobStatusReply *disperser.BlobStatusReply,
 ) (coretypes.EigenDACert, error) {
 	switch certVersion {
@@ -69,7 +70,7 @@ func (cb *CertBuilder) BuildCert(
 // buildEigenDAV3Cert builds an EigenDA certificate of version 3 using the provided blob key and blob status reply.
 func (cb *CertBuilder) buildEigenDAV3Cert(
 	ctx context.Context,
-	blobKey core.BlobKey,
+	blobKey coreV2.BlobKey,
 	blobStatusReply *disperser.BlobStatusReply,
 ) (*coretypes.EigenDACertV3, error) {
 	// TODO: configurable timeout
@@ -91,27 +92,6 @@ func (cb *CertBuilder) buildEigenDAV3Cert(
 	return eigenDACert, nil
 }
 
-// padTo32Bytes left-pads the input with zeros to ensure it's 32 bytes long.
-func padTo32Bytes(input []byte) []byte {
-	padded := make([]byte, 32)
-	copy(padded[32-len(input):], input)
-	return padded
-}
-
-// HashG1Point returns the keccak256 hash of the G1 point.
-func HashG1Point(p certTypesBinding.BN254G1Point) [32]byte {
-	xBytes := padTo32Bytes(p.X.Bytes())
-	yBytes := padTo32Bytes(p.Y.Bytes())
-
-	var data [64]byte
-	copy(data[:32], xBytes)
-	copy(data[32:], yBytes)
-
-	return crypto.Keccak256Hash(data[:])
-}
-
-
-
 // GetNonSignerStakesAndSignature constructs a NonSignerStakesAndSignature object by calling an
 // onchain OperatorStateRetriever retriever to fetch necessary non-signer metadata
 func (cb *CertBuilder)  getNonSignerStakesAndSignature(
@@ -129,12 +109,8 @@ func (cb *CertBuilder)  getNonSignerStakesAndSignature(
 	// 2a - create operator IDs by hashing non-signer public keys
 	nonSignerOperatorIDs := make([][32]byte, len(nonSignerPubKeys))
 	for i, pubKeySet := range nonSignerPubKeys {
-		point := certTypesBinding.BN254G1Point{
-			X: pubKeySet.X,
-			Y: pubKeySet.Y,
-		}
-
-		nonSignerOperatorIDs[i] = HashG1Point(point)
+		g1Point := core.NewG1Point(pubKeySet.X, pubKeySet.Y)
+		nonSignerOperatorIDs[i] = coreEth.HashPubKeyG1(g1Point)
 	}
 
 	// 2b - cast []uint32 to []byte for quorum numbers

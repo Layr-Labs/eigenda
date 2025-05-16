@@ -60,7 +60,7 @@ type TestClient struct {
 	// validator downloads with limited CPU resources.
 	onlyDownloadValidatorClient validator.ValidatorClient
 	certBuilder                 *clients.CertBuilder
-	certVerifier                *verification.GenericCertVerifier
+	certVerifier                *verification.CertVerifier
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
 	metrics                     *testClientMetrics
@@ -450,7 +450,7 @@ func (c *TestClient) GetValidatorPayloadRetriever() *payloadretrieval.ValidatorP
 }
 
 // GetCertVerifier returns the test client's cert verifier.
-func (c *TestClient) GetCertVerifier() *verification.GenericCertVerifier {
+func (c *TestClient) GetCertVerifier() *verification.CertVerifier {
 	return c.certVerifier
 }
 
