@@ -65,6 +65,11 @@ func TestAccountBlob_Reservation(t *testing.T) {
 			StartTimestamp:   100,
 			EndTimestamp:     200,
 		},
+		1: {
+			SymbolsPerSecond: 200,
+			StartTimestamp:   100,
+			EndTimestamp:     200,
+		},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
@@ -103,10 +108,9 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	assert.NotEqual(t, uint64(0), header.Timestamp)
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 
-	// With overflow, usage should be at the limit in the current period
+	// With overflow, usage should have exceeded the limit in the current period
 	binLimit := reservation[0].SymbolsPerSecond * uint64(reservationWindow)
-	expectedUsage := binLimit
-	assert.Equal(t, expectedUsage, quorum0Records[currentPeriodIndex].Usage)
+	assert.Less(t, binLimit, quorum0Records[currentPeriodIndex].Usage)
 
 	// The overflow should be in the next bin
 	overflowIndex := uint32((meterer.GetReservationPeriodByNanosecond(now, reservationWindow) + 2) % uint64(numBins))
@@ -182,12 +186,17 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 	quorums := []uint8{0, 1}
 	now := time.Now().UnixNano()
 	_, err = accountant.AccountBlob(ctx, now, numSymbols, quorums)
-	assert.Contains(t, err.Error(), "no bandwidth reservation found for account")
+	assert.Contains(t, err.Error(), "no reservation found for account")
 }
 
 func TestAccountBlobCallSeries(t *testing.T) {
 	reservation := map[uint8]*core.ReservedPayment{
 		0: {
+			SymbolsPerSecond: 200,
+			StartTimestamp:   100,
+			EndTimestamp:     200,
+		},
+		1: {
 			SymbolsPerSecond: 200,
 			StartTimestamp:   100,
 			EndTimestamp:     200,
@@ -235,12 +244,17 @@ func TestAccountBlobCallSeries(t *testing.T) {
 	now = time.Now().UnixNano()
 	_, err = accountant.AccountBlob(ctx, now, 600, quorums)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no bandwidth reservation found for account")
+	assert.Contains(t, err.Error(), "no reservation found for account")
 }
 
 func TestAccountBlob_BinRotation(t *testing.T) {
 	reservation := map[uint8]*core.ReservedPayment{
 		0: {
+			SymbolsPerSecond: 1000,
+			StartTimestamp:   100,
+			EndTimestamp:     200,
+		},
+		1: {
 			SymbolsPerSecond: 1000,
 			StartTimestamp:   100,
 			EndTimestamp:     200,
@@ -345,6 +359,11 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 			StartTimestamp:   100,
 			EndTimestamp:     200,
 		},
+		1: {
+			SymbolsPerSecond: 200,
+			StartTimestamp:   100,
+			EndTimestamp:     200,
+		},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -379,10 +398,10 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 
-	// Check current period is at limit
+	// Check current period already exceeded limit
 	binLimit := reservation[0].SymbolsPerSecond * uint64(reservationWindow) // 1000
 	record = accountant.GetRelativePeriodRecord(currentPeriod, 0)
-	assert.Equal(t, binLimit, record.Usage)
+	assert.Less(t, binLimit, record.Usage)
 
 	// Check overflow period has the overflow
 	overflowRecord := accountant.GetRelativePeriodRecord(currentPeriod+2, 0)
@@ -399,6 +418,11 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	reservation := map[uint8]*core.ReservedPayment{
 		0: {
+			SymbolsPerSecond: 1000,
+			StartTimestamp:   100,
+			EndTimestamp:     200,
+		},
+		1: {
 			SymbolsPerSecond: 1000,
 			StartTimestamp:   100,
 			EndTimestamp:     200,

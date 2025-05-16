@@ -12,24 +12,21 @@ import (
 
 func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName string) error {
 	ctx := context.Background()
+	// Create a composite primary key with AccountAndQuorum as hash key and ReservationPeriod as range key
 	_, err := test_utils.CreateTable(ctx, clientConfig, tableName, &dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{
 			{
-				AttributeName: aws.String("AccountID"),
+				AttributeName: aws.String("AccountAndQuorum"),
 				AttributeType: types.ScalarAttributeTypeS,
 			},
 			{
 				AttributeName: aws.String("ReservationPeriod"),
 				AttributeType: types.ScalarAttributeTypeN,
 			},
-			{
-				AttributeName: aws.String("QuorumNumber"),
-				AttributeType: types.ScalarAttributeTypeN,
-			},
 		},
 		KeySchema: []types.KeySchemaElement{
 			{
-				AttributeName: aws.String("AccountID"),
+				AttributeName: aws.String("AccountAndQuorum"),
 				KeyType:       types.KeyTypeHash,
 			},
 			{
@@ -43,7 +40,14 @@ func CreateReservationTable(clientConfig commonaws.ClientConfig, tableName strin
 			WriteCapacityUnits: aws.Int64(10),
 		},
 	})
-	return err
+
+	if err != nil {
+		if err.Error() == "ResourceInUseException: Table already exists" {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func CreateGlobalReservationTable(clientConfig commonaws.ClientConfig, tableName string) error {

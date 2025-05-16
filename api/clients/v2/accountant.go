@@ -138,8 +138,8 @@ func (a *Accountant) BlobPaymentInfo(
 		return a.cumulativePayment, nil
 	}
 	return big.NewInt(0), fmt.Errorf(
-		"no bandwidth reservation found for account %s, and current cumulativePayment balance insufficient "+
-			"to make an on-demand dispersal. Consider depositing more eth to the PaymentVault contract.", a.accountID.Hex())
+		"no reservation found for account %s for quorums %v, and current cumulativePayment balance insufficient "+
+			"to make an on-demand dispersal. Consider depositing more eth to the PaymentVault contract.", a.accountID.Hex(), quorumNumbers)
 }
 
 // AccountBlob accountant provides and records payment information
@@ -272,7 +272,7 @@ func QuorumCheck(quorumNumbers []uint8, allowedNumbers []uint8) error {
 	}
 	for _, quorum := range quorumNumbers {
 		if !slices.Contains(allowedNumbers, quorum) {
-			return fmt.Errorf("provided quorum number %v not allowed", quorum)
+			return fmt.Errorf("user does not have a reservation for quorum number %v", quorum)
 		}
 	}
 	return nil
