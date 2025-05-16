@@ -21,7 +21,7 @@ import (
 func TestGenerateData(t *testing.T) {
 	t.Skip() // comment out this line to generate data
 
-	version := segment.CurrentSerializationVersion
+	version := segment.LatestSegmentVersion
 	dataDir := fmt.Sprintf("testdata/v%d", version)
 
 	exists, err := util.Exists(dataDir)
@@ -90,7 +90,7 @@ func TestMigration(t *testing.T) {
 	// Skip the test if no version directories are found
 	require.NotEmpty(t, migrationPaths, "No version directories found in testdata/")
 
-	currentVersion := segment.CurrentSerializationVersion
+	currentVersion := segment.LatestSegmentVersion
 	for _, migrationPath := range migrationPaths {
 
 		// Each migration path is in the format "v[version]".

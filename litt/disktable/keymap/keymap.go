@@ -19,13 +19,14 @@ const KeymapInitializedFileName = "initialized"
 
 // Keymap maintains a mapping between keys and addresses. Implementations of this interface are goroutine safe.
 type Keymap interface {
-	// Put adds keys to the keymap as a batch.
+	// Put adds keys to the keymap as a batch. This method is required to store the address, but can ignore
+	// other fields in the ScopedKey struct such as the value length.
 	//
 	// A keymap provides atomicity for individual key-address pairs, but not for the batch as a whole.
 	//
 	// It is not safe to modify the contents of any slices passed to this function after the call.
 	// This includes the byte slices containing the keys.
-	Put(pairs []*types.KAPair) error
+	Put(pairs []*types.ScopedKey) error
 
 	// Get returns the address for a key. Returns true if the key exists, and false otherwise (i.e. does not
 	// return an error if the key does not exist).
@@ -39,7 +40,7 @@ type Keymap interface {
 	//
 	// It is not safe to modify the contents of any slices passed to this function after the call.
 	// This includes the byte slices containing the keys.
-	Delete(keys []*types.KAPair) error
+	Delete(keys []*types.ScopedKey) error
 
 	// Stop stops the keymap.
 	Stop() error

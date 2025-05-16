@@ -56,7 +56,7 @@ type Config struct {
 	// this constant prevents a segment from accumulating too many keys. A segment with too many keys may have
 	// undesirable properties such as a very large key file and very slow garbage collection (since no kv-pair in
 	// a segment can be deleted until the entire segment is deleted).
-	MaxSegmentKeyCount uint64
+	MaxSegmentKeyCount uint32
 
 	// The desired maximum size for a key file. The default is 2 MB. When a key file exceeds this size, the segment
 	// will close the current segment and begin writing to a new one. For workloads with moderately large values,

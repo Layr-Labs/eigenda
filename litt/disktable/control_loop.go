@@ -60,7 +60,7 @@ type controlLoop struct {
 	targetFileSize uint32
 
 	// The maximum number of keys in a segment.
-	maxKeyCount uint64
+	maxKeyCount uint32
 
 	// The target size for key files.
 	targetKeyFileSize uint64
@@ -150,20 +150,22 @@ func (c *controlLoop) run() {
 
 // doGarbageCollection performs garbage collection on all segments, deleting old ones as necessary.
 func (c *controlLoop) doGarbageCollection() {
-	start := c.clock()
+	now := c.clock()
 	ttl := c.metadata.GetTTL()
 	if ttl.Nanoseconds() <= 0 {
 		// No TTL set, so nothing to do.
 		return
 	}
 
-	if c.metrics != nil {
-		defer func() {
+	defer func() {
+		if c.metrics != nil {
 			end := c.clock()
-			delta := end.Sub(start)
+			delta := end.Sub(now)
 			c.metrics.ReportGarbageCollectionLatency(c.name, delta)
-		}()
-	}
+
+		}
+		c.updateCurrentSize()
+	}()
 
 	for index := c.lowestSegmentIndex; index <= c.highestSegmentIndex; index++ {
 		seg := c.segments[index]
@@ -173,7 +175,7 @@ func (c *controlLoop) doGarbageCollection() {
 		}
 
 		sealTime := seg.GetSealTime()
-		segmentAge := start.Sub(sealTime)
+		segmentAge := now.Sub(sealTime)
 		if segmentAge < ttl {
 			// Segment is not old enough to be deleted.
 			return
@@ -198,8 +200,13 @@ func (c *controlLoop) doGarbageCollection() {
 			}
 		}
 
+		if seg.Size() > c.immutableSegmentSize {
+			c.logger.Errorf("segment %d size %d is larger than immutable segment size %d, "+
+				"reported DB size will not be accurate", index, seg.Size(), c.immutableSegmentSize)
+		}
+
 		c.immutableSegmentSize -= seg.Size()
-		c.keyCount.Add(-1 * int64(len(keys)))
+		c.keyCount.Add(-1 * int64(seg.KeyCount()))
 
 		// Deletion of segment files will happen when the segment is released by all reservation holders.
 		seg.Release()
@@ -209,8 +216,6 @@ func (c *controlLoop) doGarbageCollection() {
 
 		c.lowestSegmentIndex++
 	}
-
-	c.updateCurrentSize()
 }
 
 // getReservedSegment returns the segment with the given index. Segment is reserved, and it is the caller's
@@ -245,7 +250,10 @@ func (c *controlLoop) getSegments() (map[uint32]*segment.Segment, error) {
 
 // updateCurrentSize updates the size of the table.
 func (c *controlLoop) updateCurrentSize() {
-	size := c.immutableSegmentSize + c.segments[c.highestSegmentIndex].Size() + segment.MetadataSize
+	size := c.immutableSegmentSize +
+		c.segments[c.highestSegmentIndex].Size() +
+		c.metadata.Size()
+
 	c.size.Store(size)
 }
 
@@ -280,8 +288,6 @@ func (c *controlLoop) handleWriteRequest(req *controlLoopWriteRequest) {
 func (c *controlLoop) expandSegments() error {
 	now := c.clock()
 
-	c.immutableSegmentSize += c.segments[c.highestSegmentIndex].Size()
-
 	// Seal the previous segment.
 	flushLoopResponseChan := make(chan struct{}, 1)
 	request := &flushLoopSealRequest{
@@ -301,6 +307,9 @@ func (c *controlLoop) expandSegments() error {
 	if err != nil {
 		return fmt.Errorf("failed to seal segment: %w", err)
 	}
+
+	// Record the size of the segment.
+	c.immutableSegmentSize += c.segments[c.highestSegmentIndex].Size()
 
 	// Create a new segment.
 	salt := [16]byte{}
