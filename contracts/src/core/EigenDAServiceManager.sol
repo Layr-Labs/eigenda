@@ -17,7 +17,6 @@ import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRe
 import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
-import {EigenDACertVerificationV1Lib} from "src/periphery/cert/v1/EigenDACertVerificationV1Lib.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
@@ -103,7 +102,14 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         );
 
         // calculate reducedBatchHeaderHash which nodes signed
-        bytes32 reducedBatchHeaderHash = EigenDACertVerificationV1Lib.hashBatchHeaderToReducedBatchHeader(batchHeader);
+        bytes32 reducedBatchHeaderHash = keccak256(
+            abi.encode(
+                DATypesV1.ReducedBatchHeader({
+                    blobHeadersRoot: batchHeader.blobHeadersRoot,
+                    referenceBlockNumber: batchHeader.referenceBlockNumber
+                })
+            )
+        );
 
         // check the signature
         (QuorumStakeTotals memory quorumStakeTotals, bytes32 signatoryRecordHash) = checkSignatures(
@@ -126,10 +132,9 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
 
         // store the metadata hash
         uint32 batchIdMemory = batchId;
-        bytes32 batchHeaderHash = EigenDACertVerificationV1Lib.hashBatchHeader(batchHeader);
-        batchIdToBatchMetadataHash[batchIdMemory] = EigenDACertVerificationV1Lib.hashBatchHashedMetadata(
-            batchHeaderHash, signatoryRecordHash, uint32(block.number)
-        );
+        bytes32 batchHeaderHash = keccak256(abi.encode(batchHeader));
+        batchIdToBatchMetadataHash[batchIdMemory] =
+            keccak256(abi.encodePacked(batchHeaderHash, signatoryRecordHash, uint32(block.number)));
 
         emit BatchConfirmed(reducedBatchHeaderHash, batchIdMemory);
 
