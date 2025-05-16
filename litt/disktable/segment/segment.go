@@ -56,7 +56,7 @@ type Segment struct {
 	maxShardSize uint64
 
 	// The number of keys written to this segment.
-	keyCount uint64
+	keyCount uint32
 
 	// shardChannels is a list of channels used to send messages to the goroutine responsible for writing to
 	// each shard. Indexed by shard number.
@@ -210,9 +210,11 @@ func LoadSegment(logger logging.Logger,
 		return nil, fmt.Errorf("failed to open metadata file: %w", err)
 	}
 
+	keyCount := uint32(0) // TODO count the number of keys!
+
 	// seal the segment if it is unsealed
 	if !metadata.sealed {
-		err = metadata.seal(now)
+		err = metadata.seal(now, keyCount)
 		if err != nil {
 			return nil, fmt.Errorf("failed to seal segment: %w", err)
 		}
@@ -243,6 +245,7 @@ func LoadSegment(logger logging.Logger,
 		keys:              keys,
 		shards:            shards,
 		keyFileSize:       keyFileSize,
+		keyCount:          metadata.keyCount,
 		deletionChannel:   make(chan struct{}, 1),
 	}
 
@@ -274,6 +277,11 @@ func (s *Segment) Size() uint64 {
 	}
 
 	return size
+}
+
+// KeyCount returns the number of keys in the segment.
+func (s *Segment) KeyCount() uint32 {
+	return s.keyCount
 }
 
 // lookForFile looks for a file in a list of directories. It returns an error if the file appears
@@ -328,7 +336,7 @@ func (s *Segment) GetShard(key []byte) uint32 {
 //
 // This method does not ensure that the key-value pair is actually written to disk, only that it will eventually be
 // written to disk. Flush must be called to ensure that all data previously passed to Write is written to disk.
-func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64, err error) {
+func (s *Segment) Write(data *types.KVPair) (keyCount uint32, keyFileSize uint64, err error) {
 	if s.metadata.sealed {
 		return 0, 0, fmt.Errorf("segment is sealed, cannot write data")
 	}
@@ -482,7 +490,7 @@ func (s *Segment) Seal(now time.Time) ([]*types.ScopedKey, error) {
 	}
 
 	// Seal the metadata file.
-	err = s.metadata.seal(now)
+	err = s.metadata.seal(now, s.keyCount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to seal metadata file: %w", err)
 	}

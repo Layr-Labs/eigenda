@@ -192,9 +192,10 @@ func (m *metadataFile) swapPath() string {
 
 // Seal seals the segment. This action will atomically write the metadata file to disk one final time,
 // and should only be performed when all data that will be written to the key/value files has been made durable.
-func (m *metadataFile) seal(now time.Time) error {
+func (m *metadataFile) seal(now time.Time, keyCount uint32) error {
 	m.sealed = true
 	m.lastValueTimestamp = uint64(now.UnixNano())
+	m.keyCount = keyCount
 	err := m.write()
 	if err != nil {
 		return fmt.Errorf("failed to write sealed metadata file: %v", err)
@@ -279,9 +280,9 @@ func (m *metadataFile) serialize() []byte {
 
 	// Write the sealed flag
 	if m.sealed {
-		data[32] = 1
+		data[36] = 1
 	} else {
-		data[32] = 0
+		data[36] = 0
 	}
 
 	return data

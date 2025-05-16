@@ -320,6 +320,11 @@ func (v *valueFile) delete() error {
 
 	err := os.Remove(v.path())
 	if err != nil {
+		if os.IsNotExist(err) {
+			// file does not exist, no work to be done // TODO verify this is actually not a problem, probably happens due to empty shard
+			return nil
+		}
+
 		return fmt.Errorf("failed to delete value file: %v", err)
 	}
 

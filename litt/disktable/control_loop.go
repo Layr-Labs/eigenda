@@ -60,7 +60,7 @@ type controlLoop struct {
 	targetFileSize uint32
 
 	// The maximum number of keys in a segment.
-	maxKeyCount uint64
+	maxKeyCount uint32
 
 	// The target size for key files.
 	targetKeyFileSize uint64
@@ -150,7 +150,7 @@ func (c *controlLoop) run() {
 
 // doGarbageCollection performs garbage collection on all segments, deleting old ones as necessary.
 func (c *controlLoop) doGarbageCollection() {
-	start := c.clock()
+	now := c.clock()
 	ttl := c.metadata.GetTTL()
 	if ttl.Nanoseconds() <= 0 {
 		// No TTL set, so nothing to do.
@@ -160,7 +160,7 @@ func (c *controlLoop) doGarbageCollection() {
 	defer func() {
 		if c.metrics != nil {
 			end := c.clock()
-			delta := end.Sub(start)
+			delta := end.Sub(now)
 			c.metrics.ReportGarbageCollectionLatency(c.name, delta)
 
 		}
@@ -175,7 +175,7 @@ func (c *controlLoop) doGarbageCollection() {
 		}
 
 		sealTime := seg.GetSealTime()
-		segmentAge := start.Sub(sealTime)
+		segmentAge := now.Sub(sealTime)
 		if segmentAge < ttl {
 			// Segment is not old enough to be deleted.
 			return
@@ -206,7 +206,7 @@ func (c *controlLoop) doGarbageCollection() {
 		}
 
 		c.immutableSegmentSize -= seg.Size()
-		c.keyCount.Add(-1 * int64(len(keys)))
+		c.keyCount.Add(-1 * int64(seg.KeyCount()))
 
 		// Deletion of segment files will happen when the segment is released by all reservation holders.
 		seg.Release()

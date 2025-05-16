@@ -2137,10 +2137,18 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 		// Once in a while, scan the table and verify that all expected values are present.
 		// Don't do this every time for the sake of test runtime.
 		if rand.BoolWithProbability(0.01) || i == iterations-1 /* always check on the last iteration */ {
+
+			// Force garbage collection to run in order to remove expired values from counts.
+			err = table.Flush()
+			require.NoError(t, err)
+			err = (table).(*DiskTable).RunGC()
+			require.NoError(t, err)
+
 			// Remove expired values from the expected values.
 			newlyExpiredKeys := make([]string, 0)
 			for key, creationTime := range creationTimes {
-				if newTime.Sub(creationTime) > ttl {
+				age := newTime.Sub(creationTime)
+				if age > ttl {
 					newlyExpiredKeys = append(newlyExpiredKeys, key)
 				}
 			}
@@ -2202,6 +2210,13 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 	require.NoError(t, err)
 
 	reportedSize := table.Size()
+	reportedKeyCount := table.KeyCount()
+
+	// The exact key count is hard to predict for the sake of this unit test, since GC is "lazy" and may not
+	// immediately remove all values that are legal to be removed. But at the very least, all unexpired
+	// values should be present, and the key count should not exceed the number of total inserted values.
+	require.GreaterOrEqual(t, reportedKeyCount, uint64(len(expectedValues)))
+	require.LessOrEqual(t, reportedKeyCount, uint64(len(expectedValues)+len(expiredValues)))
 
 	err = table.Close()
 	require.NoError(t, err)
@@ -2236,9 +2251,14 @@ func tableSizeTest(t *testing.T, tableBuilder *tableBuilder) {
 	require.NoError(t, err)
 
 	newReportedSize := table.Size()
+	newReportedKeyCount := table.KeyCount()
 
 	// New size should be greater than the old size, since GC is disabled and
 	// we will have started a new segment upon restart.
+	require.LessOrEqual(t, reportedSize, newReportedSize)
+
+	// The number of keys should be the same as before.
+	require.Equal(t, reportedKeyCount, newReportedKeyCount)
 
 	err = table.Close()
 	require.NoError(t, err)

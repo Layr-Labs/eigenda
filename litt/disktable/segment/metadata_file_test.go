@@ -146,13 +146,16 @@ func TestSealing(t *testing.T) {
 
 	// seal the file
 	sealTime := rand.Time()
-	err = m.seal(sealTime)
+	err = m.seal(sealTime, 987)
 	require.NoError(t, err)
 
 	require.Equal(t, index, m.index)
 	require.Equal(t, LatestSegmentVersion, m.segmentVersion)
 	require.True(t, m.sealed)
 	require.Equal(t, uint64(sealTime.UnixNano()), m.lastValueTimestamp)
+	require.Equal(t, salt, m.salt)
+	require.Equal(t, uint32(1234), m.shardingFactor)
+	require.Equal(t, uint32(987), m.keyCount)
 	require.Equal(t, directory, m.parentDirectory)
 
 	// load the file
