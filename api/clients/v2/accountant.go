@@ -196,7 +196,7 @@ func (a *Accountant) GetRelativePeriodRecord(index uint64, quorumNumber uint8) *
 // dummy values that disable accountant from using the corresponding payment method.
 // If off-chain fields are not present, we assume the account has no payment history
 // and set accoutant state to use initial values.
-func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentStateReply) error {
+func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetQuorumSpecificPaymentStateReply) error {
 	if paymentState == nil {
 		return fmt.Errorf("payment state cannot be nil")
 	} else if paymentState.GetPaymentGlobalParams() == nil {
@@ -236,56 +236,30 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 		}
 	}
 
-	// Initialize periodRecords map
 	periodRecords := make(map[uint8][]PeriodRecord)
-	
-	// Process all period records and organize them by quorum number
-	quorumRecords := make(map[uint8][]*disperser_rpc.PeriodRecord)
 	for _, record := range paymentState.GetPeriodRecords() {
 		quorumNumber := uint8(record.QuorumNumber)
-		quorumRecords[quorumNumber] = append(quorumRecords[quorumNumber], record)
-	}
-	
-	// Initialize period records for each quorum
-	for quorumNumber, records := range quorumRecords {
-		periodRecords[quorumNumber] = make([]PeriodRecord, a.numBins)
-		
-		// By default, initialize each bin with empty period records
-		for i := range periodRecords[quorumNumber] {
-			periodRecords[quorumNumber][i] = PeriodRecord{
-				Index:        uint32(i),
-				Usage:        0,
-				QuorumNumber: quorumNumber,
-			}
-		}
-		
-		// Process the actual records
-		for _, record := range records {
-			// We need to convert to the right bin index based on reservation period
-			bin := uint32(record.Index % uint32(a.numBins))
-			periodRecords[quorumNumber][bin] = PeriodRecord{
-				Index:        record.Index,
-				Usage:        record.Usage,
-				QuorumNumber: quorumNumber,
-			}
-		}
-	}
-	
-	// Initialize period records for reservations that don't have period records
-	for quorumNumber := range a.reservation {
 		if _, exists := periodRecords[quorumNumber]; !exists {
 			periodRecords[quorumNumber] = make([]PeriodRecord, a.numBins)
-			for i := range periodRecords[quorumNumber] {
+			// Initialize all records for this quorum
+			for i := uint32(0); i < a.numBins; i++ {
 				periodRecords[quorumNumber][i] = PeriodRecord{
-					Index:        uint32(i),
+					Index:        i,
 					Usage:        0,
 					QuorumNumber: quorumNumber,
 				}
 			}
 		}
+		// Update the specific record
+		idx := record.Index % a.numBins
+		periodRecords[quorumNumber][idx] = PeriodRecord{
+			Index:        record.Index,
+			Usage:        record.Usage,
+			QuorumNumber: quorumNumber,
+		}
 	}
-	
 	a.periodRecords = periodRecords
+
 	return nil
 }
 

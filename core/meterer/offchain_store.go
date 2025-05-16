@@ -322,12 +322,12 @@ func (s *OffchainStore) RollbackOnDemandPayment(ctx context.Context, accountID g
 
 // GetPeriodRecords retrieves up to MinNumBins period records for a specific account and quorum number.
 // The records are sorted by reservation period in ascending order, starting from the given period.
-func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, quorumNumber uint8) ([MinNumBins]*pb.PeriodRecord, error) {
+func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, quorumNumber uint8) ([MinNumBins]*pb.QuorumPeriodRecord, error) {
 	// Fetch the 3 bins starting from the current bin with specific quorum number
 	queryInput := &dynamodb.QueryInput{
-		TableName: aws.String(s.reservationTableName),
+		TableName:              aws.String(s.reservationTableName),
 		KeyConditionExpression: aws.String("AccountID = :account AND ReservationPeriod >= :reservationPeriod"),
-		FilterExpression: aws.String("QuorumNumber = :quorumNumber"),
+		FilterExpression:       aws.String("QuorumNumber = :quorumNumber"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":account":           &types.AttributeValueMemberS{Value: accountID.Hex()},
 			":reservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
@@ -339,14 +339,14 @@ func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID gethcomm
 
 	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
-		return [MinNumBins]*pb.PeriodRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
+		return [MinNumBins]*pb.QuorumPeriodRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
 	}
 
-	records := [MinNumBins]*pb.PeriodRecord{}
+	records := [MinNumBins]*pb.QuorumPeriodRecord{}
 	for i := 0; i < len(bins) && i < int(MinNumBins); i++ {
-		periodRecord, err := parsePeriodRecord(bins[i])
+		periodRecord, err := parseQuorumPeriodRecord(bins[i])
 		if err != nil {
-			return [MinNumBins]*pb.PeriodRecord{}, fmt.Errorf("failed to parse bin %d record: %w", i, err)
+			return [MinNumBins]*pb.QuorumPeriodRecord{}, fmt.Errorf("failed to parse bin %d record: %w", i, err)
 		}
 		records[i] = periodRecord
 	}
@@ -362,9 +362,9 @@ func (s *OffchainStore) GetPeriodRecordsMultiQuorum(
 	accountID gethcommon.Address,
 	reservationPeriod uint64,
 	quorumNumbers []uint8,
-) ([]*pb.PeriodRecord, error) {
+) ([]*pb.QuorumPeriodRecord, error) {
 	if len(quorumNumbers) == 0 {
-		return []*pb.PeriodRecord{}, nil
+		return []*pb.QuorumPeriodRecord{}, nil
 	}
 
 	// Create the query input with base parameters
@@ -396,7 +396,7 @@ func (s *OffchainStore) GetPeriodRecordsMultiQuorum(
 				Value: strconv.FormatUint(uint64(q), 10),
 			}
 		}
-		
+
 		// Complete the IN expression
 		queryInput.FilterExpression = aws.String("QuorumNumber IN (" + strings.Join(filterExprParts, ", ") + ")")
 	}
@@ -404,13 +404,13 @@ func (s *OffchainStore) GetPeriodRecordsMultiQuorum(
 	// Execute the query
 	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
-		return []*pb.PeriodRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
+		return []*pb.QuorumPeriodRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
 	}
 
 	// Parse all found records
-	records := make([]*pb.PeriodRecord, 0, len(bins))
+	records := make([]*pb.QuorumPeriodRecord, 0, len(bins))
 	for _, bin := range bins {
-		periodRecord, err := parsePeriodRecord(bin)
+		periodRecord, err := parseQuorumPeriodRecord(bin)
 		if err != nil {
 			s.logger.Debug("Failed to parse period record", "err", err)
 			continue
@@ -457,7 +457,7 @@ func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, account
 	return payment, nil
 }
 
-func parsePeriodRecord(bin map[string]types.AttributeValue) (*pb.PeriodRecord, error) {
+func parseQuorumPeriodRecord(bin map[string]types.AttributeValue) (*pb.QuorumPeriodRecord, error) {
 	reservationPeriod, ok := bin["ReservationPeriod"]
 	if !ok {
 		return nil, errors.New("ReservationPeriod is not present in the response")
@@ -501,7 +501,7 @@ func parsePeriodRecord(bin map[string]types.AttributeValue) (*pb.PeriodRecord, e
 		}
 	}
 
-	return &pb.PeriodRecord{
+	return &pb.QuorumPeriodRecord{
 		Index:        uint32(reservationPeriodValue),
 		Usage:        uint64(binUsageValue),
 		QuorumNumber: quorumNumber,

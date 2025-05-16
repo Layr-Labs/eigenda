@@ -4,9 +4,10 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"time"
+
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/api/hashing"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/common/replay"
 	core "github.com/Layr-Labs/eigenda/core/v2"
@@ -66,7 +67,7 @@ func (*authenticator) AuthenticateBlobRequest(header *core.BlobHeader, signature
 // AuthenticatePaymentStateRequest verifies the signature of the payment state request
 // The signature is signed over the byte representation of the account ID and requestHash
 // See implementation of BlobRequestSigner.SignPaymentStateRequest for more details
-func (a *authenticator) AuthenticatePaymentStateRequest(accountAddr common.Address, request *pb.GetPaymentStateRequest) error {
+func (a *authenticator) AuthenticatePaymentStateRequest(accountAddr common.Address, request *pb.GetQuorumSpecificPaymentStateRequest) error {
 	sig := request.GetSignature()
 	// Ensure the signature is 65 bytes (Recovery ID is the last byte)
 	if len(sig) != 65 {

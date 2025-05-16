@@ -2,12 +2,13 @@ package v2_test
 
 import (
 	"crypto/sha256"
-	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/api/hashing"
-	"github.com/Layr-Labs/eigenda/common/replay"
 	"math/big"
 	"testing"
 	"time"
+
+	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/api/hashing"
+	"github.com/Layr-Labs/eigenda/common/replay"
 
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
@@ -191,7 +192,7 @@ func TestAuthenticatePaymentStateRequestCorruptedSignature(t *testing.T) {
 
 	requestHash, err := hashing.HashGetPaymentStateRequest(accountId, fixedTimestamp)
 	assert.NoError(t, err)
-	
+
 	hash := sha256.Sum256(requestHash)
 	signature, err := crypto.Sign(hash[:], signer.PrivateKey)
 	assert.NoError(t, err)
@@ -204,8 +205,8 @@ func TestAuthenticatePaymentStateRequestCorruptedSignature(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func mockGetPaymentStateRequest(accountId gethcommon.Address, signature []byte) *disperser_rpc.GetPaymentStateRequest {
-	return &disperser_rpc.GetPaymentStateRequest{
+func mockGetPaymentStateRequest(accountId gethcommon.Address, signature []byte) *disperser_rpc.GetQuorumSpecificPaymentStateRequest {
+	return &disperser_rpc.GetQuorumSpecificPaymentStateRequest{
 		AccountId: accountId.Hex(),
 		Signature: signature,
 		Timestamp: fixedTimestamp,

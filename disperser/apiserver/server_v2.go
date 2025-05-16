@@ -273,17 +273,21 @@ func (s *DispersalServerV2) getAllQuorumIds() []uint8 {
 		s.logger.Debug("onchain state not loaded yet")
 		return []uint8{}
 	}
-	
+
 	quorumCount := state.QuorumCount
 	quorumIds := make([]uint8, quorumCount)
 	for i := range quorumIds {
 		quorumIds[i] = uint8(i)
 	}
-	
+
 	return quorumIds
 }
 
 func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
+	return nil, api.NewErrorUnimplemented()
+}
+
+func (s *DispersalServerV2) GetQuorumSpecificPaymentState(ctx context.Context, req *pb.GetQuorumSpecificPaymentStateRequest) (*pb.GetQuorumSpecificPaymentStateReply, error) {
 	if s.meterer == nil {
 		return nil, errors.New("payment meterer is not enabled")
 	}
@@ -303,7 +307,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		s.logger.Debug("failed to validate signature", "err", err, "accountID", accountID)
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
-	
+
 	// on-chain global payment parameters
 	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetOnDemandSymbolsPerSecond()
 	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols()
@@ -315,22 +319,22 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
 
 	// Get all quorum IDs from the system
-	var periodRecords []*pb.PeriodRecord
+	var periodRecords []*pb.QuorumPeriodRecord
 	quorumIds := s.getAllQuorumIds()
-	
+
 	if len(quorumIds) == 0 {
-		periodRecords = []*pb.PeriodRecord{}
+		periodRecords = []*pb.QuorumPeriodRecord{}
 	} else {
 		// Get all period records for this account across all quorums
 		var fetchErr error
 		periodRecords, fetchErr = s.meterer.OffchainStore.GetPeriodRecordsMultiQuorum(ctx, accountID, currentReservationPeriod, quorumIds)
 		if fetchErr != nil {
-			s.logger.Debug("failed to get reservation records for multiple quorums", 
+			s.logger.Debug("failed to get reservation records for multiple quorums",
 				"err", fetchErr, "accountID", accountID)
-			periodRecords = []*pb.PeriodRecord{}
+			periodRecords = []*pb.QuorumPeriodRecord{}
 		}
 	}
-	
+
 	// Get largest cumulative payment
 	var largestCumulativePaymentBytes []byte
 	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, accountID)
@@ -339,24 +343,24 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	} else {
 		largestCumulativePaymentBytes = largestCumulativePayment.Bytes()
 	}
-	
+
 	// Get on-Chain account state for reservations
-	var pbReservation []*pb.Reservation
-	
+	var pbReservation []*pb.QuorumReservation
+
 	// Get fresh quorum IDs since onchain state might have changed
 	quorumIds = s.getAllQuorumIds()
 	if len(quorumIds) == 0 {
-		pbReservation = []*pb.Reservation{}
+		pbReservation = []*pb.QuorumReservation{}
 	} else {
 		reservations, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, accountID, quorumIds)
 		if err != nil {
 			s.logger.Debug("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
-			pbReservation = []*pb.Reservation{}
+			pbReservation = []*pb.QuorumReservation{}
 		} else {
 			quorumCount := uint8(len(quorumIds))
-			pbReservation = make([]*pb.Reservation, quorumCount)
+			pbReservation = make([]*pb.QuorumReservation, quorumCount)
 			for quorumId, reservation := range reservations {
-				pbReservation[quorumId] = &pb.Reservation{
+				pbReservation[quorumId] = &pb.QuorumReservation{
 					SymbolsPerSecond: reservation.SymbolsPerSecond,
 					StartTimestamp:   uint32(reservation.StartTimestamp),
 					EndTimestamp:     uint32(reservation.EndTimestamp),
@@ -384,7 +388,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	}
 
 	// Build reply
-	reply := &pb.GetPaymentStateReply{
+	reply := &pb.GetQuorumSpecificPaymentStateReply{
 		PaymentGlobalParams:      &paymentGlobalParams,
 		PeriodRecords:            periodRecords,
 		Reservations:             pbReservation,
