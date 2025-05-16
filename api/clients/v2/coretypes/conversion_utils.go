@@ -17,6 +17,12 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+/*
+	NOTE: Two binding types are used here to represent the same data since legacy EigenDACertVerifierV2
+	binding and IEigenDACertTypeBindings leverage the same structs but are not currently interchangeable.
+	This can be changed in the future to use a single binding type once the legacy contract is deprecated.
+*/
+
 func SignedBatchProtoToV2CertBinding(inputBatch *disperserv2.SignedBatch) (*contractEigenDACertVerifier.EigenDATypesV2SignedBatch, error) {
 	convertedBatchHeader, err := BatchHeaderProtoToV2CertVerifierBinding(inputBatch.GetHeader())
 	if err != nil {
