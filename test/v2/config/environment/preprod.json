@@ -15,5 +15,7 @@
   "SRSOrder": 268435456,
   "MaxBlobSize": 16777216,
   "MetricsPort": 9101,
-  "DisableMetrics": true
+  "DisableMetrics": true,
+  "ValidatorReadConnectionPoolSize": 20,
+  "ValidatorReadComputePoolSize": 20
 }
