@@ -37,6 +37,9 @@ func setupTest(t *testing.T) *testContext {
 
 	var err error
 
+	// Clean up any tables that might exist with these names already
+	cleanupTables(tc)
+
 	// Create the tables
 	err = meterer.CreateReservationTable(clientConfig, tc.reservationTable)
 	require.NoError(t, err)
@@ -46,6 +49,9 @@ func setupTest(t *testing.T) *testContext {
 
 	err = meterer.CreateGlobalReservationTable(clientConfig, tc.globalBinTable)
 	require.NoError(t, err)
+
+	// Skip table schema verification since we don't have DescribeTable in our mock interface
+	// We can verify the key structure by attempting a direct query later in the tests
 
 	// Register cleanup to remove tables after test completes
 	t.Cleanup(func() {
@@ -86,11 +92,11 @@ func TestUpdateReservationBin(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, size, binUsage)
 
-	// Get the bin directly from DynamoDB to verify
+	// Get the bin directly from DynamoDB to verify with the composite key
+	accountAndQuorum := fmt.Sprintf("%s_%d", accountID.Hex(), quorumNumber)
 	item, err := dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"AccountAndQuorum":   &types.AttributeValueMemberS{Value: accountAndQuorum},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
-		"QuorumNumber":      &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(quorumNumber), 10)},
 	})
 	require.NoError(t, err)
 	binUsageStr := item["BinUsage"].(*types.AttributeValueMemberN).Value
@@ -104,11 +110,11 @@ func TestUpdateReservationBin(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, size+additionalSize, binUsage)
 
-	// Verify updated bin
+	// Verify updated bin with the composite key
+	accountAndQuorum = fmt.Sprintf("%s_%d", accountID.Hex(), quorumNumber)
 	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"AccountAndQuorum":   &types.AttributeValueMemberS{Value: accountAndQuorum},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
-		"QuorumNumber":      &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(quorumNumber), 10)},
 	})
 	require.NoError(t, err)
 	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
@@ -123,11 +129,11 @@ func TestUpdateReservationBin(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, size2, binUsage)
 	
-	// Verify second quorum bin
+	// Verify second quorum bin with the composite key
+	accountAndQuorum2 := fmt.Sprintf("%s_%d", accountID.Hex(), quorumNumber2)
 	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"AccountAndQuorum":   &types.AttributeValueMemberS{Value: accountAndQuorum2},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
-		"QuorumNumber":      &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(quorumNumber2), 10)},
 	})
 	require.NoError(t, err)
 	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
@@ -135,11 +141,11 @@ func TestUpdateReservationBin(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, size2, binUsageVal)
 	
-	// First quorum should remain unchanged
+	// First quorum should remain unchanged - verify with the composite key
+	accountAndQuorum = fmt.Sprintf("%s_%d", accountID.Hex(), quorumNumber)
 	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"AccountAndQuorum":   &types.AttributeValueMemberS{Value: accountAndQuorum},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
-		"QuorumNumber":      &types.AttributeValueMemberN{Value: strconv.FormatUint(uint64(quorumNumber), 10)},
 	})
 	require.NoError(t, err)
 	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
@@ -566,11 +572,11 @@ func TestBatchUpdateReservationBins(t *testing.T) {
 	assert.Equal(t, uint64(2000), results[1])
 	assert.Equal(t, uint64(3000), results[2])
 	
-	// Verify records in database
+	// Verify records in database using the composite key
+	accountAndQuorum := fmt.Sprintf("%s_%d", accountID.Hex(), uint8(0))
 	item, err := dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"AccountAndQuorum":   &types.AttributeValueMemberS{Value: accountAndQuorum},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: "100"},
-		"QuorumNumber":      &types.AttributeValueMemberN{Value: "0"},
 	})
 	require.NoError(t, err)
 	binUsageStr := item["BinUsage"].(*types.AttributeValueMemberN).Value
@@ -578,10 +584,10 @@ func TestBatchUpdateReservationBins(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, uint64(1000), binUsageVal)
 	
+	accountAndQuorum = fmt.Sprintf("%s_%d", accountID.Hex(), uint8(0))
 	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"AccountAndQuorum":   &types.AttributeValueMemberS{Value: accountAndQuorum},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: "101"},
-		"QuorumNumber":      &types.AttributeValueMemberN{Value: "0"},
 	})
 	require.NoError(t, err)
 	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
@@ -589,10 +595,10 @@ func TestBatchUpdateReservationBins(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, uint64(2000), binUsageVal)
 	
+	accountAndQuorum = fmt.Sprintf("%s_%d", accountID.Hex(), uint8(1))
 	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"AccountAndQuorum":   &types.AttributeValueMemberS{Value: accountAndQuorum},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: "100"},
-		"QuorumNumber":      &types.AttributeValueMemberN{Value: "1"},
 	})
 	require.NoError(t, err)
 	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
@@ -624,11 +630,11 @@ func TestBatchUpdateReservationBins(t *testing.T) {
 	assert.Equal(t, uint64(1500), results[0]) // 1000 + 500
 	assert.Equal(t, uint64(3700), results[1]) // 3000 + 700
 	
-	// Verify records in database were updated
+	// Verify records in database were updated - using the composite key
+	accountAndQuorum = fmt.Sprintf("%s_%d", accountID.Hex(), uint8(0))
 	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"AccountAndQuorum":   &types.AttributeValueMemberS{Value: accountAndQuorum},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: "100"},
-		"QuorumNumber":      &types.AttributeValueMemberN{Value: "0"},
 	})
 	require.NoError(t, err)
 	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
@@ -636,10 +642,10 @@ func TestBatchUpdateReservationBins(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, uint64(1500), binUsageVal)
 	
+	accountAndQuorum = fmt.Sprintf("%s_%d", accountID.Hex(), uint8(1))
 	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
+		"AccountAndQuorum":   &types.AttributeValueMemberS{Value: accountAndQuorum},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: "100"},
-		"QuorumNumber":      &types.AttributeValueMemberN{Value: "1"},
 	})
 	require.NoError(t, err)
 	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
