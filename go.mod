@@ -34,6 +34,7 @@ require (
 	github.com/urfave/cli v1.22.14
 	github.com/urfave/cli/v2 v2.27.4
 	github.com/wealdtech/go-merkletree/v2 v2.6.0
+	github.com/yusufpapurcu/wmi v1.2.4
 	go.uber.org/automaxprocs v1.5.2
 	go.uber.org/mock v0.4.0
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa

@@ -59,7 +59,7 @@ import {
         quorumNumbers1
       )
       
-      // for each quroum in quorumNumbers, mock the call to getApk
+      // for each quorum in quorumNumbers, mock the call to getApk
       for(let i = 0; i < quorumNumbers1.length; i++) {
         let quorumNumber = quorumNumbers1[i]
         let quorumNumberBigInt = BigInt.fromI32(quorumNumber)
@@ -71,14 +71,12 @@ import {
       handleOperatorAddedToQuorums(newOperatorAddedToQuorumsEvent1)
   
       assert.entityCount("QuorumApk", quorumNumbers1.length)
-  
-      assert.entityCount("QuorumApk", quorumNumbers1.length)
       checkQuorumApkEntities(newOperatorAddedToQuorumsEvent1.transaction.hash, newOperatorAddedToQuorumsEvent1.logIndex, quorumNumbers1, quorumApks1)
   
       let newOperatorRemovedFromQuorumsEvent2 = createNewOperatorRemovedFromQuorumsEvent(operator, quorumNumbers2)
       newOperatorRemovedFromQuorumsEvent2.logIndex = newOperatorAddedToQuorumsEvent1.logIndex.plus(BigInt.fromI32(1))
   
-      // for each quroum in quorumNumbers, mock the call to getApk
+      // for each quorum in quorumNumbers, mock the call to getApk
       for(let i = 0; i < quorumNumbers2.length; i++) {
         let quorumNumber = quorumNumbers2[i]
         let quorumNumberBigInt = BigInt.fromI32(quorumNumber)
