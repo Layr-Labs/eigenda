@@ -147,15 +147,15 @@ import {
     })
 
     test("operator registered", () => {
-      assert.fieldEquals("Operator", operator.toHex(), "id", operator.toHex())
-      assert.fieldEquals("Operator", operator.toHex(), "pubkeyG1_X", pubkeyG1_X.toString())
-      assert.fieldEquals("Operator", operator.toHex(), "pubkeyG1_Y", pubkeyG1_Y.toString())
+      assert.fieldEquals("Operator", pubkeyHash.toHexString(), "operator", operator.toHexString())
+      assert.fieldEquals("Operator", pubkeyHash.toHexString(), "pubkeyG1_X", pubkeyG1_X.toString())
+      assert.fieldEquals("Operator", pubkeyHash.toHexString(), "pubkeyG1_Y", pubkeyG1_Y.toString())
     })
 
     test("operator ejected", () => {
       let ejectionEvent = createNewOperatorEjectedEvent(operator)
       handleOperatorEjected(ejectionEvent)
 
-      assert.fieldEquals("Operator", operator.toHex(), "status", "ejected")
+      assert.fieldEquals("Operator", pubkeyHash.toHexString(), "status", "ejected")
     })
 })

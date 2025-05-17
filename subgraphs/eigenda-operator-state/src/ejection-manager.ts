@@ -12,8 +12,10 @@ import {
   OperatorEjected,
   OwnershipTransferred,
   QuorumEjection,
-  QuorumEjectionParamsSet
+  QuorumEjectionParamsSet,
+  Operator
 } from "../generated/schema"
+import { Bytes } from "@graphprotocol/graph-ts"
 
 export function handleEjectorUpdated(event: EjectorUpdatedEvent): void {
   let entity = new EjectorUpdated(
@@ -54,6 +56,13 @@ export function handleOperatorEjected(event: OperatorEjectedEvent): void {
   entity.transactionHash = event.transaction.hash
 
   entity.save()
+
+  // Update operator status
+  let operator = Operator.load(event.params.operatorId)
+  if (operator != null) {
+    operator.status = "ejected"
+    operator.save()
+  }
 }
 
 export function handleOwnershipTransferred(

@@ -18,6 +18,7 @@ export function handleNewPubkeyRegistration(
   entity.pubkeyG2_X = event.params.pubkeyG2.X
   entity.pubkeyG2_Y = event.params.pubkeyG2.Y
   entity.deregistrationBlockNumber = BigInt.fromI32(0)
+  entity.status = "active"
 
   entity.save()
 }

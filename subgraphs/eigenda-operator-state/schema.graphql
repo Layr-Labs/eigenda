@@ -148,6 +148,7 @@ type Operator @entity {
   pubkeyG2_Y: [BigInt!]! # uint256[2]
   deregistrationBlockNumber: BigInt!
   socketUpdates: [OperatorSocketUpdate!]! @derivedFrom(field: "operatorId")
+  status: String! # active, ejected, etc.
 }
 
 type QuorumApk @entity(immutable: true) {
