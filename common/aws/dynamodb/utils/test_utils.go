@@ -38,6 +38,18 @@ func CreateTable(ctx context.Context, cfg commonaws.ClientConfig, name string, i
 	return table.TableDescription, nil
 }
 
+func DeleteTable(ctx context.Context, cfg commonaws.ClientConfig, name string) error {
+	c, err := getClient(cfg)
+	if err != nil {
+		return err
+	}
+	_, err = c.DeleteTable(ctx, &dynamodb.DeleteTableInput{TableName: aws.String(name)})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func getClient(clientConfig commonaws.ClientConfig) (*dynamodb.Client, error) {
 	createClient := func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		if clientConfig.EndpointURL != "" {

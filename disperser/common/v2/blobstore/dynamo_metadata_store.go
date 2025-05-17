@@ -339,6 +339,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtForward(
 	startKey := after.ToCursorKey()
 	endKey := before.ToCursorKey()
 	result := make([]*v2.BlobMetadata, 0)
+
 	var lastProcessedCursor *BlobFeedCursor
 
 	for bucket := startBucket; bucket <= endBucket; bucket++ {
