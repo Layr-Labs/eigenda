@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
@@ -655,7 +654,6 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForward(t *testing.T) {
 
 	// Test pagination
 	t.Run("pagination", func(t *testing.T) {
-		t.Skip("Skipping test for Postgres")
 		startCursor := blobstore.BlobFeedCursor{
 			RequestedAt: firstBlobTime,
 			BlobKey:     nil,
@@ -845,7 +843,6 @@ func TestBlobMetadataStoreGetBlobMetadataByRequestedAtBackward(t *testing.T) {
 
 	// Test pagination
 	t.Run("pagination", func(t *testing.T) {
-		t.Skip("Skipping test for Postgres")
 		beforeCursor := blobstore.BlobFeedCursor{
 			RequestedAt: math.MaxUint64,
 			BlobKey:     nil,
@@ -1693,7 +1690,6 @@ func TestBlobMetadataStoreDispersalsByRespondedAt(t *testing.T) {
 	nanoSecsPerRequest := uint64(time.Second.Nanoseconds()) // 1 batch/s
 
 	respondedAt := make([]uint64, numRequests)
-	dynamoKeys := make([]commondynamodb.Key, numRequests)
 	for i := 0; i < numRequests; i++ {
 		respondedAt[i] = firstRequestTs + uint64(i)*nanoSecsPerRequest
 		dispersalRequest := &corev2.DispersalRequest{
@@ -1716,12 +1712,8 @@ func TestBlobMetadataStoreDispersalsByRespondedAt(t *testing.T) {
 		err := env.blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
 		require.NoError(t, err)
 
-		bhh, err := dispersalRequest.BatchHeader.Hash()
+		_, err = dispersalRequest.BatchHeader.Hash()
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
-			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
-			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID.Hex()},
-		}
 	}
 
 	// Test empty range

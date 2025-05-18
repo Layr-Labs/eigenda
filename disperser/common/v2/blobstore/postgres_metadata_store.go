@@ -684,7 +684,8 @@ func (s *PostgresBlobMetadataStore) queryBucketBlobMetadata(
 		SELECT blob_key, blob_header, requested_at, blob_status, updated_at
 		FROM blob_metadata
 		WHERE requested_at_bucket = $1 
-		  AND requested_at_blob_key BETWEEN $2 AND $3
+		  AND requested_at_blob_key  > $2
+		  AND requested_at_blob_key  < $3
 		ORDER BY requested_at_blob_key %s
 		%s
 	`, orderBy, limitClause)
