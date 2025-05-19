@@ -247,7 +247,7 @@ func NewNode(
 		ctx := context.Background()
 		// 12s per block
 		ttl := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second
-		n.ValidatorStore, err = NewValidatorStore(ctx, logger, config, time.Now, ttl, reg)
+		n.ValidatorStore, err = NewValidatorStore(logger, config, time.Now, ttl, reg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new store v2: %w", err)
 		}
@@ -813,7 +813,7 @@ func (n *Node) checkNodeReachability(checkPath string) {
 				n.Logger.Error("Reachability check failed to unmarshal json response", err)
 				continue
 			}
-			
+
 			n.processReachabilityResponse(version, responseObject)
 		} else {
 			var v2ResponseObject OperatorV2ReachabilityResponse
@@ -822,7 +822,7 @@ func (n *Node) checkNodeReachability(checkPath string) {
 				n.Logger.Error("Reachability check v2 failed to unmarshal json response", err)
 				continue
 			}
-			
+
 			if len(v2ResponseObject.Operators) > 0 {
 				// Process the first operator from the array
 				n.processReachabilityResponse(version, v2ResponseObject.Operators[0])

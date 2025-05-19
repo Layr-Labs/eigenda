@@ -422,6 +422,7 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 		NODE_TIMEOUT:                          "10s",
 		NODE_QUORUM_ID_LIST:                   "0,1",
 		NODE_DB_PATH:                          dbPath,
+		NODE_LITT_DB_STORAGE_PATHS:            dbPath,
 		NODE_ENABLE_TEST_MODE:                 "false", // using encrypted key in inabox
 		NODE_TEST_PRIVATE_BLS:                 blsKey,
 		NODE_BLS_KEY_FILE:                     blsKeyFile,
