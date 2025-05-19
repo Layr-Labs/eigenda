@@ -40,7 +40,7 @@ func init() {
 type CertificateVersion = uint64
 
 const (
-	// starting at two since we never formally defined a V1 cert in the core code
+	// starting at two since we never formally defined a V1 cert in the core codebase
 	VersionTwoCert   = 0x2
 	VersionThreeCert = 0x3
 )
@@ -83,6 +83,14 @@ func (s VerifyStatusCode) String() string {
 	}
 }
 
+type CertSerializationType byte
+const (
+	// CertSerializationRLP is the RLP encoding of the certificate
+	CertSerializationRLP CertSerializationType = iota
+	// CertSerializationABI is the ABI encoding of the certificate
+	CertSerializationABI
+)
+
 type EigenDACert interface {
 	BlobVersion()coreV2.BlobVersion
 	RelayKeys() []coreV2.RelayKey
@@ -92,7 +100,7 @@ type EigenDACert interface {
 
 	ComputeBlobKey() (*coreV2.BlobKey, error)
 	Commitments() (*encoding.BlobCommitments, error)
-	Serialize() ([]byte, error)
+	Serialize(CertSerializationType) ([]byte, error)
 }
 
 var _ EigenDACert = &EigenDACertV2{}
@@ -178,8 +186,27 @@ func (c *EigenDACertV3) ComputeBlobKey() (*coreV2.BlobKey, error) {
 	return &blobKey, nil
 }
 
-func (c *EigenDACertV3) Serialize() ([]byte, error) {
-	return v3CertTypeEncodeArgs.Pack(c)
+func (c *EigenDACertV3) Serialize(ct CertSerializationType) ([]byte, error) {
+	switch ct {
+	case CertSerializationRLP:
+		b, err := rlp.EncodeToBytes(c)
+		if err != nil {
+			return nil, fmt.Errorf("rlp encode v3 cert: %w", err)
+		}
+		return b, nil
+
+	case CertSerializationABI:
+		b, err := v3CertTypeEncodeArgs.Pack(c)
+		if err != nil {
+			return nil, fmt.Errorf("abi encode v3 cert: %w", err)
+		}
+		return b, nil
+
+	default:
+		return nil, fmt.Errorf("unknown serialization type: %d", ct)
+	}
+
+	
 }
 
 // Commitments returns the blob's cryptographic kzg commitments 
@@ -280,13 +307,22 @@ func (c *EigenDACertV2) QuorumNumbers() []byte {
 }
 
 // Serialize serializes the EigenDACertV2 to bytes
-func (c *EigenDACertV2) Serialize() ([]byte, error) {
-	b, err := rlp.EncodeToBytes(c)
-	if err != nil {
-		return nil, fmt.Errorf("rlp encode v2 cert: %w", err)
-	}
+func (c *EigenDACertV2) Serialize(ct CertSerializationType) ([]byte, error) {
+	switch ct {
+	case CertSerializationRLP:
+		b, err := rlp.EncodeToBytes(c)
+		if err != nil {
+			return nil, fmt.Errorf("rlp encode v2 cert: %w", err)
+		}
+		return b, nil
 
-	return b, nil
+	case CertSerializationABI:
+		return nil, fmt.Errorf("abi serialization not supported for v2 cert")
+
+	default:
+		return nil, fmt.Errorf("unknown serialization type: %d", ct)
+
+	}
 }
 
 

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 )
 
 // This example demonstrates how to use the RelayPayloadRetriever to retrieve a payload from EigenDA, running on
@@ -67,7 +69,7 @@ func Example_relayPayloadRetrieval() {
 	// is valid: if this call doesn't return an error, then the EigenDA network has attested to the availability of the
 	// dispersed blob.
 
-	certBytes, err := eigenDACert.Serialize()
+	certBytes, err := eigenDACert.Serialize(coretypes.CertSerializationABI)
 	if err != nil {
 		panic(fmt.Sprintf("serialize cert: %v", err))
 	}

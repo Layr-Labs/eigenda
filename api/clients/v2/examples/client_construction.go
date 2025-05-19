@@ -30,7 +30,6 @@ import (
 const (
 	ethRPCURL                        = "https://ethereum-holesky-rpc.publicnode.com"
 	disperserHostname                = "disperser-testnet-holesky.eigenda.xyz"
-	certVerifierAddress              = "0xFe52fE1940858DCb6e12153E2104aD0fDFbE1162"
 	certVerifierRouterAddress        = "0x7F40A8e1B62aa1c8Afed23f6E8bAe0D340A4BC4e"
 	registryCoordinatorAddress       = "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490"
 	blsOperatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"

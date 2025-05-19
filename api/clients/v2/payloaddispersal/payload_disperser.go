@@ -77,7 +77,7 @@ func NewPayloadDisperser(
 //  2. Disperse the blob
 //  3. Poll the disperser with GetBlobStatus until a terminal status is reached, or until the polling timeout is reached
 //  4. Construct an EigenDACert if dispersal is successful
-//  5. Verify the constructed cert with an eth_call to the EigenDACertVerifier contract
+//  5. Verify the constructed cert via an eth_call to the EigenDACertVerifier contract
 //  6. Return the valid cert
 func (pd *PayloadDisperser) SendPayload(
 	ctx context.Context,
@@ -167,7 +167,7 @@ func (pd *PayloadDisperser) SendPayload(
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
 
-	certBytes, err := eigenDACert.Serialize()
+	certBytes, err := eigenDACert.Serialize(coretypes.CertSerializationABI)
 	if err != nil {
 		return nil, fmt.Errorf("serialize cert: %w", err)
 	}
