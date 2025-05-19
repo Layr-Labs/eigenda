@@ -17,7 +17,7 @@ import (
 // CertVerifier is responsible for making eth calls against version agnostic CertVerifier contracts to ensure
 // cryptographic and structural integrity of EigenDA certificate types.
 // The V3 cert verifier contract is located at:
-// https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/periphery/cert/v3/EigenDACertVerifierV3.sol
+// https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/periphery/cert/EigenDACertVerifier.sol
 type CertVerifier struct {
 	logger            logging.Logger
 	ethClient         common.EthClient
