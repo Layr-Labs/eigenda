@@ -319,8 +319,6 @@ func (s *Segment) sealLoadedSegment(now time.Time) error {
 	return nil
 }
 
-// TODO figure out if empty value files at DB close time causes problems
-
 // Size returns the size of the segment in bytes. Counts bytes that are on disk or that will eventually end up on disk.
 // This method is not thread safe, and should not be called concurrently with methods that modify the segment.
 func (s *Segment) Size() uint64 {
