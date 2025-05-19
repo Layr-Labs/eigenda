@@ -13,7 +13,7 @@ stop-geth:
 	cd geth && docker compose down
 
 
-.PHONY: new-anvil new-docker-anvil chain localstack exp deploy-all stop-infra run-e2e run-e2e-nochurner run-e2e-nograph clean
+.PHONY: new-anvil new-docker-anvil chain localstack postgres exp deploy-all stop-infra run-e2e run-e2e-nochurner run-e2e-nograph clean
 
 new-anvil:
 	mkdir -p "testdata/$(dt)"
@@ -34,6 +34,9 @@ chain:
 localstack:
 	go run ./deploy/cmd -localstack-port 4570 localstack
 
+postgres:
+	go run ./deploy/cmd -postgres-port 5433 postgres
+
 exp: 
 	go run ./deploy/cmd exp
 
@@ -43,7 +46,8 @@ deploy-all:
 stop-infra:
 	./bin.sh stop-anvil
 	./bin.sh stop-graph
-	docker stop localstack-test
+	docker stop localstack-test || true
+	docker stop postgres-eigenda-test || true
 
 run-e2e:
 	go test ./tests -v -config=../templates/testconfig-anvil.yaml

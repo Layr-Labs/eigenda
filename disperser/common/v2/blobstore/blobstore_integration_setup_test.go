@@ -47,7 +47,7 @@ type testEnv struct {
 	mockDynamoClient          *mock.MockDynamoDBClient
 	blobStore                 *blobstore.BlobStore
 	blobMetadataStore         blobstore.MetadataStore
-	mockedBlobMetadataStore   *blobstore.BlobMetadataStore
+	mockedBlobMetadataStore   *blobstore.DynamoDBBlobMetadataStore
 	postgresBlobMetadataStore *blobstore.PostgresBlobMetadataStore
 	UUID                      uuid.UUID
 	s3BucketName              string
@@ -314,8 +314,8 @@ func setupDynamoDB(env *testEnv) error {
 	env.mockDynamoClient = &mock.MockDynamoDBClient{}
 
 	// Create DynamoDB metadata store
-	dynamoMetadataStore := blobstore.NewBlobMetadataStore(env.dynamoClient, env.logger, env.metadataTableName)
-	env.mockedBlobMetadataStore = blobstore.NewBlobMetadataStore(env.mockDynamoClient, env.logger, env.metadataTableName)
+	dynamoMetadataStore := blobstore.NewDynamoDBBlobMetadataStore(env.dynamoClient, env.logger, env.metadataTableName)
+	env.mockedBlobMetadataStore = blobstore.NewDynamoDBBlobMetadataStore(env.mockDynamoClient, env.logger, env.metadataTableName)
 
 	// Use the DynamoDB metadata store
 	env.blobMetadataStore = dynamoMetadataStore

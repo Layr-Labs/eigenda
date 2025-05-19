@@ -196,6 +196,51 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RESERVED_ONLY"),
 		Hidden:   false,
 	}
+	UsePostgres = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "use-postgres"),
+		Usage:    "if true, use postgres for blob metadata store",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USE_POSTGRES"),
+	}
+	PostgresHost = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "postgres-host"),
+		Usage:    "host of the postgres server",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "POSTGRES_HOST"),
+	}
+	PostgresPort = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "postgres-port"),
+		Usage:    "port of the postgres server",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "POSTGRES_PORT"),
+		Value:    5432,
+	}
+	PostgresDatabase = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "postgres-database"),
+		Usage:    "database of the postgres server",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "POSTGRES_DATABASE"),
+		Value:    "eigenda_blobs_metadata",
+	}
+	PostgresUsername = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "postgres-username"),
+		Usage:    "username of the postgres server",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "POSTGRES_USERNAME"),
+	}
+	PostgresPassword = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "postgres-password"),
+		Usage:    "password of the postgres server",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "POSTGRES_PASSWORD"),
+	}
+	PostgresSSLMode = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "postgres-ssl-mode"),
+		Usage:    "ssl mode of the postgres server",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "POSTGRES_SSL_MODE"),
+		Value:    "disable",
+	}
 )
 
 var kzgFlags = []cli.Flag{
@@ -295,6 +340,13 @@ var optionalFlags = []cli.Flag{
 	NtpServerFlag,
 	NtpSyncIntervalFlag,
 	ReservedOnly,
+	UsePostgres,
+	PostgresHost,
+	PostgresPort,
+	PostgresDatabase,
+	PostgresUsername,
+	PostgresPassword,
+	PostgresSSLMode,
 }
 
 // Flags contains the list of configuration options available to the binary.

@@ -49,7 +49,7 @@ var (
 
 type dispatcherComponents struct {
 	Dispatcher        *controller.Dispatcher
-	BlobMetadataStore *blobstore.BlobMetadataStore
+	BlobMetadataStore blobstore.MetadataStore
 	Pool              common.WorkerPool
 	ChainReader       *coremock.MockWriter
 	ChainState        *coremock.ChainDataMock
@@ -616,7 +616,7 @@ type testObjects struct {
 	blobCerts     []*corev2.BlobCertificate
 }
 
-func setupBlobCerts(t *testing.T, blobMetadataStore *blobstore.BlobMetadataStore, quorumNumbers []core.QuorumID, numObjects int) *testObjects {
+func setupBlobCerts(t *testing.T, blobMetadataStore blobstore.MetadataStore, quorumNumbers []core.QuorumID, numObjects int) *testObjects {
 	ctx := context.Background()
 	headers := make([]*corev2.BlobHeader, numObjects)
 	keys := make([]corev2.BlobKey, numObjects)
@@ -651,7 +651,7 @@ func setupBlobCerts(t *testing.T, blobMetadataStore *blobstore.BlobMetadataStore
 	}
 }
 
-func deleteBlobs(t *testing.T, blobMetadataStore *blobstore.BlobMetadataStore, keys []corev2.BlobKey, batchHeaderHashes [][32]byte) {
+func deleteBlobs(t *testing.T, blobMetadataStore blobstore.MetadataStore, keys []corev2.BlobKey, batchHeaderHashes [][32]byte) {
 	ctx := context.Background()
 	for _, key := range keys {
 		err := blobMetadataStore.DeleteBlobMetadata(ctx, key)

@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/controller/flags"
+	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	"github.com/Layr-Labs/eigenda/indexer"
 	"github.com/urfave/cli"
@@ -40,6 +41,9 @@ type Config struct {
 	MetricsPort                  int
 	ControllerReadinessProbePath string
 	ControllerHealthProbePath    string
+
+	UsePostgres    bool
+	PostgresConfig blobstore.PostgreSQLConfig
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -103,6 +107,16 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		MetricsPort:                   ctx.GlobalInt(flags.MetricsPortFlag.Name),
 		ControllerReadinessProbePath:  ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
 		ControllerHealthProbePath:     ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
+
+		UsePostgres: ctx.GlobalBool(flags.UsePostgres.Name),
+		PostgresConfig: blobstore.PostgreSQLConfig{
+			Host:     ctx.GlobalString(flags.PostgresHost.Name),
+			Port:     ctx.GlobalInt(flags.PostgresPort.Name),
+			Database: ctx.GlobalString(flags.PostgresDatabase.Name),
+			Username: ctx.GlobalString(flags.PostgresUsername.Name),
+			Password: ctx.GlobalString(flags.PostgresPassword.Name),
+			SSLMode:  ctx.GlobalString(flags.PostgresSSLMode.Name),
+		},
 	}
 	if !config.DisperserStoreChunksSigningDisabled && config.DisperserKMSKeyID == "" {
 		return Config{}, fmt.Errorf("DisperserKMSKeyID is required when StoreChunks() signing is enabled")

@@ -167,7 +167,6 @@ func DeployResources(
 	}
 
 	return err
-
 }
 
 func PurgeDockertestResources(pool *dockertest.Pool, resource *dockertest.Resource) {

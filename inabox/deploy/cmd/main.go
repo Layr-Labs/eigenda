@@ -15,6 +15,7 @@ var (
 	rootPathFlagName        = "root-path"
 	localstackFlagName      = "localstack-port"
 	deployResourcesFlagName = "deploy-resources"
+	postgresPortFlagName    = "postgres-port"
 
 	metadataTableName   = "test-BlobMetadata"
 	bucketTableName     = "test-BucketStore"
@@ -22,6 +23,7 @@ var (
 
 	chainCmdName       = "chain"
 	localstackCmdName  = "localstack"
+	postgresCmdName    = "postgres"
 	expCmdName         = "exp"
 	generateEnvCmdName = "env"
 	allCmdName         = "all"
@@ -62,6 +64,11 @@ func main() {
 				Name:   localstackCmdName,
 				Usage:  "deploy localstack and create the AWS resources needed for the inabox test",
 				Action: getRunner(localstackCmdName),
+			},
+			{
+				Name:   postgresCmdName,
+				Usage:  "deploy PostgreSQL database for metadata storage",
+				Action: getRunner(postgresCmdName),
 			},
 			{
 				Name:   expCmdName,
@@ -111,6 +118,8 @@ func getRunner(command string) func(ctx *cli.Context) error {
 			return chainInfra(ctx, config)
 		case localstackCmdName:
 			return localstack(ctx)
+		case postgresCmdName:
+			return postgres(ctx)
 		case expCmdName:
 			config.DeployExperiment()
 		case generateEnvCmdName:
@@ -152,6 +161,28 @@ func localstack(ctx *cli.Context) error {
 	return nil
 }
 
+func postgres(ctx *cli.Context) error {
+	fmt.Println("Starting PostgreSQL database for metadata storage")
+	postgresPort := "5433"
+	if ctx.String(postgresPortFlagName) != "" {
+		postgresPort = ctx.String(postgresPortFlagName)
+	}
+
+	pool, resource, err := deploy.StartDockertestWithPostgresContainer(postgresPort)
+	if err != nil {
+		return fmt.Errorf("could not start PostgreSQL: %w", err)
+	}
+
+	// Initialize PostgreSQL with required schemas
+	err = deploy.InitializePostgresDatabase(pool, resource)
+	if err != nil {
+		return fmt.Errorf("could not initialize PostgreSQL schemas: %w", err)
+	}
+
+	fmt.Println("PostgreSQL initialized successfully and ready for use")
+	return nil
+}
+
 func all(ctx *cli.Context, config *deploy.Config) error {
 
 	err := chainInfra(ctx, config)
@@ -162,6 +193,12 @@ func all(ctx *cli.Context, config *deploy.Config) error {
 	err = localstack(ctx)
 	if err != nil {
 		return err
+	}
+
+	err = postgres(ctx)
+	if err != nil {
+		fmt.Printf("Warning: Could not start PostgreSQL: %v\n", err)
+		// Continue even if PostgreSQL fails since it's optional
 	}
 
 	config.DeployExperiment()

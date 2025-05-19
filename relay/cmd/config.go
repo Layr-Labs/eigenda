@@ -8,6 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	core "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/relay"
 	"github.com/Layr-Labs/eigenda/relay/cmd/flags"
 	"github.com/Layr-Labs/eigenda/relay/limiter"
@@ -28,6 +29,12 @@ type Config struct {
 
 	// MetadataTableName is the name of the DynamoDB table that stores metadata. Default is "metadata".
 	MetadataTableName string
+
+	// UsePostgres is a flag to indicate if the relay should use postgres for metadata storage.
+	UsePostgres bool
+
+	// PostgresConfig is the configuration for the postgres database.
+	PostgresConfig blobstore.PostgreSQLConfig
 
 	// RelayConfig is the configuration for the relay.
 	RelayConfig relay.Config
@@ -104,6 +111,15 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		BLSOperatorStateRetrieverAddr: ctx.String(flags.BlsOperatorStateRetrieverAddrFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.String(flags.EigenDAServiceManagerAddrFlag.Name),
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
+		UsePostgres:                   ctx.Bool(flags.UsePostgresFlag.Name),
+		PostgresConfig: blobstore.PostgreSQLConfig{
+			Host:     ctx.String(flags.PostgresHostFlag.Name),
+			Port:     ctx.Int(flags.PostgresPortFlag.Name),
+			Database: ctx.String(flags.PostgresDatabaseFlag.Name),
+			Username: ctx.String(flags.PostgresUsernameFlag.Name),
+			Password: ctx.String(flags.PostgresPasswordFlag.Name),
+			SSLMode:  ctx.String(flags.PostgresSSLMode.Name),
+		},
 	}
 	for i, id := range relayKeys {
 		config.RelayConfig.RelayKeys[i] = core.RelayKey(id)

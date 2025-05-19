@@ -63,7 +63,7 @@ var (
 
 	UUID                = uuid.New()
 	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
-	blobMetadataStore   *blobstorev2.BlobMetadataStore
+	blobMetadataStore   *blobstorev2.DynamoDBBlobMetadataStore
 	testDataApiServerV2 *serverv2.ServerV2
 
 	logger = testutils.GetLogger()
@@ -183,7 +183,7 @@ func setup(m *testing.M) {
 		teardown()
 		panic("failed to create dynamodb client: " + err.Error())
 	}
-	blobMetadataStore = blobstorev2.NewBlobMetadataStore(dynamoClient, logger, metadataTableName)
+	blobMetadataStore = blobstorev2.NewDynamoDBBlobMetadataStore(dynamoClient, logger, metadataTableName)
 
 	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
 	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
@@ -1074,7 +1074,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 	assert.NoError(t, err)
 
 	operatorStakesByBlock := map[uint32]core.OperatorStakes{
-		10: core.OperatorStakes{
+		10: {
 			0: {
 				0: {
 					OperatorID: operatorPubKeys[0].GetOperatorID(),
@@ -1129,13 +1129,13 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 		assert.Equal(t, attestation, response.AttestationInfo.Attestation)
 
 		signers := map[uint8][]serverv2.OperatorIdentity{
-			0: []serverv2.OperatorIdentity{
+			0: {
 				{
 					OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
 					OperatorAddress: operatorAddresses[2].Hex(),
 				},
 			},
-			1: []serverv2.OperatorIdentity{
+			1: {
 				{
 					OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
 					OperatorAddress: operatorAddresses[2].Hex(),
@@ -1147,7 +1147,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 			},
 		}
 		nonsigners := map[uint8][]serverv2.OperatorIdentity{
-			0: []serverv2.OperatorIdentity{
+			0: {
 				{
 					OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
 					OperatorAddress: operatorAddresses[0].Hex(),
@@ -1157,7 +1157,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 					OperatorAddress: operatorAddresses[1].Hex(),
 				},
 			},
-			1: []serverv2.OperatorIdentity{
+			1: {
 				{
 					OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
 					OperatorAddress: operatorAddresses[0].Hex(),
@@ -1283,7 +1283,7 @@ func TestFetchBatch(t *testing.T) {
 	)
 
 	operatorStakesByBlock := map[uint32]core.OperatorStakes{
-		10: core.OperatorStakes{
+		10: {
 			0: {
 				0: {
 					OperatorID: operatorPubKeys[0].GetOperatorID(),
@@ -1343,13 +1343,13 @@ func TestFetchBatch(t *testing.T) {
 	assert.Equal(t, []byte{0, 1, 2, 3, 4}, response.BlobCertificates[0].Signature)
 
 	signers := map[uint8][]serverv2.OperatorIdentity{
-		0: []serverv2.OperatorIdentity{
+		0: {
 			{
 				OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
 				OperatorAddress: operatorAddresses[2].Hex(),
 			},
 		},
-		1: []serverv2.OperatorIdentity{
+		1: {
 			{
 				OperatorId:      operatorPubKeys[2].GetOperatorID().Hex(),
 				OperatorAddress: operatorAddresses[2].Hex(),
@@ -1361,7 +1361,7 @@ func TestFetchBatch(t *testing.T) {
 		},
 	}
 	nonsigners := map[uint8][]serverv2.OperatorIdentity{
-		0: []serverv2.OperatorIdentity{
+		0: {
 			{
 				OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
 				OperatorAddress: operatorAddresses[0].Hex(),
@@ -1371,7 +1371,7 @@ func TestFetchBatch(t *testing.T) {
 				OperatorAddress: operatorAddresses[1].Hex(),
 			},
 		},
-		1: []serverv2.OperatorIdentity{
+		1: {
 			{
 				OperatorId:      operatorPubKeys[0].GetOperatorID().Hex(),
 				OperatorAddress: operatorAddresses[0].Hex(),
@@ -1753,14 +1753,14 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 	// defined above, ie. operatorIds[i] <-> operatorAddresses[i]
 	// We prepare data at two blocks (1 and 4) as they will be hit by queries below
 	operatorIntialQuorumsByBlock := map[uint32]map[core.OperatorID]*big.Int{
-		1: map[core.OperatorID]*big.Int{
+		1: {
 			operatorIds[0]: big.NewInt(4), // quorum 2
 			operatorIds[1]: big.NewInt(3), // quorum 0,1
 			operatorIds[2]: big.NewInt(3), // quorum 0,1
 			operatorIds[3]: big.NewInt(0), // no quorum
 			operatorIds[4]: big.NewInt(0), // no quorum
 		},
-		4: map[core.OperatorID]*big.Int{
+		4: {
 			operatorIds[0]: big.NewInt(4), // quorum 2
 			operatorIds[1]: big.NewInt(3), // quorum 0,1
 			operatorIds[2]: big.NewInt(3), // quorum 0,1
@@ -1781,7 +1781,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 
 	// We prepare data at two blocks (1 and 4) as they will be hit by queries below
 	operatorStakesByBlock := map[uint32]core.OperatorStakes{
-		1: core.OperatorStakes{
+		1: {
 			0: {
 				0: {
 					OperatorID: operatorIds[1],
@@ -1809,7 +1809,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 				},
 			},
 		},
-		4: core.OperatorStakes{
+		4: {
 			0: {
 				0: {
 					OperatorID: operatorIds[1],
@@ -2225,7 +2225,7 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 	operatorId := core.OperatorID{1}
 	ios := &core.IndexedOperatorState{
 		IndexedOperators: map[core.OperatorID]*core.IndexedOperatorInfo{
-			operatorId: &core.IndexedOperatorInfo{
+			operatorId: {
 				Socket: "1.2.3.4:3004:3005",
 			},
 		},

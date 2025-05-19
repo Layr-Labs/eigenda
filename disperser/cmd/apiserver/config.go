@@ -12,6 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/apiserver"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/apiserver/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/urfave/cli"
 )
@@ -54,6 +55,9 @@ type Config struct {
 
 	NtpServer       string
 	NtpSyncInterval time.Duration
+
+	UsePostgres    bool
+	PostgresConfig blobstorev2.PostgreSQLConfig
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -137,6 +141,15 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		AuthPmtStateRequestMaxFutureAge: ctx.GlobalDuration(flags.AuthPmtStateRequestMaxFutureAge.Name),
 		NtpServer:                       ctx.GlobalString(flags.NtpServerFlag.Name),
 		NtpSyncInterval:                 ctx.GlobalDuration(flags.NtpSyncIntervalFlag.Name),
+		UsePostgres:                     ctx.GlobalBool(flags.UsePostgres.Name),
+		PostgresConfig: blobstorev2.PostgreSQLConfig{
+			Host:     ctx.GlobalString(flags.PostgresHost.Name),
+			Port:     ctx.GlobalInt(flags.PostgresPort.Name),
+			Database: ctx.GlobalString(flags.PostgresDatabase.Name),
+			Username: ctx.GlobalString(flags.PostgresUsername.Name),
+			Password: ctx.GlobalString(flags.PostgresPassword.Name),
+			SSLMode:  ctx.GlobalString(flags.PostgresSSLMode.Name),
+		},
 	}
 	return config, nil
 }

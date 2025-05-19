@@ -38,26 +38,28 @@ var (
 	testName          string
 	inMemoryBlobStore bool
 
-	testConfig         *deploy.Config
+	testConfig *deploy.Config
+
+	// Localstack
 	dockertestPool     *dockertest.Pool
 	dockertestResource *dockertest.Resource
 	localStackPort     string
 
-	metadataTableName   = "test-BlobMetadata"
-	bucketTableName     = "test-BucketStore"
-	metadataTableNameV2 = "test-BlobMetadata-v2"
-	logger              logging.Logger
-	ethClient           common.EthClient
-	rpcClient           common.RPCEthClient
-	eigenDACertVerifierV1   *verifierv1bindings.ContractEigenDACertVerifierV1
-	eigenDACertVerifierV2Legacy   *verifierv2legacybindings.ContractEigenDACertVerifierV2
-	eigenDACertVerifier *verifierv2bindings.ContractEigenDACertVerifier
-	eigenDACertVerifierRouter *routerbindings.ContractEigenDACertVerifierRouter
-	retrievalClient     clients.RetrievalClient
-	retrievalClientV2   clientsv2.ValidatorClient
-	numConfirmations    int = 3
-	numRetries              = 0
-	chainReader         core.Reader
+	metadataTableName           = "test-BlobMetadata"
+	bucketTableName             = "test-BucketStore"
+	metadataTableNameV2         = "test-BlobMetadata-v2"
+	logger                      logging.Logger
+	ethClient                   common.EthClient
+	rpcClient                   common.RPCEthClient
+	eigenDACertVerifierV1       *verifierv1bindings.ContractEigenDACertVerifierV1
+	eigenDACertVerifierV2Legacy *verifierv2legacybindings.ContractEigenDACertVerifierV2
+	eigenDACertVerifier         *verifierv2bindings.ContractEigenDACertVerifier
+	eigenDACertVerifierRouter   *routerbindings.ContractEigenDACertVerifierRouter
+	retrievalClient             clients.RetrievalClient
+	retrievalClientV2           clientsv2.ValidatorClient
+	numConfirmations            int = 3
+	numRetries                      = 0
+	chainReader                 core.Reader
 
 	cancel context.CancelFunc
 )
@@ -103,6 +105,15 @@ var _ = BeforeSuite(func() {
 
 			err = deploy.DeployResources(pool, localStackPort, metadataTableName, bucketTableName, metadataTableNameV2)
 			Expect(err).To(BeNil())
+
+			// Deploy postgres
+			fmt.Println("Deploying postgres")
+			postgresPort := "5433"
+			postgresPool, postgresResource, err := deploy.StartDockertestWithPostgresContainer(postgresPort)
+			Expect(err).To(BeNil())
+			postgresPool = postgresPool
+			postgresResource = postgresResource
+
 		} else {
 			fmt.Println("Using in-memory Blob Store")
 		}
@@ -244,5 +255,6 @@ var _ = AfterSuite(func() {
 		testConfig.StopGraphNode()
 
 		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)
+		deploy.PurgeDockertestResources(postgresPool, postgresResource)
 	}
 })

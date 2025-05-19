@@ -101,10 +101,10 @@ func NewPostgresBlobMetadataStore(config PostgreSQLConfig, logger logging.Logger
 	}
 
 	// Initialize the database tables
-	if err := store.initTables(); err != nil {
-		pool.Close() // Close the pool if initialization fails
-		return nil, fmt.Errorf("failed to initialize tables: %w", err)
-	}
+	// if err := store.initTables(); err != nil {
+	// 	pool.Close() // Close the pool if initialization fails
+	// 	return nil, fmt.Errorf("failed to initialize tables: %w", err)
+	// }
 
 	return store, nil
 }
@@ -117,11 +117,13 @@ func (s *PostgresBlobMetadataStore) initTables() error {
 		CREATE TABLE IF NOT EXISTS blob_metadata (
 			blob_key BYTEA PRIMARY KEY,
 			blob_header JSONB NOT NULL,
+			blob_size INTEGER NOT NULL,
 			signature BYTEA NOT NULL,
 			requested_at BIGINT NOT NULL,
 			requested_at_bucket BYTEA NOT NULL,
 			requested_at_blob_key BYTEA NOT NULL,
 			blob_status INTEGER NOT NULL,
+			num_retries INTEGER NOT NULL,
 			updated_at BIGINT NOT NULL,
 			account_id VARCHAR(42) NOT NULL,
 			expiry BIGINT NOT NULL
@@ -333,13 +335,23 @@ func (s *PostgresBlobMetadataStore) PutBlobMetadata(ctx context.Context, blobMet
 	requestedAtBucket := computeRequestedAtBucket(blobMetadata.RequestedAt)
 	requestedAtBlobKey := encodeBlobFeedCursorKey(blobMetadata.RequestedAt, &blobKey)
 
+	// Marshal FragmentInfo to JSON if present
+	var fragmentInfoJSON []byte
+	if blobMetadata.FragmentInfo != nil {
+		fragmentInfoJSON, err = json.Marshal(blobMetadata.FragmentInfo)
+		if err != nil {
+			return fmt.Errorf("failed to marshal fragment info: %w", err)
+		}
+	}
+
 	// Insert into database
 	query := `
 		INSERT INTO blob_metadata (
 			blob_key, blob_header, signature, requested_at, requested_at_bucket, 
-			requested_at_blob_key, blob_status, updated_at, account_id, expiry
+			requested_at_blob_key, blob_status, updated_at, account_id, expiry,
+			num_retries, blob_size, fragment_info
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
 		) ON CONFLICT DO NOTHING
 	`
 	commandTag, err := s.db.Exec(
@@ -347,6 +359,7 @@ func (s *PostgresBlobMetadataStore) PutBlobMetadata(ctx context.Context, blobMet
 		blobKey[:], blobHeaderJSON, blobMetadata.Signature, blobMetadata.RequestedAt, requestedAtBucket,
 		requestedAtBlobKey, int(blobMetadata.BlobStatus), blobMetadata.UpdatedAt,
 		blobMetadata.BlobHeader.PaymentMetadata.AccountID.Hex(), blobMetadata.Expiry,
+		blobMetadata.NumRetries, blobMetadata.BlobSize, fragmentInfoJSON,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert blob metadata: %w", err)
@@ -557,7 +570,7 @@ func (s *PostgresBlobMetadataStore) GetBlobMetadataByStatusPaginated(
 	if exclusiveStartKey != nil && exclusiveStartKey.BlobKey != nil {
 		// Continue from the previous cursor
 		query = `
-			SELECT blob_key, blob_header, requested_at, blob_status, updated_at
+			SELECT blob_key, blob_header, signature, requested_at, blob_status, updated_at, expiry, blob_size, num_retries, fragment_info
 			FROM blob_metadata
 			WHERE blob_status = $1 AND 
 				  (updated_at > $2 OR (updated_at = $2 AND blob_key > $3))
@@ -568,7 +581,7 @@ func (s *PostgresBlobMetadataStore) GetBlobMetadataByStatusPaginated(
 	} else {
 		// Start from the beginning
 		query = `
-			SELECT blob_key, blob_header, requested_at, blob_status, updated_at
+			SELECT blob_key, blob_header, signature, requested_at, blob_status, updated_at, expiry, blob_size, num_retries, fragment_info
 			FROM blob_metadata
 			WHERE blob_status = $1
 			ORDER BY updated_at ASC, blob_key ASC
@@ -577,6 +590,7 @@ func (s *PostgresBlobMetadataStore) GetBlobMetadataByStatusPaginated(
 		args = append(args, int(status), limit)
 	}
 
+	s.logger.Info("querying blob metadata by status paginated", "query", query, "args", args)
 	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to query blob metadata by status paginated: %w", err)
@@ -588,11 +602,13 @@ func (s *PostgresBlobMetadataStore) GetBlobMetadataByStatusPaginated(
 	var lastUpdatedAt uint64
 
 	for rows.Next() {
-		var blobKey, blobHeader []byte
-		var requestedAt, updatedAt uint64
+		var blobKey, blobHeader, signature []byte
+		var requestedAt, updatedAt, expiry, blobSize uint64
+		var numRetries uint
 		var blobStatus int
+		var fragmentInfoJSON []byte
 
-		if err := rows.Scan(&blobKey, &blobHeader, &requestedAt, &blobStatus, &updatedAt); err != nil {
+		if err := rows.Scan(&blobKey, &blobHeader, &signature, &requestedAt, &blobStatus, &updatedAt, &expiry, &blobSize, &numRetries, &fragmentInfoJSON); err != nil {
 			return nil, nil, fmt.Errorf("failed to scan blob metadata: %w", err)
 		}
 
@@ -600,15 +616,28 @@ func (s *PostgresBlobMetadataStore) GetBlobMetadataByStatusPaginated(
 		lastUpdatedAt = updatedAt
 
 		metadata := &v2.BlobMetadata{
+			Signature:   signature,
 			RequestedAt: requestedAt,
 			BlobStatus:  v2.BlobStatus(blobStatus),
 			UpdatedAt:   updatedAt,
+			Expiry:      expiry,
+			BlobSize:    blobSize,
+			NumRetries:  numRetries,
 		}
 
 		// Unmarshal BlobHeader
 		err = json.Unmarshal(blobHeader, &metadata.BlobHeader)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to unmarshal blob header: %w", err)
+		}
+
+		// Unmarshal FragmentInfo if present
+		if fragmentInfoJSON != nil {
+			var fragmentInfo encoding.FragmentInfo
+			if err := json.Unmarshal(fragmentInfoJSON, &fragmentInfo); err != nil {
+				return nil, nil, fmt.Errorf("failed to unmarshal fragment info: %w", err)
+			}
+			metadata.FragmentInfo = &fragmentInfo
 		}
 
 		results = append(results, metadata)
@@ -626,6 +655,12 @@ func (s *PostgresBlobMetadataStore) GetBlobMetadataByStatusPaginated(
 	// Check if we've reached the limit (more records might be available)
 	if len(results) < int(limit) {
 		// No more records, return nil cursor to indicate end
+		for _, result := range results {
+			s.logger.Info("results is less than limit and no more records",
+				"results", fmt.Sprintf("%+v", result),
+				"num_results", len(results),
+				"limit", limit)
+		}
 		return results, nil, nil
 	}
 
@@ -635,6 +670,13 @@ func (s *PostgresBlobMetadataStore) GetBlobMetadataByStatusPaginated(
 	nextCursor := &StatusIndexCursor{
 		BlobKey:   &bk,
 		UpdatedAt: lastUpdatedAt,
+	}
+
+	for _, result := range results {
+		s.logger.Info("results is less than limit and there are more records",
+			"results", fmt.Sprintf("%+v", result),
+			"num_results", len(results),
+			"limit", limit)
 	}
 
 	return results, nextCursor, nil

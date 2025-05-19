@@ -9,6 +9,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/dataapi/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
+	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus"
 	"github.com/urfave/cli"
@@ -37,6 +38,9 @@ type Config struct {
 	DisperserHostname  string
 	ChurnerHostname    string
 	BatcherHealthEndpt string
+
+	UsePostgres    bool
+	PostgresConfig blobstorev2.PostgreSQLConfig
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -81,6 +85,15 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ChurnerHostname:    ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
 		BatcherHealthEndpt: ctx.GlobalString(flags.BatcherHealthEndptFlag.Name),
 		ChainStateConfig:   thegraph.ReadCLIConfig(ctx),
+		UsePostgres:        ctx.GlobalBool(flags.UsePostgresFlag.Name),
+		PostgresConfig: blobstorev2.PostgreSQLConfig{
+			Host:     ctx.GlobalString(flags.PostgresHostFlag.Name),
+			Port:     ctx.GlobalInt(flags.PostgresPortFlag.Name),
+			Database: ctx.GlobalString(flags.PostgresDatabaseFlag.Name),
+			Username: ctx.GlobalString(flags.PostgresUsernameFlag.Name),
+			Password: ctx.GlobalString(flags.PostgresPasswordFlag.Name),
+			SSLMode:  ctx.GlobalString(flags.PostgresSSLMode.Name),
+		},
 	}
 	return config, nil
 }

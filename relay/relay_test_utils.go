@@ -102,7 +102,7 @@ func teardown() {
 	}
 }
 
-func buildMetadataStore(t *testing.T) *blobstore.BlobMetadataStore {
+func buildMetadataStore(t *testing.T) blobstore.MetadataStore {
 
 	logger, err := common.NewLogger(common.DefaultLoggerConfig())
 	require.NoError(t, err)
@@ -133,7 +133,7 @@ func buildMetadataStore(t *testing.T) *blobstore.BlobMetadataStore {
 	dynamoClient, err := dynamodb.NewClient(cfg, logger)
 	require.NoError(t, err)
 
-	return blobstore.NewBlobMetadataStore(
+	return blobstore.NewDynamoDBBlobMetadataStore(
 		dynamoClient,
 		logger,
 		metadataTableName)

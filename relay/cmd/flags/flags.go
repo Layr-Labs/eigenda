@@ -323,6 +323,48 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GET_CHUNKS_REQUEST_MAX_FUTURE_AGE"),
 		Value:    5 * time.Minute,
 	}
+	UsePostgresFlag = cli.BoolFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "use-postgres"),
+		Usage:    "Use postgres for metadata storage",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USE_POSTGRES"),
+	}
+	PostgresHostFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "postgres-host"),
+		Usage:    "Host of the postgres database",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "POSTGRES_HOST"),
+	}
+	PostgresPortFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "postgres-port"),
+		Usage:    "Port of the postgres database",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "POSTGRES_PORT"),
+	}
+	PostgresDatabaseFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "postgres-database"),
+		Usage:    "Database of the postgres database",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "POSTGRES_DATABASE"),
+	}
+	PostgresUsernameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "postgres-username"),
+		Usage:    "Username of the postgres database",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "POSTGRES_USERNAME"),
+	}
+	PostgresPasswordFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "postgres-password"),
+		Usage:    "Password of the postgres database",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "POSTGRES_PASSWORD"),
+	}
+	PostgresSSLMode = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "postgres-ssl-mode"),
+		Usage:    "ssl mode of the postgres server",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "POSTGRES_SSL_MODE"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -374,6 +416,13 @@ var optionalFlags = []cli.Flag{
 	PprofHttpPortFlag,
 	GetChunksRequestMaxPastAgeFlag,
 	GetChunksRequestMaxFutureAgeFlag,
+	UsePostgresFlag,
+	PostgresHostFlag,
+	PostgresPortFlag,
+	PostgresDatabaseFlag,
+	PostgresUsernameFlag,
+	PostgresPasswordFlag,
+	PostgresSSLMode,
 }
 
 var Flags []cli.Flag

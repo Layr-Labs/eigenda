@@ -211,8 +211,8 @@ func TestBlobFeedCursor_LessThan(t *testing.T) {
 func TestBlobFeedCursor_CursorKeyCodec(t *testing.T) {
 	bk := corev2.BlobKey([32]byte{1, 2, 3})
 	cursors := []*blobstore.BlobFeedCursor{
-		&blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: nil},
-		&blobstore.BlobFeedCursor{RequestedAt: 1, BlobKey: &bk},
+		{RequestedAt: 1, BlobKey: nil},
+		{RequestedAt: 1, BlobKey: &bk},
 	}
 	for _, cursor := range cursors {
 		encoded := cursor.ToCursorKey()

@@ -44,7 +44,7 @@ import (
 type testComponents struct {
 	DispersalServerV2 *apiserver.DispersalServerV2
 	BlobStore         *blobstore.BlobStore
-	BlobMetadataStore *blobstore.BlobMetadataStore
+	BlobMetadataStore *blobstore.DynamoDBBlobMetadataStore
 	ChainReader       *mock.MockWriter
 	Signer            *auth.LocalBlobRequestSigner
 	Peer              *peer.Peer
@@ -509,7 +509,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	assert.NoError(t, err)
 	dynamoClient, err := dynamodb.NewClient(awsConfig, logger)
 	assert.NoError(t, err)
-	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, v2MetadataTableName)
+	blobMetadataStore := blobstore.NewDynamoDBBlobMetadataStore(dynamoClient, logger, v2MetadataTableName)
 	blobStore := blobstore.NewBlobStore(s3BucketName, s3Client, logger)
 	chainReader := &mock.MockWriter{}
 

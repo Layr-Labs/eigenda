@@ -41,7 +41,7 @@ var (
 	s3Client          s3.Client
 	dynamoClient      dynamodb.Client
 	blobStore         *blobstore.BlobStore
-	blobMetadataStore *blobstore.BlobMetadataStore
+	blobMetadataStore blobstore.MetadataStore
 
 	UUID              = uuid.New()
 	s3BucketName      = "test-eigenda-blobstore"
@@ -97,7 +97,7 @@ func setup(m *testing.M) {
 		panic("failed to create dynamodb client: " + err.Error())
 	}
 
-	blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, metadataTableName)
+	blobMetadataStore = blobstore.NewDynamoDBBlobMetadataStore(dynamoClient, logger, metadataTableName)
 
 	s3Client, err = s3.NewClient(context.Background(), cfg, logger)
 	if err != nil {

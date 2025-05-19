@@ -69,25 +69,25 @@ var (
 	}
 )
 
-var _ MetadataStore = (*BlobMetadataStore)(nil)
+var _ MetadataStore = (*DynamoDBBlobMetadataStore)(nil)
 
 // BlobMetadataStore is a blob metadata storage backed by DynamoDB
-type BlobMetadataStore struct {
+type DynamoDBBlobMetadataStore struct {
 	dynamoDBClient commondynamodb.Client
 	logger         logging.Logger
 	tableName      string
 }
 
-func NewBlobMetadataStore(dynamoDBClient commondynamodb.Client, logger logging.Logger, tableName string) *BlobMetadataStore {
+func NewDynamoDBBlobMetadataStore(dynamoDBClient commondynamodb.Client, logger logging.Logger, tableName string) *DynamoDBBlobMetadataStore {
 	logger.Debugf("creating blob metadata store v2 with table %s", tableName)
-	return &BlobMetadataStore{
+	return &DynamoDBBlobMetadataStore{
 		dynamoDBClient: dynamoDBClient,
 		logger:         logger.With("component", "blobMetadataStoreV2"),
 		tableName:      tableName,
 	}
 }
 
-func (s *BlobMetadataStore) PutBlobMetadata(ctx context.Context, blobMetadata *v2.BlobMetadata) error {
+func (s *DynamoDBBlobMetadataStore) PutBlobMetadata(ctx context.Context, blobMetadata *v2.BlobMetadata) error {
 	s.logger.Debug("store put blob metadata", "blobMetadata", blobMetadata)
 	item, err := MarshalBlobMetadata(blobMetadata)
 	if err != nil {
@@ -102,7 +102,7 @@ func (s *BlobMetadataStore) PutBlobMetadata(ctx context.Context, blobMetadata *v
 	return err
 }
 
-func (s *BlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKey corev2.BlobKey, status v2.BlobStatus) error {
+func (s *DynamoDBBlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKey corev2.BlobKey, status v2.BlobStatus) error {
 	validStatuses := statusUpdatePrecondition[status]
 	if len(validStatuses) == 0 {
 		return fmt.Errorf("%w: invalid status transition to %s", ErrInvalidStateTransition, status.String())
@@ -145,7 +145,7 @@ func (s *BlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKey corev2
 	return err
 }
 
-func (s *BlobMetadataStore) DeleteBlobMetadata(ctx context.Context, blobKey corev2.BlobKey) error {
+func (s *DynamoDBBlobMetadataStore) DeleteBlobMetadata(ctx context.Context, blobKey corev2.BlobKey) error {
 	err := s.dynamoDBClient.DeleteItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
@@ -158,7 +158,7 @@ func (s *BlobMetadataStore) DeleteBlobMetadata(ctx context.Context, blobKey core
 	return err
 }
 
-func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey corev2.BlobKey) (*v2.BlobMetadata, error) {
+func (s *DynamoDBBlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey corev2.BlobKey) (*v2.BlobMetadata, error) {
 	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
@@ -185,7 +185,7 @@ func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey corev2.
 }
 
 // CheckBlobExists checks if a blob exists without fetching the entire metadata.
-func (s *BlobMetadataStore) CheckBlobExists(ctx context.Context, blobKey corev2.BlobKey) (bool, error) {
+func (s *DynamoDBBlobMetadataStore) CheckBlobExists(ctx context.Context, blobKey corev2.BlobKey) (bool, error) {
 	input := &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
@@ -209,9 +209,9 @@ func (s *BlobMetadataStore) CheckBlobExists(ctx context.Context, blobKey corev2.
 }
 
 // GetBlobMetadataByStatus returns all the metadata with the given status that were updated after lastUpdatedAt
-// Because this function scans the entire index, it should only be used for status with a limited number of items.
+// Because this function scans the entire index, it should only be used for status with a limited -reeber of items.
 // Results are ordered by UpdatedAt in ascending order.
-func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status v2.BlobStatus, lastUpdatedAt uint64) ([]*v2.BlobMetadata, error) {
+func (s *DynamoDBBlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status v2.BlobStatus, lastUpdatedAt uint64) ([]*v2.BlobMetadata, error) {
 	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, StatusIndexName, "BlobStatus = :status AND UpdatedAt > :updatedAt", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
@@ -239,7 +239,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status 
 //
 // The function handles DynamoDB's 1MB response size limitation by performing multiple queries if necessary.
 // It filters out blobs at the exact startKey and endKey as they are exclusive bounds.
-func (s *BlobMetadataStore) queryBucketBlobMetadata(
+func (s *DynamoDBBlobMetadataStore) queryBucketBlobMetadata(
 	ctx context.Context,
 	bucket uint64,
 	ascending bool,
@@ -325,7 +325,7 @@ func (s *BlobMetadataStore) queryBucketBlobMetadata(
 //
 // If limit > 0, returns at most that many blobs. If limit <= 0, returns all blobs in range.
 // Also returns the cursor of the last processed blob, or nil if no blobs were processed.
-func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtForward(
+func (s *DynamoDBBlobMetadataStore) GetBlobMetadataByRequestedAtForward(
 	ctx context.Context,
 	after BlobFeedCursor,
 	before BlobFeedCursor,
@@ -366,7 +366,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtForward(
 //
 // If limit > 0, returns at most that many blobs. If limit <= 0, returns all blobs in range.
 // Also returns the cursor of the last processed blob, or nil if no blobs were processed.
-func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtBackward(
+func (s *DynamoDBBlobMetadataStore) GetBlobMetadataByRequestedAtBackward(
 	ctx context.Context,
 	before BlobFeedCursor,
 	after BlobFeedCursor,
@@ -409,7 +409,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByRequestedAtBackward(
 //
 // If limit > 0, returns at most that many blobs. If limit <= 0, returns all results
 // in the time range.
-func (s *BlobMetadataStore) GetBlobMetadataByAccountID(
+func (s *DynamoDBBlobMetadataStore) GetBlobMetadataByAccountID(
 	ctx context.Context,
 	accountId gethcommon.Address,
 	start uint64,
@@ -482,7 +482,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByAccountID(
 //
 // The function handles DynamoDB's 1MB response size limitation by performing multiple queries  if necessary.
 // If there are more than numToReturn attestations in the bucket, returns numToReturn attestations; otherwise returns all attestations in bucket.
-func (s *BlobMetadataStore) queryBucketAttestation(
+func (s *DynamoDBBlobMetadataStore) queryBucketAttestation(
 	ctx context.Context,
 	bucket, start, end uint64,
 	numToReturn int,
@@ -547,7 +547,7 @@ func (s *BlobMetadataStore) queryBucketAttestation(
 //
 // If limit > 0, returns at most that many attestations. If limit <= 0, returns all attestations
 // in the time range.
-func (s *BlobMetadataStore) GetAttestationByAttestedAtForward(
+func (s *DynamoDBBlobMetadataStore) GetAttestationByAttestedAtForward(
 	ctx context.Context,
 	after uint64,
 	before uint64,
@@ -591,7 +591,7 @@ func (s *BlobMetadataStore) GetAttestationByAttestedAtForward(
 //
 // If limit > 0, returns at most that many attestations. If limit <= 0, returns all attestations
 // in the time range.
-func (s *BlobMetadataStore) GetAttestationByAttestedAtBackward(
+func (s *DynamoDBBlobMetadataStore) GetAttestationByAttestedAtBackward(
 	ctx context.Context,
 	before uint64,
 	after uint64,
@@ -634,7 +634,7 @@ func (s *BlobMetadataStore) GetAttestationByAttestedAtBackward(
 // even when there are no more results or there are no results at all.
 // This cursor can be used to get new set of results when they become available.
 // Therefore, it's possible to get an empty result from a request with exclusive start key returned from previous response.
-func (s *BlobMetadataStore) GetBlobMetadataByStatusPaginated(
+func (s *DynamoDBBlobMetadataStore) GetBlobMetadataByStatusPaginated(
 	ctx context.Context,
 	status v2.BlobStatus,
 	exclusiveStartKey *StatusIndexCursor,
@@ -723,7 +723,7 @@ func (s *BlobMetadataStore) GetBlobMetadataByStatusPaginated(
 
 // GetBlobMetadataCountByStatus returns the count of all the metadata with the given status
 // Because this function scans the entire index, it should only be used for status with a limited number of items.
-func (s *BlobMetadataStore) GetBlobMetadataCountByStatus(ctx context.Context, status v2.BlobStatus) (int32, error) {
+func (s *DynamoDBBlobMetadataStore) GetBlobMetadataCountByStatus(ctx context.Context, status v2.BlobStatus) (int32, error) {
 	count, err := s.dynamoDBClient.QueryIndexCount(ctx, s.tableName, StatusIndexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
@@ -736,7 +736,7 @@ func (s *BlobMetadataStore) GetBlobMetadataCountByStatus(ctx context.Context, st
 	return count, nil
 }
 
-func (s *BlobMetadataStore) PutBlobCertificate(ctx context.Context, blobCert *corev2.BlobCertificate, fragmentInfo *encoding.FragmentInfo) error {
+func (s *DynamoDBBlobMetadataStore) PutBlobCertificate(ctx context.Context, blobCert *corev2.BlobCertificate, fragmentInfo *encoding.FragmentInfo) error {
 	item, err := MarshalBlobCertificate(blobCert, fragmentInfo)
 	if err != nil {
 		return err
@@ -750,7 +750,7 @@ func (s *BlobMetadataStore) PutBlobCertificate(ctx context.Context, blobCert *co
 	return err
 }
 
-func (s *BlobMetadataStore) DeleteBlobCertificate(ctx context.Context, blobKey corev2.BlobKey) error {
+func (s *DynamoDBBlobMetadataStore) DeleteBlobCertificate(ctx context.Context, blobKey corev2.BlobKey) error {
 	err := s.dynamoDBClient.DeleteItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
@@ -763,7 +763,7 @@ func (s *BlobMetadataStore) DeleteBlobCertificate(ctx context.Context, blobKey c
 	return err
 }
 
-func (s *BlobMetadataStore) GetBlobCertificate(ctx context.Context, blobKey corev2.BlobKey) (*corev2.BlobCertificate, *encoding.FragmentInfo, error) {
+func (s *DynamoDBBlobMetadataStore) GetBlobCertificate(ctx context.Context, blobKey corev2.BlobKey) (*corev2.BlobCertificate, *encoding.FragmentInfo, error) {
 	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
@@ -791,7 +791,7 @@ func (s *BlobMetadataStore) GetBlobCertificate(ctx context.Context, blobKey core
 
 // GetBlobCertificates returns the certificates for the given blob keys
 // Note: the returned certificates are NOT necessarily ordered by the order of the input blob keys
-func (s *BlobMetadataStore) GetBlobCertificates(ctx context.Context, blobKeys []corev2.BlobKey) ([]*corev2.BlobCertificate, []*encoding.FragmentInfo, error) {
+func (s *DynamoDBBlobMetadataStore) GetBlobCertificates(ctx context.Context, blobKeys []corev2.BlobKey) ([]*corev2.BlobCertificate, []*encoding.FragmentInfo, error) {
 	keys := make([]map[string]types.AttributeValue, len(blobKeys))
 	for i, blobKey := range blobKeys {
 		keys[i] = map[string]types.AttributeValue{
@@ -823,7 +823,7 @@ func (s *BlobMetadataStore) GetBlobCertificates(ctx context.Context, blobKeys []
 	return certs, fragmentInfos, nil
 }
 
-func (s *BlobMetadataStore) PutDispersalRequest(ctx context.Context, req *corev2.DispersalRequest) error {
+func (s *DynamoDBBlobMetadataStore) PutDispersalRequest(ctx context.Context, req *corev2.DispersalRequest) error {
 	item, err := MarshalDispersalRequest(req)
 	if err != nil {
 		return err
@@ -837,7 +837,7 @@ func (s *BlobMetadataStore) PutDispersalRequest(ctx context.Context, req *corev2
 	return err
 }
 
-func (s *BlobMetadataStore) GetDispersalRequest(ctx context.Context, batchHeaderHash [32]byte, operatorID core.OperatorID) (*corev2.DispersalRequest, error) {
+func (s *DynamoDBBlobMetadataStore) GetDispersalRequest(ctx context.Context, batchHeaderHash [32]byte, operatorID core.OperatorID) (*corev2.DispersalRequest, error) {
 	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: dispersalKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
@@ -872,7 +872,7 @@ func (s *BlobMetadataStore) GetDispersalRequest(ctx context.Context, batchHeader
 //
 // If limit > 0, returns at most that many dispersals. If limit <= 0, returns all results
 // in the time range.
-func (s *BlobMetadataStore) GetDispersalsByRespondedAt(
+func (s *DynamoDBBlobMetadataStore) GetDispersalsByRespondedAt(
 	ctx context.Context,
 	operatorId core.OperatorID,
 	start uint64,
@@ -940,7 +940,7 @@ func (s *BlobMetadataStore) GetDispersalsByRespondedAt(
 	return dispersals, nil
 }
 
-func (s *BlobMetadataStore) PutDispersalResponse(ctx context.Context, res *corev2.DispersalResponse) error {
+func (s *DynamoDBBlobMetadataStore) PutDispersalResponse(ctx context.Context, res *corev2.DispersalResponse) error {
 	item, err := MarshalDispersalResponse(res)
 	if err != nil {
 		return err
@@ -954,7 +954,7 @@ func (s *BlobMetadataStore) PutDispersalResponse(ctx context.Context, res *corev
 	return err
 }
 
-func (s *BlobMetadataStore) GetDispersalResponse(ctx context.Context, batchHeaderHash [32]byte, operatorID core.OperatorID) (*corev2.DispersalResponse, error) {
+func (s *DynamoDBBlobMetadataStore) GetDispersalResponse(ctx context.Context, batchHeaderHash [32]byte, operatorID core.OperatorID) (*corev2.DispersalResponse, error) {
 	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: dispersalKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
@@ -980,7 +980,7 @@ func (s *BlobMetadataStore) GetDispersalResponse(ctx context.Context, batchHeade
 	return res, nil
 }
 
-func (s *BlobMetadataStore) GetDispersalResponses(ctx context.Context, batchHeaderHash [32]byte) ([]*corev2.DispersalResponse, error) {
+func (s *DynamoDBBlobMetadataStore) GetDispersalResponses(ctx context.Context, batchHeaderHash [32]byte) ([]*corev2.DispersalResponse, error) {
 	items, err := s.dynamoDBClient.Query(ctx, s.tableName, "PK = :pk AND begins_with(SK, :prefix)", commondynamodb.ExpressionValues{
 		":pk": &types.AttributeValueMemberS{
 			Value: dispersalKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
@@ -1009,7 +1009,7 @@ func (s *BlobMetadataStore) GetDispersalResponses(ctx context.Context, batchHead
 	return responses, nil
 }
 
-func (s *BlobMetadataStore) PutBatch(ctx context.Context, batch *corev2.Batch) error {
+func (s *DynamoDBBlobMetadataStore) PutBatch(ctx context.Context, batch *corev2.Batch) error {
 	item, err := MarshalBatch(batch)
 	if err != nil {
 		return err
@@ -1023,7 +1023,7 @@ func (s *BlobMetadataStore) PutBatch(ctx context.Context, batch *corev2.Batch) e
 	return err
 }
 
-func (s *BlobMetadataStore) GetBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.Batch, error) {
+func (s *DynamoDBBlobMetadataStore) GetBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.Batch, error) {
 	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
@@ -1049,7 +1049,7 @@ func (s *BlobMetadataStore) GetBatch(ctx context.Context, batchHeaderHash [32]by
 	return batch, nil
 }
 
-func (s *BlobMetadataStore) PutBatchHeader(ctx context.Context, batchHeader *corev2.BatchHeader) error {
+func (s *DynamoDBBlobMetadataStore) PutBatchHeader(ctx context.Context, batchHeader *corev2.BatchHeader) error {
 	item, err := MarshalBatchHeader(batchHeader)
 	if err != nil {
 		return err
@@ -1063,7 +1063,7 @@ func (s *BlobMetadataStore) PutBatchHeader(ctx context.Context, batchHeader *cor
 	return err
 }
 
-func (s *BlobMetadataStore) DeleteBatchHeader(ctx context.Context, batchHeaderHash [32]byte) error {
+func (s *DynamoDBBlobMetadataStore) DeleteBatchHeader(ctx context.Context, batchHeaderHash [32]byte) error {
 	err := s.dynamoDBClient.DeleteItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
@@ -1076,7 +1076,7 @@ func (s *BlobMetadataStore) DeleteBatchHeader(ctx context.Context, batchHeaderHa
 	return err
 }
 
-func (s *BlobMetadataStore) GetBatchHeader(ctx context.Context, batchHeaderHash [32]byte) (*corev2.BatchHeader, error) {
+func (s *DynamoDBBlobMetadataStore) GetBatchHeader(ctx context.Context, batchHeaderHash [32]byte) (*corev2.BatchHeader, error) {
 	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
@@ -1102,7 +1102,7 @@ func (s *BlobMetadataStore) GetBatchHeader(ctx context.Context, batchHeaderHash 
 	return header, nil
 }
 
-func (s *BlobMetadataStore) PutAttestation(ctx context.Context, attestation *corev2.Attestation) error {
+func (s *DynamoDBBlobMetadataStore) PutAttestation(ctx context.Context, attestation *corev2.Attestation) error {
 	item, err := MarshalAttestation(attestation)
 	if err != nil {
 		return err
@@ -1113,7 +1113,7 @@ func (s *BlobMetadataStore) PutAttestation(ctx context.Context, attestation *cor
 	return err
 }
 
-func (s *BlobMetadataStore) GetAttestation(ctx context.Context, batchHeaderHash [32]byte) (*corev2.Attestation, error) {
+func (s *DynamoDBBlobMetadataStore) GetAttestation(ctx context.Context, batchHeaderHash [32]byte) (*corev2.Attestation, error) {
 	input := &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
@@ -1144,7 +1144,7 @@ func (s *BlobMetadataStore) GetAttestation(ctx context.Context, batchHeaderHash 
 	return attestation, nil
 }
 
-func (s *BlobMetadataStore) PutBlobInclusionInfo(ctx context.Context, inclusionInfo *corev2.BlobInclusionInfo) error {
+func (s *DynamoDBBlobMetadataStore) PutBlobInclusionInfo(ctx context.Context, inclusionInfo *corev2.BlobInclusionInfo) error {
 	item, err := MarshalBlobInclusionInfo(inclusionInfo)
 	if err != nil {
 		return err
@@ -1160,7 +1160,7 @@ func (s *BlobMetadataStore) PutBlobInclusionInfo(ctx context.Context, inclusionI
 
 // PutBlobInclusionInfos puts multiple inclusion infos into the store
 // It retries failed items up to 2 times
-func (s *BlobMetadataStore) PutBlobInclusionInfos(ctx context.Context, inclusionInfos []*corev2.BlobInclusionInfo) error {
+func (s *DynamoDBBlobMetadataStore) PutBlobInclusionInfos(ctx context.Context, inclusionInfos []*corev2.BlobInclusionInfo) error {
 	items := make([]commondynamodb.Item, len(inclusionInfos))
 	for i, info := range inclusionInfos {
 		item, err := MarshalBlobInclusionInfo(info)
@@ -1189,7 +1189,7 @@ func (s *BlobMetadataStore) PutBlobInclusionInfos(ctx context.Context, inclusion
 	return nil
 }
 
-func (s *BlobMetadataStore) GetBlobInclusionInfo(ctx context.Context, blobKey corev2.BlobKey, batchHeaderHash [32]byte) (*corev2.BlobInclusionInfo, error) {
+func (s *DynamoDBBlobMetadataStore) GetBlobInclusionInfo(ctx context.Context, blobKey corev2.BlobKey, batchHeaderHash [32]byte) (*corev2.BlobInclusionInfo, error) {
 	bhh := hex.EncodeToString(batchHeaderHash[:])
 	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
@@ -1216,7 +1216,7 @@ func (s *BlobMetadataStore) GetBlobInclusionInfo(ctx context.Context, blobKey co
 	return info, nil
 }
 
-func (s *BlobMetadataStore) GetBlobAttestationInfo(ctx context.Context, blobKey corev2.BlobKey) (*v2.BlobAttestationInfo, error) {
+func (s *DynamoDBBlobMetadataStore) GetBlobAttestationInfo(ctx context.Context, blobKey corev2.BlobKey) (*v2.BlobAttestationInfo, error) {
 	blobInclusionInfos, err := s.GetBlobInclusionInfos(ctx, blobKey)
 	if err != nil {
 		s.logger.Error("failed to get blob inclusion info for blob", "err", err, "blobKey", blobKey.Hex())
@@ -1254,7 +1254,7 @@ func (s *BlobMetadataStore) GetBlobAttestationInfo(ctx context.Context, blobKey 
 	return nil, fmt.Errorf("no attestation info found for blobkey: %s", blobKey.Hex())
 }
 
-func (s *BlobMetadataStore) GetBlobInclusionInfos(ctx context.Context, blobKey corev2.BlobKey) ([]*corev2.BlobInclusionInfo, error) {
+func (s *DynamoDBBlobMetadataStore) GetBlobInclusionInfos(ctx context.Context, blobKey corev2.BlobKey) ([]*corev2.BlobInclusionInfo, error) {
 	items, err := s.dynamoDBClient.Query(ctx, s.tableName, "PK = :pk AND begins_with(SK, :prefix)", commondynamodb.ExpressionValues{
 		":pk": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
@@ -1283,7 +1283,7 @@ func (s *BlobMetadataStore) GetBlobInclusionInfos(ctx context.Context, blobKey c
 	return responses, nil
 }
 
-func (s *BlobMetadataStore) GetSignedBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.BatchHeader, *corev2.Attestation, error) {
+func (s *DynamoDBBlobMetadataStore) GetSignedBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.BatchHeader, *corev2.Attestation, error) {
 	input := &dynamodb.QueryInput{
 		TableName:              aws.String(s.tableName),
 		KeyConditionExpression: aws.String("PK = :pk"),

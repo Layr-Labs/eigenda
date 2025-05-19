@@ -36,6 +36,10 @@ Notice: The scripts for setting up a local geth chain are currently broken. The 
    ```
    $ npm install -g @graphprotocol/graph-cli@latest
    ```
+- PostgreSQL is installed (optional, only needed if you want to use PostgreSQL for metadata storage instead of DynamoDB)
+   ```
+   $ brew install postgresql
+   ```
 
 ## Run a complete end-to-end test
 
@@ -61,7 +65,23 @@ cd inabox
 make new-anvil
 ```
 
-This will create a new file, e.g. `./testdata/12D-07M-2023Y-14H-41M-19S/config.yaml`. Please feel free to inspect the file and make any desired configuration changes at this point. After you have deployed the experiment, changes will not go into effect. 
+This will create a new file, e.g. `./testdata/12D-07M-2023Y-14H-41M-19S/config.yaml`. Please feel free to inspect the file and make any desired configuration changes at this point. After you have deployed the experiment, changes will not go into effect.
+
+#### Using PostgreSQL for Metadata Storage
+
+By default, inabox uses DynamoDB (via localstack) for metadata storage. If you want to use PostgreSQL instead, you can start a PostgreSQL instance before running the services:
+
+```
+cd inabox
+./bin.sh start-postgres 5433
+```
+
+This will start a PostgreSQL container with the necessary schemas for EigenDA. The PostgreSQL instance will be available at `localhost:5433` with the following credentials:
+- Username: postgres
+- Password: postgres
+- Database: eigenda
+
+The configuration for the disperser, controller, and relay components already includes PostgreSQL settings that point to this instance.
 
 
 ### Provision the test infrastructure, deploy contracts, and configure services
@@ -194,6 +214,12 @@ cd inabox
 make stop-infra
 ```
 
-If you followed [Option 2](#option-2), you can stop the infra services by `Ctrl-C`'ing in each terminal. For the graph, it's also important to run `docker compose down -v` from within the `inabox/thegraph` directory to make sure that the containers are fully removed. 
+If you followed [Option 2](#option-2), you can stop the infra services by `Ctrl-C`'ing in each terminal. For the graph, it's also important to run `docker compose down -v` from within the `inabox/thegraph` directory to make sure that the containers are fully removed.
+
+If you started PostgreSQL, you can stop it with:
+```
+cd inabox
+./bin.sh stop-postgres
+```
 
 

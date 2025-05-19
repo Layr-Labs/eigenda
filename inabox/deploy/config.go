@@ -234,6 +234,15 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_RESERVATIONS_TABLE_NAME: "e2e_v2_reservation",
 		DISPERSER_SERVER_ON_DEMAND_TABLE_NAME:    "e2e_v2_ondemand",
 		DISPERSER_SERVER_GLOBAL_RATE_TABLE_NAME:  "e2e_v2_global_reservation",
+
+		// Use postgres for metadata storage
+		DISPERSER_SERVER_USE_POSTGRES:      "true",
+		DISPERSER_SERVER_POSTGRES_HOST:     "localhost",
+		DISPERSER_SERVER_POSTGRES_PORT:     "5433",
+		DISPERSER_SERVER_POSTGRES_DATABASE: "eigenda",
+		DISPERSER_SERVER_POSTGRES_USERNAME: "postgres",
+		DISPERSER_SERVER_POSTGRES_PASSWORD: "postgres",
+		DISPERSER_SERVER_POSTGRES_SSL_MODE: "disable",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
@@ -358,6 +367,15 @@ func (env *Config) generateControllerVars(
 		CONTROLLER_FINALIZATION_BLOCK_DELAY:                "0",
 		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "false",
 		CONTROLLER_DISPERSER_KMS_KEY_ID:                    env.DisperserKMSKeyID,
+
+		// Use postgres for metadata storage
+		CONTROLLER_USE_POSTGRES:      "true",
+		CONTROLLER_POSTGRES_HOST:     "localhost",
+		CONTROLLER_POSTGRES_PORT:     "5433",
+		CONTROLLER_POSTGRES_DATABASE: "eigenda",
+		CONTROLLER_POSTGRES_USERNAME: "postgres",
+		CONTROLLER_POSTGRES_PASSWORD: "postgres",
+		CONTROLLER_POSTGRES_SSL_MODE: "disable",
 	}
 	env.applyDefaults(&v, "CONTROLLER", "controller", ind)
 
@@ -380,6 +398,15 @@ func (env *Config) generateRelayVars(ind int, graphUrl, grpcPort string) RelayVa
 		RELAY_MAX_GET_CHUNK_BYTES_PER_SECOND_CLIENT: "100000000",
 		RELAY_AUTHENTICATION_DISABLED:               "false",
 		RELAY_ENABLE_METRICS:                        "true",
+
+		// Use postgres for metadata storage
+		RELAY_USE_POSTGRES:      "true",
+		RELAY_POSTGRES_HOST:     "localhost",
+		RELAY_POSTGRES_PORT:     "5433",
+		RELAY_POSTGRES_DATABASE: "eigenda",
+		RELAY_POSTGRES_USERNAME: "postgres",
+		RELAY_POSTGRES_PASSWORD: "postgres",
+		RELAY_POSTGRES_SSL_MODE: "disable",
 	}
 	env.applyDefaults(&v, "RELAY", "relay", ind)
 

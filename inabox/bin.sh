@@ -278,6 +278,30 @@ function stop_graph {
     popd
 }
 
+function start_postgres {
+    echo "Starting PostgreSQL database for metadata storage..."
+    ./start-postgres.sh "$2"
+    
+    # Default to port 5433 if not specified
+    POSTGRES_PORT=${2:-5433}
+    
+    ./wait-for localhost:${POSTGRES_PORT} -- echo "PostgreSQL up"
+    
+    if [ $? -ne 0 ]; then
+        echo "Failed to start PostgreSQL"
+        exit 1
+    fi
+    
+    echo "PostgreSQL started successfully!"
+}
+
+function stop_postgres {
+    echo "Stopping PostgreSQL database..."
+    docker stop postgres-eigenda >/dev/null 2>&1
+    docker rm postgres-eigenda >/dev/null 2>&1
+    echo "PostgreSQL stopped."
+}
+
 testpath=$(ls -td ./testdata/*/ | head -1)
 
 case "$1" in
@@ -300,5 +324,9 @@ EOF
         start_graph ${@:2} ;;
     stop-graph)
         stop_graph ${@:2} ;;
+    start-postgres)
+        start_postgres ${@:2} ;;
+    stop-postgres)
+        stop_postgres ${@:2} ;;
     *)
 esac
