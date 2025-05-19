@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IVersionedEigenDACertVerifier} from "src/periphery/cert/interfaces/IVersionedEigenDACertVerifier.sol";
-import {IEigenDACertVerifierBase} from "src/periphery/cert/interfaces/IEigenDACertVerifierBase.sol";
+import {
+    IEigenDACertVerifier,
+    IEigenDACertVerifierBase,
+    IVersionedEigenDACertVerifier
+} from "src/periphery/cert/interfaces/IEigenDACertVerifier.sol";
 
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
@@ -12,7 +15,7 @@ import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.
 
 import {EigenDACertVerificationLib as CertLib} from "src/periphery/cert/libraries/EigenDACertVerificationLib.sol";
 
-contract EigenDACertVerifier is IEigenDACertVerifierBase, IVersionedEigenDACertVerifier {
+contract EigenDACertVerifier is IEigenDACertVerifier {
     error InvalidSecurityThresholds();
 
     IEigenDAThresholdRegistry internal immutable _eigenDAThresholdRegistry;
@@ -52,22 +55,22 @@ contract EigenDACertVerifier is IEigenDACertVerifierBase, IVersionedEigenDACertV
         return uint8(status);
     }
 
-    /// @notice Returns the EigenDAThresholdRegistry contract.
+    /// @inheritdoc IEigenDACertVerifier
     function eigenDAThresholdRegistry() external view returns (IEigenDAThresholdRegistry) {
         return _eigenDAThresholdRegistry;
     }
 
-    /// @notice Returns the EigenDASignatureVerifier contract.
+    /// @inheritdoc IEigenDACertVerifier
     function eigenDASignatureVerifier() external view returns (IEigenDASignatureVerifier) {
         return _eigenDASignatureVerifier;
     }
 
-    /// @notice Returns the security thresholds required for EigenDA certificate verification.
+    /// @inheritdoc IEigenDACertVerifier
     function securityThresholds() external view returns (DATypesV1.SecurityThresholds memory) {
         return _securityThresholds;
     }
 
-    /// @notice Returns the quorum numbers required in bytes format for certificate verification.
+    /// @inheritdoc IEigenDACertVerifier
     function quorumNumbersRequired() external view returns (bytes memory) {
         return _quorumNumbersRequired;
     }
