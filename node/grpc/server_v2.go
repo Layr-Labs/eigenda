@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"runtime"
 	"time"
 
@@ -13,7 +14,9 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/core"
+	coreauthv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
 	"github.com/Layr-Labs/eigenda/node/auth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -26,13 +29,14 @@ type ServerV2 struct {
 	pb.UnimplementedDispersalServer
 	pb.UnimplementedRetrievalServer
 
-	config         *node.Config
-	node           *node.Node
-	ratelimiter    common.RateLimiter
-	logger         logging.Logger
-	metrics        *MetricsV2
-	authenticator  auth.RequestAuthenticator
-	replayGuardian replay.ReplayGuardian
+	config             *node.Config
+	node               *node.Node
+	ratelimiter        common.RateLimiter
+	logger             logging.Logger
+	metrics            *MetricsV2
+	chunkAuthenticator auth.RequestAuthenticator
+	blobAuthenticator  corev2.BlobRequestAuthenticator
+	replayGuardian     replay.ReplayGuardian
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -50,9 +54,10 @@ func NewServerV2(
 		return nil, err
 	}
 
-	var authenticator auth.RequestAuthenticator
+	var chunkAuthenticator auth.RequestAuthenticator
+	var blobAuthenticator corev2.BlobRequestAuthenticator
 	if !config.DisableDispersalAuthentication {
-		authenticator, err = auth.NewRequestAuthenticator(
+		chunkAuthenticator, err = auth.NewRequestAuthenticator(
 			ctx,
 			reader,
 			config.DispersalAuthenticationKeyCacheSize,
@@ -64,21 +69,22 @@ func NewServerV2(
 		if err != nil {
 			return nil, fmt.Errorf("failed to create authenticator: %w", err)
 		}
+		blobAuthenticator = coreauthv2.NewBlobRequestAuthenticator()
 	}
-
 	replayGuardian := replay.NewReplayGuardian(
 		time.Now,
 		config.StoreChunksRequestMaxPastAge,
 		config.StoreChunksRequestMaxFutureAge)
 
 	return &ServerV2{
-		config:         config,
-		node:           node,
-		ratelimiter:    ratelimiter,
-		logger:         logger,
-		metrics:        metrics,
-		authenticator:  authenticator,
-		replayGuardian: replayGuardian,
+		config:             config,
+		node:               node,
+		ratelimiter:        ratelimiter,
+		logger:             logger,
+		metrics:            metrics,
+		chunkAuthenticator: chunkAuthenticator,
+		blobAuthenticator:  blobAuthenticator,
+		replayGuardian:     replayGuardian,
 	}, nil
 }
 
@@ -128,8 +134,8 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to serialize batch header hash: %v", err))
 	}
 
-	if s.authenticator != nil {
-		hash, err := s.authenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
+	if s.chunkAuthenticator != nil {
+		hash, err := s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
 		if err != nil {
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to authenticate request: %v", err))
 		}
@@ -140,7 +146,17 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
 		}
 	}
-
+	if s.blobAuthenticator != nil {
+		// TODO: check the latency of request validation later; could be parallelized to avoid significant
+		// impact to the request latency
+		for _, blob := range batch.BlobCertificates {
+			_, err = s.validateDispersalRequest(blob)
+			if err != nil {
+				// TODO: Blacklist the disperser if there's an invalid dispersal request
+				return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
+			}
+		}
+	}
 	probe.SetStage("get_operator_state")
 	s.logger.Info("new StoreChunks request",
 		"batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]),
@@ -313,4 +329,64 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 		Chunks:              chunks,
 		ChunkEncodingFormat: pb.ChunkEncodingFormat_GNARK,
 	}, nil
+}
+
+// validateDispersalRequest validates the DisperseBlobRequest and returns the blob header
+// Differences between this and the DispersalServerV2 are:
+// - Takes *corev2.BlobCertificate instead of DisperseBlobRequest
+// - no encoding prover GetCommitmentsForPaddedLength check
+// - directly take blob lengths (no blob data yet)
+// - doesn't check every 32 bytes is a valid field element
+// Node cannot make these checks because the checks require the blob data
+func (s *ServerV2) validateDispersalRequest(
+	blobCert *corev2.BlobCertificate,
+) (*corev2.BlobHeader, error) {
+	if len(blobCert.Signature) != 65 {
+		return nil, fmt.Errorf("signature is expected to be 65 bytes, but got %d bytes", len(blobCert.Signature))
+	}
+	err := s.blobAuthenticator.AuthenticateBlobRequest(blobCert.BlobHeader, blobCert.Signature)
+	if err != nil {
+		return nil, fmt.Errorf("failed to authenticate blob request: %v", err)
+	}
+
+	// this is the length in SYMBOLS (32 byte field elements) of the blob. it must be a power of 2
+	commitedBlobLength := blobCert.BlobHeader.BlobCommitments.Length
+	if commitedBlobLength == 0 {
+		return nil, errors.New("blob size must be greater than 0")
+	}
+	if commitedBlobLength != encoding.NextPowerOf2(commitedBlobLength) {
+		return nil, errors.New("invalid commitment length, must be a power of 2")
+	}
+
+	blobHeader := blobCert.BlobHeader
+	if blobHeader.PaymentMetadata == (core.PaymentMetadata{}) {
+		return nil, errors.New("payment metadata is required")
+	}
+
+	timestampIsNegative := blobHeader.PaymentMetadata.Timestamp < 0
+	paymentIsNegative := blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == -1
+	timestampIsZeroAndPaymentIsZero := blobHeader.PaymentMetadata.Timestamp == 0 && blobHeader.PaymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) == 0
+	if timestampIsNegative || paymentIsNegative || timestampIsZeroAndPaymentIsZero {
+		return nil, errors.New("invalid payment metadata")
+	}
+
+	if len(blobHeader.QuorumNumbers) == 0 {
+		return nil, errors.New("blob header must contain at least one quorum number")
+	}
+
+	if len(blobHeader.QuorumNumbers) > int(s.node.QuorumCount.Load()) {
+		return nil, fmt.Errorf("too many quorum numbers specified: maximum is %d", s.node.QuorumCount.Load())
+	}
+
+	for _, quorum := range blobHeader.QuorumNumbers {
+		if quorum > corev2.MaxQuorumID || quorum >= uint8(s.node.QuorumCount.Load()) {
+			return nil, fmt.Errorf("invalid quorum number %d; maximum is %d", quorum, s.node.QuorumCount.Load())
+		}
+	}
+
+	if _, ok := s.node.BlobVersionParams.Load().Get(corev2.BlobVersion(blobHeader.BlobVersion)); !ok {
+		return nil, fmt.Errorf("invalid blob version %d; valid blob versions are: %v", blobHeader.BlobVersion, s.node.BlobVersionParams.Load().Keys())
+	}
+
+	return blobHeader, nil
 }

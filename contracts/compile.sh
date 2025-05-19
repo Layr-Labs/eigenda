@@ -37,8 +37,8 @@ contracts="PaymentVault \
   BN254 \
   EigenDAServiceManager \
   IEigenDAServiceManager \
-  MockRollup \
   EjectionManager \
+  EigenDACertVerifierV1 \
   EigenDACertVerifierV2 \
   EigenDAThresholdRegistry \
   EigenDARelayRegistry \
