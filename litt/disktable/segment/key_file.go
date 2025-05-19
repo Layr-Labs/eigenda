@@ -19,7 +19,7 @@ const KeyFileExtension = ".keys"
 
 // KeyFileSwapExtension is the file extension for the keys swap file. This file is used to atomically
 // update key files.
-const KeyFileSwapExtension = ".keys.swap" // TODO check for these files and delete them if found
+const KeyFileSwapExtension = ".keys.swap"
 
 // keyFile tracks the keys in a segment. It is used to do garbage collection on the keymap.
 //

@@ -54,6 +54,9 @@ func scanDirectories(logger logging.Logger, rootDirectories []string) (
 			case MetadataSwapExtension:
 				garbageFiles = append(garbageFiles, filePath)
 				continue
+			case KeyFileSwapExtension:
+				garbageFiles = append(garbageFiles, filePath)
+				continue
 			case MetadataFileExtension:
 				index, err = getMetadataFileIndex(fileName)
 				if err != nil {
