@@ -20,6 +20,7 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
     error ABNNotInFuture(uint32 activationBlockNumber);
     error ABNNotGreaterThanLast(uint32 activationBlockNumber);
     error InvalidCertLength();
+    error RBNInFuture(uint32 referenceBlockNumber);
 
     /// IEigenDACertVerifierRouter ///
 
@@ -41,7 +42,9 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
     }
 
     function addCertVerifier(uint32 activationBlockNumber, address certVerifier) external onlyOwner {
-        if (activationBlockNumber < block.number) {
+        // We disallow adding cert verifiers at the current block number to avoid a race condition of
+        // adding a cert verifier at the current block and verifying in the same block
+        if (activationBlockNumber <= block.number) {
             revert ABNNotInFuture(activationBlockNumber);
         }
         if (activationBlockNumber <= certVerifierABNs[certVerifierABNs.length - 1]) {
@@ -77,6 +80,9 @@ contract EigenDACertVerifierRouter is IEigenDACertVerifierRouter, OwnableUpgrade
         view
         returns (uint32 activationBlockNumber)
     {
+        if (referenceBlockNumber > block.number) {
+            revert RBNInFuture(referenceBlockNumber);
+        }
         // It is assumed that the latest ABN are the most likely to be used.
         uint256 abnMaxIndex = certVerifierABNs.length - 1; // cache to memory
         for (uint256 i; i < certVerifierABNs.length; i++) {

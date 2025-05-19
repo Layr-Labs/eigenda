@@ -42,11 +42,10 @@ contract EigenDACertVerifierRouterUnit is MockEigenDADeployer {
         vm.expectRevert();
         eigenDACertVerifierRouter.checkDACert(abi.encode(cert));
 
-        uint256 blockNumber = block.number;
-        vm.roll(rbn);
+        vm.roll(rbn - 1);
         eigenDACertVerifierRouter.addCertVerifier(rbn, address(eigenDACertVerifier));
-        vm.roll(blockNumber);
 
+        vm.roll(type(uint32).max);
         assertEq(eigenDACertVerifierRouter.getCertVerifierAt(uint32(bound(seed2, 0, rbn - 1))), address(0));
         assertEq(
             eigenDACertVerifierRouter.getCertVerifierAt(uint32(bound(seed3, rbn, type(uint32).max))),
