@@ -39,8 +39,7 @@ type BundleToStore struct {
 // ValidatorStore encapsulates the database for storing batches of chunk data for the V2 validator node.
 type ValidatorStore interface {
 
-	// StoreBatch stores a batch and its raw bundles in the database. Returns the keys of the stored data
-	// and the size of the stored data, in bytes.
+	// StoreBatch stores a batch and its raw bundles in the database. Returns the size of the stored data, in bytes.
 	StoreBatch(batchData []*BundleToStore) (uint64, error)
 
 	// GetBundleData returns the chunks of a blob with the given bundle key.
@@ -87,10 +86,15 @@ func NewValidatorStore(
 	registry *prometheus.Registry) (ValidatorStore, error) {
 
 	if len(config.LittDBStoragePaths) == 0 {
-		return nil, fmt.Errorf("no littDB paths provided")
+		logger.Warnf("WARNING: setting NODE_DB_PATH is deprecated and will be removed in a future version. " +
+			"Please use NODE_LITT_DB_STORAGE_PATHS=\"${DB_PATH}/chunk_v2_litt\"")
+		config.LittDBStoragePaths = []string{
+			config.DbPath + "/chunk_v2_litt",
+		}
 	}
 
 	stringBuilder := strings.Builder{}
+	stringBuilder.WriteString("Using littDB at path")
 	if len(config.LittDBStoragePaths) > 1 {
 		stringBuilder.WriteString("s")
 	}
@@ -101,7 +105,7 @@ func NewValidatorStore(
 			stringBuilder.WriteString(",")
 		}
 	}
-	logger.Infof("Using littDB at path%s", stringBuilder.String())
+	logger.Info(stringBuilder.String())
 
 	littConfig, err := litt.DefaultConfig(config.LittDBStoragePaths...)
 	littConfig.ShardingFactor = 1
