@@ -20,8 +20,6 @@ const unflushedKeysInitialCapacity = 128
 // shardControlChannelCapacity is the capacity of the channel used to send messages to the shard control loop.
 const shardControlChannelCapacity = 32
 
-// TODO look for unclosed tickers
-
 // Segment is a chunk of data stored on disk. All data in a particular data segment is expired at the same time.
 //
 // This struct is not safe for operations that mutate the segment, access control must be handled by the caller.

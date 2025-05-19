@@ -119,6 +119,7 @@ func (c *controlLoop) enqueue(request controlLoopMessage) error {
 // mutate the data in the disk table.
 func (c *controlLoop) run() {
 	ticker := time.NewTicker(c.garbageCollectionPeriod)
+	defer ticker.Stop()
 
 	for {
 		select {

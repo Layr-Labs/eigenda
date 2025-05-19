@@ -63,6 +63,7 @@ func NewMemTable(config *litt.Config, name string) litt.ManagedTable {
 	if config.GCPeriod > 0 {
 		ticker := time.NewTicker(config.GCPeriod)
 		go func() {
+			defer ticker.Stop()
 			for !table.shutdown.Load() {
 				<-ticker.C
 				err := table.RunGC()

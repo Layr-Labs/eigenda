@@ -77,7 +77,7 @@ func buildMemTable(
 
 	config, err := litt.DefaultConfig(path)
 	config.Clock = clock
-	config.GCPeriod = 0
+	config.GCPeriod = time.Millisecond
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create config: %w", err)
@@ -431,11 +431,9 @@ func garbageCollectionTest(t *testing.T, tableBuilder *tableBuilder) {
 			require.NoError(t, err)
 		}
 
-		// Once in a while, flush the table.
-		if rand.BoolWithProbability(0.1) {
-			err = table.Flush()
-			require.NoError(t, err)
-		}
+		// Flush the table.
+		err = table.Flush()
+		require.NoError(t, err)
 
 		// Once in a while, change the TTL. To avoid introducing test flakiness, only decrease the TTL
 		// (increasing the TTL risks causing the expected deletions as tracked by this test to get out
@@ -486,14 +484,16 @@ func garbageCollectionTest(t *testing.T, tableBuilder *tableBuilder) {
 			// Garbage collection happens asynchronously, so we may need to wait for it to complete.
 			testutils.AssertEventuallyTrue(t, func() bool {
 				// keep a running sum of the unexpired data size. Some data may be unable to expire
-				// due to sharing a file with data that is not yet ready to expire. At the most,
-				// we expect so see no more than 232 bytes of unexpired data.
+				// due to sharing a file with data that is not yet ready to expire, so it's hard
+				// to predict the exact quantity of unexpired data.
 				//
 				// Math:
 				// - 100 bytes in each segment                   (test configuration)
 				// - max value size of 128 bytes                 (test configuration)
 				// - 4 bytes to store the length of the value    (default property)
-				// 100+128+4 = 232
+				// - max bytes per segment: 100+128+4 = 232
+				// - max number of segments per write is equal to max batch size, or 9
+				// - max unexpired data size = 9 * 232 = 2088
 				unexpiredDataSize := 0
 
 				for key, expectedValue := range expiredValues {
@@ -513,7 +513,7 @@ func garbageCollectionTest(t *testing.T, tableBuilder *tableBuilder) {
 				// This check passes if the unexpired data size is less than or equal to the maximum plausible
 				// size of unexpired data. If working as expected, this should always happen within a reasonable
 				// amount of time.
-				return unexpiredDataSize <= 232
+				return unexpiredDataSize <= 2088
 			}, time.Second)
 		}
 	}
