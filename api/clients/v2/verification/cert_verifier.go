@@ -9,7 +9,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/common"
 	genericVerifierBinding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
-	opsrbinding "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -22,7 +21,6 @@ import (
 type CertVerifier struct {
 	logger            logging.Logger
 	ethClient         common.EthClient
-	opsrCaller        *opsrbinding.ContractOperatorStateRetrieverCaller
 	addressProvider   clients.CertVerifierAddressProvider
 
 	// Cache maps
@@ -32,8 +30,8 @@ type CertVerifier struct {
 	versions               sync.Map
 }
 
-// NewGenericCertVerifier constructs a new CertVerifier instance
-func NewGenericCertVerifier(
+// NewCertVerifier constructs a new CertVerifier instance
+func NewCertVerifier(
 	logger logging.Logger,
 	ethClient common.EthClient,
 	certVerifierAddressProvider clients.CertVerifierAddressProvider,
@@ -50,7 +48,7 @@ func NewGenericCertVerifier(
 func (cv *CertVerifier) CheckDACert(
 	ctx context.Context,
 	referenceBlockNumber uint64,
-	certBytes []byte,
+	cert coretypes.EigenDACert,
 ) error {
 	// 1 - Get verifier caller for the block number
 	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, referenceBlockNumber)
@@ -58,7 +56,13 @@ func (cv *CertVerifier) CheckDACert(
 		return fmt.Errorf("get verifier caller: %w", err)
 	}
 
-	// 2 - Call the contract method CheckDACert to verify the certificate
+	// 2 - Serialize the certificate to ABI bytes
+	certBytes, err := cert.Serialize(coretypes.CertSerializationABI)
+	if err != nil {
+		return fmt.Errorf("serialize cert: %w", err)
+	}
+
+	// 3 - Call the contract method CheckDACert to verify the certificate
 	result, err := certVerifierCaller.CheckDACert(
 		&bind.CallOpts{Context: ctx},
 		certBytes,
@@ -67,7 +71,7 @@ func (cv *CertVerifier) CheckDACert(
 		return fmt.Errorf("verify cert: %w", err)
 	}
 
-	// 3 - Cast result to structured enum type and check for success
+	// 4 - Cast result to structured enum type and check for success
 	verifyResultCode := coretypes.VerifyStatusCode(result)
 
 	if verifyResultCode != coretypes.StatusSuccess {

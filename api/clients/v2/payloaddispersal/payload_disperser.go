@@ -151,12 +151,13 @@ func (pd *PayloadDisperser) SendPayload(
 
 	pd.logSigningPercentages(blobKey, blobStatusReply)
 
-	probe.SetStage("build_cert")
+	probe.SetStage("wait_for_block_number")
 	err = pd.blockMonitor.WaitForBlockNumber(ctx, blobStatusReply.SignedBatch.Header.ReferenceBlockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("wait for block number: %w", err)
 	}
 	
+	probe.SetStage("build_cert")
 	eigenDACert, err := pd.certBuilder.BuildCert(ctx, certVersion, blobKey, blobStatusReply)
 	if err != nil {
 		return nil, fmt.Errorf("build cert: %w", err)
@@ -167,12 +168,7 @@ func (pd *PayloadDisperser) SendPayload(
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
 
-	certBytes, err := eigenDACert.Serialize(coretypes.CertSerializationABI)
-	if err != nil {
-		return nil, fmt.Errorf("serialize cert: %w", err)
-	}
-
-	err = pd.certVerifier.CheckDACert(timeoutCtx, eigenDACert.ReferenceBlockNumber(), certBytes)
+	err = pd.certVerifier.CheckDACert(timeoutCtx, eigenDACert.ReferenceBlockNumber(), eigenDACert)
 	if err != nil {
 		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
 	}

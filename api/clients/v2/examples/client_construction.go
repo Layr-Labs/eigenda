@@ -261,7 +261,7 @@ func createGenericCertVerifier() (*verification.CertVerifier, error) {
 		return nil, fmt.Errorf("create router address provider: %w", err)
 	}
 
-	return verification.NewGenericCertVerifier(
+	return verification.NewCertVerifier(
 		logger,
 		ethClient,
 		routerAddressProvider,

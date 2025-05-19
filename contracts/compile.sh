@@ -40,7 +40,6 @@ contracts="PaymentVault \
   EjectionManager \
   EigenDACertVerifierV1 \
   EigenDACertVerifierV2 \
-  EigenDACertVerifierV3 \
   IEigenDACertTypeBindings \
   EigenDACertVerifier \
   EigenDACertVerifierRouter \
