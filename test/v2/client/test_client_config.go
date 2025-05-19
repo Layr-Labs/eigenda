@@ -60,7 +60,7 @@ type TestClientConfig struct {
 	DisableMetrics bool
 	// The size of the thread pool for read operations on the relay.
 	ValidatorReadConnectionPoolSize int
-	// The size of the thread pool for read operations on the relay.
+	// The size of the thread pool for CPU heavy operations.
 	ValidatorReadComputePoolSize int
 }
 
