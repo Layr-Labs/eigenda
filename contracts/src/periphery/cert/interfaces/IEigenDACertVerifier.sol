@@ -9,7 +9,7 @@ import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVe
 
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
-interface IEigenDACertVerifier is IEigenDACertVerifierBase, IVersionedEigenDACertVerifier {
+interface IEigenDACertVerifier {
     /// @notice Returns the EigenDAThresholdRegistry contract.
     function eigenDAThresholdRegistry() external view returns (IEigenDAThresholdRegistry);
 
