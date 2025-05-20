@@ -31,8 +31,6 @@ func HeartbeatMonitor(filePath string, maxStallDuration time.Duration, livenessC
 				return nil
 			}
 
-			logger.Info("Received heartbeat", "component", hb.Component, "timestamp", hb.Timestamp)
-
 			// Update the last heartbeat for this component
 			lastHeartbeats[hb.Component] = hb.Timestamp
 
@@ -43,8 +41,6 @@ func HeartbeatMonitor(filePath string, maxStallDuration time.Duration, livenessC
 			}
 			if err := os.WriteFile(filePath, []byte(summary), 0666); err != nil {
 				logger.Error("Failed to update heartbeat file", "error", err)
-			} else {
-				logger.Info("Wrote heartbeat file", "path", filePath)
 			}
 
 			stallTicker.Reset(maxStallDuration)
@@ -79,7 +75,6 @@ func SignalHeartbeat(component string, livenessChan chan<- HeartbeatMessage, log
 	}
 	select {
 	case livenessChan <- hb:
-		logger.Info("Heartbeat signal sent", "component", component)
 	default:
 		logger.Warn("Heartbeat signal skipped, no receiver on the channel", "component", component)
 	}

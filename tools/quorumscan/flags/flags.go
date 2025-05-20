@@ -36,10 +36,10 @@ var (
 	}
 	QuorumIDsFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "quorum-ids"),
-		Usage:    "Comma-separated list of quorum IDs to scan (default: 0,1,2)",
+		Usage:    "Comma-separated list of quorum IDs to scan (default: all)",
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "QUORUM_IDS"),
-		Value:    "0,1,2",
+		Value:    "",
 	}
 	TopNFlag = cli.UintFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "top"),

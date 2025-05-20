@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {IEigenDACertVerifier} from "src/periphery/cert/interfaces/IEigenDACertVerifier.sol";
-import {IEigenDACertVerifierBase} from "src/periphery/cert/interfaces/IEigenDACertVerifierBase.sol";
+import {
+    IEigenDACertVerifier,
+    IEigenDACertVerifierBase,
+    IVersionedEigenDACertVerifier
+} from "src/periphery/cert/interfaces/IEigenDACertVerifier.sol";
 
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
@@ -72,7 +75,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier {
         return _quorumNumbersRequired;
     }
 
-    /// @inheritdoc IEigenDACertVerifier
+    /// @inheritdoc IVersionedEigenDACertVerifier
     function certVersion() external pure returns (uint64) {
         return CERT_VERSION;
     }

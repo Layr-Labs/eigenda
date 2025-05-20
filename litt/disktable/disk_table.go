@@ -198,6 +198,12 @@ func NewDiskTable(
 		return nil, fmt.Errorf("failed to gather segment files: %w", err)
 	}
 
+	keyCount := int64(0)
+	for _, seg := range segments {
+		keyCount += int64(seg.KeyCount())
+	}
+	table.keyCount.Store(keyCount)
+
 	immutableSegmentSize := uint64(0)
 	for _, seg := range segments {
 		immutableSegmentSize += seg.Size()
@@ -282,6 +288,7 @@ func NewDiskTable(
 		keymap:                  keymap,
 		flushLoop:               fLoop,
 		garbageCollectionPeriod: config.GCPeriod,
+		immutableSegmentSize:    immutableSegmentSize,
 	}
 	cLoop.threadsafeHighestSegmentIndex.Store(highestSegmentIndex)
 	table.controlLoop = cLoop
@@ -306,27 +313,14 @@ func (d *DiskTable) reloadKeymap(
 	lowestSegmentIndex uint32,
 	highestSegmentIndex uint32) error {
 
-	if len(segments) > 0 {
-		// TODO(cody.littley): there is currently a race condition that may cause key files and value files to
-		//  be inconsistent. This is not a problem as long as the keymap is not reloaded, since this inconsistency
-		//  only hurts us when we are reloading the keymap. This needs to be fixed, but is not urgent since reloading
-		//  the keymap is not a feature currently used in production.
-		d.logger.Errorf("there is currently a race condition in this method, " +
-			"changing keymap type should not be used until fixed")
-	}
-
 	start := d.clock()
 	defer func() {
 		d.logger.Infof("spent %v reloading keymap", d.clock().Sub(start))
 	}()
 
-	// It's possible that some of the data written near the end of the previous session was corrupted.
-	// Read data from the end until the first valid key/value pair is found.
-	isValid := false
+	batch := make([]*types.ScopedKey, 0, keymapReloadBatchSize)
 
-	batch := make([]*types.KAPair, 0, keymapReloadBatchSize)
-
-	for i := highestSegmentIndex; i >= lowestSegmentIndex && i+1 != 0; i-- {
+	for i := lowestSegmentIndex; i <= highestSegmentIndex; i++ {
 		if !segments[i].IsSealed() {
 			// ignore unsealed segment, this will have been created in the current session and will not
 			// yet contain any data.
@@ -340,32 +334,15 @@ func (d *DiskTable) reloadKeymap(
 		for keyIndex := len(keys) - 1; keyIndex >= 0; keyIndex-- {
 			key := keys[keyIndex]
 
-			if !isValid {
-				_, err = segments[i].Read(key.Key, key.Address)
-				if err == nil {
-					// we found a valid key/value pair. All subsequent keys are valid.
-					isValid = true
-				} else {
-					// This is not cause for alarm (probably).
-					// This can happen when the database is not cleanly shut down,
-					// and just means that some data near the end was not fully committed.
-					d.logger.Infof("truncated value for key %s with address %s for segment %d",
-						key.Key, key.Address, i)
+			batch = append(batch, key)
+			if len(batch) == keymapReloadBatchSize {
+				err = d.keymap.Put(batch)
+				if err != nil {
+					return fmt.Errorf("failed to put keys for segment %d: %w", i, err)
 				}
-			}
-
-			if isValid {
-				batch = append(batch, key)
-				if len(batch) == keymapReloadBatchSize {
-					err = d.keymap.Put(batch)
-					if err != nil {
-						return fmt.Errorf("failed to put keys for segment %d: %w", i, err)
-					}
-					batch = make([]*types.KAPair, 0, keymapReloadBatchSize)
-				}
+				batch = make([]*types.ScopedKey, 0, keymapReloadBatchSize)
 			}
 		}
-
 	}
 
 	if len(batch) > 0 {
@@ -540,23 +517,10 @@ func (d *DiskTable) Get(key []byte) (value []byte, exists bool, err error) {
 			"Cannot process Get() request, DB is in panicked state due to error: %w", err)
 	}
 
-	var cacheHit bool
-	var dataSize uint64
-	if d.metrics != nil {
-		start := d.clock()
-		defer func() {
-			end := d.clock()
-			delta := end.Sub(start)
-			d.metrics.ReportReadOperation(d.name, delta, dataSize, cacheHit)
-		}()
-	}
-
 	// First, check if the key is in the unflushed data map.
 	// If so, return it from there.
 	if value, ok := d.unflushedDataCache.Load(util.UnsafeBytesToString(key)); ok {
 		bytes := value.([]byte)
-		cacheHit = true
-		dataSize = uint64(len(bytes))
 		return bytes, true, nil
 	}
 
@@ -582,8 +546,6 @@ func (d *DiskTable) Get(key []byte) (value []byte, exists bool, err error) {
 		return nil, false, fmt.Errorf("failed to read data: %w", err)
 	}
 
-	dataSize = uint64(len(data))
-
 	return data, true, nil
 }
 
@@ -597,25 +559,12 @@ func (d *DiskTable) CacheAwareGet(
 			"Cannot process CacheAwareGet() request, DB is in panicked state due to error: %w", err)
 	}
 
-	var cacheHit bool
-	var dataSize uint64
-	if d.metrics != nil {
-		start := d.clock()
-		defer func() {
-			end := d.clock()
-			delta := end.Sub(start)
-			d.metrics.ReportReadOperation(d.name, delta, dataSize, cacheHit)
-		}()
-	}
-
 	// First, check if the key is in the unflushed data map. If so, return it from there.
 	// Performance wise, this has equivalent semantics to reading the value from
 	// a cache, so we'd might as well count it as a cache hit.
 	var rawValue any
 	if rawValue, exists = d.unflushedDataCache.Load(util.UnsafeBytesToString(key)); exists {
 		value = rawValue.([]byte)
-		cacheHit = true
-		dataSize = uint64(len(value))
 		return value, true, true, nil
 	}
 
@@ -648,8 +597,6 @@ func (d *DiskTable) CacheAwareGet(
 	if err != nil {
 		return nil, false, false, fmt.Errorf("failed to read data: %w", err)
 	}
-
-	dataSize = uint64(len(value))
 
 	return value, true, false, nil
 }
@@ -796,7 +743,7 @@ func (d *DiskTable) RunGC() error {
 
 // writeKeysToKeymap flushes all keys to the keymap. Once they are flushed, it also removes the keys from the
 // unflushedDataCache.
-func (d *DiskTable) writeKeysToKeymap(keys []*types.KAPair) error {
+func (d *DiskTable) writeKeysToKeymap(keys []*types.ScopedKey) error {
 	if len(keys) == 0 {
 		// Nothing to flush.
 		return nil

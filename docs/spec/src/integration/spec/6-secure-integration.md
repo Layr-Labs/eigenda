@@ -1,29 +1,51 @@
 # Secure Integration
 
-This page is meant to be read by eigenda and rollup developers who are writing a secure integration. To understand what a secure integration is at a high level, visit our [secure integration overview](https://docs.eigenda.xyz/integrations-guides/rollup-guides/integrations-overview) docs instead.
+This page is meant to be read by eigenda and rollup developers who are writing a secure integration and need to understand the details. For users who just want a high-level understanding of what a secure integration is, please visit our [secure integration overview](https://docs.eigenda.xyz/integrations-guides/rollup-guides/integrations-overview) page instead.
 
-## Cert+Blob+Timing Validation
+## Validity Conditions
 
-Blob and Cert verification is done for both the write (sequencer) and read (validator) paths. Given this duplication in the lifecycle, and given its importance, it deserves its own section.
+EigenDA is a service that assures the availability and integrity of payloads posted to it for 14 days.
+When deriving a rollup chain by running its derivation pipeline, only EigenDA certs that satisfy 3 validity conditions are considered valid and used:
+1. RBN Recency Validation - ensure that the cert's reference block number (RBN) is not too old with respect to the L1 block at which the cert was included in the rollup's batcher-inbox. This ensures that the blob on EigenDA has sufficient availability time left (out of the 14 day period) in order to be downloadable if needed during a rollup fault proof window.
+2. Cert Validation - ensures sufficient operator stake has signed to make the blob available, for all specified quorums. The stake is obtained onchain at a given reference block number (RBN) specified inside the cert.
+3. Blob Validation - ensures that the blob used is consistent with the KZG commitment inside the Cert.
 
-The validation process is:
+### 1. RBN Recency Validation
 
-1. Validate the Cert (against state on ethereum)
-2. Validate the Blob (against the Cert)
+This check is related to time guarantees. It is important for both optimistic and zk rollup validators to have sufficient time to download the blob from EigenDA once a cert lands in the batcher inbox. 
 
-### Cert Validation
+We will use fault proofs as our base example to reason about the necessity of the recency check.
 
-Cert validation is done inside the EigenDACertVerifier contract, which EigenDA deploys as-is, but is also available for rollups to modify and deploy on their own. Specifically, [verifyDACertV2](https://github.com/Layr-Labs/eigenda/blob/98e21397e3471d170f3131549cdbc7113c0cdfaf/contracts/src/core/EigenDACertVerifier.sol#L86) is the entry point for validation. This could either be called during a normal eth transaction (either for pessimistic “bridging” like EigenDA V1 used to do, or when uploading a Blob Field Element to a one-step-proof’s [preimage contract](https://specs.optimism.io/fault-proof/index.html#pre-image-oracle)), or be zk proven using a library like [Steel](https://github.com/risc0/risc0-ethereum/blob/main/crates/steel/docs/what-is-steel.md).
+![](../../assets/integration/recency-window-timeline.png)
 
-The [cert verification](https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/libraries/EigenDABlobVerificationUtils.sol#L162) logic consists of:
+Looking at the timing diagram above, we need the EigenDA availability period to overlap the ~7days challenge period. In order to uphold this guarantee, what we need to do is simply to have rollups' derivation pipelines reject certs whose DA availability period started a long time ago. However, from the cert itself, there is no way to know when the cert was signed and made available. The only information available on the cert itself is `cert.RBN`, the reference block number chosen by the disperser at which to anchor operator stakes. But that happens to be before validators sign, so it is enough to bound how far that can be from the cert's inclusion block.
 
-1. [merkleInclusion](https://github.com/Layr-Labs/eigenda/blob/c3d1ff2a9a1ec39fc78c4936eabbc2443df38571/contracts/src/libraries/EigenDABlobVerificationUtils.sol#L173): 
+Rollups must thus enforce that
+```
+certL1InclusionBlock - cert.RBN <= RecencyWindowSize
+```
+
+This has a second security implication. A malicious EigenDA disperser could have chosen a reference block number (RBN) that is very old, where the stake of operators was very different from the current one, due to operators withdrawing stake for example.
+
+> To give a concrete example with a rollup stack, optimism has a [sequencerWindow](https://docs.optimism.io/stack/rollup/derivation-pipeline#sequencer-window) which forces batches to land onchain in a timely fashion (12h). This filtering however, happens in the [BatchQueue](https://specs.optimism.io/protocol/derivation.html#batch-queue) stage of the derivation pipeline (DP), and doesn't prevent the DP being stalled in the [L1Retrieval](https://specs.optimism.io/protocol/derivation.html#l1-retrieval) stage by an old cert having been submitted whose blob is no longer available on EigenDA. To prevent this, we need the recencyWindow filtering to happen during the L1Retrieval stage of the DP.
+>
+> Despite its semantics being slightly different, sequencerWindow and recencyWindow are related concepts, and in order to not force another config change on op altda forks, we suggest using the same value as the `SequencerWindowSize` for the `RecencyWindowSize`, namely 12h.
+
+![](../../assets/integration/cert-rbn-recency-window.png)
+
+
+### 2. Cert Validation
+
+Cert validation is done inside the EigenDACertVerifier contract, which EigenDA deploys as-is, but is also available for rollups to modify and deploy on their own. Specifically, [verifyDACertV2](https://github.com/Layr-Labs/eigenda/blob/ee092f345dfbc37fce3c02f99a756ff446c5864a/contracts/src/periphery/cert/v2/EigenDACertVerifierV2.sol#L72) is the entry point for validation. This could either be called during a normal eth transaction (either for pessimistic “bridging” like EigenDA V1 used to do, or when uploading a Blob Field Element to a one-step-proof’s [preimage contract](https://specs.optimism.io/fault-proof/index.html#pre-image-oracle)), or be zk proven using a library like [Steel](https://github.com/risc0/risc0-ethereum/blob/main/crates/steel/docs/what-is-steel.md).
+
+The [cert verification](https://github.com/Layr-Labs/eigenda/blob/ee092f345dfbc37fce3c02f99a756ff446c5864a/contracts/src/periphery/cert/v2/EigenDACertVerificationV2Lib.sol#L122) logic consists of:
+
+1. [merkleInclusion](https://github.com/Layr-Labs/eigenda/blob/ee092f345dfbc37fce3c02f99a756ff446c5864a/contracts/src/periphery/cert/v2/EigenDACertVerificationV2Lib.sol#L132): 
 2. verify `sigma` (operators’ bls signature) over `batchRoot` using the `NonSignerStakesAndSignature` struct
-3. verify relay keys
-4. verify blob security params (blob_params + security thresholds)
-5. verify each quorum part of the blob_header has met its threshold
+3. verify blob security params (blob_params + security thresholds)
+4. verify each quorum part of the blob_header has met its threshold
 
-### Blob Validation
+### 3. Blob Validation
 
 There are different required validation steps, depending on whether the client is retrieving or dispersing a blob.
 
@@ -49,12 +71,6 @@ Dispersal:
 2. After dispersal, verify that the `BlobKey` actually dispersed by the disperser matches the locally computed `BlobKey`
 
 Note: The verification steps in point 1. for dispersal are not currently implemented. This route only makes sense for clients that want to avoid having large amounts of SRS data, but KZG commitment verification via Fiat-Shamir is required to do the verification without this data. Until the alternate verification method is implemented, usage of `GetBlobCommitment` places a correctness trust assumption on the disperser generating the commitment.
-
-### Timing Verification
-
-Certs need to be included in the rollup’s batcher-inbox in a timely matter, otherwise a malicious batcher could wait until the blobs have expired on EigenDA before posting the cert to the rollup.
-
-![image.png](../../assets/integration/cert-punctuality-window.png)
 
 ### Rollup Stack Secure Integrations
 

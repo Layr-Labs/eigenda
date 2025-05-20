@@ -51,19 +51,19 @@ func testBasicBehavior(t *testing.T, keymap Keymap) {
 			key := []byte(rand.String(32))
 			address := types.Address(rand.Uint64())
 
-			err := keymap.Put([]*types.KAPair{{Key: key, Address: address}})
+			err := keymap.Put([]*types.ScopedKey{{Key: key, Address: address}})
 			require.NoError(t, err)
 			expected[string(key)] = address
 		} else if choice < 0.75 {
 			// Delete a few random values
 			numberToDelete := rand.Int32Range(1, 10)
 			numberToDelete = min(numberToDelete, int32(len(expected)))
-			keysToDelete := make([]*types.KAPair, 0, numberToDelete)
+			keysToDelete := make([]*types.ScopedKey, 0, numberToDelete)
 			for key := range expected {
 				if numberToDelete == int32(len(keysToDelete)) {
 					break
 				}
-				keysToDelete = append(keysToDelete, &types.KAPair{Key: []byte(key)})
+				keysToDelete = append(keysToDelete, &types.ScopedKey{Key: []byte(key)})
 				numberToDelete--
 			}
 
@@ -75,11 +75,11 @@ func testBasicBehavior(t *testing.T, keymap Keymap) {
 		} else {
 			// Write a batch of random values
 			numberToWrite := rand.Int32Range(1, 10)
-			pairs := make([]*types.KAPair, numberToWrite)
+			pairs := make([]*types.ScopedKey, numberToWrite)
 			for i := 0; i < int(numberToWrite); i++ {
 				key := []byte(rand.String(32))
 				address := types.Address(rand.Uint64())
-				pairs[i] = &types.KAPair{Key: key, Address: address}
+				pairs[i] = &types.ScopedKey{Key: key, Address: address}
 				expected[string(key)] = address
 			}
 			err := keymap.Put(pairs)
@@ -157,19 +157,19 @@ func TestRestart(t *testing.T) {
 			key := []byte(rand.String(32))
 			address := types.Address(rand.Uint64())
 
-			err := keymap.Put([]*types.KAPair{{Key: key, Address: address}})
+			err := keymap.Put([]*types.ScopedKey{{Key: key, Address: address}})
 			require.NoError(t, err)
 			expected[string(key)] = address
 		} else if choice < 0.75 {
 			// Delete a few random values
 			numberToDelete := rand.Int32Range(1, 10)
 			numberToDelete = min(numberToDelete, int32(len(expected)))
-			keysToDelete := make([]*types.KAPair, 0, numberToDelete)
+			keysToDelete := make([]*types.ScopedKey, 0, numberToDelete)
 			for key := range expected {
 				if numberToDelete == int32(len(keysToDelete)) {
 					break
 				}
-				keysToDelete = append(keysToDelete, &types.KAPair{Key: []byte(key)})
+				keysToDelete = append(keysToDelete, &types.ScopedKey{Key: []byte(key)})
 				numberToDelete--
 			}
 
@@ -181,11 +181,11 @@ func TestRestart(t *testing.T) {
 		} else {
 			// Write a batch of random values
 			numberToWrite := rand.Int32Range(1, 10)
-			pairs := make([]*types.KAPair, numberToWrite)
+			pairs := make([]*types.ScopedKey, numberToWrite)
 			for i := 0; i < int(numberToWrite); i++ {
 				key := []byte(rand.String(32))
 				address := types.Address(rand.Uint64())
-				pairs[i] = &types.KAPair{Key: key, Address: address}
+				pairs[i] = &types.ScopedKey{Key: key, Address: address}
 				expected[string(key)] = address
 			}
 			err := keymap.Put(pairs)
@@ -232,19 +232,19 @@ func TestRestart(t *testing.T) {
 			key := []byte(rand.String(32))
 			address := types.Address(rand.Uint64())
 
-			err := keymap.Put([]*types.KAPair{{Key: key, Address: address}})
+			err := keymap.Put([]*types.ScopedKey{{Key: key, Address: address}})
 			require.NoError(t, err)
 			expected[string(key)] = address
 		} else if choice < 0.75 {
 			// Delete a few random values
 			numberToDelete := rand.Int32Range(1, 10)
 			numberToDelete = min(numberToDelete, int32(len(expected)))
-			keysToDelete := make([]*types.KAPair, 0, numberToDelete)
+			keysToDelete := make([]*types.ScopedKey, 0, numberToDelete)
 			for key := range expected {
 				if numberToDelete == int32(len(keysToDelete)) {
 					break
 				}
-				keysToDelete = append(keysToDelete, &types.KAPair{Key: []byte(key)})
+				keysToDelete = append(keysToDelete, &types.ScopedKey{Key: []byte(key)})
 				numberToDelete--
 			}
 
@@ -256,11 +256,11 @@ func TestRestart(t *testing.T) {
 		} else {
 			// Write a batch of random values
 			numberToWrite := rand.Int32Range(1, 10)
-			pairs := make([]*types.KAPair, numberToWrite)
+			pairs := make([]*types.ScopedKey, numberToWrite)
 			for i := 0; i < int(numberToWrite); i++ {
 				key := []byte(rand.String(32))
 				address := types.Address(rand.Uint64())
-				pairs[i] = &types.KAPair{Key: key, Address: address}
+				pairs[i] = &types.ScopedKey{Key: key, Address: address}
 				expected[string(key)] = address
 			}
 			err := keymap.Put(pairs)

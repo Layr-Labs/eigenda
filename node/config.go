@@ -57,8 +57,6 @@ type Config struct {
 	ExpirationPollIntervalSec       uint64
 	LevelDBDisableSeeksCompactionV1 bool
 	LevelDBSyncWritesV1             bool
-	LevelDBDisableSeeksCompactionV2 bool
-	LevelDBSyncWritesV2             bool
 	EnableTestMode                  bool
 	OverrideBlockStaleMeasure       uint64
 	OverrideStoreDurationBlocks     uint64
@@ -109,10 +107,6 @@ type Config struct {
 	// The size of the pool where chunks are downloaded from the relay network.
 	DownloadPoolSize int
 
-	// If true, use littDB instead of levelDB for v2 storage. Once enabled, cannot be disabled. That is,
-	// once littDB is turned on, turning it off again is not supported.
-	LittDBEnabled bool
-
 	// A special test only setting. If true, then littDB will throw an error if the same data is written twice.
 	LittDBDoubleWriteProtection bool
 
@@ -134,6 +128,10 @@ type Config struct {
 	// this config value overrides the LittDBReadCacheSizeFraction value.
 	LittDBReadCacheSizeGB float64
 
+	// The list of paths to the littDB storage directories. Data is spread across these directories.
+	// Directories do not need to be on the same filesystem.
+	LittDBStoragePaths []string
+
 	// The rate limit for the number of bytes served by the GetChunks API if the data is in the cache.
 	// Unit is in megabytes per second.
 	GetChunksHotCacheReadLimitMB float64
@@ -149,6 +147,11 @@ type Config struct {
 	// The burst limit for the number of bytes served by the GetChunks API if the data is not in the cache.
 	// Unit is in megabytes.
 	GetChunksColdBurstLimitMB float64
+
+	// Defines a safety buffer for the garbage collector. If non-zero, then the garbage collector will be instructed
+	// to aggressively garbage collect so as to keep this amount of memory free. Useful for preventing kubernetes
+	// from OOM-killing the process.
+	GCSafetyBufferSizeGB float64
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -336,8 +339,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		OverrideBlockStaleMeasure:           ctx.GlobalUint64(flags.OverrideBlockStaleMeasureFlag.Name),
 		LevelDBDisableSeeksCompactionV1:     ctx.GlobalBool(flags.LevelDBDisableSeeksCompactionV1Flag.Name),
 		LevelDBSyncWritesV1:                 ctx.GlobalBool(flags.LevelDBEnableSyncWritesV1Flag.Name),
-		LevelDBDisableSeeksCompactionV2:     ctx.GlobalBool(flags.LevelDBDisableSeeksCompactionV2Flag.Name),
-		LevelDBSyncWritesV2:                 ctx.GlobalBool(flags.LevelDBEnableSyncWritesV2Flag.Name),
 		OverrideStoreDurationBlocks:         ctx.GlobalUint64(flags.OverrideStoreDurationBlocksFlag.Name),
 		QuorumIDList:                        ids,
 		DbPath:                              ctx.GlobalString(flags.DbPathFlag.Name),
@@ -370,15 +371,16 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		DisperserKeyTimeout:                 ctx.GlobalDuration(flags.DisperserKeyTimeoutFlag.Name),
 		StoreChunksRequestMaxPastAge:        ctx.GlobalDuration(flags.StoreChunksRequestMaxPastAgeFlag.Name),
 		StoreChunksRequestMaxFutureAge:      ctx.GlobalDuration(flags.StoreChunksRequestMaxFutureAgeFlag.Name),
-		LittDBEnabled:                       ctx.GlobalBool(flags.LittDBEnabledFlag.Name),
 		LittDBWriteCacheSizeGB:              ctx.GlobalFloat64(flags.LittDBWriteCacheSizeGBFlag.Name),
 		LittDBWriteCacheSizeFraction:        ctx.GlobalFloat64(flags.LittDBWriteCacheSizeFractionFlag.Name),
 		LittDBReadCacheSizeGB:               ctx.GlobalFloat64(flags.LittDBReadCacheSizeGBFlag.Name),
 		LittDBReadCacheSizeFraction:         ctx.GlobalFloat64(flags.LittDBReadCacheSizeFractionFlag.Name),
+		LittDBStoragePaths:                  ctx.GlobalStringSlice(flags.LittDBStoragePathsFlag.Name),
 		DownloadPoolSize:                    ctx.GlobalInt(flags.DownloadPoolSizeFlag.Name),
 		GetChunksHotCacheReadLimitMB:        ctx.GlobalFloat64(flags.GetChunksHotCacheReadLimitMBFlag.Name),
 		GetChunksHotBurstLimitMB:            ctx.GlobalFloat64(flags.GetChunksHotBurstLimitMBFlag.Name),
 		GetChunksColdCacheReadLimitMB:       ctx.GlobalFloat64(flags.GetChunksColdCacheReadLimitMBFlag.Name),
 		GetChunksColdBurstLimitMB:           ctx.GlobalFloat64(flags.GetChunksColdBurstLimitMBFlag.Name),
+		GCSafetyBufferSizeGB:                ctx.GlobalFloat64(flags.GCSafetyBufferSizeGBFlag.Name),
 	}, nil
 }
