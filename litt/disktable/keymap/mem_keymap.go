@@ -25,6 +25,8 @@ type memKeymap struct {
 	lock                  sync.RWMutex
 }
 
+var _ BuildKeymap = NewMemKeymap
+
 // NewMemKeymap creates a new in-memory keymap.
 func NewMemKeymap(logger logging.Logger,
 	_ string,

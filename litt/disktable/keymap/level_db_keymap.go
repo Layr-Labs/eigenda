@@ -29,6 +29,8 @@ type LevelDBKeymap struct {
 	syncWrites bool
 }
 
+var _ BuildKeymap = NewLevelDBKeymap
+
 // NewLevelDBKeymap creates a new LevelDBKeymap instance.
 func NewLevelDBKeymap(
 	logger logging.Logger,

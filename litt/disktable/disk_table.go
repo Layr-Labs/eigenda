@@ -198,11 +198,11 @@ func NewDiskTable(
 		return nil, fmt.Errorf("failed to gather segment files: %w", err)
 	}
 
-	keyCount := uint64(0)
+	keyCount := int64(0)
 	for _, seg := range segments {
-		keyCount += uint64(seg.KeyCount())
+		keyCount += int64(seg.KeyCount())
 	}
-	table.keyCount.Store(int64(keyCount))
+	table.keyCount.Store(keyCount)
 
 	immutableSegmentSize := uint64(0)
 	for _, seg := range segments {

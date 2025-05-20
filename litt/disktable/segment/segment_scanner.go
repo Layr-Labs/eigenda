@@ -51,10 +51,7 @@ func scanDirectories(logger logging.Logger, rootDirectories []string) (
 			var index uint32
 
 			switch extension {
-			case MetadataSwapExtension:
-				garbageFiles = append(garbageFiles, filePath)
-				continue
-			case KeyFileSwapExtension:
+			case MetadataSwapExtension, KeyFileSwapExtension:
 				garbageFiles = append(garbageFiles, filePath)
 				continue
 			case MetadataFileExtension:

@@ -151,7 +151,7 @@ func (c *controlLoop) run() {
 
 // doGarbageCollection performs garbage collection on all segments, deleting old ones as necessary.
 func (c *controlLoop) doGarbageCollection() {
-	now := c.clock()
+	start := c.clock()
 	ttl := c.metadata.GetTTL()
 	if ttl.Nanoseconds() <= 0 {
 		// No TTL set, so nothing to do.
@@ -161,7 +161,7 @@ func (c *controlLoop) doGarbageCollection() {
 	defer func() {
 		if c.metrics != nil {
 			end := c.clock()
-			delta := end.Sub(now)
+			delta := end.Sub(start)
 			c.metrics.ReportGarbageCollectionLatency(c.name, delta)
 
 		}
@@ -176,7 +176,7 @@ func (c *controlLoop) doGarbageCollection() {
 		}
 
 		sealTime := seg.GetSealTime()
-		segmentAge := now.Sub(sealTime)
+		segmentAge := start.Sub(sealTime)
 		if segmentAge < ttl {
 			// Segment is not old enough to be deleted.
 			return

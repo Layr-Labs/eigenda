@@ -38,7 +38,7 @@ const (
 	// - and 1 byte for sealed.
 	V1MetadataSize = 33
 
-	// V2MetadataSize is the size of the metadata file at version 3 (aka ValueSizeSegmentVersion).
+	// V2MetadataSize is the size of the metadata file at version 2 (aka ValueSizeSegmentVersion).
 	// This is a constant, so it's convenient to have it here.
 	// - 4 bytes for version
 	// - 4 bytes for the sharding factor
