@@ -3,8 +3,11 @@ package benchmark
 import (
 	"encoding/binary"
 	"fmt"
+	"os"
 	"path"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/litt/util"
 )
 
 // CohortFileExtension is the file extension used for cohort files.
@@ -67,21 +70,115 @@ func NewCohort(
 		firstValueTimestamp: time.Time{},
 	}
 
+	err := cohort.Write()
+	if err != nil {
+		return nil, fmt.Errorf("failed to write cohort file: %w", err)
+	}
+
 	return cohort, nil
 }
 
-// Seal marks that all key-value pairs in the cohort have been written to the database.
-func (cohort *Cohort) Seal() error {
+func LoadCohort(
+	parentDirectory string,
+	cohortIndex uint64) (*Cohort, error) {
+
+	cohort := &Cohort{
+		parentDirectory: parentDirectory,
+		cohortIndex:     cohortIndex,
+	}
+
+	filePath := cohort.Path(false)
+	exists, err := util.Exists(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if cohort file exists: %w", err)
+	}
+
+	if !exists {
+		return nil, fmt.Errorf("cohort file does not exist: %s", filePath)
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open cohort file: %w", err)
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read cohort file: %w", err)
+	}
+
+	err = cohort.deserialize(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize cohort file: %w", err)
+	}
+
+	err = file.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed to close cohort file: %w", err)
+	}
+
+	return cohort, nil
+}
+
+// MarkComplete marks that all key-value pairs in the cohort have been written to the database. Once done,
+// all key-value pairs in the cohort become safe to read, so long as the cohort has not yet expired.
+func (c *Cohort) MarkComplete() error {
+	c.allValuesWritten = true
+	err := c.Write()
+	if err != nil {
+		return fmt.Errorf("failed to mark cohort complete: %w", err)
+	}
 	return nil
 }
 
 // Path returns the file path of the cohort file.
-func (cohort *Cohort) Path() string {
-	return path.Join(cohort.parentDirectory, fmt.Sprintf("%d%s", cohort.cohortIndex, CohortFileExtension))
+func (c *Cohort) Path(swap bool) string {
+
+	var extension string
+	if swap {
+		extension = CohortSwapFileExtension
+	} else {
+		extension = CohortFileExtension
+	}
+
+	return path.Join(c.parentDirectory, fmt.Sprintf("%d%s", c.cohortIndex, extension))
+}
+
+func (c *Cohort) Write() error {
+	swapPath := c.Path(true)
+	targetPath := c.Path(false)
+
+	swapFile, err := os.Create(swapPath)
+	if err != nil {
+		return fmt.Errorf("failed to create swap file: %w", err)
+	}
+
+	bytes := c.serialize()
+	_, err = swapFile.Write(bytes)
+	if err != nil {
+		return fmt.Errorf("failed to write to swap file: %w", err)
+	}
+
+	err = swapFile.Sync()
+	if err != nil {
+		return fmt.Errorf("failed to sync swap file: %w", err)
+	}
+
+	err = swapFile.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close swap file: %w", err)
+	}
+
+	err = os.Rename(swapPath, targetPath)
+	if err != nil {
+		return fmt.Errorf("failed to rename swap file: %w", err)
+	}
+
+	return nil
 }
 
 // serialize serializes the cohort to a byte array.
-func (cohort *Cohort) serialize() []byte {
+func (c *Cohort) serialize() []byte {
 	// Data size:
 	//  - cohortIndex (8 bytes)
 	//  - lowIndex (8 bytes)
@@ -91,15 +188,37 @@ func (cohort *Cohort) serialize() []byte {
 	// Total: 33 bytes
 
 	data := make([]byte, 33)
-	binary.BigEndian.PutUint64(data[0:8], cohort.cohortIndex)
-	binary.BigEndian.PutUint64(data[8:16], cohort.lowIndex)
-	binary.BigEndian.PutUint64(data[16:24], cohort.highIndex)
-	binary.BigEndian.PutUint64(data[24:32], uint64(cohort.firstValueTimestamp.Unix()))
-	if cohort.allValuesWritten {
+	binary.BigEndian.PutUint64(data[0:8], c.cohortIndex)
+	binary.BigEndian.PutUint64(data[8:16], c.lowIndex)
+	binary.BigEndian.PutUint64(data[16:24], c.highIndex)
+	binary.BigEndian.PutUint64(data[24:32], uint64(c.firstValueTimestamp.Unix()))
+	if c.allValuesWritten {
 		data[32] = 1
 	} else {
 		data[32] = 0
 	}
 
 	return data
+}
+
+func (c *Cohort) deserialize(data []byte) error {
+	if len(data) != 33 {
+		return fmt.Errorf("invalid data length: %d", len(data))
+	}
+
+	cohortIndex := binary.BigEndian.Uint64(data[0:8])
+	if cohortIndex != c.cohortIndex {
+		return fmt.Errorf("cohort index mismatch: %d != %d", cohortIndex, c.cohortIndex)
+	}
+
+	c.lowIndex = binary.BigEndian.Uint64(data[8:16])
+	c.highIndex = binary.BigEndian.Uint64(data[16:24])
+	if c.lowIndex >= c.highIndex {
+		return fmt.Errorf("invalid index range: %d >= %d", c.lowIndex, c.highIndex)
+	}
+
+	c.firstValueTimestamp = time.Unix(int64(binary.BigEndian.Uint64(data[24:32])), 0)
+	c.allValuesWritten = data[32] == 1
+
+	return nil
 }

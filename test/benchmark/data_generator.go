@@ -3,8 +3,6 @@ package benchmark
 import (
 	"math/rand"
 	"sync"
-
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
 )
 
 // DataGenerator is responsible for generating key-value pairs to be inserted into the database, for the sake of
@@ -25,14 +23,14 @@ func NewDataGenerator(seed int64, poolSize uint64) *DataGenerator {
 
 	randPool := &sync.Pool{
 		New: func() interface{} {
-			return random.NewTestRandomNoPrint()
+			return rand.New(rand.NewSource(seed))
 		},
 	}
 
 	dataPool := make([]byte, poolSize)
 	rng := randPool.Get().(*rand.Rand)
 	rng.Read(dataPool)
-	randPool.Put(randPool)
+	randPool.Put(rng)
 
 	return &DataGenerator{
 		randPool: randPool,
