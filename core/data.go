@@ -649,11 +649,23 @@ type OnDemandPayment struct {
 }
 
 type BlobVersionParameters struct {
-	CodingRate                  uint32
+	// CodingRate specifies the amount of redundancy that will be added when encoding the blob
+	// (Note that for the purposes of integer representation, this is the inverse of the standard
+	// coding rate used in coding theory). CodingRate must be a power of 2.
+	CodingRate uint32
+	// ReconstructionThresholdBips specifies the minimum difference between the ConfirmationThreshold
+	// and AdversaryThreshold that is valid for a given BlobVersionParameters. The ReconstructionThreshold
+	// is a function of all other parameters in the BlobVersionParameters.
 	ReconstructionThresholdBips uint32
-	NumChunks                   uint32
-	NumUnits                    uint32
-	SamplesPerUnit              uint32
+	// NumChunks is the number of individual encoded chunks of data that will be generated for each blob.
+	// NumChunks must be a power of 2.
+	NumChunks uint32
+	// NumUnits and SamplesPerUnit parameterize the mapping used by validators to determine which chunks they will
+	// download. The number of chunks that each validator will download is given by the equation
+	// NumChunks*ceil(NumUnits*MaxStakePercentage), where MaxStakePercentage is the maximum of the validator's
+	// stake percentage across the quorums for which it is registered.
+	NumUnits       uint32
+	SamplesPerUnit uint32
 }
 
 // IsActive returns true if the reservation is active at the given timestamp
