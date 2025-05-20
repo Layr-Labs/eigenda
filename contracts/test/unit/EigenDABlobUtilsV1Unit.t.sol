@@ -2,8 +2,8 @@
 pragma solidity =0.8.12;
 
 import "../MockEigenDADeployer.sol";
-import {EigenDACertVerifierV1} from "src/periphery/cert/v1/EigenDACertVerifierV1.sol";
-import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/periphery/cert/v1/EigenDACertVerificationV1Lib.sol";
+import {EigenDACertVerifierV1} from "src/periphery/cert/legacy/v1/EigenDACertVerifierV1.sol";
+import {EigenDACertVerificationV1Lib as CertV1Lib} from "src/periphery/cert/legacy/v1/EigenDACertVerificationV1Lib.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {IEigenDABatchMetadataStorage} from "src/core/interfaces/IEigenDABatchMetadataStorage.sol";
 
