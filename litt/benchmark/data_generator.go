@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"encoding/binary"
 	"math/rand"
 	"sync"
 )
@@ -38,27 +39,39 @@ func NewDataGenerator(seed int64, poolSize uint64) *DataGenerator {
 	}
 }
 
-// GenerateKVPair generates a new key value pair. The key is always 32 bytes long and generated randomly.
-// The value is sourced from reusable entropy (since it's expensive to generate huge quantities of random data).
-// The resulting value is deterministic given the same index + length.
-func (g *DataGenerator) GenerateKVPair(index uint64, valueLength uint64) (key []byte, value []byte) {
+// Key generates a new key. The value id deterministic for the same index and seed.
+func (g *DataGenerator) Key(index uint64) []byte {
 	rng := g.randPool.Get().(*rand.Rand)
 	rng.Seed(g.seed + int64(index))
 
-	key = make([]byte, 32)
+	key := make([]byte, 32)
 	rng.Read(key)
-	defer g.randPool.Put(rng)
+	g.randPool.Put(rng)
+
+	return key
+}
+
+// Value generates a new value. The value is deterministic for the same index, seed, and value size.
+// The actual length of the value is always valueLength + 4 bytes long, where the first four bytes
+// encode the length of the value.
+func (g *DataGenerator) Value(index uint64, valueLength uint64) []byte {
+	rng := g.randPool.Get().(*rand.Rand)
+	rng.Seed(g.seed + int64(index))
+
+	value := make([]byte, valueLength+4)
+	binary.BigEndian.PutUint32(value[0:4], uint32(valueLength))
 
 	if valueLength > uint64(len(g.dataPool)) {
 		// Special case: we don't have enough data in the pool to satisfy the request.
 		// For the sake of completeness, just generate the data if this happens.
 		// This shouldn't be encountered for sane configurations (i.e. with a pool size much larger than value sizes).
-		value = make([]byte, valueLength)
-		rng.Read(value)
+		rng.Read(value[4:])
 	} else {
 		startIndex := rng.Intn(len(g.dataPool) - int(valueLength))
-		value = g.dataPool[startIndex : startIndex+int(valueLength)]
+		copy(value[4:], g.dataPool[startIndex:startIndex+int(valueLength)])
 	}
 
-	return key, value
+	g.randPool.Put(rng)
+
+	return value
 }

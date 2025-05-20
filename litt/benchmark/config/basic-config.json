@@ -1,0 +1,5 @@
+{
+  "LittConfig": {
+    "Paths": ["~/benchmark/volume1", "~/benchmark/volume2", "~/benchmark/volume3"]
+  }
+}

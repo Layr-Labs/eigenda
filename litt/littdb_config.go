@@ -147,6 +147,15 @@ func DefaultConfig(paths ...string) (*Config, error) {
 		return nil, fmt.Errorf("at least one path must be provided")
 	}
 
+	config := DefaultConfigNoPaths()
+	config.Paths = paths
+
+	return config, nil
+}
+
+// DefaultConfigNoPaths returns a Config with default values, and does not require any paths to be provided.
+// If paths are not set prior to use, then the DB will return an error at startup.
+func DefaultConfigNoPaths() *Config {
 	seed := time.Now().UnixNano()
 	saltShaker := rand.New(rand.NewSource(seed))
 
@@ -154,7 +163,6 @@ func DefaultConfig(paths ...string) (*Config, error) {
 
 	return &Config{
 		CTX:                      context.Background(),
-		Paths:                    paths,
 		LoggerConfig:             &loggerConfig,
 		Clock:                    time.Now,
 		GCPeriod:                 5 * time.Minute,
@@ -172,7 +180,7 @@ func DefaultConfig(paths ...string) (*Config, error) {
 		MetricsNamespace:         "litt",
 		MetricsPort:              9101,
 		MetricsUpdateInterval:    time.Second,
-	}, nil
+	}
 }
 
 // SanityCheck performs a sanity check on the configuration, returning an error if any of the configuration
