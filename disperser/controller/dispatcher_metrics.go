@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -31,10 +32,19 @@ type dispatcherMetrics struct {
 	blobSetSize                  *prometheus.GaugeVec
 	batchStageTimer              *common.StageTimer
 	sendToValidatorStageTimer    *common.StageTimer
+	importantSigningThresholds   []float64
+	signatureThresholds          *prometheus.CounterVec
 }
 
 // NewDispatcherMetrics sets up metrics for the dispatcher.
-func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
+//
+// importantSigningThresholds is a list of meaningful thresholds. Thresholds should be between 0.0 and 1.0.
+// A count of batches meeting each specified threshold is reported as a metric.
+func newDispatcherMetrics(
+	registry *prometheus.Registry,
+	importantSigningThresholds []float64,
+) (*dispatcherMetrics, error) {
+
 	objectives := map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
 
 	attestation := promauto.With(registry).NewGaugeVec(
@@ -181,6 +191,31 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		"send_to_validator",
 		false)
 
+	// Verify that thresholds are sane
+	for _, threshold := range importantSigningThresholds {
+		if threshold < 0 || threshold > 1 {
+			return nil, fmt.Errorf("threshold %f is not between 0.0 and 1.0", threshold)
+		}
+	}
+	sort.Float64s(importantSigningThresholds)
+
+	// Add thresholds for 0.0 and 1.0, if missing.
+	if len(importantSigningThresholds) == 0 || importantSigningThresholds[0] != 0.0 {
+		importantSigningThresholds = append([]float64{0.0}, importantSigningThresholds...)
+	}
+	if importantSigningThresholds[0] != 1.0 {
+		importantSigningThresholds = append(importantSigningThresholds, 1.0)
+	}
+
+	signatureThresholds := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: dispatcherNamespace,
+			Name:      "signature_thresholds",
+			Help:      "A count of blobs that have reached various signature thresholds.",
+		},
+		[]string{"quorum", "threshold"},
+	)
+
 	return &dispatcherMetrics{
 		sendChunksRetryCount:         sendChunksRetryCount,
 		processSigningMessageLatency: processSigningMessageLatency,
@@ -198,7 +233,9 @@ func newDispatcherMetrics(registry *prometheus.Registry) *dispatcherMetrics {
 		blobSetSize:                  blobSetSize,
 		batchStageTimer:              batchStageTimer,
 		sendToValidatorStageTimer:    sendToValidatorStageTimer,
-	}
+		importantSigningThresholds:   importantSigningThresholds,
+		signatureThresholds:          signatureThresholds,
+	}, nil
 }
 
 func (m *dispatcherMetrics) reportSendChunksRetryCount(retries float64) {
@@ -266,7 +303,11 @@ func (m *dispatcherMetrics) reportBlobSetSize(size int) {
 	m.blobSetSize.WithLabelValues().Set(float64(size))
 }
 
-func (m *dispatcherMetrics) reportAttestation(operatorCount map[core.QuorumID]int, signerCount map[core.QuorumID]int, quorumResults map[core.QuorumID]*core.QuorumResult) {
+func (m *dispatcherMetrics) reportAttestation(
+	operatorCount map[core.QuorumID]int,
+	signerCount map[core.QuorumID]int,
+	quorumResults map[core.QuorumID]*core.QuorumResult) {
+
 	for quorumID, count := range operatorCount {
 		quorumStr := fmt.Sprintf("%d", quorumID)
 		signers, ok := signerCount[quorumID]
@@ -282,7 +323,34 @@ func (m *dispatcherMetrics) reportAttestation(operatorCount map[core.QuorumID]in
 		m.attestation.WithLabelValues("signers", quorumStr).Set(float64(signers))
 		m.attestation.WithLabelValues("non_signers", quorumStr).Set(float64(nonSigners))
 		m.attestation.WithLabelValues("percent_signed", quorumStr).Set(float64(quorumResult.PercentSigned))
+
+		m.reportSigningThreshold(quorumID, float64(quorumResult.PercentSigned)/100.0)
 	}
+}
+
+func (m *dispatcherMetrics) reportSigningThreshold(quorumID core.QuorumID, signingFraction float64) {
+	// First, determine the threshold to report. In order to be reported as threshold X, the signing fraction
+	// must be greater than or equal to X, but strictly less than the next highest threshold.
+	//
+	// For example, lets say important thresholds are [0, 0.55, 0.67, 0.80, 1.0]
+	// 0.55 signing -> threshold 0.55 (>= 0.55 but < 0.67)
+	// 0.56 signing -> threshold 0.55 (>= 0.55 but < 0.67)
+	// 0.66 signing -> threshold 0.55 (>= 0.55 but < 0.67)
+	// 0.67 signing -> threshold 0.67 (>= 0.67 but < 0.80)
+
+	var threshold float64
+	for i := len(m.importantSigningThresholds) - 1; i >= 0; i-- {
+		candidateThreshold := m.importantSigningThresholds[i]
+		if candidateThreshold <= signingFraction {
+			threshold = candidateThreshold
+			break
+		}
+	}
+
+	quorumString := fmt.Sprintf("%d", quorumID)
+	thresholdString := fmt.Sprintf("%f", threshold)
+
+	m.signatureThresholds.WithLabelValues(quorumString, thresholdString).Inc()
 }
 
 func (m *dispatcherMetrics) newBatchProbe() *common.SequenceProbe {
