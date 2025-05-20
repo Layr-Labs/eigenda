@@ -29,10 +29,12 @@ library EigenDACertVerificationLib {
     error InvalidInclusionProof(uint256 blobIndex, bytes32 blobHash, bytes32 rootHash);
 
     /// @notice Thrown when security assumptions are not met
-    /// @param gamma The difference between confirmation and adversary thresholds
-    /// @param n The calculated security parameter
-    /// @param minRequired The minimum required value for n
-    error SecurityAssumptionsNotMet(uint256 gamma, uint256 n, uint256 minRequired);
+    /// @param confirmationThreshold The confirmation threshold
+    /// @param adversaryThreshold The adversary threshold
+    /// @param reconstructionThreshold The reconstruction threshold
+    error SecurityAssumptionsNotMet(
+        uint8 confirmationThreshold, uint8 adversaryThreshold, uint32 reconstructionThreshold
+    );
 
     /// @notice Thrown when blob quorums are not a subset of confirmed quorums
     /// @param blobQuorumsBitmap The bitmap of blob quorums
@@ -118,7 +120,7 @@ library EigenDACertVerificationLib {
         }
 
         (err, errParams) = checkSecurityParams(
-            eigenDAThresholdRegistry.getBlobParams(blobInclusionInfo.blobCertificate.blobHeader.version),
+            eigenDAThresholdRegistry.getBlobParamsV2(blobInclusionInfo.blobCertificate.blobHeader.version),
             securityThresholds
         );
         if (err != StatusCode.SUCCESS) {
@@ -186,17 +188,23 @@ library EigenDACertVerificationLib {
      * @return errParams Additional error parameters
      */
     function checkSecurityParams(
-        DATypesV1.VersionedBlobParams memory blobParams,
+        DATypesV2.VersionedBlobParams memory blobParams,
         DATypesV1.SecurityThresholds memory securityThresholds
     ) internal pure returns (StatusCode err, bytes memory errParams) {
-        uint256 gamma = securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold;
-        uint256 n = (10000 - ((1_000_000 / gamma) / uint256(blobParams.codingRate))) * uint256(blobParams.numChunks);
-        uint256 minRequired = blobParams.maxNumOperators * 10000;
-
-        if (n >= minRequired) {
+        if (
+            securityThresholds.confirmationThreshold - securityThresholds.adversaryThreshold
+                > blobParams.reconstructionThreshold
+        ) {
             return (StatusCode.SUCCESS, "");
         } else {
-            return (StatusCode.SECURITY_ASSUMPTIONS_NOT_MET, abi.encode(gamma, n, minRequired));
+            return (
+                StatusCode.SECURITY_ASSUMPTIONS_NOT_MET,
+                abi.encode(
+                    securityThresholds.confirmationThreshold,
+                    securityThresholds.adversaryThreshold,
+                    blobParams.reconstructionThreshold
+                )
+            );
         }
     }
 
@@ -342,8 +350,9 @@ library EigenDACertVerificationLib {
             (uint256 blobIndex, bytes32 blobHash, bytes32 rootHash) = abi.decode(errParams, (uint256, bytes32, bytes32));
             revert InvalidInclusionProof(blobIndex, blobHash, rootHash);
         } else if (err == StatusCode.SECURITY_ASSUMPTIONS_NOT_MET) {
-            (uint256 gamma, uint256 n, uint256 minRequired) = abi.decode(errParams, (uint256, uint256, uint256));
-            revert SecurityAssumptionsNotMet(gamma, n, minRequired);
+            (uint8 confirmationThreshold, uint8 adversaryThreshold, uint32 reconstructionThreshold) =
+                abi.decode(errParams, (uint8, uint8, uint32));
+            revert SecurityAssumptionsNotMet(confirmationThreshold, adversaryThreshold, reconstructionThreshold);
         } else if (err == StatusCode.BLOB_QUORUMS_NOT_SUBSET) {
             (uint256 blobQuorumsBitmap, uint256 confirmedQuorumsBitmap) = abi.decode(errParams, (uint256, uint256));
             revert BlobQuorumsNotSubset(blobQuorumsBitmap, confirmedQuorumsBitmap);

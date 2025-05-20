@@ -3,6 +3,7 @@ pragma solidity ^0.8.9;
 
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 
 /**
  * @title Storage variables for the `EigenDAThresholdRegistry` contract.
@@ -24,6 +25,8 @@ abstract contract EigenDAThresholdRegistryStorage is IEigenDAThresholdRegistry {
 
     /// @notice mapping of blob version id to the params of the blob version
     mapping(uint16 => DATypesV1.VersionedBlobParams) public versionedBlobParams;
+
+    DATypesV2.VersionedBlobParams[] internal _versionedBlobParamsV2;
 
     // storage gap for upgradeability
     // slither-disable-next-line shadowing-state

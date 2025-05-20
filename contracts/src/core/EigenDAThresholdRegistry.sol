@@ -6,6 +6,7 @@ import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRe
 import {OwnableUpgradeable} from "lib/openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
 import {BitmapUtils} from "lib/eigenlayer-middleware/src/libraries/BitmapUtils.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 
 /**
  * @title The `EigenDAThresholdRegistry` contract.
@@ -40,6 +41,12 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
         returns (uint16)
     {
         return _addVersionedBlobParams(_versionedBlobParams);
+    }
+
+    function addVersionedBlobParamsV2(DATypesV2.VersionedBlobParams memory newVersionedBlobParams) external onlyOwner {
+        uint256 version = _versionedBlobParamsV2.length;
+        _versionedBlobParamsV2.push(newVersionedBlobParams);
+        emit VersionedBlobParamsV2Added(version, newVersionedBlobParams);
     }
 
     function _addVersionedBlobParams(DATypesV1.VersionedBlobParams memory _versionedBlobParams)
@@ -88,5 +95,9 @@ contract EigenDAThresholdRegistry is EigenDAThresholdRegistryStorage, OwnableUpg
     /// @notice Returns the blob params for a given blob version
     function getBlobParams(uint16 version) external view returns (DATypesV1.VersionedBlobParams memory) {
         return versionedBlobParams[version];
+    }
+
+    function getBlobParamsV2(uint256 version) external view returns (DATypesV2.VersionedBlobParams memory) {
+        return _versionedBlobParamsV2[version];
     }
 }

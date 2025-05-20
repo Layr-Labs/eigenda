@@ -56,4 +56,12 @@ library EigenDATypesV2 {
         BN254.G2Point apkG2;
         uint32[] quorumNumbers;
     }
+
+    struct VersionedBlobParams {
+        uint32 codingRate;
+        uint32 reconstructionThreshold;
+        uint32 numChunks;
+        uint32 numUnits;
+        uint32 samplesPerUnit;
+    }
 }

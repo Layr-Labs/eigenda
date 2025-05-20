@@ -4,7 +4,7 @@ pragma solidity ^0.8.9;
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 
-interface IEigenDAThresholdRegistry {
+interface IEigenDAThresholdRegistryBase {
     event VersionedBlobParamsAdded(uint16 indexed version, DATypesV1.VersionedBlobParams versionedBlobParams);
 
     event QuorumAdversaryThresholdPercentagesUpdated(
@@ -46,4 +46,12 @@ interface IEigenDAThresholdRegistry {
 
     /// @notice Returns the blob params for a given blob version
     function getBlobParams(uint16 version) external view returns (DATypesV1.VersionedBlobParams memory);
+}
+
+interface IEigenDAThresholdRegistry is IEigenDAThresholdRegistryBase {
+    event VersionedBlobParamsV2Added(uint256 indexed version, DATypesV2.VersionedBlobParams versionedBlobParams);
+
+    function getBlobParamsV2(uint256 version) external view returns (DATypesV2.VersionedBlobParams memory);
+
+    function addVersionedBlobParamsV2(DATypesV2.VersionedBlobParams memory newVersionedBlobParams) external;
 }

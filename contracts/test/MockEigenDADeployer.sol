@@ -182,6 +182,17 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             defaultSecurityThresholds,
             quorumNumbersRequired
         );
+
+        cheats.prank(registryCoordinatorOwner);
+        eigenDAThresholdRegistry.addVersionedBlobParamsV2(
+            DATypesV2.VersionedBlobParams({
+                codingRate: 8,
+                reconstructionThreshold: 1,
+                numChunks: 1,
+                numUnits: 1,
+                samplesPerUnit: 1
+            })
+        );
     }
 
     function _getHeaderandNonSigners(uint256 _nonSigners, uint256 _pseudoRandomNumber, uint8 _threshold)
