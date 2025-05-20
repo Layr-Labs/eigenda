@@ -20,6 +20,7 @@ import (
 type OnchainPayment interface {
 	RefreshOnchainPaymentState(ctx context.Context) error
 	GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error)
+	GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[core.QuorumID]*core.ReservedPayment, error)
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error)
 	GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error)
 	GetGlobalSymbolsPerSecond() uint64
@@ -216,6 +217,27 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx contex
 			(pcs.ReservedPayments)[accountID][quorumNumber] = res[quorumNumber]
 		}
 	}
+	pcs.ReservationsLock.Unlock()
+
+	return res, nil
+}
+
+// GetReservedPaymentByAccount returns a pointer to the active reservation for the given account ID; no writes will be made to the reservation
+func (pcs *OnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[core.QuorumID]*core.ReservedPayment, error) {
+	pcs.ReservationsLock.RLock()
+	if reservation, ok := (pcs.ReservedPayments)[accountID]; ok {
+		pcs.ReservationsLock.RUnlock()
+		return reservation, nil
+	}
+	pcs.ReservationsLock.RUnlock()
+
+	// pulls the chain state
+	res, err := pcs.tx.GetReservedPaymentByAccount(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	pcs.ReservationsLock.Lock()
+	(pcs.ReservedPayments)[accountID] = res
 	pcs.ReservationsLock.Unlock()
 
 	return res, nil

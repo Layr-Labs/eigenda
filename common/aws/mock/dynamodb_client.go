@@ -59,6 +59,24 @@ func (c *MockDynamoDBClient) IncrementBy(ctx context.Context, tableName string, 
 	return args.Get(0).(dynamodb.Item), args.Error(1)
 }
 
+func (c *MockDynamoDBClient) TransactIncrementBy(ctx context.Context, tableName string, ops []struct {
+	Key   dynamodb.Key
+	Attr  string
+	Value uint64
+}) error {
+	args := c.Called()
+	return args.Error(0)
+}
+
+func (c *MockDynamoDBClient) TransactDecrementBy(ctx context.Context, tableName string, ops []struct {
+	Key   dynamodb.Key
+	Attr  string
+	Value uint64
+}) error {
+	args := c.Called()
+	return args.Error(0)
+}
+
 func (c *MockDynamoDBClient) GetItem(ctx context.Context, tableName string, key dynamodb.Key) (dynamodb.Item, error) {
 	args := c.Called()
 	return args.Get(0).(dynamodb.Item), args.Error(1)

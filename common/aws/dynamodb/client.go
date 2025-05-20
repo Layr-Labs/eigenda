@@ -66,6 +66,16 @@ type Client interface {
 	DeleteItem(ctx context.Context, tableName string, key Key) error
 	DeleteItems(ctx context.Context, tableName string, keys []Key) ([]Key, error)
 	TableExists(ctx context.Context, name string) error
+	TransactIncrementBy(ctx context.Context, tableName string, ops []struct {
+		Key   Key
+		Attr  string
+		Value uint64
+	}) error
+	TransactDecrementBy(ctx context.Context, tableName string, ops []struct {
+		Key   Key
+		Attr  string
+		Value uint64
+	}) error
 }
 
 type client struct {
@@ -530,6 +540,97 @@ func (c *client) TableExists(ctx context.Context, name string) error {
 	})
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+// TransactIncrementBy performs atomic increments on multiple items using DynamoDB's TransactWriteItems API.
+// Each operation is specified by a key, attribute name, and increment value.
+// All increments are performed atomically; if any fail, none are applied.
+// Returns a slice of errors (one per operation) or a single error if the transaction fails.
+func (c *client) TransactIncrementBy(ctx context.Context, tableName string, ops []struct {
+	Key   Key
+	Attr  string
+	Value uint64
+}) error {
+	if len(ops) == 0 {
+		return nil
+	}
+	if len(ops) > 25 {
+		return fmt.Errorf("DynamoDB TransactWriteItems limit is 25 operations per transaction")
+	}
+
+	transactItems := make([]types.TransactWriteItem, len(ops))
+	for i, op := range ops {
+		update := expression.UpdateBuilder{}
+		update = update.Add(expression.Name(op.Attr), expression.Value(aws.Float64(float64(op.Value))))
+		expr, err := expression.NewBuilder().WithUpdate(update).Build()
+		if err != nil {
+			return fmt.Errorf("failed to build update expression: %w", err)
+		}
+		transactItems[i] = types.TransactWriteItem{
+			Update: &types.Update{
+				TableName:                           aws.String(tableName),
+				Key:                                 op.Key,
+				UpdateExpression:                    expr.Update(),
+				ExpressionAttributeNames:            expr.Names(),
+				ExpressionAttributeValues:           expr.Values(),
+				ReturnValuesOnConditionCheckFailure: types.ReturnValuesOnConditionCheckFailureAllOld,
+			},
+		}
+	}
+
+	_, err := c.dynamoClient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: transactItems,
+	})
+	if err != nil {
+		return fmt.Errorf("TransactWriteItems failed: %w", err)
+	}
+	return nil
+}
+
+// TransactDecrementBy performs atomic decrements on multiple items using DynamoDB's TransactWriteItems API.
+// Each operation is specified by a key, attribute name, and decrement value.
+// All decrements are performed atomically; if any fail, none are applied.
+// Returns an error if the transaction fails.
+// Q: Should I just make a TransactIncrementBy function and use it for both increment and decrement? by negating Values before passing it in
+func (c *client) TransactDecrementBy(ctx context.Context, tableName string, ops []struct {
+	Key   Key
+	Attr  string
+	Value uint64
+}) error {
+	if len(ops) == 0 {
+		return nil
+	}
+	if len(ops) > 25 {
+		return fmt.Errorf("DynamoDB TransactWriteItems limit is 25 operations per transaction")
+	}
+
+	transactItems := make([]types.TransactWriteItem, len(ops))
+	for i, op := range ops {
+		update := expression.UpdateBuilder{}
+		update = update.Add(expression.Name(op.Attr), expression.Value(aws.Float64(-float64(op.Value))))
+		expr, err := expression.NewBuilder().WithUpdate(update).Build()
+		if err != nil {
+			return fmt.Errorf("failed to build update expression: %w", err)
+		}
+		transactItems[i] = types.TransactWriteItem{
+			Update: &types.Update{
+				TableName:                           aws.String(tableName),
+				Key:                                 op.Key,
+				UpdateExpression:                    expr.Update(),
+				ExpressionAttributeNames:            expr.Names(),
+				ExpressionAttributeValues:           expr.Values(),
+				ReturnValuesOnConditionCheckFailure: types.ReturnValuesOnConditionCheckFailureAllOld,
+			},
+		}
+	}
+
+	_, err := c.dynamoClient.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: transactItems,
+	})
+	if err != nil {
+		return fmt.Errorf("TransactWriteItems failed: %w", err)
 	}
 	return nil
 }

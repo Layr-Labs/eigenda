@@ -20,6 +20,33 @@ import (
 
 const MinNumBins int32 = 3
 
+// OffchainStoreInterface defines the methods that an offchain store must implement
+type OffchainStoreInterface interface {
+	// UpdateReservationBin updates the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
+	// The key is now AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
+	UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, requestReservationPeriods map[core.QuorumID]uint64, size uint64) (map[core.QuorumID]uint64, map[core.QuorumID]error)
+
+	// IncrementBinUsages(ctx, header.AccountID, quorumNumbers, requestReservationPeriods, symbolsCharged)
+	IncrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, requestReservationPeriods map[core.QuorumID]uint64, size uint64) (map[core.QuorumID]uint64, map[core.QuorumID]error)
+	// GetBinUsage retrieves the current bin usage for a specific account, period, and quorum
+	GetBinUsage(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, quorumNumber uint8) (uint64, error)
+	// UpdateGlobalBin updates the global bin usage for a specific period
+	UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error)
+	// AddOnDemandPayment adds a payment for on-demand requests
+	AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, paymentCharged *big.Int) (*big.Int, error)
+	// RollbackOnDemandPayment rolls back a payment to a previous value
+	RollbackOnDemandPayment(ctx context.Context, accountID gethcommon.Address, newPayment, oldPayment *big.Int) error
+	// GetPeriodRecords retrieves the period records for a specific account and quorum
+	GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, quorumNumber uint8) ([MinNumBins]*pb.PeriodRecord, error)
+	// GetPeriodRecordsMultiQuorum retrieves period records for multiple quorums
+	GetPeriodRecordsMultiQuorum(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, quorumNumbers []uint8) ([]*pb.PeriodRecord, error)
+	// GetLargestCumulativePayment retrieves the largest cumulative payment for an account
+	GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error)
+	// DecrementBinUsages atomically decrements the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
+	// The key is AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
+	DecrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) error
+}
+
 type OffchainStore struct {
 	dynamoClient         commondynamodb.Client
 	reservationTableName string
@@ -65,33 +92,66 @@ func NewOffchainStore(
 	}, nil
 }
 
-func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, size uint64) (uint64, error) {
-	key := map[string]types.AttributeValue{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+// IncrementBinUsages updates the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
+// The key is AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
+func (s *OffchainStore) IncrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) (map[core.QuorumID]uint64, error) {
+	binUsages := make(map[core.QuorumID]uint64)
+
+	// Build ops for atomic batch increment
+	ops := make([]struct {
+		Key   commondynamodb.Key
+		Attr  string
+		Value uint64
+	}, len(quorumNumbers))
+	for i, quorumNumber := range quorumNumbers {
+		accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorumNumber), 10)
+		key := map[string]types.AttributeValue{
+			"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
+			"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
+		}
+		ops[i] = struct {
+			Key   commondynamodb.Key
+			Attr  string
+			Value uint64
+		}{
+			Key:   key,
+			Attr:  "BinUsage",
+			Value: sizes[quorumNumber],
+		}
 	}
 
-	res, err := s.dynamoClient.IncrementBy(ctx, s.reservationTableName, key, "BinUsage", size)
+	err := s.dynamoClient.TransactIncrementBy(ctx, s.reservationTableName, ops)
 	if err != nil {
-		return 0, fmt.Errorf("failed to increment bin usage: %w", err)
+		return nil, err
 	}
 
-	binUsage, ok := res["BinUsage"]
-	if !ok {
-		return 0, errors.New("BinUsage is not present in the response")
+	// Fetch new values for each key
+	for _, quorumNumber := range quorumNumbers {
+		accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorumNumber), 10)
+		key := map[string]types.AttributeValue{
+			"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
+			"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
+		}
+		item, getErr := s.dynamoClient.GetItem(ctx, s.reservationTableName, key)
+		if getErr != nil {
+			return nil, getErr
+		}
+		binUsage, ok := item["BinUsage"]
+		if !ok {
+			return nil, fmt.Errorf("BinUsage is not present in the response")
+		}
+		binUsageAttr, ok := binUsage.(*types.AttributeValueMemberN)
+		if !ok {
+			return nil, fmt.Errorf("unexpected type for BinUsage: %T", binUsage)
+		}
+		binUsageValue, parseErr := strconv.ParseUint(binUsageAttr.Value, 10, 64)
+		if parseErr != nil {
+			return nil, fmt.Errorf("failed to parse BinUsage: %w", parseErr)
+		}
+		binUsages[quorumNumber] = binUsageValue
 	}
 
-	binUsageAttr, ok := binUsage.(*types.AttributeValueMemberN)
-	if !ok {
-		return 0, fmt.Errorf("unexpected type for BinUsage: %T", binUsage)
-	}
-
-	binUsageValue, err := strconv.ParseUint(binUsageAttr.Value, 10, 32)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse BinUsage: %w", err)
-	}
-
-	return binUsageValue, nil
+	return binUsages, nil
 }
 
 func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error) {
@@ -332,4 +392,33 @@ func parsePeriodRecord(bin map[string]types.AttributeValue) (*pb.PeriodRecord, e
 		Index: uint32(reservationPeriodValue),
 		Usage: uint64(binUsageValue),
 	}, nil
+}
+
+// DecrementBinUsages atomically decrements the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
+// The key is AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
+func (s *OffchainStore) DecrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) error {
+	// Build ops for atomic batch decrement
+	ops := make([]struct {
+		Key   commondynamodb.Key
+		Attr  string
+		Value uint64
+	}, len(quorumNumbers))
+	for i, quorumNumber := range quorumNumbers {
+		accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorumNumber), 10)
+		key := map[string]types.AttributeValue{
+			"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
+			"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
+		}
+		ops[i] = struct {
+			Key   commondynamodb.Key
+			Attr  string
+			Value uint64
+		}{
+			Key:   key,
+			Attr:  "BinUsage",
+			Value: sizes[quorumNumber],
+		}
+	}
+
+	return s.dynamoClient.TransactDecrementBy(ctx, s.reservationTableName, ops)
 }
