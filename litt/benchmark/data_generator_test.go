@@ -1,7 +1,6 @@
 package benchmark
 
 import (
-	"encoding/binary"
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
@@ -25,8 +24,7 @@ func TestDeterminism(t *testing.T) {
 	require.Equal(t, k1, k3)
 	require.Equal(t, v1, v3)
 
-	decodedValueSize := binary.BigEndian.Uint32(v1)
-	require.Equal(t, decodedValueSize, uint32(32))
+	require.Equal(t, 32, len(v1))
 
 	index := rand.Uint64()
 	size := rand.Uint64Range(1, 100)
@@ -38,8 +36,7 @@ func TestDeterminism(t *testing.T) {
 	require.Equal(t, k1, k3)
 	require.Equal(t, v1, v3)
 
-	decodedValueSize = binary.BigEndian.Uint32(v1)
-	require.Equal(t, decodedValueSize, uint32(size))
+	require.Equal(t, size, uint64(len(v1)))
 
 	index = rand.Uint64()
 	k1, v1 = generator1.Key(index), generator1.Value(index, bufferSize*2)
@@ -50,6 +47,5 @@ func TestDeterminism(t *testing.T) {
 	require.Equal(t, k1, k3)
 	require.Equal(t, v1, v3)
 
-	decodedValueSize = binary.BigEndian.Uint32(v1)
-	require.Equal(t, decodedValueSize, uint32(bufferSize*2))
+	require.Equal(t, bufferSize*2, uint64(len(v1)))
 }

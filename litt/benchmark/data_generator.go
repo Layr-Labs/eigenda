@@ -1,7 +1,6 @@
 package benchmark
 
 import (
-	"encoding/binary"
 	"math/rand"
 	"sync"
 )
@@ -39,6 +38,9 @@ func NewDataGenerator(seed int64, poolSize uint64) *DataGenerator {
 	}
 }
 
+// TODO use the reusable randomness for the key as well. Make it so that the first 24 bytes come from the pool,
+//  and the last 8 bytes are the index.
+
 // Key generates a new key. The value id deterministic for the same index and seed.
 func (g *DataGenerator) Key(index uint64) []byte {
 	rng := g.randPool.Get().(*rand.Rand)
@@ -52,23 +54,21 @@ func (g *DataGenerator) Key(index uint64) []byte {
 }
 
 // Value generates a new value. The value is deterministic for the same index, seed, and value size.
-// The actual length of the value is always valueLength + 4 bytes long, where the first four bytes
-// encode the length of the value.
 func (g *DataGenerator) Value(index uint64, valueLength uint64) []byte {
 	rng := g.randPool.Get().(*rand.Rand)
 	rng.Seed(g.seed + int64(index))
 
-	value := make([]byte, valueLength+4)
-	binary.BigEndian.PutUint32(value[0:4], uint32(valueLength))
+	var value []byte
 
 	if valueLength > uint64(len(g.dataPool)) {
 		// Special case: we don't have enough data in the pool to satisfy the request.
 		// For the sake of completeness, just generate the data if this happens.
 		// This shouldn't be encountered for sane configurations (i.e. with a pool size much larger than value sizes).
-		rng.Read(value[4:])
+		value = make([]byte, valueLength)
+		rng.Read(value)
 	} else {
 		startIndex := rng.Intn(len(g.dataPool) - int(valueLength))
-		copy(value[4:], g.dataPool[startIndex:startIndex+int(valueLength)])
+		value = g.dataPool[startIndex : startIndex+int(valueLength)]
 	}
 
 	g.randPool.Put(rng)

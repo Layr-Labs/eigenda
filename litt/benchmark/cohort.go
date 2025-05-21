@@ -24,14 +24,14 @@ const CohortSwapFileExtension = ".cohort.swap"
     +-----+     +-----------+     +----------+
        |              |
        v              |
-    +------------+    |
-    | incomplete | <--|
-    +------------+
+    +-----------+     |
+    | abandoned | <---|
+    +-----------+
 
 - new: the cohort was just created and is currently being used to supply keys for writing.
 - exhausted: all keys in the cohort have taken to be written, but the DB may not have ingested them all yet.
 - complete: all keys in the cohort have been written to the DB and are safe to read.
-- incomplete: before becoming complete, the benchmark was restarted. It will never be thread safe to read or write
+- abandoned: before becoming complete, the benchmark was restarted. It will never be thread safe to read or write
               any keys in this cohort.
 */
 
@@ -51,6 +51,9 @@ type Cohort struct {
 
 	// The index of the last key-value pair in the cohort.
 	highKeyIndex uint64
+
+	// The size of the values written in this cohort.
+	valueSize uint64
 
 	// The next available index to be written. Only relevant for a new cohort that is currently being written to
 	// the DB. This value is undefined for cohorts that have been completely written or loaded from disk. This value
@@ -72,13 +75,15 @@ func NewCohort(
 	parentDirectory string,
 	cohortIndex uint64,
 	lowIndex uint64,
-	highIndex uint64) (*Cohort, error) {
+	highIndex uint64,
+	valueSize uint64) (*Cohort, error) {
 
 	cohort := &Cohort{
 		parentDirectory:     parentDirectory,
 		cohortIndex:         cohortIndex,
 		lowKeyIndex:         lowIndex,
 		highKeyIndex:        highIndex,
+		valueSize:           valueSize,
 		nextKeyIndex:        lowIndex,
 		allValuesWritten:    false,
 		firstValueTimestamp: time.Time{},
@@ -135,6 +140,24 @@ func LoadCohort(
 	return cohort, nil
 }
 
+// NextCohort creates the next cohort in the sequence with the given number of keys.
+func (c *Cohort) NextCohort(keyCount uint64, valueSize uint64) (*Cohort, error) {
+	nextIndex := c.cohortIndex + 1
+	nextLowKeyIndex := c.highKeyIndex + 1
+	nextHighKeyIndex := nextLowKeyIndex + keyCount - 1
+
+	nextCohort, err := NewCohort(
+		c.parentDirectory,
+		nextIndex,
+		nextLowKeyIndex,
+		nextHighKeyIndex,
+		valueSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create next cohort: %w", err)
+	}
+	return nextCohort, nil
+}
+
 // CohortIndex returns the index of the cohort.
 func (c *Cohort) CohortIndex() uint64 {
 	return c.cohortIndex
@@ -148,6 +171,10 @@ func (c *Cohort) LowKeyIndex() uint64 {
 // HighKeyIndex returns the index of the last key in the cohort.
 func (c *Cohort) HighKeyIndex() uint64 {
 	return c.highKeyIndex
+}
+
+func (c *Cohort) ValueSize() uint64 {
+	return c.valueSize
 }
 
 // FirstValueTimestamp returns the timestamp of the first value in the cohort.
@@ -278,26 +305,28 @@ func (c *Cohort) serialize() []byte {
 	//  - cohortIndex (8 bytes)
 	//  - lowKeyIndex (8 bytes)
 	//  - highKeyIndex (8 bytes)
+	//  - valueSize (8 bytes)
 	//  - firstValueTimestamp (8 bytes)
 	//  - allValuesWritten (1 byte)
-	// Total: 33 bytes
+	// Total: 41 bytes
 
-	data := make([]byte, 33)
+	data := make([]byte, 41)
 	binary.BigEndian.PutUint64(data[0:8], c.cohortIndex)
 	binary.BigEndian.PutUint64(data[8:16], c.lowKeyIndex)
 	binary.BigEndian.PutUint64(data[16:24], c.highKeyIndex)
-	binary.BigEndian.PutUint64(data[24:32], uint64(c.firstValueTimestamp.Unix()))
+	binary.BigEndian.PutUint64(data[24:32], c.valueSize)
+	binary.BigEndian.PutUint64(data[32:40], uint64(c.firstValueTimestamp.Unix()))
 	if c.allValuesWritten {
-		data[32] = 1
+		data[40] = 1
 	} else {
-		data[32] = 0
+		data[40] = 0
 	}
 
 	return data
 }
 
 func (c *Cohort) deserialize(data []byte) error {
-	if len(data) != 33 {
+	if len(data) != 41 {
 		return fmt.Errorf("invalid data length: %d", len(data))
 	}
 
@@ -308,12 +337,28 @@ func (c *Cohort) deserialize(data []byte) error {
 
 	c.lowKeyIndex = binary.BigEndian.Uint64(data[8:16])
 	c.highKeyIndex = binary.BigEndian.Uint64(data[16:24])
+	c.valueSize = binary.BigEndian.Uint64(data[24:32])
 	if c.lowKeyIndex >= c.highKeyIndex {
 		return fmt.Errorf("invalid index range: %d >= %d", c.lowKeyIndex, c.highKeyIndex)
 	}
 
-	c.firstValueTimestamp = time.Unix(int64(binary.BigEndian.Uint64(data[24:32])), 0)
-	c.allValuesWritten = data[32] == 1
+	c.firstValueTimestamp = time.Unix(int64(binary.BigEndian.Uint64(data[32:40])), 0)
+	c.allValuesWritten = data[40] == 1
 
+	return nil
+}
+
+// IsExpired returns true if the cohort has expired (i.e. it is no longer safe to read).
+func (c *Cohort) IsExpired(now time.Time, maxAge time.Duration) bool {
+	age := now.Sub(c.firstValueTimestamp)
+	return age > maxAge
+}
+
+// Delete the associated cohort file.
+func (c *Cohort) Delete() error {
+	err := os.Remove(c.Path(false))
+	if err != nil {
+		return fmt.Errorf("failed to delete cohort file: %w", err)
+	}
 	return nil
 }

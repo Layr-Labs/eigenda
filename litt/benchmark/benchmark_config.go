@@ -22,11 +22,8 @@ type BenchmarkConfig struct {
 	// The maximum target throughput in MB/s.
 	MaximumThroughputMB float64
 
-	// The average size of the values in MB.
-	AverageValueSizeMB float64
-
-	// The standard deviation of the size of the values in MB.
-	ValueSizeStandardDeviationMB float64
+	// The size of the values in MB.
+	ValueSizeMB float64
 
 	// Data is written to the DB in batches and then flushed. This determines the size of those batches, in MB.
 	BatchSizeMB float64
@@ -34,18 +31,41 @@ type BenchmarkConfig struct {
 	// The maximum number of batches permitted to be in-flight at any given time. If batches can't be written/flushed
 	// fast enough, then the benchmark engine will not push data as fast as requested.
 	BatchParallelism int
+
+	// The frequency at which the benchmark does cohort garbage collection, in seconds
+	CohortGCPeriodSeconds float64
+
+	// The size of the write info channel. Controls the max number of keys to prepare for writing ahead of time.
+	WriteInfoChanelSize uint64
+
+	// The size of the read info channel. Controls the max number of keys to prepare for reading ahead of time.
+	ReadInfoChanelSize uint64
+
+	// The number of keys in a new cohort.
+	CohortSize uint64
+
+	// The time-to-live (TTL) for keys in the database, in hours.
+	TTLHours float64
+
+	// If data is within this many minutes of its expiration time, it will not be read.
+	ReadSafetyMarginMinutes float64
 }
 
 // DefaultBenchmarkConfig returns a default BenchmarkConfig with the given data paths.
 func DefaultBenchmarkConfig() *BenchmarkConfig {
 	return &BenchmarkConfig{
-		LittConfig:                   litt.DefaultConfigNoPaths(),
-		MetadataDirectory:            "~/benchmark",
-		MaximumThroughputMB:          10.0,
-		AverageValueSizeMB:           2.0,
-		ValueSizeStandardDeviationMB: 0.25,
-		BatchSizeMB:                  10,
-		BatchParallelism:             10,
+		LittConfig:              litt.DefaultConfigNoPaths(),
+		MetadataDirectory:       "~/benchmark",
+		MaximumThroughputMB:     10,
+		ValueSizeMB:             2.0,
+		BatchSizeMB:             32,
+		BatchParallelism:        8,
+		CohortGCPeriodSeconds:   10.0,
+		WriteInfoChanelSize:     1024,
+		ReadInfoChanelSize:      1024,
+		CohortSize:              1024,
+		TTLHours:                1.0,
+		ReadSafetyMarginMinutes: 5.0,
 	}
 }
 
@@ -77,7 +97,7 @@ func LoadConfig(path string) (*BenchmarkConfig, error) {
 	// Create a decoder that will return an error if there are unmatched fields
 	decoder := json.NewDecoder(strings.NewReader(string(data)))
 	decoder.DisallowUnknownFields()
-	
+
 	// Unmarshal JSON into config struct
 	err = decoder.Decode(config)
 	if err != nil {
