@@ -56,7 +56,7 @@ type Segment struct {
 	maxShardSize uint64
 
 	// The number of keys written to this segment.
-	keyCount uint64
+	keyCount uint32
 
 	// shardChannels is a list of channels used to send messages to the goroutine responsible for writing to
 	// each shard. Indexed by shard number.
@@ -131,7 +131,7 @@ func CreateSegment(
 		// By default, put the key file in the first parent directory.
 		keysDirectory = parentDirectories[0]
 	}
-	keys, err := createKeyFile(logger, index, keysDirectory)
+	keys, err := createKeyFile(logger, index, keysDirectory, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open key file: %v", err)
 	}
@@ -210,16 +210,8 @@ func LoadSegment(logger logging.Logger,
 		return nil, fmt.Errorf("failed to open metadata file: %w", err)
 	}
 
-	// seal the segment if it is unsealed
-	if !metadata.sealed {
-		err = metadata.seal(now)
-		if err != nil {
-			return nil, fmt.Errorf("failed to seal segment: %w", err)
-		}
-	}
-
 	// Look for the key file.
-	keys, err := loadKeyFile(logger, index, parentDirectories)
+	keys, err := loadKeyFile(logger, index, parentDirectories, metadata.segmentVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open key file: %v", err)
 	}
@@ -243,6 +235,7 @@ func LoadSegment(logger logging.Logger,
 		keys:              keys,
 		shards:            shards,
 		keyFileSize:       keyFileSize,
+		keyCount:          metadata.keyCount,
 		deletionChannel:   make(chan struct{}, 1),
 	}
 
@@ -250,8 +243,80 @@ func LoadSegment(logger logging.Logger,
 	// have a reference to the segment.
 	segment.reservationCount.Store(1)
 
-	return segment, nil
+	if !metadata.sealed {
+		err = segment.sealLoadedSegment(now)
+		if err != nil {
+			return nil, fmt.Errorf("failed to seal segment: %w", err)
+		}
+	}
 
+	return segment, nil
+}
+
+// sealLoadedSegment is responsible for sealing a segment loaded from disk that is not already sealed.
+// While doing this, it is responsible for making the key file consistent with the values present in the
+// value files.
+func (s *Segment) sealLoadedSegment(now time.Time) error {
+	scopedKeys, err := s.keys.readKeys()
+	if err != nil {
+		return fmt.Errorf("failed to read keys: %w", err)
+	}
+
+	// keys with values that are not present in the value files
+	goodKeys := make([]*types.ScopedKey, 0, len(scopedKeys))
+
+	// keys with values that weren't flushed out to the value files before the DB crashed
+	badKeys := make([]*types.ScopedKey, 0, len(scopedKeys))
+
+	for _, scopedKey := range scopedKeys {
+		shard := s.GetShard(scopedKey.Key)
+
+		requiredValueFileLength := uint64(scopedKey.Address.Offset()) +
+			4 /* value size uint32 */ +
+			uint64(scopedKey.ValueSize)
+
+		if s.shards[shard].Size() < requiredValueFileLength {
+			badKeys = append(badKeys, scopedKey)
+		} else {
+			goodKeys = append(goodKeys, scopedKey)
+		}
+	}
+
+	if len(badKeys) > 0 {
+		// We have at least one bad key. Rewrite the keyfile with only the good keys.
+		s.logger.Warnf("segment %d has %d unflushed value(s)",
+			s.index, len(badKeys))
+
+		swapFile, err := createKeyFile(s.logger, s.index, s.keys.parentDirectory, true)
+		if err != nil {
+			return fmt.Errorf("failed to create swap key file: %w", err)
+		}
+
+		for _, scopedKey := range goodKeys {
+			err = swapFile.write(scopedKey)
+			if err != nil {
+				return fmt.Errorf("failed to write key to swap file: %w", err)
+			}
+		}
+		err = swapFile.seal()
+		if err != nil {
+			return fmt.Errorf("failed to seal swap file: %w", err)
+		}
+
+		err = swapFile.atomicSwap()
+		if err != nil {
+			return fmt.Errorf("failed to swap key file: %w", err)
+		}
+
+		s.keys = swapFile
+	}
+
+	err = s.metadata.seal(now, uint32(len(goodKeys)))
+	if err != nil {
+		return fmt.Errorf("failed to seal metadata file: %w", err)
+	}
+
+	return nil
 }
 
 // Size returns the size of the segment in bytes. Counts bytes that are on disk or that will eventually end up on disk.
@@ -274,6 +339,11 @@ func (s *Segment) Size() uint64 {
 	}
 
 	return size
+}
+
+// KeyCount returns the number of keys in the segment.
+func (s *Segment) KeyCount() uint32 {
+	return s.keyCount
 }
 
 // lookForFile looks for a file in a list of directories. It returns an error if the file appears
@@ -315,7 +385,7 @@ func (s *Segment) GetShard(key []byte) uint32 {
 		return 0
 	}
 
-	if s.metadata.serializationVersion == OldHashFunctionSerializationVersion {
+	if s.metadata.segmentVersion == OldHashFunctionSegmentVersion {
 		return util.LegacyHashKey(key, s.metadata.legacySalt) % s.metadata.shardingFactor
 	}
 
@@ -328,7 +398,7 @@ func (s *Segment) GetShard(key []byte) uint32 {
 //
 // This method does not ensure that the key-value pair is actually written to disk, only that it will eventually be
 // written to disk. Flush must be called to ensure that all data previously passed to Write is written to disk.
-func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64, err error) {
+func (s *Segment) Write(data *types.KVPair) (keyCount uint32, keyFileSize uint64, err error) {
 	if s.metadata.sealed {
 		return 0, 0, fmt.Errorf("segment is sealed, cannot write data")
 	}
@@ -351,7 +421,7 @@ func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64
 		s.maxShardSize = s.shardSizes[shard]
 	}
 	s.keyCount++
-	s.keyFileSize += uint64(len(data.Key)) + 4 /* uint32 length */ + 8 /* uint64 Address */
+	s.keyFileSize += uint64(len(data.Key)) + 4 /* uint32 length */ + 8 /* uint64 Address */ + 4 /* uint32 ValueSize */
 
 	// Forward the value to the shard control loop, which asynchronously writes it to the value file.
 	shardRequest := &valueToWrite{
@@ -365,10 +435,12 @@ func (s *Segment) Write(data *types.KVPair) (keyCount uint64, keyFileSize uint64
 	}
 
 	// Forward the value to the key and its address file control loop, which asynchronously writes it to the key file.
-	keyRequest := &types.KAPair{
-		Key:     data.Key,
-		Address: types.NewAddress(s.index, firstByteIndex),
+	keyRequest := &types.ScopedKey{
+		Key:       data.Key,
+		Address:   types.NewAddress(s.index, firstByteIndex),
+		ValueSize: uint32(len(data.Value)),
 	}
+
 	err = util.SendIfNotFatal(s.fatalErrorHandler, s.keyFileChannel, keyRequest)
 	if err != nil {
 		return 0, 0,
@@ -398,7 +470,7 @@ func (s *Segment) Read(key []byte, dataAddress types.Address) ([]byte, error) {
 }
 
 // GetKeys returns all keys in the data segment. Only permitted to be called after the segment has been sealed.
-func (s *Segment) GetKeys() ([]*types.KAPair, error) {
+func (s *Segment) GetKeys() ([]*types.ScopedKey, error) {
 	if !s.metadata.sealed {
 		return nil, fmt.Errorf("segment is not sealed, cannot read keys")
 	}
@@ -412,7 +484,7 @@ func (s *Segment) GetKeys() ([]*types.KAPair, error) {
 
 // FlushWaitFunction is a function that waits for a flush operation to complete. It returns the addresses of the data
 // that was flushed, or an error if the flush operation failed.
-type FlushWaitFunction func() ([]*types.KAPair, error)
+type FlushWaitFunction func() ([]*types.ScopedKey, error)
 
 // Flush schedules a flush operation. Flush operations are performed serially in the order they are scheduled.
 // This method returns a function that, when called, will block until the flush operation is complete. The function
@@ -448,7 +520,7 @@ func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 		return nil, fmt.Errorf("failed to send flush request to key file: %w", err)
 	}
 
-	return func() ([]*types.KAPair, error) {
+	return func() ([]*types.ScopedKey, error) {
 		// Wait for each shard to finish flushing.
 		for i := range s.shardChannels {
 			_, err := util.AwaitIfNotFatal(s.fatalErrorHandler, shardResponseChannels[i])
@@ -469,7 +541,7 @@ func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 
 // Seal flushes all data to disk and finalizes the metadata. Returns addresses that became durable as a result of
 // this method call. After this method is called, no more data can be written to this segment.
-func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
+func (s *Segment) Seal(now time.Time) ([]*types.ScopedKey, error) {
 	flushWaitFunction, err := s.flush(true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to flush segment: %w", err)
@@ -480,7 +552,7 @@ func (s *Segment) Seal(now time.Time) ([]*types.KAPair, error) {
 	}
 
 	// Seal the metadata file.
-	err = s.metadata.seal(now)
+	err = s.metadata.seal(now, s.keyCount)
 	if err != nil {
 		return nil, fmt.Errorf("failed to seal metadata file: %w", err)
 	}
@@ -627,15 +699,15 @@ func (s *Segment) handleShardWrite(shard uint32, data *valueToWrite) {
 }
 
 // handleKeyFileWrite writes a key to the key file.
-func (s *Segment) handleKeyFileWrite(data *types.KAPair) {
-	err := s.keys.write(data.Key, data.Address)
+func (s *Segment) handleKeyFileWrite(data *types.ScopedKey) {
+	err := s.keys.write(data)
 	if err != nil {
 		s.fatalErrorHandler.Panic(fmt.Errorf("failed to write key to key file: %w", err))
 	}
 }
 
 // handleKeyFileFlushRequest handles a request to flush the key file to disk.
-func (s *Segment) handleKeyFileFlushRequest(request *keyFileFlushRequest, unflushedKeys []*types.KAPair) {
+func (s *Segment) handleKeyFileFlushRequest(request *keyFileFlushRequest, unflushedKeys []*types.ScopedKey) {
 	if request.seal {
 		err := s.keys.seal()
 		if err != nil {
@@ -707,13 +779,13 @@ type keyFileFlushRequest struct {
 // keyFileFlushResponse is a message sent from the key file control loop to the caller of Flush to indicate that the
 // key file has been flushed.
 type keyFileFlushResponse struct {
-	addresses []*types.KAPair
+	addresses []*types.ScopedKey
 }
 
 // keyFileControlLoop is the main loop for performing modifications to the key file. This goroutine is responsible
 // for writing key-address pairs to the key file.
 func (s *Segment) keyFileControlLoop() {
-	unflushedKeys := make([]*types.KAPair, 0, unflushedKeysInitialCapacity)
+	unflushedKeys := make([]*types.ScopedKey, 0, unflushedKeysInitialCapacity)
 
 	for {
 		select {
@@ -724,14 +796,14 @@ func (s *Segment) keyFileControlLoop() {
 
 			if flushRequest, ok := operation.(*keyFileFlushRequest); ok {
 				s.handleKeyFileFlushRequest(flushRequest, unflushedKeys)
-				unflushedKeys = make([]*types.KAPair, 0, unflushedKeysInitialCapacity)
+				unflushedKeys = make([]*types.ScopedKey, 0, unflushedKeysInitialCapacity)
 
 				if flushRequest.seal {
 					// After sealing, we can exit the control loop.
 					return
 				}
 
-			} else if data, ok := operation.(*types.KAPair); ok {
+			} else if data, ok := operation.(*types.ScopedKey); ok {
 				s.handleKeyFileWrite(data)
 				unflushedKeys = append(unflushedKeys, data)
 

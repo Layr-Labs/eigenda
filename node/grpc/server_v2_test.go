@@ -322,7 +322,6 @@ func TestV2StoreChunksStorageFailure(t *testing.T) {
 func TestV2StoreChunksLittDBValidationFailure(t *testing.T) {
 	config := makeConfig(t)
 	config.EnableV2 = true
-	config.LittDBEnabled = true
 	c := newTestComponents(t, config)
 
 	blobKeys, batch, bundles := nodemock.MockBatch(t)

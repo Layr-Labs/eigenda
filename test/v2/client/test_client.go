@@ -294,6 +294,8 @@ func NewTestClient(
 	validatorClientMetrics := validator.NewValidatorClientMetrics(registry)
 
 	clientConfig := validator.DefaultClientConfig()
+	clientConfig.ConnectionPoolSize = config.ValidatorReadConnectionPoolSize
+	clientConfig.ComputePoolSize = config.ValidatorReadComputePoolSize
 	retrievalClient := validator.NewValidatorClient(
 		logger,
 		ethReader,
@@ -314,6 +316,8 @@ func NewTestClient(
 	// Create a client that only downloads the blob and does not verify it. Useful for load testing validator downloads
 	// with limited CPU resources.
 	onlyDownloadClientConfig := validator.DefaultClientConfig()
+	onlyDownloadClientConfig.ConnectionPoolSize = config.ValidatorReadConnectionPoolSize
+	onlyDownloadClientConfig.ComputePoolSize = config.ValidatorReadComputePoolSize
 	onlyDownloadClientConfig.UnsafeChunkDeserializerFactory =
 		mock.NewMockChunkDeserializerFactory(&mock.MockChunkDeserializer{})
 	onlyDownloadClientConfig.UnsafeBlobDecoderFactory =

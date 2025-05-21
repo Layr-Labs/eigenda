@@ -20,7 +20,7 @@ import (
 
 type testContext struct {
 	ctx              context.Context
-	store            meterer.OffchainStore
+	store            meterer.MeteringStore
 	reservationTable string
 	onDemandTable    string
 	globalBinTable   string
@@ -52,8 +52,8 @@ func setupTest(t *testing.T) *testContext {
 		cleanupTables(tc)
 	})
 
-	// Create the OffchainStore
-	tc.store, err = meterer.NewOffchainStore(
+	// Create the MeteringStore (using DynamoDBStore implementation)
+	tc.store, err = meterer.NewDynamoDBMeteringStore(
 		clientConfig,
 		tc.reservationTable,
 		tc.onDemandTable,

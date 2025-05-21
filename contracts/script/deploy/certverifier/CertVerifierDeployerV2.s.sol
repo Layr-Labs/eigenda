@@ -63,7 +63,7 @@ contract CertVerifierDeployerV2 is Script, Test {
 
         vm.stopBroadcast();
 
-        console.log("Deployed new EigenDACertVerifierV2 at address: ", eigenDACertVerifier);
+        console.log("Deployed new EigenDACertVerifier at address: ", eigenDACertVerifier);
 
         string memory outputPath = string.concat("./script/deploy/certverifier/output/", outputJSONFile);
         string memory parent_object = "parent object";

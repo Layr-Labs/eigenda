@@ -100,28 +100,31 @@ func RunDataApi(ctx *cli.Context) error {
 		chainState        = coreeth.NewChainState(tx, client)
 		indexedChainState = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
 		metrics           = dataapi.NewMetrics(config.ServerVersion, blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
-		server            = dataapi.NewServer(
-			dataapi.Config{
-				ServerMode:         config.ServerMode,
-				SocketAddr:         config.SocketAddr,
-				AllowOrigins:       config.AllowOrigins,
-				DisperserHostname:  config.DisperserHostname,
-				ChurnerHostname:    config.ChurnerHostname,
-				BatcherHealthEndpt: config.BatcherHealthEndpt,
-			},
-			sharedStorage,
-			promClient,
-			subgraphClient,
-			tx,
-			chainState,
-			indexedChainState,
-			logger,
-			metrics,
-			nil,
-			nil,
-			nil,
-		)
 	)
+	server, err := dataapi.NewServer(
+		dataapi.Config{
+			ServerMode:         config.ServerMode,
+			SocketAddr:         config.SocketAddr,
+			AllowOrigins:       config.AllowOrigins,
+			DisperserHostname:  config.DisperserHostname,
+			ChurnerHostname:    config.ChurnerHostname,
+			BatcherHealthEndpt: config.BatcherHealthEndpt,
+		},
+		sharedStorage,
+		promClient,
+		subgraphClient,
+		tx,
+		chainState,
+		indexedChainState,
+		logger,
+		metrics,
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create v1 server: %w", err)
+	}
 
 	if config.ServerVersion == 2 {
 		blobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
@@ -145,7 +148,7 @@ func RunDataApi(ctx *cli.Context) error {
 			metrics,
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create v2 server: %w", err)
 		}
 
 		// Enable Metrics Block

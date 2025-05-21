@@ -62,6 +62,9 @@ type DispersalServerV2 struct {
 	metrics       *metricsV2
 
 	ntpClock *core.NTPSyncedClock
+	// ReservedOnly mode doesn't support on-demand payments
+	// This would be removed with decentralized ratelimiting
+	ReservedOnly bool
 }
 
 // NewDispersalServerV2 creates a new Server struct with the provided parameters.
@@ -79,6 +82,7 @@ func NewDispersalServerV2(
 	registry *prometheus.Registry,
 	metricsConfig disperser.MetricsConfig,
 	ntpClock *core.NTPSyncedClock,
+	ReservedOnly bool,
 ) (*DispersalServerV2, error) {
 	if serverConfig.GrpcPort == "" {
 		return nil, errors.New("grpc port is required")
@@ -124,7 +128,8 @@ func NewDispersalServerV2(
 		metricsConfig: metricsConfig,
 		metrics:       newAPIServerV2Metrics(registry, metricsConfig, logger),
 
-		ntpClock: ntpClock,
+		ntpClock:     ntpClock,
+		ReservedOnly: ReservedOnly,
 	}, nil
 }
 
@@ -299,12 +304,12 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// off-chain account specific payment state
 	now := time.Now().Unix()
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
-	periodRecords, err := s.meterer.OffchainStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod)
+	periodRecords, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod)
 	if err != nil {
 		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountID)
 	}
 	var largestCumulativePaymentBytes []byte
-	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, accountID)
+	largestCumulativePayment, err := s.meterer.MeteringStore.GetLargestCumulativePayment(ctx, accountID)
 	if err != nil {
 		s.logger.Debug("failed to get largest cumulative payment, use zero value", "err", err, "accountID", accountID)
 

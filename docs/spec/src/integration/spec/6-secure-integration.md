@@ -22,7 +22,7 @@ Looking at the timing diagram above, we need the EigenDA availability period to 
 
 Rollups must thus enforce that
 ```
-cert.L1InclusionBlock - cert.RBN < RecencyWindowSize
+certL1InclusionBlock - cert.RBN <= RecencyWindowSize
 ```
 
 This has a second security implication. A malicious EigenDA disperser could have chosen a reference block number (RBN) that is very old, where the stake of operators was very different from the current one, due to operators withdrawing stake for example.
