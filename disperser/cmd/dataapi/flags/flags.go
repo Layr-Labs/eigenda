@@ -139,6 +139,26 @@ var (
 		Value:    1,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "DATA_API_VERSION"),
 	}
+
+	// DynamoDB table names for reservations
+	ReservationsTableNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "reservations-table-name"),
+		Usage:    "Name of the DynamoDB table for reservations",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "RESERVATIONS_TABLE_NAME"),
+	}
+	OnDemandTableNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "on-demand-table-name"),
+		Usage:    "Name of the DynamoDB table for on-demand usage",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ON_DEMAND_TABLE_NAME"),
+	}
+	GlobalRateTableNameFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "global-rate-table-name"),
+		Usage:    "Name of the DynamoDB table for global rate limits",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GLOBAL_RATE_TABLE_NAME"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -158,6 +178,9 @@ var requiredFlags = []cli.Flag{
 	DisperserHostnameFlag,
 	ChurnerHostnameFlag,
 	BatcherHealthEndptFlag,
+	ReservationsTableNameFlag,
+	OnDemandTableNameFlag,
+	GlobalRateTableNameFlag,
 }
 
 var optionalFlags = []cli.Flag{

@@ -37,6 +37,11 @@ type Config struct {
 	DisperserHostname  string
 	ChurnerHostname    string
 	BatcherHealthEndpt string
+
+	// DynamoDB table names for reservations
+	ReservationsTableName string
+	OnDemandTableName     string
+	GlobalRateTableName   string
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -81,6 +86,11 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ChurnerHostname:    ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
 		BatcherHealthEndpt: ctx.GlobalString(flags.BatcherHealthEndptFlag.Name),
 		ChainStateConfig:   thegraph.ReadCLIConfig(ctx),
+
+		// DynamoDB table names for reservations
+		ReservationsTableName: ctx.GlobalString(flags.ReservationsTableNameFlag.Name),
+		OnDemandTableName:     ctx.GlobalString(flags.OnDemandTableNameFlag.Name),
+		GlobalRateTableName:   ctx.GlobalString(flags.GlobalRateTableNameFlag.Name),
 	}
 	return config, nil
 }

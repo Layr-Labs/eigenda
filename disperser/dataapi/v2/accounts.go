@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
@@ -101,4 +102,88 @@ func (s *ServerV2) FetchAccountBlobFeed(c *gin.Context) {
 	s.metrics.ObserveLatency("FetchAccountBlobFeed", time.Since(handlerStart))
 	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBlobFeedAge))
 	c.JSON(http.StatusOK, response)
+}
+
+// FetchAccountReservationUsage godoc
+//
+//	@Summary	Fetch reservation usage for an account
+//	@Tags		Accounts
+//	@Produce	json
+//	@Param		account_id	path		string	true	"The account ID to fetch reservation usage for"
+//	@Success	200			{object}	AccountReservationUsageResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/accounts/{account_id}/reservation/usage [get]
+func (s *ServerV2) FetchAccountReservationUsage(c *gin.Context) {
+	handlerStart := time.Now()
+	var err error
+
+	// Parse account ID
+	accountStr := c.Param("account_id")
+	if !gethcommon.IsHexAddress(accountStr) {
+		s.metrics.IncrementInvalidArgRequestNum("FetchAccountReservationUsage")
+		invalidParamsErrorResponse(c, errors.New("account id is not valid hex"))
+		return
+	}
+	accountId := gethcommon.HexToAddress(accountStr)
+	if accountId == (gethcommon.Address{}) {
+		s.metrics.IncrementInvalidArgRequestNum("FetchAccountReservationUsage")
+		invalidParamsErrorResponse(c, errors.New("zero account id is not valid"))
+		return
+	}
+
+	// Calculate reservation period for last 24 hours
+	now := time.Now()
+	oneDayAgo := now.Add(-24 * time.Hour)
+	startPeriod := meterer.GetReservationPeriod(oneDayAgo.Unix(), 3600) // Use 1 hour as the window
+
+	// Get period records for the last 24 hours
+	periodRecords, err := s.offchainStore.GetReservationBinUsage(c.Request.Context(), accountId, startPeriod)
+	if err != nil {
+		s.metrics.IncrementFailedRequestNum("FetchAccountReservationUsage")
+		errorResponse(c, fmt.Errorf("failed to fetch period records for account (%s): %w", accountId.Hex(), err))
+		return
+	}
+
+	// Convert period records to response format
+	records := make([]PeriodRecord, len(periodRecords))
+	for i, record := range periodRecords {
+		if record == nil {
+			records[i] = PeriodRecord{
+				ReservationPeriod: 0,
+				Usage:             0,
+				Timestamp:         time.Unix(0, 0).UTC().Format(time.RFC3339),
+			}
+		} else {
+			records[i] = PeriodRecord{
+				ReservationPeriod: record.Index,
+				Usage:             record.Usage,
+				Timestamp:         time.Unix(int64(record.Index), 0).UTC().Format(time.RFC3339),
+			}
+		}
+	}
+
+	response := &AccountReservationUsageResponse{
+		AccountId: accountId.Hex(),
+		Records:   records,
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchAccountReservationUsage")
+	s.metrics.ObserveLatency("FetchAccountReservationUsage", time.Since(handlerStart))
+	c.Writer.Header().Set(cacheControlParam, fmt.Sprintf("max-age=%d", maxBlobFeedAge))
+	c.JSON(http.StatusOK, response)
+}
+
+// AccountReservationUsageResponse represents the response for account reservation usage
+type AccountReservationUsageResponse struct {
+	AccountId string         `json:"account_id"`
+	Records   []PeriodRecord `json:"records"`
+}
+
+// PeriodRecord represents a single period's usage record
+type PeriodRecord struct {
+	ReservationPeriod uint32 `json:"reservation_period"`
+	Usage             uint64 `json:"usage"`
+	Timestamp         string `json:"timestamp"`
 }
