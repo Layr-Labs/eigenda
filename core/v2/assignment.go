@@ -3,71 +3,199 @@ package v2
 import (
 	"fmt"
 	"math"
-	"math/big"
+	"sort"
 
-	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
 )
 
-// getMaxStakePercentage calculates the maximum stake percentage across specified quorums for a specific operator.
-// The function assumes that it will be passed an operator state that contains the quorums for which the operator is a member.
-// Therefore, it does not return an error if a quorum is not found in the state.
-func getMaxStakePercentage(state *core.OperatorState, quorums []core.QuorumID, id core.OperatorID) (*big.Float, error) {
-	maxStakePercentage := new(big.Float)
-	found := false
+var LinkedQuorums = []core.QuorumID{core.QuorumID(0), core.QuorumID(1)}
 
+func getOrderedOperators(state *core.OperatorState, quorums []core.QuorumID) ([]core.OperatorID, map[core.OperatorID]*core.OperatorInfo, error) {
+
+	if state == nil {
+		return nil, nil, fmt.Errorf("state cannot be nil")
+	}
+	operators := make(map[core.OperatorID]*core.OperatorInfo, 0)
 	for _, q := range quorums {
-		total, ok := state.Totals[q]
-		if !ok {
+		quorumOps, ok := state.Operators[q]
+		if !ok || len(quorumOps) == 0 {
+			return nil, nil, fmt.Errorf("no operators found for quorum %d", q)
+		}
+
+		for id := range quorumOps {
+			operators[id] = quorumOps[id]
+		}
+	}
+
+	orderedOps := make([]core.OperatorID, len(operators))
+	for id := range operators {
+		orderedOps = append(orderedOps, id)
+	}
+	sort.Slice(orderedOps, func(i, j int) bool {
+		return orderedOps[i].Hex() < orderedOps[j].Hex()
+	})
+
+	return orderedOps, operators, nil
+}
+
+func getValidatorStakePercentages(state *core.OperatorState, quorum core.QuorumID) (map[core.OperatorID]float64, error) {
+
+	total, ok := state.Totals[quorum]
+	if !ok {
+		return nil, fmt.Errorf("no total found for quorum %d", quorum)
+	}
+
+	percentages := make(map[core.OperatorID]float64)
+	for id := range state.Operators[quorum] {
+		percentages[id] = float64(state.Operators[quorum][id].Stake.Int64()) / float64(total.Stake.Int64())
+	}
+	return percentages, nil
+}
+
+func GetAssignmentVector(percentages map[core.OperatorID]float64, orderedOps []core.OperatorID, numChunks uint32, offset uint32) (map[core.OperatorID][]uint32, uint32, error) {
+
+	assignmentVector := make(map[core.OperatorID][]uint32, len(percentages))
+	for _, id := range orderedOps {
+
+		if _, ok := percentages[id]; !ok {
 			continue
 		}
 
-		ops, ok := state.Operators[q]
-		if !ok || len(ops) == 0 {
-			return nil, fmt.Errorf("no operators found for quorum %d", q)
+		chunksForOperator := uint32(math.Ceil(float64(numChunks) * percentages[id]))
+		assignmentVector[id] = make([]uint32, chunksForOperator)
+
+		for j := range assignmentVector[id] {
+			assignmentVector[id][j] = offset
+			offset++
 		}
 
-		// Get the stake for this operator in this quorum
-		stake, ok := ops[id]
-		if !ok {
-			continue // Skip if operator is not in this quorum
-		}
-
-		found = true
-		stakePercentage := new(big.Float).Quo(
-			new(big.Float).SetInt(stake.Stake),
-			new(big.Float).SetInt(total.Stake),
-		)
-		if maxStakePercentage.Cmp(stakePercentage) < 0 {
-			maxStakePercentage = stakePercentage
-		}
 	}
 
-	if !found {
-		return nil, ErrNotFound
-	}
-
-	return maxStakePercentage, nil
+	return assignmentVector, offset, nil
 }
 
-// getRelevantOperators gets all of the operators that are relevant to the blob
-func getRelevantOperators(state *core.OperatorState, quorums []core.QuorumID) (map[core.OperatorID]struct{}, error) {
-	if state == nil {
-		return nil, fmt.Errorf("state cannot be nil")
+func GetAssignmentsForQuorum(state *core.OperatorState, blobParams *core.BlobVersionParameters, quorum core.QuorumID) (map[core.OperatorID]*Assignment, error) {
+
+	orderedOps, _, err := getOrderedOperators(state, []core.QuorumID{quorum})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ordered operators for quorum %d: %w", quorum, err)
 	}
 
-	operators := make(map[core.OperatorID]struct{}, 0)
-	for _, q := range quorums {
-		ops, ok := state.Operators[q]
-		if !ok || len(ops) == 0 {
-			return nil, fmt.Errorf("no operators found for quorum %d", q)
-		}
+	// Get minimum percentages for each operator across the linked quorums
+	quorumPercentages, err := getValidatorStakePercentages(state, quorum)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get validator stake percentages for quorum %d: %w", quorum, err)
+	}
 
-		for id := range ops {
-			operators[id] = struct{}{}
+	assignmentVector1, _, err := GetAssignmentVector(quorumPercentages, orderedOps, blobParams.NumChunks, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get assignment vector for quorum 1: %w", err)
+	}
+
+	assignments := make(map[core.OperatorID]*Assignment)
+	for _, id := range orderedOps {
+		assignments[id] = &Assignment{
+			Indices: assignmentVector1[id],
 		}
 	}
-	return operators, nil
+
+	return assignments, nil
+}
+
+func AddAssignmentsForQuorum(assignments map[core.OperatorID]*Assignment, state *core.OperatorState, blobParams *core.BlobVersionParameters, quorum core.QuorumID) (map[core.OperatorID]*Assignment, error) {
+
+	dummyAssignments, err := GetAssignmentsForQuorum(state, blobParams, quorum)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get assignments for quorum %d: %w", quorum, err)
+	}
+
+	availableIndices := make([]uint32, 0)
+
+	newAssignments := make(map[core.OperatorID]*Assignment)
+
+	for id, dummyAssignment := range dummyAssignments {
+		newAssignmentIndicesCount := len(dummyAssignment.Indices)
+
+		if newAssignmentIndicesCount > len(assignments[id].Indices) {
+			newAssignmentIndicesCount = len(assignments[id].Indices)
+		}
+
+		newAssignments[id] = &Assignment{
+			Indices: assignments[id].Indices[:newAssignmentIndicesCount],
+		}
+
+		if newAssignmentIndicesCount < len(assignments[id].Indices) {
+			excessIndices := assignments[id].Indices[newAssignmentIndicesCount:]
+			availableIndices = append(availableIndices, excessIndices...)
+		}
+	}
+
+	for id, dummyAssignment := range dummyAssignments {
+
+		newAssignmentIndicesCount := len(dummyAssignment.Indices)
+		if newAssignmentIndicesCount > len(newAssignments[id].Indices) {
+
+			// Add available indices to new assignments
+			newAssignments[id].Indices = append(newAssignments[id].Indices, availableIndices[:newAssignmentIndicesCount]...)
+
+			// Remove used indices from available indices
+			availableIndices = availableIndices[newAssignmentIndicesCount:]
+		}
+	}
+
+	return newAssignments, nil
+}
+
+func MergeAssignmentsAndCap(assignments []map[core.OperatorID]*Assignment, blobParams *core.BlobVersionParameters) map[core.OperatorID]Assignment {
+
+	_mergedAssignments := make(map[core.OperatorID]*Assignment)
+	indexMaps := make(map[core.OperatorID]map[uint32]struct{})
+
+	maxChunks := blobParams.NumChunks / blobParams.CodingRate
+
+	for _, assignment := range assignments {
+		for id, a := range assignment {
+
+			if _, ok := _mergedAssignments[id]; !ok {
+				// Take all indices if less than maxChunks, otherwise take only maxChunks
+				indicesLen := uint32(len(a.Indices))
+				if indicesLen > maxChunks {
+					indicesLen = maxChunks
+				}
+
+				_mergedAssignments[id] = &Assignment{
+					Indices: a.Indices[:indicesLen],
+				}
+				indexMaps[id] = make(map[uint32]struct{})
+				for _, index := range a.Indices[:indicesLen] {
+					indexMaps[id][index] = struct{}{}
+				}
+				continue
+			}
+
+			for _, index := range a.Indices {
+
+				if uint32(len(_mergedAssignments[id].Indices)) >= maxChunks {
+					break
+				}
+
+				if _, ok := indexMaps[id][index]; ok {
+					continue
+				}
+				_mergedAssignments[id].Indices = append(_mergedAssignments[id].Indices, index)
+				indexMaps[id][index] = struct{}{}
+			}
+		}
+	}
+
+	mergedAssignments := make(map[core.OperatorID]Assignment)
+	for id, a := range _mergedAssignments {
+		mergedAssignments[id] = Assignment{
+			Indices: a.Indices,
+		}
+	}
+
+	return mergedAssignments
 }
 
 // GetAssignments calculates chunk assignments for operators in a quorum based on their stake
@@ -80,88 +208,52 @@ func GetAssignments(state *core.OperatorState, blobParams *core.BlobVersionParam
 		return nil, fmt.Errorf("blob params cannot be nil")
 	}
 
-	ops, err := getRelevantOperators(state, quorums)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get relevant operators: %w", err)
-	}
+	// Sort quorums
+	sort.Slice(quorums, func(i, j int) bool {
+		return quorums[i] < quorums[j]
+	})
 
-	numOps := len(ops)
-
-	// Early return for empty operator set
-	if numOps == 0 {
-		return make(map[core.OperatorID]Assignment), nil
-	}
-
-	assignments := make(map[core.OperatorID]Assignment, numOps)
-	for id := range ops {
-		assignment, err := GetAssignment(state, blobParams, quorums, blobKey, id)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get assignment for operator %v: %w", id, err)
+	assignmentsList := make([]map[core.OperatorID]*Assignment, len(quorums))
+	for i, q := range quorums {
+		if i == 0 {
+			assignments, err := GetAssignmentsForQuorum(state, blobParams, q)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get assignments for quorum %d: %w", q, err)
+			}
+			assignmentsList[i] = assignments
+			continue
 		}
-		assignments[id] = assignment
+
+		assignments, err := AddAssignmentsForQuorum(assignmentsList[0], state, blobParams, q)
+		if err != nil {
+			return nil, fmt.Errorf("failed to add assignments for quorum %d: %w", q, err)
+		}
+		assignmentsList[i] = assignments
 	}
 
-	return assignments, nil
+	mergedAssignments := MergeAssignmentsAndCap(assignmentsList, blobParams)
+
+	return mergedAssignments, nil
 }
 
 // GetAssignment returns the assignment for a specific operator
 func GetAssignment(state *core.OperatorState, blobParams *core.BlobVersionParameters, quorums []core.QuorumID, blobKey []byte, id core.OperatorID) (Assignment, error) {
-	if state == nil {
-		return Assignment{}, fmt.Errorf("state cannot be nil")
-	}
 
 	if blobParams == nil {
 		return Assignment{}, fmt.Errorf("blob params cannot be nil")
 	}
 
-	maxStakePercentage, err := getMaxStakePercentage(state, quorums, id)
+	assignments, err := GetAssignments(state, blobParams, quorums, blobKey)
 	if err != nil {
-		return Assignment{}, fmt.Errorf("failed to get max stake percentage: %w", err)
+		return Assignment{}, err
 	}
 
-	if maxStakePercentage.Cmp(big.NewFloat(0)) == 0 {
-		return Assignment{}, fmt.Errorf("max stake percentage is zero")
+	assignment, ok := assignments[id]
+	if !ok {
+		return Assignment{}, fmt.Errorf("assignment not found for operator %s", id)
 	}
 
-	// Cap stake using reconstruction threshold
-	stakeCapPercentage := big.NewFloat(float64(blobParams.ReconstructionThresholdBips) / 10000)
-	if maxStakePercentage.Cmp(stakeCapPercentage) > 0 {
-		maxStakePercentage = stakeCapPercentage
-	}
-
-	maxStakeFloat, _ := maxStakePercentage.Float64()
-
-	numSamples := blobParams.SamplesPerUnit * uint32(math.Ceil(maxStakeFloat*float64(blobParams.NumUnits)))
-
-	// Create a deterministic custom PRNG using the full seed entropy
-	seed := make([]byte, 40) // 32 bytes for blob key + 8 bytes for operator ID
-	copy(seed[:32], blobKey[:])
-	copy(seed[32:], id[:])
-
-	// Create a custom random number generator that uses the full seed entropy
-	customRand := common.NewDeterministicRand(seed)
-
-	// Generate random indices without replacement for this operator
-	indices := make([]uint32, 0, numSamples)
-
-	// Use a map to track which indices we've already selected
-	selectedIndices := make(map[uint32]struct{})
-
-	// Keep selecting random indices until we have enough
-	for uint32(len(indices)) < numSamples && uint32(len(indices)) < blobParams.NumChunks {
-		// Generate a random index within the range [0, NumChunks)
-		randomIndex := customRand.Uint32N(blobParams.NumChunks)
-
-		// Check if we've already selected this index
-		if _, exists := selectedIndices[randomIndex]; !exists {
-			indices = append(indices, randomIndex)
-			selectedIndices[randomIndex] = struct{}{}
-		}
-	}
-
-	return Assignment{
-		Indices: indices,
-	}, nil
+	return assignment, nil
 }
 
 // GetChunkLength calculates the chunk length based on blob length and parameters

@@ -2,7 +2,6 @@ package v2_test
 
 import (
 	"context"
-	"math"
 	"math/big"
 	"math/rand"
 	"testing"
@@ -15,6 +14,13 @@ import (
 
 var blobKey1 = []byte("blobKey1")
 var blobKey2 = []byte("blobKey2")
+
+// Tests that we want to do
+// 1. Test that we get the same assignment for the same operator with identical headers
+// 2. Test that we can always retreive the blob from a set of operators with sufficient stake
+// 3. Test that large operators never have more than the maximum number of chunks
+// 4. Test that when there are two quorums, an operators number of chunks is equal to their maximum
+// allocation across the two quorums.
 
 // func TestOperatorAssignmentsV2(t *testing.T) {
 
@@ -151,7 +157,6 @@ func TestSingleOperator(t *testing.T) {
 
 func TestValidatorSizes(t *testing.T) {
 	thresholdBips := blobParams.ReconstructionThresholdBips
-	thresholdPercentage := float64(thresholdBips) / 10000.0
 
 	testCases := []struct {
 		name              string
@@ -162,21 +167,21 @@ func TestValidatorSizes(t *testing.T) {
 		{
 			name:              "Negligible Stake",
 			operatorStake:     1,
-			otherStake:        1000000,                   // Large stake to ensure test operator's percentage is negligible
-			expectedNumChunks: blobParams.SamplesPerUnit, // Minimum assignment
+			otherStake:        1000000, // Large stake to ensure test operator's percentage is negligible
+			expectedNumChunks: 1,       // Minimum assignment
 		},
 		{
 			name:              "Exactly Threshold Stake",
 			operatorStake:     thresholdBips,
 			otherStake:        10000 - thresholdBips, // Ensure we get exactly the threshold percentage
-			expectedNumChunks: blobParams.SamplesPerUnit * uint32(math.Ceil(thresholdPercentage*float64(blobParams.NumUnits))),
+			expectedNumChunks: blobParams.NumChunks / blobParams.CodingRate,
 		},
 		{
 			name:          "Double Threshold Stake",
 			operatorStake: thresholdBips * 2,
 			otherStake:    10000 - (thresholdBips * 2), // Ensure percentage is double the threshold
 			// Capped at the threshold
-			expectedNumChunks: blobParams.SamplesPerUnit * uint32(math.Ceil(thresholdPercentage*float64(blobParams.NumUnits))),
+			expectedNumChunks: blobParams.NumChunks / blobParams.CodingRate,
 		},
 	}
 
@@ -241,12 +246,12 @@ func TestDeterministicAssignment(t *testing.T) {
 	// Assignments should be different for different operators
 	assert.NotEqual(t, assignment1, assignment3)
 
-	// Get assignment for the same operator but different header
-	assignment4, err := corev2.GetAssignment(operatorState, blobParams, []core.QuorumID{0}, blobKey2[:], mock.MakeOperatorId(0))
+	// Get assignment for the same operator but different set of quourms
+	assignment4, err := corev2.GetAssignment(operatorState, blobParams, []core.QuorumID{0, 1}, blobKey1[:], mock.MakeOperatorId(0))
 	assert.NoError(t, err)
 
-	// Assignments should be different for different headers
-	assert.NotEqual(t, assignment1, assignment4)
+	// Assignments should be different for different set of quourms
+	assert.Equal(t, assignment1, assignment4)
 }
 
 func FuzzOperatorAssignmentsV2(f *testing.F) {
