@@ -134,6 +134,15 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to serialize batch header hash: %v", err))
 	}
 
+	// check the blacklist to see if we need to proceed or not
+	disperserAddress, err := s.chunkAuthenticator.GetDisperserAddress(ctx, in.DisperserID, time.Now())
+	if err != nil {
+		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to get disperser address: %v", err))
+	}
+
+	if s.node.BlacklistStore.IsBlacklisted(ctx, disperserAddress.Bytes()) {
+		return nil, api.NewErrorInvalidArg("disperser is blacklisted")
+	}
 	if s.chunkAuthenticator != nil {
 		hash, err := s.chunkAuthenticator.AuthenticateStoreChunksRequest(ctx, in, time.Now())
 		if err != nil {

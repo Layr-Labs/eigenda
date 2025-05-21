@@ -83,3 +83,14 @@ func (s *BlacklistStore) AddEntry(ctx context.Context, disperserAddr []byte, con
 
 	return s.db.Put(disperserAddr, data)
 }
+
+// IsBlacklisted checks if a disperser is blacklisted
+func (s *BlacklistStore) IsBlacklisted(ctx context.Context, disperserAddr []byte) bool {
+	blacklist, err := s.Get(ctx, disperserAddr)
+	if err != nil {
+		return false
+	}
+
+	// is blacklisted if number of entries is >= 3
+	return len(blacklist.Entries) >= 3
+}
