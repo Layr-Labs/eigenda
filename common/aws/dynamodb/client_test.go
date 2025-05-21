@@ -234,6 +234,11 @@ func TestBasicOperations(t *testing.T) {
 	}, expression.Name("Status").In(expression.Value("Confirmed")))
 	assert.NoError(t, err)
 
+	_, err = dynamoClient.IncrementBy(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+	}, "BlobSize", 1000)
+	assert.NoError(t, err)
+
 	// Test increment using TransactAddBy
 	ops := []commondynamodb.TransactAddOp{{
 		Key: commondynamodb.Key{

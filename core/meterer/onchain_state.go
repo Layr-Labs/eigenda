@@ -189,7 +189,6 @@ func (pcs *OnchainPaymentState) refreshOnDemandPayments(ctx context.Context) err
 func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error) {
 	pcs.ReservationsLock.RLock()
 	if quorumReservations, ok := (pcs.ReservedPayments)[accountID]; ok {
-		pcs.ReservationsLock.RUnlock()
 		// Check if all the quorums are present; pull the chain state if not
 		allFound := true
 		for _, quorumNumber := range quorumNumbers {
@@ -199,6 +198,7 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx contex
 			}
 		}
 		if allFound {
+			pcs.ReservationsLock.RUnlock()
 			return quorumReservations, nil
 		}
 	}
