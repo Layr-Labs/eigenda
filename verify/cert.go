@@ -10,8 +10,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/common/consts"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
-	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	edsm_binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
+	binding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertVerifierLegacy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 
 	"github.com/ethereum-optimism/optimism/op-service/retry"
@@ -117,7 +117,7 @@ func (cv *CertVerifier) verifyBatchConfirmedOnChain(
 	}
 
 	// 2. Compute the hash of the batch metadata received as argument.
-	header := &binding.BatchHeader{
+	header := &binding.EigenDATypesV1BatchHeader{
 		BlobHeadersRoot:       [32]byte(batchMetadata.GetBatchHeader().GetBatchRoot()),
 		QuorumNumbers:         batchMetadata.GetBatchHeader().GetQuorumNumbers(),
 		ReferenceBlockNumber:  batchMetadata.GetBatchHeader().GetReferenceBlockNumber(),

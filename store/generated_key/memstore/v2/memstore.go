@@ -16,7 +16,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
-	cert_verifier_binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	cert_verifier_binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
@@ -97,12 +97,12 @@ func (e *MemStore) generateRandomCert(blobContents []byte) (*coretypes.EigenDACe
 		Y: y,
 	}
 
-	pseudoRandomBlobInclusionInfo := cert_verifier_binding.BlobInclusionInfo{
-		BlobCertificate: cert_verifier_binding.BlobCertificate{
-			BlobHeader: cert_verifier_binding.BlobHeaderV2{
+	pseudoRandomBlobInclusionInfo := cert_verifier_binding.EigenDATypesV2BlobInclusionInfo{
+		BlobCertificate: cert_verifier_binding.EigenDATypesV2BlobCertificate{
+			BlobHeader: cert_verifier_binding.EigenDATypesV2BlobHeaderV2{
 				Version:       0,                            // only supported version as of now
 				QuorumNumbers: []byte{byte(0x0), byte(0x1)}, // quorum 0 && quorum 1
-				Commitment: cert_verifier_binding.BlobCommitment{
+				Commitment: cert_verifier_binding.EigenDATypesV2BlobCommitment{
 					LengthCommitment: cert_verifier_binding.BN254G2Point{
 						X: [2]*big.Int{unsafeRandInt(1000), unsafeRandInt(1000)},
 						Y: [2]*big.Int{unsafeRandInt(1000), unsafeRandInt(1000)},
@@ -125,12 +125,12 @@ func (e *MemStore) generateRandomCert(blobContents []byte) (*coretypes.EigenDACe
 		InclusionProof: unsafeRandomBytes(128),
 	}
 
-	randomBatchHeader := cert_verifier_binding.BatchHeaderV2{
+	randomBatchHeader := cert_verifier_binding.EigenDATypesV2BatchHeaderV2{
 		BatchRoot:            [32]byte(unsafeRandomBytes(32)),
 		ReferenceBlockNumber: unsafeRandUint32(),
 	}
 
-	randomNonSignerStakesAndSigs := cert_verifier_binding.NonSignerStakesAndSignature{
+	randomNonSignerStakesAndSigs := cert_verifier_binding.EigenDATypesV1NonSignerStakesAndSignature{
 		NonSignerQuorumBitmapIndices: []uint32{unsafeRandUint32(), unsafeRandUint32()},
 		NonSignerPubkeys: []cert_verifier_binding.BN254G1Point{
 			{

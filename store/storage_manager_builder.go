@@ -22,6 +22,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	client_validator "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -384,20 +385,20 @@ func (smb *StorageManagerBuilder) buildRelayPayloadRetriever(
 func (smb *StorageManagerBuilder) buildRelayClient(
 	ethClient common_eigenda.EthClient,
 	relayRegistryAddress geth_common.Address,
-) (clients_v2.RelayClient, error) {
+) (relay.RelayClient, error) {
 	relayURLProvider, err := relay.NewRelayUrlProvider(ethClient, relayRegistryAddress)
 	if err != nil {
 		return nil, fmt.Errorf("new relay url provider: %w", err)
 	}
 
-	relayCfg := &clients_v2.RelayClientConfig{
+	relayCfg := &relay.RelayClientConfig{
 		UseSecureGrpcFlag: smb.v2ClientCfg.DisperserClientCfg.UseSecureGrpcFlag,
 		// we should never expect a message greater than our allowed max blob size.
 		// 10% of max blob size is added for additional safety
 		MaxGRPCMessageSize: uint(smb.v2ClientCfg.MaxBlobSizeBytes + (smb.v2ClientCfg.MaxBlobSizeBytes / 10)),
 	}
 
-	relayClient, err := clients_v2.NewRelayClient(relayCfg, smb.log, relayURLProvider)
+	relayClient, err := relay.NewRelayClient(relayCfg, smb.log, relayURLProvider)
 	if err != nil {
 		return nil, fmt.Errorf("new relay client: %w", err)
 	}
@@ -415,12 +416,13 @@ func (smb *StorageManagerBuilder) buildValidatorPayloadRetriever(
 ) (*payloadretrieval.ValidatorPayloadRetriever, error) {
 	chainState := eth.NewChainState(ethReader, ethClient)
 
-	retrievalClient := clients_v2.NewRetrievalClient(
+	retrievalClient := client_validator.NewValidatorClient(
 		smb.log,
 		ethReader,
 		chainState,
 		kzgVerifier,
-		20, // Default connection count
+		client_validator.DefaultClientConfig(),
+		nil,
 	)
 
 	// Create validator payload retriever
