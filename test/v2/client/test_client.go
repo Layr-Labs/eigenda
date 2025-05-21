@@ -200,6 +200,9 @@ func NewTestClient(
 		ethClient,
 		time.Second * 12,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create block number monitor: %w", err)
+	}
 
 	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
 		logger,
