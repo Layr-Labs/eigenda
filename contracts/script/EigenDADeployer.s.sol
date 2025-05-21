@@ -43,6 +43,7 @@ import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 
+// NOTE: This contract is used to deploy the EigenDA contracts to a local inabox environment. It is not meant to be used in production and is only used for testing purposes.
 // # To load the variables in the .env file
 // source .env
 // # To deploy and verify our contract
@@ -153,7 +154,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
         eigenDARelayRegistry = EigenDARelayRegistry(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
-        
+
         eigenDACertVerifierRouter = EigenDACertVerifierRouter(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
