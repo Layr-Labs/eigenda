@@ -22,12 +22,8 @@ const MinNumBins int32 = 3
 
 // OffchainStoreInterface defines the methods that an offchain store must implement
 type OffchainStoreInterface interface {
-	// UpdateReservationBin updates the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
-	// The key is now AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
+	// UpdateReservationBin(ctx, header.AccountID, quorumNumbers, requestReservationPeriods, symbolsCharged)
 	UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, requestReservationPeriods map[core.QuorumID]uint64, size uint64) (map[core.QuorumID]uint64, map[core.QuorumID]error)
-
-	// IncrementBinUsages(ctx, header.AccountID, quorumNumbers, requestReservationPeriods, symbolsCharged)
-	IncrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, requestReservationPeriods map[core.QuorumID]uint64, size uint64) (map[core.QuorumID]uint64, map[core.QuorumID]error)
 	// GetBinUsage retrieves the current bin usage for a specific account, period, and quorum
 	GetBinUsage(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, quorumNumber uint8) (uint64, error)
 	// UpdateGlobalBin updates the global bin usage for a specific period
@@ -92,35 +88,27 @@ func NewOffchainStore(
 	}, nil
 }
 
-// IncrementBinUsages updates the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
+// UpdateReservationBin updates the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
 // The key is AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
-func (s *OffchainStore) IncrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) (map[core.QuorumID]uint64, error) {
+func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) (map[core.QuorumID]uint64, error) {
 	binUsages := make(map[core.QuorumID]uint64)
 
 	// Build ops for atomic batch increment
-	ops := make([]struct {
-		Key   commondynamodb.Key
-		Attr  string
-		Value uint64
-	}, len(quorumNumbers))
+	ops := make([]commondynamodb.TransactAddOp, len(quorumNumbers))
 	for i, quorumNumber := range quorumNumbers {
 		accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorumNumber), 10)
 		key := map[string]types.AttributeValue{
 			"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
 			"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
 		}
-		ops[i] = struct {
-			Key   commondynamodb.Key
-			Attr  string
-			Value uint64
-		}{
+		ops[i] = commondynamodb.TransactAddOp{
 			Key:   key,
 			Attr:  "BinUsage",
-			Value: sizes[quorumNumber],
+			Value: float64(sizes[quorumNumber]), // positive for increment
 		}
 	}
 
-	err := s.dynamoClient.TransactIncrementBy(ctx, s.reservationTableName, ops)
+	err := s.dynamoClient.TransactAddBy(ctx, s.reservationTableName, ops)
 	if err != nil {
 		return nil, err
 	}
@@ -398,27 +386,19 @@ func parsePeriodRecord(bin map[string]types.AttributeValue) (*pb.PeriodRecord, e
 // The key is AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
 func (s *OffchainStore) DecrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) error {
 	// Build ops for atomic batch decrement
-	ops := make([]struct {
-		Key   commondynamodb.Key
-		Attr  string
-		Value uint64
-	}, len(quorumNumbers))
+	ops := make([]commondynamodb.TransactAddOp, len(quorumNumbers))
 	for i, quorumNumber := range quorumNumbers {
 		accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorumNumber), 10)
 		key := map[string]types.AttributeValue{
 			"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
 			"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
 		}
-		ops[i] = struct {
-			Key   commondynamodb.Key
-			Attr  string
-			Value uint64
-		}{
+		ops[i] = commondynamodb.TransactAddOp{
 			Key:   key,
 			Attr:  "BinUsage",
-			Value: sizes[quorumNumber],
+			Value: -float64(sizes[quorumNumber]), // negative for decrement
 		}
 	}
 
-	return s.dynamoClient.TransactDecrementBy(ctx, s.reservationTableName, ops)
+	return s.dynamoClient.TransactAddBy(ctx, s.reservationTableName, ops)
 }

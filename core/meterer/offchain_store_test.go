@@ -72,11 +72,11 @@ func cleanupTables(tc *testContext) {
 	_ = dynamoClient.DeleteTable(tc.ctx, tc.globalBinTable)
 }
 
-// TestIncrementBinUsages_EdgeCases tests the IncrementBinUsages function with edge cases
-func TestIncrementBinUsages_EdgeCases(t *testing.T) {
+// TestUpdateReservationBin_EdgeCases tests the UpdateReservationBin function with edge cases
+func TestUpdateReservationBin_EdgeCases(t *testing.T) {
 	t.Run("empty input", func(t *testing.T) {
 		tc := setupTest(t)
-		binUsages, errs := tc.store.IncrementBinUsages(tc.ctx, gethcommon.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"), []core.QuorumID{}, map[core.QuorumID]uint64{}, map[core.QuorumID]uint64{})
+		binUsages, errs := tc.store.UpdateReservationBin(tc.ctx, gethcommon.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"), []core.QuorumID{}, map[core.QuorumID]uint64{}, map[core.QuorumID]uint64{})
 		assert.Empty(t, binUsages)
 		assert.Empty(t, errs)
 	})
@@ -92,7 +92,7 @@ func TestIncrementBinUsages_EdgeCases(t *testing.T) {
 			quorums = append(quorums, core.QuorumID(i))
 			periods[core.QuorumID(i)] = reservationPeriod
 		}
-		binUsages, err := tc.store.IncrementBinUsages(tc.ctx, accountID, quorums, periods, map[core.QuorumID]uint64{core.QuorumID(0): size})
+		binUsages, err := tc.store.UpdateReservationBin(tc.ctx, accountID, quorums, periods, map[core.QuorumID]uint64{core.QuorumID(0): size})
 		assert.Empty(t, binUsages)
 		assert.Error(t, err)
 	})
@@ -105,9 +105,9 @@ func TestIncrementBinUsages_EdgeCases(t *testing.T) {
 		quorum := core.QuorumID(1)
 		periods := map[core.QuorumID]uint64{quorum: reservationPeriod}
 		// First increment
-		_, _ = tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum}, periods, map[core.QuorumID]uint64{quorum: size})
+		_, _ = tc.store.UpdateReservationBin(tc.ctx, accountID, []core.QuorumID{quorum}, periods, map[core.QuorumID]uint64{quorum: size})
 		// Second increment
-		binUsages, err := tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum}, periods, map[core.QuorumID]uint64{quorum: size})
+		binUsages, err := tc.store.UpdateReservationBin(tc.ctx, accountID, []core.QuorumID{quorum}, periods, map[core.QuorumID]uint64{quorum: size})
 		assert.NoError(t, err)
 		assert.Equal(t, size*2, binUsages[quorum])
 	})
@@ -117,7 +117,7 @@ func TestIncrementBinUsages_EdgeCases(t *testing.T) {
 		size := uint64(100)
 		quorums := []core.QuorumID{10, 11}
 		periods := map[core.QuorumID]uint64{10: 42, 11: 42}
-		binUsages, err := tc.store.IncrementBinUsages(tc.ctx, gethcommon.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"), quorums, periods, map[core.QuorumID]uint64{10: size, 11: size})
+		binUsages, err := tc.store.UpdateReservationBin(tc.ctx, gethcommon.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"), quorums, periods, map[core.QuorumID]uint64{10: size, 11: size})
 		for _, quorum := range quorums {
 			assert.NoError(t, err)
 			assert.Equal(t, size, binUsages[quorum])
@@ -136,7 +136,7 @@ func TestIncrementBinUsages_EdgeCases(t *testing.T) {
 			periods[core.QuorumID(i)] = reservationPeriod
 			sizes[core.QuorumID(i)] = uint64(i)
 		}
-		_, err := tc.store.IncrementBinUsages(tc.ctx, accountID, quorums, periods, sizes)
+		_, err := tc.store.UpdateReservationBin(tc.ctx, accountID, quorums, periods, sizes)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "limit is 25")
 	})

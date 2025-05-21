@@ -804,7 +804,7 @@ func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*cor
 	return res, nil
 }
 
-// TODO: this function should take in all quorumIds
+// TODO: later add quorumIds specifications
 func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment, error) {
 	if t.bindings.PaymentVault == nil {
 		return nil, errors.New("payment vault not deployed")

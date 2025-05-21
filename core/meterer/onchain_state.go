@@ -222,7 +222,7 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx contex
 	return res, nil
 }
 
-// GetReservedPaymentByAccount returns a pointer to the active reservation for the given account ID; no writes will be made to the reservation
+// GetReservedPaymentByAccount returns a pointer to all quorums' reservation for the given account ID; no writes will be made to the reservation
 func (pcs *OnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[core.QuorumID]*core.ReservedPayment, error) {
 	pcs.ReservationsLock.RLock()
 	if reservation, ok := (pcs.ReservedPayments)[accountID]; ok {

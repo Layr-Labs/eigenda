@@ -107,7 +107,7 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 	requestReservationPeriods := make(map[core.QuorumID]uint64, len(reservations))
 	for quorumID := range reservations {
 		quorumIDs = append(quorumIDs, quorumID)
-		// These reservations should all have the same reservation parameters until the payment update goes through
+		// TODO: update to use actual quorum configs when the payment vault update goes through
 		reservationWindows[quorumID] = m.ChainPaymentState.GetReservationWindow()
 		requestReservationPeriods[quorumID] = GetReservationPeriodByNanosecond(header.Timestamp, m.ChainPaymentState.GetReservationWindow())
 	}
@@ -119,7 +119,7 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 		if !reservation.IsActiveByNanosecond(header.Timestamp) {
 			return fmt.Errorf("reservation not active")
 		}
-		// reservation configurations should become different after the payment update goes through
+		// TODO: update to use actual quorum configs when the payment vault update goes through
 		if !m.ValidateReservationPeriod(reservation, requestReservationPeriods[quorumID], reservationWindows[quorumID], receivedAt) {
 			return fmt.Errorf("invalid reservation period for reservation on quorum %d", quorumID)
 		}
@@ -177,10 +177,10 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 		quorumNumbers = append(quorumNumbers, quorumID)
 	}
 
-	// 1. Batch increment all quorums for the current period
+	// Batch increment all quorums for the current quorums' reservation period
 	// For each quorum, increment by its specific symbolsCharged value
 	updatedUsages := make(map[core.QuorumID]uint64)
-	usage, err := m.OffchainStore.IncrementBinUsages(ctx, header.AccountID, quorumNumbers, requestReservationPeriods, charges)
+	usage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, quorumNumbers, requestReservationPeriods, charges)
 	if err != nil {
 		return err
 	}
@@ -213,9 +213,9 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 		}
 	}
 
-	// 2. Batch increment overflow bins for candidates
+	// Batch increment overflow bins for overflown reservation candidates
 	for quorumID := range overflowCandidates {
-		_, err := m.OffchainStore.IncrementBinUsages(ctx, header.AccountID, []core.QuorumID{quorumID}, map[core.QuorumID]uint64{quorumID: requestReservationPeriods[quorumID] + 2}, map[core.QuorumID]uint64{quorumID: overflowAmounts[quorumID]})
+		_, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, []core.QuorumID{quorumID}, map[core.QuorumID]uint64{quorumID: requestReservationPeriods[quorumID] + 2}, map[core.QuorumID]uint64{quorumID: overflowAmounts[quorumID]})
 		if err != nil {
 			// Rollback the increments for the current periods
 			rollbackErr := m.OffchainStore.DecrementBinUsages(ctx, header.AccountID, quorumNumbers, requestReservationPeriods, charges)
