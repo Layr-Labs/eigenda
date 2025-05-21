@@ -113,9 +113,9 @@ type EigenDAContract struct {
 	OperatorStateRetreiver string `json:"operatorStateRetriever"`
 	BlsApkRegistry         string `json:"blsApkRegistry"`
 	RegistryCoordinator    string `json:"registryCoordinator"`
-	CertVerifierLegacy 	string `yaml:"eigenDALegacyCertVerifier"`
-	CertVerifier 	   	   string `yaml:"eigenDACertVerifier"`
-	CertVerifierRouter   string `yaml:"eigenDACertVerifierRouter"`
+	CertVerifierLegacy 	string `json:"eigenDALegacyCertVerifier"`
+	CertVerifier 	   	   string `json:"eigenDACertVerifier"`
+	CertVerifierRouter   string `json:"eigenDACertVerifierRouter"`
 }
 
 type Stakes struct {
