@@ -1,7 +1,20 @@
 package benchmark
 
 // KeyManager is responsible for tracking key-value pairs that have been written to the database.
+//
+// Public methods on this object are NOT thread safe, and should not be called from multiple threads concurrently.
 type KeyManager struct {
+	// The directory where cohort files are stored.
+	cohortDirectory string
+
+	// A map from cohort index to information about the cohort.
+	cohorts map[uint64]*Cohort
+
+	// The index of the oldest cohort being tracked.
+	lowestCohortIndex uint64
+
+	// The index of the newest cohort being tracked.
+	highestCohortIndex uint64
 }
 
 // NewKeyManager creates a new key manager.
