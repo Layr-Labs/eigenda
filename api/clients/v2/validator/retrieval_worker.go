@@ -91,7 +91,6 @@ const (
 )
 
 // TODO(cody.littley): the following improvements can be made in the future
-//  - the ability to download a blob from multiple quorums at once (useful if many validators are offline)
 //  - check to see if it's faster to send the bare minimum number of chunks to decoding, modify code accordingly
 //  - more granular metrics via sequence probe (requires sequence probe enhancements)
 
@@ -340,6 +339,7 @@ func (w *retrievalWorker) retrieveBlobFromValidators() ([]byte, error) {
 	w.probe.SetStage("download_and_verify")
 
 	controlLoopTicker := time.NewTicker(w.config.ControlLoopPeriod)
+	defer controlLoopTicker.Stop()
 	for {
 		if w.getStatusCount(verified) >= w.minimumChunkCount {
 			// We've verified enough chunks to reconstruct the blob
@@ -390,7 +390,13 @@ func (w *retrievalWorker) checkPessimisticTimeout() {
 		if w.getChunkStatus(operatorID) != downloading {
 			// The operator has finished downloading, we can remove it from the queue.
 			w.downloadsInProgressQueue.Dequeue()
-		} else if time.Since(downloadStart) > w.config.PessimisticTimeout {
+			continue
+		}
+
+		now := w.config.TimeSource()
+		elapsed := now.Sub(downloadStart)
+
+		if elapsed > w.config.PessimisticTimeout {
 			// Too much time has passed. Assume that the operator is not responding.
 			if w.config.DetailedLogging {
 				w.logger.Debug("soft timeout exceeded for chunk download",

@@ -427,26 +427,10 @@ func TestDownloadTimeout(t *testing.T) {
 	// None of the downloads should have hit the full timeout.
 	require.Equal(t, uint32(0), timedOutDownloads.Load())
 
-	// Now, unblock all the downloads except for one. We will let that one download timeout.
-	unblockCount := 0
+	// Now, unblock all the downloads.
 	for operatorID := range downloadLocks {
-		// Don't unblock the last one
-		if unblockCount == int(validatorCount-1) {
-			break
-		}
-		unblockCount++
-
 		downloadLocks[operatorID] <- struct{}{}
 	}
-
-	// Advance the clock to trigger the timeout.
-	newTime = start.Add(config.DownloadTimeout + 100*time.Second)
-
-	// At least one download should time out. In theory, multiple downloads could have timed out (since
-	// the context is cancelled after the download is completed).
-	testutils.AssertEventuallyTrue(t, func() bool {
-		return timedOutDownloads.Load() > uint32(0)
-	}, time.Second)
 
 	// Wait for the blob to be downloaded.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

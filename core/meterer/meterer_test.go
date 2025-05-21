@@ -139,7 +139,7 @@ func setup(_ *testing.M) {
 	account1OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}
 	account2OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(2000)}
 
-	store, err := meterer.NewOffchainStore(
+	store, err := meterer.NewDynamoDBMeteringStore(
 		clientConfig,
 		reservationTableName,
 		ondemandTableName,
@@ -149,7 +149,7 @@ func setup(_ *testing.M) {
 
 	if err != nil {
 		teardown()
-		panic("failed to create offchain store")
+		panic("failed to create metering store")
 	}
 
 	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil).Maybe()

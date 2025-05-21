@@ -11,13 +11,6 @@ import (
 
 const (
 
-	// OldHashFunctionSerializationVersion is the serialization version for the old hash function.
-	OldHashFunctionSerializationVersion = uint32(0)
-
-	// CurrentSerializationVersion is current serialization version. If we ever change how we serialize data,
-	// bump this version.
-	CurrentSerializationVersion = uint32(1)
-
 	// MetadataFileExtension is the file extension for the metadata file.
 	MetadataFileExtension = ".metadata"
 
@@ -27,22 +20,36 @@ const (
 	// deleted.
 	MetadataSwapExtension = ".metadata.swap"
 
-	// OldMetadataSize is the size of the format 0 metadata file in bytes.
+	// V0MetadataSize is the size the metadata file at version 0 (aka OldHashFunctionSegmentVersion)
 	// This is a constant, so it's convenient to have it here.
 	// - 4 bytes for version
 	// - 4 bytes for the sharding factor
 	// - 4 bytes for salt
 	// - 8 bytes for lastValueTimestamp
 	// - and 1 byte for sealed.
-	OldMetadataSize = 21
+	V0MetadataSize = 21
 
-	// MetadataSize is the size of the metadata file in bytes. This is a constant, so it's convenient to have it here.
+	// V1MetadataSize is the size of the metadata file at version 1 (aka SipHashSegmentVersion).
+	// This is a constant, so it's convenient to have it here.
 	// - 4 bytes for version
 	// - 4 bytes for the sharding factor
 	// - 16 bytes for salt
 	// - 8 bytes for lastValueTimestamp
 	// - and 1 byte for sealed.
-	MetadataSize = 33
+	V1MetadataSize = 33
+
+	// V2MetadataSize is the size of the metadata file at version 2 (aka ValueSizeSegmentVersion).
+	// This is a constant, so it's convenient to have it here.
+	// - 4 bytes for version
+	// - 4 bytes for the sharding factor
+	// - 16 bytes for salt
+	// - 8 bytes for lastValueTimestamp
+	// - 4 bytes for keyCount
+	// - and 1 byte for sealed.
+	V2MetadataSize = 37
+
+	// CurrentMetadataSize is the size of the metadata file at the current version.
+	CurrentMetadataSize = V2MetadataSize
 )
 
 // metadataFile contains metadata about a segment. This file contains metadata about the data segment, such as
@@ -53,7 +60,7 @@ type metadataFile struct {
 
 	// The serialization version for this segment, used to permit smooth data migrations.
 	// This value is encoded in the file.
-	serializationVersion uint32
+	segmentVersion SegmentVersion
 
 	// The sharding factor for this segment. This value is encoded in the file.
 	shardingFactor uint32
@@ -68,13 +75,17 @@ type metadataFile struct {
 	salt [16]byte
 
 	// The time when the last value was written into the segment, in nanoseconds since the epoch. A segment can
-	// only be deleted when all values within it are expired, and so we only need to keep track of the lastValueTimestamp of
-	// the last value (which always expires last). This value is irrelevant if the segment is not yet sealed.
-	// This value is encoded in the file.
+	// only be deleted when all values within it are expired, and so we only need to keep track of the
+	// lastValueTimestamp of the last value (which always expires last). This value is irrelevant if the segment is
+	// not yet sealed. This value is encoded in the file.
 	lastValueTimestamp uint64
 
-	// If true, the segment is sealed and no more data can be written to it. If false, then data can still be written to
-	// this segment. This value is encoded in the file.
+	// The number of keys in the segment. This value is undefined if the segment is not yet sealed.
+	// This value is encoded in the file.
+	keyCount uint32
+
+	// If true, the segment is sealed and no more data can be written to it. If false, then data can still be written
+	// to this segment. This value is encoded in the file.
 	sealed bool
 
 	// The parent directory containing this file. This value is not encoded in file, and is stored here
@@ -95,7 +106,7 @@ func createMetadataFile(
 		parentDirectory: parentDirectory,
 	}
 
-	file.serializationVersion = CurrentSerializationVersion
+	file.segmentVersion = LatestSegmentVersion
 	file.shardingFactor = shardingFactor
 	file.salt = salt
 	err := file.write()
@@ -150,10 +161,12 @@ func getMetadataFileIndex(fileName string) (uint32, error) {
 
 // Size returns the size of the metadata file in bytes.
 func (m *metadataFile) Size() uint64 {
-	if m.serializationVersion == OldHashFunctionSerializationVersion {
-		return OldMetadataSize
+	if m.segmentVersion == OldHashFunctionSegmentVersion {
+		return V0MetadataSize
+	} else if m.segmentVersion == SipHashSegmentVersion {
+		return V1MetadataSize
 	} else {
-		return MetadataSize
+		return V2MetadataSize
 	}
 }
 
@@ -179,9 +192,10 @@ func (m *metadataFile) swapPath() string {
 
 // Seal seals the segment. This action will atomically write the metadata file to disk one final time,
 // and should only be performed when all data that will be written to the key/value files has been made durable.
-func (m *metadataFile) seal(now time.Time) error {
+func (m *metadataFile) seal(now time.Time, keyCount uint32) error {
 	m.sealed = true
 	m.lastValueTimestamp = uint64(now.UnixNano())
+	m.keyCount = keyCount
 	err := m.write()
 	if err != nil {
 		return fmt.Errorf("failed to write sealed metadata file: %v", err)
@@ -189,11 +203,11 @@ func (m *metadataFile) seal(now time.Time) error {
 	return nil
 }
 
-func (m *metadataFile) serializeLegacy() []byte {
-	data := make([]byte, OldMetadataSize)
+func (m *metadataFile) serializeV0Legacy() []byte {
+	data := make([]byte, V0MetadataSize)
 
 	// Write the version
-	binary.BigEndian.PutUint32(data[0:4], m.serializationVersion)
+	binary.BigEndian.PutUint32(data[0:4], uint32(m.segmentVersion))
 
 	// Write the sharding factor
 	binary.BigEndian.PutUint32(data[4:8], m.shardingFactor)
@@ -214,16 +228,11 @@ func (m *metadataFile) serializeLegacy() []byte {
 	return data
 }
 
-// serialize serializes the metadata file to a byte array.
-func (m *metadataFile) serialize() []byte {
-	if m.serializationVersion == OldHashFunctionSerializationVersion {
-		return m.serializeLegacy()
-	}
-
-	data := make([]byte, MetadataSize)
+func (m *metadataFile) serializeV1Legacy() []byte {
+	data := make([]byte, V1MetadataSize)
 
 	// Write the version
-	binary.BigEndian.PutUint32(data[0:4], m.serializationVersion)
+	binary.BigEndian.PutUint32(data[0:4], uint32(m.segmentVersion))
 
 	// Write the sharding factor
 	binary.BigEndian.PutUint32(data[4:8], m.shardingFactor)
@@ -244,38 +253,96 @@ func (m *metadataFile) serialize() []byte {
 	return data
 }
 
-// deserialize deserializes the metadata file from a byte array.
-func (m *metadataFile) deserialize(data []byte) error {
-	if len(data) < 4 {
-		return fmt.Errorf("metadata file is not the correct size, expected at least 4 bytes, got %d", len(data))
+// serialize serializes the metadata file to a byte array.
+func (m *metadataFile) serialize() []byte {
+	if m.segmentVersion == OldHashFunctionSegmentVersion {
+		return m.serializeV0Legacy()
+	} else if m.segmentVersion == SipHashSegmentVersion {
+		return m.serializeV1Legacy()
 	}
 
-	m.serializationVersion = binary.BigEndian.Uint32(data[0:4])
-	if m.serializationVersion == OldHashFunctionSerializationVersion {
-		if len(data) != OldMetadataSize {
-			return fmt.Errorf("metadata file is not the correct size, expected %d, got %d",
-				OldMetadataSize, len(data))
-		}
+	data := make([]byte, V2MetadataSize)
 
-		// TODO (cody.littley): delete this after all data is migrated to the new hash function.
-		m.shardingFactor = binary.BigEndian.Uint32(data[4:8])
-		m.legacySalt = binary.BigEndian.Uint32(data[8:12])
-		m.lastValueTimestamp = binary.BigEndian.Uint64(data[12:20])
-		m.sealed = data[20] == 1
-		return nil
-	} else if m.serializationVersion != CurrentSerializationVersion {
-		return fmt.Errorf("unsupported serialization version: %d", m.serializationVersion)
+	// Write the version
+	binary.BigEndian.PutUint32(data[0:4], uint32(m.segmentVersion))
+
+	// Write the sharding factor
+	binary.BigEndian.PutUint32(data[4:8], m.shardingFactor)
+
+	// Write the salt
+	copy(data[8:24], m.salt[:])
+
+	// Write the lastValueTimestamp
+	binary.BigEndian.PutUint64(data[24:32], m.lastValueTimestamp)
+
+	// Write the key count
+	binary.BigEndian.PutUint32(data[32:36], m.keyCount)
+
+	// Write the sealed flag
+	if m.sealed {
+		data[36] = 1
+	} else {
+		data[36] = 0
 	}
 
-	if len(data) != MetadataSize {
+	return data
+}
+
+func (m *metadataFile) deserializeV0Legacy(data []byte) error {
+	// TODO (cody.littley): delete this after all data is migrated
+	if len(data) != V0MetadataSize {
 		return fmt.Errorf("metadata file is not the correct size, expected %d, got %d",
-			MetadataSize, len(data))
+			V0MetadataSize, len(data))
+	}
+
+	m.shardingFactor = binary.BigEndian.Uint32(data[4:8])
+	m.legacySalt = binary.BigEndian.Uint32(data[8:12])
+	m.lastValueTimestamp = binary.BigEndian.Uint64(data[12:20])
+	m.sealed = data[20] == 1
+	return nil
+}
+
+func (m *metadataFile) deserializeV1Legacy(data []byte) error {
+	// TODO (cody.littley): delete this after all data is migrated
+	if len(data) != V1MetadataSize {
+		return fmt.Errorf("metadata file is not the correct size, expected %d, got %d",
+			V1MetadataSize, len(data))
 	}
 
 	m.shardingFactor = binary.BigEndian.Uint32(data[4:8])
 	m.salt = [16]byte(data[8:24])
 	m.lastValueTimestamp = binary.BigEndian.Uint64(data[24:32])
 	m.sealed = data[32] == 1
+	return nil
+}
+
+// deserialize deserializes the metadata file from a byte array.
+func (m *metadataFile) deserialize(data []byte) error {
+	if len(data) < 4 {
+		return fmt.Errorf("metadata file is not the correct size, expected at least 4 bytes, got %d", len(data))
+	}
+
+	m.segmentVersion = SegmentVersion(binary.BigEndian.Uint32(data[0:4]))
+	if m.segmentVersion > LatestSegmentVersion {
+		return fmt.Errorf("unsupported serialization version: %d", m.segmentVersion)
+	}
+
+	if m.segmentVersion == OldHashFunctionSegmentVersion {
+		return m.deserializeV0Legacy(data)
+	} else if m.segmentVersion == SipHashSegmentVersion {
+		return m.deserializeV1Legacy(data)
+	}
+
+	if len(data) != V2MetadataSize {
+		return fmt.Errorf("metadata file is not the correct size, expected %d, got %d",
+			V2MetadataSize, len(data))
+	}
+
+	m.shardingFactor = binary.BigEndian.Uint32(data[4:8])
+	m.salt = [16]byte(data[8:24])
+	m.lastValueTimestamp = binary.BigEndian.Uint64(data[24:32])
+	m.keyCount = binary.BigEndian.Uint32(data[32:36])
+	m.sealed = data[36] == 1
 
 	return nil
 }

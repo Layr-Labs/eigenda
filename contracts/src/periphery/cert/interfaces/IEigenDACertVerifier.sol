@@ -1,14 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-interface IEigenDACertVerifier {
-    /// @notice Check a DA cert's validity, and revert if invalid.
-    function verifyDACert(bytes calldata certBytes) external view;
+import {IEigenDACertVerifierBase} from "src/periphery/cert/interfaces/IEigenDACertVerifierBase.sol";
+import {IVersionedEigenDACertVerifier} from "src/periphery/cert/interfaces/IVersionedEigenDACertVerifier.sol";
 
-    /// @notice Check a DA cert's validity
-    /// @return status An enum value. Success is always mapped to 1, and other values are errors specific to each CertVerifier.
-    function checkDACert(bytes calldata certBytes) external view returns (uint8 status);
+import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
+import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
 
-    /// @notice Returns the certificate version. Used off-chain to identify how to encode a certificate for this CertVerifier.
-    function certVersion() external view returns (uint8);
+import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
+
+interface IEigenDACertVerifier is IEigenDACertVerifierBase, IVersionedEigenDACertVerifier {
+    /// @notice Returns the EigenDAThresholdRegistry contract.
+    function eigenDAThresholdRegistry() external view returns (IEigenDAThresholdRegistry);
+
+    /// @notice Returns the EigenDASignatureVerifier contract.
+    function eigenDASignatureVerifier() external view returns (IEigenDASignatureVerifier);
+
+    /// @notice Returns the security thresholds required for EigenDA certificate verification.
+    function securityThresholds() external view returns (DATypesV1.SecurityThresholds memory);
+
+    /// @notice Returns the quorum numbers required in bytes format for certificate verification.
+    function quorumNumbersRequired() external view returns (bytes memory);
 }

@@ -282,7 +282,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		panic("failed to create global reservation table")
 	}
 
-	offchainStore, err := meterer.NewOffchainStore(
+	meteringStore, err := meterer.NewDynamoDBMeteringStore(
 		clientConfig,
 		table_names[0],
 		table_names[1],
@@ -298,7 +298,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		panic("failed to make initial query to the on-chain state")
 	}
 
-	mt := meterer.NewMeterer(meterer.Config{}, mockState, offchainStore, logger)
+	mt := meterer.NewMeterer(meterer.Config{}, mockState, meteringStore, logger)
 	server := apiserver.NewDispersalServer(serverConfig, store, tx, logger, disperserMetrics, grpcprom.NewServerMetrics(), mt, ratelimiter, rateConfig, testMaxBlobSize)
 
 	return TestDisperser{

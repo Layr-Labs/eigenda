@@ -18,32 +18,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-const MinNumBins int32 = 3
-
-// OffchainStoreInterface defines the methods that an offchain store must implement
-type OffchainStoreInterface interface {
-	// UpdateReservationBin(ctx, header.AccountID, quorumNumbers, requestReservationPeriods, symbolsCharged)
-	UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, requestReservationPeriods map[core.QuorumID]uint64, size uint64) (map[core.QuorumID]uint64, map[core.QuorumID]error)
-	// GetBinUsage retrieves the current bin usage for a specific account, period, and quorum
-	GetBinUsage(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, quorumNumber uint8) (uint64, error)
-	// UpdateGlobalBin updates the global bin usage for a specific period
-	UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error)
-	// AddOnDemandPayment adds a payment for on-demand requests
-	AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, paymentCharged *big.Int) (*big.Int, error)
-	// RollbackOnDemandPayment rolls back a payment to a previous value
-	RollbackOnDemandPayment(ctx context.Context, accountID gethcommon.Address, newPayment, oldPayment *big.Int) error
-	// GetPeriodRecords retrieves the period records for a specific account and quorum
-	GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, quorumNumber uint8) ([MinNumBins]*pb.PeriodRecord, error)
-	// GetPeriodRecordsMultiQuorum retrieves period records for multiple quorums
-	GetPeriodRecordsMultiQuorum(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, quorumNumbers []uint8) ([]*pb.PeriodRecord, error)
-	// GetLargestCumulativePayment retrieves the largest cumulative payment for an account
-	GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error)
-	// DecrementBinUsages atomically decrements the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
-	// The key is AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
-	DecrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) error
-}
-
-type OffchainStore struct {
+// DynamoDBMeteringStore implements the MeteringStore interface using DynamoDB
+type DynamoDBMeteringStore struct {
 	dynamoClient         commondynamodb.Client
 	reservationTableName string
 	onDemandTableName    string
@@ -52,34 +28,34 @@ type OffchainStore struct {
 	// TODO: add maximum storage for both tables
 }
 
-func NewOffchainStore(
+// NewDynamoDBMeteringStore creates a new DynamoDB-backed metering store
+func NewDynamoDBMeteringStore(
 	cfg commonaws.ClientConfig,
 	reservationTableName string,
 	onDemandTableName string,
 	globalBinTableName string,
 	logger logging.Logger,
-) (OffchainStore, error) {
-
+) (*DynamoDBMeteringStore, error) {
 	dynamoClient, err := commondynamodb.NewClient(cfg, logger)
 	if err != nil {
-		return OffchainStore{}, err
+		return nil, err
 	}
 
 	err = dynamoClient.TableExists(context.Background(), reservationTableName)
 	if err != nil {
-		return OffchainStore{}, err
+		return nil, err
 	}
 	err = dynamoClient.TableExists(context.Background(), onDemandTableName)
 	if err != nil {
-		return OffchainStore{}, err
+		return nil, err
 	}
 	err = dynamoClient.TableExists(context.Background(), globalBinTableName)
 	if err != nil {
-		return OffchainStore{}, err
+		return nil, err
 	}
 	//TODO: add a separate thread to periodically clean up the tables
 	// delete expired reservation bins (<i-1) and old on-demand payments (retain max N payments)
-	return OffchainStore{
+	return &DynamoDBMeteringStore{
 		dynamoClient:         dynamoClient,
 		reservationTableName: reservationTableName,
 		onDemandTableName:    onDemandTableName,
@@ -88,9 +64,9 @@ func NewOffchainStore(
 	}, nil
 }
 
-// UpdateReservationBin updates the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
+// IncrementBinUsages updates the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
 // The key is AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
-func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) (map[core.QuorumID]uint64, error) {
+func (s *DynamoDBMeteringStore) IncrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) (map[core.QuorumID]uint64, error) {
 	binUsages := make(map[core.QuorumID]uint64)
 
 	// Build ops for atomic batch increment
@@ -142,7 +118,7 @@ func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID geth
 	return binUsages, nil
 }
 
-func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error) {
+func (s *DynamoDBMeteringStore) UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error) {
 	key := map[string]types.AttributeValue{
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 	}
@@ -170,7 +146,7 @@ func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod u
 	return binUsageValue, nil
 }
 
-func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, paymentCharged *big.Int) (*big.Int, error) {
+func (s *DynamoDBMeteringStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, paymentCharged *big.Int) (*big.Int, error) {
 	// Create new item with only AccountID and CumulativePayment
 	item := commondynamodb.Item{
 		"AccountID":         &types.AttributeValueMemberS{Value: paymentMetadata.AccountID.Hex()},
@@ -228,7 +204,7 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 // RollbackOnDemandPayment rolls back a payment to the previous value
 // If oldPayment is 0, it writes a zero value instead of deleting the record
 // This method uses a conditional expression to ensure we only roll back if the current value matches newPayment
-func (s *OffchainStore) RollbackOnDemandPayment(ctx context.Context, accountID gethcommon.Address, newPayment, oldPayment *big.Int) error {
+func (s *DynamoDBMeteringStore) RollbackOnDemandPayment(ctx context.Context, accountID gethcommon.Address, newPayment, oldPayment *big.Int) error {
 	// Initialize oldPayment to zero if it's nil
 	if oldPayment == nil {
 		oldPayment = big.NewInt(0)
@@ -280,7 +256,7 @@ func (s *OffchainStore) RollbackOnDemandPayment(ctx context.Context, accountID g
 	return nil
 }
 
-func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error) {
+func (s *DynamoDBMeteringStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error) {
 	// Fetch the 3 bins start from the current bin
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.reservationTableName),
@@ -309,7 +285,7 @@ func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID gethcomm
 	return records, nil
 }
 
-func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
+func (s *DynamoDBMeteringStore) GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
 	// Get the single record for this account
 	key := commondynamodb.Key{
 		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
@@ -384,7 +360,7 @@ func parsePeriodRecord(bin map[string]types.AttributeValue) (*pb.PeriodRecord, e
 
 // DecrementBinUsages atomically decrements the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
 // The key is AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
-func (s *OffchainStore) DecrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) error {
+func (s *DynamoDBMeteringStore) DecrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) error {
 	// Build ops for atomic batch decrement
 	ops := make([]commondynamodb.TransactAddOp, len(quorumNumbers))
 	for i, quorumNumber := range quorumNumbers {

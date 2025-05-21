@@ -27,10 +27,12 @@ type Config struct {
 // payments information is valid.
 type Meterer struct {
 	Config
-	// ChainPaymentState reads on-chain payment state periodically and cache it in memory
+
+	// ChainPaymentState reads on-chain payment state periodically and caches it in memory
 	ChainPaymentState OnchainPayment
-	// OffchainStore uses DynamoDB to track metering and used to validate requests
-	OffchainStore OffchainStore
+
+	// MeteringStore tracks usage and payments in a storage backend
+	MeteringStore MeteringStore
 
 	logger logging.Logger
 }
@@ -38,16 +40,14 @@ type Meterer struct {
 func NewMeterer(
 	config Config,
 	paymentChainState OnchainPayment,
-	offchainStore OffchainStore,
+	meteringStore MeteringStore,
 	logger logging.Logger,
 ) *Meterer {
 	return &Meterer{
-		Config: config,
-
+		Config:            config,
 		ChainPaymentState: paymentChainState,
-		OffchainStore:     offchainStore,
-
-		logger: logger.With("component", "Meterer"),
+		MeteringStore:     meteringStore,
+		logger:            logger.With("component", "Meterer"),
 	}
 }
 
@@ -180,7 +180,7 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 	// Batch increment all quorums for the current quorums' reservation period
 	// For each quorum, increment by its specific symbolsCharged value
 	updatedUsages := make(map[core.QuorumID]uint64)
-	usage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, quorumNumbers, requestReservationPeriods, charges)
+	usage, err := m.MeteringStore.IncrementBinUsages(ctx, header.AccountID, quorumNumbers, requestReservationPeriods, charges)
 	if err != nil {
 		return err
 	}
@@ -215,10 +215,10 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 
 	// Batch increment overflow bins for overflown reservation candidates
 	for quorumID := range overflowCandidates {
-		_, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, []core.QuorumID{quorumID}, map[core.QuorumID]uint64{quorumID: requestReservationPeriods[quorumID] + 2}, map[core.QuorumID]uint64{quorumID: overflowAmounts[quorumID]})
+		_, err := m.MeteringStore.IncrementBinUsages(ctx, header.AccountID, []core.QuorumID{quorumID}, map[core.QuorumID]uint64{quorumID: requestReservationPeriods[quorumID] + 2}, map[core.QuorumID]uint64{quorumID: overflowAmounts[quorumID]})
 		if err != nil {
 			// Rollback the increments for the current periods
-			rollbackErr := m.OffchainStore.DecrementBinUsages(ctx, header.AccountID, quorumNumbers, requestReservationPeriods, charges)
+			rollbackErr := m.MeteringStore.DecrementBinUsages(ctx, header.AccountID, quorumNumbers, requestReservationPeriods, charges)
 			if rollbackErr != nil {
 				return fmt.Errorf("failed to increment overflow bin for quorum %d: %w; rollback also failed: %v", quorumID, err, rollbackErr)
 			}
@@ -267,7 +267,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 	}
 
 	paymentCharged := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol())
-	oldPayment, err := m.OffchainStore.AddOnDemandPayment(ctx, header, paymentCharged)
+	oldPayment, err := m.MeteringStore.AddOnDemandPayment(ctx, header, paymentCharged)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
 	}
@@ -277,7 +277,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 		// If global bin usage update fails, roll back the payment to its previous value
 		// The rollback will only happen if the current payment value still matches what we just wrote
 		// This ensures we don't accidentally roll back a newer payment that might have been processed
-		dbErr := m.OffchainStore.RollbackOnDemandPayment(ctx, header.AccountID, header.CumulativePayment, oldPayment)
+		dbErr := m.MeteringStore.RollbackOnDemandPayment(ctx, header.AccountID, header.CumulativePayment, oldPayment)
 		if dbErr != nil {
 			return dbErr
 		}
@@ -312,7 +312,7 @@ func (m *Meterer) SymbolsCharged(numSymbols uint64) uint64 {
 func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64, receivedAt time.Time) error {
 	globalPeriod := GetReservationPeriod(receivedAt.Unix(), m.ChainPaymentState.GetGlobalRatePeriodInterval())
 
-	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalPeriod, symbolsCharged)
+	newUsage, err := m.MeteringStore.UpdateGlobalBin(ctx, globalPeriod, symbolsCharged)
 	if err != nil {
 		return fmt.Errorf("failed to increment global bin usage: %w", err)
 	}
