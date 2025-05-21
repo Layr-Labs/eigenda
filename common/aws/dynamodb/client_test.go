@@ -278,6 +278,12 @@ func TestBasicOperations(t *testing.T) {
 	}, "BlobSize", 1000)
 	assert.NoError(t, err)
 
+	fetchedItem, err = dynamoClient.GetItem(ctx, tableName, commondynamodb.Key{
+		"MetadataKey": &types.AttributeValueMemberS{Value: "key"},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "1623", fetchedItem["BlobSize"].(*types.AttributeValueMemberN).Value)
+
 	err = dynamoClient.DeleteTable(ctx, tableName)
 	assert.NoError(t, err)
 }
