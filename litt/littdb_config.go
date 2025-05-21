@@ -56,7 +56,7 @@ type Config struct {
 	// this constant prevents a segment from accumulating too many keys. A segment with too many keys may have
 	// undesirable properties such as a very large key file and very slow garbage collection (since no kv-pair in
 	// a segment can be deleted until the entire segment is deleted).
-	MaxSegmentKeyCount uint64
+	MaxSegmentKeyCount uint32
 
 	// The desired maximum size for a key file. The default is 2 MB. When a key file exceeds this size, the segment
 	// will close the current segment and begin writing to a new one. For workloads with moderately large values,
@@ -85,10 +85,17 @@ type Config struct {
 	// seeded by the current time.
 	SaltShaker *rand.Rand
 
-	// The size of the cache for tables that have not had their cache size set. The default is 0 (no cache).
+	// The size of the cache for tables that have not had their write cache size set. A write cache is used
+	// to store recently written values for fast access. The default is 0 (no cache).
 	// Cache size is in bytes, and includes the size of both the key and the value. Cache size can be set
-	// individually on each table by calling Table.SetCacheSize().
-	CacheSize uint64
+	// individually on each table by calling Table.SetWriteCacheSize().
+	WriteCacheSize uint64
+
+	// The size of the cache for tables that have not had their read cache size set. A read cache is used
+	// to store recently read values for fast access. The default is 0 (no cache).
+	// Cache size is in bytes, and includes the size of both the key and the value. Cache size can be set
+	// individually on each table by calling Table.SetReadCacheSize().
+	ReadCacheSize uint64
 
 	// The time source used by the database. This can be substituted for an artificial time source
 	// for testing purposes. The default is time.Now.

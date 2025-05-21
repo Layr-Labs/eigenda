@@ -66,7 +66,10 @@ func newChunkProvider(
 
 	var err error
 	server.frameCache, err = cache.NewCacheAccessor[blobKeyWithMetadata, *core.ChunksData](
-		cachecommon.NewFIFOCache[blobKeyWithMetadata, *core.ChunksData](cacheSize, server.computeFramesCacheWeight),
+		cachecommon.NewFIFOCache[blobKeyWithMetadata, *core.ChunksData](
+			cacheSize,
+			server.computeFramesCacheWeight,
+			nil),
 		maxIOConcurrency,
 		server.fetchFrames,
 		metrics)

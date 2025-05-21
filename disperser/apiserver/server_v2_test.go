@@ -151,6 +151,30 @@ func TestV2DisperseBlob(t *testing.T) {
 	})
 	assert.Nil(t, reply)
 	assert.ErrorContains(t, err, "failed to update cumulative payment: insufficient cumulative payment increment")
+
+	// request with on-demand payments in reserved only mode
+	c.DispersalServerV2.ReservedOnly = true
+	ondemandReqProto := &pbcommonv2.BlobHeader{
+		Version:       0,
+		QuorumNumbers: []uint32{0, 1},
+		Commitment:    commitmentProto,
+		PaymentHeader: &pbcommonv2.PaymentHeader{
+			AccountId:         accountID.Hex(),
+			Timestamp:         0,
+			CumulativePayment: big.NewInt(500).Bytes(),
+		},
+	}
+	blobHeader, err = corev2.BlobHeaderFromProtobuf(ondemandReqProto)
+	assert.NoError(t, err)
+	sig, err = signer.SignBlobRequest(blobHeader)
+	assert.NoError(t, err)
+
+	_, err = c.DispersalServerV2.DisperseBlob(context.Background(), &pbv2.DisperseBlobRequest{
+		Blob:       data,
+		Signature:  sig,
+		BlobHeader: ondemandReqProto,
+	})
+	assert.ErrorContains(t, err, "on-demand payments are not supported by reserved-only mode disperser")
 }
 
 func TestV2DisperseBlobRequestValidation(t *testing.T) {
@@ -332,6 +356,7 @@ func TestV2DisperseBlobRequestValidation(t *testing.T) {
 		BlobHeader: validHeader,
 	})
 	assert.ErrorContains(t, err, "blob size too big")
+
 }
 
 func TestV2GetBlobStatus(t *testing.T) {
@@ -384,7 +409,7 @@ func TestV2GetBlobStatus(t *testing.T) {
 	// First transition to GatheringSignatures state
 	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.GatheringSignatures)
 	require.NoError(t, err)
-	
+
 	// Then transition to Complete state
 	err = c.BlobMetadataStore.UpdateBlobStatus(ctx, blobKey, dispv2.Complete)
 	require.NoError(t, err)
@@ -574,6 +599,8 @@ func newTestServerV2(t *testing.T) *testComponents {
 			EnableMetrics: false,
 		},
 		ntpClock,
+		// reserved only mode
+		false,
 	)
 	assert.NoError(t, err)
 

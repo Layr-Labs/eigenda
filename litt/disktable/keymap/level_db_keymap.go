@@ -29,6 +29,8 @@ type LevelDBKeymap struct {
 	syncWrites bool
 }
 
+var _ BuildKeymap = NewLevelDBKeymap
+
 // NewLevelDBKeymap creates a new LevelDBKeymap instance.
 func NewLevelDBKeymap(
 	logger logging.Logger,
@@ -85,23 +87,23 @@ func newLevelDBKeymap(
 	return kmap, requiresReload, nil
 }
 
-func (l *LevelDBKeymap) Put(pairs []*types.KAPair) error {
+func (l *LevelDBKeymap) Put(keys []*types.ScopedKey) error {
 
 	if l.doubleWriteProtection {
-		for _, pair := range pairs {
-			_, ok, err := l.Get(pair.Key)
+		for _, k := range keys {
+			_, ok, err := l.Get(k.Key)
 			if err != nil {
 				return fmt.Errorf("failed to get key: %w", err)
 			}
 			if ok {
-				return fmt.Errorf("key %s already exists", pair.Key)
+				return fmt.Errorf("key %s already exists", k.Key)
 			}
 		}
 	}
 
 	batch := new(leveldb.Batch)
-	for _, pair := range pairs {
-		batch.Put(pair.Key, pair.Address.Serialize())
+	for _, k := range keys {
+		batch.Put(k.Key, k.Address.Serialize())
 	}
 
 	writeOptions := &opt.WriteOptions{
@@ -132,7 +134,7 @@ func (l *LevelDBKeymap) Get(key []byte) (types.Address, bool, error) {
 	return address, true, nil
 }
 
-func (l *LevelDBKeymap) Delete(keys []*types.KAPair) error {
+func (l *LevelDBKeymap) Delete(keys []*types.ScopedKey) error {
 	batch := new(leveldb.Batch)
 	for _, key := range keys {
 		batch.Delete(key.Key)

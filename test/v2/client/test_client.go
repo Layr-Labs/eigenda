@@ -13,7 +13,9 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
-	relayv2 "github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
@@ -49,11 +51,14 @@ type TestClient struct {
 	certVerifierAddressProvider *test.TestCertVerifierAddressProvider
 	disperserClient             clients.DisperserClient
 	payloadDisperser            *payloaddispersal.PayloadDisperser
-	relayClient                 clients.RelayClient
+	relayClient                 relay.RelayClient
 	relayPayloadRetriever       *payloadretrieval.RelayPayloadRetriever
 	indexedChainState           core.IndexedChainState
-	retrievalClient             clients.RetrievalClient
+	validatorClient             validator.ValidatorClient
 	validatorPayloadRetriever   *payloadretrieval.ValidatorPayloadRetriever
+	// For fetching blobs from the validators without verifying or decoding them. Useful for load testing
+	// validator downloads with limited CPU resources.
+	onlyDownloadValidatorClient validator.ValidatorClient
 	certVerifier                *verification.CertVerifier
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
@@ -176,6 +181,7 @@ func NewTestClient(
 		PayloadClientConfig: *payloadClientConfig,
 		DisperseBlobTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 		BlobCompleteTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
+		ContractCallTimeout: 1337 * time.Hour, // this suite enforces its own timeouts
 	}
 
 	var registry *prometheus.Registry
@@ -212,23 +218,23 @@ func NewTestClient(
 		return nil, fmt.Errorf("failed to generate BLS keypair: %w", err)
 	}
 
-	var fakeSigner clients.MessageSigner = func(ctx context.Context, data [32]byte) (*core.Signature, error) {
+	var fakeSigner relay.MessageSigner = func(ctx context.Context, data [32]byte) (*core.Signature, error) {
 		return keypair.SignMessage(data), nil
 	}
 
-	relayConfig := &clients.RelayClientConfig{
+	relayConfig := &relay.RelayClientConfig{
 		UseSecureGrpcFlag:  true,
 		MaxGRPCMessageSize: units.GiB,
 		OperatorID:         &core.OperatorID{0},
 		MessageSigner:      fakeSigner,
 	}
 
-	relayUrlProvider, err := relayv2.NewRelayUrlProvider(ethClient, ethReader.GetRelayRegistryAddress())
+	relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, ethReader.GetRelayRegistryAddress())
 	if err != nil {
 		return nil, fmt.Errorf("create relay url provider: %w", err)
 	}
 
-	relayClient, err := clients.NewRelayClient(relayConfig, logger, relayUrlProvider)
+	relayClient, err := relay.NewRelayClient(relayConfig, logger, relayUrlProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create relay client: %w", err)
 	}
@@ -270,12 +276,18 @@ func NewTestClient(
 		RetrievalTimeout:    1337 * time.Hour, // this suite enforces its own timeouts
 	}
 
-	retrievalClient := clients.NewRetrievalClient(
+	validatorClientMetrics := validator.NewValidatorClientMetrics(registry)
+
+	clientConfig := validator.DefaultClientConfig()
+	clientConfig.ConnectionPoolSize = config.ValidatorReadConnectionPoolSize
+	clientConfig.ComputePoolSize = config.ValidatorReadComputePoolSize
+	retrievalClient := validator.NewValidatorClient(
 		logger,
 		ethReader,
 		indexedChainState,
 		blobVerifier,
-		20)
+		clientConfig,
+		validatorClientMetrics)
 
 	validatorPayloadRetriever, err := payloadretrieval.NewValidatorPayloadRetriever(
 		logger,
@@ -285,6 +297,24 @@ func NewTestClient(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create validator payload retriever: %w", err)
 	}
+
+	// Create a client that only downloads the blob and does not verify it. Useful for load testing validator downloads
+	// with limited CPU resources.
+	onlyDownloadClientConfig := validator.DefaultClientConfig()
+	onlyDownloadClientConfig.ConnectionPoolSize = config.ValidatorReadConnectionPoolSize
+	onlyDownloadClientConfig.ComputePoolSize = config.ValidatorReadComputePoolSize
+	onlyDownloadClientConfig.UnsafeChunkDeserializerFactory =
+		mock.NewMockChunkDeserializerFactory(&mock.MockChunkDeserializer{})
+	onlyDownloadClientConfig.UnsafeBlobDecoderFactory =
+		mock.NewMockBlobDecoderFactory(&mock.MockBlobDecoder{})
+
+	onlyDownloadValidatorClient := validator.NewValidatorClient(
+		logger,
+		ethReader,
+		indexedChainState,
+		blobVerifier,
+		onlyDownloadClientConfig,
+		validatorClientMetrics)
 
 	return &TestClient{
 		config:                      config,
@@ -296,8 +326,9 @@ func NewTestClient(
 		relayClient:                 relayClient,
 		relayPayloadRetriever:       relayPayloadRetriever,
 		indexedChainState:           indexedChainState,
-		retrievalClient:             retrievalClient,
+		validatorClient:             retrievalClient,
 		validatorPayloadRetriever:   validatorPayloadRetriever,
+		onlyDownloadValidatorClient: onlyDownloadValidatorClient,
 		certVerifier:                certVerifier,
 		privateKey:                  privateKey,
 		metricsRegistry:             registry,
@@ -382,7 +413,7 @@ func (c *TestClient) GetPayloadDisperser() *payloaddispersal.PayloadDisperser {
 }
 
 // GetRelayClient returns the test client's relay client.
-func (c *TestClient) GetRelayClient() clients.RelayClient {
+func (c *TestClient) GetRelayClient() relay.RelayClient {
 	return c.relayClient
 }
 
@@ -396,9 +427,9 @@ func (c *TestClient) GetIndexedChainState() core.IndexedChainState {
 	return c.indexedChainState
 }
 
-// GetRetrievalClient returns the test client's retrieval client.
-func (c *TestClient) GetRetrievalClient() clients.RetrievalClient {
-	return c.retrievalClient
+// GetValidatorClient returns the test client's validator client.
+func (c *TestClient) GetValidatorClient() validator.ValidatorClient {
+	return c.validatorClient
 }
 
 // GetValidatorPayloadRetriever returns the test client's validator payload retriever.
@@ -469,7 +500,8 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		*blobKey,
 		eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys,
 		payload,
-		blobLengthSymbols)
+		blobLengthSymbols,
+		0)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relays: %w", err)
 	}
@@ -487,7 +519,10 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		blobHeader.Version,
 		*commitment,
 		eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
-		payload)
+		eigenDACert.BatchHeader.ReferenceBlockNumber,
+		payload,
+		0,
+		true)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from validators: %w", err)
 	}
@@ -503,8 +538,9 @@ func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (
 	payload := coretypes.NewPayload(payloadBytes)
 
 	cert, err := c.GetPayloadDisperser().SendPayload(ctx, payload)
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to disperse payload: %w", err)
+		return nil, fmt.Errorf("failed to disperse payload, %s", err)
 	}
 
 	c.metrics.reportDispersalTime(time.Since(start))
@@ -513,72 +549,134 @@ func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (
 }
 
 // ReadBlobFromRelays reads a blob from the relays and compares it to the given payload.
+//
+// The timeout provided is a timeout for each individual relay read, not all reads as a whole.
 func (c *TestClient) ReadBlobFromRelays(
 	ctx context.Context,
 	key corev2.BlobKey,
 	relayKeys []corev2.RelayKey,
 	expectedPayload []byte,
-	blobLengthSymbols uint32) error {
+	blobLengthSymbols uint32,
+	timeout time.Duration) error {
 
 	for _, relayID := range relayKeys {
-		start := time.Now()
-
-		c.logger.Debugf("Reading blob from relay %d", relayID)
-		blobBytesFromRelay, err := c.relayClient.GetBlob(ctx, relayID, key)
+		err := c.ReadBlobFromRelay(ctx, key, relayID, expectedPayload, blobLengthSymbols, timeout)
 		if err != nil {
-			return fmt.Errorf("failed to read blob from relay: %w", err)
-		}
-
-		c.metrics.reportRelayReadTime(time.Since(start), relayID)
-
-		blob, err := coretypes.DeserializeBlob(blobBytesFromRelay, blobLengthSymbols)
-		if err != nil {
-			return fmt.Errorf("failed to deserialize blob: %w", err)
-		}
-
-		payload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
-		if err != nil {
-			return fmt.Errorf("failed to decode blob: %w", err)
-		}
-
-		payloadBytesFromRelay := payload.Serialize()
-
-		if !bytes.Equal(payloadBytesFromRelay, expectedPayload) {
-			return fmt.Errorf("payloads do not match")
+			return fmt.Errorf("failed to read blob from relay %d: %w", relayID, err)
 		}
 	}
 
 	return nil
 }
 
+// ReadBlobFromRelay reads a blob from the relay and compares it to the given payload.
+func (c *TestClient) ReadBlobFromRelay(
+	ctx context.Context,
+	key corev2.BlobKey,
+	relayKey corev2.RelayKey,
+	expectedPayload []byte,
+	blobLengthSymbols uint32,
+	timeout time.Duration,
+) error {
+
+	start := time.Now()
+
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	blobBytesFromRelay, err := c.relayClient.GetBlob(ctx, relayKey, key)
+	if err != nil {
+		return fmt.Errorf("failed to read blob from relay: %w", err)
+	}
+
+	c.metrics.reportRelayReadTime(time.Since(start), relayKey)
+
+	blob, err := coretypes.DeserializeBlob(blobBytesFromRelay, blobLengthSymbols)
+	if err != nil {
+		return fmt.Errorf("failed to deserialize blob: %w", err)
+	}
+
+	payload, err := blob.ToPayload(c.payloadClientConfig.PayloadPolynomialForm)
+	if err != nil {
+		return fmt.Errorf("failed to decode blob: %w", err)
+	}
+
+	payloadBytesFromRelay := payload.Serialize()
+
+	if !bytes.Equal(payloadBytesFromRelay, expectedPayload) {
+		return fmt.Errorf("payloads do not match")
+	}
+
+	return nil
+}
+
 // ReadBlobFromValidators reads a blob from the validators and compares it to the given payload.
+//
+// The timeout provided is a timeout for each read from a quorum, not all reads as a whole.
 func (c *TestClient) ReadBlobFromValidators(
 	ctx context.Context,
 	blobKey corev2.BlobKey,
 	blobVersion corev2.BlobVersion,
 	blobCommitments encoding.BlobCommitments,
 	quorums []core.QuorumID,
-	expectedPayloadBytes []byte) error {
-
-	currentBlockNumber, err := c.indexedChainState.GetCurrentBlockNumber(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get current block number: %w", err)
-	}
+	referenceBlockNumber uint32,
+	expectedPayloadBytes []byte,
+	timeout time.Duration,
+	validateAndDecode bool) error {
 
 	for _, quorumID := range quorums {
-		c.logger.Debugf("Reading blob from validators for quorum %d", quorumID)
-
-		start := time.Now()
-
-		retrievedBlobBytes, err := c.retrievalClient.GetBlob(
+		err := c.ReadBlobFromValidatorsInQuorum(
 			ctx,
 			blobKey,
 			blobVersion,
 			blobCommitments,
-			uint64(currentBlockNumber),
+			quorumID,
+			referenceBlockNumber,
+			expectedPayloadBytes,
+			timeout,
+			validateAndDecode)
+		if err != nil {
+			return fmt.Errorf("failed to read blob from validators in quorum %d: %w", quorumID, err)
+		}
+	}
+
+	return nil
+}
+
+// ReadBlobFromValidatorsInQuorum reads a blob from the validators in a specific quorum and compares it to
+// the given payload.
+func (c *TestClient) ReadBlobFromValidatorsInQuorum(
+	ctx context.Context,
+	blobKey corev2.BlobKey,
+	blobVersion corev2.BlobVersion,
+	blobCommitments encoding.BlobCommitments,
+	quorumID core.QuorumID,
+	referenceBlockNumber uint32,
+	expectedPayloadBytes []byte,
+	timeout time.Duration,
+	validateAndDecode bool) error {
+
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	if validateAndDecode {
+		start := time.Now()
+
+		retrievedBlobBytes, err := c.validatorClient.GetBlob(
+			ctx,
+			blobKey,
+			blobVersion,
+			blobCommitments,
+			uint64(referenceBlockNumber),
 			quorumID)
 		if err != nil {
-			return fmt.Errorf("failed to read blob from validators: %w", err)
+			return fmt.Errorf("failed to read blob from validators, %s", err)
 		}
 
 		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
@@ -597,6 +695,20 @@ func (c *TestClient) ReadBlobFromValidators(
 		payloadBytes := retrievedPayload.Serialize()
 		if !bytes.Equal(payloadBytes, expectedPayloadBytes) {
 			return fmt.Errorf("payloads do not match")
+		}
+	} else {
+
+		// Just download the blob without validating or decoding. Don't report timing metrics for this operation.
+
+		_, err := c.onlyDownloadValidatorClient.GetBlob(
+			ctx,
+			blobKey,
+			blobVersion,
+			blobCommitments,
+			uint64(referenceBlockNumber),
+			quorumID)
+		if err != nil {
+			return fmt.Errorf("failed to read blob from validators: %w", err)
 		}
 	}
 

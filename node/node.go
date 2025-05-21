@@ -26,7 +26,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/grpc/node"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/core"
@@ -86,6 +85,10 @@ type Node struct {
 	// BlobVersionParams is a map of blob version parameters loaded from the chain.
 	// It is used to determine blob parameters based on the version number.
 	BlobVersionParams atomic.Pointer[corev2.BlobVersionParameterMap]
+
+	// TODO: utilize meterer onchain state later to check quorum ID and minimum payments
+	// QuorumCount is the number of quorums in the network.
+	QuorumCount atomic.Uint32
 }
 
 // NewNode creates a new Node with the provided config.
@@ -241,20 +244,21 @@ func NewNode(
 
 	var blobVersionParams *corev2.BlobVersionParameterMap
 	if config.EnableV2 {
+		ctx := context.Background()
 		// 12s per block
 		ttl := time.Duration(blockStaleMeasure+storeDurationBlocks) * 12 * time.Second
-		n.ValidatorStore, err = NewValidatorStore(context.Background(), logger, config, time.Now, ttl, reg)
+		n.ValidatorStore, err = NewValidatorStore(logger, config, time.Now, ttl, reg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new store v2: %w", err)
 		}
 
-		blobParams, err := tx.GetAllVersionedBlobParams(context.Background())
+		blobParams, err := tx.GetAllVersionedBlobParams(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get versioned blob parameters: %w", err)
 		}
 		blobVersionParams = corev2.NewBlobVersionParameterMap(blobParams)
 
-		relayClientConfig := &clients.RelayClientConfig{
+		relayClientConfig := &relay.RelayClientConfig{
 			UseSecureGrpcFlag:  config.UseSecureGrpc,
 			OperatorID:         &config.ID,
 			MessageSigner:      n.SignMessage,
@@ -266,12 +270,22 @@ func NewNode(
 			return nil, fmt.Errorf("create relay url provider: %w", err)
 		}
 
-		relayClient, err := clients.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
+		relayClient, err := relay.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new relay client: %w", err)
 		}
 
 		n.RelayClient.Store(relayClient)
+
+		blockNumber, err := tx.GetCurrentBlockNumber(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get block number: %w", err)
+		}
+		quorumCount, err := tx.GetQuorumCount(ctx, blockNumber)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get quorum count: %w", err)
+		}
+		n.QuorumCount.Store(uint32(quorumCount))
 	}
 
 	n.BlobVersionParams.Store(blobVersionParams)
@@ -442,6 +456,17 @@ func (n *Node) RefreshOnchainState(ctx context.Context) error {
 				}
 			} else {
 				n.Logger.Error("error fetching blob params", "err", err)
+			}
+			blockNumber, err := n.Transactor.GetCurrentBlockNumber(ctx)
+			if err == nil {
+				quorumCount, err := n.Transactor.GetQuorumCount(ctx, blockNumber)
+				if err == nil {
+					n.QuorumCount.Store(uint32(quorumCount))
+				} else {
+					n.Logger.Error("error fetching quorum count", "err", err)
+				}
+			} else {
+				n.Logger.Error("error fetching block number", "err", err)
 			}
 		case <-ctx.Done():
 			return ctx.Err()
@@ -707,6 +732,7 @@ func (n *Node) checkCurrentNodeIp(ctx context.Context) {
 }
 
 // OperatorReachabilityResponse is the response object for the reachability check
+// For v1 endpoints
 type OperatorReachabilityResponse struct {
 	OperatorID      string `json:"operator_id"`
 	DispersalSocket string `json:"dispersal_socket"`
@@ -715,6 +741,11 @@ type OperatorReachabilityResponse struct {
 	RetrievalOnline bool   `json:"retrieval_online"`
 	DispersalStatus string `json:"dispersal_status"`
 	RetrievalStatus string `json:"retrieval_status"`
+}
+
+// OperatorV2ReachabilityResponse is the response object for the v2 reachability check
+type OperatorV2ReachabilityResponse struct {
+	Operators []OperatorReachabilityResponse `json:"operators"`
 }
 
 func (n *Node) checkNodeReachability(checkPath string) {
@@ -775,35 +806,56 @@ func (n *Node) checkNodeReachability(checkPath string) {
 			continue
 		}
 
-		var responseObject OperatorReachabilityResponse
-		err = json.Unmarshal(data, &responseObject)
-		if err != nil {
-			n.Logger.Error("Reachability check failed to unmarshal json response", err)
-			continue
-		}
+		if version == "v1" {
+			var responseObject OperatorReachabilityResponse
+			err = json.Unmarshal(data, &responseObject)
+			if err != nil {
+				n.Logger.Error("Reachability check failed to unmarshal json response", err)
+				continue
+			}
 
-		if responseObject.DispersalOnline {
-			n.Logger.Info(fmt.Sprintf("Reachability check %s - dispersal socket ONLINE", version),
-				"status", responseObject.DispersalStatus,
-				"socket", responseObject.DispersalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("dispersal-%s", version)).Set(1.0)
+			n.processReachabilityResponse(version, responseObject)
 		} else {
-			n.Logger.Error(fmt.Sprintf("Reachability check %s - dispersal socket UNREACHABLE", version),
-				"status", responseObject.DispersalStatus,
-				"socket", responseObject.DispersalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("dispersal-%s", version)).Set(0.0)
+			var v2ResponseObject OperatorV2ReachabilityResponse
+			err = json.Unmarshal(data, &v2ResponseObject)
+			if err != nil {
+				n.Logger.Error("Reachability check v2 failed to unmarshal json response", err)
+				continue
+			}
+
+			if len(v2ResponseObject.Operators) > 0 {
+				// Process the first operator from the array
+				n.processReachabilityResponse(version, v2ResponseObject.Operators[0])
+			} else {
+				n.Logger.Error("Reachability check v2 returned empty operators array")
+			}
 		}
-		if responseObject.RetrievalOnline {
-			n.Logger.Info(fmt.Sprintf("Reachability check %s - retrieval socket ONLINE", version),
-				"status", responseObject.RetrievalStatus,
-				"socket", responseObject.RetrievalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("retrieval-%s", version)).Set(1.0)
-		} else {
-			n.Logger.Error(fmt.Sprintf("Reachability check %s - retrieval socket UNREACHABLE", version),
-				"status", responseObject.RetrievalStatus,
-				"socket", responseObject.RetrievalSocket)
-			n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("retrieval-%s", version)).Set(0.0)
-		}
+	}
+}
+
+// processReachabilityResponse handles the response for a single operator
+func (n *Node) processReachabilityResponse(version string, responseObject OperatorReachabilityResponse) {
+	if responseObject.DispersalOnline {
+		n.Logger.Info(fmt.Sprintf("Reachability check %s - dispersal socket ONLINE", version),
+			"status", responseObject.DispersalStatus,
+			"socket", responseObject.DispersalSocket)
+		n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("dispersal-%s", version)).Set(1.0)
+	} else {
+		n.Logger.Error(fmt.Sprintf("Reachability check %s - dispersal socket UNREACHABLE", version),
+			"status", responseObject.DispersalStatus,
+			"socket", responseObject.DispersalSocket)
+		n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("dispersal-%s", version)).Set(0.0)
+	}
+	if responseObject.RetrievalOnline {
+		n.Logger.Info(fmt.Sprintf("Reachability check %s - retrieval socket ONLINE", version),
+			"status", responseObject.RetrievalStatus,
+			"socket", responseObject.RetrievalSocket)
+		n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("retrieval-%s", version)).Set(1.0)
+	} else {
+		n.Logger.Error(fmt.Sprintf("Reachability check %s - retrieval socket UNREACHABLE", version),
+			"status", responseObject.RetrievalStatus,
+			"socket", responseObject.RetrievalSocket)
+		n.Metrics.ReachabilityGauge.WithLabelValues(fmt.Sprintf("retrieval-%s", version)).Set(0.0)
 	}
 }
 

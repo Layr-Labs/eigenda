@@ -178,7 +178,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		var batchRoot [32]byte
 		copy(batchRoot[:], batchHeader1.BatchRoot)
 
-		err = verifierContract.VerifyDACertV2FromSignedBatch(
+		err = eigenDACertVerifierV2.VerifyDACertV2FromSignedBatch(
 			&bind.CallOpts{},
 			verifierbindings.EigenDATypesV2SignedBatch{
 				BatchHeader: verifierbindings.EigenDATypesV2BatchHeaderV2{
@@ -196,7 +196,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		proof, err = convertBlobInclusionInfo(blobInclusion2)
 		Expect(err).To(BeNil())
 		copy(batchRoot[:], batchHeader2.BatchRoot)
-		err = verifierContract.VerifyDACertV2FromSignedBatch(
+		err = eigenDACertVerifierV2.VerifyDACertV2FromSignedBatch(
 			&bind.CallOpts{},
 			verifierbindings.EigenDATypesV2SignedBatch{
 				BatchHeader: verifierbindings.EigenDATypesV2BatchHeaderV2{
@@ -209,7 +209,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		)
 		Expect(err).To(BeNil())
 
-		relayClientConfig := &clients.RelayClientConfig{
+		relayClientConfig := &relay.RelayClientConfig{
 			MaxGRPCMessageSize: units.GiB,
 		}
 
@@ -217,7 +217,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		Expect(err).To(BeNil())
 
 		// Test retrieval from relay
-		relayClient, err := clients.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
+		relayClient, err := relay.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
 		Expect(err).To(BeNil())
 
 		blob1Relays := make(map[corev2.RelayKey]struct{}, 0)
