@@ -29,11 +29,29 @@ func (m *MockOnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context
 	return args.Error(0)
 }
 
-func (m *MockOnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.ReservedPayment, error) {
+func (m *MockOnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[uint8]*core.ReservedPayment, error) {
 	args := m.Called(ctx, accountID)
+	var value map[uint8]*core.ReservedPayment
+	if args.Get(0) != nil {
+		value = args.Get(0).(map[uint8]*core.ReservedPayment)
+	}
+	return value, args.Error(1)
+}
+
+func (m *MockOnchainPaymentState) GetReservedPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint8) (*core.ReservedPayment, error) {
+	args := m.Called(ctx, accountID, quorumId)
 	var value *core.ReservedPayment
 	if args.Get(0) != nil {
 		value = args.Get(0).(*core.ReservedPayment)
+	}
+	return value, args.Error(1)
+}
+
+func (m *MockOnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumIds []uint8) (map[uint8]*core.ReservedPayment, error) {
+	args := m.Called(ctx, accountID, quorumIds)
+	var value map[uint8]*core.ReservedPayment
+	if args.Get(0) != nil {
+		value = args.Get(0).(map[uint8]*core.ReservedPayment)
 	}
 	return value, args.Error(1)
 }

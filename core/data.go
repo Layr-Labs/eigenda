@@ -648,6 +648,29 @@ type OnDemandPayment struct {
 	CumulativePayment *big.Int
 }
 
+// QuorumConfig represents the payment configuration for a specific quorum
+type QuorumConfig struct {
+	// Maximum symbols per second for reservations
+	ReservationSymbolsPerSecond uint64
+	// Maximum symbols per second for on-demand
+	OnDemandSymbolsPerSecond uint64
+	// Price per symbol for on-demand
+	OnDemandPricePerSymbol uint64
+}
+
+// QuorumProtocolConfig represents the protocol configuration for a specific quorum
+type QuorumProtocolConfig struct {
+	// Minimum number of symbols required for dispersal
+	MinNumSymbols uint64
+	// Rate limit window for reservations
+	ReservationRateLimitWindow uint64
+	// Rate limit window for on-demand
+	OnDemandRateLimitWindow uint64
+	// Whether on-demand dispersal is enabled; We assume quorum 0 is the only quorum that supports on-demand dispersal
+	// This field will only be used when on-demand is supported for multiple quorums
+	OnDemandEnabled bool
+}
+
 type BlobVersionParameters struct {
 	CodingRate      uint32
 	MaxNumOperators uint32

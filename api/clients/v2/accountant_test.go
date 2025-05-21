@@ -35,10 +35,11 @@ func TestNewAccountant(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	reservations := map[uint8]*core.ReservedPayment{0: reservation}
+	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	assert.NotNil(t, accountant)
-	assert.Equal(t, reservation, accountant.reservation)
+	assert.Equal(t, reservations, accountant.reservation)
 	assert.Equal(t, onDemand, accountant.onDemand)
 	assert.Equal(t, reservationWindow, accountant.reservationWindow)
 	assert.Equal(t, pricePerSymbol, accountant.pricePerSymbol)
@@ -65,7 +66,8 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	reservations := map[uint8]*core.ReservedPayment{0: reservation}
+	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
 	symbolLength := uint64(500)
@@ -99,12 +101,23 @@ func TestAccountBlob_Reservation(t *testing.T) {
 }
 
 func TestAccountBlob_OnDemand(t *testing.T) {
-	reservation := &core.ReservedPayment{
-		SymbolsPerSecond: 200,
-		StartTimestamp:   100,
-		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
+
+	numSymbols := uint64(1500)
+	quorums := []uint8{0, 1}
+
+	reservations := map[uint8]*core.ReservedPayment{
+		0: {
+			SymbolsPerSecond: 200,
+			StartTimestamp:   100,
+			EndTimestamp:     200,
+			QuorumSplits:     []byte{50, 50},
+			QuorumNumbers:    []uint8{0, 1},
+		},
+		1: {
+			SymbolsPerSecond: 200,
+			StartTimestamp:   100,
+			EndTimestamp:     200,
+		},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1500),
@@ -116,11 +129,9 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
-	numSymbols := uint64(1500)
-	quorums := []uint8{0, 1}
 	now := time.Now().UnixNano()
 	header, err := accountant.AccountBlob(ctx, now, numSymbols, quorums)
 	assert.NoError(t, err)
@@ -133,7 +144,7 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 }
 
 func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
-	reservation := &core.ReservedPayment{}
+	reservation := map[uint8]*core.ReservedPayment{} // Empty reservation map
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
 	}
@@ -172,7 +183,8 @@ func TestAccountBlobCallSeries(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	reservations := map[uint8]*core.ReservedPayment{0: reservation}
+	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -225,7 +237,8 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	reservations := map[uint8]*core.ReservedPayment{0: reservation}
+	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -266,7 +279,8 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	reservations := map[uint8]*core.ReservedPayment{0: reservation}
+	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -309,7 +323,8 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	reservations := map[uint8]*core.ReservedPayment{0: reservation}
+	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -356,7 +371,8 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	reservations := map[uint8]*core.ReservedPayment{0: reservation}
+	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
