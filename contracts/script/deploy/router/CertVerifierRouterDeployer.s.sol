@@ -7,7 +7,7 @@ import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 
 /**
- * @notice Deployment script for EigenDACertVerifierRouter
+ * @notice Deployment script for immutable EigenDACertVerifierRouter
  * @dev Run with:
  * forge script script/deploy/router/CertVerifierRouterDeployer.s.sol:CertVerifierRouterDeployer --sig "run(string, string)" <config.json> <output.json> --rpc-url $RPC --private-key $PRIVATE_KEY -vvvv --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast
  */
@@ -21,7 +21,7 @@ contract CertVerifierRouterDeployer is Script, Test {
 
         bytes memory raw = stdJson.parseRaw(data, ".initialOwner");
         initialOwner = abi.decode(raw, (address));
-        raw = stdJson.parseRaw(data, ".initialCertVerifier");
+        raw = stdJson.parseRaw(data, ".initialCertVerifier"); // set at block height 0
         address initialCertVerifier = abi.decode(raw, (address));
 
         vm.startBroadcast();
