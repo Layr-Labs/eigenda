@@ -50,7 +50,6 @@ func AssertEventuallyTrue(t *testing.T, condition func() bool, duration time.Dur
 				return
 			}
 		case <-ctx.Done():
-			fmt.Printf("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< timeout %v elapsed\n", duration) // TODO
 			require.True(t, condition(), debugInfo...)
 			return
 		}
