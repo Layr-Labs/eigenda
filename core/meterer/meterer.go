@@ -27,10 +27,12 @@ type Config struct {
 // payments information is valid.
 type Meterer struct {
 	Config
-	// ChainPaymentState reads on-chain payment state periodically and cache it in memory
+
+	// ChainPaymentState reads on-chain payment state periodically and caches it in memory
 	ChainPaymentState OnchainPayment
-	// OffchainStore uses DynamoDB to track metering and used to validate requests
-	OffchainStore OffchainStore
+
+	// MeteringStore tracks usage and payments in a storage backend
+	MeteringStore MeteringStore
 
 	logger logging.Logger
 }
@@ -38,16 +40,14 @@ type Meterer struct {
 func NewMeterer(
 	config Config,
 	paymentChainState OnchainPayment,
-	offchainStore OffchainStore,
+	meteringStore MeteringStore,
 	logger logging.Logger,
 ) *Meterer {
 	return &Meterer{
-		Config: config,
-
+		Config:            config,
 		ChainPaymentState: paymentChainState,
-		OffchainStore:     offchainStore,
-
-		logger: logger.With("component", "Meterer"),
+		MeteringStore:     meteringStore,
+		logger:            logger.With("component", "Meterer"),
 	}
 }
 
@@ -157,7 +157,7 @@ func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, r
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ReservedPayment, symbolsCharged uint64, reservationWindow uint64, requestReservationPeriod uint64) error {
-	newUsage, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, requestReservationPeriod, symbolsCharged)
+	newUsage, err := m.MeteringStore.UpdateReservationBin(ctx, header.AccountID, requestReservationPeriod, symbolsCharged)
 	if err != nil {
 		return fmt.Errorf("failed to increment bin usage: %w", err)
 	}
@@ -171,7 +171,7 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 		return fmt.Errorf("bin has already been filled")
 	}
 	if newUsage <= 2*usageLimit && requestReservationPeriod+2 <= GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow) {
-		_, err := m.OffchainStore.UpdateReservationBin(ctx, header.AccountID, uint64(requestReservationPeriod+2), newUsage-usageLimit)
+		_, err := m.MeteringStore.UpdateReservationBin(ctx, header.AccountID, uint64(requestReservationPeriod+2), newUsage-usageLimit)
 		if err != nil {
 			return err
 		}
@@ -218,7 +218,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 	}
 
 	paymentCharged := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol())
-	oldPayment, err := m.OffchainStore.AddOnDemandPayment(ctx, header, paymentCharged)
+	oldPayment, err := m.MeteringStore.AddOnDemandPayment(ctx, header, paymentCharged)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
 	}
@@ -228,7 +228,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 		// If global bin usage update fails, roll back the payment to its previous value
 		// The rollback will only happen if the current payment value still matches what we just wrote
 		// This ensures we don't accidentally roll back a newer payment that might have been processed
-		dbErr := m.OffchainStore.RollbackOnDemandPayment(ctx, header.AccountID, header.CumulativePayment, oldPayment)
+		dbErr := m.MeteringStore.RollbackOnDemandPayment(ctx, header.AccountID, header.CumulativePayment, oldPayment)
 		if dbErr != nil {
 			return dbErr
 		}
@@ -263,7 +263,7 @@ func (m *Meterer) SymbolsCharged(numSymbols uint64) uint64 {
 func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64, receivedAt time.Time) error {
 	globalPeriod := GetReservationPeriod(receivedAt.Unix(), m.ChainPaymentState.GetGlobalRatePeriodInterval())
 
-	newUsage, err := m.OffchainStore.UpdateGlobalBin(ctx, globalPeriod, symbolsCharged)
+	newUsage, err := m.MeteringStore.UpdateGlobalBin(ctx, globalPeriod, symbolsCharged)
 	if err != nil {
 		return fmt.Errorf("failed to increment global bin usage: %w", err)
 	}
