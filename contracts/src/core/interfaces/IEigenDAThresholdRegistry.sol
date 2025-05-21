@@ -4,6 +4,8 @@ pragma solidity ^0.8.9;
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 
+/// @notice This interface is a placeholder to accommodate upgrading the threshold registry without having to upgrade the service manager
+///         which inherits this interface. Eventually this contract will be deprecated.
 interface IEigenDAThresholdRegistryBase {
     event VersionedBlobParamsAdded(uint16 indexed version, DATypesV1.VersionedBlobParams versionedBlobParams);
 
