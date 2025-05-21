@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
+	eigendav2store "github.com/Layr-Labs/eigenda-proxy/store/generated_key/v2"
 	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/s3"
 	"github.com/gorilla/mux"
 )
@@ -59,7 +61,7 @@ func (svr *Server) handleGetStdCommitment(w http.ResponseWriter, r *http.Request
 	}
 	versionedCert := certs.NewVersionedCert(serializedCert, certVersion)
 
-	return svr.handleGetShared(r.Context(), w, versionedCert, commitments.StandardCommitmentMode)
+	return svr.handleGetShared(r.Context(), w, r, versionedCert, commitments.StandardCommitmentMode)
 }
 
 // handleGetOPKeccakCommitment handles GET requests for optimism keccak commitments.
@@ -77,7 +79,7 @@ func (svr *Server) handleGetOPKeccakCommitment(w http.ResponseWriter, r *http.Re
 	payload, err := svr.sm.GetOPKeccakValueFromS3(r.Context(), keccakCommitment)
 	if err != nil {
 		err = fmt.Errorf("GET keccakCommitment %v: %w", keccakCommitmentHex, err)
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, s3.ErrKeccakKeyNotFound) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 		} else {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -105,27 +107,47 @@ func (svr *Server) handleGetOPGenericCommitment(w http.ResponseWriter, r *http.R
 	}
 	versionedCert := certs.NewVersionedCert(commitment, certVersion)
 
-	return svr.handleGetShared(r.Context(), w, versionedCert, commitments.OptimismGenericCommitmentMode)
+	return svr.handleGetShared(r.Context(), w, r, versionedCert, commitments.OptimismGenericCommitmentMode)
 }
 
 func (svr *Server) handleGetShared(
 	ctx context.Context,
 	w http.ResponseWriter,
+	r *http.Request,
 	versionedCert certs.VersionedCert,
 	mode commitments.CommitmentMode,
 ) error {
 	serializedCertHex := hex.EncodeToString(versionedCert.SerializedCert)
 	svr.log.Info("Processing GET request", "commitmentMode", mode,
 		"certVersion", versionedCert.Version, "serializedCert", serializedCertHex)
-	input, err := svr.sm.Get(ctx, versionedCert, mode)
+
+	l1InclusionBlockNum, err := parseCommitmentInclusionL1BlockNumQueryParam(r)
+	if err != nil {
+		err = NewGETError(
+			fmt.Errorf("invalid l1_block_number: %w", err),
+			versionedCert.Version, mode)
+		// the inclusion block query param is optional, but if it is provided and invalid, we return a 400 error
+		// to let the client know that they probably have a bug.
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return err
+	}
+	input, err := svr.sm.Get(
+		ctx,
+		versionedCert,
+		mode,
+		common.CertVerificationOpts{L1InclusionBlockNum: l1InclusionBlockNum},
+	)
 	if err != nil {
 		err = NewGETError(
 			fmt.Errorf("get request failed with serializedCert %v: %w", serializedCertHex, err),
-			versionedCert.Version,
-			mode,
-		)
-		if errors.Is(err, ErrNotFound) {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			versionedCert.Version, mode)
+		var rbnRecencyCheckFailedErr eigendav2store.RBNRecencyCheckFailedError
+		if errors.As(err, &rbnRecencyCheckFailedErr) {
+			// We return a 418 TEAPOT error for any cert validation error.
+			// Rollup derivation pipeline should drop any certs that return this error.
+			// See https://github.com/Layr-Labs/optimism/pull/45 for how this is
+			// used in optimism's derivation pipeline.
+			http.Error(w, err.Error(), http.StatusTeapot)
 		} else {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -134,6 +156,25 @@ func (svr *Server) handleGetShared(
 
 	svr.writeResponse(w, input)
 	return nil
+}
+
+// Parses the l1_inclusion_block_number query param from the request.
+// Happy path:
+//   - if the l1_inclusion_block_number is provided, it returns the parsed value.
+//
+// Unhappy paths:
+//   - if the l1_inclusion_block_number is not provided, it returns 0 (whose meaning is to skip the check).
+//   - if the l1_inclusion_block_number is provided but isn't a valid integer, it returns an error.
+func parseCommitmentInclusionL1BlockNumQueryParam(r *http.Request) (uint64, error) {
+	l1BlockNumStr := r.URL.Query().Get("l1_inclusion_block_number")
+	if l1BlockNumStr != "" {
+		l1BlockNum, err := strconv.ParseUint(l1BlockNumStr, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("invalid l1_inclusion_block_number: %w", err)
+		}
+		return l1BlockNum, nil
+	}
+	return 0, nil
 }
 
 // handleGetEigenDADispersalBackend handles the GET request to check the current EigenDA backend used for dispersal.
@@ -260,7 +301,8 @@ func (svr *Server) handlePostShared(
 	// We write the commitment as bytes directly instead of hex encoded.
 	// The spec https://specs.optimism.io/experimental/alt-da.html#da-server says it should be hex-encoded,
 	// but the client expects it to be raw bytes.
-	// See https://github.com/Layr-Labs/optimism/blob/89ac40d0fddba2e06854b253b9f0266f36350af2/op-alt-da/daclient.go#L151
+	// See
+	// https://github.com/Layr-Labs/optimism/blob/89ac40d0fddba2e06854b253b9f0266f36350af2/op-alt-da/daclient.go#L151
 	svr.writeResponse(w, responseCommit)
 	return nil
 }

@@ -289,6 +289,7 @@ func (smb *StorageManagerBuilder) buildEigenDAV2Backend(
 	eigenDAV2Store, err := eigenda_v2.NewStore(
 		smb.log,
 		smb.v2ClientCfg.PutTries,
+		smb.v2ClientCfg.RBNRecencyWindowSize,
 		payloadDisperser,
 		retrievers,
 		certVerifier)

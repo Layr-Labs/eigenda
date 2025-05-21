@@ -12,7 +12,7 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 	"github.com/ethereum/go-ethereum/log"
 
-	"github.com/Layr-Labs/eigenda/api/grpc/common"
+	grpccommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -23,6 +23,10 @@ const (
 )
 
 type Config struct {
+	// Cert verification is optional, and verifies certs retrieved from eigenDA when turned on.
+	// It is optional because it requires making calls to the blockchain, which is not necessarily always possible.
+	// For eg, some rollups are running on sepolia testnet which doesn't have an eigenlayer/eigenda contracts
+	// deployment.
 	VerifyCerts bool
 	// below fields are only required if VerifyCerts is true
 	RPCURL               string
@@ -43,6 +47,13 @@ func (c Config) MarshalJSON() ([]byte, error) {
 	return json.Marshal(aux)
 }
 
+// Verifier verifies the integrity of a blob and its certificate. There are 3 main categories of verification:
+//  1. Blob: properties localized to a single blob, most specifically its commitment
+//  2. Cert: properties wrt the EigenDA network: signatures, quorum thresholds, onchain inclusion, etc.
+//  3. RBN Recency: make sure a cert's l1 inclusion block is not too old.
+//     This check is not currently supported for EigenDA V1. We are only building fully secure
+//     integrations on EigenDA V2.
+//
 // TODO: right now verification and confirmation depth are tightly coupled. we should decouple them
 type Verifier struct {
 	// kzgVerifier is needed to commit blobs to the memstore
@@ -61,19 +72,16 @@ func NewVerifier(cfg *Config, kzgVerifier *kzgverifier.Verifier, l logging.Logge
 	if cfg.VerifyCerts {
 		cv, err = NewCertVerifier(cfg, l)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create cert verifier: %w", err)
+			return nil, fmt.Errorf("new cert verifier: %w", err)
 		}
-		log.Info(
-			"Certificate verification against Ethereum state enabled",
-			"confirmation_depth",
-			cfg.EthConfirmationDepth)
+		log.Info("Certificate verification against Ethereum state enabled",
+			"confirmation_depth", cfg.EthConfirmationDepth)
 	} else {
 		log.Warn("Certificate verification against Ethereum state disabled")
 	}
 
 	return &Verifier{
 		kzgVerifier: kzgVerifier,
-		verifyCerts: cfg.VerifyCerts,
 		cv:          cv,
 		holesky:     isHolesky(cfg.SvcManagerAddr),
 	}, nil
@@ -81,6 +89,7 @@ func NewVerifier(cfg *Config, kzgVerifier *kzgverifier.Verifier, l logging.Logge
 
 // verifies V0 eigenda certificate type
 func (v *Verifier) VerifyCert(ctx context.Context, cert *Certificate) error {
+	// Skip the below checks if cert verification is disabled
 	if !v.verifyCerts {
 		return nil
 	}
@@ -96,7 +105,8 @@ func (v *Verifier) VerifyCert(ctx context.Context, cert *Certificate) error {
 		cert.Proof().GetInclusionProof(),
 		cert.BatchHeaderRoot(),
 		cert.Proof().GetBlobIndex(),
-		cert.ReadBlobHeader())
+		cert.ReadBlobHeader(),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to verify merkle proof: %w", err)
 	}
@@ -138,7 +148,7 @@ func (v *Verifier) Commit(blob []byte) (*bn254.G1Affine, error) {
 // Verify regenerates a commitment from the blob and asserts equivalence
 // to the commitment in the certificate
 // TODO: Optimize implementation by opening a point on the commitment instead
-func (v *Verifier) VerifyCommitment(certCommitment *common.G1Commitment, blob []byte) error {
+func (v *Verifier) VerifyCommitment(certCommitment *grpccommon.G1Commitment, blob []byte) error {
 	actualCommit, err := v.Commit(blob)
 	if err != nil {
 		return err

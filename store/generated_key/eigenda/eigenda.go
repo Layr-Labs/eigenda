@@ -181,6 +181,8 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to verify commitment: %w", err)
 	}
 
+	// The cert will only be included in the batcher's inbox after
+	// the proxy returns the verified cert to the batcher.
 	err = e.verifier.VerifyCert(ctx, cert)
 	if err != nil {
 		if errors.Is(err, verify.ErrBatchMetadataHashMismatch) {
@@ -214,7 +216,7 @@ func (e Store) BackendType() common.BackendType {
 
 // Key is used to recover certificate fields and that verifies blob
 // against commitment to ensure data is valid and non-tampered.
-func (e Store) Verify(ctx context.Context, serializedCert []byte, payload []byte) error {
+func (e Store) Verify(ctx context.Context, serializedCert []byte, payload []byte, _ common.CertVerificationOpts) error {
 	var cert verify.Certificate
 	err := rlp.DecodeBytes(serializedCert, &cert)
 	if err != nil {

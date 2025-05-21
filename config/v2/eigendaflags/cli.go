@@ -34,6 +34,7 @@ var (
 	EthRPCURLFlagName                 = withFlagPrefix("eth-rpc")
 	MaxBlobLengthFlagName             = withFlagPrefix("max-blob-length")
 	NetworkFlagName                   = withFlagPrefix("network")
+	RBNRecencyWindowSizeFlagName      = withFlagPrefix("rbn-recency-window-size")
 )
 
 func withFlagPrefix(s string) string {
@@ -43,6 +44,8 @@ func withFlagPrefix(s string) string {
 func withEnvPrefix(envPrefix, s string) string {
 	return envPrefix + "_EIGENDA_V2_" + s
 }
+
+// nolint: funlen
 func CLIFlags(envPrefix, category string) []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
@@ -161,7 +164,7 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 		&cli.UintFlag{
 			Name: BlobParamsVersionFlagName,
 			Usage: `Blob params version used when dispersing. This refers to a global version maintained by EigenDA
-						governance and is injected in the BlobHeader before dispersing. Currently only supports (0).`,
+governance and is injected in the BlobHeader before dispersing. Currently only supports (0).`,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "BLOB_PARAMS_VERSION")},
 			Category: category,
 			Value:    uint(0),
@@ -170,8 +173,8 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 		&cli.StringFlag{
 			Name: MaxBlobLengthFlagName,
 			Usage: `Maximum blob length to be written or read from EigenDA. Determines the number of SRS points
-						loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. Maximum size
-						slightly exceeds 1GB.`,
+loaded into memory for KZG commitments. Example units: '30MiB', '4Kb', '30MB'. Maximum size
+slightly exceeds 1GB.`,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "MAX_BLOB_LENGTH")},
 			Value:    "16MiB",
 			Category: category,
@@ -179,10 +182,10 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 		&cli.StringFlag{
 			Name: NetworkFlagName,
 			Usage: fmt.Sprintf(`The EigenDA network that is being used. This is an optional flag, to configure
-						default values for %s, %s, %s, and %s. If all of these fields are explicitly configured, the
-						network flag may be omitted. If some or all of these fields are configured, and the network
-						is also configured, then the explicitly defined field values will take precedence. Permitted
-						EigenDANetwork values include %s, and %s.`,
+default values for %s, %s, %s, and %s. If all of these fields are explicitly configured, the
+network flag may be omitted. If some or all of these fields are configured, and the network
+is also configured, then the explicitly defined field values will take precedence. Permitted
+EigenDANetwork values include %s, and %s.`,
 				DisperserFlagName,
 				CertVerifierAddrFlagName,
 				ServiceManagerAddrFlagName,
@@ -190,6 +193,17 @@ func CLIFlags(envPrefix, category string) []cli.Flag {
 				common.HoleskyTestnetEigenDANetwork,
 				common.HoleskyPreprodEigenDANetwork),
 			EnvVars:  []string{withEnvPrefix(envPrefix, "NETWORK")},
+			Category: category,
+		},
+		&cli.Uint64Flag{
+			Name: RBNRecencyWindowSizeFlagName,
+			Usage: `Allowed distance (in L1 blocks) between the eigenDA cert's reference 
+block number (RBN) and the L1 block number at which the cert was included 
+in the rollup's batch inbox. If certL1InclusionBlock > cert.RBN + rbnRecencyWindowSize, 
+the cert is considered stale and verification will fail. This check is 
+optional and will be skipped when set to 0.`,
+			Value:    0,
+			EnvVars:  []string{withEnvPrefix(envPrefix, "RBN_RECENCY_WINDOW_SIZE")},
 			Category: category,
 		},
 	}
@@ -246,20 +260,21 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 	}
 
 	return common.ClientConfigV2{
-		DisperserClientCfg:            disperserConfig,
-		PayloadDisperserCfg:           readPayloadDisperserCfg(ctx),
-		RelayPayloadRetrieverCfg:      readRelayRetrievalConfig(ctx),
-		ValidatorPayloadRetrieverCfg:  readValidatorRetrievalConfig(ctx),
-		PutTries:                      ctx.Int(PutRetriesFlagName),
-		MaxBlobSizeBytes:              maxBlobLengthBytes,
-		EigenDACertVerifierAddress:    certVerifierAddress,
-		BLSOperatorStateRetrieverAddr: blsOperatorStateRetrieverAddress,
-		EigenDAServiceManagerAddr:     serviceManagerAddress,
+		DisperserClientCfg:           disperserConfig,
+		PayloadDisperserCfg:          readPayloadDisperserCfg(ctx),
+		RelayPayloadRetrieverCfg:     readRelayRetrievalConfig(ctx),
+		ValidatorPayloadRetrieverCfg: readValidatorRetrievalConfig(ctx),
+		PutTries:                     ctx.Int(PutRetriesFlagName),
+		MaxBlobSizeBytes:             maxBlobLengthBytes,
+		EigenDACertVerifierAddress:   certVerifierAddress,
 		// we don't expose this configuration to users, as all production use cases should have
 		// both retrieval methods enabled. This could be exposed in the future, if necessary.
 		// Note the order of these retrievers, which is significant: the relay retriever will be
 		// tried first, and the validator retriever will only be tried if the relay retriever fails
-		RetrieversToEnable: []common.RetrieverType{common.RelayRetrieverType, common.ValidatorRetrieverType},
+		RetrieversToEnable:            []common.RetrieverType{common.RelayRetrieverType, common.ValidatorRetrieverType},
+		BLSOperatorStateRetrieverAddr: blsOperatorStateRetrieverAddress,
+		EigenDAServiceManagerAddr:     serviceManagerAddress,
+		RBNRecencyWindowSize:          ctx.Uint64(RBNRecencyWindowSizeFlagName),
 	}, nil
 }
 

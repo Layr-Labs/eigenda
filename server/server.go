@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -18,10 +17,6 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
-)
-
-var (
-	ErrNotFound = errors.New("not found")
 )
 
 type Server struct {

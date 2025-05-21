@@ -44,18 +44,18 @@ func (m *MockIManager) EXPECT() *MockIManagerMockRecorder {
 }
 
 // Get mocks base method.
-func (m *MockIManager) Get(ctx context.Context, versionedCert certs.VersionedCert, cm commitments.CommitmentMode) ([]byte, error) {
+func (m *MockIManager) Get(ctx context.Context, versionedCert certs.VersionedCert, cm commitments.CommitmentMode, verifyOpts common.CertVerificationOpts) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", ctx, versionedCert, cm)
+	ret := m.ctrl.Call(m, "Get", ctx, versionedCert, cm, verifyOpts)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockIManagerMockRecorder) Get(ctx, versionedCert, cm any) *gomock.Call {
+func (mr *MockIManagerMockRecorder) Get(ctx, versionedCert, cm, verifyOpts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockIManager)(nil).Get), ctx, versionedCert, cm)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockIManager)(nil).Get), ctx, versionedCert, cm, verifyOpts)
 }
 
 // GetDispersalBackend mocks base method.

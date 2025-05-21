@@ -44,6 +44,7 @@ type CertVerifier struct {
 }
 
 func NewCertVerifier(cfg *Config, log logging.Logger) (*CertVerifier, error) {
+	log.Info("Enabling certificate verification", "confirmation_depth", cfg.EthConfirmationDepth)
 	if cfg.EthConfirmationDepth >= uint64(consts.EthHappyPathFinalizationDepthBlocks) {
 		// We keep this low (<128) to avoid requiring an archive node.
 		return nil, fmt.Errorf(
@@ -186,9 +187,9 @@ func (cv *CertVerifier) getConfDeepBlockNumber(ctx context.Context) (*big.Int, e
 	return new(big.Int).SetUint64(blockNumber - cv.ethConfirmationDepth), nil
 }
 
-// retrieveBatchMetadataHash retrieves the batch metadata hash stored on-chain at a specific blockNumber for a given
-// batchID
-// returns an error if some problem calling the contract happens, or the hash is not found.
+// retrieveBatchMetadataHash retrieves the batch metadata hash stored on-chain
+// at a specific blockNumber for a given batchID.
+// Returns an error if some problem calling the contract happens, or the hash is not found.
 // We make an eth_call to the EigenDAServiceManager at the given blockNumber to retrieve the hash.
 // Therefore, make sure that blockNumber is <128 blocks behind the latest block, to avoid requiring an archive node.
 // This is currently enforced by having EthConfirmationDepth be <64.

@@ -64,8 +64,11 @@ func validCfg() ProxyConfig {
 			MaxBlobSizeBytes:              maxBlobLengthBytes,
 			BLSOperatorStateRetrieverAddr: "0x000000000004324311",
 			EigenDAServiceManagerAddr:     "0x000000000005324322",
-			RetrieversToEnable:            []common.RetrieverType{common.RelayRetrieverType, common.ValidatorRetrieverType},
-			PutTries:                      3,
+			RetrieversToEnable: []common.RetrieverType{
+				common.RelayRetrieverType,
+				common.ValidatorRetrieverType,
+			},
+			PutTries: 3,
 		},
 		StorageConfig: store.Config{
 			BackendsToEnable: []common.EigenDABackend{common.V1EigenDABackend, common.V2EigenDABackend},

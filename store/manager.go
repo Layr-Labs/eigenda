@@ -20,7 +20,8 @@ type IManager interface {
 	// See [Manager.Put]
 	Put(ctx context.Context, cm commitments.CommitmentMode, key, value []byte) ([]byte, error)
 	// See [Manager.Get]
-	Get(ctx context.Context, versionedCert certs.VersionedCert, cm commitments.CommitmentMode) ([]byte, error)
+	Get(ctx context.Context, versionedCert certs.VersionedCert,
+		cm commitments.CommitmentMode, verifyOpts common.CertVerificationOpts) ([]byte, error)
 	// See [Manager.SetDispersalBackend]
 	SetDispersalBackend(backend common.EigenDABackend)
 	// See [Manager.GetDispersalBackend]
@@ -92,10 +93,12 @@ func NewManager(
 	return manager, nil
 }
 
-// Get ... fetches a value from a storage backend based on the (commitment mode, type)
+// Get fetches a value from a storage backend based on the (commitment mode, type).
+// It also validates the value retrieved and returns an error if the value is invalid.
 func (m *Manager) Get(ctx context.Context,
 	versionedCert certs.VersionedCert,
 	cm commitments.CommitmentMode,
+	verifyOpts common.CertVerificationOpts,
 ) ([]byte, error) {
 	switch cm {
 	case commitments.StandardCommitmentMode, commitments.OptimismGenericCommitmentMode:
@@ -114,7 +117,7 @@ func (m *Manager) Get(ctx context.Context,
 		// 1 - read blob from cache if enabled
 		if m.secondary.CachingEnabled() {
 			m.log.Debug("Retrieving data from cached backends")
-			data, err := m.secondary.MultiSourceRead(ctx, versionedCert.SerializedCert, false, verifyMethod)
+			data, err := m.secondary.MultiSourceRead(ctx, versionedCert.SerializedCert, false, verifyMethod, verifyOpts)
 			if err == nil {
 				return data, nil
 			}
@@ -123,7 +126,7 @@ func (m *Manager) Get(ctx context.Context,
 		}
 
 		// 2 - read blob from EigenDA
-		data, err := m.getFromCorrectEigenDABackend(ctx, versionedCert)
+		data, err := m.getFromCorrectEigenDABackend(ctx, versionedCert, verifyOpts)
 		if err == nil {
 			return data, nil
 		}
@@ -132,7 +135,7 @@ func (m *Manager) Get(ctx context.Context,
 
 		// 3 - read blob from fallbacks if enabled and data is non-retrievable from EigenDA
 		if m.secondary.FallbackEnabled() {
-			data, err = m.secondary.MultiSourceRead(ctx, versionedCert.SerializedCert, true, verifyMethod)
+			data, err = m.secondary.MultiSourceRead(ctx, versionedCert.SerializedCert, true, verifyMethod, verifyOpts)
 			if err != nil {
 				m.log.Error("Failed to read from fallback targets", "err", err)
 				return nil, err
@@ -190,7 +193,7 @@ func (m *Manager) Put(ctx context.Context, cm commitments.CommitmentMode, key, v
 
 // getVerifyMethod returns the correct verify method based on commitment type
 func (m *Manager) getVerifyMethod(commitmentType certs.VersionByte) (
-	func(context.Context, []byte, []byte) error,
+	func(context.Context, []byte, []byte, common.CertVerificationOpts) error,
 	error,
 ) {
 	switch commitmentType {
@@ -231,6 +234,7 @@ func (m *Manager) putToCorrectEigenDABackend(ctx context.Context, value []byte) 
 func (m *Manager) getFromCorrectEigenDABackend(
 	ctx context.Context,
 	versionedCert certs.VersionedCert,
+	verifyOpts common.CertVerificationOpts,
 ) ([]byte, error) {
 	switch versionedCert.Version {
 	case certs.V0VersionByte:
@@ -238,7 +242,7 @@ func (m *Manager) getFromCorrectEigenDABackend(
 		data, err := m.eigenda.Get(ctx, versionedCert.SerializedCert)
 		if err == nil {
 			// verify v1 (payload, cert)
-			err = m.eigenda.Verify(ctx, versionedCert.SerializedCert, data)
+			err = m.eigenda.Verify(ctx, versionedCert.SerializedCert, data, verifyOpts)
 			if err != nil {
 				return nil, err
 			}
@@ -250,7 +254,7 @@ func (m *Manager) getFromCorrectEigenDABackend(
 	case certs.V1VersionByte:
 		// The cert must be verified before attempting to get the data, since the GET logic
 		// assumes the cert is valid. Verify v2 doesn't require a payload.
-		err := m.eigendaV2.Verify(ctx, versionedCert.SerializedCert, nil)
+		err := m.eigendaV2.Verify(ctx, versionedCert.SerializedCert, nil, verifyOpts)
 		if err != nil {
 			return nil, fmt.Errorf("verify EigenDACert: %w", err)
 		}

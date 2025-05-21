@@ -27,20 +27,28 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 		withLogging(withMetrics(svr.handleGetStdCommitment, svr.m, commitments.StandardCommitmentMode), svr.log),
 	).Queries("commitment_mode", "standard")
 	// op keccak256 commitments (write to S3)
-	subrouterGET.HandleFunc("/"+
-		"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
-		"{"+routingVarNameCommitTypeByteHex+":00}"+ // 00 for keccak256 commitments
-		"{"+routingVarNameKeccakCommitmentHex+"}",
-		withLogging(withMetrics(svr.handleGetOPKeccakCommitment, svr.m, commitments.OptimismKeccakCommitmentMode), svr.log),
+	subrouterGET.HandleFunc(
+		"/"+
+			"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
+			"{"+routingVarNameCommitTypeByteHex+":00}"+ // 00 for keccak256 commitments
+			"{"+routingVarNameKeccakCommitmentHex+"}",
+		withLogging(
+			withMetrics(svr.handleGetOPKeccakCommitment, svr.m, commitments.OptimismKeccakCommitmentMode),
+			svr.log,
+		),
 	)
 	// op generic commitments (write to EigenDA)
-	subrouterGET.HandleFunc("/"+
-		"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
-		"{"+routingVarNameCommitTypeByteHex+":01}"+ // 01 for generic commitments
-		"{da_layer_byte:[0-9a-fA-F]{2}}"+ // should always be 0x00 for eigenDA but we let others through to return a 404
-		"{"+routingVarNameVersionByteHex+":[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a 404
-		"{"+routingVarNamePayloadHex+"}",
-		withLogging(withMetrics(svr.handleGetOPGenericCommitment, svr.m, commitments.OptimismGenericCommitmentMode), svr.log),
+	subrouterGET.HandleFunc(
+		"/"+
+			"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
+			"{"+routingVarNameCommitTypeByteHex+":01}"+ // 01 for generic commitments
+			"{da_layer_byte:[0-9a-fA-F]{2}}"+ // should always be 0x00 for eigenDA but we let others through to return a 404
+			"{"+routingVarNameVersionByteHex+":[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a 404
+			"{"+routingVarNamePayloadHex+"}",
+		withLogging(
+			withMetrics(svr.handleGetOPGenericCommitment, svr.m, commitments.OptimismGenericCommitmentMode),
+			svr.log,
+		),
 	)
 	// unrecognized op commitment type (not 00 or 01)
 	subrouterGET.HandleFunc("/"+
@@ -63,18 +71,30 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 		withLogging(withMetrics(svr.handlePostStdCommitment, svr.m, commitments.StandardCommitmentMode), svr.log),
 	).Queries("commitment_mode", "standard")
 	// op keccak256 commitments (write to S3)
-	subrouterPOST.HandleFunc("/"+
-		"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
-		"{"+routingVarNameCommitTypeByteHex+":00}"+ // 00 for keccak256 commitments
-		"{"+routingVarNameKeccakCommitmentHex+"}",
-		withLogging(withMetrics(svr.handlePostOPKeccakCommitment, svr.m, commitments.OptimismKeccakCommitmentMode), svr.log),
+	subrouterPOST.HandleFunc(
+		"/"+
+			"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
+			"{"+routingVarNameCommitTypeByteHex+":00}"+ // 00 for keccak256 commitments
+			"{"+routingVarNameKeccakCommitmentHex+"}",
+		withLogging(
+			withMetrics(svr.handlePostOPKeccakCommitment, svr.m, commitments.OptimismKeccakCommitmentMode),
+			svr.log,
+		),
 	)
 	// op generic commitments (write to EigenDA)
-	subrouterPOST.HandleFunc("", // commitment is calculated by the server using the body data
-		withLogging(withMetrics(svr.handlePostOPGenericCommitment, svr.m, commitments.OptimismGenericCommitmentMode), svr.log),
+	subrouterPOST.HandleFunc(
+		"", // commitment is calculated by the server using the body data
+		withLogging(
+			withMetrics(svr.handlePostOPGenericCommitment, svr.m, commitments.OptimismGenericCommitmentMode),
+			svr.log,
+		),
 	)
-	subrouterPOST.HandleFunc("/", // commitment is calculated by the server using the body data
-		withLogging(withMetrics(svr.handlePostOPGenericCommitment, svr.m, commitments.OptimismGenericCommitmentMode), svr.log),
+	subrouterPOST.HandleFunc(
+		"/", // commitment is calculated by the server using the body data
+		withLogging(
+			withMetrics(svr.handlePostOPGenericCommitment, svr.m, commitments.OptimismGenericCommitmentMode),
+			svr.log,
+		),
 	)
 
 	r.HandleFunc("/health", withLogging(svr.handleHealth, svr.log)).Methods("GET")

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
-	"github.com/Layr-Labs/eigenda/api/grpc/common"
+	grpccommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
@@ -26,7 +26,7 @@ func TestCommitmentVerification(t *testing.T) {
 	y, err := hex.DecodeString("02efa5a7813233ae13f32bae9b8f48252fa45c1b06a5d70bed471a9bea8d98ae")
 	require.NoError(t, err)
 
-	c := &common.G1Commitment{
+	c := &grpccommon.G1Commitment{
 		X: x,
 		Y: y,
 	}
@@ -101,7 +101,7 @@ func TestCommitmentWithTooLargeBlob(t *testing.T) {
 	y, err := hex.DecodeString("02efa5a7813233ae13f32bae9b8f48252fa45c1b06a5d70bed471a9bea8d98ae")
 	require.NoError(t, err)
 
-	c := &common.G1Commitment{
+	c := &grpccommon.G1Commitment{
 		X: x,
 		Y: y,
 	}

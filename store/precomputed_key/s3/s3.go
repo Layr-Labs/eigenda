@@ -13,8 +13,8 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/minio/minio-go/v7"
 
+	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
@@ -23,6 +23,10 @@ const (
 	CredentialTypeIAM     CredentialType = "iam"
 	CredentialTypePublic  CredentialType = "public"
 	CredentialTypeUnknown CredentialType = "unknown"
+)
+
+var (
+	ErrKeccakKeyNotFound = errors.New("OP Keccak key not found in S3 bucket")
 )
 
 func StringToCredentialType(s string) CredentialType {
@@ -107,8 +111,10 @@ func (s *Store) Get(ctx context.Context, key []byte) ([]byte, error) {
 	)
 	if err != nil {
 		errResponse := minio.ToErrorResponse(err)
+		// minio-go doesn't seem to define an error code enum... so we just use the "NoSuchKey" string manually.
+		// See https://github.com/minio/minio-go/blob/5d96728978e67e3dca618a76cbbad47cc313a45f/s3-error.go#L39
 		if errResponse.Code == "NoSuchKey" {
-			return nil, errors.New("value not found in s3 bucket")
+			return nil, ErrKeccakKeyNotFound
 		}
 		return nil, err
 	}
