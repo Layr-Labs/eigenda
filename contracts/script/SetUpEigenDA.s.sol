@@ -193,7 +193,8 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         vm.serializeAddress(output, "operatorStateRetriever", address(operatorStateRetriever));
         vm.serializeAddress(output, "blsApkRegistry", address(apkRegistry));
         vm.serializeAddress(output, "registryCoordinator", address(registryCoordinator));
-        vm.serializeAddress(output, "legacyV2CertVerifier", address(eigenDACertVerifier));
+        vm.serializeAddress(output, "eigenDALegacyCertVerifier", address(legacyEigenDACertVerifier));
+        vm.serializeAddress(output, "eigenDACertVerifier", address(eigenDACertVerifier));
         vm.serializeAddress(output, "eigenDACertVerifierRouter", address(eigenDACertVerifierRouter));
 
         string memory finalJson = vm.serializeString(output, "object", output);
