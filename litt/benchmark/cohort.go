@@ -6,6 +6,9 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/litt/util"
@@ -97,9 +100,14 @@ func NewCohort(
 	return cohort, nil
 }
 
-func LoadCohort(
-	parentDirectory string,
-	cohortIndex uint64) (*Cohort, error) {
+func LoadCohort(path string) (*Cohort, error) {
+
+	parentDirectory := filepath.Dir(path)
+	indexString := strings.Replace(filepath.Base(path), CohortFileExtension, "", 1)
+	cohortIndex, err := strconv.ParseUint(indexString, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse cohort file %s: %w", path, err)
+	}
 
 	cohort := &Cohort{
 		parentDirectory: parentDirectory,
@@ -235,7 +243,7 @@ func (c *Cohort) GetKeyIndexForReading(rand *rand.Rand) (uint64, error) {
 // is said to have expired when it is possible that at least one key in the cohort may be deleted from the DB
 // due to the TTL.
 func (c *Cohort) MarkComplete() error {
-	if c.allValuesWritten == true {
+	if c.allValuesWritten {
 		return fmt.Errorf("cannot mark cohort complete: cohort is already complete")
 	}
 	if c.loadedFromDisk {

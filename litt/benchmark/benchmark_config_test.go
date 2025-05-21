@@ -15,8 +15,7 @@ func TestLoadConfig(t *testing.T) {
 	testConfigJSON := `{
 		"MetadataDirectory": "/test/dir",
 		"MaximumThroughputMB": 20.0,
-		"AverageValueSizeMB": 3.0,
-		"ValueSizeStandardDeviationMB": 0.5,
+		"ValueSizeMB": 3.0,
 		"BatchSizeMB": 15,
 		"BatchParallelism": 5
 	}`
@@ -27,12 +26,11 @@ func TestLoadConfig(t *testing.T) {
 
 	// Expected config for comparison
 	expectedConfig := &BenchmarkConfig{
-		MetadataDirectory:            "/test/dir",
-		MaximumThroughputMB:          20.0,
-		AverageValueSizeMB:           3.0,
-		ValueSizeStandardDeviationMB: 0.5,
-		BatchSizeMB:                  15,
-		BatchParallelism:             5,
+		MetadataDirectory:   "/test/dir",
+		MaximumThroughputMB: 20.0,
+		ValueSizeMB:         3.0,
+		BatchSizeMB:         15,
+		BatchParallelism:    5,
 	}
 
 	// Test loading the config
@@ -40,8 +38,7 @@ func TestLoadConfig(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expectedConfig.MetadataDirectory, loadedConfig.MetadataDirectory)
 	require.Equal(t, expectedConfig.MaximumThroughputMB, loadedConfig.MaximumThroughputMB)
-	require.Equal(t, expectedConfig.AverageValueSizeMB, loadedConfig.AverageValueSizeMB)
-	require.Equal(t, expectedConfig.ValueSizeStandardDeviationMB, loadedConfig.ValueSizeStandardDeviationMB)
+	require.Equal(t, expectedConfig.ValueSizeMB, loadedConfig.ValueSizeMB)
 	require.Equal(t, expectedConfig.BatchSizeMB, loadedConfig.BatchSizeMB)
 	require.Equal(t, expectedConfig.BatchParallelism, loadedConfig.BatchParallelism)
 

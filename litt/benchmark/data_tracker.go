@@ -3,8 +3,11 @@ package benchmark
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/rand"
+	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/docker/go-units"
@@ -82,20 +85,24 @@ type DataTracker struct {
 
 // NewDataTracker creates a new DataTracker instance, loading all relevant cohorts from disk.
 func NewDataTracker(ctx context.Context, config *BenchmarkConfig) (*DataTracker, error) {
-
-	// TODO load cohorts from disk
-
 	cohortDirectory := path.Join(config.MetadataDirectory, "cohorts")
-	cohorts := make(map[uint64]*Cohort)
+
+	lowestCohortIndex, highestCohortIndex, cohorts, err := gatherCohorts(cohortDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to gather cohorts: %w", err)
+	}
+
 	completeCohortSet := make(map[uint64]struct{})
-	lowestCohortIndex := uint64(0)
-	highestCohortIndex := uint64(0)
+	for i := lowestCohortIndex; i <= highestCohortIndex; i++ {
+		if cohorts[i].IsComplete() {
+			completeCohortSet[i] = struct{}{}
+		}
+	}
 
 	valueSize := uint64(config.ValueSizeMB * float64(units.MiB))
 
 	// Create an initial active cohort.
 	var activeCohort *Cohort
-	var err error
 	if len(cohorts) == 0 {
 		// Starting fresh, create a new cohort starting from key index 0.
 		activeCohort, err = NewCohort(
@@ -148,6 +155,68 @@ func NewDataTracker(ctx context.Context, config *BenchmarkConfig) (*DataTracker,
 	go tracker.dataGenerator()
 
 	return tracker, nil
+}
+
+func gatherCohorts(path string) (
+	lowestCohortIndex uint64,
+	highestCohortIndex uint64,
+	cohorts map[uint64]*Cohort,
+	err error) {
+
+	cohorts = make(map[uint64]*Cohort)
+
+	// walk over files in path
+	// for each file, check if it is a cohort file
+	// if it is, load the cohort and add it to the map
+	// if it is not, ignore it
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return 0,
+			0,
+			nil,
+			fmt.Errorf("failed to read directory: %w", err)
+	}
+
+	lowestCohortIndex = math.MaxUint64
+	highestCohortIndex = 0
+
+	for _, file := range files {
+		fileName := file.Name()
+
+		if strings.HasSuffix(fileName, CohortFileExtension) {
+			cohort, err := LoadCohort(path)
+			if err != nil {
+				return 0,
+					0,
+					nil,
+					fmt.Errorf("failed to load cohort: %w", err)
+			}
+			cohorts[cohort.CohortIndex()] = cohort
+
+			if cohort.CohortIndex() < lowestCohortIndex {
+				lowestCohortIndex = cohort.CohortIndex()
+			}
+			if cohort.cohortIndex > highestCohortIndex {
+				highestCohortIndex = cohort.cohortIndex
+			}
+		} else if strings.HasSuffix(fileName, CohortSwapFileExtension) {
+			// Delete any swap files discovered
+			err = os.Remove(fileName)
+			if err != nil {
+				return 0,
+					0,
+					nil,
+					fmt.Errorf("failed to delete swap file: %w", err)
+			}
+		}
+	}
+
+	if len(cohorts) == 0 {
+		// Special case, no cohorts found.
+		return 0, 0, cohorts, nil
+	}
+
+	return lowestCohortIndex, highestCohortIndex, cohorts, nil
 }
 
 // GetWriteInfo returns information required to perform a write operation. It returns the key index (which is needed to
