@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/docker/go-units"
 )
 
@@ -87,15 +88,30 @@ type DataTracker struct {
 func NewDataTracker(ctx context.Context, config *BenchmarkConfig) (*DataTracker, error) {
 	cohortDirectory := path.Join(config.MetadataDirectory, "cohorts")
 
+	// Create the cohort directory if it doesn't exist.
+	exists, err := util.Exists(cohortDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if cohort directory exists: %w", err)
+	}
+	if !exists {
+		err = os.MkdirAll(cohortDirectory, os.ModePerm)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create cohort directory: %w", err)
+		}
+	}
+
 	lowestCohortIndex, highestCohortIndex, cohorts, err := gatherCohorts(cohortDirectory)
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather cohorts: %w", err)
 	}
 
+	// Gather the set of complete cohorts. These are the cohorts we can read from.
 	completeCohortSet := make(map[uint64]struct{})
-	for i := lowestCohortIndex; i <= highestCohortIndex; i++ {
-		if cohorts[i].IsComplete() {
-			completeCohortSet[i] = struct{}{}
+	if len(cohorts) != 0 {
+		for i := lowestCohortIndex; i <= highestCohortIndex; i++ {
+			if cohorts[i].IsComplete() {
+				completeCohortSet[i] = struct{}{}
+			}
 		}
 	}
 
@@ -150,6 +166,7 @@ func NewDataTracker(ctx context.Context, config *BenchmarkConfig) (*DataTracker,
 		highestCohortBeingWrittenIndex: highestCohortIndex, // only the active cohort initially being written
 		safeTTL:                        safeTTL,
 		valueSize:                      valueSize,
+		generator:                      NewDataGenerator(config.Seed, config.RandomPoolSize),
 	}
 
 	go tracker.dataGenerator()
@@ -157,7 +174,7 @@ func NewDataTracker(ctx context.Context, config *BenchmarkConfig) (*DataTracker,
 	return tracker, nil
 }
 
-func gatherCohorts(path string) (
+func gatherCohorts(cohortDirPath string) (
 	lowestCohortIndex uint64,
 	highestCohortIndex uint64,
 	cohorts map[uint64]*Cohort,
@@ -169,7 +186,7 @@ func gatherCohorts(path string) (
 	// for each file, check if it is a cohort file
 	// if it is, load the cohort and add it to the map
 	// if it is not, ignore it
-	files, err := os.ReadDir(path)
+	files, err := os.ReadDir(cohortDirPath)
 	if err != nil {
 		return 0,
 			0,
@@ -181,10 +198,10 @@ func gatherCohorts(path string) (
 	highestCohortIndex = 0
 
 	for _, file := range files {
-		fileName := file.Name()
+		filePath := path.Join(cohortDirPath, file.Name())
 
-		if strings.HasSuffix(fileName, CohortFileExtension) {
-			cohort, err := LoadCohort(path)
+		if strings.HasSuffix(filePath, CohortFileExtension) {
+			cohort, err := LoadCohort(filePath)
 			if err != nil {
 				return 0,
 					0,
@@ -199,9 +216,9 @@ func gatherCohorts(path string) (
 			if cohort.cohortIndex > highestCohortIndex {
 				highestCohortIndex = cohort.cohortIndex
 			}
-		} else if strings.HasSuffix(fileName, CohortSwapFileExtension) {
+		} else if strings.HasSuffix(filePath, CohortSwapFileExtension) {
 			// Delete any swap files discovered
-			err = os.Remove(fileName)
+			err = os.Remove(filePath)
 			if err != nil {
 				return 0,
 					0,
@@ -326,6 +343,7 @@ func (t *DataTracker) generateNextWriteInfo() *WriteInfo {
 			panic(fmt.Sprintf("failed to generate next cohort for highest cohort: %v", err)) // TODO not clean
 		}
 		t.highestCohortIndex = t.activeCohort.CohortIndex()
+		t.cohorts[t.highestCohortIndex] = t.activeCohort
 	}
 
 	keyIndex, err := t.activeCohort.GetKeyIndexForWriting()
@@ -342,16 +360,17 @@ func (t *DataTracker) generateNextWriteInfo() *WriteInfo {
 
 // generateNextReadInfo generates the next read info to be placed into the readInfoChan.
 func (t *DataTracker) generateNextReadInfo() *ReadInfo {
+	if len(t.completeCohortSet) == 0 {
+		// No cohorts are complete, so we can't read anything.
+		return nil
+	}
+
 	var cohortIndexToRead uint64
 	for cohortIndexToRead = range t.completeCohortSet {
 		// map iteration is random in golang, so this will yield a random complete cohort.
 		break
 	}
-	cohortToRead, ok := t.cohorts[cohortIndexToRead]
-	if !ok {
-		// This cohort has been removed from the set of complete cohorts.
-		return nil
-	}
+	cohortToRead := t.cohorts[cohortIndexToRead]
 
 	keyIndex, err := cohortToRead.GetKeyIndexForReading(t.rand)
 	if err != nil {
@@ -377,6 +396,8 @@ func (t *DataTracker) DoCohortGC() {
 				panic(fmt.Sprintf("failed to delete expired cohort: %v", err)) // TODO not clean
 			}
 			t.lowestCohortIndex++
+			delete(t.cohorts, cohort.CohortIndex())
+			delete(t.completeCohortSet, cohort.CohortIndex())
 		}
 	}
 

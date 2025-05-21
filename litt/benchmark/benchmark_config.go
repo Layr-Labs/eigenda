@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Layr-Labs/eigenda/litt"
+	"github.com/docker/go-units"
 )
 
 // BenchmarkConfig is a struct that holds the configuration for the benchmark.
@@ -49,6 +50,15 @@ type BenchmarkConfig struct {
 
 	// If data is within this many minutes of its expiration time, it will not be read.
 	ReadSafetyMarginMinutes float64
+
+	// A seed for the random number generator used to generate keys and values. When restarting the benchmark,
+	// it's important to always use the same seed.
+	Seed int64
+
+	// The size of the pool of random data. Instead of generating random data for each key/value pair
+	// (which is expensive), data from this pool is reused. When restarting the benchmark,
+	// it's important to always use the same pool size.
+	RandomPoolSize uint64
 }
 
 // DefaultBenchmarkConfig returns a default BenchmarkConfig with the given data paths.
@@ -66,6 +76,8 @@ func DefaultBenchmarkConfig() *BenchmarkConfig {
 		CohortSize:              1024,
 		TTLHours:                1.0,
 		ReadSafetyMarginMinutes: 5.0,
+		Seed:                    1337,
+		RandomPoolSize:          units.GiB,
 	}
 }
 
