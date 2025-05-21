@@ -64,6 +64,7 @@ type Node struct {
 	Metrics                 *Metrics
 	NodeApi                 *nodeapi.NodeApi
 	Store                   *Store
+	BlacklistStore          *BlacklistStore
 	ValidatorStore          ValidatorStore
 	ChainState              core.ChainState
 	Validator               core.ShardValidator
@@ -180,7 +181,7 @@ func NewNode(
 		}
 		storeDurationBlocks = storeDuration
 	}
-	// Create new store
+	// Create new chunk store
 	store, err := NewLevelDBStore(
 		config.DbPath+"/chunk",
 		logger,
@@ -191,6 +192,15 @@ func NewNode(
 		storeDurationBlocks)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new store: %w", err)
+	}
+
+	blacklistStore, err := NewLevelDBBlacklistStore(
+		config.DbPath+"/blacklist",
+		logger,
+		config.LevelDBDisableSeeksCompactionV1,
+		config.LevelDBSyncWritesV1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new blacklist store: %w", err)
 	}
 
 	eigenDAServiceManagerAddr := gethcommon.HexToAddress(config.EigenDAServiceManagerAddr)
@@ -227,6 +237,7 @@ func NewNode(
 		Metrics:                 metrics,
 		NodeApi:                 nodeApi,
 		Store:                   store,
+		BlacklistStore:          blacklistStore,
 		ChainState:              cst,
 		Transactor:              tx,
 		Validator:               validator,
