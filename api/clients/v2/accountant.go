@@ -26,7 +26,7 @@ type Accountant struct {
 
 	// local accounting
 	// contains 3 bins; circular wrapping of indices
-	periodRecords     []PeriodRecord
+	periodRecords     map[uint8][]PeriodRecord
 	usageLock         sync.Mutex
 	cumulativePayment *big.Int
 
@@ -41,9 +41,12 @@ type PeriodRecord struct {
 }
 
 func NewAccountant(accountID gethcommon.Address, reservation map[uint8]*core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint64, pricePerSymbol uint64, minNumSymbols uint64, numBins uint32) *Accountant {
-	periodRecords := make([]PeriodRecord, numBins)
-	for i := range periodRecords {
-		periodRecords[i] = PeriodRecord{Index: uint32(i), Usage: 0, QuorumNumber: 0}
+	periodRecords := make(map[uint8][]PeriodRecord)
+	for quorumNumber := range reservation {
+		periodRecords[quorumNumber] = make([]PeriodRecord, numBins)
+		for i := range periodRecords[quorumNumber] {
+			periodRecords[quorumNumber][i] = PeriodRecord{Index: uint32(i), Usage: 0, QuorumNumber: quorumNumber}
+		}
 	}
 	a := Accountant{
 		accountID:         accountID,
@@ -176,15 +179,15 @@ func (a *Accountant) SymbolsCharged(numSymbols uint64) uint64 {
 
 func (a *Accountant) GetRelativePeriodRecord(index uint64, quorumNumber uint8) *PeriodRecord {
 	relativeIndex := uint32(index % uint64(a.numBins))
-	if a.periodRecords[relativeIndex].Index != uint32(index) || a.periodRecords[relativeIndex].QuorumNumber != quorumNumber {
-		a.periodRecords[relativeIndex] = PeriodRecord{
+	if a.periodRecords[quorumNumber][relativeIndex].Index != uint32(index) {
+		a.periodRecords[quorumNumber][relativeIndex] = PeriodRecord{
 			Index:        uint32(index),
 			Usage:        0,
 			QuorumNumber: quorumNumber,
 		}
 	}
 
-	return &a.periodRecords[relativeIndex]
+	return &a.periodRecords[quorumNumber][relativeIndex]
 }
 
 // SetPaymentState sets the accountant's state from the disperser's response
@@ -193,7 +196,7 @@ func (a *Accountant) GetRelativePeriodRecord(index uint64, quorumNumber uint8) *
 // dummy values that disable accountant from using the corresponding payment method.
 // If off-chain fields are not present, we assume the account has no payment history
 // and set accoutant state to use initial values.
-func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentStateReply) error {
+func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetQuorumSpecificPaymentStateReply) error {
 	if paymentState == nil {
 		return fmt.Errorf("payment state cannot be nil")
 	} else if paymentState.GetPaymentGlobalParams() == nil {
@@ -235,19 +238,30 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 		}
 	}
 
-	periodRecords := make([]PeriodRecord, len(paymentState.GetPeriodRecords()))
-	for i, record := range paymentState.GetPeriodRecords() {
-		if record == nil {
-			periodRecords[i] = PeriodRecord{Index: 0, Usage: 0, QuorumNumber: 0}
-		} else {
-			periodRecords[i] = PeriodRecord{
-				Index:        record.Index,
-				Usage:        record.Usage,
-				QuorumNumber: uint8(record.QuorumNumber),
+	periodRecords := make(map[uint8][]PeriodRecord)
+	for _, record := range paymentState.GetPeriodRecords() {
+		quorumNumber := uint8(record.QuorumNumber)
+		if _, exists := periodRecords[quorumNumber]; !exists {
+			periodRecords[quorumNumber] = make([]PeriodRecord, a.numBins)
+			// Initialize all records for this quorum
+			for i := uint32(0); i < a.numBins; i++ {
+				periodRecords[quorumNumber][i] = PeriodRecord{
+					Index:        i,
+					Usage:        0,
+					QuorumNumber: quorumNumber,
+				}
 			}
+		}
+		// Update the specific record
+		idx := record.Index % a.numBins
+		periodRecords[quorumNumber][idx] = PeriodRecord{
+			Index:        record.Index,
+			Usage:        record.Usage,
+			QuorumNumber: quorumNumber,
 		}
 	}
 	a.periodRecords = periodRecords
+
 	return nil
 }
 

@@ -70,7 +70,28 @@ func (m *DisperserRPC) GetPaymentState(ctx context.Context, in *v2.GetPaymentSta
 			ReservationWindow:      3600, // Mock window
 			GlobalSymbolsPerSecond: 1000, // Mock rate limit
 		},
-		Reservations: []*v2.Reservation{
+		Reservation: &v2.Reservation{
+			SymbolsPerSecond: 100,
+			StartTimestamp:   uint32(time.Now().Unix() - 3600), // Start an hour ago
+			EndTimestamp:     uint32(time.Now().Unix() + 3600), // End an hour from now
+			QuorumNumbers:    []uint32{1},                      // Allow quorum 1
+		},
+		CumulativePayment:        big.NewInt(0).Bytes(),
+		OnchainCumulativePayment: big.NewInt(1000000).Bytes(), // Allow some payment
+	}, nil
+}
+
+// GetQuorumSpecificPaymentState is a mock implementation
+func (m *DisperserRPC) GetQuorumSpecificPaymentState(ctx context.Context, in *v2.GetPaymentStateRequest, opts ...grpc.CallOption) (*v2.GetQuorumSpecificPaymentStateReply, error) {
+	// Create a mock payment state response with valid global parameters
+	return &v2.GetQuorumSpecificPaymentStateReply{
+		PaymentGlobalParams: &v2.PaymentGlobalParams{
+			MinNumSymbols:          32,   // Ensure non-zero value to avoid division by zero
+			PricePerSymbol:         100,  // Mock price
+			ReservationWindow:      3600, // Mock window
+			GlobalSymbolsPerSecond: 1000, // Mock rate limit
+		},
+		Reservations: []*v2.QuorumReservation{
 			{
 				SymbolsPerSecond: 100,
 				StartTimestamp:   uint32(time.Now().Unix() - 3600), // Start an hour ago

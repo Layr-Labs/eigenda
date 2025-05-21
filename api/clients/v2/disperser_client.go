@@ -363,7 +363,7 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.Blob
 }
 
 // GetPaymentState returns the payment state of the disperser client
-func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
+func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetQuorumSpecificPaymentStateReply, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, api.NewErrorInternal(err.Error())
@@ -381,12 +381,12 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		return nil, fmt.Errorf("error signing payment state request: %w", err)
 	}
 
-	request := &disperser_rpc.GetPaymentStateRequest{
+	request := &disperser_rpc.GetQuorumSpecificPaymentStateRequest{
 		AccountId: accountID.Hex(),
 		Signature: signature,
 		Timestamp: timestamp,
 	}
-	return c.client.GetPaymentState(ctx, request)
+	return c.client.GetQuorumSpecificPaymentState(ctx, request)
 }
 
 // GetBlobCommitment is a utility method that calculates commitment for a blob payload.

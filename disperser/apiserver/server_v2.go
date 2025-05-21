@@ -294,6 +294,10 @@ func (s *DispersalServerV2) getAllQuorumIds() []uint8 {
 }
 
 func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
+	return nil, api.NewErrorUnimplemented()
+}
+
+func (s *DispersalServerV2) GetQuorumSpecificPaymentState(ctx context.Context, req *pb.GetQuorumSpecificPaymentStateRequest) (*pb.GetQuorumSpecificPaymentStateReply, error) {
 	if s.meterer == nil {
 		return nil, errors.New("payment meterer is not enabled")
 	}
@@ -321,17 +325,17 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
 
 	// Get on-Chain account state for reservations
-	var pbReservation []*pb.Reservation
+	var pbReservation []*pb.QuorumReservation
 	// Get fresh quorum IDs since onchain state might have changed
 	reservations, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
 	if err != nil {
 		s.logger.Debug("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
-		pbReservation = []*pb.Reservation{}
+		pbReservation = []*pb.QuorumReservation{}
 	} else {
 		numQuorums := uint8(len(reservations))
-		pbReservation = make([]*pb.Reservation, numQuorums)
+		pbReservation = make([]*pb.QuorumReservation, numQuorums)
 		for quorumId := range reservations {
-			pbReservation[quorumId] = &pb.Reservation{
+			pbReservation[quorumId] = &pb.QuorumReservation{
 				SymbolsPerSecond: reservations[quorumId].SymbolsPerSecond,
 				StartTimestamp:   uint32(reservations[quorumId].StartTimestamp),
 				EndTimestamp:     uint32(reservations[quorumId].EndTimestamp),
@@ -345,21 +349,19 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
 
 	// Get all quorum IDs from the system
-	var periodRecords []*pb.PeriodRecord
+	var periodRecords []*pb.QuorumPeriodRecord
 	quorumIds := s.getAllQuorumIds()
 
 	if len(quorumIds) == 0 {
-		periodRecords = []*pb.PeriodRecord{}
+		periodRecords = []*pb.QuorumPeriodRecord{}
 	} else {
 		// Get all period records for this account across all quorums
-		// TODO: quorum separated Offchain query in subsequent PR
-		records, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod)
-		if err != nil {
+		var fetchErr error
+		periodRecords, fetchErr = s.meterer.MeteringStore.GetPeriodRecordsMultiQuorum(ctx, accountID, currentReservationPeriod, quorumIds)
+		if fetchErr != nil {
 			s.logger.Debug("failed to get reservation records for multiple quorums",
-				"err", err, "accountID", accountID)
-			periodRecords = []*pb.PeriodRecord{}
-		} else {
-			periodRecords = records[:]
+				"err", fetchErr, "accountID", accountID)
+			periodRecords = []*pb.QuorumPeriodRecord{}
 		}
 	}
 
@@ -390,7 +392,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	}
 
 	// Build reply
-	reply := &pb.GetPaymentStateReply{
+	reply := &pb.GetQuorumSpecificPaymentStateReply{
 		PaymentGlobalParams:      &paymentGlobalParams,
 		PeriodRecords:            periodRecords,
 		Reservations:             pbReservation,
