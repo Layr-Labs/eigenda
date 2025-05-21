@@ -168,7 +168,7 @@ func (pd *PayloadDisperser) SendPayload(
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
 	defer cancel()
 
-	err = pd.certVerifier.CheckDACert(timeoutCtx, eigenDACert.ReferenceBlockNumber(), eigenDACert)
+	err = pd.certVerifier.CheckDACert(timeoutCtx, eigenDACert)
 	if err != nil {
 		return nil, fmt.Errorf("verify cert for blobKey %v: %w", blobKey.Hex(), err)
 	}

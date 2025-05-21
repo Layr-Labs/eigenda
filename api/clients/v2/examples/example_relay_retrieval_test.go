@@ -67,7 +67,7 @@ func Example_relayPayloadRetrieval() {
 	// is valid: if this call doesn't return an error, then the EigenDA network has attested to the availability of the
 	// dispersed blob.
 
-	err = certVerifier.CheckDACert(verificationCtx, eigenDACert.ReferenceBlockNumber(), eigenDACert)
+	err = certVerifier.CheckDACert(verificationCtx, eigenDACert)
 	if err != nil {
 		panic(fmt.Sprintf("verify cert: %v", err))
 	}

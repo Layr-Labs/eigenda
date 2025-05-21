@@ -3,6 +3,7 @@ package verification
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"sync"
 
 	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -47,11 +48,10 @@ func NewCertVerifier(
 // This method returns nil if the certificate is successfully verified; otherwise, it returns an error.
 func (cv *CertVerifier) CheckDACert(
 	ctx context.Context,
-	referenceBlockNumber uint64,
 	cert coretypes.EigenDACert,
 ) error {
 	// 1 - Get verifier caller for the block number
-	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, referenceBlockNumber)
+	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, cert.ReferenceBlockNumber())
 	if err != nil {
 		return fmt.Errorf("get verifier caller: %w", err)
 	}
@@ -64,7 +64,7 @@ func (cv *CertVerifier) CheckDACert(
 
 	// 3 - Call the contract method CheckDACert to verify the certificate
 	result, err := certVerifierCaller.CheckDACert(
-		&bind.CallOpts{Context: ctx},
+		&bind.CallOpts{Context: ctx, BlockNumber: big.NewInt(int64(cert.ReferenceBlockNumber()))},
 		certBytes,
 	)
 	if err != nil {
@@ -72,7 +72,7 @@ func (cv *CertVerifier) CheckDACert(
 	}
 
 	// 4 - Cast result to structured enum type and check for success
-	verifyResultCode := coretypes.VerifyStatusCode(result)
+	verifyResultCode := coretypes.VerificationStatusCode(result)
 
 	if verifyResultCode != coretypes.StatusSuccess {
 		return fmt.Errorf("check da cert error status code: (%d) %s", verifyResultCode, verifyResultCode.String())
