@@ -170,10 +170,10 @@ func (s *DispersalServerV2) Start(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				s.logger.Debug("Refreshing onchain quorum state", "onchainState", s.onchainState.Load())
 				if err := s.RefreshOnchainState(ctx); err != nil {
 					s.logger.Error("failed to refresh onchain quorum state", "err", err)
 				}
+				s.logger.Debug("Refreshed onchain quorum state", "onchainState", s.onchainState.Load())
 			case <-ctx.Done():
 				return
 			}
