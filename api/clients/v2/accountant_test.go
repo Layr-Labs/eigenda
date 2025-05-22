@@ -9,6 +9,7 @@ import (
 	"time"
 
 	v2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -37,7 +38,7 @@ func TestNewAccountant(t *testing.T) {
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
-	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
 
 	assert.NotNil(t, accountant)
 	assert.Equal(t, reservations, accountant.reservation)
@@ -78,7 +79,7 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
-	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
 
 	ctx := context.Background()
 	symbolLength := uint64(500)
@@ -156,7 +157,7 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
 
 	ctx := context.Background()
 	now := time.Now().UnixNano()
@@ -189,7 +190,7 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
 
 	ctx := context.Background()
 	numSymbols := uint64(2000)
@@ -218,7 +219,7 @@ func TestAccountBlobCallSeries(t *testing.T) {
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
-	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -272,7 +273,7 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
-	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -335,7 +336,7 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
-	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -382,7 +383,7 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
-	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -450,7 +451,7 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
-	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -562,7 +563,7 @@ func TestSetPaymentState(t *testing.T) {
 	accountant := NewAccountant(accountId,
 		map[uint8]*core.ReservedPayment{},
 		&core.OnDemandPayment{CumulativePayment: big.NewInt(0)},
-		10, 1, 100, numBins)
+		10, 1, 100, numBins, testutils.GetLogger())
 
 	// Create payment state reply with sample data
 	paymentState := &v2.GetQuorumSpecificPaymentStateReply{

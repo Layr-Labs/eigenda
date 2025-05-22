@@ -14,6 +14,7 @@ import (
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 	"google.golang.org/grpc"
 )
@@ -60,6 +61,7 @@ type disperserClient struct {
 	accountant         *Accountant
 	accountantLock     sync.Mutex
 	ntpClock           *core.NTPSyncedClock
+	logger             logging.Logger
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -125,6 +127,7 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 		prover:     prover,
 		accountant: accountant,
 		ntpClock:   ntpClock,
+		logger:     logger,
 		// conn and client are initialized lazily
 	}, nil
 }
@@ -136,7 +139,7 @@ func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("error getting account ID: %w", err)
 		}
-		c.accountant = NewAccountant(accountId, nil, nil, 0, 0, 0, 0)
+		c.accountant = NewAccountant(accountId, nil, nil, 0, 0, 0, 0, c.logger)
 	}
 
 	paymentState, err := c.GetPaymentState(ctx)
