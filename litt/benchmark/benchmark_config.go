@@ -20,18 +20,23 @@ type BenchmarkConfig struct {
 	// The location where the benchmark stores test metadata.
 	MetadataDirectory string
 
-	// The maximum target throughput in MB/s.
-	MaximumThroughputMB float64
+	// The maximum target write throughput in MB/s.
+	MaximumWriteThroughputMB float64
+
+	// The maximum read throughput in MB/s.
+	MaximumReadThroughputMB float64
+
+	// The number of parallel write goroutines.
+	WriterParallelism int
+
+	// The number of parallel read goroutines.
+	ReaderParallelism int
 
 	// The size of the values in MB.
 	ValueSizeMB float64
 
 	// Data is written to the DB in batches and then flushed. This determines the size of those batches, in MB.
 	BatchSizeMB float64
-
-	// The maximum number of batches permitted to be in-flight at any given time. If batches can't be written/flushed
-	// fast enough, then the benchmark engine will not push data as fast as requested.
-	BatchParallelism int
 
 	// The frequency at which the benchmark does cohort garbage collection, in seconds
 	CohortGCPeriodSeconds float64
@@ -64,20 +69,22 @@ type BenchmarkConfig struct {
 // DefaultBenchmarkConfig returns a default BenchmarkConfig with the given data paths.
 func DefaultBenchmarkConfig() *BenchmarkConfig {
 	return &BenchmarkConfig{
-		LittConfig:              litt.DefaultConfigNoPaths(),
-		MetadataDirectory:       "~/benchmark",
-		MaximumThroughputMB:     10,
-		ValueSizeMB:             2.0,
-		BatchSizeMB:             32,
-		BatchParallelism:        8,
-		CohortGCPeriodSeconds:   10.0,
-		WriteInfoChanelSize:     1024,
-		ReadInfoChanelSize:      1024,
-		CohortSize:              1024,
-		TTLHours:                1.0,
-		ReadSafetyMarginMinutes: 5.0,
-		Seed:                    1337,
-		RandomPoolSize:          units.GiB,
+		LittConfig:               litt.DefaultConfigNoPaths(),
+		MetadataDirectory:        "~/benchmark",
+		MaximumWriteThroughputMB: 10,
+		MaximumReadThroughputMB:  10,
+		WriterParallelism:        4,
+		ReaderParallelism:        32,
+		ValueSizeMB:              2.0,
+		BatchSizeMB:              32,
+		CohortGCPeriodSeconds:    10.0,
+		WriteInfoChanelSize:      1024,
+		ReadInfoChanelSize:       1024,
+		CohortSize:               1024,
+		TTLHours:                 1.0,
+		ReadSafetyMarginMinutes:  5.0,
+		Seed:                     1337,
+		RandomPoolSize:           units.GiB,
 	}
 }
 

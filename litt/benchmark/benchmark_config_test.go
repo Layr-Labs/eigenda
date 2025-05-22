@@ -14,7 +14,7 @@ func TestLoadConfig(t *testing.T) {
 
 	testConfigJSON := `{
 		"MetadataDirectory": "/test/dir",
-		"MaximumThroughputMB": 20.0,
+		"MaximumWriteThroughputMB": 20.0,
 		"ValueSizeMB": 3.0,
 		"BatchSizeMB": 15,
 		"BatchParallelism": 5
@@ -26,18 +26,18 @@ func TestLoadConfig(t *testing.T) {
 
 	// Expected config for comparison
 	expectedConfig := &BenchmarkConfig{
-		MetadataDirectory:   "/test/dir",
-		MaximumThroughputMB: 20.0,
-		ValueSizeMB:         3.0,
-		BatchSizeMB:         15,
-		BatchParallelism:    5,
+		MetadataDirectory:        "/test/dir",
+		MaximumWriteThroughputMB: 20.0,
+		ValueSizeMB:              3.0,
+		BatchSizeMB:              15,
+		BatchParallelism:         5,
 	}
 
 	// Test loading the config
 	loadedConfig, err := LoadConfig(testConfigPath)
 	require.NoError(t, err)
 	require.Equal(t, expectedConfig.MetadataDirectory, loadedConfig.MetadataDirectory)
-	require.Equal(t, expectedConfig.MaximumThroughputMB, loadedConfig.MaximumThroughputMB)
+	require.Equal(t, expectedConfig.MaximumWriteThroughputMB, loadedConfig.MaximumWriteThroughputMB)
 	require.Equal(t, expectedConfig.ValueSizeMB, loadedConfig.ValueSizeMB)
 	require.Equal(t, expectedConfig.BatchSizeMB, loadedConfig.BatchSizeMB)
 	require.Equal(t, expectedConfig.BatchParallelism, loadedConfig.BatchParallelism)
@@ -49,7 +49,7 @@ func TestLoadConfig(t *testing.T) {
 	// Test that unknown fields cause an error
 	unknownFieldConfig := []byte(`{
 		"MetadataDirectory": "/test/dir",
-		"MaximumThroughputMB": 20.0,
+		"MaximumWriteThroughputMB": 20.0,
 		"UnknownField": "this field doesn't exist in the struct"
 	}`)
 

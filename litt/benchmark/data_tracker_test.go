@@ -229,5 +229,3 @@ func TestTrackReads(t *testing.T) {
 	err = os.RemoveAll(directory)
 	require.NoError(t, err)
 }
-
-// TODO: test read expirations somehow
