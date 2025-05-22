@@ -14,7 +14,8 @@ import (
 //
 // Example encoding:
 //
-//             Encoded Payload header (32 bytes total)                   Encoded Payload Data (len is multiple of 32)
+//	Encoded Payload header (32 bytes total)                   Encoded Payload Data (len is multiple of 32)
+//
 // [0x00, version byte, big-endian uint32 len of payload, 0x00, ...] + [0x00, 31 bytes of data, 0x00, 31 bytes of data,...]
 type encodedPayload struct {
 	// the size of these bytes is guaranteed to be a multiple of 32

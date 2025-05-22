@@ -59,6 +59,7 @@ type TestClient struct {
 	// For fetching blobs from the validators without verifying or decoding them. Useful for load testing
 	// validator downloads with limited CPU resources.
 	onlyDownloadValidatorClient validator.ValidatorClient
+	certBuilder                 *clients.CertBuilder
 	certVerifier                *verification.CertVerifier
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
@@ -189,10 +190,27 @@ func NewTestClient(
 		registry = metrics.registry
 	}
 
+	certBuilder, err := clients.NewCertBuilder(logger, gethcommon.HexToAddress(config.BLSOperatorStateRetrieverAddr), gethcommon.HexToAddress(config.EigenDARegistryCoordinatorAddress), ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cert builder: %w", err)
+	}
+
+	blockMon, err := verification.NewBlockNumberMonitor(
+		logger,
+		ethClient,
+		time.Second * 12,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create block number monitor: %w", err)
+	}
+
 	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
+		ethClient,
 		disperserClient,
+		blockMon,
+		certBuilder,
 		certVerifier,
 		registry)
 	if err != nil {
@@ -328,6 +346,7 @@ func NewTestClient(
 		indexedChainState:           indexedChainState,
 		validatorClient:             retrievalClient,
 		validatorPayloadRetriever:   validatorPayloadRetriever,
+		certBuilder:                 certBuilder,
 		onlyDownloadValidatorClient: onlyDownloadValidatorClient,
 		certVerifier:                certVerifier,
 		privateKey:                  privateKey,
@@ -442,6 +461,11 @@ func (c *TestClient) GetCertVerifier() *verification.CertVerifier {
 	return c.certVerifier
 }
 
+// GetCertBuilder returns the test client's cert builder.
+func (c *TestClient) GetCertBuilder() *clients.CertBuilder {
+	return c.certBuilder
+}
+
 // GetPrivateKey returns the test client's private key.
 func (c *TestClient) GetPrivateKey() string {
 	return c.privateKey
@@ -492,34 +516,34 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		return fmt.Errorf("payloads do not match")
 	}
 
-	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
+	commitment, err := eigenDACert.Commitments()
+	if err != nil {
+		return fmt.Errorf("failed to parse blob commitments: %w", err)
+	}
+
+	blobLengthSymbols := commitment.Length
 
 	// read blob from ALL relays
 	err = c.ReadBlobFromRelays(
 		ctx,
 		*blobKey,
-		eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys,
+		eigenDACert.RelayKeys(),
 		payload,
-		blobLengthSymbols,
+		uint32(blobLengthSymbols),
 		0)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relays: %w", err)
 	}
 
-	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
-	if err != nil {
-		return fmt.Errorf("failed to convert blob commitments: %w", err)
-	}
 
 	// read blob from ALL quorums
 	err = c.ReadBlobFromValidators(
 		ctx,
 		*blobKey,
-		blobHeader.Version,
+		eigenDACert.BlobVersion(),
 		*commitment,
-		eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
-		eigenDACert.BatchHeader.ReferenceBlockNumber,
+		eigenDACert.QuorumNumbers(),
+		uint32(eigenDACert.ReferenceBlockNumber()),
 		payload,
 		0,
 		true)
@@ -531,7 +555,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 }
 
 // DispersePayload sends a payload to the disperser. Returns the blob key.
-func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (*coretypes.EigenDACert, error) {
+func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (coretypes.EigenDACert, error) {
 	c.logger.Debugf("Dispersing payload of length %d", len(payloadBytes))
 	start := time.Now()
 

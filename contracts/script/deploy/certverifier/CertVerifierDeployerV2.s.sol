@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.12;
 
-import {EigenDACertVerifierV2} from "src/periphery/cert/legacy/v2/EigenDACertVerifierV2.sol";
+import {EigenDACertVerifier} from "src/periphery/cert/EigenDACertVerifier.sol";
 import {RegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
@@ -44,12 +44,6 @@ contract CertVerifierDeployerV2 is Script, Test {
         raw = stdJson.parseRaw(data, ".eigenDARelayRegistry");
         eigenDARelayRegistry = abi.decode(raw, (address));
 
-        raw = stdJson.parseRaw(data, ".registryCoordinator");
-        registryCoordinator = abi.decode(raw, (address));
-
-        raw = stdJson.parseRaw(data, ".operatorStateRetriever");
-        operatorStateRetriever = abi.decode(raw, (address));
-
         raw = stdJson.parseRaw(data, ".defaultSecurityThresholds");
         defaultSecurityThresholds = abi.decode(raw, (DATypesV1.SecurityThresholds));
 
@@ -59,11 +53,9 @@ contract CertVerifierDeployerV2 is Script, Test {
         vm.startBroadcast();
 
         eigenDACertVerifier = address(
-            new EigenDACertVerifierV2(
+            new EigenDACertVerifier(
                 IEigenDAThresholdRegistry(eigenDAThresholdRegistry),
                 IEigenDASignatureVerifier(eigenDAServiceManager),
-                OperatorStateRetriever(operatorStateRetriever),
-                IRegistryCoordinator(registryCoordinator),
                 defaultSecurityThresholds,
                 quorumNumbersRequired
             )
@@ -71,7 +63,7 @@ contract CertVerifierDeployerV2 is Script, Test {
 
         vm.stopBroadcast();
 
-        console.log("Deployed new EigenDACertVerifierV2 at address: ", eigenDACertVerifier);
+        console.log("Deployed new EigenDACertVerifier at address: ", eigenDACertVerifier);
 
         string memory outputPath = string.concat("./script/deploy/certverifier/output/", outputJSONFile);
         string memory parent_object = "parent object";

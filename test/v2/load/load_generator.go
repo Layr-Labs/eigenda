@@ -181,7 +181,7 @@ func (l *LoadGenerator) readAndWriteBlob() {
 func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 	blobKey *corev2.BlobKey,
 	payload []byte,
-	eigenDACert *coretypes.EigenDACert,
+	eigenDACert coretypes.EigenDACert,
 	err error) {
 
 	payloadSize := int(rand.BoundedGaussian(
@@ -222,7 +222,7 @@ func (l *LoadGenerator) readBlobFromRelays(
 	rand *random.TestRandom,
 	blobKey *corev2.BlobKey,
 	payload []byte,
-	eigenDACert *coretypes.EigenDACert,
+	eigenDACert coretypes.EigenDACert,
 ) {
 
 	timeout := time.Duration(l.config.RelayReadTimeout) * time.Second
@@ -245,8 +245,15 @@ func (l *LoadGenerator) readBlobFromRelays(
 		l.metrics.endOperation("relay_read")
 	}()
 
-	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
-	relayKeys := eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys
+	commitments, err := eigenDACert.Commitments()
+	if err != nil {
+		l.metrics.reportRelayReadFailure()
+		l.client.GetLogger().Errorf("failed to get blob commitments: %v", err)
+		return
+	}
+
+	blobLengthSymbols := uint32(commitments.Length)
+	relayKeys := eigenDACert.RelayKeys()
 	readStartIndex := rand.Int32Range(0, int32(len(relayKeys)))
 
 	for i := 0; i < relayReadCount; i++ {
@@ -271,7 +278,7 @@ func (l *LoadGenerator) readBlobFromValidators(
 	rand *random.TestRandom,
 	blobKey *corev2.BlobKey,
 	payload []byte,
-	eigenDACert *coretypes.EigenDACert) {
+	eigenDACert coretypes.EigenDACert) {
 
 	timeout := time.Duration(l.config.ValidatorReadTimeout) * time.Second
 	ctx, cancel := context.WithTimeout(l.ctx, timeout)
@@ -293,15 +300,14 @@ func (l *LoadGenerator) readBlobFromValidators(
 		l.metrics.endOperation("validator_read")
 	}()
 
-	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
+	commitments, err := eigenDACert.Commitments()
 	if err != nil {
 		l.metrics.reportValidatorReadFailure()
-		l.client.GetLogger().Errorf("failed to bind blob commitments: %v", err)
+		l.client.GetLogger().Errorf("failed to get blob commitments: %v", err)
 		return
 	}
 
-	quorums := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers
+	quorums := eigenDACert.QuorumNumbers()
 
 	readStartIndex := rand.Int32Range(0, int32(len(quorums)))
 
@@ -311,14 +317,13 @@ func (l *LoadGenerator) readBlobFromValidators(
 		err = l.client.ReadBlobFromValidatorsInQuorum(
 			ctx,
 			*blobKey,
-			blobHeader.Version,
-			*commitment,
+			eigenDACert.BlobVersion(),
+			*commitments,
 			quorums[(int(readStartIndex)+i)%len(quorums)],
-			eigenDACert.BatchHeader.ReferenceBlockNumber,
+			uint32(eigenDACert.ReferenceBlockNumber()),
 			payload,
 			0,
-			validateAndDecode,
-		)
+			validateAndDecode)
 		if err == nil {
 			l.metrics.reportValidatorReadSuccess()
 		} else {
