@@ -20,7 +20,7 @@ import (
 const (
 	// DynamoBatchWriteLimit is the maximum number of items that can be written in a single batch
 	// Reference: https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TransactWriteItems.html
-	DynamoBatchWriteLimit = 100
+	DynamoBatchWriteLimit = 25
 	// DynamoBatchReadLimit is the maximum number of items that can be read in a single batch
 	DynamoBatchReadLimit = 100
 )
