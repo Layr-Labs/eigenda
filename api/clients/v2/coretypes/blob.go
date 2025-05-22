@@ -81,6 +81,11 @@ func (b *Blob) BlobLengthSymbols() uint32 {
 	return b.blobLengthSymbols
 }
 
+// BlobLengthBytes returns the length of the blob, in bytes
+func (b *Blob) BlobLengthBytes() uint32 {
+	return b.blobLengthSymbols * 32
+}
+
 // toEncodedPayload creates an encodedPayload from the blob
 //
 // The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what

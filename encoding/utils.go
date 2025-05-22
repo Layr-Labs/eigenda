@@ -30,6 +30,12 @@ func RoundUpDivide[T constraints.Integer](a, b T) T {
 	return (a + b - 1) / b
 }
 
+// IsPowerOf2 checks if a number is a power of 2
+func IsPowerOf2[T constraints.Integer](d T) bool {
+	return d != 0 && (d&(d-1)) == 0
+}
+
+// NextPowerOf2 returns the next power of 2 greater than or equal to d
 func NextPowerOf2[T constraints.Integer](d T) T {
 	nextPower := math.Ceil(math.Log2(float64(d)))
 	return T(math.Pow(2.0, nextPower))
