@@ -9,14 +9,15 @@ import (
 
 // Blacklist contains entries of blacklisted dispersers
 type Blacklist struct {
-	Entries []BlacklistEntry `json:"entries"`
+	Entries     []BlacklistEntry `json:"entries"`
+	LastUpdated uint64           `json:"last_updated"`
 }
 
 // BlacklistEntry represents a single blacklist record
 type BlacklistEntry struct {
-	DisperserAddress []byte            `json:"disperser_address"`
-	Metadata         BlacklistMetadata `json:"metadata"`
-	Timestamp        uint64            `json:"timestamp"`
+	DisperserID uint32            `json:"disperser_id"`
+	Metadata    BlacklistMetadata `json:"metadata"`
+	Timestamp   uint64            `json:"timestamp"`
 }
 
 // BlacklistMetadata contains additional information about the blacklisting
@@ -36,13 +37,14 @@ func (b *Blacklist) FromBytes(data []byte) error {
 }
 
 // AddEntry adds a new blacklist entry
-func (b *Blacklist) AddEntry(disperserAddr []byte, contextID, reason string) {
+func (b *Blacklist) AddEntry(disperserId uint32, contextID, reason string) {
+	b.LastUpdated = uint64(time.Now().Unix())
 	b.Entries = append(b.Entries, BlacklistEntry{
-		DisperserAddress: disperserAddr,
+		DisperserID: disperserId,
 		Metadata: BlacklistMetadata{
 			ContextId: contextID,
 			Reason:    reason,
 		},
-		Timestamp: uint64(time.Now().Unix()),
+		Timestamp: b.LastUpdated,
 	})
 }

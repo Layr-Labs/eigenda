@@ -134,13 +134,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to serialize batch header hash: %v", err))
 	}
 
-	// check the blacklist to see if we need to proceed or not
-	disperserAddress, err := s.chunkAuthenticator.GetDisperserAddress(ctx, in.DisperserID, time.Now())
-	if err != nil {
-		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to get disperser address: %v", err))
-	}
-
-	if s.node.BlacklistStore.IsBlacklisted(ctx, disperserAddress.Bytes()) {
+	if s.node.BlacklistStore.IsBlacklisted(ctx, in.DisperserID) {
 		return nil, api.NewErrorInvalidArg("disperser is blacklisted")
 	}
 	if s.chunkAuthenticator != nil {
@@ -162,7 +156,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			_, err = s.validateDispersalRequest(blobCert)
 			if err != nil {
 				// Blacklist the disperser if there's an invalid dispersal request
-				s.blacklistDisperser(in, blobCert)
+				s.blacklistDisperserFromBlobCert(in, blobCert)
 				return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
 			}
 		}
@@ -275,15 +269,10 @@ func (s *ServerV2) validateAndStoreChunksLittDB(
 }
 
 // blacklistDisperser blacklists a disperser by retrieving the disperser's public key from the request and storing it in the blacklist store
-func (s *ServerV2) blacklistDisperser(request *pb.StoreChunksRequest, blobCert *corev2.BlobCertificate) error {
+func (s *ServerV2) blacklistDisperserFromBlobCert(request *pb.StoreChunksRequest, blobCert *corev2.BlobCertificate) error {
 
 	ctx := context.Background()
-
-	// using the pubkey here since disperserId can be claimed by others and has some edge cases, so will avoid that.
-	disperserAddress, err := s.chunkAuthenticator.GetDisperserAddress(ctx, request.DisperserID, time.Now())
-	if err != nil {
-		return fmt.Errorf("failed to get disperser address: %w", err)
-	}
+	s.logger.Info("blacklisting disperser from storeChunks request due to blobCert validation failure", "disperserID", request.DisperserID)
 
 	// Get blob key for context
 	blobKey, err := blobCert.BlobHeader.BlobKey()
@@ -291,10 +280,7 @@ func (s *ServerV2) blacklistDisperser(request *pb.StoreChunksRequest, blobCert *
 		return fmt.Errorf("failed to get blob key: %w", err)
 	}
 
-	// Store bytes once to avoid repeated conversions
-	disperserBytes := disperserAddress.Bytes()
-
-	err = s.node.BlacklistStore.AddEntry(ctx, disperserBytes, fmt.Sprintf("blobKey: %x", blobKey), "blobCert validation failed")
+	err = s.node.BlacklistStore.AddEntry(ctx, request.DisperserID, fmt.Sprintf("blobKey: %x", blobKey), "blobCert validation failed")
 	if err != nil {
 		return fmt.Errorf("failed to add entry to blacklist: %w", err)
 	}
