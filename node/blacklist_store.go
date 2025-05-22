@@ -51,7 +51,7 @@ func (s *BlacklistStore) HasKey(ctx context.Context, key []byte) bool {
 
 // Get retrieves a blacklist by key
 func (s *BlacklistStore) GetByDisperserID(ctx context.Context, disperserId uint32) (*Blacklist, error) {
-	disperserIdHash := sha256.Sum256([]byte(fmt.Sprintf("%d", disperserId)))
+	disperserIdHash := sha256.Sum256(fmt.Appendf(nil, "%d", disperserId))
 	return s.Get(ctx, disperserIdHash[:])
 }
 
@@ -76,7 +76,7 @@ func (s *BlacklistStore) Put(ctx context.Context, key []byte, value []byte) erro
 }
 
 // AddEntry adds or updates a blacklist entry for a disperser
-func (s *BlacklistStore) AddEntry(ctx context.Context, disperserId uint32, contextReason, reason string) error {
+func (s *BlacklistStore) AddEntry(ctx context.Context, disperserId uint32, contextId, reason string) error {
 	var blacklist *Blacklist
 	var err error
 
@@ -89,15 +89,15 @@ func (s *BlacklistStore) AddEntry(ctx context.Context, disperserId uint32, conte
 		blacklist = new(Blacklist)
 	}
 
-	blacklist.AddEntry(disperserId, contextReason, reason)
+	blacklist.AddEntry(disperserId, contextId, reason)
 
 	data, err := blacklist.ToBytes()
 	if err != nil {
 		return fmt.Errorf("failed to serialize blacklist: %w", err)
 	}
 
-	s.logger.Info("Adding entry to blacklist", "disperserId", disperserId, "contextReason", contextReason, "reason", reason)
-	disperserIdHash := sha256.Sum256([]byte(fmt.Sprintf("%d", disperserId)))
+	s.logger.Info("Adding entry to blacklist", "disperserId", disperserId, "contextReason", contextId, "reason", reason)
+	disperserIdHash := sha256.Sum256(fmt.Appendf(nil, "%d", disperserId))
 	return s.db.Put(disperserIdHash[:], data)
 }
 

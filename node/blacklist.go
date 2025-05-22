@@ -37,12 +37,12 @@ func (b *Blacklist) FromBytes(data []byte) error {
 }
 
 // AddEntry adds a new blacklist entry
-func (b *Blacklist) AddEntry(disperserId uint32, contextID, reason string) {
+func (b *Blacklist) AddEntry(disperserId uint32, contextId, reason string) {
 	b.LastUpdated = uint64(time.Now().Unix())
 	b.Entries = append(b.Entries, BlacklistEntry{
 		DisperserID: disperserId,
 		Metadata: BlacklistMetadata{
-			ContextId: contextID,
+			ContextId: contextId,
 			Reason:    reason,
 		},
 		Timestamp: b.LastUpdated,

@@ -195,11 +195,14 @@ func NewNode(
 	}
 
 	// Create new blacklist store
+	// We disable seeks compaction and enable sync writes to ensure that the blacklist is always up to date.
+	// This is because the blacklist is used to check if a disperser is blacklisted, and if it is, we need to
+	// stop accepting requests from that disperser.
 	blacklistStore, err := NewLevelDBBlacklistStore(
 		config.DbPath+"/blacklist",
 		logger,
-		config.LevelDBDisableSeeksCompactionV1,
-		config.LevelDBSyncWritesV1)
+		true, // disable seeks compaction
+		true) // enable sync writes
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new blacklist store: %w", err)
 	}
