@@ -47,13 +47,11 @@ func GetAssignmentsForQuorum(
 		return nil, fmt.Errorf("failed to get ordered operators for quorum %d: %w", quorum, err)
 	}
 
-	numOperators := len(orderedOps)
+	if len(orderedOps) > int(blobParams.MaxNumOperators) {
+		return nil, fmt.Errorf("too many operators for quorum %d", quorum)
+	}
 
-	// if numOperators > blobParams.MaxNumOperators {
-	// 	return nil, fmt.Errorf("too many operators for quorum %d", quorum)
-	// }
-
-	effectiveNumChunks := blobParams.NumChunks - uint32(numOperators)
+	effectiveNumChunks := blobParams.NumChunks - blobParams.MaxNumOperators
 
 	total, ok := state.Totals[quorum]
 	if !ok {

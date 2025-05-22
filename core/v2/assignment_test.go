@@ -156,7 +156,7 @@ func TestSingleOperator(t *testing.T) {
 }
 
 func TestValidatorSizes(t *testing.T) {
-	thresholdBips := blobParams.ReconstructionThresholdBips
+	thresholdBips := blobParams.GetReconstructionThresholdBips()
 
 	testCases := []struct {
 		name              string
@@ -303,7 +303,7 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 		totalStake := new(big.Int).Set(state.OperatorState.Totals[0].Stake)
 
 		// Calculate the threshold stake required for reconstruction
-		thresholdPercentage := float64(blobParams.ReconstructionThresholdBips) / 10000.0 // Convert from basis points to percentage
+		thresholdPercentage := float64(blobParams.GetReconstructionThresholdBips()) / 10000.0 // Convert from basis points to percentage
 		thresholdStake := new(big.Int).Mul(totalStake, big.NewInt(int64(thresholdPercentage*10000)))
 		thresholdStake.Div(thresholdStake, big.NewInt(10000))
 

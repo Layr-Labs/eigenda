@@ -29,11 +29,9 @@ import (
 
 var (
 	blobParams = &core.BlobVersionParameters{
-		NumChunks:                   8192,
-		CodingRate:                  8,
-		ReconstructionThresholdBips: 1666,
-		SamplesPerUnit:              20,
-		NumUnits:                    393,
+		NumChunks:       8192,
+		CodingRate:      8,
+		MaxNumOperators: 2048,
 	}
 
 	blobKey1 = []byte("hello0")

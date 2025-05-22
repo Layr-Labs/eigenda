@@ -211,11 +211,9 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	defer cancel()
 
 	blobParams2 := &core.BlobVersionParameters{
-		NumChunks:                   111,
-		CodingRate:                  1,
-		ReconstructionThresholdBips: 1666,
-		NumUnits:                    393,
-		SamplesPerUnit:              20,
+		NumChunks:       111,
+		CodingRate:      1,
+		MaxNumOperators: 2048,
 	}
 	c.tx.On("GetAllVersionedBlobParams", mock.Anything).Return(map[v2.BlobVersion]*core.BlobVersionParameters{
 		0: blobParams,

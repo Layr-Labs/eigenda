@@ -29,11 +29,9 @@ import (
 )
 
 var blobParams = &core.BlobVersionParameters{
-	NumChunks:                   8192,
-	CodingRate:                  8,
-	ReconstructionThresholdBips: 1666,
-	NumUnits:                    393,
-	SamplesPerUnit:              20,
+	NumChunks:       8192,
+	CodingRate:      8,
+	MaxNumOperators: 2048,
 }
 
 type testComponents struct {

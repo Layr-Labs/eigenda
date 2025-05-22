@@ -2,9 +2,10 @@ package controller_test
 
 import (
 	"context"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"testing"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/encoding"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
@@ -533,11 +534,9 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 	chainReader.On("GetCurrentBlockNumber").Return(blockNumber, nil)
 	chainReader.On("GetAllVersionedBlobParams", mock.Anything).Return(map[v2.BlobVersion]*core.BlobVersionParameters{
 		0: {
-			NumChunks:                   8192,
-			CodingRate:                  8,
-			ReconstructionThresholdBips: 1666,
-			NumUnits:                    393,
-			SamplesPerUnit:              20,
+			NumChunks:       8192,
+			CodingRate:      8,
+			MaxNumOperators: 2048,
 		},
 	}, nil)
 	onchainRefreshInterval := 1 * time.Millisecond
