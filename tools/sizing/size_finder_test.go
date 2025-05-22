@@ -101,7 +101,7 @@ func TestGenerateOptimumSizeTable(t *testing.T) {
 		sb.WriteString("|\n")
 	}
 
-	fmt.Printf(sb.String())
+	fmt.Print(sb.String())
 }
 
 func TestMinPayloadSizes(t *testing.T) {
