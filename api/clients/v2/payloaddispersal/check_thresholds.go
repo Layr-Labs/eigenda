@@ -88,8 +88,8 @@ func checkThresholds(
 			return &thresholdNotMetError{
 				BlobKey:               blobKey,
 				ConfirmationThreshold: confirmationThreshold,
-				BlobQuorumNumbers:    blobQuorumNumbers,
-				SignedPercentagesMap: signedPercentagesMap,
+				BlobQuorumNumbers:     blobQuorumNumbers,
+				SignedPercentagesMap:  signedPercentagesMap,
 			}
 		}
 	}

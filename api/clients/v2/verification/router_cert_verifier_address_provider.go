@@ -32,7 +32,7 @@ func BuildRouterAddressProvider(routerAddr gethcommon.Address, ethClient common.
 	}
 
 	// Create the BlockNumberMonitor
-	blockNumberMonitor, err := NewBlockNumberMonitor(logger, ethClient, time.Second*3)
+	blockNumberMonitor, err := NewBlockNumberMonitor(logger, ethClient, time.Second*1)
 	if err != nil {
 		return nil, fmt.Errorf("create block number monitor: %w", err)
 	}

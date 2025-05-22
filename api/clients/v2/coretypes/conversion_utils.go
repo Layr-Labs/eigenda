@@ -139,20 +139,19 @@ func InclusionInfoProtoToIEigenDATypesBinding(inputInclusionInfo *disperserv2.Bl
 
 	blobCertificateTypesBinding := &certTypesBinding.EigenDATypesV2BlobCertificate{
 		BlobHeader: certTypesBinding.EigenDATypesV2BlobHeaderV2{
-			Version: convertedBlobCertificate.BlobHeader.Version,
+			Version:       convertedBlobCertificate.BlobHeader.Version,
 			QuorumNumbers: convertedBlobCertificate.BlobHeader.QuorumNumbers,
 			Commitment: certTypesBinding.EigenDATypesV2BlobCommitment{
-				Commitment: certTypesBinding.BN254G1Point(convertedBlobCertificate.BlobHeader.Commitment.Commitment),
+				Commitment:       certTypesBinding.BN254G1Point(convertedBlobCertificate.BlobHeader.Commitment.Commitment),
 				LengthCommitment: certTypesBinding.BN254G2Point(convertedBlobCertificate.BlobHeader.Commitment.LengthCommitment),
-				LengthProof: certTypesBinding.BN254G2Point(convertedBlobCertificate.BlobHeader.Commitment.LengthProof),
-				Length: convertedBlobCertificate.BlobHeader.Commitment.Length,
+				LengthProof:      certTypesBinding.BN254G2Point(convertedBlobCertificate.BlobHeader.Commitment.LengthProof),
+				Length:           convertedBlobCertificate.BlobHeader.Commitment.Length,
 			},
 			PaymentHeaderHash: convertedBlobCertificate.BlobHeader.PaymentHeaderHash,
 		},
 		Signature: convertedBlobCertificate.Signature,
 		RelayKeys: convertedBlobCertificate.RelayKeys,
 	}
-
 
 	return &certTypesBinding.EigenDATypesV2BlobInclusionInfo{
 		BlobCertificate: *blobCertificateTypesBinding,

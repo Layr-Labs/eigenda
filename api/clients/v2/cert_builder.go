@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	coreEth "github.com/Layr-Labs/eigenda/core/eth"
@@ -14,16 +13,14 @@ import (
 	certTypesBinding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 	opsrbinding "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
 	"github.com/Layr-Labs/eigenda/core"
-	coreV2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-
 type CertBuilder struct {
-	logger 					logging.Logger
-	opsrCaller				*opsrbinding.ContractOperatorStateRetrieverCaller
+	logger                  logging.Logger
+	opsrCaller              *opsrbinding.ContractOperatorStateRetrieverCaller
 	registryCoordinatorAddr gethcommon.Address
 }
 
@@ -43,11 +40,10 @@ func NewCertBuilder(
 	if err != nil {
 		return nil, fmt.Errorf("create operator state retriever caller: %w", err)
 	}
-	
 
 	return &CertBuilder{
-		logger: logger,
-		opsrCaller: opsrCaller,
+		logger:                  logger,
+		opsrCaller:              opsrCaller,
 		registryCoordinatorAddr: registryCoordinatorAddr,
 	}, nil
 }
@@ -56,12 +52,11 @@ func NewCertBuilder(
 func (cb *CertBuilder) BuildCert(
 	ctx context.Context,
 	certVersion coretypes.CertificateVersion,
-	blobKey coreV2.BlobKey,
 	blobStatusReply *disperser.BlobStatusReply,
 ) (coretypes.EigenDACert, error) {
 	switch certVersion {
 	case coretypes.VersionThreeCert:
-		return cb.buildEigenDAV3Cert(ctx, blobKey, blobStatusReply)
+		return cb.buildEigenDAV3Cert(ctx, blobStatusReply)
 	default:
 		return nil, fmt.Errorf("unsupported EigenDA cert version: %d", certVersion)
 	}
@@ -70,31 +65,25 @@ func (cb *CertBuilder) BuildCert(
 // buildEigenDAV3Cert builds an EigenDA certificate of version 3 using the provided blob key and blob status reply.
 func (cb *CertBuilder) buildEigenDAV3Cert(
 	ctx context.Context,
-	blobKey coreV2.BlobKey,
 	blobStatusReply *disperser.BlobStatusReply,
 ) (*coretypes.EigenDACertV3, error) {
-	// TODO: configurable timeout
-	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second)
-	defer cancel()
 	nonSignerStakesAndSignature, err := cb.getNonSignerStakesAndSignature(
-		timeoutCtx, blobStatusReply.GetSignedBatch())
+		ctx, blobStatusReply.GetSignedBatch())
 	if err != nil {
 		return nil, fmt.Errorf("get non signer stake and signature: %w", err)
 	}
-	cb.logger.Debug("Retrieved NonSignerStakesAndSignature", "blobKey", blobKey.Hex())
 
 	eigenDACert, err := coretypes.BuildEigenDACertV3(blobStatusReply, nonSignerStakesAndSignature)
 	if err != nil {
 		return nil, fmt.Errorf("build eigenda v3 cert: %w", err)
 	}
-	cb.logger.Debug("Constructed EigenDACertV3", "blobKey", blobKey.Hex())
 
 	return eigenDACert, nil
 }
 
 // GetNonSignerStakesAndSignature constructs a NonSignerStakesAndSignature object by calling an
 // onchain OperatorStateRetriever retriever to fetch necessary non-signer metadata
-func (cb *CertBuilder)  getNonSignerStakesAndSignature(
+func (cb *CertBuilder) getNonSignerStakesAndSignature(
 	ctx context.Context,
 	signedBatch *disperser.SignedBatch,
 ) (*certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature, error) {
@@ -103,7 +92,7 @@ func (cb *CertBuilder)  getNonSignerStakesAndSignature(
 	if err != nil {
 		return nil, fmt.Errorf("convert signed batch: %w", err)
 	}
-	
+
 	nonSignerPubKeys := signedBatchBinding.Attestation.NonSignerPubkeys
 
 	// 2a - create operator IDs by hashing non-signer public keys
@@ -114,9 +103,9 @@ func (cb *CertBuilder)  getNonSignerStakesAndSignature(
 	}
 
 	// 2b - cast []uint32 to []byte for quorum numbers
-	quorumNumbers := make([]byte, len(signedBatch.GetAttestation().GetQuorumNumbers()))
-	for i, qn := range signedBatch.GetAttestation().GetQuorumNumbers() {
-		quorumNumbers[i] = byte(qn)
+	quorumNumbers, err := coretypes.QuorumNumbersUint32ToUint8(signedBatchBinding.Attestation.QuorumNumbers)
+	if err != nil {
+		return nil, fmt.Errorf("convert quorum numbers: %w", err)
 	}
 
 	// use the reference block # from the disperser generated signed batch header
@@ -158,7 +147,6 @@ func (cb *CertBuilder)  getNonSignerStakesAndSignature(
 		X: signedBatchBinding.Attestation.Sigma.X,
 		Y: signedBatchBinding.Attestation.Sigma.Y,
 	}
-
 
 	// 5 - construct non signer stakes and signature
 	return &certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature{

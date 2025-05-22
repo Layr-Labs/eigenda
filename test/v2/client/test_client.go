@@ -198,7 +198,7 @@ func NewTestClient(
 	blockMon, err := verification.NewBlockNumberMonitor(
 		logger,
 		ethClient,
-		time.Second * 12,
+		time.Second * 1,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create block number monitor: %w", err)
@@ -207,7 +207,6 @@ func NewTestClient(
 	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
-		ethClient,
 		disperserClient,
 		blockMon,
 		certBuilder,

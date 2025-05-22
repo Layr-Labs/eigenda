@@ -72,7 +72,7 @@ func (pr *ValidatorPayloadRetriever) GetPayload(
 		blob, err := pr.retrieveBlobWithTimeout(
 			ctx,
 			*blobKey,
-			uint16(eigenDACert.BlobVersion()),
+			eigenDACert.BlobVersion(),
 			*commitment,
 			eigenDACert.ReferenceBlockNumber(),
 			quorumID)

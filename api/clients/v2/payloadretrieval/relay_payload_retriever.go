@@ -81,7 +81,7 @@ func (pr *RelayPayloadRetriever) GetPayload(
 	blobCommitments, err := eigenDACert.Commitments()
 
 	if err != nil {
-		return nil, fmt.Errorf("blob commitments binding to internal: %w", err)
+		return nil, fmt.Errorf("reading blob commitments from cert: %w", err)
 	}
 
 	// create a randomized array of indices, so that it isn't always the first relay in the list which gets hit

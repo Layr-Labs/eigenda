@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"sync"
 
-	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/common"
-	genericVerifierBinding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
+	certVerifierBinding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -19,15 +19,18 @@ import (
 // The V3 cert verifier contract is located at:
 // https://github.com/Layr-Labs/eigenda/blob/master/contracts/src/periphery/cert/EigenDACertVerifier.sol
 type CertVerifier struct {
-	logger            logging.Logger
-	ethClient         common.EthClient
-	addressProvider   clients.CertVerifierAddressProvider
+	logger          logging.Logger
+	ethClient       common.EthClient
+	addressProvider clients.CertVerifierAddressProvider
 
-	// Cache maps
-	verifierCallers        sync.Map
-	requiredQuorums        sync.Map
+	// maps contract address to a ContractEigenDACertVerifierCaller object
+	verifierCallers sync.Map
+	// maps contract address to set of required quorums specified in the contract at that address
+	requiredQuorums sync.Map
+	// maps contract address to the confirmation threshold required by that address
 	confirmationThresholds sync.Map
-	versions               sync.Map
+	// maps contract address to the cert version specified in the contract at that address
+	versions sync.Map
 }
 
 // NewCertVerifier constructs a new CertVerifier instance
@@ -62,14 +65,14 @@ func (cv *CertVerifier) CheckDACert(
 	}
 
 	// 3 - Call the contract method CheckDACert to verify the certificate
-	// TODO: determine if there's any merit in passing call options to impose better determinism and 
+	// TODO: determine if there's any merit in passing call options to impose better determinism and
 	// safety on the operation
 	result, err := certVerifierCaller.CheckDACert(
 		&bind.CallOpts{Context: ctx},
 		certBytes,
 	)
 	if err != nil {
-		return fmt.Errorf("verify cert: %w", err)
+		return fmt.Errorf("check da cert: %w", err)
 	}
 
 	// 4 - Cast result to structured enum type and check for success
@@ -82,16 +85,21 @@ func (cv *CertVerifier) CheckDACert(
 	return nil
 }
 
-
-
 // GetQuorumNumbersRequired returns the set of quorum numbers that must be set in the BlobHeader, and verified in
 // VerifyCert and CheckDACert.
 //
 // This method will return required quorum numbers from an internal cache if they are already known for the currently
 // active cert verifier. Otherwise, this method will query the required quorum numbers from the currently active
 // cert verifier, and cache the result for future use.
-func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context, referenceBlockNumber uint64) ([]uint8, error) {
-	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
+func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context) ([]uint8, error) {
+	// get the latest cert verifier address from the address provider
+
+	blockNum, err := cv.ethClient.BlockByNumber(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("get latest block number: %w", err)
+	}
+
+	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, blockNum.NumberU64())
 	if err != nil {
 		return nil, fmt.Errorf("get cert verifier address: %w", err)
 	}
@@ -130,7 +138,7 @@ func (cv *CertVerifier) GetQuorumNumbersRequired(ctx context.Context, referenceB
 func (cv *CertVerifier) getVerifierCallerFromBlockNumber(
 	ctx context.Context,
 	referenceBlockNumber uint64,
-) (*genericVerifierBinding.ContractEigenDACertVerifier, error) {
+) (*certVerifierBinding.ContractEigenDACertVerifier, error) {
 	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("get cert verifier address: %w", err)
@@ -146,10 +154,10 @@ func (cv *CertVerifier) getVerifierCallerFromBlockNumber(
 // and parsing json, and is therefore non-trivially expensive.
 func (cv *CertVerifier) getVerifierCallerFromAddress(
 	certVerifierAddress gethcommon.Address,
-) (*genericVerifierBinding.ContractEigenDACertVerifier, error) {
+) (*certVerifierBinding.ContractEigenDACertVerifier, error) {
 	existingCallerAny, valueExists := cv.verifierCallers.Load(certVerifierAddress)
 	if valueExists {
-		existingCaller, ok := existingCallerAny.(*genericVerifierBinding.ContractEigenDACertVerifier)
+		existingCaller, ok := existingCallerAny.(*certVerifierBinding.ContractEigenDACertVerifier)
 		if !ok {
 			return nil, fmt.Errorf(
 				"value in verifierCallers wasn't of type ContractEigenDACertVerifier. this should be impossible")
@@ -157,7 +165,7 @@ func (cv *CertVerifier) getVerifierCallerFromAddress(
 		return existingCaller, nil
 	}
 
-	certVerifierCaller, err := genericVerifierBinding.NewContractEigenDACertVerifier(certVerifierAddress, cv.ethClient)
+	certVerifierCaller, err := certVerifierBinding.NewContractEigenDACertVerifier(certVerifierAddress, cv.ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("bind to verifier contract at %s: %w", certVerifierAddress, err)
 	}

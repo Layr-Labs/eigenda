@@ -24,10 +24,9 @@ type PayloadDisperser struct {
 	logger          logging.Logger
 	config          PayloadDisperserConfig
 	disperserClient clients.DisperserClient
-	ethClient       common.EthClient
-	blockMonitor  *verification.BlockNumberMonitor
-	certBuilder   *clients.CertBuilder
-	certVerifier  *verification.CertVerifier
+	blockMonitor    *verification.BlockNumberMonitor
+	certBuilder     *clients.CertBuilder
+	certVerifier    *verification.CertVerifier
 	stageTimer      *common.StageTimer
 }
 
@@ -36,7 +35,6 @@ type PayloadDisperser struct {
 func NewPayloadDisperser(
 	logger logging.Logger,
 	payloadDisperserConfig PayloadDisperserConfig,
-	ethClient common.EthClient,
 	// IMPORTANT: it is permissible for the disperserClient to be configured without a prover, but operating with this
 	// configuration puts a trust assumption on the disperser. With a nil prover, the disperser is responsible for computing
 	// the commitments to a blob, and the PayloadDisperser doesn't have a mechanism to verify these commitments.
@@ -46,7 +44,7 @@ func NewPayloadDisperser(
 	//  disperser, but the disperser's commitments will be verifiable without needing a full-fledged prover
 	disperserClient clients.DisperserClient,
 	blockMonitor *verification.BlockNumberMonitor,
-	certBuilder  *clients.CertBuilder,
+	certBuilder *clients.CertBuilder,
 	certVerifier *verification.CertVerifier,
 	// if nil, then no metrics will be collected
 	registry *prometheus.Registry,
@@ -61,12 +59,11 @@ func NewPayloadDisperser(
 
 	return &PayloadDisperser{
 		logger:          logger,
-		ethClient:       ethClient,
 		config:          payloadDisperserConfig,
 		disperserClient: disperserClient,
-		blockMonitor:  blockMonitor,
-		certBuilder:      certBuilder,
-		certVerifier:  certVerifier,
+		blockMonitor:    blockMonitor,
+		certBuilder:     certBuilder,
+		certVerifier:    certVerifier,
 		stageTimer:      stageTimer,
 	}, nil
 }
@@ -102,22 +99,12 @@ func (pd *PayloadDisperser) SendPayload(
 	defer cancel()
 
 	// NOTE: there is a synchronization edge case where the disperser accredits a RBN that correlates
-	//       to a newly added immutable CertVerifier under the Router contract design. Resulting in 
+	//       to a newly added immutable CertVerifier under the Router contract design. Resulting in
 	//       in potentially a few failed dispersals until the RBN advances; guaranteeing eventually consistency.
 	//       This is a known issue and will be addressed with future enhancements.
-	num, err := pd.ethClient.BlockNumber(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get block number: %w", err)
-	}
-
-	requiredQuorums, err := pd.certVerifier.GetQuorumNumbersRequired(timeoutCtx, num)
+	requiredQuorums, err := pd.certVerifier.GetQuorumNumbersRequired(timeoutCtx)
 	if err != nil {
 		return nil, fmt.Errorf("get quorum numbers required: %w", err)
-	}
-
-	certVersion, err := pd.certVerifier.GetCertVersion(timeoutCtx, num)
-	if err != nil {
-		return nil, fmt.Errorf("get certificate version: %w", err)
 	}
 
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.DisperseBlobTimeout)
@@ -140,7 +127,7 @@ func (pd *PayloadDisperser) SendPayload(
 
 	probe.SetStage("QUEUED")
 
-	// poll the disperser for the status of the blob until its received adequate signatures in regards to
+	// poll the disperser for the status of the blob until it's received adequate signatures in regards to
 	// confirmation thresholds, a terminal error, or a timeout
 	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.BlobCompleteTimeout)
 	defer cancel()
@@ -152,16 +139,28 @@ func (pd *PayloadDisperser) SendPayload(
 	pd.logSigningPercentages(blobKey, blobStatusReply)
 
 	probe.SetStage("wait_for_block_number")
-	err = pd.blockMonitor.WaitForBlockNumber(ctx, blobStatusReply.SignedBatch.Header.ReferenceBlockNumber)
+	// TODO: given the repeated context timeout declaration in this method we should consider creating some
+	// generic function or helper to enhance DRY
+	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
+	defer cancel()
+	err = pd.blockMonitor.WaitForBlockNumber(timeoutCtx, blobStatusReply.SignedBatch.Header.ReferenceBlockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("wait for block number: %w", err)
 	}
-	
+
+	certVersion, err := pd.certVerifier.GetCertVersion(ctx, blobStatusReply.SignedBatch.Header.ReferenceBlockNumber)
+	if err != nil {
+		return nil, fmt.Errorf("get certificate version: %w", err)
+	}
+
 	probe.SetStage("build_cert")
-	eigenDACert, err := pd.certBuilder.BuildCert(ctx, certVersion, blobKey, blobStatusReply)
+	timeoutCtx, cancel = context.WithTimeout(ctx, pd.config.ContractCallTimeout)
+	defer cancel()
+	eigenDACert, err := pd.certBuilder.BuildCert(timeoutCtx, certVersion, blobStatusReply)
 	if err != nil {
 		return nil, fmt.Errorf("build cert: %w", err)
 	}
+	pd.logger.Debug("EigenDACert built", "blobKey", blobKey.Hex(), "certVersion", certVersion)
 
 	probe.SetStage("verify_cert")
 
@@ -177,7 +176,6 @@ func (pd *PayloadDisperser) SendPayload(
 
 	return eigenDACert, nil
 }
-
 
 // logSigningPercentages logs the signing percentage of each quorum for a blob that has been dispersed and satisfied
 // required signing thresholds
@@ -304,4 +302,3 @@ func (pd *PayloadDisperser) pollBlobStatusUntilSigned(
 		}
 	}
 }
-

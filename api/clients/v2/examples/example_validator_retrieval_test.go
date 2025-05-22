@@ -57,7 +57,7 @@ func Example_validatorPayloadRetrieval() {
 	fmt.Printf("Successfully retrieved payload\n")
 
 	// Create a cert verifier, to verify the certificate on chain
-	certVerifier, err := createGenericCertVerifier()
+	certVerifier, err := createCertVerifier()
 	if err != nil {
 		panic(fmt.Sprintf("create cert verifier: %v", err))
 	}
