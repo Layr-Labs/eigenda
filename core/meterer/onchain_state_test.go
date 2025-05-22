@@ -45,11 +45,11 @@ func TestGetCurrentBlockNumber(t *testing.T) {
 func TestGetReservedPaymentByAccount(t *testing.T) {
 	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
-	mockState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(dummyReservedPayment, nil)
+	mockState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(map[uint8]*core.ReservedPayment{0: dummyReservedPayment}, nil)
 
-	reservation, err := mockState.GetReservedPaymentByAccount(ctx, gethcommon.Address{})
+	reservations, err := mockState.GetReservedPaymentByAccount(ctx, gethcommon.Address{})
 	assert.NoError(t, err)
-	assert.Equal(t, dummyReservedPayment, reservation)
+	assert.Equal(t, dummyReservedPayment, reservations[0])
 }
 
 func TestGetOnDemandPaymentByAccount(t *testing.T) {

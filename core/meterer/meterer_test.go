@@ -188,23 +188,23 @@ func TestMetererReservations(t *testing.T) {
 
 	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == accountID1
-	})).Return(account1Reservations, nil)
+	})).Return(map[uint8]*core.ReservedPayment{0: account1Reservations, 1: account1Reservations}, nil)
 	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == accountID2
-	})).Return(account2Reservations, nil)
+	})).Return(map[uint8]*core.ReservedPayment{0: account2Reservations, 1: account2Reservations}, nil)
 	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
 		return account == accountID3
-	})).Return(account3Reservations, nil)
-	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(&core.ReservedPayment{}, fmt.Errorf("reservation not found"))
+	})).Return(map[uint8]*core.ReservedPayment{0: account3Reservations, 1: account3Reservations}, nil)
+	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(map[uint8]*core.ReservedPayment{}, fmt.Errorf("reservation not found"))
 
 	// test not active reservation
 	header := createPaymentHeader(1, big.NewInt(0), accountID1)
-	_, err := mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, now)
+	_, err := mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1}, now)
 	assert.ErrorContains(t, err, "reservation not active")
 
 	// test invalid quorom ID
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID1)
-	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, now)
+	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2, 3, 4}, now)
 	assert.ErrorContains(t, err, "invalid quorum for reservation")
 
 	// small bin overflow for empty bin
@@ -244,16 +244,18 @@ func TestMetererReservations(t *testing.T) {
 		header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
 		symbolsCharged, err := mt.MeterRequest(ctx, *header, symbolLength, quoromNumbers, now)
 		assert.NoError(t, err)
+		//TODO(hopeyen): with DB update, this should be testing across quorums
+		// for _, quorum := range quoromNumbers {
 		item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
 			"AccountID":         &types.AttributeValueMemberS{Value: accountID2.Hex()},
 			"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(reservationPeriod))},
 		})
-		assert.NotNil(t, item)
 		assert.NoError(t, err)
-		assert.Equal(t, uint64(requiredLength), symbolsCharged)
 		assert.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
 		assert.Equal(t, strconv.Itoa(int(reservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 		assert.Equal(t, strconv.Itoa((i+1)*int(requiredLength)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
+		// }
+		assert.Equal(t, uint64(requiredLength), symbolsCharged)
 	}
 	// first over flow is allowed
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
@@ -261,21 +263,25 @@ func TestMetererReservations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(27), symbolsCharged)
 	overflowedReservationPeriod := reservationPeriod + 2
+	// TODO(hopeyen): with DB update, this should be testing across quorums
+	// for _, quorum := range quoromNumbers {
+	// accountID := accountID2.Hex() + ":" + strconv.FormatUint(uint64(quorum), 10)
 	item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
 		"AccountID":         &types.AttributeValueMemberS{Value: accountID2.Hex()},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(overflowedReservationPeriod))},
 	})
+
 	assert.NoError(t, err)
 	assert.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
 	assert.Equal(t, strconv.Itoa(int(overflowedReservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
-	// 25 rounded up to the nearest multiple of minNumSymbols - (200-21*9) = 16
 	assert.Equal(t, strconv.Itoa(int(16)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
-
+	// }
 	// second over flow
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
 	assert.NoError(t, err)
 	_, err = mt.MeterRequest(ctx, *header, 1, quoromNumbers, now)
-	assert.ErrorContains(t, err, "bin has already been filled")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "bin has already been filled")
 }
 
 func TestMetererOnDemand(t *testing.T) {

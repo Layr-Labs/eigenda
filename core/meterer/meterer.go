@@ -78,11 +78,11 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 	m.logger.Info("Validating incoming request's payment metadata", "paymentMetadata", header, "numSymbols", numSymbols, "quorumNumbers", quorumNumbers)
 	// Validate against the payment method
 	if header.CumulativePayment.Sign() == 0 {
-		reservation, err := m.ChainPaymentState.GetReservedPaymentByAccount(ctx, header.AccountID)
+		reservations, err := m.ChainPaymentState.GetReservedPaymentByAccount(ctx, header.AccountID)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get active reservation by account: %w", err)
 		}
-		if err := m.ServeReservationRequest(ctx, header, reservation, symbolsCharged, quorumNumbers, receivedAt); err != nil {
+		if err := m.ServeReservationRequest(ctx, header, reservations, symbolsCharged, quorumNumbers, receivedAt); err != nil {
 			return 0, fmt.Errorf("invalid reservation: %w", err)
 		}
 	} else {
@@ -99,25 +99,36 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 }
 
 // ServeReservationRequest handles the rate limiting logic for incoming requests
-func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.PaymentMetadata, reservation *core.ReservedPayment, symbolsCharged uint64, quorumNumbers []uint8, receivedAt time.Time) error {
-	m.logger.Info("Recording and validating reservation usage", "header", header, "reservation", reservation)
-	if !reservation.IsActiveByNanosecond(header.Timestamp) {
-		return fmt.Errorf("reservation not active")
+func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.PaymentMetadata, reservations map[uint8]*core.ReservedPayment, symbolsCharged uint64, quorumNumbers []uint8, receivedAt time.Time) error {
+	m.logger.Info("Recording and validating reservation usage", "header", header, "reservations", reservations)
+	reservedQuorumNumbers := make([]uint8, 0, len(reservations))
+	for quorum := range reservations {
+		reservedQuorumNumbers = append(reservedQuorumNumbers, quorum)
 	}
-	if err := m.ValidateQuorum(quorumNumbers, reservation.QuorumNumbers); err != nil {
+	fmt.Println("reservedQuorumNumbers", reservedQuorumNumbers, "header quorumNumbers", quorumNumbers)
+	if err := m.ValidateQuorum(quorumNumbers, reservedQuorumNumbers); err != nil {
 		return fmt.Errorf("invalid quorum for reservation: %w", err)
 	}
+	//TODO(hopeyen): with DB update, this should be using quorum specific params (moved to above loop)
 	reservationWindow := m.ChainPaymentState.GetReservationWindow()
 	requestReservationPeriod := GetReservationPeriodByNanosecond(header.Timestamp, reservationWindow)
-	if !m.ValidateReservationPeriod(reservation, requestReservationPeriod, reservationWindow, receivedAt) {
-		return fmt.Errorf("invalid reservation period for reservation")
+	for _, quorum := range quorumNumbers {
+		reservation, ok := reservations[quorum]
+		if !ok {
+			return fmt.Errorf("no reservation found for quorum %d", quorum)
+		}
+		if !reservation.IsActiveByNanosecond(header.Timestamp) {
+			return fmt.Errorf("reservation not active for quorum %d", quorum)
+		}
+		if !m.ValidateReservationPeriod(reservation, requestReservationPeriod, reservationWindow, receivedAt) {
+			return fmt.Errorf("invalid reservation period for reservation quorum %d", quorum)
+		}
 	}
-
+	//TODO(hopeyen): with DB update, this should be testing across quorums (moved to above loop)
 	// Update bin usage atomically and check against reservation's data rate as the bin limit
-	if err := m.IncrementBinUsage(ctx, header, reservation, symbolsCharged, reservationWindow, requestReservationPeriod); err != nil {
-		return fmt.Errorf("bin overflows: %w", err)
+	if err := m.IncrementBinUsage(ctx, header, reservations[quorumNumbers[0]], symbolsCharged, reservationWindow, requestReservationPeriod); err != nil {
+		return fmt.Errorf("bin overflows for reservation period %d: %w", requestReservationPeriod, err)
 	}
-
 	return nil
 }
 
@@ -141,6 +152,7 @@ func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) 
 }
 
 // ValidateReservationPeriod checks if the provided reservation period is valid
+// Note: This is called per-quorum, so reservation is for a single quorum.
 func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, requestReservationPeriod uint64, reservationWindow uint64, receivedAt time.Time) bool {
 	currentReservationPeriod := GetReservationPeriod(receivedAt.Unix(), reservationWindow)
 	// Valid reservation periods are either the current bin or the previous bin
@@ -156,6 +168,7 @@ func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, r
 }
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
+// Note: This is called per-quorum, so reservation is for a single quorum.
 func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ReservedPayment, symbolsCharged uint64, reservationWindow uint64, requestReservationPeriod uint64) error {
 	newUsage, err := m.MeteringStore.UpdateReservationBin(ctx, header.AccountID, requestReservationPeriod, symbolsCharged)
 	if err != nil {
@@ -274,6 +287,7 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged ui
 }
 
 // GetReservationBinLimit returns the bin limit for a given reservation
+// Note: This is called per-quorum, so reservation is for a single quorum.
 func (m *Meterer) GetReservationBinLimit(reservation *core.ReservedPayment, reservationWindow uint64) uint64 {
 	return reservation.SymbolsPerSecond * reservationWindow
 }

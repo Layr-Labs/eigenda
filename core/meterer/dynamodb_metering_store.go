@@ -231,10 +231,11 @@ func (s *DynamoDBMeteringStore) RollbackOnDemandPayment(ctx context.Context, acc
 	return nil
 }
 
-// GetPeriodRecords retrieves up to MinNumBins period records for a specific account and quorum number.
-// The records are sorted by reservation period in ascending order, starting from the given period.
-func (s *DynamoDBMeteringStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, quorumNumber uint8) ([MinNumBins]*pb.QuorumPeriodRecord, error) {
-	// Fetch the 3 bins starting from the current bin with specific quorum number
+// GetPeriodRecords retrieves up to MinNumBins period records for a specific account and reservation period.
+// This implementation fetches for quorum 0 (or the first available quorum) for backward compatibility.
+func (s *DynamoDBMeteringStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error) {
+	// For backward compatibility, use quorum 0
+	quorumNumber := uint8(0)
 	accountIDAndQuorum := fmt.Sprintf("%s:%d", accountID.Hex(), quorumNumber)
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.reservationTableName),
@@ -248,19 +249,31 @@ func (s *DynamoDBMeteringStore) GetPeriodRecords(ctx context.Context, accountID 
 	}
 	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
-		return [MinNumBins]*pb.QuorumPeriodRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
+		return [MinNumBins]*pb.PeriodRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
 	}
 
-	records := [MinNumBins]*pb.QuorumPeriodRecord{}
+	records := [MinNumBins]*pb.PeriodRecord{}
 	for i := 0; i < len(bins) && i < int(MinNumBins); i++ {
 		periodRecord, err := parseQuorumPeriodRecord(bins[i])
 		if err != nil {
-			return [MinNumBins]*pb.QuorumPeriodRecord{}, fmt.Errorf("failed to parse bin %d record: %w", i, err)
+			return [MinNumBins]*pb.PeriodRecord{}, fmt.Errorf("failed to parse bin %d record: %w", i, err)
 		}
-		records[i] = periodRecord
+		records[i] = quorumToPeriodRecord(periodRecord)
 	}
 
 	return records, nil
+}
+
+// Helper to convert QuorumPeriodRecord to PeriodRecord
+func quorumToPeriodRecord(q *pb.QuorumPeriodRecord) *pb.PeriodRecord {
+	if q == nil {
+		return nil
+	}
+	return &pb.PeriodRecord{
+		Index:        q.Index,
+		Usage:        q.Usage,
+		QuorumNumber: q.QuorumNumber,
+	}
 }
 
 // GetPeriodRecordsMultiQuorum retrieves period records for multiple quorums efficiently.

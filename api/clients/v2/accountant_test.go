@@ -36,7 +36,7 @@ func TestNewAccountant(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	reservations := map[uint8]*core.ReservedPayment{0: reservation}
+	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
 	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	assert.NotNil(t, accountant)
@@ -77,7 +77,7 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	reservations := map[uint8]*core.ReservedPayment{0: reservation}
+	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
 	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
@@ -85,8 +85,11 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	quorums := []uint8{0, 1}
 	now := time.Now().UnixNano()
 
-	header, err := accountant.AccountBlob(ctx, now, symbolLength, quorums)
+	header, err := accountant.AccountBlob(ctx, now, symbolLength, []uint8{0, 1, 2})
+	assert.Nil(t, header)
+	assert.Error(t, err, "no reservation found for quorum")
 
+	header, err = accountant.AccountBlob(ctx, now, symbolLength, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, meterer.GetReservationPeriod(time.Now().Unix(), reservationWindow), meterer.GetReservationPeriodByNanosecond(header.Timestamp, reservationWindow))
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
@@ -214,7 +217,7 @@ func TestAccountBlobCallSeries(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	reservations := map[uint8]*core.ReservedPayment{0: reservation}
+	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
 	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
@@ -268,7 +271,7 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	reservations := map[uint8]*core.ReservedPayment{0: reservation}
+	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
 	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
@@ -276,33 +279,41 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 
 	// First call
 	now := time.Now().UnixNano()
-	currentPeriod := meterer.GetReservationPeriodByNanosecond(now, reservationWindow) % uint64(numBins)
+	currentPeriod := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
 	_, err = accountant.AccountBlob(ctx, now, 800, quorums)
 	assert.NoError(t, err)
 
-	// Check bin 0 has usage 800
-	record := accountant.GetRelativePeriodRecord(currentPeriod, 0)
-	assert.Equal(t, uint64(800), record.Usage)
+	// Check bin 0 has usage 800 for charged quorums
+	for _, quorumNumber := range quorums {
+		relativeIndex := uint32(currentPeriod % uint64(numBins))
+		assert.Equal(t, uint64(800), accountant.periodRecords[quorumNumber][relativeIndex].Usage)
+	}
 
 	// Second call
 	now += int64(reservationWindow) * time.Second.Nanoseconds()
 	nextPeriod := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
-	assert.Equal(t, currentPeriod+1, nextPeriod, "Should be next period")
-
 	_, err = accountant.AccountBlob(ctx, now, 300, quorums)
 	assert.NoError(t, err)
 
 	// Check bin 1 has usage 300
-	record = accountant.GetRelativePeriodRecord(nextPeriod, 0)
-	assert.Equal(t, uint64(300), record.Usage)
+	for _, quorumNumber := range quorums {
+		relativeIndex := uint32(currentPeriod % uint64(numBins))
+		assert.Equal(t, uint64(800), accountant.periodRecords[quorumNumber][relativeIndex].Usage)
+		relativeIndex = uint32(nextPeriod % uint64(numBins))
+		assert.Equal(t, uint64(300), accountant.periodRecords[quorumNumber][relativeIndex].Usage)
+	}
 
 	// Third call
 	_, err = accountant.AccountBlob(ctx, now, 500, quorums)
 	assert.NoError(t, err)
 
 	// Check bin 1 now has usage 800
-	record = accountant.GetRelativePeriodRecord(nextPeriod, 0)
-	assert.Equal(t, uint64(800), record.Usage)
+	for _, quorumNumber := range quorums {
+		relativeIndex := uint32(currentPeriod % uint64(numBins))
+		assert.Equal(t, uint64(800), accountant.periodRecords[quorumNumber][relativeIndex].Usage)
+		relativeIndex = uint32(nextPeriod % uint64(numBins))
+		assert.Equal(t, uint64(800), accountant.periodRecords[quorumNumber][relativeIndex].Usage)
+	}
 }
 
 func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
@@ -323,19 +334,19 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	reservations := map[uint8]*core.ReservedPayment{0: reservation}
+	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
 	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
 
 	// Start concurrent AccountBlob calls
+	now := time.Now().UnixNano()
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			now := time.Now().UnixNano()
 			_, err := accountant.AccountBlob(ctx, now, 100, quorums)
 			assert.NoError(t, err)
 		}()
@@ -345,12 +356,11 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 	wg.Wait()
 
 	// Check final state
-	usages := mapRecordUsage(accountant.periodRecords)
-	sum := uint64(0)
-	for _, v := range usages[0] {
-		sum += v
+	for _, quorumNumber := range quorums {
+		currentPeriod := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+		relativeIndex := uint32(currentPeriod % uint64(numBins))
+		assert.Equal(t, uint64(1000), accountant.periodRecords[quorumNumber][relativeIndex].Usage)
 	}
-	assert.Equal(t, uint64(1000), sum)
 }
 
 func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
@@ -371,13 +381,13 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	reservations := map[uint8]*core.ReservedPayment{0: reservation}
+	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
 	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
 	now := time.Now().UnixNano()
-	currentPeriod := meterer.GetReservationPeriodByNanosecond(now, reservationWindow) % uint64(numBins)
+	currentPeriod := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
 	header, err := accountant.AccountBlob(ctx, now, 800, quorums)
 	assert.NoError(t, err)
 	timestamp := (time.Duration(header.Timestamp) * time.Nanosecond).Seconds()
@@ -385,9 +395,10 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 
 	// Check current period usage
-	record := accountant.GetRelativePeriodRecord(currentPeriod, 0)
-	assert.Equal(t, uint64(800), record.Usage)
-
+	for _, quorumNumber := range quorums {
+		record := accountant.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		assert.Equal(t, uint64(800), record.Usage)
+	}
 	// Second call: Allow one overflow
 	header, err = accountant.AccountBlob(ctx, now, 500, quorums)
 	assert.NoError(t, err)
@@ -395,12 +406,16 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 
 	// Check current period is at limit
 	binLimit := reservations[0].SymbolsPerSecond * uint64(reservationWindow) // 1000
-	record = accountant.GetRelativePeriodRecord(currentPeriod, 0)
-	assert.Equal(t, binLimit, record.Usage)
+	for _, quorumNumber := range quorums {
+		record := accountant.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		assert.Equal(t, binLimit, record.Usage)
+	}
 
 	// Check overflow period has the overflow
-	overflowRecord := accountant.GetRelativePeriodRecord(currentPeriod+2, 0)
-	assert.Equal(t, uint64(300), overflowRecord.Usage) // 800 + 500 - 1000 = 300
+	for _, quorumNumber := range quorums {
+		overflowRecord := accountant.GetRelativePeriodRecord(currentPeriod+2, quorumNumber)
+		assert.Equal(t, uint64(300), overflowRecord.Usage) // 800 + 500 - 1000 = 300
+	}
 
 	// Third call: Should use on-demand payment
 	now = time.Now().UnixNano()
@@ -408,7 +423,12 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEqual(t, uint64(0), header.Timestamp)
 	assert.Equal(t, big.NewInt(200), header.CumulativePayment)
-	assert.Equal(t, isRotation([]uint64{1300, 0, 300}, mapRecordUsage(accountant.periodRecords)[0]), true)
+	for _, quorumNumber := range quorums {
+		record := accountant.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		assert.Equal(t, uint64(binLimit), record.Usage)
+		record = accountant.GetRelativePeriodRecord(currentPeriod+2, quorumNumber)
+		assert.Equal(t, uint64(300), record.Usage)
+	}
 }
 
 func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
@@ -429,7 +449,7 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	reservations := map[uint8]*core.ReservedPayment{0: reservation}
+	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
 	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
 	ctx := context.Background()
@@ -437,19 +457,24 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 
 	// full reservation
 	now := time.Now().UnixNano()
-	currentPeriod := meterer.GetReservationPeriodByNanosecond(now, reservationWindow) % uint64(numBins)
+	currentPeriod := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
 	_, err = accountant.AccountBlob(ctx, now, 1000, quorums)
 	assert.NoError(t, err)
 
 	// Check current period is at limit
-	record := accountant.GetRelativePeriodRecord(currentPeriod, 0)
-	assert.Equal(t, uint64(1000), record.Usage)
+	for _, quorumNumber := range quorums {
+		record := accountant.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		assert.Equal(t, uint64(1000), record.Usage)
+	}
 
 	// no overflow
 	now = time.Now().UnixNano()
 	header, err := accountant.AccountBlob(ctx, now, 500, quorums)
 	assert.NoError(t, err)
-	assert.Equal(t, isRotation([]uint64{1000, 0, 0}, mapRecordUsage(accountant.periodRecords)[0]), true)
+	for _, quorumNumber := range quorums {
+		record := accountant.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		assert.Equal(t, uint64(1000), record.Usage)
+	}
 	assert.Equal(t, big.NewInt(500), header.CumulativePayment)
 
 	// Wait for next reservation duration
@@ -464,8 +489,10 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Check next period has usage 500
-	record = accountant.GetRelativePeriodRecord(nextPeriod, 0)
-	assert.Equal(t, uint64(500), record.Usage)
+	for _, quorumNumber := range quorums {
+		record := accountant.GetRelativePeriodRecord(nextPeriod, quorumNumber)
+		assert.Equal(t, uint64(500), record.Usage)
+	}
 }
 
 func TestQuorumCheck(t *testing.T) {
@@ -637,36 +664,4 @@ func TestSetPaymentState(t *testing.T) {
 	err = accountant.SetPaymentState(nilGlobalParams)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "payment global params cannot be nil")
-}
-
-func mapRecordUsage(periodRecords map[uint8][]PeriodRecord) map[uint8][]uint64 {
-	usage := make(map[uint8][]uint64)
-	for quorum, records := range periodRecords {
-		usage[quorum] = make([]uint64, len(records))
-		for i, record := range records {
-			usage[quorum][i] = record.Usage
-		}
-	}
-	return usage
-}
-
-func isRotation(arrA, arrB []uint64) bool {
-	n := len(arrA)
-	if n != len(arrB) {
-		return false
-	}
-	doubleArrA := append(arrA, arrA...)
-	for i := 0; i < n; i++ {
-		match := true
-		for j := 0; j < n; j++ {
-			if doubleArrA[i+j] != arrB[j] {
-				match = false
-				break
-			}
-		}
-		if match {
-			return true
-		}
-	}
-	return false
 }

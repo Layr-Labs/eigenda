@@ -85,40 +85,53 @@ func (a *Accountant) BlobPaymentInfo(
 	defer a.usageLock.Unlock()
 
 	// first attempt to use the active reservation for each quorum
+	// get all the quorum as part of a.reservation
+	quorumWithReservation := make([]uint8, 0, len(a.reservation))
+	for quorumNumber := range a.reservation {
+		quorumWithReservation = append(quorumWithReservation, quorumNumber)
+	}
+	useReservation := true
+	// check the input quorumNumbers is a subset of quorumWithReservation
 	for _, quorumNumber := range quorumNumbers {
-		res, exists := a.reservation[quorumNumber]
-		if !exists {
-			continue
+		if !slices.Contains(quorumWithReservation, quorumNumber) {
+			useReservation = false
+			fmt.Println("no reservation found for quorum: ", quorumNumber)
+		}
+	}
+	if useReservation {
+		for quorumNumber, res := range a.reservation {
+			// if quorumNumber is not in quorumNumbers, skip
+			if !slices.Contains(quorumNumbers, quorumNumber) {
+				continue
+			}
+
+			// Get period record specific to this quorum
+			relativePeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod, quorumNumber)
+			// Update usage for this quorum
+			relativePeriodRecord.Usage += symbolUsage
+
+			binLimit := res.SymbolsPerSecond * uint64(a.reservationWindow)
+			if relativePeriodRecord.Usage <= binLimit {
+				continue
+			}
+
+			overflowPeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod+2, quorumNumber)
+			// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
+			if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
+				overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
+				relativePeriodRecord.Usage = binLimit
+				continue
+			}
+
+			// Rollback usage for this quorum since we couldn't use it
+			useReservation = false
+			relativePeriodRecord.Usage -= symbolUsage
 		}
 
-		// Get period record specific to this quorum
-		relativePeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod, quorumNumber)
-		// Update usage for this quorum
-		relativePeriodRecord.Usage += symbolUsage
+	}
 
-		binLimit := res.SymbolsPerSecond * uint64(a.reservationWindow)
-		if relativePeriodRecord.Usage <= binLimit {
-			// TODO: Check against users's registered quorums; replace requiredQuorums with
-			// the user's registered quorums numbers
-			// if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
-			// 	return big.NewInt(0), err
-			// }
-			return big.NewInt(0), nil
-		}
-
-		overflowPeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod+2, quorumNumber)
-		// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
-		if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
-			// if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
-			// 	return big.NewInt(0), err
-			// }
-			overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
-			relativePeriodRecord.Usage = binLimit
-			return big.NewInt(0), nil
-		}
-
-		// Rollback usage for this quorum since we couldn't use it
-		relativePeriodRecord.Usage -= symbolUsage
+	if useReservation {
+		return big.NewInt(0), nil
 	}
 
 	// reservation not available for any quorums, attempt on-demand
