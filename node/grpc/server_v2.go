@@ -147,10 +147,23 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		"batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]),
 		"numBlobs", len(batch.BlobCertificates),
 		"referenceBlockNumber", batch.BatchHeader.ReferenceBlockNumber)
-	operatorState, err := s.node.ChainState.GetOperatorStateByOperator(
+
+	quorums := make(map[core.QuorumID]struct{}, len(batch.BlobCertificates))
+	for _, blobCert := range batch.BlobCertificates {
+		for _, quorum := range blobCert.BlobHeader.QuorumNumbers {
+			quorums[quorum] = struct{}{}
+		}
+	}
+
+	quorumList := make([]core.QuorumID, 0, len(quorums))
+	for quorum := range quorums {
+		quorumList = append(quorumList, quorum)
+	}
+
+	operatorState, err := s.node.ChainState.GetOperatorState(
 		ctx,
 		uint(batch.BatchHeader.ReferenceBlockNumber),
-		s.node.Config.ID)
+		quorumList)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}

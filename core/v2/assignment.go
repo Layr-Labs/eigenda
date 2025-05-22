@@ -2,35 +2,27 @@ package v2
 
 import (
 	"fmt"
-	"math"
 	"sort"
 
 	"github.com/Layr-Labs/eigenda/core"
 )
 
-var LinkedQuorums = []core.QuorumID{core.QuorumID(0), core.QuorumID(1)}
-
-func getOrderedOperators(state *core.OperatorState, quorums []core.QuorumID) ([]core.OperatorID, map[core.OperatorID]*core.OperatorInfo, error) {
+func getOrderedOperators(state *core.OperatorState, quorum core.QuorumID) ([]core.OperatorID, map[core.OperatorID]*core.OperatorInfo, error) {
 
 	if state == nil {
 		return nil, nil, fmt.Errorf("state cannot be nil")
 	}
-	operators := make(map[core.OperatorID]*core.OperatorInfo, 0)
-	for _, q := range quorums {
-		quorumOps, ok := state.Operators[q]
-		if !ok || len(quorumOps) == 0 {
-			return nil, nil, fmt.Errorf("no operators found for quorum %d", q)
-		}
 
-		for id := range quorumOps {
-			operators[id] = quorumOps[id]
-		}
+	operators, ok := state.Operators[quorum]
+	if !ok || len(operators) == 0 {
+		return nil, nil, fmt.Errorf("no operators found for quorum %d", quorum)
 	}
 
-	orderedOps := make([]core.OperatorID, len(operators))
+	orderedOps := make([]core.OperatorID, 0, len(operators))
 	for id := range operators {
 		orderedOps = append(orderedOps, id)
 	}
+
 	sort.Slice(orderedOps, func(i, j int) bool {
 		return orderedOps[i].Hex() < orderedOps[j].Hex()
 	})
@@ -38,65 +30,50 @@ func getOrderedOperators(state *core.OperatorState, quorums []core.QuorumID) ([]
 	return orderedOps, operators, nil
 }
 
-func getValidatorStakePercentages(state *core.OperatorState, quorum core.QuorumID) (map[core.OperatorID]float64, error) {
+func GetAssignmentsForQuorum(state *core.OperatorState, blobParams *core.BlobVersionParameters, quorum core.QuorumID) (map[core.OperatorID]*Assignment, error) {
+
+	orderedOps, operators, err := getOrderedOperators(state, quorum)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ordered operators for quorum %d: %w", quorum, err)
+	}
+
+	numOperators := len(orderedOps)
+
+	// if numOperators > blobParams.MaxNumOperators {
+	// 	return nil, fmt.Errorf("too many operators for quorum %d", quorum)
+	// }
+
+	effectiveNumChunks := blobParams.NumChunks - uint32(numOperators)
 
 	total, ok := state.Totals[quorum]
 	if !ok {
 		return nil, fmt.Errorf("no total found for quorum %d", quorum)
 	}
 
-	percentages := make(map[core.OperatorID]float64)
-	for id := range state.Operators[quorum] {
-		percentages[id] = float64(state.Operators[quorum][id].Stake.Int64()) / float64(total.Stake.Int64())
-	}
-	return percentages, nil
-}
+	assignments := make(map[core.OperatorID]*Assignment, len(operators))
 
-func GetAssignmentVector(percentages map[core.OperatorID]float64, orderedOps []core.OperatorID, numChunks uint32, offset uint32) (map[core.OperatorID][]uint32, uint32, error) {
+	offset := uint32(0)
 
-	assignmentVector := make(map[core.OperatorID][]uint32, len(percentages))
+	totalChunks := 0
 	for _, id := range orderedOps {
 
-		if _, ok := percentages[id]; !ok {
+		if _, ok := operators[id]; !ok {
 			continue
 		}
 
-		chunksForOperator := uint32(math.Ceil(float64(numChunks) * percentages[id]))
-		assignmentVector[id] = make([]uint32, chunksForOperator)
+		chunksForOperator := core.RoundUpDivide(uint64(effectiveNumChunks)*operators[id].Stake.Uint64(), total.Stake.Uint64())
 
-		for j := range assignmentVector[id] {
-			assignmentVector[id][j] = offset
+		totalChunks += int(chunksForOperator)
+
+		assignments[id] = &Assignment{
+			Indices: make([]uint32, chunksForOperator),
+		}
+
+		for j := range assignments[id].Indices {
+			assignments[id].Indices[j] = offset
 			offset++
 		}
 
-	}
-
-	return assignmentVector, offset, nil
-}
-
-func GetAssignmentsForQuorum(state *core.OperatorState, blobParams *core.BlobVersionParameters, quorum core.QuorumID) (map[core.OperatorID]*Assignment, error) {
-
-	orderedOps, _, err := getOrderedOperators(state, []core.QuorumID{quorum})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get ordered operators for quorum %d: %w", quorum, err)
-	}
-
-	// Get minimum percentages for each operator across the linked quorums
-	quorumPercentages, err := getValidatorStakePercentages(state, quorum)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get validator stake percentages for quorum %d: %w", quorum, err)
-	}
-
-	assignmentVector1, _, err := GetAssignmentVector(quorumPercentages, orderedOps, blobParams.NumChunks, 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get assignment vector for quorum 1: %w", err)
-	}
-
-	assignments := make(map[core.OperatorID]*Assignment)
-	for _, id := range orderedOps {
-		assignments[id] = &Assignment{
-			Indices: assignmentVector1[id],
-		}
 	}
 
 	return assignments, nil
@@ -109,12 +86,17 @@ func AddAssignmentsForQuorum(assignments map[core.OperatorID]*Assignment, state 
 		return nil, fmt.Errorf("failed to get assignments for quorum %d: %w", quorum, err)
 	}
 
-	availableIndices := make([]uint32, 0)
+	orderedOps, _, err := getOrderedOperators(state, quorum)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ordered operators for quorum %d: %w", quorum, err)
+	}
+
+	usedIndices := make(map[uint32]struct{})
 
 	newAssignments := make(map[core.OperatorID]*Assignment)
 
-	for id, dummyAssignment := range dummyAssignments {
-		newAssignmentIndicesCount := len(dummyAssignment.Indices)
+	for _, id := range orderedOps {
+		newAssignmentIndicesCount := len(dummyAssignments[id].Indices)
 
 		if newAssignmentIndicesCount > len(assignments[id].Indices) {
 			newAssignmentIndicesCount = len(assignments[id].Indices)
@@ -126,13 +108,22 @@ func AddAssignmentsForQuorum(assignments map[core.OperatorID]*Assignment, state 
 
 		if newAssignmentIndicesCount < len(assignments[id].Indices) {
 			excessIndices := assignments[id].Indices[newAssignmentIndicesCount:]
-			availableIndices = append(availableIndices, excessIndices...)
+			for _, index := range excessIndices {
+				usedIndices[index] = struct{}{}
+			}
 		}
 	}
 
-	for id, dummyAssignment := range dummyAssignments {
+	availableIndices := make([]uint32, 0)
+	for i := uint32(0); i < blobParams.NumChunks; i++ {
+		if _, ok := usedIndices[i]; !ok {
+			availableIndices = append(availableIndices, i)
+		}
+	}
 
-		newAssignmentIndicesCount := len(dummyAssignment.Indices)
+	for _, id := range orderedOps {
+
+		newAssignmentIndicesCount := len(dummyAssignments[id].Indices)
 		if newAssignmentIndicesCount > len(newAssignments[id].Indices) {
 
 			// Add available indices to new assignments

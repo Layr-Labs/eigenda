@@ -251,7 +251,7 @@ func TestDeterministicAssignment(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Assignments should be different for different set of quourms
-	assert.Equal(t, assignment1, assignment4)
+	assert.NotEqual(t, assignment1, assignment4)
 }
 
 func FuzzOperatorAssignmentsV2(f *testing.F) {
@@ -294,7 +294,7 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 			for _, assignment := range assignments {
 				totalChunks += assignment.NumChunks()
 			}
-			assert.GreaterOrEqual(t, totalChunks, blobParams.NumUnits*blobParams.SamplesPerUnit)
+			assert.GreaterOrEqual(t, totalChunks, blobParams.NumChunks-uint32(numOperators))
 		}
 
 		// Sample a random collection of operators whose total stake exceeds the reconstruction threshold and check that they can reconstruct the blob
@@ -349,7 +349,7 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 		}
 
 		// Calculate the minimum required unique chunks for reconstruction
-		minChunksNeeded := blobParams.NumUnits / blobParams.CodingRate
+		minChunksNeeded := blobParams.NumChunks / blobParams.CodingRate
 
 		// Assert that the sampled operators have enough unique chunks to reconstruct the blob
 		assert.GreaterOrEqual(t, uint32(len(uniqueChunkIndices)), minChunksNeeded,
