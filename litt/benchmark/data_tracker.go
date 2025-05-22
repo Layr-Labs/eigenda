@@ -56,14 +56,24 @@ type DataTracker struct {
 	// A set of cohorts that have been completely written to the database (i.e. cohorts that are safe to read).
 	completeCohortSet map[uint64]struct{}
 
+	// A set of keys passed to ReportWrite() that have not yet been fully processed.
+	writtenKeysSet map[uint64]struct{}
+
 	// The index of the oldest cohort being tracked.
 	lowestCohortIndex uint64
 
 	// The index of the newest cohort being tracked.
 	highestCohortIndex uint64
 
-	// The index of the oldest cohort currently being written to. All older cohorts are either complete or abandoned.
-	highestCohortBeingWrittenIndex uint64
+	// Consider all key indices that have been generated this session (i.e. ignore keys indices generated prior to the
+	// most recent restart). We want to find the highest key index that has been written to the database AND
+	// where all lower key indices have also been written as well.
+	highestWrittenKeyIndex uint64
+
+	// Consider all cohorts that have been generated this session (i.e. ignore cohorts generated prior to the most
+	// recent restart). We want to find the highest cohort index that has been fully written to the database AND
+	// where all cohorts with lower indices have also been written as well.
+	highestWrittenCohortIndex uint64
 
 	// A channel containing keys-value pairs that are ready to be written.
 	writeInfoChan chan *WriteInfo
@@ -150,23 +160,25 @@ func NewDataTracker(ctx context.Context, config *BenchmarkConfig) (*DataTracker,
 	ctx, cancel := context.WithCancel(ctx)
 
 	tracker := &DataTracker{
-		ctx:                            ctx,
-		cancel:                         cancel,
-		rand:                           rand.New(rand.NewSource(time.Now().UnixNano())),
-		config:                         config,
-		cohortDirectory:                cohortDirectory,
-		cohorts:                        cohorts,
-		completeCohortSet:              completeCohortSet,
-		writeInfoChan:                  writeInfoChan,
-		readInfoChan:                   readInfoChan,
-		writtenKeyIndicesChan:          writtenKeyIndicesChan,
-		activeCohort:                   activeCohort,
-		lowestCohortIndex:              lowestCohortIndex,
-		highestCohortIndex:             highestCohortIndex,
-		highestCohortBeingWrittenIndex: highestCohortIndex, // only the active cohort initially being written
-		safeTTL:                        safeTTL,
-		valueSize:                      valueSize,
-		generator:                      NewDataGenerator(config.Seed, config.RandomPoolSize),
+		ctx:                       ctx,
+		cancel:                    cancel,
+		rand:                      rand.New(rand.NewSource(time.Now().UnixNano())),
+		config:                    config,
+		cohortDirectory:           cohortDirectory,
+		cohorts:                   cohorts,
+		completeCohortSet:         completeCohortSet,
+		writtenKeysSet:            make(map[uint64]struct{}),
+		writeInfoChan:             writeInfoChan,
+		readInfoChan:              readInfoChan,
+		writtenKeyIndicesChan:     writtenKeyIndicesChan,
+		activeCohort:              activeCohort,
+		lowestCohortIndex:         lowestCohortIndex,
+		highestCohortIndex:        highestCohortIndex,
+		highestWrittenKeyIndex:    activeCohort.LowKeyIndex() - 1,
+		highestWrittenCohortIndex: highestCohortIndex, // only the active cohort initially being written
+		safeTTL:                   safeTTL,
+		valueSize:                 valueSize,
+		generator:                 NewDataGenerator(config.Seed, config.RandomPoolSize),
 	}
 
 	go tracker.dataGenerator()
@@ -249,10 +261,8 @@ func (t *DataTracker) GetWriteInfo() *WriteInfo {
 	}
 }
 
-// MarkHighestIndexWritten marks the given index as having been written. It is assumed that writes happen in order,
-// meaning that calling MarkHighestIndexWritten(X) implies that index X-1 has also been written (as long as X-1 is not
-// an index that was allocated before the benchmark most recently restarted).
-func (t *DataTracker) MarkHighestIndexWritten(index uint64) {
+// ReportWrite is called when a key has been written to the database. This means that the key is now safe to be read.
+func (t *DataTracker) ReportWrite(index uint64) {
 	select {
 	case t.writtenKeyIndicesChan <- index:
 		return
@@ -347,8 +357,14 @@ func (t *DataTracker) dataGenerator() {
 
 // handleWrittenKey handles a key that has been written to the database.
 func (t *DataTracker) handleWrittenKey(keyIndex uint64) {
+
+	// Add key index to the set of written keys we are tracking.
+	t.writtenKeysSet[keyIndex] = struct{}{}
+
 	// Iterate over cohorts currently being written. If any cohort has all keys less than or equal to
 	// this keyIndex, then mark that cohort as complete.
+
+	// TODO future Cody: continue here
 
 	for i := t.highestCohortBeingWrittenIndex; i <= t.highestCohortIndex; i++ {
 		cohort := t.cohorts[i]
