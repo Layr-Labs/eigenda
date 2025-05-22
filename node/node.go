@@ -194,6 +194,7 @@ func NewNode(
 		return nil, fmt.Errorf("failed to create new store: %w", err)
 	}
 
+	// Create new blacklist store
 	blacklistStore, err := NewLevelDBBlacklistStore(
 		config.DbPath+"/blacklist",
 		logger,
