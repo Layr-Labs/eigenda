@@ -126,11 +126,8 @@ func AddAssignmentsForQuorum(
 			Indices: assignments[id].Indices[:newAssignmentIndicesCount],
 		}
 
-		if newAssignmentIndicesCount < len(assignments[id].Indices) {
-			excessIndices := assignments[id].Indices[newAssignmentIndicesCount:]
-			for _, index := range excessIndices {
-				usedIndices[index] = struct{}{}
-			}
+		for _, index := range newAssignments[id].Indices {
+			usedIndices[index] = struct{}{}
 		}
 	}
 
@@ -146,11 +143,13 @@ func AddAssignmentsForQuorum(
 		newAssignmentIndicesCount := len(dummyAssignments[id].Indices)
 		if newAssignmentIndicesCount > len(newAssignments[id].Indices) {
 
+			indicesToAdd := newAssignmentIndicesCount - len(newAssignments[id].Indices)
+
 			// Add available indices to new assignments
-			newAssignments[id].Indices = append(newAssignments[id].Indices, availableIndices[:newAssignmentIndicesCount]...)
+			newAssignments[id].Indices = append(newAssignments[id].Indices, availableIndices[:indicesToAdd]...)
 
 			// Remove used indices from available indices
-			availableIndices = availableIndices[newAssignmentIndicesCount:]
+			availableIndices = availableIndices[indicesToAdd:]
 		}
 	}
 

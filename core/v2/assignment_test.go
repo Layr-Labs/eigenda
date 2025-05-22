@@ -155,6 +155,39 @@ func TestSingleOperator(t *testing.T) {
 	_ = assignment
 }
 
+func TestTwoQuorums(t *testing.T) {
+
+	stakes := map[core.QuorumID]map[core.OperatorID]int{
+		0: {
+			mock.MakeOperatorId(0): 1,
+			mock.MakeOperatorId(1): 4,
+			mock.MakeOperatorId(2): 6,
+			mock.MakeOperatorId(3): 10,
+		},
+		1: {
+			mock.MakeOperatorId(0): 1,
+			mock.MakeOperatorId(1): 3,
+			mock.MakeOperatorId(2): 8,
+			mock.MakeOperatorId(3): 9,
+		},
+	}
+
+	dat, err := mock.NewChainDataMock(stakes)
+	assert.NoError(t, err)
+
+	state := dat.GetTotalOperatorState(context.Background(), 0)
+
+	assignments, err := corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{0, 1}, blobKey1[:])
+	assert.NoError(t, err)
+	assert.Len(t, assignments, 4)
+	assignment, exists := assignments[mock.MakeOperatorId(0)]
+	assert.True(t, exists)
+
+	// assert.Equal(t, blobParams.NumChunks, assignment.NumChunks())
+	_ = assignment
+
+}
+
 func TestValidatorSizes(t *testing.T) {
 	thresholdBips := blobParams.GetReconstructionThresholdBips()
 
@@ -272,9 +305,11 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 		stakes := map[core.QuorumID]map[core.OperatorID]int{
 			0: {},
+			1: {},
 		}
 		for i := 0; i < numOperators; i++ {
 			stakes[0][mock.MakeOperatorId(i)] = rand.Intn(100) + 1
+			stakes[1][mock.MakeOperatorId(i)] = rand.Intn(100) + 10
 		}
 
 		dat, err := mock.NewChainDataMock(stakes)
@@ -284,7 +319,7 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 		state := dat.GetTotalOperatorState(context.Background(), 0)
 
-		assignments, err := corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{0}, blobKey2[:])
+		assignments, err := corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{0, 1}, blobKey2[:])
 		assert.NoError(t, err)
 
 		_ = assignments
