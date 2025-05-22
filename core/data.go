@@ -665,7 +665,7 @@ type BlobVersionParameters struct {
 // GetReconstructionThreshold returns the minimum difference between the ConfirmationThreshold
 // and AdversaryThreshold that is valid for a given BlobVersionParameters.
 func (bvp *BlobVersionParameters) GetReconstructionThresholdBips() uint32 {
-	return RoundUpDivide(bvp.NumChunks*10000, (bvp.NumChunks - bvp.MaxNumOperators))
+	return RoundUpDivide(bvp.NumChunks*10000, (bvp.NumChunks-bvp.MaxNumOperators)*bvp.CodingRate)
 }
 
 // IsActive returns true if the reservation is active at the given timestamp

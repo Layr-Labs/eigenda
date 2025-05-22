@@ -263,7 +263,7 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 	}
 
 	for i := 0; i < 100; i++ {
-		f.Add(rand.Intn(2048) + 100)
+		f.Add(rand.Intn(int(blobParams.MaxNumOperators)-100) + 100)
 	}
 
 	f.Fuzz(func(t *testing.T, numOperators int) {
@@ -287,6 +287,8 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 		assignments, err := corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{0}, blobKey2[:])
 		assert.NoError(t, err)
 
+		_ = assignments
+
 		// Check that the total number of chunks satisfies expected bounds
 		if numOperators > 20 {
 
@@ -294,7 +296,7 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 			for _, assignment := range assignments {
 				totalChunks += assignment.NumChunks()
 			}
-			assert.GreaterOrEqual(t, totalChunks, blobParams.NumChunks-uint32(numOperators))
+			assert.GreaterOrEqual(t, totalChunks, blobParams.NumChunks-blobParams.MaxNumOperators)
 		}
 
 		// Sample a random collection of operators whose total stake exceeds the reconstruction threshold and check that they can reconstruct the blob

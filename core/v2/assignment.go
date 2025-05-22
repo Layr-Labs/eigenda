@@ -66,7 +66,7 @@ func GetAssignmentsForQuorum(
 	for _, id := range orderedOps {
 
 		if _, ok := operators[id]; !ok {
-			continue
+			return nil, fmt.Errorf("operator %s not found for quorum %d", id, quorum)
 		}
 
 		chunksForOperator := core.RoundUpDivide(uint64(effectiveNumChunks)*operators[id].Stake.Uint64(), total.Stake.Uint64())
@@ -207,7 +207,7 @@ func MergeAssignmentsAndCap(
 	}
 
 	mergedAssignmentsFinal := make(map[core.OperatorID]Assignment)
-	for id, a := range mergedAssignmentsFinal {
+	for id, a := range mergedAssignments {
 		mergedAssignmentsFinal[id] = Assignment{
 			Indices: a.Indices,
 		}
