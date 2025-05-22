@@ -15,7 +15,7 @@ const MinNumBins int32 = 3
 // used to track reservation and payment usage data
 type MeteringStore interface {
 	// UpdateReservationBin atomically increments the usage for a reservation bin and returns the new value
-	UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, size uint64) (uint64, error)
+	UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, quorumNumber uint8, size uint64) (uint64, error)
 
 	// UpdateGlobalBin atomically increments the usage for a global bin and returns the new value
 	UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error)
@@ -27,7 +27,7 @@ type MeteringStore interface {
 	RollbackOnDemandPayment(ctx context.Context, accountID gethcommon.Address, newPayment, oldPayment *big.Int) error
 
 	// GetPeriodRecords fetches period records for the given account ID and reservation period
-	GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error)
+	GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, quorumNumber uint8) ([MinNumBins]*pb.QuorumPeriodRecord, error)
 
 	// GetPeriodRecordsMultiQuorum fetches period records for the given account ID and reservation period
 	GetPeriodRecordsMultiQuorum(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, quorumIds []uint8) ([]*pb.QuorumPeriodRecord, error)

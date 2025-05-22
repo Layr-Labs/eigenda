@@ -48,12 +48,11 @@ func TestNewAccountant(t *testing.T) {
 	assert.Equal(t, minNumSymbols, accountant.minNumSymbols)
 
 	// Check initialization of periodRecords
-	for quorumNumber, records := range accountant.periodRecords {
+	for _, records := range accountant.periodRecords {
 		assert.Equal(t, int(numBins), len(records), "Should have numBins records for each quorum")
 		for i, record := range records {
 			assert.Equal(t, uint32(i), record.Index)
 			assert.Equal(t, uint64(0), record.Usage)
-			assert.Equal(t, quorumNumber, record.QuorumNumber)
 		}
 	}
 

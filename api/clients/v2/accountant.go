@@ -38,9 +38,8 @@ type Accountant struct {
 }
 
 type PeriodRecord struct {
-	Index        uint32
-	Usage        uint64
-	QuorumNumber uint8
+	Index uint32
+	Usage uint64
 }
 
 func NewAccountant(accountID gethcommon.Address, reservation map[uint8]*core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint64, pricePerSymbol uint64, minNumSymbols uint64, numBins uint32, logger logging.Logger) *Accountant {
@@ -48,7 +47,7 @@ func NewAccountant(accountID gethcommon.Address, reservation map[uint8]*core.Res
 	for quorumNumber := range reservation {
 		periodRecords[quorumNumber] = make([]PeriodRecord, numBins)
 		for i := range periodRecords[quorumNumber] {
-			periodRecords[quorumNumber][i] = PeriodRecord{Index: uint32(i), Usage: 0, QuorumNumber: quorumNumber}
+			periodRecords[quorumNumber][i] = PeriodRecord{Index: uint32(i), Usage: 0}
 		}
 	}
 	a := Accountant{
@@ -203,9 +202,8 @@ func (a *Accountant) GetRelativePeriodRecord(index uint64, quorumNumber uint8) *
 	relativeIndex := uint32(index % uint64(a.numBins))
 	if a.periodRecords[quorumNumber][relativeIndex].Index != uint32(index) {
 		a.periodRecords[quorumNumber][relativeIndex] = PeriodRecord{
-			Index:        uint32(index),
-			Usage:        0,
-			QuorumNumber: quorumNumber,
+			Index: uint32(index),
+			Usage: 0,
 		}
 	}
 
@@ -268,23 +266,31 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetQuorumSpecif
 	// and the value should be a slice of PeriodRecord, which is a circular array of length numBins
 
 	periodRecords := make(map[uint8][]PeriodRecord)
+	for quorumNumber, _ := range a.reservation {
+		periodRecords[quorumNumber] = make([]PeriodRecord, a.numBins)
+		for i := uint32(0); i < a.numBins; i++ {
+			periodRecords[quorumNumber][i] = PeriodRecord{
+				Index: i,
+				Usage: 0,
+			}
+		}
+	}
+
 	for _, record := range paymentState.GetPeriodRecords() {
 		quorumNumber := uint8(record.QuorumNumber)
 		if _, exists := periodRecords[quorumNumber]; !exists {
 			periodRecords[quorumNumber] = make([]PeriodRecord, a.numBins)
 			for i := uint32(0); i < a.numBins; i++ {
 				periodRecords[quorumNumber][i] = PeriodRecord{
-					Index:        i,
-					Usage:        0,
-					QuorumNumber: quorumNumber,
+					Index: i,
+					Usage: 0,
 				}
 			}
 		}
 		idx := record.Index % a.numBins
 		periodRecords[quorumNumber][idx] = PeriodRecord{
-			Index:        record.Index,
-			Usage:        record.Usage,
-			QuorumNumber: quorumNumber,
+			Index: record.Index,
+			Usage: record.Usage,
 		}
 	}
 	a.periodRecords = periodRecords

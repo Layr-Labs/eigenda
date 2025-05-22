@@ -79,13 +79,15 @@ func TestUpdateReservationBin(t *testing.T) {
 	// Test updating bin that doesn't exist yet (should create it)
 	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 	reservationPeriod := uint64(1)
+	quorumNumber := uint8(0)
 	size := uint64(1000)
 
-	binUsage, err := tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, size)
+	binUsage, err := tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, quorumNumber, size)
 	require.NoError(t, err)
 	assert.Equal(t, size, binUsage)
 
 	// Get the bin directly from DynamoDB to verify
+	// accountIDAndQuorum := fmt.Sprintf("%s:%d", accountID.Hex(), quorumNumber)
 	item, err := dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
 		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
@@ -98,12 +100,13 @@ func TestUpdateReservationBin(t *testing.T) {
 
 	// Test updating existing bin
 	additionalSize := uint64(500)
-	binUsage, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, additionalSize)
+	binUsage, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, quorumNumber, additionalSize)
 	require.NoError(t, err)
 	assert.Equal(t, size+additionalSize, binUsage)
 
 	// Verify updated bin
 	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
+		// "AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
 		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 	})
