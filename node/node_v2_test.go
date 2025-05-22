@@ -114,7 +114,8 @@ func TestDownloadBundlesOnlyParticipatingQuorums(t *testing.T) {
 		require.Len(t, requests, 1)
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 	})
-	state, err := c.node.ChainState.GetOperatorStateByOperator(ctx, uint(10), op3)
+
+	state, err := c.node.ChainState.GetOperatorState(ctx, uint(10), []core.QuorumID{0, 1, 2})
 	require.NoError(t, err)
 	blobShards, rawBundles, err := c.node.DownloadBundles(ctx, batch, state, nil)
 	require.NoError(t, err)
