@@ -23,8 +23,6 @@ type RequestAuthenticator interface {
 		ctx context.Context,
 		request *grpc.StoreChunksRequest,
 		now time.Time) ([]byte, error)
-
-	GetDisperserAddress(ctx context.Context, disperserID uint32, now time.Time) (*gethcommon.Address, error)
 }
 
 // keyWithTimeout is a key with that key's expiration time. After a key "expires", it should be reloaded
@@ -90,17 +88,6 @@ func (a *requestAuthenticator) preloadCache(ctx context.Context, now time.Time) 
 	}
 
 	return nil
-}
-
-func (a *requestAuthenticator) GetDisperserAddress(
-	ctx context.Context,
-	disperserID uint32,
-	now time.Time) (*gethcommon.Address, error) {
-	key, err := a.getDisperserKey(ctx, now, disperserID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get disperser key: %w", err)
-	}
-	return key, nil
 }
 
 func (a *requestAuthenticator) AuthenticateStoreChunksRequest(
