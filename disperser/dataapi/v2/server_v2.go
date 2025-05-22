@@ -91,7 +91,6 @@ type ServerV2 struct {
 	promClient        dataapi.PrometheusClient
 	metrics           *dataapi.Metrics
 	offchainStore     meterer.OffchainStore
-	onchainPayment    meterer.OnchainPayment
 
 	operatorHandler *dataapi.OperatorHandler
 	metricsHandler  *dataapi.MetricsHandler

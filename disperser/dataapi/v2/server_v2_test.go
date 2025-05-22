@@ -25,6 +25,7 @@ import (
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
@@ -61,10 +62,14 @@ var (
 	//go:embed testdata/prometheus-response-network-signing-rate.json
 	mockPrometheusResponseNetworkSigningRate string
 
-	UUID                = uuid.New()
-	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
-	blobMetadataStore   *blobstorev2.BlobMetadataStore
-	testDataApiServerV2 *serverv2.ServerV2
+	UUID                 = uuid.New()
+	metadataTableName    = fmt.Sprintf("test-BlobMetadata-%v", UUID)
+	reservationTableName = fmt.Sprintf("test-Reservations-%v", UUID)
+	ondemandTableName    = fmt.Sprintf("test-OnDemand-%v", UUID)
+	globalTableName      = fmt.Sprintf("test-Global-%v", UUID)
+	blobMetadataStore    *blobstorev2.BlobMetadataStore
+	offchainStore        meterer.OffchainStore
+	testDataApiServerV2  *serverv2.ServerV2
 
 	logger = testutils.GetLogger()
 
@@ -185,10 +190,38 @@ func setup(m *testing.M) {
 	}
 	blobMetadataStore = blobstorev2.NewBlobMetadataStore(dynamoClient, logger, metadataTableName)
 
+	err = meterer.CreateReservationTable(cfg, reservationTableName)
+	if err != nil {
+		teardown()
+		panic("failed to create reservation table")
+	}
+	err = meterer.CreateOnDemandTable(cfg, ondemandTableName)
+	if err != nil {
+		teardown()
+		panic("failed to create ondemand table")
+	}
+	err = meterer.CreateGlobalReservationTable(cfg, globalTableName)
+	if err != nil {
+		teardown()
+		panic("failed to create global reservation table")
+	}
+
+	offchainStore, err = meterer.NewOffchainStore(
+		cfg,
+		reservationTableName,
+		ondemandTableName,
+		globalTableName,
+		logger,
+	)
+	if err != nil {
+		teardown()
+		panic("failed to create offchain store")
+	}
+
 	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
 	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 
-	testDataApiServerV2, err = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
+	testDataApiServerV2, err = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger), offchainStore)
 	if err != nil {
 		teardown()
 		panic("failed to create v2 server: " + err.Error())
@@ -1465,7 +1498,7 @@ func TestFetchBatchFeed(t *testing.T) {
 	// Create a local server so the internal state (e.g. cache) will be re-created.
 	// This is needed because /v2/operators/signing-info API shares the cache state with
 	// /v2/batches/feed API.
-	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
+	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger), offchainStore)
 	require.NoError(t, err)
 
 	r.GET("/v2/batches/feed", testDataApiServerV2.FetchBatchFeed)
@@ -1942,7 +1975,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 	// Create a local server so the internal state (e.g. cache) will be re-created.
 	// This is needed because /v2/operators/signing-info API shares the cache state with
 	// /v2/batches/feed API.
-	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
+	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger), offchainStore)
 	require.NoError(t, err)
 
 	r.GET("/v2/operators/signing-info", testDataApiServerV2.FetchOperatorSigningInfo)
@@ -2238,7 +2271,7 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
 	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 
-	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIcs, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
+	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIcs, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger), offchainStore)
 	require.NoError(t, err)
 
 	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
