@@ -14,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
@@ -42,7 +41,7 @@ var (
 		SamplesPerUnit:              20,
 		NumUnits:                    393,
 	}
-	blobParamsMap = v2.NewBlobVersionParameterMap(map[corev2.BlobVersion]*core.BlobVersionParameters{
+	blobParamsMap = corev2.NewBlobVersionParameterMap(map[corev2.BlobVersion]*core.BlobVersionParameters{
 		0: blobParams,
 	})
 	quorumNumbers = []core.QuorumID{0, 1, 2}
@@ -155,11 +154,12 @@ func prepareBlobs(
 		blob := blobs[z]
 		header := cert.BlobHeader
 
-		params, err := v2.GetEncodingParams(header.BlobCommitments.Length, blobParams)
+		params, err := corev2.GetEncodingParams(header.BlobCommitments.Length, blobParams)
 		require.NoError(t, err)
 		chunks, err := p.GetFrames(blob, params)
 		require.NoError(t, err)
 		state, err := cst.GetOperatorState(context.Background(), uint(referenceBlockNumber), header.QuorumNumbers)
+
 		require.NoError(t, err)
 
 		blobKey, err := header.BlobKey()
@@ -205,7 +205,7 @@ func checkBatchByUniversalVerifier(
 	for id := range state.IndexedOperators {
 		val := corev2.NewShardValidator(v, id, testutils.GetLogger())
 		blobs := packagedBlobs[id]
-		st, err := cst.GetOperatorStateByOperator(ctx, 0, id)
+		st, err := cst.GetOperatorState(ctx, 0, quorumNumbers)
 		require.NoError(t, err)
 		err = val.ValidateBlobs(ctx, blobs, blobParamsMap, pool, st)
 		require.NoError(t, err)
