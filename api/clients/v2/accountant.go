@@ -264,6 +264,9 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetQuorumSpecif
 		}
 	}
 
+	// periodRecords should be a map of quorumNumbers (the quorum numbers same as reservations)
+	// and the value should be a slice of PeriodRecord, which is a circular array of length numBins
+
 	periodRecords := make(map[uint8][]PeriodRecord)
 	for _, record := range paymentState.GetPeriodRecords() {
 		quorumNumber := uint8(record.QuorumNumber)
@@ -277,7 +280,6 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetQuorumSpecif
 				}
 			}
 		}
-		// Update the specific record
 		idx := record.Index % a.numBins
 		periodRecords[quorumNumber][idx] = PeriodRecord{
 			Index:        record.Index,
@@ -287,7 +289,7 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetQuorumSpecif
 	}
 	a.periodRecords = periodRecords
 
-	a.logger.Info("payment state updated", "reservations", len(a.reservation), "periodRecords", len(a.periodRecords))
+	a.logger.Info("payment state updated", "reservations", a.reservation, "periodRecords", a.periodRecords, "onchain cumulative deposit", a.onDemand, "used amount", a.cumulativePayment)
 
 	return nil
 }

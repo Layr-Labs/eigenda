@@ -334,11 +334,11 @@ func (s *DispersalServerV2) GetQuorumSpecificPaymentState(ctx context.Context, r
 	} else {
 		numQuorums := uint8(len(reservations))
 		pbReservation = make([]*pb.QuorumReservation, numQuorums)
-		for quorumId := range reservations {
+		for quorumId, reservation := range reservations {
 			pbReservation[quorumId] = &pb.QuorumReservation{
-				SymbolsPerSecond: reservations[quorumId].SymbolsPerSecond,
-				StartTimestamp:   uint32(reservations[quorumId].StartTimestamp),
-				EndTimestamp:     uint32(reservations[quorumId].EndTimestamp),
+				SymbolsPerSecond: reservation.SymbolsPerSecond,
+				StartTimestamp:   uint32(reservation.StartTimestamp),
+				EndTimestamp:     uint32(reservation.EndTimestamp),
 				QuorumNumber:     uint32(quorumId),
 			}
 		}
@@ -358,6 +358,7 @@ func (s *DispersalServerV2) GetQuorumSpecificPaymentState(ctx context.Context, r
 		// Get all period records for this account across all quorums
 		var fetchErr error
 		periodRecords, fetchErr = s.meterer.MeteringStore.GetPeriodRecordsMultiQuorum(ctx, accountID, currentReservationPeriod, quorumIds)
+		s.logger.Debug("offchain stored period records", "periodRecords", periodRecords)
 		if fetchErr != nil {
 			s.logger.Debug("failed to get reservation records for multiple quorums",
 				"err", fetchErr, "accountID", accountID)
