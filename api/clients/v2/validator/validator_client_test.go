@@ -56,7 +56,7 @@ func MakeRandomAssignment(t *testing.T, rand *testrandom.TestRandom, validatorCo
 
 	state := dat.GetTotalOperatorState(context.Background(), 0)
 
-	assignments, err := v2.GetAssignments(state.OperatorState, blobParams, []core.QuorumID{quorumID}, blobKey1[:])
+	assignments, err := v2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{quorumID}, blobKey1[:])
 	require.NoError(t, err)
 
 	return assignments

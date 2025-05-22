@@ -7,7 +7,10 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 )
 
-func getOrderedOperators(state *core.OperatorState, quorum core.QuorumID) ([]core.OperatorID, map[core.OperatorID]*core.OperatorInfo, error) {
+func getOrderedOperators(
+	state *core.OperatorState,
+	quorum core.QuorumID,
+) ([]core.OperatorID, map[core.OperatorID]*core.OperatorInfo, error) {
 
 	if state == nil {
 		return nil, nil, fmt.Errorf("state cannot be nil")
@@ -30,7 +33,14 @@ func getOrderedOperators(state *core.OperatorState, quorum core.QuorumID) ([]cor
 	return orderedOps, operators, nil
 }
 
-func GetAssignmentsForQuorum(state *core.OperatorState, blobParams *core.BlobVersionParameters, quorum core.QuorumID) (map[core.OperatorID]*Assignment, error) {
+// GetAssignmentsForQuorum calculates chunk assignments for the validators in a single quorum, independently
+// of any other quorums. Not all of the chunks in the encoded blob will be assigned; only enough to satisfy the
+// reconstruction threshold for the blob.
+func GetAssignmentsForQuorum(
+	state *core.OperatorState,
+	blobParams *core.BlobVersionParameters,
+	quorum core.QuorumID,
+) (map[core.OperatorID]*Assignment, error) {
 
 	orderedOps, operators, err := getOrderedOperators(state, quorum)
 	if err != nil {
@@ -79,7 +89,19 @@ func GetAssignmentsForQuorum(state *core.OperatorState, blobParams *core.BlobVer
 	return assignments, nil
 }
 
-func AddAssignmentsForQuorum(assignments map[core.OperatorID]*Assignment, state *core.OperatorState, blobParams *core.BlobVersionParameters, quorum core.QuorumID) (map[core.OperatorID]*Assignment, error) {
+// AddAssignmentsForQuorum uses an existing quorum assignment as a baseline and creates a new assignment for a separate
+// quorum which maximizes the overlap of the assignments for each validator. This is done through two steps:
+// 1. For each validator, as many chunks as possible are taken from the existing assignments for the first quorum,
+// 2. Any unused chunks are then distributed among the validators who still need additional chunks to meet their alloted number.
+// This has the property that the total number of chunks assigned to an operator across the two quorums will be equal to that
+// of the quorum in which it has the largest allocation. (AddAssignmentsForQuorum can be used iteratively with more than two quorums
+// in order to maximize overlap, but will not preserve this property.)
+func AddAssignmentsForQuorum(
+	assignments map[core.OperatorID]*Assignment,
+	state *core.OperatorState,
+	blobParams *core.BlobVersionParameters,
+	quorum core.QuorumID,
+) (map[core.OperatorID]*Assignment, error) {
 
 	dummyAssignments, err := GetAssignmentsForQuorum(state, blobParams, quorum)
 	if err != nil {
@@ -137,9 +159,16 @@ func AddAssignmentsForQuorum(assignments map[core.OperatorID]*Assignment, state 
 	return newAssignments, nil
 }
 
-func MergeAssignmentsAndCap(assignments []map[core.OperatorID]*Assignment, blobParams *core.BlobVersionParameters) map[core.OperatorID]Assignment {
+// MergeAssignmentsAndCap merges a list of assignments into a single assignment which contains the union of the
+// indices from each of the input assignments. The number of indices for each operator is capped at the maximum
+// number of chunks needed to construct a blob. This is because once a validator has enough unique chunks to reconstruct
+// a blob, the relationship of these chunk indices to those held by other validators is irrelevant.
+func MergeAssignmentsAndCap(
+	assignments []map[core.OperatorID]*Assignment,
+	blobParams *core.BlobVersionParameters,
+) map[core.OperatorID]Assignment {
 
-	_mergedAssignments := make(map[core.OperatorID]*Assignment)
+	mergedAssignments := make(map[core.OperatorID]*Assignment)
 	indexMaps := make(map[core.OperatorID]map[uint32]struct{})
 
 	maxChunks := blobParams.NumChunks / blobParams.CodingRate
@@ -147,14 +176,14 @@ func MergeAssignmentsAndCap(assignments []map[core.OperatorID]*Assignment, blobP
 	for _, assignment := range assignments {
 		for id, a := range assignment {
 
-			if _, ok := _mergedAssignments[id]; !ok {
+			if _, ok := mergedAssignments[id]; !ok {
 				// Take all indices if less than maxChunks, otherwise take only maxChunks
 				indicesLen := uint32(len(a.Indices))
 				if indicesLen > maxChunks {
 					indicesLen = maxChunks
 				}
 
-				_mergedAssignments[id] = &Assignment{
+				mergedAssignments[id] = &Assignment{
 					Indices: a.Indices[:indicesLen],
 				}
 				indexMaps[id] = make(map[uint32]struct{})
@@ -166,31 +195,40 @@ func MergeAssignmentsAndCap(assignments []map[core.OperatorID]*Assignment, blobP
 
 			for _, index := range a.Indices {
 
-				if uint32(len(_mergedAssignments[id].Indices)) >= maxChunks {
+				if uint32(len(mergedAssignments[id].Indices)) >= maxChunks {
 					break
 				}
 
 				if _, ok := indexMaps[id][index]; ok {
 					continue
 				}
-				_mergedAssignments[id].Indices = append(_mergedAssignments[id].Indices, index)
+				mergedAssignments[id].Indices = append(mergedAssignments[id].Indices, index)
 				indexMaps[id][index] = struct{}{}
 			}
 		}
 	}
 
-	mergedAssignments := make(map[core.OperatorID]Assignment)
-	for id, a := range _mergedAssignments {
-		mergedAssignments[id] = Assignment{
+	mergedAssignmentsFinal := make(map[core.OperatorID]Assignment)
+	for id, a := range mergedAssignmentsFinal {
+		mergedAssignmentsFinal[id] = Assignment{
 			Indices: a.Indices,
 		}
 	}
 
-	return mergedAssignments
+	return mergedAssignmentsFinal
 }
 
-// GetAssignments calculates chunk assignments for operators in a quorum based on their stake
-func GetAssignments(state *core.OperatorState, blobParams *core.BlobVersionParameters, quorums []core.QuorumID, blobKey []byte) (map[core.OperatorID]Assignment, error) {
+// GetAssignmentsForBlob calculates chunk assignments for the validators in a set of quorums based on their stake.
+// The quorums passed into GetAssignmentsForBlob should be the full set of quorums contained in the blob header.
+// Moreover, the OperatorState must include the operator state maps for each of the quorums specified.
+// GetAssignemntsForBlob will attempt to construct maximally overlapping assignments for each quorum, and then merge them together.
+// The number of chunks assigned to each operator is capped at the maximum number of chunks needed to construct a blob.
+func GetAssignmentsForBlob(
+	state *core.OperatorState,
+	blobParams *core.BlobVersionParameters,
+	quorums []core.QuorumID,
+	blobKey []byte,
+) (map[core.OperatorID]Assignment, error) {
 	if state == nil {
 		return nil, fmt.Errorf("state cannot be nil")
 	}
@@ -227,14 +265,22 @@ func GetAssignments(state *core.OperatorState, blobParams *core.BlobVersionParam
 	return mergedAssignments, nil
 }
 
-// GetAssignment returns the assignment for a specific operator
-func GetAssignment(state *core.OperatorState, blobParams *core.BlobVersionParameters, quorums []core.QuorumID, blobKey []byte, id core.OperatorID) (Assignment, error) {
+// GetAssignmentForBlob returns the assignment for a specific operator for a specific blob. The quorums passed into GetAssignmentsForBlob should be the full set of quorums contained in the blob header.
+// Moreover, the OperatorState must include the operator state maps for each of the quorums specified. GetAssignmentForBlob calls
+// GetAssignmentsForBlob under the hood.
+func GetAssignmentForBlob(
+	state *core.OperatorState,
+	blobParams *core.BlobVersionParameters,
+	quorums []core.QuorumID,
+	blobKey []byte,
+	id core.OperatorID,
+) (Assignment, error) {
 
 	if blobParams == nil {
 		return Assignment{}, fmt.Errorf("blob params cannot be nil")
 	}
 
-	assignments, err := GetAssignments(state, blobParams, quorums, blobKey)
+	assignments, err := GetAssignmentsForBlob(state, blobParams, quorums, blobKey)
 	if err != nil {
 		return Assignment{}, err
 	}

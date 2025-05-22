@@ -27,7 +27,7 @@ var blobKey2 = []byte("blobKey2")
 // 	state := dat.GetTotalOperatorState(context.Background(), 0)
 // 	operatorState := state.OperatorState
 
-// 	assignments, err := corev2.GetAssignments(operatorState, blobParams, 0)
+// 	assignments, err := corev2.GetAssignmentsForBlob(operatorState, blobParams, 0)
 // 	assert.NoError(t, err)
 // 	expectedAssignments := map[core.OperatorID]corev2.Assignment{
 // 		mock.MakeOperatorId(0): {
@@ -60,7 +60,7 @@ var blobKey2 = []byte("blobKey2")
 
 // 		assert.Equal(t, assignment, expectedAssignments[operatorID])
 
-// 		assignment, err := corev2.GetAssignment(operatorState, blobParams, 0, operatorID)
+// 		assignment, err := corev2.GetAssignmentForBlob(operatorState, blobParams, 0, operatorID)
 // 		assert.NoError(t, err)
 
 // 		assert.Equal(t, assignment, expectedAssignments[operatorID])
@@ -117,20 +117,20 @@ func TestInvalidChunkLength(t *testing.T) {
 }
 
 func TestNilStateAssignments(t *testing.T) {
-	_, err := corev2.GetAssignments(nil, blobParams, []core.QuorumID{0}, blobKey1[:])
+	_, err := corev2.GetAssignmentsForBlob(nil, blobParams, []core.QuorumID{0}, blobKey1[:])
 	assert.Error(t, err)
 }
 
 // func TestNonExistentQuorum(t *testing.T) {
 // 	state := dat.GetTotalOperatorState(context.Background(), 0)
 // 	nonExistentQuorum := uint8(99) // Assuming this quorum doesn't exist
-// 	_, err := corev2.GetAssignments(state.OperatorState, blobParams, nonExistentQuorum)
+// 	_, err := corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, nonExistentQuorum)
 // 	assert.Error(t, err)
 // }
 
 func TestNonExistentOperator(t *testing.T) {
 	state := dat.GetTotalOperatorState(context.Background(), 0)
-	_, err := corev2.GetAssignment(state.OperatorState, blobParams, []core.QuorumID{0}, blobKey1[:], mock.MakeOperatorId(999))
+	_, err := corev2.GetAssignmentForBlob(state.OperatorState, blobParams, []core.QuorumID{0}, blobKey1[:], mock.MakeOperatorId(999))
 	assert.Error(t, err, corev2.ErrNotFound)
 }
 
@@ -146,7 +146,7 @@ func TestSingleOperator(t *testing.T) {
 
 	state := dat.GetTotalOperatorState(context.Background(), 0)
 
-	assignments, err := corev2.GetAssignments(state.OperatorState, blobParams, []core.QuorumID{0}, blobKey1[:])
+	assignments, err := corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{0}, blobKey1[:])
 	assert.NoError(t, err)
 	assert.Len(t, assignments, 1)
 	assignment, exists := assignments[mock.MakeOperatorId(0)]
@@ -201,7 +201,7 @@ func TestValidatorSizes(t *testing.T) {
 			state := dat.GetTotalOperatorState(context.Background(), 0)
 
 			// Get assignment for the test operator
-			assignment, err := corev2.GetAssignment(state.OperatorState, blobParams, []core.QuorumID{0}, blobKey1[:], mock.MakeOperatorId(0))
+			assignment, err := corev2.GetAssignmentForBlob(state.OperatorState, blobParams, []core.QuorumID{0}, blobKey1[:], mock.MakeOperatorId(0))
 			assert.NoError(t, err)
 
 			// Verify the assignment has the expected number of chunks
@@ -230,24 +230,24 @@ func TestDeterministicAssignment(t *testing.T) {
 	operatorState := state.OperatorState
 
 	// Get assignments for the same operator with identical headers
-	assignment1, err := corev2.GetAssignment(operatorState, blobParams, []core.QuorumID{0}, blobKey1[:], mock.MakeOperatorId(0))
+	assignment1, err := corev2.GetAssignmentForBlob(operatorState, blobParams, []core.QuorumID{0}, blobKey1[:], mock.MakeOperatorId(0))
 	assert.NoError(t, err)
 
-	assignment2, err := corev2.GetAssignment(operatorState, blobParams, []core.QuorumID{0}, blobKey1[:], mock.MakeOperatorId(0))
+	assignment2, err := corev2.GetAssignmentForBlob(operatorState, blobParams, []core.QuorumID{0}, blobKey1[:], mock.MakeOperatorId(0))
 	assert.NoError(t, err)
 
 	// Assignments should be identical
 	assert.Equal(t, assignment1, assignment2)
 
 	// Get assignments for different operators with the same header
-	assignment3, err := corev2.GetAssignment(operatorState, blobParams, []core.QuorumID{0}, blobKey1[:], mock.MakeOperatorId(1))
+	assignment3, err := corev2.GetAssignmentForBlob(operatorState, blobParams, []core.QuorumID{0}, blobKey1[:], mock.MakeOperatorId(1))
 	assert.NoError(t, err)
 
 	// Assignments should be different for different operators
 	assert.NotEqual(t, assignment1, assignment3)
 
 	// Get assignment for the same operator but different set of quourms
-	assignment4, err := corev2.GetAssignment(operatorState, blobParams, []core.QuorumID{0, 1}, blobKey1[:], mock.MakeOperatorId(0))
+	assignment4, err := corev2.GetAssignmentForBlob(operatorState, blobParams, []core.QuorumID{0, 1}, blobKey1[:], mock.MakeOperatorId(0))
 	assert.NoError(t, err)
 
 	// Assignments should be different for different set of quourms
@@ -284,7 +284,7 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 		state := dat.GetTotalOperatorState(context.Background(), 0)
 
-		assignments, err := corev2.GetAssignments(state.OperatorState, blobParams, []core.QuorumID{0}, blobKey2[:])
+		assignments, err := corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{0}, blobKey2[:])
 		assert.NoError(t, err)
 
 		// Check that the total number of chunks satisfies expected bounds

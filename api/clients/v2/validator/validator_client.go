@@ -132,7 +132,7 @@ func (c *validatorClient) GetBlob(
 	}
 
 	probe.SetStage("get_assignments")
-	assignments, err := corev2.GetAssignments(operatorState, blobParams, blobHeader.QuorumNumbers, blobKey[:])
+	assignments, err := corev2.GetAssignmentsForBlob(operatorState, blobParams, blobHeader.QuorumNumbers, blobKey[:])
 	if err != nil {
 		return nil, errors.New("failed to get assignments")
 	}

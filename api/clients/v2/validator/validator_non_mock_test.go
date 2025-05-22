@@ -87,7 +87,7 @@ func TestNonMockedValidatorClientWorkflow(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get assignments
-	assignments, err := v2.GetAssignments(operatorState, blobParams, quorumNumbers, blobKey[:])
+	assignments, err := v2.GetAssignmentsForBlob(operatorState, blobParams, quorumNumbers, blobKey[:])
 	require.NoError(t, err)
 
 	// Put a redundant index in each assignment

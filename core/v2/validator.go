@@ -53,7 +53,7 @@ func (v *shardValidator) validateBlobParams(blob *BlobShard, blobParams *core.Bl
 		return nil, err
 	}
 
-	assignment, err := GetAssignment(operatorState, blobParams, blob.BlobHeader.QuorumNumbers, blobKey[:], v.operatorID)
+	assignment, err := GetAssignmentForBlob(operatorState, blobParams, blob.BlobHeader.QuorumNumbers, blobKey[:], v.operatorID)
 	if err != nil {
 		return nil, err
 	}
