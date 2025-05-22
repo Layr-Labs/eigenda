@@ -18,10 +18,11 @@ import (
 )
 
 const (
-	// dynamoBatchWriteLimit is the maximum number of items that can be written in a single batch
-	dynamoBatchWriteLimit = 25
-	// dynamoBatchReadLimit is the maximum number of items that can be read in a single batch
-	dynamoBatchReadLimit = 100
+	// DynamoBatchWriteLimit is the maximum number of items that can be written in a single batch
+	// Reference: https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TransactWriteItems.html
+	DynamoBatchWriteLimit = 100
+	// DynamoBatchReadLimit is the maximum number of items that can be read in a single batch
+	DynamoBatchReadLimit = 100
 )
 
 type batchOperation uint
@@ -453,7 +454,7 @@ func (c *client) writeItems(ctx context.Context, tableName string, requestItems 
 	failedItems := make([]map[string]types.AttributeValue, 0)
 	for startIndex < len(requestItems) {
 		remainingNumKeys := float64(len(requestItems) - startIndex)
-		batchSize := int(math.Min(float64(dynamoBatchWriteLimit), remainingNumKeys))
+		batchSize := int(math.Min(float64(DynamoBatchWriteLimit), remainingNumKeys))
 		writeRequests := make([]types.WriteRequest, batchSize)
 		for i := 0; i < batchSize; i += 1 {
 			item := requestItems[startIndex+i]
@@ -483,7 +484,7 @@ func (c *client) writeItems(ctx context.Context, tableName string, requestItems 
 			}
 		}
 
-		startIndex += dynamoBatchWriteLimit
+		startIndex += DynamoBatchWriteLimit
 	}
 
 	return failedItems, nil
@@ -499,7 +500,7 @@ func (c *client) readItems(
 	items := make([]Item, 0)
 	for startIndex < len(keys) {
 		remainingNumKeys := float64(len(keys) - startIndex)
-		batchSize := int(math.Min(float64(dynamoBatchReadLimit), remainingNumKeys))
+		batchSize := int(math.Min(float64(DynamoBatchReadLimit), remainingNumKeys))
 		keysBatch := keys[startIndex : startIndex+batchSize]
 		output, err := c.dynamoClient.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
 			RequestItems: map[string]types.KeysAndAttributes{
@@ -551,8 +552,8 @@ func (c *client) TransactAddBy(ctx context.Context, tableName string, ops []Tran
 	if len(ops) == 0 {
 		return nil
 	}
-	if len(ops) > 25 {
-		return fmt.Errorf("DynamoDB TransactWriteItems limit is 25 operations per transaction")
+	if len(ops) > DynamoBatchWriteLimit {
+		return fmt.Errorf("DynamoDB TransactWriteItems limit is 100 operations per transaction")
 	}
 
 	transactItems := make([]types.TransactWriteItem, len(ops))

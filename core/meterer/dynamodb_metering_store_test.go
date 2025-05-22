@@ -88,7 +88,7 @@ func TestIncrementBinUsages_EdgeCases(t *testing.T) {
 		size := uint64(100)
 		var quorums []core.QuorumID
 		periods := make(map[core.QuorumID]uint64)
-		for i := 0; i < 26; i++ {
+		for i := 0; i < commondynamodb.DynamoBatchWriteLimit+1; i++ {
 			quorums = append(quorums, core.QuorumID(i))
 			periods[core.QuorumID(i)] = reservationPeriod
 		}
