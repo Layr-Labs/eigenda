@@ -3,7 +3,6 @@ package verification
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"sync"
 
 	clients "github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -63,8 +62,10 @@ func (cv *CertVerifier) CheckDACert(
 	}
 
 	// 3 - Call the contract method CheckDACert to verify the certificate
+	// TODO: determine if there's any merit in passing call options to impose better determinism and 
+	// safety on the operation
 	result, err := certVerifierCaller.CheckDACert(
-		&bind.CallOpts{Context: ctx, BlockNumber: big.NewInt(int64(cert.ReferenceBlockNumber()))},
+		&bind.CallOpts{Context: ctx},
 		certBytes,
 	)
 	if err != nil {
