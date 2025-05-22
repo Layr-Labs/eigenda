@@ -288,44 +288,6 @@ func TestDeterministicAssignment(t *testing.T) {
 	assert.NotEqual(t, assignment1, assignment4)
 }
 
-func BenchmarkOperatorAssignments(b *testing.B) {
-	// Test different operator counts
-	numOperators := []int{10, 50, 100, 500, 1000, 2000}
-	for _, n := range numOperators {
-		b.Run(fmt.Sprintf("operators-%d", n), func(b *testing.B) {
-			// Setup test data outside the benchmark loop
-			stakes := map[core.QuorumID]map[core.OperatorID]int{
-				0: {},
-				1: {},
-			}
-			for i := 0; i < n; i++ {
-				stakes[0][mock.MakeOperatorId(i)] = rand.Intn(100) + 1
-				stakes[1][mock.MakeOperatorId(i)] = rand.Intn(100) + 10
-			}
-
-			dat, err := mock.NewChainDataMock(stakes)
-			if err != nil {
-				b.Fatal(err)
-			}
-
-			state := dat.GetTotalOperatorState(context.Background(), 0)
-			blobKey := make([]byte, 32)
-			rand.Read(blobKey)
-
-			// Reset timer after setup
-			b.ResetTimer()
-
-			// Run the actual benchmark
-			for i := 0; i < b.N; i++ {
-				_, err = corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{0, 1}, blobKey)
-				if err != nil {
-					b.Fatal(err)
-				}
-			}
-		})
-	}
-}
-
 func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 	// Add distributions to fuzz
