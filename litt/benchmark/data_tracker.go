@@ -219,7 +219,7 @@ func gatherCohorts(cohortDirPath string) (
 		} else if strings.HasSuffix(filePath, CohortSwapFileExtension) {
 			// Delete any swap files discovered
 			err = os.Remove(filePath)
-			if err != nil {
+			if err != nil && !os.IsNotExist(err) {
 				return 0,
 					0,
 					nil,
@@ -261,13 +261,26 @@ func (t *DataTracker) MarkHighestIndexWritten(index uint64) {
 	}
 }
 
-// GetReadInfo returns information required to perform a read operation. If this returns nil, then there are currently
-// no keys that are safe to read.
+// GetReadInfo returns information required to perform a read operation. Blocks until there is data eligible to be read.
 func (t *DataTracker) GetReadInfo() *ReadInfo {
 	select {
 	case info := <-t.readInfoChan:
 		return info
 	case <-t.ctx.Done():
+		return nil
+	}
+}
+
+// GetReadInfoWithTimeout returns information required to perform a read operation. Waits the specified timeout for
+// data to be eligible to be read. If no data is available within the time limit, returns nil.
+func (t *DataTracker) GetReadInfoWithTimeout(timeout time.Duration) *ReadInfo {
+	ctx, cancel := context.WithTimeout(t.ctx, timeout)
+	defer cancel()
+
+	select {
+	case info := <-t.readInfoChan:
+		return info
+	case <-ctx.Done():
 		return nil
 	}
 }
@@ -286,27 +299,48 @@ func (t *DataTracker) dataGenerator() {
 	nextReadInfo := t.generateNextReadInfo()
 
 	for {
-		select {
+		if nextReadInfo == nil {
+			// Edge case: when stared up for the first time, there won't be any values eligible to be read.
+			// We have to handle this in a special manner to prevent nil values from being inserted into
+			// the readInfoChan.
 
-		case <-t.ctx.Done():
-			// abort when context is cancelled
-			return
+			select {
+			case <-t.ctx.Done():
+				// abort when context is cancelled
+				return
+			case keyIndex := <-t.writtenKeyIndicesChan:
+				// track keys that have been written so that we can read them in the future
+				t.handleWrittenKey(keyIndex)
+			case t.writeInfoChan <- nextWriteInfo:
+				// prepare a value to be eventually written
+				nextWriteInfo = t.generateNextWriteInfo()
+			case <-ticker.C:
+				// perform garbage collection on cohorts
+				t.DoCohortGC()
+			}
 
-		case keyIndex := <-t.writtenKeyIndicesChan:
-			// track keys that have been written so that we can read them in the future
-			t.handleWrittenKey(keyIndex)
-
-		case t.writeInfoChan <- nextWriteInfo:
-			// prepare a value to be eventually written
-			nextWriteInfo = t.generateNextWriteInfo()
-
-		case t.readInfoChan <- nextReadInfo:
-			// prepare a value to be eventually read
 			nextReadInfo = t.generateNextReadInfo()
 
-		case <-ticker.C:
-			// perform garbage collection on cohorts
-			t.DoCohortGC()
+		} else {
+			// Standard case.
+
+			select {
+			case <-t.ctx.Done():
+				// abort when context is cancelled
+				return
+			case keyIndex := <-t.writtenKeyIndicesChan:
+				// track keys that have been written so that we can read them in the future
+				t.handleWrittenKey(keyIndex)
+			case t.writeInfoChan <- nextWriteInfo:
+				// prepare a value to be eventually written
+				nextWriteInfo = t.generateNextWriteInfo()
+			case t.readInfoChan <- nextReadInfo:
+				// prepare a value to be eventually read
+				nextReadInfo = t.generateNextReadInfo()
+			case <-ticker.C:
+				// perform garbage collection on cohorts
+				t.DoCohortGC()
+			}
 		}
 	}
 }
@@ -329,7 +363,8 @@ func (t *DataTracker) handleWrittenKey(keyIndex uint64) {
 		if err != nil {
 			panic(fmt.Sprintf("failed to mark cohort complete: %v", err)) // TODO not clean
 		}
-		t.completeCohortSet[keyIndex] = struct{}{}
+		t.completeCohortSet[cohort.CohortIndex()] = struct{}{}
+		t.highestCohortBeingWrittenIndex++
 	}
 }
 
