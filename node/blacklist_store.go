@@ -96,7 +96,7 @@ func (s *BlacklistStore) AddEntry(ctx context.Context, disperserId uint32, conte
 		return fmt.Errorf("failed to serialize blacklist: %w", err)
 	}
 
-	s.logger.Info("Adding entry to blacklist", "disperserId", disperserId, "contextReason", contextId, "reason", reason)
+	s.logger.Info("Adding entry to blacklist", "disperserId", disperserId, "contextId", contextId, "reason", reason)
 	disperserIdHash := sha256.Sum256(fmt.Appendf(nil, "%d", disperserId))
 	return s.db.Put(disperserIdHash[:], data)
 }
@@ -111,7 +111,6 @@ func (s *BlacklistStore) IsBlacklisted(ctx context.Context, disperserId uint32) 
 	// The number of entries determines the number of times a disperser has offended
 	// We exponentially increase the amount of time the disperser is blacklisted
 	// So it is 1 hour, 1 day and 1 week for the 3 offences and is based on the LastUpdated timestamp
-
 	lastUpdated := blacklist.LastUpdated
 	if len(blacklist.Entries) == 1 {
 		if time.Since(time.Unix(int64(lastUpdated), 0)) < time.Hour {
@@ -127,6 +126,6 @@ func (s *BlacklistStore) IsBlacklisted(ctx context.Context, disperserId uint32) 
 		}
 	}
 
-	// is blacklisted if number of entries is >= 3
-	return len(blacklist.Entries) >= 3
+	// if the disperser is not blacklisted, return false
+	return false
 }
