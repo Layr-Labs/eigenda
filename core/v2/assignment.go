@@ -41,22 +41,22 @@ func GetAssignmentsForQuorum(
 	state *core.OperatorState,
 	blobParams *core.BlobVersionParameters,
 	quorum core.QuorumID,
-) (map[core.OperatorID]*Assignment, error) {
+) (map[core.OperatorID]*Assignment, []core.OperatorID, error) {
 
 	orderedOps, operators, err := getOrderedOperators(state, quorum)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ordered operators for quorum %d: %w", quorum, err)
+		return nil, nil, fmt.Errorf("failed to get ordered operators for quorum %d: %w", quorum, err)
 	}
 
 	if len(orderedOps) > int(blobParams.MaxNumOperators) {
-		return nil, fmt.Errorf("too many operators for quorum %d", quorum)
+		return nil, nil, fmt.Errorf("too many operators for quorum %d", quorum)
 	}
 
 	effectiveNumChunks := blobParams.NumChunks - blobParams.MaxNumOperators
 
 	total, ok := state.Totals[quorum]
 	if !ok {
-		return nil, fmt.Errorf("no total found for quorum %d", quorum)
+		return nil, nil, fmt.Errorf("no total found for quorum %d", quorum)
 	}
 
 	assignments := make(map[core.OperatorID]*Assignment, len(operators))
@@ -66,11 +66,12 @@ func GetAssignmentsForQuorum(
 	totalChunks := 0
 	for _, id := range orderedOps {
 
-		if _, ok := operators[id]; !ok {
-			return nil, fmt.Errorf("operator %s not found for quorum %d", id, quorum)
+		operator, ok := operators[id]
+		if !ok {
+			return nil, nil, fmt.Errorf("operator %s not found for quorum %d", id, quorum)
 		}
 
-		chunksForOperator := uint32(core.RoundUpDivideBig(new(big.Int).Mul(big.NewInt(int64(effectiveNumChunks)), operators[id].Stake), total.Stake).Uint64())
+		chunksForOperator := uint32(core.RoundUpDivideBig(new(big.Int).Mul(big.NewInt(int64(effectiveNumChunks)), operator.Stake), total.Stake).Uint64())
 
 		totalChunks += int(chunksForOperator)
 
@@ -85,7 +86,7 @@ func GetAssignmentsForQuorum(
 
 	}
 
-	return assignments, nil
+	return assignments, orderedOps, nil
 }
 
 // AddAssignmentsForQuorum uses an existing quorum assignment as a baseline and creates a new assignment for a separate
@@ -102,14 +103,9 @@ func AddAssignmentsForQuorum(
 	quorum core.QuorumID,
 ) (map[core.OperatorID]*Assignment, error) {
 
-	dummyAssignments, err := GetAssignmentsForQuorum(state, blobParams, quorum)
+	dummyAssignments, orderedOps, err := GetAssignmentsForQuorum(state, blobParams, quorum)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get assignments for quorum %d: %w", quorum, err)
-	}
-
-	orderedOps, _, err := getOrderedOperators(state, quorum)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get ordered operators for quorum %d: %w", quorum, err)
 	}
 
 	usedIndices := make(map[uint32]struct{})
@@ -132,7 +128,7 @@ func AddAssignmentsForQuorum(
 		}
 	}
 
-	availableIndices := make([]uint32, 0)
+	availableIndices := make([]uint32, 0, blobParams.NumChunks)
 	for i := uint32(0); i < blobParams.NumChunks; i++ {
 		if _, ok := usedIndices[i]; !ok {
 			availableIndices = append(availableIndices, i)
@@ -243,7 +239,7 @@ func GetAssignmentsForBlob(
 	assignmentsList := make([]map[core.OperatorID]*Assignment, len(quorums))
 	for i, q := range quorums {
 		if i == 0 {
-			assignments, err := GetAssignmentsForQuorum(state, blobParams, q)
+			assignments, _, err := GetAssignmentsForQuorum(state, blobParams, q)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get assignments for quorum %d: %w", q, err)
 			}

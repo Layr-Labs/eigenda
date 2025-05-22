@@ -2,6 +2,7 @@ package v2_test
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"testing"
@@ -287,6 +288,44 @@ func TestDeterministicAssignment(t *testing.T) {
 	assert.NotEqual(t, assignment1, assignment4)
 }
 
+func BenchmarkOperatorAssignments(b *testing.B) {
+	// Test different operator counts
+	numOperators := []int{10, 50, 100, 500, 1000, 2000}
+	for _, n := range numOperators {
+		b.Run(fmt.Sprintf("operators-%d", n), func(b *testing.B) {
+			// Setup test data outside the benchmark loop
+			stakes := map[core.QuorumID]map[core.OperatorID]int{
+				0: {},
+				1: {},
+			}
+			for i := 0; i < n; i++ {
+				stakes[0][mock.MakeOperatorId(i)] = rand.Intn(100) + 1
+				stakes[1][mock.MakeOperatorId(i)] = rand.Intn(100) + 10
+			}
+
+			dat, err := mock.NewChainDataMock(stakes)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			state := dat.GetTotalOperatorState(context.Background(), 0)
+			blobKey := make([]byte, 32)
+			rand.Read(blobKey)
+
+			// Reset timer after setup
+			b.ResetTimer()
+
+			// Run the actual benchmark
+			for i := 0; i < b.N; i++ {
+				_, err = corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{0, 1}, blobKey)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
 func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 	// Add distributions to fuzz
@@ -339,10 +378,8 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 		// Get the total stake for the quorum
 		totalStake := new(big.Int).Set(state.OperatorState.Totals[0].Stake)
 
-		// Calculate the threshold stake required for reconstruction
-		thresholdPercentage := float64(blobParams.GetReconstructionThresholdBips()) / 10000.0 // Convert from basis points to percentage
-		thresholdStake := new(big.Int).Mul(totalStake, big.NewInt(int64(thresholdPercentage*10000)))
-		thresholdStake.Div(thresholdStake, big.NewInt(10000))
+		// Calculate the threshold stake required for reconstruction\
+		thresholdStake := core.RoundUpDivideBig(new(big.Int).Mul(totalStake, big.NewInt(int64(blobParams.GetReconstructionThresholdBips()))), big.NewInt(10000))
 
 		// Create a slice of operator IDs to randomly sample from
 		operatorIDs := make([]core.OperatorID, 0, len(stakes[0]))
@@ -391,5 +428,25 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 		// Assert that the sampled operators have enough unique chunks to reconstruct the blob
 		assert.GreaterOrEqual(t, uint32(len(uniqueChunkIndices)), minChunksNeeded,
 			"Sampled operators should have enough unique chunks to reconstruct the blob")
+
+		if uint32(len(uniqueChunkIndices)) < minChunksNeeded {
+
+			fmt.Println("Quorum: 0")
+			for opID, stake := range stakes[0] {
+				fmt.Println("Stake: ", stake, "Operator: ", opID.Hex())
+			}
+
+			fmt.Println("Quorum: 1")
+			for opID, stake := range stakes[1] {
+				fmt.Println("Stake: ", stake, "Operator: ", opID.Hex())
+			}
+
+			fmt.Println("Sampled operators:")
+			for _, opID := range sampledOperators {
+				fmt.Println(opID.Hex())
+			}
+
+			t.Fatal("Sampled operators should have enough unique chunks to reconstruct the blob")
+		}
 	})
 }
