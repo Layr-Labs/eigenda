@@ -2,6 +2,7 @@ package v2
 
 import (
 	"fmt"
+	"math/big"
 	"sort"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -69,7 +70,7 @@ func GetAssignmentsForQuorum(
 			return nil, fmt.Errorf("operator %s not found for quorum %d", id, quorum)
 		}
 
-		chunksForOperator := core.RoundUpDivide(uint64(effectiveNumChunks)*operators[id].Stake.Uint64(), total.Stake.Uint64())
+		chunksForOperator := uint32(core.RoundUpDivideBig(new(big.Int).Mul(big.NewInt(int64(effectiveNumChunks)), operators[id].Stake), total.Stake).Uint64())
 
 		totalChunks += int(chunksForOperator)
 
