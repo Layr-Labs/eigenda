@@ -553,7 +553,7 @@ func (c *client) TransactAddBy(ctx context.Context, tableName string, ops []Tran
 		return nil
 	}
 	if len(ops) > DynamoBatchWriteLimit {
-		return fmt.Errorf("DynamoDB TransactWriteItems limit is 100 operations per transaction")
+		return fmt.Errorf("DynamoDB TransactWriteItems limit is %d operations per transaction", DynamoBatchWriteLimit)
 	}
 
 	transactItems := make([]types.TransactWriteItem, len(ops))
