@@ -196,3 +196,50 @@ type PeriodRecord struct {
 	ReservationPeriod uint32 `json:"reservation_period"`
 	UsageBytes        uint64 `json:"usage_bytes"`
 }
+
+type AccountPaymentStateResponse struct {
+	AccountId                string                   `json:"account_id"`
+	PaymentGlobalParams      map[string]interface{}   `json:"payment_global_params"`
+	PeriodRecords            []map[string]interface{} `json:"period_records"`
+	Reservation              map[string]interface{}   `json:"reservation"`
+	CumulativePayment        string                   `json:"cumulative_payment"`
+	OnchainCumulativePayment string                   `json:"onchain_cumulative_payment"`
+}
+
+// FetchAccountPaymentState godoc
+//
+//	@Summary	Fetch payment state for an account
+//	@Tags		Accounts
+//	@Produce	json
+//	@Param		account_id	path		string	true	"The account ID to fetch payment state for"
+//	@Success	200			{object}	AccountPaymentStateResponse
+//	@Failure	400			{object}	ErrorResponse	"error: Bad request"
+//	@Failure	404			{object}	ErrorResponse	"error: Not found"
+//	@Failure	500			{object}	ErrorResponse	"error: Server error"
+//	@Router		/accounts/{account_id}/payment-state [get]
+func (s *ServerV2) FetchAccountPaymentState(c *gin.Context) {
+	handlerStart := time.Now()
+
+	// Parse account ID
+	accountStr := c.Param("account_id")
+	if !gethcommon.IsHexAddress(accountStr) {
+		s.metrics.IncrementInvalidArgRequestNum("FetchAccountPaymentState")
+		invalidParamsErrorResponse(c, errors.New("account id is not valid hex"))
+		return
+	}
+	accountId := gethcommon.HexToAddress(accountStr)
+	if accountId == (gethcommon.Address{}) {
+		s.metrics.IncrementInvalidArgRequestNum("FetchAccountPaymentState")
+		invalidParamsErrorResponse(c, errors.New("zero account id is not valid"))
+		return
+	}
+
+	// For now, just return the account_id in the response
+	response := &AccountPaymentStateResponse{
+		AccountId: accountId.Hex(),
+	}
+
+	s.metrics.IncrementSuccessfulRequestNum("FetchAccountPaymentState")
+	s.metrics.ObserveLatency("FetchAccountPaymentState", time.Since(handlerStart))
+	c.JSON(http.StatusOK, response)
+}

@@ -82,6 +82,52 @@
                 }
             }
         },
+        "/accounts/{account_id}/payment-state": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Fetch payment state for an account",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "The account ID to fetch payment state for",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.AccountPaymentStateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/accounts/{account_id}/reservation/usage": {
             "get": {
                 "produces": [
@@ -1280,6 +1326,35 @@
                     "items": {
                         "$ref": "#/definitions/v2.BlobInfo"
                     }
+                }
+            }
+        },
+        "v2.AccountPaymentStateResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "cumulative_payment": {
+                    "type": "string"
+                },
+                "onchain_cumulative_payment": {
+                    "type": "string"
+                },
+                "payment_global_params": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "period_records": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                    }
+                },
+                "reservation": {
+                    "type": "object",
+                    "additionalProperties": true
                 }
             }
         },
