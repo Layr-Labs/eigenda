@@ -12,7 +12,7 @@ EigenDA is a secure, high-throughput, and decentralized data availability (DA) s
 
 To understand more about how EigenDA works and how it transforms the modern landscape of data availability, continue reading [EigenDA introduction](https://www.blog.eigenlayer.xyz/intro-to-eigenda-hyperscale-data-availability-for-rollups/).
 
-To dive deep into the technical details, continue reading [EigenDA protocol spec](https://layr-labs.github.io/eigenda/).
+To dive deep into the technical details, continue reading [EigenDA protocol spec](https://layr-labs.github.io/eigenda/) in mdBook.
 
 If you're interested in integrating your rollup with EigenDA, please fill out the [EigenDA Partner Registration](https://docs.google.com/forms/d/e/1FAIpQLSdXvfxgRfIHWYu90FqN-2yyhgrYm9oExr0jSy7ERzbMUimJew/viewform).
 
