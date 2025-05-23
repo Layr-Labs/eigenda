@@ -66,7 +66,7 @@ The correctness of a L2 state is determined by the derivation rules, which are i
 With interactive fault proof, the derivation logics are packaged into a binary ELF file, which can be run inside a FPVM (Cannon, Asterisc, etc.).
 
 The FPVM requires both the ELF binary and data (L2 batches and L1 deposits) to be able to rerun the derivation pipeline.
-The ida is to repeat what op-node has done to reach consensus, except that in FPVM, every execution is traceable and challengable.
+The idea is to repeat what op-node has done to reach consensus, except that in FPVM, every execution is traceable and challengeable.
 
 Data is provided to FPVM in the form of preimage oracle. OP spec has defined rules such that all data in the preimage oracle are verifiable on L1.
 
