@@ -1,4 +1,4 @@
-# EigenDACertVerifierRouter Immutable Deployment
+# EigenDACertVerifierRouter Deployment
 
 This directory contains the deployment script for the EigenDACertVerifierRouter contract.
 
@@ -8,7 +8,7 @@ The EigenDACertVerifierRouter is a routing contract that directs certification v
 
 ## Deployment
 
-To deploy an immutable EigenDACertVerifierRouter, use the following command:
+To deploy the EigenDACertVerifierRouter, use the following command:
 
 ```shell
 forge script script/deploy/router/CertVerifierRouterDeployer.s.sol:CertVerifierRouterDeployer \
@@ -28,21 +28,24 @@ Create a configuration file in the `config/` directory with the following format
 ```json
 {
   "initialOwner": "0x0000000000000000000000000000000000000001",
-  "initialCertVerifier": "0x0000000000000000000000000000000000000000"
+  "initialCertVerifier": "0x0000000000000000000000000000000000000002",
+  "proxyAdmin": "0x0000000000000000000000000000000000000003"
 }
 ```
 
 - The `initialOwner` parameter specifies the address that will be set as the owner of the deployed router contract.
 - The `initialCertVerifier` parameter specifies the initial address of the cert verifier initialized at block height 0.
+- The `proxyAdmin` parameter specifies the address of the proxy admin for the transparent proxy.
 
 ### Post-Deployment
 
-After deployment, the router contract is deployed but doesn't have any cert verifiers registered. The owner will need to call `addCertVerifier(uint32 abn, address certVerifier)` to register cert verifiers with their activation block numbers (ABNs).
+After deployment, the router is initialized with the provided initial cert verifier at block height 0. The owner will need to call `addCertVerifier(uint32 abn, address certVerifier)` to register additional cert verifiers with their activation block numbers (ABNs).
 
-The deployment script will write the router's address to an output JSON file in the format:
+The deployment script will write the deployment addresses to an output JSON file in the format:
 
 ```json
 {
-  "eigenDACertVerifierRouter": "0x..."
+  "eigenDACertVerifierRouter": "0x...",
+  "eigenDACertVerifierRouterImplementation": "0x..."
 }
 ```
