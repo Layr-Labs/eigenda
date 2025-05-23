@@ -13,13 +13,13 @@ A rollup system can be split into two parts: write path to L1 and read path from
 
 | Path      | Direction | Purpose                                    | Main actor                   |
 | --------- | --------- | ------------------------------------------ | ---------------------------- |
-| **Write**| L2 → L1   | Liveness – keep blocks flowing             | `op-batcher` + EigenDA proxy |
+| **Write**| L2 → L1   | Low cost L2 block production with user transactions  | `op-batcher` + EigenDA proxy |
 | **Write**| Direct on L1   | Censorship resistance + Deposit        | Rollup users        + Opimism Portal     |
 | **Read**  | L1 → L2   | Safety – all nodes see the same block list | OP derivation pipeline       |
 
 
 - The `write path` ensures the liveness of the L2 consensus. It consists of L2 batches produced by op-batcher and L1  deposit transactions.
-- The `read path` controls the safety of the L2 consensus. It ensures that all L2 consensus nodes see an identical list of L2 blocks and L1 induced transactions, such that an EVM can produce identical L2 state
+- The `read path` controls the safety of the L2 consensus. It ensures that all L2 consensus nodes see an identical list of L2 batchrs and L1 sytem and deposits transactions, such that an EVM can produce identical L2 state
 
 If the read path stalls, honest nodes can’t reach the block height needed to dispute a bad state root.
 
