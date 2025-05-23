@@ -1,7 +1,7 @@
 # How To Choose Good Payload Sizes
 
 Choosing a good payload size is important for optimizing EigenDA usage costs. If you have the ability to control
-the size of your payload and you choose unoptimally, you may end up paying twice as much for your traffic.
+the size of your payload and you choose un-optimally, you may end up paying twice as much for your traffic.
 
 ## Definitions
 
@@ -28,22 +28,24 @@ possible but without exceeding it.
 
 In the table below, all bounds are inclusive.
 
-| Minimum Payload Size | Maximum Payload Size | Blob Size       | Blob Size |
-|:---------------------|:---------------------|:----------------|:----------|
-| 0 bytes              | 126945 bytes         | 131072 bytes    | 128 kb    |
-| 126946 bytes         | 253921 bytes         | 262144 bytes    | 256 kb    |
-| 253922 bytes         | 507873 bytes         | 524288 bytes    | 512 kb    |
-| 507874 bytes         | 1015777 bytes        | 1048576 bytes   | 1 mb      |
-| 1015778 bytes        | 2031585 bytes        | 2097152 bytes   | 2 mb      |
-| 2031586 bytes        | 4063201 bytes        | 4194304 bytes   | 4 mb      |
-| 4063202 bytes        | 8126433 bytes        | 8388608 bytes   | 8 mb      |
-| 8126434 bytes        | 16252897 bytes       | 16777216 bytes  | 16 mb     |
+| Minimum Payload Size | Maximum Payload Size | Blob Size               |
+|:---------------------|:---------------------|:------------------------|
+| 0 bytes              | 126945 bytes         | 131072 bytes (128 KiB)  |
+| 126946 bytes         | 253921 bytes         | 262144 bytes (256 KiB)  |
+| 253922 bytes         | 507873 bytes         | 524288 bytes (512 KiB)  |
+| 507874 bytes         | 1015777 bytes        | 1048576 bytes (1 MiB)   |
+| 1015778 bytes        | 2031585 bytes        | 2097152 bytes (2 MiB)   |
+| 2031586 bytes        | 4063201 bytes        | 4194304 bytes (4 MiB)   |
+| 4063202 bytes        | 8126433 bytes        | 8388608 bytes (8 MiB)   |
+| 8126434 bytes        | 16252897 bytes       | 16777216 bytes (16 MiB) |
 
 ## Minimum Blob SIze
 
-The minimum `blob` size is 128kb. Sending extremely small `payloads` will always result in a blob of at least 128kb.
+The minimum `blob` size is 128KiB. Sending extremely small `payloads` will always result in being charted for at least
+as much as if sending 128KiB. (Note that the actual data transmitted over the wire may be smaller than 128KiB, but
+it is metered and charged as if it were 128KiB.)
 
 ## Maximum Blob Size
 
-The maximum `blob` size is 16mb. Sending extremely large `payloads` may result in a dispersal error if it cannot 
-fit into a 16mb `blob`.
+The maximum `blob` size is 16MiB. Sending extremely large `payloads` will result in a dispersal error if it cannot 
+fit into a 16MiB `blob`.

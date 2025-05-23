@@ -109,7 +109,7 @@ func (b *Blob) toEncodedPayload(payloadForm codecs.PolynomialForm) (*encodedPayl
 		return nil, fmt.Errorf("invalid polynomial form")
 	}
 
-	maxPermissiblePayloadLength, err := codec.GetMaxPermissiblePayloadLength(b.blobLengthSymbols)
+	maxPermissiblePayloadLength, err := codec.BlobSymbolsToMaxPayloadSize(b.blobLengthSymbols)
 	if err != nil {
 		return nil, fmt.Errorf("get max permissible payload length: %w", err)
 	}
