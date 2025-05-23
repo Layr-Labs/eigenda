@@ -4,7 +4,7 @@ This document presents an overview on how EigenDA plugs into Optimism (OP) Stack
 - `write` and `read` path in a L2 rollup
 - Why the `read` path must stay live (even with a misbehaving op-batcher)
 - Adding an EigenDA stage to the OP derivation pipeline
-- Hokulea, Rust library that defines and implement the Eigenda derivation rule
+- Hokulea, Rust library that defines and implements the Eigenda derivation rule
 - How Hokulea works in both interactive fault-proof VMs and zkVMs
 
 ## Write and Read path in L2 consensus
