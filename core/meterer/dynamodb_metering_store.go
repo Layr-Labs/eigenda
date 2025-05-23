@@ -245,14 +245,14 @@ func (s *DynamoDBMeteringStore) GetPeriodRecords(ctx context.Context, accountID 
 	}
 	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
-		return []*pb.PeriodRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
+		return make([]*pb.PeriodRecord, MinNumBins), fmt.Errorf("failed to query payments for account: %w", err)
 	}
 
 	records := make([]*pb.PeriodRecord, max(len(bins), int(MinNumBins)))
 	for i := 0; i < len(bins) && i < int(limit); i++ {
 		periodRecord, err := parsePeriodRecord(bins[i])
 		if err != nil {
-			return []*pb.PeriodRecord{}, fmt.Errorf("failed to parse bin %d record: %w", i, err)
+			return make([]*pb.PeriodRecord, MinNumBins), fmt.Errorf("failed to parse bin %d record: %w", i, err)
 		}
 		records[i] = periodRecord
 	}
