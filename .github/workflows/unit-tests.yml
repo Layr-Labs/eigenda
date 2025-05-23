@@ -7,11 +7,31 @@ on:
     branches:
       - master
 
+permissions:
+  contents: read
+
 jobs:
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            23.93.76.1:32005
+            23.93.76.1:32006
+            analytics.localstack.cloud:443
+            assets.localstack.cloud:443
+            auth.docker.io:443
+            github.com:443
+            production.cloudflare.docker.com:443
+            proxy.golang.org:443
+            registry-1.docker.io:443
+            storage.googleapis.com:443
+
       - name: Add LocalStack AWS Credentials
         run: |
           mkdir -p ~/.aws
