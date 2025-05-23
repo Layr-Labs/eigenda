@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"math/big"
 	"os"
 	"runtime"
 	"testing"
@@ -13,7 +14,6 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
@@ -37,9 +37,9 @@ var (
 	blobParams = &core.BlobVersionParameters{
 		NumChunks:       8192,
 		CodingRate:      8,
-		MaxNumOperators: 3537,
+		MaxNumOperators: 2048,
 	}
-	blobParamsMap = v2.NewBlobVersionParameterMap(map[corev2.BlobVersion]*core.BlobVersionParameters{
+	blobParamsMap = corev2.NewBlobVersionParameterMap(map[corev2.BlobVersion]*core.BlobVersionParameters{
 		0: blobParams,
 	})
 	quorumNumbers = []core.QuorumID{0, 1, 2}
@@ -116,6 +116,11 @@ func makeTestBlob(t *testing.T, p encoding.Prover, version corev2.BlobVersion, l
 			BlobVersion:     version,
 			QuorumNumbers:   quorums,
 			BlobCommitments: commitments,
+			PaymentMetadata: core.PaymentMetadata{
+				AccountID:         gethcommon.HexToAddress("0x123"),
+				Timestamp:         5,
+				CumulativePayment: big.NewInt(100),
+			},
 		},
 	}
 
@@ -140,58 +145,43 @@ func prepareBlobs(
 	})
 	assert.NoError(t, err)
 
-	blobsMap := make([]map[core.QuorumID]map[core.OperatorID][]*encoding.Frame, 0, len(certs))
+	blobsMap := make(map[core.OperatorID][]*corev2.BlobShard)
 
-	for z, cert := range certs {
+	for z := range certs {
+		cert := certs[z]
 		blob := blobs[z]
 		header := cert.BlobHeader
 
-		params, err := v2.GetEncodingParams(header.BlobCommitments.Length, blobParams)
+		params, err := corev2.GetEncodingParams(header.BlobCommitments.Length, blobParams)
 		require.NoError(t, err)
 		chunks, err := p.GetFrames(blob, params)
 		require.NoError(t, err)
 		state, err := cst.GetOperatorState(context.Background(), uint(referenceBlockNumber), header.QuorumNumbers)
+
 		require.NoError(t, err)
-		blobMap := make(map[core.QuorumID]map[core.OperatorID][]*encoding.Frame)
 
-		for _, quorum := range header.QuorumNumbers {
-			assignments, err := corev2.GetAssignments(state, blobParams, quorum)
-			require.NoError(t, err)
+		assignments, err := corev2.GetAssignmentsForBlob(state, blobParams, header.QuorumNumbers)
+		require.NoError(t, err)
 
-			blobMap[quorum] = make(map[core.OperatorID][]*encoding.Frame)
+		for opID, assignment := range assignments {
 
-			for opID, assignment := range assignments {
-				blobMap[quorum][opID] = chunks[assignment.StartIndex : assignment.StartIndex+assignment.NumChunks]
+			if _, ok := blobsMap[opID]; !ok {
+				blobsMap[opID] = make([]*corev2.BlobShard, 0)
 			}
-		}
 
-		blobsMap = append(blobsMap, blobMap)
-	}
-
-	// Invert the blobsMap
-	inverseMap := make(map[core.OperatorID][]*corev2.BlobShard)
-	for blobIndex, blobMap := range blobsMap {
-		for quorum, operatorMap := range blobMap {
-			for operatorID, frames := range operatorMap {
-
-				if _, ok := inverseMap[operatorID]; !ok {
-					inverseMap[operatorID] = make([]*corev2.BlobShard, 0)
-				}
-				if len(inverseMap[operatorID]) < blobIndex+1 {
-					inverseMap[operatorID] = append(inverseMap[operatorID], &corev2.BlobShard{
-						BlobCertificate: &certs[blobIndex],
-						Bundles:         make(map[core.QuorumID]core.Bundle),
-					})
-				}
-				if len(frames) == 0 {
-					continue
-				}
-				inverseMap[operatorID][blobIndex].Bundles[quorum] = append(inverseMap[operatorID][blobIndex].Bundles[quorum], frames...)
+			shard := &corev2.BlobShard{
+				BlobCertificate: &cert,
+				Bundle:          make([]*encoding.Frame, assignment.NumChunks()),
 			}
+			for i := uint32(0); i < assignment.NumChunks(); i++ {
+				shard.Bundle[i] = chunks[assignment.Indices[i]]
+			}
+
+			blobsMap[opID] = append(blobsMap[opID], shard)
 		}
 	}
 
-	return inverseMap, cst
+	return blobsMap, cst
 
 }
 
@@ -210,7 +200,7 @@ func checkBatchByUniversalVerifier(
 	for id := range state.IndexedOperators {
 		val := corev2.NewShardValidator(v, id, testutils.GetLogger())
 		blobs := packagedBlobs[id]
-		st, err := cst.GetOperatorStateByOperator(ctx, 0, id)
+		st, err := cst.GetOperatorState(ctx, 0, quorumNumbers)
 		require.NoError(t, err)
 		err = val.ValidateBlobs(ctx, blobs, blobParamsMap, pool, st)
 		require.NoError(t, err)
@@ -219,7 +209,7 @@ func checkBatchByUniversalVerifier(
 
 func TestValidationSucceeds(t *testing.T) {
 
-	operatorCounts := []uint{1, 10}
+	operatorCounts := []uint{2, 10}
 	numBlob := 1 // must be greater than 0
 	blobLengths := []int{1, 2}
 	bn := uint64(1000)

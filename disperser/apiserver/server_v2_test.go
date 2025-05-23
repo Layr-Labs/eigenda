@@ -569,7 +569,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		0: {
 			NumChunks:       8192,
 			CodingRate:      8,
-			MaxNumOperators: 3537,
+			MaxNumOperators: 2048,
 		},
 	}, nil)
 
