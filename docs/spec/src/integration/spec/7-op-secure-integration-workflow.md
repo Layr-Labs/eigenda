@@ -84,7 +84,7 @@ More information about the communication spec is at [Hokulea](https://github.com
 oracle and derivation logics allows for 
 
 - deterministically derive rollup payload from a EigenDA certificate
-- discard DA certs that can stall the derivation pipeline
+- discarding DA certs that can stall the derivation pipeline
 
 ### Canoe
 
