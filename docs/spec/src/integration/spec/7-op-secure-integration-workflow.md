@@ -107,5 +107,5 @@ For an integration guide, please refer to the [preloader](https://github.com/Lay
 
 ### Rust Kzg Bn254 library
 
-The constraint also requires all eigenda blob with respect to the kzg commitment in the DA cert. We developed a similar library to `c-kzg`s called
+The constraint also requires all eigenda blob with respect to the kzg commitment in the DA cert. We developed a similar library to `c-kzg` called
 [rust-kzg-bn254](https://github.com/Layr-Labs/rust-kzg-bn254) that offers similar functionalities as [4844 spec](https://github.com/ethereum/consensus-specs/blob/86fb82b221474cc89387fa6436806507b3849d88/specs/deneb/polynomial-commitments.md).
