@@ -18,7 +18,7 @@ A rollup system can be split into two parts: write path to L1 and read path from
 | **Read**  | L1 → L2   | Safety – all nodes see the same block list | OP derivation pipeline       |
 
 
-- The `write path` ensures the liveness of the L2 consensus. It consists of L2 blocks produced by op-batch and L1 induced transactions.
+- The `write path` ensures the liveness of the L2 consensus. It consists of L2 batches produced by op-batcher and L1  deposit transactions.
 - The `read path` controls the safety of the L2 consensus. It ensures all L2 consensus node sees an identical list of L2 blocks, then a EVM can produce identical L2 state
 
 If the read path stalls, honest nodes can’t reach the block height needed to dispute a bad state root. As the result so it must never stall.
