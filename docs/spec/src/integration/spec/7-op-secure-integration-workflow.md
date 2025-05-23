@@ -76,8 +76,8 @@ Hokulea builds on top of OP Kona derivation pipeline to integrate EigenDA as a D
 for EigenDA part of derivation pipeline, such that those logics can be compiled into ELF together with Kona.
 
 Hokulea also extends preimage oracle for EigenDA, which is able to provide the verifiable interface for answering
-- if a DA cert is correct
-- what is the current recency window to determine if a blob is stale
+- whether a DA cert is correct
+- what is the current recency window to determine if a cert is stale
 
 More information about the communication spec is at [Hokulea](https://github.com/Layr-Labs/hokulea/tree/master/docs). Both extension to preimage
 oracle and derivation logics allows for 
@@ -95,11 +95,11 @@ We developed a rust library called [**Canoe**](https://github.com/Layr-Labs/hoku
 
 Unlike interactive challenge game with fault proof, a zk proof has a property that only the honest party can create a valid zk proof with respect to
 the correct derivation rule.
-Hence,a n incorrect party can raise a challenge but is unable to defend its position.
+Hence, a malicious party can raise a challenge but is unable to defend its position.
 
 - The Hokulea+Kona derivation are compiled into ELF
 - The Hokulea+Kona preimage oracle are prepared, where the validity of DA cert is provided by Canoe
-- zkVM takes preimage and verifys it, then feed the data into the ELF containing the derivation logics
+- zkVM takes preimage and verifies it, then feeds the data into the ELF containing the derivation logics
 - zkVM produces a proof about the execution
 
 Hokulea is currently integrating with [OP-succinct](https://github.com/succinctlabs/op-succinct) and [OP-Kailua](https://github.com/risc0/kailua).
