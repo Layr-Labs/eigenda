@@ -185,13 +185,15 @@ slightly exceeds 1GB.`,
 default values for %s, %s, %s, and %s. If all of these fields are explicitly configured, the
 network flag may be omitted. If some or all of these fields are configured, and the network
 is also configured, then the explicitly defined field values will take precedence. Permitted
-EigenDANetwork values include %s, and %s.`,
+EigenDANetwork values include %s, %s, & %s.`,
 				DisperserFlagName,
 				CertVerifierAddrFlagName,
 				ServiceManagerAddrFlagName,
 				BLSOperatorStateRetrieverFlagName,
 				common.HoleskyTestnetEigenDANetwork,
-				common.HoleskyPreprodEigenDANetwork),
+				common.HoleskyPreprodEigenDANetwork,
+				common.SepoliaTestnetEigenDANetwork,
+			),
 			EnvVars:  []string{withEnvPrefix(envPrefix, "NETWORK")},
 			Category: category,
 		},

@@ -29,6 +29,9 @@ jobs:
             .env.exampleV1.holesky,
             .env.exampleV2.holesky,
             .env.exampleV1AndV2.holesky,
+            .env.exampleV1.sepolia,
+            .env.exampleV2.sepolia,
+            .env.exampleV1AndV2.sepolia,
           ]
     runs-on: ubuntu-latest
     steps:
@@ -116,6 +119,24 @@ jobs:
         env:
           SIGNER_PRIVATE_KEY: ${{ secrets.SIGNER_PRIVATE_KEY }}
           ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
+  
+  e2e-tests-sepolia:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: jdx/mise-action@v2
+        with:
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+      - name: Install dependencies
+        run: make deps
+      - run: go mod download
+      - run: make test-e2e-sepolia
+        env:
+          SIGNER_PRIVATE_KEY: ${{ secrets.SIGNER_SEPOLIA_PRIVATE_KEY }}
+          ETHEREUM_RPC: ${{ secrets.ETHEREUM_SEPOLIA_RPC }}
 
   fuzz:
     runs-on: ubuntu-latest

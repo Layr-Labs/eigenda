@@ -50,6 +50,11 @@ const (
 	testnetCertVerifierAddress              = "0xFe52fE1940858DCb6e12153E2104aD0fDFbE1162"
 	testnetSvcManagerAddress                = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
 	testnetBLSOperatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
+
+	disperserSepoliaHostname                = "disperser-testnet-sepolia.eigenda.xyz"
+	sepoliaCertVerifierAddress              = "0x73818fed0743085c4557a736a7630447fb57c662"
+	sepoliaSvcManagerAddress                = "0x3a5acf46ba6890B8536420F4900AC9BC45Df4764"
+	sepoliaBLSOperatorStateRetrieverAddress = "0x22478d082E9edaDc2baE8443E4aC9473F6E047Ff"
 )
 
 var (
@@ -124,6 +129,7 @@ type Backend int
 const (
 	TestnetBackend Backend = iota + 1
 	PreprodBackend
+	SepoliaBackend
 	MemstoreBackend
 )
 
@@ -134,6 +140,8 @@ func ParseBackend(inputString string) (Backend, error) {
 		return TestnetBackend, nil
 	case "preprod":
 		return PreprodBackend, nil
+	case "sepolia":
+		return SepoliaBackend, nil
 	case "memstore":
 		return MemstoreBackend, nil
 	default:
@@ -144,7 +152,7 @@ func ParseBackend(inputString string) (Backend, error) {
 func GetBackend() Backend {
 	backend, err := ParseBackend(os.Getenv(backendEnvVar))
 	if err != nil {
-		panic(fmt.Sprintf("BACKEND must be = memstore|testnet|preprod. parse backend error: %v", err))
+		panic(fmt.Sprintf("BACKEND must be = memstore|testnet|sepolia|preprod. parse backend error: %v", err))
 	}
 	return backend
 }
@@ -222,6 +230,7 @@ func createS3Config(storeConfig store.Config) store.Config {
 	return storeConfig
 }
 
+// nolint: funlen
 func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 	useMemory := testCfg.Backend == MemstoreBackend
 	pk := os.Getenv(privateKeyEnvVar)
@@ -267,6 +276,11 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		certVerifierAddress = testnetCertVerifierAddress
 		svcManagerAddress = testnetSvcManagerAddress
 		blsOperatorStateRetrieverAddress = testnetBLSOperatorStateRetrieverAddress
+	case SepoliaBackend:
+		disperserHostname = disperserSepoliaHostname
+		certVerifierAddress = sepoliaCertVerifierAddress
+		svcManagerAddress = sepoliaSvcManagerAddress
+		blsOperatorStateRetrieverAddress = sepoliaBLSOperatorStateRetrieverAddress
 	default:
 		panic("Unsupported backend")
 	}
