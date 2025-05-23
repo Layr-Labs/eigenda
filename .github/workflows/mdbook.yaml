@@ -8,6 +8,10 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
     permissions:
       contents: write  # To push a branch 
       pages: write  # To push to a GitHub Pages site
@@ -20,7 +24,7 @@ jobs:
         run: make build # also installs deps
         working-directory: docs/spec
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v5
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
