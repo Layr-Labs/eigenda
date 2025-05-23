@@ -69,7 +69,6 @@ The FPVM requires both the ELF binary and data (L2 batches and L1 deposits) to b
 The ida is to repeat what op-node has done to reach consensus, except that in FPVM, every execution is traceable and challengable.
 
 Data is provided to FPVM in the form of preimage oracle. OP spec has defined rules such that all data in the preimage oracle are verifiable on L1.
-A FPVM creates a binding system on the relation between (software logic, data, VM opcode, and output).
 
 ### Hokulea
 
