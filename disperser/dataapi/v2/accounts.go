@@ -9,6 +9,9 @@ import (
 
 	//"time"
 
+	"encoding/base64"
+
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
@@ -262,10 +265,10 @@ func (s *ServerV2) FetchAccountPaymentState(c *gin.Context) {
 	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
 
 	// off-chain account specific payment state
-	now := time.Now()
-	startTime := now.Add(-time.Duration(24) * time.Hour)
+	now := time.Now().Unix()
+	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
 
-	periodRecords, err := s.meterer.MeteringStore.GetPeriodRecords(c.Request.Context(), accountId, uint64(startTime.Unix()), 1000)
+	periodRecords, err := s.meterer.MeteringStore.GetPeriodRecords(c.Request.Context(), accountId, currentReservationPeriod, meterer.MinNumBins)
 	if err != nil {
 		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountId)
 	}
@@ -332,8 +335,8 @@ func (s *ServerV2) FetchAccountPaymentState(c *gin.Context) {
 		PaymentGlobalParams:      paymentGlobalParams,
 		PeriodRecords:            convertedRecords,
 		Reservation:              *reservation,
-		CumulativePayment:        string(largestCumulativePaymentBytes),
-		OnchainCumulativePayment: string(onchainCumulativePaymentBytes),
+		CumulativePayment:        base64.StdEncoding.EncodeToString(largestCumulativePaymentBytes),
+		OnchainCumulativePayment: base64.StdEncoding.EncodeToString(onchainCumulativePaymentBytes),
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchAccountPaymentState")
