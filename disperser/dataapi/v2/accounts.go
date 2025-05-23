@@ -150,8 +150,8 @@ func (s *ServerV2) FetchAccountReservationUsage(c *gin.Context) {
 	now := time.Now()
 	startTime := now.Add(-time.Duration(window) * time.Hour)
 
-	// Get period records for the specified window
-	periodRecords, err := s.offchainStore.GetReservationBinUsage(c.Request.Context(), accountId, uint64(startTime.Unix()))
+	// Get period records for the specified window (limit 1000)
+	periodRecords, err := s.offchainStore.GetReservationBinUsage(c.Request.Context(), accountId, uint64(startTime.Unix()), 1000)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchAccountReservationUsage")
 		errorResponse(c, fmt.Errorf("failed to fetch period records for account (%s): %w", accountId.Hex(), err))

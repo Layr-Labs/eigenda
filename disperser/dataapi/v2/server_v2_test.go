@@ -2719,3 +2719,97 @@ func createAttestation(
 		},
 	}
 }
+
+func TestFetchAccountReservationUsage(t *testing.T) {
+	router := setUpRouter()
+	router.GET("/v2/accounts/:account_id/reservation/usage", testDataApiServerV2.FetchAccountReservationUsage)
+
+	testCases := []struct {
+		name           string
+		accountID      string
+		window         string
+		expectedStatus int
+		expectedError  bool
+	}{
+		{
+			name:           "valid account with default window",
+			accountID:      "0x1234567890123456789012345678901234567890",
+			window:         "",
+			expectedStatus: http.StatusOK,
+			expectedError:  false,
+		},
+		{
+			name:           "valid account with custom window",
+			accountID:      "0x1234567890123456789012345678901234567890",
+			window:         "48",
+			expectedStatus: http.StatusOK,
+			expectedError:  false,
+		},
+		{
+			name:           "invalid account ID",
+			accountID:      "invalid",
+			window:         "",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  true,
+		},
+		{
+			name:           "zero account ID",
+			accountID:      "0x0000000000000000000000000000000000000000",
+			window:         "",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  true,
+		},
+		{
+			name:           "invalid window value",
+			accountID:      "0x1234567890123456789012345678901234567890",
+			window:         "invalid",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  true,
+		},
+		{
+			name:           "window too large",
+			accountID:      "0x1234567890123456789012345678901234567890",
+			window:         "73",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  true,
+		},
+		{
+			name:           "window too small",
+			accountID:      "0x1234567890123456789012345678901234567890",
+			window:         "0",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			url := fmt.Sprintf("/v2/accounts/%s/reservation/usage", tc.accountID)
+			if tc.window != "" {
+				url += fmt.Sprintf("?window=%s", tc.window)
+			}
+
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", url, nil)
+			router.ServeHTTP(w, req)
+			assert.Equal(t, tc.expectedStatus, w.Code)
+
+			if !tc.expectedError {
+				response := decodeResponseBody[serverv2.AccountReservationUsageResponse](t, w)
+
+				// Verify response structure
+				assert.Equal(t, tc.accountID, response.AccountId)
+				assert.NotNil(t, response.Records)
+
+				// Verify each record has the expected fields
+				for _, record := range response.Records {
+					assert.NotNil(t, record.ReservationPeriod)
+					assert.NotNil(t, record.UsageBytes)
+				}
+			} else {
+				errorResponse := decodeResponseBody[serverv2.ErrorResponse](t, w)
+				assert.NotEmpty(t, errorResponse.Error)
+			}
+		})
+	}
+}

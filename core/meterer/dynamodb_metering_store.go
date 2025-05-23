@@ -260,7 +260,7 @@ func (s *DynamoDBMeteringStore) GetPeriodRecords(ctx context.Context, accountID 
 	return records, nil
 }
 
-func (s *OffchainStore) GetReservationBinUsage(ctx context.Context, accountID gethcommon.Address, startPeriod uint64) ([]*pb.PeriodRecord, error) {
+func (s *OffchainStore) GetReservationBinUsage(ctx context.Context, accountID gethcommon.Address, startPeriod uint64, limit int32) ([]*pb.PeriodRecord, error) {
 	// Fetch all bins from the start period
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.reservationTableName),
@@ -270,7 +270,7 @@ func (s *OffchainStore) GetReservationBinUsage(ctx context.Context, accountID ge
 			":reservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(startPeriod, 10)},
 		},
 		ScanIndexForward: aws.Bool(true),
-		Limit:            aws.Int32(1000),
+		Limit:            aws.Int32(limit),
 	}
 	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
