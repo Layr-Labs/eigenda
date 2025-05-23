@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -131,7 +132,17 @@ func RunDataApi(ctx *cli.Context) error {
 		blobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
 		metrics = dataapi.NewMetrics(config.ServerVersion, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)
 
-		// Create offchainStore for reservations
+		mtConfig := meterer.Config{
+			ChainReadTimeout: 10 * time.Second,
+			UpdateInterval:   10 * time.Minute,
+		}
+		paymentChainState, err := meterer.NewOnchainPaymentState(context.Background(), tx, logger)
+		if err != nil {
+			return fmt.Errorf("failed to create onchain payment state: %w", err)
+		}
+		if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
+			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
+		}
 		meteringStore, err := meterer.NewDynamoDBMeteringStore(
 			config.AwsClientConfig,
 			config.ReservationsTableName,
@@ -142,6 +153,7 @@ func RunDataApi(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create offchain store: %w", err)
 		}
+		meterer := meterer.NewMeterer(mtConfig, paymentChainState, meteringStore, logger)
 
 		serverv2, err := serverv2.NewServerV2(
 			dataapi.Config{
@@ -161,6 +173,7 @@ func RunDataApi(ctx *cli.Context) error {
 			logger,
 			metrics,
 			meteringStore,
+			meterer,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create v2 server: %w", err)

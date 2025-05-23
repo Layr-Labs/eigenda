@@ -91,6 +91,7 @@ type ServerV2 struct {
 	promClient        dataapi.PrometheusClient
 	metrics           *dataapi.Metrics
 	meteringStore     meterer.MeteringStore
+	meterer           *meterer.Meterer
 
 	operatorHandler *dataapi.OperatorHandler
 	metricsHandler  *dataapi.MetricsHandler
@@ -119,6 +120,7 @@ func NewServerV2(
 	logger logging.Logger,
 	metrics *dataapi.Metrics,
 	meteringStore meterer.MeteringStore,
+	meterer *meterer.Meterer,
 ) (*ServerV2, error) {
 	l := logger.With("component", "DataAPIServerV2")
 
@@ -245,6 +247,7 @@ func (s *ServerV2) Start() error {
 		accounts := v2.Group("/accounts")
 		{
 			accounts.GET("/:account_id/blobs", s.FetchAccountBlobFeed)
+			accounts.GET("/:account_id/payment-state", s.FetchAccountPaymentState)
 			accounts.GET("/:account_id/reservation/usage", s.FetchAccountReservationUsage)
 		}
 		operators := v2.Group("/operators")

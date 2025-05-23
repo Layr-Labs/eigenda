@@ -199,11 +199,41 @@ definitions:
       signature:
         type: string
     type: object
+  github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PaymentGlobalParams:
+    properties:
+      global_symbols_per_second:
+        type: integer
+      min_num_symbols:
+        type: integer
+      price_per_symbol:
+        type: integer
+      reservation_window:
+        type: integer
+    type: object
   github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PeriodRecord:
     properties:
       reservation_period:
         type: integer
+      usage:
+        type: integer
       usage_bytes:
+        type: integer
+    type: object
+  github_com_Layr-Labs_eigenda_disperser_dataapi_v2.Reservation:
+    properties:
+      end_timestamp:
+        type: integer
+      quorum_numbers:
+        items:
+          type: integer
+        type: array
+      quorum_splits:
+        items:
+          type: integer
+        type: array
+      start_timestamp:
+        type: integer
+      symbols_per_second:
         type: integer
     type: object
   github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch:
@@ -257,16 +287,13 @@ definitions:
       onchain_cumulative_payment:
         type: string
       payment_global_params:
-        additionalProperties: true
-        type: object
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PaymentGlobalParams'
       period_records:
         items:
-          additionalProperties: true
-          type: object
+          $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PeriodRecord'
         type: array
       reservation:
-        additionalProperties: true
-        type: object
+        $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.Reservation'
     type: object
   v2.AccountReservationUsageResponse:
     properties:

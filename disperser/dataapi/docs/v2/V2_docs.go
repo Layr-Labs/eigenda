@@ -1256,13 +1256,59 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PaymentGlobalParams": {
+            "type": "object",
+            "properties": {
+                "global_symbols_per_second": {
+                    "type": "integer"
+                },
+                "min_num_symbols": {
+                    "type": "integer"
+                },
+                "price_per_symbol": {
+                    "type": "integer"
+                },
+                "reservation_window": {
+                    "type": "integer"
+                }
+            }
+        },
         "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PeriodRecord": {
             "type": "object",
             "properties": {
                 "reservation_period": {
                     "type": "integer"
                 },
+                "usage": {
+                    "type": "integer"
+                },
                 "usage_bytes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.Reservation": {
+            "type": "object",
+            "properties": {
+                "end_timestamp": {
+                    "type": "integer"
+                },
+                "quorum_numbers": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "quorum_splits": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "start_timestamp": {
+                    "type": "integer"
+                },
+                "symbols_per_second": {
                     "type": "integer"
                 }
             }
@@ -1345,19 +1391,16 @@ const docTemplateV2 = `{
                     "type": "string"
                 },
                 "payment_global_params": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PaymentGlobalParams"
                 },
                 "period_records": {
                     "type": "array",
                     "items": {
-                        "type": "object",
-                        "additionalProperties": true
+                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PeriodRecord"
                     }
                 },
                 "reservation": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.Reservation"
                 }
             }
         },

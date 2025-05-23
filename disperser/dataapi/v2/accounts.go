@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
@@ -194,16 +195,31 @@ type AccountReservationUsageResponse struct {
 // PeriodRecord represents a single period's usage record
 type PeriodRecord struct {
 	ReservationPeriod uint32 `json:"reservation_period"`
+	Usage             uint64 `json:"usage"`
 	UsageBytes        uint64 `json:"usage_bytes"`
 }
 
+type Reservation struct {
+	SymbolsPerSecond uint64   `json:"symbols_per_second"`
+	StartTimestamp   uint32   `json:"start_timestamp"`
+	EndTimestamp     uint32   `json:"end_timestamp"`
+	QuorumSplits     []uint32 `json:"quorum_splits"`
+	QuorumNumbers    []uint32 `json:"quorum_numbers"`
+}
+
+type PaymentGlobalParams struct {
+	GlobalSymbolsPerSecond uint64 `json:"global_symbols_per_second"`
+	MinNumSymbols          uint64 `json:"min_num_symbols"`
+	PricePerSymbol         uint64 `json:"price_per_symbol"`
+	ReservationWindow      uint64 `json:"reservation_window"`
+}
 type AccountPaymentStateResponse struct {
-	AccountId                string                   `json:"account_id"`
-	PaymentGlobalParams      map[string]interface{}   `json:"payment_global_params"`
-	PeriodRecords            []map[string]interface{} `json:"period_records"`
-	Reservation              map[string]interface{}   `json:"reservation"`
-	CumulativePayment        string                   `json:"cumulative_payment"`
-	OnchainCumulativePayment string                   `json:"onchain_cumulative_payment"`
+	AccountId                string              `json:"account_id"`
+	PaymentGlobalParams      PaymentGlobalParams `json:"payment_global_params"`
+	PeriodRecords            []PeriodRecord      `json:"period_records"`
+	Reservation              Reservation         `json:"reservation"`
+	CumulativePayment        string              `json:"cumulative_payment"`
+	OnchainCumulativePayment string              `json:"onchain_cumulative_payment"`
 }
 
 // FetchAccountPaymentState godoc
@@ -234,9 +250,90 @@ func (s *ServerV2) FetchAccountPaymentState(c *gin.Context) {
 		return
 	}
 
-	// For now, just return the account_id in the response
+	if s.meterer == nil || s.meterer.ChainPaymentState == nil {
+		errorResponse(c, fmt.Errorf("payment state is not available"))
+		return
+	}
+
+	// on-chain global payment parameters
+	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetGlobalSymbolsPerSecond()
+	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols()
+	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol()
+	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
+
+	// off-chain account specific payment state
+	now := time.Now().Unix()
+	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
+	periodRecords, err := s.meterer.MeteringStore.GetPeriodRecords(c.Request.Context(), accountId, currentReservationPeriod)
+	if err != nil {
+		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountId)
+	}
+	var largestCumulativePaymentBytes []byte
+	largestCumulativePayment, err := s.meterer.MeteringStore.GetLargestCumulativePayment(c.Request.Context(), accountId)
+	if err != nil {
+		s.logger.Debug("failed to get largest cumulative payment, use zero value", "err", err, "accountId", accountId)
+
+	} else {
+		largestCumulativePaymentBytes = largestCumulativePayment.Bytes()
+	}
+
+	// on-Chain account state
+	var reservation *Reservation
+	reservedPayment, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(c.Request.Context(), accountId)
+	if err != nil {
+		s.logger.Debug("failed to get onchain reservation, use zero values", "err", err, "accountId", accountId)
+	} else {
+		quorumNumbers := make([]uint32, len(reservedPayment.QuorumNumbers))
+		for i, v := range reservedPayment.QuorumNumbers {
+			quorumNumbers[i] = uint32(v)
+		}
+		quorumSplits := make([]uint32, len(reservedPayment.QuorumSplits))
+		for i, v := range reservedPayment.QuorumSplits {
+			quorumSplits[i] = uint32(v)
+		}
+
+		reservation = &Reservation{
+			SymbolsPerSecond: reservedPayment.SymbolsPerSecond,
+			StartTimestamp:   uint32(reservedPayment.StartTimestamp),
+			EndTimestamp:     uint32(reservedPayment.EndTimestamp),
+			QuorumSplits:     quorumSplits,
+			QuorumNumbers:    quorumNumbers,
+		}
+	}
+
+	var onchainCumulativePaymentBytes []byte
+	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(c.Request.Context(), accountId)
+	if err != nil {
+		s.logger.Debug("failed to get ondemand payment, use zero value", "err", err, "accountId", accountId)
+	} else {
+		onchainCumulativePaymentBytes = onDemandPayment.CumulativePayment.Bytes()
+	}
+
+	paymentGlobalParams := PaymentGlobalParams{
+		GlobalSymbolsPerSecond: globalSymbolsPerSecond,
+		MinNumSymbols:          minNumSymbols,
+		PricePerSymbol:         pricePerSymbol,
+		ReservationWindow:      reservationWindow,
+	}
+
+	convertedRecords := make([]PeriodRecord, len(periodRecords))
+	for i, pr := range periodRecords {
+		if pr != nil {
+			convertedRecords[i] = PeriodRecord{
+				ReservationPeriod: pr.Index,
+				Usage:             pr.Usage,
+				UsageBytes:        pr.Usage * 32,
+			}
+		}
+	}
+
 	response := &AccountPaymentStateResponse{
-		AccountId: accountId.Hex(),
+		AccountId:                accountId.Hex(),
+		PaymentGlobalParams:      paymentGlobalParams,
+		PeriodRecords:            convertedRecords,
+		Reservation:              *reservation,
+		CumulativePayment:        string(largestCumulativePaymentBytes),
+		OnchainCumulativePayment: string(onchainCumulativePaymentBytes),
 	}
 
 	s.metrics.IncrementSuccessfulRequestNum("FetchAccountPaymentState")
