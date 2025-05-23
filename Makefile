@@ -36,7 +36,6 @@ protoc-local:
 	$(MAKE) -C api protoc-local
 
 lint:
-	golint -set_exit_status ./...
 	go tool fix ./..
 	golangci-lint run
 
