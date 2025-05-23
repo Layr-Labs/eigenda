@@ -24,6 +24,9 @@ The EigenDA public API is documented [here](https://github.com/Layr-Labs/eigenda
 
 If you want to be an EigenDA operator and run a node, please clone [Operator Setup Guide](https://github.com/Layr-Labs/eigenda-operator-setup) GitHub repo and follow the instructions there.
 
+## Protocol Spec
+If you want to know more about eigenda protocol and integrations with rollup, please see [MD Book](https://layr-labs.github.io/eigenda/)
+
 ## Contributing
 We welcome all contributions! There are many ways to contribute to the project, including but not limited to:
 
