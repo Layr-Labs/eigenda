@@ -151,7 +151,7 @@ func (s *ServerV2) FetchAccountReservationUsage(c *gin.Context) {
 	startTime := now.Add(-time.Duration(window) * time.Hour)
 
 	// Get period records for the specified window (limit 1000)
-	periodRecords, err := s.meteringStore.GetReservationBinUsage(c.Request.Context(), accountId, uint64(startTime.Unix()), 1000)
+	periodRecords, err := s.meteringStore.GetPeriodRecords(c.Request.Context(), accountId, uint64(startTime.Unix()), 1000)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchAccountReservationUsage")
 		errorResponse(c, fmt.Errorf("failed to fetch period records for account (%s): %w", accountId.Hex(), err))
@@ -164,12 +164,12 @@ func (s *ServerV2) FetchAccountReservationUsage(c *gin.Context) {
 		if record == nil {
 			records[i] = PeriodRecord{
 				ReservationPeriod: 0,
-				UsageBytes:        0,
+				Usage:             0,
 			}
 		} else {
 			records[i] = PeriodRecord{
 				ReservationPeriod: record.Index,
-				UsageBytes:        record.Usage * 32,
+				Usage:             record.Usage,
 			}
 		}
 	}
@@ -194,5 +194,5 @@ type AccountReservationUsageResponse struct {
 // PeriodRecord represents a single period's usage record
 type PeriodRecord struct {
 	ReservationPeriod uint32 `json:"reservation_period"`
-	UsageBytes        uint64 `json:"usage_bytes"`
+	Usage             uint64 `json:"usage"`
 }

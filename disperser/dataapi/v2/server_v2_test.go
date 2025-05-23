@@ -2804,7 +2804,7 @@ func TestFetchAccountReservationUsage(t *testing.T) {
 				// Verify each record has the expected fields
 				for _, record := range response.Records {
 					assert.NotNil(t, record.ReservationPeriod)
-					assert.NotNil(t, record.UsageBytes)
+					assert.NotNil(t, record.Usage)
 				}
 			} else {
 				errorResponse := decodeResponseBody[serverv2.ErrorResponse](t, w)

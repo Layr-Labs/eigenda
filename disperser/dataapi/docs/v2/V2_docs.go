@@ -1216,7 +1216,7 @@ const docTemplateV2 = `{
                 "reservation_period": {
                     "type": "integer"
                 },
-                "usage_bytes": {
+                "usage": {
                     "type": "integer"
                 }
             }

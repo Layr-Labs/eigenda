@@ -203,7 +203,7 @@ definitions:
     properties:
       reservation_period:
         type: integer
-      usage_bytes:
+      usage:
         type: integer
     type: object
   github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch:
