@@ -83,7 +83,7 @@ Hokulea also extends preimage oracle for EigenDA, which is able to provide the v
 More information about the communication spec is at [Hokulea](https://github.com/Layr-Labs/hokulea/tree/master/docs). Both extension to preimage
 oracle and derivation logics allows for 
 
-- deterministically derive rollup payload from a EigenDA certificate
+- deterministically deriving a rollup payload from an EigenDA certificate
 - discarding DA certs that can stall the derivation pipeline
 
 ### Canoe
