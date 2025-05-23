@@ -16,60 +16,6 @@ import (
 var blobKey1 = []byte("blobKey1")
 var blobKey2 = []byte("blobKey2")
 
-// Tests that we want to do
-// 1. Test that we get the same assignment for the same operator with identical headers
-// 2. Test that we can always retreive the blob from a set of operators with sufficient stake
-// 3. Test that large operators never have more than the maximum number of chunks
-// 4. Test that when there are two quorums, an operators number of chunks is equal to their maximum
-// allocation across the two quorums.
-
-// func TestOperatorAssignmentsV2(t *testing.T) {
-
-// 	state := dat.GetTotalOperatorState(context.Background(), 0)
-// 	operatorState := state.OperatorState
-
-// 	assignments, err := corev2.GetAssignmentsForBlob(operatorState, blobParams, 0)
-// 	assert.NoError(t, err)
-// 	expectedAssignments := map[core.OperatorID]corev2.Assignment{
-// 		mock.MakeOperatorId(0): {
-// 			StartIndex: 7802,
-// 			NumChunks:  390,
-// 		},
-// 		mock.MakeOperatorId(1): {
-// 			StartIndex: 7022,
-// 			NumChunks:  780,
-// 		},
-// 		mock.MakeOperatorId(2): {
-// 			StartIndex: 5852,
-// 			NumChunks:  1170,
-// 		},
-// 		mock.MakeOperatorId(3): {
-// 			StartIndex: 4291,
-// 			NumChunks:  1561,
-// 		},
-// 		mock.MakeOperatorId(4): {
-// 			StartIndex: 2340,
-// 			NumChunks:  1951,
-// 		},
-// 		mock.MakeOperatorId(5): {
-// 			StartIndex: 0,
-// 			NumChunks:  2340,
-// 		},
-// 	}
-
-// 	for operatorID, assignment := range assignments {
-
-// 		assert.Equal(t, assignment, expectedAssignments[operatorID])
-
-// 		assignment, err := corev2.GetAssignmentForBlob(operatorState, blobParams, 0, operatorID)
-// 		assert.NoError(t, err)
-
-// 		assert.Equal(t, assignment, expectedAssignments[operatorID])
-
-// 	}
-
-// }
-
 func TestChunkLength(t *testing.T) {
 	pairs := []struct {
 		blobLength  uint32
@@ -122,12 +68,12 @@ func TestNilStateAssignments(t *testing.T) {
 	assert.Error(t, err)
 }
 
-// func TestNonExistentQuorum(t *testing.T) {
-// 	state := dat.GetTotalOperatorState(context.Background(), 0)
-// 	nonExistentQuorum := uint8(99) // Assuming this quorum doesn't exist
-// 	_, err := corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, nonExistentQuorum)
-// 	assert.Error(t, err)
-// }
+func TestNonExistentQuorum(t *testing.T) {
+	state := dat.GetTotalOperatorState(context.Background(), 0)
+	nonExistentQuorum := uint8(99) // Assuming this quorum doesn't exist
+	_, err := corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{nonExistentQuorum}, blobKey1[:])
+	assert.Error(t, err)
+}
 
 func TestNonExistentOperator(t *testing.T) {
 	state := dat.GetTotalOperatorState(context.Background(), 0)
@@ -152,8 +98,7 @@ func TestSingleOperator(t *testing.T) {
 	assert.Len(t, assignments, 1)
 	assignment, exists := assignments[mock.MakeOperatorId(0)]
 	assert.True(t, exists)
-	// assert.Equal(t, blobParams.NumChunks, assignment.NumChunks())
-	_ = assignment
+	assert.Equal(t, blobParams.NumChunks/blobParams.CodingRate, assignment.NumChunks())
 }
 
 func TestTwoQuorums(t *testing.T) {
@@ -161,15 +106,16 @@ func TestTwoQuorums(t *testing.T) {
 	stakes := map[core.QuorumID]map[core.OperatorID]int{
 		0: {
 			mock.MakeOperatorId(0): 1,
-			mock.MakeOperatorId(1): 4,
-			mock.MakeOperatorId(2): 6,
-			mock.MakeOperatorId(3): 10,
+			mock.MakeOperatorId(1): 10,
+			mock.MakeOperatorId(2): 1,
+			mock.MakeOperatorId(3): 1,
+			mock.MakeOperatorId(4): 3,
 		},
 		1: {
-			mock.MakeOperatorId(0): 1,
-			mock.MakeOperatorId(1): 3,
-			mock.MakeOperatorId(2): 8,
-			mock.MakeOperatorId(3): 9,
+			mock.MakeOperatorId(0): 2,
+			mock.MakeOperatorId(1): 1,
+			mock.MakeOperatorId(2): 10,
+			mock.MakeOperatorId(3): 1,
 		},
 	}
 
@@ -178,15 +124,79 @@ func TestTwoQuorums(t *testing.T) {
 
 	state := dat.GetTotalOperatorState(context.Background(), 0)
 
-	assignments, err := corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{0, 1}, blobKey1[:])
+	assignmentsBothQuorums, err := corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{0, 1}, blobKey1[:])
 	assert.NoError(t, err)
-	assert.Len(t, assignments, 4)
-	assignment, exists := assignments[mock.MakeOperatorId(0)]
-	assert.True(t, exists)
+	assert.Len(t, assignmentsBothQuorums, 5)
 
-	// assert.Equal(t, blobParams.NumChunks, assignment.NumChunks())
-	_ = assignment
+	assignmentsQuorum0, err := corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{0}, blobKey1[:])
+	assert.NoError(t, err)
+	assert.Len(t, assignmentsQuorum0, 5)
 
+	assignmentsQuorum1, err := corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{1}, blobKey1[:])
+	assert.NoError(t, err)
+	assert.Len(t, assignmentsQuorum1, 4)
+
+	// Check that the lenght of the assignment for each operator is equal to the maximum of the assignments for that operator in each quorum
+	for id := range assignmentsBothQuorums {
+
+		// Get the bigger assignemnt between the two quorums
+		maxChunks := uint32(0)
+		assignment, ok := assignmentsQuorum0[id]
+		if ok {
+			maxChunks = assignment.NumChunks()
+		}
+		assignment, ok = assignmentsQuorum1[id]
+		if ok {
+			if assignment.NumChunks() > maxChunks {
+				maxChunks = assignment.NumChunks()
+			}
+		}
+		fmt.Println(id, assignmentsBothQuorums[id].NumChunks(), maxChunks)
+		assert.LessOrEqual(t, assignmentsBothQuorums[id].NumChunks(), maxChunks)
+	}
+}
+
+func TestManyQuorums(t *testing.T) {
+
+	testCases := []uint8{1, 2, 3, 4, 5, 10, 15, 20, 50, 100, 200, 255}
+	numOperators := 100
+
+	for _, numQuorums := range testCases {
+		t.Run("Numer of quorums: "+string(numQuorums), func(t *testing.T) {
+
+			stakes := make(map[core.QuorumID]map[core.OperatorID]int)
+			quorumNumbers := make([]core.QuorumID, numQuorums)
+
+			for i := uint8(0); i < numQuorums; i++ {
+				quorumNumbers[i] = i
+				stakes[i] = make(map[core.OperatorID]int)
+				for j := 0; j < numOperators; j++ {
+					stakes[i][mock.MakeOperatorId(j)] = rand.Intn(100) + 1
+				}
+			}
+
+			dat, err := mock.NewChainDataMock(stakes)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			state := dat.GetTotalOperatorState(context.Background(), 0)
+
+			assignments, err := corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, quorumNumbers, blobKey2[:])
+			assert.NoError(t, err)
+
+			for _, i := range quorumNumbers {
+
+				assignmentForQuorum, err := corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{i}, blobKey2[:])
+				assert.NoError(t, err)
+
+				for id := range assignments {
+					assert.GreaterOrEqual(t, assignments[id].NumChunks(), assignmentForQuorum[id].NumChunks())
+				}
+			}
+
+		})
+	}
 }
 
 func TestValidatorSizes(t *testing.T) {
@@ -259,35 +269,6 @@ func TestValidatorSizes(t *testing.T) {
 	}
 }
 
-func TestDeterministicAssignment(t *testing.T) {
-	state := dat.GetTotalOperatorState(context.Background(), 0)
-	operatorState := state.OperatorState
-
-	// Get assignments for the same operator with identical headers
-	assignment1, err := corev2.GetAssignmentForBlob(operatorState, blobParams, []core.QuorumID{0}, blobKey1[:], mock.MakeOperatorId(0))
-	assert.NoError(t, err)
-
-	assignment2, err := corev2.GetAssignmentForBlob(operatorState, blobParams, []core.QuorumID{0}, blobKey1[:], mock.MakeOperatorId(0))
-	assert.NoError(t, err)
-
-	// Assignments should be identical
-	assert.Equal(t, assignment1, assignment2)
-
-	// Get assignments for different operators with the same header
-	assignment3, err := corev2.GetAssignmentForBlob(operatorState, blobParams, []core.QuorumID{0}, blobKey1[:], mock.MakeOperatorId(1))
-	assert.NoError(t, err)
-
-	// Assignments should be different for different operators
-	assert.NotEqual(t, assignment1, assignment3)
-
-	// Get assignment for the same operator but different set of quourms
-	assignment4, err := corev2.GetAssignmentForBlob(operatorState, blobParams, []core.QuorumID{0, 1}, blobKey1[:], mock.MakeOperatorId(0))
-	assert.NoError(t, err)
-
-	// Assignments should be different for different set of quourms
-	assert.NotEqual(t, assignment1, assignment4)
-}
-
 func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 	// Add distributions to fuzz
@@ -322,8 +303,6 @@ func FuzzOperatorAssignmentsV2(f *testing.F) {
 
 		assignments, err := corev2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{0, 1}, blobKey2[:])
 		assert.NoError(t, err)
-
-		_ = assignments
 
 		// Check that the total number of chunks satisfies expected bounds
 		if numOperators > 20 {

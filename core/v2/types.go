@@ -23,11 +23,11 @@ type Assignment struct {
 }
 
 // GetIndices generates the list of ChunkIndices associated with a given assignment
-func (c *Assignment) GetIndices() []uint32 {
+func (c Assignment) GetIndices() []uint32 {
 	return c.Indices
 }
 
-func (c *Assignment) NumChunks() uint32 {
+func (c Assignment) NumChunks() uint32 {
 	return uint32(len(c.Indices))
 }
 
