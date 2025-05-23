@@ -77,7 +77,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 	symbolsCharged := m.SymbolsCharged(numSymbols)
 	m.logger.Info("Validating incoming request's payment metadata", "paymentMetadata", header, "numSymbols", numSymbols, "quorumNumbers", quorumNumbers)
 	// Validate against the payment method
-	if header.CumulativePayment.Sign() == 0 {
+	if !IsOnDemandPayment(&header) {
 		reservation, err := m.ChainPaymentState.GetReservedPaymentByAccount(ctx, header.AccountID)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get active reservation by account: %w", err)
@@ -276,4 +276,8 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged ui
 // GetReservationBinLimit returns the bin limit for a given reservation
 func (m *Meterer) GetReservationBinLimit(reservation *core.ReservedPayment, reservationWindow uint64) uint64 {
 	return reservation.SymbolsPerSecond * reservationWindow
+}
+
+func IsOnDemandPayment(paymentMetadata *core.PaymentMetadata) bool {
+	return paymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) > 0
 }
