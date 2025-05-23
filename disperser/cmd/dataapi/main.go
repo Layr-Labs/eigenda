@@ -132,7 +132,7 @@ func RunDataApi(ctx *cli.Context) error {
 		metrics = dataapi.NewMetrics(config.ServerVersion, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)
 
 		// Create offchainStore for reservations
-		offchainStore, err := meterer.NewOffchainStore(
+		meteringStore, err := meterer.NewDynamoDBMeteringStore(
 			config.AwsClientConfig,
 			config.ReservationsTableName,
 			config.OnDemandTableName,
@@ -160,7 +160,7 @@ func RunDataApi(ctx *cli.Context) error {
 			indexedChainState,
 			logger,
 			metrics,
-			offchainStore,
+			meteringStore,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create v2 server: %w", err)

@@ -260,35 +260,6 @@ func (s *DynamoDBMeteringStore) GetPeriodRecords(ctx context.Context, accountID 
 	return records, nil
 }
 
-func (s *OffchainStore) GetReservationBinUsage(ctx context.Context, accountID gethcommon.Address, startPeriod uint64, limit int32) ([]*pb.PeriodRecord, error) {
-	// Fetch all bins from the start period
-	queryInput := &dynamodb.QueryInput{
-		TableName:              aws.String(s.reservationTableName),
-		KeyConditionExpression: aws.String("AccountID = :account AND ReservationPeriod >= :reservationPeriod"),
-		ExpressionAttributeValues: commondynamodb.ExpressionValues{
-			":account":           &types.AttributeValueMemberS{Value: accountID.Hex()},
-			":reservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(startPeriod, 10)},
-		},
-		ScanIndexForward: aws.Bool(true),
-		Limit:            aws.Int32(limit),
-	}
-	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query reservation bin usage for account: %w", err)
-	}
-
-	records := make([]*pb.PeriodRecord, len(bins))
-	for i := 0; i < len(bins); i++ {
-		periodRecord, err := parsePeriodRecord(bins[i])
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse bin %d record: %w", i, err)
-		}
-		records[i] = periodRecord
-	}
-
-	return records, nil
-}
-
 func (s *DynamoDBMeteringStore) GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
 	// Get the single record for this account
 	key := commondynamodb.Key{
@@ -360,4 +331,33 @@ func parsePeriodRecord(bin map[string]types.AttributeValue) (*pb.PeriodRecord, e
 		Index: uint32(reservationPeriodValue),
 		Usage: uint64(binUsageValue),
 	}, nil
+}
+
+func (s *DynamoDBMeteringStore) GetReservationBinUsage(ctx context.Context, accountID gethcommon.Address, startPeriod uint64, limit int32) ([]*pb.PeriodRecord, error) {
+	// Fetch all bins from the start period
+	queryInput := &dynamodb.QueryInput{
+		TableName:              aws.String(s.reservationTableName),
+		KeyConditionExpression: aws.String("AccountID = :account AND ReservationPeriod >= :reservationPeriod"),
+		ExpressionAttributeValues: commondynamodb.ExpressionValues{
+			":account":           &types.AttributeValueMemberS{Value: accountID.Hex()},
+			":reservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(startPeriod, 10)},
+		},
+		ScanIndexForward: aws.Bool(true),
+		Limit:            aws.Int32(limit),
+	}
+	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query reservation bin usage for account: %w", err)
+	}
+
+	records := make([]*pb.PeriodRecord, len(bins))
+	for i := 0; i < len(bins); i++ {
+		periodRecord, err := parsePeriodRecord(bins[i])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse bin %d record: %w", i, err)
+		}
+		records[i] = periodRecord
+	}
+
+	return records, nil
 }

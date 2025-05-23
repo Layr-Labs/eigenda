@@ -31,4 +31,7 @@ type MeteringStore interface {
 
 	// GetLargestCumulativePayment returns the largest cumulative payment for the given account
 	GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error)
+
+	// GetReservationBinUsage returns all reservation bin usage records for an account within a time range
+	GetReservationBinUsage(ctx context.Context, accountID gethcommon.Address, startPeriod uint64, limit int32) ([]*pb.PeriodRecord, error)
 }
