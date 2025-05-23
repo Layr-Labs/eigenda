@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/cmd/dataapi/flags"
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
@@ -129,6 +130,31 @@ func RunDataApi(ctx *cli.Context) error {
 	if config.ServerVersion == 2 {
 		blobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
 		metrics = dataapi.NewMetrics(config.ServerVersion, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)
+
+		mtConfig := meterer.Config{
+			ChainReadTimeout: config.ChainReadTimeout,
+			UpdateInterval:   config.UpdateInterval,
+		}
+		paymentChainState, err := meterer.NewOnchainPaymentState(context.Background(), tx, logger)
+		if err != nil {
+			return fmt.Errorf("failed to create onchain payment state: %w", err)
+		}
+		if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
+			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
+		}
+
+		meteringStore, err := meterer.NewDynamoDBMeteringStore(
+			config.AwsClientConfig,
+			config.ReservationsTableName,
+			config.OnDemandTableName,
+			config.GlobalRateTableName,
+			logger,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create offchain store: %w", err)
+		}
+		meterer := meterer.NewMeterer(mtConfig, paymentChainState, meteringStore, logger)
+
 		serverv2, err := serverv2.NewServerV2(
 			dataapi.Config{
 				ServerMode:         config.ServerMode,
@@ -146,6 +172,7 @@ func RunDataApi(ctx *cli.Context) error {
 			indexedChainState,
 			logger,
 			metrics,
+			meterer,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create v2 server: %w", err)

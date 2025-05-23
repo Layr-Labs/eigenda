@@ -25,6 +25,7 @@ import (
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
@@ -61,10 +62,14 @@ var (
 	//go:embed testdata/prometheus-response-network-signing-rate.json
 	mockPrometheusResponseNetworkSigningRate string
 
-	UUID                = uuid.New()
-	metadataTableName   = fmt.Sprintf("test-BlobMetadata-%v", UUID)
-	blobMetadataStore   *blobstorev2.BlobMetadataStore
-	testDataApiServerV2 *serverv2.ServerV2
+	UUID                 = uuid.New()
+	metadataTableName    = fmt.Sprintf("test-BlobMetadata-%v", UUID)
+	reservationTableName = fmt.Sprintf("test-Reservations-%v", UUID)
+	ondemandTableName    = fmt.Sprintf("test-OnDemand-%v", UUID)
+	globalTableName      = fmt.Sprintf("test-Global-%v", UUID)
+	blobMetadataStore    *blobstorev2.BlobMetadataStore
+	testDataApiServerV2  *serverv2.ServerV2
+	testMeterer          *meterer.Meterer
 
 	logger = testutils.GetLogger()
 
@@ -185,10 +190,45 @@ func setup(m *testing.M) {
 	}
 	blobMetadataStore = blobstorev2.NewBlobMetadataStore(dynamoClient, logger, metadataTableName)
 
+	mockState := &coremock.MockOnchainPaymentState{}
+	mockState.On("GetReservationWindow", mock.Anything).Return(uint64(1), nil)
+	mockState.On("GetPricePerSymbol", mock.Anything).Return(uint64(2), nil)
+	mockState.On("GetGlobalSymbolsPerSecond", mock.Anything).Return(uint64(1009), nil)
+	mockState.On("GetGlobalRatePeriodInterval", mock.Anything).Return(uint64(1), nil)
+	mockState.On("GetMinNumSymbols", mock.Anything).Return(uint64(3), nil)
+	err = meterer.CreateReservationTable(cfg, reservationTableName)
+	if err != nil {
+		teardown()
+		panic("failed to create reservation table")
+	}
+	err = meterer.CreateOnDemandTable(cfg, ondemandTableName)
+	if err != nil {
+		teardown()
+		panic("failed to create ondemand table")
+	}
+	err = meterer.CreateGlobalReservationTable(cfg, globalTableName)
+	if err != nil {
+		teardown()
+		panic("failed to create global reservation table")
+	}
+
+	meteringStore, err := meterer.NewDynamoDBMeteringStore(
+		cfg,
+		reservationTableName,
+		ondemandTableName,
+		globalTableName,
+		logger,
+	)
+	if err != nil {
+		teardown()
+		panic("failed to create offchain store")
+	}
+	testMeterer = meterer.NewMeterer(meterer.Config{}, mockState, meteringStore, logger)
+
 	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
 	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 
-	testDataApiServerV2, err = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
+	testDataApiServerV2, err = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger), testMeterer)
 	if err != nil {
 		teardown()
 		panic("failed to create v2 server: " + err.Error())
@@ -1465,7 +1505,7 @@ func TestFetchBatchFeed(t *testing.T) {
 	// Create a local server so the internal state (e.g. cache) will be re-created.
 	// This is needed because /v2/operators/signing-info API shares the cache state with
 	// /v2/batches/feed API.
-	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
+	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger), testMeterer)
 	require.NoError(t, err)
 
 	r.GET("/v2/batches/feed", testDataApiServerV2.FetchBatchFeed)
@@ -1942,7 +1982,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 	// Create a local server so the internal state (e.g. cache) will be re-created.
 	// This is needed because /v2/operators/signing-info API shares the cache state with
 	// /v2/batches/feed API.
-	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
+	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger), testMeterer)
 	require.NoError(t, err)
 
 	r.GET("/v2/operators/signing-info", testDataApiServerV2.FetchOperatorSigningInfo)
@@ -2238,7 +2278,7 @@ func TestCheckOperatorsLivenessLegacyV1SocketRegistration(t *testing.T) {
 	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
 	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 
-	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIcs, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger))
+	testDataApiServerV2, err := serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIcs, mockLogger, dataapi.NewMetrics(serverVersion, nil, "9001", mockLogger), testMeterer)
 	require.NoError(t, err)
 
 	r.GET("/v2/operators/liveness", testDataApiServerV2.CheckOperatorsLiveness)
@@ -2684,5 +2724,99 @@ func createAttestation(
 			0: 100,
 			1: 80,
 		},
+	}
+}
+
+func TestFetchAccountReservationUsage(t *testing.T) {
+	router := setUpRouter()
+	router.GET("/v2/accounts/:account_id/reservation/usage", testDataApiServerV2.FetchAccountReservationUsage)
+
+	testCases := []struct {
+		name           string
+		accountID      string
+		window         string
+		expectedStatus int
+		expectedError  bool
+	}{
+		{
+			name:           "valid account with default window",
+			accountID:      "0x1234567890123456789012345678901234567890",
+			window:         "",
+			expectedStatus: http.StatusOK,
+			expectedError:  false,
+		},
+		{
+			name:           "valid account with custom window",
+			accountID:      "0x1234567890123456789012345678901234567890",
+			window:         "48",
+			expectedStatus: http.StatusOK,
+			expectedError:  false,
+		},
+		{
+			name:           "invalid account ID",
+			accountID:      "invalid",
+			window:         "",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  true,
+		},
+		{
+			name:           "zero account ID",
+			accountID:      "0x0000000000000000000000000000000000000000",
+			window:         "",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  true,
+		},
+		{
+			name:           "invalid window value",
+			accountID:      "0x1234567890123456789012345678901234567890",
+			window:         "invalid",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  true,
+		},
+		{
+			name:           "window too large",
+			accountID:      "0x1234567890123456789012345678901234567890",
+			window:         "73",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  true,
+		},
+		{
+			name:           "window too small",
+			accountID:      "0x1234567890123456789012345678901234567890",
+			window:         "0",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			url := fmt.Sprintf("/v2/accounts/%s/reservation/usage", tc.accountID)
+			if tc.window != "" {
+				url += fmt.Sprintf("?window=%s", tc.window)
+			}
+
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", url, nil)
+			router.ServeHTTP(w, req)
+			assert.Equal(t, tc.expectedStatus, w.Code)
+
+			if !tc.expectedError {
+				response := decodeResponseBody[serverv2.AccountReservationUsageResponse](t, w)
+
+				// Verify response structure
+				assert.Equal(t, tc.accountID, response.AccountId)
+				assert.NotNil(t, response.Records)
+
+				// Verify each record has the expected fields
+				for _, record := range response.Records {
+					assert.NotNil(t, record.ReservationPeriod)
+					assert.NotNil(t, record.Usage)
+				}
+			} else {
+				errorResponse := decodeResponseBody[serverv2.ErrorResponse](t, w)
+				assert.NotEmpty(t, errorResponse.Error)
+			}
+		})
 	}
 }

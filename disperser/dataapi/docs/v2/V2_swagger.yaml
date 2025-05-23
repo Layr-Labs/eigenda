@@ -8,10 +8,16 @@ definitions:
         items:
           type: integer
         type: array
+      "y":
+        items:
+          type: integer
+        type: array
     type: object
   core.G2Point:
     properties:
       x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   core.PaymentMetadata:
@@ -37,6 +43,10 @@ definitions:
         items:
           type: integer
         type: array
+      "y":
+        items:
+          type: integer
+        type: array
     type: object
   encoding.BlobCommitments:
     properties:
@@ -57,15 +67,23 @@ definitions:
         items:
           type: integer
         type: array
+      "y":
+        items:
+          type: integer
+        type: array
     type: object
   encoding.G2Commitment:
     properties:
       x:
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   encoding.LengthProof:
     properties:
       x:
+        $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
+      "y":
         $ref: '#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2'
     type: object
   github_com_Layr-Labs_eigenda_core_v2.Attestation:
@@ -181,6 +199,13 @@ definitions:
       signature:
         type: string
     type: object
+  github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PeriodRecord:
+    properties:
+      reservation_period:
+        type: integer
+      usage:
+        type: integer
+    type: object
   github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch:
     properties:
       attestation_info:
@@ -191,6 +216,10 @@ definitions:
   github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2:
     properties:
       a0:
+        items:
+          type: integer
+        type: array
+      a1:
         items:
           type: integer
         type: array
@@ -217,6 +246,15 @@ definitions:
       blobs:
         items:
           $ref: '#/definitions/v2.BlobInfo'
+        type: array
+    type: object
+  v2.AccountReservationUsageResponse:
+    properties:
+      account_id:
+        type: string
+      records:
+        items:
+          $ref: '#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PeriodRecord'
         type: array
     type: object
   v2.AttestationInfo:
@@ -584,6 +622,41 @@ paths:
           schema:
             $ref: '#/definitions/v2.ErrorResponse'
       summary: Fetch blobs posted by an account in a time window by specific direction
+      tags:
+      - Accounts
+  /accounts/{account_id}/reservation/usage:
+    get:
+      parameters:
+      - description: The account ID to fetch reservation usage for
+        in: path
+        name: account_id
+        required: true
+        type: string
+      - description: 'Time window in hours to fetch reservation usage for [default:
+          24; max: 72]'
+        in: query
+        name: window
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/v2.AccountReservationUsageResponse'
+        "400":
+          description: 'error: Bad request'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "404":
+          description: 'error: Not found'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+        "500":
+          description: 'error: Server error'
+          schema:
+            $ref: '#/definitions/v2.ErrorResponse'
+      summary: Fetch reservation usage for an account
       tags:
       - Accounts
   /batches/{batch_header_hash}:

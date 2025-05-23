@@ -82,6 +82,58 @@
                 }
             }
         },
+        "/accounts/{account_id}/reservation/usage": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Fetch reservation usage for an account",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "The account ID to fetch reservation usage for",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Time window in hours to fetch reservation usage for [default: 24; max: 72]",
+                        "name": "window",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.AccountReservationUsageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/batches/feed": {
             "get": {
                 "produces": [
@@ -874,6 +926,12 @@
                     "items": {
                         "type": "integer"
                     }
+                },
+                "y": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -881,6 +939,9 @@
             "type": "object",
             "properties": {
                 "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -917,6 +978,12 @@
                     "items": {
                         "type": "integer"
                     }
+                },
+                "y": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -946,6 +1013,12 @@
                     "items": {
                         "type": "integer"
                     }
+                },
+                "y": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -954,6 +1027,9 @@
             "properties": {
                 "x": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
         },
@@ -961,6 +1037,9 @@
             "type": "object",
             "properties": {
                 "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -1128,6 +1207,17 @@
                 }
             }
         },
+        "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PeriodRecord": {
+            "type": "object",
+            "properties": {
+                "reservation_period": {
+                    "type": "integer"
+                },
+                "usage": {
+                    "type": "integer"
+                }
+            }
+        },
         "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch": {
             "type": "object",
             "properties": {
@@ -1143,6 +1233,12 @@
             "type": "object",
             "properties": {
                 "a0": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "a1": {
                     "type": "array",
                     "items": {
                         "type": "integer"
@@ -1183,6 +1279,20 @@
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/v2.BlobInfo"
+                    }
+                }
+            }
+        },
+        "v2.AccountReservationUsageResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "records": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PeriodRecord"
                     }
                 }
             }
