@@ -19,7 +19,7 @@ func TestDecodeShortBytes(t *testing.T) {
 	require.NoError(t, err)
 
 	// truncate
-	encodedPayload.bytes = encodedPayload.bytes[:len(encodedPayload.bytes) -32]
+	encodedPayload.bytes = encodedPayload.bytes[:len(encodedPayload.bytes)-32]
 
 	payload, err := encodedPayload.decode()
 	require.Error(t, err)
@@ -50,7 +50,7 @@ func TestEncodeTooManyElements(t *testing.T) {
 
 	for i := 0; i < len(powersOf2); i++ {
 		blobLength := powersOf2[i]
-		maxPermissiblePayloadLength, err := codec.GetMaxPermissiblePayloadLength(blobLength)
+		maxPermissiblePayloadLength, err := codec.BlobSymbolsToMaxPayloadSize(blobLength)
 		require.NoError(t, err)
 
 		almostTooLongData := testRandom.Bytes(int(maxPermissiblePayloadLength))
@@ -97,7 +97,7 @@ func TestTrailingNonZeros(t *testing.T) {
 	require.NoError(t, err)
 
 	// adding a non-0 is non-fine
-	fieldElements2 = append(fieldElements2, fr.Element{0,0,0,1})
+	fieldElements2 = append(fieldElements2, fr.Element{0, 0, 0, 1})
 	_, err = encodedPayloadFromElements(fieldElements2, uint32(len(fieldElements2)*encoding.BYTES_PER_SYMBOL))
 	require.Error(t, err)
 }

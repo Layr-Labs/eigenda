@@ -81,6 +81,11 @@ func (b *Blob) BlobLengthSymbols() uint32 {
 	return b.blobLengthSymbols
 }
 
+// BlobLengthBytes returns the length of the blob, in bytes
+func (b *Blob) BlobLengthBytes() uint32 {
+	return b.blobLengthSymbols * 32
+}
+
 // toEncodedPayload creates an encodedPayload from the blob
 //
 // The payloadForm indicates how payloads are interpreted. The way that payloads are interpreted dictates what
@@ -104,7 +109,7 @@ func (b *Blob) toEncodedPayload(payloadForm codecs.PolynomialForm) (*encodedPayl
 		return nil, fmt.Errorf("invalid polynomial form")
 	}
 
-	maxPermissiblePayloadLength, err := codec.GetMaxPermissiblePayloadLength(b.blobLengthSymbols)
+	maxPermissiblePayloadLength, err := codec.BlobSymbolsToMaxPayloadSize(b.blobLengthSymbols)
 	if err != nil {
 		return nil, fmt.Errorf("get max permissible payload length: %w", err)
 	}
