@@ -6,17 +6,22 @@ import {EigenDACertVerificationLib as CertLib} from "src/periphery/cert/librarie
 import {EigenDATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDACertTypes} from "src/periphery/cert/EigenDACertTypes.sol";
+import {EigenDACertVerifier} from "src/periphery/cert/EigenDACertVerifier.sol";
+import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
+import {EigenDACertVerifierRouter} from "src/periphery/cert/router/EigenDACertVerifierRouter.sol";
+import {console2} from "forge-std/console2.sol";
 
-contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
+contract EigenDACertVerifierRouterUnit is MockEigenDADeployer {
     using stdStorage for StdStorage;
     using BN254 for BN254.G1Point;
 
-    address relay0 = address(uint160(uint256(keccak256(abi.encodePacked("relay0")))));
-    address relay1 = address(uint160(uint256(keccak256(abi.encodePacked("relay1")))));
+    EigenDACertVerifierRouter internal eigenDACertVerifierRouter;
 
     function setUp() public virtual {
         quorumNumbersRequired = hex"00";
         _deployDA();
+        eigenDACertVerifierRouter = new EigenDACertVerifierRouter();
+        eigenDACertVerifierRouter.initialize(address(this), address(0)); // adding a default cert verifier that should fail.
     }
 
     function _getDACert(uint256 seed) internal returns (EigenDACertTypes.EigenDACertV3 memory) {
@@ -31,19 +36,22 @@ contract EigenDACertVerifierV2Unit is MockEigenDADeployer {
         );
     }
 
-    function test_verifyDACert(uint256 pseudoRandomNumber) public {
-        EigenDACertTypes.EigenDACertV3 memory cert = _getDACert(pseudoRandomNumber);
-        uint8 res = eigenDACertVerifier.checkDACert(abi.encode(cert));
-        assertEq(res, 1);
-    }
+    function test_verifyDACert(uint256 seed1, uint256 seed2, uint256 seed3) public {
+        EigenDACertTypes.EigenDACertV3 memory cert = _getDACert(seed1);
+        uint32 rbn = cert.batchHeader.referenceBlockNumber;
+        vm.expectRevert();
+        eigenDACertVerifierRouter.checkDACert(abi.encode(cert));
 
-    function test_verifyDACert_revert_InclusionProofInvalid(uint256 pseudoRandomNumber) public {
-        EigenDACertTypes.EigenDACertV3 memory cert = _getDACert(pseudoRandomNumber);
+        vm.roll(rbn - 1);
+        eigenDACertVerifierRouter.addCertVerifier(rbn, address(eigenDACertVerifier));
 
-        cert.blobInclusionInfo.inclusionProof =
-            abi.encodePacked(keccak256(abi.encode(pseudoRandomNumber, "inclusion proof")));
-        uint8 res = eigenDACertVerifier.checkDACert(abi.encode(cert));
-        assertEq(res, uint8(CertLib.StatusCode.INVALID_INCLUSION_PROOF));
+        vm.roll(type(uint32).max);
+        assertEq(eigenDACertVerifierRouter.getCertVerifierAt(uint32(bound(seed2, 0, rbn - 1))), address(0));
+        assertEq(
+            eigenDACertVerifierRouter.getCertVerifierAt(uint32(bound(seed3, rbn, type(uint32).max))),
+            address(eigenDACertVerifier)
+        );
+        assertEq(eigenDACertVerifierRouter.checkDACert(abi.encode(cert)), 1);
     }
 
     function _getSignedBatchAndBlobVerificationProof(uint256 pseudoRandomNumber, uint8 version)
