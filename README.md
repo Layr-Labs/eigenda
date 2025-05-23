@@ -12,7 +12,7 @@ EigenDA is a secure, high-throughput, and decentralized data availability (DA) s
 
 To understand more about how EigenDA works and how it transforms the modern landscape of data availability, continue reading [EigenDA introduction](https://www.blog.eigenlayer.xyz/intro-to-eigenda-hyperscale-data-availability-for-rollups/).
 
-To dive deep into the technical details, continue reading [EigenDA protocol spec](https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/overview.md).
+To dive deep into the technical details, continue reading [EigenDA protocol spec](https://layr-labs.github.io/eigenda/).
 
 If you're interested in integrating your rollup with EigenDA, please fill out the [EigenDA Partner Registration](https://docs.google.com/forms/d/e/1FAIpQLSdXvfxgRfIHWYu90FqN-2yyhgrYm9oExr0jSy7ERzbMUimJew/viewform).
 
@@ -23,9 +23,6 @@ The EigenDA public API is documented [here](https://github.com/Layr-Labs/eigenda
 ## Operating EigenDA Node
 
 If you want to be an EigenDA operator and run a node, please clone [Operator Setup Guide](https://github.com/Layr-Labs/eigenda-operator-setup) GitHub repo and follow the instructions there.
-
-## Protocol Spec
-If you want to know more about eigenda protocol and integrations with rollup, please see [MD Book](https://layr-labs.github.io/eigenda/)
 
 ## Contributing
 We welcome all contributions! There are many ways to contribute to the project, including but not limited to:
