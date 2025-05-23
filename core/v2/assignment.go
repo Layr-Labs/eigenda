@@ -215,7 +215,7 @@ func MergeAssignmentsAndCap(
 // GetAssignmentsForBlob calculates chunk assignments for the validators in a set of quorums based on their stake.
 // The quorums passed into GetAssignmentsForBlob should be the full set of quorums contained in the blob header.
 // Moreover, the OperatorState must include the operator state maps for each of the quorums specified.
-// GetAssignemntsForBlob will attempt to construct maximally overlapping assignments for each quorum, and then merge them together.
+// GetAssignmentsForBlob will attempt to construct maximally overlapping assignments for each quorum, and then merge them together.
 // The number of chunks assigned to each operator is capped at the maximum number of chunks needed to construct a blob.
 func GetAssignmentsForBlob(
 	state *core.OperatorState,
@@ -258,8 +258,9 @@ func GetAssignmentsForBlob(
 	return mergedAssignments, nil
 }
 
-// GetAssignmentForBlob returns the assignment for a specific operator for a specific blob. The quorums passed into GetAssignmentsForBlob should be the full set of quorums contained in the blob header.
-// Moreover, the OperatorState must include the operator state maps for each of the quorums specified. GetAssignmentForBlob calls
+// GetAssignmentForBlob returns the assignment for a specific operator for a specific blob. The quorums passed into
+// GetAssignmentsForBlob should be the full set of quorums contained in the blob header. Moreover, the OperatorState
+// must include the operator state maps for each of the quorums specified. GetAssignmentForBlob calls
 // GetAssignmentsForBlob under the hood.
 func GetAssignmentForBlob(
 	state *core.OperatorState,
