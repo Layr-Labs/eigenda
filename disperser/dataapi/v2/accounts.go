@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/core/meterer"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
@@ -110,6 +110,7 @@ func (s *ServerV2) FetchAccountBlobFeed(c *gin.Context) {
 //	@Tags		Accounts
 //	@Produce	json
 //	@Param		account_id	path		string	true	"The account ID to fetch reservation usage for"
+//	@Param		window		query		int		false	"Time window in hours to fetch reservation usage for [default: 24; max: 72]"
 //	@Success	200			{object}	AccountReservationUsageResponse
 //	@Failure	400			{object}	ErrorResponse	"error: Bad request"
 //	@Failure	404			{object}	ErrorResponse	"error: Not found"
@@ -133,13 +134,24 @@ func (s *ServerV2) FetchAccountReservationUsage(c *gin.Context) {
 		return
 	}
 
-	// Calculate reservation period for last 24 hours
-	now := time.Now()
-	oneDayAgo := now.Add(-24 * time.Hour)
-	startPeriod := meterer.GetReservationPeriod(oneDayAgo.Unix(), 3600) // Use 1 hour as the window
+	// Parse window parameter
+	window := 24 // default 24 hours
+	if windowStr := c.Query("window"); windowStr != "" {
+		parsedWindow, err := strconv.Atoi(windowStr)
+		if err != nil || parsedWindow <= 0 || parsedWindow > 72 {
+			s.metrics.IncrementInvalidArgRequestNum("FetchAccountReservationUsage")
+			invalidParamsErrorResponse(c, errors.New("window must be between 1 and 72 hours"))
+			return
+		}
+		window = parsedWindow
+	}
 
-	// Get period records for the last 24 hours
-	periodRecords, err := s.offchainStore.GetReservationBinUsage(c.Request.Context(), accountId, startPeriod)
+	// Calculate reservation period
+	now := time.Now()
+	startTime := now.Add(-time.Duration(window) * time.Hour)
+
+	// Get period records for the specified window
+	periodRecords, err := s.offchainStore.GetReservationBinUsage(c.Request.Context(), accountId, uint64(startTime.Unix()))
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchAccountReservationUsage")
 		errorResponse(c, fmt.Errorf("failed to fetch period records for account (%s): %w", accountId.Hex(), err))
@@ -152,14 +164,12 @@ func (s *ServerV2) FetchAccountReservationUsage(c *gin.Context) {
 		if record == nil {
 			records[i] = PeriodRecord{
 				ReservationPeriod: 0,
-				Usage:             0,
-				Timestamp:         time.Unix(0, 0).UTC().Format(time.RFC3339),
+				UsageBytes:        0,
 			}
 		} else {
 			records[i] = PeriodRecord{
 				ReservationPeriod: record.Index,
-				Usage:             record.Usage,
-				Timestamp:         time.Unix(int64(record.Index), 0).UTC().Format(time.RFC3339),
+				UsageBytes:        record.Usage * 32,
 			}
 		}
 	}
@@ -184,6 +194,5 @@ type AccountReservationUsageResponse struct {
 // PeriodRecord represents a single period's usage record
 type PeriodRecord struct {
 	ReservationPeriod uint32 `json:"reservation_period"`
-	Usage             uint64 `json:"usage"`
-	Timestamp         string `json:"timestamp"`
+	UsageBytes        uint64 `json:"usage_bytes"`
 }

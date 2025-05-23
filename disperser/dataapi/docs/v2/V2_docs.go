@@ -101,6 +101,12 @@ const docTemplateV2 = `{
                         "name": "account_id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Time window in hours to fetch reservation usage for [default: 24; max: 72]",
+                        "name": "window",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1210,7 +1216,7 @@ const docTemplateV2 = `{
                 "reservation_period": {
                     "type": "integer"
                 },
-                "usage": {
+                "usage_bytes": {
                     "type": "integer"
                 }
             }

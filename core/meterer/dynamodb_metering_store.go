@@ -270,6 +270,7 @@ func (s *OffchainStore) GetReservationBinUsage(ctx context.Context, accountID ge
 			":reservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(startPeriod, 10)},
 		},
 		ScanIndexForward: aws.Bool(true),
+		Limit:            aws.Int32(1000),
 	}
 	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {

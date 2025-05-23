@@ -203,7 +203,7 @@ definitions:
     properties:
       reservation_period:
         type: integer
-      usage:
+      usage_bytes:
         type: integer
     type: object
   github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch:
@@ -632,6 +632,11 @@ paths:
         name: account_id
         required: true
         type: string
+      - description: 'Time window in hours to fetch reservation usage for [default:
+          24; max: 72]'
+        in: query
+        name: window
+        type: integer
       produces:
       - application/json
       responses:
