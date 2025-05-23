@@ -90,6 +90,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			NumRequestRetries:                     ctx.GlobalInt(flags.NumRequestRetriesFlag.Name),
 			MaxBatchSize:                          int32(ctx.GlobalInt(flags.MaxBatchSizeFlag.Name)),
 			SignificantSigningThresholdPercentage: uint8(ctx.GlobalUint(flags.SignificantSigningThresholdPercentageFlag.Name)),
+			SignificantSigningMetricsThresholds:   ctx.GlobalStringSlice(flags.SignificantSigningMetricsThresholdsFlag.Name),
 		},
 		NumConcurrentEncodingRequests:  ctx.GlobalInt(flags.NumConcurrentEncodingRequestsFlag.Name),
 		NumConcurrentDispersalRequests: ctx.GlobalInt(flags.NumConcurrentDispersalRequestsFlag.Name),
