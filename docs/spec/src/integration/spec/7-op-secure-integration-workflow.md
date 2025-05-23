@@ -72,7 +72,7 @@ Data is provided to FPVM in the form of preimage oracle. OP spec has defined rul
 
 ### Hokulea
 
-Hokulea builds on top of OP Kona derivation pipeline to integrate EigenDA as a Data Availability Source. Hokulea provides traits, implementation
+Hokulea uses traits exposed by Kona derivation pipeline to integrate EigenDA as a Data Availability Source. Hokulea provides traits, implementation
 for EigenDA part of derivation pipeline, such that those logics can be compiled into ELF together with Kona.
 
 Hokulea also extends preimage oracle for EigenDA, which is able to provide the verifiable interface for answering
@@ -87,9 +87,7 @@ oracle and derivation logics allows for
 
 ### Canoe
 
-We developed a rust library called [**Canoe**](https://github.com/Layr-Labs/hokulea/tree/master/canoe#1protocol-overview) that uses zk validity proof to provide ways 
-- to efficiently verify the cert validity via verifying a zk validity proof
-- to verify validity of a DA cert within zkVM, this enables zkVM integration
+We developed a rust library called [**Canoe**](https://github.com/Layr-Labs/hokulea/tree/master/canoe#1protocol-overview) that uses zk validity proof to efficiently verify the cert validity on L1 or inside a zkVM.
 
 ### Hokulea integration with zkVM
 
@@ -97,7 +95,7 @@ Unlike interactive challenge game with fault proof, a zk proof has a property th
 the correct derivation rule.
 Hence, a malicious party can raise a challenge but is unable to defend its position.
 
-- The Hokulea+Kona derivation are compiled into ELF
+- The Hokulea+Kona derivation is compiled into ELF for the needed environment (RiscV zkVM or one of the FPVMs)
 - The Hokulea+Kona preimage oracle are prepared, where the validity of DA cert is provided by Canoe
 - zkVM takes preimage and verifies it, then feeds the data into the ELF containing the derivation logics
 - zkVM produces a proof about the execution
