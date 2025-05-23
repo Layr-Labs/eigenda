@@ -155,19 +155,9 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
             );
         }
 
-        // Register Reservations for client as the eigenDACommunityMultisig
-        IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
-            symbolsPerSecond: 452198,
-            startTimestamp: uint64(block.timestamp),
-            endTimestamp: uint64(block.timestamp + 1000000000),
-            quorumNumbers: hex"0001",
-            quorumSplits: hex"3232"
-        });
-        address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
+        // address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
         vm.startBroadcast(msg.sender);
-        paymentVault.setReservation(clientAddress, reservation);
         // Deposit OnDemand
-        paymentVault.depositOnDemand{value: 0.1 ether}(clientAddress);
         vm.stopBroadcast();
 
         // Deposit stakers into EigenLayer and delegate to operators

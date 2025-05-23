@@ -176,15 +176,6 @@ contract DeploymentInitializer {
         EigenDARelayRegistry(RELAY_REGISTRY).initialize(INITIAL_OWNER);
 
         upgrade(PAYMENT_VAULT, PAYMENT_VAULT_IMPL);
-        PaymentVault(payable(PAYMENT_VAULT)).initialize(
-            INITIAL_OWNER,
-            MIN_NUM_SYMBOLS,
-            PRICE_PER_SYMBOL,
-            PRICE_UPDATE_COOLDOWN,
-            GLOBAL_SYMBOLS_PER_PERIOD,
-            RESERVATION_PERIOD_INTERVAL,
-            GLOBAL_RATE_PERIOD_INTERVAL
-        );
 
         upgrade(DISPERSER_REGISTRY, DISPERSER_REGISTRY_IMPL);
         EigenDADisperserRegistry(DISPERSER_REGISTRY).initialize(INITIAL_OWNER);
