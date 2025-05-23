@@ -1281,9 +1281,6 @@ const docTemplateV2 = `{
                 },
                 "usage": {
                     "type": "integer"
-                },
-                "usage_bytes": {
-                    "type": "integer"
                 }
             }
         },

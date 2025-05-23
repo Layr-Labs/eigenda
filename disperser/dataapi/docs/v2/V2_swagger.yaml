@@ -216,8 +216,6 @@ definitions:
         type: integer
       usage:
         type: integer
-      usage_bytes:
-        type: integer
     type: object
   github_com_Layr-Labs_eigenda_disperser_dataapi_v2.Reservation:
     properties:

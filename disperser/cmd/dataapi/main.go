@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -133,8 +132,8 @@ func RunDataApi(ctx *cli.Context) error {
 		metrics = dataapi.NewMetrics(config.ServerVersion, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)
 
 		mtConfig := meterer.Config{
-			ChainReadTimeout: 10 * time.Second,
-			UpdateInterval:   10 * time.Minute,
+			ChainReadTimeout: config.ChainReadTimeout,
+			UpdateInterval:   config.UpdateInterval,
 		}
 		paymentChainState, err := meterer.NewOnchainPaymentState(context.Background(), tx, logger)
 		if err != nil {
@@ -143,6 +142,7 @@ func RunDataApi(ctx *cli.Context) error {
 		if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
 			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
 		}
+
 		meteringStore, err := meterer.NewDynamoDBMeteringStore(
 			config.AwsClientConfig,
 			config.ReservationsTableName,
@@ -172,7 +172,6 @@ func RunDataApi(ctx *cli.Context) error {
 			indexedChainState,
 			logger,
 			metrics,
-			meteringStore,
 			meterer,
 		)
 		if err != nil {

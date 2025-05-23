@@ -1278,9 +1278,6 @@
                 },
                 "usage": {
                     "type": "integer"
-                },
-                "usage_bytes": {
-                    "type": "integer"
                 }
             }
         },

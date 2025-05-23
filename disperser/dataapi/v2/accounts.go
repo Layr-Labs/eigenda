@@ -7,7 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/core/meterer"
+	//"time"
+
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
@@ -152,7 +153,7 @@ func (s *ServerV2) FetchAccountReservationUsage(c *gin.Context) {
 	startTime := now.Add(-time.Duration(window) * time.Hour)
 
 	// Get period records for the specified window (limit 1000)
-	periodRecords, err := s.meteringStore.GetReservationBinUsage(c.Request.Context(), accountId, uint64(startTime.Unix()), 1000)
+	periodRecords, err := s.meterer.MeteringStore.GetPeriodRecords(c.Request.Context(), accountId, uint64(startTime.Unix()), 1000)
 	if err != nil {
 		s.metrics.IncrementFailedRequestNum("FetchAccountReservationUsage")
 		errorResponse(c, fmt.Errorf("failed to fetch period records for account (%s): %w", accountId.Hex(), err))
@@ -165,12 +166,12 @@ func (s *ServerV2) FetchAccountReservationUsage(c *gin.Context) {
 		if record == nil {
 			records[i] = PeriodRecord{
 				ReservationPeriod: 0,
-				UsageBytes:        0,
+				Usage:             0,
 			}
 		} else {
 			records[i] = PeriodRecord{
 				ReservationPeriod: record.Index,
-				UsageBytes:        record.Usage * 32,
+				Usage:             record.Usage,
 			}
 		}
 	}
@@ -196,7 +197,6 @@ type AccountReservationUsageResponse struct {
 type PeriodRecord struct {
 	ReservationPeriod uint32 `json:"reservation_period"`
 	Usage             uint64 `json:"usage"`
-	UsageBytes        uint64 `json:"usage_bytes"`
 }
 
 type Reservation struct {
@@ -262,9 +262,10 @@ func (s *ServerV2) FetchAccountPaymentState(c *gin.Context) {
 	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
 
 	// off-chain account specific payment state
-	now := time.Now().Unix()
-	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
-	periodRecords, err := s.meterer.MeteringStore.GetPeriodRecords(c.Request.Context(), accountId, currentReservationPeriod)
+	now := time.Now()
+	startTime := now.Add(-time.Duration(24) * time.Hour)
+
+	periodRecords, err := s.meterer.MeteringStore.GetPeriodRecords(c.Request.Context(), accountId, uint64(startTime.Unix()), 1000)
 	if err != nil {
 		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountId)
 	}
@@ -322,7 +323,6 @@ func (s *ServerV2) FetchAccountPaymentState(c *gin.Context) {
 			convertedRecords[i] = PeriodRecord{
 				ReservationPeriod: pr.Index,
 				Usage:             pr.Usage,
-				UsageBytes:        pr.Usage * 32,
 			}
 		}
 	}

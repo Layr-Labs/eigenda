@@ -90,7 +90,6 @@ type ServerV2 struct {
 	indexedChainState core.IndexedChainState
 	promClient        dataapi.PrometheusClient
 	metrics           *dataapi.Metrics
-	meteringStore     meterer.MeteringStore
 	meterer           *meterer.Meterer
 
 	operatorHandler *dataapi.OperatorHandler
@@ -119,7 +118,6 @@ func NewServerV2(
 	indexedChainState core.IndexedChainState,
 	logger logging.Logger,
 	metrics *dataapi.Metrics,
-	meteringStore meterer.MeteringStore,
 	meterer *meterer.Meterer,
 ) (*ServerV2, error) {
 	l := logger.With("component", "DataAPIServerV2")
@@ -191,7 +189,7 @@ func NewServerV2(
 		blobCertificateCache:             blobCertificateCache,
 		blobAttestationInfoResponseCache: blobAttestationInfoResponseCache,
 		batchResponseCache:               batchResponseCache,
-		meteringStore:                    meteringStore,
+		meterer:                          meterer,
 	}, nil
 }
 

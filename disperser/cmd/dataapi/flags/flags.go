@@ -1,6 +1,8 @@
 package flags
 
 import (
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/geth"
@@ -158,6 +160,20 @@ var (
 		Usage:    "Name of the DynamoDB table for global rate limits",
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "GLOBAL_RATE_TABLE_NAME"),
+	}
+	ChainReadTimeout = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "chain-read-timeout"),
+		Usage:    "timeout for reading from the chain",
+		Value:    10,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "CHAIN_READ_TIMEOUT"),
+		Required: false,
+	}
+	OnchainStateRefreshInterval = cli.DurationFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "onchain-state-refresh-interval"),
+		Usage:    "The interval at which to refresh the onchain state. This flag is only relevant in v2",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "ONCHAIN_STATE_REFRESH_INTERVAL"),
+		Value:    1 * time.Minute,
 	}
 )
 
