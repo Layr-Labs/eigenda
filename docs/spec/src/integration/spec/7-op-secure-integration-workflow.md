@@ -1,6 +1,6 @@
 # EigenDA OP Secure integration
 
-This document presents an overview on how EigenDAA plugs into Optimism (OP) Stack.
+This document presents an overview on how EigenDA plugs into Optimism (OP) Stack.
 - `write` and `read` path in a L2 rollup
 - Why the `read` path must stay live (even with a misbehaving op-batcher)
 - Adding an EigenDA stage to the OP derivation pipeline
