@@ -26,7 +26,7 @@ If the read path stalls, honest nodes can’t reach the block height needed to d
 ### L2 Write path (happy-flow)
 - op-batcher bundles user txs.
 - Sends batch to EigenDA proxy, which converts it to an Eigenda blob. Proxy sends blob to EigenDA, and forwards the returned certificate to op-batcher
-- Post certificate are posted to the L1 Rollup Inbox.
+- EigenDA certificates are posted to the L1 Rollup Inbox.
 ![](../../assets/integration/op-integration-high-level.png)
 
 ### L2 Read path
