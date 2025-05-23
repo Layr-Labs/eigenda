@@ -61,7 +61,9 @@ contract CertVerifierRouterDeployer is Script, Test {
         vm.stopBroadcast();
 
         // 4. Output the deployed addresses to a JSON file
-        string memory outputPath = string.concat("./script/deploy/router/output/", outputJSONFile);
+
+        string memory outputPath =
+            string.concat("./script/deploy/router/output/", vm.toString(block.chainid), "/", outputJSONFile);
         string memory parent = "parent object";
         string memory finalJson = vm.serializeAddress(parent, "eigenDACertVerifierRouter", address(proxy));
         finalJson = vm.serializeAddress(parent, "eigenDACertVerifierRouterImplementation", address(implementation));

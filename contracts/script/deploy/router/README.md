@@ -4,7 +4,7 @@ This directory contains the deployment script for the EigenDACertVerifierRouter 
 
 ## Overview
 
-The EigenDACertVerifierRouter is a routing contract that directs certification verification requests to the appropriate cert verifier contract based on the reference block number (RBN) in the certificate.
+The EigenDACertVerifierRouter is a routing contract that directs certificate verification requests to the appropriate cert verifier contract based on the reference block number (RBN) in the certificate.
 
 ## Deployment
 
