@@ -203,15 +203,15 @@ func newDispatcherMetrics(
 	if len(importantSigningThresholds) == 0 || importantSigningThresholds[0] != 0.0 {
 		importantSigningThresholds = append([]float64{0.0}, importantSigningThresholds...)
 	}
-	if importantSigningThresholds[0] != 1.0 {
+	if importantSigningThresholds[len(importantSigningThresholds)-1] != 1.0 {
 		importantSigningThresholds = append(importantSigningThresholds, 1.0)
 	}
 
-	signatureThresholds := promauto.With(registry).NewCounterVec(
+	batchSigningThresholdCount := promauto.With(registry).NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: dispatcherNamespace,
-			Name:      "signature_thresholds",
-			Help:      "A count of blobs that have reached various signature thresholds.",
+			Name:      "batch_signing_threshold_count",
+			Help:      "A count of batches that have reached various signature thresholds.",
 		},
 		[]string{"quorum", "threshold"},
 	)
@@ -234,7 +234,7 @@ func newDispatcherMetrics(
 		batchStageTimer:              batchStageTimer,
 		sendToValidatorStageTimer:    sendToValidatorStageTimer,
 		importantSigningThresholds:   importantSigningThresholds,
-		signatureThresholds:          signatureThresholds,
+		signatureThresholds:          batchSigningThresholdCount,
 	}, nil
 }
 
@@ -332,7 +332,7 @@ func (m *dispatcherMetrics) reportSigningThreshold(quorumID core.QuorumID, signi
 	// First, determine the threshold to report. In order to be reported as threshold X, the signing fraction
 	// must be greater than or equal to X, but strictly less than the next highest threshold.
 	//
-	// For example, lets say important thresholds are [0, 0.55, 0.67, 0.80, 1.0]
+	// For example, let's say important thresholds are [0, 0.55, 0.67, 0.80, 1.0]
 	// 0.55 signing -> threshold 0.55 (>= 0.55 but < 0.67)
 	// 0.56 signing -> threshold 0.55 (>= 0.55 but < 0.67)
 	// 0.66 signing -> threshold 0.55 (>= 0.55 but < 0.67)
