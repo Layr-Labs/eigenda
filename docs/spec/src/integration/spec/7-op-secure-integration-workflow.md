@@ -93,7 +93,7 @@ We developed a rust library called [**Canoe**](https://github.com/Layr-Labs/hoku
 
 ### Hokulea integration with zkVM
 
-Unlike interactively challenge game with fault proof, a zk proof has a property that only the honest party can create a valid zk proof with respect to
+Unlike interactive challenge game with fault proof, a zk proof has a property that only the honest party can create a valid zk proof with respect to
 the correct derivation rule.
 Hence,a n incorrect party can raise a challenge but is unable to defend its position.
 
