@@ -221,7 +221,6 @@ func GetAssignmentsForBlob(
 	state *core.OperatorState,
 	blobParams *core.BlobVersionParameters,
 	quorums []core.QuorumID,
-	blobKey []byte,
 ) (map[core.OperatorID]Assignment, error) {
 	if state == nil {
 		return nil, fmt.Errorf("state cannot be nil")
@@ -266,7 +265,6 @@ func GetAssignmentForBlob(
 	state *core.OperatorState,
 	blobParams *core.BlobVersionParameters,
 	quorums []core.QuorumID,
-	blobKey []byte,
 	id core.OperatorID,
 ) (Assignment, error) {
 
@@ -274,7 +272,7 @@ func GetAssignmentForBlob(
 		return Assignment{}, fmt.Errorf("blob params cannot be nil")
 	}
 
-	assignments, err := GetAssignmentsForBlob(state, blobParams, quorums, blobKey)
+	assignments, err := GetAssignmentsForBlob(state, blobParams, quorums)
 	if err != nil {
 		return Assignment{}, err
 	}

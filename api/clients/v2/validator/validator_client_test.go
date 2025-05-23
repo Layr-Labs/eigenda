@@ -33,8 +33,6 @@ var (
 		CodingRate:      8,
 		MaxNumOperators: 2048,
 	}
-
-	blobKey1 = []byte("hello0")
 )
 
 func MakeRandomAssignment(t *testing.T, rand *testrandom.TestRandom, validatorCount int32, quorumID core.QuorumID) map[core.OperatorID]v2.Assignment {
@@ -54,7 +52,7 @@ func MakeRandomAssignment(t *testing.T, rand *testrandom.TestRandom, validatorCo
 
 	state := dat.GetTotalOperatorState(context.Background(), 0)
 
-	assignments, err := v2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{quorumID}, blobKey1[:])
+	assignments, err := v2.GetAssignmentsForBlob(state.OperatorState, blobParams, []core.QuorumID{quorumID})
 	require.NoError(t, err)
 
 	return assignments

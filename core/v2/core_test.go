@@ -160,10 +160,7 @@ func prepareBlobs(
 
 		require.NoError(t, err)
 
-		blobKey, err := header.BlobKey()
-		require.NoError(t, err)
-
-		assignments, err := corev2.GetAssignmentsForBlob(state, blobParams, header.QuorumNumbers, blobKey[:])
+		assignments, err := corev2.GetAssignmentsForBlob(state, blobParams, header.QuorumNumbers)
 		require.NoError(t, err)
 
 		for opID, assignment := range assignments {

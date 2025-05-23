@@ -48,12 +48,7 @@ func (v *shardValidator) validateBlobParams(blob *BlobShard, blobParams *core.Bl
 
 	// Get the assignments for the quorum
 
-	blobKey, err := blob.BlobHeader.BlobKey()
-	if err != nil {
-		return nil, err
-	}
-
-	assignment, err := GetAssignmentForBlob(operatorState, blobParams, blob.BlobHeader.QuorumNumbers, blobKey[:], v.operatorID)
+	assignment, err := GetAssignmentForBlob(operatorState, blobParams, blob.BlobHeader.QuorumNumbers, v.operatorID)
 	if err != nil {
 		return nil, err
 	}

@@ -80,7 +80,7 @@ func (n *Node) DownloadBundles(
 			return nil, nil, fmt.Errorf("blob version %d not found", cert.BlobHeader.BlobVersion)
 		}
 
-		assgn, err := corev2.GetAssignmentForBlob(operatorState, blobParams, cert.BlobHeader.QuorumNumbers, blobKey[:], n.Config.ID)
+		assgn, err := corev2.GetAssignmentForBlob(operatorState, blobParams, cert.BlobHeader.QuorumNumbers, n.Config.ID)
 
 		if err != nil {
 			n.Logger.Errorf("failed to get assignment: %v", err)
