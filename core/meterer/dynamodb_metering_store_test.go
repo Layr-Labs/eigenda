@@ -131,14 +131,14 @@ func TestIncrementBinUsages_EdgeCases(t *testing.T) {
 		sizes := make(map[core.QuorumID]uint64)
 		var quorums []core.QuorumID
 		periods := make(map[core.QuorumID]uint64)
-		for i := 0; i < 26; i++ { // 26 > DynamoDB batch limit
+		for i := 0; i < commondynamodb.DynamoBatchWriteLimit+1; i++ { // 26 > DynamoDB batch limit
 			quorums = append(quorums, core.QuorumID(i))
 			periods[core.QuorumID(i)] = reservationPeriod
 			sizes[core.QuorumID(i)] = uint64(i)
 		}
 		_, err := tc.store.IncrementBinUsages(tc.ctx, accountID, quorums, periods, sizes)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "limit is 25")
+		assert.Contains(t, err.Error(), fmt.Sprintf("limit is %d", commondynamodb.DynamoBatchWriteLimit))
 	})
 }
 
