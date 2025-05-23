@@ -28,16 +28,16 @@ possible but without exceeding it.
 
 In the table below, all bounds are inclusive.
 
-| Minimum Payload Size | Maximum Payload Size | Blob Size               |
-|:---------------------|:---------------------|:------------------------|
-| 0 bytes              | 126945 bytes         | 131072 bytes (128 KiB)  |
-| 126946 bytes         | 253921 bytes         | 262144 bytes (256 KiB)  |
-| 253922 bytes         | 507873 bytes         | 524288 bytes (512 KiB)  |
-| 507874 bytes         | 1015777 bytes        | 1048576 bytes (1 MiB)   |
-| 1015778 bytes        | 2031585 bytes        | 2097152 bytes (2 MiB)   |
-| 2031586 bytes        | 4063201 bytes        | 4194304 bytes (4 MiB)   |
-| 4063202 bytes        | 8126433 bytes        | 8388608 bytes (8 MiB)   |
-| 8126434 bytes        | 16252897 bytes       | 16777216 bytes (16 MiB) |
+| Maximum Payload Size | Blob Size               |
+|:---------------------|:------------------------|
+| 126945 bytes         | 131072 bytes (128 KiB)  |
+| 253921 bytes         | 262144 bytes (256 KiB)  |
+| 507873 bytes         | 524288 bytes (512 KiB)  |
+| 1015777 bytes        | 1048576 bytes (1 MiB)   |
+| 2031585 bytes        | 2097152 bytes (2 MiB)   |
+| 4063201 bytes        | 4194304 bytes (4 MiB)   |
+| 8126433 bytes        | 8388608 bytes (8 MiB)   |
+| 16252897 bytes       | 16777216 bytes (16 MiB) |
 
 ## Minimum Blob SIze
 

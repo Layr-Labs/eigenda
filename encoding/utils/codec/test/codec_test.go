@@ -48,14 +48,10 @@ func TestGenerateOptimumSizeTable(t *testing.T) {
 	blobSizes, err := codec.FindLegalBlobSizes(minBlobSize, maxBlobSize)
 	require.NoError(t, err)
 
-	minPayloadSizes, err := codec.FindMinPayloadSizes(minBlobSize, maxBlobSize)
-	require.NoError(t, err)
-
 	maxPayloadSizes, err := codec.FindMaxPayloadSizes(minBlobSize, maxBlobSize)
 	require.NoError(t, err)
 
 	columns := []string{
-		"Minimum Payload Size",
 		"Maximum Payload Size",
 		"Blob Size              ",
 	}
@@ -76,10 +72,6 @@ func TestGenerateOptimumSizeTable(t *testing.T) {
 	sb.WriteString("|\n")
 
 	for i := 0; i < len(blobSizes); i++ {
-		minSize := 0
-		if i > 0 {
-			minSize = int(minPayloadSizes[i])
-		}
 		maxSize := maxPayloadSizes[i]
 		blobSize := blobSizes[i]
 
@@ -90,16 +82,12 @@ func TestGenerateOptimumSizeTable(t *testing.T) {
 			niceQuantity = int(float64(blobSize) / float64(units.MiB))
 		}
 
-		str := fmt.Sprintf("%d bytes", minSize)
+		str := fmt.Sprintf("%d bytes", maxSize)
 		str = fmt.Sprintf("| %-*s ", len(columns[0]), str) // Pad to column width
 		sb.WriteString(str)
 
-		str = fmt.Sprintf("%d bytes", maxSize)
-		str = fmt.Sprintf("| %-*s ", len(columns[1]), str) // Pad to column width
-		sb.WriteString(str)
-
 		str = fmt.Sprintf("%d bytes (%d %s)", blobSize, niceQuantity, niceUnit)
-		str = fmt.Sprintf("| %-*s ", len(columns[2]), str) // Pad to column width
+		str = fmt.Sprintf("| %-*s ", len(columns[1]), str) // Pad to column width
 		sb.WriteString(str)
 
 		sb.WriteString("|\n")
