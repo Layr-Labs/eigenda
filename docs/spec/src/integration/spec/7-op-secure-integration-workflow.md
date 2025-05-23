@@ -9,7 +9,7 @@ This document presents an overview on how EigenDA plugs into Optimism (OP) Stack
 
 ## Write and Read path in L2 consensus
 
-A rollup system can be splitted into two parts: write path to L1 and read path from L1
+A rollup system can be split into two parts: write path to L1 and read path from L1
 
 | Path      | Direction | Purpose                                    | Main actor                   |
 | --------- | --------- | ------------------------------------------ | ---------------------------- |
