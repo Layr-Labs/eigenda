@@ -1,8 +1,7 @@
-![Unit Tests](https://github.com/Layr-Labs/eigenda/actions/workflows/unit-tests.yml/badge.svg)
-![Integration Tests](https://github.com/Layr-Labs/eigenda/actions/workflows/integration-tests.yml/badge.svg)
-![Linter](https://github.com/Layr-Labs/eigenda/actions/workflows/golangci-lint.yml/badge.svg)
-![Contracts](https://github.com/Layr-Labs/eigenda/actions/workflows/test-contracts.yml/badge.svg)
-![Go Coverage](https://github.com/Layr-Labs/eigenda/wiki/coverage.svg)
+[![Unit Tests](https://github.com/Layr-Labs/eigenda/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/Layr-Labs/eigenda/actions/workflows/unit-tests.yml)
+[![Integration Tests](https://github.com/Layr-Labs/eigenda/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/Layr-Labs/eigenda/actions/workflows/integration-tests.yml)
+[![Linter](https://github.com/Layr-Labs/eigenda/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/Layr-Labs/eigenda/actions/workflows/golangci-lint.yml)
+[![Contracts](https://github.com/Layr-Labs/eigenda/actions/workflows/test-contracts.yml/badge.svg)](https://github.com/Layr-Labs/eigenda/actions/workflows/test-contracts.yml)
 
 # EigenDA
 
