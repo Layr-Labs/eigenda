@@ -14,6 +14,7 @@ import (
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/rs"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 	"google.golang.org/grpc"
 )
@@ -60,6 +61,7 @@ type disperserClient struct {
 	accountant         *Accountant
 	accountantLock     sync.Mutex
 	ntpClock           *core.NTPSyncedClock
+	logger             logging.Logger
 }
 
 var _ DisperserClient = &disperserClient{}
@@ -125,6 +127,7 @@ func NewDisperserClient(config *DisperserClientConfig, signer corev2.BlobRequest
 		prover:     prover,
 		accountant: accountant,
 		ntpClock:   ntpClock,
+		logger:     logger,
 		// conn and client are initialized lazily
 	}, nil
 }
@@ -136,7 +139,7 @@ func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("error getting account ID: %w", err)
 		}
-		c.accountant = NewAccountant(accountId, nil, nil, 0, 0, 0, 0)
+		c.accountant = NewAccountant(accountId, nil, nil, 0, 0, 0, 0, c.logger)
 	}
 
 	paymentState, err := c.GetPaymentState(ctx)
@@ -363,7 +366,7 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.Blob
 }
 
 // GetPaymentState returns the payment state of the disperser client
-func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
+func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetQuorumSpecificPaymentStateReply, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, api.NewErrorInternal(err.Error())
@@ -381,12 +384,12 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		return nil, fmt.Errorf("error signing payment state request: %w", err)
 	}
 
-	request := &disperser_rpc.GetPaymentStateRequest{
+	request := &disperser_rpc.GetQuorumSpecificPaymentStateRequest{
 		AccountId: accountID.Hex(),
 		Signature: signature,
 		Timestamp: timestamp,
 	}
-	return c.client.GetPaymentState(ctx, request)
+	return c.client.GetQuorumSpecificPaymentState(ctx, request)
 }
 
 // GetBlobCommitment is a utility method that calculates commitment for a blob payload.

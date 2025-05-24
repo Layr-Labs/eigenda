@@ -150,16 +150,39 @@ func (pcs *OnchainPaymentState) refreshReservedPayments(ctx context.Context) err
 		return nil
 	}
 
+	blockNumber, err := pcs.tx.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return err
+	}
+
+	quorumCount, err := pcs.tx.GetQuorumCount(ctx, blockNumber)
+	if err != nil {
+		return err
+	}
+	quorumNumbers := make([]uint8, quorumCount)
+	for i := range quorumNumbers {
+		quorumNumbers[i] = uint8(i)
+	}
+
 	accountIDs := make([]gethcommon.Address, 0, len(pcs.ReservedPayments))
 	for accountID := range pcs.ReservedPayments {
 		accountIDs = append(accountIDs, accountID)
 	}
 
+	// TODO(hopeyen): get all quorum numbers and use quorum specific calls
 	reservedPayments, err := pcs.tx.GetReservedPayments(ctx, accountIDs)
 	if err != nil {
 		return err
 	}
-	pcs.ReservedPayments = reservedPayments
+
+	reservedPaymentsByQuorum := make(map[gethcommon.Address]map[uint8]*core.ReservedPayment)
+	for accountID, payments := range reservedPayments {
+		reservedPaymentsByQuorum[accountID] = make(map[uint8]*core.ReservedPayment)
+		for quorumNumber, reservation := range payments {
+			reservedPaymentsByQuorum[accountID][uint8(quorumNumber)] = reservation
+		}
+	}
+	pcs.ReservedPayments = reservedPaymentsByQuorum
 	return nil
 }
 
@@ -205,7 +228,7 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx contex
 	pcs.ReservationsLock.RUnlock()
 
 	// pulls the chain state
-	// TODO: update this to be pulling specific quorum IDs from the chain
+	// TODO(hopeyen): update this to be pulling specific quorum IDs from the chain when payment vault is updated
 	res, err := pcs.tx.GetReservedPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return nil, err
@@ -236,11 +259,16 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
+
+	reservedPaymentsByQuorum := make(map[core.QuorumID]*core.ReservedPayment)
+	for quorumNumber, reservation := range res {
+		reservedPaymentsByQuorum[uint8(quorumNumber)] = reservation
+	}
 	pcs.ReservationsLock.Lock()
-	(pcs.ReservedPayments)[accountID] = res
+	(pcs.ReservedPayments)[accountID] = reservedPaymentsByQuorum
 	pcs.ReservationsLock.Unlock()
 
-	return res, nil
+	return reservedPaymentsByQuorum, nil
 }
 
 // GetOnDemandPaymentByAccount returns a pointer to the on-demand payment for the given account ID; no writes will be made to the payment
