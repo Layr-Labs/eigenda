@@ -29,11 +29,11 @@ func (m *MockOnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context
 	return args.Error(0)
 }
 
-func (m *MockOnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[uint8]*core.ReservedPayment, error) {
+func (m *MockOnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[core.QuorumID]*core.ReservedPayment, error) {
 	args := m.Called(ctx, accountID)
-	var value map[uint8]*core.ReservedPayment
+	var value map[core.QuorumID]*core.ReservedPayment
 	if args.Get(0) != nil {
-		value = args.Get(0).(map[uint8]*core.ReservedPayment)
+		value = args.Get(0).(map[core.QuorumID]*core.ReservedPayment)
 	}
 	return value, args.Error(1)
 }
@@ -47,13 +47,19 @@ func (m *MockOnchainPaymentState) GetReservedPaymentByAccountAndQuorum(ctx conte
 	return value, args.Error(1)
 }
 
-func (m *MockOnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumIds []uint8) (map[uint8]*core.ReservedPayment, error) {
-	args := m.Called(ctx, accountID, quorumIds)
-	var value map[uint8]*core.ReservedPayment
-	if args.Get(0) != nil {
-		value = args.Get(0).(map[uint8]*core.ReservedPayment)
+func (m *MockOnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error) {
+	args := m.Called(ctx, accountID, quorumNumbers)
+	var value map[core.QuorumID]*core.ReservedPayment
+	if fn, ok := args.Get(0).(func(context.Context, gethcommon.Address, []core.QuorumID) map[core.QuorumID]*core.ReservedPayment); ok {
+		value = fn(ctx, accountID, quorumNumbers)
+	} else if args.Get(0) != nil {
+		value = args.Get(0).(map[core.QuorumID]*core.ReservedPayment)
 	}
-	return value, args.Error(1)
+	var err error
+	if len(args) > 1 {
+		err = args.Error(1)
+	}
+	return value, err
 }
 
 func (m *MockOnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {

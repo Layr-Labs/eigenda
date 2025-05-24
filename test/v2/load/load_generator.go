@@ -173,7 +173,7 @@ func (l *LoadGenerator) readAndWriteBlob() {
 	<-l.relayReadLimiter
 
 	l.validatorReadLimiter <- struct{}{}
-	l.readBlobFromValidators(rand, blobKey, payload, eigenDACert)
+	l.readBlobFromValidators(rand, payload, eigenDACert)
 	<-l.validatorReadLimiter
 }
 
@@ -269,7 +269,6 @@ func (l *LoadGenerator) readBlobFromRelays(
 // readBlobFromValidators reads a blob from the validators using the validator retrieval client.
 func (l *LoadGenerator) readBlobFromValidators(
 	rand *random.TestRandom,
-	blobKey *corev2.BlobKey,
 	payload []byte,
 	eigenDACert *coretypes.EigenDACert) {
 
@@ -293,27 +292,19 @@ func (l *LoadGenerator) readBlobFromValidators(
 		l.metrics.endOperation("validator_read")
 	}()
 
-	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
+	blobHeader, err := coretypes.BlobHeaderBindingToInternal(&eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader)
 	if err != nil {
 		l.metrics.reportValidatorReadFailure()
-		l.client.GetLogger().Errorf("failed to bind blob commitments: %v", err)
+		l.client.GetLogger().Errorf("failed to bind blob header: %v", err)
 		return
 	}
-
-	quorums := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers
-
-	readStartIndex := rand.Int32Range(0, int32(len(quorums)))
 
 	for i := 0; i < validatorReadCount; i++ {
 		validateAndDecode := rand.Float64() < l.config.ValidatorVerificationFraction
 
-		err = l.client.ReadBlobFromValidatorsInQuorum(
+		err = l.client.ReadBlobFromValidators(
 			ctx,
-			*blobKey,
-			blobHeader.Version,
-			*commitment,
-			quorums[(int(readStartIndex)+i)%len(quorums)],
+			blobHeader,
 			eigenDACert.BatchHeader.ReferenceBlockNumber,
 			payload,
 			0,

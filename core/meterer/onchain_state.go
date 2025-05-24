@@ -19,7 +19,8 @@ import (
 // OnchainPaymentState is an interface for getting information about the current chain state for payments.
 type OnchainPayment interface {
 	RefreshOnchainPaymentState(ctx context.Context) error
-	GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[uint8]*core.ReservedPayment, error)
+	GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error)
+	GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[core.QuorumID]*core.ReservedPayment, error)
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error)
 	GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error)
 	GetGlobalSymbolsPerSecond() uint64
@@ -35,7 +36,7 @@ type OnchainPaymentState struct {
 	tx     *eth.Reader
 	logger logging.Logger
 
-	ReservedPayments map[gethcommon.Address]map[uint8]*core.ReservedPayment
+	ReservedPayments map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment
 	OnDemandPayments map[gethcommon.Address]*core.OnDemandPayment
 
 	ReservationsLock sync.RWMutex
@@ -57,7 +58,7 @@ func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader, logger logging.
 	state := OnchainPaymentState{
 		tx:                 tx,
 		logger:             logger.With("component", "OnchainPaymentState"),
-		ReservedPayments:   make(map[gethcommon.Address]map[uint8]*core.ReservedPayment),
+		ReservedPayments:   make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment),
 		OnDemandPayments:   make(map[gethcommon.Address]*core.OnDemandPayment),
 		PaymentVaultParams: atomic.Pointer[PaymentVaultParams]{},
 	}
@@ -177,8 +178,8 @@ func (pcs *OnchainPaymentState) refreshReservedPayments(ctx context.Context) err
 	reservedPaymentsByQuorum := make(map[gethcommon.Address]map[uint8]*core.ReservedPayment)
 	for accountID, payments := range reservedPayments {
 		reservedPaymentsByQuorum[accountID] = make(map[uint8]*core.ReservedPayment)
-		for quorumNumber, _ := range payments.QuorumNumbers {
-			reservedPaymentsByQuorum[accountID][uint8(quorumNumber)] = payments
+		for quorumNumber, reservation := range payments {
+			reservedPaymentsByQuorum[accountID][uint8(quorumNumber)] = reservation
 		}
 	}
 	pcs.ReservedPayments = reservedPaymentsByQuorum
@@ -207,8 +208,45 @@ func (pcs *OnchainPaymentState) refreshOnDemandPayments(ctx context.Context) err
 	return nil
 }
 
-// GetReservedPaymentByAccount returns a pointer to the active reservation for the given account ID; no writes will be made to the reservation
-func (pcs *OnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[uint8]*core.ReservedPayment, error) {
+// GetReservedPaymentByAccountAndQuorums returns a pointer to the active reservation for the given account ID; no writes will be made to the reservation
+func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error) {
+	pcs.ReservationsLock.RLock()
+	if quorumReservations, ok := (pcs.ReservedPayments)[accountID]; ok {
+		// Check if all the quorums are present; pull the chain state if not
+		allFound := true
+		for _, quorumNumber := range quorumNumbers {
+			if _, ok := quorumReservations[quorumNumber]; !ok {
+				allFound = false
+				break
+			}
+		}
+		if allFound {
+			pcs.ReservationsLock.RUnlock()
+			return quorumReservations, nil
+		}
+	}
+	pcs.ReservationsLock.RUnlock()
+
+	// pulls the chain state
+	// TODO(hopeyen): update this to be pulling specific quorum IDs from the chain when payment vault is updated
+	res, err := pcs.tx.GetReservedPaymentByAccount(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	pcs.ReservationsLock.Lock()
+	// update specific quorum reservations
+	for _, quorumNumber := range quorumNumbers {
+		if _, ok := res[quorumNumber]; ok {
+			(pcs.ReservedPayments)[accountID][quorumNumber] = res[quorumNumber]
+		}
+	}
+	pcs.ReservationsLock.Unlock()
+
+	return res, nil
+}
+
+// GetReservedPaymentByAccount returns a pointer to all quorums' reservation for the given account ID; no writes will be made to the reservation
+func (pcs *OnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[core.QuorumID]*core.ReservedPayment, error) {
 	pcs.ReservationsLock.RLock()
 	if reservation, ok := (pcs.ReservedPayments)[accountID]; ok {
 		pcs.ReservationsLock.RUnlock()
@@ -222,9 +260,9 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context,
 		return nil, err
 	}
 
-	reservedPaymentsByQuorum := make(map[uint8]*core.ReservedPayment)
-	for quorumNumber, _ := range res.QuorumNumbers {
-		reservedPaymentsByQuorum[uint8(quorumNumber)] = res
+	reservedPaymentsByQuorum := make(map[core.QuorumID]*core.ReservedPayment)
+	for quorumNumber, reservation := range res {
+		reservedPaymentsByQuorum[uint8(quorumNumber)] = reservation
 	}
 	pcs.ReservationsLock.Lock()
 	(pcs.ReservedPayments)[accountID] = reservedPaymentsByQuorum

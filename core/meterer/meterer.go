@@ -78,7 +78,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 	m.logger.Info("Validating incoming request's payment metadata", "paymentMetadata", header, "numSymbols", numSymbols, "quorumNumbers", quorumNumbers)
 	// Validate against the payment method
 	if header.CumulativePayment.Sign() == 0 {
-		reservations, err := m.ChainPaymentState.GetReservedPaymentByAccount(ctx, header.AccountID)
+		reservations, err := m.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, header.AccountID, quorumNumbers)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get active reservation by account: %w", err)
 		}
@@ -99,39 +99,35 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 }
 
 // ServeReservationRequest handles the rate limiting logic for incoming requests
-func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.PaymentMetadata, reservations map[uint8]*core.ReservedPayment, symbolsCharged uint64, quorumNumbers []uint8, receivedAt time.Time) error {
-	m.logger.Info("Recording and validating reservation usage", "header", header, "reservations", reservations)
-	reservedQuorumNumbers := make([]uint8, 0, len(reservations))
-	for quorum := range reservations {
-		reservedQuorumNumbers = append(reservedQuorumNumbers, quorum)
+func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.PaymentMetadata, reservations map[core.QuorumID]*core.ReservedPayment, symbolsCharged uint64, quorumNumbers []uint8, receivedAt time.Time) error {
+	m.logger.Info("Recording and validating reservation usage", "header", header, "reservation", reservations)
+	// Take all the quorumIDs from the reservations
+	quorumIDs := make([]core.QuorumID, 0, len(reservations))
+	reservationWindows := make(map[core.QuorumID]uint64, len(reservations))
+	requestReservationPeriods := make(map[core.QuorumID]uint64, len(reservations))
+	for quorumID := range reservations {
+		quorumIDs = append(quorumIDs, quorumID)
+		// TODO: update to use actual quorum configs when the payment vault update goes through
+		reservationWindows[quorumID] = m.ChainPaymentState.GetReservationWindow()
+		requestReservationPeriods[quorumID] = GetReservationPeriodByNanosecond(header.Timestamp, m.ChainPaymentState.GetReservationWindow())
 	}
-	fmt.Println("reservedQuorumNumbers", reservedQuorumNumbers, "header quorumNumbers", quorumNumbers)
-	if err := m.ValidateQuorum(quorumNumbers, reservedQuorumNumbers); err != nil {
+	if err := m.ValidateQuorum(quorumNumbers, quorumIDs); err != nil {
 		return fmt.Errorf("invalid quorum for reservation: %w", err)
 	}
-	reservationWindow := m.ChainPaymentState.GetReservationWindow()
-	requestReservationPeriod := GetReservationPeriodByNanosecond(header.Timestamp, reservationWindow)
-	for _, quorum := range quorumNumbers {
-		reservation, ok := reservations[quorum]
-		if !ok {
-			return fmt.Errorf("no reservation found for quorum %d", quorum)
-		}
+
+	for quorumID, reservation := range reservations {
 		if !reservation.IsActiveByNanosecond(header.Timestamp) {
-			return fmt.Errorf("reservation not active for quorum %d", quorum)
+			return fmt.Errorf("reservation not active")
 		}
-		if !m.ValidateReservationPeriod(reservation, requestReservationPeriod, reservationWindow, receivedAt) {
-			return fmt.Errorf("invalid reservation period for reservation quorum %d", quorum)
+		// TODO: update to use actual quorum configs when the payment vault update goes through
+		if !m.ValidateReservationPeriod(reservation, requestReservationPeriods[quorumID], reservationWindows[quorumID], receivedAt) {
+			return fmt.Errorf("invalid reservation period for reservation on quorum %d", quorumID)
 		}
 	}
-	// TODO(hopeyen): uncomment the loop once the offchain store PR is merged
-	// Update bin usage atomically for each quorum and check against reservation's data rate as the bin limit
-	// for _, quorum := range quorumNumbers {
-	// 	if err := m.IncrementBinUsage(ctx, header, reservations[quorum], quorum, symbolsCharged, reservationWindow, requestReservationPeriod); err != nil {
-	// 		return fmt.Errorf("bin overflows for quorum %d reservation period %d: %w", quorum, requestReservationPeriod, err)
-	// 	}
-	// }
-	if err := m.IncrementBinUsage(ctx, header, reservations[0], 0, symbolsCharged, reservationWindow, requestReservationPeriod); err != nil {
-		return fmt.Errorf("bin overflows for quorum %d reservation period %d (quorum is fixed to the first one as testing placeholder): %w", 0, requestReservationPeriod, err)
+
+	// Make atomic batched updates over all reservations identified by the same account and quorum
+	if err := m.IncrementBinUsage(ctx, header, reservations, symbolsCharged, reservationWindows, requestReservationPeriods); err != nil {
+		return fmt.Errorf("failed to increment bin usages: %w", err)
 	}
 	return nil
 }
@@ -172,29 +168,66 @@ func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, r
 }
 
 // IncrementBinUsage increments the bin usage atomically and checks for overflow
-// Note: This is called per-quorum, so reservation is for a single quorum.
-func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservation *core.ReservedPayment, quorumNumber uint8, symbolsCharged uint64, reservationWindow uint64, requestReservationPeriod uint64) error {
-	newUsage, err := m.MeteringStore.UpdateReservationBin(ctx, header.AccountID, requestReservationPeriod, quorumNumber, symbolsCharged)
-	if err != nil {
-		return fmt.Errorf("failed to increment bin usage: %w", err)
+func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservations map[core.QuorumID]*core.ReservedPayment, symbolsCharged uint64, reservationWindows map[core.QuorumID]uint64, requestReservationPeriods map[core.QuorumID]uint64) error {
+	charges := make(map[core.QuorumID]uint64)
+	for quorumID := range reservations {
+		charges[quorumID] = symbolsCharged
+	}
+	quorumNumbers := make([]core.QuorumID, 0, len(reservations))
+	for quorumID := range reservations {
+		quorumNumbers = append(quorumNumbers, quorumID)
 	}
 
-	// metered usage stays within the bin limit
-	usageLimit := m.GetReservationBinLimit(reservation, reservationWindow)
-	if newUsage <= usageLimit {
-		return nil
-	} else if newUsage-symbolsCharged >= usageLimit {
-		// metered usage before updating the size already exceeded the limit
-		return fmt.Errorf("bin has already been filled")
+	// Batch increment all quorums for the current quorums' reservation period
+	// For each quorum, increment by its specific symbolsCharged value
+	updatedUsages := make(map[core.QuorumID]uint64)
+	usage, err := m.MeteringStore.IncrementBinUsages(ctx, header.AccountID, quorumNumbers, requestReservationPeriods, charges)
+	if err != nil {
+		return err
 	}
-	if newUsage <= 2*usageLimit && requestReservationPeriod+2 <= GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow) {
-		_, err := m.MeteringStore.UpdateReservationBin(ctx, header.AccountID, uint64(requestReservationPeriod+2), quorumNumber, newUsage-usageLimit)
-		if err != nil {
-			return err
+	for _, quorumID := range quorumNumbers {
+		updatedUsages[quorumID] = usage[quorumID]
+	}
+
+	overflowCandidates := make(map[core.QuorumID]struct{})
+	overflowAmounts := make(map[core.QuorumID]uint64)
+
+	for quorumID, reservation := range reservations {
+		reservationWindow := reservationWindows[quorumID]
+		usageLimit := m.GetReservationBinLimit(reservation, reservationWindow)
+		newUsage, ok := updatedUsages[quorumID]
+		if !ok {
+			return fmt.Errorf("failed to get updated usage for quorum %d", quorumID)
 		}
-		return nil
+		prevUsage := newUsage - charges[quorumID]
+		if newUsage <= usageLimit {
+			continue
+		} else if prevUsage >= usageLimit {
+			// Bin was already filled before this increment
+			return fmt.Errorf("bin has already been filled for quorum %d", quorumID)
+		} else if newUsage <= 2*usageLimit && requestReservationPeriods[quorumID]+2 <= GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow) {
+			// Needs to go to overflow bin
+			overflowCandidates[quorumID] = struct{}{}
+			overflowAmounts[quorumID] = newUsage - usageLimit
+		} else {
+			return fmt.Errorf("overflow usage exceeds bin limit for quorum %d", quorumID)
+		}
 	}
-	return fmt.Errorf("overflow usage exceeds bin limit")
+
+	// Batch increment overflow bins for overflown reservation candidates
+	for quorumID := range overflowCandidates {
+		_, err := m.MeteringStore.IncrementBinUsages(ctx, header.AccountID, []core.QuorumID{quorumID}, map[core.QuorumID]uint64{quorumID: requestReservationPeriods[quorumID] + 2}, map[core.QuorumID]uint64{quorumID: overflowAmounts[quorumID]})
+		if err != nil {
+			// Rollback the increments for the current periods
+			rollbackErr := m.MeteringStore.DecrementBinUsages(ctx, header.AccountID, quorumNumbers, requestReservationPeriods, charges)
+			if rollbackErr != nil {
+				return fmt.Errorf("failed to increment overflow bin for quorum %d: %w; rollback also failed: %v", quorumID, err, rollbackErr)
+			}
+			return fmt.Errorf("failed to increment overflow bin for quorum %d: %w; successfully rolled back increments", quorumID, err)
+		}
+	}
+
+	return nil
 }
 
 // GetReservationPeriodByNanosecondTimestamp returns the current reservation period by finding the nearest lower multiple of the bin interval;
