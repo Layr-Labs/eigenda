@@ -2820,3 +2820,80 @@ func TestFetchAccountReservationUsage(t *testing.T) {
 		})
 	}
 }
+
+func TestFetchAccountPaymentState(t *testing.T) {
+	router := setUpRouter()
+	router.GET("/v2/accounts/:account_id/payment-state", testDataApiServerV2.FetchAccountPaymentState)
+
+	testAccount := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
+	reservedPayment := &core.ReservedPayment{
+		SymbolsPerSecond: 100,
+		StartTimestamp:   1,
+		EndTimestamp:     2,
+		QuorumNumbers:    []uint8{0, 1},
+		QuorumSplits:     []byte{50, 50},
+	}
+	onDemandPayment := &core.OnDemandPayment{
+		CumulativePayment: big.NewInt(12345),
+	}
+	// Set up the mock for the test account
+	testMeterer.ChainPaymentState.(*coremock.MockOnchainPaymentState).
+		On("GetReservedPaymentByAccount", mock.Anything, testAccount).
+		Return(reservedPayment, nil)
+	testMeterer.ChainPaymentState.(*coremock.MockOnchainPaymentState).
+		On("GetOnDemandPaymentByAccount", mock.Anything, testAccount).
+		Return(onDemandPayment, nil)
+
+	testCases := []struct {
+		name           string
+		accountID      string
+		expectedStatus int
+		expectedError  bool
+	}{
+		{
+			name:           "valid account",
+			accountID:      "0x1234567890123456789012345678901234567890",
+			expectedStatus: http.StatusOK,
+			expectedError:  false,
+		},
+		{
+			name:           "invalid account ID",
+			accountID:      "invalid",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  true,
+		},
+		{
+			name:           "zero account ID",
+			accountID:      "0x0000000000000000000000000000000000000000",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			url := fmt.Sprintf("/v2/accounts/%s/payment-state", tc.accountID)
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", url, nil)
+			router.ServeHTTP(w, req)
+			assert.Equal(t, tc.expectedStatus, w.Code)
+
+			if !tc.expectedError {
+				response := decodeResponseBody[serverv2.AccountPaymentStateResponse](t, w)
+				assert.Equal(t, tc.accountID, response.AccountId)
+				// Check global params
+				assert.NotNil(t, response.PaymentGlobalParams)
+				// Check period records is a slice
+				assert.NotNil(t, response.PeriodRecords)
+				// Check reservation is present (may be zero value)
+				assert.NotNil(t, response.Reservation)
+				// Check cumulative payment fields are present (may be empty string)
+				assert.NotNil(t, response.CumulativePayment)
+				assert.NotNil(t, response.OnchainCumulativePayment)
+			} else {
+				errorResponse := decodeResponseBody[serverv2.ErrorResponse](t, w)
+				assert.NotEmpty(t, errorResponse.Error)
+			}
+		})
+	}
+}
