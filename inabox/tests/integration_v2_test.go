@@ -28,6 +28,14 @@ import (
 )
 
 var _ = Describe("Inabox v2 Integration", func() {
+	/*
+		This end to end test ensures that:
+		1. a blob can be dispersed using the lower level disperser client to successfully produce a blob certificate
+		2. the blob certificate can be verified on chain using the EigenDACertVerifierV2 contract
+		3. the blob can be retrieved from the disperser relay using the blob certificate
+		4. the blob can be retrieved from the DA validator network using the blob certificate
+
+	*/
 	It("test end to end scenario", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
@@ -178,7 +186,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		var batchRoot [32]byte
 		copy(batchRoot[:], batchHeader1.BatchRoot)
 
-		err = eigenDACertVerifierV2.VerifyDACertV2FromSignedBatch(
+		err = eigenDACertVerifierV2Legacy.VerifyDACertV2FromSignedBatch(
 			&bind.CallOpts{},
 			verifierbindings.EigenDATypesV2SignedBatch{
 				BatchHeader: verifierbindings.EigenDATypesV2BatchHeaderV2{
@@ -196,7 +204,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		proof, err = convertBlobInclusionInfo(blobInclusion2)
 		Expect(err).To(BeNil())
 		copy(batchRoot[:], batchHeader2.BatchRoot)
-		err = eigenDACertVerifierV2.VerifyDACertV2FromSignedBatch(
+		err = eigenDACertVerifierV2Legacy.VerifyDACertV2FromSignedBatch(
 			&bind.CallOpts{},
 			verifierbindings.EigenDATypesV2SignedBatch{
 				BatchHeader: verifierbindings.EigenDATypesV2BatchHeaderV2{

@@ -18,6 +18,8 @@ import {IBLSApkRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IBLSA
 import {EigenDAServiceManager, IAVSDirectory, IRewardsCoordinator} from "src/core/EigenDAServiceManager.sol";
 import {EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
 import {EigenDACertVerifierV2} from "src/periphery/cert/legacy/v2/EigenDACertVerifierV2.sol";
+import {EigenDACertVerifier} from "src/periphery/cert/EigenDACertVerifier.sol";
+import {EigenDACertVerifierRouter} from "src/periphery/cert/router/EigenDACertVerifierRouter.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
@@ -41,6 +43,7 @@ import "forge-std/Test.sol";
 import "forge-std/Script.sol";
 import "forge-std/StdJson.sol";
 
+// NOTE: This contract is used to deploy the EigenDA contracts to a local inabox environment. It is not meant to be used in production and is only used for testing purposes.
 // # To load the variables in the .env file
 // source .env
 // # To deploy and verify our contract
@@ -53,7 +56,9 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     BLSApkRegistry public apkRegistry;
     EigenDAServiceManager public eigenDAServiceManager;
     EigenDAThresholdRegistry public eigenDAThresholdRegistry;
-    EigenDACertVerifierV2 public eigenDACertVerifier;
+    EigenDACertVerifierV2 public legacyEigenDACertVerifier;
+    EigenDACertVerifier public eigenDACertVerifier;
+    EigenDACertVerifierRouter public eigenDACertVerifierRouter;
     RegistryCoordinator public registryCoordinator;
     IIndexRegistry public indexRegistry;
     IStakeRegistry public stakeRegistry;
@@ -65,6 +70,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
     BLSApkRegistry public apkRegistryImplementation;
     EigenDAServiceManager public eigenDAServiceManagerImplementation;
+    EigenDACertVerifierRouter public eigenDACertVerifierRouterImplementation;
     IRegistryCoordinator public registryCoordinatorImplementation;
     IIndexRegistry public indexRegistryImplementation;
     IStakeRegistry public stakeRegistryImplementation;
@@ -146,6 +152,10 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
         eigenDARelayRegistry = EigenDARelayRegistry(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+        );
+
+        eigenDACertVerifierRouter = EigenDACertVerifierRouter(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
         );
 
@@ -316,7 +326,9 @@ contract EigenDADeployer is DeployOpenEigenLayer {
 
         operatorStateRetriever = new OperatorStateRetriever();
 
-        eigenDACertVerifier = new EigenDACertVerifierV2(
+        // NOTE: will be deprecated in the future with subsequent release
+        //       which removes the legacy V2 cert verifier entirely
+        legacyEigenDACertVerifier = new EigenDACertVerifierV2(
             IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
             IEigenDASignatureVerifier(address(eigenDAServiceManager)),
             OperatorStateRetriever(address(operatorStateRetriever)),
@@ -325,6 +337,24 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             hex"0001"
         );
 
+        eigenDACertVerifier = new EigenDACertVerifier(
+            IEigenDAThresholdRegistry(address(eigenDAThresholdRegistry)),
+            IEigenDASignatureVerifier(address(eigenDAServiceManager)),
+            defaultSecurityThresholds,
+            hex"0001"
+        );
+
+        eigenDACertVerifierRouterImplementation = new EigenDACertVerifierRouter();
+
+        eigenDAProxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(eigenDACertVerifierRouter))),
+            address(eigenDACertVerifierRouterImplementation),
+            abi.encodeWithSelector(
+                EigenDACertVerifierRouter.initialize.selector,
+                addressConfig.eigenDACommunityMultisig,
+                address(eigenDACertVerifier)
+            )
+        );
         eigenDARelayRegistryImplementation = new EigenDARelayRegistry();
 
         eigenDAProxyAdmin.upgradeAndCall(
