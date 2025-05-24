@@ -27,7 +27,7 @@ type MeteringStore interface {
 	RollbackOnDemandPayment(ctx context.Context, accountID gethcommon.Address, newPayment, oldPayment *big.Int) error
 
 	// GetPeriodRecords fetches period records for the given account ID and reservation period
-	GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error)
+	GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, limit int32) ([]*pb.PeriodRecord, error)
 
 	// GetLargestCumulativePayment returns the largest cumulative payment for the given account
 	GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error)

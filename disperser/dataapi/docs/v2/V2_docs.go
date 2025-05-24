@@ -85,6 +85,104 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "/accounts/{account_id}/payment-state": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Fetch payment state for an account",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "The account ID to fetch payment state for",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.AccountPaymentStateResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/accounts/{account_id}/reservation/usage": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Accounts"
+                ],
+                "summary": "Fetch reservation usage for an account",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "The account ID to fetch reservation usage for",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Time window in hours to fetch reservation usage for [default: 24; max: 72]",
+                        "name": "window",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/v2.AccountReservationUsageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "error: Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "error: Not found",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "error: Server error",
+                        "schema": {
+                            "$ref": "#/definitions/v2.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/batches/feed": {
             "get": {
                 "produces": [
@@ -877,6 +975,12 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "y": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -884,6 +988,9 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -920,6 +1027,12 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "y": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -949,6 +1062,12 @@ const docTemplateV2 = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "y": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -957,6 +1076,9 @@ const docTemplateV2 = `{
             "properties": {
                 "x": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
         },
@@ -964,6 +1086,9 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "x": {
+                    "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
+                },
+                "y": {
                     "$ref": "#/definitions/github_com_consensys_gnark-crypto_ecc_bn254_internal_fptower.E2"
                 }
             }
@@ -1131,6 +1256,60 @@ const docTemplateV2 = `{
                 }
             }
         },
+        "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PaymentGlobalParams": {
+            "type": "object",
+            "properties": {
+                "global_symbols_per_second": {
+                    "type": "integer"
+                },
+                "min_num_symbols": {
+                    "type": "integer"
+                },
+                "price_per_symbol": {
+                    "type": "integer"
+                },
+                "reservation_window": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PeriodRecord": {
+            "type": "object",
+            "properties": {
+                "reservation_period": {
+                    "type": "integer"
+                },
+                "usage": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.Reservation": {
+            "type": "object",
+            "properties": {
+                "end_timestamp": {
+                    "type": "integer"
+                },
+                "quorum_numbers": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "quorum_splits": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "start_timestamp": {
+                    "type": "integer"
+                },
+                "symbols_per_second": {
+                    "type": "integer"
+                }
+            }
+        },
         "github_com_Layr-Labs_eigenda_disperser_dataapi_v2.SignedBatch": {
             "type": "object",
             "properties": {
@@ -1146,6 +1325,12 @@ const docTemplateV2 = `{
             "type": "object",
             "properties": {
                 "a0": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "a1": {
                     "type": "array",
                     "items": {
                         "type": "integer"
@@ -1186,6 +1371,46 @@ const docTemplateV2 = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/v2.BlobInfo"
+                    }
+                }
+            }
+        },
+        "v2.AccountPaymentStateResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "cumulative_payment": {
+                    "type": "string"
+                },
+                "onchain_cumulative_payment": {
+                    "type": "string"
+                },
+                "payment_global_params": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PaymentGlobalParams"
+                },
+                "period_records": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PeriodRecord"
+                    }
+                },
+                "reservation": {
+                    "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.Reservation"
+                }
+            }
+        },
+        "v2.AccountReservationUsageResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "records": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_Layr-Labs_eigenda_disperser_dataapi_v2.PeriodRecord"
                     }
                 }
             }

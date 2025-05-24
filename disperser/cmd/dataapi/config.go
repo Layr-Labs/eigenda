@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws"
@@ -37,6 +38,15 @@ type Config struct {
 	DisperserHostname  string
 	ChurnerHostname    string
 	BatcherHealthEndpt string
+
+	// DynamoDB table names for reservations
+	ReservationsTableName string
+	OnDemandTableName     string
+	GlobalRateTableName   string
+
+	// Meterer config
+	ChainReadTimeout time.Duration
+	UpdateInterval   time.Duration
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -81,6 +91,15 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ChurnerHostname:    ctx.GlobalString(flags.ChurnerHostnameFlag.Name),
 		BatcherHealthEndpt: ctx.GlobalString(flags.BatcherHealthEndptFlag.Name),
 		ChainStateConfig:   thegraph.ReadCLIConfig(ctx),
+
+		// DynamoDB table names for reservations
+		ReservationsTableName: ctx.GlobalString(flags.ReservationsTableNameFlag.Name),
+		OnDemandTableName:     ctx.GlobalString(flags.OnDemandTableNameFlag.Name),
+		GlobalRateTableName:   ctx.GlobalString(flags.GlobalRateTableNameFlag.Name),
+
+		// Meterer config
+		ChainReadTimeout: ctx.GlobalDuration(flags.ChainReadTimeout.Name),
+		UpdateInterval:   ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
 	}
 	return config, nil
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
@@ -89,6 +90,7 @@ type ServerV2 struct {
 	indexedChainState core.IndexedChainState
 	promClient        dataapi.PrometheusClient
 	metrics           *dataapi.Metrics
+	meterer           *meterer.Meterer
 
 	operatorHandler *dataapi.OperatorHandler
 	metricsHandler  *dataapi.MetricsHandler
@@ -116,6 +118,7 @@ func NewServerV2(
 	indexedChainState core.IndexedChainState,
 	logger logging.Logger,
 	metrics *dataapi.Metrics,
+	meterer *meterer.Meterer,
 ) (*ServerV2, error) {
 	l := logger.With("component", "DataAPIServerV2")
 
@@ -186,6 +189,7 @@ func NewServerV2(
 		blobCertificateCache:             blobCertificateCache,
 		blobAttestationInfoResponseCache: blobAttestationInfoResponseCache,
 		batchResponseCache:               batchResponseCache,
+		meterer:                          meterer,
 	}, nil
 }
 
@@ -241,6 +245,8 @@ func (s *ServerV2) Start() error {
 		accounts := v2.Group("/accounts")
 		{
 			accounts.GET("/:account_id/blobs", s.FetchAccountBlobFeed)
+			accounts.GET("/:account_id/payment-state", s.FetchAccountPaymentState)
+			accounts.GET("/:account_id/reservation/usage", s.FetchAccountReservationUsage)
 		}
 		operators := v2.Group("/operators")
 		{
