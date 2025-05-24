@@ -47,7 +47,7 @@ As in the diagram, op-nodes use the `read-path` on the eigenda-proxy to fetch Ei
 - retrieve & KZG-checked blob from EigenDA
 - Decode and pass the data onward
 
-More information can be found in the page [secure integration](./6-secure-integration.md). The key properties which EigenDA derivation strives to keep are
+More information can be found in the page [secure integration](../spec/6-secure-integration.md). The key properties which EigenDA derivation strives to keep are
 
 - Determinism – one unique blob per DA certificate.
 - Liveness – discard anything that could halt the chain.
