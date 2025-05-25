@@ -37,6 +37,8 @@ type ServerV2 struct {
 	chunkAuthenticator auth.RequestAuthenticator
 	blobAuthenticator  corev2.BlobRequestAuthenticator
 	replayGuardian     replay.ReplayGuardian
+	// TODO: Replace this placeholder with proper BatchMeterer integration once interface compatibility issues are resolved
+	batchMeterer *node.BatchMeterer
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -75,6 +77,13 @@ func NewServerV2(
 		time.Now,
 		config.StoreChunksRequestMaxPastAge,
 		config.StoreChunksRequestMaxFutureAge)
+
+	// Note: BatchMeterer initialization is left as a placeholder.
+	// The node.ChainState does not implement meterer.OnchainPayment interface.
+	// In the future, we'll need to either:
+	// 1. Extend the node.ChainState interface
+	// 2. Create an adapter between node.ChainState and meterer.OnchainPayment
+	// 3. Or refactor BatchMeterer to work with the existing node.ChainState interface
 
 	return &ServerV2{
 		config:             config,
@@ -157,6 +166,17 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			}
 		}
 	}
+
+	// TODO: Implement batch metering validation
+	// The ChainState doesn't have the GetReservedPaymentByAccountAndQuorums method needed for validation
+	// This will need to be implemented in a future update once we resolve the interface issues
+	//
+	// Implementation plan:
+	// 1. Create a separate OnchainPayment implementation (not sharing the ChainState)
+	// 2. Initialize BatchMeterer with this OnchainPayment instance
+	// 3. Call batchMeterer.MeterBatch(ctx, batch, time.Now()) here
+	//    and return an appropriate error if validation fails
+
 	probe.SetStage("get_operator_state")
 	s.logger.Info("new StoreChunks request",
 		"batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]),
