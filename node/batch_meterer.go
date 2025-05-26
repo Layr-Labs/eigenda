@@ -105,7 +105,7 @@ func (b *BatchMeterer) BatchToRequestInfos(batch *corev2.Batch) ([]BatchRequestI
 		return nil, fmt.Errorf("batch is nil")
 	}
 
-	if batch.BlobCertificates == nil || len(batch.BlobCertificates) == 0 {
+	if len(batch.BlobCertificates) == 0 {
 		return nil, fmt.Errorf("batch has no blob certificates")
 	}
 
@@ -121,9 +121,7 @@ func (b *BatchMeterer) BatchToRequestInfos(batch *corev2.Batch) ([]BatchRequestI
 
 		// Extract the quorum numbers from the blob header
 		quorumIDs := make([]core.QuorumID, len(cert.BlobHeader.QuorumNumbers))
-		for i, q := range cert.BlobHeader.QuorumNumbers {
-			quorumIDs[i] = q
-		}
+		copy(quorumIDs, cert.BlobHeader.QuorumNumbers)
 
 		// Get the number of symbols from the blob commitment
 		numSymbols := uint64(cert.BlobHeader.BlobCommitments.Length)
