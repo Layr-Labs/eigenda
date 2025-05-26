@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -152,7 +153,7 @@ func (b *BatchMeterer) BatchMeterRequest(
 	for accountID, quorumUsages := range aggregatedUsage {
 		// Get reservations for this account
 		reservations, err := b.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(
-			ctx, accountID, mapKeysToSlice(quorumUsages),
+			ctx, accountID, mapQuorumIDsToSortedSlice(quorumUsages),
 		)
 		if err != nil {
 			b.logger.Error("Failed to get reservations", "account", accountID, "error", err)
@@ -367,11 +368,18 @@ type BatchRequestInfo struct {
 	NumSymbols uint64
 }
 
-// mapKeysToSlice converts a map's keys to a slice
-func mapKeysToSlice[K comparable, V any](m map[K]V) []K {
-	keys := make([]K, 0, len(m))
+// mapQuorumIDsToSortedSlice converts map keys of type QuorumID to a sorted slice
+// This ensures consistent ordering for deterministic test behavior
+func mapQuorumIDsToSortedSlice(m map[core.QuorumID]uint64) []core.QuorumID {
+	keys := make([]core.QuorumID, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
 	}
+
+	// Sort QuorumIDs in ascending order using the standard library
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
+
 	return keys
 }
