@@ -179,6 +179,11 @@ func (b *BatchMeterer) BatchMeterRequest(
 				return fmt.Errorf("account %s has inactive reservation for quorum %d", accountID.Hex(), quorumID)
 			}
 
+			// Validate reservation period (TODO: quorum specific)
+			if !b.validateReservationPeriod(reservation, currentPeriod, b.ChainPaymentState.GetReservationWindow(), batchTimestamp) {
+				return fmt.Errorf("account %s has invalid reservation period for quorum %d", accountID.Hex(), quorumID)
+			}
+
 			// Increment and validate usage
 			err := b.incrementAndValidateUsage(
 				accountID,
@@ -338,6 +343,23 @@ func (b *BatchMeterer) symbolsCharged(numSymbols uint64) uint64 {
 	}
 	// Round up to the nearest multiple of MinNumSymbols
 	return core.RoundUpDivide(numSymbols, minSymbols) * minSymbols
+}
+
+// validateReservationPeriod checks if the provided reservation period is valid
+// Based on meterer.ValidateReservationPeriod
+func (b *BatchMeterer) validateReservationPeriod(reservation *core.ReservedPayment, requestReservationPeriod uint64, reservationWindow uint64, receivedAt time.Time) bool {
+	currentReservationPeriod := meterer.GetReservationPeriod(receivedAt.Unix(), reservationWindow)
+
+	// Valid reservation periods are either the current bin or the previous bin
+	isCurrentOrPreviousPeriod := requestReservationPeriod == currentReservationPeriod ||
+		requestReservationPeriod == (currentReservationPeriod-reservationWindow)
+
+	startPeriod := meterer.GetReservationPeriod(int64(reservation.StartTimestamp), reservationWindow)
+	endPeriod := meterer.GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow)
+
+	isWithinReservationWindow := startPeriod <= requestReservationPeriod && requestReservationPeriod < endPeriod
+
+	return isCurrentOrPreviousPeriod && isWithinReservationWindow
 }
 
 // BatchRequestInfo represents a single request within a batch
