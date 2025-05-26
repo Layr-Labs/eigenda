@@ -152,6 +152,9 @@ type Config struct {
 	// to aggressively garbage collect so as to keep this amount of memory free. Useful for preventing kubernetes
 	// from OOM-killing the process.
 	GCSafetyBufferSizeGB float64
+
+	// The number of bins to track for each account's reservation usage. The minimum value is 3.
+	ReservationNumBins int
 }
 
 // NewConfig parses the Config from the provided flags or environment variables and
@@ -382,5 +385,6 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		GetChunksColdCacheReadLimitMB:       ctx.GlobalFloat64(flags.GetChunksColdCacheReadLimitMBFlag.Name),
 		GetChunksColdBurstLimitMB:           ctx.GlobalFloat64(flags.GetChunksColdBurstLimitMBFlag.Name),
 		GCSafetyBufferSizeGB:                ctx.GlobalFloat64(flags.GCSafetyBufferSizeGBFlag.Name),
+		ReservationNumBins:                  ctx.GlobalInt(flags.ReservationNumBinsFlag.Name),
 	}, nil
 }

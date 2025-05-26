@@ -37,8 +37,7 @@ type ServerV2 struct {
 	chunkAuthenticator auth.RequestAuthenticator
 	blobAuthenticator  corev2.BlobRequestAuthenticator
 	replayGuardian     replay.ReplayGuardian
-	// TODO: Replace this placeholder with proper BatchMeterer integration once interface compatibility issues are resolved
-	batchMeterer *node.BatchMeterer
+	batchMeterer       *node.BatchMeterer
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -49,7 +48,9 @@ func NewServerV2(
 	logger logging.Logger,
 	ratelimiter common.RateLimiter,
 	registry *prometheus.Registry,
-	reader core.Reader) (*ServerV2, error) {
+	reader core.Reader,
+	batchMeterer *node.BatchMeterer,
+) (*ServerV2, error) {
 
 	metrics, err := NewV2Metrics(logger, registry)
 	if err != nil {
@@ -94,6 +95,7 @@ func NewServerV2(
 		chunkAuthenticator: chunkAuthenticator,
 		blobAuthenticator:  blobAuthenticator,
 		replayGuardian:     replayGuardian,
+		batchMeterer:       batchMeterer,
 	}, nil
 }
 
@@ -167,15 +169,17 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		}
 	}
 
-	// TODO: Implement batch metering validation
-	// The ChainState doesn't have the GetReservedPaymentByAccountAndQuorums method needed for validation
-	// This will need to be implemented in a future update once we resolve the interface issues
-	//
-	// Implementation plan:
-	// 1. Create a separate OnchainPayment implementation (not sharing the ChainState)
-	// 2. Initialize BatchMeterer with this OnchainPayment instance
-	// 3. Call batchMeterer.MeterBatch(ctx, batch, time.Now()) here
-	//    and return an appropriate error if validation fails
+	// Batch metering validation
+	if s.batchMeterer != nil {
+		// If the batch meterer is configured, use it to validate the batch
+		err = s.batchMeterer.MeterBatch(ctx, batch, time.Now())
+		if err != nil {
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("batch metering validation failed: %v", err))
+		}
+	} else {
+		// Log that batch metering is skipped (it's not configured)
+		s.logger.Debug("Batch metering skipped - no batch meterer configured")
+	}
 
 	probe.SetStage("get_operator_state")
 	s.logger.Info("new StoreChunks request",
