@@ -20,35 +20,46 @@ const SwapFileExtension = ".swap"
 func AtomicWrite(destination string, data []byte) error { // TODO test
 
 	swapPath := destination + ".swap"
-	parentDirectory := filepath.Dir(destination)
 
 	// Write the data into the swap file.
 	swapFile, err := os.Create(swapPath)
 	if err != nil {
-		return fmt.Errorf("failed to create swap file: %w", err)
+		return fmt.Errorf("failed to create swap file: %v", err)
 	}
 
 	_, err = swapFile.Write(data)
 	if err != nil {
-		return fmt.Errorf("failed to write to swap file: %w", err)
+		return fmt.Errorf("failed to write to swap file: %v", err)
 	}
 
 	// Ensure the data in the swap file is fully written to disk.
 	err = swapFile.Sync()
 	if err != nil {
-		return fmt.Errorf("failed to sync swap file: %w", err)
+		return fmt.Errorf("failed to sync swap file: %v", err)
 	}
 
 	err = swapFile.Close()
 	if err != nil {
-		return fmt.Errorf("failed to close swap file: %w", err)
+		return fmt.Errorf("failed to close swap file: %v", err)
 	}
 
 	// Rename the swap file to the destination file.
-	err = os.Rename(swapPath, destination)
+	err = AtomicRename(swapPath, destination)
 	if err != nil {
-		return fmt.Errorf("failed to rename swap file: %w", err)
+		return fmt.Errorf("failed to rename swap file: %v", err)
 	}
+
+	return nil
+}
+
+// AtomicRename renames a file from oldPath to newPath atomically.
+func AtomicRename(oldPath string, newPath string) error {
+	err := os.Rename(oldPath, newPath)
+	if err != nil {
+		return fmt.Errorf("failed to rename file: %w", err)
+	}
+
+	parentDirectory := filepath.Dir(newPath)
 
 	// Ensure that the rename is committed to disk.
 	dirFile, err := os.Open(parentDirectory)

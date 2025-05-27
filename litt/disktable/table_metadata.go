@@ -130,27 +130,9 @@ func (t *tableMetadata) SetShardingFactor(shardingFactor uint32) error {
 
 // Store atomically stores the table metadata to disk.
 func (t *tableMetadata) write() error {
-	bytes := t.serialize()
-	swapPath := t.swapPath()
-	swapFile, err := os.Create(swapPath)
+	err := util.AtomicWrite(metadataPath(t.tableDirectory), t.serialize())
 	if err != nil {
-		return fmt.Errorf("failed to create swap file %s: %v", swapPath, err)
-	}
-
-	_, err = swapFile.Write(bytes)
-	if err != nil {
-		return fmt.Errorf("failed to write to swap file %s: %v", swapPath, err)
-	}
-
-	err = swapFile.Close()
-	if err != nil {
-		return fmt.Errorf("failed to close swap file %s: %v", swapPath, err)
-	}
-
-	mPath := metadataPath(t.tableDirectory)
-	err = os.Rename(swapPath, mPath)
-	if err != nil {
-		return fmt.Errorf("failed to rename swap file %s to metadata file %s: %v", swapPath, mPath, err)
+		return fmt.Errorf("failed to write table metadata file: %v", err)
 	}
 
 	return nil
