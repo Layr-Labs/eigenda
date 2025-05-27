@@ -6,7 +6,6 @@ import (
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	contractEigenDACertVerifierV2 "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
 	certTypesBinding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
-	coreV2 "github.com/Layr-Labs/eigenda/core/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/ethereum/go-ethereum/accounts/abi"
