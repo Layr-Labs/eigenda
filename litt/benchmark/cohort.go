@@ -115,7 +115,7 @@ func LoadCohort(path string) (*Cohort, error) {
 		loadedFromDisk:  true,
 	}
 
-	filePath := cohort.Path(false)
+	filePath := cohort.Path()
 	exists, err := util.Exists(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if cohort file exists: %w", err)
@@ -262,20 +262,12 @@ func (c *Cohort) MarkComplete() error {
 }
 
 // Path returns the file path of the cohort file.
-func (c *Cohort) Path(swap bool) string {
-
-	var extension string
-	if swap {
-		extension = CohortSwapFileExtension
-	} else {
-		extension = CohortFileExtension
-	}
-
-	return path.Join(c.parentDirectory, fmt.Sprintf("%d%s", c.cohortIndex, extension))
+func (c *Cohort) Path() string {
+	return path.Join(c.parentDirectory, fmt.Sprintf("%d%s", c.cohortIndex, CohortFileExtension))
 }
 
 func (c *Cohort) Write() error {
-	err := util.AtomicWrite(c.Path(false), c.serialize())
+	err := util.AtomicWrite(c.Path(), c.serialize())
 	if err != nil {
 		return fmt.Errorf("failed to write cohort file: %w", err)
 	}
@@ -340,7 +332,7 @@ func (c *Cohort) IsExpired(now time.Time, maxAge time.Duration) bool {
 
 // Delete the associated cohort file.
 func (c *Cohort) Delete() error {
-	err := os.Remove(c.Path(false))
+	err := os.Remove(c.Path())
 	if err != nil {
 		return fmt.Errorf("failed to delete cohort file: %w", err)
 	}

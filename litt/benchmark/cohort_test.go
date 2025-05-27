@@ -31,13 +31,13 @@ func TestCohortSerialization(t *testing.T) {
 	require.Equal(t, false, cohort.IsComplete())
 
 	// Check if the cohort file exists
-	filePath := cohort.Path(false)
+	filePath := cohort.Path()
 	exists, err := util.Exists(filePath)
 	require.NoError(t, err)
 	require.True(t, exists)
 
 	// Initialize a copy cohort from the file
-	loadedCohort, err := LoadCohort(cohort.Path(false))
+	loadedCohort, err := LoadCohort(cohort.Path())
 	require.NoError(t, err)
 	require.Equal(t, cohortIndex, loadedCohort.CohortIndex())
 	require.Equal(t, lowIndex, loadedCohort.LowKeyIndex())
@@ -53,7 +53,7 @@ func TestCohortSerialization(t *testing.T) {
 	require.NoError(t, err)
 
 	// Load the cohort again.
-	loadedCohort, err = LoadCohort(cohort.Path(false))
+	loadedCohort, err = LoadCohort(cohort.Path())
 	require.NoError(t, err)
 	require.Equal(t, cohortIndex, loadedCohort.CohortIndex())
 	require.Equal(t, lowIndex, loadedCohort.LowKeyIndex())
@@ -179,7 +179,7 @@ func TestIncompleteCohortAllKeysExtractedLifecycle(t *testing.T) {
 	}
 
 	// Simulate a benchmark restart by reloading the cohort from disk.
-	loadedCohort, err := LoadCohort(cohort.Path(false))
+	loadedCohort, err := LoadCohort(cohort.Path())
 	require.NoError(t, err)
 
 	require.Equal(t, loadedCohort.CohortIndex(), cohortIndex)
@@ -240,7 +240,7 @@ func TestIncompleteCohortSomeKeysExtractedLifecycle(t *testing.T) {
 	}
 
 	// Simulate a benchmark restart by reloading the cohort from disk.
-	loadedCohort, err := LoadCohort(cohort.Path(false))
+	loadedCohort, err := LoadCohort(cohort.Path())
 	require.NoError(t, err)
 
 	require.Equal(t, loadedCohort.CohortIndex(), cohortIndex)
@@ -282,7 +282,7 @@ func TestNextCohort(t *testing.T) {
 	require.Equal(t, false, cohort.IsComplete())
 
 	// Check if the cohort file exists
-	filePath := cohort.Path(false)
+	filePath := cohort.Path()
 	exists, err := util.Exists(filePath)
 	require.NoError(t, err)
 	require.True(t, exists)
@@ -300,7 +300,7 @@ func TestNextCohort(t *testing.T) {
 	require.Equal(t, false, nextCohort.IsComplete())
 
 	// Check if the next cohort file exists
-	nextFilePath := nextCohort.Path(false)
+	nextFilePath := nextCohort.Path()
 	exists, err = util.Exists(nextFilePath)
 	require.NoError(t, err)
 	require.True(t, exists)
