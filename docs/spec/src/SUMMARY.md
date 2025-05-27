@@ -30,4 +30,5 @@
     - [Lifecycle Phases](./integration/spec/5-lifecycle-phases.md)
     - [Secure Integration](./integration/spec/6-secure-integration.md)
   - [Rollup Stacks](./integration/rollup-stacks.md)
+    - [OP Secure Integration](./integration/rollup-stacks/1-op-secure-integration-workflow.md)
 - [V1](./v1.md)

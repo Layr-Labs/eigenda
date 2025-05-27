@@ -9,10 +9,10 @@ import (
 
 	"github.com/Layr-Labs/eigenda/encoding/rs"
 
+	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder/v2"
 	"github.com/Layr-Labs/eigenda/common/aws/mock"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	pb "github.com/Layr-Labs/eigenda/api/grpc/encoder/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/encoder"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -31,7 +31,7 @@ import (
 var blobParams = &core.BlobVersionParameters{
 	NumChunks:       8192,
 	CodingRate:      8,
-	MaxNumOperators: 3537,
+	MaxNumOperators: 2048,
 }
 
 type testComponents struct {

@@ -139,7 +139,7 @@ func setup(_ *testing.M) {
 	account1OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}
 	account2OnDemandPayments = &core.OnDemandPayment{CumulativePayment: big.NewInt(2000)}
 
-	store, err := meterer.NewOffchainStore(
+	store, err := meterer.NewDynamoDBMeteringStore(
 		clientConfig,
 		reservationTableName,
 		ondemandTableName,
@@ -149,7 +149,7 @@ func setup(_ *testing.M) {
 
 	if err != nil {
 		teardown()
-		panic("failed to create offchain store")
+		panic("failed to create metering store")
 	}
 
 	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil).Maybe()
@@ -186,26 +186,32 @@ func TestMetererReservations(t *testing.T) {
 	reservationPeriod := meterer.GetReservationPeriodByNanosecond(now.UnixNano(), mt.ChainPaymentState.GetReservationWindow())
 	quoromNumbers := []uint8{0, 1}
 
-	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
-		return account == accountID1
-	})).Return(account1Reservations, nil)
-	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
-		return account == accountID2
-	})).Return(account2Reservations, nil)
-	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
-		return account == accountID3
-	})).Return(account3Reservations, nil)
-	paymentChainState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(&core.ReservedPayment{}, fmt.Errorf("reservation not found"))
+	// Update mocks for GetReservedPaymentByAccountAndQuorums
+	paymentChainState.On("GetReservedPaymentByAccountAndQuorums", testifymock.Anything, accountID1, testifymock.Anything).Return(
+		map[core.QuorumID]*core.ReservedPayment{0: account1Reservations, 1: account1Reservations},
+	)
+	paymentChainState.On("GetReservedPaymentByAccountAndQuorums", testifymock.Anything, accountID2, testifymock.Anything).Return(
+		map[core.QuorumID]*core.ReservedPayment{0: account2Reservations, 1: account2Reservations},
+	)
+	paymentChainState.On("GetReservedPaymentByAccountAndQuorums", testifymock.Anything, accountID3, testifymock.Anything).Return(
+		map[core.QuorumID]*core.ReservedPayment{0: account3Reservations, 1: account3Reservations},
+	)
+	paymentChainState.On("GetReservedPaymentByAccountAndQuorums", testifymock.Anything, testifymock.Anything, testifymock.Anything).Return(
+		func(ctx context.Context, account gethcommon.Address, quorums []core.QuorumID) map[core.QuorumID]*core.ReservedPayment {
+			return map[core.QuorumID]*core.ReservedPayment{}
+		},
+		fmt.Errorf("reservation not found"),
+	)
 
 	// test not active reservation
 	header := createPaymentHeader(1, big.NewInt(0), accountID1)
-	_, err := mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, now)
+	_, err := mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1}, now)
 	assert.ErrorContains(t, err, "reservation not active")
 
 	// test invalid quorom ID
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID1)
 	_, err = mt.MeterRequest(ctx, *header, 1000, []uint8{0, 1, 2}, now)
-	assert.ErrorContains(t, err, "invalid quorum for reservation")
+	assert.ErrorContains(t, err, "invalid quorum for reservation: quorum number mismatch")
 
 	// small bin overflow for empty bin
 	header = createPaymentHeader(now.UnixNano()-int64(mt.ChainPaymentState.GetReservationWindow())*1e9, big.NewInt(0), accountID2)
@@ -239,21 +245,27 @@ func TestMetererReservations(t *testing.T) {
 	// test bin usage metering
 	symbolLength := uint64(20)
 	requiredLength := uint(21) // 21 should be charged for length of 20 since minNumSymbols is 3
+	accountAndQuorums := []string{}
+	for _, quorum := range quoromNumbers {
+		accountAndQuorums = append(accountAndQuorums, fmt.Sprintf("%s:%d", accountID2.Hex(), quorum))
+	}
 	for i := 0; i < 9; i++ {
 		reservationPeriod = meterer.GetReservationPeriodByNanosecond(now.UnixNano(), mt.ChainPaymentState.GetReservationWindow())
 		header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
 		symbolsCharged, err := mt.MeterRequest(ctx, *header, symbolLength, quoromNumbers, now)
 		assert.NoError(t, err)
-		item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
-			"AccountID":         &types.AttributeValueMemberS{Value: accountID2.Hex()},
-			"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(reservationPeriod))},
-		})
-		assert.NotNil(t, item)
-		assert.NoError(t, err)
-		assert.Equal(t, uint64(requiredLength), symbolsCharged)
-		assert.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
-		assert.Equal(t, strconv.Itoa(int(reservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
-		assert.Equal(t, strconv.Itoa((i+1)*int(requiredLength)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
+		for _, accountAndQuorum := range accountAndQuorums {
+			item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
+				"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountAndQuorum},
+				"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+			})
+			assert.NotNil(t, item)
+			assert.NoError(t, err)
+			assert.Equal(t, uint64(requiredLength), symbolsCharged)
+			assert.Equal(t, accountAndQuorum, item["AccountIDAndQuorum"].(*types.AttributeValueMemberS).Value)
+			assert.Equal(t, strconv.Itoa(int(reservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
+			assert.Equal(t, strconv.Itoa((i+1)*int(requiredLength)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
+		}
 	}
 	// first over flow is allowed
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
@@ -261,12 +273,13 @@ func TestMetererReservations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(27), symbolsCharged)
 	overflowedReservationPeriod := reservationPeriod + 2
+	accountAndQuorum := fmt.Sprintf("%s:%d", accountID2.Hex(), quoromNumbers[0])
 	item, err := dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID2.Hex()},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.Itoa(int(overflowedReservationPeriod))},
+		"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountAndQuorum},
+		"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(overflowedReservationPeriod))},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, accountID2.Hex(), item["AccountID"].(*types.AttributeValueMemberS).Value)
+	assert.Equal(t, accountAndQuorum, item["AccountIDAndQuorum"].(*types.AttributeValueMemberS).Value)
 	assert.Equal(t, strconv.Itoa(int(overflowedReservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 	// 25 rounded up to the nearest multiple of minNumSymbols - (200-21*9) = 16
 	assert.Equal(t, strconv.Itoa(int(16)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
@@ -276,6 +289,36 @@ func TestMetererReservations(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = mt.MeterRequest(ctx, *header, 1, quoromNumbers, now)
 	assert.ErrorContains(t, err, "bin has already been filled")
+
+	// Test quorum-specific behavior - one quorum succeeds, one fails
+	// First, reset the bin data for quorum 1
+	accountAndQuorum1 := fmt.Sprintf("%s_%d", accountID2.Hex(), uint8(1))
+	err = dynamoClient.DeleteItem(ctx, reservationTableName, commondynamodb.Key{
+		"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountAndQuorum1},
+		"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(reservationPeriod))},
+	})
+	assert.NoError(t, err)
+
+	// Now try a request that should succeed for quorum 1 but fail for quorum 0
+	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
+	_, err = mt.MeterRequest(ctx, *header, 50, quoromNumbers, now)
+	assert.ErrorContains(t, err, "bin has already been filled")
+
+	// Verify quorum 1 was not updated (because the operation should be atomic)
+	item, err = dynamoClient.GetItem(ctx, reservationTableName, commondynamodb.Key{
+		"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountAndQuorum1},
+		"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(reservationPeriod))},
+	})
+	assert.NoError(t, err)
+	// The item should not exist or have zero usage since the batched update failed
+	if len(item) > 0 {
+		if binUsage, ok := item["BinUsage"]; ok {
+			binUsageStr := binUsage.(*types.AttributeValueMemberN).Value
+			binUsageVal, _ := strconv.ParseUint(binUsageStr, 10, 64)
+			assert.Zero(t, binUsageVal, "Bin usage for quorum 1 should be zero since the batched update should have failed atomically")
+		}
+	}
+
 }
 
 func TestMetererOnDemand(t *testing.T) {
