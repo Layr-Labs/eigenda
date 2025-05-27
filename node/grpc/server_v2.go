@@ -162,7 +162,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 				blacklistErr := s.blacklistDisperserFromBlobCert(in, blobCert)
 				if blacklistErr != nil {
 					s.logger.Error("failed to blacklist disperser", "disperserID", in.DisperserID, "error", blacklistErr, "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]))
-					return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to blacklist disperser due to blobCert validation failure"))
+					return nil, api.NewErrorInvalidArg("failed to blacklist disperser due to blobCert validation failure")
 				}
 				s.logger.Info("disperser blacklisted due to blobCert validation failure", "disperserID", in.DisperserID)
 				return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
