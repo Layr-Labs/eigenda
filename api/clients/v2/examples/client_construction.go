@@ -56,12 +56,7 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 	if err != nil {
 		return nil, fmt.Errorf("create cert verifier: %w", err)
 	}
-
-	ethClient, err := createEthClient(logger)
-	if err != nil {
-		return nil, fmt.Errorf("create eth client: %w", err)
-	}
-
+	
 	certBuilder, err := createCertBuilder()
 	if err != nil {
 		return nil, fmt.Errorf("create cert builder: %w", err)
@@ -83,7 +78,6 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 	return payloaddispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
-		ethClient,
 		disperserClient,
 		blockNumMonitor,
 		certBuilder,

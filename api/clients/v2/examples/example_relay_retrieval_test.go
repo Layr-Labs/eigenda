@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 )
 
 // This example demonstrates how to use the RelayPayloadRetriever to retrieve a payload from EigenDA, running on
@@ -47,8 +49,13 @@ func Example_relayPayloadRetrieval() {
 	}
 	defer payloadRetriever.Close()
 
+	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
+	if !ok {
+		panic(fmt.Sprintf("expected EigenDACertV3, got %T", eigenDACert))
+	}
+
 	// Retrieve the payload using the certificate
-	_, err = payloadRetriever.GetPayload(ctx, eigenDACert)
+	_, err = payloadRetriever.GetPayload(ctx, eigenDAV3Cert)
 	if err != nil {
 		panic(fmt.Sprintf("get payload: %v", err))
 	}

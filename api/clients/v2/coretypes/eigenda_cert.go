@@ -6,7 +6,7 @@ import (
 	disperser "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	contractEigenDACertVerifierV2 "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
 	certTypesBinding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
-	corev2 "github.com/Layr-Labs/eigenda/core/v2"
+	coreV2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -179,14 +179,14 @@ func (c *EigenDACertV3) ComputeBlobKey() (*coreV2.BlobKey, error) {
 	return &blobKey, nil
 }
 
-func (c *EigenDACertV3) BlobHeader() (*corev2.BlobHeaderWithHashedPayment, error) {
+func (c *EigenDACertV3) BlobHeader() (*coreV2.BlobHeaderWithHashedPayment, error) {
 
 	commitments, err := c.Commitments()
 	if err != nil {
 		return nil, fmt.Errorf("get commitments: %w", err)
 	}
 
-	blobHeader := &corev2.BlobHeaderWithHashedPayment{
+	blobHeader := &coreV2.BlobHeaderWithHashedPayment{
 		BlobVersion: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version,
 		BlobCommitments: *commitments,
 		QuorumNumbers: c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
