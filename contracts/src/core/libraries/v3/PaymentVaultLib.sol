@@ -105,23 +105,23 @@ library PaymentVaultLib {
         require(reservation.endTimestamp >= currentReservation.endTimestamp, "Invalid end timestamp");
         require(reservation.symbolsPerSecond >= currentReservation.symbolsPerSecond, "Invalid symbols per second");
 
+        if (reservation.symbolsPerSecond > currentReservation.symbolsPerSecond) {
+            // increase reservation symbols before a reservation time increase, if any
+            increaseReservedSymbols(
+                quorumId,
+                currentReservation.startTimestamp,
+                currentReservation.endTimestamp,
+                reservation.symbolsPerSecond - currentReservation.symbolsPerSecond,
+                schedulePeriod
+            );
+        }
         if (reservation.endTimestamp > currentReservation.endTimestamp) {
-            // increase reservation time based on current reservation
+            // increase reservation time
             increaseReservedSymbols(
                 quorumId,
                 currentReservation.endTimestamp,
                 reservation.endTimestamp,
-                currentReservation.symbolsPerSecond,
-                schedulePeriod
-            );
-        }
-        if (reservation.symbolsPerSecond > currentReservation.symbolsPerSecond) {
-            // increase reservation symbols after a reservation time increase, if any
-            increaseReservedSymbols(
-                quorumId,
-                reservation.startTimestamp,
-                reservation.endTimestamp,
-                reservation.symbolsPerSecond - currentReservation.symbolsPerSecond,
+                reservation.symbolsPerSecond,
                 schedulePeriod
             );
         }
@@ -147,7 +147,7 @@ library PaymentVaultLib {
         require(reservation.symbolsPerSecond <= currentReservation.symbolsPerSecond, "Invalid symbols per second");
 
         if (reservation.endTimestamp < currentReservation.endTimestamp) {
-            // decrease reservation time based on current reservation
+            // decrease reservation time
             decreaseReservedSymbols(
                 quorumId,
                 reservation.endTimestamp,
@@ -157,11 +157,11 @@ library PaymentVaultLib {
             );
         }
         if (reservation.symbolsPerSecond < currentReservation.symbolsPerSecond) {
-            // decrease reservation symbols after a reservation time decrease, if any
+            // decrease reservation symbols before a reservation time decrease, if any
             decreaseReservedSymbols(
                 quorumId,
-                reservation.startTimestamp,
-                reservation.endTimestamp,
+                currentReservation.startTimestamp,
+                currentReservation.endTimestamp,
                 currentReservation.symbolsPerSecond - reservation.symbolsPerSecond,
                 schedulePeriod
             );
