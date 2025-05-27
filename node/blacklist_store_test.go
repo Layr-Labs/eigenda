@@ -22,8 +22,6 @@ func TestNewLevelDBBlacklistStore(t *testing.T) {
 	store, err := NewLevelDBBlacklistStore(testDir, logger, false, false)
 	require.NoError(t, err)
 	require.NotNil(t, store)
-	require.NotNil(t, store.db)
-	require.NotNil(t, store.logger)
 }
 
 // TestBlacklistStoreAddEntry tests the AddEntry method which adds new blacklist entries
@@ -307,3 +305,5 @@ func TestBlacklistStorePut(t *testing.T) {
 	// Verify it exists
 	require.True(t, store.HasKey(ctx, testKey))
 }
+
+// Note: Interface testing with mock is done in a separate test package to avoid import cycles

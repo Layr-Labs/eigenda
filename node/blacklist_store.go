@@ -11,17 +11,43 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-type BlacklistStore struct {
+// BlacklistStore encapsulates the database for storing blacklist entries for dispersers.
+type BlacklistStore interface {
+	// HasDisperserID checks if a disperser ID exists in the blacklist store
+	HasDisperserID(ctx context.Context, disperserId uint32) bool
+
+	// HasKey checks if a key exists in the store
+	HasKey(ctx context.Context, key []byte) bool
+
+	// GetByDisperserID retrieves a blacklist by disperser ID
+	GetByDisperserID(ctx context.Context, disperserId uint32) (*Blacklist, error)
+
+	// Get retrieves a blacklist by key
+	Get(ctx context.Context, key []byte) (*Blacklist, error)
+
+	// Put stores raw blacklist data
+	Put(ctx context.Context, key []byte, value []byte) error
+
+	// AddEntry adds or updates a blacklist entry for a disperser
+	AddEntry(ctx context.Context, disperserId uint32, contextId, reason string) error
+
+	// IsBlacklisted checks if a disperser is blacklisted
+	IsBlacklisted(ctx context.Context, disperserId uint32) bool
+}
+
+type blacklistStore struct {
 	db     kvstore.Store[[]byte]
 	logger logging.Logger
 }
+
+var _ BlacklistStore = &blacklistStore{}
 
 // NewLevelDBBlacklistStore creates a new Store object with a levelDB at the provided path and the given logger specifically for the blacklist.
 func NewLevelDBBlacklistStore(
 	path string,
 	logger logging.Logger,
 	disableSeeksCompaction bool,
-	syncWrites bool) (*BlacklistStore, error) {
+	syncWrites bool) (BlacklistStore, error) {
 
 	// Create the DB at the path.
 	db, err := leveldb.NewStore(logger, path, disableSeeksCompaction, syncWrites, nil)
@@ -30,33 +56,33 @@ func NewLevelDBBlacklistStore(
 		return nil, fmt.Errorf("failed to create leveldb database: %w", err)
 	}
 
-	return &BlacklistStore{
+	return &blacklistStore{
 		db:     db,
 		logger: logger,
 	}, nil
 }
 
 // HasKey checks if a key exists in the store
-func (s *BlacklistStore) HasDisperserID(ctx context.Context, disperserId uint32) bool {
+func (s *blacklistStore) HasDisperserID(ctx context.Context, disperserId uint32) bool {
 	// hash the disperserId and look up
 	disperserIdHash := sha256.Sum256([]byte(fmt.Sprintf("%d", disperserId)))
 	return s.HasKey(ctx, disperserIdHash[:])
 }
 
 // HasKey checks if a key exists in the store
-func (s *BlacklistStore) HasKey(ctx context.Context, key []byte) bool {
+func (s *blacklistStore) HasKey(ctx context.Context, key []byte) bool {
 	_, err := s.db.Get(key)
 	return err == nil
 }
 
 // Get retrieves a blacklist by key
-func (s *BlacklistStore) GetByDisperserID(ctx context.Context, disperserId uint32) (*Blacklist, error) {
+func (s *blacklistStore) GetByDisperserID(ctx context.Context, disperserId uint32) (*Blacklist, error) {
 	disperserIdHash := sha256.Sum256(fmt.Appendf(nil, "%d", disperserId))
 	return s.Get(ctx, disperserIdHash[:])
 }
 
 // Get retrieves a blacklist by key
-func (s *BlacklistStore) Get(ctx context.Context, key []byte) (*Blacklist, error) {
+func (s *blacklistStore) Get(ctx context.Context, key []byte) (*Blacklist, error) {
 	rawBlackList, err := s.db.Get(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get blacklist data: %w", err)
@@ -71,12 +97,12 @@ func (s *BlacklistStore) Get(ctx context.Context, key []byte) (*Blacklist, error
 }
 
 // Put stores raw blacklist data
-func (s *BlacklistStore) Put(ctx context.Context, key []byte, value []byte) error {
+func (s *blacklistStore) Put(ctx context.Context, key []byte, value []byte) error {
 	return s.db.Put(key, value)
 }
 
 // AddEntry adds or updates a blacklist entry for a disperser
-func (s *BlacklistStore) AddEntry(ctx context.Context, disperserId uint32, contextId, reason string) error {
+func (s *blacklistStore) AddEntry(ctx context.Context, disperserId uint32, contextId, reason string) error {
 	var blacklist *Blacklist
 	var err error
 
@@ -102,7 +128,7 @@ func (s *BlacklistStore) AddEntry(ctx context.Context, disperserId uint32, conte
 }
 
 // IsBlacklisted checks if a disperser is blacklisted
-func (s *BlacklistStore) IsBlacklisted(ctx context.Context, disperserId uint32) bool {
+func (s *blacklistStore) IsBlacklisted(ctx context.Context, disperserId uint32) bool {
 	blacklist, err := s.GetByDisperserID(ctx, disperserId)
 	if err != nil {
 		return false

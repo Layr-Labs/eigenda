@@ -64,7 +64,7 @@ type Node struct {
 	Metrics                 *Metrics
 	NodeApi                 *nodeapi.NodeApi
 	Store                   *Store
-	BlacklistStore          *BlacklistStore
+	BlacklistStore          BlacklistStore
 	ValidatorStore          ValidatorStore
 	ChainState              core.ChainState
 	Validator               core.ShardValidator

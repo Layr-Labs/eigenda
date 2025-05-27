@@ -134,7 +134,9 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to serialize batch header hash: %v", err))
 	}
 
-	if s.node.BlacklistStore.IsBlacklisted(ctx, in.DisperserID) {
+	// If the disperser is blacklisted and the blob authenticator is not nil, return an error
+	// we don't want to blacklist the disperser if the blob authenticator is nil since that indicated v1
+	if s.node.BlacklistStore.IsBlacklisted(ctx, in.DisperserID) && s.blobAuthenticator != nil {
 		return nil, api.NewErrorInvalidArg("disperser is blacklisted")
 	}
 	if s.chunkAuthenticator != nil {
