@@ -4,8 +4,9 @@ on:
     branches:
       - master
   pull_request:
-    branches:
-      - master
+
+env:
+  MISE_VERSION: 2024.12.14
 
 jobs:
   unit-tests:
@@ -26,9 +27,10 @@ jobs:
           aws configure --profile test-profile set region us-east-1
           aws configure --profile test-profile set source_profile default
 
-      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34
+      - uses: jdx/mise-action@v2
         with:
-          go-version: '1.21' # The Go version to download (if necessary) and use.
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
       - run: go version
 
       - name: Checkout EigenDA

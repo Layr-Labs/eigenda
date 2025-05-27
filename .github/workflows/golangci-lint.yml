@@ -5,14 +5,18 @@ on:
       - master
   pull_request:
 
+env:
+  MISE_VERSION: 2024.12.14
+
 jobs:
   golangci:
     name: Linter
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-go@v3
+      - uses: jdx/mise-action@v2
         with:
-          go-version: '1.21' # The Go version to download (if necessary) and use.
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
       - run: go version
 
       - name: Checkout EigenDA
