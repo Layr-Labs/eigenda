@@ -283,7 +283,7 @@ func TestMetererReservations(t *testing.T) {
 	assert.Equal(t, accountAndQuorum, item["AccountIDAndQuorum"].(*types.AttributeValueMemberS).Value)
 	assert.Equal(t, strconv.Itoa(int(overflowedReservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
 	assert.Equal(t, strconv.Itoa(int(16)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
-	// }
+
 	// second over flow
 	header = createPaymentHeader(now.UnixNano(), big.NewInt(0), accountID2)
 	assert.NoError(t, err)

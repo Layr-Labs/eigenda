@@ -169,7 +169,7 @@ func (pcs *OnchainPaymentState) refreshReservedPayments(ctx context.Context) err
 		accountIDs = append(accountIDs, accountID)
 	}
 
-	// TODO(hopeyen): get all quorum numbers and use quorum specific calls
+	// TODO(hopeyen): get all quorum numbers and use quorum specific calls when there's updated payment vault interface
 	reservedPayments, err := pcs.tx.GetReservedPayments(ctx, accountIDs)
 	if err != nil {
 		return err

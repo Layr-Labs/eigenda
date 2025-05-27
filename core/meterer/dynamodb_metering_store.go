@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"strings"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	commonaws "github.com/Layr-Labs/eigenda/common/aws"
@@ -258,14 +259,14 @@ func (s *DynamoDBMeteringStore) RollbackOnDemandPayment(ctx context.Context, acc
 
 // GetPeriodRecords retrieves up to MinNumBins period records for a specific account and reservation period.
 // This implementation fetches for quorum 0 (or the first available quorum) for backward compatibility.
-func (s *DynamoDBMeteringStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, quorumNumber uint8) ([MinNumBins]*pb.QuorumPeriodRecord, error) {
-	// TODO(hopeyen): add quorum specific query
+func (s *DynamoDBMeteringStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, quorumNumber core.QuorumID) ([MinNumBins]*pb.QuorumPeriodRecord, error) {
+	accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorumNumber), 10)
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.reservationTableName),
-		KeyConditionExpression: aws.String("AccountID = :account AND ReservationPeriod >= :reservationPeriod"),
+		KeyConditionExpression: aws.String("AccountIDAndQuorum = :accountIDAndQuorum AND ReservationPeriod >= :reservationPeriod"),
 		ExpressionAttributeValues: commondynamodb.ExpressionValues{
-			":account":           &types.AttributeValueMemberS{Value: accountID.Hex()},
-			":reservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+			":accountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
+			":reservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 		},
 		ScanIndexForward: aws.Bool(true),
 		Limit:            aws.Int32(MinNumBins),
@@ -277,7 +278,7 @@ func (s *DynamoDBMeteringStore) GetPeriodRecords(ctx context.Context, accountID 
 
 	records := [MinNumBins]*pb.QuorumPeriodRecord{}
 	for i := 0; i < len(bins) && i < int(MinNumBins); i++ {
-		periodRecord, err := parseQuorumPeriodRecord(bins[i], uint32(quorumNumber))
+		periodRecord, err := parseQuorumPeriodRecord(bins[i])
 		if err != nil {
 			return [MinNumBins]*pb.QuorumPeriodRecord{}, fmt.Errorf("failed to parse bin %d record: %w", i, err)
 		}
@@ -294,7 +295,7 @@ func (s *DynamoDBMeteringStore) GetPeriodRecordsMultiQuorum(
 	ctx context.Context,
 	accountID gethcommon.Address,
 	reservationPeriod uint64,
-	quorumNumbers []uint8,
+	quorumNumbers []core.QuorumID,
 ) ([]*pb.QuorumPeriodRecord, error) {
 	if len(quorumNumbers) == 0 {
 		return []*pb.QuorumPeriodRecord{}, nil
@@ -302,36 +303,30 @@ func (s *DynamoDBMeteringStore) GetPeriodRecordsMultiQuorum(
 
 	// Prepare all keys for batch get
 	var keys []map[string]types.AttributeValue
-	// TODO(hopeyen): this is tempoary until the offchain store PR
-	// for _, quorum := range quorumNumbers {
-	// accountID := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorum), 10)
-	// accountID := accountID.Hex()
-	for i := 0; i < int(MinNumBins); i++ {
-		key := map[string]types.AttributeValue{
-			"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
-			"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod+uint64(i), 10)},
+	for _, quorum := range quorumNumbers {
+		accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorum), 10)
+		for i := 0; i < int(MinNumBins); i++ {
+			key := map[string]types.AttributeValue{
+				"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
+				"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod+uint64(i), 10)},
+			}
+			keys = append(keys, key)
 		}
-		keys = append(keys, key)
 	}
-	// }
 
 	items, err := s.dynamoClient.GetItems(ctx, s.reservationTableName, keys, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to batch get period records: %w", err)
 	}
 
-	records := make([]*pb.QuorumPeriodRecord, 0, len(items)*len(quorumNumbers))
-	for i := range quorumNumbers {
-		for _, item := range items {
-			// TODO(hopeyen): parse should update with the key being {accountID}:{quorumNumber}
-			periodRecord, err := parseQuorumPeriodRecord(item, uint32(i))
-			if err != nil {
-				s.logger.Debug("Failed to parse period record", "err", err)
-				continue
-			}
-			records = append(records, periodRecord)
+	records := make([]*pb.QuorumPeriodRecord, 0, len(items))
+	for _, item := range items {
+		periodRecord, err := parseQuorumPeriodRecord(item)
+		if err != nil {
+			s.logger.Debug("Failed to parse period record", "err", err)
+			continue
 		}
-
+		records = append(records, periodRecord)
 	}
 
 	return records, nil
@@ -373,7 +368,7 @@ func (s *DynamoDBMeteringStore) GetLargestCumulativePayment(ctx context.Context,
 	return payment, nil
 }
 
-func parseQuorumPeriodRecord(bin map[string]types.AttributeValue, quorumNumber uint32) (*pb.QuorumPeriodRecord, error) {
+func parseQuorumPeriodRecord(bin map[string]types.AttributeValue) (*pb.QuorumPeriodRecord, error) {
 	reservationPeriod, ok := bin["ReservationPeriod"]
 	if !ok {
 		return nil, errors.New("ReservationPeriod is not present in the response")
@@ -403,24 +398,30 @@ func parseQuorumPeriodRecord(bin map[string]types.AttributeValue, quorumNumber u
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse BinUsage: %w", err)
 	}
+	accountIDAndQuorum, ok := bin["AccountIDAndQuorum"]
+	if !ok {
+		return nil, errors.New("AccountIDAndQuorum is not present in the response")
+	}
 
-	//TODO (hopeyen): uncomment this once the offchain store PR is merged
-	// // Extract QuorumNumber from the response
-	// quorumNumberAttr, ok := bin["QuorumNumber"]
-	// if ok {
-	// 	quorumNumberMember, ok := quorumNumberAttr.(*types.AttributeValueMemberN)
-	// 	if ok {
-	// 		quorumNumberValue, err := strconv.ParseUint(quorumNumberMember.Value, 10, 32)
-	// 		if err == nil {
-	// 			quorumNumber = uint32(quorumNumberValue)
-	// 		}
-	// 	}
-	// }
+	accountIDAndQuorumAttr, ok := accountIDAndQuorum.(*types.AttributeValueMemberS)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for AccountIDAndQuorum: %T", accountIDAndQuorum)
+	}
+
+	parts := strings.Split(accountIDAndQuorumAttr.Value, ":")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid AccountIDAndQuorum format: %s", accountIDAndQuorumAttr.Value)
+	}
+
+	quorumNumber, err := strconv.ParseUint(parts[1], 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse QuorumNumber: %w", err)
+	}
 
 	return &pb.QuorumPeriodRecord{
 		Index:        uint32(reservationPeriodValue),
 		Usage:        uint64(binUsageValue),
-		QuorumNumber: quorumNumber,
+		QuorumNumber: uint32(quorumNumber),
 	}, nil
 }
 
