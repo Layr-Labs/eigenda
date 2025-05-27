@@ -14,7 +14,6 @@ import (
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser/common"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -68,7 +67,6 @@ var (
 		v2.Complete:            {v2.GatheringSignatures},
 		v2.Failed:              {v2.Queued, v2.Encoded, v2.GatheringSignatures},
 	}
-	ErrInvalidStateTransition = errors.New("invalid state transition")
 )
 
 var _ MetadataStore = (*BlobMetadataStore)(nil)
@@ -98,7 +96,7 @@ func (s *BlobMetadataStore) PutBlobMetadata(ctx context.Context, blobMetadata *v
 
 	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return common.ErrAlreadyExists
+		return ErrAlreadyExists
 	}
 
 	return err
@@ -138,7 +136,7 @@ func (s *BlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKey corev2
 		}
 
 		if blob.BlobStatus == status {
-			return fmt.Errorf("%w: blob already in status %s", common.ErrAlreadyExists, status.String())
+			return fmt.Errorf("%w: blob already in status %s", ErrAlreadyExists, status.String())
 		}
 
 		return fmt.Errorf("%w: invalid status transition from %s to %s", ErrInvalidStateTransition, blob.BlobStatus.String(), status.String())
@@ -171,7 +169,7 @@ func (s *BlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey corev2.
 	})
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: metadata not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
+		return nil, fmt.Errorf("%w: metadata not found for key %s", ErrMetadataNotFound, blobKey.Hex())
 	}
 
 	if err != nil {
@@ -745,7 +743,7 @@ func (s *BlobMetadataStore) PutBlobCertificate(ctx context.Context, blobCert *co
 
 	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return common.ErrAlreadyExists
+		return ErrAlreadyExists
 	}
 
 	return err
@@ -779,7 +777,7 @@ func (s *BlobMetadataStore) GetBlobCertificate(ctx context.Context, blobKey core
 	}
 
 	if item == nil {
-		return nil, nil, fmt.Errorf("%w: certificate not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
+		return nil, nil, fmt.Errorf("%w: certificate not found for key %s", ErrMetadataNotFound, blobKey.Hex())
 	}
 
 	cert, fragmentInfo, err := UnmarshalBlobCertificate(item)
@@ -832,7 +830,7 @@ func (s *BlobMetadataStore) PutDispersalRequest(ctx context.Context, req *corev2
 
 	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return common.ErrAlreadyExists
+		return ErrAlreadyExists
 	}
 
 	return err
@@ -853,7 +851,7 @@ func (s *BlobMetadataStore) GetDispersalRequest(ctx context.Context, batchHeader
 	}
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: dispersal request not found for batch header hash %x and operator %s", common.ErrMetadataNotFound, batchHeaderHash, operatorID.Hex())
+		return nil, fmt.Errorf("%w: dispersal request not found for batch header hash %x and operator %s", ErrMetadataNotFound, batchHeaderHash, operatorID.Hex())
 	}
 
 	req, err := UnmarshalDispersalRequest(item)
@@ -949,7 +947,7 @@ func (s *BlobMetadataStore) PutDispersalResponse(ctx context.Context, res *corev
 
 	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return common.ErrAlreadyExists
+		return ErrAlreadyExists
 	}
 
 	return err
@@ -970,7 +968,7 @@ func (s *BlobMetadataStore) GetDispersalResponse(ctx context.Context, batchHeade
 	}
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: dispersal response not found for batch header hash %x and operator %s", common.ErrMetadataNotFound, batchHeaderHash, operatorID.Hex())
+		return nil, fmt.Errorf("%w: dispersal response not found for batch header hash %x and operator %s", ErrMetadataNotFound, batchHeaderHash, operatorID.Hex())
 	}
 
 	res, err := UnmarshalDispersalResponse(item)
@@ -996,7 +994,7 @@ func (s *BlobMetadataStore) GetDispersalResponses(ctx context.Context, batchHead
 	}
 
 	if len(items) == 0 {
-		return nil, fmt.Errorf("%w: dispersal responses not found for batch header hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+		return nil, fmt.Errorf("%w: dispersal responses not found for batch header hash %x", ErrMetadataNotFound, batchHeaderHash)
 	}
 
 	responses := make([]*corev2.DispersalResponse, len(items))
@@ -1018,7 +1016,7 @@ func (s *BlobMetadataStore) PutBatch(ctx context.Context, batch *corev2.Batch) e
 
 	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return common.ErrAlreadyExists
+		return ErrAlreadyExists
 	}
 
 	return err
@@ -1039,7 +1037,7 @@ func (s *BlobMetadataStore) GetBatch(ctx context.Context, batchHeaderHash [32]by
 	}
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: batch info not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+		return nil, fmt.Errorf("%w: batch info not found for hash %x", ErrMetadataNotFound, batchHeaderHash)
 	}
 
 	batch, err := UnmarshalBatch(item)
@@ -1058,7 +1056,7 @@ func (s *BlobMetadataStore) PutBatchHeader(ctx context.Context, batchHeader *cor
 
 	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return common.ErrAlreadyExists
+		return ErrAlreadyExists
 	}
 
 	return err
@@ -1092,7 +1090,7 @@ func (s *BlobMetadataStore) GetBatchHeader(ctx context.Context, batchHeaderHash 
 	}
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: batch header not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+		return nil, fmt.Errorf("%w: batch header not found for hash %x", ErrMetadataNotFound, batchHeaderHash)
 	}
 
 	header, err := UnmarshalBatchHeader(item)
@@ -1134,7 +1132,7 @@ func (s *BlobMetadataStore) GetAttestation(ctx context.Context, batchHeaderHash 
 	}
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: attestation not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+		return nil, fmt.Errorf("%w: attestation not found for hash %x", ErrMetadataNotFound, batchHeaderHash)
 	}
 
 	attestation, err := UnmarshalAttestation(item)
@@ -1153,7 +1151,7 @@ func (s *BlobMetadataStore) PutBlobInclusionInfo(ctx context.Context, inclusionI
 
 	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
-		return common.ErrAlreadyExists
+		return ErrAlreadyExists
 	}
 
 	return err
@@ -1206,7 +1204,7 @@ func (s *BlobMetadataStore) GetBlobInclusionInfo(ctx context.Context, blobKey co
 	}
 
 	if item == nil {
-		return nil, fmt.Errorf("%w: inclusion info not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
+		return nil, fmt.Errorf("%w: inclusion info not found for key %s", ErrMetadataNotFound, blobKey.Hex())
 	}
 
 	info, err := UnmarshalBlobInclusionInfo(item)
@@ -1270,7 +1268,7 @@ func (s *BlobMetadataStore) GetBlobInclusionInfos(ctx context.Context, blobKey c
 	}
 
 	if len(items) == 0 {
-		return nil, fmt.Errorf("%w: inclusion info not found for key %s", common.ErrMetadataNotFound, blobKey.Hex())
+		return nil, fmt.Errorf("%w: inclusion info not found for key %s", ErrMetadataNotFound, blobKey.Hex())
 	}
 
 	responses := make([]*corev2.BlobInclusionInfo, len(items))
@@ -1302,7 +1300,7 @@ func (s *BlobMetadataStore) GetSignedBatch(ctx context.Context, batchHeaderHash 
 	}
 
 	if len(items) == 0 {
-		return nil, nil, fmt.Errorf("%w: no records found for batch header hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+		return nil, nil, fmt.Errorf("%w: no records found for batch header hash %x", ErrMetadataNotFound, batchHeaderHash)
 	}
 
 	var header *corev2.BatchHeader
@@ -1326,11 +1324,11 @@ func (s *BlobMetadataStore) GetSignedBatch(ctx context.Context, batchHeaderHash 
 	}
 
 	if header == nil {
-		return nil, nil, fmt.Errorf("%w: batch header not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+		return nil, nil, fmt.Errorf("%w: batch header not found for hash %x", ErrMetadataNotFound, batchHeaderHash)
 	}
 
 	if attestation == nil {
-		return nil, nil, fmt.Errorf("%w: attestation not found for hash %x", common.ErrMetadataNotFound, batchHeaderHash)
+		return nil, nil, fmt.Errorf("%w: attestation not found for hash %x", ErrMetadataNotFound, batchHeaderHash)
 	}
 
 	return header, attestation, nil
