@@ -208,7 +208,6 @@ func TestV2StoreChunksSuccess(t *testing.T) {
 
 	c.validator.On("ValidateBlobs", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	c.validator.On("ValidateBatchHeader", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(false)
 	bundles00Bytes, err := bundles[0][0].Serialize()
 	require.NoError(t, err)
 	bundles01Bytes, err := bundles[0][1].Serialize()
@@ -235,6 +234,8 @@ func TestV2StoreChunksSuccess(t *testing.T) {
 		require.Equal(t, blobKeys[1], requests[0].BlobKey)
 		require.Equal(t, blobKeys[1], requests[1].BlobKey)
 	})
+	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(false)
+	c.blacklistStore.On("GetByDisperserID", mock.Anything, mock.Anything).Return(nil, nil)
 	c.store.On("StoreBatch", mock.Anything, mock.Anything).Return(nil, nil)
 	reply, err := c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
 		DisperserID: 0,
@@ -261,6 +262,7 @@ func TestV2StoreChunksDownloadFailure(t *testing.T) {
 	batchProto, err := batch.ToProtobuf()
 	require.NoError(t, err)
 	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(false)
+	c.blacklistStore.On("GetByDisperserID", mock.Anything, mock.Anything).Return(nil, nil)
 	c.validator.On("ValidateBlobs", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	c.validator.On("ValidateBatchHeader", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	relayErr := errors.New("error")
@@ -286,7 +288,8 @@ func TestV2StoreChunksStorageFailure(t *testing.T) {
 
 	c.validator.On("ValidateBlobs", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	c.validator.On("ValidateBatchHeader", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
+	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(false)
+	c.blacklistStore.On("GetByDisperserID", mock.Anything, mock.Anything).Return(nil, nil)
 	bundles00Bytes, err := bundles[0][0].Serialize()
 	require.NoError(t, err)
 	bundles01Bytes, err := bundles[0][1].Serialize()
@@ -336,7 +339,8 @@ func TestV2StoreChunksLittDBValidationFailure(t *testing.T) {
 		errors.New("error"))
 	c.validator.On("ValidateBatchHeader", mock.Anything, mock.Anything, mock.Anything).Return(
 		nil)
-
+	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(false)
+	c.blacklistStore.On("GetByDisperserID", mock.Anything, mock.Anything).Return(nil, nil)
 	bundles00Bytes, err := bundles[0][0].Serialize()
 	require.NoError(t, err)
 	bundles01Bytes, err := bundles[0][1].Serialize()
@@ -389,7 +393,8 @@ func TestV2StoreChunksLevelDBValidationFailure(t *testing.T) {
 		errors.New("error"))
 	c.validator.On("ValidateBatchHeader", mock.Anything, mock.Anything, mock.Anything).Return(
 		nil)
-
+	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(false)
+	c.blacklistStore.On("GetByDisperserID", mock.Anything, mock.Anything).Return(nil, nil)
 	bundles00Bytes, err := bundles[0][0].Serialize()
 	require.NoError(t, err)
 	bundles01Bytes, err := bundles[0][1].Serialize()
