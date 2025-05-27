@@ -2,9 +2,6 @@
 pragma solidity =0.8.12;
 
 import {EigenDACertVerifier} from "src/periphery/cert/EigenDACertVerifier.sol";
-import {RegistryCoordinator} from "lib/eigenlayer-middleware/src/RegistryCoordinator.sol";
-import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
-import {OperatorStateRetriever} from "lib/eigenlayer-middleware/src/OperatorStateRetriever.sol";
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {IEigenDAServiceManager} from "src/core/interfaces/IEigenDAServiceManager.sol";
 import {EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
@@ -24,9 +21,6 @@ contract CertVerifierDeployerV2 is Script, Test {
 
     address eigenDAServiceManager;
     address eigenDAThresholdRegistry;
-    address eigenDARelayRegistry;
-    address registryCoordinator;
-    address operatorStateRetriever;
 
     DATypesV1.SecurityThresholds defaultSecurityThresholds;
     bytes quorumNumbersRequired;
@@ -40,9 +34,6 @@ contract CertVerifierDeployerV2 is Script, Test {
 
         raw = stdJson.parseRaw(data, ".eigenDAThresholdRegistry");
         eigenDAThresholdRegistry = abi.decode(raw, (address));
-
-        raw = stdJson.parseRaw(data, ".eigenDARelayRegistry");
-        eigenDARelayRegistry = abi.decode(raw, (address));
 
         raw = stdJson.parseRaw(data, ".defaultSecurityThresholds");
         defaultSecurityThresholds = abi.decode(raw, (DATypesV1.SecurityThresholds));

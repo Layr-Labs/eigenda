@@ -162,10 +162,23 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		"batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]),
 		"numBlobs", len(batch.BlobCertificates),
 		"referenceBlockNumber", batch.BatchHeader.ReferenceBlockNumber)
-	operatorState, err := s.node.ChainState.GetOperatorStateByOperator(
+
+	quorums := make(map[core.QuorumID]struct{}, len(batch.BlobCertificates))
+	for _, blobCert := range batch.BlobCertificates {
+		for _, quorum := range blobCert.BlobHeader.QuorumNumbers {
+			quorums[quorum] = struct{}{}
+		}
+	}
+
+	quorumList := make([]core.QuorumID, 0, len(quorums))
+	for quorum := range quorums {
+		quorumList = append(quorumList, quorum)
+	}
+
+	operatorState, err := s.node.ChainState.GetOperatorState(
 		ctx,
 		uint(batch.BatchHeader.ReferenceBlockNumber),
-		s.node.Config.ID)
+		quorumList)
 	if err != nil {
 		return nil, api.NewErrorInternal(fmt.Sprintf("failed to get the operator state: %v", err))
 	}
@@ -195,35 +208,31 @@ func (s *ServerV2) validateAndStoreChunks(
 	ctx context.Context,
 	batch *corev2.Batch,
 	blobShards []*corev2.BlobShard,
-	rawBundles []*node.RawBundles,
+	rawBundles []*node.RawBundle,
 	operatorState *core.OperatorState,
 	batchHeaderHash [32]byte,
 	probe *common.SequenceProbe,
 ) error {
 
-	bundleCount := 0
-	for _, bundles := range rawBundles {
-		bundleCount += len(bundles.Bundles)
-	}
-
-	batchData := make([]*node.BundleToStore, 0, bundleCount)
-	for _, bundles := range rawBundles {
-		blobKey, err := bundles.BlobCertificate.BlobHeader.BlobKey()
+	batchData := make([]*node.BundleToStore, 0, len(rawBundles))
+	for _, bundle := range rawBundles {
+		blobKey, err := bundle.BlobCertificate.BlobHeader.BlobKey()
 		if err != nil {
 			return api.NewErrorInternal("failed to get blob key")
 		}
 
-		for quorum, bundle := range bundles.Bundles {
-			bundleKey, err := node.BundleKey(blobKey, quorum)
-			if err != nil {
-				return api.NewErrorInternal("failed to get bundle key")
-			}
+		// The current sampling scheme will store the same chunks for all quorums, so we always use quorum 0 as the quorum key in storage.
+		quorum := core.QuorumID(0)
 
-			batchData = append(batchData, &node.BundleToStore{
-				BundleKey:   bundleKey,
-				BundleBytes: bundle,
-			})
+		bundleKey, err := node.BundleKey(blobKey, quorum)
+		if err != nil {
+			return api.NewErrorInternal("failed to get bundle key")
 		}
+
+		batchData = append(batchData, &node.BundleToStore{
+			BundleKey:   bundleKey,
+			BundleBytes: bundle.Bundle,
+		})
 	}
 
 	return s.validateAndStoreChunksLittDB(
@@ -300,7 +309,9 @@ func (s *ServerV2) GetChunks(ctx context.Context, in *pb.GetChunksRequest) (*pb.
 	if corev2.MaxQuorumID < in.GetQuorumId() {
 		return nil, api.NewErrorInvalidArg("invalid quorum ID")
 	}
-	quorumID := core.QuorumID(in.GetQuorumId())
+
+	// The current sampling scheme will store the same chunks for all quorums, so we always use quorum 0 as the quorum key in storage.
+	quorumID := core.QuorumID(0)
 
 	bundleKey, err := node.BundleKey(blobKey, quorumID)
 	if err != nil {

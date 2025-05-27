@@ -8,6 +8,12 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Deploy to the github-pages environment
+    # see https://github.com/actions/deploy-pages?tab=readme-ov-file#usage
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     permissions:
       contents: write  # To push a branch 
       pages: write  # To push to a GitHub Pages site

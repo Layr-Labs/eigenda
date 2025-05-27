@@ -17,7 +17,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
@@ -533,16 +532,18 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relays: %w", err)
 	}
+	
 
+	blobHeader, err := coretypes.BlobHeaderBindingToInternal(&eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader)
+	if err != nil {
+		return fmt.Errorf("failed to bind blob header: %w", err)
+	}
 
 	// read blob from ALL quorums
 	err = c.ReadBlobFromValidators(
 		ctx,
-		*blobKey,
-		eigenDACert.BlobVersion(),
-		*commitment,
-		eigenDACert.QuorumNumbers(),
-		uint32(eigenDACert.ReferenceBlockNumber()),
+		blobHeader,
+		eigenDACert.BatchHeader.ReferenceBlockNumber,
 		payload,
 		0,
 		true)
@@ -641,42 +642,7 @@ func (c *TestClient) ReadBlobFromRelay(
 // The timeout provided is a timeout for each read from a quorum, not all reads as a whole.
 func (c *TestClient) ReadBlobFromValidators(
 	ctx context.Context,
-	blobKey corev2.BlobKey,
-	blobVersion corev2.BlobVersion,
-	blobCommitments encoding.BlobCommitments,
-	quorums []core.QuorumID,
-	referenceBlockNumber uint32,
-	expectedPayloadBytes []byte,
-	timeout time.Duration,
-	validateAndDecode bool) error {
-
-	for _, quorumID := range quorums {
-		err := c.ReadBlobFromValidatorsInQuorum(
-			ctx,
-			blobKey,
-			blobVersion,
-			blobCommitments,
-			quorumID,
-			referenceBlockNumber,
-			expectedPayloadBytes,
-			timeout,
-			validateAndDecode)
-		if err != nil {
-			return fmt.Errorf("failed to read blob from validators in quorum %d: %w", quorumID, err)
-		}
-	}
-
-	return nil
-}
-
-// ReadBlobFromValidatorsInQuorum reads a blob from the validators in a specific quorum and compares it to
-// the given payload.
-func (c *TestClient) ReadBlobFromValidatorsInQuorum(
-	ctx context.Context,
-	blobKey corev2.BlobKey,
-	blobVersion corev2.BlobVersion,
-	blobCommitments encoding.BlobCommitments,
-	quorumID core.QuorumID,
+	header *corev2.BlobHeaderWithHashedPayment,
 	referenceBlockNumber uint32,
 	expectedPayloadBytes []byte,
 	timeout time.Duration,
@@ -689,22 +655,22 @@ func (c *TestClient) ReadBlobFromValidatorsInQuorum(
 	}
 
 	if validateAndDecode {
+
 		start := time.Now()
 
 		retrievedBlobBytes, err := c.validatorClient.GetBlob(
 			ctx,
-			blobKey,
-			blobVersion,
-			blobCommitments,
-			uint64(referenceBlockNumber),
-			quorumID)
+			header,
+			uint64(referenceBlockNumber))
 		if err != nil {
 			return fmt.Errorf("failed to read blob from validators, %s", err)
 		}
 
+		// Since retrieval is now agnostic to quorum ID, we default quorumID parameters to zero.
+		quorumID := core.QuorumID(0)
 		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
 
-		blobLengthSymbols := uint32(blobCommitments.Length)
+		blobLengthSymbols := uint32(header.BlobCommitments.Length)
 		blob, err := coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
 		if err != nil {
 			return fmt.Errorf("failed to deserialize blob: %w", err)
@@ -725,11 +691,8 @@ func (c *TestClient) ReadBlobFromValidatorsInQuorum(
 
 		_, err := c.onlyDownloadValidatorClient.GetBlob(
 			ctx,
-			blobKey,
-			blobVersion,
-			blobCommitments,
-			uint64(referenceBlockNumber),
-			quorumID)
+			header,
+			uint64(referenceBlockNumber))
 		if err != nil {
 			return fmt.Errorf("failed to read blob from validators: %w", err)
 		}

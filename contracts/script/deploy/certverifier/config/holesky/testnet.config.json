@@ -1,10 +1,6 @@
 {
     "eigenDAServiceManager": "0xD4A7E1Bd8015057293f0D0A557088c286942e84b",
     "eigenDAThresholdRegistry": "0x76d131CFBD900dA12f859a363Fb952eEDD1d1Ec1",
-    "eigenDARelayRegistry": "0xaC8C6C7Ee7572975454E2f0b5c720f9E74989254",
-    "registryCoordinator": "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490",
-    "operatorStateRetriever": "0x5322F480c6a14aBA6491974fa0fbF2A925C71B94", 
-
     "defaultSecurityThresholds": {
         "0_confirmationThreshold": 55,
         "1_adversaryThreshold": 33

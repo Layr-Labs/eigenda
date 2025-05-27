@@ -124,14 +124,11 @@ type retrievalWorker struct {
 	// The assignments for the operators, i.e. which operators are responsible for which chunks.
 	assignments map[core.OperatorID]v2.Assignment
 
-	// The quorum to download from.
-	quorumID core.QuorumID
+	// The blob header to download.
+	blobHeader *v2.BlobHeaderWithHashedPayment
 
 	// The blob key to download.
 	blobKey v2.BlobKey
-
-	// The commitments for the blob.
-	blobCommitments *encoding.BlobCommitments
 
 	// When a thread begins downloading chunk data, it will send a message to the downloadStartedChan.
 	downloadStartedChan chan *downloadStarted
@@ -185,6 +182,15 @@ type retrievalWorker struct {
 
 	// Counts the number of chunks in each status.
 	chunkStatusCounts map[chunkStatus]int
+
+	// For the purposes of retrieving this blob, the validator that we have decided to mark as being the "owner".
+	// Although it's possible that a particular chunk might be available from more than one validator, we only
+	// ever attempt to fetch any particular chunk from a single source.
+	// Our assignment scheme allows for chunk indices to be assigned to multiple validators. The retrieval worker
+	// will track only a single status for each chunk index, by assigning each chunk index to a single validator.
+	// When a validator's status is updated, we only update the status for the chunks for which it is the owner.
+	// Redundant chunks may be downloaded and verified by the worker, but they will not count toward status counts.
+	chunkOwner map[uint32]core.OperatorID
 }
 
 // downloadStarted is used to signal that a download of chunk data has been initiated.
@@ -224,12 +230,10 @@ func newRetrievalWorker(
 	chunkDeserializer internal.ChunkDeserializer,
 	blobDecoder internal.BlobDecoder,
 	assignments map[core.OperatorID]v2.Assignment,
-	totalChunkCount uint32,
 	minimumChunkCount uint32,
 	encodingParams *encoding.EncodingParams,
-	quorumID core.QuorumID,
+	blobHeader *v2.BlobHeaderWithHashedPayment,
 	blobKey v2.BlobKey,
-	blobCommitments *encoding.BlobCommitments,
 	probe *common.SequenceProbe,
 ) (*retrievalWorker, error) {
 	if config.DownloadPessimism < 1.0 {
@@ -256,11 +260,21 @@ func newRetrievalWorker(
 	downloadAndVerifyCtx, downloadAndVerifyCancel := context.WithCancel(ctx)
 
 	chunkStatusMap := make(map[core.OperatorID]chunkStatus)
+	chunkOwner := make(map[uint32]core.OperatorID)
 	chunkStatusCounts := make(map[chunkStatus]int)
+
 	for _, opID := range downloadOrder {
+		for _, index := range assignments[opID].Indices {
+			_, ok := chunkOwner[index]
+			if !ok {
+				chunkStatusCounts[available]++
+				chunkOwner[index] = opID
+			}
+		}
 		chunkStatusMap[opID] = available
-		chunkStatusCounts[available] += int(assignments[opID].NumChunks)
 	}
+
+	totalChunkCount := uint32(chunkStatusCounts[available])
 
 	targetDownloadCount := uint32(math.Ceil(float64(minimumChunkCount) * config.DownloadPessimism))
 	targetVerifiedCount := uint32(math.Ceil(float64(minimumChunkCount) * config.VerificationPessimism))
@@ -275,9 +289,8 @@ func newRetrievalWorker(
 		computePool:               computePool,
 		encodingParams:            encodingParams,
 		assignments:               assignments,
-		quorumID:                  quorumID,
+		blobHeader:                blobHeader,
 		blobKey:                   blobKey,
-		blobCommitments:           blobCommitments,
 		downloadStartedChan:       make(chan *downloadStarted, len(assignments)),
 		downloadCompletedChan:     make(chan *downloadCompleted, len(assignments)),
 		verificationCompletedChan: make(chan *verificationCompleted, len(assignments)),
@@ -291,6 +304,7 @@ func newRetrievalWorker(
 		totalChunkCount:           totalChunkCount,
 		chunkStatusMap:            chunkStatusMap,
 		chunkStatusCounts:         chunkStatusCounts,
+		chunkOwner:                chunkOwner,
 		targetDownloadCount:       targetDownloadCount,
 		targetVerifiedCount:       targetVerifiedCount,
 		validatorGRPCManager:      validatorGRPCManager,
@@ -304,14 +318,29 @@ func newRetrievalWorker(
 // updateChunkStatus updates the status of a chunk from a given operator. It also updates the
 // counts of the various chunk statuses.
 func (w *retrievalWorker) updateChunkStatus(operatorID core.OperatorID, status chunkStatus) {
-	operatorChunks := w.assignments[operatorID].NumChunks
 
 	oldStatus, ok := w.chunkStatusMap[operatorID]
-	if ok {
-		w.chunkStatusCounts[oldStatus] -= int(operatorChunks)
-	}
 	w.chunkStatusMap[operatorID] = status
-	w.chunkStatusCounts[status] += int(operatorChunks)
+
+	numChunks := 0
+	for _, index := range w.assignments[operatorID].Indices {
+		_, ok := w.chunkOwner[index]
+		// If the new status is verified and the oldStatus is anything else, we move the chunk to the current operator
+		// as a new owner.
+		// TODO(@cody-littley): When setting a chunk to failed, if there is any other validator assigned to the chunk with a non-failed status,
+		// we should shift ownership to that validator.
+		if !ok || (status == verified && oldStatus != verified) {
+			w.chunkOwner[index] = operatorID
+		}
+		if w.chunkOwner[index] == operatorID {
+			numChunks++
+		}
+	}
+
+	if ok {
+		w.chunkStatusCounts[oldStatus] -= numChunks
+	}
+	w.chunkStatusCounts[status] += numChunks
 }
 
 // getChunkStatus returns the status of a chunk from a given operator.
@@ -321,6 +350,7 @@ func (w *retrievalWorker) getChunkStatus(operatorID core.OperatorID) chunkStatus
 
 // getStatusCount returns the number of chunks with one of the given statuses.
 func (w *retrievalWorker) getStatusCount(statuses ...chunkStatus) uint32 {
+
 	total := 0
 	for _, status := range statuses {
 		if count, ok := w.chunkStatusCounts[status]; ok {
@@ -552,7 +582,7 @@ func (w *retrievalWorker) downloadChunks(operatorID core.OperatorID) {
 	ctx, cancel := context.WithTimeout(w.downloadAndVerifyCtx, w.config.DownloadTimeout)
 	defer cancel()
 
-	reply, err := w.validatorGRPCManager.DownloadChunks(ctx, w.blobKey, operatorID, w.quorumID)
+	reply, err := w.validatorGRPCManager.DownloadChunks(ctx, w.blobKey, operatorID)
 
 	w.downloadCompletedChan <- &downloadCompleted{
 		operatorID: operatorID,
@@ -582,7 +612,7 @@ func (w *retrievalWorker) deserializeAndVerifyChunks(
 		w.blobKey,
 		operatorID,
 		getChunksReply,
-		w.blobCommitments,
+		&w.blobHeader.BlobCommitments,
 		w.encodingParams)
 
 	w.verificationCompletedChan <- &verificationCompleted{
@@ -598,7 +628,7 @@ func (w *retrievalWorker) decodeBlob(chunks []*encoding.Frame, indices []uint) {
 		w.logger.Debug("decoding blob", "blobKey", w.blobKey.Hex())
 	}
 
-	blob, err := w.blobDecoder.DecodeBlob(w.blobKey, chunks, indices, w.encodingParams, w.blobCommitments)
+	blob, err := w.blobDecoder.DecodeBlob(w.blobKey, chunks, indices, w.encodingParams, &w.blobHeader.BlobCommitments)
 
 	w.decodeResponseChan <- &decodeCompleted{
 		blob: blob,
