@@ -1,63 +1,82 @@
 package benchmark
 
-//func TestTrackerDeterminism(t *testing.T) {
-//	rand := random.NewTestRandom()
-//	directory := t.TempDir()
-//
-//	config := DefaultBenchmarkConfig()
-//	config.RandomPoolSize = units.MiB
-//	config.CohortSize = rand.Uint64Range(10, 20)
-//	config.MetadataDirectory = directory
-//	config.Seed = rand.Int63()
-//	config.ValueSizeMB = 1.0 / 1024 // 1kb
-//
-//	// Generate enough data to fill 10ish cohorts.
-//	keyCount := 10*config.CohortSize + rand.Uint64Range(0, 10)
-//
-//	dataTracker, err := NewDataTracker(context.Background(), config)
-//	require.NoError(t, err)
-//
-//	// map from indices to keys
-//	expectedKeys := make(map[uint64][]byte)
-//
-//	// map from indices to values
-//	expectedValues := make(map[uint64][]byte)
-//
-//	// Get a bunch of values.
-//	for i := uint64(0); i < keyCount; i++ {
-//		writeInfo := dataTracker.GetWriteInfo()
-//		require.Equal(t, i, writeInfo.Index)
-//		require.Equal(t, 32, len(writeInfo.Key))
-//		require.Equal(t, units.KiB, len(writeInfo.Value))
-//
-//		expectedKeys[i] = writeInfo.Key
-//		expectedValues[i] = writeInfo.Value
+import (
+	"context"
+	"os"
+	"testing"
+
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/docker/go-units"
+	"github.com/stretchr/testify/require"
+)
+
+func TestTrackerDeterminism(t *testing.T) {
+	rand := random.NewTestRandom()
+	directory := t.TempDir()
+
+	config := DefaultBenchmarkConfig()
+	config.RandomPoolSize = units.MiB
+	config.CohortSize = rand.Uint64Range(10, 20)
+	config.MetadataDirectory = directory
+	config.Seed = rand.Int63()
+	config.ValueSizeMB = 1.0 / 1024 // 1kb
+	config.TTLHours = 1
+
+	// Generate enough data to fill 10ish cohorts.
+	keyCount := 10*config.CohortSize + rand.Uint64Range(0, 10)
+
+	dataTracker, err := NewDataTracker(context.Background(), config)
+	require.NoError(t, err)
+
+	// map from indices to keys
+	expectedKeys := make(map[uint64][]byte)
+
+	// map from indices to values
+	expectedValues := make(map[uint64][]byte)
+
+	// Get a bunch of values.
+	for i := uint64(0); i < keyCount; i++ {
+		writeInfo := dataTracker.GetWriteInfo()
+		require.Equal(t, i, writeInfo.Index)
+		require.Equal(t, 32, len(writeInfo.Key))
+		require.Equal(t, units.KiB, len(writeInfo.Value))
+
+		expectedKeys[i] = writeInfo.Key
+		expectedValues[i] = writeInfo.Value
+	}
+
+	dataTracker.Close()
+
+	// Rebuild the tracker at genesis. We should get the same sequence of keys and values.
+	err = os.RemoveAll(directory)
+	require.NoError(t, err)
+	err = os.MkdirAll(directory, os.ModePerm)
+	require.NoError(t, err)
+
+	dataTracker, err = NewDataTracker(context.Background(), config)
+	require.NoError(t, err)
+
+	for i := uint64(0); i < keyCount; i++ {
+		writeInfo := dataTracker.GetWriteInfo()
+		require.Equal(t, i, writeInfo.Index)
+		require.Equal(t, 32, len(writeInfo.Key))
+		require.Equal(t, units.KiB, len(writeInfo.Value))
+		require.Equal(t, expectedKeys[i], writeInfo.Key)
+		require.Equal(t, expectedValues[i], writeInfo.Value)
+	}
+
+	dataTracker.Close()
+
+	err = os.RemoveAll(directory)
+	require.NoError(t, err)
+}
+
+//func Test(t *testing.T) {
+//	for i := 0; i < 100; i++ {
+//		t.Run(fmt.Sprintf("TrackerDeterminism-%d", i), TestTrackerDeterminism)
+//		// t.Run("TrackerRestart", TestTrackerRestart)
+//		// t.Run("TrackReads", TestTrackReads)
 //	}
-//
-//	dataTracker.Close()
-//
-//	// Rebuild the tracker at genesis. We should get the same sequence of keys and values.
-//	err = os.RemoveAll(directory)
-//	require.NoError(t, err)
-//	err = os.MkdirAll(directory, os.ModePerm)
-//	require.NoError(t, err)
-//
-//	dataTracker, err = NewDataTracker(context.Background(), config)
-//	require.NoError(t, err)
-//
-//	for i := uint64(0); i < keyCount; i++ {
-//		writeInfo := dataTracker.GetWriteInfo()
-//		require.Equal(t, i, writeInfo.Index)
-//		require.Equal(t, 32, len(writeInfo.Key))
-//		require.Equal(t, units.KiB, len(writeInfo.Value))
-//		require.Equal(t, expectedKeys[i], writeInfo.Key)
-//		require.Equal(t, expectedValues[i], writeInfo.Value)
-//	}
-//
-//	dataTracker.Close()
-//
-//	err = os.RemoveAll(directory)
-//	require.NoError(t, err)
 //}
 
 //func TestTrackerRestart(t *testing.T) {

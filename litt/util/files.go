@@ -9,6 +9,66 @@ import (
 	"time"
 )
 
+// SwapFileExtension is the file extension used for temporary swap files created during atomic writes.
+const SwapFileExtension = ".swap"
+
+// AtomicWrite writes data to a file atomically. The parent directory must exist and be writable.
+// If the destination file already exists, it will be overwritten.
+//
+// This method creates a temporary swap file in the same directory as the destination, but with SwapFileExtension
+// appended to the filename. If there is a crash during this method's execution, it may leave this swap file behind.
+func AtomicWrite(destination string, data []byte) error { // TODO test
+
+	swapPath := destination + ".swap"
+	parentDirectory := filepath.Dir(destination)
+
+	// Write the data into the swap file.
+	swapFile, err := os.Create(swapPath)
+	if err != nil {
+		return fmt.Errorf("failed to create swap file: %w", err)
+	}
+
+	_, err = swapFile.Write(data)
+	if err != nil {
+		return fmt.Errorf("failed to write to swap file: %w", err)
+	}
+
+	// Ensure the data in the swap file is fully written to disk.
+	err = swapFile.Sync()
+	if err != nil {
+		return fmt.Errorf("failed to sync swap file: %w", err)
+	}
+
+	err = swapFile.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close swap file: %w", err)
+	}
+
+	// Rename the swap file to the destination file.
+	err = os.Rename(swapPath, destination)
+	if err != nil {
+		return fmt.Errorf("failed to rename swap file: %w", err)
+	}
+
+	// Ensure that the rename is committed to disk.
+	dirFile, err := os.Open(parentDirectory)
+	if err != nil {
+		return fmt.Errorf("failed to open parent directory %s: %w", parentDirectory, err)
+	}
+
+	err = dirFile.Sync()
+	if err != nil {
+		return fmt.Errorf("failed to sync parent directory %s: %w", parentDirectory, err)
+	}
+
+	err = dirFile.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close parent directory %s: %w", parentDirectory, err)
+	}
+
+	return nil
+}
+
 // VerifyFileProperties checks if a file has read/write permissions and is a regular file (if it exists),
 // returning an error if it does not if the file permissions or file type is not as expected.
 // Also returns a boolean indicating if the file exists and its size (to save on additional os.Stat calls).

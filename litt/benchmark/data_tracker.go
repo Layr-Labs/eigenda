@@ -92,6 +92,10 @@ type DataTracker struct {
 
 	// The size of the values in bytes for new cohorts.
 	valueSize uint64
+
+	// This channel has capacity one and initially has one value in it. This value is drained when the DataTracker is
+	// fully stopped. Other threads can use this to block until the DataTracker is fully stopped.
+	closedChan chan struct{}
 }
 
 // NewDataTracker creates a new DataTracker instance, loading all relevant cohorts from disk.
@@ -157,6 +161,9 @@ func NewDataTracker(ctx context.Context, config *BenchmarkConfig) (*DataTracker,
 	safetyMargin := time.Duration(config.ReadSafetyMarginMinutes * float64(time.Minute))
 	safeTTL := ttl - safetyMargin
 
+	closedChan := make(chan struct{}, 1)
+	closedChan <- struct{}{} // Initially closed, will be drained when the DataTracker is closed.
+
 	ctx, cancel := context.WithCancel(ctx)
 
 	tracker := &DataTracker{
@@ -179,6 +186,7 @@ func NewDataTracker(ctx context.Context, config *BenchmarkConfig) (*DataTracker,
 		safeTTL:                   safeTTL,
 		valueSize:                 valueSize,
 		generator:                 NewDataGenerator(config.Seed, config.RandomPoolSize),
+		closedChan:                closedChan,
 	}
 
 	go tracker.dataGenerator()
@@ -298,12 +306,17 @@ func (t *DataTracker) GetReadInfoWithTimeout(timeout time.Duration) *ReadInfo {
 // Close stops the key manager's background tasks.
 func (t *DataTracker) Close() {
 	t.cancel()
+	t.closedChan <- struct{}{}
+	<-t.closedChan
 }
 
 // dataGenerator is responsible for generating data in the background.
 func (t *DataTracker) dataGenerator() {
 	ticker := time.NewTicker(time.Duration(t.config.CohortGCPeriodSeconds * float64(time.Second)))
-	defer ticker.Stop()
+	defer func() {
+		ticker.Stop()
+		<-t.closedChan
+	}()
 
 	nextWriteInfo := t.generateNextWriteInfo()
 	nextReadInfo := t.generateNextReadInfo()

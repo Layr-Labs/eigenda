@@ -18,7 +18,7 @@ import (
 const CohortFileExtension = ".cohort"
 
 // CohortSwapFileExtension is the file extension used for cohort swap files. Used to atomically update cohort files.
-const CohortSwapFileExtension = ".cohort.swap"
+const CohortSwapFileExtension = CohortFileExtension + util.SwapFileExtension
 
 /* The lifecycle of a cohort:
 
@@ -275,33 +275,9 @@ func (c *Cohort) Path(swap bool) string {
 }
 
 func (c *Cohort) Write() error {
-	swapPath := c.Path(true)
-	targetPath := c.Path(false)
-
-	swapFile, err := os.Create(swapPath)
+	err := util.AtomicWrite(c.Path(false), c.serialize())
 	if err != nil {
-		return fmt.Errorf("failed to create swap file: %w", err)
-	}
-
-	bytes := c.serialize()
-	_, err = swapFile.Write(bytes)
-	if err != nil {
-		return fmt.Errorf("failed to write to swap file: %w", err)
-	}
-
-	err = swapFile.Sync()
-	if err != nil {
-		return fmt.Errorf("failed to sync swap file: %w", err)
-	}
-
-	err = swapFile.Close()
-	if err != nil {
-		return fmt.Errorf("failed to close swap file: %w", err)
-	}
-
-	err = os.Rename(swapPath, targetPath)
-	if err != nil {
-		return fmt.Errorf("failed to rename swap file: %w", err)
+		return fmt.Errorf("failed to write cohort file: %w", err)
 	}
 
 	return nil
