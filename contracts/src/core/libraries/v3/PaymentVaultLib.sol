@@ -106,7 +106,7 @@ library PaymentVaultLib {
         require(reservation.symbolsPerSecond >= currentReservation.symbolsPerSecond, "Invalid symbols per second");
 
         if (reservation.symbolsPerSecond > currentReservation.symbolsPerSecond) {
-            // increase reservation symbols before a reservation time increase, if any
+            // increase reservation symbols for the current reservation time.
             increaseReservedSymbols(
                 quorumId,
                 currentReservation.startTimestamp,
@@ -116,7 +116,7 @@ library PaymentVaultLib {
             );
         }
         if (reservation.endTimestamp > currentReservation.endTimestamp) {
-            // increase reservation time
+            // increase reservation time with new symbols per second
             increaseReservedSymbols(
                 quorumId,
                 currentReservation.endTimestamp,
@@ -157,7 +157,7 @@ library PaymentVaultLib {
             );
         }
         if (reservation.symbolsPerSecond < currentReservation.symbolsPerSecond) {
-            // decrease reservation symbols before a reservation time decrease, if any
+            // decrease reservation symbols for the remaining reservation time
             decreaseReservedSymbols(
                 quorumId,
                 currentReservation.startTimestamp,
