@@ -7,6 +7,7 @@ import (
 	contractEigenDACertVerifierV2 "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
 	certTypesBinding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 	coreV2 "github.com/Layr-Labs/eigenda/core/v2"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -92,15 +93,7 @@ const (
 )
 
 type EigenDACert interface {
-	BlobVersion()coreV2.BlobVersion
-	RelayKeys() []coreV2.RelayKey
 	Version() CertificateVersion
-	ReferenceBlockNumber() uint64
-	QuorumNumbers() []byte
-
-	ComputeBlobKey() (*coreV2.BlobKey, error)
-	Commitments() (*encoding.BlobCommitments, error)
-	Serialize(CertSerializationType) ([]byte, error)
 }
 
 var _ EigenDACert = &EigenDACertV2{}
@@ -109,6 +102,7 @@ var _ EigenDACert = &EigenDACertV3{}
 
 // This struct represents the composition of a EigenDA V3 certificate, as it would exist in a rollup inbox.
 type EigenDACertV3 certTypesBinding.EigenDACertTypesEigenDACertV3
+
 
 // BuildEigenDACertV3 creates a new EigenDACertV3 from a BlobStatusReply, and NonSignerStakesAndSignature
 func BuildEigenDACertV3(
@@ -184,6 +178,23 @@ func (c *EigenDACertV3) ComputeBlobKey() (*coreV2.BlobKey, error) {
 		return nil, fmt.Errorf("bytes to blob key: %w", err)
 	}
 	return &blobKey, nil
+}
+
+func (c *EigenDACertV3) BlobHeader() (*corev2.BlobHeaderWithHashedPayment, error) {
+
+	commitments, err := c.Commitments()
+	if err != nil {
+		return nil, fmt.Errorf("get commitments: %w", err)
+	}
+
+	blobHeader := &corev2.BlobHeaderWithHashedPayment{
+		BlobVersion: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version,
+		BlobCommitments: *commitments,
+		QuorumNumbers: c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+		PaymentMetadataHash: c.BlobInclusionInfo.BlobCertificate.BlobHeader.PaymentHeaderHash,
+	}
+
+	return blobHeader, nil
 }
 
 func (c *EigenDACertV3) Serialize(ct CertSerializationType) ([]byte, error) {

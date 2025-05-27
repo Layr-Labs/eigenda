@@ -489,13 +489,18 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 	}
 	c.metrics.reportCertificationTime(time.Since(start))
 
-	blobKey, err := eigenDACert.ComputeBlobKey()
+	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
+	if !ok {
+		return fmt.Errorf("expected EigenDACertV3, got %T", eigenDACert)
+	}
+
+	blobKey, err := eigenDAV3Cert.ComputeBlobKey()
 	if err != nil {
 		return fmt.Errorf("failed to compute blob key: %w", err)
 	}
 
 	// read blob from a single relay (assuming success, otherwise will retry)
-	payloadFromRelayRetriever, err := c.relayPayloadRetriever.GetPayload(ctx, eigenDACert)
+	payloadFromRelayRetriever, err := c.relayPayloadRetriever.GetPayload(ctx, eigenDAV3Cert)
 	if err != nil {
 		return fmt.Errorf("failed to get payload from relay: %w", err)
 	}
@@ -505,7 +510,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 	}
 
 	// read blob from a single quorum (assuming success, otherwise will retry)
-	payloadFromValidatorRetriever, err := c.validatorPayloadRetriever.GetPayload(ctx, eigenDACert)
+	payloadFromValidatorRetriever, err := c.validatorPayloadRetriever.GetPayload(ctx, eigenDAV3Cert)
 	if err != nil {
 		return fmt.Errorf("failed to get payload from validators: %w", err)
 	}
@@ -514,7 +519,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		return fmt.Errorf("payloads do not match")
 	}
 
-	commitment, err := eigenDACert.Commitments()
+	commitment, err := eigenDAV3Cert.Commitments()
 	if err != nil {
 		return fmt.Errorf("failed to parse blob commitments: %w", err)
 	}
@@ -525,7 +530,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 	err = c.ReadBlobFromRelays(
 		ctx,
 		*blobKey,
-		eigenDACert.RelayKeys(),
+		eigenDAV3Cert.RelayKeys(),
 		payload,
 		uint32(blobLengthSymbols),
 		0)
@@ -533,17 +538,16 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		return fmt.Errorf("failed to read blob from relays: %w", err)
 	}
 	
-
-	blobHeader, err := coretypes.BlobHeaderBindingToInternal(&eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader)
+	blobHeader, err := eigenDAV3Cert.BlobHeader()
 	if err != nil {
-		return fmt.Errorf("failed to bind blob header: %w", err)
+		return fmt.Errorf("failed to get blob header from cert: %w", err)
 	}
 
 	// read blob from ALL quorums
 	err = c.ReadBlobFromValidators(
 		ctx,
 		blobHeader,
-		eigenDACert.BatchHeader.ReferenceBlockNumber,
+		eigenDAV3Cert.BatchHeader.ReferenceBlockNumber,
 		payload,
 		0,
 		true)

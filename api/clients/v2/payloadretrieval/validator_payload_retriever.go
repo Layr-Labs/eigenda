@@ -52,17 +52,17 @@ func NewValidatorPayloadRetriever(
 // payload is returned.
 func (pr *ValidatorPayloadRetriever) GetPayload(
 	ctx context.Context,
-	eigenDACert coretypes.EigenDACertV3,
+	eigenDACert *coretypes.EigenDACertV3,
 ) (*coretypes.Payload, error) {
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	if err != nil {
-		return nil, fmt.Errorf("compute blob key: %w", err)
+		return nil, fmt.Errorf("get blob key: %w", err)
 	}
 
-	blobHeader, err := coretypes.BlobHeaderBindingToInternal(&eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader)
+	blobHeader, err := eigenDACert.BlobHeader()
 	if err != nil {
-		return nil, fmt.Errorf("convert blob header binding to internal: %w", err)
+		return nil, fmt.Errorf("get blob header: %w", err)
 	}
 
 	// TODO (litt3): Add a feature which keeps chunks from previous quorums, and just fills in gaps

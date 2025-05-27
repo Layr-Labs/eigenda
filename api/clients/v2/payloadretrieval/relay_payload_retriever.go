@@ -65,7 +65,7 @@ func NewRelayPayloadRetriever(
 // verified prior to calling this method.
 func (pr *RelayPayloadRetriever) GetPayload(
 	ctx context.Context,
-	eigenDACert coretypes.EigenDACert) (*coretypes.Payload, error) {
+	eigenDACert *coretypes.EigenDACertV3) (*coretypes.Payload, error) {
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	if err != nil {

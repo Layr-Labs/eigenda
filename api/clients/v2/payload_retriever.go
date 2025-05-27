@@ -12,5 +12,5 @@ import (
 // bucket instead of from EigenDA relays or nodes.
 type PayloadRetriever interface {
 	// GetPayload retrieves a payload from some backend, using the provided certificate
-	GetPayload(ctx context.Context, eigenDACert coretypes.EigenDACert) (*coretypes.Payload, error)
+	GetPayload(ctx context.Context, eigenDACert *coretypes.EigenDACertV3) (*coretypes.Payload, error)
 }

@@ -52,19 +52,46 @@ func (cv *CertVerifier) CheckDACert(
 	ctx context.Context,
 	cert coretypes.EigenDACert,
 ) error {
-	// 1 - Get verifier caller for the block number
-	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, cert.ReferenceBlockNumber())
-	if err != nil {
-		return fmt.Errorf("get verifier caller: %w", err)
+	// 1 - switch on the certificate version to determine which underlying type to decode into
+	//     and which contract to call
+
+	var certVerifierCaller *certVerifierBinding.ContractEigenDACertVerifier
+	var certBytes []byte
+	var err error
+	switch cert.Version() {
+	case coretypes.VersionThreeCert:
+		certV3, ok := cert.(*coretypes.EigenDACertV3)
+		if !ok {
+			return fmt.Errorf("expected cert to be of type EigenDACertV3, got %T", cert)
+		}
+
+		// TODO: Determine adequate future proofing strategy for EigenDACertVerifierRouter to be compliant
+		//       with future reference timestamp change which deprecates the reference block number
+		//       used for quorum stake check-pointing.
+		certVerifierCaller, err = cv.getVerifierCallerFromBlockNumber(ctx, certV3.ReferenceBlockNumber())
+		if err != nil {
+			return fmt.Errorf("get verifier caller: %w", err)
+		}
+
+		certBytes, err = certV3.Serialize(coretypes.CertSerializationABI)
+		if err != nil {
+			return fmt.Errorf("serialize cert: %w", err)
+		}
+	
+	case coretypes.VersionTwoCert:
+		_, ok := cert.(*coretypes.EigenDACertV2)
+		if !ok {
+			return fmt.Errorf("expected cert to be of type EigenDACertV2, got %T", cert)
+		}
+
+		return nil // noop verification. only used on V2 testnets and no mainnets
+
+	default:
+		return fmt.Errorf("unsupported cert version: %d", cert.Version())
+
 	}
 
-	// 2 - Serialize the certificate to ABI bytes
-	certBytes, err := cert.Serialize(coretypes.CertSerializationABI)
-	if err != nil {
-		return fmt.Errorf("serialize cert: %w", err)
-	}
-
-	// 3 - Call the contract method CheckDACert to verify the certificate
+	// 2 - Call the contract method CheckDACert to verify the certificate
 	// TODO: determine if there's any merit in passing call options to impose better determinism and
 	// safety on the operation
 	result, err := certVerifierCaller.CheckDACert(
@@ -75,7 +102,7 @@ func (cv *CertVerifier) CheckDACert(
 		return fmt.Errorf("check da cert: %w", err)
 	}
 
-	// 4 - Cast result to structured enum type and check for success
+	// 3 - Cast result to structured enum type and check for success
 	verifyResultCode := coretypes.VerificationStatusCode(result)
 
 	if verifyResultCode != coretypes.StatusSuccess {
