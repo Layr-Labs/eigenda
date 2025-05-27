@@ -156,7 +156,7 @@ library PaymentVaultLib {
                 schedulePeriod
             );
         }
-        if (reservation.symbolsPerSecond > currentReservation.symbolsPerSecond) {
+        if (reservation.symbolsPerSecond < currentReservation.symbolsPerSecond) {
             // decrease reservation symbols after a reservation time decrease, if any
             decreaseReservedSymbols(
                 quorumId,
