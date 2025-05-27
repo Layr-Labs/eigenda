@@ -201,9 +201,9 @@ EigenDANetwork values include %s, %s, & %s.`,
 			Name: RBNRecencyWindowSizeFlagName,
 			Usage: `Allowed distance (in L1 blocks) between the eigenDA cert's reference 
 block number (RBN) and the L1 block number at which the cert was included 
-in the rollup's batch inbox. If certL1InclusionBlock > cert.RBN + rbnRecencyWindowSize, 
-the cert is considered stale and verification will fail. This check is 
-optional and will be skipped when set to 0.`,
+in the rollup's batch inbox. A cert is valid when cert.RBN < certL1InclusionBlock <= cert.RBN + rbnRecencyWindowSize, 
+and otherwise is considered stale and verification will fail, and a 418 HTTP error will be returned.
+This check is optional and will be skipped when set to 0.`,
 			Value:    0,
 			EnvVars:  []string{withEnvPrefix(envPrefix, "RBN_RECENCY_WINDOW_SIZE")},
 			Category: category,

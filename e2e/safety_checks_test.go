@@ -66,7 +66,7 @@ func testOpClientKeccak256MalformedInputs(t *testing.T, dispersalBackend common.
 
 			// The below test panics silently.
 			input := altda.NewGenericCommitment([]byte(""))
-			_, err = daClientPcFalse.GetInput(ts.Ctx, input)
+			_, err = daClientPcFalse.GetInput(ts.Ctx, input, 0)
 			require.Error(t, err)
 
 			// Should not fail on slice bounds out of range. This needs to be fixed by OP.

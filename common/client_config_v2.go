@@ -40,8 +40,8 @@ type ClientConfigV2 struct {
 
 	// Allowed distance (in L1 blocks) between the eigenDA cert's reference block number (RBN)
 	// and the L1 block number at which the cert was included in the rollup's batch inbox.
-	// If cert.RBN + RBNRecencyWindowSize < cert.L1InclusionBlock, the cert is considered
-	// stale and should be discarded from rollups' derivation pipeline.
+	// A cert is valid if cert.L1InclusionBlock <= cert.RBN + RBNRecencyWindowSize, otherwise it
+	// is considered stale and should be discarded from rollups' derivation pipeline.
 	// See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html#1-rbn-recency-validation
 	//
 	// This check is optional and will be skipped when RBNRecencyWindowSize is set to 0.

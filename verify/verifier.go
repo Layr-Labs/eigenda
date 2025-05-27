@@ -25,8 +25,7 @@ const (
 type Config struct {
 	// Cert verification is optional, and verifies certs retrieved from eigenDA when turned on.
 	// It is optional because it requires making calls to the blockchain, which is not necessarily always possible.
-	// For eg, some rollups are running on sepolia testnet which doesn't have an eigenlayer/eigenda contracts
-	// deployment.
+	// One example is if using a settlement chain where eigenlayer/eigenda contracts are not deployed.
 	VerifyCerts bool
 	// below fields are only required if VerifyCerts is true
 	RPCURL               string
@@ -47,12 +46,12 @@ func (c Config) MarshalJSON() ([]byte, error) {
 	return json.Marshal(aux)
 }
 
-// Verifier verifies the integrity of a blob and its certificate. There are 3 main categories of verification:
-//  1. Blob: properties localized to a single blob, most specifically its commitment
-//  2. Cert: properties wrt the EigenDA network: signatures, quorum thresholds, onchain inclusion, etc.
-//  3. RBN Recency: make sure a cert's l1 inclusion block is not too old.
-//     This check is not currently supported for EigenDA V1. We are only building fully secure
-//     integrations on EigenDA V2.
+// Verifier verifies the integrity of certs and their blobs. There are 3 main categories of verification:
+//  1. Cert: properties wrt the EigenDA network: signatures, quorum thresholds, onchain inclusion, etc.
+//  2. Blob: properties localized to a single blob, most specifically its commitment
+//  3. RBN Recency: make sure a cert's RBN is not too old wrt its l1 inclusion block number.
+//     This check is NOT supported for EigenDA V1. We are only building fully secure
+//     integrations on EigenDA V2. See https://layr-labs.github.io/eigenda/integration/spec/6-secure-integration.html.
 //
 // TODO: right now verification and confirmation depth are tightly coupled. we should decouple them
 type Verifier struct {

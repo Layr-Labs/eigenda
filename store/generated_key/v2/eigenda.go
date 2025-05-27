@@ -170,7 +170,7 @@ func (e Store) BackendType() common.BackendType {
 //
 // TODO: this whole function should be upstreamed to a new eigenda VerifyingPayloadRetrieval client
 // that would verify certs, and then retrieve the payloads (from relay with fallback to eigenda validators if needed).
-// Then proxy could remain a very thing server wrapper around eigenda clients.
+// Then proxy could remain a very thin server wrapper around eigenda clients.
 func (e Store) Verify(ctx context.Context, certBytes []byte, _ []byte, opts common.CertVerificationOpts) error {
 	var eigenDACert coretypes.EigenDACert
 	err := rlp.DecodeBytes(certBytes, &eigenDACert)
@@ -207,7 +207,7 @@ func (e Store) Verify(ctx context.Context, certBytes []byte, _ []byte, opts comm
 //
 // Note that for a secure integration, this same check needs to be verified onchain.
 // There are 2 approaches to doing this:
-//  1. Pessimistic approach: use a smart batcher inbox to dissalow stale blobs from even beign included
+//  1. Pessimistic approach: use a smart batcher inbox to disallow stale blobs from even being included
 //     in the batcher inbox (see https://github.com/ethereum-optimism/design-docs/pull/229)
 //  2. Optimistic approach: verify the check in op-program or hokulea (kona)'s derivation pipeline. See
 //     https://github.com/Layr-Labs/hokulea/blob/8c4c89bc4f/crates/eigenda/src/eigenda.rs#L90

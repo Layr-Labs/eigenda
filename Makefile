@@ -21,7 +21,7 @@ run-memstore-server: build
 	./bin/eigenda-proxy --memstore.enabled --metrics.enabled
 
 disperse-test-blob:
-	curl -X POST -d my-blob-content http://127.0.0.1:3100/put/
+	curl -X POST -d my-blob-content http://127.0.0.1:3100/put/ | xxd -p | tr -d '\n'
 
 # Runs all tests, excluding e2e
 test-unit:

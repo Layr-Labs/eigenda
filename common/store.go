@@ -79,7 +79,7 @@ type CertVerificationOpts struct {
 	// to lookup the stake of the eigenda operators before verifying signature thresholds.
 	// The rollup commitment containing the eigenDA cert is only valid if it was included
 	// within a certain number of blocks after the RBN.
-	// validity condition is: certRBN < L1InclusionBlockNum < RBN + RBNRecencyWindowSize
+	// validity condition is: certRBN < L1InclusionBlockNum <= RBN + RBNRecencyWindowSize
 	L1InclusionBlockNum uint64
 }
 
