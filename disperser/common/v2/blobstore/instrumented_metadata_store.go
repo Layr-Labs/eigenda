@@ -42,8 +42,8 @@ type InstrumentedMetadataStore struct {
 }
 
 type metadataStoreMetricsCollector struct {
-	// Request latency summary
-	requestLatency *prometheus.SummaryVec
+	// Request duration summary
+	requestDuration *prometheus.SummaryVec
 	// Request counter
 	requestTotal *prometheus.CounterVec
 	// Errors counter
@@ -58,7 +58,7 @@ func NewInstrumentedMetadataStore(metadataStore MetadataStore, config Config) *I
 	}
 
 	metrics := &metadataStoreMetricsCollector{
-		requestLatency: promauto.With(config.Registry).NewSummaryVec(
+		requestDuration: promauto.With(config.Registry).NewSummaryVec(
 			prometheus.SummaryOpts{
 				Namespace:  namespace,
 				Subsystem:  subsystem,
@@ -115,7 +115,7 @@ func (m *InstrumentedMetadataStore) recordMetrics(method string, start time.Time
 		m.metrics.errorTotal.WithLabelValues(method, m.config.ServiceName, errorType, backend).Inc()
 	}
 
-	m.metrics.requestLatency.WithLabelValues(method, m.config.ServiceName, status, backend).Observe(duration)
+	m.metrics.requestDuration.WithLabelValues(method, m.config.ServiceName, status, backend).Observe(duration)
 	m.metrics.requestTotal.WithLabelValues(method, m.config.ServiceName, status, backend).Inc()
 }
 
