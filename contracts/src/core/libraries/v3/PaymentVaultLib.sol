@@ -20,7 +20,7 @@ library PaymentVaultTypes {
         address token; // the address of the token used for on-demand payments.
         address recipient; // the address of the recipient of the on-demand payments.
         uint64 reservationSymbolsPerSecond;
-        uint64 onDemandSymbolsPerPeriod;
+        uint64 onDemandSymbolsPerSecond;
         uint64 onDemandPricePerSymbol;
     }
 
@@ -81,7 +81,7 @@ library PaymentVaultLib {
         );
         require(reservation.startTimestamp >= block.timestamp, "Invalid start timestamp");
 
-        populateReservedSymbols(
+        increaseReservedSymbols(
             quorumId, reservation.startTimestamp, reservation.endTimestamp, reservation.symbolsPerSecond, schedulePeriod
         );
         s().quorum[quorumId].user[account].reservation = reservation;
@@ -97,16 +97,34 @@ library PaymentVaultLib {
         checkReservation(quorumId, account, reservation, schedulePeriod);
 
         require(reservation.startTimestamp == currentReservation.startTimestamp, "Invalid start timestamp");
-        require(reservation.endTimestamp > currentReservation.endTimestamp, "Invalid end timestamp");
+        require(
+            reservation.endTimestamp > currentReservation.endTimestamp
+                || reservation.symbolsPerSecond > currentReservation.symbolsPerSecond,
+            "Invalid reservation update"
+        );
+        require(reservation.endTimestamp >= currentReservation.endTimestamp, "Invalid end timestamp");
         require(reservation.symbolsPerSecond >= currentReservation.symbolsPerSecond, "Invalid symbols per second");
 
-        populateReservedSymbols(
-            quorumId,
-            currentReservation.endTimestamp,
-            reservation.endTimestamp,
-            reservation.symbolsPerSecond,
-            schedulePeriod
-        );
+        if (reservation.endTimestamp > currentReservation.endTimestamp) {
+            // increase reservation time based on current reservation
+            increaseReservedSymbols(
+                quorumId,
+                currentReservation.endTimestamp,
+                reservation.endTimestamp,
+                currentReservation.symbolsPerSecond,
+                schedulePeriod
+            );
+        }
+        if (reservation.symbolsPerSecond > currentReservation.symbolsPerSecond) {
+            // increase reservation symbols after a reservation time increase, if any
+            increaseReservedSymbols(
+                quorumId,
+                reservation.startTimestamp,
+                reservation.endTimestamp,
+                reservation.symbolsPerSecond - currentReservation.symbolsPerSecond,
+                schedulePeriod
+            );
+        }
         s().quorum[quorumId].user[account].reservation = reservation;
     }
 
@@ -120,16 +138,34 @@ library PaymentVaultLib {
         checkReservation(quorumId, account, reservation, schedulePeriod);
 
         require(reservation.startTimestamp == currentReservation.startTimestamp, "Invalid start timestamp");
+        require(
+            reservation.endTimestamp < currentReservation.endTimestamp
+                || reservation.symbolsPerSecond < currentReservation.symbolsPerSecond,
+            "Invalid reservation update"
+        );
         require(reservation.endTimestamp <= currentReservation.endTimestamp, "Invalid end timestamp");
         require(reservation.symbolsPerSecond <= currentReservation.symbolsPerSecond, "Invalid symbols per second");
 
-        populateReservedSymbols(
-            quorumId,
-            currentReservation.endTimestamp,
-            reservation.endTimestamp,
-            reservation.symbolsPerSecond,
-            schedulePeriod
-        );
+        if (reservation.endTimestamp < currentReservation.endTimestamp) {
+            // decrease reservation time based on current reservation
+            decreaseReservedSymbols(
+                quorumId,
+                reservation.endTimestamp,
+                currentReservation.endTimestamp,
+                currentReservation.symbolsPerSecond,
+                schedulePeriod
+            );
+        }
+        if (reservation.symbolsPerSecond > currentReservation.symbolsPerSecond) {
+            // decrease reservation symbols after a reservation time decrease, if any
+            decreaseReservedSymbols(
+                quorumId,
+                reservation.startTimestamp,
+                reservation.endTimestamp,
+                currentReservation.symbolsPerSecond - reservation.symbolsPerSecond,
+                schedulePeriod
+            );
+        }
         s().quorum[quorumId].user[account].reservation = reservation;
     }
 
@@ -154,7 +190,7 @@ library PaymentVaultLib {
             PaymentVaultTypes.Reservation memory currentReservation = user.reservation;
             require(
                 reservation.startTimestamp == currentReservation.startTimestamp
-                    && reservation.endTimestamp > currentReservation.endTimestamp,
+                    && reservation.endTimestamp >= currentReservation.endTimestamp,
                 "Invalid reservation update"
             );
             require(reservation.symbolsPerSecond >= currentReservation.symbolsPerSecond, "Invalid symbols per second");
@@ -176,13 +212,17 @@ library PaymentVaultLib {
         user.deposit = newAmount;
     }
 
-    function populateReservedSymbols(
+    function increaseReservedSymbols(
         uint64 quorumId,
         uint64 startTimestamp,
         uint64 endTimestamp,
         uint64 symbolsPerSecond,
         uint64 schedulePeriod
     ) internal {
+        require(startTimestamp % schedulePeriod == 0, "Invalid start timestamp");
+        require(endTimestamp % schedulePeriod == 0, "Invalid end timestamp");
+        require(endTimestamp > startTimestamp, "Invalid reservation period");
+
         require(startTimestamp % schedulePeriod == 0, "Invalid start timestamp");
         require(endTimestamp % schedulePeriod == 0, "Invalid end timestamp");
         uint64 startPeriod = startTimestamp / schedulePeriod;
@@ -194,6 +234,28 @@ library PaymentVaultLib {
             uint64 reservedSymbols = quorum.reservedSymbols[i] + symbolsPerSecond;
             require(reservedSymbols <= maxReservedSymbols, "Not enough symbols available");
             quorum.reservedSymbols[i] = reservedSymbols;
+        }
+    }
+
+    function decreaseReservedSymbols(
+        uint64 quorumId,
+        uint64 startTimestamp,
+        uint64 endTimestamp,
+        uint64 symbolsPerSecond,
+        uint64 schedulePeriod
+    ) internal {
+        require(startTimestamp % schedulePeriod == 0, "Invalid start timestamp");
+        require(endTimestamp % schedulePeriod == 0, "Invalid end timestamp");
+        require(endTimestamp > startTimestamp, "Invalid reservation period");
+
+        require(startTimestamp % schedulePeriod == 0, "Invalid start timestamp");
+        require(endTimestamp % schedulePeriod == 0, "Invalid end timestamp");
+        uint64 startPeriod = startTimestamp / schedulePeriod;
+        uint64 endPeriod = endTimestamp / schedulePeriod;
+
+        PaymentVaultTypes.Quorum storage quorum = s().quorum[quorumId];
+        for (uint64 i = startPeriod; i < endPeriod; i++) {
+            quorum.reservedSymbols[i] -= symbolsPerSecond; // Revert on underflow
         }
     }
 }
