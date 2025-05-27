@@ -255,7 +255,7 @@ func TestV2StoreChunksSuccess(t *testing.T) {
 }
 
 // blacklist tests
-func TestV2StoreChunksIsBlacklisted(t *testing.T) {
+func TestV2StoreChunksIsBlacklistedCheck(t *testing.T) {
 	config := makeConfig(t)
 	config.EnableV2 = true
 	c := newTestComponents(t, config)
