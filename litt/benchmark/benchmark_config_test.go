@@ -16,8 +16,7 @@ func TestLoadConfig(t *testing.T) {
 		"MetadataDirectory": "/test/dir",
 		"MaximumWriteThroughputMB": 20.0,
 		"ValueSizeMB": 3.0,
-		"BatchSizeMB": 15,
-		"BatchParallelism": 5
+		"BatchSizeMB": 15
 	}`
 
 	testConfigPath := filepath.Join(tempDir, "test-config.json")
@@ -30,7 +29,6 @@ func TestLoadConfig(t *testing.T) {
 		MaximumWriteThroughputMB: 20.0,
 		ValueSizeMB:              3.0,
 		BatchSizeMB:              15,
-		BatchParallelism:         5,
 	}
 
 	// Test loading the config
@@ -40,7 +38,6 @@ func TestLoadConfig(t *testing.T) {
 	require.Equal(t, expectedConfig.MaximumWriteThroughputMB, loadedConfig.MaximumWriteThroughputMB)
 	require.Equal(t, expectedConfig.ValueSizeMB, loadedConfig.ValueSizeMB)
 	require.Equal(t, expectedConfig.BatchSizeMB, loadedConfig.BatchSizeMB)
-	require.Equal(t, expectedConfig.BatchParallelism, loadedConfig.BatchParallelism)
 
 	// Test loading a non-existent file
 	_, err = LoadConfig("/non/existent/path.json")

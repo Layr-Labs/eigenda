@@ -55,6 +55,10 @@ func NewBenchmarkEngine(configPath string) (*BenchmarkEngine, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	dataTracker, err := NewDataTracker(ctx, config)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to create data tracker: %w", err)
+	}
 
 	writeBytesPerSecond := uint64(config.MaximumWriteThroughputMB * float64(units.MiB))
 	writeBytesPerSecondPerThread := writeBytesPerSecond / uint64(config.WriterParallelism)

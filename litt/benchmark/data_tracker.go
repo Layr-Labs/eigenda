@@ -361,26 +361,37 @@ func (t *DataTracker) handleWrittenKey(keyIndex uint64) {
 	// Add key index to the set of written keys we are tracking.
 	t.writtenKeysSet[keyIndex] = struct{}{}
 
-	// Iterate over cohorts currently being written. If any cohort has all keys less than or equal to
-	// this keyIndex, then mark that cohort as complete.
-
-	// TODO future Cody: continue here
-
-	for i := t.highestCohortBeingWrittenIndex; i <= t.highestCohortIndex; i++ {
-		cohort := t.cohorts[i]
-
-		if cohort.HighKeyIndex() > keyIndex {
-			// Once we find the first cohort without all keys written, we can stop checking.
+	// Determine the highest key index written so far that also has all lower key indices written.
+	for {
+		nextKeyIndex := t.highestWrittenKeyIndex + 1
+		if _, ok := t.writtenKeysSet[nextKeyIndex]; ok {
+			// The next key has been written, mark it as such.
+			t.highestWrittenKeyIndex = nextKeyIndex
+			delete(t.writtenKeysSet, nextKeyIndex)
+		} else {
+			// Once we find the first key that has not been written, we can stop checking.
+			// We want t.highestWrittenKeyIndex to be the highest key index that has been written
+			// without any gaps in the sequence.
 			break
 		}
+	}
 
-		// All keys in this cohort have been written.
-		err := cohort.MarkComplete()
-		if err != nil {
-			panic(fmt.Sprintf("failed to mark cohort complete: %v", err)) // TODO not clean
+	// Determine the highest cohort index written so far that also has all lower cohorts written.
+	for {
+		nextCohortIndex := t.highestCohortIndex + 1
+		if nextCohortIndex >= t.activeCohort.CohortIndex() {
+			// Don't ever mark the active cohort as complete.
+			break
 		}
-		t.completeCohortSet[cohort.CohortIndex()] = struct{}{}
-		t.highestCohortBeingWrittenIndex++
+		nextCohort := t.cohorts[nextCohortIndex]
+		if nextCohort.HighKeyIndex() <= t.highestWrittenKeyIndex {
+			// We've found a cohort that has all keys written.
+			t.highestWrittenCohortIndex = nextCohort.CohortIndex()
+			t.completeCohortSet[nextCohort.CohortIndex()] = struct{}{}
+		} else {
+			// Once we find the first cohort that does not have all keys written, we can stop checking.
+			break
+		}
 	}
 }
 
@@ -462,7 +473,6 @@ func (t *DataTracker) DoCohortGC() {
 
 		t.activeCohort = activeCohort
 		t.highestCohortIndex = activeCohort.CohortIndex()
-		t.highestCohortBeingWrittenIndex = activeCohort.CohortIndex()
 		t.cohorts[activeCohort.CohortIndex()] = activeCohort
 	}
 }
