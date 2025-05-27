@@ -35,6 +35,7 @@ type Config struct {
 	EncodingConfig              kzg.KzgConfig
 	EnableRatelimiter           bool
 	EnablePaymentMeterer        bool
+	ReservedOnly                bool
 	ChainReadTimeout            time.Duration
 	ReservationsTableName       string
 	OnDemandTableName           string
@@ -50,6 +51,9 @@ type Config struct {
 	EigenDAServiceManagerAddr       string
 	AuthPmtStateRequestMaxPastAge   time.Duration
 	AuthPmtStateRequestMaxFutureAge time.Duration
+
+	NtpServer       string
+	NtpSyncInterval time.Duration
 }
 
 func NewConfig(ctx *cli.Context) (Config, error) {
@@ -115,6 +119,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EncodingConfig:              encodingConfig,
 		EnableRatelimiter:           ctx.GlobalBool(flags.EnableRatelimiter.Name),
 		EnablePaymentMeterer:        ctx.GlobalBool(flags.EnablePaymentMeterer.Name),
+		ReservedOnly:                ctx.GlobalBoolT(flags.ReservedOnly.Name),
 		ReservationsTableName:       ctx.GlobalString(flags.ReservationsTableName.Name),
 		OnDemandTableName:           ctx.GlobalString(flags.OnDemandTableName.Name),
 		GlobalRateTableName:         ctx.GlobalString(flags.GlobalRateTableName.Name),
@@ -130,6 +135,8 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EigenDAServiceManagerAddr:       ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
 		AuthPmtStateRequestMaxPastAge:   ctx.GlobalDuration(flags.AuthPmtStateRequestMaxPastAge.Name),
 		AuthPmtStateRequestMaxFutureAge: ctx.GlobalDuration(flags.AuthPmtStateRequestMaxFutureAge.Name),
+		NtpServer:                       ctx.GlobalString(flags.NtpServerFlag.Name),
+		NtpSyncInterval:                 ctx.GlobalDuration(flags.NtpSyncIntervalFlag.Name),
 	}
 	return config, nil
 }

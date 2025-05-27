@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
 )
 
@@ -38,13 +38,21 @@ func AssertEventuallyTrue(t *testing.T, condition func() bool, duration time.Dur
 	}
 
 	ticker := time.NewTicker(1 * time.Millisecond)
-	select {
-	case <-ticker.C:
-		if condition() {
+	defer ticker.Stop()
+
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
+	defer cancel()
+
+	for {
+		select {
+		case <-ticker.C:
+			if condition() {
+				return
+			}
+		case <-ctx.Done():
+			require.True(t, condition(), debugInfo...)
 			return
 		}
-	case <-time.After(duration):
-		assert.True(t, condition(), debugInfo...)
 	}
 }
 

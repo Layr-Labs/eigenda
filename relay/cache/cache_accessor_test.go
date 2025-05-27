@@ -35,7 +35,7 @@ func TestRandomOperationsSingleThread(t *testing.T) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil, nil)
 	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 
@@ -83,7 +83,7 @@ func TestCacheMisses(t *testing.T) {
 		return &str, nil
 	}
 
-	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil, nil)
 	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 
@@ -147,7 +147,7 @@ func ParallelAccessTest(t *testing.T, sleepEnabled bool) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil, nil)
 	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 
@@ -217,7 +217,7 @@ func TestParallelAccessWithError(t *testing.T) {
 	}
 	cacheSize := 100
 
-	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil, nil)
 	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 
@@ -291,7 +291,7 @@ func TestConcurrencyLimiter(t *testing.T) {
 
 	cacheSize := 100
 
-	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil, nil)
 	ca, err := NewCacheAccessor[int, *string](cache, maxConcurrency, accessor, nil)
 	require.NoError(t, err)
 
@@ -346,7 +346,7 @@ func TestOriginalRequesterTimesOut(t *testing.T) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil, nil)
 	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 
@@ -435,7 +435,7 @@ func TestSecondaryRequesterTimesOut(t *testing.T) {
 	}
 	cacheSize := rand.Intn(dataSize) + 1
 
-	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil)
+	cache := cache2.NewFIFOCache[int, *string](uint64(cacheSize), nil, nil)
 	ca, err := NewCacheAccessor[int, *string](cache, 0, accessor, nil)
 	require.NoError(t, err)
 

@@ -79,7 +79,18 @@ func RunScan(ctx *cli.Context) error {
 	}
 	logger.Info("Using block number", "block", blockNumber)
 
-	operatorState, err := chainState.GetOperatorState(context.Background(), blockNumber, config.QuorumIDs)
+	// If QuorumIDs is empty, get all quorums
+	quorumIDs := config.QuorumIDs
+	if len(quorumIDs) == 0 {
+		quorumCount, err := tx.GetQuorumCount(context.Background(), uint32(blockNumber))
+		if err != nil {
+			return fmt.Errorf("failed to fetch quorum count: %w", err)
+		}
+		quorumIDs = eth.GetAllQuorumIDs(quorumCount)
+		logger.Info("Using all quorums", "count", quorumCount)
+	}
+
+	operatorState, err := chainState.GetOperatorState(context.Background(), blockNumber, quorumIDs)
 	if err != nil {
 		return fmt.Errorf("failed to fetch operator state - %s", err)
 	}

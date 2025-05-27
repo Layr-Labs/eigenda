@@ -51,7 +51,7 @@ func scanDirectories(logger logging.Logger, rootDirectories []string) (
 			var index uint32
 
 			switch extension {
-			case MetadataSwapExtension:
+			case MetadataSwapExtension, KeyFileSwapExtension:
 				garbageFiles = append(garbageFiles, filePath)
 				continue
 			case MetadataFileExtension:
@@ -149,6 +149,12 @@ func lookForMissingFiles(
 	damagedSegments = make(map[uint32]struct{})
 
 	for segment := lowestSegmentIndex; segment <= highestSegmentIndex; segment++ {
+
+		if segment == 0 && len(metadataFiles) == 0 && len(keyFiles) == 0 && len(valueFiles) == 0 {
+			// Special case, only happens when starting a table from scratch.
+			// Files aren't actually missing, so no need to log anything.
+			break
+		}
 
 		potentialOrphans := make([]string, 0)
 		segmentMissingFiles := false

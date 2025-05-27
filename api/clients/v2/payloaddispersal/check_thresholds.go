@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	dispgrpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
@@ -48,7 +48,7 @@ func (e *thresholdNotMetError) Error() string {
 // checkThresholds verifies if all quorums meet the confirmation threshold and returns a structured error if they don't
 func checkThresholds(
 	ctx context.Context,
-	certVerifier clients.ICertVerifier,
+	certVerifier *verification.CertVerifier,
 	blobStatusReply *dispgrpc.BlobStatusReply,
 	blobKey string,
 ) error {
@@ -88,8 +88,8 @@ func checkThresholds(
 			return &thresholdNotMetError{
 				BlobKey:               blobKey,
 				ConfirmationThreshold: confirmationThreshold,
-				BlobQuorumNumbers:    blobQuorumNumbers,
-				SignedPercentagesMap: signedPercentagesMap,
+				BlobQuorumNumbers:     blobQuorumNumbers,
+				SignedPercentagesMap:  signedPercentagesMap,
 			}
 		}
 	}

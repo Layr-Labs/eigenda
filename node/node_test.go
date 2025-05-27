@@ -30,7 +30,7 @@ var (
 	blobParams = &core.BlobVersionParameters{
 		NumChunks:       8192,
 		CodingRate:      8,
-		MaxNumOperators: 3537,
+		MaxNumOperators: 2048,
 	}
 	blobParamsMap = map[v2.BlobVersion]*core.BlobVersionParameters{
 		0: blobParams,

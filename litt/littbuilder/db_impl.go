@@ -244,6 +244,7 @@ func (d *db) gatherMetrics(interval time.Duration) {
 	}
 
 	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 
 	for !d.stopped.Load() {
 		select {

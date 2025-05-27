@@ -8,6 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -24,7 +25,7 @@ type RelayPayloadRetriever struct {
 	// must be evaluated for thread safety.
 	random      *rand.Rand
 	config      RelayPayloadRetrieverConfig
-	relayClient clients.RelayClient
+	relayClient relay.RelayClient
 	g1Srs       []bn254.G1Affine
 }
 
@@ -36,7 +37,7 @@ func NewRelayPayloadRetriever(
 	log logging.Logger,
 	random *rand.Rand,
 	relayPayloadRetrieverConfig RelayPayloadRetrieverConfig,
-	relayClient clients.RelayClient,
+	relayClient relay.RelayClient,
 	g1Srs []bn254.G1Affine) (*RelayPayloadRetriever, error) {
 
 	err := relayPayloadRetrieverConfig.checkAndSetDefaults()
@@ -64,24 +65,23 @@ func NewRelayPayloadRetriever(
 // verified prior to calling this method.
 func (pr *RelayPayloadRetriever) GetPayload(
 	ctx context.Context,
-	eigenDACert *coretypes.EigenDACert) (*coretypes.Payload, error) {
+	eigenDACert *coretypes.EigenDACertV3) (*coretypes.Payload, error) {
 
 	blobKey, err := eigenDACert.ComputeBlobKey()
 	if err != nil {
 		return nil, fmt.Errorf("compute blob key: %w", err)
 	}
 
-	relayKeys := eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys
+	relayKeys := eigenDACert.RelayKeys()
 	relayKeyCount := len(relayKeys)
 	if relayKeyCount == 0 {
 		return nil, errors.New("relay key count is zero")
 	}
 
-	blobCommitments, err := coretypes.BlobCommitmentsBindingToInternal(
-		&eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment)
+	blobCommitments, err := eigenDACert.Commitments()
 
 	if err != nil {
-		return nil, fmt.Errorf("blob commitments binding to internal: %w", err)
+		return nil, fmt.Errorf("reading blob commitments from cert: %w", err)
 	}
 
 	// create a randomized array of indices, so that it isn't always the first relay in the list which gets hit
@@ -94,7 +94,7 @@ func (pr *RelayPayloadRetriever) GetPayload(
 	for _, val := range indices {
 		relayKey := relayKeys[val]
 
-		blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
+		blobLengthSymbols := uint32(blobCommitments.Length)
 
 		blob, err := pr.retrieveBlobWithTimeout(ctx, relayKey, blobKey, blobLengthSymbols)
 		// if GetBlob returned an error, try calling a different relay

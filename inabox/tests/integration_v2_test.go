@@ -28,6 +28,14 @@ import (
 )
 
 var _ = Describe("Inabox v2 Integration", func() {
+	/*
+		This end to end test ensures that:
+		1. a blob can be dispersed using the lower level disperser client to successfully produce a blob certificate
+		2. the blob certificate can be verified on chain using the EigenDACertVerifierV2 contract
+		3. the blob can be retrieved from the disperser relay using the blob certificate
+		4. the blob can be retrieved from the DA validator network using the blob certificate
+
+	*/
 	It("test end to end scenario", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
@@ -178,7 +186,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		var batchRoot [32]byte
 		copy(batchRoot[:], batchHeader1.BatchRoot)
 
-		err = verifierContract.VerifyDACertV2FromSignedBatch(
+		err = eigenDACertVerifierV2Legacy.VerifyDACertV2FromSignedBatch(
 			&bind.CallOpts{},
 			verifierbindings.EigenDATypesV2SignedBatch{
 				BatchHeader: verifierbindings.EigenDATypesV2BatchHeaderV2{
@@ -196,7 +204,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		proof, err = convertBlobInclusionInfo(blobInclusion2)
 		Expect(err).To(BeNil())
 		copy(batchRoot[:], batchHeader2.BatchRoot)
-		err = verifierContract.VerifyDACertV2FromSignedBatch(
+		err = eigenDACertVerifierV2Legacy.VerifyDACertV2FromSignedBatch(
 			&bind.CallOpts{},
 			verifierbindings.EigenDATypesV2SignedBatch{
 				BatchHeader: verifierbindings.EigenDATypesV2BatchHeaderV2{
@@ -209,7 +217,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		)
 		Expect(err).To(BeNil())
 
-		relayClientConfig := &clients.RelayClientConfig{
+		relayClientConfig := &relay.RelayClientConfig{
 			MaxGRPCMessageSize: units.GiB,
 		}
 
@@ -217,7 +225,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		Expect(err).To(BeNil())
 
 		// Test retrieval from relay
-		relayClient, err := clients.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
+		relayClient, err := relay.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
 		Expect(err).To(BeNil())
 
 		blob1Relays := make(map[corev2.RelayKey]struct{}, 0)
@@ -250,50 +258,26 @@ var _ = Describe("Inabox v2 Integration", func() {
 			}
 		}
 
-		blob1Key, err := blobCert1.BlobHeader.BlobKey()
+		blob1HeaderWithoutPayment, err := blobCert1.BlobHeader.GetBlobHeaderWithHashedPayment()
 		Expect(err).To(BeNil())
 
-		blob2Key, err := blobCert2.BlobHeader.BlobKey()
+		blob2HeaderWithoutPayment, err := blobCert2.BlobHeader.GetBlobHeaderWithHashedPayment()
 		Expect(err).To(BeNil())
 
 		// Test retrieval from DA network
 		b, err := retrievalClientV2.GetBlob(
 			ctx,
-			blob1Key,
-			blobCert1.BlobHeader.BlobVersion,
-			blobCert1.BlobHeader.BlobCommitments,
+			blob1HeaderWithoutPayment,
 			batchHeader1.ReferenceBlockNumber,
-			0)
+		)
 		Expect(err).To(BeNil())
 		restored := bytes.TrimRight(b, "\x00")
 		Expect(restored).To(Equal(paddedData1))
 		b, err = retrievalClientV2.GetBlob(
 			ctx,
-			blob1Key,
-			blobCert1.BlobHeader.BlobVersion,
-			blobCert1.BlobHeader.BlobCommitments,
-			batchHeader1.ReferenceBlockNumber,
-			1)
-		restored = bytes.TrimRight(b, "\x00")
-		Expect(err).To(BeNil())
-		Expect(restored).To(Equal(paddedData1))
-		b, err = retrievalClientV2.GetBlob(
-			ctx,
-			blob2Key,
-			blobCert2.BlobHeader.BlobVersion,
-			blobCert2.BlobHeader.BlobCommitments,
+			blob2HeaderWithoutPayment,
 			batchHeader2.ReferenceBlockNumber,
-			0)
-		restored = bytes.TrimRight(b, "\x00")
-		Expect(err).To(BeNil())
-		Expect(restored).To(Equal(paddedData2))
-		b, err = retrievalClientV2.GetBlob(
-			ctx,
-			blob2Key,
-			blobCert2.BlobHeader.BlobVersion,
-			blobCert2.BlobHeader.BlobCommitments,
-			batchHeader2.ReferenceBlockNumber,
-			1)
+		)
 		restored = bytes.TrimRight(b, "\x00")
 		Expect(err).To(BeNil())
 		Expect(restored).To(Equal(paddedData2))

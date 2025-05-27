@@ -30,8 +30,12 @@ type LoadGenerator struct {
 	submissionPeriod time.Duration
 	// The channel to limit the number of parallel blob submissions.
 	submissionLimiter chan struct{}
-	// The channel to limit the number of parallel blob reads.
-	readLimiter chan struct{}
+	// The channel to limit the number of parallel blob reads sent to the relays.
+	relayReadLimiter chan struct{}
+	// The channel to limit the number of parallel blob reads sent to the validators.
+	validatorReadLimiter chan struct{}
+	// The channel to limit the number of blobs in all phases of the read/write lifecycle.
+	lifecycleLimiter chan struct{}
 	// if true, the load generator is running.
 	alive atomic.Bool
 	// The channel to signal when the load generator is finished.
@@ -75,7 +79,12 @@ func NewLoadGenerator(
 	submissionPeriodAsDuration := time.Duration(submissionPeriod * float64(time.Second))
 
 	submissionLimiter := make(chan struct{}, config.SubmissionParallelism)
-	readLimiter := make(chan struct{}, config.ReadParallelism)
+	relayReadLimiter := make(chan struct{}, config.RelayReadParallelism)
+	validatorReadLimiter := make(chan struct{}, config.ValidatorReadParallelism)
+	lifecycleLimiter := make(chan struct{},
+		config.SubmissionParallelism+
+			config.RelayReadParallelism+
+			config.ValidatorReadParallelism)
 
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
@@ -98,17 +107,19 @@ func NewLoadGenerator(
 	}
 
 	return &LoadGenerator{
-		ctx:               ctx,
-		cancel:            cancel,
-		config:            config,
-		client:            client,
-		submissionPeriod:  submissionPeriodAsDuration,
-		submissionLimiter: submissionLimiter,
-		readLimiter:       readLimiter,
-		alive:             atomic.Bool{},
-		finishedChan:      make(chan struct{}),
-		metrics:           metrics,
-		randPool:          randPool,
+		ctx:                  ctx,
+		cancel:               cancel,
+		config:               config,
+		client:               client,
+		submissionPeriod:     submissionPeriodAsDuration,
+		submissionLimiter:    submissionLimiter,
+		relayReadLimiter:     relayReadLimiter,
+		lifecycleLimiter:     lifecycleLimiter,
+		validatorReadLimiter: validatorReadLimiter,
+		alive:                atomic.Bool{},
+		finishedChan:         make(chan struct{}),
+		randPool:             randPool,
+		metrics:              metrics,
 	}
 }
 
@@ -135,7 +146,12 @@ func (l *LoadGenerator) run() {
 	ticker := time.NewTicker(l.submissionPeriod)
 	for l.alive.Load() {
 		<-ticker.C
-		go l.readAndWriteBlob()
+
+		l.lifecycleLimiter <- struct{}{}
+		go func() {
+			l.readAndWriteBlob()
+			<-l.lifecycleLimiter
+		}()
 	}
 }
 
@@ -146,30 +162,34 @@ func (l *LoadGenerator) readAndWriteBlob() {
 	defer l.randPool.Put(randObj) // Return to pool when done
 
 	l.submissionLimiter <- struct{}{}
-	blobKey, payload, eigenDACert, err := l.submitBlob(rand)
+	blobKey, payload, eigenDACert, err := l.disperseBlob(rand)
 	<-l.submissionLimiter
 	if err != nil {
 		return
 	}
 
-	l.readLimiter <- struct{}{}
-	l.readBlob(rand, blobKey, payload, eigenDACert)
-	<-l.readLimiter
+	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
+	if !ok {
+		l.metrics.reportDispersalFailure()
+		l.client.GetLogger().Errorf("expected EigenDACertV3, got %T", eigenDACert)
+		return
+	}
+
+	l.relayReadLimiter <- struct{}{}
+	l.readBlobFromRelays(rand, blobKey, payload, eigenDAV3Cert)
+	<-l.relayReadLimiter
+
+	l.validatorReadLimiter <- struct{}{}
+	l.readBlobFromValidators(rand, payload, eigenDAV3Cert)
+	<-l.validatorReadLimiter
 }
 
 // Submits a single blob to the network.
-func (l *LoadGenerator) submitBlob(rand *random.TestRandom) (
+func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 	blobKey *corev2.BlobKey,
 	payload []byte,
-	eigenDACert *coretypes.EigenDACert,
+	eigenDACert coretypes.EigenDACert,
 	err error) {
-
-	ctx, cancel := context.WithTimeout(l.ctx, l.config.DispersalTimeout*time.Second)
-	l.metrics.startOperation("write")
-	defer func() {
-		l.metrics.endOperation("write")
-		cancel()
-	}()
 
 	payloadSize := int(rand.BoundedGaussian(
 		l.config.AverageBlobSizeMB*units.MiB,
@@ -178,6 +198,14 @@ func (l *LoadGenerator) submitBlob(rand *random.TestRandom) (
 		float64(l.client.GetConfig().MaxBlobSize+1)))
 	payload = rand.Bytes(payloadSize)
 
+	timeout := time.Duration(l.config.DispersalTimeout) * time.Second
+	ctx, cancel := context.WithTimeout(l.ctx, timeout)
+	l.metrics.startOperation("dispersal")
+	defer func() {
+		l.metrics.endOperation("dispersal")
+		cancel()
+	}()
+
 	eigenDACert, err = l.client.DispersePayload(ctx, payload)
 	if err != nil {
 		l.metrics.reportDispersalFailure()
@@ -185,7 +213,15 @@ func (l *LoadGenerator) submitBlob(rand *random.TestRandom) (
 		return nil, nil, nil, err
 	}
 
-	blobKey, err = eigenDACert.ComputeBlobKey()
+	// Ensure the eigenDACert is of type EigenDACertV3
+	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
+	if !ok {
+		l.metrics.reportDispersalFailure()
+		l.client.GetLogger().Errorf("expected EigenDACertV3, got %T", eigenDACert)
+		return nil, nil, nil, fmt.Errorf("expected EigenDACertV3, got %T", eigenDACert)
+	}
+
+	blobKey, err = eigenDAV3Cert.ComputeBlobKey()
 	if err != nil {
 		l.metrics.reportDispersalFailure()
 		l.client.GetLogger().Errorf("failed to compute blob key: %v", err)
@@ -196,38 +232,46 @@ func (l *LoadGenerator) submitBlob(rand *random.TestRandom) (
 	return blobKey, payload, eigenDACert, nil
 }
 
-// readBlob reads a blob from the network. May read from relays or validators or both. May read multiple times.
-func (l *LoadGenerator) readBlob(
+// readBlobFromRelays reads a blob from the relays.
+func (l *LoadGenerator) readBlobFromRelays(
 	rand *random.TestRandom,
 	blobKey *corev2.BlobKey,
 	payload []byte,
-	eigenDACert *coretypes.EigenDACert) {
+	eigenDACert *coretypes.EigenDACertV3,
+) {
 
-	ctx, cancel := context.WithTimeout(l.ctx, l.config.ReadTimeout*time.Second)
-	l.metrics.startOperation("read")
-	defer func() {
-		l.metrics.endOperation("read")
-		cancel()
-	}()
-
-	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
+	timeout := time.Duration(l.config.RelayReadTimeout) * time.Second
+	ctx, cancel := context.WithTimeout(l.ctx, timeout)
+	defer cancel()
 
 	var relayReadCount int
 	if l.config.RelayReadAmplification < 1 {
 		if rand.Float64() < l.config.RelayReadAmplification {
 			relayReadCount = 1
+		} else {
+			return
 		}
 	} else {
 		relayReadCount = int(l.config.RelayReadAmplification)
 	}
 
+	l.metrics.startOperation("relay_read")
+	defer func() {
+		l.metrics.endOperation("relay_read")
+	}()
+
+	blobLengthSymbols := uint32(eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length)
+	relayKeys := eigenDACert.RelayKeys()
+	readStartIndex := rand.Int32Range(0, int32(len(relayKeys)))
+
 	for i := 0; i < relayReadCount; i++ {
-		err := l.client.ReadBlobFromRelays(
+		err := l.client.ReadBlobFromRelay(
 			ctx,
 			*blobKey,
-			eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys,
+			relayKeys[(int(readStartIndex)+i)%len(relayKeys)],
 			payload,
-			blobLengthSymbols)
+			blobLengthSymbols,
+			0)
 		if err == nil {
 			l.metrics.reportRelayReadSuccess()
 		} else {
@@ -235,31 +279,51 @@ func (l *LoadGenerator) readBlob(
 			l.client.GetLogger().Errorf("failed to read blob from relays: %v", err)
 		}
 	}
+}
 
-	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
-	if err != nil {
-		l.client.GetLogger().Errorf("failed to bind blob commitments: %v", err)
-		return
-	}
+// readBlobFromValidators reads a blob from the validators using the validator retrieval client.
+func (l *LoadGenerator) readBlobFromValidators(
+	rand *random.TestRandom,
+	payload []byte,
+	eigenDACert *coretypes.EigenDACertV3) {
+
+	timeout := time.Duration(l.config.ValidatorReadTimeout) * time.Second
+	ctx, cancel := context.WithTimeout(l.ctx, timeout)
+	defer cancel()
 
 	var validatorReadCount int
 	if l.config.ValidatorReadAmplification < 1 {
 		if rand.Float64() < l.config.ValidatorReadAmplification {
 			validatorReadCount = 1
+		} else {
+			return
 		}
 	} else {
 		validatorReadCount = int(l.config.ValidatorReadAmplification)
 	}
 
+	l.metrics.startOperation("validator_read")
+	defer func() {
+		l.metrics.endOperation("validator_read")
+	}()
+
+	blobHeader, err := eigenDACert.BlobHeader()
+	if err != nil {
+		l.metrics.reportValidatorReadFailure()
+		l.client.GetLogger().Errorf("failed to get blob header: %v", err)
+		return
+	}
+
 	for i := 0; i < validatorReadCount; i++ {
+		validateAndDecode := rand.Float64() < l.config.ValidatorVerificationFraction
+
 		err = l.client.ReadBlobFromValidators(
 			ctx,
-			*blobKey,
-			blobHeader.Version,
-			*commitment,
-			eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
-			payload)
+			blobHeader,
+			uint32(eigenDACert.ReferenceBlockNumber()),
+			payload,
+			0,
+			validateAndDecode)
 		if err == nil {
 			l.metrics.reportValidatorReadSuccess()
 		} else {

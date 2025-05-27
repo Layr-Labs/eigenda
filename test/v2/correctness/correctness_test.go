@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -407,13 +408,17 @@ func unauthorizedGetChunksTest(t *testing.T, environment string) {
 	eigenDACert, err := c.DispersePayload(ctx, payload)
 	require.NoError(t, err)
 
-	blobKey, err := eigenDACert.ComputeBlobKey()
+	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
+	require.True(t, ok, "expected EigenDACertV3, got %T", eigenDACert)
+	require.NotNil(t, eigenDAV3Cert)
+
+	blobKey, err := eigenDAV3Cert.ComputeBlobKey()
 	require.NoError(t, err)
 
-	targetRelay := eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys[0]
+	targetRelay := eigenDAV3Cert.RelayKeys()[0]
 
-	chunkRequests := make([]*clients.ChunkRequestByRange, 1)
-	chunkRequests[0] = &clients.ChunkRequestByRange{
+	chunkRequests := make([]*relay.ChunkRequestByRange, 1)
+	chunkRequests[0] = &relay.ChunkRequestByRange{
 		BlobKey: *blobKey,
 		Start:   0,
 		End:     1,
