@@ -1,4 +1,4 @@
-package config
+package builder
 
 import (
 	"testing"
@@ -6,20 +6,26 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/store"
+	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
-	"github.com/Layr-Labs/eigenda-proxy/verify"
+	"github.com/Layr-Labs/eigenda-proxy/store/secondary/redis"
+	"github.com/Layr-Labs/eigenda-proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	v2_clients "github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/stretchr/testify/require"
 )
 
-func validCfg() ProxyConfig {
+func validCfg() Config {
 	maxBlobLengthBytes, err := common.ParseBytesAmount("2MiB")
 	if err != nil {
 		panic(err)
 	}
-	proxyCfg := ProxyConfig{
+	proxyCfg := Config{
+		StoreConfig: store.Config{
+			BackendsToEnable: []common.EigenDABackend{common.V1EigenDABackend, common.V2EigenDABackend},
+			DispersalBackend: common.V2EigenDABackend,
+		},
 		ClientConfigV1: common.ClientConfigV1{
 			EdaClientCfg: clients.EigenDAClientConfig{
 				RPC:                          "http://localhost:8545",
@@ -70,9 +76,19 @@ func validCfg() ProxyConfig {
 			},
 			PutTries: 3,
 		},
-		StorageConfig: store.Config{
-			BackendsToEnable: []common.EigenDABackend{common.V1EigenDABackend, common.V2EigenDABackend},
-			DispersalBackend: common.V2EigenDABackend,
+		RedisConfig: redis.Config{
+			Endpoint: "localhost:6379",
+			Password: "password",
+			DB:       0,
+			Eviction: 10 * time.Minute,
+		},
+		S3Config: s3.Config{
+			Bucket:          "test-bucket",
+			Path:            "",
+			Endpoint:        "http://localhost:9000",
+			EnableTLS:       false,
+			AccessKeyID:     "access-key-id",
+			AccessKeySecret: "access-key-secret",
 		},
 	}
 
@@ -158,4 +174,33 @@ func TestConfigVerification(t *testing.T) {
 				})
 		})
 
+	t.Run("SecondaryConfigs", func(t *testing.T) {
+		t.Run("BadRedisConfiguration", func(t *testing.T) {
+			cfg := validCfg()
+			cfg.RedisConfig.Endpoint = ""
+
+			err := cfg.Check()
+			require.Error(t, err)
+		})
+
+		t.Run("MissingS3AccessKeys", func(t *testing.T) {
+			cfg := validCfg()
+
+			cfg.S3Config.CredentialType = s3.CredentialTypeStatic
+			cfg.S3Config.Endpoint = "http://localhost:9000"
+			cfg.S3Config.AccessKeyID = ""
+
+			err := cfg.Check()
+			require.Error(t, err)
+		})
+
+		t.Run("MissingS3Credential", func(t *testing.T) {
+			cfg := validCfg()
+
+			cfg.S3Config.CredentialType = s3.CredentialTypeUnknown
+
+			err := cfg.Check()
+			require.Error(t, err)
+		})
+	})
 }

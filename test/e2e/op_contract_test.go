@@ -6,7 +6,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
-	"github.com/Layr-Labs/eigenda-proxy/testutils"
+	"github.com/Layr-Labs/eigenda-proxy/test/testutils"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	contractEigenDACertVerifierV2 "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
@@ -87,7 +87,7 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 				common.V2EigenDABackend,
 				[]common.EigenDABackend{common.V2EigenDABackend})
 			tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-			tsConfig.EigenDAConfig.ClientConfigV2.RBNRecencyWindowSize = tt.RBNRecencyWindowSize
+			tsConfig.StoreBuilderConfig.ClientConfigV2.RBNRecencyWindowSize = tt.RBNRecencyWindowSize
 			ts, kill := testutils.CreateTestSuite(tsConfig)
 			t.Cleanup(kill)
 

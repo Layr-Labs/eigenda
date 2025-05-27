@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/utils"
-	"github.com/Layr-Labs/eigenda-proxy/verify"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	"github.com/Layr-Labs/eigensdk-go/logging"

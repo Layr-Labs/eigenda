@@ -8,7 +8,10 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/config"
 	proxy_metrics "github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/server"
+	"github.com/Layr-Labs/eigenda-proxy/store/builder"
+	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/gorilla/mux"
 )
 
 // TestSuite contains necessary objects, to be able to execute a proxy test
@@ -47,9 +50,27 @@ func CreateTestSuite(
 
 	ctx, logger, metrics := ts.Ctx, ts.Log, ts.Metrics
 
-	proxyServer, err := server.BuildAndStartProxyServer(ctx, logger, metrics, appConfig)
+	storeManager, err := builder.BuildStoreManager(
+		ctx,
+		logger,
+		metrics,
+		appConfig.StoreBuilderConfig,
+		appConfig.SecretConfig,
+	)
 	if err != nil {
-		panic(fmt.Errorf("build and start proxy server: %w", err))
+		panic(fmt.Sprintf("build storage manager: %v", err.Error()))
+	}
+
+	proxyServer := server.NewServer(appConfig.ServerConfig, storeManager, logger, metrics)
+	router := mux.NewRouter()
+	proxyServer.RegisterRoutes(router)
+	if appConfig.StoreBuilderConfig.MemstoreEnabled {
+		memconfig.NewHandlerHTTP(logger, appConfig.StoreBuilderConfig.MemstoreConfig).
+			RegisterMemstoreConfigHandlers(router)
+	}
+
+	if err := proxyServer.Start(router); err != nil {
+		panic(fmt.Sprintf("start proxy server: %v", err.Error()))
 	}
 
 	kill := func() {

@@ -14,7 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
 	eigendav2store "github.com/Layr-Labs/eigenda-proxy/store/generated_key/v2"
-	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/s3"
+	"github.com/Layr-Labs/eigenda-proxy/store/secondary/s3"
 	"github.com/gorilla/mux"
 )
 

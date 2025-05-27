@@ -8,7 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
 	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/Layr-Labs/eigenda-proxy/testutils"
+	"github.com/Layr-Labs/eigenda-proxy/test/testutils"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -208,7 +208,7 @@ func testKeccak256CommitmentRequestErrorsWhenS3NotSet(t *testing.T, dispersalBac
 	testCfg.UseKeccak256ModeS3 = true
 
 	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	tsConfig.EigenDAConfig.StorageConfig.S3Config.Endpoint = "localhost:1234"
+	tsConfig.StoreBuilderConfig.S3Config.Endpoint = "localhost:1234"
 
 	ts, kill := testutils.CreateTestSuite(tsConfig)
 	defer kill()

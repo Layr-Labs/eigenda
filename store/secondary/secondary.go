@@ -1,4 +1,4 @@
-package store
+package secondary
 
 import (
 	"context"
@@ -51,8 +51,8 @@ type SecondaryManager struct {
 	log logging.Logger
 	m   metrics.Metricer
 
-	caches    []common.PrecomputedKeyStore
-	fallbacks []common.PrecomputedKeyStore
+	caches    []common.SecondaryStore
+	fallbacks []common.SecondaryStore
 
 	verifyLock       sync.RWMutex
 	topic            chan PutNotify
@@ -63,8 +63,8 @@ type SecondaryManager struct {
 func NewSecondaryManager(
 	log logging.Logger,
 	m metrics.Metricer,
-	caches []common.PrecomputedKeyStore,
-	fallbacks []common.PrecomputedKeyStore,
+	caches []common.SecondaryStore,
+	fallbacks []common.SecondaryStore,
 ) ISecondary {
 	return &SecondaryManager{
 		topic: make(
@@ -169,7 +169,7 @@ func (sm *SecondaryManager) MultiSourceRead(
 	verify func(context.Context, []byte, []byte, common.CertVerificationOpts) error,
 	verifyOpts common.CertVerificationOpts,
 ) ([]byte, error) {
-	var sources []common.PrecomputedKeyStore
+	var sources []common.SecondaryStore
 	if fallback {
 		sources = sm.fallbacks
 	} else {

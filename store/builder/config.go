@@ -1,4 +1,4 @@
-package config
+package builder
 
 import (
 	"encoding/json"
@@ -9,17 +9,21 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/config/eigendaflags"
 	eigendaflags_v2 "github.com/Layr-Labs/eigenda-proxy/config/v2/eigendaflags"
 	"github.com/Layr-Labs/eigenda-proxy/store"
+	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
-	"github.com/Layr-Labs/eigenda-proxy/verify"
+	"github.com/Layr-Labs/eigenda-proxy/store/secondary/redis"
+	"github.com/Layr-Labs/eigenda-proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/urfave/cli/v2"
 )
 
-// ProxyConfig ... Higher order config which bundles all configs for orchestrating
-// the proxy server with necessary client context
-type ProxyConfig struct {
-	ServerConfig     ServerConfig
+// Config ... Higher order config which bundles all configs for building
+// the proxy store manager with necessary client context
+type Config struct {
+	StoreConfig store.Config
+
+	// main storage configs
 	ClientConfigV1   common.ClientConfigV1
 	VerifierConfigV1 verify.Config
 	KzgConfig        kzg.KzgConfig
@@ -27,74 +31,72 @@ type ProxyConfig struct {
 
 	MemstoreConfig  *memconfig.SafeConfig
 	MemstoreEnabled bool
-	StorageConfig   store.Config
+
+	// secondary storage cfgs
+	RedisConfig redis.Config
+	S3Config    s3.Config
 }
 
-// ReadProxyConfig ... parses the Config from the provided flags or environment variables.
-func ReadProxyConfig(ctx *cli.Context) (ProxyConfig, error) {
-	storageConfig, err := store.ReadConfig(ctx)
+// ReadConfig ... parses the Config from the provided flags or environment variables.
+func ReadConfig(ctx *cli.Context) (Config, error) {
+	storeConfig, err := store.ReadConfig(ctx)
 	if err != nil {
-		return ProxyConfig{}, fmt.Errorf("read storage config: %w", err)
+		return Config{}, fmt.Errorf("read storage config: %w", err)
 	}
 
 	var clientConfigV1 common.ClientConfigV1
 	var verifierConfigV1 verify.Config
-	if slices.Contains(storageConfig.BackendsToEnable, common.V1EigenDABackend) {
+	if slices.Contains(storeConfig.BackendsToEnable, common.V1EigenDABackend) {
 		clientConfigV1, err = eigendaflags.ReadClientConfigV1(ctx)
 		if err != nil {
-			return ProxyConfig{}, fmt.Errorf("read client config v1: %w", err)
+			return Config{}, fmt.Errorf("read client config v1: %w", err)
 		}
 
 		verifierConfigV1 = verify.ReadConfig(ctx, clientConfigV1)
 	}
 
 	var clientConfigV2 common.ClientConfigV2
-	if slices.Contains(storageConfig.BackendsToEnable, common.V2EigenDABackend) {
+	if slices.Contains(storeConfig.BackendsToEnable, common.V2EigenDABackend) {
 		clientConfigV2, err = eigendaflags_v2.ReadClientConfigV2(ctx)
 		if err != nil {
-			return ProxyConfig{}, fmt.Errorf("read client config v2: %w", err)
+			return Config{}, fmt.Errorf("read client config v2: %w", err)
 		}
 	}
 
 	var maxBlobSizeBytes uint64
-	switch storageConfig.DispersalBackend {
+	switch storeConfig.DispersalBackend {
 	case common.V1EigenDABackend:
 		maxBlobSizeBytes = clientConfigV1.MaxBlobSizeBytes
 	case common.V2EigenDABackend:
 		maxBlobSizeBytes = clientConfigV2.MaxBlobSizeBytes
 	default:
-		return ProxyConfig{}, fmt.Errorf("unknown dispersal backend %s",
-			common.EigenDABackendToString(storageConfig.DispersalBackend))
+		return Config{}, fmt.Errorf("unknown dispersal backend %s",
+			common.EigenDABackendToString(storeConfig.DispersalBackend))
 	}
-
-	kzgConfig := verify.ReadKzgConfig(ctx, maxBlobSizeBytes)
 
 	memstoreConfig, err := memstore.ReadConfig(ctx, maxBlobSizeBytes)
 	if err != nil {
-		return ProxyConfig{}, fmt.Errorf("read memstore config: %w", err)
+		return Config{}, fmt.Errorf("read memstore config: %w", err)
 	}
 
-	cfg := ProxyConfig{
-		ServerConfig: ServerConfig{
-			Host:        ctx.String(ListenAddrFlagName),
-			Port:        ctx.Int(PortFlagName),
-			EnabledAPIs: ctx.StringSlice(APIsEnabledFlagName),
-		},
+	cfg := Config{
+		StoreConfig:      storeConfig,
 		ClientConfigV1:   clientConfigV1,
 		VerifierConfigV1: verifierConfigV1,
-		KzgConfig:        kzgConfig,
+		KzgConfig:        verify.ReadKzgConfig(ctx, maxBlobSizeBytes),
 		ClientConfigV2:   clientConfigV2,
 		MemstoreConfig:   memstoreConfig,
 		MemstoreEnabled:  ctx.Bool(memstore.EnabledFlagName),
-		StorageConfig:    storageConfig,
+		RedisConfig:      redis.ReadConfig(ctx),
+		S3Config:         s3.ReadConfig(ctx),
 	}
 
 	return cfg, nil
 }
 
 // Check ... verifies that configuration values are adequately set
-func (cfg *ProxyConfig) Check() error {
-	v1Enabled := slices.Contains(cfg.StorageConfig.BackendsToEnable, common.V1EigenDABackend)
+func (cfg *Config) Check() error {
+	v1Enabled := slices.Contains(cfg.StoreConfig.BackendsToEnable, common.V1EigenDABackend)
 	if v1Enabled {
 		err := cfg.checkV1Config()
 		if err != nil {
@@ -102,7 +104,7 @@ func (cfg *ProxyConfig) Check() error {
 		}
 	}
 
-	v2Enabled := slices.Contains(cfg.StorageConfig.BackendsToEnable, common.V2EigenDABackend)
+	v2Enabled := slices.Contains(cfg.StoreConfig.BackendsToEnable, common.V2EigenDABackend)
 	if v2Enabled && !cfg.MemstoreEnabled {
 		err := cfg.ClientConfigV2.Check()
 		if err != nil {
@@ -110,10 +112,23 @@ func (cfg *ProxyConfig) Check() error {
 		}
 	}
 
-	return cfg.StorageConfig.Check()
+	if cfg.S3Config.CredentialType == s3.CredentialTypeUnknown && cfg.S3Config.Endpoint != "" {
+		return fmt.Errorf("s3 credential type must be set")
+	}
+	if cfg.S3Config.CredentialType == s3.CredentialTypeStatic {
+		if cfg.S3Config.Endpoint != "" && (cfg.S3Config.AccessKeyID == "" || cfg.S3Config.AccessKeySecret == "") {
+			return fmt.Errorf("s3 endpoint is set, but access key id or access key secret is not set")
+		}
+	}
+
+	if cfg.RedisConfig.Endpoint == "" && cfg.RedisConfig.Password != "" {
+		return fmt.Errorf("redis password is set, but endpoint is not")
+	}
+
+	return cfg.StoreConfig.Check()
 }
 
-func (cfg *ProxyConfig) checkV1Config() error {
+func (cfg *Config) checkV1Config() error {
 	if cfg.MemstoreEnabled {
 		// provide dummy values to eigenda client config. Since the client won't be called in this
 		// mode it doesn't matter.
@@ -150,7 +165,7 @@ func (cfg *ProxyConfig) checkV1Config() error {
 	return nil
 }
 
-func (cfg *ProxyConfig) ToString() (string, error) {
+func (cfg *Config) ToString() (string, error) {
 	redacted := "******"
 
 	// create a copy, otherwise the original values being redacted will be lost
@@ -163,14 +178,14 @@ func (cfg *ProxyConfig) ToString() (string, error) {
 		// hiding as RPC providers typically use sensitive API keys within
 		configCopy.ClientConfigV1.EdaClientCfg.EthRpcUrl = redacted
 	}
-	if configCopy.StorageConfig.RedisConfig.Password != "" {
-		configCopy.StorageConfig.RedisConfig.Password = redacted
+	if configCopy.RedisConfig.Password != "" {
+		configCopy.RedisConfig.Password = redacted
 	}
-	if configCopy.StorageConfig.S3Config.AccessKeySecret != "" {
-		configCopy.StorageConfig.S3Config.AccessKeySecret = redacted
+	if configCopy.S3Config.AccessKeySecret != "" {
+		configCopy.S3Config.AccessKeySecret = redacted
 	}
-	if configCopy.StorageConfig.S3Config.AccessKeyID != "" {
-		configCopy.StorageConfig.S3Config.AccessKeyID = redacted
+	if configCopy.S3Config.AccessKeyID != "" {
+		configCopy.S3Config.AccessKeyID = redacted
 	}
 
 	configJSON, err := json.MarshalIndent(configCopy, "", "  ")

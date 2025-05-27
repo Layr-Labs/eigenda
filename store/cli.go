@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/redis"
-	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/s3"
 	"github.com/urfave/cli/v2"
 )
 
@@ -96,7 +94,5 @@ func ReadConfig(ctx *cli.Context) (Config, error) {
 		AsyncPutWorkers:  ctx.Int(ConcurrentWriteThreads),
 		FallbackTargets:  ctx.StringSlice(FallbackTargetsFlagName),
 		CacheTargets:     ctx.StringSlice(CacheTargetsFlagName),
-		RedisConfig:      redis.ReadConfig(ctx),
-		S3Config:         s3.ReadConfig(ctx),
 	}, nil
 }

@@ -6,18 +6,33 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
-	"github.com/Layr-Labs/eigenda-proxy/config"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/store"
-	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
 )
+
+// Config ... Config for the proxy HTTP server
+type Config struct {
+	Host string
+	Port int
+	// EnabledAPIs contains the list of API types that are enabled.
+	// When empty (default), no special API endpoints are registered.
+	// Example: If it contains "admin", administrative endpoints like
+	// /admin/eigenda-dispersal-backend will be available.
+	EnabledAPIs []string
+}
+
+// IsAPIEnabled checks if a specific API type is enabled
+func (c *Config) IsAPIEnabled(apiType string) bool {
+	return slices.Contains(c.EnabledAPIs, apiType)
+}
 
 type Server struct {
 	log        logging.Logger
@@ -26,11 +41,11 @@ type Server struct {
 	m          metrics.Metricer
 	httpServer *http.Server
 	listener   net.Listener
-	config     config.ServerConfig
+	config     Config
 }
 
 func NewServer(
-	cfg config.ServerConfig,
+	cfg Config,
 	sm store.IManager,
 	log logging.Logger,
 	m metrics.Metricer,
@@ -49,46 +64,6 @@ func NewServer(
 			WriteTimeout: 40 * time.Minute,
 		},
 	}
-}
-
-// BuildAndStartProxyServer constructs a new proxy server, and starts it
-func BuildAndStartProxyServer(
-	ctx context.Context,
-	logger logging.Logger,
-	metrics metrics.Metricer,
-	appConfig config.AppConfig,
-) (*Server, error) {
-	storageManager, err := store.NewStorageManagerBuilder(
-		ctx,
-		logger,
-		metrics,
-		appConfig.EigenDAConfig.StorageConfig,
-		appConfig.EigenDAConfig.MemstoreConfig,
-		appConfig.EigenDAConfig.MemstoreEnabled,
-		appConfig.EigenDAConfig.KzgConfig,
-		appConfig.EigenDAConfig.ClientConfigV1,
-		appConfig.EigenDAConfig.VerifierConfigV1,
-		appConfig.EigenDAConfig.ClientConfigV2,
-		appConfig.SecretConfig,
-	).Build(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create store: %w", err)
-	}
-
-	proxyServer := NewServer(appConfig.EigenDAConfig.ServerConfig, storageManager, logger, metrics)
-	router := mux.NewRouter()
-	proxyServer.RegisterRoutes(router)
-	if appConfig.EigenDAConfig.MemstoreEnabled {
-		memconfig.NewHandlerHTTP(logger, appConfig.EigenDAConfig.MemstoreConfig).RegisterMemstoreConfigHandlers(router)
-	}
-
-	if err := proxyServer.Start(router); err != nil {
-		return nil, fmt.Errorf("failed to start the DA server: %w", err)
-	}
-
-	logger.Info("Started EigenDA proxy server")
-
-	return proxyServer, nil
 }
 
 func (svr *Server) Start(r *mux.Router) error {

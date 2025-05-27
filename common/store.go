@@ -100,9 +100,9 @@ type EigenDAStore interface {
 	Verify(ctx context.Context, serializedCert []byte, payload []byte, opts CertVerificationOpts) error
 }
 
-// PrecomputedKeyStore is the interface for a key-value data store that uses keccak(value) as the key.
+// SecondaryStore is the interface for a key-value data store that uses keccak(value) as the key.
 // It is used for Optimism altda keccak commitments, as well as for caching EigenDAStore entries.
-type PrecomputedKeyStore interface {
+type SecondaryStore interface {
 	Store
 	// Put inserts the given value into the key-value data store.
 	Put(ctx context.Context, key []byte, value []byte) error

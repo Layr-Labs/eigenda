@@ -42,7 +42,7 @@ func StringToCredentialType(s string) CredentialType {
 	}
 }
 
-var _ common.PrecomputedKeyStore = (*Store)(nil)
+var _ common.SecondaryStore = (*Store)(nil)
 
 type CredentialType string
 type Config struct {

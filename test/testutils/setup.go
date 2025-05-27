@@ -12,11 +12,13 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/config"
 	"github.com/Layr-Labs/eigenda-proxy/config/eigendaflags"
 	proxy_metrics "github.com/Layr-Labs/eigenda-proxy/metrics"
+	"github.com/Layr-Labs/eigenda-proxy/server"
 	"github.com/Layr-Labs/eigenda-proxy/store"
+	"github.com/Layr-Labs/eigenda-proxy/store/builder"
+	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
-	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/redis"
-	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/s3"
-	"github.com/Layr-Labs/eigenda-proxy/verify"
+	"github.com/Layr-Labs/eigenda-proxy/store/secondary/redis"
+	"github.com/Layr-Labs/eigenda-proxy/store/secondary/s3"
 	"github.com/Layr-Labs/eigenda/api/clients"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -201,23 +203,21 @@ func NewTestConfig(
 	}
 }
 
-func createRedisConfig(storageConfig store.Config) store.Config {
-	storageConfig.RedisConfig = redis.Config{
+func createRedisConfig() redis.Config {
+	return redis.Config{
 		Endpoint: redisEndpoint,
 		Password: "",
 		DB:       0,
 		Eviction: 10 * time.Minute,
 	}
-
-	return storageConfig
 }
 
-func createS3Config(storeConfig store.Config) store.Config {
+func createS3Config() s3.Config {
 	// generate random string
 	bucketName := "eigenda-proxy-test-" + RandStr(10)
 	createS3Bucket(bucketName)
 
-	storeConfig.S3Config = s3.Config{
+	return s3.Config{
 		Bucket:          bucketName,
 		Path:            "",
 		Endpoint:        minioEndpoint,
@@ -226,8 +226,6 @@ func createS3Config(storeConfig store.Config) store.Config {
 		AccessKeyID:     "minioadmin",
 		CredentialType:  s3.CredentialTypeStatic,
 	}
-
-	return storeConfig
 }
 
 // nolint: funlen
@@ -288,10 +286,11 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		PayloadPolynomialForm: codecs.PolynomialFormEval,
 		BlobVersion:           0,
 	}
-	proxyConfig := config.ProxyConfig{
-		ServerConfig: config.ServerConfig{
-			Host: host,
-			Port: 0,
+	builderConfig := builder.Config{
+		StoreConfig: store.Config{
+			AsyncPutWorkers:  testCfg.WriteThreadCount,
+			BackendsToEnable: testCfg.BackendsToEnable,
+			DispersalBackend: testCfg.DispersalBackend,
 		},
 		ClientConfigV1: common.ClientConfigV1{
 			EdaClientCfg: clients.EigenDAClientConfig{
@@ -315,10 +314,10 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			MaxBlobSizeBytes:     maxBlobLengthBytes,
 		},
 		KzgConfig: kzg.KzgConfig{
-			G1Path:          "../resources/g1.point",
-			G2Path:          "../resources/g2.point",
-			G2TrailingPath:  "../resources/g2.trailing.point",
-			CacheDir:        "../resources/SRSTables",
+			G1Path:          "../../resources/g1.point",
+			G2Path:          "../../resources/g2.point",
+			G2TrailingPath:  "../../resources/g2.trailing.point",
+			CacheDir:        "../../resources/SRSTables",
 			SRSOrder:        eigendaflags.SrsOrder,
 			SRSNumberToLoad: maxBlobLengthBytes / 32,
 			NumWorker:       uint64(runtime.GOMAXPROCS(0)), // #nosec G115
@@ -353,38 +352,37 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			EigenDAServiceManagerAddr:     svcManagerAddress,
 			RetrieversToEnable:            testCfg.Retrievers,
 		},
-		StorageConfig: store.Config{
-			AsyncPutWorkers:  testCfg.WriteThreadCount,
-			BackendsToEnable: testCfg.BackendsToEnable,
-			DispersalBackend: testCfg.DispersalBackend,
-		},
 	}
 	if useMemory {
-		proxyConfig.ClientConfigV1.EdaClientCfg.SignerPrivateKeyHex =
+		builderConfig.ClientConfigV1.EdaClientCfg.SignerPrivateKeyHex =
 			"0000000000000000000100000000000000000000000000000000000000000000"
-		proxyConfig.ClientConfigV1.EdaClientCfg.SvcManagerAddr = "0x00000000069"
+		builderConfig.ClientConfigV1.EdaClientCfg.SvcManagerAddr = "0x00000000069"
 	}
 	switch {
 	case testCfg.UseKeccak256ModeS3:
-		proxyConfig.StorageConfig = createS3Config(proxyConfig.StorageConfig)
+		builderConfig.S3Config = createS3Config()
 	case testCfg.UseS3Caching:
-		proxyConfig.StorageConfig.CacheTargets = []string{"S3"}
-		proxyConfig.StorageConfig = createS3Config(proxyConfig.StorageConfig)
+		builderConfig.StoreConfig.CacheTargets = []string{"S3"}
+		builderConfig.S3Config = createS3Config()
 	case testCfg.UseS3Fallback:
-		proxyConfig.StorageConfig.FallbackTargets = []string{"S3"}
-		proxyConfig.StorageConfig = createS3Config(proxyConfig.StorageConfig)
+		builderConfig.StoreConfig.FallbackTargets = []string{"S3"}
+		builderConfig.S3Config = createS3Config()
 	case testCfg.UseRedisCaching:
-		proxyConfig.StorageConfig.CacheTargets = []string{"redis"}
-		proxyConfig.StorageConfig = createRedisConfig(proxyConfig.StorageConfig)
+		builderConfig.StoreConfig.CacheTargets = []string{"redis"}
+		builderConfig.RedisConfig = createRedisConfig()
 	}
 	secretConfig := common.SecretConfigV2{
 		SignerPaymentKey: pk,
 		EthRPCURL:        ethRPC,
 	}
 	return config.AppConfig{
-		EigenDAConfig: proxyConfig,
-		SecretConfig:  secretConfig,
-		MetricsConfig: proxy_metrics.Config{},
+		StoreBuilderConfig:  builderConfig,
+		SecretConfig:        secretConfig,
+		MetricsServerConfig: proxy_metrics.Config{},
+		ServerConfig: server.Config{
+			Host: host,
+			Port: 0,
+		},
 	}
 }
 func createS3Bucket(bucketName string) {

@@ -21,10 +21,9 @@ const (
 
 // Config ... Metrics server configuration
 type Config struct {
-	Host              string
-	Port              int
-	Enabled           bool
-	ReadHeaderTimeout int
+	Host    string
+	Port    int
+	Enabled bool
 }
 
 // Metricer ... Interface for metrics

@@ -9,7 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda-proxy/clients/standard_client"
 	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/Layr-Labs/eigenda-proxy/testutils"
+	"github.com/Layr-Labs/eigenda-proxy/test/testutils"
 )
 
 // BenchmarkPutsWithSecondaryV1  ... Takes in an async worker count and profiles blob insertions using

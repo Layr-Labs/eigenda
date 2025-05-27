@@ -14,10 +14,9 @@ import (
 	"testing"
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
-	"github.com/Layr-Labs/eigenda-proxy/config"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
-	"github.com/Layr-Labs/eigenda-proxy/mocks"
-	"github.com/Layr-Labs/eigenda-proxy/store/precomputed_key/s3"
+	"github.com/Layr-Labs/eigenda-proxy/store/secondary/s3"
+	"github.com/Layr-Labs/eigenda-proxy/test/mocks"
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/gorilla/mux"
@@ -29,10 +28,10 @@ import (
 
 var (
 	testLogger = logging.NewTextSLogger(os.Stdout, &logging.SLoggerOptions{})
-	testCfg    = config.ServerConfig{
+	testCfg    = Config{
 		Host:        "localhost",
 		Port:        0,
-		EnabledAPIs: []string{config.AdminAPIType}, // Enable admin API for testing
+		EnabledAPIs: []string{AdminAPIType}, // Enable admin API for testing
 	}
 )
 
@@ -374,7 +373,7 @@ func TestEigenDADispersalBackendEndpoints(t *testing.T) {
 	// Test with admin endpoints disabled - they should not be accessible
 	t.Run("Admin Endpoints Disabled", func(t *testing.T) {
 		// Create server config with admin endpoints disabled
-		adminDisabledCfg := config.ServerConfig{
+		adminDisabledCfg := Config{
 			Host:        "localhost",
 			Port:        0,
 			EnabledAPIs: []string{}, // Empty list means no APIs are enabled

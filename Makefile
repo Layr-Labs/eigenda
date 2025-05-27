@@ -25,30 +25,33 @@ disperse-test-blob:
 
 # Runs all tests, excluding e2e
 test-unit:
-	gotestsum --format pkgname-and-test-fails -- `go list ./... | grep -v ./e2e` -parallel 4
+	gotestsum --format pkgname-and-test-fails -- `go list ./... | grep -v ./test/e2e` -parallel 4
 
 # E2E tests using local memstore, leveraging op-e2e framework. Also tests the standard client against the proxy.
 test-e2e-local:
-	BACKEND=memstore gotestsum --format testname -- -v -timeout 10m ./e2e -parallel 8
+	BACKEND=memstore gotestsum --format testname -- -v -timeout 10m ./test/e2e -parallel 8
 
 # E2E tests using holesky testnet backend, leveraging op-e2e framework. Also tests the standard client against the proxy.
 # If holesky tests are failing, consider checking https://dora.holesky.ethpandaops.io/epochs for block production status.
 test-e2e-testnet:
-	BACKEND=testnet gotestsum --format testname -- -v -timeout 20m ./e2e -parallel 32
+	BACKEND=testnet gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
 
 ## Equivalent to `test-e2e-testnet`, but against preprod instead of testnet
 test-e2e-preprod:
-	BACKEND=preprod gotestsum --format testname -- -v -timeout 20m ./e2e -parallel 32
+	BACKEND=preprod gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
 
 ## Equivalent to `test-e2e-testnet`, bug against sepolia network instead of holesky
 test-e2e-sepolia:
-	BACKEND=sepolia gotestsum --format testname -- -v -timeout 20m ./e2e -parallel 32
+	BACKEND=sepolia gotestsum --format testname -- -v -timeout 20m ./test/e2e -parallel 32
 
 # Very simple fuzzer which generates random bytes arrays and sends them to the proxy using the standard client.
 # To clean the cached corpus, run `go clean -fuzzcache` before running this.
 test-fuzz:
-	go test ./fuzz -fuzz=FuzzProxyClientServerV1 -fuzztime=1m
-	go test ./fuzz -fuzz=FuzzProxyClientServerV2 -fuzztime=1m
+	go test ./test/fuzz -fuzz=FuzzProxyClientServerV1 -fuzztime=1m
+	go test ./test/fuzz -fuzz=FuzzProxyClientServerV2 -fuzztime=1m
+
+benchmark:
+	go test -benchmem -run=^$ -bench . ./test/benchmark -test.parallel 4
 
 .PHONY: lint
 lint:
@@ -73,9 +76,6 @@ mocks:
 op-devnet-allocs:
 	@echo "Generating devnet allocs..."
 	@./scripts/op-devnet-allocs.sh
-
-benchmark:
-	go test -benchmem -run=^$ -bench . ./benchmark -test.parallel 4
 
 deps:
 	mise install

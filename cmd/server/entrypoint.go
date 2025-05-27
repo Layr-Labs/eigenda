@@ -8,6 +8,9 @@ import (
 	proxy_logging "github.com/Layr-Labs/eigenda-proxy/logging"
 	proxy_metrics "github.com/Layr-Labs/eigenda-proxy/metrics"
 	"github.com/Layr-Labs/eigenda-proxy/server"
+	"github.com/Layr-Labs/eigenda-proxy/store/builder"
+	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
+	"github.com/gorilla/mux"
 	"github.com/urfave/cli/v2"
 
 	"github.com/ethereum-optimism/optimism/op-service/ctxinterrupt"
@@ -26,7 +29,7 @@ func StartProxySvr(cliCtx *cli.Context) error {
 
 	log.Info("Starting EigenDA Proxy Server", "version", Version, "date", Date, "commit", Commit)
 
-	cfg, err := config.ReadCLIConfig(cliCtx)
+	cfg, err := config.ReadAppConfig(cliCtx)
 	if err != nil {
 		return fmt.Errorf("read cli config: %w", err)
 	}
@@ -34,7 +37,7 @@ func StartProxySvr(cliCtx *cli.Context) error {
 	if err := cfg.Check(); err != nil {
 		return err
 	}
-	configString, err := cfg.EigenDAConfig.ToString()
+	configString, err := cfg.StoreBuilderConfig.ToString()
 	if err != nil {
 		return fmt.Errorf("convert config json to string: %w", err)
 	}
@@ -46,22 +49,41 @@ func StartProxySvr(cliCtx *cli.Context) error {
 	ctx, ctxCancel := context.WithCancel(cliCtx.Context)
 	defer ctxCancel()
 
-	proxyServer, err := server.BuildAndStartProxyServer(ctx, log, metrics, cfg)
+	storeManager, err := builder.BuildStoreManager(
+		ctx,
+		log,
+		metrics,
+		cfg.StoreBuilderConfig,
+		cfg.SecretConfig,
+	)
 	if err != nil {
-		return fmt.Errorf("build proxy server: %w", err)
+		return fmt.Errorf("build storage manager: %w", err)
 	}
+
+	proxyServer := server.NewServer(cfg.ServerConfig, storeManager, log, metrics)
+	router := mux.NewRouter()
+	proxyServer.RegisterRoutes(router)
+	if cfg.StoreBuilderConfig.MemstoreEnabled {
+		memconfig.NewHandlerHTTP(log, cfg.StoreBuilderConfig.MemstoreConfig).RegisterMemstoreConfigHandlers(router)
+	}
+
+	if err := proxyServer.Start(router); err != nil {
+		return fmt.Errorf("start proxy server: %w", err)
+	}
+
+	log.Info("Started EigenDA proxy server")
 
 	defer func() {
 		if err := proxyServer.Stop(); err != nil {
 			log.Error("failed to stop DA server", "err", err)
 		}
 
-		log.Info("successfully shutdown API server")
+		log.Info("Successfully shutdown API server")
 	}()
 
-	if cfg.MetricsConfig.Enabled {
-		log.Debug("starting metrics server", "addr", cfg.MetricsConfig.Host, "port", cfg.MetricsConfig.Port)
-		svr, err := metrics.StartServer(cfg.MetricsConfig.Host, cfg.MetricsConfig.Port)
+	if cfg.MetricsServerConfig.Enabled {
+		log.Info("Starting metrics server", "addr", cfg.MetricsServerConfig.Host, "port", cfg.MetricsServerConfig.Port)
+		svr, err := metrics.StartServer(cfg.MetricsServerConfig.Host, cfg.MetricsServerConfig.Port)
 		if err != nil {
 			return fmt.Errorf("failed to start metrics server: %w", err)
 		}

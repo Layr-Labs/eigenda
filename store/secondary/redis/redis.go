@@ -40,7 +40,7 @@ type Store struct {
 	client *redis.Client
 }
 
-var _ common.PrecomputedKeyStore = (*Store)(nil)
+var _ common.SecondaryStore = (*Store)(nil)
 
 // NewStore ... constructor
 func NewStore(cfg *Config) (*Store, error) {

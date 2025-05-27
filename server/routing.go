@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
-	"github.com/Layr-Labs/eigenda-proxy/config"
 	"github.com/gorilla/mux"
 )
 
@@ -107,7 +106,7 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 	// Note: A common pattern for admin endpoints is to generate a random API key on startup for authentication.
 	// Since the proxy isn't meant to be exposed publicly, we haven't implemented this here, but it's something
 	// that might be done in the future.
-	if svr.config.IsAPIEnabled(config.AdminAPIType) {
+	if svr.config.IsAPIEnabled(AdminAPIType) {
 		svr.log.Warn("Admin API endpoints are enabled")
 		// Admin endpoints to check and set EigenDA backend used for dispersal
 		r.HandleFunc("/admin/eigenda-dispersal-backend",

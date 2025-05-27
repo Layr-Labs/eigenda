@@ -11,8 +11,8 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/common"
 	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/metrics"
-	"github.com/Layr-Labs/eigenda-proxy/store"
-	"github.com/Layr-Labs/eigenda-proxy/testutils"
+	"github.com/Layr-Labs/eigenda-proxy/store/secondary"
+	"github.com/Layr-Labs/eigenda-proxy/test/testutils"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
@@ -33,11 +33,11 @@ func requireDispersalRetrievalEigenDA(t *testing.T, cm *metrics.CountMap, mode c
 
 // requireWriteReadSecondary ... ensure that secondary backend was successfully written/read to/from
 func requireWriteReadSecondary(t *testing.T, cm *metrics.CountMap, bt common.BackendType) {
-	writeCount, err := cm.Get(http.MethodPut, store.Success, bt.String())
+	writeCount, err := cm.Get(http.MethodPut, secondary.Success, bt.String())
 	require.NoError(t, err)
 	require.True(t, writeCount > 0)
 
-	readCount, err := cm.Get(http.MethodGet, store.Success, bt.String())
+	readCount, err := cm.Get(http.MethodGet, secondary.Success, bt.String())
 	require.NoError(t, err)
 	require.True(t, readCount > 0)
 }
@@ -486,7 +486,7 @@ func testMaxBlobSize(t *testing.T, dispersalBackend common.EigenDABackend) {
 
 	// the payload has things added to it during encoding, so it has a slightly lower limit than max blob size
 	maxPayloadSize, err := codec.GetMaxPermissiblePayloadLength(
-		uint32(tsConfig.EigenDAConfig.ClientConfigV2.MaxBlobSizeBytes / 32))
+		uint32(tsConfig.StoreBuilderConfig.ClientConfigV2.MaxBlobSizeBytes / 32))
 	require.NoError(t, err)
 
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(int(maxPayloadSize)))
