@@ -1,0 +1,8 @@
+version: "2"
+
+# But right now revive raises 50+ issues, whereas golint didn't have any.
+# despite revive being recommended as a replacement for golint.
+# TODO: should we turn on revive and fix the issues?
+# linters:
+#   enable:
+#     - revive # drop-in replacement for golint
