@@ -59,11 +59,12 @@ var (
 )
 
 type testComponents struct {
-	server      *grpc.ServerV2
-	node        *node.Node
-	store       *nodemock.MockStoreV2
-	validator   *coremockv2.MockShardValidator
-	relayClient *clientsmock.MockRelayClient
+	server         *grpc.ServerV2
+	node           *node.Node
+	store          *nodemock.MockStoreV2
+	validator      *coremockv2.MockShardValidator
+	relayClient    *clientsmock.MockRelayClient
+	blacklistStore *nodemock.MockBlacklistStore
 }
 
 func newTestComponents(t *testing.T, config *node.Config) *testComponents {
@@ -91,6 +92,7 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 	metrics := node.NewMetrics(noopMetrics, reg, logger, ":9090", opID, -1, tx, chainState)
 
 	s := nodemock.NewMockStoreV2()
+	blacklistStore := nodemock.NewMockBlacklistStore()
 	relay := clientsmock.NewRelayClient()
 	var atomicRelayClient atomic.Value
 	atomicRelayClient.Store(relay)
@@ -101,6 +103,7 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		BLSSigner:      signer,
 		Metrics:        metrics,
 		ValidatorStore: s,
+		BlacklistStore: blacklistStore,
 		ChainState:     chainState,
 		ValidatorV2:    val,
 		RelayClient:    atomicRelayClient,
@@ -122,11 +125,12 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 
 	require.NoError(t, err)
 	return &testComponents{
-		server:      server,
-		node:        node,
-		store:       s,
-		validator:   val,
-		relayClient: relay,
+		server:         server,
+		node:           node,
+		store:          s,
+		blacklistStore: blacklistStore,
+		validator:      val,
+		relayClient:    relay,
 	}
 }
 
@@ -204,7 +208,7 @@ func TestV2StoreChunksSuccess(t *testing.T) {
 
 	c.validator.On("ValidateBlobs", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	c.validator.On("ValidateBatchHeader", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
+	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(false)
 	bundles00Bytes, err := bundles[0][0].Serialize()
 	require.NoError(t, err)
 	bundles01Bytes, err := bundles[0][1].Serialize()
@@ -256,7 +260,7 @@ func TestV2StoreChunksDownloadFailure(t *testing.T) {
 	_, batch, _ := nodemock.MockBatch(t)
 	batchProto, err := batch.ToProtobuf()
 	require.NoError(t, err)
-
+	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(false)
 	c.validator.On("ValidateBlobs", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	c.validator.On("ValidateBatchHeader", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	relayErr := errors.New("error")

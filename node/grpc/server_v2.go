@@ -136,7 +136,8 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 
 	// If the disperser is blacklisted and the blob authenticator is not nil, return an error
 	// we don't want to blacklist the disperser if the blob authenticator is nil since that indicated v1
-	if s.node.BlacklistStore.IsBlacklisted(ctx, in.DisperserID) && s.blobAuthenticator != nil {
+	if s.node.BlacklistStore.IsBlacklisted(ctx, in.DisperserID) && s.config.EnableV2 {
+		s.logger.Info("disperser is blacklisted", "disperserID", in.DisperserID, "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]))
 		return nil, api.NewErrorInvalidArg("disperser is blacklisted")
 	}
 	if s.chunkAuthenticator != nil {
@@ -158,7 +159,12 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			_, err = s.validateDispersalRequest(blobCert)
 			if err != nil {
 				// Blacklist the disperser if there's an invalid dispersal request
-				s.blacklistDisperserFromBlobCert(in, blobCert)
+				blacklistErr := s.blacklistDisperserFromBlobCert(in, blobCert)
+				if blacklistErr != nil {
+					s.logger.Error("failed to blacklist disperser", "disperserID", in.DisperserID, "error", blacklistErr, "batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]))
+					return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to blacklist disperser due to blobCert validation failure"))
+				}
+				s.logger.Info("disperser blacklisted due to blobCert validation failure", "disperserID", in.DisperserID)
 				return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to validate blob request: %v", err))
 			}
 		}
