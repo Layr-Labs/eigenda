@@ -73,7 +73,7 @@ func (cb *CertBuilder) buildEigenDAV3Cert(
 		return nil, fmt.Errorf("get non signer stake and signature: %w", err)
 	}
 
-	eigenDACert, err := coretypes.BuildEigenDACertV3(blobStatusReply, nonSignerStakesAndSignature)
+	eigenDACert, err := coretypes.NewEigenDACertV3(blobStatusReply, nonSignerStakesAndSignature)
 	if err != nil {
 		return nil, fmt.Errorf("build eigenda v3 cert: %w", err)
 	}

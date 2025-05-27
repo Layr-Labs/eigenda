@@ -104,8 +104,8 @@ var _ EigenDACert = &EigenDACertV3{}
 type EigenDACertV3 certTypesBinding.EigenDACertTypesEigenDACertV3
 
 
-// BuildEigenDACertV3 creates a new EigenDACertV3 from a BlobStatusReply, and NonSignerStakesAndSignature
-func BuildEigenDACertV3(
+// NewEigenDACertV3 creates a new EigenDACertV3 from a BlobStatusReply, and NonSignerStakesAndSignature
+func NewEigenDACertV3(
 	blobStatusReply *disperser.BlobStatusReply,
 	nonSignerStakesAndSignature *certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature,
 ) (*EigenDACertV3, error) {

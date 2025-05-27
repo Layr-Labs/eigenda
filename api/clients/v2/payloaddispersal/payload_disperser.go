@@ -86,8 +86,8 @@ func (pd *PayloadDisperser) SendPayload(
 	defer probe.End()
 	probe.SetStage("convert_to_blob")
 
-	// convert the higher level payload into a low level EigenDA blob using the polynomial form
-	// to dictate whether the representation is in coefficient (requires IFFT) or evaluation form
+	// convert the payload into an EigenDA blob by interpreting the payload in polynomial form,
+	// which means the encoded payload will need to be IFFT'd since EigenDA blobs are in coefficient form.
 	blob, err := payload.ToBlob(pd.config.PayloadPolynomialForm)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert payload to blob: %w", err)
