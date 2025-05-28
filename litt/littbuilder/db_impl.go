@@ -11,6 +11,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/metrics"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -127,8 +128,6 @@ func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, e
 		go database.gatherMetrics(config.MetricsUpdateInterval)
 	}
 
-	config.Logger.Infof("LittDB started, current data size: %d", database.Size())
-
 	return database, nil
 }
 
@@ -173,16 +172,18 @@ func (d *db) GetTable(name string) (litt.Table, error) {
 	if !ok {
 		if !d.isTableNameValid(name) {
 			return nil, fmt.Errorf(
-				"table name %s is invalid, must be at least one character long and "+
+				"Table name '%s' is invalid, must be at least one character long and "+
 					"contain only letters, numbers, and underscores, and dashes.", name)
 		}
 
 		var err error
-		d.logger.Infof("creating table %s", name)
 		table, err = d.tableBuilder(d.ctx, d.logger, name, d.metrics)
 		if err != nil {
 			return nil, fmt.Errorf("error creating table: %w", err)
 		}
+		d.logger.Infof(
+			"Table '%s' initialized, table contains %d key-value pairs and has a size of %s.",
+			name, table.KeyCount(), util.PrettyPrintBytes(table.Size()))
 
 		d.tables[name] = table
 	}
