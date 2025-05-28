@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"sync"
 	"sync/atomic"
 
@@ -308,7 +309,7 @@ func (pcs *OnchainPaymentState) GetGlobalRatePeriodInterval() uint64 {
 func (pcs *OnchainPaymentState) GetMinNumSymbols() uint64 {
 	params := pcs.PaymentVaultParams.Load()
 	if params == nil {
-		return 0
+		return math.MaxUint64
 	}
 	return params.MinNumSymbols
 }
@@ -316,7 +317,7 @@ func (pcs *OnchainPaymentState) GetMinNumSymbols() uint64 {
 func (pcs *OnchainPaymentState) GetPricePerSymbol() uint64 {
 	params := pcs.PaymentVaultParams.Load()
 	if params == nil {
-		return 0
+		return math.MaxUint64
 	}
 	return params.PricePerSymbol
 }
