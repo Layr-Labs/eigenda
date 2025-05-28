@@ -44,9 +44,12 @@ type Metrics struct {
 	logger   logging.Logger
 }
 
-func NewMetrics(serverVersion uint, blobMetadataStore interface{}, httpPort string, logger logging.Logger) *Metrics {
+func NewMetrics(serverVersion uint, reg *prometheus.Registry, blobMetadataStore interface{}, httpPort string, logger logging.Logger) *Metrics {
 	namespace := "eigenda_dataapi"
-	reg := prometheus.NewRegistry()
+	if reg == nil {
+		reg = prometheus.NewRegistry()
+	}
+
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	reg.MustRegister(collectors.NewGoCollector())
 	if serverVersion == 1 {
