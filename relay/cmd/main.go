@@ -6,18 +6,18 @@ import (
 	"log"
 	"os"
 
-	"github.com/Layr-Labs/eigenda/common/geth"
-	coreeth "github.com/Layr-Labs/eigenda/core/eth"
-	"github.com/Layr-Labs/eigenda/core/thegraph"
-	gethcommon "github.com/ethereum/go-ethereum/common"
-
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
+	"github.com/Layr-Labs/eigenda/common/geth"
+	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/relay"
 	"github.com/Layr-Labs/eigenda/relay/chunkstore"
 	"github.com/Layr-Labs/eigenda/relay/cmd/flags"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli"
 )
 
@@ -65,7 +65,14 @@ func RunRelay(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create s3 client: %w", err)
 	}
 
-	metadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.MetadataTableName)
+	metricsRegistry := prometheus.NewRegistry()
+
+	baseMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.MetadataTableName)
+	metadataStore := blobstore.NewInstrumentedMetadataStore(baseMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
+		ServiceName: "relay",
+		Registry:    metricsRegistry,
+		Backend:     blobstore.BackendDynamoDB,
+	})
 	blobStore := blobstore.NewBlobStore(config.BucketName, s3Client, logger)
 	chunkReader := chunkstore.NewChunkReader(logger, s3Client, config.BucketName)
 	client, err := geth.NewMultiHomingClient(config.EthClientConfig, gethcommon.Address{}, logger)
@@ -83,6 +90,7 @@ func RunRelay(ctx *cli.Context) error {
 
 	server, err := relay.NewServer(
 		context.Background(),
+		metricsRegistry,
 		logger,
 		&config.RelayConfig,
 		metadataStore,

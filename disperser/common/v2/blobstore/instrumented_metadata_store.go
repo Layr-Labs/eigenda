@@ -2,6 +2,7 @@ package blobstore
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -27,7 +28,7 @@ const (
 	BackendUnknown    BackendType = "unknown"
 )
 
-type Config struct {
+type InstrumentedMetadataStoreConfig struct {
 	ServiceName string
 	Backend     BackendType
 	Registry    *prometheus.Registry
@@ -38,7 +39,7 @@ var _ MetadataStore = (*InstrumentedMetadataStore)(nil)
 type InstrumentedMetadataStore struct {
 	metadataStore MetadataStore
 	metrics       *metadataStoreMetricsCollector
-	config        Config
+	config        InstrumentedMetadataStoreConfig
 }
 
 type metadataStoreMetricsCollector struct {
@@ -52,7 +53,7 @@ type metadataStoreMetricsCollector struct {
 	requestsInFlight *prometheus.GaugeVec
 }
 
-func NewInstrumentedMetadataStore(metadataStore MetadataStore, config Config) *InstrumentedMetadataStore {
+func NewInstrumentedMetadataStore(metadataStore MetadataStore, config InstrumentedMetadataStoreConfig) *InstrumentedMetadataStore {
 	if config.Registry == nil {
 		config.Registry = prometheus.NewRegistry()
 	}
@@ -100,6 +101,7 @@ func NewInstrumentedMetadataStore(metadataStore MetadataStore, config Config) *I
 	return &InstrumentedMetadataStore{
 		metadataStore: metadataStore,
 		metrics:       metrics,
+		config:        config,
 	}
 }
 
@@ -112,11 +114,11 @@ func (m *InstrumentedMetadataStore) recordMetrics(method string, start time.Time
 	if err != nil {
 		status = "error"
 		errorType := getErrorType(err)
-		m.metrics.errorTotal.WithLabelValues(method, m.config.ServiceName, errorType, backend).Inc()
+		m.metrics.errorTotal.WithLabelValues(method, errorType, m.config.ServiceName, backend).Inc()
 	}
 
-	m.metrics.requestDuration.WithLabelValues(method, m.config.ServiceName, status, backend).Observe(duration)
-	m.metrics.requestTotal.WithLabelValues(method, m.config.ServiceName, status, backend).Inc()
+	m.metrics.requestDuration.WithLabelValues(method, status, m.config.ServiceName, backend).Observe(duration)
+	m.metrics.requestTotal.WithLabelValues(method, status, m.config.ServiceName, backend).Inc()
 }
 
 // Helper function to track in-flight requests
@@ -133,17 +135,19 @@ func getErrorType(err error) string {
 	if err == nil {
 		return "none"
 	}
-	// Add more specific error type detection based on your error types
-	switch err {
-	case ErrAlreadyExists:
+	if errors.Is(err, ErrAlreadyExists) {
 		return "already_exists"
-	case ErrMetadataNotFound:
-		return "not_found"
-	case ErrInvalidStateTransition:
-		return "invalid_state_transition"
-	default:
-		return "unknown"
 	}
+	if errors.Is(err, ErrMetadataNotFound) {
+		return "not_found"
+	}
+	if errors.Is(err, ErrBlobNotFound) {
+		return "blob_not_found"
+	}
+	if errors.Is(err, ErrInvalidStateTransition) {
+		return "invalid_state_transition"
+	}
+	return "unknown"
 }
 
 func (m *InstrumentedMetadataStore) CheckBlobExists(ctx context.Context, blobKey corev2.BlobKey) (bool, error) {

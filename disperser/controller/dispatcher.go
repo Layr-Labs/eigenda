@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"math"
 	"slices"
 	"strings"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
@@ -52,7 +52,7 @@ type DispatcherConfig struct {
 type Dispatcher struct {
 	*DispatcherConfig
 
-	blobMetadataStore *blobstore.BlobMetadataStore
+	blobMetadataStore blobstore.MetadataStore
 	pool              common.WorkerPool
 	chainState        core.IndexedChainState
 	aggregator        core.SignatureAggregator
@@ -80,7 +80,7 @@ type batchData struct {
 
 func NewDispatcher(
 	config *DispatcherConfig,
-	blobMetadataStore *blobstore.BlobMetadataStore,
+	blobMetadataStore blobstore.MetadataStore,
 	pool common.WorkerPool,
 	chainState core.IndexedChainState,
 	aggregator core.SignatureAggregator,
@@ -170,7 +170,7 @@ func (d *Dispatcher) HandleBatch(
 ) (chan core.SigningMessage, *batchData, error) {
 	// Signal Liveness to indicate no stall
 	healthcheck.SignalHeartbeat("dispatcher", d.controllerLivenessChan, d.logger)
-	
+
 	batchProbe.SetStage("get_reference_block")
 	currentBlockNumber, err := d.chainState.GetCurrentBlockNumber(ctx)
 	if err != nil {

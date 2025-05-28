@@ -6,21 +6,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/replay"
-	"github.com/docker/go-units"
-
-	"github.com/Layr-Labs/eigenda/common/testutils/random"
-	"github.com/Layr-Labs/eigenda/relay/auth"
-
-	"github.com/Layr-Labs/eigenda/relay/limiter"
-
 	pb "github.com/Layr-Labs/eigenda/api/grpc/relay"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/replay"
 	tu "github.com/Layr-Labs/eigenda/common/testutils"
+	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigenda/relay/auth"
+	"github.com/Layr-Labs/eigenda/relay/limiter"
+	"github.com/docker/go-units"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -140,6 +138,7 @@ func TestReadWriteBlobs(t *testing.T) {
 	config := defaultConfig()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -229,6 +228,7 @@ func TestReadNonExistentBlob(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -293,6 +293,7 @@ func TestReadWriteBlobsWithSharding(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -437,6 +438,7 @@ func TestReadWriteChunks(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -663,6 +665,7 @@ func TestBatchedReadWriteChunks(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -817,6 +820,7 @@ func TestReadWriteChunksWithSharding(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,
@@ -1122,6 +1126,7 @@ func TestBatchedReadWriteChunksWithSharding(t *testing.T) {
 	chainReader := newMockChainReader()
 	server, err := NewServer(
 		context.Background(),
+		prometheus.NewRegistry(),
 		logger,
 		config,
 		metadataStore,

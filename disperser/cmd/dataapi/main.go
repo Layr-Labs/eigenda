@@ -18,10 +18,11 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/blobstore"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
-	"github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus"
+	dataapiprometheus "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi/subgraph"
 	serverv2 "github.com/Layr-Labs/eigenda/disperser/dataapi/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/prometheus/client_golang/prometheus"
 
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/urfave/cli"
@@ -76,7 +77,7 @@ func RunDataApi(ctx *cli.Context) error {
 		return err
 	}
 
-	promApi, err := prometheus.NewApi(config.PrometheusConfig)
+	promApi, err := dataapiprometheus.NewApi(config.PrometheusConfig)
 	if err != nil {
 		return err
 	}
@@ -92,6 +93,7 @@ func RunDataApi(ctx *cli.Context) error {
 	}
 
 	var (
+		reg               = prometheus.NewRegistry()
 		promClient        = dataapi.NewPrometheusClient(promApi, config.PrometheusConfig.Cluster)
 		blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, 0)
 		sharedStorage     = blobstore.NewSharedStorage(config.BlobstoreConfig.BucketName, s3Client, blobMetadataStore, logger)
@@ -99,7 +101,7 @@ func RunDataApi(ctx *cli.Context) error {
 		subgraphClient    = dataapi.NewSubgraphClient(subgraphApi, logger)
 		chainState        = coreeth.NewChainState(tx, client)
 		indexedChainState = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
-		metrics           = dataapi.NewMetrics(config.ServerVersion, blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
+		metrics           = dataapi.NewMetrics(config.ServerVersion, reg, blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
 	)
 	server, err := dataapi.NewServer(
 		dataapi.Config{
@@ -127,8 +129,13 @@ func RunDataApi(ctx *cli.Context) error {
 	}
 
 	if config.ServerVersion == 2 {
-		blobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
-		metrics = dataapi.NewMetrics(config.ServerVersion, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)
+		baseBlobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
+		blobMetadataStorev2 := blobstorev2.NewInstrumentedMetadataStore(baseBlobMetadataStorev2, blobstorev2.InstrumentedMetadataStoreConfig{
+			ServiceName: "dataapi",
+			Registry:    reg,
+			Backend:     blobstorev2.BackendDynamoDB,
+		})
+		metrics = dataapi.NewMetrics(config.ServerVersion, reg, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)
 		serverv2, err := serverv2.NewServerV2(
 			dataapi.Config{
 				ServerMode:         config.ServerMode,
