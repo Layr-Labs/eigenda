@@ -95,38 +95,11 @@ func RunDataApi(ctx *cli.Context) error {
 	var (
 		reg               = prometheus.NewRegistry()
 		promClient        = dataapi.NewPrometheusClient(promApi, config.PrometheusConfig.Cluster)
-		blobMetadataStore = blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, 0)
-		sharedStorage     = blobstore.NewSharedStorage(config.BlobstoreConfig.BucketName, s3Client, blobMetadataStore, logger)
 		subgraphApi       = subgraph.NewApi(config.SubgraphApiBatchMetadataAddr, config.SubgraphApiOperatorStateAddr)
 		subgraphClient    = dataapi.NewSubgraphClient(subgraphApi, logger)
 		chainState        = coreeth.NewChainState(tx, client)
 		indexedChainState = thegraph.MakeIndexedChainState(config.ChainStateConfig, chainState, logger)
-		metrics           = dataapi.NewMetrics(config.ServerVersion, reg, blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
 	)
-	server, err := dataapi.NewServer(
-		dataapi.Config{
-			ServerMode:         config.ServerMode,
-			SocketAddr:         config.SocketAddr,
-			AllowOrigins:       config.AllowOrigins,
-			DisperserHostname:  config.DisperserHostname,
-			ChurnerHostname:    config.ChurnerHostname,
-			BatcherHealthEndpt: config.BatcherHealthEndpt,
-		},
-		sharedStorage,
-		promClient,
-		subgraphClient,
-		tx,
-		chainState,
-		indexedChainState,
-		logger,
-		metrics,
-		nil,
-		nil,
-		nil,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create v1 server: %w", err)
-	}
 
 	if config.ServerVersion == 2 {
 		baseBlobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
@@ -135,7 +108,7 @@ func RunDataApi(ctx *cli.Context) error {
 			Registry:    reg,
 			Backend:     blobstorev2.BackendDynamoDB,
 		})
-		metrics = dataapi.NewMetrics(config.ServerVersion, reg, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)
+		metrics := dataapi.NewMetrics(config.ServerVersion, reg, blobMetadataStorev2, config.MetricsConfig.HTTPPort, logger)
 		serverv2, err := serverv2.NewServerV2(
 			dataapi.Config{
 				ServerMode:         config.ServerMode,
@@ -166,6 +139,35 @@ func RunDataApi(ctx *cli.Context) error {
 		}
 
 		return runServer(serverv2, logger)
+	}
+
+	blobMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName, 0)
+	sharedStorage := blobstore.NewSharedStorage(config.BlobstoreConfig.BucketName, s3Client, blobMetadataStore, logger)
+	metrics := dataapi.NewMetrics(config.ServerVersion, reg, blobMetadataStore, config.MetricsConfig.HTTPPort, logger)
+
+	server, err := dataapi.NewServer(
+		dataapi.Config{
+			ServerMode:         config.ServerMode,
+			SocketAddr:         config.SocketAddr,
+			AllowOrigins:       config.AllowOrigins,
+			DisperserHostname:  config.DisperserHostname,
+			ChurnerHostname:    config.ChurnerHostname,
+			BatcherHealthEndpt: config.BatcherHealthEndpt,
+		},
+		sharedStorage,
+		promClient,
+		subgraphClient,
+		tx,
+		chainState,
+		indexedChainState,
+		logger,
+		metrics,
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create v1 server: %w", err)
 	}
 
 	// Enable Metrics Block
