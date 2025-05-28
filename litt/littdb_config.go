@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -181,6 +182,27 @@ func DefaultConfigNoPaths() *Config {
 		MetricsPort:              9101,
 		MetricsUpdateInterval:    time.Second,
 	}
+}
+
+// ExpandTildes expands any tildes in the Paths field to the user's home directory.
+func (c *Config) ExpandTildes() error {
+	for i, path := range c.Paths {
+		if len(path) > 0 && path[0] == '~' {
+
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("failed to get user home directory: %w", err)
+			}
+
+			if len(path) == 1 {
+				c.Paths[i] = homeDir
+			} else if len(path) > 1 && path[1] == '/' {
+				c.Paths[i] = homeDir + path[1:]
+			}
+		}
+	}
+
+	return nil
 }
 
 // SanityCheck performs a sanity check on the configuration, returning an error if any of the configuration

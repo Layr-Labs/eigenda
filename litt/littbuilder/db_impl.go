@@ -73,6 +73,11 @@ func NewDB(config *litt.Config) (litt.DB, error) {
 		return nil, fmt.Errorf("error checking config: %w", err)
 	}
 
+	err = config.ExpandTildes()
+	if err != nil {
+		return nil, fmt.Errorf("error expanding tildes in config: %w", err)
+	}
+
 	tableBuilder := func(
 		ctx context.Context,
 		logger logging.Logger,

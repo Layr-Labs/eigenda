@@ -17,7 +17,7 @@ import (
 // WriteInfo contains information needed to perform a write operation.
 type WriteInfo struct {
 	// The index of the key to write.
-	Index uint64
+	KeyIndex uint64
 	// The key to write.
 	Key []byte
 	// The value to write.
@@ -430,9 +430,9 @@ func (t *DataTracker) generateNextWriteInfo() *WriteInfo {
 	}
 
 	return &WriteInfo{
-		Index: keyIndex,
-		Key:   t.generator.Key(keyIndex),
-		Value: t.generator.Value(keyIndex, t.activeCohort.valueSize),
+		KeyIndex: keyIndex,
+		Key:      t.generator.Key(keyIndex),
+		Value:    t.generator.Value(keyIndex, t.activeCohort.valueSize),
 	}
 }
 

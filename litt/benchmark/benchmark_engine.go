@@ -52,6 +52,12 @@ func NewBenchmarkEngine(configPath string) (*BenchmarkEngine, error) {
 		return nil, fmt.Errorf("failed to create table: %w", err)
 	}
 
+	ttl := time.Duration(config.TTLHours) * time.Hour
+	err = table.SetTTL(ttl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set TTL for table: %w", err)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	dataTracker, err := NewDataTracker(ctx, config)
@@ -78,7 +84,9 @@ func NewBenchmarkEngine(configPath string) (*BenchmarkEngine, error) {
 // encounters an error.
 func (b *BenchmarkEngine) Run() error {
 
-	go b.writer()
+	for i := 0; i < b.config.WriterParallelism; i++ {
+		go b.writer()
+	}
 
 	// Create a channel to listen for OS signals
 	sigChan := make(chan os.Signal, 1)
@@ -122,6 +130,8 @@ func (b *BenchmarkEngine) writer() {
 				if err != nil {
 					panic(fmt.Sprintf("failed to write data: %v", err)) // TODO not clean
 				}
+
+				b.dataTracker.ReportWrite(writeInfo.KeyIndex)
 			}
 
 			err := b.table.Flush()

@@ -38,7 +38,7 @@ func TestTrackerDeterminism(t *testing.T) {
 	// Get a bunch of values.
 	for i := uint64(0); i < keyCount; i++ {
 		writeInfo := dataTracker.GetWriteInfo()
-		require.Equal(t, i, writeInfo.Index)
+		require.Equal(t, i, writeInfo.KeyIndex)
 		require.Equal(t, 32, len(writeInfo.Key))
 		require.Equal(t, units.KiB, len(writeInfo.Value))
 
@@ -59,7 +59,7 @@ func TestTrackerDeterminism(t *testing.T) {
 
 	for i := uint64(0); i < keyCount; i++ {
 		writeInfo := dataTracker.GetWriteInfo()
-		require.Equal(t, i, writeInfo.Index)
+		require.Equal(t, i, writeInfo.KeyIndex)
 		require.Equal(t, 32, len(writeInfo.Key))
 		require.Equal(t, units.KiB, len(writeInfo.Value))
 		require.Equal(t, expectedKeys[i], writeInfo.Key)
@@ -94,11 +94,11 @@ func TestTrackerRestart(t *testing.T) {
 	// Generate a bunch of values.
 	for i := uint64(0); i < keyCount; i++ {
 		writeInfo := dataTracker.GetWriteInfo()
-		require.Equal(t, i, writeInfo.Index)
+		require.Equal(t, i, writeInfo.KeyIndex)
 		require.Equal(t, 32, len(writeInfo.Key))
 		require.Equal(t, units.KiB, len(writeInfo.Value))
 
-		indexSet[writeInfo.Index] = struct{}{}
+		indexSet[writeInfo.KeyIndex] = struct{}{}
 	}
 
 	// All indices should be unique.
@@ -112,7 +112,7 @@ func TestTrackerRestart(t *testing.T) {
 	// Generate more values.
 	for i := uint64(0); i < keyCount; i++ {
 		writeInfo := dataTracker.GetWriteInfo()
-		indexSet[writeInfo.Index] = struct{}{}
+		indexSet[writeInfo.KeyIndex] = struct{}{}
 	}
 
 	// If we aren't reusing indices after the restart, then the set should now be equal to 2*keyCount.
@@ -151,11 +151,11 @@ func TestTrackReads(t *testing.T) {
 	// Generate a bunch of values.
 	for i := uint64(0); i < keyCount; i++ {
 		writeInfo := dataTracker.GetWriteInfo()
-		require.Equal(t, i, writeInfo.Index)
+		require.Equal(t, i, writeInfo.KeyIndex)
 		require.Equal(t, 32, len(writeInfo.Key))
 		require.Equal(t, units.KiB, len(writeInfo.Value))
 
-		keyToIndexMap[string(writeInfo.Key)] = writeInfo.Index
+		keyToIndexMap[string(writeInfo.Key)] = writeInfo.KeyIndex
 
 		if rand.Float64() < 0.1 && i > 2*config.CohortSize {
 			// Advance the highest written index.
