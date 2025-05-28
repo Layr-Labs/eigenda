@@ -1,5 +1,9 @@
 version: "2"
 
+run:
+  # CI was timing out with the default timeout of 1m.
+  timeout: 5m
+
 # But right now revive raises 50+ issues, whereas golint didn't have any.
 # despite revive being recommended as a replacement for golint.
 # TODO: should we turn on revive and fix the issues?
