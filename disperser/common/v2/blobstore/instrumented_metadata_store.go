@@ -44,7 +44,7 @@ type InstrumentedMetadataStore struct {
 
 type metadataStoreMetricsCollector struct {
 	// Request duration summary
-	requestDuration *prometheus.SummaryVec
+	requestDuration *prometheus.HistogramVec
 	// Request counter
 	requestTotal *prometheus.CounterVec
 	// Errors counter
@@ -59,13 +59,14 @@ func NewInstrumentedMetadataStore(metadataStore MetadataStore, config Instrument
 	}
 
 	metrics := &metadataStoreMetricsCollector{
-		requestDuration: promauto.With(config.Registry).NewSummaryVec(
-			prometheus.SummaryOpts{
-				Namespace:  namespace,
-				Subsystem:  subsystem,
-				Name:       "request_duration_seconds",
-				Help:       "Duration of metadata store requests",
-				Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		// Should use Histogram instead
+		requestDuration: promauto.With(config.Registry).NewHistogramVec(
+			prometheus.HistogramOpts{
+				Namespace: namespace,
+				Subsystem: subsystem,
+				Name:      "request_duration_seconds",
+				Help:      "Duration of metadata store requests",
+				Buckets:   prometheus.DefBuckets,
 			},
 			[]string{"method", "status", "service", "backend"},
 		),
