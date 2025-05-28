@@ -59,7 +59,6 @@ func NewInstrumentedMetadataStore(metadataStore MetadataStore, config Instrument
 	}
 
 	metrics := &metadataStoreMetricsCollector{
-		// Should use Histogram instead
 		requestDuration: promauto.With(config.Registry).NewHistogramVec(
 			prometheus.HistogramOpts{
 				Namespace: namespace,
