@@ -41,7 +41,7 @@ In the table below, all bounds are inclusive.
 
 ## Minimum Blob SIze
 
-The minimum `blob` size is 128KiB. Sending extremely small `payloads` will always result in being charted for at least
+The minimum `blob` size is 128KiB. Sending extremely small `payloads` will always result in being charged for at least
 as much as if sending 128KiB. (Note that the actual data transmitted over the wire may be smaller than 128KiB, but
 it is metered and charged as if it were 128KiB.)
 

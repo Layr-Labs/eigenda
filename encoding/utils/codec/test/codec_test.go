@@ -43,7 +43,7 @@ func deriveRealBlobSize(t *testing.T, payloadSize uint32) uint32 {
 func TestGenerateOptimumSizeTable(t *testing.T) {
 
 	// Uncomment this to generate an optimum size table.
-	//t.Skip() // Do not merge with unless this line is uncommented.
+	t.Skip() // Do not merge with this test enabled
 
 	blobSizes, err := codec.FindLegalBlobSizes(minBlobSize, maxBlobSize)
 	require.NoError(t, err)
