@@ -188,7 +188,8 @@ func setup(m *testing.M) {
 	mockTx.On("GetCurrentBlockNumber").Return(uint32(1), nil)
 	mockTx.On("GetQuorumCount").Return(uint8(2), nil)
 
-	testDataApiServerV2, err = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, dataapi.NewMetrics(serverVersion, nil, nil, "9001", mockLogger))
+	metrics := dataapi.NewMetrics(serverVersion, nil, blobMetadataStore, "9001", mockLogger)
+	testDataApiServerV2, err = serverv2.NewServerV2(config, blobMetadataStore, prometheusClient, subgraphClient, mockTx, mockChainState, mockIndexedChainState, mockLogger, metrics)
 	if err != nil {
 		teardown()
 		panic("failed to create v2 server: " + err.Error())
