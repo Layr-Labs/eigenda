@@ -225,7 +225,8 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 
 	// Create payment state with test configurations
 	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
-		PaymentVaultParams: createTestPaymentVaultParams(5, 1, 100),
+		PaymentVaultParams:       createTestPaymentVaultParams(5, 1, 100),
+		OnchainCumulativePayment: big.NewInt(1500).Bytes(),
 	}
 	err = accountant.SetPaymentState(paymentState)
 	assert.NoError(t, err)
@@ -261,7 +262,8 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 
 	// Create payment state with test configurations
 	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
-		PaymentVaultParams: createTestPaymentVaultParams(60, 100, 100),
+		PaymentVaultParams:       createTestPaymentVaultParams(60, 100, 100),
+		OnchainCumulativePayment: big.NewInt(500).Bytes(),
 	}
 	err = accountant.SetPaymentState(paymentState)
 	assert.NoError(t, err)
@@ -293,7 +295,22 @@ func TestAccountBlobCallSeries(t *testing.T) {
 
 	// Create payment state with test configurations
 	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
-		PaymentVaultParams: createTestPaymentVaultParams(reservationWindow, 1, 100),
+		PaymentVaultParams:       createTestPaymentVaultParams(reservationWindow, 1, 100),
+		OnchainCumulativePayment: big.NewInt(1000).Bytes(),
+		Reservations: []*v2.QuorumReservation{
+			{
+				QuorumNumber:     0,
+				SymbolsPerSecond: 200,
+				StartTimestamp:   100,
+				EndTimestamp:     200,
+			},
+			{
+				QuorumNumber:     1,
+				SymbolsPerSecond: 200,
+				StartTimestamp:   100,
+				EndTimestamp:     200,
+			},
+		},
 	}
 	err = accountant.SetPaymentState(paymentState)
 	assert.NoError(t, err)
@@ -350,7 +367,22 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 
 	// Create payment state with test configurations
 	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
-		PaymentVaultParams: createTestPaymentVaultParams(reservationWindow, 1, 100),
+		PaymentVaultParams:       createTestPaymentVaultParams(reservationWindow, 1, 100),
+		OnchainCumulativePayment: big.NewInt(1000).Bytes(),
+		Reservations: []*v2.QuorumReservation{
+			{
+				QuorumNumber:     0,
+				SymbolsPerSecond: 1000,
+				StartTimestamp:   100,
+				EndTimestamp:     200,
+			},
+			{
+				QuorumNumber:     1,
+				SymbolsPerSecond: 1000,
+				StartTimestamp:   100,
+				EndTimestamp:     200,
+			},
+		},
 	}
 	err = accountant.SetPaymentState(paymentState)
 	assert.NoError(t, err)
@@ -416,7 +448,22 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 
 	// Create payment state with test configurations
 	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
-		PaymentVaultParams: createTestPaymentVaultParams(reservationWindow, 1, 100),
+		PaymentVaultParams:       createTestPaymentVaultParams(reservationWindow, 1, 100),
+		OnchainCumulativePayment: big.NewInt(1000).Bytes(),
+		Reservations: []*v2.QuorumReservation{
+			{
+				QuorumNumber:     0,
+				SymbolsPerSecond: 1000,
+				StartTimestamp:   100,
+				EndTimestamp:     200,
+			},
+			{
+				QuorumNumber:     1,
+				SymbolsPerSecond: 1000,
+				StartTimestamp:   100,
+				EndTimestamp:     200,
+			},
+		},
 	}
 	err = accountant.SetPaymentState(paymentState)
 	assert.NoError(t, err)
@@ -466,7 +513,22 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 
 	// Create payment state with test configurations
 	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
-		PaymentVaultParams: createTestPaymentVaultParams(reservationWindow, 1, 100),
+		PaymentVaultParams:       createTestPaymentVaultParams(reservationWindow, 1, 100),
+		OnchainCumulativePayment: big.NewInt(1000).Bytes(),
+		Reservations: []*v2.QuorumReservation{
+			{
+				QuorumNumber:     0,
+				SymbolsPerSecond: 200,
+				StartTimestamp:   100,
+				EndTimestamp:     200,
+			},
+			{
+				QuorumNumber:     1,
+				SymbolsPerSecond: 200,
+				StartTimestamp:   100,
+				EndTimestamp:     200,
+			},
+		},
 	}
 	err = accountant.SetPaymentState(paymentState)
 	assert.NoError(t, err)
@@ -537,7 +599,22 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 
 	// Create payment state with test configurations
 	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
-		PaymentVaultParams: createTestPaymentVaultParams(reservationWindow, 1, 100),
+		PaymentVaultParams:       createTestPaymentVaultParams(reservationWindow, 1, 100),
+		OnchainCumulativePayment: big.NewInt(1000).Bytes(),
+		Reservations: []*v2.QuorumReservation{
+			{
+				QuorumNumber:     0,
+				SymbolsPerSecond: 1000,
+				StartTimestamp:   100,
+				EndTimestamp:     200,
+			},
+			{
+				QuorumNumber:     1,
+				SymbolsPerSecond: 1000,
+				StartTimestamp:   100,
+				EndTimestamp:     200,
+			},
+		},
 	}
 	err = accountant.SetPaymentState(paymentState)
 	assert.NoError(t, err)

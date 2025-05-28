@@ -329,6 +329,8 @@ func TestMetererOnDemand(t *testing.T) {
 	quorumNumbers := []uint8{0, 1}
 	paymentChainState.On("GetPricePerSymbol", testifymock.Anything, testifymock.Anything).Return(uint64(2), nil)
 	paymentChainState.On("GetMinNumSymbols", testifymock.Anything, testifymock.Anything).Return(uint64(3), nil)
+	paymentChainState.On("GetOnDemandGlobalSymbolsPerSecond", testifymock.Anything).Return(uint64(1009), nil)
+	paymentChainState.On("GetOnDemandGlobalRatePeriodInterval", testifymock.Anything).Return(uint64(1), nil)
 	now := time.Now()
 
 	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
