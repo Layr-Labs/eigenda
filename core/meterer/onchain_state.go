@@ -212,6 +212,9 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx contex
 	}
 	pcs.ReservationsLock.Lock()
 	// update specific quorum reservations
+	if (pcs.ReservedPayments)[accountID] == nil {
+		(pcs.ReservedPayments)[accountID] = make(map[core.QuorumID]*core.ReservedPayment)
+	}
 	for _, quorumNumber := range quorumNumbers {
 		if _, ok := res[quorumNumber]; ok {
 			(pcs.ReservedPayments)[accountID][quorumNumber] = res[quorumNumber]
@@ -287,21 +290,41 @@ func (pcs *OnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([
 }
 
 func (pcs *OnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
-	return pcs.PaymentVaultParams.Load().GlobalSymbolsPerSecond
+	params := pcs.PaymentVaultParams.Load()
+	if params == nil {
+		return 0
+	}
+	return params.GlobalSymbolsPerSecond
 }
 
 func (pcs *OnchainPaymentState) GetGlobalRatePeriodInterval() uint64 {
-	return pcs.PaymentVaultParams.Load().GlobalRatePeriodInterval
+	params := pcs.PaymentVaultParams.Load()
+	if params == nil {
+		return 0
+	}
+	return params.GlobalRatePeriodInterval
 }
 
 func (pcs *OnchainPaymentState) GetMinNumSymbols() uint64 {
-	return pcs.PaymentVaultParams.Load().MinNumSymbols
+	params := pcs.PaymentVaultParams.Load()
+	if params == nil {
+		return 0
+	}
+	return params.MinNumSymbols
 }
 
 func (pcs *OnchainPaymentState) GetPricePerSymbol() uint64 {
-	return pcs.PaymentVaultParams.Load().PricePerSymbol
+	params := pcs.PaymentVaultParams.Load()
+	if params == nil {
+		return 0
+	}
+	return params.PricePerSymbol
 }
 
 func (pcs *OnchainPaymentState) GetReservationWindow() uint64 {
-	return pcs.PaymentVaultParams.Load().ReservationWindow
+	params := pcs.PaymentVaultParams.Load()
+	if params == nil {
+		return 0
+	}
+	return params.ReservationWindow
 }
