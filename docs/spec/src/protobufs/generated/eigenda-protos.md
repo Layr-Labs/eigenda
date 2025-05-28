@@ -21,6 +21,11 @@
     - [BlobCertificate](#common-v2-BlobCertificate)
     - [BlobHeader](#common-v2-BlobHeader)
     - [PaymentHeader](#common-v2-PaymentHeader)
+    - [PaymentQuorumConfig](#common-v2-PaymentQuorumConfig)
+    - [PaymentQuorumProtocolConfig](#common-v2-PaymentQuorumProtocolConfig)
+    - [PaymentVaultParams](#common-v2-PaymentVaultParams)
+    - [PaymentVaultParams.QuorumPaymentConfigsEntry](#common-v2-PaymentVaultParams-QuorumPaymentConfigsEntry)
+    - [PaymentVaultParams.QuorumProtocolConfigsEntry](#common-v2-PaymentVaultParams-QuorumProtocolConfigsEntry)
   
 - [disperser/disperser.proto](#disperser_disperser-proto)
     - [AuthenticatedReply](#disperser-AuthenticatedReply)
@@ -484,6 +489,91 @@ Detailed Payment Mechanics: 1. Cumulative Design: Rather than sending incrementa
 3. Validation Process: When the disperser receives a request with a cumulative_payment, it performs multiple validations: - Checks that the on-chain deposit balance in the PaymentVault is sufficient to cover this payment - Verifies the cumulative_payment is greater than the highest previous payment from this account - Verifies the increase from the previous cumulative payment is appropriate for the blob size - If other requests from the same account are currently processing, ensures this new cumulative value is consistent with those (preventing double-spending)
 
 4. On-chain Implementation: The PaymentVault contract maintains: - A deposit balance for each account - Global parameters including minNumSymbols, GlobalSymbolsPerSecond and pricePerSymbol Due to the use of cumulative payments, if a client loses track of their current cumulative payment value, they can query the disperser server for their current payment state using the GetPaymentState RPC. |
+
+
+
+
+
+
+<a name="common-v2-PaymentQuorumConfig"></a>
+
+### PaymentQuorumConfig
+PaymentQuorumConfig contains the configuration for a quorum&#39;s payment configurations
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| reservation_symbols_per_second | [uint64](#uint64) |  | reservation_symbols_per_second is the total symbols per second that can be reserved for this quorum |
+| on_demand_symbols_per_second | [uint64](#uint64) |  | on_demand_symbols_per_second is the symbols per second allowed for on-demand payments for this quorum |
+| on_demand_price_per_symbol | [uint64](#uint64) |  | on_demand_price_per_symbol is the price per symbol for on-demand payments in wei |
+
+
+
+
+
+
+<a name="common-v2-PaymentQuorumProtocolConfig"></a>
+
+### PaymentQuorumProtocolConfig
+PaymentQuorumProtocolConfig contains the configuration for a quorum&#39;s protocol-level configurations
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| min_num_symbols | [uint64](#uint64) |  | min_num_symbols is the minimum number of symbols that must be charged for any request |
+| reservation_advance_window | [uint64](#uint64) |  | reservation_advance_window is the window in seconds before a reservation starts that it can be activated |
+| reservation_rate_limit_window | [uint64](#uint64) |  | reservation_rate_limit_window is the time window in seconds for reservation rate limiting |
+| on_demand_rate_limit_window | [uint64](#uint64) |  | on_demand_rate_limit_window is the time window in seconds for on-demand rate limiting |
+| on_demand_enabled | [bool](#bool) |  | on_demand_enabled indicates whether on-demand payments are enabled for this quorum |
+
+
+
+
+
+
+<a name="common-v2-PaymentVaultParams"></a>
+
+### PaymentVaultParams
+PaymentVaultParams contains the global payment configuration parameters from the payment vault
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| quorum_payment_configs | [PaymentVaultParams.QuorumPaymentConfigsEntry](#common-v2-PaymentVaultParams-QuorumPaymentConfigsEntry) | repeated | quorum_payment_configs maps quorum IDs to their payment configurations |
+| quorum_protocol_configs | [PaymentVaultParams.QuorumProtocolConfigsEntry](#common-v2-PaymentVaultParams-QuorumProtocolConfigsEntry) | repeated | quorum_protocol_configs maps quorum IDs to their protocol configurations |
+| on_demand_quorum_numbers | [uint32](#uint32) | repeated | on_demand_quorum_numbers lists the quorum numbers that support on-demand payments |
+
+
+
+
+
+
+<a name="common-v2-PaymentVaultParams-QuorumPaymentConfigsEntry"></a>
+
+### PaymentVaultParams.QuorumPaymentConfigsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [uint32](#uint32) |  |  |
+| value | [PaymentQuorumConfig](#common-v2-PaymentQuorumConfig) |  |  |
+
+
+
+
+
+
+<a name="common-v2-PaymentVaultParams-QuorumProtocolConfigsEntry"></a>
+
+### PaymentVaultParams.QuorumProtocolConfigsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [uint32](#uint32) |  |  |
+| value | [PaymentQuorumProtocolConfig](#common-v2-PaymentQuorumProtocolConfig) |  |  |
 
 
 
@@ -1026,7 +1116,7 @@ GetQuorumSpecificPaymentStateReply contains the payment state of an account.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| payment_global_params | [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams) |  | global payment vault parameters |
+| payment_vault_params | [common.v2.PaymentVaultParams](#common-v2-PaymentVaultParams) |  | payment vault parameters with per-quorum configurations |
 | period_records | [QuorumPeriodRecord](#disperser-v2-QuorumPeriodRecord) | repeated | off-chain account reservation usage records |
 | reservations | [QuorumReservation](#disperser-v2-QuorumReservation) | repeated | on-chain account reservation setting |
 | cumulative_payment | [bytes](#bytes) |  | off-chain on-demand payment usage |

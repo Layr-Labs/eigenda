@@ -12,6 +12,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api"
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
+	commonpbv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	pbv1 "github.com/Layr-Labs/eigenda/api/grpc/disperser"
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
@@ -318,16 +319,17 @@ func (s *DispersalServerV2) GetQuorumSpecificPaymentState(ctx context.Context, r
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 
-	// on-chain global payment parameters
-	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetGlobalSymbolsPerSecond()
-	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols()
-	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol()
-	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
+	// These parameters will be retrieved per-quorum in the PaymentVaultParams construction below
 
 	// Get on-Chain account state for reservations
 	var pbReservation []*pb.QuorumReservation
 	// Get fresh quorum IDs since onchain state might have changed
-	reservations, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
+	quorumNumbers, err := s.meterer.ChainPaymentState.GetQuorumNumbers(ctx)
+	if err != nil {
+		s.logger.Debug("failed to get quorum numbers", "err", err, "accountID", accountID)
+		return nil, api.NewErrorInternal("failed to get quorum numbers")
+	}
+	reservations, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, accountID, quorumNumbers)
 	if err != nil {
 		s.logger.Debug("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
 		pbReservation = []*pb.QuorumReservation{}
@@ -346,6 +348,8 @@ func (s *DispersalServerV2) GetQuorumSpecificPaymentState(ctx context.Context, r
 
 	// off-chain account specific payment state
 	now := time.Now().Unix()
+	// Use quorum 0 for reservation period calculation (this should be consistent across quorums)
+	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow(core.QuorumID(0))
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
 
 	// Get all quorum IDs from the system
@@ -389,17 +393,58 @@ func (s *DispersalServerV2) GetQuorumSpecificPaymentState(ctx context.Context, r
 		onchainCumulativePaymentBytes = onDemandPayment.CumulativePayment.Bytes()
 	}
 
-	// Prepare global parameters for the response
-	paymentGlobalParams := pb.PaymentGlobalParams{
-		GlobalSymbolsPerSecond: globalSymbolsPerSecond,
-		MinNumSymbols:          minNumSymbols,
-		PricePerSymbol:         pricePerSymbol,
-		ReservationWindow:      reservationWindow,
+	// Prepare payment vault parameters for the response
+	// Get all quorum configurations
+	quorumPaymentConfigs := make(map[uint32]*commonpbv2.PaymentQuorumConfig)
+	quorumProtocolConfigs := make(map[uint32]*commonpbv2.PaymentQuorumProtocolConfig)
+
+	// Build configurations for all available quorums
+	allQuorumNumbers, err := s.meterer.ChainPaymentState.GetQuorumNumbers(ctx)
+	if err != nil {
+		s.logger.Debug("failed to get quorum numbers, using default", "err", err)
+		allQuorumNumbers = []uint8{0} // fallback to quorum 0
+	}
+
+	for _, quorumNumber := range allQuorumNumbers {
+		quorumID := uint32(quorumNumber)
+
+		// Payment configuration for this quorum
+		quorumPaymentConfigs[quorumID] = &commonpbv2.PaymentQuorumConfig{
+			ReservationSymbolsPerSecond: 0, // TODO: get from chain when available
+			OnDemandSymbolsPerSecond:    s.meterer.ChainPaymentState.GetOnDemandGlobalSymbolsPerSecond(core.QuorumID(quorumNumber)),
+			OnDemandPricePerSymbol:      s.meterer.ChainPaymentState.GetPricePerSymbol(core.QuorumID(quorumNumber)),
+		}
+
+		// Protocol configuration for this quorum
+		quorumProtocolConfigs[quorumID] = &commonpbv2.PaymentQuorumProtocolConfig{
+			MinNumSymbols:              s.meterer.ChainPaymentState.GetMinNumSymbols(core.QuorumID(quorumNumber)),
+			ReservationAdvanceWindow:   0, // TODO: get from chain when available
+			ReservationRateLimitWindow: s.meterer.ChainPaymentState.GetReservationWindow(core.QuorumID(quorumNumber)),
+			OnDemandRateLimitWindow:    s.meterer.ChainPaymentState.GetOnDemandGlobalRatePeriodInterval(core.QuorumID(quorumNumber)),
+			OnDemandEnabled:            true, // TODO: get from chain when available
+		}
+	}
+
+	// Get on-demand quorum numbers
+	onDemandQuorumNumbers, err := s.meterer.ChainPaymentState.GetOnDemandQuorumNumbers(ctx)
+	if err != nil {
+		s.logger.Debug("failed to get on-demand quorum numbers, using default", "err", err)
+		onDemandQuorumNumbers = []uint8{0} // fallback to quorum 0
+	}
+	onDemandQuorumNumbers32 := make([]uint32, len(onDemandQuorumNumbers))
+	for i, qn := range onDemandQuorumNumbers {
+		onDemandQuorumNumbers32[i] = uint32(qn)
+	}
+
+	paymentVaultParams := &commonpbv2.PaymentVaultParams{
+		QuorumPaymentConfigs:  quorumPaymentConfigs,
+		QuorumProtocolConfigs: quorumProtocolConfigs,
+		OnDemandQuorumNumbers: onDemandQuorumNumbers32,
 	}
 
 	// Build reply
 	reply := &pb.GetQuorumSpecificPaymentStateReply{
-		PaymentGlobalParams:      &paymentGlobalParams,
+		PaymentVaultParams:       paymentVaultParams,
 		PeriodRecords:            periodRecords,
 		Reservations:             pbReservation,
 		CumulativePayment:        largestCumulativePaymentBytes,

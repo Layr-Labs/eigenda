@@ -166,8 +166,8 @@ message GetPaymentStateReply {
 
 // GetQuorumSpecificPaymentStateReply contains the payment state of an account.
 message GetQuorumSpecificPaymentStateReply {
-  // global payment vault parameters
-  PaymentGlobalParams payment_global_params = 1;
+  // payment vault parameters with per-quorum configurations
+  common.v2.PaymentVaultParams payment_vault_params = 1;
   // off-chain account reservation usage records
   repeated QuorumPeriodRecord period_records = 2;
   // on-chain account reservation setting

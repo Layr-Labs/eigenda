@@ -648,27 +648,26 @@ type OnDemandPayment struct {
 	CumulativePayment *big.Int
 }
 
-// QuorumConfig represents the payment configuration for a specific quorum
-type QuorumConfig struct {
-	// Maximum symbols per second for reservations
+// PaymentQuorumConfig contains the configuration for a quorum's payment configurations
+// This is pretty much the same as the PaymentVaultTypesQuorumConfig struct in the contracts/bindings/IPaymentVault/binding.go file
+type PaymentQuorumConfig struct {
 	ReservationSymbolsPerSecond uint64
-	// Maximum symbols per second for on-demand
+
+	// OnDemand is initially only enabled on Quorum 0
 	OnDemandSymbolsPerSecond uint64
-	// Price per symbol for on-demand
-	OnDemandPricePerSymbol uint64
+	OnDemandPricePerSymbol   uint64
 }
 
-// QuorumProtocolConfig represents the protocol configuration for a specific quorum
-type QuorumProtocolConfig struct {
-	// Minimum number of symbols required for dispersal
-	MinNumSymbols uint64
-	// Rate limit window for reservations
+// PaymentQuorumProtocolConfig contains the configuration for a quorum's ratelimiting configurations
+// This is pretty much the same as the PaymentVaultTypesQuorumProtocolConfig struct in the contracts/bindings/IPaymentVault/binding.go file
+type PaymentQuorumProtocolConfig struct {
+	MinNumSymbols              uint64
+	ReservationAdvanceWindow   uint64
 	ReservationRateLimitWindow uint64
-	// Rate limit window for on-demand
+
+	// OnDemand is initially only enabled on Quorum 0
 	OnDemandRateLimitWindow uint64
-	// Whether on-demand dispersal is enabled; We assume quorum 0 is the only quorum that supports on-demand dispersal
-	// This field will only be used when on-demand is supported for multiple quorums
-	OnDemandEnabled bool
+	OnDemandEnabled         bool
 }
 
 type BlobVersionParameters struct {

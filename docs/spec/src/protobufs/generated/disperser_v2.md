@@ -225,7 +225,7 @@ GetQuorumSpecificPaymentStateReply contains the payment state of an account.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| payment_global_params | [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams) |  | global payment vault parameters |
+| payment_vault_params | [common.v2.PaymentVaultParams](#common-v2-PaymentVaultParams) |  | payment vault parameters with per-quorum configurations |
 | period_records | [QuorumPeriodRecord](#disperser-v2-QuorumPeriodRecord) | repeated | off-chain account reservation usage records |
 | reservations | [QuorumReservation](#disperser-v2-QuorumReservation) | repeated | on-chain account reservation setting |
 | cumulative_payment | [bytes](#bytes) |  | off-chain on-demand payment usage |

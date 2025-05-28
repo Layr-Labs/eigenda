@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	commonpbv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	v2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
@@ -19,33 +20,85 @@ import (
 
 const numBins = uint32(3)
 
+// Helper function to create standard PaymentVaultParams for testing
+func createTestPaymentVaultParams(reservationWindow, pricePerSymbol, minNumSymbols uint64) *commonpbv2.PaymentVaultParams {
+	return &commonpbv2.PaymentVaultParams{
+		QuorumPaymentConfigs: map[uint32]*commonpbv2.PaymentQuorumConfig{
+			0: {
+				ReservationSymbolsPerSecond: 2000,
+				OnDemandSymbolsPerSecond:    1000,
+				OnDemandPricePerSymbol:      pricePerSymbol,
+			},
+			1: {
+				ReservationSymbolsPerSecond: 2000,
+				OnDemandSymbolsPerSecond:    1000,
+				OnDemandPricePerSymbol:      pricePerSymbol,
+			},
+		},
+		QuorumProtocolConfigs: map[uint32]*commonpbv2.PaymentQuorumProtocolConfig{
+			0: {
+				MinNumSymbols:              minNumSymbols,
+				ReservationAdvanceWindow:   10,
+				ReservationRateLimitWindow: reservationWindow,
+				OnDemandRateLimitWindow:    30,
+				OnDemandEnabled:            true,
+			},
+			1: {
+				MinNumSymbols:              minNumSymbols,
+				ReservationAdvanceWindow:   10,
+				ReservationRateLimitWindow: reservationWindow,
+				OnDemandRateLimitWindow:    30,
+				OnDemandEnabled:            true,
+			},
+		},
+	}
+}
+
 func TestNewAccountant(t *testing.T) {
 	reservation := &core.ReservedPayment{
 		SymbolsPerSecond: 100,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
 	}
-	reservationWindow := uint64(6)
-	pricePerSymbol := uint64(1)
-	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
-	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
+
+	accountant := NewAccountant(accountId, reservations, onDemand, numBins, testutils.GetLogger())
+
+	// Create payment state with test configurations
+	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
+		PaymentVaultParams:       createTestPaymentVaultParams(6, 1, 100),
+		OnchainCumulativePayment: big.NewInt(500).Bytes(),
+		Reservations: []*v2.QuorumReservation{
+			{
+				QuorumNumber:     0,
+				SymbolsPerSecond: 100,
+				StartTimestamp:   100,
+				EndTimestamp:     200,
+			},
+			{
+				QuorumNumber:     1,
+				SymbolsPerSecond: 100,
+				StartTimestamp:   100,
+				EndTimestamp:     200,
+			},
+		},
+	}
+	err = accountant.SetPaymentState(paymentState)
+	assert.NoError(t, err)
 
 	assert.NotNil(t, accountant)
-	assert.Equal(t, reservations, accountant.reservation)
-	assert.Equal(t, onDemand, accountant.onDemand)
-	assert.Equal(t, reservationWindow, accountant.reservationWindow)
-	assert.Equal(t, pricePerSymbol, accountant.pricePerSymbol)
-	assert.Equal(t, minNumSymbols, accountant.minNumSymbols)
+	// After SetPaymentState, reservations and onDemand should be updated from the payment state
+	assert.Equal(t, 2, len(accountant.reservation))
+	assert.Equal(t, uint64(100), accountant.reservation[0].SymbolsPerSecond)
+	assert.Equal(t, uint64(100), accountant.reservation[1].SymbolsPerSecond)
+	assert.Equal(t, big.NewInt(500), accountant.onDemand.CumulativePayment)
 
 	// Check initialization of periodRecords
 	for _, records := range accountant.periodRecords {
@@ -64,21 +117,39 @@ func TestAccountBlob_Reservation(t *testing.T) {
 		SymbolsPerSecond: 200,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
 	}
 	reservationWindow := uint64(5)
-	pricePerSymbol := uint64(1)
-	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
-	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
+	accountant := NewAccountant(accountId, reservations, onDemand, numBins, testutils.GetLogger())
+
+	// Create payment state with test configurations
+	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
+		PaymentVaultParams:       createTestPaymentVaultParams(reservationWindow, 1, 100),
+		OnchainCumulativePayment: big.NewInt(500).Bytes(),
+		Reservations: []*v2.QuorumReservation{
+			{
+				QuorumNumber:     0,
+				SymbolsPerSecond: 200,
+				StartTimestamp:   100,
+				EndTimestamp:     200,
+			},
+			{
+				QuorumNumber:     1,
+				SymbolsPerSecond: 200,
+				StartTimestamp:   100,
+				EndTimestamp:     200,
+			},
+		},
+	}
+	err = accountant.SetPaymentState(paymentState)
+	assert.NoError(t, err)
 
 	ctx := context.Background()
 	symbolLength := uint64(500)
@@ -137,8 +208,6 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 			SymbolsPerSecond: 200,
 			StartTimestamp:   100,
 			EndTimestamp:     200,
-			QuorumSplits:     []byte{50, 50},
-			QuorumNumbers:    []uint8{0, 1},
 		},
 		1: {
 			SymbolsPerSecond: 200,
@@ -149,21 +218,24 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1500),
 	}
-	reservationWindow := uint64(5)
-	pricePerSymbol := uint64(1)
-	minNumSymbols := uint64(100)
-
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
+	accountant := NewAccountant(accountId, reservations, onDemand, numBins, testutils.GetLogger())
+
+	// Create payment state with test configurations
+	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
+		PaymentVaultParams: createTestPaymentVaultParams(5, 1, 100),
+	}
+	err = accountant.SetPaymentState(paymentState)
+	assert.NoError(t, err)
 
 	ctx := context.Background()
 	now := time.Now().UnixNano()
 	header, err := accountant.AccountBlob(ctx, now, numSymbols, quorums)
 	assert.NoError(t, err)
 
-	expectedPayment := big.NewInt(int64(numSymbols * pricePerSymbol))
+	expectedPayment := big.NewInt(int64(numSymbols * 1)) // pricePerSymbol = 1
 	assert.NotEqual(t, uint64(0), header.Timestamp)
 	assert.Equal(t, expectedPayment, header.CumulativePayment)
 
@@ -182,14 +254,17 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
 	}
-	reservationWindow := uint64(60)
-	pricePerSymbol := uint64(100)
-	minNumSymbols := uint64(100)
-
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
+	accountant := NewAccountant(accountId, reservation, onDemand, numBins, testutils.GetLogger())
+
+	// Create payment state with test configurations
+	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
+		PaymentVaultParams: createTestPaymentVaultParams(60, 100, 100),
+	}
+	err = accountant.SetPaymentState(paymentState)
+	assert.NoError(t, err)
 
 	ctx := context.Background()
 	numSymbols := uint64(2000)
@@ -204,21 +279,24 @@ func TestAccountBlobCallSeries(t *testing.T) {
 		SymbolsPerSecond: 200,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
 	}
 	reservationWindow := uint64(5)
-	pricePerSymbol := uint64(1)
-	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
-	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
+	accountant := NewAccountant(accountId, reservations, onDemand, numBins, testutils.GetLogger())
+
+	// Create payment state with test configurations
+	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
+		PaymentVaultParams: createTestPaymentVaultParams(reservationWindow, 1, 100),
+	}
+	err = accountant.SetPaymentState(paymentState)
+	assert.NoError(t, err)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -258,21 +336,24 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 		SymbolsPerSecond: 1000,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
 	}
 	reservationWindow := uint64(1) // Set to 1 second for testing
-	pricePerSymbol := uint64(1)
-	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
-	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
+	accountant := NewAccountant(accountId, reservations, onDemand, numBins, testutils.GetLogger())
+
+	// Create payment state with test configurations
+	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
+		PaymentVaultParams: createTestPaymentVaultParams(reservationWindow, 1, 100),
+	}
+	err = accountant.SetPaymentState(paymentState)
+	assert.NoError(t, err)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -321,21 +402,24 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 		SymbolsPerSecond: 1000,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
 	}
 	reservationWindow := uint64(1) // Set to 1 second for testing
-	pricePerSymbol := uint64(1)
-	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
-	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
+	accountant := NewAccountant(accountId, reservations, onDemand, numBins, testutils.GetLogger())
+
+	// Create payment state with test configurations
+	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
+		PaymentVaultParams: createTestPaymentVaultParams(reservationWindow, 1, 100),
+	}
+	err = accountant.SetPaymentState(paymentState)
+	assert.NoError(t, err)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -368,21 +452,24 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 		SymbolsPerSecond: 200,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
 	}
 	reservationWindow := uint64(5)
-	pricePerSymbol := uint64(1)
-	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
-	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
+	accountant := NewAccountant(accountId, reservations, onDemand, numBins, testutils.GetLogger())
+
+	// Create payment state with test configurations
+	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
+		PaymentVaultParams: createTestPaymentVaultParams(reservationWindow, 1, 100),
+	}
+	err = accountant.SetPaymentState(paymentState)
+	assert.NoError(t, err)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -436,21 +523,24 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 		SymbolsPerSecond: 1000,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
 	}
 	reservationWindow := uint64(1) // Set to 1 second for testing
-	pricePerSymbol := uint64(1)
-	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
 	reservations := map[uint8]*core.ReservedPayment{0: reservation, 1: reservation}
-	accountant := NewAccountant(accountId, reservations, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins, testutils.GetLogger())
+	accountant := NewAccountant(accountId, reservations, onDemand, numBins, testutils.GetLogger())
+
+	// Create payment state with test configurations
+	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
+		PaymentVaultParams: createTestPaymentVaultParams(reservationWindow, 1, 100),
+	}
+	err = accountant.SetPaymentState(paymentState)
+	assert.NoError(t, err)
 
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
@@ -562,15 +652,39 @@ func TestSetPaymentState(t *testing.T) {
 	accountant := NewAccountant(accountId,
 		map[uint8]*core.ReservedPayment{},
 		&core.OnDemandPayment{CumulativePayment: big.NewInt(0)},
-		10, 1, 100, numBins, testutils.GetLogger())
+		numBins, testutils.GetLogger())
 
 	// Create payment state reply with sample data
 	paymentState := &v2.GetQuorumSpecificPaymentStateReply{
-		PaymentGlobalParams: &v2.PaymentGlobalParams{
-			GlobalSymbolsPerSecond: 2000,
-			MinNumSymbols:          200,
-			PricePerSymbol:         2,
-			ReservationWindow:      20,
+		PaymentVaultParams: &commonpbv2.PaymentVaultParams{
+			QuorumPaymentConfigs: map[uint32]*commonpbv2.PaymentQuorumConfig{
+				0: {
+					ReservationSymbolsPerSecond: 2000,
+					OnDemandSymbolsPerSecond:    1000,
+					OnDemandPricePerSymbol:      2,
+				},
+				1: {
+					ReservationSymbolsPerSecond: 3000,
+					OnDemandSymbolsPerSecond:    1500,
+					OnDemandPricePerSymbol:      3,
+				},
+			},
+			QuorumProtocolConfigs: map[uint32]*commonpbv2.PaymentQuorumProtocolConfig{
+				0: {
+					MinNumSymbols:              200,
+					ReservationAdvanceWindow:   20,
+					ReservationRateLimitWindow: 60,
+					OnDemandRateLimitWindow:    30,
+					OnDemandEnabled:            true,
+				},
+				1: {
+					MinNumSymbols:              300,
+					ReservationAdvanceWindow:   25,
+					ReservationRateLimitWindow: 70,
+					OnDemandRateLimitWindow:    35,
+					OnDemandEnabled:            true,
+				},
+			},
 		},
 		CumulativePayment:        big.NewInt(500).Bytes(),
 		OnchainCumulativePayment: big.NewInt(1000).Bytes(),
@@ -606,10 +720,13 @@ func TestSetPaymentState(t *testing.T) {
 	err = accountant.SetPaymentState(paymentState)
 	assert.NoError(t, err)
 
-	// Verify global params are updated
-	assert.Equal(t, uint64(200), accountant.minNumSymbols)
-	assert.Equal(t, uint64(2), accountant.pricePerSymbol)
-	assert.Equal(t, uint64(20), accountant.reservationWindow)
+	// Verify per-quorum params are updated
+	assert.Equal(t, uint64(200), accountant.GetMinNumSymbols(core.QuorumID(0)))
+	assert.Equal(t, uint64(2), accountant.GetPricePerSymbol(core.QuorumID(0)))
+	assert.Equal(t, uint64(60), accountant.GetReservationWindow(core.QuorumID(0)))
+	assert.Equal(t, uint64(300), accountant.GetMinNumSymbols(core.QuorumID(1)))
+	assert.Equal(t, uint64(3), accountant.GetPricePerSymbol(core.QuorumID(1)))
+	assert.Equal(t, uint64(70), accountant.GetReservationWindow(core.QuorumID(1)))
 
 	// Verify on-demand payment is updated
 	assert.Equal(t, big.NewInt(1000), accountant.onDemand.CumulativePayment)
@@ -628,11 +745,23 @@ func TestSetPaymentState(t *testing.T) {
 
 	// Test with nil values
 	nilPaymentState := &v2.GetQuorumSpecificPaymentStateReply{
-		PaymentGlobalParams: &v2.PaymentGlobalParams{
-			GlobalSymbolsPerSecond: 3000,
-			MinNumSymbols:          300,
-			PricePerSymbol:         3,
-			ReservationWindow:      30,
+		PaymentVaultParams: &commonpbv2.PaymentVaultParams{
+			QuorumPaymentConfigs: map[uint32]*commonpbv2.PaymentQuorumConfig{
+				0: {
+					ReservationSymbolsPerSecond: 4000,
+					OnDemandSymbolsPerSecond:    2000,
+					OnDemandPricePerSymbol:      3,
+				},
+			},
+			QuorumProtocolConfigs: map[uint32]*commonpbv2.PaymentQuorumProtocolConfig{
+				0: {
+					MinNumSymbols:              300,
+					ReservationAdvanceWindow:   30,
+					ReservationRateLimitWindow: 90,
+					OnDemandRateLimitWindow:    45,
+					OnDemandEnabled:            true,
+				},
+			},
 		},
 		// No CumulativePayment
 		// No OnchainCumulativePayment
@@ -642,10 +771,10 @@ func TestSetPaymentState(t *testing.T) {
 	err = accountant.SetPaymentState(nilPaymentState)
 	assert.NoError(t, err)
 
-	// Verify global params are updated
-	assert.Equal(t, uint64(300), accountant.minNumSymbols)
-	assert.Equal(t, uint64(3), accountant.pricePerSymbol)
-	assert.Equal(t, uint64(30), accountant.reservationWindow)
+	// Verify per-quorum params are updated
+	assert.Equal(t, uint64(300), accountant.GetMinNumSymbols(core.QuorumID(0)))
+	assert.Equal(t, uint64(3), accountant.GetPricePerSymbol(core.QuorumID(0)))
+	assert.Equal(t, uint64(90), accountant.GetReservationWindow(core.QuorumID(0)))
 
 	// Verify defaults when fields are nil
 	assert.Equal(t, big.NewInt(0), accountant.onDemand.CumulativePayment)
@@ -657,11 +786,11 @@ func TestSetPaymentState(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "payment state cannot be nil")
 
-	// Test with nil payment global params
-	nilGlobalParams := &v2.GetQuorumSpecificPaymentStateReply{
-		// No PaymentGlobalParams
+	// Test with nil payment vault params
+	nilVaultParams := &v2.GetQuorumSpecificPaymentStateReply{
+		// No PaymentVaultParams
 	}
-	err = accountant.SetPaymentState(nilGlobalParams)
+	err = accountant.SetPaymentState(nilVaultParams)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "payment global params cannot be nil")
+	assert.Contains(t, err.Error(), "payment vault params cannot be nil")
 }

@@ -248,6 +248,26 @@
                   <a href="#common.v2.PaymentHeader"><span class="badge">M</span>PaymentHeader</a>
                 </li>
               
+                <li>
+                  <a href="#common.v2.PaymentQuorumConfig"><span class="badge">M</span>PaymentQuorumConfig</a>
+                </li>
+              
+                <li>
+                  <a href="#common.v2.PaymentQuorumProtocolConfig"><span class="badge">M</span>PaymentQuorumProtocolConfig</a>
+                </li>
+              
+                <li>
+                  <a href="#common.v2.PaymentVaultParams"><span class="badge">M</span>PaymentVaultParams</a>
+                </li>
+              
+                <li>
+                  <a href="#common.v2.PaymentVaultParams.QuorumPaymentConfigsEntry"><span class="badge">M</span>PaymentVaultParams.QuorumPaymentConfigsEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#common.v2.PaymentVaultParams.QuorumProtocolConfigsEntry"><span class="badge">M</span>PaymentVaultParams.QuorumProtocolConfigsEntry</a>
+                </li>
+              
               
               
               
@@ -1342,6 +1362,196 @@ Detailed Payment Mechanics:
    - Global parameters including minNumSymbols, GlobalSymbolsPerSecond and pricePerSymbol
 Due to the use of cumulative payments, if a client loses track of their current cumulative payment value,
 they can query the disperser server for their current payment state using the GetPaymentState RPC. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="common.v2.PaymentQuorumConfig">PaymentQuorumConfig</h3>
+        <p>PaymentQuorumConfig contains the configuration for a quorum's payment configurations</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>reservation_symbols_per_second</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>reservation_symbols_per_second is the total symbols per second that can be reserved for this quorum </p></td>
+                </tr>
+              
+                <tr>
+                  <td>on_demand_symbols_per_second</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>on_demand_symbols_per_second is the symbols per second allowed for on-demand payments for this quorum </p></td>
+                </tr>
+              
+                <tr>
+                  <td>on_demand_price_per_symbol</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>on_demand_price_per_symbol is the price per symbol for on-demand payments in wei </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="common.v2.PaymentQuorumProtocolConfig">PaymentQuorumProtocolConfig</h3>
+        <p>PaymentQuorumProtocolConfig contains the configuration for a quorum's protocol-level configurations</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>min_num_symbols</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>min_num_symbols is the minimum number of symbols that must be charged for any request </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reservation_advance_window</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>reservation_advance_window is the window in seconds before a reservation starts that it can be activated </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reservation_rate_limit_window</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>reservation_rate_limit_window is the time window in seconds for reservation rate limiting </p></td>
+                </tr>
+              
+                <tr>
+                  <td>on_demand_rate_limit_window</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>on_demand_rate_limit_window is the time window in seconds for on-demand rate limiting </p></td>
+                </tr>
+              
+                <tr>
+                  <td>on_demand_enabled</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>on_demand_enabled indicates whether on-demand payments are enabled for this quorum </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="common.v2.PaymentVaultParams">PaymentVaultParams</h3>
+        <p>PaymentVaultParams contains the global payment configuration parameters from the payment vault</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>quorum_payment_configs</td>
+                  <td><a href="#common.v2.PaymentVaultParams.QuorumPaymentConfigsEntry">PaymentVaultParams.QuorumPaymentConfigsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p>quorum_payment_configs maps quorum IDs to their payment configurations </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_protocol_configs</td>
+                  <td><a href="#common.v2.PaymentVaultParams.QuorumProtocolConfigsEntry">PaymentVaultParams.QuorumProtocolConfigsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p>quorum_protocol_configs maps quorum IDs to their protocol configurations </p></td>
+                </tr>
+              
+                <tr>
+                  <td>on_demand_quorum_numbers</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p>on_demand_quorum_numbers lists the quorum numbers that support on-demand payments </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="common.v2.PaymentVaultParams.QuorumPaymentConfigsEntry">PaymentVaultParams.QuorumPaymentConfigsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#common.v2.PaymentQuorumConfig">PaymentQuorumConfig</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="common.v2.PaymentVaultParams.QuorumProtocolConfigsEntry">PaymentVaultParams.QuorumProtocolConfigsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#common.v2.PaymentQuorumProtocolConfig">PaymentQuorumProtocolConfig</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -2517,10 +2727,10 @@ request may be rejected. </p></td>
             <tbody>
               
                 <tr>
-                  <td>payment_global_params</td>
-                  <td><a href="#disperser.v2.PaymentGlobalParams">PaymentGlobalParams</a></td>
+                  <td>payment_vault_params</td>
+                  <td><a href="#common.v2.PaymentVaultParams">common.v2.PaymentVaultParams</a></td>
                   <td></td>
-                  <td><p>global payment vault parameters </p></td>
+                  <td><p>payment vault parameters with per-quorum configurations </p></td>
                 </tr>
               
                 <tr>

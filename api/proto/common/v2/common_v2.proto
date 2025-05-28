@@ -208,3 +208,45 @@ message PaymentHeader {
   // they can query the disperser server for their current payment state using the GetPaymentState RPC.
   bytes cumulative_payment = 3;
 }
+
+// PaymentQuorumConfig contains the configuration for a quorum's payment configurations
+message PaymentQuorumConfig {
+  // reservation_symbols_per_second is the total symbols per second that can be reserved for this quorum
+  uint64 reservation_symbols_per_second = 1;
+
+  // on_demand_symbols_per_second is the symbols per second allowed for on-demand payments for this quorum
+  uint64 on_demand_symbols_per_second = 2;
+
+  // on_demand_price_per_symbol is the price per symbol for on-demand payments in wei
+  uint64 on_demand_price_per_symbol = 3;
+}
+
+// PaymentQuorumProtocolConfig contains the configuration for a quorum's protocol-level configurations
+message PaymentQuorumProtocolConfig {
+  // min_num_symbols is the minimum number of symbols that must be charged for any request
+  uint64 min_num_symbols = 1;
+
+  // reservation_advance_window is the window in seconds before a reservation starts that it can be activated
+  uint64 reservation_advance_window = 2;
+
+  // reservation_rate_limit_window is the time window in seconds for reservation rate limiting
+  uint64 reservation_rate_limit_window = 3;
+
+  // on_demand_rate_limit_window is the time window in seconds for on-demand rate limiting
+  uint64 on_demand_rate_limit_window = 4;
+
+  // on_demand_enabled indicates whether on-demand payments are enabled for this quorum
+  bool on_demand_enabled = 5;
+}
+
+// PaymentVaultParams contains the global payment configuration parameters from the payment vault
+message PaymentVaultParams {
+  // quorum_payment_configs maps quorum IDs to their payment configurations
+  map<uint32, PaymentQuorumConfig> quorum_payment_configs = 1;
+
+  // quorum_protocol_configs maps quorum IDs to their protocol configurations
+  map<uint32, PaymentQuorumProtocolConfig> quorum_protocol_configs = 2;
+
+  // on_demand_quorum_numbers lists the quorum numbers that support on-demand payments
+  repeated uint32 on_demand_quorum_numbers = 3;
+}

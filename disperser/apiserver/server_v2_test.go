@@ -518,7 +518,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil).Maybe()
 	mockState.On("GetReservationWindow", tmock.Anything).Return(uint64(1), nil)
 	mockState.On("GetPricePerSymbol", tmock.Anything).Return(uint64(2), nil)
-	mockState.On("GetGlobalSymbolsPerSecond", tmock.Anything).Return(uint64(1009), nil)
+	mockState.On("GetOnDemandGlobalSymbolsPerSecond", tmock.Anything).Return(uint64(1009), nil)
 	mockState.On("GetGlobalRatePeriodInterval", tmock.Anything).Return(uint64(1), nil)
 	mockState.On("GetMinNumSymbols", tmock.Anything).Return(uint64(3), nil)
 

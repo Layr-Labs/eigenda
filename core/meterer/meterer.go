@@ -22,6 +22,8 @@ type Config struct {
 	UpdateInterval time.Duration
 }
 
+const OnDemandQuorumID = core.QuorumID(0)
+
 // Meterer handles payment accounting across different accounts. Disperser API server receives requests from clients and each request contains a blob header
 // with payments information (CumulativePayments, Timestamp, and Signature). Disperser will pass the blob header to the meterer, which will check if the
 // payments information is valid.
@@ -108,8 +110,8 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 	for quorumID := range reservations {
 		quorumIDs = append(quorumIDs, quorumID)
 		// TODO: update to use actual quorum configs when the payment vault update goes through
-		reservationWindows[quorumID] = m.ChainPaymentState.GetReservationWindow()
-		requestReservationPeriods[quorumID] = GetReservationPeriodByNanosecond(header.Timestamp, m.ChainPaymentState.GetReservationWindow())
+		reservationWindows[quorumID] = m.ChainPaymentState.GetReservationWindow(quorumID)
+		requestReservationPeriods[quorumID] = GetReservationPeriodByNanosecond(header.Timestamp, m.ChainPaymentState.GetReservationWindow(quorumID))
 	}
 	if err := m.ValidateQuorum(quorumNumbers, quorumIDs); err != nil {
 		return fmt.Errorf("invalid quorum for reservation: %w", err)
@@ -267,7 +269,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, header core.PaymentM
 		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
 	}
 
-	paymentCharged := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol())
+	paymentCharged := PaymentCharged(symbolsCharged, m.ChainPaymentState.GetPricePerSymbol(OnDemandQuorumID))
 	oldPayment, err := m.MeteringStore.AddOnDemandPayment(ctx, header, paymentCharged)
 	if err != nil {
 		return fmt.Errorf("failed to update cumulative payment: %w", err)
@@ -296,7 +298,7 @@ func PaymentCharged(numSymbols, pricePerSymbol uint64) *big.Int {
 // SymbolsCharged returns the number of symbols charged for a given data length
 // being at least MinNumSymbols or the nearest rounded-up multiple of MinNumSymbols.
 func (m *Meterer) SymbolsCharged(numSymbols uint64) uint64 {
-	minSymbols := uint64(m.ChainPaymentState.GetMinNumSymbols())
+	minSymbols := uint64(m.ChainPaymentState.GetMinNumSymbols(OnDemandQuorumID))
 	if numSymbols <= minSymbols {
 		return minSymbols
 	}
@@ -311,13 +313,13 @@ func (m *Meterer) SymbolsCharged(numSymbols uint64) uint64 {
 
 // IncrementGlobalBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged uint64, receivedAt time.Time) error {
-	globalPeriod := GetReservationPeriod(receivedAt.Unix(), m.ChainPaymentState.GetGlobalRatePeriodInterval())
+	globalPeriod := GetReservationPeriod(receivedAt.Unix(), m.ChainPaymentState.GetOnDemandGlobalRatePeriodInterval(OnDemandQuorumID))
 
 	newUsage, err := m.MeteringStore.UpdateGlobalBin(ctx, globalPeriod, symbolsCharged)
 	if err != nil {
 		return fmt.Errorf("failed to increment global bin usage: %w", err)
 	}
-	if newUsage > m.ChainPaymentState.GetGlobalSymbolsPerSecond()*uint64(m.ChainPaymentState.GetGlobalRatePeriodInterval()) {
+	if newUsage > m.ChainPaymentState.GetOnDemandGlobalSymbolsPerSecond(OnDemandQuorumID)*uint64(m.ChainPaymentState.GetOnDemandGlobalRatePeriodInterval(OnDemandQuorumID)) {
 		return fmt.Errorf("global bin usage overflows")
 	}
 	return nil

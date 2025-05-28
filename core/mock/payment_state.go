@@ -80,27 +80,36 @@ func (m *MockOnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) 
 	return value, args.Error(1)
 }
 
-func (m *MockOnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
-	args := m.Called()
+func (m *MockOnchainPaymentState) GetOnDemandGlobalSymbolsPerSecond(quorumID core.QuorumID) uint64 {
+	args := m.Called(quorumID)
 	return args.Get(0).(uint64)
 }
 
-func (m *MockOnchainPaymentState) GetGlobalRatePeriodInterval() uint64 {
-	args := m.Called()
+func (m *MockOnchainPaymentState) GetOnDemandGlobalRatePeriodInterval(quorumID core.QuorumID) uint64 {
+	args := m.Called(quorumID)
 	return args.Get(0).(uint64)
 }
 
-func (m *MockOnchainPaymentState) GetMinNumSymbols() uint64 {
-	args := m.Called()
+func (m *MockOnchainPaymentState) GetMinNumSymbols(quorumID core.QuorumID) uint64 {
+	args := m.Called(quorumID)
 	return args.Get(0).(uint64)
 }
 
-func (m *MockOnchainPaymentState) GetPricePerSymbol() uint64 {
-	args := m.Called()
+func (m *MockOnchainPaymentState) GetPricePerSymbol(quorumID core.QuorumID) uint64 {
+	args := m.Called(quorumID)
 	return args.Get(0).(uint64)
 }
 
-func (m *MockOnchainPaymentState) GetReservationWindow() uint64 {
-	args := m.Called()
+func (m *MockOnchainPaymentState) GetReservationWindow(quorumID core.QuorumID) uint64 {
+	args := m.Called(quorumID)
 	return args.Get(0).(uint64)
+}
+
+func (m *MockOnchainPaymentState) GetQuorumNumbers(ctx context.Context) ([]uint8, error) {
+	args := m.Called()
+	var value []uint8
+	if args.Get(0) != nil {
+		value = args.Get(0).([]uint8)
+	}
+	return value, args.Error(1)
 }
