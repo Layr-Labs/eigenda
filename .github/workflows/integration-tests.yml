@@ -29,14 +29,14 @@ jobs:
           aws configure --profile test-profile set region us-east-1
           aws configure --profile test-profile set source_profile default
 
+      - name: Checkout EigenDA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+
       - uses: jdx/mise-action@v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
       - run: go version
-
-      - name: Checkout EigenDA
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
 
       - name: Update Submodule Commits
         run: |

@@ -13,15 +13,15 @@ jobs:
     name: Linter
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout EigenDA
+        uses: actions/checkout@v4
+
       - uses: jdx/mise-action@v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
       - run: go version
 
-      - name: Checkout EigenDA
-        uses: actions/checkout@v3
-
       - run: make lint
-      
+
       - run: make fmt-check
