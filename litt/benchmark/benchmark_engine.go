@@ -63,7 +63,7 @@ func NewBenchmarkEngine(configPath string) (*BenchmarkEngine, error) {
 		return nil, fmt.Errorf("failed to create table: %w", err)
 	}
 
-	ttl := time.Duration(cfg.TTLHours) * time.Hour
+	ttl := time.Duration(cfg.TTLHours * float64(time.Hour))
 	err = table.SetTTL(ttl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set TTL for table: %w", err)

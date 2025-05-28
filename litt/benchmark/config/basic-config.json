@@ -1,5 +1,7 @@
 {
   "LittConfig": {
     "Paths": ["~/benchmark/volume1", "~/benchmark/volume2", "~/benchmark/volume3"]
-  }
+  },
+  "TTLHours": 0.0834,
+  "MaximumWriteThroughputMB": 100
 }

@@ -89,7 +89,7 @@ func NewCohort(
 		valueSize:           valueSize,
 		nextKeyIndex:        lowIndex,
 		allValuesWritten:    false,
-		firstValueTimestamp: time.Time{},
+		firstValueTimestamp: time.Now(),
 	}
 
 	err := cohort.Write()
@@ -342,11 +342,6 @@ func (c *Cohort) IsExpired(now time.Time, maxAge time.Duration) bool {
 	}
 
 	age := now.Sub(c.firstValueTimestamp)
-
-	if age > maxAge {
-		ageString := fmt.Sprintf("Cohort %d has expired: age %s exceeds max age %s", c.cohortIndex, age, maxAge)
-		fmt.Println(ageString)
-	}
 
 	return age > maxAge
 }

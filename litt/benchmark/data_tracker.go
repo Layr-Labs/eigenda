@@ -160,7 +160,7 @@ func NewDataTracker(ctx context.Context, config *config2.BenchmarkConfig) (*Data
 
 	ttl := time.Duration(config.TTLHours * float64(time.Hour))
 	safetyMargin := time.Duration(config.ReadSafetyMarginMinutes * float64(time.Minute))
-	safeTTL := ttl - safetyMargin
+	safeTTL := ttl + safetyMargin
 
 	closedChan := make(chan struct{}, 1)
 	closedChan <- struct{}{} // Initially closed, will be drained when the DataTracker is closed.
@@ -470,11 +470,7 @@ func (t *DataTracker) DoCohortGC() {
 	for i := t.lowestCohortIndex; i < t.highestCohortIndex; i++ {
 		cohort := t.cohorts[i]
 
-		expired := cohort.IsExpired(now, t.safeTTL)
-		stillBeingWritten := !cohort.IsComplete() && !cohort.IsLoadedFromDisk()
-
-		if expired && !stillBeingWritten {
-			
+		if cohort.IsExpired(now, t.safeTTL) {
 			err := cohort.Delete()
 			if err != nil {
 				panic(fmt.Sprintf("failed to delete expired cohort: %v", err)) // TODO not clean
