@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	core "github.com/Layr-Labs/eigenda/core/v2"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
 )
@@ -65,23 +66,55 @@ func NewRelayPayloadRetriever(
 // verified prior to calling this method.
 func (pr *RelayPayloadRetriever) GetPayload(
 	ctx context.Context,
-	eigenDACert *coretypes.EigenDACertV3) (*coretypes.Payload, error) {
+	eigenDACert coretypes.EigenDACert) (*coretypes.Payload, error) {
 
-	blobKey, err := eigenDACert.ComputeBlobKey()
-	if err != nil {
-		return nil, fmt.Errorf("compute blob key: %w", err)
+	var blobKey *core.BlobKey
+	var relayKeys []core.RelayKey
+	var blobCommitments *encoding.BlobCommitments
+	var err error
+
+	switch eigenDACert.Version() {
+	case coretypes.VersionTwoCert:
+		eigenDAV2Cert, ok := eigenDACert.(*coretypes.EigenDACertV2)
+		if !ok {
+			return nil, fmt.Errorf("expected eigenDACert to be of type *coretypes.EigenDAV2Cert, got %T", eigenDACert)
+		}
+
+		blobKey, err = eigenDAV2Cert.ComputeBlobKey()
+		if err != nil {
+			return nil, fmt.Errorf("compute blob key: %w", err)
+		}
+
+		relayKeys = eigenDAV2Cert.RelayKeys()
+		blobCommitments, err = eigenDAV2Cert.Commitments()
+		if err != nil {
+			return nil, fmt.Errorf("reading blob commitments from cert: %w", err)
+		}
+
+	case coretypes.VersionThreeCert:
+		eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
+		if !ok {
+			return nil, fmt.Errorf("expected eigenDACert to be of type *coretypes.eigenDAV3Cert, got %T", eigenDACert)
+		}
+
+		blobKey, err = eigenDAV3Cert.ComputeBlobKey()
+		if err != nil {
+			return nil, fmt.Errorf("compute blob key: %w", err)
+		}
+
+		relayKeys = eigenDAV3Cert.RelayKeys()
+		blobCommitments, err = eigenDAV3Cert.Commitments()
+		if err != nil {
+			return nil, fmt.Errorf("reading blob commitments from cert: %w", err)
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported eigenDACert type %T", eigenDACert)
 	}
 
-	relayKeys := eigenDACert.RelayKeys()
 	relayKeyCount := len(relayKeys)
 	if relayKeyCount == 0 {
 		return nil, errors.New("relay key count is zero")
-	}
-
-	blobCommitments, err := eigenDACert.Commitments()
-
-	if err != nil {
-		return nil, fmt.Errorf("reading blob commitments from cert: %w", err)
 	}
 
 	// create a randomized array of indices, so that it isn't always the first relay in the list which gets hit

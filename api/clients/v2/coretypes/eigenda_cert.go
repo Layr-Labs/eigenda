@@ -316,6 +316,21 @@ func (c *EigenDACertV2) QuorumNumbers() []byte {
 	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers
 }
 
+// BlobHeader returns the blob header of the EigenDACertV2
+func (c *EigenDACertV2) BlobHeader() (*coreV2.BlobHeaderWithHashedPayment, error) {
+	commitments, err := c.Commitments()
+	if err != nil {
+		return nil, fmt.Errorf("get commitments: %w", err)
+	}
+	blobHeader := &coreV2.BlobHeaderWithHashedPayment{
+		BlobVersion: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version,
+		BlobCommitments: *commitments,
+		QuorumNumbers: c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+		PaymentMetadataHash: c.BlobInclusionInfo.BlobCertificate.BlobHeader.PaymentHeaderHash,
+	}
+	return blobHeader, nil
+}
+
 // Serialize serializes the EigenDACertV2 to bytes
 func (c *EigenDACertV2) Serialize(ct CertSerializationType) ([]byte, error) {
 	switch ct {
