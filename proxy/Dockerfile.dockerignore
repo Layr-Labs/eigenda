@@ -1,0 +1,10 @@
+# Ignore everything
+*
+
+# Re-include necessary files only
+!go.mod
+!clients/go.mod
+!go.sum
+!*/**/*.go
+!Makefile
+!resources
