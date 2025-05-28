@@ -203,6 +203,11 @@ func (c *Cohort) IsExhausted() bool {
 	return c.nextKeyIndex > c.highKeyIndex
 }
 
+// IsLoadedFromDisk returns true if the cohort has been loaded from disk.
+func (c *Cohort) IsLoadedFromDisk() bool {
+	return c.loadedFromDisk
+}
+
 // GetKeyIndexForWriting gets the next key to be written to the database.
 func (c *Cohort) GetKeyIndexForWriting() (uint64, error) {
 	if c.loadedFromDisk {
@@ -326,7 +331,23 @@ func (c *Cohort) deserialize(data []byte) error {
 
 // IsExpired returns true if the cohort has expired (i.e. it is no longer safe to read).
 func (c *Cohort) IsExpired(now time.Time, maxAge time.Duration) bool {
+	if !c.IsComplete() {
+		if c.loadedFromDisk && !c.IsComplete() {
+			// Incomplete cohorts loaded from disk are instantly expired.
+			return true
+		} else {
+			// A cohort currently in the process of being written can't expire.
+			return false
+		}
+	}
+
 	age := now.Sub(c.firstValueTimestamp)
+
+	if age > maxAge {
+		ageString := fmt.Sprintf("Cohort %d has expired: age %s exceeds max age %s", c.cohortIndex, age, maxAge)
+		fmt.Println(ageString)
+	}
+
 	return age > maxAge
 }
 

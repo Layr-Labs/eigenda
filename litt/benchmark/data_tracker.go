@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	config2 "github.com/Layr-Labs/eigenda/litt/benchmark/config"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/docker/go-units"
 )
@@ -42,7 +43,7 @@ type DataTracker struct {
 	rand *rand.Rand
 
 	// The configuration for the benchmark.
-	config *BenchmarkConfig
+	config *config2.BenchmarkConfig
 
 	// The directory where cohort files are stored.
 	cohortDirectory string
@@ -99,7 +100,7 @@ type DataTracker struct {
 }
 
 // NewDataTracker creates a new DataTracker instance, loading all relevant cohorts from disk.
-func NewDataTracker(ctx context.Context, config *BenchmarkConfig) (*DataTracker, error) {
+func NewDataTracker(ctx context.Context, config *config2.BenchmarkConfig) (*DataTracker, error) {
 	cohortDirectory := path.Join(config.MetadataDirectory, "cohorts")
 
 	// Create the cohort directory if it doesn't exist.
@@ -465,10 +466,15 @@ func (t *DataTracker) generateNextReadInfo() *ReadInfo {
 func (t *DataTracker) DoCohortGC() {
 	now := time.Now()
 
-	for i := t.lowestCohortIndex; i <= t.highestCohortIndex; i++ {
+	// Check all cohorts except for the active cohort (i.e. the one with index t.highestCohortIndex).
+	for i := t.lowestCohortIndex; i < t.highestCohortIndex; i++ {
 		cohort := t.cohorts[i]
 
-		if cohort.IsExpired(now, t.safeTTL) {
+		expired := cohort.IsExpired(now, t.safeTTL)
+		stillBeingWritten := !cohort.IsComplete() && !cohort.IsLoadedFromDisk()
+
+		if expired && !stillBeingWritten {
+			
 			err := cohort.Delete()
 			if err != nil {
 				panic(fmt.Sprintf("failed to delete expired cohort: %v", err)) // TODO not clean
@@ -476,6 +482,9 @@ func (t *DataTracker) DoCohortGC() {
 			t.lowestCohortIndex++
 			delete(t.cohorts, cohort.CohortIndex())
 			delete(t.completeCohortSet, cohort.CohortIndex())
+		} else {
+			// Stop once we find the first cohort that is not eligible for deletion.
+			break
 		}
 	}
 

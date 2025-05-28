@@ -12,12 +12,38 @@ import (
 // SwapFileExtension is the file extension used for temporary swap files created during atomic writes.
 const SwapFileExtension = ".swap"
 
+// SanitizePath returns a sanitized version of the given path, doing things like expanding
+// "~" to the user's home directory, converting to absolute path, normalizing slashes, etc.
+func SanitizePath(path string) (string, error) {
+	if len(path) > 0 && path[0] == '~' {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get user home directory: %w", err)
+		}
+
+		if len(path) == 1 {
+			path = homeDir
+		} else if len(path) > 1 && path[1] == '/' {
+			path = homeDir + path[1:]
+		}
+	}
+
+	path = filepath.Clean(path)
+	path = filepath.ToSlash(path)
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve absolute path: %w", err)
+	}
+
+	return path, nil
+}
+
 // AtomicWrite writes data to a file atomically. The parent directory must exist and be writable.
 // If the destination file already exists, it will be overwritten.
 //
 // This method creates a temporary swap file in the same directory as the destination, but with SwapFileExtension
 // appended to the filename. If there is a crash during this method's execution, it may leave this swap file behind.
-func AtomicWrite(destination string, data []byte) error { // TODO test
+func AtomicWrite(destination string, data []byte) error {
 
 	swapPath := destination + ".swap"
 

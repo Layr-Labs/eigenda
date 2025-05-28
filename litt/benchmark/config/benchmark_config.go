@@ -1,13 +1,14 @@
-package benchmark
+package config
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/litt"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/docker/go-units"
 )
 
@@ -68,8 +69,12 @@ type BenchmarkConfig struct {
 
 // DefaultBenchmarkConfig returns a default BenchmarkConfig with the given data paths.
 func DefaultBenchmarkConfig() *BenchmarkConfig {
+
+	littConfig := litt.DefaultConfigNoPaths()
+	littConfig.LoggerConfig = common.DefaultConsoleLoggerConfig()
+
 	return &BenchmarkConfig{
-		LittConfig:               litt.DefaultConfigNoPaths(),
+		LittConfig:               littConfig,
 		MetadataDirectory:        "~/benchmark",
 		MaximumWriteThroughputMB: 10,
 		MaximumReadThroughputMB:  10,
@@ -92,23 +97,13 @@ func DefaultBenchmarkConfig() *BenchmarkConfig {
 func LoadConfig(path string) (*BenchmarkConfig, error) {
 	config := DefaultBenchmarkConfig()
 
-	// Expand home directory if path contains ~
-	if strings.HasPrefix(path, "~") {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get user home directory: %w", err)
-		}
-		path = strings.Replace(path, "~", homeDir, 1)
-	}
-
-	// Resolve relative paths to absolute paths
-	absPath, err := filepath.Abs(path)
+	path, err := util.SanitizePath(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve absolute path: %w", err)
+		return nil, fmt.Errorf("failed to sanitize path: %w", err)
 	}
 
 	// Read the file
-	data, err := os.ReadFile(absPath)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
@@ -121,6 +116,11 @@ func LoadConfig(path string) (*BenchmarkConfig, error) {
 	err = decoder.Decode(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)
+	}
+
+	config.MetadataDirectory, err = util.SanitizePath(config.MetadataDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sanitize metadata directory: %w", err)
 	}
 
 	return config, nil

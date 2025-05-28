@@ -8,8 +8,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/litt"
+	"github.com/Layr-Labs/eigenda/litt/benchmark/config"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 	"golang.org/x/time/rate"
 )
@@ -18,9 +21,10 @@ import (
 type BenchmarkEngine struct {
 	ctx    context.Context
 	cancel context.CancelFunc
+	logger logging.Logger
 
 	// The configuration for the benchmark.
-	config *BenchmarkConfig
+	config *config.BenchmarkConfig
 
 	// The database to be benchmarked.
 	db litt.DB
@@ -37,12 +41,19 @@ type BenchmarkEngine struct {
 
 // NewBenchmarkEngine creates a new BenchmarkEngine with the given configuration.
 func NewBenchmarkEngine(configPath string) (*BenchmarkEngine, error) {
-	config, err := LoadConfig(configPath)
+	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config file %s: %w", configPath, err)
 	}
 
-	db, err := littbuilder.NewDB(config.LittConfig)
+	cfg.LittConfig.Logger, err = common.NewLogger(cfg.LittConfig.LoggerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	cfg.LittConfig.ShardingFactor = uint32(len(cfg.LittConfig.Paths))
+
+	db, err := littbuilder.NewDB(cfg.LittConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create db: %w", err)
 	}
@@ -52,7 +63,7 @@ func NewBenchmarkEngine(configPath string) (*BenchmarkEngine, error) {
 		return nil, fmt.Errorf("failed to create table: %w", err)
 	}
 
-	ttl := time.Duration(config.TTLHours) * time.Hour
+	ttl := time.Duration(cfg.TTLHours) * time.Hour
 	err = table.SetTTL(ttl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set TTL for table: %w", err)
@@ -60,24 +71,30 @@ func NewBenchmarkEngine(configPath string) (*BenchmarkEngine, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	dataTracker, err := NewDataTracker(ctx, config)
+	dataTracker, err := NewDataTracker(ctx, cfg)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to create data tracker: %w", err)
 	}
 
-	writeBytesPerSecond := uint64(config.MaximumWriteThroughputMB * float64(units.MiB))
-	writeBytesPerSecondPerThread := writeBytesPerSecond / uint64(config.WriterParallelism)
+	writeBytesPerSecond := uint64(cfg.MaximumWriteThroughputMB * float64(units.MiB))
+	writeBytesPerSecondPerThread := writeBytesPerSecond / uint64(cfg.WriterParallelism)
 
 	return &BenchmarkEngine{
 		ctx:                          ctx,
 		cancel:                       cancel,
-		config:                       config,
+		logger:                       cfg.LittConfig.Logger,
+		config:                       cfg,
 		db:                           db,
 		table:                        table,
 		dataTracker:                  dataTracker,
 		writeBytesPerSecondPerThread: writeBytesPerSecondPerThread,
 	}, nil
+}
+
+// Logger returns the logger used by the benchmark engine.
+func (b *BenchmarkEngine) Logger() logging.Logger {
+	return b.logger
 }
 
 // Run executes the benchmark. This method blocks forever, or until the benchmark is stopped via control-C or

@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"os"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 	"github.com/prometheus/client_golang/prometheus"
@@ -164,7 +164,7 @@ func DefaultConfigNoPaths() *Config {
 
 	return &Config{
 		CTX:                      context.Background(),
-		LoggerConfig:             &loggerConfig,
+		LoggerConfig:             loggerConfig,
 		Clock:                    time.Now,
 		GCPeriod:                 5 * time.Minute,
 		GCBatchSize:              10_000,
@@ -184,21 +184,13 @@ func DefaultConfigNoPaths() *Config {
 	}
 }
 
-// ExpandTildes expands any tildes in the Paths field to the user's home directory.
-func (c *Config) ExpandTildes() error {
+// SanitizePaths replaces any paths that start with '~' with the user's home directory.
+func (c *Config) SanitizePaths() error {
 	for i, path := range c.Paths {
-		if len(path) > 0 && path[0] == '~' {
-
-			homeDir, err := os.UserHomeDir()
-			if err != nil {
-				return fmt.Errorf("failed to get user home directory: %w", err)
-			}
-
-			if len(path) == 1 {
-				c.Paths[i] = homeDir
-			} else if len(path) > 1 && path[1] == '/' {
-				c.Paths[i] = homeDir + path[1:]
-			}
+		var err error
+		c.Paths[i], err = util.SanitizePath(path)
+		if err != nil {
+			return fmt.Errorf("error sanitizing path %s: %w", path, err)
 		}
 	}
 

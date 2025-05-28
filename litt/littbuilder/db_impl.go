@@ -63,9 +63,12 @@ type db struct {
 // NewDB creates a new DB instance. After this method is called, the config object should not be modified.
 func NewDB(config *litt.Config) (litt.DB, error) {
 	var err error
-	config.Logger, err = buildLogger(config)
-	if err != nil {
-		return nil, fmt.Errorf("error building logger: %w", err)
+
+	if config.Logger == nil {
+		config.Logger, err = buildLogger(config)
+		if err != nil {
+			return nil, fmt.Errorf("error building logger: %w", err)
+		}
 	}
 
 	err = config.SanityCheck()
@@ -73,7 +76,7 @@ func NewDB(config *litt.Config) (litt.DB, error) {
 		return nil, fmt.Errorf("error checking config: %w", err)
 	}
 
-	err = config.ExpandTildes()
+	err = config.SanitizePaths()
 	if err != nil {
 		return nil, fmt.Errorf("error expanding tildes in config: %w", err)
 	}
@@ -93,20 +96,24 @@ func NewDB(config *litt.Config) (litt.DB, error) {
 // NewDBUnsafe creates a new DB instance with a custom table builder. This is intended for unit test use,
 // and should not be considered a stable API.
 func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, error) {
-	logger, err := buildLogger(config)
-	if err != nil {
-		return nil, fmt.Errorf("error building logger: %w", err)
+	var err error
+
+	if config.Logger == nil {
+		config.Logger, err = buildLogger(config)
+		if err != nil {
+			return nil, fmt.Errorf("error building logger: %w", err)
+		}
 	}
 
 	var dbMetrics *metrics.LittDBMetrics
 	var metricsServer *http.Server
 	if config.MetricsEnabled {
-		dbMetrics, metricsServer = buildMetrics(config, logger)
+		dbMetrics, metricsServer = buildMetrics(config, config.Logger)
 	}
 
 	database := &db{
 		ctx:           config.CTX,
-		logger:        logger,
+		logger:        config.Logger,
 		clock:         config.Clock,
 		ttl:           config.TTL,
 		gcPeriod:      config.GCPeriod,
@@ -120,7 +127,7 @@ func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, e
 		go database.gatherMetrics(config.MetricsUpdateInterval)
 	}
 
-	logger.Infof("LittDB started, current data size: %d", database.Size())
+	config.Logger.Infof("LittDB started, current data size: %d", database.Size())
 
 	return database, nil
 }

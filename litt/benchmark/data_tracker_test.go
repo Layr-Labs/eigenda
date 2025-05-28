@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	config2 "github.com/Layr-Labs/eigenda/litt/benchmark/config"
 	"github.com/docker/go-units"
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +16,7 @@ func TestTrackerDeterminism(t *testing.T) {
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
-	config := DefaultBenchmarkConfig()
+	config := config2.DefaultBenchmarkConfig()
 	config.RandomPoolSize = units.MiB
 	config.CohortSize = rand.Uint64Range(10, 20)
 	config.MetadataDirectory = directory
@@ -76,7 +77,7 @@ func TestTrackerRestart(t *testing.T) {
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
-	config := DefaultBenchmarkConfig()
+	config := config2.DefaultBenchmarkConfig()
 	config.RandomPoolSize = units.MiB
 	config.CohortSize = rand.Uint64Range(10, 20)
 	config.MetadataDirectory = directory
@@ -128,7 +129,7 @@ func TestTrackReads(t *testing.T) {
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
-	config := DefaultBenchmarkConfig()
+	config := config2.DefaultBenchmarkConfig()
 	config.RandomPoolSize = units.MiB
 	config.CohortSize = rand.Uint64Range(10, 20)
 	config.MetadataDirectory = directory
