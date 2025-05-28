@@ -46,7 +46,7 @@ lint:
 # TODO: this should also format github workflows, etc.
 fmt:
 	$(MAKE) -C contracts fmt
-	gofmt ./...
+	go fmt ./...
 
 # TODO: this should also check github workflows, contracts, etc.
 fmt-check:
