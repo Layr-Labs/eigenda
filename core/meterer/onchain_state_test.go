@@ -2,6 +2,7 @@ package meterer_test
 
 import (
 	"context"
+	"math"
 	"math/big"
 	"testing"
 
@@ -77,21 +78,18 @@ func TestGetOnDemandQuorumNumbers(t *testing.T) {
 // properly handles nil map assignments and doesn't panic
 func TestOnchainPaymentStateNilAssignmentProtection(t *testing.T) {
 	t.Run("PaymentVaultParams_NilProtection", func(t *testing.T) {
-		// Test edge case: create a state with nil PaymentVaultParams to test nil protection
 		stateWithNilParams := &meterer.OnchainPaymentState{}
 
-		// These should return 0 and not panic due to our nil protection
 		assert.Equal(t, uint64(0), stateWithNilParams.GetGlobalSymbolsPerSecond())
 		assert.Equal(t, uint64(0), stateWithNilParams.GetGlobalRatePeriodInterval())
-		assert.Equal(t, uint64(0), stateWithNilParams.GetMinNumSymbols())
-		assert.Equal(t, uint64(0), stateWithNilParams.GetPricePerSymbol())
+		assert.Equal(t, uint64(math.MaxUint64), stateWithNilParams.GetMinNumSymbols())
+		assert.Equal(t, uint64(math.MaxUint64), stateWithNilParams.GetPricePerSymbol())
 		assert.Equal(t, uint64(0), stateWithNilParams.GetReservationWindow())
 	})
 
 	t.Run("NilMapAssignment_Protection", func(t *testing.T) {
 		state := &meterer.OnchainPaymentState{
 			ReservedPayments: make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment),
-			OnDemandPayments: make(map[gethcommon.Address]*core.OnDemandPayment),
 		}
 
 		account := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
