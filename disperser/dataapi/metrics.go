@@ -57,9 +57,12 @@ func NewMetrics(serverVersion uint, reg *prometheus.Registry, blobMetadataStore 
 			reg.MustRegister(NewDynamoDBCollector(store, logger))
 		}
 	} else if serverVersion == 2 {
-		if store, ok := blobMetadataStore.(*blobstorev2.BlobMetadataStore); ok {
-			reg.MustRegister(NewBlobMetadataStoreV2Collector(store, reg, logger))
+		blobMetadataStore, ok := blobMetadataStore.(blobstorev2.MetadataStore)
+		if !ok {
+			logger.Error("blobMetadataStore is not a blobstorev2.MetadataStore")
+			return nil
 		}
+		reg.MustRegister(NewBlobMetadataStoreV2Collector(blobMetadataStore, reg, logger))
 	}
 	metrics := &Metrics{
 		NumRequests: promauto.With(reg).NewCounterVec(
@@ -278,14 +281,14 @@ type BlobStatusMetrics struct {
 
 // BlobMetadataStoreV2Collector collects metrics from the blob metadata store.
 type BlobMetadataStoreV2Collector struct {
-	blobMetadataStore *blobstorev2.BlobMetadataStore
+	blobMetadataStore blobstorev2.MetadataStore
 	statusMetrics     map[commonv2.BlobStatus]*BlobStatusMetrics
 	logger            logging.Logger
 	ctx               context.Context
 	cancel            context.CancelFunc
 }
 
-func NewBlobMetadataStoreV2Collector(blobMetadataStore *blobstorev2.BlobMetadataStore, registry *prometheus.Registry, logger logging.Logger) *BlobMetadataStoreV2Collector {
+func NewBlobMetadataStoreV2Collector(blobMetadataStore blobstorev2.MetadataStore, registry *prometheus.Registry, logger logging.Logger) *BlobMetadataStoreV2Collector {
 	ctx, cancel := context.WithCancel(context.Background())
 	collector := &BlobMetadataStoreV2Collector{
 		blobMetadataStore: blobMetadataStore,
