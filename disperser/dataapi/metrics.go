@@ -313,7 +313,6 @@ func NewBlobMetadataStoreV2Collector(blobMetadataStore blobstorev2.MetadataStore
 				},
 			},
 		)
-		registry.MustRegister(gauge)
 		collector.statusMetrics[status] = &BlobStatusMetrics{
 			gauge:        gauge,
 			currentValue: 0,
