@@ -2,7 +2,6 @@ package benchmark
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -125,12 +124,6 @@ func TestTrackerRestart(t *testing.T) {
 	require.NoError(t, err)
 }
 
-//func Test(t *testing.T) {
-//	for i := 0; i < 1000; i++ {
-//		t.Run(fmt.Sprintf("TestTrackerRestart-%d", i), TestTrackerRestart)
-//	}
-//}
-
 func TestTrackReads(t *testing.T) {
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
@@ -151,8 +144,8 @@ func TestTrackReads(t *testing.T) {
 	keyToIndexMap := make(map[string]uint64)
 
 	// When reading, we should only ever read from indices that have been confirmed written.
-	highestWrittenIndex := uint64(0)
-	highestIndexReportedWritten := uint64(0)
+	highestWrittenIndex := -1
+	highestIndexReportedWritten := -1
 	readCount := uint64(0)
 
 	// Generate a bunch of values.
@@ -167,14 +160,14 @@ func TestTrackReads(t *testing.T) {
 		if rand.Float64() < 0.1 && i > 2*config.CohortSize {
 			// Advance the highest written index.
 			possibleIndex := rand.Uint64Range(i-config.CohortSize*2, i)
-			if possibleIndex > highestWrittenIndex {
-				highestWrittenIndex = possibleIndex
+			if int(possibleIndex) > highestWrittenIndex {
+				highestWrittenIndex = int(possibleIndex)
 			} else {
 				highestWrittenIndex++
 			}
 			for highestIndexReportedWritten < highestWrittenIndex {
 				highestIndexReportedWritten++
-				dataTracker.ReportWrite(highestIndexReportedWritten)
+				dataTracker.ReportWrite(uint64(highestIndexReportedWritten))
 			}
 
 			// Give the data tracker time to ingest data. Not required for the test to pass.
@@ -195,17 +188,17 @@ func TestTrackReads(t *testing.T) {
 			index := keyToIndexMap[string(readInfo.Key)]
 
 			// we should not read values we haven't told the data tracker we've written.
-			require.True(t, index <= highestWrittenIndex)
+			require.True(t, int(index) <= highestWrittenIndex)
 		}
 	}
 
 	require.True(t, readCount > 0)
 
 	// Mark all data as having been written so far.
-	highestWrittenIndex = keyCount - 1
+	highestWrittenIndex = int(keyCount - 1)
 	for highestIndexReportedWritten < highestWrittenIndex {
 		highestIndexReportedWritten++
-		dataTracker.ReportWrite(highestIndexReportedWritten)
+		dataTracker.ReportWrite(uint64(highestIndexReportedWritten))
 	}
 
 	unwrittenKeys := make(map[string]struct{})
@@ -237,7 +230,6 @@ func TestTrackReads(t *testing.T) {
 
 	// The data we read is random, but the following heuristic should hold with high probability.
 	require.True(t, len(readDataSet) > int(0.5*float64(keyCount)))
-	fmt.Printf("read %d keys out of %d\n", len(readDataSet), keyCount) // TODO
 
 	dataTracker.Close()
 

@@ -68,12 +68,12 @@ type DataTracker struct {
 	// Consider all key indices that have been generated this session (i.e. ignore keys indices generated prior to the
 	// most recent restart). We want to find the highest key index that has been written to the database AND
 	// where all lower key indices have also been written as well.
-	highestWrittenKeyIndex uint64
+	highestWrittenKeyIndex int64
 
 	// Consider all cohorts that have been generated this session (i.e. ignore cohorts generated prior to the most
 	// recent restart). We want to find the highest cohort index that has been fully written to the database AND
 	// where all cohorts with lower indices have also been written as well.
-	highestWrittenCohortIndex uint64
+	highestWrittenCohortIndex int64
 
 	// A channel containing keys-value pairs that are ready to be written.
 	writeInfoChan chan *WriteInfo
@@ -181,8 +181,8 @@ func NewDataTracker(ctx context.Context, config *BenchmarkConfig) (*DataTracker,
 		activeCohort:              activeCohort,
 		lowestCohortIndex:         lowestCohortIndex,
 		highestCohortIndex:        highestCohortIndex,
-		highestWrittenKeyIndex:    activeCohort.LowKeyIndex() - 1,
-		highestWrittenCohortIndex: highestCohortIndex, // only the active cohort initially being written
+		highestWrittenKeyIndex:    int64(activeCohort.LowKeyIndex()) - 1,
+		highestWrittenCohortIndex: int64(highestCohortIndex) - 1,
 		safeTTL:                   safeTTL,
 		valueSize:                 valueSize,
 		generator:                 NewDataGenerator(config.Seed, config.RandomPoolSize),
@@ -370,16 +370,15 @@ func (t *DataTracker) dataGenerator() {
 
 // handleWrittenKey handles a key that has been written to the database.
 func (t *DataTracker) handleWrittenKey(keyIndex uint64) {
-
 	// Add key index to the set of written keys we are tracking.
 	t.writtenKeysSet[keyIndex] = struct{}{}
 
 	// Determine the highest key index written so far that also has all lower key indices written.
 	for {
-		nextKeyIndex := t.highestWrittenKeyIndex + 1
+		nextKeyIndex := uint64(t.highestWrittenKeyIndex + 1)
 		if _, ok := t.writtenKeysSet[nextKeyIndex]; ok {
 			// The next key has been written, mark it as such.
-			t.highestWrittenKeyIndex = nextKeyIndex
+			t.highestWrittenKeyIndex = int64(nextKeyIndex)
 			delete(t.writtenKeysSet, nextKeyIndex)
 		} else {
 			// Once we find the first key that has not been written, we can stop checking.
@@ -391,16 +390,20 @@ func (t *DataTracker) handleWrittenKey(keyIndex uint64) {
 
 	// Determine the highest cohort index written so far that also has all lower cohorts written.
 	for {
-		nextCohortIndex := t.highestCohortIndex + 1
+		nextCohortIndex := uint64(t.highestWrittenCohortIndex + 1)
 		if nextCohortIndex >= t.activeCohort.CohortIndex() {
 			// Don't ever mark the active cohort as complete.
 			break
 		}
 		nextCohort := t.cohorts[nextCohortIndex]
-		if nextCohort.HighKeyIndex() <= t.highestWrittenKeyIndex {
+		if int64(nextCohort.HighKeyIndex()) <= t.highestWrittenKeyIndex {
 			// We've found a cohort that has all keys written.
-			t.highestWrittenCohortIndex = nextCohort.CohortIndex()
+			t.highestWrittenCohortIndex = int64(nextCohort.CohortIndex())
 			t.completeCohortSet[nextCohort.CohortIndex()] = struct{}{}
+			err := nextCohort.MarkComplete()
+			if err != nil {
+				panic(fmt.Sprintf("failed to mark cohort as complete: %v", err)) // TODO not clean
+			}
 		} else {
 			// Once we find the first cohort that does not have all keys written, we can stop checking.
 			break
