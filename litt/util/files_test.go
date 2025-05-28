@@ -12,7 +12,7 @@ import (
 func TestVerifyFileProperties(t *testing.T) {
 	// Setup
 	tempDir := t.TempDir()
-	
+
 	// Test cases
 	tests := []struct {
 		name             string
@@ -67,20 +67,20 @@ func TestVerifyFileProperties(t *testing.T) {
 			expectedErrorMsg: "is a directory",
 		},
 	}
-	
+
 	// Run tests
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			path := tc.setup()
 			exists, size, err := VerifyFileProperties(path)
-			
+
 			if tc.expectError {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.expectedErrorMsg)
 			} else {
 				require.NoError(t, err)
 			}
-			
+
 			require.Equal(t, tc.expectedExists, exists)
 			require.Equal(t, tc.expectedSize, size)
 		})
@@ -93,9 +93,9 @@ func TestExists(t *testing.T) {
 	existingFile := filepath.Join(tempDir, "existing-file")
 	err := os.WriteFile(existingFile, []byte("test"), 0600)
 	require.NoError(t, err)
-	
+
 	nonExistentFile := filepath.Join(tempDir, "non-existent-file")
-	
+
 	// Test cases
 	tests := []struct {
 		name        string
@@ -116,18 +116,18 @@ func TestExists(t *testing.T) {
 			expectError: false,
 		},
 	}
-	
+
 	// Run tests
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			exists, err := Exists(tc.path)
-			
+
 			if tc.expectError {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 			}
-			
+
 			require.Equal(t, tc.expected, exists)
 		})
 	}
@@ -136,22 +136,22 @@ func TestExists(t *testing.T) {
 func TestVerifyDirectoryWritable(t *testing.T) {
 	// Setup
 	tempDir := t.TempDir()
-	
+
 	// Create a non-writable directory (0500 = read & execute, no write)
 	nonWritableDir := filepath.Join(tempDir, "non-writable-dir")
 	err := os.Mkdir(nonWritableDir, 0500)
 	require.NoError(t, err)
-	
+
 	// Create a writable directory
 	writableDir := filepath.Join(tempDir, "writable-dir")
 	err = os.Mkdir(writableDir, 0700)
 	require.NoError(t, err)
-	
+
 	// Create a regular file
 	regularFile := filepath.Join(tempDir, "regular-file")
 	err = os.WriteFile(regularFile, []byte("test"), 0600)
 	require.NoError(t, err)
-	
+
 	// Test cases
 	tests := []struct {
 		name        string
@@ -182,12 +182,12 @@ func TestVerifyDirectoryWritable(t *testing.T) {
 			expectError: false,
 		},
 	}
-	
+
 	// Run tests
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			err := verifyDirectoryWritable(tc.path)
-			
+
 			if tc.expectError {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.errorMsg)
@@ -196,7 +196,7 @@ func TestVerifyDirectoryWritable(t *testing.T) {
 			}
 		})
 	}
-	
+
 	// Cleanup special permissions
 	err = os.Chmod(nonWritableDir, 0700)
 	require.NoError(t, err)
@@ -205,17 +205,17 @@ func TestVerifyDirectoryWritable(t *testing.T) {
 func TestEnsureParentDirExists(t *testing.T) {
 	// Setup
 	tempDir := t.TempDir()
-	
+
 	// Create a non-writable directory (0500 = read & execute, no write)
 	nonWritableDir := filepath.Join(tempDir, "non-writable-dir")
 	err := os.Mkdir(nonWritableDir, 0500)
 	require.NoError(t, err)
-	
+
 	// Create a test file
 	testFile := filepath.Join(tempDir, "test-file")
 	err = os.WriteFile(testFile, []byte("test"), 0600)
 	require.NoError(t, err)
-	
+
 	// Test cases
 	tests := []struct {
 		name        string
@@ -246,18 +246,18 @@ func TestEnsureParentDirExists(t *testing.T) {
 			errorMsg:    "is not a directory",
 		},
 	}
-	
+
 	// Run tests
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			err := ensureParentDirExists(tc.path)
-			
+
 			if tc.expectError {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.errorMsg)
 			} else {
 				require.NoError(t, err)
-				
+
 				// Verify the parent directory was created if needed
 				parentDir := filepath.Dir(tc.path)
 				exists, err := Exists(parentDir)
@@ -266,7 +266,7 @@ func TestEnsureParentDirExists(t *testing.T) {
 			}
 		})
 	}
-	
+
 	// Cleanup special permissions
 	err = os.Chmod(nonWritableDir, 0700)
 	require.NoError(t, err)
@@ -275,22 +275,22 @@ func TestEnsureParentDirExists(t *testing.T) {
 func TestCopyRegularFile(t *testing.T) {
 	// Setup
 	tempDir := t.TempDir()
-	
+
 	// Create a source file with specific content, permissions, and time
 	sourceFile := filepath.Join(tempDir, "source-file")
 	content := []byte("test content")
 	err := os.WriteFile(sourceFile, content, 0640)
 	require.NoError(t, err)
-	
+
 	// Set a specific modification time
 	modTime := time.Now().Add(-24 * time.Hour) // yesterday
 	err = os.Chtimes(sourceFile, modTime, modTime)
 	require.NoError(t, err)
-	
+
 	// Get file info for permissions and modtime
 	sourceInfo, err := os.Stat(sourceFile)
 	require.NoError(t, err)
-	
+
 	// Test cases
 	tests := []struct {
 		name        string
@@ -313,7 +313,7 @@ func TestCopyRegularFile(t *testing.T) {
 			expectError: false,
 		},
 	}
-	
+
 	// Run tests
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -322,28 +322,28 @@ func TestCopyRegularFile(t *testing.T) {
 				err := os.WriteFile(tc.destPath, []byte("original content"), 0600)
 				require.NoError(t, err)
 			}
-			
+
 			err := copyRegularFile(sourceFile, tc.destPath, sourceInfo.Mode(), sourceInfo.ModTime())
-			
+
 			if tc.expectError {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				
+
 				// Verify the file was copied correctly
 				destInfo, err := os.Stat(tc.destPath)
 				require.NoError(t, err)
-				
+
 				// Check content
 				destContent, err := os.ReadFile(tc.destPath)
 				require.NoError(t, err)
 				require.Equal(t, content, destContent)
-				
+
 				// Check permissions (mask out the bits we don't care about for comparison)
 				// We only care about user, group, and world permissions (0777)
 				// This handles umask and platform differences
 				require.Equal(t, sourceInfo.Mode()&0777, destInfo.Mode()&0777)
-				
+
 				// Check modification time
 				require.Equal(t, sourceInfo.ModTime().Unix(), destInfo.ModTime().Unix())
 			}
@@ -356,20 +356,20 @@ func TestCopySymlink(t *testing.T) {
 	if !supportsSymlinks() {
 		t.Skip("Symlinks not supported on this platform/environment")
 	}
-	
+
 	// Setup
 	tempDir := t.TempDir()
-	
+
 	// Create a target file for the symlink
 	targetFile := filepath.Join(tempDir, "target-file")
 	err := os.WriteFile(targetFile, []byte("target content"), 0644)
 	require.NoError(t, err)
-	
+
 	// Create a source symlink
 	sourceSymlink := filepath.Join(tempDir, "source-symlink")
 	err = os.Symlink(targetFile, sourceSymlink)
 	require.NoError(t, err)
-	
+
 	// Test cases
 	tests := []struct {
 		name        string
@@ -387,21 +387,21 @@ func TestCopySymlink(t *testing.T) {
 			expectError: false,
 		},
 	}
-	
+
 	// Run tests
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			err := copySymlink(sourceSymlink, tc.destPath)
-			
+
 			if tc.expectError {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				
+
 				// Verify the symlink was created
 				linkDest, err := os.Readlink(tc.destPath)
 				require.NoError(t, err)
-				
+
 				// Verify it points to the right target
 				require.Equal(t, targetFile, linkDest)
 			}
@@ -412,12 +412,12 @@ func TestCopySymlink(t *testing.T) {
 func TestEnsureDirectoryExists(t *testing.T) {
 	// Setup
 	tempDir := t.TempDir()
-	
+
 	// Create a regular file
 	regularFile := filepath.Join(tempDir, "regular-file")
 	err := os.WriteFile(regularFile, []byte("test"), 0600)
 	require.NoError(t, err)
-	
+
 	// Test cases
 	tests := []struct {
 		name        string
@@ -435,9 +435,9 @@ func TestEnsureDirectoryExists(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "directory already exists",
-			dirPath:     filepath.Join(tempDir, "existing-dir"),
-			mode:        0755,
+			name:    "directory already exists",
+			dirPath: filepath.Join(tempDir, "existing-dir"),
+			mode:    0755,
 			setup: func(path string) {
 				err := os.Mkdir(path, 0755)
 				require.NoError(t, err)
@@ -453,9 +453,9 @@ func TestEnsureDirectoryExists(t *testing.T) {
 			errorMsg:    "is not a directory",
 		},
 		{
-			name:        "directory exists but is non-writable",
-			dirPath:     filepath.Join(tempDir, "non-writable-dir"),
-			mode:        0755,
+			name:    "directory exists but is non-writable",
+			dirPath: filepath.Join(tempDir, "non-writable-dir"),
+			mode:    0755,
 			setup: func(path string) {
 				err := os.Mkdir(path, 0500) // read & execute only
 				require.NoError(t, err)
@@ -464,25 +464,25 @@ func TestEnsureDirectoryExists(t *testing.T) {
 			errorMsg:    "not writable",
 		},
 	}
-	
+
 	// Run tests
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setup(tc.dirPath)
-			
+
 			err := ensureDirectoryExists(tc.dirPath, tc.mode)
-			
+
 			if tc.expectError {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.errorMsg)
 			} else {
 				require.NoError(t, err)
-				
+
 				// Verify the directory exists
 				info, err := os.Stat(tc.dirPath)
 				require.NoError(t, err)
 				require.True(t, info.IsDir())
-				
+
 				// If we created a new directory, verify the mode
 				if tc.name == "directory doesn't exist" {
 					// Note: mode comparison can be tricky due to umask and OS differences
@@ -492,7 +492,7 @@ func TestEnsureDirectoryExists(t *testing.T) {
 			}
 		})
 	}
-	
+
 	// Clean up non-writable directory
 	nonWritableDir := filepath.Join(tempDir, "non-writable-dir")
 	if _, err := os.Stat(nonWritableDir); err == nil {
@@ -504,27 +504,27 @@ func TestEnsureDirectoryExists(t *testing.T) {
 func TestCopyDirectoryRecursively(t *testing.T) {
 	// Setup
 	tempDir := t.TempDir()
-	
+
 	// Create a source directory structure
 	sourceDir := filepath.Join(tempDir, "source")
 	err := os.Mkdir(sourceDir, 0755)
 	require.NoError(t, err)
-	
+
 	// Create some files in the source directory
 	err = os.WriteFile(filepath.Join(sourceDir, "file1.txt"), []byte("file1 content"), 0644)
 	require.NoError(t, err)
 	err = os.WriteFile(filepath.Join(sourceDir, "file2.txt"), []byte("file2 content"), 0644)
 	require.NoError(t, err)
-	
+
 	// Create a subdirectory
 	subDir := filepath.Join(sourceDir, "subdir")
 	err = os.Mkdir(subDir, 0755)
 	require.NoError(t, err)
-	
+
 	// Create files in the subdirectory
 	err = os.WriteFile(filepath.Join(subDir, "file3.txt"), []byte("file3 content"), 0644)
 	require.NoError(t, err)
-	
+
 	// Create a symlink if supported
 	supportsLinks := supportsSymlinks()
 	var symlinkPath string
@@ -533,7 +533,7 @@ func TestCopyDirectoryRecursively(t *testing.T) {
 		err = os.Symlink(filepath.Join(sourceDir, "file1.txt"), symlinkPath)
 		require.NoError(t, err)
 	}
-	
+
 	// Test cases
 	tests := []struct {
 		name        string
@@ -551,7 +551,7 @@ func TestCopyDirectoryRecursively(t *testing.T) {
 			expectError: false,
 		},
 	}
-	
+
 	// Run tests
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -559,48 +559,48 @@ func TestCopyDirectoryRecursively(t *testing.T) {
 			if tc.name == "copy to existing destination" {
 				err := os.Mkdir(tc.destDir, 0755)
 				require.NoError(t, err)
-				
+
 				// Add a pre-existing file
 				err = os.WriteFile(filepath.Join(tc.destDir, "existing.txt"), []byte("existing content"), 0644)
 				require.NoError(t, err)
 			}
-			
+
 			err := CopyDirectoryRecursively(sourceDir, tc.destDir)
-			
+
 			if tc.expectError {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				
+
 				// Verify the directory was copied correctly
-				
+
 				// Check for file1.txt
 				content, err := os.ReadFile(filepath.Join(tc.destDir, "file1.txt"))
 				require.NoError(t, err)
 				require.Equal(t, "file1 content", string(content))
-				
+
 				// Check for file2.txt
 				content, err = os.ReadFile(filepath.Join(tc.destDir, "file2.txt"))
 				require.NoError(t, err)
 				require.Equal(t, "file2 content", string(content))
-				
+
 				// Check for subdirectory and its file
 				subDirPath := filepath.Join(tc.destDir, "subdir")
 				info, err := os.Stat(subDirPath)
 				require.NoError(t, err)
 				require.True(t, info.IsDir())
-				
+
 				content, err = os.ReadFile(filepath.Join(subDirPath, "file3.txt"))
 				require.NoError(t, err)
 				require.Equal(t, "file3 content", string(content))
-				
+
 				// Check for symlink if supported
 				if supportsLinks {
 					linkTarget, err := os.Readlink(filepath.Join(tc.destDir, "symlink"))
 					require.NoError(t, err)
 					require.Equal(t, filepath.Join(sourceDir, "file1.txt"), linkTarget)
 				}
-				
+
 				// For the "existing destination" test, verify the pre-existing file is still there
 				if tc.name == "copy to existing destination" {
 					content, err = os.ReadFile(filepath.Join(tc.destDir, "existing.txt"))
@@ -619,15 +619,15 @@ func supportsSymlinks() bool {
 		return false
 	}
 	defer os.RemoveAll(tempDir)
-	
+
 	source := filepath.Join(tempDir, "source")
 	target := filepath.Join(tempDir, "target")
-	
+
 	err = os.WriteFile(source, []byte{}, 0644)
 	if err != nil {
 		return false
 	}
-	
+
 	err = os.Symlink(source, target)
 	return err == nil
 }

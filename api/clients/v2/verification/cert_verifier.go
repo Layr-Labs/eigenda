@@ -77,7 +77,7 @@ func (cv *CertVerifier) CheckDACert(
 		if err != nil {
 			return fmt.Errorf("serialize cert: %w", err)
 		}
-	
+
 	case coretypes.VersionTwoCert:
 		_, ok := cert.(*coretypes.EigenDACertV2)
 		if !ok {

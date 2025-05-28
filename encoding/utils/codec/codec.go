@@ -14,7 +14,8 @@ import (
 // inserting a 0 and the remainder. The output is thus not necessarily a multiple of 32.
 //
 // TODO (litt3): usage of this function should be migrated to use PadPayload instead. I've left it unchanged for now,
-//  since v1 logic and tests rely on the specific assumptions of this implementation.
+//
+//	since v1 logic and tests rely on the specific assumptions of this implementation.
 func ConvertByPaddingEmptyByte(data []byte) []byte {
 	dataSize := len(data)
 	parseSize := encoding.BYTES_PER_SYMBOL - 1
@@ -49,7 +50,8 @@ func ConvertByPaddingEmptyByte(data []byte) []byte {
 // the output.
 //
 // TODO (litt3): usage of this function should be migrated to use RemoveInternalPadding instead. I've left it unchanged
-//  for now, since v1 logic and tests rely on the specific assumptions of this implementation.
+//
+//	for now, since v1 logic and tests rely on the specific assumptions of this implementation.
 func RemoveEmptyByteFromPaddedBytes(data []byte) []byte {
 	dataSize := len(data)
 	parseSize := encoding.BYTES_PER_SYMBOL
@@ -78,7 +80,7 @@ func RemoveEmptyByteFromPaddedBytes(data []byte) []byte {
 // PadPayload internally pads the input data by prepending a 0x00 to each chunk of 31 bytes. This guarantees that
 // the data will be a valid field element for the bn254 curve
 //
-// Additionally, this function will add necessary padding to align the output to 32 bytes
+// # Additionally, this function will add necessary padding to align the output to 32 bytes
 //
 // NOTE: this method is a reimplementation of ConvertByPaddingEmptyByte, with one meaningful difference: the alignment
 // of the output to encoding.BYTES_PER_SYMBOL. This alignment actually makes the padding logic simpler, and the
