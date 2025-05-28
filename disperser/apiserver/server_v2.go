@@ -45,7 +45,7 @@ type DispersalServerV2 struct {
 
 	serverConfig      disperser.ServerConfig
 	blobStore         *blobstore.BlobStore
-	blobMetadataStore *blobstore.BlobMetadataStore
+	blobMetadataStore blobstore.MetadataStore
 	meterer           *meterer.Meterer
 
 	chainReader              core.Reader
@@ -71,7 +71,7 @@ type DispersalServerV2 struct {
 func NewDispersalServerV2(
 	serverConfig disperser.ServerConfig,
 	blobStore *blobstore.BlobStore,
-	blobMetadataStore *blobstore.BlobMetadataStore,
+	blobMetadataStore blobstore.MetadataStore,
 	chainReader core.Reader,
 	meterer *meterer.Meterer,
 	blobRequestAuthenticator corev2.BlobRequestAuthenticator,
