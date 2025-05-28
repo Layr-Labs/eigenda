@@ -155,7 +155,6 @@ func (b *BenchmarkEngine) writer() {
 			if err != nil {
 				panic(fmt.Sprintf("failed to flush data: %v", err)) // TODO not clean
 			}
-			// TODO report writes to data tracker
 		}
 	}
 }

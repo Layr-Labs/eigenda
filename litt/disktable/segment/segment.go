@@ -253,6 +253,11 @@ func LoadSegment(logger logging.Logger,
 	return segment, nil
 }
 
+// SegmentIndex returns the index of the segment.
+func (s *Segment) SegmentIndex() uint32 {
+	return s.index
+}
+
 // sealLoadedSegment is responsible for sealing a segment loaded from disk that is not already sealed.
 // While doing this, it is responsible for making the key file consistent with the values present in the
 // value files.
@@ -315,6 +320,7 @@ func (s *Segment) sealLoadedSegment(now time.Time) error {
 	if err != nil {
 		return fmt.Errorf("failed to seal metadata file: %w", err)
 	}
+	s.keyCount = uint32(len(goodKeys))
 
 	return nil
 }
