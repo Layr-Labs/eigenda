@@ -47,6 +47,9 @@ type BenchmarkEngine struct {
 
 	// The burst size for read rate limiting.
 	readBurstSize uint64
+
+	// Records benchmark metrics.
+	metrics *metrics
 }
 
 // NewBenchmarkEngine creates a new BenchmarkEngine with the given configuration.
@@ -113,6 +116,7 @@ func NewBenchmarkEngine(configPath string) (*BenchmarkEngine, error) {
 		readBytesPerSecondPerThread:  readBytesPerSecondPerThread,
 		writeBurstSize:               writeBurstSize,
 		readBurstSize:                readBurstSize,
+		metrics:                      newMetrics(ctx, cfg.LittConfig.Logger, cfg),
 	}, nil
 }
 
@@ -179,18 +183,25 @@ func (b *BenchmarkEngine) writer() {
 					time.Sleep(reservation.Delay())
 				}
 
+				start := time.Now()
+
 				err := b.table.Put(writeInfo.Key, writeInfo.Value)
 				if err != nil {
 					panic(fmt.Sprintf("failed to write data: %v", err)) // TODO not clean
 				}
 
+				b.metrics.reportWrite(time.Since(start), uint64(len(writeInfo.Value)))
 				b.dataTracker.ReportWrite(writeInfo.KeyIndex)
 			}
+
+			start := time.Now()
 
 			err := b.table.Flush()
 			if err != nil {
 				panic(fmt.Sprintf("failed to flush data: %v", err)) // TODO not clean
 			}
+
+			b.metrics.reportFlush(time.Since(start))
 		}
 	}
 }
@@ -228,10 +239,15 @@ func (b *BenchmarkEngine) reader() {
 				time.Sleep(reservation.Delay())
 			}
 
+			start := time.Now()
+
 			value, exists, err := b.table.Get(readInfo.Key)
 			if err != nil {
 				panic(fmt.Sprintf("failed to read data: %v", err)) // TODO not clean
 			}
+
+			b.metrics.reportRead(time.Since(start), uint64(len(readInfo.Value)))
+
 			if !exists {
 				panic(fmt.Sprintf("key %s not found in database", readInfo.Key)) // TODO not clean
 			}
