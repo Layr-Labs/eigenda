@@ -44,7 +44,7 @@ type DisperserClient interface {
 	// For an example usage, see how our disperser_client makes a call to this endpoint when it doesn't have a local prover:
 	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166
 	GetBlobCommitment(ctx context.Context, in *BlobCommitmentRequest, opts ...grpc.CallOption) (*BlobCommitmentReply, error)
-	// GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
+	// GetPaymentState will soon be deprecated. It is a utility method to get the payment state of a given account, at a given disperser.
 	// EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
 	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
 	// That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
@@ -54,8 +54,8 @@ type DisperserClient interface {
 	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
 	GetPaymentState(ctx context.Context, in *GetPaymentStateRequest, opts ...grpc.CallOption) (*GetPaymentStateReply, error)
 	// GetPaymentStateQuorumSpecific is a utility method to get the payment state of a given account, at a given disperser.
-	// EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
-	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
+	// EigenDA's dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id.
+	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it disperse from.
 	// That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
 	// The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
 	//
@@ -135,7 +135,7 @@ type DisperserServer interface {
 	// For an example usage, see how our disperser_client makes a call to this endpoint when it doesn't have a local prover:
 	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166
 	GetBlobCommitment(context.Context, *BlobCommitmentRequest) (*BlobCommitmentReply, error)
-	// GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
+	// GetPaymentState will soon be deprecated. It is a utility method to get the payment state of a given account, at a given disperser.
 	// EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
 	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
 	// That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
@@ -145,8 +145,8 @@ type DisperserServer interface {
 	// https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
 	GetPaymentState(context.Context, *GetPaymentStateRequest) (*GetPaymentStateReply, error)
 	// GetPaymentStateQuorumSpecific is a utility method to get the payment state of a given account, at a given disperser.
-	// EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
-	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
+	// EigenDA's dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id.
+	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it disperse from.
 	// That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
 	// The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
 	//

@@ -25,7 +25,7 @@ service Disperser {
   // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166
   rpc GetBlobCommitment(BlobCommitmentRequest) returns (BlobCommitmentReply) {}
 
-  // GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
+  // GetPaymentState will soon be deprecated. It is a utility method to get the payment state of a given account, at a given disperser.
   // EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
   // A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
   // That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
@@ -36,8 +36,8 @@ service Disperser {
   rpc GetPaymentState(GetPaymentStateRequest) returns (GetPaymentStateReply) {}
 
   // GetPaymentStateQuorumSpecific is a utility method to get the payment state of a given account, at a given disperser.
-  // EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
-  // A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
+  // EigenDA's dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id.
+  // A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it disperse from.
   // That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
   // The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
   //
@@ -168,9 +168,9 @@ message GetPaymentStateReply {
 message GetPaymentStateQuorumSpecificReply {
   // payment vault parameters with per-quorum configurations
   PaymentVaultParams payment_vault_params = 1;
-  // off-chain account reservation usage records
+  // period_records maps quorum IDs to the off-chain account reservation usage records
   map<uint32, PeriodRecord> period_records = 2;
-  // on-chain account reservation setting
+  // reservations maps quorum IDs to the on-chain account reservation record
   map<uint32, QuorumReservation> reservations = 3;
   // off-chain on-demand payment usage
   bytes cumulative_payment = 4;
