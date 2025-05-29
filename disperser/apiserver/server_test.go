@@ -754,21 +754,19 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 
 	mockState.On("GetPricePerSymbol").Return(uint32(encoding.BYTES_PER_SYMBOL), nil)
 	mockState.On("GetMinNumSymbols").Return(uint32(1), nil)
-	mockState.On("GetOnDemandGlobalSymbolsPerSecond").Return(uint64(4096), nil)
+	mockState.On("GetGlobalSymbolsPerSecond").Return(uint64(4096), nil)
 	mockState.On("GetRequiredQuorumNumbers").Return([]uint8{0, 1}, nil)
 	mockState.On("GetOnDemandQuorumNumbers").Return([]uint8{0, 1}, nil)
 	mockState.On("GetReservationWindow").Return(uint32(1), nil)
 	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.OnDemandPayment{
 		CumulativePayment: big.NewInt(3000),
 	}, nil)
-	mockState.On("GetReservedPaymentByAccountAndQuorums", tmock.Anything, tmock.Anything, tmock.Anything).Return(map[uint8]*core.ReservedPayment{
-		0: {SymbolsPerSecond: 2048, StartTimestamp: 0, EndTimestamp: math.MaxUint32},
-		1: {SymbolsPerSecond: 2048, StartTimestamp: 0, EndTimestamp: math.MaxUint32},
-	}, nil)
 	mockState.On("GetReservedPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.ReservedPayment{
 		SymbolsPerSecond: 2048,
 		StartTimestamp:   0,
 		EndTimestamp:     math.MaxUint32,
+		QuorumNumbers:    []uint8{0, 1},
+		QuorumSplits:     []byte{50, 50},
 	}, nil)
 	// append test name to each table name for an unique store
 	table_names := []string{"reservations_server_" + testName, "ondemand_server_" + testName, "global_server_" + testName}
