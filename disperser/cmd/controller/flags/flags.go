@@ -223,6 +223,14 @@ var (
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_THRESHOLD_PERCENTAGE"),
 		Value:    55,
 	}
+	defaultSigningThresholds cli.StringSlice = []string{"0.55", "0.67"}
+	SignificantSigningMetricsThresholdsFlag = cli.StringSliceFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "significant-signing-thresholds"),
+		Usage:    "Significant signing thresholds for metrics, each must be between 0.0 and 1.0",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "SIGNIFICANT_SIGNING_METRICS_THRESHOLDS"),
+		Value:    &defaultSigningThresholds,
+	}
 )
 
 var requiredFlags = []cli.Flag{
@@ -261,6 +269,7 @@ var optionalFlags = []cli.Flag{
 	ControllerReadinessProbePathFlag,
 	ControllerHealthProbePathFlag,
 	SignificantSigningThresholdPercentageFlag,
+	SignificantSigningMetricsThresholdsFlag,
 }
 
 var Flags []cli.Flag
