@@ -448,7 +448,9 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 			logger,
 			rateLimiter,
 			prometheus.NewRegistry(),
-			reader)
+			reader,
+			nil,
+		)
 		require.NoError(t, err)
 
 		ops[id] = TestOperator{

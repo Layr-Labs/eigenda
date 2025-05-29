@@ -38,6 +38,30 @@ func (m *MockOnchainPaymentState) GetReservedPaymentByAccount(ctx context.Contex
 	return value, args.Error(1)
 }
 
+func (m *MockOnchainPaymentState) GetReservedPaymentByAccountAndQuorum(ctx context.Context, accountID gethcommon.Address, quorumId uint8) (*core.ReservedPayment, error) {
+	args := m.Called(ctx, accountID, quorumId)
+	var value *core.ReservedPayment
+	if args.Get(0) != nil {
+		value = args.Get(0).(*core.ReservedPayment)
+	}
+	return value, args.Error(1)
+}
+
+func (m *MockOnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error) {
+	args := m.Called(ctx, accountID, quorumNumbers)
+	var value map[core.QuorumID]*core.ReservedPayment
+	if fn, ok := args.Get(0).(func(context.Context, gethcommon.Address, []core.QuorumID) map[core.QuorumID]*core.ReservedPayment); ok {
+		value = fn(ctx, accountID, quorumNumbers)
+	} else if args.Get(0) != nil {
+		value = args.Get(0).(map[core.QuorumID]*core.ReservedPayment)
+	}
+	var err error
+	if len(args) > 1 {
+		err = args.Error(1)
+	}
+	return value, err
+}
+
 func (m *MockOnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
 	args := m.Called(ctx, accountID)
 	var value *core.OnDemandPayment
@@ -79,19 +103,4 @@ func (m *MockOnchainPaymentState) GetPricePerSymbol() uint64 {
 func (m *MockOnchainPaymentState) GetReservationWindow() uint64 {
 	args := m.Called()
 	return args.Get(0).(uint64)
-}
-
-func (m *MockOnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error) {
-	args := m.Called(ctx, accountID, quorumNumbers)
-	var value map[core.QuorumID]*core.ReservedPayment
-	if fn, ok := args.Get(0).(func(context.Context, gethcommon.Address, []core.QuorumID) map[core.QuorumID]*core.ReservedPayment); ok {
-		value = fn(ctx, accountID, quorumNumbers)
-	} else if args.Get(0) != nil {
-		value = args.Get(0).(map[core.QuorumID]*core.ReservedPayment)
-	}
-	var err error
-	if len(args) > 1 {
-		err = args.Error(1)
-	}
-	return value, err
 }

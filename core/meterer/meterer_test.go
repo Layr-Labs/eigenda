@@ -278,10 +278,10 @@ func TestMetererReservations(t *testing.T) {
 		"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountAndQuorum},
 		"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.Itoa(int(overflowedReservationPeriod))},
 	})
+
 	assert.NoError(t, err)
 	assert.Equal(t, accountAndQuorum, item["AccountIDAndQuorum"].(*types.AttributeValueMemberS).Value)
 	assert.Equal(t, strconv.Itoa(int(overflowedReservationPeriod)), item["ReservationPeriod"].(*types.AttributeValueMemberN).Value)
-	// 25 rounded up to the nearest multiple of minNumSymbols - (200-21*9) = 16
 	assert.Equal(t, strconv.Itoa(int(16)), item["BinUsage"].(*types.AttributeValueMemberN).Value)
 
 	// second over flow
