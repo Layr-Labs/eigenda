@@ -42,16 +42,6 @@ jobs:
         run: |
           git submodule update --init --recursive
 
-      # TODO: add back geth if we need it in tests
-      # - name: Install geth
-      #   run: |
-      #     sudo add-apt-repository -y ppa:ethereum/ethereum
-      #     sudo apt-get update
-      #     sudo apt-get -y install ethereum
-
-      # - name: Get geth version
-      #   run: geth version
-
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
