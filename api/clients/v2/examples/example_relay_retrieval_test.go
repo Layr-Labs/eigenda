@@ -49,9 +49,9 @@ func Example_relayPayloadRetrieval() {
 	}
 	defer payloadRetriever.Close()
 
-	retrievableCert, ok := eigenDACert.(coretypes.RetrievableEigenDACert)
+	retrievableCert, ok := eigenDACert.(*coretypes.EigenDACertV3)
 	if !ok {
-		panic("eigenDACert is not a RetrievableEigenDACert")
+		panic("eigenDACert is not a EigenDACertV3")
 	}
 	
 	// Retrieve the payload using the certificate

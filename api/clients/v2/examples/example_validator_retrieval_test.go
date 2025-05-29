@@ -50,9 +50,9 @@ func Example_validatorPayloadRetrieval() {
 		panic(fmt.Sprintf("create validator payload retriever: %v", err))
 	}
 
-	retrievableCert, ok := eigenDACert.(coretypes.RetrievableEigenDACert)
+	retrievableCert, ok := eigenDACert.(*coretypes.EigenDACertV3)
 	if !ok {
-		panic("eigenDACert is not a RetrievableEigenDACert")
+		panic("eigenDACert is not a EigenDACertV3")
 	}
 
 	// Retrieve the payload using the certificate by fetching from validator nodes

@@ -188,10 +188,9 @@ func (c *EigenDACertV3) ComputeBlobKey() (*coreV2.BlobKey, error) {
 
 // BlobHeader returns the blob header of the EigenDACertV3 
 func (c *EigenDACertV3) BlobHeader() (*coreV2.BlobHeaderWithHashedPayment, error) {
-
 	commitments, err := c.Commitments()
 	if err != nil {
-		return nil, fmt.Errorf("get commitments: %w", err)
+		return nil, fmt.Errorf("calculate coretype commitments: %w", err)
 	}
 
 	blobHeader := &coreV2.BlobHeaderWithHashedPayment{
@@ -323,8 +322,9 @@ func (c *EigenDACertV2) QuorumNumbers() []byte {
 func (c *EigenDACertV2) BlobHeader() (*coreV2.BlobHeaderWithHashedPayment, error) {
 	commitments, err := c.Commitments()
 	if err != nil {
-		return nil, fmt.Errorf("get commitments: %w", err)
+		return nil, fmt.Errorf("calculate coretype commitments: %w", err)
 	}
+
 	blobHeader := &coreV2.BlobHeaderWithHashedPayment{
 		BlobVersion: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version,
 		BlobCommitments: *commitments,
