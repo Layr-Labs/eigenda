@@ -8,6 +8,7 @@ import (
 type BlobRequestAuthenticator interface {
 	AuthenticateBlobRequest(header *BlobHeader, signature []byte) error
 	AuthenticatePaymentStateRequest(accountId gethcommon.Address, request *pb.GetPaymentStateRequest) error
+	AuthenticateQuorumSpecificPaymentStateRequest(accountId gethcommon.Address, request *pb.GetQuorumSpecificPaymentStateRequest) error
 }
 
 type BlobRequestSigner interface {
