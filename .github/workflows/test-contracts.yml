@@ -16,6 +16,10 @@ concurrency:
 ##       - changes that affect storage are caught by CI
 ##       - (stretch) yarn fmt
 ##       - some level of security through automated static analysis (e.g, slither)
+
+permissions:
+  contents: read
+
 jobs:
   fmt:
     name: Enforce Contracts Formatting
@@ -36,22 +40,34 @@ jobs:
     name: Foundry Project
     runs-on: ubuntu-24.04
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            binaries.soliditylang.org:443
+            github.com:443
+            objects.githubusercontent.com:443
+            registry.yarnpkg.com:443
+          
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
         with:
           submodules: recursive
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: foundry-rs/foundry-toolchain@de808b1eea699e761c404bda44ba8f21aba30b2c
         with:
           version: nightly
 
       - name: Set Node.js 16.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
         with:
           node-version: 16.x
 
       - name: Run install
-        uses: borales/actions-yarn@v4
+        uses: borales/actions-yarn@3766bb1335b98fb13c60eaf358fe20811b730a88
         with:
           cmd: install
 
@@ -73,22 +89,36 @@ jobs:
     name: Verify bindings are updated
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v3
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+            proxy.golang.org:443
+            registry.yarnpkg.com:443
+            storage.googleapis.com:443
+            sum.golang.org:443
+          
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           submodules: recursive
 
       - name: Set Node.js 16.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e
         with:
           node-version: 16.x
 
       - name: Run install
-        uses: borales/actions-yarn@v4
+        uses: borales/actions-yarn@3766bb1335b98fb13c60eaf358fe20811b730a88
         with:
           cmd: install
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: foundry-rs/foundry-toolchain@de808b1eea699e761c404bda44ba8f21aba30b2c
         with:
           version: nightly
 
@@ -99,7 +129,7 @@ jobs:
         working-directory: ./contracts
 
       - name: Setup Go 1.21.13
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b
         with:
           go-version: "1.21.13"
 

@@ -7,21 +7,33 @@ on:
     branches:
       - master
 
+permissions:
+  contents: read
+
 jobs:
   golangci:
     name: Linter
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-go@v3
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            raw.githubusercontent.com:443
+      
+      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34
         with:
           go-version: '1.21' # The Go version to download (if necessary) and use.
       - run: go version
 
       - name: Checkout EigenDA
-        uses: actions/checkout@v3
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84
         with:
           version: v1.60
           args: --timeout 3m --verbose --out-format=colored-line-number

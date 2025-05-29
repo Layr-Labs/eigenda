@@ -7,11 +7,14 @@ on:
     branches:
       - master
 
+permissions: ''
+
 jobs:
   integration-tests:
     name: Integration Tests
     runs-on: ubuntu-latest
     steps:
+          
       - name: Add LocalStack AWS Credentials
         run: |
           mkdir -p ~/.aws
@@ -49,7 +52,7 @@ jobs:
       #   run: geth version
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: foundry-rs/foundry-toolchain@de808b1eea699e761c404bda44ba8f21aba30b2c
         with:
           version: nightly
 

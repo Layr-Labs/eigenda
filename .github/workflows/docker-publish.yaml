@@ -10,6 +10,8 @@ env:
   # TODO: Push to AWS CR at a later stage
   REGISTRY: ghcr.io
 
+permissions: ''
+
 jobs:
   build:
 
@@ -18,6 +20,21 @@ jobs:
       contents: read
       packages: write
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            auth.docker.io:443
+            dl-cdn.alpinelinux.org:443
+            ghcr.io:443
+            github.com:443
+            production.cloudflare.docker.com:443
+            proxy.golang.org:443
+            registry-1.docker.io:443
+            storage.googleapis.com:443
+      
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
         with:
