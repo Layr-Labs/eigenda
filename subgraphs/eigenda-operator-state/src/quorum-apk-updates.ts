@@ -24,8 +24,9 @@ function updateApks(blsApkRegistryAddress: Address, quorumApkIdPrefix: Bytes, qu
     // create a binding for blspubkeyregistry
     let blsApkRegistry = BLSApkRegistry.bind(blsApkRegistryAddress)
     // for each quorum, get the apk from the contract and store it as an entity
-    for (let i = 0; i < quorumNumbers.length; i++) {
-        let quorumNumber = quorumNumbers[i]
+    let quorumNumbersArr = quorumNumbers;
+    for (let i = 0; i < quorumNumbersArr.length; i++) {
+        let quorumNumber = quorumNumbersArr[i];
         let quorumApk = new QuorumApk(
             quorumApkIdPrefix.concatI32(quorumNumber)
         )

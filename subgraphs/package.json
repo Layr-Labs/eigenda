@@ -2,8 +2,8 @@
   "name": "eigenda-subgraphs",
   "license": "UNLICENSED",
   "dependencies": {
-    "@graphprotocol/graph-cli": "0.96.0",
-    "@graphprotocol/graph-ts": "0.38.0"
+    "@graphprotocol/graph-cli": "0.51.0",
+    "@graphprotocol/graph-ts": "0.32.0"
   },
-  "devDependencies": { "matchstick-as": "0.6.0" }
+  "devDependencies": { "matchstick-as": "0.5.0" }
 }
