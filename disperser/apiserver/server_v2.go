@@ -466,22 +466,15 @@ func (s *DispersalServerV2) GetPaymentStateQuorumSpecific(ctx context.Context, r
 
 	//TODO(hopeyen): temporarily repeat the same record for all reserved quorums
 	// update the MeteringStore interface in a subsequent PR for quorum specific period records
-	quorumNumber := uint8(0)
-	if len(reservedQuorums) > 0 {
-		quorumNumber = reservedQuorums[0]
-	}
-	records, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod, quorumNumber)
+	records, err := s.meterer.MeteringStore.GetPeriodRecordsMultiQuorum(ctx, accountID, currentReservationPeriod, reservedQuorums)
 	s.logger.Debug("offchain stored period records", "records", records)
 	if err != nil {
 		s.logger.Debug("failed to get reservation records for multiple quorums",
 			"err", err, "accountID", accountID)
 		return nil, err
 	}
-	pbPeriodRecords := &pb.PeriodRecords{
-		Records: records,
-	}
 	for quorumId := range reservedQuorums {
-		periodRecords[uint32(quorumId)] = pbPeriodRecords
+		periodRecords[uint32(quorumId)] = records[uint32(quorumId)]
 	}
 
 	// Get largest cumulative payment
