@@ -1085,6 +1085,8 @@ func (x *Attestation) GetQuorumSignedPercentages() []byte {
 }
 
 // Global constant parameters defined by the payment vault.
+// This message type will soon be deprecated in replacement of PaymentVaultParams. During endpoint migration, this will be filled
+// with the parameters on quorum 0, quorum configurations will be the same across quorums for the foreseeable future.
 type PaymentGlobalParams struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1170,6 +1172,9 @@ func (x *PaymentGlobalParams) GetOnDemandQuorumNumbers() []uint32 {
 }
 
 // Reservation parameters of an account, used to determine the rate limit for the account.
+// This message type will soon be deprecated. During the migration time, we will maintain the usage by returning the
+// most restrictive reservation parameters across the quroums: symbols_per_second will be the lowest rate of across all quroums
+// with latest start and earliest end timestamp, all the quorum numbers with a reservation, and a dummy quorum_splits which was never used.
 type Reservation struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1466,6 +1471,7 @@ func (x *PaymentQuorumProtocolConfig) GetOnDemandEnabled() bool {
 }
 
 // PaymentVaultParams contains the global payment configuration parameters from the payment vault
+// This is the new version of
 type PaymentVaultParams struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
