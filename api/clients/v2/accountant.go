@@ -10,6 +10,7 @@ import (
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -32,6 +33,8 @@ type Accountant struct {
 
 	// number of bins in the circular accounting, restricted by minNumBins which is 3
 	numBins uint32
+
+	logger logging.Logger
 }
 
 type PeriodRecord struct {
@@ -39,7 +42,7 @@ type PeriodRecord struct {
 	Usage uint64
 }
 
-func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint64, pricePerSymbol uint64, minNumSymbols uint64, numBins uint32) *Accountant {
+func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint64, pricePerSymbol uint64, minNumSymbols uint64, numBins uint32, logger logging.Logger) *Accountant {
 	periodRecords := make([]PeriodRecord, numBins)
 	for i := range periodRecords {
 		periodRecords[i] = PeriodRecord{Index: uint32(i), Usage: 0}
@@ -54,6 +57,7 @@ func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayme
 		periodRecords:     periodRecords,
 		cumulativePayment: big.NewInt(0),
 		numBins:           max(numBins, uint32(meterer.MinNumBins)),
+		logger:            logger,
 	}
 	// TODO: add a routine to refresh the on-chain state occasionally?
 	return &a
@@ -86,8 +90,10 @@ func (a *Accountant) BlobPaymentInfo(
 	binLimit := a.reservation.SymbolsPerSecond * uint64(a.reservationWindow)
 	if relativePeriodRecord.Usage <= binLimit {
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
+			a.logger.Error("quorum check failed for reservation", "err", err)
 			return big.NewInt(0), err
 		}
+		a.logger.Info("using reservation", "quorums", quorumNumbers, "symbols", numSymbols, "cumulative", a.cumulativePayment)
 		return big.NewInt(0), nil
 	}
 
@@ -95,9 +101,11 @@ func (a *Accountant) BlobPaymentInfo(
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
 	if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
+			a.logger.Error("quorum check failed for reservation", "err", err)
 			return big.NewInt(0), err
 		}
 		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
+		a.logger.Info("reservation bin overflowed, using overflow bin", "quorums", quorumNumbers, "symbols", numSymbols, "cumulative", a.cumulativePayment)
 		return big.NewInt(0), nil
 	}
 
@@ -110,11 +118,14 @@ func (a *Accountant) BlobPaymentInfo(
 	resultingPayment.Add(a.cumulativePayment, incrementRequired)
 	if resultingPayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
 		if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
+			a.logger.Error("quorum check failed for on-demand payment", "err", err)
 			return big.NewInt(0), err
 		}
+		a.logger.Info("using on-demand payment", "increment", incrementRequired, "cumulative", a.cumulativePayment)
 		a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 		return a.cumulativePayment, nil
 	}
+	a.logger.Error("no bandwidth reservation and insufficient on-demand payment", "account", a.accountID.Hex(), "symbols charged", numSymbols, "current reservation period usage", relativePeriodRecord.Usage, "ondemand increment", incrementRequired, "offchain cumulative payment ", a.cumulativePayment, "onChain cumulative payment", a.onDemand.CumulativePayment)
 	return big.NewInt(0), fmt.Errorf(
 		"no bandwidth reservation found for account %s, and current cumulativePayment balance insufficient "+
 			"to make an on-demand dispersal. Consider depositing more eth to the PaymentVault contract.", a.accountID.Hex())
@@ -177,8 +188,10 @@ func (a *Accountant) GetRelativePeriodRecord(index uint64) *PeriodRecord {
 // and set accoutant state to use initial values.
 func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentStateReply) error {
 	if paymentState == nil {
+		a.logger.Error("payment state cannot be nil")
 		return fmt.Errorf("payment state cannot be nil")
 	} else if paymentState.GetPaymentGlobalParams() == nil {
+		a.logger.Error("payment vault params cannot be nil")
 		return fmt.Errorf("payment global params cannot be nil")
 	}
 
@@ -240,6 +253,9 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 		}
 	}
 	a.periodRecords = periodRecords
+
+	a.logger.Info("set payment state", "reservations", a.reservation, "periodRecords", a.periodRecords, "onchain cumulative deposit", a.onDemand, "used amount", a.cumulativePayment)
+
 	return nil
 }
 
