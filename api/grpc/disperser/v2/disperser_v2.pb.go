@@ -548,8 +548,8 @@ func (x *GetPaymentStateRequest) GetTimestamp() uint64 {
 	return 0
 }
 
-// GetQuorumSpecificPaymentStateRequest contains parameters to query the payment state of an account.
-type GetQuorumSpecificPaymentStateRequest struct {
+// GetPaymentStateQuorumSpecificRequest contains parameters to query the payment state of an account.
+type GetPaymentStateQuorumSpecificRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -565,8 +565,8 @@ type GetQuorumSpecificPaymentStateRequest struct {
 	QuorumNumber uint32 `protobuf:"varint,4,opt,name=quorum_number,json=quorumNumber,proto3" json:"quorum_number,omitempty"`
 }
 
-func (x *GetQuorumSpecificPaymentStateRequest) Reset() {
-	*x = GetQuorumSpecificPaymentStateRequest{}
+func (x *GetPaymentStateQuorumSpecificRequest) Reset() {
+	*x = GetPaymentStateQuorumSpecificRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_disperser_v2_disperser_v2_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -574,13 +574,13 @@ func (x *GetQuorumSpecificPaymentStateRequest) Reset() {
 	}
 }
 
-func (x *GetQuorumSpecificPaymentStateRequest) String() string {
+func (x *GetPaymentStateQuorumSpecificRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetQuorumSpecificPaymentStateRequest) ProtoMessage() {}
+func (*GetPaymentStateQuorumSpecificRequest) ProtoMessage() {}
 
-func (x *GetQuorumSpecificPaymentStateRequest) ProtoReflect() protoreflect.Message {
+func (x *GetPaymentStateQuorumSpecificRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_disperser_v2_disperser_v2_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -592,33 +592,33 @@ func (x *GetQuorumSpecificPaymentStateRequest) ProtoReflect() protoreflect.Messa
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetQuorumSpecificPaymentStateRequest.ProtoReflect.Descriptor instead.
-func (*GetQuorumSpecificPaymentStateRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetPaymentStateQuorumSpecificRequest.ProtoReflect.Descriptor instead.
+func (*GetPaymentStateQuorumSpecificRequest) Descriptor() ([]byte, []int) {
 	return file_disperser_v2_disperser_v2_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *GetQuorumSpecificPaymentStateRequest) GetAccountId() string {
+func (x *GetPaymentStateQuorumSpecificRequest) GetAccountId() string {
 	if x != nil {
 		return x.AccountId
 	}
 	return ""
 }
 
-func (x *GetQuorumSpecificPaymentStateRequest) GetSignature() []byte {
+func (x *GetPaymentStateQuorumSpecificRequest) GetSignature() []byte {
 	if x != nil {
 		return x.Signature
 	}
 	return nil
 }
 
-func (x *GetQuorumSpecificPaymentStateRequest) GetTimestamp() uint64 {
+func (x *GetPaymentStateQuorumSpecificRequest) GetTimestamp() uint64 {
 	if x != nil {
 		return x.Timestamp
 	}
 	return 0
 }
 
-func (x *GetQuorumSpecificPaymentStateRequest) GetQuorumNumber() uint32 {
+func (x *GetPaymentStateQuorumSpecificRequest) GetQuorumNumber() uint32 {
 	if x != nil {
 		return x.QuorumNumber
 	}
@@ -710,8 +710,8 @@ func (x *GetPaymentStateReply) GetOnchainCumulativePayment() []byte {
 	return nil
 }
 
-// GetQuorumSpecificPaymentStateReply contains the payment state of an account.
-type GetQuorumSpecificPaymentStateReply struct {
+// GetPaymentStateQuorumSpecificReply contains the payment state of an account.
+type GetPaymentStateQuorumSpecificReply struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -728,8 +728,8 @@ type GetQuorumSpecificPaymentStateReply struct {
 	OnchainCumulativePayment []byte `protobuf:"bytes,5,opt,name=onchain_cumulative_payment,json=onchainCumulativePayment,proto3" json:"onchain_cumulative_payment,omitempty"`
 }
 
-func (x *GetQuorumSpecificPaymentStateReply) Reset() {
-	*x = GetQuorumSpecificPaymentStateReply{}
+func (x *GetPaymentStateQuorumSpecificReply) Reset() {
+	*x = GetPaymentStateQuorumSpecificReply{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_disperser_v2_disperser_v2_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -737,13 +737,13 @@ func (x *GetQuorumSpecificPaymentStateReply) Reset() {
 	}
 }
 
-func (x *GetQuorumSpecificPaymentStateReply) String() string {
+func (x *GetPaymentStateQuorumSpecificReply) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetQuorumSpecificPaymentStateReply) ProtoMessage() {}
+func (*GetPaymentStateQuorumSpecificReply) ProtoMessage() {}
 
-func (x *GetQuorumSpecificPaymentStateReply) ProtoReflect() protoreflect.Message {
+func (x *GetPaymentStateQuorumSpecificReply) ProtoReflect() protoreflect.Message {
 	mi := &file_disperser_v2_disperser_v2_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -755,40 +755,40 @@ func (x *GetQuorumSpecificPaymentStateReply) ProtoReflect() protoreflect.Message
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetQuorumSpecificPaymentStateReply.ProtoReflect.Descriptor instead.
-func (*GetQuorumSpecificPaymentStateReply) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetPaymentStateQuorumSpecificReply.ProtoReflect.Descriptor instead.
+func (*GetPaymentStateQuorumSpecificReply) Descriptor() ([]byte, []int) {
 	return file_disperser_v2_disperser_v2_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *GetQuorumSpecificPaymentStateReply) GetPaymentVaultParams() *PaymentVaultParams {
+func (x *GetPaymentStateQuorumSpecificReply) GetPaymentVaultParams() *PaymentVaultParams {
 	if x != nil {
 		return x.PaymentVaultParams
 	}
 	return nil
 }
 
-func (x *GetQuorumSpecificPaymentStateReply) GetPeriodRecords() map[uint32]*PeriodRecord {
+func (x *GetPaymentStateQuorumSpecificReply) GetPeriodRecords() map[uint32]*PeriodRecord {
 	if x != nil {
 		return x.PeriodRecords
 	}
 	return nil
 }
 
-func (x *GetQuorumSpecificPaymentStateReply) GetReservations() map[uint32]*QuorumReservation {
+func (x *GetPaymentStateQuorumSpecificReply) GetReservations() map[uint32]*QuorumReservation {
 	if x != nil {
 		return x.Reservations
 	}
 	return nil
 }
 
-func (x *GetQuorumSpecificPaymentStateReply) GetCumulativePayment() []byte {
+func (x *GetPaymentStateQuorumSpecificReply) GetCumulativePayment() []byte {
 	if x != nil {
 		return x.CumulativePayment
 	}
 	return nil
 }
 
-func (x *GetQuorumSpecificPaymentStateReply) GetOnchainCumulativePayment() []byte {
+func (x *GetPaymentStateQuorumSpecificReply) GetOnchainCumulativePayment() []byte {
 	if x != nil {
 		return x.OnchainCumulativePayment
 	}
@@ -1869,9 +1869,9 @@ var file_disperser_v2_disperser_v2_proto_goTypes = []interface{}{
 	(*BlobCommitmentRequest)(nil),                // 5: disperser.v2.BlobCommitmentRequest
 	(*BlobCommitmentReply)(nil),                  // 6: disperser.v2.BlobCommitmentReply
 	(*GetPaymentStateRequest)(nil),               // 7: disperser.v2.GetPaymentStateRequest
-	(*GetQuorumSpecificPaymentStateRequest)(nil), // 8: disperser.v2.GetQuorumSpecificPaymentStateRequest
+	(*GetPaymentStateQuorumSpecificRequest)(nil), // 8: disperser.v2.GetPaymentStateQuorumSpecificRequest
 	(*GetPaymentStateReply)(nil),                 // 9: disperser.v2.GetPaymentStateReply
-	(*GetQuorumSpecificPaymentStateReply)(nil),   // 10: disperser.v2.GetQuorumSpecificPaymentStateReply
+	(*GetPaymentStateQuorumSpecificReply)(nil),   // 10: disperser.v2.GetPaymentStateQuorumSpecificReply
 	(*QuorumReservation)(nil),                    // 11: disperser.v2.QuorumReservation
 	(*SignedBatch)(nil),                          // 12: disperser.v2.SignedBatch
 	(*BlobInclusionInfo)(nil),                    // 13: disperser.v2.BlobInclusionInfo
@@ -1882,8 +1882,8 @@ var file_disperser_v2_disperser_v2_proto_goTypes = []interface{}{
 	(*PaymentQuorumConfig)(nil),                  // 18: disperser.v2.PaymentQuorumConfig
 	(*PaymentQuorumProtocolConfig)(nil),          // 19: disperser.v2.PaymentQuorumProtocolConfig
 	(*PaymentVaultParams)(nil),                   // 20: disperser.v2.PaymentVaultParams
-	nil,                                          // 21: disperser.v2.GetQuorumSpecificPaymentStateReply.PeriodRecordsEntry
-	nil,                                          // 22: disperser.v2.GetQuorumSpecificPaymentStateReply.ReservationsEntry
+	nil,                                          // 21: disperser.v2.GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry
+	nil,                                          // 22: disperser.v2.GetPaymentStateQuorumSpecificReply.ReservationsEntry
 	nil,                                          // 23: disperser.v2.PaymentVaultParams.QuorumPaymentConfigsEntry
 	nil,                                          // 24: disperser.v2.PaymentVaultParams.QuorumProtocolConfigsEntry
 	(*v2.BlobHeader)(nil),                        // 25: common.v2.BlobHeader
@@ -1901,28 +1901,28 @@ var file_disperser_v2_disperser_v2_proto_depIdxs = []int32{
 	15, // 6: disperser.v2.GetPaymentStateReply.payment_global_params:type_name -> disperser.v2.PaymentGlobalParams
 	17, // 7: disperser.v2.GetPaymentStateReply.period_records:type_name -> disperser.v2.PeriodRecord
 	16, // 8: disperser.v2.GetPaymentStateReply.reservation:type_name -> disperser.v2.Reservation
-	20, // 9: disperser.v2.GetQuorumSpecificPaymentStateReply.payment_vault_params:type_name -> disperser.v2.PaymentVaultParams
-	21, // 10: disperser.v2.GetQuorumSpecificPaymentStateReply.period_records:type_name -> disperser.v2.GetQuorumSpecificPaymentStateReply.PeriodRecordsEntry
-	22, // 11: disperser.v2.GetQuorumSpecificPaymentStateReply.reservations:type_name -> disperser.v2.GetQuorumSpecificPaymentStateReply.ReservationsEntry
+	20, // 9: disperser.v2.GetPaymentStateQuorumSpecificReply.payment_vault_params:type_name -> disperser.v2.PaymentVaultParams
+	21, // 10: disperser.v2.GetPaymentStateQuorumSpecificReply.period_records:type_name -> disperser.v2.GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry
+	22, // 11: disperser.v2.GetPaymentStateQuorumSpecificReply.reservations:type_name -> disperser.v2.GetPaymentStateQuorumSpecificReply.ReservationsEntry
 	27, // 12: disperser.v2.SignedBatch.header:type_name -> common.v2.BatchHeader
 	14, // 13: disperser.v2.SignedBatch.attestation:type_name -> disperser.v2.Attestation
 	28, // 14: disperser.v2.BlobInclusionInfo.blob_certificate:type_name -> common.v2.BlobCertificate
 	23, // 15: disperser.v2.PaymentVaultParams.quorum_payment_configs:type_name -> disperser.v2.PaymentVaultParams.QuorumPaymentConfigsEntry
 	24, // 16: disperser.v2.PaymentVaultParams.quorum_protocol_configs:type_name -> disperser.v2.PaymentVaultParams.QuorumProtocolConfigsEntry
-	17, // 17: disperser.v2.GetQuorumSpecificPaymentStateReply.PeriodRecordsEntry.value:type_name -> disperser.v2.PeriodRecord
-	11, // 18: disperser.v2.GetQuorumSpecificPaymentStateReply.ReservationsEntry.value:type_name -> disperser.v2.QuorumReservation
+	17, // 17: disperser.v2.GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry.value:type_name -> disperser.v2.PeriodRecord
+	11, // 18: disperser.v2.GetPaymentStateQuorumSpecificReply.ReservationsEntry.value:type_name -> disperser.v2.QuorumReservation
 	18, // 19: disperser.v2.PaymentVaultParams.QuorumPaymentConfigsEntry.value:type_name -> disperser.v2.PaymentQuorumConfig
 	19, // 20: disperser.v2.PaymentVaultParams.QuorumProtocolConfigsEntry.value:type_name -> disperser.v2.PaymentQuorumProtocolConfig
 	1,  // 21: disperser.v2.Disperser.DisperseBlob:input_type -> disperser.v2.DisperseBlobRequest
 	3,  // 22: disperser.v2.Disperser.GetBlobStatus:input_type -> disperser.v2.BlobStatusRequest
 	5,  // 23: disperser.v2.Disperser.GetBlobCommitment:input_type -> disperser.v2.BlobCommitmentRequest
 	7,  // 24: disperser.v2.Disperser.GetPaymentState:input_type -> disperser.v2.GetPaymentStateRequest
-	8,  // 25: disperser.v2.Disperser.GetQuorumSpecificPaymentState:input_type -> disperser.v2.GetQuorumSpecificPaymentStateRequest
+	8,  // 25: disperser.v2.Disperser.GetPaymentStateQuorumSpecific:input_type -> disperser.v2.GetPaymentStateQuorumSpecificRequest
 	2,  // 26: disperser.v2.Disperser.DisperseBlob:output_type -> disperser.v2.DisperseBlobReply
 	4,  // 27: disperser.v2.Disperser.GetBlobStatus:output_type -> disperser.v2.BlobStatusReply
 	6,  // 28: disperser.v2.Disperser.GetBlobCommitment:output_type -> disperser.v2.BlobCommitmentReply
 	9,  // 29: disperser.v2.Disperser.GetPaymentState:output_type -> disperser.v2.GetPaymentStateReply
-	10, // 30: disperser.v2.Disperser.GetQuorumSpecificPaymentState:output_type -> disperser.v2.GetQuorumSpecificPaymentStateReply
+	10, // 30: disperser.v2.Disperser.GetPaymentStateQuorumSpecific:output_type -> disperser.v2.GetPaymentStateQuorumSpecificReply
 	26, // [26:31] is the sub-list for method output_type
 	21, // [21:26] is the sub-list for method input_type
 	21, // [21:21] is the sub-list for extension type_name
@@ -2021,7 +2021,7 @@ func file_disperser_v2_disperser_v2_proto_init() {
 			}
 		}
 		file_disperser_v2_disperser_v2_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetQuorumSpecificPaymentStateRequest); i {
+			switch v := v.(*GetPaymentStateQuorumSpecificRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -2045,7 +2045,7 @@ func file_disperser_v2_disperser_v2_proto_init() {
 			}
 		}
 		file_disperser_v2_disperser_v2_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*GetQuorumSpecificPaymentStateReply); i {
+			switch v := v.(*GetPaymentStateQuorumSpecificReply); i {
 			case 0:
 				return &v.state
 			case 1:

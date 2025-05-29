@@ -205,8 +205,8 @@ func TestAuthenticatePaymentStateRequestCorruptedSignature(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func mockGetPaymentStateRequest(accountId gethcommon.Address, signature []byte) *disperser_rpc.GetQuorumSpecificPaymentStateRequest {
-	return &disperser_rpc.GetQuorumSpecificPaymentStateRequest{
+func mockGetPaymentStateRequest(accountId gethcommon.Address, signature []byte) *disperser_rpc.GetPaymentStateQuorumSpecificRequest {
+	return &disperser_rpc.GetPaymentStateQuorumSpecificRequest{
 		AccountId: accountId.Hex(),
 		Signature: signature,
 		Timestamp: fixedTimestamp,

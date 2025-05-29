@@ -219,19 +219,19 @@
                 </li>
               
                 <li>
-                  <a href="#disperser.v2.GetQuorumSpecificPaymentStateReply"><span class="badge">M</span>GetQuorumSpecificPaymentStateReply</a>
+                  <a href="#disperser.v2.GetPaymentStateQuorumSpecificReply"><span class="badge">M</span>GetPaymentStateQuorumSpecificReply</a>
                 </li>
               
                 <li>
-                  <a href="#disperser.v2.GetQuorumSpecificPaymentStateReply.PeriodRecordsEntry"><span class="badge">M</span>GetQuorumSpecificPaymentStateReply.PeriodRecordsEntry</a>
+                  <a href="#disperser.v2.GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry"><span class="badge">M</span>GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry</a>
                 </li>
               
                 <li>
-                  <a href="#disperser.v2.GetQuorumSpecificPaymentStateReply.ReservationsEntry"><span class="badge">M</span>GetQuorumSpecificPaymentStateReply.ReservationsEntry</a>
+                  <a href="#disperser.v2.GetPaymentStateQuorumSpecificReply.ReservationsEntry"><span class="badge">M</span>GetPaymentStateQuorumSpecificReply.ReservationsEntry</a>
                 </li>
               
                 <li>
-                  <a href="#disperser.v2.GetQuorumSpecificPaymentStateRequest"><span class="badge">M</span>GetQuorumSpecificPaymentStateRequest</a>
+                  <a href="#disperser.v2.GetPaymentStateQuorumSpecificRequest"><span class="badge">M</span>GetPaymentStateQuorumSpecificRequest</a>
                 </li>
               
                 <li>
@@ -703,8 +703,8 @@ request may be rejected. </p></td>
 
         
       
-        <h3 id="disperser.v2.GetQuorumSpecificPaymentStateReply">GetQuorumSpecificPaymentStateReply</h3>
-        <p>GetQuorumSpecificPaymentStateReply contains the payment state of an account.</p>
+        <h3 id="disperser.v2.GetPaymentStateQuorumSpecificReply">GetPaymentStateQuorumSpecificReply</h3>
+        <p>GetPaymentStateQuorumSpecificReply contains the payment state of an account.</p>
 
         
           <table class="field-table">
@@ -722,14 +722,14 @@ request may be rejected. </p></td>
               
                 <tr>
                   <td>period_records</td>
-                  <td><a href="#disperser.v2.GetQuorumSpecificPaymentStateReply.PeriodRecordsEntry">GetQuorumSpecificPaymentStateReply.PeriodRecordsEntry</a></td>
+                  <td><a href="#disperser.v2.GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry">GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry</a></td>
                   <td>repeated</td>
                   <td><p>off-chain account reservation usage records </p></td>
                 </tr>
               
                 <tr>
                   <td>reservations</td>
-                  <td><a href="#disperser.v2.GetQuorumSpecificPaymentStateReply.ReservationsEntry">GetQuorumSpecificPaymentStateReply.ReservationsEntry</a></td>
+                  <td><a href="#disperser.v2.GetPaymentStateQuorumSpecificReply.ReservationsEntry">GetPaymentStateQuorumSpecificReply.ReservationsEntry</a></td>
                   <td>repeated</td>
                   <td><p>on-chain account reservation setting </p></td>
                 </tr>
@@ -755,7 +755,7 @@ request may be rejected. </p></td>
 
         
       
-        <h3 id="disperser.v2.GetQuorumSpecificPaymentStateReply.PeriodRecordsEntry">GetQuorumSpecificPaymentStateReply.PeriodRecordsEntry</h3>
+        <h3 id="disperser.v2.GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry">GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry</h3>
         <p></p>
 
         
@@ -786,7 +786,7 @@ request may be rejected. </p></td>
 
         
       
-        <h3 id="disperser.v2.GetQuorumSpecificPaymentStateReply.ReservationsEntry">GetQuorumSpecificPaymentStateReply.ReservationsEntry</h3>
+        <h3 id="disperser.v2.GetPaymentStateQuorumSpecificReply.ReservationsEntry">GetPaymentStateQuorumSpecificReply.ReservationsEntry</h3>
         <p></p>
 
         
@@ -817,8 +817,8 @@ request may be rejected. </p></td>
 
         
       
-        <h3 id="disperser.v2.GetQuorumSpecificPaymentStateRequest">GetQuorumSpecificPaymentStateRequest</h3>
-        <p>GetQuorumSpecificPaymentStateRequest contains parameters to query the payment state of an account.</p>
+        <h3 id="disperser.v2.GetPaymentStateQuorumSpecificRequest">GetPaymentStateQuorumSpecificRequest</h3>
+        <p>GetPaymentStateQuorumSpecificRequest contains parameters to query the payment state of an account.</p>
 
         
           <table class="field-table">
@@ -1374,10 +1374,10 @@ https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da4490
               </tr>
             
               <tr>
-                <td>GetQuorumSpecificPaymentState</td>
-                <td><a href="#disperser.v2.GetQuorumSpecificPaymentStateRequest">GetQuorumSpecificPaymentStateRequest</a></td>
-                <td><a href="#disperser.v2.GetQuorumSpecificPaymentStateReply">GetQuorumSpecificPaymentStateReply</a></td>
-                <td><p>GetQuorumSpecificPaymentState is a utility method to get the payment state of a given account, at a given disperser.
+                <td>GetPaymentStateQuorumSpecific</td>
+                <td><a href="#disperser.v2.GetPaymentStateQuorumSpecificRequest">GetPaymentStateQuorumSpecificRequest</a></td>
+                <td><a href="#disperser.v2.GetPaymentStateQuorumSpecificReply">GetPaymentStateQuorumSpecificReply</a></td>
+                <td><p>GetPaymentStateQuorumSpecific is a utility method to get the payment state of a given account, at a given disperser.
 EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
 A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
 That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.

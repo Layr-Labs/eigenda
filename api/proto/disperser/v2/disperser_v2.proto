@@ -35,7 +35,7 @@ service Disperser {
   // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
   rpc GetPaymentState(GetPaymentStateRequest) returns (GetPaymentStateReply) {}
 
-  // GetQuorumSpecificPaymentState is a utility method to get the payment state of a given account, at a given disperser.
+  // GetPaymentStateQuorumSpecific is a utility method to get the payment state of a given account, at a given disperser.
   // EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
   // A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
   // That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
@@ -43,7 +43,7 @@ service Disperser {
   //
   // For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
   // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
-  rpc GetQuorumSpecificPaymentState(GetQuorumSpecificPaymentStateRequest) returns (GetQuorumSpecificPaymentStateReply) {}
+  rpc GetPaymentStateQuorumSpecific(GetPaymentStateQuorumSpecificRequest) returns (GetPaymentStateQuorumSpecificReply) {}
 }
 
 // Requests and Replies
@@ -137,8 +137,8 @@ message GetPaymentStateRequest {
   uint64 timestamp = 3;
 }
 
-// GetQuorumSpecificPaymentStateRequest contains parameters to query the payment state of an account.
-message GetQuorumSpecificPaymentStateRequest {
+// GetPaymentStateQuorumSpecificRequest contains parameters to query the payment state of an account.
+message GetPaymentStateQuorumSpecificRequest {
   // The ID of the account being queried. This account ID is an eth wallet address of the user.
   string account_id = 1;
   // Signature over the account ID
@@ -164,8 +164,8 @@ message GetPaymentStateReply {
   bytes onchain_cumulative_payment = 5;
 }
 
-// GetQuorumSpecificPaymentStateReply contains the payment state of an account.
-message GetQuorumSpecificPaymentStateReply {
+// GetPaymentStateQuorumSpecificReply contains the payment state of an account.
+message GetPaymentStateQuorumSpecificReply {
   // payment vault parameters with per-quorum configurations
   PaymentVaultParams payment_vault_params = 1;
   // off-chain account reservation usage records
