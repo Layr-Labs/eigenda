@@ -257,6 +257,27 @@ func gatherCohorts(cohortDirPath string) (
 	return lowestCohortIndex, highestCohortIndex, cohorts, nil
 }
 
+// LargestReadableValueSize returns the size of the largest value possible to read from the database,
+// given current configuration. Considers both values previously written and stored
+// (possibly with different configurations), and values that may be written in the future with the
+// current configuration.
+func (t *DataTracker) LargestReadableValueSize() uint64 {
+	largestValue := uint64(t.config.ValueSizeMB * float64(units.MiB))
+
+	if len(t.cohorts) > 0 {
+		for i := t.lowestCohortIndex; i <= t.highestCohortIndex; i++ {
+			cohort := t.cohorts[i]
+			if cohort.IsComplete() {
+				if cohort.ValueSize() > largestValue {
+					largestValue = cohort.ValueSize()
+				}
+			}
+		}
+	}
+
+	return largestValue
+}
+
 // GetWriteInfo returns information required to perform a write operation. It returns the key index (which is needed to
 // call MarkHighestIndexWritten()), the key, and the value. Data is generated on background goroutines in order to
 // make this method very fast. Will not block as long as data can be generated in the background fast enough.

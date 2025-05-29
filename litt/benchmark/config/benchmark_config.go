@@ -65,6 +65,11 @@ type BenchmarkConfig struct {
 	// (which is expensive), data from this pool is reused. When restarting the benchmark,
 	// it's important to always use the same pool size.
 	RandomPoolSize uint64
+
+	// When the benchmark starts, it sleeps for a length of time. The average amount of time spent sleeping is equal to
+	// this value, in seconds. The purpose of this sleeping to stagger the start of the workers so that they don't all
+	// operate in lockstep.
+	StartupSleepFactorSeconds float64
 }
 
 // DefaultBenchmarkConfig returns a default BenchmarkConfig with the given data paths.
@@ -74,22 +79,23 @@ func DefaultBenchmarkConfig() *BenchmarkConfig {
 	littConfig.LoggerConfig = common.DefaultConsoleLoggerConfig()
 
 	return &BenchmarkConfig{
-		LittConfig:               littConfig,
-		MetadataDirectory:        "~/benchmark",
-		MaximumWriteThroughputMB: 10,
-		MaximumReadThroughputMB:  10,
-		WriterParallelism:        4,
-		ReaderParallelism:        32,
-		ValueSizeMB:              2.0,
-		BatchSizeMB:              32,
-		CohortGCPeriodSeconds:    10.0,
-		WriteInfoChanelSize:      1024,
-		ReadInfoChanelSize:       1024,
-		CohortSize:               1024,
-		TTLHours:                 1.0,
-		ReadSafetyMarginMinutes:  5.0,
-		Seed:                     1337,
-		RandomPoolSize:           units.GiB,
+		LittConfig:                littConfig,
+		MetadataDirectory:         "~/benchmark",
+		MaximumWriteThroughputMB:  10,
+		MaximumReadThroughputMB:   10,
+		WriterParallelism:         4,
+		ReaderParallelism:         32,
+		ValueSizeMB:               2.0,
+		BatchSizeMB:               32,
+		CohortGCPeriodSeconds:     10.0,
+		WriteInfoChanelSize:       1024,
+		ReadInfoChanelSize:        1024,
+		CohortSize:                1024,
+		TTLHours:                  1.0,
+		ReadSafetyMarginMinutes:   5.0,
+		Seed:                      1337,
+		RandomPoolSize:            units.GiB,
+		StartupSleepFactorSeconds: 0.5,
 	}
 }
 

@@ -3,6 +3,7 @@ package benchmark
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/signal"
 	"syscall"
@@ -37,6 +38,15 @@ type BenchmarkEngine struct {
 
 	// The maximum write throughput in bytes per second for each worker thread.
 	writeBytesPerSecondPerThread uint64
+
+	// The maximum read throughput in bytes per second for each worker thread.
+	readBytesPerSecondPerThread uint64
+
+	// The burst size for write rate limiting.
+	writeBurstSize uint64
+
+	// The burst size for read rate limiting.
+	readBurstSize uint64
 }
 
 // NewBenchmarkEngine creates a new BenchmarkEngine with the given configuration.
@@ -80,6 +90,17 @@ func NewBenchmarkEngine(configPath string) (*BenchmarkEngine, error) {
 	writeBytesPerSecond := uint64(cfg.MaximumWriteThroughputMB * float64(units.MiB))
 	writeBytesPerSecondPerThread := writeBytesPerSecond / uint64(cfg.WriterParallelism)
 
+	// If we set the write burst size smaller than an individual value, then the rate limiter will never
+	// permit any writes.
+	writeBurstSize := uint64(cfg.ValueSizeMB * float64(units.MiB))
+
+	readBytesPerSecond := uint64(cfg.MaximumReadThroughputMB * float64(units.MiB))
+	readBytesPerSecondPerThread := readBytesPerSecond / uint64(cfg.ReaderParallelism)
+
+	// If we set the read burst size smaller than an individual value we need to read, then the rate limiter will
+	// never permit us to read that value.
+	readBurstSize := dataTracker.LargestReadableValueSize()
+
 	return &BenchmarkEngine{
 		ctx:                          ctx,
 		cancel:                       cancel,
@@ -89,6 +110,9 @@ func NewBenchmarkEngine(configPath string) (*BenchmarkEngine, error) {
 		table:                        table,
 		dataTracker:                  dataTracker,
 		writeBytesPerSecondPerThread: writeBytesPerSecondPerThread,
+		readBytesPerSecondPerThread:  readBytesPerSecondPerThread,
+		writeBurstSize:               writeBurstSize,
+		readBurstSize:                readBurstSize,
 	}, nil
 }
 
@@ -101,8 +125,21 @@ func (b *BenchmarkEngine) Logger() logging.Logger {
 // encounters an error.
 func (b *BenchmarkEngine) Run() error {
 
+	// multiply 2 to make configured value the average
+	sleepFactor := b.config.StartupSleepFactorSeconds * float64(time.Second) * 2.0
+
 	for i := 0; i < b.config.WriterParallelism; i++ {
+		// Sleep a short time to prevent all goroutines from starting in lockstep.
+		time.Sleep(time.Duration(sleepFactor * rand.Float64()))
+
 		go b.writer()
+	}
+
+	for i := 0; i < b.config.ReaderParallelism; i++ {
+		// Sleep a short time to prevent all goroutines from starting in lockstep.
+		time.Sleep(time.Duration(sleepFactor * rand.Float64()))
+
+		go b.reader()
 	}
 
 	// Create a channel to listen for OS signals
@@ -120,9 +157,8 @@ func (b *BenchmarkEngine) Run() error {
 
 // writer runs on a goroutine and writes data to the database.
 func (b *BenchmarkEngine) writer() {
-
 	maxBatchSize := uint64(b.config.BatchSizeMB * float64(units.MiB))
-	throttle := rate.NewLimiter(rate.Limit(b.writeBytesPerSecondPerThread), int(b.writeBytesPerSecondPerThread))
+	throttle := rate.NewLimiter(rate.Limit(b.writeBytesPerSecondPerThread), int(b.writeBurstSize))
 
 	for {
 		select {
@@ -137,7 +173,7 @@ func (b *BenchmarkEngine) writer() {
 
 				reservation := throttle.ReserveN(time.Now(), len(writeInfo.Value))
 				if !reservation.OK() {
-					continue
+					panic(fmt.Sprintf("failed to reserve write quota for key %s", writeInfo.Key)) // TODO not clean
 				}
 				if reservation.Delay() > 0 {
 					time.Sleep(reservation.Delay())
@@ -154,6 +190,54 @@ func (b *BenchmarkEngine) writer() {
 			err := b.table.Flush()
 			if err != nil {
 				panic(fmt.Sprintf("failed to flush data: %v", err)) // TODO not clean
+			}
+		}
+	}
+}
+
+// verifyValue checks if the actual value read from the database matches the expected value.
+func (b *BenchmarkEngine) verifyValue(expected *ReadInfo, actual []byte) error {
+	if len(actual) != len(expected.Value) {
+		return fmt.Errorf("read value size %d does not match expected size %d for key %s",
+			len(actual), len(expected.Value), expected.Key)
+	}
+	for i := range actual {
+		if actual[i] != expected.Value[i] {
+			return fmt.Errorf("read value does not match expected value for key %s", expected.Key)
+		}
+	}
+	return nil
+}
+
+// reader runs on a goroutine and reads data from the database.
+func (b *BenchmarkEngine) reader() {
+	throttle := rate.NewLimiter(rate.Limit(b.readBytesPerSecondPerThread), int(b.readBurstSize))
+
+	for {
+		select {
+		case <-b.ctx.Done():
+			break
+		default:
+			readInfo := b.dataTracker.GetReadInfo()
+
+			reservation := throttle.ReserveN(time.Now(), len(readInfo.Value))
+			if !reservation.OK() {
+				panic(fmt.Sprintf("failed to reserve read quota for key %s", readInfo.Key)) // TODO not clean
+			}
+			if reservation.Delay() > 0 {
+				time.Sleep(reservation.Delay())
+			}
+
+			value, exists, err := b.table.Get(readInfo.Key)
+			if err != nil {
+				panic(fmt.Sprintf("failed to read data: %v", err)) // TODO not clean
+			}
+			if !exists {
+				panic(fmt.Sprintf("key %s not found in database", readInfo.Key)) // TODO not clean
+			}
+			err = b.verifyValue(readInfo, value)
+			if err != nil {
+				panic(fmt.Sprintf("value verification failed for key %s: %v", readInfo.Key, err)) // TODO not clean
 			}
 		}
 	}
