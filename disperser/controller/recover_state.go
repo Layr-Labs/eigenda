@@ -12,7 +12,7 @@ import (
 // RecoverState checks for blobs in the GatheringSignatures state and updates their status to Failed.
 func RecoverState(
 	ctx context.Context,
-	blobStore *blobstore.BlobMetadataStore,
+	blobStore blobstore.MetadataStore,
 	logger logging.Logger,
 ) error {
 	logger.Info("recovering state...")

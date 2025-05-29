@@ -17,7 +17,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator/mock"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification/test"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/prometheus/client_golang/prometheus"
@@ -59,6 +58,7 @@ type TestClient struct {
 	// For fetching blobs from the validators without verifying or decoding them. Useful for load testing
 	// validator downloads with limited CPU resources.
 	onlyDownloadValidatorClient validator.ValidatorClient
+	certBuilder                 *clients.CertBuilder
 	certVerifier                *verification.CertVerifier
 	privateKey                  string
 	metricsRegistry             *prometheus.Registry
@@ -189,10 +189,26 @@ func NewTestClient(
 		registry = metrics.registry
 	}
 
+	certBuilder, err := clients.NewCertBuilder(logger, gethcommon.HexToAddress(config.BLSOperatorStateRetrieverAddr), gethcommon.HexToAddress(config.EigenDARegistryCoordinatorAddress), ethClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cert builder: %w", err)
+	}
+
+	blockMon, err := verification.NewBlockNumberMonitor(
+		logger,
+		ethClient,
+		time.Second * 1,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create block number monitor: %w", err)
+	}
+
 	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
 		logger,
 		payloadDisperserConfig,
 		disperserClient,
+		blockMon,
+		certBuilder,
 		certVerifier,
 		registry)
 	if err != nil {
@@ -328,6 +344,7 @@ func NewTestClient(
 		indexedChainState:           indexedChainState,
 		validatorClient:             retrievalClient,
 		validatorPayloadRetriever:   validatorPayloadRetriever,
+		certBuilder:                 certBuilder,
 		onlyDownloadValidatorClient: onlyDownloadValidatorClient,
 		certVerifier:                certVerifier,
 		privateKey:                  privateKey,
@@ -442,6 +459,11 @@ func (c *TestClient) GetCertVerifier() *verification.CertVerifier {
 	return c.certVerifier
 }
 
+// GetCertBuilder returns the test client's cert builder.
+func (c *TestClient) GetCertBuilder() *clients.CertBuilder {
+	return c.certBuilder
+}
+
 // GetPrivateKey returns the test client's private key.
 func (c *TestClient) GetPrivateKey() string {
 	return c.privateKey
@@ -467,13 +489,18 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 	}
 	c.metrics.reportCertificationTime(time.Since(start))
 
-	blobKey, err := eigenDACert.ComputeBlobKey()
+	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
+	if !ok {
+		return fmt.Errorf("expected EigenDACertV3, got %T", eigenDACert)
+	}
+
+	blobKey, err := eigenDAV3Cert.ComputeBlobKey()
 	if err != nil {
 		return fmt.Errorf("failed to compute blob key: %w", err)
 	}
 
 	// read blob from a single relay (assuming success, otherwise will retry)
-	payloadFromRelayRetriever, err := c.relayPayloadRetriever.GetPayload(ctx, eigenDACert)
+	payloadFromRelayRetriever, err := c.relayPayloadRetriever.GetPayload(ctx, eigenDAV3Cert)
 	if err != nil {
 		return fmt.Errorf("failed to get payload from relay: %w", err)
 	}
@@ -483,7 +510,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 	}
 
 	// read blob from a single quorum (assuming success, otherwise will retry)
-	payloadFromValidatorRetriever, err := c.validatorPayloadRetriever.GetPayload(ctx, eigenDACert)
+	payloadFromValidatorRetriever, err := c.validatorPayloadRetriever.GetPayload(ctx, eigenDAV3Cert)
 	if err != nil {
 		return fmt.Errorf("failed to get payload from validators: %w", err)
 	}
@@ -492,34 +519,35 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 		return fmt.Errorf("payloads do not match")
 	}
 
-	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
+	commitment, err := eigenDAV3Cert.Commitments()
+	if err != nil {
+		return fmt.Errorf("failed to parse blob commitments: %w", err)
+	}
+
+	blobLengthSymbols := commitment.Length
 
 	// read blob from ALL relays
 	err = c.ReadBlobFromRelays(
 		ctx,
 		*blobKey,
-		eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys,
+		eigenDAV3Cert.RelayKeys(),
 		payload,
-		blobLengthSymbols,
+		uint32(blobLengthSymbols),
 		0)
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relays: %w", err)
 	}
-
-	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
+	
+	blobHeader, err := eigenDAV3Cert.BlobHeader()
 	if err != nil {
-		return fmt.Errorf("failed to convert blob commitments: %w", err)
+		return fmt.Errorf("failed to get blob header from cert: %w", err)
 	}
 
 	// read blob from ALL quorums
 	err = c.ReadBlobFromValidators(
 		ctx,
-		*blobKey,
-		blobHeader.Version,
-		*commitment,
-		eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
-		eigenDACert.BatchHeader.ReferenceBlockNumber,
+		blobHeader,
+		eigenDAV3Cert.BatchHeader.ReferenceBlockNumber,
 		payload,
 		0,
 		true)
@@ -531,7 +559,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 }
 
 // DispersePayload sends a payload to the disperser. Returns the blob key.
-func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (*coretypes.EigenDACert, error) {
+func (c *TestClient) DispersePayload(ctx context.Context, payloadBytes []byte) (coretypes.EigenDACert, error) {
 	c.logger.Debugf("Dispersing payload of length %d", len(payloadBytes))
 	start := time.Now()
 
@@ -618,42 +646,7 @@ func (c *TestClient) ReadBlobFromRelay(
 // The timeout provided is a timeout for each read from a quorum, not all reads as a whole.
 func (c *TestClient) ReadBlobFromValidators(
 	ctx context.Context,
-	blobKey corev2.BlobKey,
-	blobVersion corev2.BlobVersion,
-	blobCommitments encoding.BlobCommitments,
-	quorums []core.QuorumID,
-	referenceBlockNumber uint32,
-	expectedPayloadBytes []byte,
-	timeout time.Duration,
-	validateAndDecode bool) error {
-
-	for _, quorumID := range quorums {
-		err := c.ReadBlobFromValidatorsInQuorum(
-			ctx,
-			blobKey,
-			blobVersion,
-			blobCommitments,
-			quorumID,
-			referenceBlockNumber,
-			expectedPayloadBytes,
-			timeout,
-			validateAndDecode)
-		if err != nil {
-			return fmt.Errorf("failed to read blob from validators in quorum %d: %w", quorumID, err)
-		}
-	}
-
-	return nil
-}
-
-// ReadBlobFromValidatorsInQuorum reads a blob from the validators in a specific quorum and compares it to
-// the given payload.
-func (c *TestClient) ReadBlobFromValidatorsInQuorum(
-	ctx context.Context,
-	blobKey corev2.BlobKey,
-	blobVersion corev2.BlobVersion,
-	blobCommitments encoding.BlobCommitments,
-	quorumID core.QuorumID,
+	header *corev2.BlobHeaderWithHashedPayment,
 	referenceBlockNumber uint32,
 	expectedPayloadBytes []byte,
 	timeout time.Duration,
@@ -666,22 +659,22 @@ func (c *TestClient) ReadBlobFromValidatorsInQuorum(
 	}
 
 	if validateAndDecode {
+
 		start := time.Now()
 
 		retrievedBlobBytes, err := c.validatorClient.GetBlob(
 			ctx,
-			blobKey,
-			blobVersion,
-			blobCommitments,
-			uint64(referenceBlockNumber),
-			quorumID)
+			header,
+			uint64(referenceBlockNumber))
 		if err != nil {
 			return fmt.Errorf("failed to read blob from validators, %s", err)
 		}
 
+		// Since retrieval is now agnostic to quorum ID, we default quorumID parameters to zero.
+		quorumID := core.QuorumID(0)
 		c.metrics.reportValidatorReadTime(time.Since(start), quorumID)
 
-		blobLengthSymbols := uint32(blobCommitments.Length)
+		blobLengthSymbols := uint32(header.BlobCommitments.Length)
 		blob, err := coretypes.DeserializeBlob(retrievedBlobBytes, blobLengthSymbols)
 		if err != nil {
 			return fmt.Errorf("failed to deserialize blob: %w", err)
@@ -702,11 +695,8 @@ func (c *TestClient) ReadBlobFromValidatorsInQuorum(
 
 		_, err := c.onlyDownloadValidatorClient.GetBlob(
 			ctx,
-			blobKey,
-			blobVersion,
-			blobCommitments,
-			uint64(referenceBlockNumber),
-			quorumID)
+			header,
+			uint64(referenceBlockNumber))
 		if err != nil {
 			return fmt.Errorf("failed to read blob from validators: %w", err)
 		}

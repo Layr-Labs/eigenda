@@ -45,7 +45,7 @@ type DispersalServerV2 struct {
 
 	serverConfig      disperser.ServerConfig
 	blobStore         *blobstore.BlobStore
-	blobMetadataStore *blobstore.BlobMetadataStore
+	blobMetadataStore blobstore.MetadataStore
 	meterer           *meterer.Meterer
 
 	chainReader              core.Reader
@@ -71,7 +71,7 @@ type DispersalServerV2 struct {
 func NewDispersalServerV2(
 	serverConfig disperser.ServerConfig,
 	blobStore *blobstore.BlobStore,
-	blobMetadataStore *blobstore.BlobMetadataStore,
+	blobMetadataStore blobstore.MetadataStore,
 	chainReader core.Reader,
 	meterer *meterer.Meterer,
 	blobRequestAuthenticator corev2.BlobRequestAuthenticator,
@@ -304,12 +304,12 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// off-chain account specific payment state
 	now := time.Now().Unix()
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
-	periodRecords, err := s.meterer.OffchainStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod)
+	periodRecords, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod)
 	if err != nil {
 		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountID)
 	}
 	var largestCumulativePaymentBytes []byte
-	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, accountID)
+	largestCumulativePayment, err := s.meterer.MeteringStore.GetLargestCumulativePayment(ctx, accountID)
 	if err != nil {
 		s.logger.Debug("failed to get largest cumulative payment, use zero value", "err", err, "accountID", accountID)
 
@@ -318,23 +318,25 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	}
 	// on-Chain account state
 	var pbReservation *pb.Reservation
-	reservation, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
+	reservations, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
 	if err != nil {
 		s.logger.Debug("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
 	} else {
-		quorumNumbers := make([]uint32, len(reservation.QuorumNumbers))
-		for i, v := range reservation.QuorumNumbers {
-			quorumNumbers[i] = uint32(v)
+		quorumNumbers := make([]uint32, len(reservations))
+		for quorumNumber, _ := range reservations {
+			quorumNumbers[quorumNumber] = uint32(quorumNumber)
 		}
-		quorumSplits := make([]uint32, len(reservation.QuorumSplits))
-		for i, v := range reservation.QuorumSplits {
-			quorumSplits[i] = uint32(v)
+		quorumSplits := make([]uint32, len(reservations))
+		for quorumNumber, _ := range reservations {
+			quorumSplits[quorumNumber] = 0
 		}
 
+		// TODO: in a subsequent PR, we update PaymentState API types to include multiple quorum reservations;
+		// For this PR, we return the first reservation as they are actually the same reservation
 		pbReservation = &pb.Reservation{
-			SymbolsPerSecond: reservation.SymbolsPerSecond,
-			StartTimestamp:   uint32(reservation.StartTimestamp),
-			EndTimestamp:     uint32(reservation.EndTimestamp),
+			SymbolsPerSecond: reservations[0].SymbolsPerSecond,
+			StartTimestamp:   uint32(reservations[0].StartTimestamp),
+			EndTimestamp:     uint32(reservations[0].EndTimestamp),
 			QuorumSplits:     quorumSplits,
 			QuorumNumbers:    quorumNumbers,
 		}

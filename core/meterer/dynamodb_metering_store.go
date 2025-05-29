@@ -18,9 +18,8 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-const MinNumBins int32 = 3
-
-type OffchainStore struct {
+// DynamoDBMeteringStore implements the MeteringStore interface using DynamoDB
+type DynamoDBMeteringStore struct {
 	dynamoClient         commondynamodb.Client
 	reservationTableName string
 	onDemandTableName    string
@@ -29,34 +28,34 @@ type OffchainStore struct {
 	// TODO: add maximum storage for both tables
 }
 
-func NewOffchainStore(
+// NewDynamoDBMeteringStore creates a new DynamoDB-backed metering store
+func NewDynamoDBMeteringStore(
 	cfg commonaws.ClientConfig,
 	reservationTableName string,
 	onDemandTableName string,
 	globalBinTableName string,
 	logger logging.Logger,
-) (OffchainStore, error) {
-
+) (*DynamoDBMeteringStore, error) {
 	dynamoClient, err := commondynamodb.NewClient(cfg, logger)
 	if err != nil {
-		return OffchainStore{}, err
+		return nil, err
 	}
 
 	err = dynamoClient.TableExists(context.Background(), reservationTableName)
 	if err != nil {
-		return OffchainStore{}, err
+		return nil, err
 	}
 	err = dynamoClient.TableExists(context.Background(), onDemandTableName)
 	if err != nil {
-		return OffchainStore{}, err
+		return nil, err
 	}
 	err = dynamoClient.TableExists(context.Background(), globalBinTableName)
 	if err != nil {
-		return OffchainStore{}, err
+		return nil, err
 	}
 	//TODO: add a separate thread to periodically clean up the tables
 	// delete expired reservation bins (<i-1) and old on-demand payments (retain max N payments)
-	return OffchainStore{
+	return &DynamoDBMeteringStore{
 		dynamoClient:         dynamoClient,
 		reservationTableName: reservationTableName,
 		onDemandTableName:    onDemandTableName,
@@ -65,36 +64,61 @@ func NewOffchainStore(
 	}, nil
 }
 
-func (s *OffchainStore) UpdateReservationBin(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64, size uint64) (uint64, error) {
-	key := map[string]types.AttributeValue{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+// IncrementBinUsages updates the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
+// The key is AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
+func (s *DynamoDBMeteringStore) IncrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) (map[core.QuorumID]uint64, error) {
+	binUsages := make(map[core.QuorumID]uint64)
+
+	// Build ops for atomic batch increment
+	ops := make([]commondynamodb.TransactAddOp, len(quorumNumbers))
+	for i, quorumNumber := range quorumNumbers {
+		accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorumNumber), 10)
+		key := map[string]types.AttributeValue{
+			"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
+			"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
+		}
+		ops[i] = commondynamodb.TransactAddOp{
+			Key:   key,
+			Attr:  "BinUsage",
+			Value: float64(sizes[quorumNumber]), // positive for increment
+		}
 	}
 
-	res, err := s.dynamoClient.IncrementBy(ctx, s.reservationTableName, key, "BinUsage", size)
+	err := s.dynamoClient.TransactAddBy(ctx, s.reservationTableName, ops)
 	if err != nil {
-		return 0, fmt.Errorf("failed to increment bin usage: %w", err)
+		return nil, err
 	}
 
-	binUsage, ok := res["BinUsage"]
-	if !ok {
-		return 0, errors.New("BinUsage is not present in the response")
+	// Fetch new values for each key
+	for _, quorumNumber := range quorumNumbers {
+		accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorumNumber), 10)
+		key := map[string]types.AttributeValue{
+			"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
+			"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
+		}
+		item, getErr := s.dynamoClient.GetItem(ctx, s.reservationTableName, key)
+		if getErr != nil {
+			return nil, getErr
+		}
+		binUsage, ok := item["BinUsage"]
+		if !ok {
+			return nil, fmt.Errorf("BinUsage is not present in the response")
+		}
+		binUsageAttr, ok := binUsage.(*types.AttributeValueMemberN)
+		if !ok {
+			return nil, fmt.Errorf("unexpected type for BinUsage: %T", binUsage)
+		}
+		binUsageValue, parseErr := strconv.ParseUint(binUsageAttr.Value, 10, 64)
+		if parseErr != nil {
+			return nil, fmt.Errorf("failed to parse BinUsage: %w", parseErr)
+		}
+		binUsages[quorumNumber] = binUsageValue
 	}
 
-	binUsageAttr, ok := binUsage.(*types.AttributeValueMemberN)
-	if !ok {
-		return 0, fmt.Errorf("unexpected type for BinUsage: %T", binUsage)
-	}
-
-	binUsageValue, err := strconv.ParseUint(binUsageAttr.Value, 10, 32)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse BinUsage: %w", err)
-	}
-
-	return binUsageValue, nil
+	return binUsages, nil
 }
 
-func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error) {
+func (s *DynamoDBMeteringStore) UpdateGlobalBin(ctx context.Context, reservationPeriod uint64, size uint64) (uint64, error) {
 	key := map[string]types.AttributeValue{
 		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 	}
@@ -122,7 +146,7 @@ func (s *OffchainStore) UpdateGlobalBin(ctx context.Context, reservationPeriod u
 	return binUsageValue, nil
 }
 
-func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, paymentCharged *big.Int) (*big.Int, error) {
+func (s *DynamoDBMeteringStore) AddOnDemandPayment(ctx context.Context, paymentMetadata core.PaymentMetadata, paymentCharged *big.Int) (*big.Int, error) {
 	// Create new item with only AccountID and CumulativePayment
 	item := commondynamodb.Item{
 		"AccountID":         &types.AttributeValueMemberS{Value: paymentMetadata.AccountID.Hex()},
@@ -180,7 +204,7 @@ func (s *OffchainStore) AddOnDemandPayment(ctx context.Context, paymentMetadata 
 // RollbackOnDemandPayment rolls back a payment to the previous value
 // If oldPayment is 0, it writes a zero value instead of deleting the record
 // This method uses a conditional expression to ensure we only roll back if the current value matches newPayment
-func (s *OffchainStore) RollbackOnDemandPayment(ctx context.Context, accountID gethcommon.Address, newPayment, oldPayment *big.Int) error {
+func (s *DynamoDBMeteringStore) RollbackOnDemandPayment(ctx context.Context, accountID gethcommon.Address, newPayment, oldPayment *big.Int) error {
 	// Initialize oldPayment to zero if it's nil
 	if oldPayment == nil {
 		oldPayment = big.NewInt(0)
@@ -232,7 +256,7 @@ func (s *OffchainStore) RollbackOnDemandPayment(ctx context.Context, accountID g
 	return nil
 }
 
-func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error) {
+func (s *DynamoDBMeteringStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error) {
 	// Fetch the 3 bins start from the current bin
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.reservationTableName),
@@ -261,7 +285,7 @@ func (s *OffchainStore) GetPeriodRecords(ctx context.Context, accountID gethcomm
 	return records, nil
 }
 
-func (s *OffchainStore) GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
+func (s *DynamoDBMeteringStore) GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error) {
 	// Get the single record for this account
 	key := commondynamodb.Key{
 		"AccountID": &types.AttributeValueMemberS{Value: accountID.Hex()},
@@ -332,4 +356,25 @@ func parsePeriodRecord(bin map[string]types.AttributeValue) (*pb.PeriodRecord, e
 		Index: uint32(reservationPeriodValue),
 		Usage: uint64(binUsageValue),
 	}, nil
+}
+
+// DecrementBinUsages atomically decrements the bin usage for each quorum in quorumNumbers for a specific account and reservation period.
+// The key is AccountIDAndQuorum, formatted as {AccountID}:{quorumNumber}.
+func (s *DynamoDBMeteringStore) DecrementBinUsages(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID, reservationPeriods map[core.QuorumID]uint64, sizes map[core.QuorumID]uint64) error {
+	// Build ops for atomic batch decrement
+	ops := make([]commondynamodb.TransactAddOp, len(quorumNumbers))
+	for i, quorumNumber := range quorumNumbers {
+		accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorumNumber), 10)
+		key := map[string]types.AttributeValue{
+			"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
+			"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
+		}
+		ops[i] = commondynamodb.TransactAddOp{
+			Key:   key,
+			Attr:  "BinUsage",
+			Value: -float64(sizes[quorumNumber]), // negative for decrement
+		}
+	}
+
+	return s.dynamoClient.TransactAddBy(ctx, s.reservationTableName, ops)
 }

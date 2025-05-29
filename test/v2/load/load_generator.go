@@ -168,12 +168,19 @@ func (l *LoadGenerator) readAndWriteBlob() {
 		return
 	}
 
+	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
+	if !ok {
+		l.metrics.reportDispersalFailure()
+		l.client.GetLogger().Errorf("expected EigenDACertV3, got %T", eigenDACert)
+		return
+	}
+
 	l.relayReadLimiter <- struct{}{}
-	l.readBlobFromRelays(rand, blobKey, payload, eigenDACert)
+	l.readBlobFromRelays(rand, blobKey, payload, eigenDAV3Cert)
 	<-l.relayReadLimiter
 
 	l.validatorReadLimiter <- struct{}{}
-	l.readBlobFromValidators(rand, blobKey, payload, eigenDACert)
+	l.readBlobFromValidators(rand, payload, eigenDAV3Cert)
 	<-l.validatorReadLimiter
 }
 
@@ -181,7 +188,7 @@ func (l *LoadGenerator) readAndWriteBlob() {
 func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 	blobKey *corev2.BlobKey,
 	payload []byte,
-	eigenDACert *coretypes.EigenDACert,
+	eigenDACert coretypes.EigenDACert,
 	err error) {
 
 	payloadSize := int(rand.BoundedGaussian(
@@ -206,7 +213,15 @@ func (l *LoadGenerator) disperseBlob(rand *random.TestRandom) (
 		return nil, nil, nil, err
 	}
 
-	blobKey, err = eigenDACert.ComputeBlobKey()
+	// Ensure the eigenDACert is of type EigenDACertV3
+	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
+	if !ok {
+		l.metrics.reportDispersalFailure()
+		l.client.GetLogger().Errorf("expected EigenDACertV3, got %T", eigenDACert)
+		return nil, nil, nil, fmt.Errorf("expected EigenDACertV3, got %T", eigenDACert)
+	}
+
+	blobKey, err = eigenDAV3Cert.ComputeBlobKey()
 	if err != nil {
 		l.metrics.reportDispersalFailure()
 		l.client.GetLogger().Errorf("failed to compute blob key: %v", err)
@@ -222,7 +237,7 @@ func (l *LoadGenerator) readBlobFromRelays(
 	rand *random.TestRandom,
 	blobKey *corev2.BlobKey,
 	payload []byte,
-	eigenDACert *coretypes.EigenDACert,
+	eigenDACert *coretypes.EigenDACertV3,
 ) {
 
 	timeout := time.Duration(l.config.RelayReadTimeout) * time.Second
@@ -245,8 +260,8 @@ func (l *LoadGenerator) readBlobFromRelays(
 		l.metrics.endOperation("relay_read")
 	}()
 
-	blobLengthSymbols := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length
-	relayKeys := eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys
+	blobLengthSymbols := uint32(eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length)
+	relayKeys := eigenDACert.RelayKeys()
 	readStartIndex := rand.Int32Range(0, int32(len(relayKeys)))
 
 	for i := 0; i < relayReadCount; i++ {
@@ -269,9 +284,8 @@ func (l *LoadGenerator) readBlobFromRelays(
 // readBlobFromValidators reads a blob from the validators using the validator retrieval client.
 func (l *LoadGenerator) readBlobFromValidators(
 	rand *random.TestRandom,
-	blobKey *corev2.BlobKey,
 	payload []byte,
-	eigenDACert *coretypes.EigenDACert) {
+	eigenDACert *coretypes.EigenDACertV3) {
 
 	timeout := time.Duration(l.config.ValidatorReadTimeout) * time.Second
 	ctx, cancel := context.WithTimeout(l.ctx, timeout)
@@ -293,32 +307,23 @@ func (l *LoadGenerator) readBlobFromValidators(
 		l.metrics.endOperation("validator_read")
 	}()
 
-	blobHeader := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader
-	commitment, err := coretypes.BlobCommitmentsBindingToInternal(&blobHeader.Commitment)
+	blobHeader, err := eigenDACert.BlobHeader()
 	if err != nil {
 		l.metrics.reportValidatorReadFailure()
-		l.client.GetLogger().Errorf("failed to bind blob commitments: %v", err)
+		l.client.GetLogger().Errorf("failed to get blob header: %v", err)
 		return
 	}
-
-	quorums := eigenDACert.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers
-
-	readStartIndex := rand.Int32Range(0, int32(len(quorums)))
 
 	for i := 0; i < validatorReadCount; i++ {
 		validateAndDecode := rand.Float64() < l.config.ValidatorVerificationFraction
 
-		err = l.client.ReadBlobFromValidatorsInQuorum(
+		err = l.client.ReadBlobFromValidators(
 			ctx,
-			*blobKey,
-			blobHeader.Version,
-			*commitment,
-			quorums[(int(readStartIndex)+i)%len(quorums)],
-			eigenDACert.BatchHeader.ReferenceBlockNumber,
+			blobHeader,
+			uint32(eigenDACert.ReferenceBlockNumber()),
 			payload,
 			0,
-			validateAndDecode,
-		)
+			validateAndDecode)
 		if err == nil {
 			l.metrics.reportValidatorReadSuccess()
 		} else {

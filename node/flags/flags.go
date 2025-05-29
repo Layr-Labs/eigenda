@@ -423,8 +423,8 @@ var (
 	}
 	LittDBStoragePathsFlag = cli.StringSliceFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "litt-db-storage-paths"),
-		Usage:    "Comma separated list of paths to store the LittDB data files. At least one path must be provided.",
-		Required: true,
+		Usage:    "Comma separated list of paths to store the LittDB data files. If not provided, falls back to NODE_DB_PATH with '/chunk_v2_litt' suffix.",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_STORAGE_PATHS"),
 	}
 	DownloadPoolSizeFlag = cli.IntFlag{

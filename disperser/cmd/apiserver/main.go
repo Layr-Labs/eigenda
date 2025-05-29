@@ -125,7 +125,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
 		}
 
-		offchainStore, err := mt.NewOffchainStore(
+		meteringStore, err := mt.NewDynamoDBMeteringStore(
 			config.AwsClientConfig,
 			config.ReservationsTableName,
 			config.OnDemandTableName,
@@ -139,7 +139,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		meterer = mt.NewMeterer(
 			mtConfig,
 			paymentChainState,
-			offchainStore,
+			meteringStore,
 			logger,
 			// metrics.NewNoopMetrics(),
 		)
@@ -182,7 +182,12 @@ func RunDisperserServer(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}
-		blobMetadataStore := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
+		baseBlobMetadataStore := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
+		blobMetadataStore := blobstorev2.NewInstrumentedMetadataStore(baseBlobMetadataStore, blobstorev2.InstrumentedMetadataStoreConfig{
+			ServiceName: "apiserver",
+			Registry:    reg,
+			Backend:     blobstorev2.BackendDynamoDB,
+		})
 		blobStore := blobstorev2.NewBlobStore(bucketName, s3Client, logger)
 
 		server, err := apiserver.NewDispersalServerV2(
