@@ -323,11 +323,11 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		s.logger.Debug("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
 	} else {
 		quorumNumbers := make([]uint32, len(reservations))
-		for quorumNumber, _ := range reservations {
+		for quorumNumber := range reservations {
 			quorumNumbers[quorumNumber] = uint32(quorumNumber)
 		}
 		quorumSplits := make([]uint32, len(reservations))
-		for quorumNumber, _ := range reservations {
+		for quorumNumber := range reservations {
 			quorumSplits[quorumNumber] = 0
 		}
 
