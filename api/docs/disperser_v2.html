@@ -211,14 +211,6 @@
                 </li>
               
                 <li>
-                  <a href="#disperser.v2.GetPaymentStateReply"><span class="badge">M</span>GetPaymentStateReply</a>
-                </li>
-              
-                <li>
-                  <a href="#disperser.v2.GetPaymentStateRequest"><span class="badge">M</span>GetPaymentStateRequest</a>
-                </li>
-              
-                <li>
                   <a href="#disperser.v2.GetPaymentStateQuorumSpecificReply"><span class="badge">M</span>GetPaymentStateQuorumSpecificReply</a>
                 </li>
               
@@ -232,6 +224,14 @@
               
                 <li>
                   <a href="#disperser.v2.GetPaymentStateQuorumSpecificRequest"><span class="badge">M</span>GetPaymentStateQuorumSpecificRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.GetPaymentStateReply"><span class="badge">M</span>GetPaymentStateReply</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.GetPaymentStateRequest"><span class="badge">M</span>GetPaymentStateRequest</a>
                 </li>
               
                 <li>
@@ -612,97 +612,6 @@ which is dispersed separately. </p></td>
 
         
       
-        <h3 id="disperser.v2.GetPaymentStateReply">GetPaymentStateReply</h3>
-        <p>GetPaymentStateReply contains the payment state of an account.</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>payment_global_params</td>
-                  <td><a href="#disperser.v2.PaymentGlobalParams">PaymentGlobalParams</a></td>
-                  <td></td>
-                  <td><p>global payment vault parameters </p></td>
-                </tr>
-              
-                <tr>
-                  <td>period_records</td>
-                  <td><a href="#disperser.v2.PeriodRecord">PeriodRecord</a></td>
-                  <td>repeated</td>
-                  <td><p>off-chain account reservation usage records </p></td>
-                </tr>
-              
-                <tr>
-                  <td>reservation</td>
-                  <td><a href="#disperser.v2.Reservation">Reservation</a></td>
-                  <td></td>
-                  <td><p>on-chain account reservation setting </p></td>
-                </tr>
-              
-                <tr>
-                  <td>cumulative_payment</td>
-                  <td><a href="#bytes">bytes</a></td>
-                  <td></td>
-                  <td><p>off-chain on-demand payment usage </p></td>
-                </tr>
-              
-                <tr>
-                  <td>onchain_cumulative_payment</td>
-                  <td><a href="#bytes">bytes</a></td>
-                  <td></td>
-                  <td><p>on-chain on-demand payment deposited </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="disperser.v2.GetPaymentStateRequest">GetPaymentStateRequest</h3>
-        <p>GetPaymentStateRequest contains parameters to query the payment state of an account.</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>account_id</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p>The ID of the account being queried. This account ID is an eth wallet address of the user. </p></td>
-                </tr>
-              
-                <tr>
-                  <td>signature</td>
-                  <td><a href="#bytes">bytes</a></td>
-                  <td></td>
-                  <td><p>Signature over the account ID </p></td>
-                </tr>
-              
-                <tr>
-                  <td>timestamp</td>
-                  <td><a href="#uint64">uint64</a></td>
-                  <td></td>
-                  <td><p>Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server&#39;s clock,
-request may be rejected. </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
         <h3 id="disperser.v2.GetPaymentStateQuorumSpecificReply">GetPaymentStateQuorumSpecificReply</h3>
         <p>GetPaymentStateQuorumSpecificReply contains the payment state of an account.</p>
 
@@ -724,14 +633,14 @@ request may be rejected. </p></td>
                   <td>period_records</td>
                   <td><a href="#disperser.v2.GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry">GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry</a></td>
                   <td>repeated</td>
-                  <td><p>off-chain account reservation usage records </p></td>
+                  <td><p>period_records maps quorum IDs to the off-chain account reservation usage records </p></td>
                 </tr>
               
                 <tr>
                   <td>reservations</td>
                   <td><a href="#disperser.v2.GetPaymentStateQuorumSpecificReply.ReservationsEntry">GetPaymentStateQuorumSpecificReply.ReservationsEntry</a></td>
                   <td>repeated</td>
-                  <td><p>on-chain account reservation setting </p></td>
+                  <td><p>reservations maps quorum IDs to the on-chain account reservation record </p></td>
                 </tr>
               
                 <tr>
@@ -854,6 +763,97 @@ request may be rejected. </p></td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
                   <td><p>Quorum number to filter the period records. If not set, quorum 0 is used by default. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.GetPaymentStateReply">GetPaymentStateReply</h3>
+        <p>GetPaymentStateReply contains the payment state of an account.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>payment_global_params</td>
+                  <td><a href="#disperser.v2.PaymentGlobalParams">PaymentGlobalParams</a></td>
+                  <td></td>
+                  <td><p>global payment vault parameters </p></td>
+                </tr>
+              
+                <tr>
+                  <td>period_records</td>
+                  <td><a href="#disperser.v2.PeriodRecord">PeriodRecord</a></td>
+                  <td>repeated</td>
+                  <td><p>off-chain account reservation usage records </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reservation</td>
+                  <td><a href="#disperser.v2.Reservation">Reservation</a></td>
+                  <td></td>
+                  <td><p>on-chain account reservation setting </p></td>
+                </tr>
+              
+                <tr>
+                  <td>cumulative_payment</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>off-chain on-demand payment usage </p></td>
+                </tr>
+              
+                <tr>
+                  <td>onchain_cumulative_payment</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>on-chain on-demand payment deposited </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.GetPaymentStateRequest">GetPaymentStateRequest</h3>
+        <p>GetPaymentStateRequest contains parameters to query the payment state of an account.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>account_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The ID of the account being queried. This account ID is an eth wallet address of the user. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>Signature over the account ID </p></td>
+                </tr>
+              
+                <tr>
+                  <td>timestamp</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server&#39;s clock,
+request may be rejected. </p></td>
                 </tr>
               
             </tbody>
@@ -1363,7 +1363,7 @@ https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da4490
                 <td>GetPaymentState</td>
                 <td><a href="#disperser.v2.GetPaymentStateRequest">GetPaymentStateRequest</a></td>
                 <td><a href="#disperser.v2.GetPaymentStateReply">GetPaymentStateReply</a></td>
-                <td><p>GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
+                <td><p>GetPaymentState will soon be deprecated. It is a utility method to get the payment state of a given account, at a given disperser.
 EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
 A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
 That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
@@ -1378,8 +1378,8 @@ https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da4490
                 <td><a href="#disperser.v2.GetPaymentStateQuorumSpecificRequest">GetPaymentStateQuorumSpecificRequest</a></td>
                 <td><a href="#disperser.v2.GetPaymentStateQuorumSpecificReply">GetPaymentStateQuorumSpecificReply</a></td>
                 <td><p>GetPaymentStateQuorumSpecific is a utility method to get the payment state of a given account, at a given disperser.
-EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
-A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
+EigenDA&#39;s dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id.
+A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it disperse from.
 That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
 The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
 
