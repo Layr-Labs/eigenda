@@ -427,6 +427,10 @@
                 </li>
               
                 <li>
+                  <a href="#disperser.v2.PeriodRecords"><span class="badge">M</span>PeriodRecords</a>
+                </li>
+              
+                <li>
                   <a href="#disperser.v2.QuorumReservation"><span class="badge">M</span>QuorumReservation</a>
                 </li>
               
@@ -2460,7 +2464,7 @@ which is dispersed separately. </p></td>
                   <td>period_records</td>
                   <td><a href="#disperser.v2.GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry">GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry</a></td>
                   <td>repeated</td>
-                  <td><p>period_records maps quorum IDs to the off-chain account reservation usage records </p></td>
+                  <td><p>period_records maps quorum IDs to the off-chain account reservation usage records for the current and next two periods </p></td>
                 </tr>
               
                 <tr>
@@ -2510,7 +2514,7 @@ which is dispersed separately. </p></td>
               
                 <tr>
                   <td>value</td>
-                  <td><a href="#disperser.v2.PeriodRecord">PeriodRecord</a></td>
+                  <td><a href="#disperser.v2.PeriodRecords">PeriodRecords</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -2954,6 +2958,30 @@ request may be rejected. </p></td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
                   <td><p>symbol usage recorded </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.PeriodRecords">PeriodRecords</h3>
+        <p>An array of period records. Typically this is used to include 3 records, from the current period to the next two periods.</p><p>The next two period records are included because they may include spillage usages from the previous period or the current period.</p><p>The client should be aware of the spillage so they account for them as they disperse during those periods.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>records</td>
+                  <td><a href="#disperser.v2.PeriodRecord">PeriodRecord</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>

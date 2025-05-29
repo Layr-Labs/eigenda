@@ -175,8 +175,8 @@ message GetPaymentStateReply {
 message GetPaymentStateQuorumSpecificReply {
   // payment vault parameters with per-quorum configurations
   PaymentVaultParams payment_vault_params = 1;
-  // period_records maps quorum IDs to the off-chain account reservation usage records
-  map<uint32, PeriodRecord> period_records = 2;
+  // period_records maps quorum IDs to the off-chain account reservation usage records for the current and next two periods
+  map<uint32, PeriodRecords> period_records = 2;
   // reservations maps quorum IDs to the on-chain account reservation record
   map<uint32, QuorumReservation> reservations = 3;
   // off-chain on-demand payment usage
@@ -360,4 +360,11 @@ message PaymentVaultParams {
 
   // on_demand_quorum_numbers lists the quorum numbers that support on-demand payments
   repeated uint32 on_demand_quorum_numbers = 3;
+}
+
+// An array of period records. Typically this is used to include 3 records, from the current period to the next two periods.
+// The next two period records are included because they may include spillage usages from the previous period or the current period.
+// The client should be aware of the spillage so they account for them as they disperse during those periods.
+message PeriodRecords {
+  repeated PeriodRecord records = 1;
 }

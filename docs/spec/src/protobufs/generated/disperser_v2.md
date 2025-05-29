@@ -25,6 +25,7 @@
     - [PaymentVaultParams.QuorumPaymentConfigsEntry](#disperser-v2-PaymentVaultParams-QuorumPaymentConfigsEntry)
     - [PaymentVaultParams.QuorumProtocolConfigsEntry](#disperser-v2-PaymentVaultParams-QuorumProtocolConfigsEntry)
     - [PeriodRecord](#disperser-v2-PeriodRecord)
+    - [PeriodRecords](#disperser-v2-PeriodRecords)
     - [QuorumReservation](#disperser-v2-QuorumReservation)
     - [Reservation](#disperser-v2-Reservation)
     - [SignedBatch](#disperser-v2-SignedBatch)
@@ -196,7 +197,7 @@ GetPaymentStateQuorumSpecificReply contains the payment state of an account.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | payment_vault_params | [PaymentVaultParams](#disperser-v2-PaymentVaultParams) |  | payment vault parameters with per-quorum configurations |
-| period_records | [GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry](#disperser-v2-GetPaymentStateQuorumSpecificReply-PeriodRecordsEntry) | repeated | period_records maps quorum IDs to the off-chain account reservation usage records |
+| period_records | [GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry](#disperser-v2-GetPaymentStateQuorumSpecificReply-PeriodRecordsEntry) | repeated | period_records maps quorum IDs to the off-chain account reservation usage records for the current and next two periods |
 | reservations | [GetPaymentStateQuorumSpecificReply.ReservationsEntry](#disperser-v2-GetPaymentStateQuorumSpecificReply-ReservationsEntry) | repeated | reservations maps quorum IDs to the on-chain account reservation record |
 | cumulative_payment | [bytes](#bytes) |  | off-chain on-demand payment usage |
 | onchain_cumulative_payment | [bytes](#bytes) |  | on-chain on-demand payment deposited |
@@ -215,7 +216,7 @@ GetPaymentStateQuorumSpecificReply contains the payment state of an account.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | key | [uint32](#uint32) |  |  |
-| value | [PeriodRecord](#disperser-v2-PeriodRecord) |  |  |
+| value | [PeriodRecords](#disperser-v2-PeriodRecords) |  |  |
 
 
 
@@ -410,6 +411,23 @@ record and the subsequent two records that contains potential overflows.
 | ----- | ---- | ----- | ----------- |
 | index | [uint32](#uint32) |  | Period index of the reservation |
 | usage | [uint64](#uint64) |  | symbol usage recorded |
+
+
+
+
+
+
+<a name="disperser-v2-PeriodRecords"></a>
+
+### PeriodRecords
+An array of period records. Typically this is used to include 3 records, from the current period to the next two periods.
+The next two period records are included because they may include spillage usages from the previous period or the current period.
+The client should be aware of the spillage so they account for them as they disperse during those periods.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| records | [PeriodRecord](#disperser-v2-PeriodRecord) | repeated |  |
 
 
 
