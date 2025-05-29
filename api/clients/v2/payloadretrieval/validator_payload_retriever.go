@@ -8,7 +8,6 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
-	core "github.com/Layr-Labs/eigenda/core/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
@@ -53,62 +52,25 @@ func NewValidatorPayloadRetriever(
 // payload is returned.
 func (pr *ValidatorPayloadRetriever) GetPayload(
 	ctx context.Context,
-	eigenDACert coretypes.EigenDACert,
+	eigenDACert coretypes.RetrievableEigenDACert,
 ) (*coretypes.Payload, error) {
 
-	var blobKey *core.BlobKey
-	var blobHeader *corev2.BlobHeaderWithHashedPayment
-	var err error
-	var rbn uint32
-
-	switch eigenDACert.Version() {
-	case coretypes.VersionTwoCert:
-		eigenDAV2Cert, ok := eigenDACert.(*coretypes.EigenDACertV2)
-		if !ok {
-			return nil, fmt.Errorf("expected eigenDACert to be of type *coretypes.EigenDAV2Cert, got %T", eigenDACert)
-		}
-
-		blobKey, err = eigenDAV2Cert.ComputeBlobKey()
-		if err != nil {
-			return nil, fmt.Errorf("compute blob key: %w", err)
-		}
-
-		blobHeader, err = eigenDAV2Cert.BlobHeader()
-		if err != nil {
-			return nil, fmt.Errorf("get blob header: %w", err)
-		}
-
-		rbn = eigenDAV2Cert.BatchHeader.ReferenceBlockNumber
-
-	case coretypes.VersionThreeCert:
-		eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
-		if !ok {
-			return nil, fmt.Errorf("expected eigenDACert to be of type *coretypes.eigenDAV3Cert, got %T", eigenDACert)
-		}
-
-		blobKey, err = eigenDAV3Cert.ComputeBlobKey()
-		if err != nil {
-			return nil, fmt.Errorf("compute blob key: %w", err)
-		}
-
-		blobHeader, err = eigenDAV3Cert.BlobHeader()
-		if err != nil {
-			return nil, fmt.Errorf("get blob header: %w", err)
-		}
-
-		rbn = eigenDAV3Cert.BatchHeader.ReferenceBlockNumber
-
-	default:
-		return nil, fmt.Errorf("unsupported eigenDACert type %T", eigenDACert)
+	blobHeader, err := eigenDACert.BlobHeader()
+	if err != nil {
+		return nil, fmt.Errorf("get blob header from eigenDACert: %w", err)
 	}
 
+	blobKey, err := eigenDACert.ComputeBlobKey()
+	if err != nil {
+		return nil, fmt.Errorf("compute blob key from eigenDACert: %w", err)
+	}
 
 	// TODO (litt3): Add a feature which keeps chunks from previous quorums, and just fills in gaps
 	for _, quorumID := range blobHeader.QuorumNumbers {
 		blob, err := pr.retrieveBlobWithTimeout(
 			ctx,
 			blobHeader,
-			rbn)
+			uint32(eigenDACert.ReferenceBlockNumber()))
 
 		if err != nil {
 			pr.logger.Error(

@@ -95,6 +95,18 @@ type EigenDACert interface {
 	Version() CertificateVersion
 }
 
+
+type RetrievableEigenDACert interface {
+	RelayKeys() []coreV2.RelayKey
+	QuorumNumbers() []byte
+	ReferenceBlockNumber() uint64
+	ComputeBlobKey() (*coreV2.BlobKey, error)
+	BlobHeader() (*coreV2.BlobHeaderWithHashedPayment, error)
+	Commitments() (*encoding.BlobCommitments, error)
+	Serialize(ct CertSerializationType) ([]byte, error)
+}
+
+
 var _ EigenDACert = &EigenDACertV2{}
 var _ EigenDACert = &EigenDACertV3{}
 
@@ -149,11 +161,6 @@ func (c *EigenDACertV3) ReferenceBlockNumber() uint64 {
 	return uint64(c.BatchHeader.ReferenceBlockNumber)
 }
 
-// BlobVersion returns the blob version of the blob header
-func (c *EigenDACertV3) BlobVersion()coreV2.BlobVersion {
-	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version
-}
-
 // ComputeBlobKey computes the blob key used for looking up the blob against an EigenDA network retrieval
 // entrypoint (e.g, a relay or a validator node)
 func (c *EigenDACertV3) ComputeBlobKey() (*coreV2.BlobKey, error) {
@@ -179,6 +186,7 @@ func (c *EigenDACertV3) ComputeBlobKey() (*coreV2.BlobKey, error) {
 	return &blobKey, nil
 }
 
+// BlobHeader returns the blob header of the EigenDACertV3 
 func (c *EigenDACertV3) BlobHeader() (*coreV2.BlobHeaderWithHashedPayment, error) {
 
 	commitments, err := c.Commitments()
@@ -305,11 +313,6 @@ func (c *EigenDACertV2) Commitments() (*encoding.BlobCommitments, error) {
 // RBN returns the reference block number
 func (c *EigenDACertV2) ReferenceBlockNumber() uint64 {
 	return uint64(c.BatchHeader.ReferenceBlockNumber)
-}
-
-// BlobVersion returns the blob version of the blob header
-func (c *EigenDACertV2) BlobVersion()coreV2.BlobVersion {
-	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version
 }
 // QuorumNumbers returns the quorum numbers requested
 func (c *EigenDACertV2) QuorumNumbers() []byte {

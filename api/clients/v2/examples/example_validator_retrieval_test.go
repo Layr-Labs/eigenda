@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 )
 
 // This example demonstrates how to use the ValidatorPayloadRetriever to retrieve a payload from EigenDA, running on
@@ -48,8 +50,13 @@ func Example_validatorPayloadRetrieval() {
 		panic(fmt.Sprintf("create validator payload retriever: %v", err))
 	}
 
+	retrievableCert, ok := eigenDACert.(coretypes.RetrievableEigenDACert)
+	if !ok {
+		panic("eigenDACert is not a RetrievableEigenDACert")
+	}
+
 	// Retrieve the payload using the certificate by fetching from validator nodes
-	_, err = validatorPayloadRetriever.GetPayload(ctx, eigenDACert)
+	_, err = validatorPayloadRetriever.GetPayload(ctx, retrievableCert)
 	if err != nil {
 		panic(fmt.Sprintf("get payload: %v", err))
 	}
