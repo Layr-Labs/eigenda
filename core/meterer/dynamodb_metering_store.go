@@ -256,7 +256,7 @@ func (s *DynamoDBMeteringStore) RollbackOnDemandPayment(ctx context.Context, acc
 	return nil
 }
 
-func (s *DynamoDBMeteringStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error) {
+func (s *DynamoDBMeteringStore) GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64) ([]*pb.PeriodRecord, error) {
 	// Fetch the 3 bins start from the current bin
 	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.reservationTableName),
@@ -270,14 +270,14 @@ func (s *DynamoDBMeteringStore) GetPeriodRecords(ctx context.Context, accountID 
 	}
 	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
-		return [MinNumBins]*pb.PeriodRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
+		return []*pb.PeriodRecord{}, fmt.Errorf("failed to query payments for account: %w", err)
 	}
 
-	records := [MinNumBins]*pb.PeriodRecord{}
+	records := make([]*pb.PeriodRecord, MinNumBins)
 	for i := 0; i < len(bins) && i < int(MinNumBins); i++ {
 		periodRecord, err := parsePeriodRecord(bins[i])
 		if err != nil {
-			return [MinNumBins]*pb.PeriodRecord{}, fmt.Errorf("failed to parse bin %d record: %w", i, err)
+			return nil, fmt.Errorf("failed to parse bin %d record: %w", i, err)
 		}
 		records[i] = periodRecord
 	}
