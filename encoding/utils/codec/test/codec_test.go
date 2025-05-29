@@ -42,7 +42,7 @@ func deriveRealBlobSize(t *testing.T, payloadSize uint32) uint32 {
 // This function generates a table containing optimum blob sizes. It is intended to be run manually.
 func TestGenerateOptimumSizeTable(t *testing.T) {
 
-	// Uncomment this to generate an optimum size table.
+	// Comment this to generate an optimum size table.
 	t.Skip() // Do not merge with this test enabled
 
 	blobSizes, err := codec.FindLegalBlobSizes(minBlobSize, maxBlobSize)
