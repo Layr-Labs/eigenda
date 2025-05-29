@@ -219,11 +219,51 @@
                 </li>
               
                 <li>
+                  <a href="#disperser.v2.GetQuorumSpecificPaymentStateReply"><span class="badge">M</span>GetQuorumSpecificPaymentStateReply</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.GetQuorumSpecificPaymentStateReply.PeriodRecordsEntry"><span class="badge">M</span>GetQuorumSpecificPaymentStateReply.PeriodRecordsEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.GetQuorumSpecificPaymentStateReply.ReservationsEntry"><span class="badge">M</span>GetQuorumSpecificPaymentStateReply.ReservationsEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.GetQuorumSpecificPaymentStateRequest"><span class="badge">M</span>GetQuorumSpecificPaymentStateRequest</a>
+                </li>
+              
+                <li>
                   <a href="#disperser.v2.PaymentGlobalParams"><span class="badge">M</span>PaymentGlobalParams</a>
                 </li>
               
                 <li>
+                  <a href="#disperser.v2.PaymentQuorumConfig"><span class="badge">M</span>PaymentQuorumConfig</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.PaymentQuorumProtocolConfig"><span class="badge">M</span>PaymentQuorumProtocolConfig</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.PaymentVaultParams"><span class="badge">M</span>PaymentVaultParams</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.PaymentVaultParams.QuorumPaymentConfigsEntry"><span class="badge">M</span>PaymentVaultParams.QuorumPaymentConfigsEntry</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.PaymentVaultParams.QuorumProtocolConfigsEntry"><span class="badge">M</span>PaymentVaultParams.QuorumProtocolConfigsEntry</a>
+                </li>
+              
+                <li>
                   <a href="#disperser.v2.PeriodRecord"><span class="badge">M</span>PeriodRecord</a>
+                </li>
+              
+                <li>
+                  <a href="#disperser.v2.QuorumReservation"><span class="badge">M</span>QuorumReservation</a>
                 </li>
               
                 <li>
@@ -663,6 +703,166 @@ request may be rejected. </p></td>
 
         
       
+        <h3 id="disperser.v2.GetQuorumSpecificPaymentStateReply">GetQuorumSpecificPaymentStateReply</h3>
+        <p>GetQuorumSpecificPaymentStateReply contains the payment state of an account.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>payment_vault_params</td>
+                  <td><a href="#disperser.v2.PaymentVaultParams">PaymentVaultParams</a></td>
+                  <td></td>
+                  <td><p>payment vault parameters with per-quorum configurations </p></td>
+                </tr>
+              
+                <tr>
+                  <td>period_records</td>
+                  <td><a href="#disperser.v2.GetQuorumSpecificPaymentStateReply.PeriodRecordsEntry">GetQuorumSpecificPaymentStateReply.PeriodRecordsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p>off-chain account reservation usage records </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reservations</td>
+                  <td><a href="#disperser.v2.GetQuorumSpecificPaymentStateReply.ReservationsEntry">GetQuorumSpecificPaymentStateReply.ReservationsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p>on-chain account reservation setting </p></td>
+                </tr>
+              
+                <tr>
+                  <td>cumulative_payment</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>off-chain on-demand payment usage </p></td>
+                </tr>
+              
+                <tr>
+                  <td>onchain_cumulative_payment</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>on-chain on-demand payment deposited </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.GetQuorumSpecificPaymentStateReply.PeriodRecordsEntry">GetQuorumSpecificPaymentStateReply.PeriodRecordsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#disperser.v2.PeriodRecord">PeriodRecord</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.GetQuorumSpecificPaymentStateReply.ReservationsEntry">GetQuorumSpecificPaymentStateReply.ReservationsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#disperser.v2.QuorumReservation">QuorumReservation</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.GetQuorumSpecificPaymentStateRequest">GetQuorumSpecificPaymentStateRequest</h3>
+        <p>GetQuorumSpecificPaymentStateRequest contains parameters to query the payment state of an account.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>account_id</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>The ID of the account being queried. This account ID is an eth wallet address of the user. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>signature</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>Signature over the account ID </p></td>
+                </tr>
+              
+                <tr>
+                  <td>timestamp</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server&#39;s clock,
+request may be rejected. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_number</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Quorum number to filter the period records. If not set, quorum 0 is used by default. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="disperser.v2.PaymentGlobalParams">PaymentGlobalParams</h3>
         <p>Global constant parameters defined by the payment vault.</p>
 
@@ -715,6 +915,196 @@ request may be rejected. </p></td>
 
         
       
+        <h3 id="disperser.v2.PaymentQuorumConfig">PaymentQuorumConfig</h3>
+        <p>PaymentQuorumConfig contains the configuration for a quorum's payment configurations</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>reservation_symbols_per_second</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>reservation_symbols_per_second is the total symbols per second that can be reserved for this quorum </p></td>
+                </tr>
+              
+                <tr>
+                  <td>on_demand_symbols_per_second</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>on_demand_symbols_per_second is the symbols per second allowed for on-demand payments for this quorum </p></td>
+                </tr>
+              
+                <tr>
+                  <td>on_demand_price_per_symbol</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>on_demand_price_per_symbol is the price per symbol for on-demand payments in wei </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.PaymentQuorumProtocolConfig">PaymentQuorumProtocolConfig</h3>
+        <p>PaymentQuorumProtocolConfig contains the configuration for a quorum's protocol-level configurations</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>min_num_symbols</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>min_num_symbols is the minimum number of symbols that must be charged for any request </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reservation_advance_window</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>reservation_advance_window is the window in seconds before a reservation starts that it can be activated </p></td>
+                </tr>
+              
+                <tr>
+                  <td>reservation_rate_limit_window</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>reservation_rate_limit_window is the time window in seconds for reservation rate limiting </p></td>
+                </tr>
+              
+                <tr>
+                  <td>on_demand_rate_limit_window</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>on_demand_rate_limit_window is the time window in seconds for on-demand rate limiting </p></td>
+                </tr>
+              
+                <tr>
+                  <td>on_demand_enabled</td>
+                  <td><a href="#bool">bool</a></td>
+                  <td></td>
+                  <td><p>on_demand_enabled indicates whether on-demand payments are enabled for this quorum </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.PaymentVaultParams">PaymentVaultParams</h3>
+        <p>PaymentVaultParams contains the global payment configuration parameters from the payment vault</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>quorum_payment_configs</td>
+                  <td><a href="#disperser.v2.PaymentVaultParams.QuorumPaymentConfigsEntry">PaymentVaultParams.QuorumPaymentConfigsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p>quorum_payment_configs maps quorum IDs to their payment configurations </p></td>
+                </tr>
+              
+                <tr>
+                  <td>quorum_protocol_configs</td>
+                  <td><a href="#disperser.v2.PaymentVaultParams.QuorumProtocolConfigsEntry">PaymentVaultParams.QuorumProtocolConfigsEntry</a></td>
+                  <td>repeated</td>
+                  <td><p>quorum_protocol_configs maps quorum IDs to their protocol configurations </p></td>
+                </tr>
+              
+                <tr>
+                  <td>on_demand_quorum_numbers</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td>repeated</td>
+                  <td><p>on_demand_quorum_numbers lists the quorum numbers that support on-demand payments </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.PaymentVaultParams.QuorumPaymentConfigsEntry">PaymentVaultParams.QuorumPaymentConfigsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#disperser.v2.PaymentQuorumConfig">PaymentQuorumConfig</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.PaymentVaultParams.QuorumProtocolConfigsEntry">PaymentVaultParams.QuorumProtocolConfigsEntry</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>key</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#disperser.v2.PaymentQuorumProtocolConfig">PaymentQuorumProtocolConfig</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="disperser.v2.PeriodRecord">PeriodRecord</h3>
         <p>PeriodRecord is the usage record of an account in a bin. The API should return the active bin</p><p>record and the subsequent two records that contains potential overflows.</p>
 
@@ -737,6 +1127,44 @@ request may be rejected. </p></td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
                   <td><p>symbol usage recorded </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="disperser.v2.QuorumReservation">QuorumReservation</h3>
+        <p>Reservation parameters of an account, used to determine the rate limit for the account.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>symbols_per_second</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>rate limit for the account </p></td>
+                </tr>
+              
+                <tr>
+                  <td>start_timestamp</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>start timestamp of the reservation </p></td>
+                </tr>
+              
+                <tr>
+                  <td>end_timestamp</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>end timestamp of the reservation </p></td>
                 </tr>
               
             </tbody>
@@ -936,6 +1364,20 @@ https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da4490
                 <td><a href="#disperser.v2.GetPaymentStateRequest">GetPaymentStateRequest</a></td>
                 <td><a href="#disperser.v2.GetPaymentStateReply">GetPaymentStateReply</a></td>
                 <td><p>GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
+EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
+A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
+That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
+The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
+
+For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
+https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetQuorumSpecificPaymentState</td>
+                <td><a href="#disperser.v2.GetQuorumSpecificPaymentStateRequest">GetQuorumSpecificPaymentStateRequest</a></td>
+                <td><a href="#disperser.v2.GetQuorumSpecificPaymentStateReply">GetQuorumSpecificPaymentStateReply</a></td>
+                <td><p>GetQuorumSpecificPaymentState is a utility method to get the payment state of a given account, at a given disperser.
 EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
 A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
 That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
