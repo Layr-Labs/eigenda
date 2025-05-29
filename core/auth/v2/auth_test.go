@@ -2,12 +2,13 @@ package v2_test
 
 import (
 	"crypto/sha256"
-	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	"github.com/Layr-Labs/eigenda/api/hashing"
-	"github.com/Layr-Labs/eigenda/common/replay"
 	"math/big"
 	"testing"
 	"time"
+
+	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	"github.com/Layr-Labs/eigenda/api/hashing"
+	"github.com/Layr-Labs/eigenda/common/replay"
 
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
@@ -137,7 +138,7 @@ func TestAuthenticatePaymentStateRequestValid(t *testing.T) {
 
 	request := mockGetPaymentStateRequest(accountId, signature)
 
-	err = paymentStateAuthenticator.AuthenticatePaymentStateRequest(accountId, request)
+	err = paymentStateAuthenticator.AuthenticateQuorumSpecificPaymentStateRequest(accountId, request)
 	assert.NoError(t, err)
 }
 
@@ -145,7 +146,7 @@ func TestAuthenticatePaymentStateRequestInvalidSignatureLength(t *testing.T) {
 	paymentStateAuthenticator := auth.NewPaymentStateAuthenticator(maxPastAge, maxFutureAge)
 	request := mockGetPaymentStateRequest(gethcommon.HexToAddress("0x123"), []byte{1, 2, 3})
 
-	err := paymentStateAuthenticator.AuthenticatePaymentStateRequest(gethcommon.HexToAddress("0x123"), request)
+	err := paymentStateAuthenticator.AuthenticateQuorumSpecificPaymentStateRequest(gethcommon.HexToAddress("0x123"), request)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "signature length is unexpected")
 }
@@ -153,7 +154,7 @@ func TestAuthenticatePaymentStateRequestInvalidSignatureLength(t *testing.T) {
 func TestAuthenticatePaymentStateRequestInvalidPublicKey(t *testing.T) {
 	paymentStateAuthenticator := auth.NewPaymentStateAuthenticator(maxPastAge, maxFutureAge)
 	request := mockGetPaymentStateRequest(gethcommon.Address{}, make([]byte, 65))
-	err := paymentStateAuthenticator.AuthenticatePaymentStateRequest(gethcommon.Address{}, request)
+	err := paymentStateAuthenticator.AuthenticateQuorumSpecificPaymentStateRequest(gethcommon.Address{}, request)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to recover public key from signature")
 }
@@ -176,7 +177,7 @@ func TestAuthenticatePaymentStateRequestSignatureMismatch(t *testing.T) {
 
 	request := mockGetPaymentStateRequest(accountId, signature)
 
-	err = paymentStateAuthenticator.AuthenticatePaymentStateRequest(accountId, request)
+	err = paymentStateAuthenticator.AuthenticateQuorumSpecificPaymentStateRequest(accountId, request)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "signature doesn't match with provided public key")
 }
@@ -191,7 +192,7 @@ func TestAuthenticatePaymentStateRequestCorruptedSignature(t *testing.T) {
 
 	requestHash, err := hashing.HashGetPaymentStateRequest(accountId, fixedTimestamp)
 	assert.NoError(t, err)
-	
+
 	hash := sha256.Sum256(requestHash)
 	signature, err := crypto.Sign(hash[:], signer.PrivateKey)
 	assert.NoError(t, err)
@@ -200,14 +201,42 @@ func TestAuthenticatePaymentStateRequestCorruptedSignature(t *testing.T) {
 	signature[0] ^= 0x01
 	request := mockGetPaymentStateRequest(accountId, signature)
 
-	err = paymentStateAuthenticator.AuthenticatePaymentStateRequest(accountId, request)
+	err = paymentStateAuthenticator.AuthenticateQuorumSpecificPaymentStateRequest(accountId, request)
 	assert.Error(t, err)
 }
 
-func mockGetPaymentStateRequest(accountId gethcommon.Address, signature []byte) *disperser_rpc.GetPaymentStateRequest {
+func mockGetPaymentStateRequest(accountId gethcommon.Address, signature []byte) *disperser_rpc.GetQuorumSpecificPaymentStateRequest {
+	return &disperser_rpc.GetQuorumSpecificPaymentStateRequest{
+		AccountId: accountId.Hex(),
+		Signature: signature,
+		Timestamp: fixedTimestamp,
+	}
+}
+
+// mockGetRegularPaymentStateRequest creates a regular GetPaymentStateRequest for testing
+func mockGetRegularPaymentStateRequest(accountId gethcommon.Address, signature []byte) *disperser_rpc.GetPaymentStateRequest {
 	return &disperser_rpc.GetPaymentStateRequest{
 		AccountId: accountId.Hex(),
 		Signature: signature,
 		Timestamp: fixedTimestamp,
 	}
+}
+
+func TestAuthenticateRegularPaymentStateRequest(t *testing.T) {
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	assert.NoError(t, err)
+	paymentStateAuthenticator := auth.NewPaymentStateAuthenticator(maxPastAge, maxFutureAge)
+	paymentStateAuthenticator.ReplayGuardian = replay.NewNoOpReplayGuardian()
+
+	signature, err := signer.SignPaymentStateRequest(fixedTimestamp)
+	assert.NoError(t, err)
+	assert.NotNil(t, signature)
+
+	accountId, err := signer.GetAccountID()
+	assert.NoError(t, err)
+
+	request := mockGetRegularPaymentStateRequest(accountId, signature)
+
+	err = paymentStateAuthenticator.AuthenticatePaymentStateRequest(accountId, request)
+	assert.NoError(t, err)
 }
