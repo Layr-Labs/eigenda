@@ -67,7 +67,16 @@ func RunRelay(ctx *cli.Context) error {
 
 	metricsRegistry := prometheus.NewRegistry()
 
-	baseMetadataStore := blobstore.NewBlobMetadataStore(dynamoClient, logger, config.MetadataTableName)
+	var baseMetadataStore blobstore.MetadataStore
+	if config.UsePostgres {
+		baseMetadataStore, err = blobstore.NewPostgresBlobMetadataStore(config.PostgresConfig, logger)
+		if err != nil {
+			return fmt.Errorf("failed to create postgres blob metadata store: %w", err)
+		}
+	} else {
+		baseMetadataStore = blobstore.NewDynamoDBBlobMetadataStore(dynamoClient, logger, config.MetadataTableName)
+	}
+
 	metadataStore := blobstore.NewInstrumentedMetadataStore(baseMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
 		ServiceName: "relay",
 		Registry:    metricsRegistry,

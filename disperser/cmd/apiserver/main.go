@@ -182,12 +182,22 @@ func RunDisperserServer(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
 		}
-		baseBlobMetadataStore := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
+
+		var baseBlobMetadataStore blobstorev2.MetadataStore
+		if config.UsePostgres {
+			baseBlobMetadataStore, err = blobstorev2.NewPostgresBlobMetadataStore(config.PostgresConfig, logger)
+			if err != nil {
+				return fmt.Errorf("failed to create postgres blob metadata store: %w", err)
+			}
+		} else {
+			baseBlobMetadataStore = blobstorev2.NewDynamoDBBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
+		}
 		blobMetadataStore := blobstorev2.NewInstrumentedMetadataStore(baseBlobMetadataStore, blobstorev2.InstrumentedMetadataStoreConfig{
 			ServiceName: "apiserver",
 			Registry:    reg,
 			Backend:     blobstorev2.BackendDynamoDB,
 		})
+
 		blobStore := blobstorev2.NewBlobStore(bucketName, s3Client, logger)
 
 		server, err := apiserver.NewDispersalServerV2(

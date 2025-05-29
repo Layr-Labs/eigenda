@@ -103,11 +103,15 @@ func RunController(ctx *cli.Context) error {
 		Handler: mux,
 	}
 
-	baseBlobMetadataStore := blobstore.NewBlobMetadataStore(
-		dynamoClient,
-		logger,
-		config.DynamoDBTableName,
-	)
+	var baseBlobMetadataStore blobstore.MetadataStore
+	if config.UsePostgres {
+		baseBlobMetadataStore, err = blobstore.NewPostgresBlobMetadataStore(config.PostgresConfig, logger)
+		if err != nil {
+			return fmt.Errorf("failed to create postgres blob metadata store: %w", err)
+		}
+	} else {
+		baseBlobMetadataStore = blobstore.NewDynamoDBBlobMetadataStore(dynamoClient, logger, config.DynamoDBTableName)
+	}
 	blobMetadataStore := blobstore.NewInstrumentedMetadataStore(baseBlobMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
 		ServiceName: "controller",
 		Registry:    metricsRegistry,

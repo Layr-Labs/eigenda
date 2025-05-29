@@ -308,17 +308,6 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 	// attempt to put metadata with the same key should fail
 	err = env.blobMetadataStore.PutBlobMetadata(ctx, metadata1)
 	assert.ErrorIs(t, err, blobstore.ErrAlreadyExists)
-
-	deleteItems(t, []commondynamodb.Key{
-		{
-			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey1.Hex()},
-			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
-		},
-		{
-			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey2.Hex()},
-			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
-		},
-	})
 }
 
 func TestBlobMetadataStoreGetBlobMetadataByRequestedAtForwardWithIdenticalTimestamp(t *testing.T) {

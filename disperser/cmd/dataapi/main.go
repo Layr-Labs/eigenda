@@ -102,7 +102,16 @@ func RunDataApi(ctx *cli.Context) error {
 	)
 
 	if config.ServerVersion == 2 {
-		baseBlobMetadataStorev2 := blobstorev2.NewBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
+		var baseBlobMetadataStorev2 blobstorev2.MetadataStore
+		if config.UsePostgres {
+			baseBlobMetadataStorev2, err = blobstorev2.NewPostgresBlobMetadataStore(config.PostgresConfig, logger)
+			if err != nil {
+				return fmt.Errorf("failed to create postgres blob metadata store: %w", err)
+			}
+		} else {
+			baseBlobMetadataStorev2 = blobstorev2.NewDynamoDBBlobMetadataStore(dynamoClient, logger, config.BlobstoreConfig.TableName)
+		}
+
 		blobMetadataStorev2 := blobstorev2.NewInstrumentedMetadataStore(baseBlobMetadataStorev2, blobstorev2.InstrumentedMetadataStoreConfig{
 			ServiceName: "dataapi",
 			Registry:    reg,

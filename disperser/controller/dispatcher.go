@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Layr-Labs/eigenda/common/healthcheck"
-
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
