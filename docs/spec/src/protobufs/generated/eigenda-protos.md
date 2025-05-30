@@ -1049,9 +1049,8 @@ GetPaymentStateQuorumSpecificRequest contains parameters to query the payment st
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | account_id | [string](#string) |  | The ID of the account being queried. This account ID is an eth wallet address of the user. |
-| signature | [bytes](#bytes) |  | Signature over the account ID |
+| signature | [bytes](#bytes) |  | Signature over the payment account ID and timestamp. |
 | timestamp | [uint64](#uint64) |  | Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server&#39;s clock, request may be rejected. |
-| quorum_number | [uint32](#uint32) |  | Quorum number to filter the period records. If not set, quorum 0 is used by default. |
 
 
 
