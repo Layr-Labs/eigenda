@@ -59,7 +59,7 @@ func ReadConfigFile(filePath string) (*LoadGeneratorConfig, error) {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	config := &LoadGeneratorConfig{}
+	config := DefaultLoadGeneratorConfig()
 	err = json.Unmarshal(configFileBytes, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)

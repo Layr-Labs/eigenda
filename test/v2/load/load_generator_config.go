@@ -46,3 +46,25 @@ type LoadGeneratorConfig struct {
 	// The slow startup pause is reduced by this quantity every second until it reaches 0.
 	SlowStartupDecay time.Duration
 }
+
+// DefaultLoadGeneratorConfig returns a default configuration for the load generator.
+func DefaultLoadGeneratorConfig() *LoadGeneratorConfig {
+	return &LoadGeneratorConfig{
+		MBPerSecond:                   0.05,
+		AverageBlobSizeMB:             1.0,
+		BlobSizeStdDev:                0.2,
+		RelayReadAmplification:        1.0,
+		ValidatorReadAmplification:    1.0,
+		ValidatorVerificationFraction: 0.01,
+		SubmissionParallelism:         300,
+		RelayReadParallelism:          300,
+		ValidatorReadParallelism:      300,
+		DispersalTimeout:              600,
+		RelayReadTimeout:              600,
+		ValidatorReadTimeout:          600,
+		EnablePprof:                   false,
+		PprofHttpPort:                 6060,
+		SlowStartupPause:              2 * time.Second,
+		SlowStartupDecay:              time.Millisecond,
+	}
+}
