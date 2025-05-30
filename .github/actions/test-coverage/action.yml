@@ -1,5 +1,5 @@
-name: 'Go coverage report'
-description: 'This action updates adds an HTML coverage report and SVG badge to your wiki'
+name: "Go coverage report"
+description: "This action updates adds an HTML coverage report and SVG badge to your wiki"
 branding:
   color: blue
   icon: award
@@ -16,7 +16,7 @@ inputs:
     default: false
   go-version:
     description: The Go version to download (if necessary) and use.
-    default: '1.21'
+    default: "1.21"
 
 runs:
   using: "composite"
@@ -31,10 +31,12 @@ runs:
         token: ${{ github.token }}
         path: ./.github/wiki/
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
+    - uses: jdx/mise-action@v2
+      env:
+        MISE_VERSION: 2024.12.14
       with:
-        go-version: ${{inputs.go-version}}
+        version: ${{ env.MISE_VERSION }}
+        experimental: true
 
     - name: Download coverage artifact
       uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
@@ -45,7 +47,7 @@ runs:
     - name: Generate coverage report
       shell: bash
       env:
-        INPUT_CHART:  ${{inputs.chart}}
+        INPUT_CHART: ${{inputs.chart}}
         INPUT_REPORT: ${{inputs.report}}
       run: |
         ${{github.action_path}}/coverage.sh ./.github/wiki/

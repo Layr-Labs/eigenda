@@ -33,6 +33,12 @@ We welcome all contributions! There are many ways to contribute to the project, 
 - Voting on [open issues](https://github.com/Layr-Labs/eigenda/issues) or
   contributing use cases to a feature request
 
+### Dependency Management
+
+We use [mise](https://mise.jdx.dev/) to manage dependencies in EigenDA. This is still a work in progress, as it currently only manages go and golangci-lint dependencies.
+The goal is to eventually get exact parity and reproducibility between our CI and local environments, so that we can reproduce and debug failing CI issues locally.
+To install dependencies using mise, first [install and activate mise](https://mise.jdx.dev/getting-started.html), and then run `mise install` in the root of the repository.
+
 ## Contact
 
 - [Open an Issue](https://github.com/Layr-Labs/eigenda/issues/new/choose)
