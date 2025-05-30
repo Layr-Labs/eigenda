@@ -20,7 +20,7 @@ func (e *CertVerifierInputError) Error() string {
 // does a bunch of things before the actual call, like abi encoding the inputs, which can fail,
 // and geth itself does not provide temporary/retryable semantics on its returned errors.
 // See https://github.com/ethereum/go-ethereum/blob/a9523b6428238a762e1a1e55e46ead47630c3a23/accounts/abi/bind/base.go#L169
-// It seems incredibly difficult in golang (maybe due to golang's laxity with error handling) to distinguish temporary errors. 
+// It seems incredibly difficult in golang (maybe due to golang's laxity with error handling) to distinguish temporary errors.
 // See the net package for exampple, which deprecated its Temporary() method: https://pkg.go.dev/net#Error
 type CertVerifierInternalError struct {
 	Msg string
