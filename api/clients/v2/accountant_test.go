@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -466,4 +467,129 @@ func isRotation(arrA, arrB []uint64) bool {
 		}
 	}
 	return false
+}
+
+func TestSetPaymentState(t *testing.T) {
+	privateKey, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey.D.Bytes()))
+
+	reservation := &core.ReservedPayment{
+		SymbolsPerSecond: 0,
+		StartTimestamp:   0,
+		EndTimestamp:     0,
+		QuorumNumbers:    []uint8{},
+		QuorumSplits:     []byte{},
+	}
+
+	onDemand := &core.OnDemandPayment{
+		CumulativePayment: big.NewInt(0),
+	}
+
+	accountant := NewAccountant(accountId, reservation, onDemand, 0, 0, 0, numBins)
+
+	t.Run("nil payment state", func(t *testing.T) {
+		err := accountant.SetPaymentState(nil)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "payment state cannot be nil")
+	})
+
+	t.Run("nil payment global params", func(t *testing.T) {
+		state := &disperser_rpc.GetPaymentStateReply{}
+		err := accountant.SetPaymentState(state)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "payment global params cannot be nil")
+	})
+
+	t.Run("successful set payment state with all fields", func(t *testing.T) {
+		onchainCumulativePayment := big.NewInt(1000).Bytes()
+		cumulativePayment := big.NewInt(500).Bytes()
+
+		state := &disperser_rpc.GetPaymentStateReply{
+			PaymentGlobalParams: &disperser_rpc.PaymentGlobalParams{
+				MinNumSymbols:     100,
+				PricePerSymbol:    50,
+				ReservationWindow: 60,
+			},
+			OnchainCumulativePayment: onchainCumulativePayment,
+			CumulativePayment:        cumulativePayment,
+			Reservation: &disperser_rpc.Reservation{
+				SymbolsPerSecond: 300,
+				StartTimestamp:   100,
+				EndTimestamp:     200,
+				QuorumNumbers:    []uint32{0},
+				QuorumSplits:     []uint32{100},
+			},
+			PeriodRecords: []*disperser_rpc.PeriodRecord{
+				{
+					Index: 1,
+					Usage: 150,
+				},
+				{
+					Index: 0,
+					Usage: 0,
+				},
+				{
+					Index: 0,
+					Usage: 0,
+				},
+			},
+		}
+
+		err := accountant.SetPaymentState(state)
+		assert.NoError(t, err)
+
+		// Verify the state was set correctly
+		assert.Equal(t, uint64(50), accountant.pricePerSymbol)
+		assert.Equal(t, uint64(60), accountant.reservationWindow)
+		assert.Equal(t, uint64(100), accountant.minNumSymbols)
+		assert.Equal(t, big.NewInt(1000), accountant.onDemand.CumulativePayment)
+		assert.Equal(t, big.NewInt(500), accountant.cumulativePayment)
+		assert.Equal(t, uint64(300), accountant.reservation.SymbolsPerSecond)
+		assert.Equal(t, uint64(100), accountant.reservation.StartTimestamp)
+		assert.Equal(t, uint64(200), accountant.reservation.EndTimestamp)
+		assert.Equal(t, []uint8{0}, accountant.reservation.QuorumNumbers)
+
+		// Check period records
+		assert.Equal(t, uint32(1), accountant.periodRecords[0].Index)
+		assert.Equal(t, uint64(150), accountant.periodRecords[0].Usage)
+		assert.Equal(t, uint32(0), accountant.periodRecords[1].Index)
+		assert.Equal(t, uint64(0), accountant.periodRecords[1].Usage)
+		assert.Equal(t, uint32(0), accountant.periodRecords[2].Index)
+		assert.Equal(t, uint64(0), accountant.periodRecords[2].Usage)
+	})
+
+	t.Run("successful set payment state with minimal fields", func(t *testing.T) {
+		state := &disperser_rpc.GetPaymentStateReply{
+			PaymentGlobalParams: &disperser_rpc.PaymentGlobalParams{
+				MinNumSymbols:     50,
+				PricePerSymbol:    25,
+				ReservationWindow: 30,
+			},
+			// No OnchainCumulativePayment
+			// No CumulativePayment
+			// No Reservation
+			// No PeriodRecords
+		}
+
+		err := accountant.SetPaymentState(state)
+		assert.NoError(t, err)
+
+		// Verify default values are set
+		assert.Equal(t, uint64(25), accountant.pricePerSymbol)
+		assert.Equal(t, uint64(30), accountant.reservationWindow)
+		assert.Equal(t, uint64(50), accountant.minNumSymbols)
+		assert.Equal(t, big.NewInt(0), accountant.onDemand.CumulativePayment)
+		assert.Equal(t, big.NewInt(0), accountant.cumulativePayment)
+		assert.Equal(t, uint64(0), accountant.reservation.SymbolsPerSecond)
+		assert.Equal(t, uint64(0), accountant.reservation.StartTimestamp)
+		assert.Equal(t, uint64(0), accountant.reservation.EndTimestamp)
+		assert.Equal(t, []uint8{}, accountant.reservation.QuorumNumbers)
+
+		// Verify period records are initialized but empty
+		for i := range accountant.periodRecords {
+			assert.Equal(t, uint32(i), accountant.periodRecords[i].Index)
+			assert.Equal(t, uint64(0), accountant.periodRecords[i].Usage)
+		}
+	})
 }
