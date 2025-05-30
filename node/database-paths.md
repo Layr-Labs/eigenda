@@ -38,7 +38,7 @@ ${NODE_DB_PATH}
 ```
 
 The `chunk` directory is created by the V1 software inside the directory specified by `NODE_DB_PATH`. Inside
-the `chunk` directory are files maintained by the V1 data storage engine (i.e. 'LevelDB').
+the `chunk` directory are files maintained by the V1 data storage engine (i.e. `LevelDB`).
 
 ## V2 Protocol
 
