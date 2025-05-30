@@ -62,7 +62,7 @@ func (cv *CertVerifier) CheckDACert(
 	case coretypes.VersionThreeCert:
 		certV3, ok := cert.(*coretypes.EigenDACertV3)
 		if !ok {
-			return fmt.Errorf("expected cert to be of type EigenDACertV3, got %T", cert)
+			return &CertVerifierInputError{Msg: fmt.Sprintf("expected cert to be of type EigenDACertV3, got %T", cert)}
 		}
 
 		// TODO: Determine adequate future proofing strategy for EigenDACertVerifierRouter to be compliant
@@ -70,25 +70,21 @@ func (cv *CertVerifier) CheckDACert(
 		//       used for quorum stake check-pointing.
 		certVerifierCaller, err = cv.getVerifierCallerFromBlockNumber(ctx, certV3.ReferenceBlockNumber())
 		if err != nil {
-			return fmt.Errorf("get verifier caller: %w", err)
+			return &CertVerifierInternalError{Msg: "get verifier caller", Err: err}
 		}
 
 		certBytes, err = certV3.Serialize(coretypes.CertSerializationABI)
 		if err != nil {
-			return fmt.Errorf("serialize cert: %w", err)
+			return &CertVerifierInternalError{Msg: "serialize cert", Err: err}
 		}
-	
 	case coretypes.VersionTwoCert:
 		_, ok := cert.(*coretypes.EigenDACertV2)
 		if !ok {
-			return fmt.Errorf("expected cert to be of type EigenDACertV2, got %T", cert)
+			return &CertVerifierInputError{Msg: fmt.Sprintf("expected cert to be of type EigenDACertV2, got %T", cert)}
 		}
-
 		return nil // noop verification. only used on V2 testnets and no mainnets
-
 	default:
-		return fmt.Errorf("unsupported cert version: %d", cert.Version())
-
+		return &CertVerifierInputError{Msg: fmt.Sprintf("unsupported cert version: %d", cert.Version())}
 	}
 
 	// 2 - Call the contract method CheckDACert to verify the certificate
@@ -99,16 +95,19 @@ func (cv *CertVerifier) CheckDACert(
 		certBytes,
 	)
 	if err != nil {
-		return fmt.Errorf("check da cert: %w", err)
+		return &CertVerifierInternalError{Msg: "checkDACert eth call", Err: err}
 	}
 
 	// 3 - Cast result to structured enum type and check for success
 	verifyResultCode := coretypes.VerificationStatusCode(result)
-
-	if verifyResultCode != coretypes.StatusSuccess {
-		return fmt.Errorf("check da cert error status code: (%d) %s", verifyResultCode, verifyResultCode.String())
+	if verifyResultCode == coretypes.StatusNullError {
+		return &CertVerifierInternalError{Msg: fmt.Sprintf("checkDACert eth-call bug: %s", verifyResultCode.String())}
+	} else if verifyResultCode != coretypes.StatusSuccess {
+		return &CertVerificationFailedError{
+			StatusCode: verifyResultCode,
+			Msg:        fmt.Sprintf("cert verification failed: status code (%d) %s", verifyResultCode, verifyResultCode.String()),
+		}
 	}
-
 	return nil
 }
 
@@ -254,7 +253,7 @@ func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber
 	if ok {
 		castVersion, ok := cachedVersion.(uint64)
 		if !ok {
-			return 0, fmt.Errorf("expected version to be uint8")
+			return 0, fmt.Errorf("expected version to be uint64")
 		}
 		return castVersion, nil
 	}
