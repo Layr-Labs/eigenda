@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 	"sync"
 	"sync/atomic"
 
@@ -21,14 +20,15 @@ import (
 type OnchainPayment interface {
 	RefreshOnchainPaymentState(ctx context.Context) error
 	GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error)
-	GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[core.QuorumID]*core.ReservedPayment, error)
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error)
 	GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error)
-	GetGlobalSymbolsPerSecond() uint64
-	GetGlobalRatePeriodInterval() uint64
-	GetMinNumSymbols() uint64
-	GetPricePerSymbol() uint64
-	GetReservationWindow() uint64
+	GetOnDemandGlobalSymbolsPerSecond(quorumID core.QuorumID) uint64
+	GetOnDemandGlobalRatePeriodInterval(quorumID core.QuorumID) uint64
+	GetMinNumSymbols(quorumID core.QuorumID) uint64
+	GetPricePerSymbol(quorumID core.QuorumID) uint64
+	GetReservationWindow(quorumID core.QuorumID) uint64
+	// Return all the quorum numbers tracked by QuorumPaymentConfigs
+	GetQuorumNumbers(ctx context.Context) ([]uint8, error)
 }
 
 var _ OnchainPayment = (*OnchainPaymentState)(nil)
@@ -47,12 +47,9 @@ type OnchainPaymentState struct {
 }
 
 type PaymentVaultParams struct {
-	GlobalSymbolsPerSecond   uint64
-	GlobalRatePeriodInterval uint64
-	MinNumSymbols            uint64
-	PricePerSymbol           uint64
-	ReservationWindow        uint64
-	OnDemandQuorumNumbers    []uint8
+	QuorumPaymentConfigs  map[core.QuorumID]*core.PaymentQuorumConfig
+	QuorumProtocolConfigs map[core.QuorumID]*core.PaymentQuorumProtocolConfig
+	OnDemandQuorumNumbers []uint8
 }
 
 func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader, logger logging.Logger) (*OnchainPaymentState, error) {
@@ -79,17 +76,26 @@ func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*Pay
 	if err != nil {
 		return nil, err
 	}
-	quorumNumbers, err := pcs.tx.GetRequiredQuorumNumbers(ctx, blockNumber)
+	requiredQuorumNumbers, err := pcs.tx.GetRequiredQuorumNumbers(ctx, blockNumber)
+	if err != nil {
+		return nil, err
+	}
+	quorumCount, err := pcs.tx.GetQuorumCount(ctx, blockNumber)
+	if err != nil {
+		return nil, err
+	}
+	quorumNumbers := make([]uint8, quorumCount)
+	for i := range quorumNumbers {
+		quorumNumbers[i] = uint8(i)
+	}
+
+	// TODO(hopeyen): these will be replaced in a later PR with payment vault interface updates
+	globalSymbolsPerSecond, err := pcs.tx.GetOnDemandGlobalSymbolsPerSecond(ctx, blockNumber)
 	if err != nil {
 		return nil, err
 	}
 
-	globalSymbolsPerSecond, err := pcs.tx.GetGlobalSymbolsPerSecond(ctx, blockNumber)
-	if err != nil {
-		return nil, err
-	}
-
-	globalRatePeriodInterval, err := pcs.tx.GetGlobalRatePeriodInterval(ctx, blockNumber)
+	globalRatePeriodInterval, err := pcs.tx.GetOnDemandGlobalRatePeriodInterval(ctx, blockNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -109,13 +115,31 @@ func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*Pay
 		return nil, err
 	}
 
+	quorumPaymentConfigs := make(map[core.QuorumID]*core.PaymentQuorumConfig)
+	quorumProtocolConfigs := make(map[core.QuorumID]*core.PaymentQuorumProtocolConfig)
+	// TODO(hopeyen): update to quorum specific values when payment vault is updated
+	quorumPaymentConfig := &core.PaymentQuorumConfig{
+		OnDemandSymbolsPerSecond:    globalSymbolsPerSecond,
+		OnDemandPricePerSymbol:      pricePerSymbol,
+		ReservationSymbolsPerSecond: uint64(0),
+	}
+	quorumProtocolConfig := &core.PaymentQuorumProtocolConfig{
+		MinNumSymbols:              minNumSymbols,
+		ReservationAdvanceWindow:   reservationWindow,
+		ReservationRateLimitWindow: uint64(0),
+		// OnDemand is initially only enabled on Quorum 0
+		OnDemandRateLimitWindow: globalRatePeriodInterval,
+		OnDemandEnabled:         false,
+	}
+	for _, quorumNumber := range quorumNumbers {
+		quorumPaymentConfigs[core.QuorumID(quorumNumber)] = quorumPaymentConfig
+		quorumProtocolConfigs[core.QuorumID(quorumNumber)] = quorumProtocolConfig
+	}
+
 	return &PaymentVaultParams{
-		OnDemandQuorumNumbers:    quorumNumbers,
-		GlobalSymbolsPerSecond:   globalSymbolsPerSecond,
-		GlobalRatePeriodInterval: globalRatePeriodInterval,
-		MinNumSymbols:            minNumSymbols,
-		PricePerSymbol:           pricePerSymbol,
-		ReservationWindow:        reservationWindow,
+		OnDemandQuorumNumbers: requiredQuorumNumbers,
+		QuorumPaymentConfigs:  quorumPaymentConfigs,
+		QuorumProtocolConfigs: quorumProtocolConfigs,
 	}, nil
 }
 
@@ -151,16 +175,39 @@ func (pcs *OnchainPaymentState) refreshReservedPayments(ctx context.Context) err
 		return nil
 	}
 
+	blockNumber, err := pcs.tx.GetCurrentBlockNumber(ctx)
+	if err != nil {
+		return err
+	}
+
+	quorumCount, err := pcs.tx.GetQuorumCount(ctx, blockNumber)
+	if err != nil {
+		return err
+	}
+	quorumNumbers := make([]uint8, quorumCount)
+	for i := range quorumNumbers {
+		quorumNumbers[i] = uint8(i)
+	}
+
 	accountIDs := make([]gethcommon.Address, 0, len(pcs.ReservedPayments))
 	for accountID := range pcs.ReservedPayments {
 		accountIDs = append(accountIDs, accountID)
 	}
 
+	// TODO(hopeyen): get all quorum numbers and use quorum specific calls when there's updated payment vault interface
 	reservedPayments, err := pcs.tx.GetReservedPayments(ctx, accountIDs)
 	if err != nil {
 		return err
 	}
-	pcs.ReservedPayments = reservedPayments
+
+	reservedPaymentsByQuorum := make(map[gethcommon.Address]map[uint8]*core.ReservedPayment)
+	for accountID, payments := range reservedPayments {
+		reservedPaymentsByQuorum[accountID] = make(map[uint8]*core.ReservedPayment)
+		for quorumNumber, reservation := range payments {
+			reservedPaymentsByQuorum[accountID][uint8(quorumNumber)] = reservation
+		}
+	}
+	pcs.ReservedPayments = reservedPaymentsByQuorum
 	return nil
 }
 
@@ -189,6 +236,7 @@ func (pcs *OnchainPaymentState) refreshOnDemandPayments(ctx context.Context) err
 // GetReservedPaymentByAccountAndQuorums returns a pointer to the active reservation for the given account ID; no writes will be made to the reservation
 func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error) {
 	pcs.ReservationsLock.RLock()
+	// defer pcs.ReservationsLock.RUnlock()
 	if quorumReservations, ok := (pcs.ReservedPayments)[accountID]; ok {
 		// Check if all the quorums are present; pull the chain state if not
 		allFound := true
@@ -206,13 +254,12 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx contex
 	pcs.ReservationsLock.RUnlock()
 
 	// pulls the chain state
-	// TODO: update this to be pulling specific quorum IDs from the chain
+	// TODO(hopeyen): update this to be pulling specific quorum IDs from the chain when payment vault is updated
 	res, err := pcs.tx.GetReservedPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return nil, err
 	}
 	pcs.ReservationsLock.Lock()
-	// update specific quorum reservations
 	if (pcs.ReservedPayments)[accountID] == nil {
 		(pcs.ReservedPayments)[accountID] = make(map[core.QuorumID]*core.ReservedPayment)
 	}
@@ -240,11 +287,16 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
+
+	reservedPaymentsByQuorum := make(map[core.QuorumID]*core.ReservedPayment)
+	for quorumNumber, reservation := range res {
+		reservedPaymentsByQuorum[uint8(quorumNumber)] = reservation
+	}
 	pcs.ReservationsLock.Lock()
-	(pcs.ReservedPayments)[accountID] = res
+	(pcs.ReservedPayments)[accountID] = reservedPaymentsByQuorum
 	pcs.ReservationsLock.Unlock()
 
-	return res, nil
+	return reservedPaymentsByQuorum, nil
 }
 
 // GetOnDemandPaymentByAccount returns a pointer to the on-demand payment for the given account ID; no writes will be made to the payment
@@ -290,42 +342,31 @@ func (pcs *OnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([
 	return quorumNumbers, nil
 }
 
-func (pcs *OnchainPaymentState) GetGlobalSymbolsPerSecond() uint64 {
-	params := pcs.PaymentVaultParams.Load()
-	if params == nil {
-		return 0
-	}
-	return params.GlobalSymbolsPerSecond
+func (pcs *OnchainPaymentState) GetOnDemandGlobalSymbolsPerSecond(quorumID core.QuorumID) uint64 {
+	return pcs.PaymentVaultParams.Load().QuorumPaymentConfigs[quorumID].OnDemandSymbolsPerSecond
 }
 
-func (pcs *OnchainPaymentState) GetGlobalRatePeriodInterval() uint64 {
-	params := pcs.PaymentVaultParams.Load()
-	if params == nil {
-		return 0
-	}
-	return params.GlobalRatePeriodInterval
+func (pcs *OnchainPaymentState) GetOnDemandGlobalRatePeriodInterval(quorumID core.QuorumID) uint64 {
+	return pcs.PaymentVaultParams.Load().QuorumProtocolConfigs[quorumID].OnDemandRateLimitWindow
 }
 
-func (pcs *OnchainPaymentState) GetMinNumSymbols() uint64 {
-	params := pcs.PaymentVaultParams.Load()
-	if params == nil {
-		return math.MaxUint64
-	}
-	return params.MinNumSymbols
+func (pcs *OnchainPaymentState) GetMinNumSymbols(quorumID core.QuorumID) uint64 {
+	return pcs.PaymentVaultParams.Load().QuorumProtocolConfigs[quorumID].MinNumSymbols
 }
 
-func (pcs *OnchainPaymentState) GetPricePerSymbol() uint64 {
-	params := pcs.PaymentVaultParams.Load()
-	if params == nil {
-		return math.MaxUint64
-	}
-	return params.PricePerSymbol
+func (pcs *OnchainPaymentState) GetPricePerSymbol(quorumID core.QuorumID) uint64 {
+	return pcs.PaymentVaultParams.Load().QuorumPaymentConfigs[quorumID].OnDemandPricePerSymbol
 }
 
-func (pcs *OnchainPaymentState) GetReservationWindow() uint64 {
-	params := pcs.PaymentVaultParams.Load()
-	if params == nil {
-		return 0
+func (pcs *OnchainPaymentState) GetReservationWindow(quorumID core.QuorumID) uint64 {
+	return pcs.PaymentVaultParams.Load().QuorumProtocolConfigs[quorumID].ReservationRateLimitWindow
+}
+
+// return the key of QuorumPaymentConfigs
+func (pcs *OnchainPaymentState) GetQuorumNumbers(ctx context.Context) ([]uint8, error) {
+	quorumNumbers := make([]uint8, 0, len(pcs.PaymentVaultParams.Load().QuorumPaymentConfigs))
+	for quorumNumber := range pcs.PaymentVaultParams.Load().QuorumPaymentConfigs {
+		quorumNumbers = append(quorumNumbers, uint8(quorumNumber))
 	}
-	return params.ReservationWindow
+	return quorumNumbers, nil
 }

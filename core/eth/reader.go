@@ -910,7 +910,7 @@ func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID geth
 	}, nil
 }
 
-func (t *Reader) GetGlobalSymbolsPerSecond(ctx context.Context, blockNumber uint32) (uint64, error) {
+func (t *Reader) GetOnDemandGlobalSymbolsPerSecond(ctx context.Context, blockNumber uint32) (uint64, error) {
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
@@ -924,7 +924,7 @@ func (t *Reader) GetGlobalSymbolsPerSecond(ctx context.Context, blockNumber uint
 	return globalSymbolsPerSecond, nil
 }
 
-func (t *Reader) GetGlobalRatePeriodInterval(ctx context.Context, blockNumber uint32) (uint64, error) {
+func (t *Reader) GetOnDemandGlobalRatePeriodInterval(ctx context.Context, blockNumber uint32) (uint64, error) {
 	if t.bindings.PaymentVault == nil {
 		return 0, errors.New("payment vault not deployed")
 	}
