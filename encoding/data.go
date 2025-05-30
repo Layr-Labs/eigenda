@@ -29,7 +29,7 @@ type BlobCommitments struct {
 	LengthCommitment *G2Commitment `json:"length_commitment"`
 	LengthProof      *LengthProof  `json:"length_proof"`
 	// this is the length in SYMBOLS (32 byte field elements) of the blob. it must be a power of 2
-	Length           uint          `json:"length"`
+	Length uint `json:"length"`
 }
 
 // ToProfobuf converts the BlobCommitments to protobuf format

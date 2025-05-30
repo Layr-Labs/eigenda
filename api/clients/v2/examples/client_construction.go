@@ -56,7 +56,7 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 	if err != nil {
 		return nil, fmt.Errorf("create cert verifier: %w", err)
 	}
-	
+
 	certBuilder, err := createCertBuilder()
 	if err != nil {
 		return nil, fmt.Errorf("create cert builder: %w", err)
