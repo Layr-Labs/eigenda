@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
@@ -170,14 +169,21 @@ var _ = Describe("Inabox v2 Integration", func() {
 		Expect(err).To(BeNil())
 		Expect(restored).To(Equal(paddedData2))
 
+		// TODO: Figure out how to advance the disperser's reference block number 
+		//       currently the disperser isn't respecting the latest anvil chain head when determining RBN
 		latestBlock, err := ethClient.BlockNumber(ctx)
 		Expect(err).To(BeNil())
 
 
-		_, err = eigenDACertVerifierRouter.AddCertVerifier(&bind.TransactOpts{}, uint32(latestBlock) + 2, gethcommon.HexToAddress("0x0"))
+		println("latest block number: ", latestBlock)
+		tx, err := eigenDACertVerifierRouter.AddCertVerifier(deployerTransactorOpts, uint32(latestBlock) + 2, gethcommon.HexToAddress("0x0"))
 		Expect(err).To(BeNil())
 
-		mineAnvilBlocks(5)
+		mineAnvilBlocks(1000)
+		receipt, err := ethClient.TransactionReceipt(ctx, tx.Hash())
+		Expect(err).To(BeNil())
+		Expect(receipt).To(Not(BeNil()))
+		time.Sleep(30 * time.Second)
 
 		var reply3 *disperserpb.BlobStatusReply
 		for loop := true; loop; {
@@ -197,7 +203,15 @@ var _ = Describe("Inabox v2 Integration", func() {
 			}
 		}
 
+		latestBlock, err = ethClient.BlockNumber(ctx)
+		Expect(err).To(BeNil())
+		println("latest block number after mining: ", latestBlock)
+
 		eigenDACert3, err := certBuilder.BuildCert(ctx, coretypes.VersionThreeCert, reply1)
+		eigenDAV3Cert3, ok := eigenDACert3.(*coretypes.EigenDACertV3)
+		Expect(ok).To(BeTrue())
+
+		println("cert 3 reference block #: ", eigenDAV3Cert3.ReferenceBlockNumber())
 		Expect(err).To(BeNil())
 
 		err = routerCertVerifier.CheckDACert(ctx, eigenDACert3)

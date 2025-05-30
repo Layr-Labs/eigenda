@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/big"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -30,8 +31,10 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gcommon "github.com/ethereum/go-ethereum/common"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -62,7 +65,9 @@ var (
 	routerCertVerifier *verification.CertVerifier
 	staticCertVerifier *verification.CertVerifier
 	eigenDACertVerifierRouter *routerbindings.ContractEigenDACertVerifierRouterTransactor
+	eigenDACertVerifierRouterCaller *routerbindings.ContractEigenDACertVerifierRouterCaller
 	eigenDACertVerifierV1   *verifierv1bindings.ContractEigenDACertVerifierV1
+	deployerTransactorOpts *bind.TransactOpts
 
 	retrievalClient     clients.RetrievalClient
 
@@ -147,6 +152,11 @@ var _ = BeforeSuite(func() {
 		}, gcommon.Address{}, logger)
 		Expect(err).To(BeNil())
 
+		chainID, err := ethClient.ChainID(context.Background())
+		Expect(err).To(BeNil())
+
+		deployerTransactorOpts = NewTransactOptsFromPrivateKey(pk, chainID)
+
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 		Expect(err).To(BeNil())
 
@@ -206,8 +216,25 @@ var _ = BeforeSuite(func() {
 		eigenDACertVerifierRouter, err = routerbindings.NewContractEigenDACertVerifierRouterTransactor(gcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)
 		Expect(err).To(BeNil())
 
+		eigenDACertVerifierRouterCaller, err = routerbindings.NewContractEigenDACertVerifierRouterCaller(gcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)
+		Expect(err).To(BeNil())
+
 	}
 })
+
+func NewTransactOptsFromPrivateKey(privateKeyHex string, chainID *big.Int) *bind.TransactOpts {
+    privateKey, err := crypto.HexToECDSA(privateKeyHex)
+    if err != nil {
+        log.Fatalf("invalid private key: %v", err)
+    }
+
+    opts, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
+    if err != nil {
+        log.Fatalf("failed to create transactor: %v", err)
+    }
+
+    return opts
+}
 
 func setupRetrievalClients(testConfig *deploy.Config) error {
 	ethClientConfig := geth.EthClientConfig{
