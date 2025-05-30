@@ -1,0 +1,12 @@
+{
+  "go.testEnvVars": {
+    "BACKEND": "memstore",
+    // To test against TESTNET, set SIGNER_PRIVATE_KEY and ETHEREUM_RPC.
+    "SIGNER_PRIVATE_KEY": "",
+    "ETHEREUM_RPC": "https://ethereum-holesky-rpc.publicnode.com"
+  },
+  "go.testFlags": [
+    "-test.parallel",
+    "4",
+  ]
+}

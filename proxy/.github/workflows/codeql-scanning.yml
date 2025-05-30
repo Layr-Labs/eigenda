@@ -1,0 +1,40 @@
+name: "codeql-scanning"
+
+on:
+  push:
+    branches:
+      - main
+      - "release/*"
+  pull_request:
+  schedule:
+    - cron: "0 9 * * *"
+
+env:
+  MISE_VERSION: 2024.12.14
+  
+jobs:
+  CodeQL-Scanning:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # 4.2.2
+        with:
+          submodules: recursive
+
+      - name: Install golang
+        uses: jdx/mise-action@v2
+        with:
+            version: ${{ env.MISE_VERSION }}
+            experimental: true
+        
+      - name: Run shared CodeQL scan
+        uses: Layr-Labs/security-shared-workflows/actions/codeql-scans@418d735c1c4e5cc650c8addaeb8909b36b9dca27
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
