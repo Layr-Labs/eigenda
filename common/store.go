@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"fmt"
 	"strings"
 )
 
@@ -18,10 +17,6 @@ const (
 	RedisBackendType
 
 	UnknownBackendType
-)
-
-var (
-	ErrProxyOversizedBlob = fmt.Errorf("encoded blob is larger than max blob size")
 )
 
 func (b BackendType) String() string {

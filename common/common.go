@@ -83,7 +83,17 @@ const (
 	V2EigenDABackend
 )
 
-// StringToEigenDABackend converts a string to EigenDABackend enum
+type InvalidBackendError struct {
+	Backend string
+}
+
+func (e InvalidBackendError) Error() string {
+	return fmt.Sprintf("invalid backend option: %s", e.Backend)
+}
+
+// StringToEigenDABackend converts a string to EigenDABackend enum value.
+// It returns an [InvalidBackendError] if the input string does not match any known backend,
+// which is automatically converted to a 400 Bad Request error by the error middleware.
 func StringToEigenDABackend(inputString string) (EigenDABackend, error) {
 	inputString = strings.ToUpper(strings.TrimSpace(inputString))
 
@@ -93,7 +103,7 @@ func StringToEigenDABackend(inputString string) (EigenDABackend, error) {
 	case "V2":
 		return V2EigenDABackend, nil
 	default:
-		return 0, fmt.Errorf("invalid backend option: %s", inputString)
+		return 0, InvalidBackendError{Backend: inputString}
 	}
 }
 

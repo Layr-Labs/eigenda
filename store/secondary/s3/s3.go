@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -23,10 +22,6 @@ const (
 	CredentialTypeIAM     CredentialType = "iam"
 	CredentialTypePublic  CredentialType = "public"
 	CredentialTypeUnknown CredentialType = "unknown"
-)
-
-var (
-	ErrKeccakKeyNotFound = errors.New("OP Keccak key not found in S3 bucket")
 )
 
 func StringToCredentialType(s string) CredentialType {

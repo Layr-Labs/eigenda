@@ -1,5 +1,11 @@
 package s3
 
+import "errors"
+
+var (
+	ErrKeccakKeyNotFound = errors.New("OP Keccak key not found in S3 bucket")
+)
+
 // Keccak256KeyValueMismatchError is an error that indicates a mismatch between the key and the keccaked value.
 // KeccakCommitments should always respect the invariant that key=keccak(value).
 // Before writing to S3 (in the POST route), or after reading the value from S3 (in the GET route),
