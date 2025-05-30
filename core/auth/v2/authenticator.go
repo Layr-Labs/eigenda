@@ -8,7 +8,6 @@ import (
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/api/hashing"
-
 	"github.com/Layr-Labs/eigenda/common/replay"
 	core "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/ethereum/go-ethereum/common"
