@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 )
 
 // This example demonstrates how to use the ValidatorPayloadRetriever to retrieve a payload from EigenDA, running on
@@ -42,6 +44,11 @@ func Example_validatorPayloadRetrieval() {
 
 	fmt.Printf("Successfully dispersed payload\n")
 
+	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
+	if !ok {
+		panic(fmt.Sprintf("expected EigenDACertV3, got %T", eigenDACert))
+	}
+
 	// Create a validator payload retriever to retrieve directly from validator nodes
 	validatorPayloadRetriever, err := createValidatorPayloadRetriever()
 	if err != nil {
@@ -49,7 +56,7 @@ func Example_validatorPayloadRetrieval() {
 	}
 
 	// Retrieve the payload using the certificate by fetching from validator nodes
-	_, err = validatorPayloadRetriever.GetPayload(ctx, eigenDACert)
+	_, err = validatorPayloadRetriever.GetPayload(ctx, eigenDAV3Cert)
 	if err != nil {
 		panic(fmt.Sprintf("get payload: %v", err))
 	}
@@ -67,7 +74,8 @@ func Example_validatorPayloadRetrieval() {
 	// VerifyCertV2 is a view-only call to the `EigenDACertVerifier` contract. This call verifies that the provided cert
 	// is valid: if this call doesn't return an error, then the eigenDA network has attested to the availability of the
 	// dispersed blob.
-	err = certVerifier.VerifyCertV2(verificationCtx, eigenDACert)
+
+	err = certVerifier.CheckDACert(verificationCtx, eigenDACert)
 	if err != nil {
 		panic(fmt.Sprintf("verify cert: %v", err))
 	}
