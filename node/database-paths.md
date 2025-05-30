@@ -73,7 +73,7 @@ The `chunks` directory is created and maintained by the V2 data storage engine (
 
 ### Recommended Configuration: `NODE_LITT_DB_STORAGE_PATHS` set
 
-Suppose you set `NODE_LITT_DB_STORAGE_PATHS` is provided 3 paths: `${volume1}`, `${volume2}`, and `${volume3}`.
+Suppose `NODE_LITT_DB_STORAGE_PATHS` is provided 3 paths: `${volume1}`, `${volume2}`, and `${volume3}`.
 
 ```
 ${volume1}
