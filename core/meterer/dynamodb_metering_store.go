@@ -74,8 +74,8 @@ func (s *DynamoDBMeteringStore) IncrementBinUsages(ctx context.Context, accountI
 	for i, quorumNumber := range quorumNumbers {
 		accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorumNumber), 10)
 		key := map[string]types.AttributeValue{
-			"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
-			"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
+			"AccountID":         &types.AttributeValueMemberS{Value: accountIDAndQuorum},
+			"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
 		}
 		ops[i] = commondynamodb.TransactAddOp{
 			Key:   key,
@@ -93,8 +93,8 @@ func (s *DynamoDBMeteringStore) IncrementBinUsages(ctx context.Context, accountI
 	for _, quorumNumber := range quorumNumbers {
 		accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorumNumber), 10)
 		key := map[string]types.AttributeValue{
-			"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
-			"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
+			"AccountID":         &types.AttributeValueMemberS{Value: accountIDAndQuorum},
+			"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
 		}
 		item, getErr := s.dynamoClient.GetItem(ctx, s.reservationTableName, key)
 		if getErr != nil {
@@ -366,8 +366,8 @@ func (s *DynamoDBMeteringStore) DecrementBinUsages(ctx context.Context, accountI
 	for i, quorumNumber := range quorumNumbers {
 		accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorumNumber), 10)
 		key := map[string]types.AttributeValue{
-			"AccountIDAndQuorum": &types.AttributeValueMemberS{Value: accountIDAndQuorum},
-			"ReservationPeriod":  &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
+			"AccountID":         &types.AttributeValueMemberS{Value: accountIDAndQuorum},
+			"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[quorumNumber], 10)},
 		}
 		ops[i] = commondynamodb.TransactAddOp{
 			Key:   key,
