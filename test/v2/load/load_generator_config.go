@@ -1,5 +1,7 @@
 package load
 
+import "time"
+
 // LoadGeneratorConfig is the configuration for the load generator.
 type LoadGeneratorConfig struct {
 	// The desired number of megabytes bytes per second to write.
@@ -38,4 +40,9 @@ type LoadGeneratorConfig struct {
 	EnablePprof bool
 	// PprofHttpPort is the port that the pprof HTTP server listens on
 	PprofHttpPort int
+	// An artificial time to sleep every cycle when the load generator is first starting up. Used to make
+	// startup less aggressive and allow the network to stabilize.
+	SlowStartupPause time.Duration
+	// The slow startup pause is reduced by this quantity every second until it reaches 0.
+	SlowStartupDecay time.Duration
 }

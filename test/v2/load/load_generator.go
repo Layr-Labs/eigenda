@@ -44,6 +44,8 @@ type LoadGenerator struct {
 	metrics *loadGeneratorMetrics
 	// Pool of random number generators
 	randPool *sync.Pool
+	// The time when the load generator started.
+	startTime time.Time
 }
 
 // ReadConfigFile loads a LoadGeneratorConfig from a file.
@@ -120,6 +122,7 @@ func NewLoadGenerator(
 		finishedChan:         make(chan struct{}),
 		randPool:             randPool,
 		metrics:              metrics,
+		startTime:            time.Now(),
 	}
 }
 
@@ -141,6 +144,19 @@ func (l *LoadGenerator) Stop() {
 	l.cancel()
 }
 
+// startupPause will sleep for a short duration when the load generator is starting up. Allows for a more
+// gradual ramp-up of load to avoid overwhelming the network.
+func (l *LoadGenerator) startupPause() {
+	timeSinceStart := time.Since(l.startTime)
+	secondsSinceStart := float64(timeSinceStart) / float64(time.Second)
+	startupPauseDecay := time.Duration(float64(l.config.SlowStartupDecay) * secondsSinceStart)
+	adjustedPause := l.config.SlowStartupPause - startupPauseDecay
+
+	if adjustedPause > 0 {
+		time.Sleep(adjustedPause)
+	}
+}
+
 // run runs the load generator.
 func (l *LoadGenerator) run() {
 	ticker := time.NewTicker(l.submissionPeriod)
@@ -152,6 +168,8 @@ func (l *LoadGenerator) run() {
 			l.readAndWriteBlob()
 			<-l.lifecycleLimiter
 		}()
+
+		l.startupPause()
 	}
 }
 
