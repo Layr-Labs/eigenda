@@ -1,0 +1,6 @@
+[tools]
+# Core Dependencies
+go = "1.21"
+
+# Tooling Dependencies
+"go:github.com/golangci/golangci-lint/cmd/golangci-lint" = "1.60.3"
