@@ -73,17 +73,21 @@ var _ MetadataStore = (*DynamoDBBlobMetadataStore)(nil)
 
 // BlobMetadataStore is a blob metadata storage backed by DynamoDB
 type DynamoDBBlobMetadataStore struct {
-	dynamoDBClient commondynamodb.Client
-	logger         logging.Logger
-	tableName      string
+	logger logging.Logger
+	config DynamoDBConfig
 }
 
-func NewDynamoDBBlobMetadataStore(dynamoDBClient commondynamodb.Client, logger logging.Logger, tableName string) *DynamoDBBlobMetadataStore {
-	logger.Debugf("creating blob metadata store v2 with table %s", tableName)
+type DynamoDBConfig struct {
+	Client    commondynamodb.Client
+	TableName string
+	Region    string
+	Endpoint  string // For local DynamoDB
+}
+
+func NewDynamoDBBlobMetadataStore(logger logging.Logger, config DynamoDBConfig) *DynamoDBBlobMetadataStore {
 	return &DynamoDBBlobMetadataStore{
-		dynamoDBClient: dynamoDBClient,
-		logger:         logger.With("component", "blobMetadataStoreV2"),
-		tableName:      tableName,
+		logger: logger.With("component", "DynamoDBBlobMetadataStore"),
+		config: config,
 	}
 }
 
@@ -94,7 +98,7 @@ func (s *DynamoDBBlobMetadataStore) PutBlobMetadata(ctx context.Context, blobMet
 		return err
 	}
 
-	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	err = s.config.Client.PutItemWithCondition(ctx, s.config.TableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
 		return ErrAlreadyExists
 	}
@@ -113,7 +117,7 @@ func (s *DynamoDBBlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKe
 		expValues[i] = expression.Value(int(validStatus))
 	}
 	condition := expression.Name("BlobStatus").In(expValues[0], expValues[1:]...)
-	_, err := s.dynamoDBClient.UpdateItemWithCondition(ctx, s.tableName, map[string]types.AttributeValue{
+	_, err := s.config.Client.UpdateItemWithCondition(ctx, s.config.TableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
 		},
@@ -146,7 +150,7 @@ func (s *DynamoDBBlobMetadataStore) UpdateBlobStatus(ctx context.Context, blobKe
 }
 
 func (s *DynamoDBBlobMetadataStore) DeleteBlobMetadata(ctx context.Context, blobKey corev2.BlobKey) error {
-	err := s.dynamoDBClient.DeleteItem(ctx, s.tableName, map[string]types.AttributeValue{
+	err := s.config.Client.DeleteItem(ctx, s.config.TableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
 		},
@@ -159,7 +163,7 @@ func (s *DynamoDBBlobMetadataStore) DeleteBlobMetadata(ctx context.Context, blob
 }
 
 func (s *DynamoDBBlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey corev2.BlobKey) (*v2.BlobMetadata, error) {
-	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+	item, err := s.config.Client.GetItem(ctx, s.config.TableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
 		},
@@ -187,7 +191,7 @@ func (s *DynamoDBBlobMetadataStore) GetBlobMetadata(ctx context.Context, blobKey
 // CheckBlobExists checks if a blob exists without fetching the entire metadata.
 func (s *DynamoDBBlobMetadataStore) CheckBlobExists(ctx context.Context, blobKey corev2.BlobKey) (bool, error) {
 	input := &dynamodb.GetItemInput{
-		TableName: aws.String(s.tableName),
+		TableName: aws.String(s.config.TableName),
 		Key: map[string]types.AttributeValue{
 			"PK": &types.AttributeValueMemberS{
 				Value: blobKeyPrefix + blobKey.Hex(),
@@ -199,7 +203,7 @@ func (s *DynamoDBBlobMetadataStore) CheckBlobExists(ctx context.Context, blobKey
 		ProjectionExpression: aws.String("PK"), // Only fetch the PK attribute
 	}
 
-	item, err := s.dynamoDBClient.GetItemWithInput(ctx, input)
+	item, err := s.config.Client.GetItemWithInput(ctx, input)
 	if err != nil {
 		return false, fmt.Errorf("failed to check blob existence: %w", err)
 	}
@@ -212,7 +216,7 @@ func (s *DynamoDBBlobMetadataStore) CheckBlobExists(ctx context.Context, blobKey
 // Because this function scans the entire index, it should only be used for status with a limited -reeber of items.
 // Results are ordered by UpdatedAt in ascending order.
 func (s *DynamoDBBlobMetadataStore) GetBlobMetadataByStatus(ctx context.Context, status v2.BlobStatus, lastUpdatedAt uint64) ([]*v2.BlobMetadata, error) {
-	items, err := s.dynamoDBClient.QueryIndex(ctx, s.tableName, StatusIndexName, "BlobStatus = :status AND UpdatedAt > :updatedAt", commondynamodb.ExpressionValues{
+	items, err := s.config.Client.QueryIndex(ctx, s.config.TableName, StatusIndexName, "BlobStatus = :status AND UpdatedAt > :updatedAt", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
 		},
@@ -257,9 +261,9 @@ func (s *DynamoDBBlobMetadataStore) queryBucketBlobMetadata(
 		if limit > 0 {
 			remaining = limit - len(result)
 		}
-		res, err := s.dynamoDBClient.QueryIndexWithPagination(
+		res, err := s.config.Client.QueryIndexWithPagination(
 			ctx,
-			s.tableName,
+			s.config.TableName,
 			RequestedAtIndexName,
 			"RequestedAtBucket = :pk AND RequestedAtBlobKey BETWEEN :start AND :end",
 			commondynamodb.ExpressionValues{
@@ -434,9 +438,9 @@ func (s *DynamoDBBlobMetadataStore) GetBlobMetadataByAccountID(
 		if limit > 0 {
 			remaining = limit - len(blobs)
 		}
-		res, err := s.dynamoDBClient.QueryIndexWithPagination(
+		res, err := s.config.Client.QueryIndexWithPagination(
 			ctx,
-			s.tableName,
+			s.config.TableName,
 			AccountBlobIndexName,
 			"AccountID = :pk AND RequestedAt BETWEEN :start AND :end",
 			commondynamodb.ExpressionValues{
@@ -496,9 +500,9 @@ func (s *DynamoDBBlobMetadataStore) queryBucketAttestation(
 	// This needs to be processed in a loop because DynamoDb has a limit on the response
 	// size of a query (1MB) and we may have more data than that.
 	for {
-		res, err := s.dynamoDBClient.QueryIndexWithPagination(
+		res, err := s.config.Client.QueryIndexWithPagination(
 			ctx,
-			s.tableName,
+			s.config.TableName,
 			AttestedAtIndexName,
 			"AttestedAtBucket = :pk AND AttestedAt BETWEEN :start AND :end",
 			commondynamodb.ExpressionValues{
@@ -676,7 +680,7 @@ func (s *DynamoDBBlobMetadataStore) GetBlobMetadataByStatusPaginated(
 			},
 		}
 	}
-	res, err := s.dynamoDBClient.QueryIndexWithPagination(ctx, s.tableName, StatusIndexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
+	res, err := s.config.Client.QueryIndexWithPagination(ctx, s.config.TableName, StatusIndexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
 		},
@@ -724,7 +728,7 @@ func (s *DynamoDBBlobMetadataStore) GetBlobMetadataByStatusPaginated(
 // GetBlobMetadataCountByStatus returns the count of all the metadata with the given status
 // Because this function scans the entire index, it should only be used for status with a limited number of items.
 func (s *DynamoDBBlobMetadataStore) GetBlobMetadataCountByStatus(ctx context.Context, status v2.BlobStatus) (int32, error) {
-	count, err := s.dynamoDBClient.QueryIndexCount(ctx, s.tableName, StatusIndexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
+	count, err := s.config.Client.QueryIndexCount(ctx, s.config.TableName, StatusIndexName, "BlobStatus = :status", commondynamodb.ExpressionValues{
 		":status": &types.AttributeValueMemberN{
 			Value: strconv.Itoa(int(status)),
 		},
@@ -742,7 +746,7 @@ func (s *DynamoDBBlobMetadataStore) PutBlobCertificate(ctx context.Context, blob
 		return err
 	}
 
-	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	err = s.config.Client.PutItemWithCondition(ctx, s.config.TableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
 		return ErrAlreadyExists
 	}
@@ -751,7 +755,7 @@ func (s *DynamoDBBlobMetadataStore) PutBlobCertificate(ctx context.Context, blob
 }
 
 func (s *DynamoDBBlobMetadataStore) DeleteBlobCertificate(ctx context.Context, blobKey corev2.BlobKey) error {
-	err := s.dynamoDBClient.DeleteItem(ctx, s.tableName, map[string]types.AttributeValue{
+	err := s.config.Client.DeleteItem(ctx, s.config.TableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
 		},
@@ -764,7 +768,7 @@ func (s *DynamoDBBlobMetadataStore) DeleteBlobCertificate(ctx context.Context, b
 }
 
 func (s *DynamoDBBlobMetadataStore) GetBlobCertificate(ctx context.Context, blobKey corev2.BlobKey) (*corev2.BlobCertificate, *encoding.FragmentInfo, error) {
-	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+	item, err := s.config.Client.GetItem(ctx, s.config.TableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
 		},
@@ -804,7 +808,7 @@ func (s *DynamoDBBlobMetadataStore) GetBlobCertificates(ctx context.Context, blo
 		}
 	}
 
-	items, err := s.dynamoDBClient.GetItems(ctx, s.tableName, keys, true)
+	items, err := s.config.Client.GetItems(ctx, s.config.TableName, keys, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -829,7 +833,7 @@ func (s *DynamoDBBlobMetadataStore) PutDispersalRequest(ctx context.Context, req
 		return err
 	}
 
-	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	err = s.config.Client.PutItemWithCondition(ctx, s.config.TableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
 		return ErrAlreadyExists
 	}
@@ -838,7 +842,7 @@ func (s *DynamoDBBlobMetadataStore) PutDispersalRequest(ctx context.Context, req
 }
 
 func (s *DynamoDBBlobMetadataStore) GetDispersalRequest(ctx context.Context, batchHeaderHash [32]byte, operatorID core.OperatorID) (*corev2.DispersalRequest, error) {
-	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+	item, err := s.config.Client.GetItem(ctx, s.config.TableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: dispersalKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
 		},
@@ -897,9 +901,9 @@ func (s *DynamoDBBlobMetadataStore) GetDispersalsByRespondedAt(
 		if limit > 0 {
 			remaining = limit - len(dispersals)
 		}
-		res, err := s.dynamoDBClient.QueryIndexWithPagination(
+		res, err := s.config.Client.QueryIndexWithPagination(
 			ctx,
-			s.tableName,
+			s.config.TableName,
 			OperatorResponseIndexName,
 			"OperatorID = :pk AND RespondedAt BETWEEN :start AND :end",
 			commondynamodb.ExpressionValues{
@@ -946,7 +950,7 @@ func (s *DynamoDBBlobMetadataStore) PutDispersalResponse(ctx context.Context, re
 		return err
 	}
 
-	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	err = s.config.Client.PutItemWithCondition(ctx, s.config.TableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
 		return ErrAlreadyExists
 	}
@@ -955,7 +959,7 @@ func (s *DynamoDBBlobMetadataStore) PutDispersalResponse(ctx context.Context, re
 }
 
 func (s *DynamoDBBlobMetadataStore) GetDispersalResponse(ctx context.Context, batchHeaderHash [32]byte, operatorID core.OperatorID) (*corev2.DispersalResponse, error) {
-	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+	item, err := s.config.Client.GetItem(ctx, s.config.TableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: dispersalKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
 		},
@@ -981,7 +985,7 @@ func (s *DynamoDBBlobMetadataStore) GetDispersalResponse(ctx context.Context, ba
 }
 
 func (s *DynamoDBBlobMetadataStore) GetDispersalResponses(ctx context.Context, batchHeaderHash [32]byte) ([]*corev2.DispersalResponse, error) {
-	items, err := s.dynamoDBClient.Query(ctx, s.tableName, "PK = :pk AND begins_with(SK, :prefix)", commondynamodb.ExpressionValues{
+	items, err := s.config.Client.Query(ctx, s.config.TableName, "PK = :pk AND begins_with(SK, :prefix)", commondynamodb.ExpressionValues{
 		":pk": &types.AttributeValueMemberS{
 			Value: dispersalKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
 		},
@@ -1015,7 +1019,7 @@ func (s *DynamoDBBlobMetadataStore) PutBatch(ctx context.Context, batch *corev2.
 		return err
 	}
 
-	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	err = s.config.Client.PutItemWithCondition(ctx, s.config.TableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
 		return ErrAlreadyExists
 	}
@@ -1024,7 +1028,7 @@ func (s *DynamoDBBlobMetadataStore) PutBatch(ctx context.Context, batch *corev2.
 }
 
 func (s *DynamoDBBlobMetadataStore) GetBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.Batch, error) {
-	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+	item, err := s.config.Client.GetItem(ctx, s.config.TableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
 		},
@@ -1055,7 +1059,7 @@ func (s *DynamoDBBlobMetadataStore) PutBatchHeader(ctx context.Context, batchHea
 		return err
 	}
 
-	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	err = s.config.Client.PutItemWithCondition(ctx, s.config.TableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
 		return ErrAlreadyExists
 	}
@@ -1064,7 +1068,7 @@ func (s *DynamoDBBlobMetadataStore) PutBatchHeader(ctx context.Context, batchHea
 }
 
 func (s *DynamoDBBlobMetadataStore) DeleteBatchHeader(ctx context.Context, batchHeaderHash [32]byte) error {
-	err := s.dynamoDBClient.DeleteItem(ctx, s.tableName, map[string]types.AttributeValue{
+	err := s.config.Client.DeleteItem(ctx, s.config.TableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
 		},
@@ -1077,7 +1081,7 @@ func (s *DynamoDBBlobMetadataStore) DeleteBatchHeader(ctx context.Context, batch
 }
 
 func (s *DynamoDBBlobMetadataStore) GetBatchHeader(ctx context.Context, batchHeaderHash [32]byte) (*corev2.BatchHeader, error) {
-	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+	item, err := s.config.Client.GetItem(ctx, s.config.TableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
 		},
@@ -1109,13 +1113,13 @@ func (s *DynamoDBBlobMetadataStore) PutAttestation(ctx context.Context, attestat
 	}
 
 	// Allow overwrite of existing attestation
-	err = s.dynamoDBClient.PutItem(ctx, s.tableName, item)
+	err = s.config.Client.PutItem(ctx, s.config.TableName, item)
 	return err
 }
 
 func (s *DynamoDBBlobMetadataStore) GetAttestation(ctx context.Context, batchHeaderHash [32]byte) (*corev2.Attestation, error) {
 	input := &dynamodb.GetItemInput{
-		TableName: aws.String(s.tableName),
+		TableName: aws.String(s.config.TableName),
 		Key: map[string]types.AttributeValue{
 			"PK": &types.AttributeValueMemberS{
 				Value: batchHeaderKeyPrefix + hex.EncodeToString(batchHeaderHash[:]),
@@ -1127,7 +1131,7 @@ func (s *DynamoDBBlobMetadataStore) GetAttestation(ctx context.Context, batchHea
 		ConsistentRead: aws.Bool(true), // Use strongly consistent read to prevent race conditions
 	}
 
-	item, err := s.dynamoDBClient.GetItemWithInput(ctx, input)
+	item, err := s.config.Client.GetItemWithInput(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -1150,7 +1154,7 @@ func (s *DynamoDBBlobMetadataStore) PutBlobInclusionInfo(ctx context.Context, in
 		return err
 	}
 
-	err = s.dynamoDBClient.PutItemWithCondition(ctx, s.tableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
+	err = s.config.Client.PutItemWithCondition(ctx, s.config.TableName, item, "attribute_not_exists(PK) AND attribute_not_exists(SK)", nil, nil)
 	if errors.Is(err, commondynamodb.ErrConditionFailed) {
 		return ErrAlreadyExists
 	}
@@ -1172,7 +1176,7 @@ func (s *DynamoDBBlobMetadataStore) PutBlobInclusionInfos(ctx context.Context, i
 
 	numRetries := 3
 	for i := 0; i < numRetries; i++ {
-		failedItems, err := s.dynamoDBClient.PutItems(ctx, s.tableName, items)
+		failedItems, err := s.config.Client.PutItems(ctx, s.config.TableName, items)
 		if err != nil {
 			return err
 		}
@@ -1191,7 +1195,7 @@ func (s *DynamoDBBlobMetadataStore) PutBlobInclusionInfos(ctx context.Context, i
 
 func (s *DynamoDBBlobMetadataStore) GetBlobInclusionInfo(ctx context.Context, blobKey corev2.BlobKey, batchHeaderHash [32]byte) (*corev2.BlobInclusionInfo, error) {
 	bhh := hex.EncodeToString(batchHeaderHash[:])
-	item, err := s.dynamoDBClient.GetItem(ctx, s.tableName, map[string]types.AttributeValue{
+	item, err := s.config.Client.GetItem(ctx, s.config.TableName, map[string]types.AttributeValue{
 		"PK": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
 		},
@@ -1255,7 +1259,7 @@ func (s *DynamoDBBlobMetadataStore) GetBlobAttestationInfo(ctx context.Context, 
 }
 
 func (s *DynamoDBBlobMetadataStore) GetBlobInclusionInfos(ctx context.Context, blobKey corev2.BlobKey) ([]*corev2.BlobInclusionInfo, error) {
-	items, err := s.dynamoDBClient.Query(ctx, s.tableName, "PK = :pk AND begins_with(SK, :prefix)", commondynamodb.ExpressionValues{
+	items, err := s.config.Client.Query(ctx, s.config.TableName, "PK = :pk AND begins_with(SK, :prefix)", commondynamodb.ExpressionValues{
 		":pk": &types.AttributeValueMemberS{
 			Value: blobKeyPrefix + blobKey.Hex(),
 		},
@@ -1285,7 +1289,7 @@ func (s *DynamoDBBlobMetadataStore) GetBlobInclusionInfos(ctx context.Context, b
 
 func (s *DynamoDBBlobMetadataStore) GetSignedBatch(ctx context.Context, batchHeaderHash [32]byte) (*corev2.BatchHeader, *corev2.Attestation, error) {
 	input := &dynamodb.QueryInput{
-		TableName:              aws.String(s.tableName),
+		TableName:              aws.String(s.config.TableName),
 		KeyConditionExpression: aws.String("PK = :pk"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":pk": &types.AttributeValueMemberS{
@@ -1295,7 +1299,7 @@ func (s *DynamoDBBlobMetadataStore) GetSignedBatch(ctx context.Context, batchHea
 		ConsistentRead: aws.Bool(true), // Use strongly consistent read to prevent race conditions
 	}
 
-	items, err := s.dynamoDBClient.QueryWithInput(ctx, input)
+	items, err := s.config.Client.QueryWithInput(ctx, input)
 	if err != nil {
 		return nil, nil, err
 	}

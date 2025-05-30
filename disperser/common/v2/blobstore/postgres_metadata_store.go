@@ -36,8 +36,8 @@ func (s *PostgresBlobMetadataStore) GetDB() *pgxpool.Pool {
 	return s.db
 }
 
-// PostgreSQLConfig contains configuration for PostgreSQL connection
-type PostgreSQLConfig struct {
+// PostgresConfig contains configuration for PostgreSQL connection
+type PostgresConfig struct {
 	Host     string
 	Port     int
 	Username string
@@ -61,7 +61,7 @@ func validateSSLMode(mode string) error {
 }
 
 // NewPostgresBlobMetadataStore creates a new PostgresBlobMetadataStore instance
-func NewPostgresBlobMetadataStore(config PostgreSQLConfig, logger logging.Logger) (*PostgresBlobMetadataStore, error) {
+func NewPostgresBlobMetadataStore(logger logging.Logger, config PostgresConfig) (*PostgresBlobMetadataStore, error) {
 	// Validate SSL mode
 	if err := validateSSLMode(config.SSLMode); err != nil {
 		return nil, fmt.Errorf("invalid SSL configuration: %w", err)
@@ -126,7 +126,8 @@ func (s *PostgresBlobMetadataStore) initTables() error {
 			num_retries INTEGER NOT NULL,
 			updated_at BIGINT NOT NULL,
 			account_id VARCHAR(42) NOT NULL,
-			expiry BIGINT NOT NULL
+			expiry BIGINT NOT NULL,
+			fragment_info JSONB
 		);
 
 		CREATE INDEX IF NOT EXISTS idx_blob_metadata_blob_status_updated_at ON blob_metadata (blob_status, updated_at);
