@@ -44,19 +44,19 @@ func Example_validatorPayloadRetrieval() {
 
 	fmt.Printf("Successfully dispersed payload\n")
 
-	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
-	if !ok {
-		panic(fmt.Sprintf("expected EigenDACertV3, got %T", eigenDACert))
-	}
-
 	// Create a validator payload retriever to retrieve directly from validator nodes
 	validatorPayloadRetriever, err := createValidatorPayloadRetriever()
 	if err != nil {
 		panic(fmt.Sprintf("create validator payload retriever: %v", err))
 	}
 
+	retrievableCert, ok := eigenDACert.(*coretypes.EigenDACertV3)
+	if !ok {
+		panic("eigenDACert is not a EigenDACertV3")
+	}
+
 	// Retrieve the payload using the certificate by fetching from validator nodes
-	_, err = validatorPayloadRetriever.GetPayload(ctx, eigenDAV3Cert)
+	_, err = validatorPayloadRetriever.GetPayload(ctx, retrievableCert)
 	if err != nil {
 		panic(fmt.Sprintf("get payload: %v", err))
 	}
