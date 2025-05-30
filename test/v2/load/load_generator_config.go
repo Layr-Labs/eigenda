@@ -64,7 +64,7 @@ func DefaultLoadGeneratorConfig() *LoadGeneratorConfig {
 		ValidatorReadTimeout:          600,
 		EnablePprof:                   false,
 		PprofHttpPort:                 6060,
-		SlowStartupPause:              2 * time.Second,
+		SlowStartupPause:              1 * time.Second,
 		SlowStartupDecay:              time.Millisecond,
 	}
 }
