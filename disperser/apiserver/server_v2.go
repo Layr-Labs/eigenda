@@ -45,7 +45,7 @@ type DispersalServerV2 struct {
 
 	serverConfig      disperser.ServerConfig
 	blobStore         *blobstore.BlobStore
-	blobMetadataStore *blobstore.BlobMetadataStore
+	blobMetadataStore blobstore.MetadataStore
 	meterer           *meterer.Meterer
 
 	chainReader              core.Reader
@@ -71,7 +71,7 @@ type DispersalServerV2 struct {
 func NewDispersalServerV2(
 	serverConfig disperser.ServerConfig,
 	blobStore *blobstore.BlobStore,
-	blobMetadataStore *blobstore.BlobMetadataStore,
+	blobMetadataStore blobstore.MetadataStore,
 	chainReader core.Reader,
 	meterer *meterer.Meterer,
 	blobRequestAuthenticator corev2.BlobRequestAuthenticator,
@@ -323,11 +323,11 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		s.logger.Debug("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
 	} else {
 		quorumNumbers := make([]uint32, len(reservations))
-		for quorumNumber, _ := range reservations {
+		for quorumNumber := range reservations {
 			quorumNumbers[quorumNumber] = uint32(quorumNumber)
 		}
 		quorumSplits := make([]uint32, len(reservations))
-		for quorumNumber, _ := range reservations {
+		for quorumNumber := range reservations {
 			quorumSplits[quorumNumber] = 0
 		}
 
