@@ -91,11 +91,13 @@ const (
 	CertSerializationABI
 )
 
+// EigenDACert is a sum type interface returned by the payload disperser
 type EigenDACert interface {
 	Version() CertificateVersion
 }
 
-
+// RetrievableEigenDACert is an interface that defines data field accessor methods 
+// used for retrieving the EigenDA certificate from the relay subnet or validator nodes
 type RetrievableEigenDACert interface {
 	RelayKeys() []coreV2.RelayKey
 	QuorumNumbers() []byte
