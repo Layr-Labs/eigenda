@@ -5,20 +5,25 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/big"
+	"math/rand"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients"
+	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/validator"
-	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
+	validatorclientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	verifierv2bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifier"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
-	verifierv2legacybindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
+	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -26,13 +31,20 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigenda/inabox/deploy"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gcommon "github.com/ethereum/go-ethereum/common"
+	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/ory/dockertest/v3"
 )
 
+/*
+	These global vars are shared across tests in the integration suite to provide
+	communication entrypoints into the local inabox test environment
+*/
 var (
 	templateName      string
 	testName          string
@@ -49,12 +61,18 @@ var (
 	logger              logging.Logger
 	ethClient           common.EthClient
 	rpcClient           common.RPCEthClient
+	certBuilder 	*clientsv2.CertBuilder
+	routerCertVerifier *verification.CertVerifier
+	staticCertVerifier *verification.CertVerifier
+	eigenDACertVerifierRouter *routerbindings.ContractEigenDACertVerifierRouterTransactor
+	eigenDACertVerifierRouterCaller *routerbindings.ContractEigenDACertVerifierRouterCaller
 	eigenDACertVerifierV1   *verifierv1bindings.ContractEigenDACertVerifierV1
-	eigenDACertVerifierV2Legacy   *verifierv2legacybindings.ContractEigenDACertVerifierV2
-	eigenDACertVerifier *verifierv2bindings.ContractEigenDACertVerifier
-	eigenDACertVerifierRouter *routerbindings.ContractEigenDACertVerifierRouter
+	deployerTransactorOpts *bind.TransactOpts
+
 	retrievalClient     clients.RetrievalClient
-	retrievalClientV2   clientsv2.ValidatorClient
+
+	relayRetrievalClientV2     *payloadretrieval.RelayPayloadRetriever
+	validatorRetrievalClientV2   validatorclientsv2.ValidatorClient
 	numConfirmations    int = 3
 	numRetries              = 0
 	chainReader         core.Reader
@@ -110,7 +128,8 @@ var _ = BeforeSuite(func() {
 		fmt.Println("Starting anvil")
 		testConfig.StartAnvil()
 
-		if deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer); ok && deployer.DeploySubgraphs {
+		deployer, ok := testConfig.GetDeployer(testConfig.EigenDA.Deployer)
+		if ok && deployer.DeploySubgraphs {
 			fmt.Println("Starting graph node")
 			testConfig.StartGraphNode()
 		}
@@ -122,7 +141,7 @@ var _ = BeforeSuite(func() {
 		fmt.Println("Deploying experiment")
 		testConfig.DeployExperiment()
 
-		pk := testConfig.Pks.EcdsaMap["default"].PrivateKey
+		pk := testConfig.Pks.EcdsaMap[deployer.Name].PrivateKey
 		pk = strings.TrimPrefix(pk, "0x")
 		pk = strings.TrimPrefix(pk, "0X")
 		ethClient, err = geth.NewMultiHomingClient(geth.EthClientConfig{
@@ -132,6 +151,11 @@ var _ = BeforeSuite(func() {
 			NumRetries:       numRetries,
 		}, gcommon.Address{}, logger)
 		Expect(err).To(BeNil())
+
+		chainID, err := ethClient.ChainID(context.Background())
+		Expect(err).To(BeNil())
+
+		deployerTransactorOpts = NewTransactOptsFromPrivateKey(pk, chainID)
 
 		rpcClient, err = ethrpc.Dial(testConfig.Deployers[0].RPC)
 		Expect(err).To(BeNil())
@@ -150,18 +174,69 @@ var _ = BeforeSuite(func() {
 
 		eigenDACertVerifierV1, err = verifierv1bindings.NewContractEigenDACertVerifierV1(gcommon.HexToAddress(testConfig.EigenDAV1CertVerifier), ethClient)
 		Expect(err).To(BeNil())
-		eigenDACertVerifierV2Legacy, err = verifierv2legacybindings.NewContractEigenDACertVerifierV2(gcommon.HexToAddress(testConfig.EigenDA.CertVerifierLegacy), ethClient)
+		err = setupRetrievalClients(testConfig)
 		Expect(err).To(BeNil())
-		eigenDACertVerifier, err = verifierv2bindings.NewContractEigenDACertVerifier(gcommon.HexToAddress(testConfig.EigenDA.CertVerifier), ethClient)
+
+		certBuilder, err = clientsv2.NewCertBuilder(
+			logger,
+			gethcommon.HexToAddress(testConfig.EigenDA.OperatorStateRetriever),
+			gethcommon.HexToAddress(testConfig.EigenDA.RegistryCoordinator),
+			ethClient,
+		)
+
 		Expect(err).To(BeNil())
-		eigenDACertVerifierRouter, err = routerbindings.NewContractEigenDACertVerifierRouter(gcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)
+
+		routerAddressProvider, err := verification.BuildRouterAddressProvider(
+			gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter),
+			ethClient,
+			logger)
+
 		Expect(err).To(BeNil())
-		err = setupRetrievalClient(testConfig)
+
+		staticAddressProvider := verification.NewStaticCertVerifierAddressProvider(
+			gethcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter))
+
 		Expect(err).To(BeNil())
+
+
+		staticCertVerifier, err = verification.NewCertVerifier(
+			logger,
+			ethClient,
+			staticAddressProvider)
+
+		Expect(err).To(BeNil())
+
+		routerCertVerifier, err = verification.NewCertVerifier(
+			logger,
+			ethClient,
+			routerAddressProvider)
+
+		Expect(err).To(BeNil())
+
+		eigenDACertVerifierRouter, err = routerbindings.NewContractEigenDACertVerifierRouterTransactor(gcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)
+		Expect(err).To(BeNil())
+
+		eigenDACertVerifierRouterCaller, err = routerbindings.NewContractEigenDACertVerifierRouterCaller(gcommon.HexToAddress(testConfig.EigenDA.CertVerifierRouter), ethClient)
+		Expect(err).To(BeNil())
+
 	}
 })
 
-func setupRetrievalClient(testConfig *deploy.Config) error {
+func NewTransactOptsFromPrivateKey(privateKeyHex string, chainID *big.Int) *bind.TransactOpts {
+    privateKey, err := crypto.HexToECDSA(privateKeyHex)
+    if err != nil {
+        log.Fatalf("invalid private key: %v", err)
+    }
+
+    opts, err := bind.NewKeyedTransactorWithChainID(privateKey, chainID)
+    if err != nil {
+        log.Fatalf("failed to create transactor: %v", err)
+    }
+
+    return opts
+}
+
+func setupRetrievalClients(testConfig *deploy.Config) error {
 	ethClientConfig := geth.EthClientConfig{
 		RPCURLs:          []string{testConfig.Deployers[0].RPC},
 		PrivateKeyString: "351b8eca372e64f64d514f90f223c5c4f86a04ff3dcead5c27293c547daab4ca", // just random private key
@@ -205,12 +280,12 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		LoadG2Points:    true,
 	}
 
-	v, err := verifier.NewVerifier(kzgConfig, nil)
+	kzgVerifier, err := verifier.NewVerifier(kzgConfig, nil)
 	if err != nil {
 		return err
 	}
 
-	retrievalClient, err = clients.NewRetrievalClient(logger, cs, agn, nodeClient, v, 10)
+	retrievalClient, err = clients.NewRetrievalClient(logger, cs, agn, nodeClient, kzgVerifier, 10)
 	if err != nil {
 		return err
 	}
@@ -223,10 +298,37 @@ func setupRetrievalClient(testConfig *deploy.Config) error {
 		return err
 	}
 	clientConfig := validator.DefaultClientConfig()
-	retrievalClientV2 = clientsv2.NewValidatorClient(logger, chainReader, cs, v, clientConfig, nil)
+	validatorRetrievalClientV2 = validatorclientsv2.NewValidatorClient(logger, chainReader, cs, kzgVerifier, clientConfig, nil)
 
-	return nil
-}
+	relayClientConfig := &relay.RelayClientConfig{
+		MaxGRPCMessageSize: units.GiB,
+	}
+
+	relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, chainReader.GetRelayRegistryAddress())
+	if err != nil {
+		return err
+	}
+
+	relayClient, err := relay.NewRelayClient(relayClientConfig, logger, relayUrlProvider)
+	if err != nil {
+		return err
+	}
+
+
+	relayPayloadRetrieverConfig := payloadretrieval.RelayPayloadRetrieverConfig{
+		PayloadClientConfig: *clientsv2.GetDefaultPayloadClientConfig(),
+		RelayTimeout:        5 * time.Second,
+	}
+
+	relayRetrievalClientV2, err = payloadretrieval.NewRelayPayloadRetriever(
+		logger,
+		rand.New(rand.NewSource(time.Now().UnixNano())),
+		relayPayloadRetrieverConfig,
+		relayClient,
+		kzgVerifier.Srs.G1)
+
+	return err
+	}
 
 var _ = AfterSuite(func() {
 	if testConfig.Environment.IsLocal() {
