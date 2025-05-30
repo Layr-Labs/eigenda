@@ -24,7 +24,7 @@ function create_binding {
 forge clean
 forge build
 
-contracts="PaymentVault \
+contracts="IPaymentVault \
   SocketRegistry \
   AVSDirectory \
   DelegationManager \
