@@ -69,7 +69,7 @@ ${NODE_DB_PATH}
 ```
 
 The `chunk_v2_litt` directory is created by the V2 software inside the directory specified by `NODE_DB_PATH`.
-The `chunks` directory is created and maintained by the V2 data storage engine (i.e. 'LittDB').
+The `chunks` directory is created and maintained by the V2 data storage engine (i.e. `LittDB`).
 
 ### Recommended Configuration: `NODE_LITT_DB_STORAGE_PATHS` set
 
@@ -105,7 +105,7 @@ ${volume3}
 ```
 
 In each of the directories specified by `NODE_LITT_DB_STORAGE_PATHS`, a `chunks` directory is created and maintained
-by the V2 data storage engine (i.e. 'LittDB').
+by the V2 data storage engine (i.e. `LittDB`).
 
 Notice that the first volume has more files than the other two volumes. LittDB selects one of the volumes to store
 metadata files. In the other volumes, it only stores values files (i.e. the `*.values` files). 99.99% of the 
