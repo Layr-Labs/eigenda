@@ -302,21 +302,6 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol()
 	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
 
-	// off-chain account specific payment state
-	now := time.Now().Unix()
-	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
-	periodRecords, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod)
-	if err != nil {
-		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountID)
-	}
-	var largestCumulativePaymentBytes []byte
-	largestCumulativePayment, err := s.meterer.MeteringStore.GetLargestCumulativePayment(ctx, accountID)
-	if err != nil {
-		s.logger.Debug("failed to get largest cumulative payment, use zero value", "err", err, "accountID", accountID)
-
-	} else {
-		largestCumulativePaymentBytes = largestCumulativePayment.Bytes()
-	}
 	// on-Chain account state
 	var pbReservation *pb.Reservation
 	reservations, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
@@ -357,6 +342,29 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 			QuorumSplits:     quorumSplits,
 			QuorumNumbers:    quorumNumbers,
 		}
+	}
+
+	// off-chain account specific payment state
+	now := time.Now().Unix()
+	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
+	// take the first quorum number from the reservations as all the records are the same for current quorum-agnostic PaymentState
+	var quorumNumber uint8
+	if len(pbReservation.QuorumNumbers) > 0 {
+		quorumNumber = uint8(pbReservation.QuorumNumbers[0])
+	} else {
+		quorumNumber = 0
+	}
+	periodRecords, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod, quorumNumber)
+	if err != nil {
+		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountID)
+	}
+	var largestCumulativePaymentBytes []byte
+	largestCumulativePayment, err := s.meterer.MeteringStore.GetLargestCumulativePayment(ctx, accountID)
+	if err != nil {
+		s.logger.Debug("failed to get largest cumulative payment, use zero value", "err", err, "accountID", accountID)
+
+	} else {
+		largestCumulativePaymentBytes = largestCumulativePayment.Bytes()
 	}
 
 	var onchainCumulativePaymentBytes []byte
@@ -458,7 +466,11 @@ func (s *DispersalServerV2) GetPaymentStateQuorumSpecific(ctx context.Context, r
 
 	//TODO(hopeyen): temporarily repeat the same record for all reserved quorums
 	// update the MeteringStore interface in a subsequent PR for quorum specific period records
-	records, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod)
+	quorumNumber := uint8(0)
+	if len(reservedQuorums) > 0 {
+		quorumNumber = reservedQuorums[0]
+	}
+	records, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod, quorumNumber)
 	s.logger.Debug("offchain stored period records", "records", records)
 	if err != nil {
 		s.logger.Debug("failed to get reservation records for multiple quorums",
