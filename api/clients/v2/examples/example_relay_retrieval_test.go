@@ -53,7 +53,7 @@ func Example_relayPayloadRetrieval() {
 	if !ok {
 		panic("eigenDACert is not a EigenDACertV3")
 	}
-	
+
 	// Retrieve the payload using the certificate
 	_, err = payloadRetriever.GetPayload(ctx, retrievableCert)
 	if err != nil {

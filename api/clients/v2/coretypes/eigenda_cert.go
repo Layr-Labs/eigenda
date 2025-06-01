@@ -97,7 +97,7 @@ type EigenDACert interface {
 	Version() CertificateVersion
 }
 
-// RetrievableEigenDACert is an interface that defines data field accessor methods 
+// RetrievableEigenDACert is an interface that defines data field accessor methods
 // used for retrieving the EigenDA certificate from the relay subnet or validator nodes
 type RetrievableEigenDACert interface {
 	RelayKeys() []coreV2.RelayKey
@@ -108,7 +108,6 @@ type RetrievableEigenDACert interface {
 	Commitments() (*encoding.BlobCommitments, error)
 	Serialize(ct CertSerializationType) ([]byte, error)
 }
-
 
 var _ EigenDACert = &EigenDACertV2{}
 var _ EigenDACert = &EigenDACertV3{}
@@ -187,7 +186,7 @@ func (c *EigenDACertV3) ComputeBlobKey() (*coreV2.BlobKey, error) {
 	return &blobKey, nil
 }
 
-// BlobHeader returns the blob header of the EigenDACertV3 
+// BlobHeader returns the blob header of the EigenDACertV3
 func (c *EigenDACertV3) BlobHeader() (*coreV2.BlobHeaderWithHashedPayment, error) {
 	commitments, err := c.Commitments()
 	if err != nil {
@@ -329,9 +328,9 @@ func (c *EigenDACertV2) BlobHeader() (*coreV2.BlobHeaderWithHashedPayment, error
 	}
 
 	blobHeader := &coreV2.BlobHeaderWithHashedPayment{
-		BlobVersion: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version,
-		BlobCommitments: *commitments,
-		QuorumNumbers: c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+		BlobVersion:         c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version,
+		BlobCommitments:     *commitments,
+		QuorumNumbers:       c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
 		PaymentMetadataHash: c.BlobInclusionInfo.BlobCertificate.BlobHeader.PaymentHeaderHash,
 	}
 	return blobHeader, nil
