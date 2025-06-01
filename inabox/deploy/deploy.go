@@ -151,7 +151,7 @@ func (env *Config) deployEigenDAContracts() {
 	}
 
 	ethClient, err := geth.NewClient(geth.EthClientConfig{
-		RPCURLs: 		[]string{deployer.RPC},
+		RPCURLs:          []string{deployer.RPC},
 		PrivateKeyString: env.Pks.EcdsaMap[deployer.Name].PrivateKey[2:],
 		NumConfirmations: 0,
 		NumRetries:       0,
@@ -315,7 +315,7 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 	return fmt.Errorf("timed out waiting for disperser address to be set")
 }
 
-// RegisterBlobVersionAndRelays initializes blob versions in ThresholdRegistry contract 
+// RegisterBlobVersionAndRelays initializes blob versions in ThresholdRegistry contract
 // and relays in RelayRegistry contract
 func (env *Config) RegisterBlobVersionAndRelays(ethClient common.EthClient) {
 	dasmAddr := gcommon.HexToAddress(env.EigenDA.ServiceManager)
