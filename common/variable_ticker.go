@@ -230,7 +230,7 @@ func (t *VariableTicker) computePeriod() {
 }
 
 // computeInflectionFrequency handles an edge case when starting from a very low frequency. Suppose we start at 0.0 hz
-// and are accelerating. At the moment we start accelerating, the frequency is zero period is infinite (1/0=∞),
+// and are accelerating. At the moment we start accelerating, the frequency is zero and the period is infinite (1/0=∞),
 // which is obviously not what we want. The "inflection frequency" is an adjusted frequency that will cause us to sleep
 // for a more reasonable time. Specifically, it causes us to sleep long enough so that at the moment we wake up,
 // the frequency at the moment we wake up will produce a period equal to the time we just slept.

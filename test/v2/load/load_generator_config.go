@@ -61,6 +61,6 @@ func DefaultLoadGeneratorConfig() *LoadGeneratorConfig {
 		ValidatorReadTimeout:          600,
 		EnablePprof:                   false,
 		PprofHttpPort:                 6060,
-		FrequencyAcceleration:         0.01,
+		FrequencyAcceleration:         0.0025,
 	}
 }
