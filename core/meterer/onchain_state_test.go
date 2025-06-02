@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	"github.com/Layr-Labs/eigenda/core/mock"
@@ -78,7 +79,8 @@ func TestGetOnDemandQuorumNumbers(t *testing.T) {
 // properly handles nil map assignments and doesn't panic
 func TestOnchainPaymentStateNilAssignmentProtection(t *testing.T) {
 	t.Run("PaymentVaultParams_NilProtection", func(t *testing.T) {
-		stateWithNilParams := &meterer.OnchainPaymentState{}
+		stateWithNilParams, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+		assert.NoError(t, err)
 
 		assert.Equal(t, uint64(0), stateWithNilParams.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID))
 		assert.Equal(t, uint64(0), stateWithNilParams.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID))
@@ -88,7 +90,8 @@ func TestOnchainPaymentStateNilAssignmentProtection(t *testing.T) {
 	})
 
 	t.Run("PaymentVaultParams_MissingQuorum", func(t *testing.T) {
-		state := &meterer.OnchainPaymentState{}
+		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+		assert.NoError(t, err)
 		params := &meterer.PaymentVaultParams{
 			QuorumPaymentConfigs:  make(map[core.QuorumID]*core.PaymentQuorumConfig),
 			QuorumProtocolConfigs: make(map[core.QuorumID]*core.PaymentQuorumProtocolConfig),
@@ -103,7 +106,9 @@ func TestOnchainPaymentStateNilAssignmentProtection(t *testing.T) {
 	})
 
 	t.Run("PaymentVaultParams_ValidConfig", func(t *testing.T) {
-		state := &meterer.OnchainPaymentState{}
+		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+		assert.NoError(t, err)
+
 		params := &meterer.PaymentVaultParams{
 			QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
 				meterer.OnDemandQuorumID: {
@@ -129,9 +134,8 @@ func TestOnchainPaymentStateNilAssignmentProtection(t *testing.T) {
 	})
 
 	t.Run("NilMapAssignment_Protection", func(t *testing.T) {
-		state := &meterer.OnchainPaymentState{
-			ReservedPayments: make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment),
-		}
+		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+		assert.NoError(t, err)
 
 		account := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 
@@ -170,9 +174,8 @@ func TestOnchainPaymentStateNilAssignmentProtection(t *testing.T) {
 // TestNilAssignmentPanicScenario tests the "assignment to entry in nil map" panic scenario
 func TestNilAssignmentPanicScenario(t *testing.T) {
 	t.Run("OriginalPanicScenario_NowFixed", func(t *testing.T) {
-		state := &meterer.OnchainPaymentState{
-			ReservedPayments: make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment),
-		}
+		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+		assert.NoError(t, err)
 
 		account := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 		quorumNumbers := []core.QuorumID{0, 1}
@@ -206,9 +209,8 @@ func TestNilAssignmentPanicScenario(t *testing.T) {
 	})
 
 	t.Run("MultipleAccounts_ConcurrentSafe", func(t *testing.T) {
-		state := &meterer.OnchainPaymentState{
-			ReservedPayments: make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment),
-		}
+		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+		assert.NoError(t, err)
 
 		accounts := []gethcommon.Address{
 			gethcommon.HexToAddress("0x1234567890123456789012345678901234567890"),
@@ -244,9 +246,8 @@ func TestNilAssignmentPanicScenario(t *testing.T) {
 	})
 
 	t.Run("WithoutProtection_WouldPanic", func(t *testing.T) {
-		state := &meterer.OnchainPaymentState{
-			ReservedPayments: make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment),
-		}
+		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+		assert.NoError(t, err)
 
 		account := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 

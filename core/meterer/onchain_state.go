@@ -72,6 +72,18 @@ func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader, logger logging.
 	return &state, nil
 }
 
+func NewOnchainPaymentStateEmpty(ctx context.Context, tx *eth.Reader, logger logging.Logger) (*OnchainPaymentState, error) {
+	state := OnchainPaymentState{
+		tx:                 tx,
+		logger:             logger.With("component", "OnchainPaymentState"),
+		ReservedPayments:   make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment),
+		OnDemandPayments:   make(map[gethcommon.Address]*core.OnDemandPayment),
+		PaymentVaultParams: atomic.Pointer[PaymentVaultParams]{},
+	}
+
+	return &state, nil
+}
+
 func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*PaymentVaultParams, error) {
 	blockNumber, err := pcs.tx.GetCurrentBlockNumber(ctx)
 	if err != nil {
