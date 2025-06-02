@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -26,8 +27,8 @@ type LoadGenerator struct {
 	config *LoadGeneratorConfig
 	// The test client to use for the load test.
 	client *client.TestClient
-	// The time between starting each blob submission.
-	submissionPeriod time.Duration
+	// The frequency at which blobs are submitted, in HZ.
+	submissionFrequency float64
 	// The channel to limit the number of parallel blob submissions.
 	submissionLimiter chan struct{}
 	// The channel to limit the number of parallel blob reads sent to the relays.
@@ -77,8 +78,6 @@ func NewLoadGenerator(
 	averageBlobSize := config.AverageBlobSizeMB * units.MiB
 
 	submissionFrequency := bytesPerSecond / averageBlobSize
-	submissionPeriod := 1 / submissionFrequency
-	submissionPeriodAsDuration := time.Duration(submissionPeriod * float64(time.Second))
 
 	submissionLimiter := make(chan struct{}, config.SubmissionParallelism)
 	relayReadLimiter := make(chan struct{}, config.RelayReadParallelism)
@@ -113,7 +112,7 @@ func NewLoadGenerator(
 		cancel:               cancel,
 		config:               config,
 		client:               client,
-		submissionPeriod:     submissionPeriodAsDuration,
+		submissionFrequency:  submissionFrequency,
 		submissionLimiter:    submissionLimiter,
 		relayReadLimiter:     relayReadLimiter,
 		lifecycleLimiter:     lifecycleLimiter,
@@ -144,32 +143,24 @@ func (l *LoadGenerator) Stop() {
 	l.cancel()
 }
 
-// startupPause will sleep for a short duration when the load generator is starting up. Allows for a more
-// gradual ramp-up of load to avoid overwhelming the network.
-func (l *LoadGenerator) startupPause() {
-	timeSinceStart := time.Since(l.startTime)
-	secondsSinceStart := float64(timeSinceStart) / float64(time.Second)
-	startupPauseDecay := time.Duration(float64(l.config.SlowStartupDecay) * secondsSinceStart)
-	adjustedPause := l.config.SlowStartupPause - startupPauseDecay
-
-	if adjustedPause > 0 {
-		time.Sleep(adjustedPause)
-	}
-}
-
 // run runs the load generator.
 func (l *LoadGenerator) run() {
-	ticker := time.NewTicker(l.submissionPeriod)
+
+	// Start with frequency 0.
+	ticker := common.NewVariableTickerWithFrequency(l.ctx, 0)
+	defer ticker.Close()
+	// Set acceleration prior to setting target frequency, since acceleration 0 allows "infinite" acceleration.
+	ticker.SetAcceleration(l.config.FrequencyAcceleration)
+	ticker.SetTargetFrequency(l.submissionFrequency)
+
 	for l.alive.Load() {
-		<-ticker.C
+		<-ticker.Tick()
 
 		l.lifecycleLimiter <- struct{}{}
 		go func() {
 			l.readAndWriteBlob()
 			<-l.lifecycleLimiter
 		}()
-
-		l.startupPause()
 	}
 }
 
