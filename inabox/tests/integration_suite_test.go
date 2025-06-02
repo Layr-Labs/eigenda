@@ -22,7 +22,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	routerbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
-	"github.com/docker/go-units"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
@@ -316,7 +315,7 @@ func setupRetrievalClients(testConfig *deploy.Config) error {
 	}
 
 	relayClientConfig := &relay.RelayClientConfig{
-		MaxGRPCMessageSize: units.GiB,
+		MaxGRPCMessageSize: 100 * 1024 * 1024, // 100 MB message size limit,
 	}
 
 	relayUrlProvider, err := relay.NewRelayUrlProvider(ethClient, chainReader.GetRelayRegistryAddress())
