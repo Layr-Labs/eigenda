@@ -463,13 +463,13 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 // Generates retriever .env
 func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath, grpcPort string) RetrieverVars {
 	v := RetrieverVars{
-		RETRIEVER_LOG_FORMAT:                  "text",
-		RETRIEVER_HOSTNAME:                    "",
-		RETRIEVER_GRPC_PORT:                   grpcPort,
-		RETRIEVER_TIMEOUT:                     "10s",
-		RETRIEVER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetriever,
-		RETRIEVER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
-		RETRIEVER_NUM_CONNECTIONS:             "10",
+		RETRIEVER_LOG_FORMAT:                   "text",
+		RETRIEVER_HOSTNAME:                     "",
+		RETRIEVER_GRPC_PORT:                    grpcPort,
+		RETRIEVER_TIMEOUT:                      "10s",
+		RETRIEVER_BLS_OPERATOR_STATE_RETRIEVER: env.EigenDA.OperatorStateRetriever,
+		RETRIEVER_EIGENDA_SERVICE_MANAGER:      env.EigenDA.ServiceManager,
+		RETRIEVER_NUM_CONNECTIONS:              "10",
 
 		RETRIEVER_CHAIN_RPC:   "",
 		RETRIEVER_PRIVATE_KEY: key[2:],

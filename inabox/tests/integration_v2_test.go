@@ -1,20 +1,22 @@
 package integration_test
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -23,9 +25,11 @@ var _ = Describe("Inabox v2 Integration", func() {
 	/*
 		This end to end test ensures that:
 		1. a blob can be dispersed using the lower level disperser client to successfully produce a blob status response
-		2. the blob certificate can be verified on chain using the EigenDACertVerifier and EigenDACertVerifierRouter contracts
+		2. the blob certificate can be verified on chain using the immutable static EigenDACertVerifier and EigenDACertVerifierRouter contracts
 		3. the blob can be retrieved from the disperser relay using the blob certificate
 		4. the blob can be retrieved from the DA validator network using the blob certificate
+		5. updates to the EigenDACertVerifierRouter contract can be made to add a new cert verifier with at a future activation block number
+		6. the new cert verifier will be used to verify the blob certificate at the future activation block number
 
 		TODO: Decompose this test into smaller tests that cover each of the above steps individually.
 	*/
@@ -37,8 +41,10 @@ var _ = Describe("Inabox v2 Integration", func() {
 		signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 		Expect(err).To(BeNil())
 
-		// TODO: update this to use the payload disperser client instead since it wraps the 
+		// TODO: update this to use the payload disperser client instead since it wraps the
 		//       disperser client and provides additional functionality
+		//       after doing an experiment with this its currently infeasible since the disperser chooses the latest block #
+		//       for cert rbn which breaks an invariant on the registry coordinator that requires block.number > rbn
 		disp, err := clients.NewDisperserClient(&clients.DisperserClientConfig{
 			Hostname: "localhost",
 			Port:     "32005",
@@ -46,61 +52,24 @@ var _ = Describe("Inabox v2 Integration", func() {
 		Expect(err).To(BeNil())
 		Expect(disp).To(Not(BeNil()))
 
-		data1 := make([]byte, 992)
-		_, err = rand.Read(data1)
-		Expect(err).To(BeNil())
-		data2 := make([]byte, 123)
-		_, err = rand.Read(data2)
+		payload1 := randomPayload(992)
+		blob1, err := payload1.ToBlob(codecs.PolynomialFormEval)
 		Expect(err).To(BeNil())
 
-		paddedData1 := codec.ConvertByPaddingEmptyByte(data1)
-		paddedData2 := codec.ConvertByPaddingEmptyByte(data2)
-
-		blobStatus1, key1, err := disp.DisperseBlob(ctx, paddedData1, 0, []uint8{0, 1})
+		payload2 := randomPayload(123)
+		blob2, err := payload2.ToBlob(codecs.PolynomialFormEval)
 		Expect(err).To(BeNil())
-		Expect(key1).To(Not(BeNil()))
-		Expect(blobStatus1).To(Not(BeNil()))
-		Expect(*blobStatus1).To(Equal(dispv2.Queued))
 
-		blobStatus2, key2, err := disp.DisperseBlob(ctx, paddedData2, 0, []uint8{0, 1})
+		reply1, err := disperseBlob(ctx, disp, blob1.Serialize())
 		Expect(err).To(BeNil())
-		Expect(key2).To(Not(BeNil()))
-		Expect(blobStatus2).To(Not(BeNil()))
-		Expect(*blobStatus2).To(Equal(dispv2.Queued))
 
-		ticker := time.NewTicker(time.Second * 1)
-		defer ticker.Stop()
-
-		var reply1 *disperserpb.BlobStatusReply
-		var reply2 *disperserpb.BlobStatusReply
-		for loop := true; loop; {
-			select {
-			case <-ctx.Done():
-				Fail("timed out")
-			case <-ticker.C:
-				reply1, err = disp.GetBlobStatus(context.Background(), key1)
-				Expect(err).To(BeNil())
-				Expect(reply1).To(Not(BeNil()))
-				status1, err := dispv2.BlobStatusFromProtobuf(reply1.GetStatus())
-				Expect(err).To(BeNil())
-
-				reply2, err = disp.GetBlobStatus(context.Background(), key2)
-				Expect(err).To(BeNil())
-				Expect(reply2).To(Not(BeNil()))
-				status2, err := dispv2.BlobStatusFromProtobuf(reply2.GetStatus())
-				Expect(err).To(BeNil())
-
-				if status1 != dispv2.Complete || status2 != dispv2.Complete {
-					continue
-				}
-				loop = false
-			}
-		}
+		reply2, err := disperseBlob(ctx, disp, blob2.Serialize())
+		Expect(err).To(BeNil())
 
 		// necessary to ensure that reference block number < current block number
 		mineAnvilBlocks(1)
 
-		// test onchain verification using disperser blob status reply #1
+		// test onchain verification using cert #1
 		eigenDACert, err := certBuilder.BuildCert(ctx, coretypes.VersionThreeCert, reply1)
 		Expect(err).To(BeNil())
 
@@ -110,7 +79,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		err = routerCertVerifier.CheckDACert(ctx, eigenDACert)
 		Expect(err).To(BeNil())
 
-		// test onchain verification using disperser blob status reply #2
+		// test onchain verification using cert #2
 		eigenDACert2, err := certBuilder.BuildCert(ctx, coretypes.VersionThreeCert, reply2)
 		Expect(err).To(BeNil())
 
@@ -120,103 +89,157 @@ var _ = Describe("Inabox v2 Integration", func() {
 		err = routerCertVerifier.CheckDACert(ctx, eigenDACert2)
 		Expect(err).To(BeNil())
 
-
 		eigenDAV3Cert1, ok := eigenDACert.(*coretypes.EigenDACertV3)
 		Expect(ok).To(BeTrue())
 
 		eigenDAV3Cert2, ok := eigenDACert2.(*coretypes.EigenDACertV3)
 		Expect(ok).To(BeTrue())
 
-
-		// test retrieval from disperser relay
-
-		// TODO: fix this test to use the payload retrieval client instead of the relay retrieval client
-		// payload1, err := relayRetrievalClientV2.GetPayload(ctx, eigenDAV3Cert1)
-		// Expect(err).To(BeNil())
-		// Expect(payload1).To(Not(BeNil()))
-		// restored := bytes.TrimRight(payload1.Serialize(), "\x00")
-		// Expect(restored).To(Equal(payload1))
-
-		// payload2, err := relayRetrievalClientV2.GetPayload(ctx, eigenDAV3Cert2)
-		// Expect(err).To(BeNil())
-		// Expect(payload2).To(Not(BeNil()))
-		// restored = bytes.TrimRight(payload2.Serialize(), "\x00")
-		// Expect(restored).To(Equal(payload2))
-
-
-		// test retrieval from DA network
-
-		blob1HeaderWithoutPayment, err := eigenDAV3Cert1.BlobHeader()
+		// test retrieval from disperser relay subnet
+		actualPayload1, err := relayRetrievalClientV2.GetPayload(ctx, eigenDAV3Cert1)
 		Expect(err).To(BeNil())
+		Expect(actualPayload1).To(Not(BeNil()))
+		Expect(actualPayload1).To(Equal(payload1))
 
-		blob2HeaderWithoutPayment, err := eigenDAV3Cert2.BlobHeader()
+		actualPayload2, err := relayRetrievalClientV2.GetPayload(ctx, eigenDAV3Cert2)
 		Expect(err).To(BeNil())
+		Expect(actualPayload2).To(Not(BeNil()))
+		Expect(actualPayload2).To(Equal(payload2))
 
-		b, err := validatorRetrievalClientV2.GetBlob(
+		// test distributed retrieval from DA network validator nodes
+		actualPayload1, err = validatorRetrievalClientV2.GetPayload(
 			ctx,
-			blob1HeaderWithoutPayment,
-			uint64(eigenDAV3Cert1.ReferenceBlockNumber()),
+			eigenDAV3Cert1,
 		)
 		Expect(err).To(BeNil())
-		restored := bytes.TrimRight(b, "\x00")
-		Expect(restored).To(Equal(paddedData1))
-		b, err = validatorRetrievalClientV2.GetBlob(
-			ctx,
-			blob2HeaderWithoutPayment,
-			uint64(eigenDAV3Cert2.ReferenceBlockNumber()),
-		)
-		restored = bytes.TrimRight(b, "\x00")
-		Expect(err).To(BeNil())
-		Expect(restored).To(Equal(paddedData2))
+		Expect(actualPayload1).To(Not(BeNil()))
+		Expect(actualPayload1).To(Equal(payload1))
 
-		// TODO: Figure out how to advance the disperser's reference block number 
-		//       currently the disperser isn't respecting the latest anvil chain head when determining RBN
+		actualPayload2, err = validatorRetrievalClientV2.GetPayload(
+			ctx,
+			eigenDAV3Cert2,
+		)
+		Expect(err).To(BeNil())
+		Expect(actualPayload2).To(Not(BeNil()))
+		Expect(actualPayload2).To(Equal(payload2))
+
+		/*
+			enforce correct functionality of the EigenDACertVerifierRouter contract:
+				1. ensure that a verifier can't be added at the latest block number
+				2. ensure that a verifier can be added two blocks in the future
+				3. ensure that the new verifier can be read from the contract when queried using a future rbn
+				4. ensure that the old verifier can still be read from the contract when queried using the latest block number
+				5. ensure that the new verifier is used to verify a cert at the future rbn after dispersal
+		*/
+
+		// ensure that a verifier can't be added at the latest block number
 		latestBlock, err := ethClient.BlockNumber(ctx)
 		Expect(err).To(BeNil())
+		_, err = eigenDACertVerifierRouter.AddCertVerifier(deployerTransactorOpts, uint32(latestBlock), gethcommon.HexToAddress("0x0"))
+		Expect(err).Error()
+		Expect(err.Error()).To(ContainSubstring(getSolidityFunctionSig("ABNNotInFuture(uint32)")))
 
-
-		println("latest block number: ", latestBlock)
-		tx, err := eigenDACertVerifierRouter.AddCertVerifier(deployerTransactorOpts, uint32(latestBlock) + 2, gethcommon.HexToAddress("0x0"))
+		// ensure that a verifier can be added two blocks in the future
+		tx, err := eigenDACertVerifierRouter.AddCertVerifier(deployerTransactorOpts, uint32(latestBlock)+2, gethcommon.HexToAddress("0x0"))
 		Expect(err).To(BeNil())
 
-		mineAnvilBlocks(1000)
+		mineAnvilBlocks(1)
+		latestBlock += 1
+
+		// ensure that tx successfully executed
 		receipt, err := ethClient.TransactionReceipt(ctx, tx.Hash())
 		Expect(err).To(BeNil())
 		Expect(receipt).To(Not(BeNil()))
-		time.Sleep(30 * time.Second)
+		Expect(receipt.Status).To(Equal(uint64(1)))
 
-		var reply3 *disperserpb.BlobStatusReply
-		for loop := true; loop; {
-			select {
-			case <-ctx.Done():
-				Fail("timed out")
-			case <-ticker.C:
-				reply3, err = disp.GetBlobStatus(context.Background(), key1)
-				Expect(err).To(BeNil())
-				Expect(reply3).To(Not(BeNil()))
-				status, err := dispv2.BlobStatusFromProtobuf(reply3.GetStatus())
-				Expect(err).To(BeNil())
-				if status != dispv2.Complete {
-					continue
-				}
-				loop = false
-			}
-		}
-
-		latestBlock, err = ethClient.BlockNumber(ctx)
+		// ensure that new verifier can be read from the contract at the future rbn
+		verifier, err := eigenDACertVerifierRouterCaller.GetCertVerifierAt(&bind.CallOpts{}, uint32(latestBlock+1))
 		Expect(err).To(BeNil())
-		println("latest block number after mining: ", latestBlock)
+		Expect(verifier).To(Equal(gethcommon.HexToAddress("0x0")))
 
-		eigenDACert3, err := certBuilder.BuildCert(ctx, coretypes.VersionThreeCert, reply1)
-		eigenDAV3Cert3, ok := eigenDACert3.(*coretypes.EigenDACertV3)
-		Expect(ok).To(BeTrue())
+		// and that old one still lives at the latest block number - 1
+		verifier, err = eigenDACertVerifierRouterCaller.GetCertVerifierAt(&bind.CallOpts{}, uint32(latestBlock-1))
+		Expect(err).To(BeNil())
+		Expect(verifier.String()).To(Equal(testConfig.EigenDA.CertVerifier))
 
-		println("cert 3 reference block #: ", eigenDAV3Cert3.ReferenceBlockNumber())
+		// progress anvil chain to ensure latest block number is set for rbn so
+		// invalid verifier can be triggered
+		mineAnvilBlocks(3)
+
+		// disperse blob #3 to trigger the new cert verifier
+
+		blob3, err := randomPayload(1000).ToBlob(codecs.PolynomialFormEval)
 		Expect(err).To(BeNil())
 
+		reply3, err := disperseBlob(ctx, disp, blob3.Serialize())
+		Expect(err).To(BeNil())
+
+		// necessary to ensure that reference block number < current block number
+		mineAnvilBlocks(1)
+
+		eigenDACert3, err := certBuilder.BuildCert(ctx, coretypes.VersionThreeCert, reply3)
+		Expect(err).To(BeNil())
+
+		// should fail since the rbn -> cert verifier is an empty address which should trigger a reversion
 		err = routerCertVerifier.CheckDACert(ctx, eigenDACert3)
-		Expect(err).To(Not(BeNil()))
+		Expect(err).ToNot(BeNil())
+		Expect(err.Error()).To(ContainSubstring("no contract code at given address"))
 
+		// should pass using old verifier
+		err = staticCertVerifier.CheckDACert(ctx, eigenDACert3)
+		Expect(err).To(BeNil())
 
 	})
 })
+
+func getSolidityFunctionSig(methodSig string) string {
+	sig := []byte(methodSig)
+	hash := sha3.NewLegacyKeccak256()
+	hash.Write(sig)
+	selector := hash.Sum(nil)[:4] // take the first 4 bytes for the function selector
+	return "0x" + hex.EncodeToString(selector)
+}
+
+func randomPayload(size int) *coretypes.Payload {
+	data := make([]byte, size)
+	_, err := rand.Read(data)
+	if err != nil {
+		panic(err)
+	}
+
+	return coretypes.NewPayload(data)
+}
+
+func disperseBlob(ctx context.Context, disp clients.DisperserClient, blob []byte) (*disperserpb.BlobStatusReply, error) {
+	ticker := time.NewTicker(time.Second * 1)
+	defer ticker.Stop()
+
+	_, key, err := disp.DisperseBlob(ctx, blob, 0, []uint8{0, 1})
+	if err != nil {
+		return nil, err
+	}
+
+	var reply *disperserpb.BlobStatusReply
+
+	for {
+		select {
+		case <-ctx.Done():
+			Fail("timed out")
+		case <-ticker.C:
+			reply, err = disp.GetBlobStatus(context.Background(), key)
+			if err != nil {
+				return nil, err
+			}
+
+			status, err := dispv2.BlobStatusFromProtobuf(reply.GetStatus())
+			if err != nil {
+				return nil, err
+			}
+
+			if status != dispv2.Complete {
+				continue
+			}
+			return reply, nil
+		}
+	}
+}

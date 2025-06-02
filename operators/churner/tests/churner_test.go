@@ -138,7 +138,7 @@ func TestChurner(t *testing.T) {
 		salt := [32]byte{}
 		copy(salt[:], crypto.Keccak256([]byte("churn"), []byte(time.Now().String())))
 		expiry := big.NewInt((time.Now().Add(10 * time.Minute)).Unix())
-		tx, err = createTransactorFromScratch(*privateKey, testConfig.EigenDA.OperatorStateRetreiver, testConfig.EigenDA.ServiceManager, logger)
+		tx, err = createTransactorFromScratch(*privateKey, testConfig.EigenDA.OperatorStateRetriever, testConfig.EigenDA.ServiceManager, logger)
 		assert.NoError(t, err)
 		if i >= testConfig.Services.Counts.NumMaxOperatorCount {
 			// This operator will churn others
@@ -229,14 +229,14 @@ func newTestServer(t *testing.T) *churner.Server {
 			NumRetries:       numRetries,
 		},
 		LoggerConfig:                  common.DefaultLoggerConfig(),
-		BLSOperatorStateRetrieverAddr: testConfig.EigenDA.OperatorStateRetreiver,
+		BLSOperatorStateRetrieverAddr: testConfig.EigenDA.OperatorStateRetriever,
 		EigenDAServiceManagerAddr:     testConfig.EigenDA.ServiceManager,
 		ChurnApprovalInterval:         15 * time.Minute,
 	}
 
 	operatorTransactorChurner, err := createTransactorFromScratch(
 		churnerPrivateKeyHex,
-		testConfig.EigenDA.OperatorStateRetreiver,
+		testConfig.EigenDA.OperatorStateRetriever,
 		testConfig.EigenDA.ServiceManager,
 		logger,
 	)
