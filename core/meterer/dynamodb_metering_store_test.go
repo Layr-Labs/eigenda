@@ -105,7 +105,8 @@ func TestIncrementBinUsages_EdgeCases(t *testing.T) {
 		quorum := core.QuorumID(1)
 		periods := map[core.QuorumID]uint64{quorum: reservationPeriod}
 		// First increment
-		_, _ = tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum}, periods, map[core.QuorumID]uint64{quorum: size})
+		_, err := tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum}, periods, map[core.QuorumID]uint64{quorum: size})
+		assert.NoError(t, err)
 		// Second increment
 		binUsages, err := tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum}, periods, map[core.QuorumID]uint64{quorum: size})
 		assert.NoError(t, err)
