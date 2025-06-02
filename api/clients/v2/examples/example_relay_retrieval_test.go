@@ -49,13 +49,13 @@ func Example_relayPayloadRetrieval() {
 	}
 	defer payloadRetriever.Close()
 
-	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
+	retrievableCert, ok := eigenDACert.(*coretypes.EigenDACertV3)
 	if !ok {
-		panic(fmt.Sprintf("expected EigenDACertV3, got %T", eigenDACert))
+		panic("eigenDACert is not a EigenDACertV3")
 	}
 
 	// Retrieve the payload using the certificate
-	_, err = payloadRetriever.GetPayload(ctx, eigenDAV3Cert)
+	_, err = payloadRetriever.GetPayload(ctx, retrievableCert)
 	if err != nil {
 		panic(fmt.Sprintf("get payload: %v", err))
 	}
