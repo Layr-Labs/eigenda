@@ -354,7 +354,6 @@ func BlobCommitmentsBindingToInternal(
 	return blobCommitment, nil
 }
 
-
 // QuorumNumbersUint32ToUint8 accepts an array of uint32 quorum numbers, and converts it into an array of uint8 quorum
 // numbers.
 //

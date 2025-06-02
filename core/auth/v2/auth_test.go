@@ -191,7 +191,7 @@ func TestAuthenticatePaymentStateRequestCorruptedSignature(t *testing.T) {
 
 	requestHash, err := hashing.HashGetPaymentStateRequest(accountId, fixedTimestamp)
 	assert.NoError(t, err)
-	
+
 	hash := sha256.Sum256(requestHash)
 	signature, err := crypto.Sign(hash[:], signer.PrivateKey)
 	assert.NoError(t, err)

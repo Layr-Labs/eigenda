@@ -311,7 +311,7 @@ func maximumSizedBlobDispersalTest(t *testing.T, environment string) {
 	config, err := client.GetConfig(environment)
 	require.NoError(t, err)
 
-	maxPermissibleDataLength, err := codec.GetMaxPermissiblePayloadLength(
+	maxPermissibleDataLength, err := codec.BlobSymbolsToMaxPayloadSize(
 		uint32(config.MaxBlobSize) / encoding.BYTES_PER_SYMBOL)
 	require.NoError(t, err)
 
@@ -338,7 +338,7 @@ func tooLargeBlobDispersalTest(t *testing.T, environment string) {
 	config, err := client.GetConfig(environment)
 	require.NoError(t, err)
 
-	maxPermissibleDataLength, err := codec.GetMaxPermissiblePayloadLength(uint32(config.MaxBlobSize) / encoding.BYTES_PER_SYMBOL)
+	maxPermissibleDataLength, err := codec.BlobSymbolsToMaxPayloadSize(uint32(config.MaxBlobSize) / encoding.BYTES_PER_SYMBOL)
 	require.NoError(t, err)
 
 	rand := random.NewTestRandom()
