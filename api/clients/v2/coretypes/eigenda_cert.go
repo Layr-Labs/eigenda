@@ -92,8 +92,21 @@ const (
 	CertSerializationABI
 )
 
+// EigenDACert is a sum type interface returned by the payload disperser
 type EigenDACert interface {
 	Version() CertificateVersion
+}
+
+// RetrievableEigenDACert is an interface that defines data field accessor methods
+// used for retrieving the EigenDA certificate from the relay subnet or validator nodes
+type RetrievableEigenDACert interface {
+	RelayKeys() []coreV2.RelayKey
+	QuorumNumbers() []byte
+	ReferenceBlockNumber() uint64
+	ComputeBlobKey() (*coreV2.BlobKey, error)
+	BlobHeader() (*coreV2.BlobHeaderWithHashedPayment, error)
+	Commitments() (*encoding.BlobCommitments, error)
+	Serialize(ct CertSerializationType) ([]byte, error)
 }
 
 var _ EigenDACert = &EigenDACertV2{}
@@ -148,11 +161,6 @@ func (c *EigenDACertV3) ReferenceBlockNumber() uint64 {
 	return uint64(c.BatchHeader.ReferenceBlockNumber)
 }
 
-// BlobVersion returns the blob version of the blob header
-func (c *EigenDACertV3) BlobVersion() coreV2.BlobVersion {
-	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version
-}
-
 // ComputeBlobKey computes the blob key used for looking up the blob against an EigenDA network retrieval
 // entrypoint (e.g, a relay or a validator node)
 func (c *EigenDACertV3) ComputeBlobKey() (*coreV2.BlobKey, error) {
@@ -178,11 +186,11 @@ func (c *EigenDACertV3) ComputeBlobKey() (*coreV2.BlobKey, error) {
 	return &blobKey, nil
 }
 
+// BlobHeader returns the blob header of the EigenDACertV3
 func (c *EigenDACertV3) BlobHeader() (*coreV2.BlobHeaderWithHashedPayment, error) {
-
 	commitments, err := c.Commitments()
 	if err != nil {
-		return nil, fmt.Errorf("get commitments: %w", err)
+		return nil, fmt.Errorf("calculate coretype commitments: %w", err)
 	}
 
 	blobHeader := &coreV2.BlobHeaderWithHashedPayment{
@@ -307,14 +315,25 @@ func (c *EigenDACertV2) ReferenceBlockNumber() uint64 {
 	return uint64(c.BatchHeader.ReferenceBlockNumber)
 }
 
-// BlobVersion returns the blob version of the blob header
-func (c *EigenDACertV2) BlobVersion() coreV2.BlobVersion {
-	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version
-}
-
 // QuorumNumbers returns the quorum numbers requested
 func (c *EigenDACertV2) QuorumNumbers() []byte {
 	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers
+}
+
+// BlobHeader returns the blob header of the EigenDACertV2
+func (c *EigenDACertV2) BlobHeader() (*coreV2.BlobHeaderWithHashedPayment, error) {
+	commitments, err := c.Commitments()
+	if err != nil {
+		return nil, fmt.Errorf("calculate coretype commitments: %w", err)
+	}
+
+	blobHeader := &coreV2.BlobHeaderWithHashedPayment{
+		BlobVersion:         c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version,
+		BlobCommitments:     *commitments,
+		QuorumNumbers:       c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+		PaymentMetadataHash: c.BlobInclusionInfo.BlobCertificate.BlobHeader.PaymentHeaderHash,
+	}
+	return blobHeader, nil
 }
 
 // Serialize serializes the EigenDACertV2 to bytes
