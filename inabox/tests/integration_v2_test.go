@@ -216,7 +216,7 @@ func disperseBlob(disp clients.DisperserClient, blob []byte) (*disperserpb.BlobS
 	ticker := time.NewTicker(time.Second * 1)
 	defer ticker.Stop()
 
-	_, key, err := disp.DisperseBlob(blob, 0, []uint8{0, 1})
+	_, key, err := disp.DisperseBlob(ctx, blob, 0, []uint8{0, 1})
 	if err != nil {
 		return nil, err
 	}
