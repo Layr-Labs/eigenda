@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 )
 
@@ -147,6 +148,7 @@ func (t *VariableTicker) run() {
 			continue
 		}
 
+		fmt.Println("<tick>")
 		// Send a tick.
 		select {
 		case t.tickChan <- struct{}{}:
@@ -204,28 +206,69 @@ func (t *VariableTicker) computePeriod() {
 
 	elapsedSinceAnchorTime := time.Since(t.anchorTime)
 
-	var currentFrequency float64
-
 	if t.acceleration == 0 {
 		// Acceleration zero is defined as infinite acceleration. Immediately adopt the target frequency.
-		currentFrequency = t.targetFrequency
+		t.currentFrequency = t.targetFrequency
 	} else if t.currentFrequency < t.targetFrequency {
 		// We are below the target frequency.
-		currentFrequency = t.anchorFrequency + (t.acceleration * elapsedSinceAnchorTime.Seconds())
-		if currentFrequency > t.targetFrequency {
-			currentFrequency = t.targetFrequency
+		t.currentFrequency = t.anchorFrequency + (t.acceleration * elapsedSinceAnchorTime.Seconds())
+		if t.currentFrequency > t.targetFrequency {
+			// If we over shoot, adopt the target frequency.
+			t.currentFrequency = t.targetFrequency
+		} else {
+			// When speeding up, substitute the current frequency with the inflection frequency.
+			// This is to avoid sleeping for a very long time when starting from a low frequency.
+			t.currentFrequency = t.computeInflectionFrequency()
 		}
 	} else {
 		// We are above the target frequency.
-		currentFrequency = t.targetFrequency - (t.acceleration * elapsedSinceAnchorTime.Seconds())
-		if currentFrequency < t.targetFrequency {
-			currentFrequency = t.targetFrequency
+		t.currentFrequency = t.targetFrequency - (t.acceleration * elapsedSinceAnchorTime.Seconds())
+		if t.currentFrequency < t.targetFrequency {
+			// If we over shoot, adopt the target frequency.
+			t.currentFrequency = t.targetFrequency
 		}
 	}
 
-	if currentFrequency == 0 {
+	if t.currentFrequency == 0 {
 		t.currentPeriod = 0
 	} else {
-		t.currentPeriod = time.Duration(float64(time.Second) / currentFrequency)
+		t.currentPeriod = time.Duration(float64(time.Second) / t.currentFrequency)
 	}
+}
+
+// computeInflectionFrequency handles an edge case when starting from a very low frequency. Suppose we start at 0.0 hz
+// and are accelerating. At the moment we start accelerating, the frequency is zero period is infinite (1/0=∞),
+// which is obviously not what we want. The "inflection frequency" is an adjusted frequency that will cause us to sleep
+// for a more reasonable time. Specifically, it causes us to sleep long enough so that at the moment we wake up,
+// the frequency at the moment we wake up will produce a period equal to the time we just slept.
+func (t *VariableTicker) computeInflectionFrequency() float64 {
+	// T0 = the current time, at this time we have frequency F0 and period P0=1/F0
+	// T1 = the time at which we would wake up if we sleep for a period we calculate the period using F0
+	//
+	// T0                                      Ti                                      T1
+	// |---------------------------------------|---------------------------------------|
+	// <-----------------Pi-------------------->
+	//
+	// Ti = the inflection time, i.e. the time we want to wake up at
+	// Pi = inflection period
+	//
+	// The goal is that at time Ti, if we use the inflection frequency Fi, we will find that we have a period of Pi.
+	//
+	// A = acceleration
+	//
+	// a) Pi = (Ti - T0) / 2
+	// b) Fi = F0 + A * Pi
+	// c) Pi = 1 / Fi
+	//
+	// Combine equations b and c:
+	// d) Pi = 1 / (F0 + A * Pi)
+	//
+	// Plug equation d into an algebraic solver:
+	// https://www.wolframalpha.com/input?i=solve+for+x+in+%28x+%3D+1%2F%28f+%2B+x+*+a%29%29
+	// Variable substitution done since WolframAlpha gets confused by multi-character variables.
+	// e) Pi = (sqrt(4A + F0^2) - F0) / 2A
+	//
+	// Combine equations c and e (i.e. invert the period to get the frequency):
+	// f) Fi = 2A / (sqrt(4A + F0^2) - F0)
+	return (2 * t.acceleration) / (math.Sqrt(4*t.acceleration+math.Pow(t.currentFrequency, 2)) - t.currentFrequency)
 }
