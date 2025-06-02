@@ -47,7 +47,7 @@ type LoadGeneratorConfig struct {
 // DefaultLoadGeneratorConfig returns a default configuration for the load generator.
 func DefaultLoadGeneratorConfig() *LoadGeneratorConfig {
 	return &LoadGeneratorConfig{
-		MBPerSecond:                   1.0,
+		MBPerSecond:                   0.5,
 		AverageBlobSizeMB:             1.0,
 		BlobSizeStdDev:                0.0,
 		RelayReadAmplification:        1.0,
