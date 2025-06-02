@@ -154,7 +154,7 @@ func (m *Meterer) ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) 
 }
 
 // ValidateReservationPeriod checks if the provided reservation period is valid
-// Note: This is called per-quorum, so reservation is for a single quorum.
+// Note: This is called per-quorum since reservation is for a single quorum.
 func (m *Meterer) ValidateReservationPeriod(reservation *core.ReservedPayment, requestReservationPeriod uint64, reservationWindow uint64, receivedAt time.Time) bool {
 	currentReservationPeriod := GetReservationPeriod(receivedAt.Unix(), reservationWindow)
 	// Valid reservation periods are either the current bin or the previous bin
@@ -326,7 +326,7 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged ui
 }
 
 // GetReservationBinLimit returns the bin limit for a given reservation
-// Note: This is called per-quorum, so reservation is for a single quorum.
+// Note: This is called per-quorum since reservation is for a single quorum.
 func (m *Meterer) GetReservationBinLimit(reservation *core.ReservedPayment, reservationWindow uint64) uint64 {
 	return reservation.SymbolsPerSecond * reservationWindow
 }
