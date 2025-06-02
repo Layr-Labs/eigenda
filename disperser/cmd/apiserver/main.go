@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"os"
@@ -14,6 +15,7 @@ import (
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding/fft"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
@@ -190,6 +192,25 @@ func RunDisperserServer(ctx *cli.Context) error {
 		})
 		blobStore := blobstorev2.NewBlobStore(bucketName, s3Client, logger)
 
+		instanceID := config.InstanceID
+		if instanceID < 0 {
+			// Generate random ID within valid range for DefaultInstanceIDBits
+			id := uuid.New()
+			maxID := uint16((1 << apiserver.DefaultInstanceIDBits) - 1)
+			randomID := binary.BigEndian.Uint16(id[:2]) & maxID
+			instanceID = int(randomID)
+
+			logger.Warn("Using randomly generated instance ID. This increases risk of ID collisions between service replicas (if more than one), which may then increase risk of having same requestedAt timestamp for different blobs",
+				"instanceID", instanceID,
+				"maxAllowedID", maxID,
+				"recommendation", "Configure unique instance IDs for each replica to ensure timestamp uniqueness")
+		}
+
+		timeOracle, err := apiserver.NewTimestampOracle(uint64(instanceID), apiserver.DefaultInstanceIDBits)
+		if err != nil {
+			return fmt.Errorf("failed to initialize timestamp oracle: %w", err)
+		}
+
 		server, err := apiserver.NewDispersalServerV2(
 			config.ServerConfig,
 			blobStore,
@@ -200,6 +221,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			prover,
 			uint64(config.MaxNumSymbolsPerBlob),
 			config.OnchainStateRefreshInterval,
+			timeOracle,
 			logger,
 			reg,
 			config.MetricsConfig,

@@ -46,6 +46,7 @@ type Config struct {
 	MaxBlobSize                 int
 	MaxNumSymbolsPerBlob        uint
 	OnchainStateRefreshInterval time.Duration
+	InstanceID                  int
 
 	BLSOperatorStateRetrieverAddr   string
 	EigenDAServiceManagerAddr       string
@@ -129,6 +130,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		EthClientConfig:             geth.ReadEthClientConfigRPCOnly(ctx),
 		MaxBlobSize:                 ctx.GlobalInt(flags.MaxBlobSize.Name),
 		MaxNumSymbolsPerBlob:        ctx.GlobalUint(flags.MaxNumSymbolsPerBlob.Name),
+		InstanceID:                  ctx.GlobalInt(flags.InstanceID.Name),
 		OnchainStateRefreshInterval: ctx.GlobalDuration(flags.OnchainStateRefreshInterval.Name),
 
 		BLSOperatorStateRetrieverAddr:   ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
