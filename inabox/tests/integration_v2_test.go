@@ -34,8 +34,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		TODO: Decompose this test into smaller tests that cover each of the above steps individually.
 	*/
 	It("test end to end scenario", func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel()
+		ctx := context.Background()
 
 		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
 		signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
@@ -60,10 +59,10 @@ var _ = Describe("Inabox v2 Integration", func() {
 		blob2, err := payload2.ToBlob(codecs.PolynomialFormEval)
 		Expect(err).To(BeNil())
 
-		reply1, err := disperseBlob(ctx, disp, blob1.Serialize())
+		reply1, err := disperseBlob(disp, blob1.Serialize())
 		Expect(err).To(BeNil())
 
-		reply2, err := disperseBlob(ctx, disp, blob2.Serialize())
+		reply2, err := disperseBlob(disp, blob2.Serialize())
 		Expect(err).To(BeNil())
 
 		// necessary to ensure that reference block number < current block number
@@ -171,7 +170,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		blob3, err := randomPayload(1000).ToBlob(codecs.PolynomialFormEval)
 		Expect(err).To(BeNil())
 
-		reply3, err := disperseBlob(ctx, disp, blob3.Serialize())
+		reply3, err := disperseBlob(disp, blob3.Serialize())
 		Expect(err).To(BeNil())
 
 		// necessary to ensure that reference block number < current block number
@@ -210,11 +209,14 @@ func randomPayload(size int) *coretypes.Payload {
 	return coretypes.NewPayload(data)
 }
 
-func disperseBlob(ctx context.Context, disp clients.DisperserClient, blob []byte) (*disperserpb.BlobStatusReply, error) {
+func disperseBlob(disp clients.DisperserClient, blob []byte) (*disperserpb.BlobStatusReply, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
 	ticker := time.NewTicker(time.Second * 1)
 	defer ticker.Stop()
 
-	_, key, err := disp.DisperseBlob(ctx, blob, 0, []uint8{0, 1})
+	_, key, err := disp.DisperseBlob(blob, 0, []uint8{0, 1})
 	if err != nil {
 		return nil, err
 	}
