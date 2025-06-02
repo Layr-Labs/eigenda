@@ -375,19 +375,19 @@
                 </li>
               
                 <li>
-                  <a href="#disperser.v2.GetPaymentStateQuorumSpecificReply"><span class="badge">M</span>GetPaymentStateQuorumSpecificReply</a>
+                  <a href="#disperser.v2.GetPaymentStateForAllQuorumsReply"><span class="badge">M</span>GetPaymentStateForAllQuorumsReply</a>
                 </li>
               
                 <li>
-                  <a href="#disperser.v2.GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry"><span class="badge">M</span>GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry</a>
+                  <a href="#disperser.v2.GetPaymentStateForAllQuorumsReply.PeriodRecordsEntry"><span class="badge">M</span>GetPaymentStateForAllQuorumsReply.PeriodRecordsEntry</a>
                 </li>
               
                 <li>
-                  <a href="#disperser.v2.GetPaymentStateQuorumSpecificReply.ReservationsEntry"><span class="badge">M</span>GetPaymentStateQuorumSpecificReply.ReservationsEntry</a>
+                  <a href="#disperser.v2.GetPaymentStateForAllQuorumsReply.ReservationsEntry"><span class="badge">M</span>GetPaymentStateForAllQuorumsReply.ReservationsEntry</a>
                 </li>
               
                 <li>
-                  <a href="#disperser.v2.GetPaymentStateQuorumSpecificRequest"><span class="badge">M</span>GetPaymentStateQuorumSpecificRequest</a>
+                  <a href="#disperser.v2.GetPaymentStateForAllQuorumsRequest"><span class="badge">M</span>GetPaymentStateForAllQuorumsRequest</a>
                 </li>
               
                 <li>
@@ -2443,8 +2443,8 @@ which is dispersed separately. </p></td>
 
         
       
-        <h3 id="disperser.v2.GetPaymentStateQuorumSpecificReply">GetPaymentStateQuorumSpecificReply</h3>
-        <p>GetPaymentStateQuorumSpecificReply contains the payment state of an account.</p>
+        <h3 id="disperser.v2.GetPaymentStateForAllQuorumsReply">GetPaymentStateForAllQuorumsReply</h3>
+        <p>GetPaymentStateForAllQuorumsReply contains the payment state of an account.</p>
 
         
           <table class="field-table">
@@ -2462,14 +2462,14 @@ which is dispersed separately. </p></td>
               
                 <tr>
                   <td>period_records</td>
-                  <td><a href="#disperser.v2.GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry">GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry</a></td>
+                  <td><a href="#disperser.v2.GetPaymentStateForAllQuorumsReply.PeriodRecordsEntry">GetPaymentStateForAllQuorumsReply.PeriodRecordsEntry</a></td>
                   <td>repeated</td>
                   <td><p>period_records maps quorum IDs to the off-chain account reservation usage records for the current and next two periods </p></td>
                 </tr>
               
                 <tr>
                   <td>reservations</td>
-                  <td><a href="#disperser.v2.GetPaymentStateQuorumSpecificReply.ReservationsEntry">GetPaymentStateQuorumSpecificReply.ReservationsEntry</a></td>
+                  <td><a href="#disperser.v2.GetPaymentStateForAllQuorumsReply.ReservationsEntry">GetPaymentStateForAllQuorumsReply.ReservationsEntry</a></td>
                   <td>repeated</td>
                   <td><p>reservations maps quorum IDs to the on-chain account reservation record </p></td>
                 </tr>
@@ -2495,7 +2495,7 @@ which is dispersed separately. </p></td>
 
         
       
-        <h3 id="disperser.v2.GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry">GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry</h3>
+        <h3 id="disperser.v2.GetPaymentStateForAllQuorumsReply.PeriodRecordsEntry">GetPaymentStateForAllQuorumsReply.PeriodRecordsEntry</h3>
         <p></p>
 
         
@@ -2526,7 +2526,7 @@ which is dispersed separately. </p></td>
 
         
       
-        <h3 id="disperser.v2.GetPaymentStateQuorumSpecificReply.ReservationsEntry">GetPaymentStateQuorumSpecificReply.ReservationsEntry</h3>
+        <h3 id="disperser.v2.GetPaymentStateForAllQuorumsReply.ReservationsEntry">GetPaymentStateForAllQuorumsReply.ReservationsEntry</h3>
         <p></p>
 
         
@@ -2557,8 +2557,8 @@ which is dispersed separately. </p></td>
 
         
       
-        <h3 id="disperser.v2.GetPaymentStateQuorumSpecificRequest">GetPaymentStateQuorumSpecificRequest</h3>
-        <p>GetPaymentStateQuorumSpecificRequest contains parameters to query the payment state of an account.</p>
+        <h3 id="disperser.v2.GetPaymentStateForAllQuorumsRequest">GetPaymentStateForAllQuorumsRequest</h3>
+        <p>GetPaymentStateForAllQuorumsRequest contains parameters to query the payment state of an account.</p>
 
         
           <table class="field-table">
@@ -3214,7 +3214,7 @@ https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da4490
                 <td><p>GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
 EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
 As reservation moves to be quorum specific and served by permissionless dispersers, GetPaymentState will soon be deprecated
-in replacement of GetPaymentStateQuorumSpecific to include more specifications. During the endpoint migration time, the response
+in replacement of GetPaymentStateForAllQuorums to include more specifications. During the endpoint migration time, the response
 uses quorum 0 for the global parameters, and the most retrictive reservation parameters of a user across quorums. For
 OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values for off-chain payments.
 For other dispersers, they will provide 0 for offchain payments. A client using non-EigenDA dispersers should not worry about
@@ -3229,10 +3229,10 @@ https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da4490
               </tr>
             
               <tr>
-                <td>GetPaymentStateQuorumSpecific</td>
-                <td><a href="#disperser.v2.GetPaymentStateQuorumSpecificRequest">GetPaymentStateQuorumSpecificRequest</a></td>
-                <td><a href="#disperser.v2.GetPaymentStateQuorumSpecificReply">GetPaymentStateQuorumSpecificReply</a></td>
-                <td><p>GetPaymentStateQuorumSpecific is a utility method to get the payment state of a given account, at a given disperser.
+                <td>GetPaymentStateForAllQuorums</td>
+                <td><a href="#disperser.v2.GetPaymentStateForAllQuorumsRequest">GetPaymentStateForAllQuorumsRequest</a></td>
+                <td><a href="#disperser.v2.GetPaymentStateForAllQuorumsReply">GetPaymentStateForAllQuorumsReply</a></td>
+                <td><p>GetPaymentStateForAllQuorums is a utility method to get the payment state of a given account, at a given disperser.
 EigenDA&#39;s dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id.
 A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it dispersed from.
 That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.

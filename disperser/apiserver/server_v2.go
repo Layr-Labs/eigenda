@@ -368,6 +368,6 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 }
 
 // TODO(hopeyen): separate this into a subsequent PR
-func (s *DispersalServerV2) GetPaymentStateQuorumSpecific(ctx context.Context, req *pb.GetPaymentStateQuorumSpecificRequest) (*pb.GetPaymentStateQuorumSpecificReply, error) {
+func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, req *pb.GetPaymentStateForAllQuorumsRequest) (*pb.GetPaymentStateForAllQuorumsReply, error) {
 	return nil, api.NewErrorUnimplemented()
 }

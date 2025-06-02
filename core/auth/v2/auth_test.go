@@ -137,7 +137,7 @@ func TestAuthenticatePaymentStateRequestValid(t *testing.T) {
 
 	request := mockGetPaymentStateRequest(accountId, signature)
 
-	err = paymentStateAuthenticator.AuthenticatePaymentStateQuorumSpecificRequest(accountId, request)
+	err = paymentStateAuthenticator.AuthenticatePaymentStateForAllQuorumsRequest(accountId, request)
 	assert.NoError(t, err)
 }
 
@@ -145,7 +145,7 @@ func TestAuthenticatePaymentStateRequestInvalidSignatureLength(t *testing.T) {
 	paymentStateAuthenticator := auth.NewPaymentStateAuthenticator(maxPastAge, maxFutureAge)
 	request := mockGetPaymentStateRequest(gethcommon.HexToAddress("0x123"), []byte{1, 2, 3})
 
-	err := paymentStateAuthenticator.AuthenticatePaymentStateQuorumSpecificRequest(gethcommon.HexToAddress("0x123"), request)
+	err := paymentStateAuthenticator.AuthenticatePaymentStateForAllQuorumsRequest(gethcommon.HexToAddress("0x123"), request)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "signature length is unexpected")
 }
@@ -153,7 +153,7 @@ func TestAuthenticatePaymentStateRequestInvalidSignatureLength(t *testing.T) {
 func TestAuthenticatePaymentStateRequestInvalidPublicKey(t *testing.T) {
 	paymentStateAuthenticator := auth.NewPaymentStateAuthenticator(maxPastAge, maxFutureAge)
 	request := mockGetPaymentStateRequest(gethcommon.Address{}, make([]byte, 65))
-	err := paymentStateAuthenticator.AuthenticatePaymentStateQuorumSpecificRequest(gethcommon.Address{}, request)
+	err := paymentStateAuthenticator.AuthenticatePaymentStateForAllQuorumsRequest(gethcommon.Address{}, request)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to recover public key from signature")
 }
@@ -176,7 +176,7 @@ func TestAuthenticatePaymentStateRequestSignatureMismatch(t *testing.T) {
 
 	request := mockGetPaymentStateRequest(accountId, signature)
 
-	err = paymentStateAuthenticator.AuthenticatePaymentStateQuorumSpecificRequest(accountId, request)
+	err = paymentStateAuthenticator.AuthenticatePaymentStateForAllQuorumsRequest(accountId, request)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "signature doesn't match with provided public key")
 }
@@ -200,12 +200,12 @@ func TestAuthenticatePaymentStateRequestCorruptedSignature(t *testing.T) {
 	signature[0] ^= 0x01
 	request := mockGetPaymentStateRequest(accountId, signature)
 
-	err = paymentStateAuthenticator.AuthenticatePaymentStateQuorumSpecificRequest(accountId, request)
+	err = paymentStateAuthenticator.AuthenticatePaymentStateForAllQuorumsRequest(accountId, request)
 	assert.Error(t, err)
 }
 
-func mockGetPaymentStateRequest(accountId gethcommon.Address, signature []byte) *disperser_rpc.GetPaymentStateQuorumSpecificRequest {
-	return &disperser_rpc.GetPaymentStateQuorumSpecificRequest{
+func mockGetPaymentStateRequest(accountId gethcommon.Address, signature []byte) *disperser_rpc.GetPaymentStateForAllQuorumsRequest {
+	return &disperser_rpc.GetPaymentStateForAllQuorumsRequest{
 		AccountId: accountId.Hex(),
 		Signature: signature,
 		Timestamp: fixedTimestamp,

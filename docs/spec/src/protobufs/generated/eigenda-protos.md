@@ -53,10 +53,10 @@
     - [BlobStatusRequest](#disperser-v2-BlobStatusRequest)
     - [DisperseBlobReply](#disperser-v2-DisperseBlobReply)
     - [DisperseBlobRequest](#disperser-v2-DisperseBlobRequest)
-    - [GetPaymentStateQuorumSpecificReply](#disperser-v2-GetPaymentStateQuorumSpecificReply)
-    - [GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry](#disperser-v2-GetPaymentStateQuorumSpecificReply-PeriodRecordsEntry)
-    - [GetPaymentStateQuorumSpecificReply.ReservationsEntry](#disperser-v2-GetPaymentStateQuorumSpecificReply-ReservationsEntry)
-    - [GetPaymentStateQuorumSpecificRequest](#disperser-v2-GetPaymentStateQuorumSpecificRequest)
+    - [GetPaymentStateForAllQuorumsReply](#disperser-v2-GetPaymentStateForAllQuorumsReply)
+    - [GetPaymentStateForAllQuorumsReply.PeriodRecordsEntry](#disperser-v2-GetPaymentStateForAllQuorumsReply-PeriodRecordsEntry)
+    - [GetPaymentStateForAllQuorumsReply.ReservationsEntry](#disperser-v2-GetPaymentStateForAllQuorumsReply-ReservationsEntry)
+    - [GetPaymentStateForAllQuorumsRequest](#disperser-v2-GetPaymentStateForAllQuorumsRequest)
     - [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply)
     - [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest)
     - [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams)
@@ -989,17 +989,17 @@ This header can be thought of as an &#34;eigenDA tx&#34;, in that it plays a pur
 
 
 
-<a name="disperser-v2-GetPaymentStateQuorumSpecificReply"></a>
+<a name="disperser-v2-GetPaymentStateForAllQuorumsReply"></a>
 
-### GetPaymentStateQuorumSpecificReply
-GetPaymentStateQuorumSpecificReply contains the payment state of an account.
+### GetPaymentStateForAllQuorumsReply
+GetPaymentStateForAllQuorumsReply contains the payment state of an account.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | payment_vault_params | [PaymentVaultParams](#disperser-v2-PaymentVaultParams) |  | payment vault parameters with per-quorum configurations |
-| period_records | [GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry](#disperser-v2-GetPaymentStateQuorumSpecificReply-PeriodRecordsEntry) | repeated | period_records maps quorum IDs to the off-chain account reservation usage records for the current and next two periods |
-| reservations | [GetPaymentStateQuorumSpecificReply.ReservationsEntry](#disperser-v2-GetPaymentStateQuorumSpecificReply-ReservationsEntry) | repeated | reservations maps quorum IDs to the on-chain account reservation record |
+| period_records | [GetPaymentStateForAllQuorumsReply.PeriodRecordsEntry](#disperser-v2-GetPaymentStateForAllQuorumsReply-PeriodRecordsEntry) | repeated | period_records maps quorum IDs to the off-chain account reservation usage records for the current and next two periods |
+| reservations | [GetPaymentStateForAllQuorumsReply.ReservationsEntry](#disperser-v2-GetPaymentStateForAllQuorumsReply-ReservationsEntry) | repeated | reservations maps quorum IDs to the on-chain account reservation record |
 | cumulative_payment | [bytes](#bytes) |  | off-chain on-demand payment usage |
 | onchain_cumulative_payment | [bytes](#bytes) |  | on-chain on-demand payment deposited |
 
@@ -1008,9 +1008,9 @@ GetPaymentStateQuorumSpecificReply contains the payment state of an account.
 
 
 
-<a name="disperser-v2-GetPaymentStateQuorumSpecificReply-PeriodRecordsEntry"></a>
+<a name="disperser-v2-GetPaymentStateForAllQuorumsReply-PeriodRecordsEntry"></a>
 
-### GetPaymentStateQuorumSpecificReply.PeriodRecordsEntry
+### GetPaymentStateForAllQuorumsReply.PeriodRecordsEntry
 
 
 
@@ -1024,9 +1024,9 @@ GetPaymentStateQuorumSpecificReply contains the payment state of an account.
 
 
 
-<a name="disperser-v2-GetPaymentStateQuorumSpecificReply-ReservationsEntry"></a>
+<a name="disperser-v2-GetPaymentStateForAllQuorumsReply-ReservationsEntry"></a>
 
-### GetPaymentStateQuorumSpecificReply.ReservationsEntry
+### GetPaymentStateForAllQuorumsReply.ReservationsEntry
 
 
 
@@ -1040,10 +1040,10 @@ GetPaymentStateQuorumSpecificReply contains the payment state of an account.
 
 
 
-<a name="disperser-v2-GetPaymentStateQuorumSpecificRequest"></a>
+<a name="disperser-v2-GetPaymentStateForAllQuorumsRequest"></a>
 
-### GetPaymentStateQuorumSpecificRequest
-GetPaymentStateQuorumSpecificRequest contains parameters to query the payment state of an account.
+### GetPaymentStateForAllQuorumsRequest
+GetPaymentStateForAllQuorumsRequest contains parameters to query the payment state of an account.
 
 
 | Field | Type | Label | Description |
@@ -1335,12 +1335,12 @@ Disperser defines the public APIs for dispersing blobs.
 | GetBlobCommitment | [BlobCommitmentRequest](#disperser-v2-BlobCommitmentRequest) | [BlobCommitmentReply](#disperser-v2-BlobCommitmentReply) | GetBlobCommitment is a utility method that calculates commitment for a blob payload. It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header and don&#39;t have the ability to calculate the commitment themselves (expensive operation which requires SRS points).
 
 For an example usage, see how our disperser_client makes a call to this endpoint when it doesn&#39;t have a local prover: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166 |
-| GetPaymentState | [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest) | [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply) | GetPaymentState is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting. As reservation moves to be quorum specific and served by permissionless dispersers, GetPaymentState will soon be deprecated in replacement of GetPaymentStateQuorumSpecific to include more specifications. During the endpoint migration time, the response uses quorum 0 for the global parameters, and the most retrictive reservation parameters of a user across quorums. For OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values for off-chain payments. For other dispersers, they will provide 0 for offchain payments. A client using non-EigenDA dispersers should not worry about the zero values for onDemand records.
+| GetPaymentState | [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest) | [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply) | GetPaymentState is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting. As reservation moves to be quorum specific and served by permissionless dispersers, GetPaymentState will soon be deprecated in replacement of GetPaymentStateForAllQuorums to include more specifications. During the endpoint migration time, the response uses quorum 0 for the global parameters, and the most retrictive reservation parameters of a user across quorums. For OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values for off-chain payments. For other dispersers, they will provide 0 for offchain payments. A client using non-EigenDA dispersers should not worry about the zero values for onDemand records.
 
 A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser. That typically only needs to be done once, and the state can be updated locally as the client disperses blobs. The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
 
 For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298 |
-| GetPaymentStateQuorumSpecific | [GetPaymentStateQuorumSpecificRequest](#disperser-v2-GetPaymentStateQuorumSpecificRequest) | [GetPaymentStateQuorumSpecificReply](#disperser-v2-GetPaymentStateQuorumSpecificReply) | GetPaymentStateQuorumSpecific is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id. A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it dispersed from. That typically only needs to be done once, and the state can be updated locally as the client disperses blobs. The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
+| GetPaymentStateForAllQuorums | [GetPaymentStateForAllQuorumsRequest](#disperser-v2-GetPaymentStateForAllQuorumsRequest) | [GetPaymentStateForAllQuorumsReply](#disperser-v2-GetPaymentStateForAllQuorumsReply) | GetPaymentStateForAllQuorums is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id. A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it dispersed from. That typically only needs to be done once, and the state can be updated locally as the client disperses blobs. The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
 
 For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298 |
 

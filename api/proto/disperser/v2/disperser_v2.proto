@@ -28,7 +28,7 @@ service Disperser {
   // GetPaymentState is a utility method to get the payment state of a given account, at a given disperser.
   // EigenDA's payment system for v2 is currently centralized, meaning that each disperser does its own accounting.
   // As reservation moves to be quorum specific and served by permissionless dispersers, GetPaymentState will soon be deprecated
-  // in replacement of GetPaymentStateQuorumSpecific to include more specifications. During the endpoint migration time, the response
+  // in replacement of GetPaymentStateForAllQuorums to include more specifications. During the endpoint migration time, the response
   // uses quorum 0 for the global parameters, and the most retrictive reservation parameters of a user across quorums. For
   // OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values for off-chain payments.
   // For other dispersers, they will provide 0 for offchain payments. A client using non-EigenDA dispersers should not worry about
@@ -42,7 +42,7 @@ service Disperser {
   // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
   rpc GetPaymentState(GetPaymentStateRequest) returns (GetPaymentStateReply) {}
 
-  // GetPaymentStateQuorumSpecific is a utility method to get the payment state of a given account, at a given disperser.
+  // GetPaymentStateForAllQuorums is a utility method to get the payment state of a given account, at a given disperser.
   // EigenDA's dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id.
   // A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it dispersed from.
   // That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
@@ -50,7 +50,7 @@ service Disperser {
   //
   // For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct:
   // https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298
-  rpc GetPaymentStateQuorumSpecific(GetPaymentStateQuorumSpecificRequest) returns (GetPaymentStateQuorumSpecificReply) {}
+  rpc GetPaymentStateForAllQuorums(GetPaymentStateForAllQuorumsRequest) returns (GetPaymentStateForAllQuorumsReply) {}
 }
 
 // Requests and Replies
@@ -144,8 +144,8 @@ message GetPaymentStateRequest {
   uint64 timestamp = 3;
 }
 
-// GetPaymentStateQuorumSpecificRequest contains parameters to query the payment state of an account.
-message GetPaymentStateQuorumSpecificRequest {
+// GetPaymentStateForAllQuorumsRequest contains parameters to query the payment state of an account.
+message GetPaymentStateForAllQuorumsRequest {
   // The ID of the account being queried. This account ID is an eth wallet address of the user.
   string account_id = 1;
   // Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server's clock,
@@ -169,8 +169,8 @@ message GetPaymentStateReply {
   bytes onchain_cumulative_payment = 5;
 }
 
-// GetPaymentStateQuorumSpecificReply contains the payment state of an account.
-message GetPaymentStateQuorumSpecificReply {
+// GetPaymentStateForAllQuorumsReply contains the payment state of an account.
+message GetPaymentStateForAllQuorumsReply {
   // payment vault parameters with per-quorum configurations
   PaymentVaultParams payment_vault_params = 1;
   // period_records maps quorum IDs to the off-chain account reservation usage records for the current and next two periods

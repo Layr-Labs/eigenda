@@ -70,10 +70,10 @@ func (a *authenticator) AuthenticatePaymentStateRequest(accountAddr common.Addre
 	return a.authenticatePaymentRequest(accountAddr, request.GetSignature(), request.GetTimestamp())
 }
 
-// AuthenticatePaymentStateQuorumSpecificRequest verifies the signature of the quorum specific payment state request
+// AuthenticatePaymentStateForAllQuorumsRequest verifies the signature of the quorum specific payment state request
 // The signature is signed over the byte representation of the account ID and requestHash
 // See implementation of BlobRequestSigner.SignPaymentStateRequest for more details
-func (a *authenticator) AuthenticatePaymentStateQuorumSpecificRequest(accountAddr common.Address, request *pb.GetPaymentStateQuorumSpecificRequest) error {
+func (a *authenticator) AuthenticatePaymentStateForAllQuorumsRequest(accountAddr common.Address, request *pb.GetPaymentStateForAllQuorumsRequest) error {
 	return a.authenticatePaymentRequest(accountAddr, request.GetSignature(), request.GetTimestamp())
 }
 
