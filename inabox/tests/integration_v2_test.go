@@ -8,24 +8,149 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/docker/go-units"
+	"google.golang.org/grpc"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
 	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	nodegrpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
 	"github.com/Layr-Labs/eigenda/core"
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/wealdtech/go-merkletree/v2"
 	"github.com/wealdtech/go-merkletree/v2/keccak256"
 )
+
+func RandomG1Point() (encoding.G1Commitment, error) {
+	// 1) pick r ← 𝐹ᵣ at random
+	var r fr.Element
+	if _, err := r.SetRandom(); err != nil {
+		return encoding.G1Commitment{}, err
+	}
+
+	// 2) compute P = r·G₁ in Jacobian form
+	G1Jac, _, _, _ := bn254.Generators()
+	var Pjac bn254.G1Jac
+
+	var rBigInt big.Int
+	r.BigInt(&rBigInt)
+	Pjac.ScalarMultiplication(&G1Jac, &rBigInt)
+
+	// 3) convert to affine (x, y)
+	var Paff bn254.G1Affine
+	Paff.FromJacobian(&Pjac)
+	return encoding.G1Commitment(Paff), nil
+}
+
+func RandomG2Point() (encoding.G2Commitment, error) {
+
+	// 1) pick r ← 𝐹ᵣ at random
+	var r fr.Element
+	if _, err := r.SetRandom(); err != nil {
+		return encoding.G2Commitment{}, err
+	}
+
+	// 2) compute P = r·G₂ in Jacobian form
+	_, g2Jac, _, _ := bn254.Generators()
+	var Pjac bn254.G2Jac
+
+	var rBigInt big.Int
+	r.BigInt(&rBigInt)
+	Pjac.ScalarMultiplication(&g2Jac, &rBigInt)
+
+	// 3) convert to affine (x, y)
+	var Paff bn254.G2Affine
+	Paff.FromJacobian(&Pjac)
+	return encoding.G2Commitment(Paff), nil
+}
+
+var _ = Describe("Inabox v2 blacklisting Integration test", func() {
+	It("test end to end scenario of blacklisting", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+
+		// random G1 point
+		g1Commitment, err := RandomG1Point()
+		if err != nil {
+			Fail("failed to generate random G1 point")
+		}
+
+		g2Commitment, err := RandomG2Point()
+		if err != nil {
+			Fail("failed to generate random G2 point")
+		}
+
+		// random data blob certificate
+		blobCert := &corev2.BlobCertificate{
+			BlobHeader: &corev2.BlobHeader{
+				BlobVersion: 2,
+				BlobCommitments: encoding.BlobCommitments{
+					Commitment:       &g1Commitment,
+					LengthCommitment: &g2Commitment,
+					LengthProof:      &g2Commitment,
+					Length:           100,
+				},
+				QuorumNumbers: []core.QuorumID{0, 1},
+				PaymentMetadata: core.PaymentMetadata{
+					AccountID:         gethcommon.HexToAddress("0x1234567890123456789012345678901234567890"),
+					Timestamp:         time.Now().UnixNano(),
+					CumulativePayment: big.NewInt(100),
+				},
+			},
+			Signature: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65},
+			RelayKeys: []corev2.RelayKey{0, 1},
+		}
+
+		blobCertProto, err := blobCert.ToProtobuf()
+		if err != nil {
+			Fail("failed to convert blob certificate to protobuf")
+		}
+
+		request := &nodegrpc.StoreChunksRequest{
+			Batch: &commonpb.Batch{
+				Header: &commonpb.BatchHeader{
+					BatchRoot:            []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32},
+					ReferenceBlockNumber: 100,
+				},
+				BlobCertificates: []*commonpb.BlobCertificate{
+					blobCertProto,
+				},
+			},
+			DisperserID: api.EigenLabsDisperserID,
+			Timestamp:   uint32(time.Now().Unix()),
+		}
+
+		addr := fmt.Sprintf("%v:%v", "localhost", "30016")
+		dialOptions := clients.GetGrpcDialOptions(false, 4*units.MiB)
+		conn, err := grpc.NewClient(addr, dialOptions...)
+		if err != nil {
+			Fail("failed to create grpc connection")
+		}
+
+		dispersalClient := nodegrpc.NewDispersalClient(conn)
+
+		reply, err := dispersalClient.StoreChunks(ctx, request)
+		if err != nil {
+			Fail("failed to store chunks")
+		}
+		Expect(reply).To(Not(BeNil()))
+
+		Expect(err).To(BeNil())
+	})
+})
 
 var _ = Describe("Inabox v2 Integration", func() {
 	It("test end to end scenario", func() {
