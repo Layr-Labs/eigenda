@@ -107,21 +107,22 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 	quorumIDs := make([]core.QuorumID, 0, len(reservations))
 	reservationWindows := make(map[core.QuorumID]uint64, len(reservations))
 	requestReservationPeriods := make(map[core.QuorumID]uint64, len(reservations))
+	// Gather quorums the user had an reservations on and relevant quorum configurations
 	for quorumID := range reservations {
 		quorumIDs = append(quorumIDs, quorumID)
-		// TODO: update to use actual quorum configs when the payment vault update goes through
 		reservationWindows[quorumID] = m.ChainPaymentState.GetReservationWindow(quorumID)
 		requestReservationPeriods[quorumID] = GetReservationPeriodByNanosecond(header.Timestamp, m.ChainPaymentState.GetReservationWindow(quorumID))
 	}
+	// Validate quorumIDs is a subset of the quorumNumbers in the dispersal request; this should be guaranteed by GetReservedPaymentByAccountAndQuorums
 	if err := m.ValidateQuorum(quorumNumbers, quorumIDs); err != nil {
 		return fmt.Errorf("invalid quorum for reservation: %w", err)
 	}
 
+	// Validate the used reservations are active and is of valid periods
 	for quorumID, reservation := range reservations {
 		if !reservation.IsActiveByNanosecond(header.Timestamp) {
 			return fmt.Errorf("reservation not active")
 		}
-		// TODO: update to use actual quorum configs when the payment vault update goes through
 		if !m.ValidateReservationPeriod(reservation, requestReservationPeriods[quorumID], reservationWindows[quorumID], receivedAt) {
 			return fmt.Errorf("invalid reservation period for reservation on quorum %d", quorumID)
 		}

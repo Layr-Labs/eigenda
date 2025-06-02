@@ -22,6 +22,8 @@ type OnchainPayment interface {
 	RefreshOnchainPaymentState(ctx context.Context) error
 	GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error)
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error)
+	GetQuorumPaymentConfig(quorumID core.QuorumID) (*core.PaymentQuorumConfig, error)
+	GetQuorumProtocolConfig(quorumID core.QuorumID) (*core.PaymentQuorumProtocolConfig, error)
 	GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error)
 	GetOnDemandGlobalSymbolsPerSecond(quorumID core.QuorumID) uint64
 	GetOnDemandGlobalRatePeriodInterval(quorumID core.QuorumID) uint64
@@ -350,8 +352,8 @@ func (pcs *OnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([
 	return quorumNumbers, nil
 }
 
-// getQuorumPaymentConfig safely retrieves a quorum payment config
-func (pcs *OnchainPaymentState) getQuorumPaymentConfig(quorumID core.QuorumID) (*core.PaymentQuorumConfig, error) {
+// GetQuorumPaymentConfig safely retrieves a quorum payment config
+func (pcs *OnchainPaymentState) GetQuorumPaymentConfig(quorumID core.QuorumID) (*core.PaymentQuorumConfig, error) {
 	params := pcs.PaymentVaultParams.Load()
 	if params == nil {
 		pcs.logger.Error("PaymentVaultParams is nil")
@@ -365,8 +367,8 @@ func (pcs *OnchainPaymentState) getQuorumPaymentConfig(quorumID core.QuorumID) (
 	return config, nil
 }
 
-// getQuorumProtocolConfig safely retrieves a quorum protocol config
-func (pcs *OnchainPaymentState) getQuorumProtocolConfig(quorumID core.QuorumID) (*core.PaymentQuorumProtocolConfig, error) {
+// GetQuorumProtocolConfig safely retrieves a quorum protocol config
+func (pcs *OnchainPaymentState) GetQuorumProtocolConfig(quorumID core.QuorumID) (*core.PaymentQuorumProtocolConfig, error) {
 	params := pcs.PaymentVaultParams.Load()
 	if params == nil {
 		pcs.logger.Error("PaymentVaultParams is nil")
@@ -381,7 +383,7 @@ func (pcs *OnchainPaymentState) getQuorumProtocolConfig(quorumID core.QuorumID) 
 }
 
 func (pcs *OnchainPaymentState) GetOnDemandGlobalSymbolsPerSecond(quorumID core.QuorumID) uint64 {
-	config, err := pcs.getQuorumPaymentConfig(quorumID)
+	config, err := pcs.GetQuorumPaymentConfig(quorumID)
 	if err != nil {
 		return 0
 	}
@@ -389,7 +391,7 @@ func (pcs *OnchainPaymentState) GetOnDemandGlobalSymbolsPerSecond(quorumID core.
 }
 
 func (pcs *OnchainPaymentState) GetOnDemandGlobalRatePeriodInterval(quorumID core.QuorumID) uint64 {
-	config, err := pcs.getQuorumProtocolConfig(quorumID)
+	config, err := pcs.GetQuorumProtocolConfig(quorumID)
 	if err != nil {
 		return 0
 	}
@@ -397,7 +399,7 @@ func (pcs *OnchainPaymentState) GetOnDemandGlobalRatePeriodInterval(quorumID cor
 }
 
 func (pcs *OnchainPaymentState) GetMinNumSymbols(quorumID core.QuorumID) uint64 {
-	config, err := pcs.getQuorumProtocolConfig(quorumID)
+	config, err := pcs.GetQuorumProtocolConfig(quorumID)
 	if err != nil {
 		return math.MaxUint64
 	}
@@ -405,7 +407,7 @@ func (pcs *OnchainPaymentState) GetMinNumSymbols(quorumID core.QuorumID) uint64 
 }
 
 func (pcs *OnchainPaymentState) GetPricePerSymbol(quorumID core.QuorumID) uint64 {
-	config, err := pcs.getQuorumPaymentConfig(quorumID)
+	config, err := pcs.GetQuorumPaymentConfig(quorumID)
 	if err != nil {
 		return math.MaxUint64
 	}
@@ -413,7 +415,7 @@ func (pcs *OnchainPaymentState) GetPricePerSymbol(quorumID core.QuorumID) uint64
 }
 
 func (pcs *OnchainPaymentState) GetReservationWindow(quorumID core.QuorumID) uint64 {
-	config, err := pcs.getQuorumProtocolConfig(quorumID)
+	config, err := pcs.GetQuorumProtocolConfig(quorumID)
 	if err != nil {
 		return 0
 	}

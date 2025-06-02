@@ -113,3 +113,13 @@ func (m *MockOnchainPaymentState) GetQuorumNumbers(ctx context.Context) ([]uint8
 	}
 	return value, args.Error(1)
 }
+
+func (m *MockOnchainPaymentState) GetQuorumPaymentConfig(quorumID core.QuorumID) (*core.PaymentQuorumConfig, error) {
+	args := m.Called(quorumID)
+	return args.Get(0).(*core.PaymentQuorumConfig), args.Error(1)
+}
+
+func (m *MockOnchainPaymentState) GetQuorumProtocolConfig(quorumID core.QuorumID) (*core.PaymentQuorumProtocolConfig, error) {
+	args := m.Called(quorumID)
+	return args.Get(0).(*core.PaymentQuorumProtocolConfig), args.Error(1)
+}
