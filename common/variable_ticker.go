@@ -215,7 +215,7 @@ func (t *VariableTicker) computePeriod() {
 		}
 	} else {
 		// We are above the target frequency.
-		t.currentFrequency = t.targetFrequency - (t.acceleration * elapsedSinceAnchorTime.Seconds())
+		t.currentFrequency = t.currentFrequency - (t.acceleration * elapsedSinceAnchorTime.Seconds())
 		if t.currentFrequency < t.targetFrequency {
 			// If we over shoot, adopt the target frequency.
 			t.currentFrequency = t.targetFrequency

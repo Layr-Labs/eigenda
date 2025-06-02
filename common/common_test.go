@@ -1,11 +1,8 @@
 package common_test
 
 import (
-	"context"
 	"encoding/hex"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
@@ -117,24 +114,4 @@ func TestEncodeDecodeStructWithPointer(t *testing.T) {
 	str, err := common.DecodeFromBytes[testStruct](bytes)
 	assert.Nil(t, err)
 	assert.Equal(t, s, str)
-}
-
-// TODO don't merge
-
-func TestTicker(t *testing.T) {
-	ticker := common.NewVariableTickerWithFrequency(context.Background(), 10.0)
-	defer ticker.Close()
-
-	ticker.SetAcceleration(0.05)
-	ticker.SetTargetFrequency(1)
-
-	previousTick := time.Now()
-
-	for {
-		<-ticker.Tick()
-		currentTick := time.Now()
-		elapsed := currentTick.Sub(previousTick)
-		previousTick = currentTick
-		fmt.Printf("elapsed: %v\n", elapsed)
-	}
 }
