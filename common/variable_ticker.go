@@ -63,12 +63,17 @@ func NewVariableTickerWithPeriod(ctx context.Context, period time.Duration) (*Va
 func NewVariableTickerWithFrequency(ctx context.Context, frequency float64) *VariableTicker {
 	ctx, cancel := context.WithCancel(ctx)
 
+	currentPeriod := time.Duration(0)
+	if frequency > 0 {
+		currentPeriod = time.Duration(float64(time.Second) / frequency)
+	}
+
 	ticker := &VariableTicker{
 		ctx:              ctx,
 		close:            cancel,
 		acceleration:     0.0,
 		currentFrequency: frequency,
-		currentPeriod:    time.Duration(1.0 / frequency),
+		currentPeriod:    currentPeriod,
 		targetFrequency:  frequency,
 		tickChan:         make(chan struct{}),
 		controlChan:      make(chan any, 2),
@@ -124,6 +129,8 @@ func (t *VariableTicker) run() {
 	timer := time.NewTimer(t.currentPeriod)
 	defer timer.Stop()
 
+	previousTickTime := time.Now()
+
 	for {
 		// Check for control messages to update the ticker's configuration.
 		select {
@@ -133,8 +140,10 @@ func (t *VariableTicker) run() {
 			// No control message received, continue with the current configuration.
 		}
 
-		if t.currentFrequency == 0 {
-			// If the current frequency is zero, never tick.
+		t.computePeriod()
+		if t.currentPeriod == 0 {
+			// Period 0 is a proxy for an infinite period, do not tick.
+			fmt.Printf("VariableTicker: current period is 0, not ticking\n") // TODO
 			continue
 		}
 
@@ -145,8 +154,17 @@ func (t *VariableTicker) run() {
 			return
 		}
 
-		// Wait until it is time to send the next tick.
-		sleepTime := t.computeSleepTime()
+		now := time.Now()
+		elapsed := now.Sub(previousTickTime)
+		sleepTime := t.currentPeriod - elapsed
+		previousTickTime = now
+		if sleepTime < 0 {
+			// If ticks are requested less often than the configured frequency, no need to sleep.
+			continue
+		}
+
+		fmt.Printf("frequency: %f, period: %v, sleep time: %v\n", t.currentFrequency, t.currentPeriod, sleepTime) // TODO
+
 		timer.Reset(sleepTime)
 		select {
 		case <-timer.C:
@@ -177,10 +195,11 @@ func (t *VariableTicker) handleControlMessage(msg any) {
 	t.acceleration = acceleration
 }
 
-// computeSleepTime calculates the time to sleep until the next tick based on the current and target periods.
-func (t *VariableTicker) computeSleepTime() time.Duration {
+// computePeriod updates the current period based on configured frequency and acceleration
+func (t *VariableTicker) computePeriod() {
 	if t.currentFrequency == t.targetFrequency {
-		return t.currentPeriod
+		// shortcut, don't recompute period if the period is already correct
+		return
 	}
 
 	elapsedSinceAnchorTime := time.Since(t.anchorTime)
@@ -204,6 +223,9 @@ func (t *VariableTicker) computeSleepTime() time.Duration {
 		}
 	}
 
-	t.currentPeriod = time.Duration(1.0 / currentFrequency)
-	return t.currentPeriod
+	if currentFrequency == 0 {
+		t.currentPeriod = 0
+	} else {
+		t.currentPeriod = time.Duration(float64(time.Second) / currentFrequency)
+	}
 }
