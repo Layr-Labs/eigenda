@@ -122,11 +122,11 @@ func TestEncodeDecodeStructWithPointer(t *testing.T) {
 // TODO don't merge
 
 func TestTicker(t *testing.T) {
-	ticker := common.NewVariableTickerWithFrequency(context.Background(), 0.0)
+	ticker := common.NewVariableTickerWithFrequency(context.Background(), 10.0)
 	defer ticker.Close()
 
 	ticker.SetAcceleration(0.05)
-	ticker.SetTargetFrequency(100)
+	ticker.SetTargetFrequency(1)
 
 	previousTick := time.Now()
 

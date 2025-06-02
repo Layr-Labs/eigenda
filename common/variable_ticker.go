@@ -130,8 +130,6 @@ func (t *VariableTicker) run() {
 	timer := time.NewTimer(t.currentPeriod)
 	defer timer.Stop()
 
-	previousTickTime := time.Now()
-
 	for {
 		// Check for control messages to update the ticker's configuration.
 		select {
@@ -144,28 +142,23 @@ func (t *VariableTicker) run() {
 		t.computePeriod()
 		if t.currentPeriod == 0 {
 			// Period 0 is a proxy for an infinite period, do not tick.
-			fmt.Printf("VariableTicker: current period is 0, not ticking\n") // TODO
 			continue
 		}
 
-		fmt.Println("<tick>")
 		// Send a tick.
+		startOfTick := time.Now()
 		select {
 		case t.tickChan <- struct{}{}:
 		case <-t.ctx.Done():
 			return
 		}
 
-		now := time.Now()
-		elapsed := now.Sub(previousTickTime)
+		elapsed := time.Since(startOfTick)
 		sleepTime := t.currentPeriod - elapsed
-		previousTickTime = now
 		if sleepTime < 0 {
 			// If ticks are requested less often than the configured frequency, no need to sleep.
 			continue
 		}
-
-		fmt.Printf("frequency: %f, period: %v, sleep time: %v\n", t.currentFrequency, t.currentPeriod, sleepTime) // TODO
 
 		timer.Reset(sleepTime)
 		select {
