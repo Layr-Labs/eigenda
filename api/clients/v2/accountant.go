@@ -13,7 +13,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-var requiredQuorums = []uint8{0, 1}
+var requiredQuorums = []core.QuorumID{0, 1}
 
 type Accountant struct {
 	// on-chain states
