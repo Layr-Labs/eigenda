@@ -168,17 +168,18 @@ func (m *metrics) logMetrics() {
 			uint64((time.Duration(m.nanosecondsSpentFlushing.Load()) / time.Duration(flushCount)).Nanoseconds())
 	}
 
-	elapsedTime := uint64(time.Since(m.startTime).Nanoseconds())
+	elapsedTimeNanoseconds := uint64(time.Since(m.startTime).Nanoseconds())
+	elapsedTimeSeconds := float64(elapsedTimeNanoseconds) / float64(time.Second)
 
 	bytesWritten := m.bytesWritten.Load()
 	writeThroughput := uint64(0)
-	if elapsedTime > 0 {
-		writeThroughput = bytesWritten * uint64(time.Second) / elapsedTime
+	if elapsedTimeSeconds > 0 {
+		writeThroughput = uint64(float64(bytesWritten) / elapsedTimeSeconds)
 	}
 
 	readThroughput := uint64(0)
-	if elapsedTime > 0 {
-		readThroughput = m.bytesRead.Load() * uint64(time.Second) / elapsedTime
+	if elapsedTimeSeconds > 0 {
+		readThroughput = uint64(float64(m.bytesRead.Load()) / elapsedTimeSeconds)
 	}
 
 	m.logger.Infof("Benchmark Metrics (since most recent restart):\n"+
@@ -196,7 +197,7 @@ func (m *metrics) logMetrics() {
 		"    Flush Count:            %s\n"+
 		"    Average Flush Latency:  %s\n"+
 		"    Longest Flush Duration: %s",
-		util.PrettyPrintTime(elapsedTime),
+		util.PrettyPrintTime(elapsedTimeNanoseconds),
 		util.PrettyPrintBytes(writeThroughput),
 		util.PrettyPrintBytes(bytesWritten),
 		util.CommaOMatic(writeCount),
