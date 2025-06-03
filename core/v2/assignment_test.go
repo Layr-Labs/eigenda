@@ -188,7 +188,7 @@ func TestTwoQuorumsReverseOrder(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, assignmentsQuorum1, 4)
 
-	// Check that the lenght of the assignment for each operator is equal to the maximum of the assignments for that operator in each quorum
+	// Check that the length of the assignment for each operator is equal to the maximum of the assignments for that operator in each quorum
 	for id := range assignmentsBothQuorums {
 
 		// Get the bigger assignemnt between the two quorums
