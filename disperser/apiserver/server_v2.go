@@ -274,6 +274,8 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 	return nil
 }
 
+// GetPaymentState returns the payment state for a given account and the related on-chain parameters
+// Deprecated: Use GetPaymentStateForAllQuorums instead.
 func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
 	if s.meterer == nil {
 		return nil, errors.New("payment meterer is not enabled")
