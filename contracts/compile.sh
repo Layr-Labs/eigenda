@@ -52,5 +52,5 @@ contracts="PaymentVault \
   EigenDADisperserRegistry"
 
 for contract in $contracts; do
-  create_binding ./ $contract ./bindings
+  create_binding_abi_only ./ $contract ./bindings
 done
