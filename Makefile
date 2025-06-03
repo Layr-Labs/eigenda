@@ -52,6 +52,7 @@ build:
 	cd tools/traffic && make build
 	cd tools/kzgpad && make build
 	cd relay && make build
+	cd litt && make build
 
 dataapi-build:
 	cd disperser && go build -o ./bin/dataapi ./cmd/dataapi
