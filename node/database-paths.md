@@ -124,7 +124,7 @@ It's possible to change the `NODE_DB_PATH` after it has been set with the follow
 
 ## Adding a Path
 
-It's possible to add additional paths to `NODE_LITT_DB_STORAGE_PATHS`. This might be useful if want to add
+It's possible to add additional paths to `NODE_LITT_DB_STORAGE_PATHS`. This might be useful if you want to add
 additional storage space by adding additional disks. To do this, do the following:
 
 - Stop the validator node.
