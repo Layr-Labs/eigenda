@@ -48,9 +48,9 @@ fmt:
 	$(MAKE) -C contracts fmt
 	go fmt ./...
 
-# TODO: this should also check github workflows, contracts, etc.
+# TODO: this should also check github workflows, etc.
 fmt-check:
-	@output=$$(gofmt -l .); \
+	$(MAKE) -C contracts fmt-check
 	if [ -n "$$output" ]; then \
 		echo "Files not gofmt'd:"; \
 		echo "$$output"; \
