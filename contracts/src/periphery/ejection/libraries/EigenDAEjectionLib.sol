@@ -13,8 +13,8 @@ library EigenDAEjectionTypes {
 
     struct ProceedingParams {
         mapping(bytes32 => OperatorProceedingParams) operatorProceedingParams;
-        uint64 proceedingTime;
         uint64 proceedingDelay;
+        uint64 proceedingCooldown;
     }
 }
 
@@ -51,7 +51,11 @@ library EigenDAEjectionLib {
 
     function startChurn(bytes32 operatorId) internal {
         startProceeding(operatorId, churnParams());
-        emit ChurnStarted(operatorId, churnParams().operatorProceedingParams[operatorId].lastProceedingInitiated, churnParams().operatorProceedingParams[operatorId].proceedingTime);
+        emit ChurnStarted(
+            operatorId,
+            churnParams().operatorProceedingParams[operatorId].lastProceedingInitiated,
+            churnParams().operatorProceedingParams[operatorId].proceedingTime
+        );
     }
 
     function cancelChurn(bytes32 operatorId) internal {
@@ -66,7 +70,11 @@ library EigenDAEjectionLib {
 
     function startEjection(bytes32 operatorId) internal {
         startProceeding(operatorId, ejectionParams());
-        emit EjectionStarted(operatorId, ejectionParams().operatorProceedingParams[operatorId].lastProceedingInitiated, ejectionParams().operatorProceedingParams[operatorId].proceedingTime);
+        emit EjectionStarted(
+            operatorId,
+            ejectionParams().operatorProceedingParams[operatorId].lastProceedingInitiated,
+            ejectionParams().operatorProceedingParams[operatorId].proceedingTime
+        );
     }
 
     function cancelEjection(bytes32 operatorId) internal {
@@ -80,55 +88,72 @@ library EigenDAEjectionLib {
     }
 
     function startProceeding(bytes32 operatorId, EigenDAEjectionTypes.ProceedingParams storage params) internal {
-        EigenDAEjectionTypes.OperatorProceedingParams storage operatorParams = params.operatorProceedingParams[operatorId];
+        EigenDAEjectionTypes.OperatorProceedingParams storage operatorParams =
+            params.operatorProceedingParams[operatorId];
 
-        require(operatorParams.proceedingTime == 0, "Ejection already in progress");
-        require(operatorParams.lastProceedingInitiated + params.ejectionCooldown <= block.timestamp, "Ejection cooldown not met");
+        require(operatorParams.proceedingTime == 0, "Proceeding already in progress");
+        require(
+            operatorParams.lastProceedingInitiated + params.proceedingCooldown <= block.timestamp,
+            "Proceeding cooldown not met"
+        );
 
-        operatorParams.proceedingTime = uint64(block.timestamp) + params.ejectionDelay;
+        operatorParams.proceedingTime = uint64(block.timestamp) + params.proceedingDelay;
         operatorParams.lastProceedingInitiated = uint64(block.timestamp);
-        emit EjectionStarted(operatorId, operatorParams.lastEjectionInitiated, operatorParams.ejectionTime);
+        emit EjectionStarted(operatorId, operatorParams.lastProceedingInitiated, operatorParams.proceedingTime);
     }
 
     function cancelProceeding(bytes32 operatorId, EigenDAEjectionTypes.ProceedingParams storage params) internal {
-        EigenDAEjectionTypes.OperatorProceedingParams storage operatorParams = params.operatorProceedingParams[operatorId];
-        require(operatorParams.ejectionTime > 0, "No ejection in progress");
+        EigenDAEjectionTypes.OperatorProceedingParams storage operatorParams =
+            params.operatorProceedingParams[operatorId];
+        require(operatorParams.proceedingTime > 0, "No proceeding in progress");
 
-        operatorParams.ejectionTime = 0;
+        operatorParams.proceedingTime = 0;
         emit EjectionCancelled(operatorId);
     }
 
     function completeProceeding(bytes32 operatorId, EigenDAEjectionTypes.ProceedingParams storage params) internal {
-        EigenDAEjectionTypes.OperatorProceedingParams storage operatorParams = params.operatorProceedingParams[operatorId];
-        require(operatorParams.ejectionTime > 0, "No ejection in progress");
+        EigenDAEjectionTypes.OperatorProceedingParams storage operatorParams =
+            params.operatorProceedingParams[operatorId];
+        require(operatorParams.proceedingTime > 0, "No proceeding in progress");
 
-        require(block.timestamp >= operatorParams.ejectionTime, "Ejection not yet due");
+        require(block.timestamp >= operatorParams.proceedingTime, "Proceeding not yet due");
 
-        operatorParams.ejectionTime = 0;
+        operatorParams.proceedingTime = 0;
         emit EjectionCompleted(operatorId);
     }
 
     function ejectionInitiated(bytes32 operatorId) internal view returns (bool) {
-        return ejectionParams().operatorEjectionParams[operatorId].ejectionTime > 0;
+        return ejectionParams().operatorProceedingParams[operatorId].proceedingTime > 0;
     }
 
     function churnInitiated(bytes32 operatorId) internal view returns (bool) {
-        return churnParams().operatorEjectionParams[operatorId].ejectionTime > 0;
+        return churnParams().operatorProceedingParams[operatorId].proceedingTime > 0;
     }
 
-    function proceedingInitiated(bytes32 operatorId, EigenDAEjectionTypes.ProceedingParams storage params) internal view returns (bool) {
-        return params.operatorEjectionParams[operatorId].ejectionTime > 0;
+    function proceedingInitiated(bytes32 operatorId, EigenDAEjectionTypes.ProceedingParams storage params)
+        internal
+        view
+        returns (bool)
+    {
+        return params.operatorProceedingParams[operatorId].proceedingTime > 0;
     }
 
-    function consumeSignature(bytes32 operatorId, address recipient, bytes32 salt, bytes memory signature, EigenDAEjectionTypes.ProceedingParams storage params) internal returns (bool) {
-        EigenDAEjectionTypes.OperatorProceedingParams storage operatorParams = params.operatorProceedingParams[operatorId];
+    function consumeSignature(
+        bytes32 operatorId,
+        address recipient,
+        bytes32 salt,
+        bytes memory signature,
+        EigenDAEjectionTypes.ProceedingParams storage params
+    ) internal {
+        EigenDAEjectionTypes.OperatorProceedingParams storage operatorParams =
+            params.operatorProceedingParams[operatorId];
 
         require(!operatorParams.salts[salt], "Signature already consumed");
         // Placeholder for signature verification logic
         // This should be replaced with actual signature verification logic
+        recipient;
         signature;
         operatorParams.salts[salt] = true;
-        return true;
     }
 
     function ejectionParams() internal view returns (EigenDAEjectionTypes.ProceedingParams storage) {
