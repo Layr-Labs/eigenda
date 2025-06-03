@@ -5,14 +5,15 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
@@ -44,15 +45,16 @@ type DispatcherConfig struct {
 	// SignificantSigningThresholdPercentage is a configurable "important" signing threshold. Right now, it's being
 	// used to track signing metrics, to understand system performance. If the value is 0, then special handling for
 	// the threshold is disabled.
-	// TODO (litt3): this might eventually be used to cause special case handling at an "important" threshold, e.g.
-	//  "update the attestation as soon as the threshold is reached."
 	SignificantSigningThresholdPercentage uint8
+	// Important signing thresholds for metrics reporting.
+	// Values should be between 0.0 (0% signed) and 1.0 (100% signed).
+	SignificantSigningMetricsThresholds []string
 }
 
 type Dispatcher struct {
 	*DispatcherConfig
 
-	blobMetadataStore *blobstore.BlobMetadataStore
+	blobMetadataStore blobstore.MetadataStore
 	pool              common.WorkerPool
 	chainState        core.IndexedChainState
 	aggregator        core.SignatureAggregator
@@ -80,7 +82,7 @@ type batchData struct {
 
 func NewDispatcher(
 	config *DispatcherConfig,
-	blobMetadataStore *blobstore.BlobMetadataStore,
+	blobMetadataStore blobstore.MetadataStore,
 	pool common.WorkerPool,
 	chainState core.IndexedChainState,
 	aggregator core.SignatureAggregator,
@@ -101,6 +103,22 @@ func NewDispatcher(
 		config.MaxBatchSize == 0 {
 		return nil, errors.New("invalid config")
 	}
+
+	// CLI library doesn't support float slices at current version, parsing must happen manually
+	significantThresholds := make([]float64, 0, len(config.SignificantSigningMetricsThresholds))
+	for _, threshold := range config.SignificantSigningMetricsThresholds {
+		significantThreshold, err := strconv.ParseFloat(threshold, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse significant threshold %s: %v", threshold, err)
+		}
+		significantThresholds = append(significantThresholds, significantThreshold)
+	}
+
+	metrics, err := newDispatcherMetrics(registry, significantThresholds)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize metrics: %v", err)
+	}
+
 	return &Dispatcher{
 		DispatcherConfig: config,
 
@@ -110,7 +128,7 @@ func NewDispatcher(
 		aggregator:        aggregator,
 		nodeClientManager: nodeClientManager,
 		logger:            logger.With("component", "Dispatcher"),
-		metrics:           newDispatcherMetrics(registry),
+		metrics:           metrics,
 
 		cursor:                 nil,
 		beforeDispatch:         beforeDispatch,
@@ -170,7 +188,7 @@ func (d *Dispatcher) HandleBatch(
 ) (chan core.SigningMessage, *batchData, error) {
 	// Signal Liveness to indicate no stall
 	healthcheck.SignalHeartbeat("dispatcher", d.controllerLivenessChan, d.logger)
-	
+
 	batchProbe.SetStage("get_reference_block")
 	currentBlockNumber, err := d.chainState.GetCurrentBlockNumber(ctx)
 	if err != nil {

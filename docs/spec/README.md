@@ -1,6 +1,6 @@
 # EigenDA Spec
 
-Built using [mdBook](https://rust-lang.github.io/mdBook/index.html).
+Built using [mdBook](https://rust-lang.github.io/mdBook/index.html) and published as a github pages site at [https://layr-labs.github.io/eigenda/](https://layr-labs.github.io/eigenda/).
 
 Meant to contain technical overviews, spec, and low-level implementation details related to EigenDA, as opposed to the [docs](https://docs.eigenda.xyz/) site which is meant to contain more introductory and high-level material.
 

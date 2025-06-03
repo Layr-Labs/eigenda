@@ -63,7 +63,14 @@ func CreateGlobalReservationTable(clientConfig commonaws.ClientConfig, tableName
 			WriteCapacityUnits: aws.Int64(10),
 		},
 	})
-	return err
+
+	if err != nil {
+		if err.Error() == "ResourceInUseException: Table already exists" {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func CreateOnDemandTable(clientConfig commonaws.ClientConfig, tableName string) error {

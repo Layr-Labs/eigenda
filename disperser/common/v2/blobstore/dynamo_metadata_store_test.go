@@ -16,7 +16,6 @@ import (
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
-	"github.com/Layr-Labs/eigenda/disperser/common"
 	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -301,7 +300,7 @@ func TestBlobMetadataStoreOperations(t *testing.T) {
 
 	// attempt to put metadata with the same key should fail
 	err = blobMetadataStore.PutBlobMetadata(ctx, metadata1)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+	assert.ErrorIs(t, err, blobstore.ErrAlreadyExists)
 
 	deleteItems(t, []commondynamodb.Key{
 		{
@@ -1487,7 +1486,7 @@ func TestBlobMetadataStoreCerts(t *testing.T) {
 		RelayKeys:  []corev2.RelayKey{0},
 	}
 	err = blobMetadataStore.PutBlobCertificate(ctx, blobCert1, fragmentInfo)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+	assert.ErrorIs(t, err, blobstore.ErrAlreadyExists)
 
 	// get multiple certs
 	numCerts := 100
@@ -1562,7 +1561,7 @@ func TestBlobMetadataStoreUpdateBlobStatus(t *testing.T) {
 
 	// Update the blob status to same status
 	err = blobMetadataStore.UpdateBlobStatus(ctx, blobKey, v2.Encoded)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+	assert.ErrorIs(t, err, blobstore.ErrAlreadyExists)
 
 	fetchedMetadata, err := blobMetadataStore.GetBlobMetadata(ctx, blobKey)
 	assert.NoError(t, err)
@@ -1612,7 +1611,7 @@ func TestBlobMetadataStoreDispersals(t *testing.T) {
 
 	// attempt to put dispersal request with the same key should fail
 	err = blobMetadataStore.PutDispersalRequest(ctx, dispersalRequest)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+	assert.ErrorIs(t, err, blobstore.ErrAlreadyExists)
 
 	dispersalResponse := &corev2.DispersalResponse{
 		DispersalRequest: dispersalRequest,
@@ -1630,7 +1629,7 @@ func TestBlobMetadataStoreDispersals(t *testing.T) {
 
 	// attempt to put dispersal response with the same key should fail
 	err = blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+	assert.ErrorIs(t, err, blobstore.ErrAlreadyExists)
 
 	// the other operator's response for the same batch
 	opID2 := core.OperatorID{2, 3}
@@ -1974,7 +1973,7 @@ func TestBlobMetadataStoreInclusionInfo(t *testing.T) {
 
 	// attempt to put inclusion info with the same key should fail
 	err = blobMetadataStore.PutBlobInclusionInfo(ctx, inclusionInfo)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+	assert.ErrorIs(t, err, blobstore.ErrAlreadyExists)
 
 	// put multiple inclusion infos
 	blobKey1 := corev2.BlobKey{2, 2, 2}
@@ -2039,7 +2038,7 @@ func TestBlobMetadataStoreBatchAttestation(t *testing.T) {
 
 	// attempt to put batch header with the same key should fail
 	err = blobMetadataStore.PutBatchHeader(ctx, h)
-	assert.ErrorIs(t, err, common.ErrAlreadyExists)
+	assert.ErrorIs(t, err, blobstore.ErrAlreadyExists)
 
 	keyPair, err := core.GenRandomBlsKeys()
 	assert.NoError(t, err)

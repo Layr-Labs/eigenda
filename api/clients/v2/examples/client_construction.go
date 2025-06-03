@@ -30,7 +30,8 @@ import (
 const (
 	ethRPCURL                        = "https://ethereum-holesky-rpc.publicnode.com"
 	disperserHostname                = "disperser-testnet-holesky.eigenda.xyz"
-	certVerifierAddress              = "0xFe52fE1940858DCb6e12153E2104aD0fDFbE1162"
+	certVerifierRouterAddress        = "0x7F40A8e1B62aa1c8Afed23f6E8bAe0D340A4BC4e"
+	registryCoordinatorAddress       = "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490"
 	blsOperatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
 	eigenDAServiceManagerAddress     = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
 )
@@ -56,6 +57,16 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 		return nil, fmt.Errorf("create cert verifier: %w", err)
 	}
 
+	certBuilder, err := createCertBuilder()
+	if err != nil {
+		return nil, fmt.Errorf("create cert builder: %w", err)
+	}
+
+	blockNumMonitor, err := createBlockNumberMonitor()
+	if err != nil {
+		return nil, fmt.Errorf("create block number monitor: %w", err)
+	}
+
 	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
 		PayloadClientConfig:    *clients.GetDefaultPayloadClientConfig(),
 		DisperseBlobTimeout:    30 * time.Second,
@@ -68,6 +79,8 @@ func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDispers
 		logger,
 		payloadDisperserConfig,
 		disperserClient,
+		blockNumMonitor,
+		certBuilder,
 		certVerifier,
 		nil,
 	)
@@ -233,10 +246,57 @@ func createCertVerifier() (*verification.CertVerifier, error) {
 		return nil, fmt.Errorf("create eth client: %w", err)
 	}
 
+	routerAddressProvider, err := verification.BuildRouterAddressProvider(
+		gethcommon.HexToAddress(certVerifierRouterAddress),
+		ethClient,
+		logger,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create router address provider: %w", err)
+	}
+
 	return verification.NewCertVerifier(
 		logger,
 		ethClient,
-		verification.NewStaticCertVerifierAddressProvider(gethcommon.HexToAddress(certVerifierAddress)))
+		routerAddressProvider,
+	)
+}
+
+func createCertBuilder() (*clients.CertBuilder, error) {
+	logger, err := createLogger()
+	if err != nil {
+		return nil, fmt.Errorf("create logger: %v", err)
+	}
+
+	ethClient, err := createEthClient(logger)
+	if err != nil {
+		return nil, fmt.Errorf("create eth client: %w", err)
+	}
+
+	return clients.NewCertBuilder(
+		logger,
+		gethcommon.HexToAddress(blsOperatorStateRetrieverAddress),
+		gethcommon.HexToAddress(registryCoordinatorAddress),
+		ethClient,
+	)
+}
+
+func createBlockNumberMonitor() (*verification.BlockNumberMonitor, error) {
+	logger, err := createLogger()
+	if err != nil {
+		return nil, fmt.Errorf("create logger: %v", err)
+	}
+
+	ethClient, err := createEthClient(logger)
+	if err != nil {
+		return nil, fmt.Errorf("create eth client: %w", err)
+	}
+
+	return verification.NewBlockNumberMonitor(
+		logger,
+		ethClient,
+		1*time.Second,
+	)
 }
 
 func createEthClient(logger logging.Logger) (*geth.EthClient, error) {

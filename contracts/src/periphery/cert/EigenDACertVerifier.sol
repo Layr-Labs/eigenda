@@ -15,7 +15,7 @@ import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.
 
 import {EigenDACertVerificationLib as CertLib} from "src/periphery/cert/libraries/EigenDACertVerificationLib.sol";
 
-contract EigenDACertVerifier is IEigenDACertVerifier {
+contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDACertVerifierBase, IVersionedEigenDACertVerifier {
     error InvalidSecurityThresholds();
 
     IEigenDAThresholdRegistry internal immutable _eigenDAThresholdRegistry;

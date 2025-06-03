@@ -20,7 +20,7 @@ import (
 
 type testContext struct {
 	ctx              context.Context
-	store            meterer.OffchainStore
+	store            meterer.MeteringStore
 	reservationTable string
 	onDemandTable    string
 	globalBinTable   string
@@ -52,8 +52,8 @@ func setupTest(t *testing.T) *testContext {
 		cleanupTables(tc)
 	})
 
-	// Create the OffchainStore
-	tc.store, err = meterer.NewOffchainStore(
+	// Create the MeteringStore (using DynamoDBStore implementation)
+	tc.store, err = meterer.NewDynamoDBMeteringStore(
 		clientConfig,
 		tc.reservationTable,
 		tc.onDemandTable,
@@ -72,46 +72,75 @@ func cleanupTables(tc *testContext) {
 	_ = dynamoClient.DeleteTable(tc.ctx, tc.globalBinTable)
 }
 
-// TestUpdateReservationBin tests the UpdateReservationBin function
-func TestUpdateReservationBin(t *testing.T) {
-	tc := setupTest(t)
-
-	// Test updating bin that doesn't exist yet (should create it)
-	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
-	reservationPeriod := uint64(1)
-	size := uint64(1000)
-
-	binUsage, err := tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, size)
-	require.NoError(t, err)
-	assert.Equal(t, size, binUsage)
-
-	// Get the bin directly from DynamoDB to verify
-	item, err := dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+// TestIncrementBinUsages_EdgeCases tests the IncrementBinUsages function with edge cases
+func TestIncrementBinUsages_EdgeCases(t *testing.T) {
+	t.Run("empty input", func(t *testing.T) {
+		tc := setupTest(t)
+		binUsages, errs := tc.store.IncrementBinUsages(tc.ctx, gethcommon.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"), []core.QuorumID{}, map[core.QuorumID]uint64{}, map[core.QuorumID]uint64{})
+		assert.Empty(t, binUsages)
+		assert.Empty(t, errs)
 	})
-	require.NoError(t, err)
-	binUsageStr := item["BinUsage"].(*types.AttributeValueMemberN).Value
-	binUsageVal, err := strconv.ParseUint(binUsageStr, 10, 64)
-	require.NoError(t, err)
-	assert.Equal(t, size, binUsageVal)
 
-	// Test updating existing bin
-	additionalSize := uint64(500)
-	binUsage, err = tc.store.UpdateReservationBin(tc.ctx, accountID, reservationPeriod, additionalSize)
-	require.NoError(t, err)
-	assert.Equal(t, size+additionalSize, binUsage)
-
-	// Verify updated bin
-	item, err = dynamoClient.GetItem(tc.ctx, tc.reservationTable, commondynamodb.Key{
-		"AccountID":         &types.AttributeValueMemberS{Value: accountID.Hex()},
-		"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
+	t.Run("exceed transaction limit", func(t *testing.T) {
+		tc := setupTest(t)
+		accountID := gethcommon.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
+		reservationPeriod := uint64(42)
+		size := uint64(100)
+		var quorums []core.QuorumID
+		periods := make(map[core.QuorumID]uint64)
+		for i := 0; i < commondynamodb.DynamoBatchWriteLimit+1; i++ {
+			quorums = append(quorums, core.QuorumID(i))
+			periods[core.QuorumID(i)] = reservationPeriod
+		}
+		binUsages, err := tc.store.IncrementBinUsages(tc.ctx, accountID, quorums, periods, map[core.QuorumID]uint64{core.QuorumID(0): size})
+		assert.Empty(t, binUsages)
+		assert.Error(t, err)
 	})
-	require.NoError(t, err)
-	binUsageStr = item["BinUsage"].(*types.AttributeValueMemberN).Value
-	binUsageVal, err = strconv.ParseUint(binUsageStr, 10, 64)
-	require.NoError(t, err)
-	assert.Equal(t, size+additionalSize, binUsageVal)
+
+	t.Run("existing bin (increment)", func(t *testing.T) {
+		tc := setupTest(t)
+		accountID := gethcommon.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
+		reservationPeriod := uint64(42)
+		size := uint64(100)
+		quorum := core.QuorumID(1)
+		periods := map[core.QuorumID]uint64{quorum: reservationPeriod}
+		// First increment
+		_, err := tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum}, periods, map[core.QuorumID]uint64{quorum: size})
+		assert.NoError(t, err)
+		// Second increment
+		binUsages, err := tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum}, periods, map[core.QuorumID]uint64{quorum: size})
+		assert.NoError(t, err)
+		assert.Equal(t, size*2, binUsages[quorum])
+	})
+
+	t.Run("nonexistent bin (first write)", func(t *testing.T) {
+		tc := setupTest(t)
+		size := uint64(100)
+		quorums := []core.QuorumID{10, 11}
+		periods := map[core.QuorumID]uint64{10: 42, 11: 42}
+		binUsages, err := tc.store.IncrementBinUsages(tc.ctx, gethcommon.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"), quorums, periods, map[core.QuorumID]uint64{10: size, 11: size})
+		for _, quorum := range quorums {
+			assert.NoError(t, err)
+			assert.Equal(t, size, binUsages[quorum])
+		}
+	})
+
+	t.Run("exceed transaction limit", func(t *testing.T) {
+		tc := setupTest(t)
+		accountID := gethcommon.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
+		reservationPeriod := uint64(42)
+		sizes := make(map[core.QuorumID]uint64)
+		var quorums []core.QuorumID
+		periods := make(map[core.QuorumID]uint64)
+		for i := 0; i < commondynamodb.DynamoBatchWriteLimit+1; i++ { // 26 > DynamoDB batch limit
+			quorums = append(quorums, core.QuorumID(i))
+			periods[core.QuorumID(i)] = reservationPeriod
+			sizes[core.QuorumID(i)] = uint64(i)
+		}
+		_, err := tc.store.IncrementBinUsages(tc.ctx, accountID, quorums, periods, sizes)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), fmt.Sprintf("limit is %d", commondynamodb.DynamoBatchWriteLimit))
+	})
 }
 
 // TestUpdateGlobalBin tests the UpdateGlobalBin function

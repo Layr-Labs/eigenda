@@ -17,10 +17,10 @@ import (
 
 type requestMetadata struct {
 	blobShardIndex int
-	quorum         core.QuorumID
+	assignment     corev2.Assignment
 }
 type relayRequest struct {
-	chunkRequests []*relay.ChunkRequestByRange
+	chunkRequests []*relay.ChunkRequestByIndex
 	metadata      []*requestMetadata
 }
 type response struct {
@@ -29,9 +29,9 @@ type response struct {
 	err      error
 }
 
-type RawBundles struct {
+type RawBundle struct {
 	BlobCertificate *corev2.BlobCertificate
-	Bundles         map[core.QuorumID][]byte
+	Bundle          []byte
 }
 
 func (n *Node) DownloadBundles(
@@ -39,7 +39,7 @@ func (n *Node) DownloadBundles(
 	batch *corev2.Batch,
 	operatorState *core.OperatorState,
 	probe *common.SequenceProbe,
-) ([]*corev2.BlobShard, []*RawBundles, error) {
+) ([]*corev2.BlobShard, []*RawBundle, error) {
 
 	probe.SetStage("prepare_to_download")
 
@@ -55,7 +55,7 @@ func (n *Node) DownloadBundles(
 	}
 
 	blobShards := make([]*corev2.BlobShard, len(batch.BlobCertificates))
-	rawBundles := make([]*RawBundles, len(batch.BlobCertificates))
+	rawBundles := make([]*RawBundle, len(batch.BlobCertificates))
 	requests := make(map[corev2.RelayKey]*relayRequest)
 	for i, cert := range batch.BlobCertificates {
 		blobKey, err := cert.BlobHeader.BlobKey()
@@ -68,52 +68,43 @@ func (n *Node) DownloadBundles(
 		}
 		blobShards[i] = &corev2.BlobShard{
 			BlobCertificate: cert,
-			Bundles:         make(map[core.QuorumID]core.Bundle),
 		}
-		rawBundles[i] = &RawBundles{
+		rawBundles[i] = &RawBundle{
 			BlobCertificate: cert,
-			Bundles:         make(map[core.QuorumID][]byte),
 		}
 		relayIndex := rand.Intn(len(cert.RelayKeys))
 		relayKey := cert.RelayKeys[relayIndex]
-		for _, quorum := range cert.BlobHeader.QuorumNumbers {
-			blobParams, ok := blobVersionParams.Get(cert.BlobHeader.BlobVersion)
-			if !ok {
-				return nil, nil, fmt.Errorf("blob version %d not found", cert.BlobHeader.BlobVersion)
-			}
 
-			if _, ok := operatorState.Operators[quorum]; !ok {
-				// operator is not part of the quorum or the quorum is not valid
-				n.Logger.Debug("operator is not part of the quorum or the quorum is not valid",
-					"quorum", quorum)
-				continue
-			}
-
-			assgn, err := corev2.GetAssignment(operatorState, blobParams, quorum, n.Config.ID)
-			if err != nil {
-				n.Logger.Errorf("failed to get assignment: %v", err)
-				continue
-			}
-
-			req, ok := requests[relayKey]
-			if !ok {
-				req = &relayRequest{
-					chunkRequests: make([]*relay.ChunkRequestByRange, 0),
-					metadata:      make([]*requestMetadata, 0),
-				}
-				requests[relayKey] = req
-			}
-			// Chunks from one blob are requested to the same relay
-			req.chunkRequests = append(req.chunkRequests, &relay.ChunkRequestByRange{
-				BlobKey: blobKey,
-				Start:   assgn.StartIndex,
-				End:     assgn.StartIndex + assgn.NumChunks,
-			})
-			req.metadata = append(req.metadata, &requestMetadata{
-				blobShardIndex: i,
-				quorum:         quorum,
-			})
+		blobParams, ok := blobVersionParams.Get(cert.BlobHeader.BlobVersion)
+		if !ok {
+			return nil, nil, fmt.Errorf("blob version %d not found", cert.BlobHeader.BlobVersion)
 		}
+
+		assgn, err := corev2.GetAssignmentForBlob(operatorState, blobParams, cert.BlobHeader.QuorumNumbers, n.Config.ID)
+
+		if err != nil {
+			n.Logger.Errorf("failed to get assignment: %v", err)
+			continue
+		}
+
+		req, ok := requests[relayKey]
+		if !ok {
+			req = &relayRequest{
+				chunkRequests: make([]*relay.ChunkRequestByIndex, 0),
+				metadata:      make([]*requestMetadata, 0),
+			}
+			requests[relayKey] = req
+		}
+		// Chunks from one blob are requested to the same relay
+		req.chunkRequests = append(req.chunkRequests, &relay.ChunkRequestByIndex{
+			BlobKey: blobKey,
+			Indices: assgn.Indices,
+		})
+		req.metadata = append(req.metadata, &requestMetadata{
+			blobShardIndex: i,
+			assignment:     assgn,
+		})
+
 	}
 
 	probe.SetStage("download")
@@ -125,7 +116,7 @@ func (n *Node) DownloadBundles(
 		n.DownloadPool.Submit(func() {
 			ctxTimeout, cancel := context.WithTimeout(ctx, n.Config.ChunkDownloadTimeout)
 			defer cancel()
-			bundles, err := relayClient.GetChunksByRange(ctxTimeout, relayKey, req.chunkRequests)
+			bundles, err := relayClient.GetChunksByIndex(ctxTimeout, relayKey, req.chunkRequests)
 			if err != nil {
 				n.Logger.Errorf("failed to get chunks from relays: %v", err)
 				bundleChan <- response{
@@ -165,11 +156,12 @@ func (n *Node) DownloadBundles(
 
 		for j, bundle := range resp.bundles {
 			metadata := resp.metadata[j]
-			blobShards[metadata.blobShardIndex].Bundles[metadata.quorum], err = new(core.Bundle).Deserialize(bundle)
+			blobShards[metadata.blobShardIndex].Bundle, err = new(core.Bundle).Deserialize(bundle)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to deserialize bundle: %v", err)
 			}
-			rawBundles[metadata.blobShardIndex].Bundles[metadata.quorum] = bundle
+			rawBundles[metadata.blobShardIndex].Bundle = bundle
+
 		}
 	}
 

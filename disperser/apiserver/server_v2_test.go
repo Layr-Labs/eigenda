@@ -547,7 +547,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		panic("failed to create global reservation table")
 	}
 
-	store, err := meterer.NewOffchainStore(
+	store, err := meterer.NewDynamoDBMeteringStore(
 		awsConfig,
 		table_names[0],
 		table_names[1],
@@ -556,7 +556,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	)
 	if err != nil {
 		teardown()
-		panic("failed to create offchain store")
+		panic("failed to create metering store")
 	}
 	meterer := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
 
@@ -569,7 +569,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 		0: {
 			NumChunks:       8192,
 			CodingRate:      8,
-			MaxNumOperators: 3537,
+			MaxNumOperators: 2048,
 		},
 	}, nil)
 

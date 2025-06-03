@@ -108,7 +108,7 @@ func NewValidatorStore(
 	logger.Info(stringBuilder.String())
 
 	littConfig, err := litt.DefaultConfig(config.LittDBStoragePaths...)
-	littConfig.ShardingFactor = 1
+	littConfig.ShardingFactor = uint32(len(config.LittDBStoragePaths))
 	littConfig.MetricsEnabled = true
 	littConfig.MetricsRegistry = registry
 	littConfig.MetricsNamespace = littDBMetricsPrefix
