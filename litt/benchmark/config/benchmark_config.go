@@ -80,6 +80,7 @@ func DefaultBenchmarkConfig() *BenchmarkConfig {
 
 	littConfig := litt.DefaultConfigNoPaths()
 	littConfig.LoggerConfig = common.DefaultConsoleLoggerConfig()
+	littConfig.MetricsEnabled = true
 
 	return &BenchmarkConfig{
 		LittConfig:                  littConfig,

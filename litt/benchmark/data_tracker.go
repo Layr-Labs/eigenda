@@ -160,7 +160,7 @@ func NewDataTracker(ctx context.Context, config *config2.BenchmarkConfig) (*Data
 
 	ttl := time.Duration(config.TTLHours * float64(time.Hour))
 	safetyMargin := time.Duration(config.ReadSafetyMarginMinutes * float64(time.Minute))
-	safeTTL := ttl + safetyMargin
+	safeTTL := ttl - safetyMargin
 
 	closedChan := make(chan struct{}, 1)
 	closedChan <- struct{}{} // Initially closed, will be drained when the DataTracker is closed.
