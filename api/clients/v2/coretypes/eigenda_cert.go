@@ -37,7 +37,7 @@ func init() {
 // CertificateVersion denotes the version of the EigenDA certificate
 // and is interpreted from querying the EigenDACertVerifier contract's
 // CertVersion() view function
-type CertificateVersion = uint64
+type CertificateVersion = uint8
 
 const (
 	// starting at two since we never formally defined a V1 cert in the core codebase
