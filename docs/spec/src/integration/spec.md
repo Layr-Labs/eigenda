@@ -1,5 +1,9 @@
 # EigenDA V2 Integration Spec
 
+This book is meant to be read by eigenda and rollup developers who are writing or extending an integration with EigenDA. 
+Users and developers who just want to understand how an integration works at a high level, and need to learn
+how to configure their own integration, should instead visit our [Integrations Guides](https://docs.eigenda.xyz/integrations-guides/overview).
+
 # Overview
 
 The [EigenDA V2](https://docs.eigenda.xyz/releases/v2) release documentation describes the architectural changes that allow for important network performance increases. From the point of view of rollup integrations, there are three important new features:
