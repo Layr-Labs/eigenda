@@ -7,7 +7,7 @@ go = "1.21"
 "go:github.com/ethereum/go-ethereum/cmd/abigen" = "v1.14.0"
 # Belive yarn is needed for foundry deps (see contracts/remappings.txt) and subgraph stuff.
 # TODO: document exactly why these are needed.
-node = "16"
+node = "18.20.8"
 yarn = "1.22.22"
 
 # Forge Dependencies
