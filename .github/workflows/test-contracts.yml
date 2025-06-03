@@ -71,6 +71,9 @@ jobs:
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
+      - run: |
+          forge --version
+          abigen --version
 
       - name: Install forge dependencies
         run: |
