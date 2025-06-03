@@ -1,6 +1,5 @@
 package disktable
 
-import "C"
 import (
 	"fmt"
 	"math/rand"

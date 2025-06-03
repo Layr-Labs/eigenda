@@ -5,4 +5,9 @@
 # Find the directory of this script
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 
-go run "$SCRIPT_DIR/cmd/main.go" "$@"
+(
+    cd "$SCRIPT_DIR" || exit 1
+    make build || exit 1
+    go run "$SCRIPT_DIR/bin/benchmark" "$@"
+)
+
