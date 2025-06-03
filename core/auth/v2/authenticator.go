@@ -66,6 +66,7 @@ func (*authenticator) AuthenticateBlobRequest(header *core.BlobHeader, signature
 // AuthenticatePaymentStateRequest verifies the signature of the payment state request
 // The signature is signed over the byte representation of the account ID and requestHash
 // See implementation of BlobRequestSigner.SignPaymentStateRequest for more details
+// Deprecated: Use AuthenticatePaymentStateForAllQuorumsRequest instead.
 func (a *authenticator) AuthenticatePaymentStateRequest(accountAddr common.Address, request *pb.GetPaymentStateRequest) error {
 	return a.authenticatePaymentRequest(accountAddr, request.GetSignature(), request.GetTimestamp())
 }
