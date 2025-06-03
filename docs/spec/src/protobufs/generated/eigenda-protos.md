@@ -993,9 +993,10 @@ This header can be thought of as an &#34;eigenDA tx&#34;, in that it plays a pur
 
 ### GetPaymentStateForAllQuorumsReply
 GetPaymentStateForAllQuorumsReply contains the payment state of an account. EigenLabs disperser is the only disperser that allows
-for ondemand usages, and it will provide the latest on-demand offchain payment records for the request account.
-Other dispersers will refuse to serve ondemand requests and serve 0 for off-chain on-demand payment usage (`cumulative_payment`). A client using
-non-EigenDA dispersers should only request with reserved usages and disregard the cumulative_payment shared by the non EigenLabs dispersers.
+for ondemand usages, and it will provide the latest on-demand offchain record of `cumulative_payment` for the request account.
+Other dispersers will refuse to serve ondemand requests and serve a dummy value for `cumulative_payment`. A client using
+non-EigenDA dispersers should disregard the `cumulative_payment` shared by the non EigenLabs dispersers and only request with reservations.
+A client can always switch to use EigenLabs disperser to request for `cumulative_payment` payment state, and use on-demand dispersals.
 
 
 | Field | Type | Label | Description |
@@ -1003,8 +1004,8 @@ non-EigenDA dispersers should only request with reserved usages and disregard th
 | payment_vault_params | [PaymentVaultParams](#disperser-v2-PaymentVaultParams) |  | payment vault parameters with per-quorum configurations |
 | period_records | [GetPaymentStateForAllQuorumsReply.PeriodRecordsEntry](#disperser-v2-GetPaymentStateForAllQuorumsReply-PeriodRecordsEntry) | repeated | period_records maps quorum IDs to the off-chain account reservation usage records for the current and next two periods |
 | reservations | [GetPaymentStateForAllQuorumsReply.ReservationsEntry](#disperser-v2-GetPaymentStateForAllQuorumsReply-ReservationsEntry) | repeated | reservations maps quorum IDs to the on-chain account reservation record |
-| cumulative_payment | [bytes](#bytes) |  | off-chain on-demand payment usage |
-| onchain_cumulative_payment | [bytes](#bytes) |  | on-chain on-demand payment deposited |
+| cumulative_payment | [bytes](#bytes) |  | off-chain on-demand payment usage. This field is currently only tracked by EigenLabs disperser because on-demand requests are only supported by EigenLabs. Future work will support decentralized on-demand dispersals and this field later be tracked and shared by dispersers unlimited to EigenLabs. |
+| onchain_cumulative_payment | [bytes](#bytes) |  | on-chain on-demand payment deposited. |
 
 
 

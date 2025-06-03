@@ -617,7 +617,7 @@ which is dispersed separately. </p></td>
         
       
         <h3 id="disperser.v2.GetPaymentStateForAllQuorumsReply">GetPaymentStateForAllQuorumsReply</h3>
-        <p>GetPaymentStateForAllQuorumsReply contains the payment state of an account. EigenLabs disperser is the only disperser that allows</p><p>for ondemand usages, and it will provide the latest on-demand offchain payment records for the request account.</p><p>Other dispersers will refuse to serve ondemand requests and serve 0 for off-chain on-demand payment usage (`cumulative_payment`). A client using</p><p>non-EigenDA dispersers should only request with reserved usages and disregard the cumulative_payment shared by the non EigenLabs dispersers.</p>
+        <p>GetPaymentStateForAllQuorumsReply contains the payment state of an account. EigenLabs disperser is the only disperser that allows</p><p>for ondemand usages, and it will provide the latest on-demand offchain record of `cumulative_payment` for the request account.</p><p>Other dispersers will refuse to serve ondemand requests and serve a dummy value for `cumulative_payment`. A client using</p><p>non-EigenDA dispersers should disregard the `cumulative_payment` shared by the non EigenLabs dispersers and only request with reservations.</p><p>A client can always switch to use EigenLabs disperser to request for `cumulative_payment` payment state, and use on-demand dispersals.</p>
 
         
           <table class="field-table">
@@ -651,14 +651,16 @@ which is dispersed separately. </p></td>
                   <td>cumulative_payment</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>off-chain on-demand payment usage </p></td>
+                  <td><p>off-chain on-demand payment usage. This field is currently only tracked by EigenLabs disperser because on-demand requests are only
+supported by EigenLabs. Future work will support decentralized on-demand dispersals and this field later be tracked and shared by
+dispersers unlimited to EigenLabs. </p></td>
                 </tr>
               
                 <tr>
                   <td>onchain_cumulative_payment</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>on-chain on-demand payment deposited </p></td>
+                  <td><p>on-chain on-demand payment deposited. </p></td>
                 </tr>
               
             </tbody>

@@ -702,9 +702,10 @@ func (x *GetPaymentStateReply) GetOnchainCumulativePayment() []byte {
 }
 
 // GetPaymentStateForAllQuorumsReply contains the payment state of an account. EigenLabs disperser is the only disperser that allows
-// for ondemand usages, and it will provide the latest on-demand offchain payment records for the request account.
-// Other dispersers will refuse to serve ondemand requests and serve 0 for off-chain on-demand payment usage (`cumulative_payment`). A client using
-// non-EigenDA dispersers should only request with reserved usages and disregard the cumulative_payment shared by the non EigenLabs dispersers.
+// for ondemand usages, and it will provide the latest on-demand offchain record of `cumulative_payment` for the request account.
+// Other dispersers will refuse to serve ondemand requests and serve a dummy value for `cumulative_payment`. A client using
+// non-EigenDA dispersers should disregard the `cumulative_payment` shared by the non EigenLabs dispersers and only request with reservations.
+// A client can always switch to use EigenLabs disperser to request for `cumulative_payment` payment state, and use on-demand dispersals.
 type GetPaymentStateForAllQuorumsReply struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -716,9 +717,11 @@ type GetPaymentStateForAllQuorumsReply struct {
 	PeriodRecords map[uint32]*PeriodRecords `protobuf:"bytes,2,rep,name=period_records,json=periodRecords,proto3" json:"period_records,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// reservations maps quorum IDs to the on-chain account reservation record
 	Reservations map[uint32]*QuorumReservation `protobuf:"bytes,3,rep,name=reservations,proto3" json:"reservations,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// off-chain on-demand payment usage
+	// off-chain on-demand payment usage. This field is currently only tracked by EigenLabs disperser because on-demand requests are only
+	// supported by EigenLabs. Future work will support decentralized on-demand dispersals and this field later be tracked and shared by
+	// dispersers unlimited to EigenLabs.
 	CumulativePayment []byte `protobuf:"bytes,4,opt,name=cumulative_payment,json=cumulativePayment,proto3" json:"cumulative_payment,omitempty"`
-	// on-chain on-demand payment deposited
+	// on-chain on-demand payment deposited.
 	OnchainCumulativePayment []byte `protobuf:"bytes,5,opt,name=onchain_cumulative_payment,json=onchainCumulativePayment,proto3" json:"onchain_cumulative_payment,omitempty"`
 }
 
