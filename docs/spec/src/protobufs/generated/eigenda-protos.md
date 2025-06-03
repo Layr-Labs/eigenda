@@ -53,10 +53,21 @@
     - [BlobStatusRequest](#disperser-v2-BlobStatusRequest)
     - [DisperseBlobReply](#disperser-v2-DisperseBlobReply)
     - [DisperseBlobRequest](#disperser-v2-DisperseBlobRequest)
+    - [GetPaymentStateForAllQuorumsReply](#disperser-v2-GetPaymentStateForAllQuorumsReply)
+    - [GetPaymentStateForAllQuorumsReply.PeriodRecordsEntry](#disperser-v2-GetPaymentStateForAllQuorumsReply-PeriodRecordsEntry)
+    - [GetPaymentStateForAllQuorumsReply.ReservationsEntry](#disperser-v2-GetPaymentStateForAllQuorumsReply-ReservationsEntry)
+    - [GetPaymentStateForAllQuorumsRequest](#disperser-v2-GetPaymentStateForAllQuorumsRequest)
     - [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply)
     - [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest)
     - [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams)
+    - [PaymentQuorumConfig](#disperser-v2-PaymentQuorumConfig)
+    - [PaymentQuorumProtocolConfig](#disperser-v2-PaymentQuorumProtocolConfig)
+    - [PaymentVaultParams](#disperser-v2-PaymentVaultParams)
+    - [PaymentVaultParams.QuorumPaymentConfigsEntry](#disperser-v2-PaymentVaultParams-QuorumPaymentConfigsEntry)
+    - [PaymentVaultParams.QuorumProtocolConfigsEntry](#disperser-v2-PaymentVaultParams-QuorumProtocolConfigsEntry)
     - [PeriodRecord](#disperser-v2-PeriodRecord)
+    - [PeriodRecords](#disperser-v2-PeriodRecords)
+    - [QuorumReservation](#disperser-v2-QuorumReservation)
     - [Reservation](#disperser-v2-Reservation)
     - [SignedBatch](#disperser-v2-SignedBatch)
   
@@ -978,6 +989,78 @@ This header can be thought of as an &#34;eigenDA tx&#34;, in that it plays a pur
 
 
 
+<a name="disperser-v2-GetPaymentStateForAllQuorumsReply"></a>
+
+### GetPaymentStateForAllQuorumsReply
+GetPaymentStateForAllQuorumsReply contains the payment state of an account. EigenLabs disperser is the only disperser that allows
+for ondemand usages, and it will provide the latest on-demand offchain record of `cumulative_payment` for the request account.
+Other dispersers will refuse to serve ondemand requests and serve a dummy value for `cumulative_payment`. A client using
+non-EigenDA dispersers should disregard the `cumulative_payment` shared by the non EigenLabs dispersers and only request with reservations.
+A client can always switch to use EigenLabs disperser to request for `cumulative_payment` payment state, and use on-demand dispersals.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| payment_vault_params | [PaymentVaultParams](#disperser-v2-PaymentVaultParams) |  | payment vault parameters with per-quorum configurations |
+| period_records | [GetPaymentStateForAllQuorumsReply.PeriodRecordsEntry](#disperser-v2-GetPaymentStateForAllQuorumsReply-PeriodRecordsEntry) | repeated | period_records maps quorum IDs to the off-chain account reservation usage records for the current and next two periods |
+| reservations | [GetPaymentStateForAllQuorumsReply.ReservationsEntry](#disperser-v2-GetPaymentStateForAllQuorumsReply-ReservationsEntry) | repeated | reservations maps quorum IDs to the on-chain account reservation record |
+| cumulative_payment | [bytes](#bytes) |  | off-chain on-demand payment usage. This field is currently only tracked by EigenLabs disperser because on-demand requests are only supported by EigenLabs. Future work will support decentralized on-demand dispersals and this field later be tracked and shared by dispersers unlimited to EigenLabs. |
+| onchain_cumulative_payment | [bytes](#bytes) |  | on-chain on-demand payment deposited. |
+
+
+
+
+
+
+<a name="disperser-v2-GetPaymentStateForAllQuorumsReply-PeriodRecordsEntry"></a>
+
+### GetPaymentStateForAllQuorumsReply.PeriodRecordsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [uint32](#uint32) |  |  |
+| value | [PeriodRecords](#disperser-v2-PeriodRecords) |  |  |
+
+
+
+
+
+
+<a name="disperser-v2-GetPaymentStateForAllQuorumsReply-ReservationsEntry"></a>
+
+### GetPaymentStateForAllQuorumsReply.ReservationsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [uint32](#uint32) |  |  |
+| value | [QuorumReservation](#disperser-v2-QuorumReservation) |  |  |
+
+
+
+
+
+
+<a name="disperser-v2-GetPaymentStateForAllQuorumsRequest"></a>
+
+### GetPaymentStateForAllQuorumsRequest
+GetPaymentStateForAllQuorumsRequest contains parameters to query the payment state of an account.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| account_id | [string](#string) |  | The ID of the account being queried. This account ID is an eth wallet address of the user. |
+| timestamp | [uint64](#uint64) |  | Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server&#39;s clock, request may be rejected. |
+| signature | [bytes](#bytes) |  | Signature over the payment account ID and timestamp. |
+
+
+
+
+
+
 <a name="disperser-v2-GetPaymentStateReply"></a>
 
 ### GetPaymentStateReply
@@ -1006,7 +1089,7 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | account_id | [string](#string) |  | The ID of the account being queried. This account ID is an eth wallet address of the user. |
-| signature | [bytes](#bytes) |  | Signature over the account ID |
+| signature | [bytes](#bytes) |  | Signature over the account ID and timestamp. |
 | timestamp | [uint64](#uint64) |  | Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server&#39;s clock, request may be rejected. |
 
 
@@ -1018,6 +1101,8 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 
 ### PaymentGlobalParams
 Global constant parameters defined by the payment vault.
+This message type will soon be deprecated in replacement of PaymentVaultParams. During endpoint migration, this will be filled
+with the parameters on quorum 0, quorum configurations will be the same across quorums for the foreseeable future.
 
 
 | Field | Type | Label | Description |
@@ -1027,6 +1112,92 @@ Global constant parameters defined by the payment vault.
 | price_per_symbol | [uint64](#uint64) |  | Price charged per symbol for on-demand dispersals |
 | reservation_window | [uint64](#uint64) |  | Reservation window for all reservations |
 | on_demand_quorum_numbers | [uint32](#uint32) | repeated | quorums allowed to make on-demand dispersals |
+
+
+
+
+
+
+<a name="disperser-v2-PaymentQuorumConfig"></a>
+
+### PaymentQuorumConfig
+PaymentQuorumConfig contains the configuration for a quorum&#39;s payment configurations
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| reservation_symbols_per_second | [uint64](#uint64) |  | reservation_symbols_per_second is the total symbols per second that can be reserved for this quorum |
+| on_demand_symbols_per_second | [uint64](#uint64) |  | on_demand_symbols_per_second is the symbols per second allowed for on-demand payments for this quorum |
+| on_demand_price_per_symbol | [uint64](#uint64) |  | on_demand_price_per_symbol is the price per symbol for on-demand payments in wei |
+
+
+
+
+
+
+<a name="disperser-v2-PaymentQuorumProtocolConfig"></a>
+
+### PaymentQuorumProtocolConfig
+PaymentQuorumProtocolConfig contains the configuration for a quorum&#39;s protocol-level configurations
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| min_num_symbols | [uint64](#uint64) |  | min_num_symbols is the minimum number of symbols that must be charged for any request |
+| reservation_advance_window | [uint64](#uint64) |  | reservation_advance_window is the window in seconds before a reservation starts that it can be activated |
+| reservation_rate_limit_window | [uint64](#uint64) |  | reservation_rate_limit_window is the time window in seconds for reservation rate limiting |
+| on_demand_rate_limit_window | [uint64](#uint64) |  | on_demand_rate_limit_window is the time window in seconds for on-demand rate limiting |
+| on_demand_enabled | [bool](#bool) |  | on_demand_enabled indicates whether on-demand payments are enabled for this quorum |
+
+
+
+
+
+
+<a name="disperser-v2-PaymentVaultParams"></a>
+
+### PaymentVaultParams
+PaymentVaultParams contains the global payment configuration parameters from the payment vault
+This is the new version of
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| quorum_payment_configs | [PaymentVaultParams.QuorumPaymentConfigsEntry](#disperser-v2-PaymentVaultParams-QuorumPaymentConfigsEntry) | repeated | quorum_payment_configs maps quorum IDs to their payment configurations |
+| quorum_protocol_configs | [PaymentVaultParams.QuorumProtocolConfigsEntry](#disperser-v2-PaymentVaultParams-QuorumProtocolConfigsEntry) | repeated | quorum_protocol_configs maps quorum IDs to their protocol configurations |
+| on_demand_quorum_numbers | [uint32](#uint32) | repeated | on_demand_quorum_numbers lists the quorum numbers that support on-demand payments |
+
+
+
+
+
+
+<a name="disperser-v2-PaymentVaultParams-QuorumPaymentConfigsEntry"></a>
+
+### PaymentVaultParams.QuorumPaymentConfigsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [uint32](#uint32) |  |  |
+| value | [PaymentQuorumConfig](#disperser-v2-PaymentQuorumConfig) |  |  |
+
+
+
+
+
+
+<a name="disperser-v2-PaymentVaultParams-QuorumProtocolConfigsEntry"></a>
+
+### PaymentVaultParams.QuorumProtocolConfigsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [uint32](#uint32) |  |  |
+| value | [PaymentQuorumProtocolConfig](#disperser-v2-PaymentQuorumProtocolConfig) |  |  |
 
 
 
@@ -1050,10 +1221,47 @@ record and the subsequent two records that contains potential overflows.
 
 
 
+<a name="disperser-v2-PeriodRecords"></a>
+
+### PeriodRecords
+An array of period records. Typically this is used to include 3 records, from the current period to the next two periods.
+The next two period records are included because they may include spillage usages from the previous period or the current period.
+The client should be aware of the spillage so they account for them as they disperse during those periods.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| records | [PeriodRecord](#disperser-v2-PeriodRecord) | repeated |  |
+
+
+
+
+
+
+<a name="disperser-v2-QuorumReservation"></a>
+
+### QuorumReservation
+Reservation parameters of an account, used to determine the rate limit for the account.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| symbols_per_second | [uint64](#uint64) |  | rate limit for the account |
+| start_timestamp | [uint32](#uint32) |  | start timestamp of the reservation |
+| end_timestamp | [uint32](#uint32) |  | end timestamp of the reservation |
+
+
+
+
+
+
 <a name="disperser-v2-Reservation"></a>
 
 ### Reservation
 Reservation parameters of an account, used to determine the rate limit for the account.
+This message type will soon be deprecated. During the migration time, we will maintain the usage by returning the
+most restrictive reservation parameters across the quroums: symbols_per_second will be the lowest rate of across all quroums
+with latest start and earliest end timestamp, all the quorum numbers with a reservation, and a dummy quorum_splits which was never used.
 
 
 | Field | Type | Label | Description |
@@ -1131,7 +1339,12 @@ Disperser defines the public APIs for dispersing blobs.
 | GetBlobCommitment | [BlobCommitmentRequest](#disperser-v2-BlobCommitmentRequest) | [BlobCommitmentReply](#disperser-v2-BlobCommitmentReply) | GetBlobCommitment is a utility method that calculates commitment for a blob payload. It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header and don&#39;t have the ability to calculate the commitment themselves (expensive operation which requires SRS points).
 
 For an example usage, see how our disperser_client makes a call to this endpoint when it doesn&#39;t have a local prover: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166 |
-| GetPaymentState | [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest) | [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply) | GetPaymentState is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting. A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser. That typically only needs to be done once, and the state can be updated locally as the client disperses blobs. The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
+| GetPaymentState | [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest) | [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply) | GetPaymentState is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting. As reservation moves to be quorum specific and served by permissionless dispersers, GetPaymentState will soon be deprecated in replacement of GetPaymentStateForAllQuorums to include more specifications. During the endpoint migration time, the response uses quorum 0 for the global parameters, and the most retrictive reservation parameters of a user across quorums. For OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values tracked for on-demand offchain payment records. For other dispersers, they will refuse to serve ondemand requests and serve 0 as the on-demand offchain records. A client using non-EigenDA dispersers should only request with reserved usages.
+
+A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser. That typically only needs to be done once, and the state can be updated locally as the client disperses blobs. The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
+
+For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298 |
+| GetPaymentStateForAllQuorums | [GetPaymentStateForAllQuorumsRequest](#disperser-v2-GetPaymentStateForAllQuorumsRequest) | [GetPaymentStateForAllQuorumsReply](#disperser-v2-GetPaymentStateForAllQuorumsReply) | GetPaymentStateForAllQuorums is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id. A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it plans to disperse to. That typically only needs to be done once, and the state can be updated locally as the client disperses blobs. The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
 
 For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298 |
 

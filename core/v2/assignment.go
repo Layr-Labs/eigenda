@@ -115,6 +115,13 @@ func AddAssignmentsForQuorum(
 	for _, id := range orderedOps {
 		newAssignmentIndicesCount := len(dummyAssignments[id].Indices)
 
+		if _, ok := assignments[id]; !ok {
+			newAssignments[id] = &Assignment{
+				Indices: make([]uint32, 0, newAssignmentIndicesCount),
+			}
+			continue
+		}
+
 		if newAssignmentIndicesCount > len(assignments[id].Indices) {
 			newAssignmentIndicesCount = len(assignments[id].Indices)
 		}
