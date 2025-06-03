@@ -6,7 +6,7 @@ import {SafeERC20, IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC2
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 
 contract EigenDAEjectionManager {
-    using EigenDAEjectionLib for bytes32;
+    using EigenDAEjectionLib for address;
     using SafeERC20 for IERC20;
 
     address internal immutable _depositToken;
@@ -19,45 +19,56 @@ contract EigenDAEjectionManager {
         _registryCoordinator = registryCoordinator_;
     }
 
-    modifier onlyOwner() {
-        _onlyOwner();
+    modifier onlyWatcher(address sender) {
+        _onlyWatcher(sender);
         _;
     }
 
-    /// OWNER FUNCTIONS
+    /// WATCHER FUNCTIONS
 
-    function startEjection(bytes32 operatorId) external onlyOwner {
+    function startEjection(address operator, bytes memory quorums) external onlyWatcher(msg.sender) {
         _takeDeposit(msg.sender);
-        operatorId.startEjection();
+        operator.startEjection(quorums);
     }
 
-    function completeEjection(bytes32 operatorId) external onlyOwner {
+    function cancelEjectionByWatcher(address operator) external onlyWatcher(msg.sender) {
         _returnDeposit(msg.sender);
-        operatorId.completeEjection();
+        operator.cancelEjection();
     }
 
-    function startChurn(bytes32 operatorId) external onlyOwner {
+    function completeEjection(address operator, bytes memory quorums) external onlyWatcher(msg.sender) {
+        operator.completeEjection(quorums);
+        IRegistryCoordinator(_registryCoordinator).ejectOperator(operator, quorums);
+        _returnDeposit(msg.sender);
+    }
+
+    function startChurn(address operator, bytes memory quorums) external onlyWatcher(msg.sender) {
         _takeDeposit(msg.sender);
-        operatorId.startChurn();
+        operator.startChurn(quorums);
     }
 
-    function completeChurn(bytes32 operatorId) external onlyOwner {
+    function cancelChurnByWatcher(address operator) external onlyWatcher(msg.sender) {
+        operator.cancelChurn();
         _returnDeposit(msg.sender);
-        operatorId.completeChurn();
+    }
+
+    function completeChurn(address operator, bytes memory quorums) external onlyWatcher(msg.sender) {
+        operator.completeChurn(quorums);
+        IRegistryCoordinator(_registryCoordinator).ejectOperator(operator, quorums);
+        _returnDeposit(msg.sender);
     }
 
     /// OPERATOR FUNCTIONS
 
-    function cancelEjection(bytes32 operatorId, address recipient, bytes32 salt, bytes memory signature) external {
-        operatorId.consumeSignature(recipient, salt, signature, EigenDAEjectionLib.ejectionParams());
-        _returnDeposit(recipient);
-        operatorId.cancelEjection();
+    function cancelEjection() external {
+        msg.sender.cancelEjection();
+        _returnDeposit(msg.sender);
     }
 
-    function cancelChurn(bytes32 operatorId, address recipient, bytes32 salt, bytes memory signature) external {
-        operatorId.consumeSignature(recipient, salt, signature, EigenDAEjectionLib.churnParams());
-        _returnDeposit(recipient);
-        operatorId.cancelChurn();
+    function cancelChurn(address lowerStakeOperator) external {
+        lowerStakeOperator; // TODO: OPERATOR MUST PROVE THAT CHURN IS INVALID BY PROVIDING A LOWER STAKE OPERATOR
+        msg.sender.cancelChurn();
+        _returnDeposit(msg.sender);
     }
 
     /// GETTERS
@@ -74,16 +85,16 @@ contract EigenDAEjectionManager {
         return _depositAmount;
     }
 
-    function churnInitiated(bytes32 operatorId) external view returns (bool) {
-        return operatorId.churnInitiated();
+    function churnInitiated(address operator) external view returns (bool) {
+        return operator.churnInitiated();
     }
 
-    function churnTime(bytes32 operatorId) external view returns (uint64) {
-        return EigenDAEjectionLib.churnParams().operatorProceedingParams[operatorId].proceedingTime;
+    function churnTime(address operator) external view returns (uint64) {
+        return EigenDAEjectionLib.churnParams().operatorProceedingParams[operator].proceedingTime;
     }
 
-    function lastChurnInitiated(bytes32 operatorId) external view returns (uint64) {
-        return EigenDAEjectionLib.churnParams().operatorProceedingParams[operatorId].lastProceedingInitiated;
+    function lastChurnInitiated(address operator) external view returns (uint64) {
+        return EigenDAEjectionLib.churnParams().operatorProceedingParams[operator].lastProceedingInitiated;
     }
 
     function churnDelay() external view returns (uint64) {
@@ -94,20 +105,16 @@ contract EigenDAEjectionManager {
         return EigenDAEjectionLib.churnParams().proceedingCooldown;
     }
 
-    function churnSaltConsumed(bytes32 operatorId, bytes32 salt) external view returns (bool) {
-        return EigenDAEjectionLib.churnParams().operatorProceedingParams[operatorId].salts[salt];
+    function ejectionInitiated(address operator) external view returns (bool) {
+        return operator.ejectionInitiated();
     }
 
-    function ejectionInitiated(bytes32 operatorId) external view returns (bool) {
-        return operatorId.ejectionInitiated();
+    function ejectionTime(address operator) external view returns (uint64) {
+        return EigenDAEjectionLib.ejectionParams().operatorProceedingParams[operator].proceedingTime;
     }
 
-    function ejectionTime(bytes32 operatorId) external view returns (uint64) {
-        return EigenDAEjectionLib.ejectionParams().operatorProceedingParams[operatorId].proceedingTime;
-    }
-
-    function lastEjectionInitiated(bytes32 operatorId) external view returns (uint64) {
-        return EigenDAEjectionLib.ejectionParams().operatorProceedingParams[operatorId].lastProceedingInitiated;
+    function lastEjectionInitiated(address operator) external view returns (uint64) {
+        return EigenDAEjectionLib.ejectionParams().operatorProceedingParams[operator].lastProceedingInitiated;
     }
 
     function ejectionDelay() external view returns (uint64) {
@@ -116,10 +123,6 @@ contract EigenDAEjectionManager {
 
     function ejectionCooldown() external view returns (uint64) {
         return EigenDAEjectionLib.ejectionParams().proceedingCooldown;
-    }
-
-    function ejectionSaltConsumed(bytes32 operatorId, bytes32 salt) external view returns (bool) {
-        return EigenDAEjectionLib.ejectionParams().operatorProceedingParams[operatorId].salts[salt];
     }
 
     /// INTERNAL FUNCTIONS
@@ -132,7 +135,7 @@ contract EigenDAEjectionManager {
         IERC20(_depositToken).safeTransfer(receiver, _depositAmount);
     }
 
-    function _onlyOwner() internal view virtual {
-        this; // PLACEHOLDER UNTIL ACCESS CONTROL IS IMPLEMENTED
+    function _onlyWatcher(address sender) internal view virtual {
+        sender; // TODO: PLACEHOLDER UNTIL ACCESS CONTROL IS IMPLEMENTED
     }
 }
