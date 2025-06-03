@@ -11,10 +11,9 @@ PROTO_DIR="${API_DIR}/proto"
 # Directories where output files are generated.
 # We place the MD files in the docs/spec directory so they can be included in the mdbook.
 HTML_OUTPUT_DIR="${API_DIR}/docs"
-MD_OUTPUT_DIR="${ROOT_DIR}/docs/spec/src/protobufs/generated"
 
-# We start by cleaning the old docs in both output directories.
-rm -rf "${HTML_OUTPUT_DIR}"/* "${MD_OUTPUT_DIR}"/*
+# We start by cleaning the old docs in the output directory.
+rm -rf "${HTML_OUTPUT_DIR}"/*
 
 # Function to get the relative path of file in argument 1 with respect directory in argument 2.
 # Doesn't use the convenient 'realpath --relative-to' because it's not available on macOS.
@@ -53,40 +52,6 @@ generateUnifiedHTML() {
 generateUnifiedHTML &
 PID_LIST+=($!)
 
-# Generate unified (single-page) markdown doc
-generateUnifiedMD() {
-  echo "Generating unified markdown documentation..."
-  docker run --rm \
-    -v "${MD_OUTPUT_DIR}":/out \
-    -v "${PROTO_DIR}":/protos \
-    pseudomuto/protoc-gen-doc \
-    "${PROTO_FILES[@]}" \
-    --doc_opt=markdown,eigenda-protos.md 2>/dev/null
-
-  if [ $? -ne 0 ]; then
-    echo "Failed to generate unified markdown documentation."
-    exit 1
-  fi
-}
-generateUnifiedMD &
-PID_LIST+=($!)
-
-# Generate markdown docs for a proto file. First argument is the name of the proto file, second is the path.
-generateMD() {
-  echo "Generating markdown documentation for ${1}..."
-  docker run --rm \
-    -v "${MD_OUTPUT_DIR}":/out \
-    -v "${PROTO_DIR}":/protos \
-    pseudomuto/protoc-gen-doc \
-    "${2}" \
-    --doc_opt=markdown,"${1}.md" 2>/dev/null
-
-  if [ $? -ne 0 ]; then
-    echo "Failed to generate documentation for ${1}."
-    exit 1
-  fi
-}
-
 # Generate HTML docs for a proto file. First argument is the name of the proto file, second is the path.
 generateHTML() {
     echo "Generating HTML documentation for ${1}..."
@@ -106,9 +71,6 @@ generateHTML() {
 # Generate individual markdown/HTML docs
 for PROTO_FILE in "${PROTO_FILES[@]}"; do
   PROTO_NAME=$(basename "${PROTO_FILE}" .proto)
-
-  generateMD "${PROTO_NAME}" "${PROTO_FILE}" &
-  PID_LIST+=($!)
 
   generateHTML "${PROTO_NAME}" "${PROTO_FILE}" &
   PID_LIST+=($!)
