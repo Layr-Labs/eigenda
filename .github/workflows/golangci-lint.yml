@@ -13,15 +13,24 @@ jobs:
     name: Linter
     runs-on: ubuntu-latest
     steps:
+<<<<<<< Updated upstream
       - name: Checkout EigenDA
         uses: actions/checkout@v4
 
       - uses: jdx/mise-action@v2
+=======
+      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 #5.3.0
+>>>>>>> Stashed changes
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
       - run: go version
 
+<<<<<<< Updated upstream
       - run: make lint
+=======
+      - name: Checkout EigenDA
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
+>>>>>>> Stashed changes
 
       - run: make fmt-check

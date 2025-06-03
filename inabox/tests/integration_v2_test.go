@@ -83,6 +83,24 @@ var _ = Describe("Inabox v2 blacklisting Integration test", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 
+		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
+		signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+		Expect(err).To(BeNil())
+
+		disp, err := clients.NewDisperserClient(&clients.DisperserClientConfig{
+			Hostname: "localhost",
+			Port:     "32005",
+		}, signer, nil, nil)
+		Expect(err).To(BeNil())
+		Expect(disp).To(Not(BeNil()))
+
+		data1 := make([]byte, 992)
+		_, err = rand.Read(data1)
+		Expect(err).To(BeNil())
+		data2 := make([]byte, 123)
+		_, err = rand.Read(data2)
+		Expect(err).To(BeNil())
+
 		// random G1 point
 		g1Commitment, err := RandomG1Point()
 		if err != nil {
@@ -119,6 +137,8 @@ var _ = Describe("Inabox v2 blacklisting Integration test", func() {
 		if err != nil {
 			Fail("failed to convert blob certificate to protobuf")
 		}
+
+		mineAnvilBlocks(1)
 
 		request := &nodegrpc.StoreChunksRequest{
 			Batch: &commonpb.Batch{
