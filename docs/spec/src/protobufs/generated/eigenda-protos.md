@@ -992,7 +992,10 @@ This header can be thought of as an &#34;eigenDA tx&#34;, in that it plays a pur
 <a name="disperser-v2-GetPaymentStateForAllQuorumsReply"></a>
 
 ### GetPaymentStateForAllQuorumsReply
-GetPaymentStateForAllQuorumsReply contains the payment state of an account.
+GetPaymentStateForAllQuorumsReply contains the payment state of an account. EigenLabs disperser is the only disperser that allows
+for ondemand usages, and it will provide the latest on-demand offchain payment records for the request account.
+Other dispersers will refuse to serve ondemand requests and serve 0 for off-chain on-demand payment usage (`cumulative_payment`). A client using
+non-EigenDA dispersers should only request with reserved usages and disregard the cumulative_payment shared by the non EigenLabs dispersers.
 
 
 | Field | Type | Label | Description |
@@ -1085,7 +1088,7 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | account_id | [string](#string) |  | The ID of the account being queried. This account ID is an eth wallet address of the user. |
-| signature | [bytes](#bytes) |  | Signature over the account ID |
+| signature | [bytes](#bytes) |  | Signature over the account ID and timestamp. |
 | timestamp | [uint64](#uint64) |  | Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server&#39;s clock, request may be rejected. |
 
 
@@ -1335,12 +1338,12 @@ Disperser defines the public APIs for dispersing blobs.
 | GetBlobCommitment | [BlobCommitmentRequest](#disperser-v2-BlobCommitmentRequest) | [BlobCommitmentReply](#disperser-v2-BlobCommitmentReply) | GetBlobCommitment is a utility method that calculates commitment for a blob payload. It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header and don&#39;t have the ability to calculate the commitment themselves (expensive operation which requires SRS points).
 
 For an example usage, see how our disperser_client makes a call to this endpoint when it doesn&#39;t have a local prover: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166 |
-| GetPaymentState | [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest) | [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply) | GetPaymentState is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting. As reservation moves to be quorum specific and served by permissionless dispersers, GetPaymentState will soon be deprecated in replacement of GetPaymentStateForAllQuorums to include more specifications. During the endpoint migration time, the response uses quorum 0 for the global parameters, and the most retrictive reservation parameters of a user across quorums. For OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values for off-chain payments. For other dispersers, they will provide 0 for offchain payments. A client using non-EigenDA dispersers should not worry about the zero values for onDemand records.
+| GetPaymentState | [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest) | [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply) | GetPaymentState is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting. As reservation moves to be quorum specific and served by permissionless dispersers, GetPaymentState will soon be deprecated in replacement of GetPaymentStateForAllQuorums to include more specifications. During the endpoint migration time, the response uses quorum 0 for the global parameters, and the most retrictive reservation parameters of a user across quorums. For OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values tracked for on-demand offchain payment records. For other dispersers, they will refuse to serve ondemand requests and serve 0 as the on-demand offchain records. A client using non-EigenDA dispersers should only request with reserved usages.
 
 A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser. That typically only needs to be done once, and the state can be updated locally as the client disperses blobs. The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
 
 For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298 |
-| GetPaymentStateForAllQuorums | [GetPaymentStateForAllQuorumsRequest](#disperser-v2-GetPaymentStateForAllQuorumsRequest) | [GetPaymentStateForAllQuorumsReply](#disperser-v2-GetPaymentStateForAllQuorumsReply) | GetPaymentStateForAllQuorums is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id. A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it dispersed from. That typically only needs to be done once, and the state can be updated locally as the client disperses blobs. The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
+| GetPaymentStateForAllQuorums | [GetPaymentStateForAllQuorumsRequest](#disperser-v2-GetPaymentStateForAllQuorumsRequest) | [GetPaymentStateForAllQuorumsReply](#disperser-v2-GetPaymentStateForAllQuorumsReply) | GetPaymentStateForAllQuorums is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id. A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it plans to disperse to. That typically only needs to be done once, and the state can be updated locally as the client disperses blobs. The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
 
 For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298 |
 

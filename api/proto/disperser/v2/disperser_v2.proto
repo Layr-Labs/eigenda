@@ -30,9 +30,9 @@ service Disperser {
   // As reservation moves to be quorum specific and served by permissionless dispersers, GetPaymentState will soon be deprecated
   // in replacement of GetPaymentStateForAllQuorums to include more specifications. During the endpoint migration time, the response
   // uses quorum 0 for the global parameters, and the most retrictive reservation parameters of a user across quorums. For
-  // OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values for off-chain payments.
-  // For other dispersers, they will provide 0 for offchain payments. A client using non-EigenDA dispersers should not worry about
-  // the zero values for onDemand records.
+  // OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values tracked for on-demand offchain payment records.
+  // For other dispersers, they will refuse to serve ondemand requests and serve 0 as the on-demand offchain records. A client using
+  // non-EigenDA dispersers should only request with reserved usages.
   //
   // A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
   // That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
@@ -44,7 +44,7 @@ service Disperser {
 
   // GetPaymentStateForAllQuorums is a utility method to get the payment state of a given account, at a given disperser.
   // EigenDA's dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id.
-  // A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it dispersed from.
+  // A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it plans to disperse to.
   // That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
   // The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
   //
@@ -137,7 +137,7 @@ message BlobCommitmentReply {
 message GetPaymentStateRequest {
   // The ID of the account being queried. This account ID is an eth wallet address of the user.
   string account_id = 1;
-  // Signature over the account ID
+  // Signature over the account ID and timestamp.
   bytes signature = 2;
   // Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server's clock,
   // request may be rejected.
@@ -169,7 +169,10 @@ message GetPaymentStateReply {
   bytes onchain_cumulative_payment = 5;
 }
 
-// GetPaymentStateForAllQuorumsReply contains the payment state of an account.
+// GetPaymentStateForAllQuorumsReply contains the payment state of an account. EigenLabs disperser is the only disperser that allows
+// for ondemand usages, and it will provide the latest on-demand offchain payment records for the request account.
+// Other dispersers will refuse to serve ondemand requests and serve 0 for off-chain on-demand payment usage (`cumulative_payment`). A client using
+// non-EigenDA dispersers should only request with reserved usages and disregard the cumulative_payment shared by the non EigenLabs dispersers.
 message GetPaymentStateForAllQuorumsReply {
   // payment vault parameters with per-quorum configurations
   PaymentVaultParams payment_vault_params = 1;

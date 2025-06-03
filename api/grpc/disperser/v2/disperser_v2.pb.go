@@ -488,7 +488,7 @@ type GetPaymentStateRequest struct {
 
 	// The ID of the account being queried. This account ID is an eth wallet address of the user.
 	AccountId string `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	// Signature over the account ID
+	// Signature over the account ID and timestamp.
 	Signature []byte `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
 	// Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server's clock,
 	// request may be rejected.
@@ -701,7 +701,10 @@ func (x *GetPaymentStateReply) GetOnchainCumulativePayment() []byte {
 	return nil
 }
 
-// GetPaymentStateForAllQuorumsReply contains the payment state of an account.
+// GetPaymentStateForAllQuorumsReply contains the payment state of an account. EigenLabs disperser is the only disperser that allows
+// for ondemand usages, and it will provide the latest on-demand offchain payment records for the request account.
+// Other dispersers will refuse to serve ondemand requests and serve 0 for off-chain on-demand payment usage (`cumulative_payment`). A client using
+// non-EigenDA dispersers should only request with reserved usages and disregard the cumulative_payment shared by the non EigenLabs dispersers.
 type GetPaymentStateForAllQuorumsReply struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

@@ -49,9 +49,9 @@ type DisperserClient interface {
 	// As reservation moves to be quorum specific and served by permissionless dispersers, GetPaymentState will soon be deprecated
 	// in replacement of GetPaymentStateForAllQuorums to include more specifications. During the endpoint migration time, the response
 	// uses quorum 0 for the global parameters, and the most retrictive reservation parameters of a user across quorums. For
-	// OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values for off-chain payments.
-	// For other dispersers, they will provide 0 for offchain payments. A client using non-EigenDA dispersers should not worry about
-	// the zero values for onDemand records.
+	// OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values tracked for on-demand offchain payment records.
+	// For other dispersers, they will refuse to serve ondemand requests and serve 0 as the on-demand offchain records. A client using
+	// non-EigenDA dispersers should only request with reserved usages.
 	//
 	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
 	// That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
@@ -62,7 +62,7 @@ type DisperserClient interface {
 	GetPaymentState(ctx context.Context, in *GetPaymentStateRequest, opts ...grpc.CallOption) (*GetPaymentStateReply, error)
 	// GetPaymentStateForAllQuorums is a utility method to get the payment state of a given account, at a given disperser.
 	// EigenDA's dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id.
-	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it dispersed from.
+	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it plans to disperse to.
 	// That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
 	// The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
 	//
@@ -147,9 +147,9 @@ type DisperserServer interface {
 	// As reservation moves to be quorum specific and served by permissionless dispersers, GetPaymentState will soon be deprecated
 	// in replacement of GetPaymentStateForAllQuorums to include more specifications. During the endpoint migration time, the response
 	// uses quorum 0 for the global parameters, and the most retrictive reservation parameters of a user across quorums. For
-	// OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values for off-chain payments.
-	// For other dispersers, they will provide 0 for offchain payments. A client using non-EigenDA dispersers should not worry about
-	// the zero values for onDemand records.
+	// OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values tracked for on-demand offchain payment records.
+	// For other dispersers, they will refuse to serve ondemand requests and serve 0 as the on-demand offchain records. A client using
+	// non-EigenDA dispersers should only request with reserved usages.
 	//
 	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser.
 	// That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
@@ -160,7 +160,7 @@ type DisperserServer interface {
 	GetPaymentState(context.Context, *GetPaymentStateRequest) (*GetPaymentStateReply, error)
 	// GetPaymentStateForAllQuorums is a utility method to get the payment state of a given account, at a given disperser.
 	// EigenDA's dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id.
-	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it dispersed from.
+	// A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it plans to disperse to.
 	// That typically only needs to be done once, and the state can be updated locally as the client disperses blobs.
 	// The accounting rules are simple and can be updated locally, but periodic checks with the disperser can't hurt.
 	//
