@@ -31,20 +31,27 @@ const (
 func (svr *Server) handleGetOPKeccakCommitment(w http.ResponseWriter, r *http.Request) error {
 	keccakCommitmentHex, ok := mux.Vars(r)[routingVarNameKeccakCommitmentHex]
 	if !ok {
-		return fmt.Errorf("keccak commitment not found in path: %s", r.URL.Path)
+		return proxyerrors.NewParsingError(fmt.Errorf("keccak commitment not found in path: %s", r.URL.Path))
 	}
 	keccakCommitment, err := hex.DecodeString(keccakCommitmentHex)
 	if err != nil {
-		return fmt.Errorf("failed to decode hex keccak commitment %s: %w", keccakCommitmentHex, err)
+		return proxyerrors.NewParsingError(
+			fmt.Errorf("failed to decode hex keccak commitment %s: %w", keccakCommitmentHex, err))
 	}
-	svr.log.Info("Processing GET request", "commitmentMode", commitments.OptimismKeccakCommitmentMode,
-		"keccakCommitment", keccakCommitmentHex)
 	payload, err := svr.sm.GetOPKeccakValueFromS3(r.Context(), keccakCommitment)
 	if err != nil {
 		return fmt.Errorf("GET keccakCommitment %v: %w", keccakCommitmentHex, err)
 	}
 
-	svr.writeResponse(w, payload)
+	svr.log.Info("Processed request", "method", r.Method, "url", r.URL.Path,
+		"commitmentMode", commitments.OptimismKeccakCommitmentMode, "commitment", keccakCommitmentHex)
+
+	_, err = w.Write(payload)
+	if err != nil {
+		// If the write fails, we will already have sent a 200 header. But we still return an error
+		// here so that the logging middleware can log it.
+		return fmt.Errorf("failed to write response for GET keccakCommitment %v: %w", keccakCommitmentHex, err)
+	}
 	return nil
 }
 
@@ -65,25 +72,23 @@ func (svr *Server) handleGetShared(
 ) error {
 	certVersion, err := parseCertVersion(w, r)
 	if err != nil {
-		return fmt.Errorf("error parsing version byte: %w", err)
+		return proxyerrors.NewParsingError(fmt.Errorf("parsing version byte: %w", err))
 	}
 	// used in the metrics middleware... there's prob a better way to do this
 	middleware.SetCertVersion(r, string(certVersion))
 	serializedCertHex, ok := mux.Vars(r)[routingVarNamePayloadHex]
 	if !ok {
-		return fmt.Errorf("serializedDACert not found in path: %s", r.URL.Path)
+		return proxyerrors.NewParsingError(fmt.Errorf("serializedDACert not found in path: %s", r.URL.Path))
 	}
 	serializedCert, err := hex.DecodeString(serializedCertHex)
 	if err != nil {
 		return proxyerrors.NewCertHexDecodingError(serializedCertHex, err)
 	}
 	versionedCert := certs.NewVersionedCert(serializedCert, certVersion)
-	svr.log.Info("Processing GET request", "commitmentMode", mode,
-		"certVersion", versionedCert.Version, "serializedCert", serializedCertHex)
 
 	l1InclusionBlockNum, err := parseCommitmentInclusionL1BlockNumQueryParam(r)
 	if err != nil {
-		return err
+		return err // doesn't need to be wrapped; already a proxyerrors
 	}
 	input, err := svr.sm.Get(
 		r.Context(),
@@ -96,7 +101,16 @@ func (svr *Server) handleGetShared(
 			versionedCert.Version, serializedCertHex, err)
 	}
 
-	svr.writeResponse(w, input)
+	svr.log.Info("Processed request", "method", r.Method, "url", r.URL.Path, "commitmentMode", mode,
+		"certVersion", versionedCert.Version, "serializedCert", serializedCertHex)
+
+	_, err = w.Write(input)
+	if err != nil {
+		// If the write fails, we will already have sent a 200 header. But we still return an error
+		// here so that the logging middleware can log it.
+		return fmt.Errorf("failed to write response for GET serializedCert (version %v) %v: %w",
+			versionedCert.Version, serializedCertHex, err)
+	}
 	return nil
 }
 
@@ -127,51 +141,53 @@ func parseCommitmentInclusionL1BlockNumQueryParam(r *http.Request) (uint64, erro
 func (svr *Server) handlePostOPKeccakCommitment(w http.ResponseWriter, r *http.Request) error {
 	keccakCommitmentHex, ok := mux.Vars(r)[routingVarNameKeccakCommitmentHex]
 	if !ok {
-		return fmt.Errorf("keccak commitment not found in path: %s", r.URL.Path)
+		return proxyerrors.NewParsingError(fmt.Errorf("keccak commitment not found in path: %s", r.URL.Path))
 	}
 	keccakCommitment, err := hex.DecodeString(keccakCommitmentHex)
 	if err != nil {
-		return fmt.Errorf("failed to decode hex keccak commitment %s: %w", keccakCommitmentHex, err)
+		return proxyerrors.NewParsingError(
+			fmt.Errorf("failed to decode hex keccak commitment %s: %w", keccakCommitmentHex, err))
 	}
-	svr.log.Info("Processing Keccak Commitment POST request",
-		"mode", commitments.OptimismKeccakCommitmentMode, "commitment", keccakCommitmentHex)
 	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxPOSTRequestBodySize))
 	if err != nil {
 		return proxyerrors.NewReadRequestBodyError(err, maxPOSTRequestBodySize)
 	}
+
 	err = svr.sm.PutOPKeccakPairInS3(r.Context(), keccakCommitment, payload)
 	if err != nil {
 		return fmt.Errorf("keccak POST request failed for commitment %v: %w", keccakCommitmentHex, err)
 	}
+
+	svr.log.Info("Processed request", "method", r.Method, "url", r.URL.Path,
+		"commitmentMode", commitments.OptimismKeccakCommitmentMode, "commitment", keccakCommitmentHex)
+	// No need to return the keccak commitment because it's already known by the client (keccak(payload)).
 	return nil
 }
 
 // handlePostStdCommitment handles the POST request for std commitments.
 func (svr *Server) handlePostStdCommitment(w http.ResponseWriter, r *http.Request) error {
-	return svr.handlePostShared(w, r, nil, commitments.StandardCommitmentMode)
+	return svr.handlePostShared(w, r, commitments.StandardCommitmentMode)
 }
 
 // handlePostOPGenericCommitment handles the POST request for optimism generic commitments.
 func (svr *Server) handlePostOPGenericCommitment(w http.ResponseWriter, r *http.Request) error {
-	return svr.handlePostShared(w, r, nil, commitments.OptimismGenericCommitmentMode)
+	return svr.handlePostShared(w, r, commitments.OptimismGenericCommitmentMode)
 }
 
 // This is a shared function for handling POST requests for
 func (svr *Server) handlePostShared(
 	w http.ResponseWriter,
 	r *http.Request,
-	comm []byte, // only non-nil for OPKeccak commitments
 	mode commitments.CommitmentMode,
 ) error {
-	svr.log.Info("Processing POST request", "commitment", hex.EncodeToString(comm), "mode", mode)
 	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxPOSTRequestBodySize))
 	if err != nil {
 		return proxyerrors.NewReadRequestBodyError(err, maxPOSTRequestBodySize)
 	}
 
-	serializedCert, err := svr.sm.Put(r.Context(), mode, comm, payload)
+	serializedCert, err := svr.sm.Put(r.Context(), mode, payload)
 	if err != nil {
-		return fmt.Errorf("post request failed with commitment %v: %w", comm, err)
+		return fmt.Errorf("post request failed: %w", err)
 	}
 
 	var certVersion certs.VersionByte
@@ -191,12 +207,20 @@ func (svr *Server) handlePostShared(
 		return fmt.Errorf("failed to encode serializedCert %v: %w", serializedCert, err)
 	}
 
-	svr.log.Info(fmt.Sprintf("response commitment: %x\n", responseCommit))
+	svr.log.Info("Processed request", "method", r.Method, "url", r.URL.Path, "commitmentMode", mode,
+		"certVersion", versionedCert.Version, "cert", hex.EncodeToString(serializedCert))
+
 	// We write the commitment as bytes directly instead of hex encoded.
 	// The spec https://specs.optimism.io/experimental/alt-da.html#da-server says it should be hex-encoded,
 	// but the client expects it to be raw bytes.
 	// See
 	// https://github.com/Layr-Labs/optimism/blob/89ac40d0fddba2e06854b253b9f0266f36350af2/op-alt-da/daclient.go#L151
-	svr.writeResponse(w, responseCommit)
+	_, err = w.Write(responseCommit)
+	if err != nil {
+		// If the write fails, we will already have sent a 200 header. But we still return an error
+		// here so that the logging middleware can log it.
+		return fmt.Errorf("failed to write response for POST serializedCert (version %v) %x: %w",
+			versionedCert.Version, serializedCert, err)
+	}
 	return nil
 }

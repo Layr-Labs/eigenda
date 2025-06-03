@@ -19,7 +19,7 @@ import (
 // IManager ... read/write interface
 type IManager interface {
 	// See [Manager.Put]
-	Put(ctx context.Context, cm commitments.CommitmentMode, key, value []byte) ([]byte, error)
+	Put(ctx context.Context, cm commitments.CommitmentMode, value []byte) ([]byte, error)
 	// See [Manager.Get]
 	Get(ctx context.Context, versionedCert certs.VersionedCert,
 		cm commitments.CommitmentMode, verifyOpts common.CertVerificationOpts) ([]byte, error)
@@ -154,7 +154,7 @@ func (m *Manager) Get(ctx context.Context,
 }
 
 // Put ... inserts a value into a storage backend based on the commitment mode
-func (m *Manager) Put(ctx context.Context, cm commitments.CommitmentMode, key, value []byte) ([]byte, error) {
+func (m *Manager) Put(ctx context.Context, cm commitments.CommitmentMode, value []byte) ([]byte, error) {
 	var commit []byte
 	var err error
 

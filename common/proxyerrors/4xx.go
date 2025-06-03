@@ -12,6 +12,7 @@ import (
 )
 
 func Is400(err error) bool {
+	var parsingError ParsingError
 	var certHexDecodingError CertHexDecodingError
 	var invalidBackendErr common.InvalidBackendError
 	var unmarshalJSONErr UnmarshalJSONError
@@ -19,6 +20,7 @@ func Is400(err error) bool {
 	var readRequestBodyErr ReadRequestBodyError
 	var s3KeccakKeyValueMismatchErr s3.Keccak256KeyValueMismatchError
 	return errors.Is(err, ErrProxyOversizedBlob) ||
+		errors.As(err, &parsingError) ||
 		errors.As(err, &certHexDecodingError) ||
 		errors.As(err, &invalidBackendErr) ||
 		errors.As(err, &unmarshalJSONErr) ||
@@ -123,4 +125,19 @@ func NewUnmarshalJSONError(err error) UnmarshalJSONError {
 
 func (me UnmarshalJSONError) Error() string {
 	return fmt.Sprintf("unmarshalling JSON: %s", me.err.Error())
+}
+
+// ParsingError is a very coarse-grained error that's used as a catch-all for any parsing errors
+// like parsing a hex string, or parsing a version byte from the request path, reading a query param, etc.
+type ParsingError struct {
+	err error
+}
+
+func NewParsingError(err error) ParsingError {
+	return ParsingError{
+		err: err,
+	}
+}
+func (me ParsingError) Error() string {
+	return fmt.Sprintf("parsing error: %s", me.err.Error())
 }

@@ -162,7 +162,6 @@ func TestHandlerPutSuccess(t *testing.T) {
 				mockStorageMgr.EXPECT().Put(
 					gomock.Any(),
 					gomock.Any(),
-					gomock.Any(),
 					gomock.Any()).Return([]byte(testCommitStr), nil)
 			},
 			expectedCode: http.StatusOK,
@@ -186,7 +185,6 @@ func TestHandlerPutSuccess(t *testing.T) {
 			body: []byte("some data that will successfully be written to EigenDA"),
 			mockBehavior: func() {
 				mockStorageMgr.EXPECT().Put(
-					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any()).Return([]byte(testCommitStr), nil)
@@ -284,7 +282,7 @@ func TestHandlerPutErrors(t *testing.T) {
 			t.Run(tt.name+" / "+mode.name, func(t *testing.T) {
 				t.Log(tt.name + " / " + mode.name)
 				mockStorageMgr.EXPECT().
-					Put(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Put(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, tt.mockStorageMgrPutReturnedErr)
 
 				req := httptest.NewRequest(
