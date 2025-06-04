@@ -135,7 +135,6 @@ library EigenDAEjectionLib {
         require(quorumsEqual(params.operatorProceedingParams[operator].quorums, quorums), "Quorums do not match");
         EigenDAEjectionTypes.OperatorProceedingParams storage operatorParams = params.operatorProceedingParams[operator];
         require(operatorParams.proceedingTime > 0, "No proceeding in progress");
-        // require(operatorParams.quorums == quorums, "Quorums do not match"); // TODO: FIX THIS
 
         require(block.timestamp >= operatorParams.proceedingTime, "Proceeding not yet due");
 

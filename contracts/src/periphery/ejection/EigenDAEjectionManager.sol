@@ -75,7 +75,7 @@ contract EigenDAEjectionManager {
     /// @notice Completes the ejection process for the operator. Transfers the deposit to the operator.
     function cancelChurn(address lowerStakeOperator, bytes memory quorums) external {
         require(
-            _isOperatorWeightsGreater(lowerStakeOperator, msg.sender, quorums),
+            _isOperatorWeightsGreater(msg.sender, lowerStakeOperator, quorums),
             "EigenDAEjectionManager: Operator does not have greater weights"
         );
         msg.sender.cancelChurn();
