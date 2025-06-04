@@ -29,8 +29,8 @@ library EigenDAEjectionStorage {
         keccak256(abi.encode(uint256(keccak256(abi.encodePacked(STORAGE_ID))) - 1)) & ~bytes32(uint256(0xff));
 
     struct Layout {
-        EigenDAEjectionTypes.ProceedingParams ejectionParams;
-        EigenDAEjectionTypes.ProceedingParams churnParams;
+        EigenDAEjectionTypes.ProceedingParams ejectionStorage;
+        EigenDAEjectionTypes.ProceedingParams churnStorage;
     }
 
     function layout() internal pure returns (Layout storage s) {
@@ -56,47 +56,51 @@ library EigenDAEjectionLib {
 
     /// @notice Starts a churning process for an operator.
     function startChurn(address operator, bytes memory quorums) internal {
-        startProceeding(operator, quorums, churnParams());
+        startProceeding(operator, quorums, churnStorage());
         emit ChurnStarted(
             operator,
             quorums,
-            churnParams().operatorProceedingParams[operator].lastProceedingInitiated,
-            churnParams().operatorProceedingParams[operator].proceedingTime
+            churnStorage().operatorProceedingParams[operator].lastProceedingInitiated,
+            churnStorage().operatorProceedingParams[operator].proceedingTime
         );
     }
 
     /// @notice Cancels a churning process for an operator.
     function cancelChurn(address operator) internal {
-        cancelProceeding(operator, churnParams());
+        cancelProceeding(operator, churnStorage());
         emit ChurnCancelled(operator);
     }
 
     /// @notice Completes a churning process for an operator.
     function completeChurn(address operator, bytes memory quorums) internal {
-        completeProceeding(operator, quorums, churnParams());
+        completeProceeding(operator, quorums, churnStorage());
         emit ChurnCompleted(operator, quorums);
     }
 
+    /// @notice Starts an ejection process for an operator.
     function startEjection(address operator, bytes memory quorums) internal {
-        startProceeding(operator, quorums, ejectionParams());
+        startProceeding(operator, quorums, ejectionStorage());
         emit EjectionStarted(
             operator,
             quorums,
-            ejectionParams().operatorProceedingParams[operator].lastProceedingInitiated,
-            ejectionParams().operatorProceedingParams[operator].proceedingTime
+            ejectionStorage().operatorProceedingParams[operator].lastProceedingInitiated,
+            ejectionStorage().operatorProceedingParams[operator].proceedingTime
         );
     }
 
+    /// @notice Cancels an ejection process for an operator.
     function cancelEjection(address operator) internal {
-        cancelProceeding(operator, ejectionParams());
+        cancelProceeding(operator, ejectionStorage());
         emit EjectionCancelled(operator);
     }
 
+    /// @notice Completes an ejection process for an operator.
     function completeEjection(address operator, bytes memory quorums) internal {
-        completeProceeding(operator, quorums, ejectionParams());
+        completeProceeding(operator, quorums, ejectionStorage());
         emit EjectionCompleted(operator, quorums);
     }
 
+    /// @notice Starts a proceeding process for an operator.
     function startProceeding(
         address operator,
         bytes memory quorums,
@@ -114,6 +118,7 @@ library EigenDAEjectionLib {
         operatorParams.lastProceedingInitiated = uint64(block.timestamp);
     }
 
+    /// @notice Cancels a proceeding process for an operator.
     function cancelProceeding(address operator, EigenDAEjectionTypes.ProceedingParams storage params) internal {
         EigenDAEjectionTypes.OperatorProceedingParams storage operatorParams = params.operatorProceedingParams[operator];
         require(operatorParams.proceedingTime > 0, "No proceeding in progress");
@@ -121,6 +126,7 @@ library EigenDAEjectionLib {
         operatorParams.proceedingTime = 0;
     }
 
+    /// @notice Completes a proceeding process for an operator.
     function completeProceeding(
         address operator,
         bytes memory quorums,
@@ -137,14 +143,17 @@ library EigenDAEjectionLib {
         operatorParams.proceedingTime = 0;
     }
 
+    /// @notice Checks if an ejection or churn process has been initiated for the operator.
     function ejectionInitiated(address operator) internal view returns (bool) {
-        return ejectionParams().operatorProceedingParams[operator].proceedingTime > 0;
+        return ejectionStorage().operatorProceedingParams[operator].proceedingTime > 0;
     }
 
+    /// @notice Checks if a churn process has been initiated for the operator.
     function churnInitiated(address operator) internal view returns (bool) {
-        return churnParams().operatorProceedingParams[operator].proceedingTime > 0;
+        return churnStorage().operatorProceedingParams[operator].proceedingTime > 0;
     }
 
+    /// @notice Checks if a proceeding has been initiated for the operator.
     function proceedingInitiated(address operator, EigenDAEjectionTypes.ProceedingParams storage params)
         internal
         view
@@ -153,14 +162,17 @@ library EigenDAEjectionLib {
         return params.operatorProceedingParams[operator].proceedingTime > 0;
     }
 
-    function ejectionParams() internal view returns (EigenDAEjectionTypes.ProceedingParams storage) {
-        return EigenDAEjectionStorage.layout().ejectionParams;
+    /// @notice Returns the ejection storage.
+    function ejectionStorage() internal view returns (EigenDAEjectionTypes.ProceedingParams storage) {
+        return EigenDAEjectionStorage.layout().ejectionStorage;
     }
 
-    function churnParams() internal view returns (EigenDAEjectionTypes.ProceedingParams storage) {
-        return EigenDAEjectionStorage.layout().churnParams;
+    /// @notice Returns the churn storage.
+    function churnStorage() internal view returns (EigenDAEjectionTypes.ProceedingParams storage) {
+        return EigenDAEjectionStorage.layout().churnStorage;
     }
 
+    /// @notice Compares two quorums to see if they are equal.
     function quorumsEqual(bytes memory quorums1, bytes memory quorums2) internal pure returns (bool) {
         return keccak256(quorums1) == keccak256(quorums2);
     }
