@@ -202,7 +202,8 @@ func NewNode(
 		config.DbPath+"/blacklist",
 		logger,
 		true, // disable seeks compaction
-		true) // enable sync writes
+		true, // enable sync writes
+		DefaultTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new blacklist store: %w", err)
 	}

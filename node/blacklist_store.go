@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"time"
 
+	pb "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/common/kvstore"
 	"github.com/Layr-Labs/eigenda/common/kvstore/leveldb"
+	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
@@ -33,11 +35,15 @@ type BlacklistStore interface {
 
 	// IsBlacklisted checks if a disperser is blacklisted
 	IsBlacklisted(ctx context.Context, disperserId uint32) bool
+
+	// blacklistDisperserFromBlobCert blacklists a disperser by retrieving the disperser's public key from the request and storing it in the blacklist store
+	BlacklistDisperserFromBlobCert(request *pb.StoreChunksRequest, blobCert *corev2.BlobCertificate) error
 }
 
 type blacklistStore struct {
 	db     kvstore.Store[[]byte]
 	logger logging.Logger
+	time   Time
 }
 
 var _ BlacklistStore = &blacklistStore{}
@@ -47,7 +53,8 @@ func NewLevelDBBlacklistStore(
 	path string,
 	logger logging.Logger,
 	disableSeeksCompaction bool,
-	syncWrites bool) (BlacklistStore, error) {
+	syncWrites bool,
+	time Time) (BlacklistStore, error) {
 
 	// Create the DB at the path.
 	db, err := leveldb.NewStore(logger, path, disableSeeksCompaction, syncWrites, nil)
@@ -59,7 +66,26 @@ func NewLevelDBBlacklistStore(
 	return &blacklistStore{
 		db:     db,
 		logger: logger,
+		time:   time,
 	}, nil
+}
+
+func (s *blacklistStore) BlacklistDisperserFromBlobCert(request *pb.StoreChunksRequest, blobCert *corev2.BlobCertificate) error {
+
+	ctx := context.Background()
+	s.logger.Info("blacklisting disperser from storeChunks request due to blobCert validation failure", "disperserID", request.DisperserID)
+
+	// Get blob key for context
+	blobKey, err := blobCert.BlobHeader.BlobKey()
+	if err != nil {
+		return fmt.Errorf("failed to get blob key: %w", err)
+	}
+
+	err = s.AddEntry(ctx, request.DisperserID, fmt.Sprintf("blobKey: %x", blobKey), "blobCert validation failed")
+	if err != nil {
+		return fmt.Errorf("failed to add entry to blacklist: %w", err)
+	}
+	return nil
 }
 
 // HasKey checks if a key exists in the store
@@ -137,17 +163,18 @@ func (s *blacklistStore) IsBlacklisted(ctx context.Context, disperserId uint32) 
 	// The number of entries determines the number of times a disperser has offended
 	// We exponentially increase the amount of time the disperser is blacklisted
 	// So it is 1 hour, 1 day and 1 week for the 3 offences and is based on the LastUpdated timestamp
+	// Uses the mockable time interface
 	lastUpdated := blacklist.LastUpdated
 	if len(blacklist.Entries) == 1 {
-		if time.Since(time.Unix(int64(lastUpdated), 0)) < time.Hour {
+		if s.time.Since(s.time.Unix(int64(lastUpdated), 0)) < time.Hour {
 			return true
 		}
 	} else if len(blacklist.Entries) == 2 {
-		if time.Since(time.Unix(int64(lastUpdated), 0)) < time.Hour*24 {
+		if s.time.Since(s.time.Unix(int64(lastUpdated), 0)) < time.Hour*24 {
 			return true
 		}
 	} else if len(blacklist.Entries) >= 3 {
-		if time.Since(time.Unix(int64(lastUpdated), 0)) < time.Hour*24*7 {
+		if s.time.Since(s.time.Unix(int64(lastUpdated), 0)) < time.Hour*24*7 {
 			return true
 		}
 	}
