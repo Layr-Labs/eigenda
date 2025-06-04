@@ -470,6 +470,14 @@ var (
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "GC_SAFETY_BUFFER_SIZE_GB"),
 	}
 
+	ReservationNumBinsFlag = cli.IntFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "reservation-num-bins"),
+		Usage:    "The number of bins to track for each account's reservation usage. The minimum value is 3.",
+		Required: false,
+		Value:    3,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "RESERVATION_NUM_BINS"),
+	}
+
 	/////////////////////////////////////////////////////////////////////////////
 	// TEST FLAGS SECTION
 	//

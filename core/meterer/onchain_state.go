@@ -212,6 +212,10 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx contex
 		return nil, err
 	}
 	pcs.ReservationsLock.Lock()
+	// Initialize the inner map for accountID if it doesn't exist
+	if _, ok := (pcs.ReservedPayments)[accountID]; !ok {
+		(pcs.ReservedPayments)[accountID] = make(map[core.QuorumID]*core.ReservedPayment)
+	}
 	// update specific quorum reservations
 	if (pcs.ReservedPayments)[accountID] == nil {
 		(pcs.ReservedPayments)[accountID] = make(map[core.QuorumID]*core.ReservedPayment)
