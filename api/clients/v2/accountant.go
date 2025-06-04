@@ -73,13 +73,13 @@ func (a *Accountant) BlobPaymentInfo(
 	numSymbols uint64,
 	quorumNumbers []uint8,
 	timestamp int64) (*big.Int, error) {
-
-	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, a.reservationWindow)
+	reservationWindow := a.reservationWindow
+	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, reservationWindow)
 	symbolUsage := a.SymbolsCharged(numSymbols)
 
 	a.usageLock.Lock()
 	defer a.usageLock.Unlock()
-	relativePeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod)
+	relativePeriodRecord := a.GetOrRefreshRelativePeriodRecord(currentReservationPeriod, reservationWindow)
 	relativePeriodRecord.Usage += symbolUsage
 
 	// first attempt to use the active reservation
@@ -91,7 +91,7 @@ func (a *Accountant) BlobPaymentInfo(
 		return big.NewInt(0), nil
 	}
 
-	overflowPeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod + 2)
+	overflowPeriodRecord := a.GetOrRefreshRelativePeriodRecord(currentReservationPeriod+2*reservationWindow, reservationWindow)
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
 	if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
@@ -116,8 +116,8 @@ func (a *Accountant) BlobPaymentInfo(
 		return a.cumulativePayment, nil
 	}
 	return big.NewInt(0), fmt.Errorf(
-		"no bandwidth reservation found for account %s, and current cumulativePayment balance insufficient "+
-			"to make an on-demand dispersal. Consider depositing more eth to the PaymentVault contract.", a.accountID.Hex())
+		"invalid payments: no available bandwidth reservation found for account %s, and current cumulativePayment balance insufficient "+
+			"to make an on-demand dispersal. Consider increasing reservation or cumulative payment on-chain.", a.accountID.Hex())
 }
 
 // AccountBlob accountant provides and records payment information
@@ -157,9 +157,24 @@ func (a *Accountant) SymbolsCharged(numSymbols uint64) uint64 {
 	return core.RoundUpDivide(numSymbols, a.minNumSymbols) * a.minNumSymbols
 }
 
+// GetRelativePeriodRecord returns the period record for the given index
+// return empty record if there is no record for the relative index
 func (a *Accountant) GetRelativePeriodRecord(index uint64) *PeriodRecord {
-	relativeIndex := uint32(index % uint64(a.numBins))
-	if a.periodRecords[relativeIndex].Index != uint32(index) {
+	// relativeIndex := uint32((index / a.reservationWindow) % uint64(a.numBins))
+	relativeIndex := uint32((index / a.reservationWindow) % uint64(a.numBins))
+	// Return empty record if the index is greater than the number of bins (should never happen by accountant initialization)
+	if relativeIndex >= uint32(a.numBins) {
+		return &PeriodRecord{Index: 0, Usage: 0}
+	}
+	return &a.periodRecords[relativeIndex]
+}
+
+// GetOrRefreshRelativePeriodRecord returns the period record for the given index (which is in seconds and is the multiple of the reservation window),
+// wrapping around the circular buffer and clearing the record if the index is greater than the number of bins
+func (a *Accountant) GetOrRefreshRelativePeriodRecord(index uint64, reservationWindow uint64) *PeriodRecord {
+	relativeIndex := uint32((index / reservationWindow) % uint64(a.numBins))
+	fmt.Println("periodRecords", a.periodRecords, "relativeIndex", relativeIndex, "index", index)
+	if a.periodRecords[relativeIndex].Index < uint32(index) {
 		a.periodRecords[relativeIndex] = PeriodRecord{
 			Index: uint32(index),
 			Usage: 0,
