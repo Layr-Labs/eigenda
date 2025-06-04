@@ -79,7 +79,7 @@ func NewServerV2(
 		config.StoreChunksRequestMaxPastAge,
 		config.StoreChunksRequestMaxFutureAge)
 
-	// Note: BatchMeterer initialization is left as a placeholder.
+	// TODO(hopeyen): BatchMeterer initialization is left as a placeholder.
 	// The node.ChainState does not implement meterer.OnchainPayment interface.
 	// In the future, we'll need to either:
 	// 1. Extend the node.ChainState interface

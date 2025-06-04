@@ -441,6 +441,7 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		reader.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
 
 		serverV1 := nodegrpc.NewServer(config, n, logger, rateLimiter)
+		//TODO(hopeyen): use actual batch meterer
 		serverV2, err := nodegrpc.NewServerV2(
 			context.Background(),
 			config,

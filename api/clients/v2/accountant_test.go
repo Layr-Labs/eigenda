@@ -152,7 +152,7 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 	quorums := []uint8{0, 1}
 	now := time.Now().UnixNano()
 	_, err = accountant.AccountBlob(ctx, now, numSymbols, quorums)
-	assert.Contains(t, err.Error(), "no bandwidth reservation found for account")
+	assert.Contains(t, err.Error(), "invalid payments")
 }
 
 func TestAccountBlobCallSeries(t *testing.T) {
@@ -205,7 +205,7 @@ func TestAccountBlobCallSeries(t *testing.T) {
 	now = time.Now().UnixNano()
 	_, err = accountant.AccountBlob(ctx, now, 600, quorums)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no bandwidth reservation found for account")
+	assert.Contains(t, err.Error(), "invalid payments")
 }
 
 func TestAccountBlob_BinRotation(t *testing.T) {
@@ -383,6 +383,128 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	_, err = accountant.AccountBlob(ctx, now, 500, quorums)
 	assert.NoError(t, err)
 	assert.Equal(t, isRotation([]uint64{1000, 500, 0}, mapRecordUsage(accountant.periodRecords)), true)
+}
+
+// Test cases:
+// Current bin under limit -> Simple increment
+// Current bin over limit but overflow bin empty -> can use overflow for spillage
+// Current bin over limit and overflow bin used -> reject, use on-demand
+// New window - start fresh with current bin, request cannot fit into a bin -> reject, use on-demand
+// New window - start fresh with current bin, within bin limit -> Simple increment
+// New window - current bin over limit but can use overflow -> overwrite spillage in previous bin
+// New window 2 - Exact bin limit usage -> Simple increment
+// New window 2 - current bin at limit -> Simply reject and use on-demand; no spillage
+func TestAccountBlob_ReservationOverflowWithWindow(t *testing.T) {
+	reservation := &core.ReservedPayment{
+		SymbolsPerSecond: 1000,
+		StartTimestamp:   100,
+		EndTimestamp:     200,
+		QuorumSplits:     []byte{50, 50},
+		QuorumNumbers:    []uint8{0, 1},
+	}
+	onDemand := &core.OnDemandPayment{
+		CumulativePayment: big.NewInt(3500),
+	}
+	reservationWindow := uint64(2) // Set to 2 seconds for testing
+	pricePerSymbol := uint64(1)
+	minNumSymbols := uint64(100)
+
+	privateKey1, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
+	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+
+	ctx := context.Background()
+	quorums := []uint8{0, 1}
+
+	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC).UnixNano()
+	windowSize := time.Duration(reservationWindow) * time.Second
+
+	// Case 1: Current bin under limit -> Simple increment
+	now := baseTime
+	period := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+	_, err = accountant.AccountBlob(ctx, now, 1000, quorums)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(1000), accountant.GetRelativePeriodRecord(period).Usage)
+	assert.Equal(t, uint64(0), accountant.GetRelativePeriodRecord(period+reservationWindow).Usage)
+	assert.Equal(t, uint64(0), accountant.GetRelativePeriodRecord(period+2*reservationWindow).Usage)
+
+	// Case 2: Current bin over limit but overflow bin empty -> can use overflow period (current bin index + 2) for spillage
+	now = baseTime + windowSize.Nanoseconds()/2
+	period = meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+	_, err = accountant.AccountBlob(ctx, now, 1500, quorums)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(2500), accountant.GetRelativePeriodRecord(period).Usage)
+	assert.Equal(t, uint64(0), accountant.GetRelativePeriodRecord(period+reservationWindow).Usage)
+	assert.Equal(t, uint64(500), accountant.GetRelativePeriodRecord(period+2*reservationWindow).Usage)
+
+	// Case 3: Current bin over limit and overflow bin used -> reject, use on-demand
+	now = baseTime + windowSize.Nanoseconds()/2 + 100
+	period = meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+	header, err := accountant.AccountBlob(ctx, now, 500, quorums)
+	assert.NoError(t, err)
+	assert.Equal(t, big.NewInt(500), header.CumulativePayment)
+	assert.Equal(t, uint64(2500), accountant.GetRelativePeriodRecord(period).Usage)
+	assert.Equal(t, uint64(0), accountant.GetRelativePeriodRecord(period+reservationWindow).Usage)
+	assert.Equal(t, uint64(500), accountant.GetRelativePeriodRecord(period+2*reservationWindow).Usage)
+
+	// Case 4: New window - start fresh with the new current bin, request cannot fit into a bin -> reject, use on-demand
+	now = baseTime + windowSize.Nanoseconds()
+	period = meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+	header, err = accountant.AccountBlob(ctx, now, 2500, quorums)
+	assert.NoError(t, err)
+	assert.Equal(t, big.NewInt(3000), header.CumulativePayment)
+	assert.Equal(t, uint64(0), accountant.GetRelativePeriodRecord(period).Usage)
+	assert.Equal(t, uint64(500), accountant.GetRelativePeriodRecord(period+reservationWindow).Usage)
+	assert.Equal(t, uint64(0), accountant.GetRelativePeriodRecord(period+2*reservationWindow).Usage)
+
+	// Case 5: New window - request within bin limit -> Simple increment
+	now = baseTime + windowSize.Nanoseconds() + 100
+	period = meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+	_, err = accountant.AccountBlob(ctx, now, 1000, quorums)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(1000), accountant.GetRelativePeriodRecord(period).Usage)
+	assert.Equal(t, uint64(500), accountant.GetRelativePeriodRecord(period+reservationWindow).Usage)
+	assert.Equal(t, uint64(0), accountant.GetRelativePeriodRecord(period+2*reservationWindow).Usage)
+
+	// Case 6: New window - current bin over limit but can use overflow -> overwrite spillage in previous bin
+	// spillage = existing + new - bin limit = 1000 + 1500 - 2000 = 500
+	now = baseTime + windowSize.Nanoseconds() + windowSize.Nanoseconds()/2
+	period = meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+	_, err = accountant.AccountBlob(ctx, now, 1500, quorums)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(2500), accountant.GetRelativePeriodRecord(period).Usage)
+	assert.Equal(t, uint64(500), accountant.GetRelativePeriodRecord(period+reservationWindow).Usage)
+	assert.Equal(t, uint64(500), accountant.GetRelativePeriodRecord(period+2*reservationWindow).Usage)
+
+	// Case 7: New window 2 - Exact bin limit usage -> Simple increment
+	now = baseTime + 2*windowSize.Nanoseconds()
+	period = meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+	_, err = accountant.AccountBlob(ctx, now, 1500, quorums)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(2000), accountant.GetRelativePeriodRecord(period).Usage)
+	assert.Equal(t, uint64(500), accountant.GetRelativePeriodRecord(period+reservationWindow).Usage)
+	assert.Equal(t, uint64(2500), accountant.GetRelativePeriodRecord(period+2*reservationWindow).Usage)
+
+	// Case 8: New window 2 - current bin at limit -> Simply reject and use on-demand; no spillage
+	// Past period record was cleaned up in the process
+	now = baseTime + 2*windowSize.Nanoseconds() + 100
+	period = meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+	header, err = accountant.AccountBlob(ctx, now, 500, quorums)
+	assert.NoError(t, err)
+	assert.Equal(t, big.NewInt(3500), header.CumulativePayment)
+	assert.Equal(t, uint64(2000), accountant.GetRelativePeriodRecord(period).Usage)
+	assert.Equal(t, uint64(500), accountant.GetRelativePeriodRecord(period+reservationWindow).Usage)
+	assert.Equal(t, uint64(0), accountant.GetRelativePeriodRecord(period+2*reservationWindow).Usage)
+
+	// Case 9: New window 2 - current bin at limit, on-demand used up, cannot serve
+	now = baseTime + 2*windowSize.Nanoseconds() + 100
+	period = meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+	_, err = accountant.AccountBlob(ctx, now, 500, quorums)
+	assert.Contains(t, err.Error(), "invalid payments")
+	assert.Equal(t, uint64(2000), accountant.GetRelativePeriodRecord(period).Usage)
+	assert.Equal(t, uint64(500), accountant.GetRelativePeriodRecord(period+reservationWindow).Usage)
+	assert.Equal(t, uint64(0), accountant.GetRelativePeriodRecord(period+2*reservationWindow).Usage)
 }
 
 func TestQuorumCheck(t *testing.T) {
