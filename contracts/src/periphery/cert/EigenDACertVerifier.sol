@@ -26,7 +26,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDACertVerifierBase, 
 
     bytes internal _quorumNumbersRequired;
 
-    uint64 internal constant CERT_VERSION = 3;
+    uint8 internal constant CERT_VERSION = 3;
 
     constructor(
         IEigenDAThresholdRegistry initEigenDAThresholdRegistry,
@@ -76,7 +76,7 @@ contract EigenDACertVerifier is IEigenDACertVerifier, IEigenDACertVerifierBase, 
     }
 
     /// @inheritdoc IVersionedEigenDACertVerifier
-    function certVersion() external pure returns (uint64) {
+    function certVersion() external pure returns (uint8) {
         return CERT_VERSION;
     }
 }
