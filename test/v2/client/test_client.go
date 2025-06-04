@@ -197,7 +197,7 @@ func NewTestClient(
 	blockMon, err := verification.NewBlockNumberMonitor(
 		logger,
 		ethClient,
-		time.Second * 1,
+		time.Second*1,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create block number monitor: %w", err)
@@ -537,7 +537,7 @@ func (c *TestClient) DisperseAndVerify(ctx context.Context, payload []byte) erro
 	if err != nil {
 		return fmt.Errorf("failed to read blob from relays: %w", err)
 	}
-	
+
 	blobHeader, err := eigenDAV3Cert.BlobHeader()
 	if err != nil {
 		return fmt.Errorf("failed to get blob header from cert: %w", err)

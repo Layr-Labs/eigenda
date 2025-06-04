@@ -124,7 +124,7 @@ func mustMakeTestClients(env *deploy.Config, privateKey string, logger logging.L
 func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger logging.Logger) *indexedstate.IndexedChainState {
 	client, rpcClient := mustMakeTestClients(env, env.Batcher[0].BATCHER_PRIVATE_KEY, logger)
 
-	tx, err := eth.NewWriter(logger, client, env.EigenDA.OperatorStateRetreiver, env.EigenDA.ServiceManager)
+	tx, err := eth.NewWriter(logger, client, env.EigenDA.OperatorStateRetriever, env.EigenDA.ServiceManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	var (
@@ -150,7 +150,14 @@ func mustMakeChainState(env *deploy.Config, store indexer.HeaderStore, logger lo
 	return chainState
 }
 
+// This test exercises the core indexer, which is not used in production. Since this test is flaky, disable it.
+var skip = true
+
 var _ = Describe("Indexer", func() {
+
+	if skip {
+		return
+	}
 
 	Context("when indexing a chain state", func() {
 

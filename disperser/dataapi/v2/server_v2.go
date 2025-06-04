@@ -82,7 +82,7 @@ type ServerV2 struct {
 	allowOrigins []string
 	logger       logging.Logger
 
-	blobMetadataStore *blobstore.BlobMetadataStore
+	blobMetadataStore blobstore.MetadataStore
 	subgraphClient    dataapi.SubgraphClient
 	chainReader       core.Reader
 	chainState        core.ChainState
@@ -108,7 +108,7 @@ type ServerV2 struct {
 
 func NewServerV2(
 	config dataapi.Config,
-	blobMetadataStore *blobstore.BlobMetadataStore,
+	blobMetadataStore blobstore.MetadataStore,
 	promClient dataapi.PrometheusClient,
 	subgraphClient dataapi.SubgraphClient,
 	chainReader core.Reader,

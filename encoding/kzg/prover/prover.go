@@ -114,7 +114,6 @@ func NewProver(kzgConfig *kzg.KzgConfig, encoderConfig *encoding.Config) (*Prove
 		return nil, err
 	}
 
-
 	// Create RS encoder
 	rsEncoder, err := rs.NewEncoder(encoderConfig)
 	if err != nil {
