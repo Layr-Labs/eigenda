@@ -9,7 +9,6 @@ proto-format:
 # Builds the protobuf files inside a docker container.
 protoc: clean proto-format
 	./builder/protoc-docker.sh
-	./builder/generate-docs.sh
 
 # Builds the protobuf files locally (i.e. without docker).
 protoc-local: clean
