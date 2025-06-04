@@ -13,6 +13,7 @@ library PaymentVaultLib {
         return PaymentVaultStorage.layout();
     }
 
+    /// @notice Adds a reservation for a user in a quorum. Requires that any previous reservation has ended, and the start of the new reservation is in the future.
     function addReservation(
         uint64 quorumId,
         address account,
@@ -34,6 +35,8 @@ library PaymentVaultLib {
         s().quorum[quorumId].user[account].reservation = reservation;
     }
 
+    /// @notice Updates a reservation for a user in a quorum. Requires that the start timestamp matches the current reservation,
+    ///         and that the new reservation is either the same or an increase over the current reservation.
     function increaseReservation(
         uint64 quorumId,
         address account,
@@ -78,6 +81,8 @@ library PaymentVaultLib {
         s().quorum[quorumId].user[account].reservation = reservation;
     }
 
+    /// @notice Updates a reservation for a user in a quorum. Requires that the start timestamp matches the current reservation,
+    ///         and that the new reservation is either the same or a decrease over the current reservation.
     function decreaseReservation(
         uint64 quorumId,
         address account,
@@ -123,7 +128,7 @@ library PaymentVaultLib {
         s().quorum[quorumId].user[account].reservation = reservation;
     }
 
-    /// @notice Does required checks on a reservation, and returns the starting timestamp for accounting for additional bandwidth.
+    /// @notice Does required checks on a reservation
     function checkReservation(uint64 quorumId, PaymentVaultTypes.Reservation memory reservation, uint64 schedulePeriod)
         internal
         view
@@ -145,6 +150,7 @@ library PaymentVaultLib {
         }
     }
 
+    /// @notice Deposits an amount on-demand for a user in a quorum. Requires that the amount does not exceed the maximum allowed deposit.
     function depositOnDemand(uint64 quorumId, address account, uint256 amount) internal {
         PaymentVaultTypes.Quorum storage quorum = s().quorum[quorumId];
         PaymentVaultTypes.User storage user = quorum.user[account];
@@ -160,6 +166,7 @@ library PaymentVaultLib {
         user.deposit = newAmount;
     }
 
+    /// @notice Increases the reserved symbols for a quorum in a given period. Requires that the start and end timestamps are multiples of the schedule period.
     function increaseReservedSymbols(
         uint64 quorumId,
         uint64 startTimestamp,
@@ -188,6 +195,7 @@ library PaymentVaultLib {
         }
     }
 
+    /// @notice Decreases the reserved symbols for a quorum in a given period. Requires that the start and end timestamps are multiples of the schedule period.
     function decreaseReservedSymbols(
         uint64 quorumId,
         uint64 startTimestamp,

@@ -28,7 +28,9 @@ contract PaymentVault is IPaymentVault {
     }
 
     constructor(uint64 schedulePeriod) {
-        require(schedulePeriod > 0, "Schedule period must be greater than 0");
+        if (schedulePeriod == 0) {
+            revert IPaymentVault.SchedulePeriodCannotBeZero();
+        }
         SCHEDULE_PERIOD = schedulePeriod;
     }
 
@@ -49,7 +51,9 @@ contract PaymentVault is IPaymentVault {
     /// OWNER
 
     function transferOwnership(address newOwner) external onlyOwner {
-        require(newOwner != address(0), "New owner is the zero address");
+        if (newOwner == address(0)) {
+            revert IPaymentVault.OwnerIsZeroAddress();
+        }
         AccessControlLib.transferRole(Constants.OWNER_ROLE, msg.sender, newOwner);
     }
 
@@ -58,9 +62,9 @@ contract PaymentVault is IPaymentVault {
         address newOwner,
         PaymentVaultTypes.QuorumProtocolConfig memory protocolCfg
     ) external onlyOwner {
-        require(
-            AccessControlLib.getRoleMemberCount(Constants.QUORUM_OWNER_ROLE(quorumId)) == 0, "Quorum owner already set"
-        );
+        if (AccessControlLib.getRoleMemberCount(Constants.QUORUM_OWNER_ROLE(quorumId)) > 0) {
+            revert IPaymentVault.QuorumOwnerAlreadySet(quorumId);
+        }
         AccessControlLib.grantRole(Constants.QUORUM_OWNER_ROLE(quorumId), newOwner);
         ps().quorum[quorumId].protocolCfg = protocolCfg;
     }
@@ -103,7 +107,9 @@ contract PaymentVault is IPaymentVault {
     }
 
     function transferQuorumOwnership(uint64 quorumId, address newOwner) external onlyQuorumOwner(quorumId) {
-        require(newOwner != address(0), "New owner is the zero address");
+        if (newOwner == address(0)) {
+            revert IPaymentVault.OwnerIsZeroAddress();
+        }
         AccessControlLib.transferRole(Constants.QUORUM_OWNER_ROLE(quorumId), msg.sender, newOwner);
     }
 
@@ -144,10 +150,10 @@ contract PaymentVault is IPaymentVault {
     }
 
     function _onlyOwner() internal view virtual {
-        require(AccessControlLib.hasRole(Constants.OWNER_ROLE, msg.sender), "Not owner");
+        AccessControlLib.checkRole(Constants.OWNER_ROLE, msg.sender);
     }
 
     function _onlyQuorumOwner(uint64 quorumId) internal view virtual {
-        require(AccessControlLib.hasRole(Constants.QUORUM_OWNER_ROLE(quorumId), msg.sender), "Not quorum owner");
+        AccessControlLib.checkRole(Constants.QUORUM_OWNER_ROLE(quorumId), msg.sender);
     }
 }

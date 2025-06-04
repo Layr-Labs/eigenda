@@ -26,6 +26,12 @@ interface IPaymentVault {
 
     error AmountTooLarge(uint256 amount, uint256 maxAmount);
 
+    error SchedulePeriodCannotBeZero();
+
+    error OwnerIsZeroAddress();
+
+    error QuorumOwnerAlreadySet(uint64 quorumId);
+
     function getOnDemandDeposit(uint64 quorumId, address account) external view returns (uint256);
 
     function getReservation(uint64 quorumId, address account)
