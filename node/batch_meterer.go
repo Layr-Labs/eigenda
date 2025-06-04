@@ -8,17 +8,14 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/meterer"
+	meterer "github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-// Minimum number of bins to track for each account's reservation usage
-const MinNumBins = 3
-
-// UsageRecord represents the usage for a specific reservation period
-type UsageRecord struct {
+// PeriodRecord represents the usage for a specific reservation period
+type PeriodRecord struct {
 	Index uint64 // The reservation period index
 	Usage uint64 // The usage amount for this period
 }
@@ -26,7 +23,7 @@ type UsageRecord struct {
 // AccountUsage tracks usage for a specific account and quorum
 type AccountUsage struct {
 	// Circular buffer of usage records, with minimum length MinNumBins
-	UsageRecords map[core.QuorumID][]UsageRecord
+	PeriodRecords map[core.QuorumID][]PeriodRecord
 	// Lock to protect concurrent access to usage records
 	Lock sync.RWMutex
 }
@@ -58,7 +55,7 @@ func NewBatchMeterer(
 	return &BatchMeterer{
 		Config:            config,
 		ChainPaymentState: paymentChainState,
-		NumBins:           max(numBins, MinNumBins),
+		NumBins:           max(numBins, meterer.MinNumBins),
 		logger:            logger.With("component", "BatchMeterer"),
 	}
 }
@@ -231,8 +228,8 @@ func (b *BatchMeterer) incrementAndValidateUsage(
 	accountUsage.Lock.Lock()
 	defer accountUsage.Lock.Unlock()
 
-	usageRecord := b.getOrCreateUsageRecord(accountUsage, quorumID, currentPeriod)
-	prevUsage := usageRecord.Usage
+	PeriodRecord := b.getOrCreatePeriodRecord(accountUsage, quorumID, currentPeriod)
+	prevUsage := PeriodRecord.Usage
 	newUsage := prevUsage + usage
 
 	// Calculate the bin limit based on the reservation's symbols per second
@@ -240,7 +237,7 @@ func (b *BatchMeterer) incrementAndValidateUsage(
 
 	if newUsage <= binLimit {
 		// Usage is within the bin limit, update the record
-		usageRecord.Usage = newUsage
+		PeriodRecord.Usage = newUsage
 		return nil
 	}
 
@@ -266,11 +263,8 @@ func (b *BatchMeterer) incrementAndValidateUsage(
 		return fmt.Errorf("overflow amount %d exceeds bin limit %d", overflowAmount, binLimit)
 	}
 
-	// Update the current bin to be at capacity
-	usageRecord.Usage = binLimit
-
 	// Increment the overflow bin
-	overflowRecord := b.getOrCreateUsageRecord(accountUsage, quorumID, overflowPeriod)
+	overflowRecord := b.getOrCreatePeriodRecord(accountUsage, quorumID, overflowPeriod)
 	if overflowRecord.Usage+overflowAmount > binLimit {
 		// Overflow bin would exceed capacity
 		return fmt.Errorf("overflow bin would exceed capacity")
@@ -288,22 +282,22 @@ func (b *BatchMeterer) getOrCreateAccountUsage(accountID gethcommon.Address) *Ac
 	}
 
 	accountUsage := &AccountUsage{
-		UsageRecords: make(map[core.QuorumID][]UsageRecord),
+		PeriodRecords: make(map[core.QuorumID][]PeriodRecord),
 	}
 	b.AccountUsages.Store(accountID, accountUsage)
 	return accountUsage
 }
 
-// getOrCreateUsageRecord gets or creates a usage record for a specific account, quorum, and period
-func (b *BatchMeterer) getOrCreateUsageRecord(
+// getOrCreatePeriodRecord gets or creates a usage record for a specific account, quorum, and period
+func (b *BatchMeterer) getOrCreatePeriodRecord(
 	accountUsage *AccountUsage,
 	quorumID core.QuorumID,
 	period uint64,
-) *UsageRecord {
-	if _, ok := accountUsage.UsageRecords[quorumID]; !ok {
-		accountUsage.UsageRecords[quorumID] = make([]UsageRecord, b.NumBins)
-		for i := range accountUsage.UsageRecords[quorumID] {
-			accountUsage.UsageRecords[quorumID][i] = UsageRecord{
+) *PeriodRecord {
+	if _, ok := accountUsage.PeriodRecords[quorumID]; !ok {
+		accountUsage.PeriodRecords[quorumID] = make([]PeriodRecord, b.NumBins)
+		for i := range accountUsage.PeriodRecords[quorumID] {
+			accountUsage.PeriodRecords[quorumID][i] = PeriodRecord{
 				Index: uint64(i),
 				Usage: 0,
 			}
@@ -311,7 +305,7 @@ func (b *BatchMeterer) getOrCreateUsageRecord(
 	}
 
 	// Find the existing record for this period or the least recently used slot
-	records := accountUsage.UsageRecords[quorumID]
+	records := accountUsage.PeriodRecords[quorumID]
 	oldestIndex := uint32(0)
 	oldestTime := uint64(0xFFFFFFFFFFFFFFFF)
 
@@ -327,7 +321,7 @@ func (b *BatchMeterer) getOrCreateUsageRecord(
 	}
 
 	// Reuse the oldest slot for the new period
-	records[oldestIndex] = UsageRecord{
+	records[oldestIndex] = PeriodRecord{
 		Index: period,
 		Usage: 0,
 	}

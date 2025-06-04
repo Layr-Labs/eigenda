@@ -349,7 +349,7 @@ func TestBatchMeterRequest(t *testing.T) {
 		reservationPeriod := meterer.GetReservationPeriod(time.Now().Unix(), 3600)
 
 		// Create a record with usage already at capacity (3600 symbols per window)
-		accountUsage.UsageRecords[0] = []UsageRecord{
+		accountUsage.PeriodRecords[0] = []PeriodRecord{
 			{
 				Index: reservationPeriod,
 				Usage: 3600, // Already at full capacity
