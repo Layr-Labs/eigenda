@@ -1,9 +1,31 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {PaymentVaultTypes} from "src/core/libraries/v3/PaymentVaultLib.sol";
+import {PaymentVaultTypes} from "src/core/libraries/v3/payment/PaymentVaultTypes.sol";
 
 interface IPaymentVault {
+    event ReservationCreated(
+        uint64 indexed quorumId, address indexed account, PaymentVaultTypes.Reservation reservation
+    );
+
+    error ReservationStillActive(uint64 endTimestamp);
+
+    error InvalidStartTimestamp(uint64 startTimestamp);
+
+    error StartTimestampMustMatch(uint64 startTimestamp);
+
+    error ReservationMustIncrease(uint64 endTimestamp, uint64 symbolsPerSecond);
+
+    error ReservationMustDecrease(uint64 endTimestamp, uint64 symbolsPerSecond);
+
+    error TimestampSchedulePeriodMismatch(uint64 timestamp, uint64 schedulePeriod);
+
+    error InvalidReservationPeriod(uint64 startTimestamp, uint64 endTimestamp);
+
+    error ReservationTooLong(uint64 length, uint64 maxLength);
+
+    error AmountTooLarge(uint256 amount, uint256 maxAmount);
+
     function getOnDemandDeposit(uint64 quorumId, address account) external view returns (uint256);
 
     function getReservation(uint64 quorumId, address account)

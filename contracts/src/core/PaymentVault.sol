@@ -2,7 +2,9 @@
 pragma solidity ^0.8.9;
 
 import {AccessControlLib} from "src/core/libraries/AccessControlLib.sol";
-import {PaymentVaultLib, PaymentVaultStorage, PaymentVaultTypes} from "src/core/libraries/v3/PaymentVaultLib.sol";
+import {PaymentVaultStorage} from "src/core/libraries/v3/payment/PaymentVaultStorage.sol";
+import {PaymentVaultTypes} from "src/core/libraries/v3/payment/PaymentVaultTypes.sol";
+import {PaymentVaultLib} from "src/core/libraries/v3/payment/PaymentVaultLib.sol";
 import {Constants} from "src/core/libraries/Constants.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {InitializableLib} from "src/core/libraries/InitializableLib.sol";
