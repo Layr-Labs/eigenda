@@ -242,7 +242,7 @@ func (cv *CertVerifier) GetConfirmationThreshold(ctx context.Context, referenceB
 // This method will return the version from an internal cache if it is already known for the cert
 // verifier which corresponds to the input reference block number. Otherwise, this method will query the version
 // and cache the result for future use.
-func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber uint64) (uint64, error) {
+func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber uint64) (uint8, error) {
 	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
 	if err != nil {
 		return 0, fmt.Errorf("get cert verifier address: %w", err)
@@ -251,7 +251,7 @@ func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber
 	// if the version for the active cert verifier address has already been cached, return it immediately
 	cachedVersion, ok := cv.versions.Load(certVerifierAddress)
 	if ok {
-		castVersion, ok := cachedVersion.(uint64)
+		castVersion, ok := cachedVersion.(uint8)
 		if !ok {
 			return 0, fmt.Errorf("expected version to be uint64")
 		}
