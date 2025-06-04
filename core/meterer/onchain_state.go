@@ -128,16 +128,18 @@ func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*Pay
 	quorumPaymentConfigs := make(map[core.QuorumID]*core.PaymentQuorumConfig)
 	quorumProtocolConfigs := make(map[core.QuorumID]*core.PaymentQuorumProtocolConfig)
 	quorumPaymentConfig := &core.PaymentQuorumConfig{
-		OnDemandSymbolsPerSecond:    globalSymbolsPerSecond,
-		OnDemandPricePerSymbol:      pricePerSymbol,
+		OnDemandSymbolsPerSecond: globalSymbolsPerSecond,
+		OnDemandPricePerSymbol:   pricePerSymbol,
+		// These two fields are not used in the offchain state
 		ReservationSymbolsPerSecond: uint64(0),
 	}
 	quorumProtocolConfig := &core.PaymentQuorumProtocolConfig{
 		MinNumSymbols:              minNumSymbols,
-		ReservationAdvanceWindow:   reservationWindow,
-		ReservationRateLimitWindow: uint64(0),
+		ReservationRateLimitWindow: reservationWindow,
 		OnDemandRateLimitWindow:    globalRatePeriodInterval,
-		OnDemandEnabled:            false,
+		// These two fields are not used in the offchain state
+		ReservationAdvanceWindow: uint64(0),
+		OnDemandEnabled:          false,
 	}
 	for _, quorumNumber := range quorumNumbers {
 		quorumPaymentConfigs[core.QuorumID(quorumNumber)] = quorumPaymentConfig
