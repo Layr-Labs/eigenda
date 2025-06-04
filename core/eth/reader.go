@@ -1021,3 +1021,7 @@ func (t *Reader) GetDisperserAddress(ctx context.Context, disperserID uint32) (g
 func (t *Reader) GetRelayRegistryAddress() gethcommon.Address {
 	return t.bindings.RelayRegistryAddress
 }
+
+func (t *Reader) GetRegistryCoordinatorAddress() gethcommon.Address {
+	return t.bindings.RegCoordinatorAddr
+}
