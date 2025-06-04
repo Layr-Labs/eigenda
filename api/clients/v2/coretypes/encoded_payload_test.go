@@ -50,7 +50,7 @@ func TestEncodeTooManyElements(t *testing.T) {
 
 	for i := 0; i < len(powersOf2); i++ {
 		blobLength := powersOf2[i]
-		maxPermissiblePayloadLength, err := codec.GetMaxPermissiblePayloadLength(blobLength)
+		maxPermissiblePayloadLength, err := codec.BlobSymbolsToMaxPayloadSize(blobLength)
 		require.NoError(t, err)
 
 		almostTooLongData := testRandom.Bytes(int(maxPermissiblePayloadLength))
