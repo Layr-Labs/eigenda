@@ -101,19 +101,19 @@ contract EigenDAEjectionManager {
     }
 
     function churnTime(address operator) external view returns (uint64) {
-        return EigenDAEjectionLib.churnParams().operatorProceedingParams[operator].proceedingTime;
+        return EigenDAEjectionLib.churnStorage().operatorProceedingParams[operator].proceedingTime;
     }
 
     function lastChurnInitiated(address operator) external view returns (uint64) {
-        return EigenDAEjectionLib.churnParams().operatorProceedingParams[operator].lastProceedingInitiated;
+        return EigenDAEjectionLib.churnStorage().operatorProceedingParams[operator].lastProceedingInitiated;
     }
 
     function churnDelay() external view returns (uint64) {
-        return EigenDAEjectionLib.churnParams().delay;
+        return EigenDAEjectionLib.churnStorage().delay;
     }
 
     function churnCooldown() external view returns (uint64) {
-        return EigenDAEjectionLib.churnParams().cooldown;
+        return EigenDAEjectionLib.churnStorage().cooldown;
     }
 
     function ejectionInitiated(address operator) external view returns (bool) {
@@ -121,19 +121,19 @@ contract EigenDAEjectionManager {
     }
 
     function ejectionTime(address operator) external view returns (uint64) {
-        return EigenDAEjectionLib.ejectionParams().operatorProceedingParams[operator].proceedingTime;
+        return EigenDAEjectionLib.ejectionStorage().operatorProceedingParams[operator].proceedingTime;
     }
 
     function lastEjectionInitiated(address operator) external view returns (uint64) {
-        return EigenDAEjectionLib.ejectionParams().operatorProceedingParams[operator].lastProceedingInitiated;
+        return EigenDAEjectionLib.ejectionStorage().operatorProceedingParams[operator].lastProceedingInitiated;
     }
 
     function ejectionDelay() external view returns (uint64) {
-        return EigenDAEjectionLib.ejectionParams().delay;
+        return EigenDAEjectionLib.ejectionStorage().delay;
     }
 
     function ejectionCooldown() external view returns (uint64) {
-        return EigenDAEjectionLib.ejectionParams().cooldown;
+        return EigenDAEjectionLib.ejectionStorage().cooldown;
     }
 
     /// INTERNAL FUNCTIONS
