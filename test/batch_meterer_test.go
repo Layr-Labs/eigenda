@@ -367,15 +367,10 @@ func TestBatchMetererOverflowBehavior(t *testing.T) {
 		},
 	}
 
-	// // Clear all existing expectations and call history
-	// mockState.ExpectedCalls = nil
-	// mockState.Calls = nil
-
-	// Set up the required mock behaviors with precise expectations
-	// We expect exactly 4 calls to GetReservedPaymentByAccountAndQuorums (one for each test case)
+	// Set up the required mock behaviors
 	mockState.On("GetReservedPaymentByAccountAndQuorums",
-		mock.Anything, // context
-		account,       // exact account match
+		mock.Anything,
+		account,
 		mock.MatchedBy(func(quorums []core.QuorumID) bool {
 			return len(quorums) == 1 && quorums[0] == 0
 		}),
@@ -439,9 +434,24 @@ func TestBatchMetererOverflowBehavior(t *testing.T) {
 	)
 	err = batchMeterer.MeterBatch(ctx, additionalBatch, now)
 	assert.Error(t, err, "Batch using already filled bin should fail")
-	assert.Contains(t, err.Error(), "bin already filled", "Error should mention bin already filled")
+	assert.Contains(t, err.Error(), "bin has already been filled", "Error should mention bin already filled")
 
-	// Test 4: Using a different timestamp (next period) should allow usage again
+	// Test 4: Create a batch that would exceed 2*binLimit (should fail)
+	// This should fail because total usage would be > 2*binLimit
+	largeOverflowBatch := createTestBatch(
+		[]accountQuorumInfo{
+			{
+				account:    account,
+				quorumIDs:  []core.QuorumID{0},
+				numSymbols: binLimit * 2, // Would cause total usage to exceed 2*binLimit
+			},
+		},
+	)
+	err = batchMeterer.MeterBatch(ctx, largeOverflowBatch, now)
+	assert.Error(t, err, "Batch causing large overflow should fail")
+	assert.Contains(t, err.Error(), "overflow usage exceeds bin limit", "Error should mention overflow limit exceeded")
+
+	// Test 5: Using a different timestamp (next period) should allow usage again
 	// Calculate a timestamp in the next reservation period
 	nextPeriodTime := now.Add(time.Duration(reservationWindow) * time.Second)
 
