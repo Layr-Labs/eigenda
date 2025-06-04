@@ -123,6 +123,7 @@ library EigenDAEjectionLib {
         EigenDAEjectionTypes.OperatorProceedingParams storage operatorParams = params.operatorProceedingParams[operator];
         require(operatorParams.proceedingTime > 0, "No proceeding in progress");
 
+        operatorParams.quorums = hex"";
         operatorParams.proceedingTime = 0;
     }
 
