@@ -4,17 +4,22 @@ pragma solidity ^0.8.9;
 import {IRegistryCoordinator} from "lib/eigenlayer-middleware/src/interfaces/IRegistryCoordinator.sol";
 
 library EigenDAEjectionTypes {
+    /// @param proceedingTime Timestamp when the proceeding is set to complete
+    /// @param lastProceedingInitiated Timestamp of when the last proceeding was initiated to enforce cooldowns
+    /// @param quorums The quorums associated with the proceeding
     struct OperatorProceedingParams {
-        mapping(address => bool) salts;
         uint64 proceedingTime;
         uint64 lastProceedingInitiated;
         bytes quorums;
     }
 
+    /// @param operatorProceedingParams Mapping of operator addresses to their proceeding parameters
+    /// @param delay Delay before the proceeding can be completed
+    /// @param cooldown Cooldown period after a proceeding is completed before a new one can be initiated
     struct ProceedingParams {
         mapping(address => OperatorProceedingParams) operatorProceedingParams;
-        uint64 proceedingDelay;
-        uint64 proceedingCooldown;
+        uint64 delay;
+        uint64 cooldown;
     }
 }
 
@@ -49,6 +54,7 @@ library EigenDAEjectionLib {
 
     event ChurnCompleted(address operator, bytes quorums);
 
+    /// @notice Starts a churning process for an operator.
     function startChurn(address operator, bytes memory quorums) internal {
         startProceeding(operator, quorums, churnParams());
         emit ChurnStarted(
@@ -59,11 +65,13 @@ library EigenDAEjectionLib {
         );
     }
 
+    /// @notice Cancels a churning process for an operator.
     function cancelChurn(address operator) internal {
         cancelProceeding(operator, churnParams());
         emit ChurnCancelled(operator);
     }
 
+    /// @notice Completes a churning process for an operator.
     function completeChurn(address operator, bytes memory quorums) internal {
         completeProceeding(operator, quorums, churnParams());
         emit ChurnCompleted(operator, quorums);
@@ -98,12 +106,11 @@ library EigenDAEjectionLib {
 
         require(operatorParams.proceedingTime == 0, "Proceeding already in progress");
         require(
-            operatorParams.lastProceedingInitiated + params.proceedingCooldown <= block.timestamp,
-            "Proceeding cooldown not met"
+            operatorParams.lastProceedingInitiated + params.cooldown <= block.timestamp, "Proceeding cooldown not met"
         );
 
         operatorParams.quorums = quorums;
-        operatorParams.proceedingTime = uint64(block.timestamp) + params.proceedingDelay;
+        operatorParams.proceedingTime = uint64(block.timestamp) + params.delay;
         operatorParams.lastProceedingInitiated = uint64(block.timestamp);
     }
 
@@ -114,9 +121,12 @@ library EigenDAEjectionLib {
         operatorParams.proceedingTime = 0;
     }
 
-    function completeProceeding(address operator, bytes memory, EigenDAEjectionTypes.ProceedingParams storage params)
-        internal
-    {
+    function completeProceeding(
+        address operator,
+        bytes memory quorums,
+        EigenDAEjectionTypes.ProceedingParams storage params
+    ) internal {
+        require(quorumsEqual(params.operatorProceedingParams[operator].quorums, quorums), "Quorums do not match");
         EigenDAEjectionTypes.OperatorProceedingParams storage operatorParams = params.operatorProceedingParams[operator];
         require(operatorParams.proceedingTime > 0, "No proceeding in progress");
         // require(operatorParams.quorums == quorums, "Quorums do not match"); // TODO: FIX THIS
@@ -149,5 +159,9 @@ library EigenDAEjectionLib {
 
     function churnParams() internal view returns (EigenDAEjectionTypes.ProceedingParams storage) {
         return EigenDAEjectionStorage.layout().churnParams;
+    }
+
+    function quorumsEqual(bytes memory quorums1, bytes memory quorums2) internal pure returns (bool) {
+        return keccak256(quorums1) == keccak256(quorums2);
     }
 }
