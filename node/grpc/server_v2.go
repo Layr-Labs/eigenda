@@ -37,6 +37,7 @@ type ServerV2 struct {
 	chunkAuthenticator auth.RequestAuthenticator
 	blobAuthenticator  corev2.BlobRequestAuthenticator
 	replayGuardian     replay.ReplayGuardian
+	batchMeterer       *node.BatchMeterer
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
@@ -47,7 +48,9 @@ func NewServerV2(
 	logger logging.Logger,
 	ratelimiter common.RateLimiter,
 	registry *prometheus.Registry,
-	reader core.Reader) (*ServerV2, error) {
+	reader core.Reader,
+	batchMeterer *node.BatchMeterer,
+) (*ServerV2, error) {
 
 	metrics, err := NewV2Metrics(logger, registry)
 	if err != nil {
@@ -76,6 +79,13 @@ func NewServerV2(
 		config.StoreChunksRequestMaxPastAge,
 		config.StoreChunksRequestMaxFutureAge)
 
+	// TODO(hopeyen): BatchMeterer initialization is left as a placeholder.
+	// The node.ChainState does not implement meterer.OnchainPayment interface.
+	// In the future, we'll need to either:
+	// 1. Extend the node.ChainState interface
+	// 2. Create an adapter between node.ChainState and meterer.OnchainPayment
+	// 3. Or refactor BatchMeterer to work with the existing node.ChainState interface
+
 	return &ServerV2{
 		config:             config,
 		node:               node,
@@ -85,6 +95,7 @@ func NewServerV2(
 		chunkAuthenticator: chunkAuthenticator,
 		blobAuthenticator:  blobAuthenticator,
 		replayGuardian:     replayGuardian,
+		batchMeterer:       batchMeterer,
 	}, nil
 }
 
@@ -157,6 +168,19 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			}
 		}
 	}
+
+	// Batch metering validation
+	if s.batchMeterer != nil {
+		// If the batch meterer is configured, use it to validate the batch
+		err = s.batchMeterer.MeterBatch(ctx, batch, time.Now())
+		if err != nil {
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("batch metering validation failed: %v", err))
+		}
+	} else {
+		// Log that batch metering is skipped (it's not configured)
+		s.logger.Debug("Batch metering skipped - no batch meterer configured")
+	}
+
 	probe.SetStage("get_operator_state")
 	s.logger.Info("new StoreChunks request",
 		"batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]),

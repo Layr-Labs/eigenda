@@ -9,7 +9,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-const MinNumBins int32 = 3
+const MinNumBins uint32 = 3
 
 // MeteringStore defines the interface for storage backends
 // used to track reservation and payment usage data

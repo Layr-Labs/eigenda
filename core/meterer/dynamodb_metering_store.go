@@ -266,7 +266,7 @@ func (s *DynamoDBMeteringStore) GetPeriodRecords(ctx context.Context, accountID 
 			":reservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod, 10)},
 		},
 		ScanIndexForward: aws.Bool(true),
-		Limit:            aws.Int32(MinNumBins),
+		Limit:            aws.Int32(int32(MinNumBins)),
 	}
 	bins, err := s.dynamoClient.QueryWithInput(ctx, queryInput)
 	if err != nil {
