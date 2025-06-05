@@ -4,19 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"time"
+	"fmt"
 
-	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/Layr-Labs/eigenda/api/clients/v2"
-
-	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
-	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
-	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -36,62 +30,33 @@ var _ = Describe("Inabox v2 Integration", func() {
 	It("test end to end scenario", func() {
 		ctx := context.Background()
 
-		privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
-		signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
-		Expect(err).To(BeNil())
-
-		// TODO: update this to use the payload disperser client instead since it wraps the
-		//       disperser client and provides additional functionality
-		//       after doing an experiment with this its currently infeasible since the disperser chooses the latest block #
-		//       for cert rbn which breaks an invariant on the registry coordinator that requires block.number > rbn
-		disp, err := clients.NewDisperserClient(&clients.DisperserClientConfig{
-			Hostname: "localhost",
-			Port:     "32005",
-		}, signer, nil, nil)
-		Expect(err).To(BeNil())
-		Expect(disp).To(Not(BeNil()))
-
 		payload1 := randomPayload(992)
-		blob1, err := payload1.ToBlob(codecs.PolynomialFormEval)
-		Expect(err).To(BeNil())
-
 		payload2 := randomPayload(123)
-		blob2, err := payload2.ToBlob(codecs.PolynomialFormEval)
+
+		// certificates are verified within the payload disperser client
+		cert1, err := payloadDisperser.SendPayload(ctx, payload1)
 		Expect(err).To(BeNil())
 
-		reply1, err := disperseBlob(disp, blob1.Serialize())
+		cert2, err := payloadDisperser.SendPayload(ctx, payload2)
 		Expect(err).To(BeNil())
 
-		reply2, err := disperseBlob(disp, blob2.Serialize())
+		err = staticCertVerifier.CheckDACert(ctx, cert1)
 		Expect(err).To(BeNil())
 
-		// necessary to ensure that reference block number < current block number
-		mineAnvilBlocks(1)
-
-		// test onchain verification using cert #1
-		eigenDACert, err := certBuilder.BuildCert(ctx, coretypes.VersionThreeCert, reply1)
-		Expect(err).To(BeNil())
-
-		err = staticCertVerifier.CheckDACert(ctx, eigenDACert)
-		Expect(err).To(BeNil())
-
-		err = routerCertVerifier.CheckDACert(ctx, eigenDACert)
+		err = routerCertVerifier.CheckDACert(ctx, cert2)
 		Expect(err).To(BeNil())
 
 		// test onchain verification using cert #2
-		eigenDACert2, err := certBuilder.BuildCert(ctx, coretypes.VersionThreeCert, reply2)
+		err = staticCertVerifier.CheckDACert(ctx, cert2)
 		Expect(err).To(BeNil())
 
-		err = staticCertVerifier.CheckDACert(ctx, eigenDACert2)
+		err = routerCertVerifier.CheckDACert(ctx, cert2)
 		Expect(err).To(BeNil())
 
-		err = routerCertVerifier.CheckDACert(ctx, eigenDACert2)
-		Expect(err).To(BeNil())
-
-		eigenDAV3Cert1, ok := eigenDACert.(*coretypes.EigenDACertV3)
+		eigenDAV3Cert1, ok := cert1.(*coretypes.EigenDACertV3)
 		Expect(ok).To(BeTrue())
 
-		eigenDAV3Cert2, ok := eigenDACert2.(*coretypes.EigenDACertV3)
+		eigenDAV3Cert2, ok := cert2.(*coretypes.EigenDACertV3)
 		Expect(ok).To(BeTrue())
 
 		// test retrieval from disperser relay subnet
@@ -138,58 +103,87 @@ var _ = Describe("Inabox v2 Integration", func() {
 		Expect(err).Error()
 		Expect(err.Error()).To(ContainSubstring(getSolidityFunctionSig("ABNNotInFuture(uint32)")))
 
-		// ensure that a verifier can be added two blocks in the future
+		// ensure that a verifier can be added two blocks in the future where activation_block_number = latestBlock + 2
 		tx, err := eigenDACertVerifierRouter.AddCertVerifier(deployerTransactorOpts, uint32(latestBlock)+2, gethcommon.HexToAddress("0x0"))
 		Expect(err).To(BeNil())
-
 		mineAnvilBlocks(1)
-		latestBlock += 1
 
 		// ensure that tx successfully executed
-		receipt, err := ethClient.TransactionReceipt(ctx, tx.Hash())
+		err = validateTxReceipt(ctx, tx.Hash())
 		Expect(err).To(BeNil())
-		Expect(receipt).To(Not(BeNil()))
-		Expect(receipt.Status).To(Equal(uint64(1)))
 
 		// ensure that new verifier can be read from the contract at the future rbn
-		verifier, err := eigenDACertVerifierRouterCaller.GetCertVerifierAt(&bind.CallOpts{}, uint32(latestBlock+1))
+		verifier, err := eigenDACertVerifierRouterCaller.GetCertVerifierAt(&bind.CallOpts{}, uint32(latestBlock+2))
 		Expect(err).To(BeNil())
 		Expect(verifier).To(Equal(gethcommon.HexToAddress("0x0")))
 
 		// and that old one still lives at the latest block number - 1
-		verifier, err = eigenDACertVerifierRouterCaller.GetCertVerifierAt(&bind.CallOpts{}, uint32(latestBlock-1))
+		verifier, err = eigenDACertVerifierRouterCaller.GetCertVerifierAt(&bind.CallOpts{}, uint32(latestBlock-2))
 		Expect(err).To(BeNil())
 		Expect(verifier.String()).To(Equal(testConfig.EigenDA.CertVerifier))
 
-		// progress anvil chain to ensure latest block number is set for rbn so
-		// invalid verifier can be triggered
-		mineAnvilBlocks(3)
+		// progress anvil chain 10 blocks
+		mineAnvilBlocks(10)
 
-		// disperse blob #3 to trigger the new cert verifier
-
-		blob3, err := randomPayload(1000).ToBlob(codecs.PolynomialFormEval)
-		Expect(err).To(BeNil())
-
-		reply3, err := disperseBlob(disp, blob3.Serialize())
-		Expect(err).To(BeNil())
-
-		// necessary to ensure that reference block number < current block number
-		mineAnvilBlocks(1)
-
-		eigenDACert3, err := certBuilder.BuildCert(ctx, coretypes.VersionThreeCert, reply3)
-		Expect(err).To(BeNil())
-
-		// should fail since the rbn -> cert verifier is an empty address which should trigger a reversion
-		err = routerCertVerifier.CheckDACert(ctx, eigenDACert3)
-		Expect(err).ToNot(BeNil())
+		// disperse blob #3 to trigger the new cert verifier which should fail
+		// since the address is not a valid cert verifier and the GetQuorums call will fail
+		payload3 := randomPayload(1234)
+		cert3, err := payloadDisperser.SendPayload(ctx, payload3)
 		Expect(err.Error()).To(ContainSubstring("no contract code at given address"))
+		Expect(cert3).To(BeNil())
 
-		// should pass using old verifier
-		err = staticCertVerifier.CheckDACert(ctx, eigenDACert3)
+		latestBlock, err = ethClient.BlockNumber(ctx)
 		Expect(err).To(BeNil())
 
+		// now disperse blob #4 to trigger the new cert verifier which should pass
+		// ensure that a verifier can be added two blocks in the future
+		tx, err = eigenDACertVerifierRouter.AddCertVerifier(deployerTransactorOpts, uint32(latestBlock)+2, gethcommon.HexToAddress(testConfig.EigenDA.CertVerifier))
+		Expect(err).To(BeNil())
+		mineAnvilBlocks(10)
+		latestBlock += 1
+		err = validateTxReceipt(ctx, tx.Hash())
+		Expect(err).To(BeNil())
+
+		// ensure that new verifier can be used for successful verification
+		payload4 := randomPayload(1234)
+		cert4, err := payloadDisperser.SendPayload(ctx, payload4)
+		Expect(err).To(BeNil())
+		err = routerCertVerifier.CheckDACert(ctx, cert4)
+		Expect(err).To(BeNil())
+
+		err = staticCertVerifier.CheckDACert(ctx, cert4)
+		Expect(err).To(BeNil())
+
+		// now force verification to fail by modifying the cert contents
+		eigenDAV3Cert4, ok := cert4.(*coretypes.EigenDACertV3)
+		Expect(ok).To(BeTrue())
+
+		// modify the merkle root of the batch header and ensure verification fails
+		// TODO: Test other cert verification failure cases as well
+		eigenDAV3Cert4.BatchHeader.BatchRoot = gethcommon.Hash{0x1, 0x2, 0x3, 0x4}
+
+		err = routerCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
+		Expect(err).To(Not(BeNil()))
+		Expect(err.Error()).To(ContainSubstring("invalid batch header merkle root"))
+		err = staticCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
+		Expect(err).To(Not(BeNil()))
+		Expect(err.Error()).To(ContainSubstring("invalid batch header merkle root"))
 	})
 })
+
+func validateTxReceipt(ctx context.Context, txHash gethcommon.Hash) error {
+	receipt, err := ethClient.TransactionReceipt(ctx, txHash)
+	if err != nil {
+		return err
+	}
+	if receipt == nil {
+		return fmt.Errorf("transaction receipt not found for hash: %s", txHash.Hex())
+	}
+	if receipt.Status != 1 {
+		return fmt.Errorf("transaction failed with status: %d", receipt.Status)
+	}
+	return nil
+}
 
 func getSolidityFunctionSig(methodSig string) string {
 	sig := []byte(methodSig)
@@ -207,41 +201,4 @@ func randomPayload(size int) *coretypes.Payload {
 	}
 
 	return coretypes.NewPayload(data)
-}
-
-func disperseBlob(disp clients.DisperserClient, blob []byte) (*disperserpb.BlobStatusReply, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	ticker := time.NewTicker(time.Second * 1)
-	defer ticker.Stop()
-
-	_, key, err := disp.DisperseBlob(ctx, blob, 0, []uint8{0, 1})
-	if err != nil {
-		return nil, err
-	}
-
-	var reply *disperserpb.BlobStatusReply
-
-	for {
-		select {
-		case <-ctx.Done():
-			Fail("timed out")
-		case <-ticker.C:
-			reply, err = disp.GetBlobStatus(context.Background(), key)
-			if err != nil {
-				return nil, err
-			}
-
-			status, err := dispv2.BlobStatusFromProtobuf(reply.GetStatus())
-			if err != nil {
-				return nil, err
-			}
-
-			if status != dispv2.Complete {
-				continue
-			}
-			return reply, nil
-		}
-	}
 }

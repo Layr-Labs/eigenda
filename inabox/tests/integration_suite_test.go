@@ -14,6 +14,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients"
 	clientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloadretrieval"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	validatorclientsv2 "github.com/Layr-Labs/eigenda/api/clients/v2/validator"
@@ -24,6 +25,7 @@ import (
 	verifierv1bindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV1"
 
 	"github.com/Layr-Labs/eigenda/core"
+	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
@@ -41,6 +43,9 @@ import (
 /*
 These global vars are shared across tests in the integration suite to provide
 communication entrypoints into the local inabox test environment
+TODO: Put these into a testSuite object which is initialized per inabox E2E test. Currently this would only enable
+
+	a client suite per test given the inabox eigenda devnet is only spun-up as a singleton and would be shared across test executions (for now).
 */
 var (
 	templateName      string
@@ -70,6 +75,7 @@ var (
 
 	relayRetrievalClientV2     *payloadretrieval.RelayPayloadRetriever
 	validatorRetrievalClientV2 *payloadretrieval.ValidatorPayloadRetriever
+	payloadDisperser           *payloaddispersal.PayloadDisperser
 	numConfirmations           int = 3
 	numRetries                     = 0
 	chainReader                core.Reader
@@ -217,8 +223,57 @@ var _ = BeforeSuite(func() {
 
 		deployerTransactorOpts = newTransactOptsFromPrivateKey(pk, chainID)
 
+		setupPayloadDisperserWithRouter(testConfig)
+
 	}
 })
+
+func setupPayloadDisperserWithRouter(testConfig *deploy.Config) error {
+	// Set up the block monitor
+	blockMonitor, err := verification.NewBlockNumberMonitor(logger, ethClient, time.Second*1)
+	if err != nil {
+		return err
+	}
+
+	// Set up the PayloadDisperser
+	// TODO: understand if this key is being used for actual payment authorization or if its
+	//       just an arbitrary account with payments being disabled in the inabox env
+	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
+	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
+	if err != nil {
+		return err
+	}
+
+	disperserClientConfig := &clientsv2.DisperserClientConfig{
+		Hostname: "localhost",
+		Port:     "32005",
+	}
+
+	disperserClient, err := clientsv2.NewDisperserClient(disperserClientConfig, signer, nil, nil)
+	if err != nil {
+		return err
+	}
+
+	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
+		PayloadClientConfig:    *clientsv2.GetDefaultPayloadClientConfig(),
+		DisperseBlobTimeout:    2 * time.Minute,
+		BlobCompleteTimeout:    2 * time.Minute,
+		BlobStatusPollInterval: 1 * time.Second,
+		ContractCallTimeout:    5 * time.Second,
+	}
+
+	payloadDisperser, err = payloaddispersal.NewPayloadDisperser(
+		logger,
+		payloadDisperserConfig,
+		disperserClient,
+		blockMonitor,
+		certBuilder,
+		routerCertVerifier,
+		nil,
+	)
+
+	return err
+}
 
 func newTransactOptsFromPrivateKey(privateKeyHex string, chainID *big.Int) *bind.TransactOpts {
 	privateKey, err := crypto.HexToECDSA(privateKeyHex)
