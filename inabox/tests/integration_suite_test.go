@@ -223,13 +223,13 @@ var _ = BeforeSuite(func() {
 
 		deployerTransactorOpts = newTransactOptsFromPrivateKey(pk, chainID)
 
-		err = setupPayloadDisperserWithRouter(testConfig)
+		err = setupPayloadDisperserWithRouter()
 		Expect(err).To(BeNil())
 
 	}
 })
 
-func setupPayloadDisperserWithRouter(testConfig *deploy.Config) error {
+func setupPayloadDisperserWithRouter() error {
 	// Set up the block monitor
 	blockMonitor, err := verification.NewBlockNumberMonitor(logger, ethClient, time.Second*1)
 	if err != nil {
@@ -237,8 +237,6 @@ func setupPayloadDisperserWithRouter(testConfig *deploy.Config) error {
 	}
 
 	// Set up the PayloadDisperser
-	// TODO: understand if this key is being used for actual payment authorization or if its
-	//       just an arbitrary account with payments being disabled in the inabox env
 	privateKeyHex := "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded"
 	signer, err := auth.NewLocalBlobRequestSigner(privateKeyHex)
 	if err != nil {
