@@ -5,10 +5,12 @@ This page is meant to be read by eigenda and rollup developers who are writing a
 ## Validity Conditions
 
 EigenDA is a service that assures the availability and integrity of payloads posted to it for 14 days.
-When deriving a rollup chain by running its derivation pipeline, only EigenDA certs that satisfy 3 validity conditions are considered valid and used:
-1. RBN Recency Validation - ensure that the cert's reference block number (RBN) is not too old with respect to the L1 block at which the cert was included in the rollup's batcher-inbox. This ensures that the blob on EigenDA has sufficient availability time left (out of the 14 day period) in order to be downloadable if needed during a rollup fault proof window.
+When deriving a rollup chain by running its derivation pipeline, only EigenDA `DACerts` that satisfy the three validity conditions are considered valid and used:
+1. RBN Recency Validation - ensure that the DA Cert's reference block number (RBN) is not too old with respect to the L1 block at which the cert was included in the rollup's batcher-inbox. This ensures that the blob on EigenDA has sufficient availability time left (out of the 14 day period) in order to be downloadable if needed during a rollup fault proof window.
 2. Cert Validation - ensures sufficient operator stake has signed to make the blob available, for all specified quorums. The stake is obtained onchain at a given reference block number (RBN) specified inside the cert.
 3. Blob Validation - ensures that the blob used is consistent with the KZG commitment inside the Cert.
+
+If a certificate fails validation then it is disregarded from the rollup's derivation pipeline and treated as an empty entry.
 
 ### 1. RBN Recency Validation
 
@@ -36,14 +38,16 @@ This has a second security implication. A malicious EigenDA disperser could have
 
 ### 2. Cert Validation
 
-Cert validation is done inside the EigenDACertVerifier contract, which EigenDA deploys as-is, but is also available for rollups to modify and deploy on their own. Specifically, [verifyDACertV2](https://github.com/Layr-Labs/eigenda/blob/ee092f345dfbc37fce3c02f99a756ff446c5864a/contracts/src/periphery/cert/v2/EigenDACertVerifierV2.sol#L72) is the entry point for validation. This could either be called during a normal eth transaction (either for pessimistic “bridging” like EigenDA V1 used to do, or when uploading a Blob Field Element to a one-step-proof’s [preimage contract](https://specs.optimism.io/fault-proof/index.html#pre-image-oracle)), or be zk proven using a library like [Steel](https://github.com/risc0/risc0-ethereum/blob/main/crates/steel/docs/what-is-steel.md).
+Cert validation is done inside the EigenDACertVerifier contract, which EigenDA deploys as-is, but is also available for rollups to modify and deploy on their own. Specifically, [checkDACert](https://github.com/Layr-Labs/eigenda/blob/2414ed6f11bd28bc631eab4da3d6b576645801b0/contracts/src/periphery/cert/EigenDACertVerifier.sol#L46-L56) is the entry point for validation. This could either be called during a normal eth transaction (either for pessimistic “bridging” like EigenDA V1 used to do, or when uploading a Blob Field Element to a one-step-proof’s [preimage contract](https://specs.optimism.io/fault-proof/index.html#pre-image-oracle)), or be zk proven using a library like [Steel](https://github.com/risc0/risc0-ethereum/blob/main/crates/steel/docs/what-is-steel.md).
 
-The [cert verification](https://github.com/Layr-Labs/eigenda/blob/ee092f345dfbc37fce3c02f99a756ff446c5864a/contracts/src/periphery/cert/v2/EigenDACertVerificationV2Lib.sol#L122) logic consists of:
+`checkDACert` takes in an unstructured `[]byte` input. This is done to ensure seamless upgrades where the underlying representation of the `DACert` can change over time with new version introductions.
 
-1. [merkleInclusion](https://github.com/Layr-Labs/eigenda/blob/ee092f345dfbc37fce3c02f99a756ff446c5864a/contracts/src/periphery/cert/v2/EigenDACertVerificationV2Lib.sol#L132): 
-2. verify `sigma` (operators’ bls signature) over `batchRoot` using the `NonSignerStakesAndSignature` struct
-3. verify blob security params (blob_params + security thresholds)
-4. verify each quorum part of the blob_header has met its threshold
+The [cert verification](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/libraries/EigenDACertVerificationLib.sol#L92-L152) logic consists of:
+
+1. verify blob batch [merkleInclusion](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/libraries/EigenDACertVerificationLib.sol#L154-L179) proof
+2. [verify](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/libraries/EigenDACertVerificationLib.sol#L203-L240) `sigma` (operators’ bls signature) over `batchRoot` using the `NonSignerStakesAndSignature` struct
+3. [verify](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/legacy/v2/EigenDACertVerificationV2Lib.sol#L198-L218) blob security params (blob_params + security thresholds)
+4. [verify](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/legacy/v2/EigenDACertVerificationV2Lib.sol#L259-L279) each quorum part of the blob_header has met its threshold
 
 ### 3. Blob Validation
 
@@ -76,6 +80,6 @@ Note: The verification steps in point 1. for dispersal are not currently impleme
 
 |                     | Nitro V1       | OP V1 (insecure) | Nitro V2       | OP V2                                                                                |
 | ------------------- | -------------- | ---------------- | -------------- | ------------------------------------------------------------------------------------ |
-| Cert Verification   | SequencerInbox | x                | one-step proof | one-step proof: done in preimage oracle contract when uploading a blob field element |
+| Cert Verification   | SequencerInbox | x                | one-step proof | one-step proof: done in one step proof HostIO contract |
 | Blob Verification   | one-step proof | x                | one-step proof | one-step proof                                                                       |
 | Timing Verification | SequencerInbox | x                | SequencerInbox | one-step proof (?)                                                                   |
