@@ -138,7 +138,6 @@ var _ = Describe("Inabox v2 Integration", func() {
 		latestBlock, err = ethClient.BlockNumber(ctx)
 		Expect(err).To(BeNil())
 
-
 		tx, err = eigenDACertVerifierRouter.AddCertVerifier(deployerTransactorOpts, uint32(latestBlock)+2, gethcommon.HexToAddress(testConfig.EigenDA.CertVerifier))
 		Expect(err).To(BeNil())
 		mineAnvilBlocks(10)
