@@ -312,6 +312,10 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		periods[i] = meterer.GetReservationPeriod(now, s.meterer.ChainPaymentState.GetReservationWindow(quorumId))
 	}
 	records, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, quorumIds, periods, 3)
+	if err != nil {
+		s.logger.Debug("failed to get period records, use zero value", "err", err, "accountID", accountID)
+	}
+
 	highestPeriodRecords := make([]*pb.PeriodRecord, meterer.MinNumBins)
 	for _, records := range records {
 		for _, record := range records.Records {
@@ -381,24 +385,6 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		OnchainCumulativePayment: onchainCumulativePaymentBytes,
 	}
 	return reply, nil
-}
-
-// getAllQuorumIds returns a slice of all quorum IDs (from 0 to quorumCount-1)
-// Returns an empty slice if the onchain state is not loaded
-func (s *DispersalServerV2) getAllQuorumIds() []uint8 {
-	state := s.onchainState.Load()
-	if state == nil {
-		s.logger.Debug("onchain state not loaded yet")
-		return []uint8{}
-	}
-
-	quorumCount := state.QuorumCount
-	quorumIds := make([]uint8, quorumCount)
-	for i := range quorumIds {
-		quorumIds[i] = uint8(i)
-	}
-
-	return quorumIds
 }
 
 // TODO(hopeyen): separate this into a subsequent PR

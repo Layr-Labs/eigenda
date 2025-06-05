@@ -294,8 +294,7 @@ func (s *DynamoDBMeteringStore) GetPeriodRecords(
 	for _, item := range items {
 		quorumNumber, periodRecord, err := parsePeriodRecord(item)
 		if err != nil {
-			s.logger.Debug("Failed to parse period record", "err", err)
-			continue
+			return nil, fmt.Errorf("failed to parse period record: %w", err)
 		}
 		records[quorumNumber] = &pb.PeriodRecords{
 			Records: []*pb.PeriodRecord{periodRecord},
