@@ -43,8 +43,7 @@ defaultSecurityThresholdsV2 = {
     adversaryThreshold = 33,
 }
 ```
-
-A new BlobParam version is very infrequently introduced by the EigenDA Foundation Governance, and rollups can choose which version they wish to use when dispersing a blob. Currently there is only version `0` defined, with parameters:
+A new BlobParam version is rarely introduced by the EigenDA Foundation Governance. When dispersing a blob, rollups explicitly specify the version they wish to use. Currently, only version `0` is defined, with the following parameters ((reference)[https://etherscan.io/address/0xdb4c89956eEa6F606135E7d366322F2bDE609F1]):
 
 ```solidity
 versionedBlobParams[0] = {
@@ -78,11 +77,11 @@ Contains EigenDA network registered Dispersers’ Ethereum address. The EigenDA 
 
 This contract's main use case is exposing a function checkDACert which is used to verify `DACerts`. This function’s logic is described in the [Cert Validation](./6-secure-integration.md#cert-validation) section. 
 
-The contract also exposes a `certVersion` method which is called by the payload disperser client to understand which certificate version is needed for backend encoding. 
+The contract also exposes a `certVersion` method which is called by the payload disperser client to know which cert version to build in order to be verifiable by that contract.
 
 ### EigenDACertVerifierRouter
 
-This contract's main use case is allowing for secure upgrades of EigenDACertVerifier contracts in a cross version compatible format. This is done through maintaining a stateful mapping:
+This contract primarily facilitates secure upgrades of EigenDACertVerifier contracts while enabling custom quorum and threshold configurations in a format that maintains cross-version compatibility. This is done through maintaining a stateful mapping:
 ```solidity
     /// @notice A mapping from an activation block number (ABN) to a cert verifier address.
     mapping(uint32 => address) public certVerifiers;
@@ -93,6 +92,6 @@ This contract's main use case is allowing for secure upgrades of EigenDACertVeri
     uint32[] public certVerifierABNs;
 ```
 
-where each key refers to an `activation_block_number` (ABN). When calling `checkDACert`, the reference block number is decoded from the `DACert` bytes and is used to find the closest sibling ABN via a reverse linear search over the `certVerifierABNs`. Once found, `EigenDACertVerifier` at the particular ABN is used for calling `checkDACert` to verify the DA Cert.
+where each key refers to an `activation_block_number` (ABN). When calling `checkDACert`, the reference block number is decoded from the `DACert` bytes and is used to find the unique CertVerifier active at that RBN (a reverse linear search over the `certVerifierABNs` is performed). Once found, `EigenDACertVerifier` at the particular ABN is used for calling `checkDACert` to verify the DA Cert.
 
 The `EigenDACertVerifierRouter` enables the use of a certificate’s Reference Block Number (RBN) as a commitment to the specific `EigenDACertVerifier` that should be used for verification. This mechanism ensures backward compatibility with older DA Certs, allowing an optimistic rollup to continue verifying historical data availability proofs accurately across verifier upgrades.

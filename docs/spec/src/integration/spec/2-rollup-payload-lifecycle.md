@@ -64,7 +64,7 @@ As an example, an op-stack Ethereum rollup’s `payload` is a compressed batch o
 [**Contracts**](./4-contracts.md)
 
 - `EigenDACertVerifier`: contains one main important function checkDACert which is used to verify `DACert`s.
-- `EigenDACertVerifierRouter`: contains router mapping of activation block number to `EigenDACertVerifier`.
+- `EigenDACertVerifierRouter`: contains router mapping of activation block number to `EigenDACertVerifier` and allows for securely and deterministically upgrading CertVerification constants (security thresholds and custom quorums) over time.
 - `EigenDAThresholdRegistry`: contains signature related thresholds and blob→chunks encoding related parameters.
 - `EigenDARelayRegistry`: contains an Ethereum address and DNS hostname (or IP address) for each registered Relay.
 - `EigenDADisperserRegistry` : contains an Ethereum address network for each registered Disperser.

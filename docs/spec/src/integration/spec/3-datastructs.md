@@ -69,7 +69,7 @@ A `DA Certicate` (or short `DACert`) contains all the information needed to retr
 
 ![image.png](../../assets/integration/v2-cert.png)
 
-A `DACert` contains the three data structs needed to call [checkDACert](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/EigenDACertVerifier.sol#L46-L56) on the EigenDACertVerifier.sol contract. Please refer to the eigenda core spec for more details, but in short, the `BlobCertificate` is included as a leaf inside the merkle tree identified by the `batch_root` in the `BatchHeader`. The `BlobInclusionInfo` contains the information needed to prove this merkle tree inclusion. The `NonSignerStakesAndSignature` contains the aggregated BLS signature `sigma` of the EigenDA validators. `sigma` is a signature over the `BatchHeader`.
+A `DACert` contains the four data structs needed to call [checkDACert](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/EigenDACertVerifier.sol#L46-L56) on the EigenDACertVerifier.sol contract. Please refer to the eigenda core spec for more details, but in short, the `BlobCertificate` is included as a leaf inside the merkle tree identified by the `batch_root` in the `BatchHeader`. The `BlobInclusionInfo` contains the information needed to prove this merkle tree inclusion. The `NonSignerStakesAndSignature` contains the aggregated BLS signature `sigma` of the EigenDA validators. `sigma` is a signature over the `BatchHeader`. The `signedQuorumNumbers` contains the quorum IDs that DA nodes signed over for the blob.
 
 ![image.png](../../assets/integration/v2-batch-hashing-structure.png)
 
@@ -79,3 +79,6 @@ In order to be understood by each rollup stack’s derivation pipeline, the enco
 
 - [op](https://specs.optimism.io/experimental/alt-da.html#input-commitment-submission) prepends 3 bytes: `version_byte`, `commitment_type`, `da_layer_byte`
 - nitro prepends 1 byte: `version_byte`
+
+**NOTE**
+In the future we plan to support a custom encoding byte which allows a user to specify different encoding formats for the `DACert` (e.g, RLP, ABI).

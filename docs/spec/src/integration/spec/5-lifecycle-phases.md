@@ -97,18 +97,18 @@ enum BlobStatus {
   QUEUED = 1; // Initial state after a DisperseBlob call returns
   ENCODED = 2; // Reed-Solomon encoded into chunks ready to be dispersed to DA Nodes
   GATHERING_SIGNATURES = 3; // blob chunks are actively being transmitted to validators
-  COMPLETE = 4; // blob has been dispersed and attested by NA nodes
+  COMPLETE = 4; // blob has been dispersed and attested by DA nodes
   FAILED = 5;
 }
 ```
 
 After a successful DisperseBlob RPC call, the disperser returns `BlobStatus.QUEUED`. To retrieve a cert, the GetBlobStatus RPC should be polled until a terminal status is reached.
 
-If `BlobStatus.GATHERING_SIGNATURES` is returned, the `signed_batch` and `blob_verification_info` fields will be present in the `BlobStatusReply`. These can be used to construct an `DACert`, which may be verified immediately against the configured threshold parameters stored in the `EigenDACertVerifier` contract. If the verification passes, the certificate can be accepted early. If verification fails, polling should continue.
+If `BlobStatus.GATHERING_SIGNATURES` is returned, the `signed_batch` and `blob_verification_info` fields will be present in the `BlobStatusReply`. These can be used to construct a `DACert`, which may be verified immediately against the configured threshold parameters stored in the `EigenDACertVerifier` contract. If the verification passes, the certificate can be accepted early. If verification fails, polling should continue.
 
-Once `BlobStatus.COMPLETE` is returned, the `signed_batch` and `blob_verification_info` fields are guaranteed to be included and should be used to construct the final `DACert`.
+Once `BlobStatus.COMPLETE` is returned, it indicates that the disperser has stopped collecting additional signatures, typically due to reaching a timeout or encountering an issue. While the `signed_batch` and `blob_verification_info` fields will be populated and can be used to construct a `DACert`, the `DACert` could still be invalid if an insufficient amount of signatures were collected in-regards to the threshold parameters.
 
- Any other terminal status indicates failure, and a new blob dispersal will need to be made.
+Any other terminal status indicates failure, and a new blob dispersal will need to be made.
 
 **Failover to Native Rollup DA**
 

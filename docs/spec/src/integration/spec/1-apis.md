@@ -58,7 +58,7 @@ The most important contract for rollups integrations is the `EigenDACertVerifier
 ```
 
 #### Upgradable Router
-`EigenDACertVerifierRouter` acts as an intermediary contract that maintains an internal mapping of `activation_block_number -> EigenDACertVerifier`. This contract can be used to enable seamless upgrades for new `EigenDACertVerifier` and provides a way for a rollup to introduce custom quorums and thresholds.
+`EigenDACertVerifierRouter` acts as an intermediary contract that maintains an internal mapping of `activation_block_number -> EigenDACertVerifier`. This contract can be used to enable seamless upgrades for new `EigenDACertVerifier` and provides a way for a rollup to securely introduce custom quorums and/or modify their security thresholds.
 ```solidity
     /// @notice Returns the address for the active cert verifier at a given reference block number.
     ///         The reference block number must not be in the future.

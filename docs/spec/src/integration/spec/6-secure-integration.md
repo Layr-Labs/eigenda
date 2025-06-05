@@ -10,7 +10,7 @@ When deriving a rollup chain by running its derivation pipeline, only EigenDA `D
 2. Cert Validation - ensures sufficient operator stake has signed to make the blob available, for all specified quorums. The stake is obtained onchain at a given reference block number (RBN) specified inside the cert.
 3. Blob Validation - ensures that the blob used is consistent with the KZG commitment inside the Cert.
 
-If a certificate fails validation then it is disregarded from the rollup's derivation pipeline and treated as an empty entry.
+If #1 or #2 fails, then the `DA Cert` is treated as invalid and MUST be discarded from the rollup's derivation pipeline.
 
 ### 1. RBN Recency Validation
 
@@ -40,7 +40,7 @@ This has a second security implication. A malicious EigenDA disperser could have
 
 Cert validation is done inside the EigenDACertVerifier contract, which EigenDA deploys as-is, but is also available for rollups to modify and deploy on their own. Specifically, [checkDACert](https://github.com/Layr-Labs/eigenda/blob/2414ed6f11bd28bc631eab4da3d6b576645801b0/contracts/src/periphery/cert/EigenDACertVerifier.sol#L46-L56) is the entry point for validation. This could either be called during a normal eth transaction (either for pessimistic “bridging” like EigenDA V1 used to do, or when uploading a Blob Field Element to a one-step-proof’s [preimage contract](https://specs.optimism.io/fault-proof/index.html#pre-image-oracle)), or be zk proven using a library like [Steel](https://github.com/risc0/risc0-ethereum/blob/main/crates/steel/docs/what-is-steel.md).
 
-`checkDACert` takes in an unstructured `[]byte` input. This is done to ensure seamless upgrades where the underlying representation of the `DACert` can change over time with new version introductions.
+The `checkDACert` function accepts an ABI-encoded `[]byte` certificate input. This design allows the underlying DACert structure to evolve across versions, enabling seamless upgrades without requiring changes to the `EigenDACertVerifierRouter` interface.
 
 The [cert verification](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/libraries/EigenDACertVerificationLib.sol#L92-L152) logic consists of:
 
@@ -80,6 +80,6 @@ Note: The verification steps in point 1. for dispersal are not currently impleme
 
 |                     | Nitro V1       | OP V1 (insecure) | Nitro V2       | OP V2                                                                                |
 | ------------------- | -------------- | ---------------- | -------------- | ------------------------------------------------------------------------------------ |
-| Cert Verification   | SequencerInbox | x                | one-step proof | one-step proof: done in one step proof HostIO contract |
+| Cert Verification   | SequencerInbox | x                | one-step proof | one-step proof: done in preimage oracle contract when uploading a blob field element |
 | Blob Verification   | one-step proof | x                | one-step proof | one-step proof                                                                       |
 | Timing Verification | SequencerInbox | x                | SequencerInbox | one-step proof (?)                                                                   |
