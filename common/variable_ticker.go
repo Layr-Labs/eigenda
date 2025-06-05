@@ -7,6 +7,13 @@ import (
 	"time"
 )
 
+// Any frequency at or below this value will be interpreted as a frequency of 0 Hz. Needed to avoid overflow.
+// The factor of 2 is to take care of floating point precision issues.
+const MinimumFrequency = float64(time.Nanosecond/math.MaxInt64) * 2.0
+
+// Any frequency above this value will be interpreted as a frequency of MaximumFrequency Hz. Needed to avoid overflow.
+const MaximumFrequency = float64(time.Nanosecond)
+
 // VariableTicker behaves like a ticker with a frequency that can be changed at runtime.
 type VariableTicker struct {
 	ctx   context.Context
@@ -26,7 +33,7 @@ type VariableTicker struct {
 	// recomputing it each tick.
 	currentPeriod time.Duration
 
-	// The previous period held by this ticker the last time its configuration was changed.
+	// The previous frequency held by this ticker the last time its configuration was changed.
 	anchorFrequency float64
 
 	// The time at which the ticker last had its configuration changed.
@@ -41,7 +48,7 @@ type VariableTicker struct {
 
 // frequencyUpdate is a control message to update the target frequency of the ticker.
 type frequencyUpdate struct {
-	// The target period to move towards.
+	// The target frequency to move towards.
 	targetFrequency float64
 }
 
@@ -57,11 +64,15 @@ func NewVariableTickerWithPeriod(ctx context.Context, period time.Duration) (*Va
 		return nil, fmt.Errorf("period must be positive, got %v", period)
 	}
 	frequency := float64(time.Second) / float64(period)
-	return NewVariableTickerWithFrequency(ctx, frequency), nil
+	return NewVariableTickerWithFrequency(ctx, frequency)
 }
 
 // NewVariableTickerWithFrequency creates a new VariableTicker given a target frequency.
-func NewVariableTickerWithFrequency(ctx context.Context, frequency float64) *VariableTicker {
+func NewVariableTickerWithFrequency(ctx context.Context, frequency float64) (*VariableTicker, error) {
+	if frequency < 0 {
+		return nil, fmt.Errorf("frequency must be non-negative, got %v", frequency)
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 
 	currentPeriod := time.Duration(0)
@@ -82,7 +93,7 @@ func NewVariableTickerWithFrequency(ctx context.Context, frequency float64) *Var
 
 	go ticker.run()
 
-	return ticker
+	return ticker, nil
 }
 
 // SetTargetPeriod sets the target period for the ticker. If acceleration is non-zero, the ticker will
@@ -95,6 +106,13 @@ func (t *VariableTicker) SetTargetPeriod(period time.Duration) error {
 
 	frequency := float64(time.Second) / float64(period)
 
+	if frequency < MinimumFrequency {
+		frequency = 0.0
+	}
+	if frequency > MaximumFrequency {
+		frequency = MaximumFrequency
+	}
+
 	t.controlChan <- &frequencyUpdate{
 		targetFrequency: frequency,
 	}
@@ -102,17 +120,36 @@ func (t *VariableTicker) SetTargetPeriod(period time.Duration) error {
 	return nil
 }
 
-func (t *VariableTicker) SetTargetFrequency(frequency float64) {
+func (t *VariableTicker) SetTargetFrequency(frequency float64) error {
+	if frequency < 0 {
+		return fmt.Errorf("invalid frequency %v, frequency must be non-negative", frequency)
+	}
+
+	if frequency < MinimumFrequency {
+		frequency = 0.0
+	}
+	if frequency > MaximumFrequency {
+		frequency = MaximumFrequency
+	}
+
 	t.controlChan <- &frequencyUpdate{
 		targetFrequency: frequency,
 	}
+
+	return nil
 }
 
 // SetAcceleration sets the acceleration for the frequency of the ticker, in HZ/second (i.e. 1/s/s).
-func (t *VariableTicker) SetAcceleration(acceleration float64) {
+func (t *VariableTicker) SetAcceleration(acceleration float64) error {
+	if acceleration < 0 {
+		return fmt.Errorf("invalid acceleration %v, acceleration must be non-negative", acceleration)
+	}
+
 	t.controlChan <- &accelerationUpdate{
 		acceleration: acceleration,
 	}
+
+	return nil
 }
 
 // Tick returns a channel that produces an output every time the ticker ticks.
@@ -131,26 +168,37 @@ func (t *VariableTicker) run() {
 	defer timer.Stop()
 
 	for {
-		// Check for control messages to update the ticker's configuration.
-		select {
-		case msg := <-t.controlChan:
-			t.handleControlMessage(msg)
-		default:
-			// No control message received, continue with the current configuration.
-		}
-
 		t.computePeriod()
 		if t.currentPeriod == 0 {
-			// Period 0 is a proxy for an infinite period, do not tick.
+			// Period==0 is overloaded, and is used as a proxy for an infinitely long period (i.e. a frequency of 0).
+			// In that case, do not tick.
+			//
+			// Only internal logic can set the period to 0. A user is unable to directly set the period to 0,
+			// since if we interpret a period of 0 literally, it would require us to tick infinitely fast,
+
+			select {
+			case msg := <-t.controlChan:
+				// check to see if we have a control message to process.
+				t.handleControlMessage(msg)
+			default:
+				// to avoid busy waiting.
+				time.Sleep(time.Millisecond)
+			}
 			continue
 		}
 
-		// Send a tick.
+		// Send a tick. Also listen for control messages.
 		startOfTick := time.Now()
-		select {
-		case t.tickChan <- struct{}{}:
-		case <-t.ctx.Done():
-			return
+		var tickSent bool
+		for !tickSent {
+			select {
+			case msg := <-t.controlChan:
+				t.handleControlMessage(msg)
+			case t.tickChan <- struct{}{}:
+				tickSent = true
+			case <-t.ctx.Done():
+				return
+			}
 		}
 
 		elapsed := time.Since(startOfTick)
@@ -215,7 +263,7 @@ func (t *VariableTicker) computePeriod() {
 		}
 	} else {
 		// We are above the target frequency.
-		t.currentFrequency = t.currentFrequency - (t.acceleration * elapsedSinceAnchorTime.Seconds())
+		t.currentFrequency = t.anchorFrequency - (t.acceleration * elapsedSinceAnchorTime.Seconds())
 		if t.currentFrequency < t.targetFrequency {
 			// If we over shoot, adopt the target frequency.
 			t.currentFrequency = t.targetFrequency
