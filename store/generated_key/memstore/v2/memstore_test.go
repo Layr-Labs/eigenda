@@ -5,7 +5,9 @@ import (
 	"os"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/stretchr/testify/require"
@@ -50,7 +52,9 @@ func TestGetSet(t *testing.T) {
 	key, err := msV2.Put(ctx, expected)
 	require.NoError(t, err)
 
-	actual, err := msV2.Get(ctx, key)
+	cert := certs.NewVersionedCert(key, coretypes.VersionThreeCert)
+
+	actual, err := msV2.Get(ctx, cert)
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)
 }

@@ -23,9 +23,9 @@ type ClientConfigV2 struct {
 	// - If > 0: Try N times total
 	// - If < 0: Retry indefinitely until success
 	// - If = 0: Not permitted
-	PutTries                   int
-	MaxBlobSizeBytes           uint64
-	EigenDACertVerifierAddress string
+	PutTries                           int
+	MaxBlobSizeBytes                   uint64
+	EigenDACertVerifierOrRouterAddress string // >= V3 cert
 
 	// TODO: we should create an upstream VerifyingPayloadRetrievalClient upstream
 	// that would take all of the below configs, and would verify certs before retrieving,
@@ -51,15 +51,16 @@ type ClientConfigV2 struct {
 // Check checks config invariants, and returns an error if there is a problem with the config struct
 func (cfg *ClientConfigV2) Check() error {
 	if cfg.DisperserClientCfg.Hostname == "" {
-		return fmt.Errorf("disperser hostname is required for using EigenDA V2 backend")
+		return fmt.Errorf("EigenDA disperser hostname is required for using EigenDA V2 backend")
 	}
 
 	if cfg.DisperserClientCfg.Port == "" {
-		return fmt.Errorf("disperser port is required for using EigenDA V2 backend")
+		return fmt.Errorf("EigenDA disperser port is required for using EigenDA V2 backend")
 	}
 
-	if cfg.EigenDACertVerifierAddress == "" {
-		return fmt.Errorf("cert verifier address is required for using EigenDA V2 backend")
+	if cfg.EigenDACertVerifierOrRouterAddress == "" {
+		return fmt.Errorf(`immutable v3 cert verifier address or dynamic router 
+		address is required for using EigenDA V2 backend`)
 	}
 
 	if cfg.MaxBlobSizeBytes == 0 {

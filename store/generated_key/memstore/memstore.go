@@ -41,7 +41,7 @@ type MemStore struct {
 	codec    codecs.BlobCodec
 }
 
-var _ common.EigenDAStore = (*MemStore)(nil)
+var _ common.EigenDAV1Store = (*MemStore)(nil)
 
 // New ... constructor
 func New(

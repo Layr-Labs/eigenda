@@ -10,7 +10,7 @@ func TestVerifyCertRBNRecencyCheck(t *testing.T) {
 
 	testTable := []struct {
 		name                  string
-		certRBN               uint32
+		certRBN               uint64
 		certL1IBN             uint64
 		rbnRecencyWindowSize  uint64
 		expectError           bool

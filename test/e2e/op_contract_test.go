@@ -8,7 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
 	"github.com/Layr-Labs/eigenda-proxy/test/testutils"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	contractEigenDACertVerifierV2 "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
+	bindings "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/stretchr/testify/require"
@@ -92,16 +92,16 @@ func TestOPContractTestRBNRecentyCheck(t *testing.T) {
 			t.Cleanup(kill)
 
 			// Build + Serialize (empty) cert with the given RBN
-			certV2 := coretypes.EigenDACert{
-				BatchHeader: contractEigenDACertVerifierV2.EigenDATypesV2BatchHeaderV2{
+			certV3 := coretypes.EigenDACertV3{
+				BatchHeader: bindings.EigenDATypesV2BatchHeaderV2{
 					ReferenceBlockNumber: tt.certRBN,
 				},
 			}
-			serializedCertV2, err := rlp.EncodeToBytes(certV2)
+			serializedCertV3, err := rlp.EncodeToBytes(certV3)
 			require.NoError(t, err)
 			// altdaCommitment is what is returned by the proxy
 			altdaCommitment, err := commitments.EncodeCommitment(
-				certs.NewVersionedCert(serializedCertV2, certs.V1VersionByte),
+				certs.NewVersionedCert(serializedCertV3, certs.V2VersionByte),
 				commitments.OptimismGenericCommitmentMode)
 			require.NoError(t, err)
 			// the op client expects a typed commitment, so we have to decode the altdaCommitment

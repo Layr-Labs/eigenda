@@ -195,7 +195,7 @@ func (svr *Server) handlePostShared(
 	case common.V1EigenDABackend:
 		certVersion = certs.V0VersionByte
 	case common.V2EigenDABackend:
-		certVersion = certs.V1VersionByte
+		certVersion = certs.V2VersionByte
 	default:
 		return fmt.Errorf("unknown dispersal backend: %v", svr.sm.GetDispersalBackend())
 	}
