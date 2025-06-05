@@ -258,7 +258,7 @@ func setupPayloadDisperserWithRouter(testConfig *deploy.Config) error {
 	payloadDisperserConfig := payloaddispersal.PayloadDisperserConfig{
 		PayloadClientConfig:    *clientsv2.GetDefaultPayloadClientConfig(),
 		DisperseBlobTimeout:    2 * time.Minute,
-		BlobCompleteTimeout:    5 * time.Minute,
+		BlobCompleteTimeout:    2 * time.Minute,
 		BlobStatusPollInterval: 1 * time.Second,
 		ContractCallTimeout:    5 * time.Second,
 	}

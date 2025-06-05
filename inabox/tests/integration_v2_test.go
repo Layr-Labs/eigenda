@@ -29,7 +29,9 @@ var _ = Describe("Inabox v2 Integration", func() {
 	*/
 	It("test end to end scenario", func() {
 		ctx := context.Background()
-		mineAnvilBlocks(10)
+		// mine finalization_delay # of blocks given sometimes registry coordinator updates can sometimes happen
+		// in-between the current_block_number - finalization_block_delay. This ensures consistent test execution.
+		mineAnvilBlocks(6)
 
 		payload1 := randomPayload(992)
 		payload2 := randomPayload(123)
