@@ -256,28 +256,30 @@ func (s *DynamoDBMeteringStore) RollbackOnDemandPayment(ctx context.Context, acc
 	return nil
 }
 
-// GetPeriodRecordsMultiQuorum retrieves period records for multiple quorums efficiently.
+// GetPeriodRecords retrieves period records for multiple quorums efficiently.
 // This function is optimized for retrieving period records for all quorums in a single database operation.
+// The records start from the first reservation period for each quorum to at most numBins in length into the future.
+// quorumNumbers and reservationPeriods must have the same length and the same ordering.
 // Returns an array of PeriodRecords up to numBins in length, with records for each requested quorum.
-func (s *DynamoDBMeteringStore) GetPeriodRecordsMultiQuorum(
+func (s *DynamoDBMeteringStore) GetPeriodRecords(
 	ctx context.Context,
 	accountID gethcommon.Address,
-	reservationPeriod uint64,
 	quorumNumbers []core.QuorumID,
+	reservationPeriods []uint64,
 	numBins uint32,
 ) (map[core.QuorumID]*pb.PeriodRecords, error) {
-	if len(quorumNumbers) == 0 {
+	if len(quorumNumbers) == 0 || len(reservationPeriods) != len(quorumNumbers) {
 		return nil, nil
 	}
 
 	// Prepare all keys for batch get
 	var keys []map[string]types.AttributeValue
-	for _, quorum := range quorumNumbers {
+	for i, quorum := range quorumNumbers {
 		accountIDAndQuorum := accountID.Hex() + ":" + strconv.FormatUint(uint64(quorum), 10)
-		for i := 0; i < int(numBins); i++ {
+		for j := 0; j < int(numBins); j++ {
 			key := map[string]types.AttributeValue{
 				"AccountID":         &types.AttributeValueMemberS{Value: accountIDAndQuorum},
-				"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriod+uint64(i), 10)},
+				"ReservationPeriod": &types.AttributeValueMemberN{Value: strconv.FormatUint(reservationPeriods[i]+uint64(j), 10)},
 			}
 			keys = append(keys, key)
 		}
