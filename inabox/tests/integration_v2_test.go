@@ -106,7 +106,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		Expect(err).Error()
 		Expect(err.Error()).To(ContainSubstring(getSolidityFunctionSig("ABNNotInFuture(uint32)")))
 
-		// ensure that a verifier can be added two blocks in the future where activation_block_number = latestBlock + 2
+		// ensure that a verifier #2 can be added two blocks in the future where activation_block_number = latestBlock + 2
 		tx, err := eigenDACertVerifierRouter.AddCertVerifier(deployerTransactorOpts, uint32(latestBlock)+2, gethcommon.HexToAddress("0x0"))
 		Expect(err).To(BeNil())
 		mineAnvilBlocks(1)
@@ -121,7 +121,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		Expect(verifier).To(Equal(gethcommon.HexToAddress("0x0")))
 
 		// and that old one still lives at the latest block number - 1
-		verifier, err = eigenDACertVerifierRouterCaller.GetCertVerifierAt(&bind.CallOpts{}, uint32(latestBlock-2))
+		verifier, err = eigenDACertVerifierRouterCaller.GetCertVerifierAt(&bind.CallOpts{}, uint32(latestBlock-1))
 		Expect(err).To(BeNil())
 		Expect(verifier.String()).To(Equal(testConfig.EigenDA.CertVerifier))
 
@@ -138,8 +138,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		latestBlock, err = ethClient.BlockNumber(ctx)
 		Expect(err).To(BeNil())
 
-		// now disperse blob #4 to trigger the new cert verifier which should pass
-		// ensure that a verifier can be added two blocks in the future
+
 		tx, err = eigenDACertVerifierRouter.AddCertVerifier(deployerTransactorOpts, uint32(latestBlock)+2, gethcommon.HexToAddress(testConfig.EigenDA.CertVerifier))
 		Expect(err).To(BeNil())
 		mineAnvilBlocks(10)
@@ -147,7 +146,9 @@ var _ = Describe("Inabox v2 Integration", func() {
 		err = validateTxReceipt(ctx, tx.Hash())
 		Expect(err).To(BeNil())
 
-		// ensure that new verifier can be used for successful verification
+		// ensure that new verifier #3 can be used for successful verification
+		// now disperse blob #4 to trigger the new cert verifier which should pass
+		// ensure that a verifier can be added two blocks in the future
 		payload4 := randomPayload(1234)
 		cert4, err := payloadDisperser.SendPayload(ctx, payload4)
 		Expect(err).To(BeNil())
