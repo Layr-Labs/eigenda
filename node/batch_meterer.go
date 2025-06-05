@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"sort"
 	"sync"
 	"time"
 
@@ -16,15 +15,6 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-// PeriodUsageMap is a map of period indices to symbols usage
-type PeriodUsageMap map[uint64]uint64
-
-// QuorumPeriodUsageMap is a map of quorum IDs to period indices to symbols usage
-type QuorumPeriodUsageMap map[core.QuorumID]PeriodUsageMap
-
-// AccountQuorumPeriodUsageMap is a map of account IDs to quorum IDs to period indices to symbols usage
-type AccountQuorumPeriodUsageMap map[gethcommon.Address]QuorumPeriodUsageMap
-
 // AccountUsage tracks usage for a specific account across quorums
 type AccountUsage struct {
 	// Circular buffer of usage records, with minimum length MinNumBins
@@ -33,23 +23,17 @@ type AccountUsage struct {
 	Lock sync.RWMutex
 }
 
-// updateRecord tracks a successful usage update for potential rollback
-type updateRecord struct {
+// UpdateRecord tracks a successful usage update for potential rollback
+type UpdateRecord struct {
 	accountID gethcommon.Address
 	quorumID  core.QuorumID
 	period    uint64
 	usage     uint64 // The usage value to restore during rollback
 }
 
-// String returns a string representation of the updateRecord
-func (r updateRecord) String() string {
-	return fmt.Sprintf("account=%s quorum=%d period=%d usage=%d",
-		r.accountID.Hex(), r.quorumID, r.period, r.usage)
-}
-
-// newUpdateRecord creates a new updateRecord with validation
-func newUpdateRecord(accountID gethcommon.Address, quorumID core.QuorumID, period, usage uint64) (updateRecord, error) {
-	record := updateRecord{
+// newUpdateRecord creates a new UpdateRecord with validation
+func newUpdateRecord(accountID gethcommon.Address, quorumID core.QuorumID, period, usage uint64) (UpdateRecord, error) {
+	record := UpdateRecord{
 		accountID: accountID,
 		quorumID:  quorumID,
 		period:    period,
@@ -130,15 +114,15 @@ func (b *BatchMeterer) MeterBatch(
 }
 
 // BatchRequestUsage aggregates the usage for each account and quorum in the batch
-// Returns an array of updateRecord representing the usage updates
-func (b *BatchMeterer) BatchRequestUsage(batch *corev2.Batch) ([]updateRecord, error) {
+// Returns an array of UpdateRecord representing the usage updates
+func (b *BatchMeterer) BatchRequestUsage(batch *corev2.Batch) ([]UpdateRecord, error) {
 	b.logger.Info("BatchRequestUsage", "batch", batch)
 	if batch == nil || len(batch.BlobCertificates) == 0 {
 		return nil, fmt.Errorf("batch is nil or empty")
 	}
 
 	// Use a map to track existing updates by account, quorum, and period
-	updatesMap := make(map[string]*updateRecord)
+	updatesMap := make(map[string]*UpdateRecord)
 
 	for _, cert := range batch.BlobCertificates {
 		if cert.BlobHeader == nil {
@@ -172,7 +156,7 @@ func (b *BatchMeterer) BatchRequestUsage(batch *corev2.Batch) ([]updateRecord, e
 	}
 
 	// Convert map to slice
-	updates := make([]updateRecord, 0, len(updatesMap))
+	updates := make([]UpdateRecord, 0, len(updatesMap))
 	for _, record := range updatesMap {
 		updates = append(updates, *record)
 	}
@@ -188,16 +172,16 @@ func (b *BatchMeterer) BatchRequestUsage(batch *corev2.Batch) ([]updateRecord, e
 // 3. Tracks usage in period records
 func (b *BatchMeterer) BatchMeterRequest(
 	ctx context.Context,
-	updates []updateRecord,
+	updates []UpdateRecord,
 	batchReceivedAt time.Time,
 ) error {
 	b.logger.Info("BatchMeterRequest", "numUpdates", len(updates), "batchReceivedAt", batchReceivedAt)
 
 	// Track successful updates for potential rollback
-	successfulUpdates := make([]updateRecord, 0)
+	successfulUpdates := make([]UpdateRecord, 0)
 
 	// Group updates by account for efficient reservation lookup
-	accountUpdates := make(map[gethcommon.Address][]updateRecord)
+	accountUpdates := make(map[gethcommon.Address][]UpdateRecord)
 	for _, update := range updates {
 		accountUpdates[update.accountID] = append(accountUpdates[update.accountID], update)
 	}
@@ -271,7 +255,7 @@ func (b *BatchMeterer) BatchMeterRequest(
 }
 
 // rollbackUpdates reverts all successful updates in reverse order
-func (b *BatchMeterer) rollbackUpdates(updates []updateRecord) {
+func (b *BatchMeterer) rollbackUpdates(updates []UpdateRecord) {
 	b.logger.Info("Rolling back updates", "numUpdates", len(updates))
 	if len(updates) == 0 {
 		return
@@ -495,20 +479,4 @@ func (b *BatchMeterer) validateReservationPeriod(reservation *core.ReservedPayme
 	)
 
 	return isCurrentOrPreviousPeriod && isWithinReservationWindow
-}
-
-// mapQuorumIDsToSortedSlice converts map keys of type QuorumID to a sorted slice
-// This ensures consistent ordering for deterministic test behavior
-func mapQuorumIDsToSortedSlice(m QuorumPeriodUsageMap) []core.QuorumID {
-	keys := make([]core.QuorumID, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-
-	// Sort QuorumIDs in ascending order using the standard library
-	sort.Slice(keys, func(i, j int) bool {
-		return keys[i] < keys[j]
-	})
-
-	return keys
 }
