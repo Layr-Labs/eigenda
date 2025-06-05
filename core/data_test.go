@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -218,64 +219,55 @@ func TestChunksData(t *testing.T) {
 	}
 }
 
-func TestReservedPayment_IsActive(t *testing.T) {
+func TestCheckTimeRange(t *testing.T) {
 	tests := []struct {
-		name             string
-		reservedPayment  core.ReservedPayment
-		currentTimestamp uint64
-		wantActive       bool
+		name        string
+		start       time.Time
+		end         time.Time
+		checkTime   time.Time
+		wantInRange bool
 	}{
 		{
-			name: "active - current time in middle of range",
-			reservedPayment: core.ReservedPayment{
-				StartTimestamp: 100,
-				EndTimestamp:   200,
-			},
-			currentTimestamp: 150,
-			wantActive:       true,
+			name:        "in range - current time in middle of range",
+			start:       time.Unix(100, 0),
+			end:         time.Unix(200, 0),
+			checkTime:   time.Unix(150, 0),
+			wantInRange: true,
 		},
 		{
-			name: "active - current time at start",
-			reservedPayment: core.ReservedPayment{
-				StartTimestamp: 100,
-				EndTimestamp:   200,
-			},
-			currentTimestamp: 100,
-			wantActive:       true,
+			name:        "in range - current time at start",
+			start:       time.Unix(100, 0),
+			end:         time.Unix(200, 0),
+			checkTime:   time.Unix(100, 0),
+			wantInRange: true,
 		},
 		{
-			name: "active - current time at end",
-			reservedPayment: core.ReservedPayment{
-				StartTimestamp: 100,
-				EndTimestamp:   200,
-			},
-			currentTimestamp: 200,
-			wantActive:       true,
+			name:        "in range - current time at end",
+			start:       time.Unix(100, 0),
+			end:         time.Unix(200, 0),
+			checkTime:   time.Unix(200, 0),
+			wantInRange: true,
 		},
 		{
-			name: "inactive - current time before start",
-			reservedPayment: core.ReservedPayment{
-				StartTimestamp: 100,
-				EndTimestamp:   200,
-			},
-			currentTimestamp: 99,
-			wantActive:       false,
+			name:        "out of range - current time before start",
+			start:       time.Unix(100, 0),
+			end:         time.Unix(200, 0),
+			checkTime:   time.Unix(99, 0),
+			wantInRange: false,
 		},
 		{
-			name: "inactive - current time after end",
-			reservedPayment: core.ReservedPayment{
-				StartTimestamp: 100,
-				EndTimestamp:   200,
-			},
-			currentTimestamp: 201,
-			wantActive:       false,
+			name:        "out of range - current time after end",
+			start:       time.Unix(100, 0),
+			end:         time.Unix(200, 0),
+			checkTime:   time.Unix(201, 0),
+			wantInRange: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			isActive := tt.reservedPayment.IsActive(tt.currentTimestamp)
-			assert.Equal(t, tt.wantActive, isActive)
+			isInRange := core.CheckTimeRange(tt.start, tt.end, tt.checkTime)
+			assert.Equal(t, tt.wantInRange, isInRange)
 		})
 	}
 }

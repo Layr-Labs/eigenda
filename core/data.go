@@ -9,6 +9,7 @@ import (
 	"time"
 
 	commonpbv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
+	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -643,6 +644,8 @@ type ReservedPayment struct {
 	QuorumSplits []byte
 }
 
+type QuorumReservation = disperser_rpc.QuorumReservation
+
 type OnDemandPayment struct {
 	// Total amount deposited by the user
 	CumulativePayment *big.Int
@@ -690,13 +693,7 @@ func (bvp *BlobVersionParameters) GetReconstructionThresholdBips() uint32 {
 	return RoundUpDivide(bvp.NumChunks*10000, (bvp.NumChunks-bvp.MaxNumOperators)*bvp.CodingRate)
 }
 
-// IsActive returns true if the reservation is active at the given timestamp
-func (ar *ReservedPayment) IsActive(currentTimestamp uint64) bool {
-	return ar.StartTimestamp <= currentTimestamp && ar.EndTimestamp >= currentTimestamp
-}
-
-// IsActive returns true if the reservation is active at the given timestamp
-func (ar *ReservedPayment) IsActiveByNanosecond(currentTimestamp int64) bool {
-	timestamp := uint64((time.Duration(currentTimestamp) * time.Nanosecond).Seconds())
-	return ar.StartTimestamp <= timestamp && ar.EndTimestamp >= timestamp
+// CheckTimeRange returns true if the checked timestamp is within the time range
+func CheckTimeRange(start, end, timestamp time.Time) bool {
+	return !timestamp.Before(start) && !timestamp.After(end)
 }
