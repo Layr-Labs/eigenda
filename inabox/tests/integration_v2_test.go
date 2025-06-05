@@ -140,7 +140,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		tx, err = eigenDACertVerifierRouter.AddCertVerifier(deployerTransactorOpts, uint32(latestBlock)+2, gethcommon.HexToAddress(testConfig.EigenDA.CertVerifier))
 		Expect(err).To(BeNil())
 		mineAnvilBlocks(10)
-		latestBlock += 1
+
 		err = validateTxReceipt(ctx, tx.Hash())
 		Expect(err).To(BeNil())
 
@@ -164,10 +164,10 @@ var _ = Describe("Inabox v2 Integration", func() {
 
 		err = routerCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
 		Expect(err).To(Not(BeNil()))
-		Expect(err.Error()).To(ContainSubstring("invalid batch header merkle root"))
+		Expect(err.Error()).To(ContainSubstring("Merkle inclusion proof for blob batch is invalid"))
 		err = staticCertVerifier.CheckDACert(ctx, eigenDAV3Cert4)
 		Expect(err).To(Not(BeNil()))
-		Expect(err.Error()).To(ContainSubstring("invalid batch header merkle root"))
+		Expect(err.Error()).To(ContainSubstring("Merkle inclusion proof for blob batch is invalid"))
 	})
 })
 

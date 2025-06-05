@@ -223,7 +223,8 @@ var _ = BeforeSuite(func() {
 
 		deployerTransactorOpts = newTransactOptsFromPrivateKey(pk, chainID)
 
-		setupPayloadDisperserWithRouter(testConfig)
+		err = setupPayloadDisperserWithRouter(testConfig)
+		Expect(err).To(BeNil())
 
 	}
 })
