@@ -47,6 +47,8 @@ type Config struct {
 	InternalDispersalPort           string
 	V2DispersalPort                 string
 	V2RetrievalPort                 string
+	InternalV2DispersalPort         string
+	InternalV2RetrievalPort         string
 	EnableNodeApi                   bool
 	NodeApiPort                     string
 	EnableMetrics                   bool
@@ -305,6 +307,15 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 
 	v2DispersalPort := ctx.GlobalString(flags.V2DispersalPortFlag.Name)
 	v2RetrievalPort := ctx.GlobalString(flags.V2RetrievalPortFlag.Name)
+	internalV2DispersalPort := ctx.GlobalString(flags.InternalV2DispersalPortFlag.Name)
+	internalV2RetrievalPort := ctx.GlobalString(flags.InternalV2RetrievalPortFlag.Name)
+	if internalV2DispersalPort == "" {
+		internalV2DispersalPort = v2DispersalPort
+	}
+	if internalV2RetrievalPort == "" {
+		internalV2RetrievalPort = v2RetrievalPort
+	}
+
 	if v2Enabled {
 		if v2DispersalPort == "" {
 			return nil, errors.New("v2 dispersal port (NODE_V2_DISPERSAL_PORT) must be defined when v2 is enabled")
@@ -326,6 +337,8 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		InternalRetrievalPort:               internalRetrievalFlag,
 		V2DispersalPort:                     v2DispersalPort,
 		V2RetrievalPort:                     v2RetrievalPort,
+		InternalV2DispersalPort:             internalV2DispersalPort,
+		InternalV2RetrievalPort:             internalV2RetrievalPort,
 		EnableNodeApi:                       ctx.GlobalBool(flags.EnableNodeApiFlag.Name),
 		NodeApiPort:                         ctx.GlobalString(flags.NodeApiPortFlag.Name),
 		EnableMetrics:                       ctx.GlobalBool(flags.EnableMetricsFlag.Name),
