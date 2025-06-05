@@ -29,6 +29,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 	*/
 	It("test end to end scenario", func() {
 		ctx := context.Background()
+		mineAnvilBlocks(10)
 
 		payload1 := randomPayload(992)
 		payload2 := randomPayload(123)
