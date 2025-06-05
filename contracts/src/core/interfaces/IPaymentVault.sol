@@ -24,6 +24,8 @@ interface IPaymentVault {
 
     error ReservationTooLong(uint64 length, uint64 maxLength);
 
+    error NotEnoughSymbolsAvailable(uint64 timestamp, uint64 requiredSymbols, uint64 availableSymbols);
+
     error AmountTooLarge(uint256 amount, uint256 maxAmount);
 
     error SchedulePeriodCannotBeZero();

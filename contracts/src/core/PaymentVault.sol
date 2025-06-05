@@ -11,6 +11,7 @@ import {InitializableLib} from "src/core/libraries/InitializableLib.sol";
 
 contract PaymentVault is IPaymentVault {
     uint64 public immutable SCHEDULE_PERIOD;
+    using PaymentVaultLib for PaymentVaultTypes.Reservation;
 
     modifier onlyOwner() {
         _onlyOwner();
@@ -34,7 +35,7 @@ contract PaymentVault is IPaymentVault {
         SCHEDULE_PERIOD = schedulePeriod;
     }
 
-    function initialize(address owner) external {
+    function initialize(address owner) external initializer {
         AccessControlLib.grantRole(Constants.OWNER_ROLE, owner);
     }
 

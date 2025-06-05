@@ -43,9 +43,9 @@ library PaymentVaultLib {
         PaymentVaultTypes.Reservation memory reservation,
         uint64 schedulePeriod
     ) internal {
-        PaymentVaultTypes.Reservation storage currentReservation = s().quorum[quorumId].user[account].reservation;
         checkReservation(quorumId, reservation, schedulePeriod);
 
+        PaymentVaultTypes.Reservation storage currentReservation = s().quorum[quorumId].user[account].reservation;
         if (reservation.startTimestamp != currentReservation.startTimestamp) {
             revert IPaymentVault.StartTimestampMustMatch(currentReservation.startTimestamp);
         }
@@ -141,7 +141,7 @@ library PaymentVaultLib {
             revert IPaymentVault.TimestampSchedulePeriodMismatch(reservation.endTimestamp, schedulePeriod);
         }
         if (reservation.startTimestamp <= reservation.endTimestamp) {
-            revert IPaymentVault.InvalidStartTimestamp(uint64(block.timestamp));
+            revert IPaymentVault.InvalidReservationPeriod(reservation.startTimestamp, reservation.endTimestamp);
         }
         if (reservation.endTimestamp - reservation.startTimestamp > quorum.protocolCfg.reservationAdvanceWindow) {
             revert IPaymentVault.ReservationTooLong(
@@ -167,6 +167,7 @@ library PaymentVaultLib {
     }
 
     /// @notice Increases the reserved symbols for a quorum in a given period. Requires that the start and end timestamps are multiples of the schedule period.
+    /// @dev Assumes that the timestamps are already checked to align with the schedule period.
     function increaseReservedSymbols(
         uint64 quorumId,
         uint64 startTimestamp,
@@ -174,15 +175,6 @@ library PaymentVaultLib {
         uint64 symbolsPerSecond,
         uint64 schedulePeriod
     ) internal {
-        if (startTimestamp % schedulePeriod != 0) {
-            revert IPaymentVault.TimestampSchedulePeriodMismatch(startTimestamp, schedulePeriod);
-        }
-        if (endTimestamp % schedulePeriod != 0) {
-            revert IPaymentVault.TimestampSchedulePeriodMismatch(endTimestamp, schedulePeriod);
-        }
-        if (endTimestamp <= startTimestamp) {
-            revert IPaymentVault.InvalidReservationPeriod(startTimestamp, endTimestamp);
-        }
         uint64 startPeriod = startTimestamp / schedulePeriod;
         uint64 endPeriod = endTimestamp / schedulePeriod;
 
@@ -190,12 +182,15 @@ library PaymentVaultLib {
         uint64 maxReservedSymbols = quorum.cfg.reservationSymbolsPerSecond;
         for (uint64 i = startPeriod; i < endPeriod; i++) {
             uint64 reservedSymbols = quorum.reservedSymbols[i] + symbolsPerSecond;
-            require(reservedSymbols <= maxReservedSymbols, "Not enough symbols available");
+            if(reservedSymbols > maxReservedSymbols) {
+                revert IPaymentVault.NotEnoughSymbolsAvailable(i * schedulePeriod, reservedSymbols, maxReservedSymbols);
+            }
             quorum.reservedSymbols[i] = reservedSymbols;
         }
     }
 
     /// @notice Decreases the reserved symbols for a quorum in a given period. Requires that the start and end timestamps are multiples of the schedule period.
+    /// @dev Assumes that the timestamps are already checked to align with the schedule period.
     function decreaseReservedSymbols(
         uint64 quorumId,
         uint64 startTimestamp,
@@ -203,15 +198,6 @@ library PaymentVaultLib {
         uint64 symbolsPerSecond,
         uint64 schedulePeriod
     ) internal {
-        if (startTimestamp % schedulePeriod != 0) {
-            revert IPaymentVault.TimestampSchedulePeriodMismatch(startTimestamp, schedulePeriod);
-        }
-        if (endTimestamp % schedulePeriod != 0) {
-            revert IPaymentVault.TimestampSchedulePeriodMismatch(endTimestamp, schedulePeriod);
-        }
-        if (endTimestamp <= startTimestamp) {
-            revert IPaymentVault.InvalidReservationPeriod(startTimestamp, endTimestamp);
-        }
         uint64 startPeriod = startTimestamp / schedulePeriod;
         uint64 endPeriod = endTimestamp / schedulePeriod;
 
