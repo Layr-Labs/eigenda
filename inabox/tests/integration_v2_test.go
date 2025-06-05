@@ -43,7 +43,7 @@ var _ = Describe("Inabox v2 Integration", func() {
 		err = staticCertVerifier.CheckDACert(ctx, cert1)
 		Expect(err).To(BeNil())
 
-		err = routerCertVerifier.CheckDACert(ctx, cert2)
+		err = routerCertVerifier.CheckDACert(ctx, cert1)
 		Expect(err).To(BeNil())
 
 		// test onchain verification using cert #2
