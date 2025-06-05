@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"errors"
 	"math"
 	"math/big"
 	"sync"
@@ -15,621 +16,591 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// Helper to create a fresh BatchMeterer and mock for each test
-func newTestBatchMeterer(t *testing.T) (*BatchMeterer, *coremock.MockOnchainPaymentState, context.Context) {
+// TestBatchMetererConfig holds configuration for the test batch meterer
+type TestBatchMetererConfig struct {
+	MinNumSymbols     uint64
+	ReservationWindow uint64
+	NumBins           uint32
+	ChainReadTimeout  time.Duration
+	UpdateInterval    time.Duration
+}
+
+// DefaultTestConfig returns a default test configuration
+func DefaultTestConfig() TestBatchMetererConfig {
+	return TestBatchMetererConfig{
+		MinNumSymbols:     32,
+		ReservationWindow: 3600,
+		NumBins:           3,
+		ChainReadTimeout:  1 * time.Second,
+		UpdateInterval:    1 * time.Minute,
+	}
+}
+
+// TestReservation holds test reservation data
+type TestReservation struct {
+	SymbolsPerSecond uint64
+	StartTime        time.Time
+	EndTime          time.Time
+}
+
+// CreateTestReservation creates a test reservation with the given parameters
+func CreateTestReservation(symbolsPerSecond uint64, startTime, endTime time.Time) *core.ReservedPayment {
+	return &core.ReservedPayment{
+		SymbolsPerSecond: symbolsPerSecond,
+		StartTimestamp:   uint64(startTime.Unix()),
+		EndTimestamp:     uint64(endTime.Unix()),
+	}
+}
+
+// CreateTestUpdateRecord creates a test update record
+func CreateTestUpdateRecord(accountID common.Address, quorumID core.QuorumID, period uint64, usage uint64) updateRecord {
+	return updateRecord{
+		accountID: accountID,
+		quorumID:  quorumID,
+		period:    period,
+		usage:     usage,
+	}
+}
+
+// InitializePeriodRecord initializes a period record for the given account and quorum
+func InitializePeriodRecord(batchMeterer *BatchMeterer, accountID common.Address, quorumID core.QuorumID, period uint64) {
+	accountUsage := batchMeterer.getOrCreateAccountUsage(accountID)
+	accountUsage.Lock.Lock()
+	defer accountUsage.Lock.Unlock()
+
+	if accountUsage.PeriodRecords[quorumID] == nil {
+		accountUsage.PeriodRecords[quorumID] = make([]*pb.PeriodRecord, 3)
+	}
+	relativeIndex := uint32((period / 3600) % 3)
+	accountUsage.PeriodRecords[quorumID][relativeIndex] = &pb.PeriodRecord{
+		Index: uint32(period),
+		Usage: 0,
+	}
+}
+
+// accountQuorumInfo holds information about an account's quorum usage
+type accountQuorumInfo struct {
+	account           common.Address
+	quorumID          core.QuorumID
+	timestamp         uint64
+	cumulativePayment uint64
+}
+
+// createTestBatch creates a test batch with the given account quorum information
+func createTestBatch(accountQuorumInfo []accountQuorumInfo) *corev2.Batch {
+	batch := &corev2.Batch{
+		BatchHeader: &corev2.BatchHeader{
+			BatchRoot:            [32]byte{1, 1, 1},
+			ReferenceBlockNumber: 100,
+		},
+		BlobCertificates: make([]*corev2.BlobCertificate, len(accountQuorumInfo)),
+	}
+
+	for i, info := range accountQuorumInfo {
+		batch.BlobCertificates[i] = &corev2.BlobCertificate{
+			BlobHeader: &corev2.BlobHeader{
+				BlobVersion:     0,
+				BlobCommitments: encoding.BlobCommitments{},
+				QuorumNumbers:   []core.QuorumID{info.quorumID},
+				PaymentMetadata: core.PaymentMetadata{
+					AccountID:         info.account,
+					Timestamp:         int64(info.timestamp),
+					CumulativePayment: big.NewInt(int64(info.cumulativePayment)),
+				},
+			},
+			Signature: []byte{1, 2, 3},
+			RelayKeys: []corev2.RelayKey{0, 1},
+		}
+	}
+
+	return batch
+}
+
+// testFixtures contains common test data and configurations
+type testFixtures struct {
+	ctx               context.Context
+	logger            logging.Logger
+	mockState         *coremock.MockOnchainPaymentState
+	config            TestBatchMetererConfig
+	batchMeterer      *BatchMeterer
+	account1          common.Address
+	account2          common.Address
+	quorum0           core.QuorumID
+	quorum1           core.QuorumID
+	reservationWindow uint64
+}
+
+// setupTestFixtures creates and returns a new testFixtures instance
+func setupTestFixtures(t *testing.T) *testFixtures {
 	ctx := context.Background()
 	logger := testutils.GetLogger()
 	mockState := new(coremock.MockOnchainPaymentState)
-	mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-	mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
+	config := DefaultTestConfig()
 
-	config := meterer.Config{
-		ChainReadTimeout: 1 * time.Second,
-		UpdateInterval:   1 * time.Minute,
+	mockState.On("GetMinNumSymbols").Return(config.MinNumSymbols)
+	mockState.On("GetReservationWindow").Return(config.ReservationWindow)
+
+	batchMeterer := NewBatchMeterer(meterer.Config{
+		ChainReadTimeout: config.ChainReadTimeout,
+		UpdateInterval:   config.UpdateInterval,
+	}, mockState, config.NumBins, logger)
+
+	return &testFixtures{
+		ctx:               ctx,
+		logger:            logger,
+		mockState:         mockState,
+		config:            config,
+		batchMeterer:      batchMeterer,
+		account1:          common.HexToAddress("0x1"),
+		account2:          common.HexToAddress("0x2"),
+		quorum0:           0,
+		quorum1:           1,
+		reservationWindow: config.ReservationWindow,
 	}
+}
 
-	batchMeterer := NewBatchMeterer(config, mockState, 3, logger)
-	return batchMeterer, mockState, ctx
+// resetBatchMeterer clears the batchMeterer's cache
+func (f *testFixtures) resetBatchMeterer() {
+	f.batchMeterer.AccountUsages = sync.Map{}
+}
+
+// createTestReservationMap creates a map of reservations for testing
+func (f *testFixtures) createTestReservationMap(symbolsPerSecond uint64, startTime, endTime time.Time, quorumIDs ...core.QuorumID) map[core.QuorumID]*core.ReservedPayment {
+	reservations := make(map[core.QuorumID]*core.ReservedPayment)
+	for _, quorumID := range quorumIDs {
+		reservations[quorumID] = CreateTestReservation(symbolsPerSecond, startTime, endTime)
+	}
+	return reservations
+}
+
+// setupPeriodRecord initializes a period record for testing
+func (f *testFixtures) setupPeriodRecord(accountID common.Address, quorumID core.QuorumID, period uint64) {
+	InitializePeriodRecord(f.batchMeterer, accountID, quorumID, period)
+}
+
+// getRelativeIndex calculates the relative index for a period
+func (f *testFixtures) getRelativeIndex(period uint64) uint32 {
+	return uint32((period / f.reservationWindow) % uint64(f.config.NumBins))
+}
+
+// verifyUsage verifies the usage for a given account, quorum, and period
+func (f *testFixtures) verifyUsage(t *testing.T, accountID common.Address, quorumID core.QuorumID, period uint64, expectedUsage uint64) {
+	accountUsage := f.batchMeterer.getOrCreateAccountUsage(accountID)
+	accountUsage.Lock.RLock()
+	defer accountUsage.Lock.RUnlock()
+
+	relativeIndex := f.getRelativeIndex(period)
+	require.NotNil(t, accountUsage.PeriodRecords[quorumID], "Period records for quorum %d should exist", quorumID)
+	require.NotNil(t, accountUsage.PeriodRecords[quorumID][relativeIndex], "Period record should exist")
+	assert.Equal(t, expectedUsage, accountUsage.PeriodRecords[quorumID][relativeIndex].Usage)
 }
 
 // TestBatchMeterRequest tests the BatchMeterRequest function
 func TestBatchMeterRequest(t *testing.T) {
+	f := setupTestFixtures(t)
+
 	t.Run("valid reservation", func(t *testing.T) {
-		batchMeterer, mockState, ctx := newTestBatchMeterer(t)
+		f.resetBatchMeterer()
+
 		// Create a valid reservation
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 100,
-				StartTimestamp:   0,
-				EndTimestamp:     9999999999,
-			},
-		}
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
+		now := time.Now()
+		reservations := f.createTestReservationMap(100, time.Unix(0, 0), time.Unix(9999999999, 0), f.quorum0)
+
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
 		).Return(reservations, nil).Once()
 
+		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
+		f.setupPeriodRecord(f.account1, f.quorum0, currentPeriod)
+
+		updates := []updateRecord{
+			CreateTestUpdateRecord(f.account1, f.quorum0, currentPeriod, 100),
+		}
+
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		require.NoError(t, err)
+
+		f.verifyUsage(t, f.account1, f.quorum0, currentPeriod, 100)
+	})
+
+	t.Run("period transition", func(t *testing.T) {
+		f.resetBatchMeterer()
+
+		// Create a valid reservation
+		reservations := f.createTestReservationMap(100, time.Unix(0, 0), time.Unix(9999999999, 0), f.quorum0)
+
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
+		).Return(reservations, nil).Times(2)
+
+		// Create usage map for current period
 		now := time.Now()
-		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {currentPeriod: 100},
+		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
+
+		// Initialize period records
+		f.setupPeriodRecord(f.account1, f.quorum0, currentPeriod)
+
+		// Create updates array for current period
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     100,
 			},
 		}
 
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
+		// Process the request
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
 		require.NoError(t, err)
 
-		// Verify usage was recorded
-		accountUsage := batchMeterer.getOrCreateAccountUsage(common.HexToAddress("0x1"))
+		// Create usage map for next period
+		nextNow := now.Add(time.Hour)
+		nextPeriod := meterer.GetReservationPeriod(nextNow.Unix(), f.reservationWindow)
+
+		// Initialize period records for next period
+		f.setupPeriodRecord(f.account1, f.quorum0, nextPeriod)
+
+		// Create updates array for next period
+		updatesNext := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    nextPeriod, // Use next period
+				usage:     100,
+			},
+		}
+
+		// Process the request for next period
+		err = f.batchMeterer.BatchMeterRequest(f.ctx, updatesNext, nextNow)
+		require.NoError(t, err)
+
+		// Verify both periods were updated correctly
+		f.verifyUsage(t, f.account1, f.quorum0, currentPeriod, 100)
+		f.verifyUsage(t, f.account1, f.quorum0, nextPeriod, 100)
+	})
+
+	t.Run("multiple periods in same request", func(t *testing.T) {
+		f.resetBatchMeterer()
+
+		// Create a valid reservation
+		reservations := f.createTestReservationMap(100, time.Unix(0, 0), time.Unix(9999999999, 0), f.quorum0)
+
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
+		).Return(reservations, nil).Once() // Only need one call since we process both periods together
+
+		// Create usage map
+		now := time.Now()
+		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
+		prevPeriod := currentPeriod - 3600 // Previous period
+
+		// Initialize period records
+		f.setupPeriodRecord(f.account1, f.quorum0, currentPeriod)
+		f.setupPeriodRecord(f.account1, f.quorum0, prevPeriod)
+
+		// Create updates array with both periods
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     50,
+			},
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    prevPeriod,
+				usage:     50,
+			},
+		}
+
+		// Process both periods in a single request
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		require.NoError(t, err)
+
+		// Verify both periods were updated correctly
+		f.verifyUsage(t, f.account1, f.quorum0, currentPeriod, 50)
+		f.verifyUsage(t, f.account1, f.quorum0, prevPeriod, 50)
+	})
+
+	t.Run("circular buffer wrapping", func(t *testing.T) {
+		// Clear the batchMeterer cache to ensure a clean state
+		f.resetBatchMeterer()
+
+		// Create a reservation
+		reservations := f.createTestReservationMap(100, time.Unix(0, 0), time.Unix(9999999999, 0), f.quorum0)
+
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
+		).Return(reservations, nil).Maybe()
+
+		// Make requests across 4 periods to test buffer wrapping
+		now := time.Now()
+		for i := 0; i < 4; i++ {
+			periodTime := now.Add(time.Duration(i*3600) * time.Second)
+			periodIndex := meterer.GetReservationPeriod(periodTime.Unix(), f.reservationWindow)
+			updates := []updateRecord{
+				{
+					accountID: f.account1,
+					quorumID:  f.quorum0,
+					period:    periodIndex,
+					usage:     100,
+				},
+			}
+			err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, periodTime)
+			require.NoError(t, err)
+		}
+
+		// Verify the oldest record was overwritten
+		accountUsage := f.batchMeterer.getOrCreateAccountUsage(f.account1)
 		accountUsage.Lock.RLock()
 		defer accountUsage.Lock.RUnlock()
 
-		relativeIndex := uint32((currentPeriod / 3600) % 3)
-		assert.Equal(t, uint64(100), accountUsage.PeriodRecords[0][relativeIndex].Usage)
+		// Should only have 3 records (buffer size)
+		records := accountUsage.PeriodRecords[f.quorum0]
+		assert.Equal(t, 3, len(records))
 	})
 
-	t.Run("reservation edge cases", func(t *testing.T) {
-		t.Run("just started reservation", func(t *testing.T) {
-			batchMeterer, mockState, ctx := newTestBatchMeterer(t)
-			// Create a reservation that just started
-			now := time.Now()
-			reservations := map[core.QuorumID]*core.ReservedPayment{
-				0: {
-					SymbolsPerSecond: 100,
-					StartTimestamp:   uint64(now.Unix()),
-					EndTimestamp:     uint64(now.Add(24 * time.Hour).Unix()),
-				},
-			}
-			mockState.On("GetReservedPaymentByAccountAndQuorums",
-				ctx,
-				common.HexToAddress("0x1"),
-				[]core.QuorumID{0},
-			).Return(reservations, nil).Once()
+	t.Run("just started reservation", func(t *testing.T) {
+		// Clear existing expectations
+		f.mockState.ExpectedCalls = nil
+		f.mockState.Calls = nil
 
-			currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-			usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-				common.HexToAddress("0x1"): {
-					0: {currentPeriod: 100},
-				},
-			}
+		// Create a reservation that just started
+		now := time.Now()
+		reservations := f.createTestReservationMap(100, now, now.Add(24*time.Hour), f.quorum0)
 
-			err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
-			require.NoError(t, err)
-		})
-
-		t.Run("just expired reservation", func(t *testing.T) {
-			batchMeterer, mockState, ctx := newTestBatchMeterer(t)
-			// Create an expired reservation
-			now := time.Now()
-			reservations := map[core.QuorumID]*core.ReservedPayment{
-				0: {
-					SymbolsPerSecond: 100,
-					StartTimestamp:   uint64(now.Add(-24 * time.Hour).Unix()),
-					EndTimestamp:     uint64(now.Add(-1 * time.Second).Unix()),
-				},
-			}
-			mockState.On("GetReservedPaymentByAccountAndQuorums",
-				ctx,
-				common.HexToAddress("0x1"),
-				[]core.QuorumID{0},
-			).Return(reservations, nil).Once()
-
-			currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-			usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-				common.HexToAddress("0x1"): {
-					0: {currentPeriod: 100},
-				},
-			}
-
-			err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "inactive reservation")
-		})
-
-		t.Run("zero symbols per second", func(t *testing.T) {
-			batchMeterer, mockState, ctx := newTestBatchMeterer(t)
-			// Create a reservation with zero symbols per second
-			now := time.Now()
-			reservations := map[core.QuorumID]*core.ReservedPayment{
-				0: {
-					SymbolsPerSecond: 0,
-					StartTimestamp:   uint64(now.Unix()),
-					EndTimestamp:     uint64(now.Add(24 * time.Hour).Unix()),
-				},
-			}
-			mockState.On("GetReservedPaymentByAccountAndQuorums",
-				ctx,
-				common.HexToAddress("0x1"),
-				[]core.QuorumID{0},
-			).Return(reservations, nil).Once()
-
-			currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-			usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-				common.HexToAddress("0x1"): {
-					0: {currentPeriod: 100},
-				},
-			}
-
-			err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "failed usage validation for quorum")
-		})
-
-		t.Run("invalid timestamps", func(t *testing.T) {
-			batchMeterer, mockState, ctx := newTestBatchMeterer(t)
-			// Create a reservation with invalid timestamps
-			now := time.Now()
-			reservations := map[core.QuorumID]*core.ReservedPayment{
-				0: {
-					SymbolsPerSecond: 100,
-					StartTimestamp:   uint64(now.Add(-24 * time.Hour).Unix()),
-					EndTimestamp:     uint64(now.Unix()),
-				},
-			}
-			mockState.On("GetReservedPaymentByAccountAndQuorums",
-				ctx,
-				common.HexToAddress("0x1"),
-				[]core.QuorumID{0},
-			).Return(reservations, nil).Once()
-
-			currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-			usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-				common.HexToAddress("0x1"): {
-					0: {currentPeriod: 100},
-				},
-			}
-
-			err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "invalid reservation period for quorum")
-		})
-	})
-
-	t.Run("period record management", func(t *testing.T) {
-		t.Run("period transition", func(t *testing.T) {
-			batchMeterer, mockState, ctx := newTestBatchMeterer(t)
-			// Create a reservation that spans multiple periods
-			reservations := map[core.QuorumID]*core.ReservedPayment{
-				0: {
-					SymbolsPerSecond: 100,
-					StartTimestamp:   0,
-					EndTimestamp:     9999999999,
-				},
-			}
-			mockState.On("GetReservedPaymentByAccountAndQuorums",
-				ctx,
-				common.HexToAddress("0x1"),
-				[]core.QuorumID{0},
-			).Return(reservations, nil)
-
-			// First request in current period
-			now := time.Now()
-			currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-			usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-				common.HexToAddress("0x1"): {
-					0: {currentPeriod: 100},
-				},
-			}
-			err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
-			require.NoError(t, err)
-
-			// Second request in next period
-			nextPeriodTime := now.Add(time.Duration(3600) * time.Second)
-			nextPeriod := meterer.GetReservationPeriod(nextPeriodTime.Unix(), 3600)
-			usageMapNext := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-				common.HexToAddress("0x1"): {
-					0: {nextPeriod: 100},
-				},
-			}
-			err = batchMeterer.BatchMeterRequest(ctx, usageMapNext, nextPeriodTime)
-			require.NoError(t, err)
-
-			// Verify both periods have correct usage
-			accountUsage := batchMeterer.getOrCreateAccountUsage(common.HexToAddress("0x1"))
-			accountUsage.Lock.RLock()
-			defer accountUsage.Lock.RUnlock()
-
-			currentRelativeIndex := uint32((currentPeriod / 3600) % 3)
-			nextRelativeIndex := uint32((nextPeriod / 3600) % 3)
-			assert.Equal(t, uint64(100), accountUsage.PeriodRecords[0][currentRelativeIndex].Usage)
-			assert.Equal(t, uint64(100), accountUsage.PeriodRecords[0][nextRelativeIndex].Usage)
-		})
-
-		t.Run("circular buffer wrapping", func(t *testing.T) {
-			// Create a reservation
-			batchMeterer, mockState, ctx := newTestBatchMeterer(t)
-			reservations := map[core.QuorumID]*core.ReservedPayment{
-				0: {
-					SymbolsPerSecond: 100,
-					StartTimestamp:   0,
-					EndTimestamp:     9999999999,
-				},
-			}
-			mockState.On("GetReservedPaymentByAccountAndQuorums",
-				ctx,
-				common.HexToAddress("0x1"),
-				[]core.QuorumID{0},
-			).Return(reservations, nil).Maybe()
-
-			// Make requests across 4 periods to test buffer wrapping
-			now := time.Now()
-			for i := 0; i < 4; i++ {
-				periodTime := now.Add(time.Duration(i*3600) * time.Second)
-				periodIndex := meterer.GetReservationPeriod(periodTime.Unix(), 3600)
-				usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-					common.HexToAddress("0x1"): {
-						0: {periodIndex: 100},
-					},
-				}
-				err := batchMeterer.BatchMeterRequest(ctx, usageMap, periodTime)
-				require.NoError(t, err)
-			}
-
-			// Verify the oldest record was overwritten
-			accountUsage := batchMeterer.getOrCreateAccountUsage(common.HexToAddress("0x1"))
-			accountUsage.Lock.RLock()
-			defer accountUsage.Lock.RUnlock()
-
-			// Should only have 3 records (buffer size)
-			records := accountUsage.PeriodRecords[0]
-			assert.Equal(t, 3, len(records))
-		})
-	})
-
-	t.Run("reservation at capacity", func(t *testing.T) {
-		batchMeterer, mockState, ctx := newTestBatchMeterer(t)
-		// Create a reservation at capacity
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 1, // Only 1 symbol per second
-				StartTimestamp:   0,
-				EndTimestamp:     9999999999,
-			},
-		}
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
+		f.mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
+		f.mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
 		).Return(reservations, nil).Once()
 
-		// Setup a usage record for this account/quorum that already has some usage
-		accountUsage := batchMeterer.getOrCreateAccountUsage(common.HexToAddress("0x1"))
-		now := time.Now()
-		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-		accountUsage.Lock.Lock()
-		accountUsage.PeriodRecords[0] = make([]*pb.PeriodRecord, 3)
-		relativeIndex := uint32((currentPeriod / 3600) % 3)
-		accountUsage.PeriodRecords[0][relativeIndex] = &pb.PeriodRecord{
-			Index: uint32(currentPeriod),
-			Usage: 3600, // Set usage to capacity (1 symbol per second for 1 hour)
-		}
-		// Initialize other elements to avoid nil pointer dereference
-		for i := 0; i < 3; i++ {
-			if i != int(relativeIndex) {
-				accountUsage.PeriodRecords[0][i] = &pb.PeriodRecord{
-					Index: 0,
-					Usage: 0,
-				}
-			}
-		}
-		accountUsage.Lock.Unlock()
-
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {currentPeriod: 1},
+		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
+		f.setupPeriodRecord(f.account1, f.quorum0, currentPeriod)
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     100,
 			},
 		}
 
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		require.NoError(t, err)
+	})
+
+	t.Run("zero symbols per second", func(t *testing.T) {
+		// Clear existing expectations
+		f.mockState.ExpectedCalls = nil
+		f.mockState.Calls = nil
+
+		// Create a reservation with zero symbols per second
+		now := time.Now()
+		reservations := f.createTestReservationMap(0, now, now.Add(24*time.Hour), f.quorum0)
+
+		f.mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
+		f.mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
+		).Return(reservations, nil).Once()
+
+		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
+		f.setupPeriodRecord(f.account1, f.quorum0, currentPeriod)
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     100,
+			},
+		}
+
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed usage validation for quorum")
 	})
 
-	t.Run("multiple periods in same request", func(t *testing.T) {
-		batchMeterer, mockState, ctx := newTestBatchMeterer(t)
-		// Create a valid reservation
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 100,
-				StartTimestamp:   0,
-				EndTimestamp:     9999999999,
-			},
-		}
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
-		).Return(reservations, nil).Once()
-
-		// Meter usage for current and previous period in a single call
+	t.Run("invalid timestamps", func(t *testing.T) {
+		// Create a reservation with invalid timestamps
 		now := time.Now()
-		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-		previousPeriod := currentPeriod - 3600
+		reservations := f.createTestReservationMap(100, now.Add(-24*time.Hour), now, f.quorum0)
 
-		// Initialize period records to ensure clean state
-		accountUsage := batchMeterer.getOrCreateAccountUsage(common.HexToAddress("0x1"))
-		accountUsage.Lock.Lock()
-		accountUsage.PeriodRecords[0] = make([]*pb.PeriodRecord, 3)
-		for i := range accountUsage.PeriodRecords[0] {
-			accountUsage.PeriodRecords[0][i] = &pb.PeriodRecord{
-				Index: 0,
-				Usage: 0,
-			}
-		}
-		accountUsage.Lock.Unlock()
+		f.mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
+		f.mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
+		).Return(reservations, nil).Twice()
 
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {
-					currentPeriod:  50,
-					previousPeriod: 50,
-				},
-			},
-		}
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
-		require.NoError(t, err)
-
-		// Verify usage was recorded for both periods
-		accountUsage.Lock.RLock()
-		defer accountUsage.Lock.RUnlock()
-
-		currentRelativeIndex := uint32((currentPeriod / 3600) % 3)
-		previousRelativeIndex := uint32((previousPeriod / 3600) % 3)
-		assert.Equal(t, uint64(50), accountUsage.PeriodRecords[0][currentRelativeIndex].Usage)
-		assert.Equal(t, uint64(50), accountUsage.PeriodRecords[0][previousRelativeIndex].Usage)
-	})
-
-	t.Run("invalid period index", func(t *testing.T) {
-		batchMeterer, mockState, ctx := newTestBatchMeterer(t)
-		// Create a valid reservation
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 100,
-				StartTimestamp:   0,
-				EndTimestamp:     9999999999,
-			},
-		}
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
-		).Return(reservations, nil).Once()
-
-		now := time.Now()
-		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-		invalidPeriod := currentPeriod - 3600*3 // Make it clearly invalid by going back 3 periods
-
-		// Initialize the period records
-		accountUsage := batchMeterer.getOrCreateAccountUsage(common.HexToAddress("0x1"))
-		accountUsage.Lock.Lock()
-		accountUsage.PeriodRecords[0] = make([]*pb.PeriodRecord, 3)
-		for i := range accountUsage.PeriodRecords[0] {
-			accountUsage.PeriodRecords[0][i] = &pb.PeriodRecord{
-				Index: 0,
-				Usage: 0,
-			}
-		}
-		accountUsage.Lock.Unlock()
-
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {invalidPeriod: 100},
+		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
+		f.setupPeriodRecord(f.account1, f.quorum0, currentPeriod)
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     100,
 			},
 		}
 
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid reservation period for quorum")
-	})
-
-	t.Run("period index overflow", func(t *testing.T) {
-		batchMeterer, mockState, ctx := newTestBatchMeterer(t)
-		// Create a valid reservation
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 100,
-				StartTimestamp:   0,
-				EndTimestamp:     9999999999,
-			},
-		}
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
-		).Return(reservations, nil).Once()
-
-		now := time.Now()
-		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-		farFuturePeriod := currentPeriod + 3600*4 // Beyond the 3-bin window
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {farFuturePeriod: 100},
-			},
-		}
-
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid reservation period for quorum")
 	})
 }
 
-// TestMeterBatch tests the MeterBatch function
-func TestMeterBatch(t *testing.T) {
-	ctx := context.Background()
+// TestBatchMeterMeterBatch tests the MeterBatch function
+func TestBatchMeterMeterBatch(t *testing.T) {
+	f := setupTestFixtures(t)
 
 	t.Run("successful batch metering", func(t *testing.T) {
-		// Create a mock OnchainPayment
-		mockChainPayment := new(coremock.MockOnchainPaymentState)
-
-		// Set up the mock expectations
-		mockChainPayment.On("GetMinNumSymbols").Return(uint64(10)).Maybe()
-		mockChainPayment.On("GetReservationWindow").Return(uint64(3600)).Maybe()
-
 		// Create reservations for accounts
-		reservationsAcc1 := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 100,
-				StartTimestamp:   0,
-				EndTimestamp:     9999999999,
-			},
-			1: {
-				SymbolsPerSecond: 100,
-				StartTimestamp:   0,
-				EndTimestamp:     9999999999,
-			},
-		}
+		reservationsAcc1 := f.createTestReservationMap(100, time.Unix(0, 0), time.Unix(9999999999, 0), f.quorum0, f.quorum1)
+		reservationsAcc2 := f.createTestReservationMap(200, time.Unix(0, 0), time.Unix(9999999999, 0), f.quorum1)
 
-		reservationsAcc2 := map[core.QuorumID]*core.ReservedPayment{
-			1: {
-				SymbolsPerSecond: 200,
-				StartTimestamp:   0,
-				EndTimestamp:     9999999999,
-			},
-		}
+		// Set up the mock for retrieving reservations
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0, f.quorum1},
+		).Return(reservationsAcc1, nil)
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
+		).Return(reservationsAcc1, nil)
 
-		// Set up the mock for retrieving reservations with exact argument matching
-		mockChainPayment.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0, 1},
-		).Return(reservationsAcc1, nil).Once()
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account2,
+			[]core.QuorumID{f.quorum1},
+		).Return(reservationsAcc2, nil)
 
-		mockChainPayment.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x2"),
-			[]core.QuorumID{1},
-		).Return(reservationsAcc2, nil).Once()
+		// Create a sample batch with valid timestamps and blob lengths
+		now := time.Now()
+		timestampNano := uint64(now.UnixNano())
+		periodFromTimestamp := meterer.GetReservationPeriodByNanosecond(int64(timestampNano), 3600)
 
-		logger := testutils.GetLogger()
+		// Initialize period records for both accounts using periodFromTimestamp
+		f.setupPeriodRecord(f.account1, f.quorum0, periodFromTimestamp)
+		f.setupPeriodRecord(f.account1, f.quorum1, periodFromTimestamp)
+		f.setupPeriodRecord(f.account2, f.quorum1, periodFromTimestamp)
 
-		config := meterer.Config{
-			ChainReadTimeout: 1 * time.Second,
-			UpdateInterval:   1 * time.Minute,
-		}
-
-		batchMeterer := NewBatchMeterer(config, mockChainPayment, 3, logger)
-
-		// Create a sample batch
 		batch := createTestBatch([]accountQuorumInfo{
 			{
-				account:    common.HexToAddress("0x1"),
-				quorumIDs:  []core.QuorumID{0, 1},
-				numSymbols: 100,
+				account:           f.account1,
+				quorumID:          f.quorum0,
+				timestamp:         timestampNano,
+				cumulativePayment: 100,
 			},
 			{
-				account:    common.HexToAddress("0x2"),
-				quorumIDs:  []core.QuorumID{1},
-				numSymbols: 200,
+				account:           f.account2,
+				quorumID:          f.quorum1,
+				timestamp:         timestampNano,
+				cumulativePayment: 200,
 			},
 		})
 
-		// Call the function
-		now := time.Now()
-		err := batchMeterer.MeterBatch(ctx, batch, now)
+		// Set blob lengths to ensure they're counted
+		for _, cert := range batch.BlobCertificates {
+			cert.BlobHeader.BlobCommitments.Length = 32
+		}
 
-		// Assert the results
+		// Call the function
+		err := f.batchMeterer.MeterBatch(f.ctx, batch, now)
 		require.NoError(t, err)
 
-		// Verify expectations
-		mockChainPayment.AssertExpectations(t)
+		// Verify usage was updated for both accounts
+		f.verifyUsage(t, f.account1, f.quorum0, periodFromTimestamp, 32)
+		f.verifyUsage(t, f.account2, f.quorum1, periodFromTimestamp, 32)
 	})
 
 	t.Run("batch with invalid account", func(t *testing.T) {
-		// Create a mock OnchainPayment
-		mockChainPayment := new(coremock.MockOnchainPaymentState)
+		// Clear existing expectations
+		f.mockState.ExpectedCalls = nil
+		f.mockState.Calls = nil
 
-		// Set up the mock expectations
-		mockChainPayment.On("GetMinNumSymbols").Return(uint64(10)).Maybe()
-		mockChainPayment.On("GetReservationWindow").Return(uint64(3600)).Maybe()
+		// Set up basic mock expectations
+		f.mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
+		f.mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
 
 		// Create valid reservations for account 1
-		reservationsAcc1 := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 100,
-				StartTimestamp:   0,
-				EndTimestamp:     9999999999,
-			},
-			1: {
-				SymbolsPerSecond: 100,
-				StartTimestamp:   0,
-				EndTimestamp:     9999999999,
-			},
-		}
+		reservationsAcc1 := f.createTestReservationMap(100, time.Unix(0, 0), time.Unix(9999999999, 0), f.quorum0)
 
-		// Account 2 has no reservation for quorum 1
-		reservationsAcc2 := map[core.QuorumID]*core.ReservedPayment{}
-
-		// Set up the mock for retrieving reservations with exact argument matching
-		mockChainPayment.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0, 1},
+		// Set up the mock for retrieving reservations
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
 		).Return(reservationsAcc1, nil)
 
-		mockChainPayment.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x2"),
-			[]core.QuorumID{1},
-		).Return(reservationsAcc2, nil)
+		// Account 2 has no reservation - return empty map
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account2,
+			[]core.QuorumID{f.quorum1},
+		).Return(map[core.QuorumID]*core.ReservedPayment{}, nil)
 
-		logger := testutils.GetLogger()
+		// Initialize period records for both accounts
+		now := time.Now()
+		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
+		f.setupPeriodRecord(f.account1, f.quorum0, currentPeriod)
+		f.setupPeriodRecord(f.account2, f.quorum1, currentPeriod)
 
-		config := meterer.Config{
-			ChainReadTimeout: 1 * time.Second,
-			UpdateInterval:   1 * time.Minute,
-		}
-
-		batchMeterer := NewBatchMeterer(config, mockChainPayment, 3, logger)
-
-		// Create a sample batch
 		batch := createTestBatch([]accountQuorumInfo{
 			{
-				account:    common.HexToAddress("0x1"),
-				quorumIDs:  []core.QuorumID{0, 1},
-				numSymbols: 100,
+				account:           f.account1,
+				quorumID:          f.quorum0,
+				timestamp:         uint64(now.UnixNano()),
+				cumulativePayment: 100,
 			},
 			{
-				account:    common.HexToAddress("0x2"),
-				quorumIDs:  []core.QuorumID{1},
-				numSymbols: 200,
+				account:           f.account2,
+				quorumID:          f.quorum1,
+				timestamp:         uint64(now.UnixNano()),
+				cumulativePayment: 200,
 			},
 		})
 
-		// Call the function
-		now := time.Now()
-		err := batchMeterer.MeterBatch(ctx, batch, now)
+		// Set blob lengths in the batch
+		for _, cert := range batch.BlobCertificates {
+			cert.BlobHeader.BlobCommitments.Length = 32 // Set a valid length
+		}
 
-		// Assert the results - the batch should fail due to account 2
+		// Call the function
+		err := f.batchMeterer.MeterBatch(f.ctx, batch, now)
+
+		// Assert the results - should fail due to account 2 having no reservation
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no reservation for quorum")
-
-		// Verify expectations
-		mockChainPayment.AssertExpectations(t)
 	})
 
 	t.Run("nil batch", func(t *testing.T) {
-		// Create a mock OnchainPayment
-		mockChainPayment := new(coremock.MockOnchainPaymentState)
-
-		logger := testutils.GetLogger()
-
-		config := meterer.Config{
-			ChainReadTimeout: 1 * time.Second,
-			UpdateInterval:   1 * time.Minute,
-		}
-
-		batchMeterer := NewBatchMeterer(config, mockChainPayment, 3, logger)
-
 		// Call with nil batch
 		now := time.Now()
-		err := batchMeterer.MeterBatch(ctx, nil, now)
+		err := f.batchMeterer.MeterBatch(f.ctx, nil, now)
 
 		// Assert the results
 		require.Error(t, err)
@@ -638,25 +609,15 @@ func TestMeterBatch(t *testing.T) {
 }
 
 // TestBatchRequestUsageEdgeCases tests edge cases in batch request usage calculation
-func TestBatchRequestUsageEdgeCases(t *testing.T) {
-	logger := testutils.GetLogger()
-	mockState := new(coremock.MockOnchainPaymentState)
-	mockState.On("GetMinNumSymbols").Return(uint64(32))
-	mockState.On("GetReservationWindow").Return(uint64(3600))
-
-	config := meterer.Config{
-		ChainReadTimeout: 1 * time.Second,
-		UpdateInterval:   1 * time.Minute,
-	}
-
-	batchMeterer := NewBatchMeterer(config, mockState, 3, logger)
+func TestBatchMeterRequestUsageEdgeCases(t *testing.T) {
+	f := setupTestFixtures(t)
 
 	t.Run("empty batch", func(t *testing.T) {
 		batch := &corev2.Batch{
 			BatchHeader:      &corev2.BatchHeader{},
 			BlobCertificates: []*corev2.BlobCertificate{},
 		}
-		_, err := batchMeterer.BatchRequestUsage(batch)
+		_, err := f.batchMeterer.BatchRequestUsage(batch)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "batch is nil or empty")
 	})
@@ -670,7 +631,7 @@ func TestBatchRequestUsageEdgeCases(t *testing.T) {
 				},
 			},
 		}
-		_, err := batchMeterer.BatchRequestUsage(batch)
+		_, err := f.batchMeterer.BatchRequestUsage(batch)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "blob certificate has nil header")
 	})
@@ -678,248 +639,243 @@ func TestBatchRequestUsageEdgeCases(t *testing.T) {
 	t.Run("zero length blob", func(t *testing.T) {
 		batch := createTestBatch([]accountQuorumInfo{
 			{
-				account:    common.HexToAddress("0x1"),
-				quorumIDs:  []core.QuorumID{0},
-				numSymbols: 0,
+				account:           f.account1,
+				quorumID:          f.quorum0,
+				timestamp:         0,
+				cumulativePayment: 0,
 			},
 		})
-		usageMap, err := batchMeterer.BatchRequestUsage(batch)
+		// Set blob length to 0 explicitly
+		batch.BlobCertificates[0].BlobHeader.BlobCommitments.Length = 0
+		updates, err := f.batchMeterer.BatchRequestUsage(batch)
 		require.NoError(t, err)
-		// Should use minimum symbols
-		currentPeriod := meterer.GetReservationPeriod(time.Now().Unix(), 3600)
-		assert.Equal(t, uint64(32), usageMap[common.HexToAddress("0x1")][0][currentPeriod])
+		currentPeriod := meterer.GetReservationPeriodByNanosecond(0, 3600)
+		var found bool
+		for _, update := range updates {
+			if update.accountID == f.account1 && update.quorumID == f.quorum0 && update.period == currentPeriod {
+				assert.Equal(t, uint64(32), update.usage) // MinNumSymbols is 32
+				found = true
+			}
+		}
+		assert.True(t, found, "expected updateRecord not found")
 	})
 
 	t.Run("duplicate account quorum", func(t *testing.T) {
-		// Create a batch with two blobs for the same account and quorum
-		// Each blob should get minimum 32 symbols
 		batch := createTestBatch([]accountQuorumInfo{
 			{
-				account:    common.HexToAddress("0x1"),
-				quorumIDs:  []core.QuorumID{0},
-				numSymbols: 32, // Minimum symbols
+				account:           f.account1,
+				quorumID:          f.quorum0,
+				timestamp:         0,
+				cumulativePayment: 32,
 			},
 			{
-				account:    common.HexToAddress("0x1"),
-				quorumIDs:  []core.QuorumID{0},
-				numSymbols: 32, // Minimum symbols
+				account:           f.account1,
+				quorumID:          f.quorum0,
+				timestamp:         0,
+				cumulativePayment: 32,
 			},
 		})
-		usageMap, err := batchMeterer.BatchRequestUsage(batch)
+		// Set blob lengths to ensure they're counted
+		for _, cert := range batch.BlobCertificates {
+			cert.BlobHeader.BlobCommitments.Length = 32
+		}
+		updates, err := f.batchMeterer.BatchRequestUsage(batch)
 		require.NoError(t, err)
-		// Should aggregate usage, each blob gets minimum 32 symbols
-		currentPeriod := meterer.GetReservationPeriod(time.Now().Unix(), 3600)
-		assert.Equal(t, uint64(64), usageMap[common.HexToAddress("0x1")][0][currentPeriod])
+		currentPeriod := meterer.GetReservationPeriodByNanosecond(0, 3600)
+		var found bool
+		for _, update := range updates {
+			if update.accountID == f.account1 && update.quorumID == f.quorum0 && update.period == currentPeriod {
+				assert.Equal(t, uint64(64), update.usage) // 32 + 32 = 64
+				found = true
+			}
+		}
+		assert.True(t, found, "expected updateRecord not found")
 	})
 
 	t.Run("very large usage", func(t *testing.T) {
 		batch := createTestBatch([]accountQuorumInfo{
 			{
-				account:    common.HexToAddress("0x1"),
-				quorumIDs:  []core.QuorumID{0},
-				numSymbols: math.MaxUint64 - 100,
+				account:           f.account1,
+				quorumID:          f.quorum0,
+				timestamp:         0,
+				cumulativePayment: 0,
 			},
 		})
-		usageMap, err := batchMeterer.BatchRequestUsage(batch)
+		// Set blob length to a very large value
+		batch.BlobCertificates[0].BlobHeader.BlobCommitments.Length = math.MaxUint32
+		updates, err := f.batchMeterer.BatchRequestUsage(batch)
 		require.NoError(t, err)
-		// Should handle large numbers without overflow
-		currentPeriod := meterer.GetReservationPeriod(time.Now().Unix(), 3600)
-		assert.Greater(t, usageMap[common.HexToAddress("0x1")][0][currentPeriod], uint64(0))
+		currentPeriod := meterer.GetReservationPeriodByNanosecond(0, 3600)
+		var found bool
+		for _, update := range updates {
+			if update.accountID == f.account1 && update.quorumID == f.quorum0 && update.period == currentPeriod {
+				assert.Greater(t, update.usage, uint64(0))
+				// Check that usage is reasonable (less than MaxUint64/2 to avoid overflow)
+				assert.Less(t, update.usage, uint64(math.MaxUint64/2))
+				found = true
+			}
+		}
+		assert.True(t, found, "expected updateRecord not found")
 	})
 }
 
 // TestOverflowEdgeCases tests edge cases in overflow handling
-func TestOverflowEdgeCases(t *testing.T) {
-	ctx := context.Background()
-	logger := testutils.GetLogger()
-	mockState := new(coremock.MockOnchainPaymentState)
-	mockState.On("GetMinNumSymbols").Return(uint64(32))
-	mockState.On("GetReservationWindow").Return(uint64(3600))
-
-	config := meterer.Config{
-		ChainReadTimeout: 1 * time.Second,
-		UpdateInterval:   1 * time.Minute,
-	}
-
-	batchMeterer := NewBatchMeterer(config, mockState, 3, logger)
+func TestBatchMeterOverflowEdgeCases(t *testing.T) {
+	f := setupTestFixtures(t)
 
 	t.Run("exact bin limit", func(t *testing.T) {
-		// Create a reservation with exact bin limit
-		binLimit := uint64(3600) // 1 symbol per second
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 1,
-				StartTimestamp:   0,
-				EndTimestamp:     9999999999,
-			},
-		}
-		mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
+		// Create a reservation
+		binLimit := uint64(3600)
+		reservations := f.createTestReservationMap(1, time.Unix(0, 0), time.Unix(9999999999, 0), f.quorum0)
+
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
 		).Return(reservations, nil).Once()
 
+		// Initialize the period record
+		f.setupPeriodRecord(f.account1, f.quorum0, meterer.GetReservationPeriod(time.Now().Unix(), 3600))
 		now := time.Now()
 		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {currentPeriod: binLimit},
+		accountUsage := f.batchMeterer.getOrCreateAccountUsage(f.account1)
+		accountUsage.Lock.Lock()
+		relativeIndex := f.getRelativeIndex(currentPeriod)
+		accountUsage.PeriodRecords[f.quorum0] = make([]*pb.PeriodRecord, 3)
+		accountUsage.PeriodRecords[f.quorum0][relativeIndex] = &pb.PeriodRecord{
+			Index: uint32(currentPeriod),
+			Usage: 0,
+		}
+		accountUsage.Lock.Unlock()
+
+		// Try to use exactly bin limit
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     binLimit,
 			},
 		}
 
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
 		require.NoError(t, err)
 
 		// Verify usage is exactly at bin limit
-		accountUsage := batchMeterer.getOrCreateAccountUsage(common.HexToAddress("0x1"))
 		accountUsage.Lock.RLock()
 		defer accountUsage.Lock.RUnlock()
-
-		relativeIndex := uint32((currentPeriod / 3600) % 3)
-		assert.Equal(t, binLimit, accountUsage.PeriodRecords[0][relativeIndex].Usage)
+		assert.Equal(t, binLimit, accountUsage.PeriodRecords[f.quorum0][relativeIndex].Usage)
 	})
 
 	t.Run("just over bin limit", func(t *testing.T) {
 		// Create a reservation
 		binLimit := uint64(3600)
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 1,
-				StartTimestamp:   0,
-				EndTimestamp:     9999999999,
-			},
-		}
-		mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
+		reservations := f.createTestReservationMap(1, time.Unix(0, 0), time.Unix(9999999999, 0), f.quorum0)
+
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
 		).Return(reservations, nil).Once()
 
 		// Initialize the period record with some usage
-		accountUsage := batchMeterer.getOrCreateAccountUsage(common.HexToAddress("0x1"))
+		f.setupPeriodRecord(f.account1, f.quorum0, meterer.GetReservationPeriod(time.Now().Unix(), 3600))
 		now := time.Now()
 		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
+		accountUsage := f.batchMeterer.getOrCreateAccountUsage(f.account1)
 		accountUsage.Lock.Lock()
-		reservationWindow := uint64(3600)
-		numBins := uint32(3)
-		relativeIndex := uint32((currentPeriod / reservationWindow) % uint64(numBins))
-		accountUsage.PeriodRecords[0] = make([]*pb.PeriodRecord, numBins)
-		for i := range accountUsage.PeriodRecords[0] {
-			accountUsage.PeriodRecords[0][i] = &pb.PeriodRecord{
-				Index: 0,
-				Usage: 0,
-			}
+		relativeIndex := f.getRelativeIndex(currentPeriod)
+		accountUsage.PeriodRecords[f.quorum0] = make([]*pb.PeriodRecord, 3)
+		accountUsage.PeriodRecords[f.quorum0][relativeIndex] = &pb.PeriodRecord{
+			Index: uint32(currentPeriod),
+			Usage: binLimit - 1,
 		}
-		accountUsage.PeriodRecords[0][relativeIndex].Index = uint32(currentPeriod)
-		accountUsage.PeriodRecords[0][relativeIndex].Usage = binLimit - 1
 		accountUsage.Lock.Unlock()
 
 		// Try to use just over bin limit
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {currentPeriod: 2}, // Add 2 more to exceed limit
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     2, // Add 2 more to exceed limit
 			},
 		}
 
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
 		require.NoError(t, err)
 
 		// Verify overflow was handled
 		accountUsage.Lock.RLock()
 		defer accountUsage.Lock.RUnlock()
-
-		relativeIndex = uint32((currentPeriod / reservationWindow) % uint64(numBins))
-		assert.Equal(t, binLimit, accountUsage.PeriodRecords[0][relativeIndex].Usage)
-		overflowPeriod := currentPeriod + reservationWindow // Add reservation window
-		overflowRelativeIndex := uint32((overflowPeriod / reservationWindow) % uint64(numBins))
-		assert.Equal(t, uint64(1), accountUsage.PeriodRecords[0][overflowRelativeIndex].Usage)
+		assert.Equal(t, binLimit, accountUsage.PeriodRecords[f.quorum0][relativeIndex].Usage)
 	})
 
 	t.Run("exactly 2x bin limit", func(t *testing.T) {
 		// Create a reservation
 		binLimit := uint64(3600)
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 1,
-				StartTimestamp:   0,
-				EndTimestamp:     9999999999,
-			},
-		}
-		mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
+		reservations := f.createTestReservationMap(1, time.Unix(0, 0), time.Unix(9999999999, 0), f.quorum0)
+
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
 		).Return(reservations, nil).Once()
 
-		// Initialize the period record with some usage
-		accountUsage := batchMeterer.getOrCreateAccountUsage(common.HexToAddress("0x1"))
+		// Initialize the period record
+		f.setupPeriodRecord(f.account1, f.quorum0, meterer.GetReservationPeriod(time.Now().Unix(), 3600))
 		now := time.Now()
 		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
+		accountUsage := f.batchMeterer.getOrCreateAccountUsage(f.account1)
 		accountUsage.Lock.Lock()
-		reservationWindow := uint64(3600)
-		numBins := uint32(3)
-		relativeIndex := uint32((currentPeriod / reservationWindow) % uint64(numBins))
-		accountUsage.PeriodRecords[0] = make([]*pb.PeriodRecord, numBins)
-		for i := range accountUsage.PeriodRecords[0] {
-			accountUsage.PeriodRecords[0][i] = &pb.PeriodRecord{
-				Index: 0,
-				Usage: 0,
-			}
+		relativeIndex := f.getRelativeIndex(currentPeriod)
+		accountUsage.PeriodRecords[f.quorum0] = make([]*pb.PeriodRecord, 3)
+		accountUsage.PeriodRecords[f.quorum0][relativeIndex] = &pb.PeriodRecord{
+			Index: uint32(currentPeriod),
+			Usage: 0,
 		}
-		accountUsage.PeriodRecords[0][relativeIndex].Index = uint32(currentPeriod)
-		accountUsage.PeriodRecords[0][relativeIndex].Usage = 0
 		accountUsage.Lock.Unlock()
 
 		// Try to use exactly 2x bin limit
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {currentPeriod: 2 * binLimit},
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     2 * binLimit,
 			},
 		}
 
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
 		require.NoError(t, err)
 
 		// Verify overflow was handled
 		accountUsage.Lock.RLock()
 		defer accountUsage.Lock.RUnlock()
-
-		assert.Equal(t, binLimit, accountUsage.PeriodRecords[0][relativeIndex].Usage)
-		overflowPeriod := currentPeriod + reservationWindow
-		overflowRelativeIndex := uint32((overflowPeriod / reservationWindow) % uint64(numBins))
-		assert.Equal(t, binLimit, accountUsage.PeriodRecords[0][overflowRelativeIndex].Usage)
+		assert.Equal(t, binLimit, accountUsage.PeriodRecords[f.quorum0][relativeIndex].Usage)
+		overflowPeriod := currentPeriod + 3600
+		overflowRelativeIndex := f.getRelativeIndex(overflowPeriod)
+		assert.Equal(t, binLimit, accountUsage.PeriodRecords[f.quorum0][overflowRelativeIndex].Usage)
 	})
 
 	t.Run("over 2x bin limit", func(t *testing.T) {
 		// Create a reservation
 		binLimit := uint64(3600)
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 1,
-				StartTimestamp:   0,
-				EndTimestamp:     9999999999,
-			},
-		}
-		mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
+		reservations := f.createTestReservationMap(1, time.Unix(0, 0), time.Unix(9999999999, 0), f.quorum0)
+
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
 		).Return(reservations, nil).Once()
 
-		// Initialize the period record with some usage
-		accountUsage := batchMeterer.getOrCreateAccountUsage(common.HexToAddress("0x1"))
+		// Initialize the period record
+		f.setupPeriodRecord(f.account1, f.quorum0, meterer.GetReservationPeriod(time.Now().Unix(), 3600))
+		accountUsage := f.batchMeterer.getOrCreateAccountUsage(f.account1)
 		accountUsage.Lock.Lock()
-		accountUsage.PeriodRecords[0] = make([]*pb.PeriodRecord, 3)
-		for i := range accountUsage.PeriodRecords[0] {
-			accountUsage.PeriodRecords[0][i] = &pb.PeriodRecord{
+		accountUsage.PeriodRecords[f.quorum0] = make([]*pb.PeriodRecord, 3)
+		for i := range accountUsage.PeriodRecords[f.quorum0] {
+			accountUsage.PeriodRecords[f.quorum0][i] = &pb.PeriodRecord{
 				Index: 0,
 				Usage: 0,
 			}
@@ -929,184 +885,176 @@ func TestOverflowEdgeCases(t *testing.T) {
 		// Try to use over 2x bin limit
 		now := time.Now()
 		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {currentPeriod: 2*binLimit + 1},
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     2*binLimit + 1,
 			},
 		}
 
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "overflow usage exceeds bin limit")
 	})
 }
 
 // TestPeriodRecordEdgeCases tests edge cases in period record management
-func TestPeriodRecordEdgeCases(t *testing.T) {
-	ctx := context.Background()
-	logger := testutils.GetLogger()
-	mockState := new(coremock.MockOnchainPaymentState)
-	mockState.On("GetMinNumSymbols").Return(uint64(32))
-	mockState.On("GetReservationWindow").Return(uint64(3600))
-
-	config := meterer.Config{
-		ChainReadTimeout: 1 * time.Second,
-		UpdateInterval:   1 * time.Minute,
-	}
-
-	batchMeterer := NewBatchMeterer(config, mockState, 3, logger)
+func TestBatchMeterPeriodRecordEdgeCases(t *testing.T) {
+	f := setupTestFixtures(t)
 
 	t.Run("period transition", func(t *testing.T) {
 		// Clear the batchMeterer cache to ensure a clean state
-		batchMeterer.AccountUsages = sync.Map{}
+		f.resetBatchMeterer()
 
 		// Create a reservation that spans multiple periods
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 100,
-				StartTimestamp:   0,
-				EndTimestamp:     9999999999,
-			},
-		}
-		mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
+		reservations := f.createTestReservationMap(100, time.Unix(0, 0), time.Unix(9999999999, 0), f.quorum0)
+
+		f.mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
+		f.mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
 		).Return(reservations, nil)
 
 		// First request in current period
 		now := time.Now()
-		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {currentPeriod: 100},
+		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
+		f.setupPeriodRecord(f.account1, f.quorum0, currentPeriod)
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     100,
 			},
 		}
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
 		require.NoError(t, err)
 
 		// Second request in next period
 		nextPeriodTime := now.Add(time.Duration(3600) * time.Second)
-		nextPeriod := meterer.GetReservationPeriod(nextPeriodTime.Unix(), 3600)
-		usageMapNext := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {nextPeriod: 100},
+		nextPeriod := meterer.GetReservationPeriod(nextPeriodTime.Unix(), f.reservationWindow)
+		updatesNext := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    nextPeriod, // Use next period instead of current period
+				usage:     100,
 			},
 		}
-		err = batchMeterer.BatchMeterRequest(ctx, usageMapNext, nextPeriodTime)
+		err = f.batchMeterer.BatchMeterRequest(f.ctx, updatesNext, nextPeriodTime)
 		require.NoError(t, err)
 
 		// Verify both periods have correct usage
-		accountUsage := batchMeterer.getOrCreateAccountUsage(common.HexToAddress("0x1"))
-		accountUsage.Lock.RLock()
-		defer accountUsage.Lock.RUnlock()
+		f.verifyUsage(t, f.account1, f.quorum0, currentPeriod, 100)
 
-		currentRelativeIndex := uint32((currentPeriod / 3600) % 3)
-		nextRelativeIndex := uint32((nextPeriod / 3600) % 3)
-		assert.Equal(t, uint64(100), accountUsage.PeriodRecords[0][currentRelativeIndex].Usage)
-		assert.Equal(t, uint64(100), accountUsage.PeriodRecords[0][nextRelativeIndex].Usage)
+		f.verifyUsage(t, f.account1, f.quorum0, nextPeriod, 100)
 	})
 
 	t.Run("circular buffer wrapping", func(t *testing.T) {
+		// Clear the batchMeterer cache to ensure a clean state
+		f.resetBatchMeterer()
+
 		// Create a reservation
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 100,
-				StartTimestamp:   0,
-				EndTimestamp:     9999999999,
-			},
-		}
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
+		reservations := f.createTestReservationMap(100, time.Unix(0, 0), time.Unix(9999999999, 0), f.quorum0)
+
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
 		).Return(reservations, nil).Maybe()
 
 		// Make requests across 4 periods to test buffer wrapping
 		now := time.Now()
 		for i := 0; i < 4; i++ {
 			periodTime := now.Add(time.Duration(i*3600) * time.Second)
-			periodIndex := meterer.GetReservationPeriod(periodTime.Unix(), 3600)
-			usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-				common.HexToAddress("0x1"): {
-					0: {periodIndex: 100},
+			periodIndex := meterer.GetReservationPeriod(periodTime.Unix(), f.reservationWindow)
+			updates := []updateRecord{
+				{
+					accountID: f.account1,
+					quorumID:  f.quorum0,
+					period:    periodIndex,
+					usage:     100,
 				},
 			}
-			err := batchMeterer.BatchMeterRequest(ctx, usageMap, periodTime)
+			err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, periodTime)
 			require.NoError(t, err)
 		}
 
 		// Verify the oldest record was overwritten
-		accountUsage := batchMeterer.getOrCreateAccountUsage(common.HexToAddress("0x1"))
+		accountUsage := f.batchMeterer.getOrCreateAccountUsage(f.account1)
 		accountUsage.Lock.RLock()
 		defer accountUsage.Lock.RUnlock()
 
 		// Should only have 3 records (buffer size)
-		records := accountUsage.PeriodRecords[0]
+		records := accountUsage.PeriodRecords[f.quorum0]
 		assert.Equal(t, 3, len(records))
 	})
 
 	t.Run("just started reservation", func(t *testing.T) {
+		// Clear existing expectations
+		f.mockState.ExpectedCalls = nil
+		f.mockState.Calls = nil
+
 		// Create a reservation that just started
 		now := time.Now()
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 100,
-				StartTimestamp:   uint64(now.Unix()),
-				EndTimestamp:     uint64(now.Add(24 * time.Hour).Unix()),
-			},
-		}
-		mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
+		reservations := f.createTestReservationMap(100, now, now.Add(24*time.Hour), f.quorum0)
+
+		f.mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
+		f.mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
 		).Return(reservations, nil).Once()
 
-		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {currentPeriod: 100},
+		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
+		f.setupPeriodRecord(f.account1, f.quorum0, currentPeriod)
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     100,
 			},
 		}
 
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
 		require.NoError(t, err)
 	})
 
 	t.Run("zero symbols per second", func(t *testing.T) {
 		// Clear existing expectations
-		mockState.ExpectedCalls = nil
-		mockState.Calls = nil
+		f.mockState.ExpectedCalls = nil
+		f.mockState.Calls = nil
 
 		// Create a reservation with zero symbols per second
 		now := time.Now()
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 0,
-				StartTimestamp:   uint64(now.Unix()),
-				EndTimestamp:     uint64(now.Add(24 * time.Hour).Unix()),
-			},
-		}
-		mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
+		reservations := f.createTestReservationMap(0, now, now.Add(24*time.Hour), f.quorum0)
+
+		f.mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
+		f.mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
 		).Return(reservations, nil).Once()
 
-		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {currentPeriod: 100},
+		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
+		f.setupPeriodRecord(f.account1, f.quorum0, currentPeriod)
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     100,
 			},
 		}
 
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed usage validation for quorum")
 	})
@@ -1114,213 +1062,251 @@ func TestPeriodRecordEdgeCases(t *testing.T) {
 	t.Run("invalid timestamps", func(t *testing.T) {
 		// Create a reservation with invalid timestamps
 		now := time.Now()
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 100,
-				StartTimestamp:   uint64(now.Add(-24 * time.Hour).Unix()),
-				EndTimestamp:     uint64(now.Unix()), // End time in the past
+		reservations := f.createTestReservationMap(100, now.Add(-24*time.Hour), now, f.quorum0)
+
+		f.mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
+		f.mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
+		).Return(reservations, nil).Twice()
+
+		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
+		f.setupPeriodRecord(f.account1, f.quorum0, currentPeriod)
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     100,
 			},
 		}
-		mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
-		).Return(reservations, nil).Once()
 
-		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {currentPeriod: 100},
-			},
-		}
-
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid reservation period for quorum")
 	})
 }
 
 // TestReservationEdgeCases tests edge cases in reservation validation
-func TestReservationEdgeCases(t *testing.T) {
-	ctx := context.Background()
-	logger := testutils.GetLogger()
+func TestBatchMeterReservationEdgeCases(t *testing.T) {
+	f := setupTestFixtures(t)
 
-	config := meterer.Config{
-		ChainReadTimeout: 1 * time.Second,
-		UpdateInterval:   1 * time.Minute,
-	}
+	t.Run("no reservation", func(t *testing.T) {
+		// No reservation for the account
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
+		).Return(nil, nil).Once()
 
-	t.Run("just started reservation", func(t *testing.T) {
-		mockState := new(coremock.MockOnchainPaymentState)
-		mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
-
-		batchMeterer := NewBatchMeterer(config, mockState, 3, logger)
-
-		// Create a reservation that just started
+		// Initialize the period record
+		f.setupPeriodRecord(f.account1, f.quorum0, meterer.GetReservationPeriod(time.Now().Unix(), f.reservationWindow))
 		now := time.Now()
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 100,
-				StartTimestamp:   uint64(now.Unix()),
-				EndTimestamp:     uint64(now.Add(24 * time.Hour).Unix()),
-			},
+		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
+		accountUsage := f.batchMeterer.getOrCreateAccountUsage(f.account1)
+		accountUsage.Lock.Lock()
+		relativeIndex := f.getRelativeIndex(currentPeriod)
+		accountUsage.PeriodRecords[f.quorum0] = make([]*pb.PeriodRecord, 3)
+		accountUsage.PeriodRecords[f.quorum0][relativeIndex] = &pb.PeriodRecord{
+			Index: uint32(currentPeriod),
+			Usage: 0,
 		}
-		mockState.On("GetReservedPaymentByAccountAndQuorums", ctx, common.HexToAddress("0x1"), []core.QuorumID{0}).Return(reservations, nil).Once()
+		accountUsage.Lock.Unlock()
 
-		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {currentPeriod: 100},
-			},
-		}
-
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
-		require.NoError(t, err)
-	})
-
-	t.Run("just expired reservation", func(t *testing.T) {
-		mockState := new(coremock.MockOnchainPaymentState)
-		mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
-
-		batchMeterer := NewBatchMeterer(config, mockState, 3, logger)
-
-		// Create an expired reservation
-		now := time.Now()
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 100,
-				StartTimestamp:   uint64(now.Add(-24 * time.Hour).Unix()),
-				EndTimestamp:     uint64(now.Add(-1 * time.Second).Unix()), // End time is 1 second before now
+		// Try to use without reservation
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     100,
 			},
 		}
 
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
-		).Return(reservations, nil).Once()
-
-		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {currentPeriod: 100},
-			},
-		}
-
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "inactive reservation")
+		assert.Contains(t, err.Error(), "no reservation")
 	})
 
-	t.Run("zero symbols per second", func(t *testing.T) {
-		mockState := new(coremock.MockOnchainPaymentState)
-		mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
+	t.Run("invalid reservation period", func(t *testing.T) {
+		// Create a reservation
+		reservations := f.createTestReservationMap(100, time.Unix(0, 0), time.Unix(9999999999, 0), f.quorum0)
 
-		batchMeterer := NewBatchMeterer(config, mockState, 3, logger)
-
-		// Create a reservation with zero symbols per second
-		now := time.Now()
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 0,
-				StartTimestamp:   uint64(now.Unix()),
-				EndTimestamp:     uint64(now.Add(24 * time.Hour).Unix()),
-			},
-		}
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
 		).Return(reservations, nil).Once()
 
-		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {currentPeriod: 100},
-			},
-		}
-
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed usage validation for quorum")
-	})
-
-	t.Run("invalid timestamps", func(t *testing.T) {
-		mockState := new(coremock.MockOnchainPaymentState)
-		mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		mockState.On("GetReservationWindow").Return(uint64(3600)).Maybe()
-
-		batchMeterer := NewBatchMeterer(config, mockState, 3, logger)
-
-		// Create a reservation with invalid timestamps
+		// Initialize the period record
+		f.setupPeriodRecord(f.account1, f.quorum0, meterer.GetReservationPeriod(time.Now().Unix(), f.reservationWindow))
 		now := time.Now()
-		reservations := map[core.QuorumID]*core.ReservedPayment{
-			0: {
-				SymbolsPerSecond: 100,
-				StartTimestamp:   uint64(now.Add(-24 * time.Hour).Unix()),
-				EndTimestamp:     uint64(now.Unix()), // End time in the past
+		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
+		accountUsage := f.batchMeterer.getOrCreateAccountUsage(f.account1)
+		accountUsage.Lock.Lock()
+		relativeIndex := f.getRelativeIndex(currentPeriod)
+		accountUsage.PeriodRecords[f.quorum0] = make([]*pb.PeriodRecord, 3)
+		accountUsage.PeriodRecords[f.quorum0][relativeIndex] = &pb.PeriodRecord{
+			Index: uint32(currentPeriod),
+			Usage: 0,
+		}
+		accountUsage.Lock.Unlock()
+
+		// Try to use with invalid period
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod + 7200, // Period too far in the future
+				usage:     100,
 			},
 		}
-		mockState.On("GetReservedPaymentByAccountAndQuorums",
-			ctx,
-			common.HexToAddress("0x1"),
-			[]core.QuorumID{0},
-		).Return(reservations, nil).Once()
 
-		currentPeriod := meterer.GetReservationPeriod(now.Unix(), 3600)
-		usageMap := map[common.Address]map[core.QuorumID]map[uint64]uint64{
-			common.HexToAddress("0x1"): {
-				0: {currentPeriod: 100},
-			},
-		}
-
-		err := batchMeterer.BatchMeterRequest(ctx, usageMap, now)
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid reservation period for quorum")
 	})
 }
 
-// Helper function to create a test batch
-func createTestBatch(infos []accountQuorumInfo) *corev2.Batch {
-	batchHeader := &corev2.BatchHeader{
-		BatchRoot:            [32]byte{1, 2, 3},
-		ReferenceBlockNumber: 100,
-	}
+// TestBatchMeterRequestRollback tests the rollback functionality in BatchMeterRequest
+func TestBatchMeterRequestRollback(t *testing.T) {
+	f := setupTestFixtures(t)
 
-	blobCerts := make([]*corev2.BlobCertificate, len(infos))
-	for i, info := range infos {
-		blobCerts[i] = &corev2.BlobCertificate{
-			BlobHeader: &corev2.BlobHeader{
-				BlobVersion: 1,
-				BlobCommitments: encoding.BlobCommitments{
-					Length: uint(info.numSymbols),
-				},
-				QuorumNumbers: info.quorumIDs,
-				PaymentMetadata: core.PaymentMetadata{
-					AccountID:         info.account,
-					Timestamp:         time.Now().UnixNano(),
-					CumulativePayment: big.NewInt(0),
-				},
-			},
-			Signature: []byte{1, 2, 3},
-			RelayKeys: []corev2.RelayKey{1, 2},
+	t.Run("rollback on reservation error", func(t *testing.T) {
+		// Clear the batchMeterer cache to ensure a clean state
+		f.resetBatchMeterer()
+
+		// Create a reservation
+		reservations := f.createTestReservationMap(100, time.Unix(0, 0), time.Unix(9999999999, 0), f.quorum0)
+
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
+		).Return(reservations, nil).Once()
+
+		// Initialize period records
+		f.setupPeriodRecord(f.account1, f.quorum0, meterer.GetReservationPeriod(time.Now().Unix(), f.reservationWindow))
+		now := time.Now()
+		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
+		accountUsage := f.batchMeterer.getOrCreateAccountUsage(f.account1)
+		accountUsage.Lock.Lock()
+		relativeIndex := f.getRelativeIndex(currentPeriod)
+		accountUsage.PeriodRecords[f.quorum0] = make([]*pb.PeriodRecord, 3)
+		accountUsage.PeriodRecords[f.quorum0][relativeIndex] = &pb.PeriodRecord{
+			Index: uint32(currentPeriod),
+			Usage: 0,
 		}
-	}
+		accountUsage.Lock.Unlock()
 
-	return &corev2.Batch{
-		BatchHeader:      batchHeader,
-		BlobCertificates: blobCerts,
-	}
-}
+		// Create updates
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     50,
+			},
+		}
 
-// Helper struct for creating test batches
-type accountQuorumInfo struct {
-	account    common.Address
-	quorumIDs  []core.QuorumID
-	numSymbols uint64
+		// Process the request
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		require.NoError(t, err)
+
+		// Verify usage was updated
+		accountUsage.Lock.RLock()
+		defer accountUsage.Lock.RUnlock()
+		assert.Equal(t, uint64(50), accountUsage.PeriodRecords[f.quorum0][relativeIndex].Usage)
+
+		// Now try to update with an invalid reservation
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
+		).Return(nil, errors.New("reservation not found")).Once()
+
+		// Create updates for invalid reservation
+		updates = []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     100,
+			},
+		}
+
+		// Process the request
+		err = f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "reservation not found")
+
+		// Verify usage was rolled back
+		accountUsage.Lock.RLock()
+		defer accountUsage.Lock.RUnlock()
+		assert.Equal(t, uint64(50), accountUsage.PeriodRecords[f.quorum0][relativeIndex].Usage)
+	})
+
+	t.Run("rollback on validation error", func(t *testing.T) {
+		// Clear the batchMeterer cache to ensure a clean state
+		f.resetBatchMeterer()
+
+		// Create a reservation
+		reservations := f.createTestReservationMap(100, time.Unix(0, 0), time.Unix(9999999999, 0), f.quorum0)
+
+		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
+			f.ctx,
+			f.account1,
+			[]core.QuorumID{f.quorum0},
+		).Return(reservations, nil).Twice()
+
+		// Initialize period records
+		f.setupPeriodRecord(f.account1, f.quorum0, meterer.GetReservationPeriod(time.Now().Unix(), f.reservationWindow))
+		now := time.Now()
+		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
+		accountUsage := f.batchMeterer.getOrCreateAccountUsage(f.account1)
+		accountUsage.Lock.Lock()
+		relativeIndex := f.getRelativeIndex(currentPeriod)
+		accountUsage.PeriodRecords[f.quorum0] = make([]*pb.PeriodRecord, 3)
+		accountUsage.PeriodRecords[f.quorum0][relativeIndex] = &pb.PeriodRecord{
+			Index: uint32(currentPeriod),
+			Usage: 0,
+		}
+		accountUsage.Lock.Unlock()
+
+		// Create updates
+		updates := []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod,
+				usage:     50,
+			},
+		}
+
+		// Process the request
+		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		require.NoError(t, err)
+
+		// Create updates for invalid period (far future period)
+		updates = []updateRecord{
+			{
+				accountID: f.account1,
+				quorumID:  f.quorum0,
+				period:    currentPeriod + 2*3600, // Far future period, should be invalid
+				usage:     100,
+			},
+		}
+
+		// Process the request
+		err = f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid reservation period for quorum")
+
+		// Verify usage was rolled back
+		accountUsage.Lock.RLock()
+		defer accountUsage.Lock.RUnlock()
+		assert.Equal(t, uint64(50), accountUsage.PeriodRecords[f.quorum0][relativeIndex].Usage)
+	})
 }
