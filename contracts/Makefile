@@ -7,3 +7,6 @@ compile: deps
 
 fmt:
 	forge fmt
+
+fmt-check:
+	forge fmt --check
