@@ -345,6 +345,10 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	}
 
 	records, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, quorumIds, periods, 3)
+	if err != nil {
+		s.logger.Debug("failed to get period records, use zero value", "err", err, "accountID", accountID)
+	}
+
 	periodRecords := make(map[uint32]*pb.PeriodRecords)
 	for quorumId, record := range records {
 		periodRecords[uint32(quorumId)] = &pb.PeriodRecords{
