@@ -71,7 +71,7 @@ An rpc call to the Disperser’s `GetPaymentState` method can be made to query t
 
 ## Blob Dispersal
 
-The `DisperseBlob` method takes a `blob` and `blob_header` as input. Dispersal entails taking a blob, reed-solomon encoding it into chunks, dispersing those to the EigenDA nodes, retrieving their signatures, creating a `cert` from them, and returning that cert to the client. The disperser batches blobs for a few seconds before dispersing them to nodes, so an entire dispersal process can exceed 10 seconds. For this reason, the API has been designed asynchronously with 2 relevant methods:
+The `DisperseBlob` method takes a `blob` and `blob_header` as input. Dispersal entails taking a blob, reed-solomon encoding it into chunks, dispersing those to the EigenDA nodes, retrieving their signatures, creating a `DACert` from them, and returning that cert to the client. The disperser batches blobs for a few seconds before dispersing them to nodes, so an entire dispersal process can exceed 10 seconds. For this reason, the API has been designed asynchronously with 2 relevant methods:
 
 ```protobuf
 // Async call which queues up the blob for processing and immediately returns.
@@ -121,19 +121,20 @@ This is not necessarily part of the spec but is currently needed given that the 
 In the updated implementation, a `CertBuilder` constructs the DA Cert through direct communication with the `OperatorStateRetriever` contract, which provides the necessary information about operator stake states. This approach ensures accurate on-chain data for certificate verification. The following pseudocode demonstrates this process:
 
 ```python
-class CertV2:
+class DACert:
     batch_header: any
     blob_verification_proof: any
     nonsigner_stake_sigs: any
-    cert_version: uint8  # Updated to use uint8 instead of uint256
+    cert_version: uint8
+    signedQuorumNumbers: bytes
 
-def get_cert_v2(blob_header_hash, operator_state_retriever, cert_version_uint8) -> CertV2:
+def get_da_cert(blob_header_hash, operator_state_retriever, cert_version_uint8) -> DACert:
     """
-    V2 cert construction pseudocode with OperatorStateRetriever
+    DA Cert construction pseudocode with OperatorStateRetriever
     @param blob_header_hash: key used for referencing blob status from disperser
     @param operator_state_retriever: ABI contract binding for retrieving operator state data
     @param cert_version_uint8: uint8 version of the certificate format to use
-    @return v2_cert: EigenDA V2 certificate used by rollup 
+    @return DACert: EigenDA certificate used by rollup 
     """
     # Call the disperser for the info needed to construct the cert
     blob_status_reply = disperser_client.get_blob_status(blob_header_hash)
@@ -166,8 +167,10 @@ def get_cert_v2(blob_header_hash, operator_state_retriever, cert_version_uint8) 
         operator_states,
         blob_status_reply.signed_batch.signatures
     )
+
+    signed_quorum_numbers = blob_status_reply.signed_batch.quorum_numbers
     
-    return CertV2(batch_header, blob_verification_proof, nonsigner_stake_sigs, cert_version_uint8)
+    return DACert(batch_header, blob_verification_proof, nonsigner_stake_sigs, cert_version_uint8, signed_quorum_numbers)
 ```
 ## Posting to Ethereum
 
