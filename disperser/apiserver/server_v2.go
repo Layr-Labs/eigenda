@@ -305,10 +305,22 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// off-chain account specific payment state
 	now := time.Now().Unix()
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
-	periodRecords, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod)
+	// Constructing the strictest period records across all quorums; a client should migrate to GetPaymentStateForAllQuorums for more precise state
+	// TODO(hopeyen): remove this in a subsequent PR. The logic here is complicated and only temporary
+	periodRecords, err := s.meterer.MeteringStore.GetPeriodRecordsMultiQuorum(ctx, accountID, currentReservationPeriod, s.getAllQuorumIds(), meterer.MinNumBins)
 	if err != nil {
 		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountID)
 	}
+	highestPeriodRecords := make([]*pb.PeriodRecord, meterer.MinNumBins)
+	for _, records := range periodRecords {
+		for _, record := range records.Records {
+			idx := record.Index % uint32(meterer.MinNumBins)
+			if highestPeriodRecords[idx] == nil || record.Usage > highestPeriodRecords[idx].Usage {
+				highestPeriodRecords[idx] = record
+			}
+		}
+	}
+
 	var largestCumulativePaymentBytes []byte
 	largestCumulativePayment, err := s.meterer.MeteringStore.GetLargestCumulativePayment(ctx, accountID)
 	if err != nil {
@@ -362,12 +374,30 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// build reply
 	reply := &pb.GetPaymentStateReply{
 		PaymentGlobalParams:      &paymentGlobalParams,
-		PeriodRecords:            periodRecords[:],
+		PeriodRecords:            highestPeriodRecords,
 		Reservation:              pbReservation,
 		CumulativePayment:        largestCumulativePaymentBytes,
 		OnchainCumulativePayment: onchainCumulativePaymentBytes,
 	}
 	return reply, nil
+}
+
+// getAllQuorumIds returns a slice of all quorum IDs (from 0 to quorumCount-1)
+// Returns an empty slice if the onchain state is not loaded
+func (s *DispersalServerV2) getAllQuorumIds() []uint8 {
+	state := s.onchainState.Load()
+	if state == nil {
+		s.logger.Debug("onchain state not loaded yet")
+		return []uint8{}
+	}
+
+	quorumCount := state.QuorumCount
+	quorumIds := make([]uint8, quorumCount)
+	for i := range quorumIds {
+		quorumIds[i] = uint8(i)
+	}
+
+	return quorumIds
 }
 
 // TODO(hopeyen): separate this into a subsequent PR
