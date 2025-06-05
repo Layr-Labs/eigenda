@@ -32,33 +32,11 @@ var (
 // ContractBitmapUtilsMetaData contains all meta data concerning the ContractBitmapUtils contract.
 var ContractBitmapUtilsMetaData = &bind.MetaData{
 	ABI: "[]",
-	Bin: "0x60566037600b82828239805160001a607314602a57634e487b7160e01b600052600060045260246000fd5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea2646970667358221220d5a26fe6a76bbd2113f07cb0fbeccb179efdec6bf98ddfcbdd0b92b276f1039764736f6c634300080c0033",
 }
 
 // ContractBitmapUtilsABI is the input ABI used to generate the binding from.
 // Deprecated: Use ContractBitmapUtilsMetaData.ABI instead.
 var ContractBitmapUtilsABI = ContractBitmapUtilsMetaData.ABI
-
-// ContractBitmapUtilsBin is the compiled bytecode used for deploying new contracts.
-// Deprecated: Use ContractBitmapUtilsMetaData.Bin instead.
-var ContractBitmapUtilsBin = ContractBitmapUtilsMetaData.Bin
-
-// DeployContractBitmapUtils deploys a new Ethereum contract, binding an instance of ContractBitmapUtils to it.
-func DeployContractBitmapUtils(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *ContractBitmapUtils, error) {
-	parsed, err := ContractBitmapUtilsMetaData.GetAbi()
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-	if parsed == nil {
-		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
-	}
-
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(ContractBitmapUtilsBin), backend)
-	if err != nil {
-		return common.Address{}, nil, nil, err
-	}
-	return address, tx, &ContractBitmapUtils{ContractBitmapUtilsCaller: ContractBitmapUtilsCaller{contract: contract}, ContractBitmapUtilsTransactor: ContractBitmapUtilsTransactor{contract: contract}, ContractBitmapUtilsFilterer: ContractBitmapUtilsFilterer{contract: contract}}, nil
-}
 
 // ContractBitmapUtils is an auto generated Go binding around an Ethereum contract.
 type ContractBitmapUtils struct {
