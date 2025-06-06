@@ -13,6 +13,7 @@ import (
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/benchmark/config"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 	"golang.org/x/time/rate"
@@ -50,6 +51,9 @@ type BenchmarkEngine struct {
 
 	// Records benchmark metrics.
 	metrics *metrics
+
+	// errorMonitor is used to handle fatal errors in the benchmark engine.
+	errorMonitor *util.ErrorMonitor
 }
 
 // NewBenchmarkEngine creates a new BenchmarkEngine with the given configuration.
@@ -84,7 +88,9 @@ func NewBenchmarkEngine(configPath string) (*BenchmarkEngine, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	dataTracker, err := NewDataTracker(ctx, cfg)
+	errorMonitor := util.NewErrorMonitor(ctx, cfg.LittConfig.Logger, nil)
+
+	dataTracker, err := NewDataTracker(ctx, cfg, errorMonitor)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to create data tracker: %w", err)
@@ -117,6 +123,7 @@ func NewBenchmarkEngine(configPath string) (*BenchmarkEngine, error) {
 		writeBurstSize:               writeBurstSize,
 		readBurstSize:                readBurstSize,
 		metrics:                      newMetrics(ctx, cfg.LittConfig.Logger, cfg),
+		errorMonitor:                 errorMonitor,
 	}, nil
 }
 
@@ -166,7 +173,7 @@ func (b *BenchmarkEngine) writer() {
 
 	for {
 		select {
-		case <-b.ctx.Done():
+		case <-b.errorMonitor.ImmediateShutdownRequired():
 			break
 		default:
 			batchSize := uint64(0)
@@ -179,7 +186,8 @@ func (b *BenchmarkEngine) writer() {
 
 				reservation := throttle.ReserveN(time.Now(), len(writeInfo.Value))
 				if !reservation.OK() {
-					panic(fmt.Sprintf("failed to reserve write quota for key %s", writeInfo.Key)) // TODO not clean
+					b.errorMonitor.Panic(fmt.Errorf("failed to reserve write quota for key %s", writeInfo.Key))
+					return
 				}
 				if reservation.Delay() > 0 {
 					time.Sleep(reservation.Delay())
@@ -189,7 +197,8 @@ func (b *BenchmarkEngine) writer() {
 
 				err := b.table.Put(writeInfo.Key, writeInfo.Value)
 				if err != nil {
-					panic(fmt.Sprintf("failed to write data: %v", err)) // TODO not clean
+					b.errorMonitor.Panic(fmt.Errorf("failed to write data: %v", err))
+					return
 				}
 
 				b.metrics.reportWrite(time.Since(start), uint64(len(writeInfo.Value)))
@@ -200,7 +209,8 @@ func (b *BenchmarkEngine) writer() {
 
 			err := b.table.Flush()
 			if err != nil {
-				panic(fmt.Sprintf("failed to flush data: %v", err)) // TODO not clean
+				b.errorMonitor.Panic(fmt.Errorf("failed to flush data: %v", err))
+				return
 			}
 
 			b.metrics.reportFlush(time.Since(start))
@@ -232,14 +242,15 @@ func (b *BenchmarkEngine) reader() {
 
 	for {
 		select {
-		case <-b.ctx.Done():
+		case <-b.errorMonitor.ImmediateShutdownRequired():
 			break
 		default:
 			readInfo := b.dataTracker.GetReadInfo()
 
 			reservation := throttle.ReserveN(time.Now(), len(readInfo.Value))
 			if !reservation.OK() {
-				panic(fmt.Sprintf("failed to reserve read quota for key %s", readInfo.Key)) // TODO not clean
+				b.errorMonitor.Panic(fmt.Errorf("failed to reserve read quota for key %s", readInfo.Key))
+				return
 			}
 			if reservation.Delay() > 0 {
 				time.Sleep(reservation.Delay())
@@ -249,14 +260,16 @@ func (b *BenchmarkEngine) reader() {
 
 			value, exists, err := b.table.Get(readInfo.Key)
 			if err != nil {
-				panic(fmt.Sprintf("failed to read data: %v", err)) // TODO not clean
+				b.errorMonitor.Panic(fmt.Errorf("failed to read data: %v", err))
+				return
 			}
 
 			b.metrics.reportRead(time.Since(start), uint64(len(readInfo.Value)))
 
 			if !exists {
 				if b.config.PanicOnReadFailure {
-					panic(fmt.Sprintf("key %s not found in database", readInfo.Key)) // TODO not clean
+					b.errorMonitor.Panic(fmt.Errorf("key %s not found in database", readInfo.Key))
+					return
 				} else {
 					b.logger.Warnf("key %s not found in database", readInfo.Key)
 					continue
@@ -264,7 +277,8 @@ func (b *BenchmarkEngine) reader() {
 			}
 			err = b.verifyValue(readInfo, value)
 			if err != nil {
-				panic(fmt.Sprintf("value verification failed for key %s: %v", readInfo.Key, err)) // TODO not clean
+				b.errorMonitor.Panic(err)
+				return
 			}
 		}
 	}

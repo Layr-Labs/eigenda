@@ -97,10 +97,18 @@ type DataTracker struct {
 	// This channel has capacity one and initially has one value in it. This value is drained when the DataTracker is
 	// fully stopped. Other threads can use this to block until the DataTracker is fully stopped.
 	closedChan chan struct{}
+
+	// Used to handle fatal errors in the DataTracker.
+	errorMonitor *util.ErrorMonitor
 }
 
 // NewDataTracker creates a new DataTracker instance, loading all relevant cohorts from disk.
-func NewDataTracker(ctx context.Context, config *config2.BenchmarkConfig) (*DataTracker, error) {
+func NewDataTracker(
+	ctx context.Context,
+	config *config2.BenchmarkConfig,
+	errorMonitor *util.ErrorMonitor,
+) (*DataTracker, error) {
+
 	cohortDirectory := path.Join(config.MetadataDirectory, "cohorts")
 
 	// Create the cohort directory if it doesn't exist.
@@ -188,6 +196,7 @@ func NewDataTracker(ctx context.Context, config *config2.BenchmarkConfig) (*Data
 		valueSize:                 valueSize,
 		generator:                 NewDataGenerator(config.Seed, config.RandomPoolSize),
 		closedChan:                closedChan,
+		errorMonitor:              errorMonitor,
 	}
 
 	go tracker.dataGenerator()
@@ -350,8 +359,9 @@ func (t *DataTracker) dataGenerator() {
 			// the readInfoChan.
 
 			select {
+			case <-t.errorMonitor.ImmediateShutdownRequired():
+				return
 			case <-t.ctx.Done():
-				// abort when context is cancelled
 				return
 			case keyIndex := <-t.writtenKeyIndicesChan:
 				// track keys that have been written so that we can read them in the future
@@ -370,8 +380,9 @@ func (t *DataTracker) dataGenerator() {
 			// Standard case.
 
 			select {
+			case <-t.errorMonitor.ImmediateShutdownRequired():
+				return
 			case <-t.ctx.Done():
-				// abort when context is cancelled
 				return
 			case keyIndex := <-t.writtenKeyIndicesChan:
 				// track keys that have been written so that we can read them in the future
@@ -424,7 +435,8 @@ func (t *DataTracker) handleWrittenKey(keyIndex uint64) {
 			t.completeCohortSet[nextCohort.CohortIndex()] = struct{}{}
 			err := nextCohort.MarkComplete()
 			if err != nil {
-				panic(fmt.Sprintf("failed to mark cohort as complete: %v", err)) // TODO not clean
+				t.errorMonitor.Panic(fmt.Errorf("failed to mark cohort as complete: %v", err))
+				return
 			}
 		} else {
 			// Once we find the first cohort that does not have all keys written, we can stop checking.
@@ -440,7 +452,8 @@ func (t *DataTracker) generateNextWriteInfo() *WriteInfo {
 	if t.activeCohort.IsExhausted() {
 		t.activeCohort, err = t.cohorts[t.highestCohortIndex].NextCohort(t.config.CohortSize, t.valueSize)
 		if err != nil {
-			panic(fmt.Sprintf("failed to generate next cohort for highest cohort: %v", err)) // TODO not clean
+			t.errorMonitor.Panic(fmt.Errorf("failed to generate next cohort for highest cohort: %v", err))
+			return nil
 		}
 		t.highestCohortIndex = t.activeCohort.CohortIndex()
 		t.cohorts[t.highestCohortIndex] = t.activeCohort
@@ -448,7 +461,8 @@ func (t *DataTracker) generateNextWriteInfo() *WriteInfo {
 
 	keyIndex, err := t.activeCohort.GetKeyIndexForWriting()
 	if err != nil {
-		panic(fmt.Sprintf("failed to get key index for writing: %v", err)) // TODO not clean
+		t.errorMonitor.Panic(fmt.Errorf("failed to get key index for writing: %v", err))
+		return nil
 	}
 
 	return &WriteInfo{
@@ -474,7 +488,8 @@ func (t *DataTracker) generateNextReadInfo() *ReadInfo {
 
 	keyIndex, err := cohortToRead.GetKeyIndexForReading(t.rand)
 	if err != nil {
-		panic(fmt.Sprintf("failed to get key index for reading: %v", err)) // TODO not clean
+		t.errorMonitor.Panic(fmt.Errorf("failed to get key index for reading: %v", err))
+		return nil
 	}
 
 	return &ReadInfo{
@@ -494,7 +509,8 @@ func (t *DataTracker) DoCohortGC() {
 		if cohort.IsExpired(now, t.safeTTL) {
 			err := cohort.Delete()
 			if err != nil {
-				panic(fmt.Sprintf("failed to delete expired cohort: %v", err)) // TODO not clean
+				t.errorMonitor.Panic(fmt.Errorf("failed to delete expired cohort: %v", err))
+				return
 			}
 			t.lowestCohortIndex++
 			delete(t.cohorts, cohort.CohortIndex())
@@ -510,7 +526,8 @@ func (t *DataTracker) DoCohortGC() {
 		// Create a new active cohort.
 		activeCohort, err := t.activeCohort.NextCohort(t.config.CohortSize, t.valueSize)
 		if err != nil {
-			panic(fmt.Sprintf("failed to create new active cohort: %v", err)) // TODO not clean
+			t.errorMonitor.Panic(fmt.Errorf("failed to create new active cohort: %v", err))
+			return
 		}
 
 		t.activeCohort = activeCohort

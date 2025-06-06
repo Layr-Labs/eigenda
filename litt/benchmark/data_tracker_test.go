@@ -8,6 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	config2 "github.com/Layr-Labs/eigenda/litt/benchmark/config"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/docker/go-units"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +28,9 @@ func TestTrackerDeterminism(t *testing.T) {
 	// Generate enough data to fill 10ish cohorts.
 	keyCount := 10*config.CohortSize + rand.Uint64Range(0, 10)
 
-	dataTracker, err := NewDataTracker(context.Background(), config)
+	errorMonitor := util.NewErrorMonitor(context.Background(), config.LittConfig.Logger, nil)
+
+	dataTracker, err := NewDataTracker(context.Background(), config, errorMonitor)
 	require.NoError(t, err)
 
 	// map from indices to keys
@@ -48,14 +51,14 @@ func TestTrackerDeterminism(t *testing.T) {
 	}
 
 	dataTracker.Close()
-
+	
 	// Rebuild the tracker at genesis. We should get the same sequence of keys and values.
 	err = os.RemoveAll(directory)
 	require.NoError(t, err)
 	err = os.MkdirAll(directory, os.ModePerm)
 	require.NoError(t, err)
 
-	dataTracker, err = NewDataTracker(context.Background(), config)
+	dataTracker, err = NewDataTracker(context.Background(), config, errorMonitor)
 	require.NoError(t, err)
 
 	for i := uint64(0); i < keyCount; i++ {
@@ -71,6 +74,8 @@ func TestTrackerDeterminism(t *testing.T) {
 
 	err = os.RemoveAll(directory)
 	require.NoError(t, err)
+	ok, _ := errorMonitor.IsOk()
+	require.True(t, ok)
 }
 
 func TestTrackerRestart(t *testing.T) {
@@ -87,7 +92,9 @@ func TestTrackerRestart(t *testing.T) {
 	// Generate enough data to fill 10ish cohorts.
 	keyCount := 10*config.CohortSize + rand.Uint64Range(0, 10)
 
-	dataTracker, err := NewDataTracker(context.Background(), config)
+	errorMonitor := util.NewErrorMonitor(context.Background(), config.LittConfig.Logger, nil)
+
+	dataTracker, err := NewDataTracker(context.Background(), config, errorMonitor)
 	require.NoError(t, err)
 
 	indexSet := make(map[uint64]struct{})
@@ -107,7 +114,7 @@ func TestTrackerRestart(t *testing.T) {
 
 	// Restart.
 	dataTracker.Close()
-	dataTracker, err = NewDataTracker(context.Background(), config)
+	dataTracker, err = NewDataTracker(context.Background(), config, errorMonitor)
 	require.NoError(t, err)
 
 	// Generate more values.
@@ -123,6 +130,9 @@ func TestTrackerRestart(t *testing.T) {
 
 	err = os.RemoveAll(directory)
 	require.NoError(t, err)
+
+	ok, _ := errorMonitor.IsOk()
+	require.True(t, ok)
 }
 
 func TestTrackReads(t *testing.T) {
@@ -139,7 +149,9 @@ func TestTrackReads(t *testing.T) {
 	// Generate enough data to fill exactly 10 cohorts.
 	keyCount := 10 * config.CohortSize
 
-	dataTracker, err := NewDataTracker(context.Background(), config)
+	errorMonitor := util.NewErrorMonitor(context.Background(), config.LittConfig.Logger, nil)
+
+	dataTracker, err := NewDataTracker(context.Background(), config, errorMonitor)
 	require.NoError(t, err)
 
 	keyToIndexMap := make(map[string]uint64)
@@ -212,7 +224,7 @@ func TestTrackReads(t *testing.T) {
 
 	// Restart the tracker without marking any of the new data as having been written.
 	dataTracker.Close()
-	dataTracker, err = NewDataTracker(context.Background(), config)
+	dataTracker, err = NewDataTracker(context.Background(), config, errorMonitor)
 	require.NoError(t, err)
 
 	// Read a bunch of data.
@@ -236,4 +248,6 @@ func TestTrackReads(t *testing.T) {
 
 	err = os.RemoveAll(directory)
 	require.NoError(t, err)
+	ok, _ := errorMonitor.IsOk()
+	require.True(t, ok)
 }
