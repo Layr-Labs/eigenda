@@ -67,6 +67,18 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "V2_RETRIEVAL_PORT"),
 	}
+	InternalV2DispersalPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-v2-dispersal-port"),
+		Usage:    "Port at which node listens for v2 dispersal calls (used when node is behind NGINX)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "INTERNAL_V2_DISPERSAL_PORT"),
+	}
+	InternalV2RetrievalPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-v2-retrieval-port"),
+		Usage:    "Port at which node listens for v2 retrieval calls (used when node is behind NGINX)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "INTERNAL_V2_RETRIEVAL_PORT"),
+	}
 	EnableNodeApiFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-node-api"),
 		Usage:    "enable node-api to serve eigenlayer-cli node-api calls",
@@ -562,6 +574,8 @@ var optionalFlags = []cli.Flag{
 	NumBatchDeserializationWorkersFlag,
 	InternalDispersalPortFlag,
 	InternalRetrievalPortFlag,
+	InternalV2DispersalPortFlag,
+	InternalV2RetrievalPortFlag,
 	ClientIPHeaderFlag,
 	ChurnerUseSecureGRPC,
 	EcdsaKeyFileFlag,

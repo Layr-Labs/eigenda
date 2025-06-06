@@ -3,22 +3,24 @@ set -o errexit -o nounset -o pipefail
 
 # This script compiles the Solidity contracts and generates Go bindings using abigen.
 
-function create_binding {
-    contract_dir=$1
-    contract=$2
-    binding_dir=$3
-    echo $contract
-    mkdir -p $binding_dir/${contract}
-    contract_json="$contract_dir/out/${contract}.sol/${contract}.json"
-    solc_abi=$(cat ${contract_json} | jq -r '.abi')
-    solc_bin=$(cat ${contract_json} | jq -r '.bytecode.object')
+function create_binding_abi_only {
+  contract_dir=$1
+  contract=$2
+  binding_dir=$3
+  echo $contract
+  mkdir -p $binding_dir/${contract}
+  contract_json="$contract_dir/out/${contract}.sol/${contract}.json"
+  solc_abi=$(cat ${contract_json} | jq -r '.abi')
 
-    mkdir -p data
-    echo ${solc_abi} > data/tmp.abi
-    echo ${solc_bin} > data/tmp.bin
+  mkdir -p data
+  echo ${solc_abi} >data/tmp.abi
 
-    rm -f $binding_dir/${contract}/binding.go
-    abigen --bin=data/tmp.bin --abi=data/tmp.abi --pkg=contract${contract} --out=$binding_dir/${contract}/binding.go
+  rm -f $binding_dir/${contract}/binding.go
+  # We generate the Go bindings only with the ABI, without bytecode.
+  # If you need bindings that include the bytecode to be able to deploy the contract from golang code,
+  # you will need to pass --bin=data/tmp.bin and create the tmp.bin file similarly to how tmp.abi is created,
+  # using `jq -r '.bytecode.object'` on the contract JSON file.
+  abigen --abi=data/tmp.abi --pkg=contract${contract} --out=$binding_dir/${contract}/binding.go
 }
 
 forge clean
@@ -50,13 +52,5 @@ contracts="PaymentVault \
   EigenDADisperserRegistry"
 
 for contract in $contracts; do
-    create_binding ./ $contract ./bindings
+  create_binding_abi_only ./ $contract ./bindings
 done
-
-# ./compile.sh ./ BitmapUtils ./bindings 
-# ./compile.sh ./ BLSOperatorStateRetriever ./bindings
-# ./compile.sh ./ BN254 ./bindings
-# ./compile.sh ./ BLSRegistryCoordinatorWithIndices ./bindings
-# ./compile.sh ./ IBLSPubkeyRegistry ./bindings
-# ./compile.sh ./ IIndexRegistry ./bindings
-# ./compile.sh ./ IStakeRegistry ./bindings
