@@ -103,21 +103,8 @@ func (t *VariableTicker) SetTargetPeriod(period time.Duration) error {
 	if period <= 0 {
 		return fmt.Errorf("invalid period %v, period must be positive", period)
 	}
-
 	frequency := float64(time.Second) / float64(period)
-
-	if frequency < MinimumFrequency {
-		frequency = 0.0
-	}
-	if frequency > MaximumFrequency {
-		frequency = MaximumFrequency
-	}
-
-	t.controlChan <- &frequencyUpdate{
-		targetFrequency: frequency,
-	}
-
-	return nil
+	return t.SetTargetFrequency(frequency)
 }
 
 func (t *VariableTicker) SetTargetFrequency(frequency float64) error {
