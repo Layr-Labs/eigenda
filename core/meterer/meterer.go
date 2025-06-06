@@ -79,7 +79,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 	symbolsCharged := m.SymbolsCharged(numSymbols)
 	m.logger.Info("Validating incoming request's payment metadata", "paymentMetadata", header, "numSymbols", numSymbols, "quorumNumbers", quorumNumbers)
 	// Validate against the payment method
-	if header.CumulativePayment.Sign() == 0 {
+	if !IsOnDemandPayment(&header) {
 		reservations, err := m.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, header.AccountID, quorumNumbers)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get active reservation by account: %w", err)
@@ -330,4 +330,8 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged ui
 // Note: This is called per-quorum since reservation is for a single quorum.
 func (m *Meterer) GetReservationBinLimit(reservation *core.ReservedPayment, reservationWindow uint64) uint64 {
 	return reservation.SymbolsPerSecond * reservationWindow
+}
+
+func IsOnDemandPayment(paymentMetadata *core.PaymentMetadata) bool {
+	return paymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) > 0
 }
