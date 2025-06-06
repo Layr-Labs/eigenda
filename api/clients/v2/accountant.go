@@ -25,7 +25,7 @@ type Accountant struct {
 	minNumSymbols     uint64
 
 	// local accounting
-	// contains 3 bins; circular wrapping of indices
+	// contains numBins of period records; circular wrapping on period record indices
 	periodRecords     []PeriodRecord
 	usageLock         sync.Mutex
 	cumulativePayment *big.Int
@@ -34,8 +34,11 @@ type Accountant struct {
 	numBins uint32
 }
 
+// PeriodRecord contains the index of the reservation period and the usage of the period
 type PeriodRecord struct {
+	// Index is start timestamp of the period in seconds; it is always a multiple of the reservation window
 	Index uint32
+	// Usage is the usage of the period in symbols
 	Usage uint64
 }
 
@@ -117,7 +120,7 @@ func (a *Accountant) BlobPaymentInfo(
 	}
 	return big.NewInt(0), fmt.Errorf(
 		"invalid payments: no available bandwidth reservation found for account %s, and current cumulativePayment balance insufficient "+
-			"to make an on-demand dispersal. Consider increasing reservation or cumulative payment on-chain.", a.accountID.Hex())
+			"to make an on-demand dispersal. Consider increasing reservation or cumulative payment on-chain. For more details, see https://docs.eigenda.xyz/core-concepts/payments#disperser-client-requirements", a.accountID.Hex())
 }
 
 // AccountBlob accountant provides and records payment information
@@ -158,13 +161,12 @@ func (a *Accountant) SymbolsCharged(numSymbols uint64) uint64 {
 }
 
 // GetRelativePeriodRecord returns the period record for the given index
-// return empty record if there is no record for the relative index
+// Returns an empty record if there is no record for the relative index
 func (a *Accountant) GetRelativePeriodRecord(index uint64) *PeriodRecord {
-	// relativeIndex := uint32((index / a.reservationWindow) % uint64(a.numBins))
 	relativeIndex := uint32((index / a.reservationWindow) % uint64(a.numBins))
 	// Return empty record if the index is greater than the number of bins (should never happen by accountant initialization)
 	if relativeIndex >= uint32(a.numBins) {
-		return &PeriodRecord{Index: 0, Usage: 0}
+		panic(fmt.Sprintf("relativeIndex %d is greater than the number of bins %d cached", relativeIndex, a.numBins))
 	}
 	return &a.periodRecords[relativeIndex]
 }
@@ -173,7 +175,6 @@ func (a *Accountant) GetRelativePeriodRecord(index uint64) *PeriodRecord {
 // wrapping around the circular buffer and clearing the record if the index is greater than the number of bins
 func (a *Accountant) GetOrRefreshRelativePeriodRecord(index uint64, reservationWindow uint64) *PeriodRecord {
 	relativeIndex := uint32((index / reservationWindow) % uint64(a.numBins))
-	fmt.Println("periodRecords", a.periodRecords, "relativeIndex", relativeIndex, "index", index)
 	if a.periodRecords[relativeIndex].Index < uint32(index) {
 		a.periodRecords[relativeIndex] = PeriodRecord{
 			Index: uint32(index),
