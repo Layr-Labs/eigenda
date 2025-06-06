@@ -10,6 +10,7 @@ import (
 )
 
 type PayloadRetrieverType string
+
 const (
 	// PayloadRetrieverTypeRelays indicates that the payload retriever retrieves payloads from EigenDA relays
 	PayloadRetrieverTypeRelays PayloadRetrieverType = "relays"
