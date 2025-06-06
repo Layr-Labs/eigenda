@@ -26,7 +26,7 @@ function create_binding_abi_only {
 forge clean
 forge build
 
-contracts="PaymentVault \
+contracts="IPaymentVault \
   SocketRegistry \
   AVSDirectory \
   DelegationManager \
