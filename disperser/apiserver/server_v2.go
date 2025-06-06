@@ -8,8 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/Layr-Labs/eigenda/api"
 	pbcommon "github.com/Layr-Labs/eigenda/api/grpc/common"
 	pbv1 "github.com/Layr-Labs/eigenda/api/grpc/disperser"
@@ -24,6 +22,7 @@ import (
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -45,7 +44,7 @@ type DispersalServerV2 struct {
 
 	serverConfig      disperser.ServerConfig
 	blobStore         *blobstore.BlobStore
-	blobMetadataStore *blobstore.BlobMetadataStore
+	blobMetadataStore blobstore.MetadataStore
 	meterer           *meterer.Meterer
 
 	chainReader              core.Reader
@@ -71,7 +70,7 @@ type DispersalServerV2 struct {
 func NewDispersalServerV2(
 	serverConfig disperser.ServerConfig,
 	blobStore *blobstore.BlobStore,
-	blobMetadataStore *blobstore.BlobMetadataStore,
+	blobMetadataStore blobstore.MetadataStore,
 	chainReader core.Reader,
 	meterer *meterer.Meterer,
 	blobRequestAuthenticator corev2.BlobRequestAuthenticator,
@@ -275,6 +274,8 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 	return nil
 }
 
+// GetPaymentState returns the payment state for a given account and the related on-chain parameters
+// Deprecated: Use GetPaymentStateForAllQuorums instead.
 func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
 	if s.meterer == nil {
 		return nil, errors.New("payment meterer is not enabled")
@@ -296,20 +297,20 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 	// on-chain global payment parameters
-	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetGlobalSymbolsPerSecond()
-	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols()
-	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol()
-	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
+	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetOnDemandGlobalSymbolsPerSecond(core.QuorumID(0))
+	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols(core.QuorumID(0))
+	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol(core.QuorumID(0))
+	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow(core.QuorumID(0))
 
 	// off-chain account specific payment state
 	now := time.Now().Unix()
 	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
-	periodRecords, err := s.meterer.OffchainStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod)
+	periodRecords, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod)
 	if err != nil {
 		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountID)
 	}
 	var largestCumulativePaymentBytes []byte
-	largestCumulativePayment, err := s.meterer.OffchainStore.GetLargestCumulativePayment(ctx, accountID)
+	largestCumulativePayment, err := s.meterer.MeteringStore.GetLargestCumulativePayment(ctx, accountID)
 	if err != nil {
 		s.logger.Debug("failed to get largest cumulative payment, use zero value", "err", err, "accountID", accountID)
 
@@ -317,24 +318,27 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		largestCumulativePaymentBytes = largestCumulativePayment.Bytes()
 	}
 	// on-Chain account state
+	quorumIds := s.onchainState.Load().getAllQuorumIds()
 	var pbReservation *pb.Reservation
-	reservation, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
+	reservations, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, accountID, quorumIds)
 	if err != nil {
 		s.logger.Debug("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
 	} else {
-		quorumNumbers := make([]uint32, len(reservation.QuorumNumbers))
-		for i, v := range reservation.QuorumNumbers {
-			quorumNumbers[i] = uint32(v)
+		quorumNumbers := make([]uint32, len(reservations))
+		for quorumNumber := range reservations {
+			quorumNumbers[quorumNumber] = uint32(quorumNumber)
 		}
-		quorumSplits := make([]uint32, len(reservation.QuorumSplits))
-		for i, v := range reservation.QuorumSplits {
-			quorumSplits[i] = uint32(v)
+		quorumSplits := make([]uint32, len(reservations))
+		for quorumNumber := range reservations {
+			quorumSplits[quorumNumber] = 0
 		}
 
+		// TODO: in a subsequent PR, we update PaymentState API types to include multiple quorum reservations;
+		// For this PR, we return the first reservation as they are actually the same reservation
 		pbReservation = &pb.Reservation{
-			SymbolsPerSecond: reservation.SymbolsPerSecond,
-			StartTimestamp:   uint32(reservation.StartTimestamp),
-			EndTimestamp:     uint32(reservation.EndTimestamp),
+			SymbolsPerSecond: reservations[0].SymbolsPerSecond,
+			StartTimestamp:   uint32(reservations[0].StartTimestamp),
+			EndTimestamp:     uint32(reservations[0].EndTimestamp),
 			QuorumSplits:     quorumSplits,
 			QuorumNumbers:    quorumNumbers,
 		}
@@ -364,4 +368,21 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		OnchainCumulativePayment: onchainCumulativePaymentBytes,
 	}
 	return reply, nil
+}
+
+// TODO(hopeyen): separate this into a subsequent PR
+func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, req *pb.GetPaymentStateForAllQuorumsRequest) (*pb.GetPaymentStateForAllQuorumsReply, error) {
+	return nil, api.NewErrorUnimplemented()
+}
+
+// getAllQuorumIds returns a slice of all quorum IDs (from 0 to quorumCount-1)
+// Returns an empty slice if the onchain state is not loaded
+func (o *OnchainState) getAllQuorumIds() []core.QuorumID {
+	quorumCount := o.QuorumCount
+	quorumIds := make([]core.QuorumID, quorumCount)
+	for i := range quorumIds {
+		quorumIds[i] = core.QuorumID(i)
+	}
+
+	return quorumIds
 }

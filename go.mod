@@ -10,7 +10,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.13.12
 	github.com/aws/aws-sdk-go-v2/service/kms v1.31.0
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.28.6
+	github.com/beevik/ntp v1.4.3
 	github.com/consensys/gnark-crypto v0.12.1
+	github.com/dchest/siphash v1.2.3
 	github.com/docker/go-units v0.5.0
 	github.com/emirpasic/gods v1.18.1
 	github.com/ethereum/go-ethereum v1.14.8
@@ -40,7 +42,6 @@ require (
 	golang.org/x/sync v0.8.0
 	golang.org/x/time v0.5.0
 	google.golang.org/grpc v1.64.1
-	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
@@ -69,7 +70,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.23.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.28.6 // indirect
 	github.com/aws/smithy-go v1.20.2 // indirect
-	github.com/beevik/ntp v1.4.3 // indirect
 	github.com/bits-and-blooms/bitset v1.13.0 // indirect
 	github.com/bytedance/sonic v1.9.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
@@ -83,7 +83,6 @@ require (
 	github.com/containerd/continuity v0.4.2 // indirect
 	github.com/crate-crypto/go-ipa v0.0.0-20240223125850-b1e8a79f509c // indirect
 	github.com/crate-crypto/go-kzg-4844 v1.0.0 // indirect
-	github.com/dchest/siphash v1.2.3 // indirect
 	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
 	github.com/docker/cli v25.0.3+incompatible // indirect
 	github.com/docker/docker v25.0.6+incompatible // indirect
@@ -151,6 +150,7 @@ require (
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
+	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/arch v0.4.0 // indirect
@@ -158,10 +158,10 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20240814211410-ddb44dafa142 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240827150818-7e3bb234dfed // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
 require (
-	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.2 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.27.11
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression v1.7.12

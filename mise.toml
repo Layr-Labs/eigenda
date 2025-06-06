@@ -1,0 +1,20 @@
+[tools]
+# Core Dependencies
+go = "1.21"
+
+# Tooling Dependencies
+"go:github.com/golangci/golangci-lint/cmd/golangci-lint" = "1.60.3"
+"go:github.com/ethereum/go-ethereum/cmd/abigen" = "v1.14.0"
+# Belive yarn is needed for foundry deps (see contracts/remappings.txt) and subgraph stuff.
+# TODO: document exactly why these are needed.
+node = "20.18.1"
+yarn = "1.22.22"
+
+# Forge Dependencies
+forge = "v1.0.0"
+cast = "v1.0.0"
+
+[alias]
+forge = "ubi:foundry-rs/foundry[exe=forge]"
+cast = "ubi:foundry-rs/foundry[exe=cast]"
+yarn = "https://github.com/mise-plugins/mise-yarn"

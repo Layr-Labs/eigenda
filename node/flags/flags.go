@@ -67,6 +67,18 @@ var (
 		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "V2_RETRIEVAL_PORT"),
 	}
+	InternalV2DispersalPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-v2-dispersal-port"),
+		Usage:    "Port at which node listens for v2 dispersal calls (used when node is behind NGINX)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "INTERNAL_V2_DISPERSAL_PORT"),
+	}
+	InternalV2RetrievalPortFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "internal-v2-retrieval-port"),
+		Usage:    "Port at which node listens for v2 retrieval calls (used when node is behind NGINX)",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "INTERNAL_V2_RETRIEVAL_PORT"),
+	}
 	EnableNodeApiFlag = cli.BoolFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "enable-node-api"),
 		Usage:    "enable node-api to serve eigenlayer-cli node-api calls",
@@ -423,8 +435,8 @@ var (
 	}
 	LittDBStoragePathsFlag = cli.StringSliceFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "litt-db-storage-paths"),
-		Usage:    "Comma separated list of paths to store the LittDB data files. At least one path must be provided.",
-		Required: true,
+		Usage:    "Comma separated list of paths to store the LittDB data files. If not provided, falls back to NODE_DB_PATH with '/chunk_v2_litt' suffix.",
+		Required: false,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "LITT_DB_STORAGE_PATHS"),
 	}
 	DownloadPoolSizeFlag = cli.IntFlag{
@@ -562,6 +574,8 @@ var optionalFlags = []cli.Flag{
 	NumBatchDeserializationWorkersFlag,
 	InternalDispersalPortFlag,
 	InternalRetrievalPortFlag,
+	InternalV2DispersalPortFlag,
+	InternalV2RetrievalPortFlag,
 	ClientIPHeaderFlag,
 	ChurnerUseSecureGRPC,
 	EcdsaKeyFileFlag,

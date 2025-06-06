@@ -1,6 +1,6 @@
-## EigenDA Cert Verfier Deployer
+## EigenDA V2 Cert Verfier Deployer
 
-This script can be used to deploy an EigenDACertVerifierV2 contract with custom security thresholds and quorum numbers. The deployment should only be performed on Ethereum L1 testnet or mainnet environment and is not supported on L2s.
+This script can be used to deploy an immutable EigenDACertVerifier contract for EigenDA V2 with custom security thresholds and quorum numbers. The deployment should only be performed on Ethereum L1 testnet or mainnet environment and is not currently supported on L2s.
 
 ### Config
 
@@ -10,9 +10,6 @@ To set up the deployment, a config json should be placed in the `config/` folder
 {
     "eigenDAServiceManager": "0x...",
     "eigenDAThresholdRegistry": "0x...",
-    "eigenDARelayRegistry": "0x...",
-    "registryCoordinator": "0x...",
-    "operatorStateRetriever": "0x...",
 
     "defaultSecurityThresholds": {
         "0_confirmationThreshold": 55,
@@ -23,7 +20,7 @@ To set up the deployment, a config json should be placed in the `config/` folder
 }
 ```
 
-Two sample configs are provided in the `config/` folder for preprod and testnet environments.
+Three sample configs are provided in the `config/` folder for preprod and testnet environments on holesky as well as testnet environment on sepolia.
 
 ### Deployment
 

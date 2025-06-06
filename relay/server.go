@@ -21,6 +21,7 @@ import (
 	"github.com/Layr-Labs/eigenda/relay/limiter"
 	"github.com/Layr-Labs/eigenda/relay/metrics"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
@@ -72,9 +73,10 @@ type Server struct {
 // NewServer creates a new relay Server.
 func NewServer(
 	ctx context.Context,
+	metricsRegistry *prometheus.Registry,
 	logger logging.Logger,
 	config *Config,
-	metadataStore *blobstore.BlobMetadataStore,
+	metadataStore blobstore.MetadataStore,
 	blobStore *blobstore.BlobStore,
 	chunkReader chunkstore.ChunkReader,
 	chainReader core.Reader,
@@ -90,7 +92,7 @@ func NewServer(
 		return nil, fmt.Errorf("error fetching blob params: %w", err)
 	}
 
-	relayMetrics := metrics.NewRelayMetrics(logger, config.MetricsPort)
+	relayMetrics := metrics.NewRelayMetrics(metricsRegistry, logger, config.MetricsPort)
 
 	mp, err := newMetadataProvider(
 		ctx,
@@ -450,8 +452,8 @@ func selectFrameSubsetByIndex(
 		Chunks:   make([][]byte, 0, len(request.ChunkIndices)),
 	}
 
-	for index := range request.ChunkIndices {
-		if index >= len(frames.Chunks) {
+	for _, index := range request.ChunkIndices {
+		if index >= uint32(len(frames.Chunks)) {
 			return nil, fmt.Errorf(
 				"chunk index %d out of range for key %s, chunk count %d",
 				index, key.Hex(), len(frames.Chunks))

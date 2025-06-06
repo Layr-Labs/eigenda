@@ -311,7 +311,7 @@ func maximumSizedBlobDispersalTest(t *testing.T, environment string) {
 	config, err := client.GetConfig(environment)
 	require.NoError(t, err)
 
-	maxPermissibleDataLength, err := codec.GetMaxPermissiblePayloadLength(
+	maxPermissibleDataLength, err := codec.BlobSymbolsToMaxPayloadSize(
 		uint32(config.MaxBlobSize) / encoding.BYTES_PER_SYMBOL)
 	require.NoError(t, err)
 
@@ -338,7 +338,7 @@ func tooLargeBlobDispersalTest(t *testing.T, environment string) {
 	config, err := client.GetConfig(environment)
 	require.NoError(t, err)
 
-	maxPermissibleDataLength, err := codec.GetMaxPermissiblePayloadLength(uint32(config.MaxBlobSize) / encoding.BYTES_PER_SYMBOL)
+	maxPermissibleDataLength, err := codec.BlobSymbolsToMaxPayloadSize(uint32(config.MaxBlobSize) / encoding.BYTES_PER_SYMBOL)
 	require.NoError(t, err)
 
 	rand := random.NewTestRandom()
@@ -408,10 +408,14 @@ func unauthorizedGetChunksTest(t *testing.T, environment string) {
 	eigenDACert, err := c.DispersePayload(ctx, payload)
 	require.NoError(t, err)
 
-	blobKey, err := eigenDACert.ComputeBlobKey()
+	eigenDAV3Cert, ok := eigenDACert.(*coretypes.EigenDACertV3)
+	require.True(t, ok, "expected EigenDACertV3, got %T", eigenDACert)
+	require.NotNil(t, eigenDAV3Cert)
+
+	blobKey, err := eigenDAV3Cert.ComputeBlobKey()
 	require.NoError(t, err)
 
-	targetRelay := eigenDACert.BlobInclusionInfo.BlobCertificate.RelayKeys[0]
+	targetRelay := eigenDAV3Cert.RelayKeys()[0]
 
 	chunkRequests := make([]*relay.ChunkRequestByRange, 1)
 	chunkRequests[0] = &relay.ChunkRequestByRange{

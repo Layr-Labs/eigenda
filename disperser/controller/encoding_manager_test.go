@@ -2,9 +2,10 @@ package controller_test
 
 import (
 	"context"
-	"github.com/Layr-Labs/eigenda/encoding"
 	"testing"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/encoding"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
@@ -14,8 +15,8 @@ import (
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	v2 "github.com/Layr-Labs/eigenda/core/v2"
-	dispcommon "github.com/Layr-Labs/eigenda/disperser/common"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
+	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/controller"
 	dispmock "github.com/Layr-Labs/eigenda/disperser/mock"
 	"github.com/gammazero/workerpool"
@@ -491,7 +492,7 @@ func TestEncodingManagerHandleBatchRetryFailure(t *testing.T) {
 	require.Greater(t, fetchedMetadata.UpdatedAt, metadata1.UpdatedAt)
 
 	fetchedCert, fetchedFragmentInfo, err := blobMetadataStore.GetBlobCertificate(ctx, blobKey1)
-	require.ErrorIs(t, err, dispcommon.ErrMetadataNotFound)
+	require.ErrorIs(t, err, blobstore.ErrMetadataNotFound)
 	require.Nil(t, fetchedCert)
 	require.Nil(t, fetchedFragmentInfo)
 	c.EncodingClient.AssertNumberOfCalls(t, "EncodeBlob", 2)
@@ -535,7 +536,7 @@ func newTestComponents(t *testing.T, mockPool bool) *testComponents {
 		0: {
 			NumChunks:       8192,
 			CodingRate:      8,
-			MaxNumOperators: 3537,
+			MaxNumOperators: 2048,
 		},
 	}, nil)
 	onchainRefreshInterval := 1 * time.Millisecond

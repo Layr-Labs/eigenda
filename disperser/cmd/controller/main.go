@@ -87,12 +87,6 @@ func RunController(ctx *cli.Context) error {
 		return err
 	}
 
-	blobMetadataStore := blobstore.NewBlobMetadataStore(
-		dynamoClient,
-		logger,
-		config.DynamoDBTableName,
-	)
-
 	metricsRegistry := prometheus.NewRegistry()
 	metricsRegistry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	metricsRegistry.MustRegister(collectors.NewGoCollector())
@@ -108,6 +102,17 @@ func RunController(ctx *cli.Context) error {
 		Addr:    addr,
 		Handler: mux,
 	}
+
+	baseBlobMetadataStore := blobstore.NewBlobMetadataStore(
+		dynamoClient,
+		logger,
+		config.DynamoDBTableName,
+	)
+	blobMetadataStore := blobstore.NewInstrumentedMetadataStore(baseBlobMetadataStore, blobstore.InstrumentedMetadataStoreConfig{
+		ServiceName: "controller",
+		Registry:    metricsRegistry,
+		Backend:     blobstore.BackendDynamoDB,
+	})
 
 	controllerLivenessChan := make(chan healthcheck.HeartbeatMessage, 10)
 

@@ -754,7 +754,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 
 	mockState.On("GetPricePerSymbol").Return(uint32(encoding.BYTES_PER_SYMBOL), nil)
 	mockState.On("GetMinNumSymbols").Return(uint32(1), nil)
-	mockState.On("GetGlobalSymbolsPerSecond").Return(uint64(4096), nil)
+	mockState.On("GetOnDemandGlobalSymbolsPerSecond").Return(uint64(4096), nil)
 	mockState.On("GetRequiredQuorumNumbers").Return([]uint8{0, 1}, nil)
 	mockState.On("GetOnDemandQuorumNumbers").Return([]uint8{0, 1}, nil)
 	mockState.On("GetReservationWindow").Return(uint32(1), nil)
@@ -786,7 +786,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 		panic("failed to create global reservation table")
 	}
 
-	store, err := meterer.NewOffchainStore(
+	store, err := meterer.NewDynamoDBMeteringStore(
 		awsConfig,
 		table_names[0],
 		table_names[1],
@@ -795,7 +795,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	)
 	if err != nil {
 		teardown()
-		panic("failed to create offchain store")
+		panic("failed to create metering store")
 	}
 	mt := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
 	err = mt.ChainPaymentState.RefreshOnchainPaymentState(context.Background())

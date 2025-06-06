@@ -18,11 +18,8 @@ type ValidatorClient interface {
 	// GetBlob downloads chunks of a blob from operator network and reconstructs the blob.
 	GetBlob(
 		ctx context.Context,
-		blobKey corev2.BlobKey,
-		blobVersion corev2.BlobVersion,
-		blobCommitments encoding.BlobCommitments,
+		blobHeader *corev2.BlobHeaderWithHashedPayment,
 		referenceBlockNumber uint64,
-		quorumID core.QuorumID,
 	) ([]byte, error)
 }
 
@@ -56,6 +53,25 @@ func NewValidatorClient(
 		config.ComputePoolSize = 1
 	}
 
+	if config.DownloadPessimism < 1 {
+		logger.Warnf(
+			"Download pessimism %f is less than 1, setting download pessimism to 1", config.DownloadPessimism)
+		config.DownloadPessimism = 1
+	}
+	if config.VerificationPessimism < 1 {
+		logger.Warnf(
+			"Verification pessimism %f is less than 1, setting verification pessimism to 1",
+			config.VerificationPessimism)
+		config.VerificationPessimism = 1
+	}
+
+	if config.DownloadPessimism < config.VerificationPessimism {
+		logger.Warnf(
+			"Download pessimism %f is less than verification pessimism %f, setting download pessimism to %f",
+			config.DownloadPessimism, config.VerificationPessimism, config.VerificationPessimism)
+		config.DownloadPessimism = config.VerificationPessimism
+	}
+
 	return &validatorClient{
 		logger:         logger.With("component", "ValidatorClient"),
 		ethClient:      ethClient,
@@ -70,18 +86,15 @@ func NewValidatorClient(
 
 func (c *validatorClient) GetBlob(
 	ctx context.Context,
-	blobKey corev2.BlobKey,
-	blobVersion corev2.BlobVersion,
-	blobCommitments encoding.BlobCommitments,
+	blobHeader *corev2.BlobHeaderWithHashedPayment,
 	referenceBlockNumber uint64,
-	quorumID core.QuorumID,
 ) ([]byte, error) {
 
 	probe := c.metrics.newGetBlobProbe()
 	defer probe.End()
 
 	probe.SetStage("verify_commitment")
-	commitmentBatch := []encoding.BlobCommitments{blobCommitments}
+	commitmentBatch := []encoding.BlobCommitments{blobHeader.BlobCommitments}
 	err := c.verifier.VerifyCommitEquivalenceBatch(commitmentBatch)
 	if err != nil {
 		return nil, err
@@ -91,7 +104,7 @@ func (c *validatorClient) GetBlob(
 	operatorState, err := c.chainState.GetOperatorStateWithSocket(
 		ctx,
 		uint(referenceBlockNumber),
-		[]core.QuorumID{quorumID})
+		blobHeader.QuorumNumbers)
 	if err != nil {
 		return nil, err
 	}
@@ -102,25 +115,31 @@ func (c *validatorClient) GetBlob(
 		return nil, err
 	}
 
-	blobParams, ok := blobVersions[blobVersion]
+	blobParams, ok := blobVersions[blobHeader.BlobVersion]
 	if !ok {
-		return nil, fmt.Errorf("invalid blob version %d", blobVersion)
+		return nil, fmt.Errorf("invalid blob version %d", blobHeader.BlobVersion)
 	}
 
 	probe.SetStage("get_encoding_params")
-	encodingParams, err := corev2.GetEncodingParams(blobCommitments.Length, blobParams)
+	encodingParams, err := corev2.GetEncodingParams(blobHeader.BlobCommitments.Length, blobParams)
+	if err != nil {
+		return nil, err
+	}
+
+	blobKey, err := blobHeader.BlobKey()
 	if err != nil {
 		return nil, err
 	}
 
 	probe.SetStage("get_assignments")
-	assignments, err := corev2.GetAssignments(operatorState, blobParams, quorumID)
+	assignments, err := corev2.GetAssignmentsForBlob(operatorState, blobParams, blobHeader.QuorumNumbers)
 	if err != nil {
 		return nil, errors.New("failed to get assignments")
 	}
 
-	totalChunkCount := uint32(encodingParams.NumChunks)
 	minimumChunkCount := uint32(encodingParams.NumChunks) / blobParams.CodingRate
+
+	sockets := getFlattenedOperatorSockets(operatorState.Operators)
 
 	worker, err := newRetrievalWorker(
 		ctx,
@@ -128,16 +147,14 @@ func (c *validatorClient) GetBlob(
 		c.config,
 		c.connectionPool,
 		c.computePool,
-		c.config.UnsafeValidatorGRPCManagerFactory(c.logger, operatorState.Operators),
+		c.config.UnsafeValidatorGRPCManagerFactory(c.logger, sockets),
 		c.config.UnsafeChunkDeserializerFactory(assignments, c.verifier),
 		c.config.UnsafeBlobDecoderFactory(c.verifier),
 		assignments,
-		totalChunkCount,
 		minimumChunkCount,
 		&encodingParams,
-		quorumID,
+		blobHeader,
 		blobKey,
-		&blobCommitments,
 		probe)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create retrieval worker: %w", err)
@@ -148,4 +165,20 @@ func (c *validatorClient) GetBlob(
 		return nil, fmt.Errorf("failed to download blob from validators: %w", err)
 	}
 	return data, nil
+}
+
+// getFlattenedOperatorSockets merges the operator sockets contained in a nested mapping (QuorumID => OperatorID => OperatorInfo) to a flattened mapping
+// (OperatorID) => OperatorSocket). If an operator is encountered multiple times, it uses the socket corresponding to the first occurence.
+// As operators can only register a single socket across quorums, this is acceptable.
+func getFlattenedOperatorSockets(operatorsMap map[core.QuorumID]map[core.OperatorID]*core.OperatorInfo) map[core.OperatorID]core.OperatorSocket {
+
+	operatorSockets := make(map[core.OperatorID]core.OperatorSocket)
+	for _, quorumOperators := range operatorsMap {
+		for opID, operator := range quorumOperators {
+			if _, ok := operatorSockets[opID]; !ok {
+				operatorSockets[opID] = operator.Socket
+			}
+		}
+	}
+	return operatorSockets
 }

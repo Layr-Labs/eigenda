@@ -53,10 +53,21 @@
     - [BlobStatusRequest](#disperser-v2-BlobStatusRequest)
     - [DisperseBlobReply](#disperser-v2-DisperseBlobReply)
     - [DisperseBlobRequest](#disperser-v2-DisperseBlobRequest)
+    - [GetPaymentStateForAllQuorumsReply](#disperser-v2-GetPaymentStateForAllQuorumsReply)
+    - [GetPaymentStateForAllQuorumsReply.PeriodRecordsEntry](#disperser-v2-GetPaymentStateForAllQuorumsReply-PeriodRecordsEntry)
+    - [GetPaymentStateForAllQuorumsReply.ReservationsEntry](#disperser-v2-GetPaymentStateForAllQuorumsReply-ReservationsEntry)
+    - [GetPaymentStateForAllQuorumsRequest](#disperser-v2-GetPaymentStateForAllQuorumsRequest)
     - [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply)
     - [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest)
     - [PaymentGlobalParams](#disperser-v2-PaymentGlobalParams)
+    - [PaymentQuorumConfig](#disperser-v2-PaymentQuorumConfig)
+    - [PaymentQuorumProtocolConfig](#disperser-v2-PaymentQuorumProtocolConfig)
+    - [PaymentVaultParams](#disperser-v2-PaymentVaultParams)
+    - [PaymentVaultParams.QuorumPaymentConfigsEntry](#disperser-v2-PaymentVaultParams-QuorumPaymentConfigsEntry)
+    - [PaymentVaultParams.QuorumProtocolConfigsEntry](#disperser-v2-PaymentVaultParams-QuorumProtocolConfigsEntry)
     - [PeriodRecord](#disperser-v2-PeriodRecord)
+    - [PeriodRecords](#disperser-v2-PeriodRecords)
+    - [QuorumReservation](#disperser-v2-QuorumReservation)
     - [Reservation](#disperser-v2-Reservation)
     - [SignedBatch](#disperser-v2-SignedBatch)
   
@@ -396,26 +407,90 @@ Reserved-bandwidth dispersal is free to use multiple quorums, however those must
 <a name="common-v2-PaymentHeader"></a>
 
 ### PaymentHeader
-PaymentHeader contains payment information for a blob.
-At least one of reservation_period or cumulative_payment must be set, and reservation_period
-is always considered before cumulative_payment. If reservation_period is set but not valid,
-the server will reject the request and not proceed with dispersal. If reservation_period is not set
-and cumulative_payment is set but not valid, the server will reject the request and not proceed with dispersal.
-Once the server has accepted the payment header, a client cannot cancel or rollback the payment.
-Every dispersal request will be charged by a multiple of `minNumSymbols` field defined by the payment vault contract.
-If the request blob size is smaller or not a multiple of `minNumSymbols`, the server will charge the user for the next
-multiple of `minNumSymbols` (https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/payments/PaymentVaultStorage.sol#L9).
+PaymentHeader contains payment information for a blob, which is crucial for validating and processing dispersal requests.
+The PaymentHeader is designed to support two distinct payment methods within the EigenDA protocol:
+
+1. Reservation-based payment system:
+   This system allows users to reserve bandwidth in advance for a specified time period. It&#39;s designed for
+   users who need predictable throughput with a fixed ratelimit bin in required or custom quorums.
+   Under this method, the user pre-arranges a reservation with specific parameters on the desired quorums:
+   - symbolsPerSecond: The rate at which they can disperse data
+   - startTimestamp and endTimestamp: The timeframe during which the reservation is active
+
+2. On-demand payment system:
+   This is a pay-as-you-go model where users deposit funds into the PaymentVault contract and
+   payments are deducted as they make dispersal requests. This system is more flexible but has
+   more restrictions on which quorums can be used (currently limited to quorums 0 and 1).
+
+The disperser client always attempts to use a reservation-based payment first if one exists for the account.
+If no valid reservation exists or if the reservation doesn&#39;t have enough remaining bandwidth,
+the client will fall back to on-demand payment, provided the user has deposited sufficient funds
+in the PaymentVault contract.
+
+The distinction between these two payment methods is made by examining:
+- For reservation-based: The timestamp must be within an active reservation period, and cumulative_payment is zero or empty
+- For on-demand: The cumulative_payment field contains a non-zero value representing the total payment for all dispersals
+
+Every dispersal request is metered based on the size of the data being dispersed, rounded up to the
+nearest multiple of the minNumSymbols parameter defined in the PaymentVault contract. The size is calculated as:
+symbols_charged = ceiling(blob_size / minNumSymbols) * minNumSymbols
+On-demand payments take a step further by calculating the specific cost
+cost = symbols_charged * price_per_symbol
+
+Security and Authentication:
+The payment header is protected by a cryptographic signature that covers the entire BlobHeader.
+This signature is verified during request processing to ensure that:
+1. The request is genuinely from the holder of the private key corresponding to account_id
+2. The payment information hasn&#39;t been tampered with
+3. The same request isn&#39;t being resubmitted (replay protection)
+
+This signature verification happens in core/auth/v2/authenticator.go where:
+- The BlobKey (a hash of the serialized BlobHeader) is computed
+- The signature is verified against this key
+- The recovered public key is checked against the account_id in the payment header
+
+Once a payment has been processed and the signature verified, the disperser server will not
+roll back the payment or usage records, even if subsequent processing fails. This design choice
+prevents double-spending and ensures payment integrity.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| account_id | [string](#string) |  | The account ID of the disperser client. This account ID is an eth wallet address of the user, corresponding to the key used by the client to sign the BlobHeader. |
-| timestamp | [int64](#int64) |  | The timestamp should be set as the UNIX timestamp in units of nanoseconds at the time of the dispersal request, and will be used to determine the reservation period, and compared against the reservation active start and end timestamps On-chain reservation timestamps are in units of seconds, while the payment header timestamp is in nanoseconds for greater precision. If the timestamp is not set or is not part of the previous or current reservation period, the request will be rejected. The reservation period of the dispersal request is used for rate-limiting the user&#39;s account against their dedicated bandwidth. This method requires users to set up reservation accounts with EigenDA team, and the team will set up an on-chain record of reserved bandwidth for the user for some period of time. The dispersal client&#39;s accountant will set this value to the current timestamp in nanoseconds. The disperser server will find the corresponding reservation period by taking the nearest lower multiple of the on-chain configured reservation period interval, mapping each request to a time-based window and is serialized and parsed as a uint32. The disperser server then validates that it matches either the current or the previous period, and check against the user&#39;s reserved bandwidth.
+| account_id | [string](#string) |  | The account ID of the disperser client, represented as an Ethereum wallet address in hex format (e.g., &#34;0x1234...abcd&#34;). This field is critical for both payment methods as it:
 
-Example Usage Flow: 1. The user sets up a reservation with the EigenDA team, including throughput (symbolsPerSecond), startTimestamp, endTimestamp, and reservationPeriodInterval. 2. When sending a dispersal request at time t, the client fill in the timestamp field with t. 3. The disperser take timestamp t and checks the reservation period and the user&#39;s bandwidth capacity: - If the reservation is active (t &gt;= startTimestamp and t &lt; endTimestamp). - After rounding up to the nearest multiple of `minNumSymbols` defined by the payment vault contract, the user still has enough bandwidth capacity (hasn’t exceeded symbolsPerSecond * reservationPeriodInterval). - The request is ratelimited against the current reservation period, and calculated as reservation_period = floor(t / reservationPeriodInterval) * reservationPeriodInterval. the request&#39;s reservation period must either be the disperser server&#39;s current reservation period or the previous reservation period. 4. Server always go ahead with recording the received request in the current reservation period, and then categorize the scenarios - If the remaining bandwidth is sufficient for the request, the dispersal request proceeds. - If the remaining bandwidth is not enough for the request, server fills up the current bin and overflowing the extra to a future bin. - If the bandwidth has already been exhausted, the request is rejected. 5. Once the dispersal request signature has been verified, the server will not roll back the payment or the usage records. Users should be aware of this when planning their usage. The dispersal client written by EigenDA team takes account of this. 6. When the reservation ends or usage is exhausted, the client must wait for the next reservation period or switch to on-demand. |
-| cumulative_payment | [bytes](#bytes) |  | Cumulative payment is the total amount of tokens paid by the requesting account, including the current request. This value is serialized as an uint256 and parsed as a big integer, and must match the user’s on-chain deposit limits as well as the recorded payments for all previous requests. Because it is a cumulative (not incremental) total, requests can arrive out of order and still unambiguously declare how much of the on-chain deposit can be deducted.
+1. Identifies whose reservation to check for reservation-based payments 2. Identifies whose on-chain deposit balance to check for on-demand payments 3. Provides the address against which the BlobHeader signature is verified
 
-Example Decision Flow: 1. In the set up phase, the user must deposit tokens into the EigenDA PaymentVault contract. The payment vault contract specifies the minimum number of symbols charged per dispersal, the pricing per symbol, and the maximum global rate for on-demand dispersals. The user should calculate the amount of tokens they would like to deposit based on their usage. The first time a user make a request, server will immediate read the contract for the on-chain balance. When user runs out of on-chain balance, the server will reject the request and not proceed with dispersal. When a user top up on-chain, the server will only refresh every few minutes for the top-up to take effect. 2. The disperser client accounts how many tokens they’ve already paid (previousCumPmt). 3. They should calculate the payment by rounding up blob size to the nearest multiple of `minNumSymbols` defined by the payment vault contract, and calculate the incremental amount of tokens needed for the current request needs based on protocol defined pricing. 4. They take the sum of previousCumPmt &#43; new incremental payment and place it in the “cumulative_payment” field. 5. The disperser checks this new cumulative total against on-chain deposits and prior records (largest previous payment and smallest later payment if exists). 6. If the payment number is valid, the request is confirmed and disperser proceeds with dispersal; otherwise it’s rejected. |
+The account_id has special significance in the authentication flow: - When a client signs a BlobHeader, they use their private key - The disperser server recovers the public key from this signature - The recovered public key is converted to an Ethereum address - This derived address must exactly match the account_id in this field
+
+This verification process (implemented in core/auth/v2/authenticator.go&#39;s AuthenticateBlobRequest method) ensures that only the legitimate owner of the account can submit dispersal requests charged to that account. It prevents unauthorized payments or impersonation attacks where someone might try to use another user&#39;s reservation or on-chain balance.
+
+The account_id is typically set by the client&#39;s Accountant when constructing the PaymentMetadata (see api/clients/v2/accountant.go - AccountBlob method). |
+| timestamp | [int64](#int64) |  | The timestamp represents the UNIX timestamp in nanoseconds at the time the dispersal request is created. This high-precision timestamp serves multiple critical functions in the protocol:
+
+For reservation-based payments: 1. Reservation Period Determination: The timestamp is used to calculate which reservation period the request belongs to using the formula: reservation_period = floor(timestamp_ns / (reservationPeriodInterval_s * 1e9)) * reservationPeriodInterval_s where reservationPeriodInterval_s is in seconds, and the result is in seconds.
+
+2. Reservation Validity Check: The timestamp must fall within an active reservation window: - It must be &gt;= the reservation&#39;s startTimestamp (in seconds) - It must be &lt; the reservation&#39;s endTimestamp (in seconds)
+
+3. Period Window Check: The server validates that the request&#39;s reservation period is either: - The current period (based on server time) - The immediately previous period This prevents requests with future timestamps or very old timestamps.
+
+4. Rate Limiting: The server uses the timestamp to allocate the request to the appropriate rate-limiting bucket. Each reservation period has a fixed bandwidth limit (symbolsPerSecond * reservationPeriodInterval).
+
+For on-demand payments: 1. Replay Protection: The timestamp helps ensure each request is unique and prevent replay attacks.
+
+2. Global Ratelimiting (TO BE IMPLEMENTED): Treating all on-demand requests as an user-agnostic more frequent reservation, timestamp is checked against the OnDemandSymbolsPerSecond and OnDemandPeriodInterval.
+
+The timestamp is typically acquired by calling time.Now().UnixNano() in Go and accounted for NTP offsets by periodically syncing with a configuratble NTP server endpoint. The client&#39;s Accountant component (api/clients/v2/accountant.go) expects the caller to provide this timestamp, which it then uses to determine the correct reservation period and check bandwidth availability. |
+| cumulative_payment | [bytes](#bytes) |  | The cumulative_payment field is a serialized uint256 big integer representing the total amount of tokens paid by the requesting account across all their dispersal requests, including the current one. The unit is in wei. This field is exclusively used for on-demand payments and should be zero or empty for reservation-based payments. If this field is zero or empty, disperser server&#39;s meterer will treat this request as reservation-based. For the current implementation, the choice of quorum doesn&#39;t affect the payment calculations. A client may choose to use any or all of the required quorums.
+
+Detailed Payment Mechanics: 1. Cumulative Design: Rather than sending incremental payment amounts, the protocol uses a cumulative approach where each request states the total amount paid by the account so far. This design: - Prevents double-spending even with concurrent requests - Simplifies verification logic - Requests are enforced by a strictly increasing order
+
+2. Calculation Formula: For a new dispersal request, the cumulative_payment is calculated as: new_cumulative = previous_cumulative &#43; (symbols_charged * price_per_symbol)
+
+ Where: - previous_cumulative: The highest cumulative payment value from previous dispersals - symbols_charged: The blob size rounded up to the nearest multiple of minNumSymbols - price_per_symbol: The cost per symbol set in the PaymentVault contract
+
+3. Validation Process: When the disperser receives a request with a cumulative_payment, it performs multiple validations: - Checks that the on-chain deposit balance in the PaymentVault is sufficient to cover this payment - Verifies the cumulative_payment is greater than the highest previous payment from this account - Verifies the increase from the previous cumulative payment is appropriate for the blob size - If other requests from the same account are currently processing, ensures this new cumulative value is consistent with those (preventing double-spending)
+
+4. On-chain Implementation: The PaymentVault contract maintains: - A deposit balance for each account - Global parameters including minNumSymbols, GlobalSymbolsPerSecond and pricePerSymbol Due to the use of cumulative payments, if a client loses track of their current cumulative payment value, they can query the disperser server for their current payment state using the GetPaymentState RPC. |
 
 
 
@@ -914,6 +989,78 @@ This header can be thought of as an &#34;eigenDA tx&#34;, in that it plays a pur
 
 
 
+<a name="disperser-v2-GetPaymentStateForAllQuorumsReply"></a>
+
+### GetPaymentStateForAllQuorumsReply
+GetPaymentStateForAllQuorumsReply contains the payment state of an account. EigenLabs disperser is the only disperser that allows
+for ondemand usages, and it will provide the latest on-demand offchain record of `cumulative_payment` for the request account.
+Other dispersers will refuse to serve ondemand requests and serve a dummy value for `cumulative_payment`. A client using
+non-EigenDA dispersers should disregard the `cumulative_payment` shared by the non EigenLabs dispersers and only request with reservations.
+A client can always switch to use EigenLabs disperser to request for `cumulative_payment` payment state, and use on-demand dispersals.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| payment_vault_params | [PaymentVaultParams](#disperser-v2-PaymentVaultParams) |  | payment vault parameters with per-quorum configurations |
+| period_records | [GetPaymentStateForAllQuorumsReply.PeriodRecordsEntry](#disperser-v2-GetPaymentStateForAllQuorumsReply-PeriodRecordsEntry) | repeated | period_records maps quorum IDs to the off-chain account reservation usage records for the current and next two periods |
+| reservations | [GetPaymentStateForAllQuorumsReply.ReservationsEntry](#disperser-v2-GetPaymentStateForAllQuorumsReply-ReservationsEntry) | repeated | reservations maps quorum IDs to the on-chain account reservation record |
+| cumulative_payment | [bytes](#bytes) |  | off-chain on-demand payment usage. This field is currently only tracked by EigenLabs disperser because on-demand requests are only supported by EigenLabs. Future work will support decentralized on-demand dispersals and this field later be tracked and shared by dispersers unlimited to EigenLabs. |
+| onchain_cumulative_payment | [bytes](#bytes) |  | on-chain on-demand payment deposited. |
+
+
+
+
+
+
+<a name="disperser-v2-GetPaymentStateForAllQuorumsReply-PeriodRecordsEntry"></a>
+
+### GetPaymentStateForAllQuorumsReply.PeriodRecordsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [uint32](#uint32) |  |  |
+| value | [PeriodRecords](#disperser-v2-PeriodRecords) |  |  |
+
+
+
+
+
+
+<a name="disperser-v2-GetPaymentStateForAllQuorumsReply-ReservationsEntry"></a>
+
+### GetPaymentStateForAllQuorumsReply.ReservationsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [uint32](#uint32) |  |  |
+| value | [QuorumReservation](#disperser-v2-QuorumReservation) |  |  |
+
+
+
+
+
+
+<a name="disperser-v2-GetPaymentStateForAllQuorumsRequest"></a>
+
+### GetPaymentStateForAllQuorumsRequest
+GetPaymentStateForAllQuorumsRequest contains parameters to query the payment state of an account.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| account_id | [string](#string) |  | The ID of the account being queried. This account ID is an eth wallet address of the user. |
+| timestamp | [uint64](#uint64) |  | Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server&#39;s clock, request may be rejected. |
+| signature | [bytes](#bytes) |  | Signature over the payment account ID and timestamp. |
+
+
+
+
+
+
 <a name="disperser-v2-GetPaymentStateReply"></a>
 
 ### GetPaymentStateReply
@@ -942,7 +1089,7 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | account_id | [string](#string) |  | The ID of the account being queried. This account ID is an eth wallet address of the user. |
-| signature | [bytes](#bytes) |  | Signature over the account ID |
+| signature | [bytes](#bytes) |  | Signature over the account ID and timestamp. |
 | timestamp | [uint64](#uint64) |  | Timestamp of the request in nanoseconds since the Unix epoch. If too far out of sync with the server&#39;s clock, request may be rejected. |
 
 
@@ -954,6 +1101,8 @@ GetPaymentStateRequest contains parameters to query the payment state of an acco
 
 ### PaymentGlobalParams
 Global constant parameters defined by the payment vault.
+This message type will soon be deprecated in replacement of PaymentVaultParams. During endpoint migration, this will be filled
+with the parameters on quorum 0, quorum configurations will be the same across quorums for the foreseeable future.
 
 
 | Field | Type | Label | Description |
@@ -963,6 +1112,92 @@ Global constant parameters defined by the payment vault.
 | price_per_symbol | [uint64](#uint64) |  | Price charged per symbol for on-demand dispersals |
 | reservation_window | [uint64](#uint64) |  | Reservation window for all reservations |
 | on_demand_quorum_numbers | [uint32](#uint32) | repeated | quorums allowed to make on-demand dispersals |
+
+
+
+
+
+
+<a name="disperser-v2-PaymentQuorumConfig"></a>
+
+### PaymentQuorumConfig
+PaymentQuorumConfig contains the configuration for a quorum&#39;s payment configurations
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| reservation_symbols_per_second | [uint64](#uint64) |  | reservation_symbols_per_second is the total symbols per second that can be reserved for this quorum |
+| on_demand_symbols_per_second | [uint64](#uint64) |  | on_demand_symbols_per_second is the symbols per second allowed for on-demand payments for this quorum |
+| on_demand_price_per_symbol | [uint64](#uint64) |  | on_demand_price_per_symbol is the price per symbol for on-demand payments in wei |
+
+
+
+
+
+
+<a name="disperser-v2-PaymentQuorumProtocolConfig"></a>
+
+### PaymentQuorumProtocolConfig
+PaymentQuorumProtocolConfig contains the configuration for a quorum&#39;s protocol-level configurations
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| min_num_symbols | [uint64](#uint64) |  | min_num_symbols is the minimum number of symbols that must be charged for any request |
+| reservation_advance_window | [uint64](#uint64) |  | reservation_advance_window is the window in seconds before a reservation starts that it can be activated |
+| reservation_rate_limit_window | [uint64](#uint64) |  | reservation_rate_limit_window is the time window in seconds for reservation rate limiting |
+| on_demand_rate_limit_window | [uint64](#uint64) |  | on_demand_rate_limit_window is the time window in seconds for on-demand rate limiting |
+| on_demand_enabled | [bool](#bool) |  | on_demand_enabled indicates whether on-demand payments are enabled for this quorum |
+
+
+
+
+
+
+<a name="disperser-v2-PaymentVaultParams"></a>
+
+### PaymentVaultParams
+PaymentVaultParams contains the global payment configuration parameters from the payment vault
+This is the new version of
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| quorum_payment_configs | [PaymentVaultParams.QuorumPaymentConfigsEntry](#disperser-v2-PaymentVaultParams-QuorumPaymentConfigsEntry) | repeated | quorum_payment_configs maps quorum IDs to their payment configurations |
+| quorum_protocol_configs | [PaymentVaultParams.QuorumProtocolConfigsEntry](#disperser-v2-PaymentVaultParams-QuorumProtocolConfigsEntry) | repeated | quorum_protocol_configs maps quorum IDs to their protocol configurations |
+| on_demand_quorum_numbers | [uint32](#uint32) | repeated | on_demand_quorum_numbers lists the quorum numbers that support on-demand payments |
+
+
+
+
+
+
+<a name="disperser-v2-PaymentVaultParams-QuorumPaymentConfigsEntry"></a>
+
+### PaymentVaultParams.QuorumPaymentConfigsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [uint32](#uint32) |  |  |
+| value | [PaymentQuorumConfig](#disperser-v2-PaymentQuorumConfig) |  |  |
+
+
+
+
+
+
+<a name="disperser-v2-PaymentVaultParams-QuorumProtocolConfigsEntry"></a>
+
+### PaymentVaultParams.QuorumProtocolConfigsEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [uint32](#uint32) |  |  |
+| value | [PaymentQuorumProtocolConfig](#disperser-v2-PaymentQuorumProtocolConfig) |  |  |
 
 
 
@@ -986,10 +1221,47 @@ record and the subsequent two records that contains potential overflows.
 
 
 
+<a name="disperser-v2-PeriodRecords"></a>
+
+### PeriodRecords
+An array of period records. Typically this is used to include 3 records, from the current period to the next two periods.
+The next two period records are included because they may include spillage usages from the previous period or the current period.
+The client should be aware of the spillage so they account for them as they disperse during those periods.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| records | [PeriodRecord](#disperser-v2-PeriodRecord) | repeated |  |
+
+
+
+
+
+
+<a name="disperser-v2-QuorumReservation"></a>
+
+### QuorumReservation
+Reservation parameters of an account, used to determine the rate limit for the account.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| symbols_per_second | [uint64](#uint64) |  | rate limit for the account |
+| start_timestamp | [uint32](#uint32) |  | start timestamp of the reservation |
+| end_timestamp | [uint32](#uint32) |  | end timestamp of the reservation |
+
+
+
+
+
+
 <a name="disperser-v2-Reservation"></a>
 
 ### Reservation
 Reservation parameters of an account, used to determine the rate limit for the account.
+This message type will soon be deprecated. During the migration time, we will maintain the usage by returning the
+most restrictive reservation parameters across the quroums: symbols_per_second will be the lowest rate of across all quroums
+with latest start and earliest end timestamp, all the quorum numbers with a reservation, and a dummy quorum_splits which was never used.
 
 
 | Field | Type | Label | Description |
@@ -1067,7 +1339,12 @@ Disperser defines the public APIs for dispersing blobs.
 | GetBlobCommitment | [BlobCommitmentRequest](#disperser-v2-BlobCommitmentRequest) | [BlobCommitmentReply](#disperser-v2-BlobCommitmentReply) | GetBlobCommitment is a utility method that calculates commitment for a blob payload. It is provided to help clients who are trying to construct a DisperseBlobRequest.blob_header and don&#39;t have the ability to calculate the commitment themselves (expensive operation which requires SRS points).
 
 For an example usage, see how our disperser_client makes a call to this endpoint when it doesn&#39;t have a local prover: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L166 |
-| GetPaymentState | [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest) | [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply) | GetPaymentState is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting. A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser. That typically only needs to be done once, and the state can be updated locally as the client disperses blobs. The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
+| GetPaymentState | [GetPaymentStateRequest](#disperser-v2-GetPaymentStateRequest) | [GetPaymentStateReply](#disperser-v2-GetPaymentStateReply) | GetPaymentState is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s payment system for v2 is currently centralized, meaning that each disperser does its own accounting. As reservation moves to be quorum specific and served by permissionless dispersers, GetPaymentState will soon be deprecated in replacement of GetPaymentStateForAllQuorums to include more specifications. During the endpoint migration time, the response uses quorum 0 for the global parameters, and the most retrictive reservation parameters of a user across quorums. For OnDemand, EigenDA disperser is the only allowed disperser, so it will provide real values tracked for on-demand offchain payment records. For other dispersers, they will refuse to serve ondemand requests and serve 0 as the on-demand offchain records. A client using non-EigenDA dispersers should only request with reserved usages.
+
+A client wanting to disperse a blob would thus need to synchronize its local accounting state with that of the disperser. That typically only needs to be done once, and the state can be updated locally as the client disperses blobs. The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
+
+For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298 |
+| GetPaymentStateForAllQuorums | [GetPaymentStateForAllQuorumsRequest](#disperser-v2-GetPaymentStateForAllQuorumsRequest) | [GetPaymentStateForAllQuorumsReply](#disperser-v2-GetPaymentStateForAllQuorumsReply) | GetPaymentStateForAllQuorums is a utility method to get the payment state of a given account, at a given disperser. EigenDA&#39;s dispersers and validators each does its own accounting for reservation usages, indexed by the account and quorum id. A client wanting to disperse a blob would thus need to synchronize its local accounting state with the disperser it plans to disperse to. That typically only needs to be done once, and the state can be updated locally as the client disperses blobs. The accounting rules are simple and can be updated locally, but periodic checks with the disperser can&#39;t hurt.
 
 For an example usage, see how our disperser_client makes a call to this endpoint to populate its local accountant struct: https://github.com/Layr-Labs/eigenda/blob/6059c6a068298d11c41e50f5bcd208d0da44906a/api/clients/v2/disperser_client.go#L298 |
 

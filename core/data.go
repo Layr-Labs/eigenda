@@ -648,10 +648,46 @@ type OnDemandPayment struct {
 	CumulativePayment *big.Int
 }
 
+// PaymentQuorumConfig contains the configuration for a quorum's payment configurations
+// This is pretty much the same as the PaymentVaultTypesQuorumConfig struct in the contracts/bindings/IPaymentVault/binding.go file
+type PaymentQuorumConfig struct {
+	ReservationSymbolsPerSecond uint64
+
+	// OnDemand is initially only enabled on Quorum 0
+	OnDemandSymbolsPerSecond uint64
+	OnDemandPricePerSymbol   uint64
+}
+
+// PaymentQuorumProtocolConfig contains the configuration for a quorum's ratelimiting configurations
+// This is pretty much the same as the PaymentVaultTypesQuorumProtocolConfig struct in the contracts/bindings/IPaymentVault/binding.go file
+type PaymentQuorumProtocolConfig struct {
+	MinNumSymbols              uint64
+	ReservationAdvanceWindow   uint64
+	ReservationRateLimitWindow uint64
+
+	// OnDemand is initially only enabled on Quorum 0
+	OnDemandRateLimitWindow uint64
+	OnDemandEnabled         bool
+}
+
 type BlobVersionParameters struct {
-	CodingRate      uint32
+	// CodingRate specifies the amount of redundancy that will be added when encoding the blob
+	// (Note that for the purposes of integer representation, this is the inverse of the standard
+	// coding rate used in coding theory). CodingRate must be a power of 2.
+	CodingRate uint32
+	// MaxNumOperators is the maximum number of operators that can be registered for each quorum for a given blob version.
+	// This limit is needed in order to ensure that the blob can satisfy a fixed reconstruction threshold. See the
+	// GetReconstructionThreshold method for more details.
 	MaxNumOperators uint32
-	NumChunks       uint32
+	// NumChunks is the number of individual encoded chunks of data that will be generated for each blob.
+	// NumChunks must be a power of 2.
+	NumChunks uint32
+}
+
+// GetReconstructionThreshold returns the minimum difference between the ConfirmationThreshold
+// and AdversaryThreshold that is valid for a given BlobVersionParameters.
+func (bvp *BlobVersionParameters) GetReconstructionThresholdBips() uint32 {
+	return RoundUpDivide(bvp.NumChunks*10000, (bvp.NumChunks-bvp.MaxNumOperators)*bvp.CodingRate)
 }
 
 // IsActive returns true if the reservation is active at the given timestamp

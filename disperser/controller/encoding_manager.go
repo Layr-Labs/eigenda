@@ -4,15 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"math"
 	"math/rand"
 	"sync/atomic"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/common/healthcheck"
 	"github.com/Layr-Labs/eigenda/core"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/disperser"
@@ -21,6 +19,7 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigensdk-go/logging"
+	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -52,7 +51,7 @@ type EncodingManager struct {
 	*EncodingManagerConfig
 
 	// components
-	blobMetadataStore *blobstore.BlobMetadataStore
+	blobMetadataStore blobstore.MetadataStore
 	pool              common.WorkerPool
 	encodingClient    disperser.EncoderClientV2
 	chainReader       core.Reader
@@ -72,7 +71,7 @@ type EncodingManager struct {
 
 func NewEncodingManager(
 	config *EncodingManagerConfig,
-	blobMetadataStore *blobstore.BlobMetadataStore,
+	blobMetadataStore blobstore.MetadataStore,
 	pool common.WorkerPool,
 	encodingClient disperser.EncoderClientV2,
 	chainReader core.Reader,
