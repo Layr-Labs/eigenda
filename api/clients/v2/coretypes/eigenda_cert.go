@@ -387,3 +387,95 @@ func (c *EigenDACertV2) ComputeBlobKey() (*coreV2.BlobKey, error) {
 func (c *EigenDACertV2) Version() CertificateVersion {
 	return VersionTwoCert
 }
+
+// ConvertV2CertToV3 converts an EigenDACertV2 to an EigenDACertV3
+func ConvertV2CertToV3(certV2 *EigenDACertV2) (*EigenDACertV3, error) {
+	if certV2 == nil {
+		return nil, fmt.Errorf("input V2 certificate cannot be nil")
+	}
+
+	// Convert BlobInclusionInfo from V2 to V3 format
+	v3BlobInclusionInfo := certTypesBinding.EigenDATypesV2BlobInclusionInfo{
+		BlobCertificate: certTypesBinding.EigenDATypesV2BlobCertificate{
+			BlobHeader: certTypesBinding.EigenDATypesV2BlobHeaderV2{
+				Version:       certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.Version,
+				QuorumNumbers: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+				Commitment: certTypesBinding.EigenDATypesV2BlobCommitment{
+					Commitment: certTypesBinding.BN254G1Point{
+						X: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment.X,
+						Y: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment.Y,
+					},
+					LengthCommitment: certTypesBinding.BN254G2Point{
+						X: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthCommitment.X,
+						Y: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthCommitment.Y,
+					},
+					LengthProof: certTypesBinding.BN254G2Point{
+						X: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthProof.X,
+						Y: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthProof.Y,
+					},
+					Length: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length,
+				},
+				PaymentHeaderHash: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.PaymentHeaderHash,
+			},
+			Signature: certV2.BlobInclusionInfo.BlobCertificate.Signature,
+			RelayKeys: convertUint32SliceToRelayKeys(certV2.BlobInclusionInfo.BlobCertificate.RelayKeys),
+		},
+		BlobIndex:      certV2.BlobInclusionInfo.BlobIndex,
+		InclusionProof: certV2.BlobInclusionInfo.InclusionProof,
+	}
+
+	// Convert BatchHeader from V2 to V3 format
+	v3BatchHeader := certTypesBinding.EigenDATypesV2BatchHeaderV2{
+		BatchRoot:            certV2.BatchHeader.BatchRoot,
+		ReferenceBlockNumber: certV2.BatchHeader.ReferenceBlockNumber,
+	}
+
+	// Convert NonSignerStakesAndSignature from V2 to V3 format
+	v3NonSignerStakesAndSignature := certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature{
+		NonSignerQuorumBitmapIndices: certV2.NonSignerStakesAndSignature.NonSignerQuorumBitmapIndices,
+		NonSignerPubkeys:             convertV2PubkeysToV3(certV2.NonSignerStakesAndSignature.NonSignerPubkeys),
+		QuorumApks:                   convertV2PubkeysToV3(certV2.NonSignerStakesAndSignature.QuorumApks),
+		ApkG2: certTypesBinding.BN254G2Point{
+			X: certV2.NonSignerStakesAndSignature.ApkG2.X,
+			Y: certV2.NonSignerStakesAndSignature.ApkG2.Y,
+		},
+		Sigma: certTypesBinding.BN254G1Point{
+			X: certV2.NonSignerStakesAndSignature.Sigma.X,
+			Y: certV2.NonSignerStakesAndSignature.Sigma.Y,
+		},
+		QuorumApkIndices:      certV2.NonSignerStakesAndSignature.QuorumApkIndices,
+		TotalStakeIndices:     certV2.NonSignerStakesAndSignature.TotalStakeIndices,
+		NonSignerStakeIndices: certV2.NonSignerStakesAndSignature.NonSignerStakeIndices,
+	}
+
+	// Create the V3 certificate
+	certV3 := &EigenDACertV3{
+		BlobInclusionInfo:           v3BlobInclusionInfo,
+		BatchHeader:                 v3BatchHeader,
+		NonSignerStakesAndSignature: v3NonSignerStakesAndSignature,
+		SignedQuorumNumbers:         certV2.SignedQuorumNumbers,
+	}
+
+	return certV3, nil
+}
+
+// convertUint32SliceToRelayKeys converts []uint32 to []coreV2.RelayKey for V3 format
+func convertUint32SliceToRelayKeys(relayKeys []uint32) []coreV2.RelayKey {
+	result := make([]coreV2.RelayKey, len(relayKeys))
+	for i, key := range relayKeys {
+		result[i] = coreV2.RelayKey(key)
+	}
+	return result
+}
+
+// convertV2PubkeysToV3 converts V2 pubkeys format to V3 format
+func convertV2PubkeysToV3(v2Pubkeys []contractEigenDACertVerifierV2.BN254G1Point) []certTypesBinding.BN254G1Point {
+	result := make([]certTypesBinding.BN254G1Point, len(v2Pubkeys))
+	for i, pubkey := range v2Pubkeys {
+		result[i] = certTypesBinding.BN254G1Point{
+			X: pubkey.X,
+			Y: pubkey.Y,
+		}
+	}
+	return result
+}
