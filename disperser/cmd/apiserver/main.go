@@ -121,7 +121,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create onchain payment state: %w", err)
 		}
-		if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
+		if _, err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
 			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
 		}
 
@@ -143,7 +143,10 @@ func RunDisperserServer(ctx *cli.Context) error {
 			logger,
 			// metrics.NewNoopMetrics(),
 		)
-		meterer.Start(context.Background())
+		err = meterer.Start(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to start meterer: %w", err)
+		}
 	}
 
 	var ratelimiter common.RateLimiter

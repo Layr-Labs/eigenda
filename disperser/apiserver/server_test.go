@@ -747,8 +747,8 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	}
 
 	mockState := &mock.MockOnchainPaymentState{}
-	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil).Maybe()
-	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
+	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(&meterer.PaymentVaultParams{}, nil)
+	if _, err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
 
@@ -761,12 +761,14 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.OnDemandPayment{
 		CumulativePayment: big.NewInt(3000),
 	}, nil)
+	mockState.On("GetReservedPaymentByAccountAndQuorums", tmock.Anything, tmock.Anything, tmock.Anything).Return(map[uint8]*core.ReservedPayment{
+		0: {SymbolsPerSecond: 2048, StartTimestamp: 0, EndTimestamp: math.MaxUint32},
+		1: {SymbolsPerSecond: 2048, StartTimestamp: 0, EndTimestamp: math.MaxUint32},
+	}, nil)
 	mockState.On("GetReservedPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.ReservedPayment{
 		SymbolsPerSecond: 2048,
 		StartTimestamp:   0,
 		EndTimestamp:     math.MaxUint32,
-		QuorumNumbers:    []uint8{0, 1},
-		QuorumSplits:     []byte{50, 50},
 	}, nil)
 	// append test name to each table name for an unique store
 	table_names := []string{"reservations_server_" + testName, "ondemand_server_" + testName, "global_server_" + testName}
@@ -798,7 +800,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 		panic("failed to create metering store")
 	}
 	mt := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
-	err = mt.ChainPaymentState.RefreshOnchainPaymentState(context.Background())
+	_, err = mt.ChainPaymentState.RefreshOnchainPaymentState(context.Background())
 	if err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
