@@ -29,7 +29,7 @@ type Segment struct {
 
 	// Used to signal an unrecoverable error in the segment. If fatalErrorHandler.Panic() is called, the entire DB
 	// enters a "panic" state and will refuse to do additional work.
-	fatalErrorHandler *util.FatalErrorHandler
+	fatalErrorHandler *util.ErrorMonitor
 
 	// The index of the data segment. The first data segment ever created has index 0, the next has index 1, and so on.
 	index uint32
@@ -92,7 +92,7 @@ type Segment struct {
 // disk always use their original sharding factor and salt values
 func CreateSegment(
 	logger logging.Logger,
-	fatalErrorHandler *util.FatalErrorHandler,
+	fatalErrorHandler *util.ErrorMonitor,
 	index uint32,
 	parentDirectories []string,
 	shardingFactor uint32,
@@ -195,7 +195,7 @@ func CreateSegment(
 
 // LoadSegment loads an existing segment from disk. If that segment is unsealed, this method will seal it.
 func LoadSegment(logger logging.Logger,
-	fatalErrorHandler *util.FatalErrorHandler,
+	fatalErrorHandler *util.ErrorMonitor,
 	index uint32,
 	parentDirectories []string,
 	now time.Time) (*Segment, error) {
@@ -434,7 +434,7 @@ func (s *Segment) Write(data *types.KVPair) (keyCount uint32, keyFileSize uint64
 		value:                  data.Value,
 		expectedFirstByteIndex: firstByteIndex,
 	}
-	err = util.SendIfNotFatal(s.fatalErrorHandler, s.shardChannels[shard], shardRequest)
+	err = util.Send(s.fatalErrorHandler, s.shardChannels[shard], shardRequest)
 	if err != nil {
 		return 0, 0,
 			fmt.Errorf("failed to send value to shard control loop: %v", err)
@@ -447,7 +447,7 @@ func (s *Segment) Write(data *types.KVPair) (keyCount uint32, keyFileSize uint64
 		ValueSize: uint32(len(data.Value)),
 	}
 
-	err = util.SendIfNotFatal(s.fatalErrorHandler, s.keyFileChannel, keyRequest)
+	err = util.Send(s.fatalErrorHandler, s.keyFileChannel, keyRequest)
 	if err != nil {
 		return 0, 0,
 			fmt.Errorf("failed to send key to key file control loop: %v", err)
@@ -508,7 +508,7 @@ func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 			seal:              seal,
 			completionChannel: shardResponseChannels[shard],
 		}
-		err := util.SendIfNotFatal(s.fatalErrorHandler, shardChannel, request)
+		err := util.Send(s.fatalErrorHandler, shardChannel, request)
 		if err != nil {
 			return nil, fmt.Errorf("failed to send flush request to shard %d: %w", shard, err)
 		}
@@ -521,7 +521,7 @@ func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 		seal:              seal,
 		completionChannel: keyResponseChannel,
 	}
-	err := util.SendIfNotFatal(s.fatalErrorHandler, s.keyFileChannel, request)
+	err := util.Send(s.fatalErrorHandler, s.keyFileChannel, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send flush request to key file: %w", err)
 	}
@@ -529,13 +529,13 @@ func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 	return func() ([]*types.ScopedKey, error) {
 		// Wait for each shard to finish flushing.
 		for i := range s.shardChannels {
-			_, err := util.AwaitIfNotFatal(s.fatalErrorHandler, shardResponseChannels[i])
+			_, err := util.Await(s.fatalErrorHandler, shardResponseChannels[i])
 			if err != nil {
 				return nil, fmt.Errorf("failed to flush shard %d: %w", i, err)
 			}
 		}
 
-		keyFlushResponse, err := util.AwaitIfNotFatal(s.fatalErrorHandler, keyResponseChannel)
+		keyFlushResponse, err := util.Await(s.fatalErrorHandler, keyResponseChannel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to flush key file: %w", err)
 		}
@@ -625,7 +625,7 @@ func (s *Segment) Release() {
 // this method will block until it is. This method should only be called once per segment (the second call
 // will block forever!).
 func (s *Segment) BlockUntilFullyDeleted() error {
-	_, err := util.AwaitIfNotFatal(s.fatalErrorHandler, s.deletionChannel)
+	_, err := util.Await(s.fatalErrorHandler, s.deletionChannel)
 	if err != nil {
 		return fmt.Errorf("failed to await segment deletion: %w", err)
 	}

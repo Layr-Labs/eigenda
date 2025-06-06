@@ -39,7 +39,7 @@ type DiskTable struct {
 	// hood, and many of these threads could, in theory, encounter errors which are unrecoverable. In such situations,
 	// the desirable outcome is for the DB to report the error and then refuse to do additional work. If the DB is in a
 	// broken state, it is much better to refuse to do work than to continue to do work and potentially corrupt data.
-	fatalErrorHandler *util.FatalErrorHandler
+	fatalErrorHandler *util.ErrorMonitor
 
 	// The root directories for the disk table.
 	roots []string
@@ -172,7 +172,7 @@ func NewDiskTable(
 		}
 	}
 
-	fatalErrorHandler := util.NewFatalErrorHandler(config.CTX, config.Logger, config.FatalErrorCallback)
+	fatalErrorHandler := util.NewErrorMonitor(config.CTX, config.Logger, config.FatalErrorCallback)
 
 	table := &DiskTable{
 		logger:             config.Logger,
@@ -394,7 +394,7 @@ func (d *DiskTable) Close() error {
 		return fmt.Errorf("failed to send shutdown request: %w", err)
 	}
 
-	_, err = util.AwaitIfNotFatal(d.fatalErrorHandler, shutdownCompleteChan)
+	_, err = util.Await(d.fatalErrorHandler, shutdownCompleteChan)
 	if err != nil {
 		return fmt.Errorf("failed to shutdown: %w", err)
 	}
@@ -690,7 +690,7 @@ func (d *DiskTable) Flush() error {
 		return fmt.Errorf("failed to send flush request: %w", err)
 	}
 
-	_, err = util.AwaitIfNotFatal(d.fatalErrorHandler, flushReq.responseChan)
+	_, err = util.Await(d.fatalErrorHandler, flushReq.responseChan)
 	if err != nil {
 		return fmt.Errorf("failed to flush: %w", err)
 	}
@@ -733,7 +733,7 @@ func (d *DiskTable) RunGC() error {
 		return fmt.Errorf("failed to send GC request: %w", err)
 	}
 
-	_, err = util.AwaitIfNotFatal(d.fatalErrorHandler, request.completionChan)
+	_, err = util.Await(d.fatalErrorHandler, request.completionChan)
 	if err != nil {
 		return fmt.Errorf("failed to await GC completion: %w", err)
 	}

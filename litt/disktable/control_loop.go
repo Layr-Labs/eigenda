@@ -22,7 +22,7 @@ type controlLoop struct {
 	diskTable *DiskTable
 
 	// fatalErrorHandler is used to react to fatal errors anywhere in the disk table.
-	fatalErrorHandler *util.FatalErrorHandler
+	fatalErrorHandler *util.ErrorMonitor
 
 	// controllerChannel is the channel for messages sent to the control loop.
 	controllerChannel chan any
@@ -111,7 +111,7 @@ type controlLoop struct {
 // database being in a panicked state. Only types defined in control_loop_messages.go are permitted to be sent
 // to the control loop.
 func (c *controlLoop) enqueue(request controlLoopMessage) error {
-	return util.SendIfNotFatal(c.fatalErrorHandler, c.controllerChannel, request)
+	return util.Send(c.fatalErrorHandler, c.controllerChannel, request)
 }
 
 // run runs the control loop for the disk table. It has sole responsibility for scheduling all operations that
@@ -303,7 +303,7 @@ func (c *controlLoop) expandSegments() error {
 	// Unfortunately, it is necessary to block until the sealing has been completed. Although this may result
 	// in a brief interruption in new write work being sent to the segment, expanding the number of segments is
 	// infrequent, even for very high throughput workloads.
-	_, err = util.AwaitIfNotFatal(c.fatalErrorHandler, flushLoopResponseChan)
+	_, err = util.Await(c.fatalErrorHandler, flushLoopResponseChan)
 	if err != nil {
 		return fmt.Errorf("failed to seal segment: %w", err)
 	}
@@ -401,7 +401,7 @@ func (c *controlLoop) handleShutdownRequest(req *controlLoopShutdownRequest) {
 		return
 	}
 
-	_, err = util.AwaitIfNotFatal(c.fatalErrorHandler, shutdownCompleteChan)
+	_, err = util.Await(c.fatalErrorHandler, shutdownCompleteChan)
 	if err != nil {
 		c.logger.Errorf("failed to shutdown flush loop: %v", err)
 		return

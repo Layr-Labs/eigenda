@@ -295,7 +295,7 @@ func linkSegments(lowestSegmentIndex uint32, highestSegmentIndex uint32, segment
 // orphaned files and checks for corrupted files. It creates a new mutable segment at the end.
 func GatherSegmentFiles(
 	logger logging.Logger,
-	fatalErrorHandler *util.FatalErrorHandler,
+	fatalErrorHandler *util.ErrorMonitor,
 	rootDirectories []string,
 	now time.Time) (lowestSegmentIndex uint32, highestSegmentIndex uint32, segments map[uint32]*Segment, err error) {
 

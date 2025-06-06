@@ -17,7 +17,7 @@ type flushLoop struct {
 	diskTable *DiskTable
 
 	// Responsible for handling fatal DB errors.
-	fatalErrorHandler *util.FatalErrorHandler
+	fatalErrorHandler *util.ErrorMonitor
 
 	// flushChannel is a channel used to enqueue work on the flush loop.
 	flushChannel chan any
@@ -34,7 +34,7 @@ type flushLoop struct {
 
 // enqueue sends work to be handled on the flush loop. Will return an error if the DB is panicking.
 func (f *flushLoop) enqueue(request flushLoopMessage) error {
-	return util.SendIfNotFatal(f.fatalErrorHandler, f.flushChannel, request)
+	return util.Send(f.fatalErrorHandler, f.flushChannel, request)
 }
 
 // run is responsible for handling operations that flush data (i.e. calls to Flush() and when the mutable segment

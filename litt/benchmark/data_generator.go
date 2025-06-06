@@ -38,9 +38,6 @@ func NewDataGenerator(seed int64, poolSize uint64) *DataGenerator {
 	}
 }
 
-// TODO use the reusable randomness for the key as well. Make it so that the first 24 bytes come from the pool,
-//  and the last 8 bytes are the index.
-
 // Key generates a new key. The value id deterministic for the same index and seed.
 func (g *DataGenerator) Key(index uint64) []byte {
 	rng := g.randPool.Get().(*rand.Rand)
