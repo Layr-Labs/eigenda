@@ -45,6 +45,11 @@ func NewValidatorPayloadRetriever(
 	}, nil
 }
 
+// Type returns the type of the payload retriever, which is PayloadRetrieverTypeNodes for ValidatorPayloadRetriever.
+func (pr *ValidatorPayloadRetriever) Type() coretypes.PayloadRetrieverType {
+	return coretypes.PayloadRetrieverTypeNodes
+}
+
 // GetPayload iteratively attempts to retrieve a given blob from the quorums listed in the EigenDACert.
 //
 // If the blob is successfully retrieved, then the blob verified against the EigenDACert. If the verification succeeds,

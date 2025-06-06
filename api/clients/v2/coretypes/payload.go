@@ -9,6 +9,14 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 )
 
+type PayloadRetrieverType string
+const (
+	// PayloadRetrieverTypeRelays indicates that the payload retriever retrieves payloads from EigenDA relays
+	PayloadRetrieverTypeRelays PayloadRetrieverType = "relays"
+	// PayloadRetrieverTypeNodes indicates that the payload retriever retrieves payloads from EigenDA nodes
+	PayloadRetrieverTypeNodes PayloadRetrieverType = "nodes"
+)
+
 // Payload represents arbitrary user data, without any processing.
 type Payload struct {
 	bytes []byte
