@@ -11,6 +11,7 @@ import {InitializableLib} from "src/core/libraries/InitializableLib.sol";
 
 contract PaymentVault is IPaymentVault {
     uint64 public immutable SCHEDULE_PERIOD;
+
     using PaymentVaultLib for PaymentVaultTypes.Reservation;
 
     modifier onlyOwner() {
@@ -20,6 +21,13 @@ contract PaymentVault is IPaymentVault {
 
     modifier onlyQuorumOwner(uint64 quorumId) {
         _onlyQuorumOwner(quorumId);
+        _;
+    }
+
+    modifier onlyOnDemandEnabled(uint64 quorumId) {
+        if (!ps().quorum[quorumId].protocolCfg.onDemandEnabled) {
+            revert IPaymentVault.OnDemandDisabled(quorumId);
+        }
         _;
     }
 
@@ -45,7 +53,7 @@ contract PaymentVault is IPaymentVault {
         PaymentVaultLib.decreaseReservation(quorumId, msg.sender, reservation, SCHEDULE_PERIOD);
     }
 
-    function depositOnDemand(uint64 quorumId, uint256 amount) external {
+    function depositOnDemand(uint64 quorumId, uint256 amount) external onlyOnDemandEnabled(quorumId) {
         PaymentVaultLib.depositOnDemand(quorumId, msg.sender, amount);
     }
 
@@ -70,23 +78,20 @@ contract PaymentVault is IPaymentVault {
         ps().quorum[quorumId].protocolCfg = protocolCfg;
     }
 
-    function setReservationAdvanceWindow(uint64 quorumId, PaymentVaultTypes.QuorumProtocolConfig memory protocolCfg)
+    function setReservationAdvanceWindow(uint64 quorumId, uint64 reservationAdvanceWindow)
         external
         onlyQuorumOwner(quorumId)
     {
-        ps().quorum[quorumId].protocolCfg.reservationAdvanceWindow = protocolCfg.reservationAdvanceWindow;
+        ps().quorum[quorumId].protocolCfg.reservationAdvanceWindow = reservationAdvanceWindow;
     }
 
-    function setOnDemandEnabled(uint64 quorumId, PaymentVaultTypes.QuorumProtocolConfig memory protocolCfg)
-        external
-        onlyQuorumOwner(quorumId)
-    {
-        ps().quorum[quorumId].protocolCfg.onDemandEnabled = protocolCfg.onDemandEnabled;
+    function setOnDemandEnabled(uint64 quorumId, bool enabled) external onlyQuorumOwner(quorumId) {
+        ps().quorum[quorumId].protocolCfg.onDemandEnabled = enabled;
     }
 
     /// QUORUM OWNER
 
-    function createReservation(uint64 quorumId, address account, PaymentVaultTypes.Reservation memory reservation)
+    function addReservation(uint64 quorumId, address account, PaymentVaultTypes.Reservation memory reservation)
         external
         onlyQuorumOwner(quorumId)
     {

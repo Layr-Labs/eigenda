@@ -9,6 +9,18 @@ import {PaymentVaultStorage} from "src/core/libraries/v3/payment/PaymentVaultSto
 library PaymentVaultLib {
     using SafeERC20 for IERC20;
 
+    event ReservationAdded(uint64 indexed quorumId, address indexed account, PaymentVaultTypes.Reservation reservation);
+
+    event ReservationIncreased(
+        uint64 indexed quorumId, address indexed account, PaymentVaultTypes.Reservation reservation
+    );
+
+    event ReservationDecreased(
+        uint64 indexed quorumId, address indexed account, PaymentVaultTypes.Reservation reservation
+    );
+
+    event DepositOnDemand(uint64 indexed quorumId, address indexed account, uint256 amount);
+
     function s() internal pure returns (PaymentVaultStorage.Layout storage) {
         return PaymentVaultStorage.layout();
     }
@@ -33,6 +45,7 @@ library PaymentVaultLib {
             quorumId, reservation.startTimestamp, reservation.endTimestamp, reservation.symbolsPerSecond, schedulePeriod
         );
         s().quorum[quorumId].user[account].reservation = reservation;
+        emit ReservationAdded(quorumId, account, reservation);
     }
 
     /// @notice Updates a reservation for a user in a quorum. Requires that the start timestamp matches the current reservation,
@@ -79,6 +92,7 @@ library PaymentVaultLib {
             );
         }
         s().quorum[quorumId].user[account].reservation = reservation;
+        emit ReservationIncreased(quorumId, account, reservation);
     }
 
     /// @notice Updates a reservation for a user in a quorum. Requires that the start timestamp matches the current reservation,
@@ -126,6 +140,7 @@ library PaymentVaultLib {
             );
         }
         s().quorum[quorumId].user[account].reservation = reservation;
+        emit ReservationDecreased(quorumId, account, reservation);
     }
 
     /// @notice Does required checks on a reservation
@@ -134,18 +149,19 @@ library PaymentVaultLib {
         view
     {
         PaymentVaultTypes.Quorum storage quorum = s().quorum[quorumId];
+        uint64 roundedCurrentTimestamp = uint64(block.timestamp / schedulePeriod) * schedulePeriod;
         if (reservation.startTimestamp % schedulePeriod != 0) {
             revert IPaymentVault.TimestampSchedulePeriodMismatch(reservation.startTimestamp, schedulePeriod);
         }
         if (reservation.endTimestamp % schedulePeriod != 0) {
             revert IPaymentVault.TimestampSchedulePeriodMismatch(reservation.endTimestamp, schedulePeriod);
         }
-        if (reservation.startTimestamp <= reservation.endTimestamp) {
+        if (reservation.startTimestamp >= reservation.endTimestamp) {
             revert IPaymentVault.InvalidReservationPeriod(reservation.startTimestamp, reservation.endTimestamp);
         }
-        if (reservation.endTimestamp - reservation.startTimestamp > quorum.protocolCfg.reservationAdvanceWindow) {
+        if (reservation.endTimestamp - roundedCurrentTimestamp > quorum.protocolCfg.reservationAdvanceWindow) {
             revert IPaymentVault.ReservationTooLong(
-                reservation.endTimestamp - reservation.startTimestamp, quorum.protocolCfg.reservationAdvanceWindow
+                uint64(reservation.endTimestamp - roundedCurrentTimestamp), quorum.protocolCfg.reservationAdvanceWindow
             );
         }
     }
@@ -164,6 +180,7 @@ library PaymentVaultLib {
         IERC20(cfg.token).safeTransferFrom(account, cfg.recipient, amount);
 
         user.deposit = newAmount;
+        emit DepositOnDemand(quorumId, account, amount);
     }
 
     /// @notice Increases the reserved symbols for a quorum in a given period. Requires that the start and end timestamps are multiples of the schedule period.
@@ -182,7 +199,7 @@ library PaymentVaultLib {
         uint64 maxReservedSymbols = quorum.cfg.reservationSymbolsPerSecond;
         for (uint64 i = startPeriod; i < endPeriod; i++) {
             uint64 reservedSymbols = quorum.reservedSymbols[i] + symbolsPerSecond;
-            if(reservedSymbols > maxReservedSymbols) {
+            if (reservedSymbols > maxReservedSymbols) {
                 revert IPaymentVault.NotEnoughSymbolsAvailable(i * schedulePeriod, reservedSymbols, maxReservedSymbols);
             }
             quorum.reservedSymbols[i] = reservedSymbols;

@@ -4,9 +4,7 @@ pragma solidity ^0.8.9;
 import {PaymentVaultTypes} from "src/core/libraries/v3/payment/PaymentVaultTypes.sol";
 
 interface IPaymentVault {
-    event ReservationCreated(
-        uint64 indexed quorumId, address indexed account, PaymentVaultTypes.Reservation reservation
-    );
+    error OnDemandDisabled(uint64 quorumId);
 
     error ReservationStillActive(uint64 endTimestamp);
 
