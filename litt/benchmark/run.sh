@@ -8,6 +8,8 @@ SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 (
     cd "$SCRIPT_DIR/.." || exit 1
     make build || exit 1
-    ./bin/benchmark "$@"
+
+    BINARY_PATH=$(cd "$(dirname './bin/benchmark')" && pwd)/$(basename './bin/benchmark')
 )
 
+$BINARY_PATH "$@"
