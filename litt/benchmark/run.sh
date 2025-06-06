@@ -5,12 +5,15 @@
 # Find the directory of this script
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 
-(
-    cd "$SCRIPT_DIR/.." || exit 1
-    make build || exit 1
+# Get the absolute path to the binary.
+BINARY_PATH="$SCRIPT_DIR/../bin/benchmark"
+BINARY_PATH="$(cd "$(dirname "BINARY_PATH")" && pwd)/$(basename "BINARY_PATH")"
 
-    BIN_PATH=$(cd "$(dirname './bin')" && pwd)/$(basename './bin')
-    BINARY_PATH="${BIN_PATH}/benchmark"
-)
+CONFIG_PATH=""${1}
+if [ -z "$CONFIG_PATH" ]; then
+    echo "Usage: $0 <config_path>"
+    exit 1
+fi
+CONFIG_PATH="$(cd "$(dirname "CONFIG_PATH")" && pwd)/$(basename "CONFIG_PATH")"
 
-$BINARY_PATH "$@"
+$BINARY_PATH $CONFIG_PATH
