@@ -171,6 +171,8 @@ func (b *BenchmarkEngine) writer() {
 		default:
 			batchSize := uint64(0)
 
+			writtenIndices := make([]uint64, 0)
+
 			for batchSize < maxBatchSize {
 				writeInfo := b.dataTracker.GetWriteInfo()
 				batchSize += uint64(len(writeInfo.Value))
@@ -191,7 +193,7 @@ func (b *BenchmarkEngine) writer() {
 				}
 
 				b.metrics.reportWrite(time.Since(start), uint64(len(writeInfo.Value)))
-				b.dataTracker.ReportWrite(writeInfo.KeyIndex)
+				writtenIndices = append(writtenIndices, writeInfo.KeyIndex)
 			}
 
 			start := time.Now()
@@ -202,6 +204,10 @@ func (b *BenchmarkEngine) writer() {
 			}
 
 			b.metrics.reportFlush(time.Since(start))
+
+			for _, index := range writtenIndices {
+				b.dataTracker.ReportWrite(index)
+			}
 		}
 	}
 }
@@ -249,7 +255,12 @@ func (b *BenchmarkEngine) reader() {
 			b.metrics.reportRead(time.Since(start), uint64(len(readInfo.Value)))
 
 			if !exists {
-				panic(fmt.Sprintf("key %s not found in database", readInfo.Key)) // TODO not clean
+				if b.config.PanicOnReadFailure {
+					panic(fmt.Sprintf("key %s not found in database", readInfo.Key)) // TODO not clean
+				} else {
+					b.logger.Warnf("key %s not found in database", readInfo.Key)
+					continue
+				}
 			}
 			err = b.verifyValue(readInfo, value)
 			if err != nil {

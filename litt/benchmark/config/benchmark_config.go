@@ -73,6 +73,12 @@ type BenchmarkConfig struct {
 
 	// The frequency at which the benchmark logs metrics, in seconds. If zero, then metrics logging is disabled.
 	MetricsLoggingPeriodSeconds float64
+
+	// If true, the benchmark will panic and halt if there is a read failure.
+	// There is currently a rare bug somewhere, I suspect in metadata tracking. The bug can cause
+	// the benchmark to read a key that is no longer present in the database. Until that bug is fixed,
+	// do not halt the benchmark on read failures by default.
+	PanicOnReadFailure bool
 }
 
 // DefaultBenchmarkConfig returns a default BenchmarkConfig with the given data paths.
@@ -101,6 +107,7 @@ func DefaultBenchmarkConfig() *BenchmarkConfig {
 		RandomPoolSize:              units.GiB,
 		StartupSleepFactorSeconds:   0.5,
 		MetricsLoggingPeriodSeconds: 60.0,
+		PanicOnReadFailure:          false,
 	}
 }
 
