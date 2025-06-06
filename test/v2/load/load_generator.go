@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/pprof"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -26,8 +27,8 @@ type LoadGenerator struct {
 	config *LoadGeneratorConfig
 	// The test client to use for the load test.
 	client *client.TestClient
-	// The time between starting each blob submission.
-	submissionPeriod time.Duration
+	// The frequency at which blobs are submitted, in HZ.
+	submissionFrequency float64
 	// The channel to limit the number of parallel blob submissions.
 	submissionLimiter chan struct{}
 	// The channel to limit the number of parallel blob reads sent to the relays.
@@ -44,6 +45,8 @@ type LoadGenerator struct {
 	metrics *loadGeneratorMetrics
 	// Pool of random number generators
 	randPool *sync.Pool
+	// The time when the load generator started.
+	startTime time.Time
 }
 
 // ReadConfigFile loads a LoadGeneratorConfig from a file.
@@ -57,7 +60,7 @@ func ReadConfigFile(filePath string) (*LoadGeneratorConfig, error) {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	config := &LoadGeneratorConfig{}
+	config := DefaultLoadGeneratorConfig()
 	err = json.Unmarshal(configFileBytes, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)
@@ -75,8 +78,6 @@ func NewLoadGenerator(
 	averageBlobSize := config.AverageBlobSizeMB * units.MiB
 
 	submissionFrequency := bytesPerSecond / averageBlobSize
-	submissionPeriod := 1 / submissionFrequency
-	submissionPeriodAsDuration := time.Duration(submissionPeriod * float64(time.Second))
 
 	submissionLimiter := make(chan struct{}, config.SubmissionParallelism)
 	relayReadLimiter := make(chan struct{}, config.RelayReadParallelism)
@@ -111,7 +112,7 @@ func NewLoadGenerator(
 		cancel:               cancel,
 		config:               config,
 		client:               client,
-		submissionPeriod:     submissionPeriodAsDuration,
+		submissionFrequency:  submissionFrequency,
 		submissionLimiter:    submissionLimiter,
 		relayReadLimiter:     relayReadLimiter,
 		lifecycleLimiter:     lifecycleLimiter,
@@ -120,6 +121,7 @@ func NewLoadGenerator(
 		finishedChan:         make(chan struct{}),
 		randPool:             randPool,
 		metrics:              metrics,
+		startTime:            time.Now(),
 	}
 }
 
@@ -143,9 +145,29 @@ func (l *LoadGenerator) Stop() {
 
 // run runs the load generator.
 func (l *LoadGenerator) run() {
-	ticker := time.NewTicker(l.submissionPeriod)
+
+	// Start with frequency 0.
+	ticker, err := common.NewVariableTickerWithFrequency(l.ctx, 0)
+	if err != nil {
+		// Not possible, error is only returned with invalid arguments, and 0hz is a valid frequency.
+		panic(fmt.Errorf("failed to create variable ticker: %w", err))
+	}
+
+	defer ticker.Close()
+	// Set acceleration prior to setting target frequency, since acceleration 0 allows "infinite" acceleration.
+	err = ticker.SetAcceleration(l.config.FrequencyAcceleration)
+	if err != nil {
+		// load generator configuration error, no way to recover
+		panic(fmt.Errorf("failed to set acceleration: %w", err))
+	}
+	err = ticker.SetTargetFrequency(l.submissionFrequency)
+	if err != nil {
+		// load generator configuration error, no way to recover
+		panic(fmt.Errorf("failed to set target frequency: %w", err))
+	}
+
 	for l.alive.Load() {
-		<-ticker.C
+		<-ticker.Tick()
 
 		l.lifecycleLimiter <- struct{}{}
 		go func() {
