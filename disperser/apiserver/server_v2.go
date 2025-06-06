@@ -297,10 +297,10 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 	// on-chain global payment parameters
-	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetGlobalSymbolsPerSecond()
-	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols()
-	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol()
-	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
+	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetOnDemandGlobalSymbolsPerSecond(core.QuorumID(0))
+	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols(core.QuorumID(0))
+	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol(core.QuorumID(0))
+	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow(core.QuorumID(0))
 
 	// off-chain account specific payment state
 	now := time.Now().Unix()
@@ -318,8 +318,9 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		largestCumulativePaymentBytes = largestCumulativePayment.Bytes()
 	}
 	// on-Chain account state
+	quorumIds := s.onchainState.Load().getAllQuorumIds()
 	var pbReservation *pb.Reservation
-	reservations, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
+	reservations, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, accountID, quorumIds)
 	if err != nil {
 		s.logger.Debug("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
 	} else {
@@ -372,4 +373,16 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 // TODO(hopeyen): separate this into a subsequent PR
 func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, req *pb.GetPaymentStateForAllQuorumsRequest) (*pb.GetPaymentStateForAllQuorumsReply, error) {
 	return nil, api.NewErrorUnimplemented()
+}
+
+// getAllQuorumIds returns a slice of all quorum IDs (from 0 to quorumCount-1)
+// Returns an empty slice if the onchain state is not loaded
+func (o *OnchainState) getAllQuorumIds() []core.QuorumID {
+	quorumCount := o.QuorumCount
+	quorumIds := make([]core.QuorumID, quorumCount)
+	for i := range quorumIds {
+		quorumIds[i] = core.QuorumID(i)
+	}
+
+	return quorumIds
 }
