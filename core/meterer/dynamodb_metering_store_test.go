@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	pb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
@@ -26,7 +27,7 @@ type testContext struct {
 	globalBinTable   string
 }
 
-// setupTest creates a test context with tables created and cleaned up after the test
+// setupTest creates a test context with tables created
 func setupTest(t *testing.T) *testContext {
 	tc := &testContext{
 		ctx:              context.Background(),
@@ -35,10 +36,8 @@ func setupTest(t *testing.T) *testContext {
 		globalBinTable:   fmt.Sprintf("global_bin_test_%d", rand.Int()),
 	}
 
-	var err error
-
 	// Create the tables
-	err = meterer.CreateReservationTable(clientConfig, tc.reservationTable)
+	err := meterer.CreateReservationTable(clientConfig, tc.reservationTable)
 	require.NoError(t, err)
 
 	err = meterer.CreateOnDemandTable(clientConfig, tc.onDemandTable)
@@ -46,11 +45,6 @@ func setupTest(t *testing.T) *testContext {
 
 	err = meterer.CreateGlobalReservationTable(clientConfig, tc.globalBinTable)
 	require.NoError(t, err)
-
-	// Register cleanup to remove tables after test completes
-	t.Cleanup(func() {
-		cleanupTables(tc)
-	})
 
 	// Create the MeteringStore (using DynamoDBStore implementation)
 	tc.store, err = meterer.NewDynamoDBMeteringStore(
@@ -65,8 +59,8 @@ func setupTest(t *testing.T) *testContext {
 	return tc
 }
 
-// cleanupTables removes all tables created for a test
-func cleanupTables(tc *testContext) {
+// cleanupTest removes all tables created for a test
+func cleanupTest(t *testing.T, tc *testContext) {
 	_ = dynamoClient.DeleteTable(tc.ctx, tc.reservationTable)
 	_ = dynamoClient.DeleteTable(tc.ctx, tc.onDemandTable)
 	_ = dynamoClient.DeleteTable(tc.ctx, tc.globalBinTable)
@@ -460,4 +454,185 @@ func TestGetLargestCumulativePayment(t *testing.T) {
 	// Test case 8: Verify rolling back a non-existent payment has no effect
 	err = tc.store.RollbackOnDemandPayment(tc.ctx, accountID, big.NewInt(9999), big.NewInt(500))
 	require.NoError(t, err)
+}
+
+// TestGetPeriodRecords tests the GetPeriodRecords function
+func TestGetPeriodRecords(t *testing.T) {
+	accountID := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
+	quorum1 := core.QuorumID(1)
+	quorum2 := core.QuorumID(2)
+	period1 := uint64(42)
+	period2 := uint64(43)
+	size1 := uint64(100)
+	size2 := uint64(200)
+
+	t.Run("empty input", func(t *testing.T) {
+		tc := setupTest(t)
+		t.Cleanup(func() { cleanupTest(t, tc) })
+		records, err := tc.store.GetPeriodRecords(tc.ctx, accountID, []core.QuorumID{}, []uint64{}, 5)
+		require.NoError(t, err)
+		assert.Empty(t, records)
+	})
+
+	t.Run("single quorum single period", func(t *testing.T) {
+		tc := setupTest(t)
+		t.Cleanup(func() { cleanupTest(t, tc) })
+		// Setup
+		_, err := tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum1}, map[core.QuorumID]uint64{quorum1: period1}, map[core.QuorumID]uint64{quorum1: size1})
+		require.NoError(t, err)
+
+		// Get the records
+		records, err := tc.store.GetPeriodRecords(tc.ctx, accountID, []core.QuorumID{quorum1}, []uint64{period1}, 1)
+		require.NoError(t, err)
+		require.Len(t, records, 1)
+		require.Contains(t, records, quorum1)
+		require.Len(t, records[quorum1].Records, 1)
+		assert.Equal(t, period1, uint64(records[quorum1].Records[0].Index))
+		assert.Equal(t, size1, records[quorum1].Records[0].Usage)
+	})
+
+	t.Run("multiple quorums multiple periods", func(t *testing.T) {
+		tc := setupTest(t)
+		t.Cleanup(func() { cleanupTest(t, tc) })
+		// Setup
+		_, err := tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum1, quorum2},
+			map[core.QuorumID]uint64{quorum1: period1, quorum2: period2},
+			map[core.QuorumID]uint64{quorum1: size1, quorum2: size2})
+		require.NoError(t, err)
+
+		// Get the records
+		records, err := tc.store.GetPeriodRecords(tc.ctx, accountID, []core.QuorumID{quorum1, quorum2}, []uint64{period1, period2}, 1)
+		require.NoError(t, err)
+		require.Len(t, records, 2)
+
+		// Check quorum1 records
+		require.Contains(t, records, quorum1)
+		require.Len(t, records[quorum1].Records, 1)
+		assert.Equal(t, period1, uint64(records[quorum1].Records[0].Index))
+		assert.Equal(t, size1, records[quorum1].Records[0].Usage)
+
+		// Check quorum2 records
+		require.Contains(t, records, quorum2)
+		require.Len(t, records[quorum2].Records, 1)
+		assert.Equal(t, period2, uint64(records[quorum2].Records[0].Index))
+		assert.Equal(t, size2, records[quorum2].Records[0].Usage)
+	})
+
+	t.Run("multiple periods for same quorum", func(t *testing.T) {
+		tc := setupTest(t)
+		t.Cleanup(func() { cleanupTest(t, tc) })
+		// Setup
+		_, err := tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum1},
+			map[core.QuorumID]uint64{quorum1: period1},
+			map[core.QuorumID]uint64{quorum1: size1})
+		require.NoError(t, err)
+
+		_, err = tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum1},
+			map[core.QuorumID]uint64{quorum1: period2},
+			map[core.QuorumID]uint64{quorum1: size2})
+		require.NoError(t, err)
+
+		// Get the records
+		records, err := tc.store.GetPeriodRecords(tc.ctx, accountID, []core.QuorumID{quorum1}, []uint64{period1}, 2)
+		require.NoError(t, err)
+		require.Len(t, records, 1)
+		require.Contains(t, records, quorum1)
+		require.Len(t, records[quorum1].Records, 2)
+
+		// Find and verify period1 record
+		var period1Record *pb.PeriodRecord
+		for _, record := range records[quorum1].Records {
+			if record.Index == uint32(period1) {
+				period1Record = record
+				break
+			}
+		}
+		require.NotNil(t, period1Record, "Period1 record not found")
+		assert.Equal(t, size1, period1Record.Usage)
+
+		// Find and verify period2 record
+		var period2Record *pb.PeriodRecord
+		for _, record := range records[quorum1].Records {
+			if record.Index == uint32(period2) {
+				period2Record = record
+				break
+			}
+		}
+		require.NotNil(t, period2Record, "Period2 record not found")
+		assert.Equal(t, size2, period2Record.Usage)
+
+		// Verify no other periods exist
+		for _, record := range records[quorum1].Records {
+			assert.True(t, record.Index == uint32(period1) || record.Index == uint32(period2),
+				"Unexpected period index found: %d", record.Index)
+		}
+	})
+
+	t.Run("numBins larger than existing periods", func(t *testing.T) {
+		tc := setupTest(t)
+		t.Cleanup(func() { cleanupTest(t, tc) })
+		// Setup
+		_, err := tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum1},
+			map[core.QuorumID]uint64{quorum1: 1},
+			map[core.QuorumID]uint64{quorum1: size1})
+		require.NoError(t, err)
+
+		_, err = tc.store.IncrementBinUsages(tc.ctx, accountID, []core.QuorumID{quorum1},
+			map[core.QuorumID]uint64{quorum1: 2},
+			map[core.QuorumID]uint64{quorum1: size2})
+		require.NoError(t, err)
+
+		// Request 5 bins but only 2 exist
+		records, err := tc.store.GetPeriodRecords(tc.ctx, accountID, []core.QuorumID{quorum1}, []uint64{1}, 5)
+		require.NoError(t, err)
+		require.Len(t, records, 1)
+		require.Contains(t, records, quorum1)
+		require.Len(t, records[quorum1].Records, 2, "Should only return existing periods")
+
+		// Verify period 1
+		var period1Record *pb.PeriodRecord
+		for _, record := range records[quorum1].Records {
+			if record.Index == 1 {
+				period1Record = record
+				break
+			}
+		}
+		require.NotNil(t, period1Record, "Period 1 record not found")
+		assert.Equal(t, size1, period1Record.Usage)
+
+		// Verify period 2
+		var period2Record *pb.PeriodRecord
+		for _, record := range records[quorum1].Records {
+			if record.Index == 2 {
+				period2Record = record
+				break
+			}
+		}
+		require.NotNil(t, period2Record, "Period 2 record not found")
+		assert.Equal(t, size2, period2Record.Usage)
+
+		// Verify no other periods exist
+		for _, record := range records[quorum1].Records {
+			assert.True(t, record.Index == 1 || record.Index == 2,
+				"Unexpected period index found: %d", record.Index)
+		}
+	})
+
+	t.Run("nonexistent periods", func(t *testing.T) {
+		tc := setupTest(t)
+		t.Cleanup(func() { cleanupTest(t, tc) })
+		// Try to get records for periods that don't exist
+		records, err := tc.store.GetPeriodRecords(tc.ctx, accountID, []core.QuorumID{quorum1}, []uint64{999}, 1)
+		require.NoError(t, err)
+		assert.Empty(t, records)
+	})
+
+	t.Run("mismatched quorum and period lengths", func(t *testing.T) {
+		tc := setupTest(t)
+		t.Cleanup(func() { cleanupTest(t, tc) })
+		// Test with mismatched lengths
+		records, err := tc.store.GetPeriodRecords(tc.ctx, accountID, []core.QuorumID{quorum1}, []uint64{period1, period2}, 1)
+		require.NoError(t, err)
+		assert.Empty(t, records)
+	})
 }

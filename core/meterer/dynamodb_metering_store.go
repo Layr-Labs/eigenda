@@ -296,8 +296,12 @@ func (s *DynamoDBMeteringStore) GetPeriodRecords(
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse period record: %w", err)
 		}
-		records[quorumNumber] = &pb.PeriodRecords{
-			Records: []*pb.PeriodRecord{periodRecord},
+		if existingRecords, exists := records[quorumNumber]; exists {
+			existingRecords.Records = append(existingRecords.Records, periodRecord)
+		} else {
+			records[quorumNumber] = &pb.PeriodRecords{
+				Records: []*pb.PeriodRecord{periodRecord},
+			}
 		}
 	}
 
@@ -370,19 +374,19 @@ func parsePeriodRecord(bin map[string]types.AttributeValue) (core.QuorumID, *pb.
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to parse BinUsage: %w", err)
 	}
-	accountIDAndQuorum, ok := bin["AccountIDAndQuorum"]
+	accountIDAndQuorum, ok := bin["AccountID"]
 	if !ok {
-		return 0, nil, errors.New("AccountIDAndQuorum is not present in the response")
+		return 0, nil, errors.New("AccountID is not present in the response")
 	}
 
 	accountIDAndQuorumAttr, ok := accountIDAndQuorum.(*types.AttributeValueMemberS)
 	if !ok {
-		return 0, nil, fmt.Errorf("unexpected type for AccountIDAndQuorum: %T", accountIDAndQuorum)
+		return 0, nil, fmt.Errorf("unexpected type for AccountID: %T", accountIDAndQuorum)
 	}
 
 	parts := strings.Split(accountIDAndQuorumAttr.Value, ":")
 	if len(parts) != 2 {
-		return 0, nil, fmt.Errorf("invalid AccountIDAndQuorum format: %s", accountIDAndQuorumAttr.Value)
+		return 0, nil, fmt.Errorf("invalid AccountID format: %s", accountIDAndQuorumAttr.Value)
 	}
 
 	quorumNumber, err := strconv.ParseUint(parts[1], 10, 32)
