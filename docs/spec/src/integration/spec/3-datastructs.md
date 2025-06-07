@@ -61,7 +61,7 @@ The `blobHeader` is submitted alongside the `blob` as part of the DisperseBlob r
 
 ![image.png](../../assets/integration/blob-certificate.png)
 
-Refer to the eigenda [protobufs](../../protobufs/generated/disperser_v2.md) documentation for full details of this struct.
+Refer to the eigenda [protobufs](https://github.com/Layr-Labs/eigenda/blob/58acdfdae98a897c1eceb4690b7fac4d3e8acb1e/api/proto/disperser/v2/disperser_v2.proto) for full details of this struct.
 
 ### DACertificate
 
