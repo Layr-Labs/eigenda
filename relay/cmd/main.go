@@ -50,7 +50,7 @@ func RunRelay(ctx *cli.Context) error {
 		return fmt.Errorf("failed to create relay config: %w", err)
 	}
 
-	logger, err := common.NewLogger(config.Log)
+	logger, err := common.NewLogger(&config.Log)
 	if err != nil {
 		return fmt.Errorf("failed to create logger: %w", err)
 	}

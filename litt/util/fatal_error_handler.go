@@ -9,36 +9,38 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// FatalErrorHandler is a struct that permits the DB to "panic". There are many goroutines that function under the hood,
-// and many of these threads could, in theory, encounter errors which are unrecoverable. In such situations, the
-// desirable outcome is for the DB to report the error and then refuse to do additional work. If the DB is in a broken
-// state, it is much better to refuse to do work than to continue to do work and potentially corrupt data.
+// ErrorMonitor is a struct that permits the process to "panic" without using the golang panic keyword.
+// When there are goroutines that function under the hood that are unable to return errors using the standard pattern,
+// this utility provides an elegant way to handle those errors. In such situations, the desirable outcome is for the
+// process to report the error and to elegantly spin itself down.
 //
-// Even though this utility can "panic", it is not the same as the panic that is built into Go. Once the DB "panics",
-// all public methods will return a meaningful error, and the DB will refuse to do additional work.
-type FatalErrorHandler struct {
+// Even though this utility can "panic", it is not the same as the panic that is built into Go. The Panic() method
+// should be called in situations where recovery is not possible, i.e. the same situations where one would otherwise use
+// as a golang panic. The big difference is that calling Panic() will not result in the process immediately being torn
+// down.
+type ErrorMonitor struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
 	logger logging.Logger
 
-	// callback is called when the DB panics.
+	// callback is called when the Panic() method is called for the first time.
 	callback func(error)
 
-	// If this is non-nil, the DB is in a "panic" state and will refuse to do additional work.
+	// If this is non-nil, the monitor is either in a "panic" state or a "shutdown" state.
 	error atomic.Pointer[error]
 }
 
-// NewFatalErrorHandler creates a new FatalErrorHandler struct. Executes the callback function when/if the DB panics.
+// NewErrorMonitor creates a new ErrorMonitor struct. Executes the callback function when/if Panic() is called.
 // The callback is ignored if it is nil.
-func NewFatalErrorHandler(
+func NewErrorMonitor(
 	ctx context.Context,
 	logger logging.Logger,
-	callback func(error)) *FatalErrorHandler {
+	callback func(error)) *ErrorMonitor {
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	return &FatalErrorHandler{
+	return &ErrorMonitor{
 		ctx:      ctx,
 		cancel:   cancel,
 		logger:   logger,
@@ -46,41 +48,42 @@ func NewFatalErrorHandler(
 	}
 }
 
-// AwaitIfNotFatal waits for a value to be sent on a channel. If the channel sends a value, the value is returned.
-// If the DB panics before the channel sends a value, an error is returned.
-func AwaitIfNotFatal[T any](handler *FatalErrorHandler, channel <-chan T) (T, error) {
+// Await waits for a value to be sent on a channel. If the channel sends a value, the value is returned.
+// If the Panic() is called before the channel sends a value, an error is returned.
+func Await[T any](handler *ErrorMonitor, channel <-chan T) (T, error) {
 	select {
 	case value := <-channel:
 		return value, nil
 	case <-handler.ImmediateShutdownRequired():
 		var zero T
-		return zero, fmt.Errorf("DB context cancelled")
+		return zero, fmt.Errorf("context cancelled")
 	}
 }
 
-// SendIfNotFatal sends a value on a channel. If the value is sent, nil is returned. If the DB panics before the value
+// Send sends a value on a channel. If the value is sent, nil is returned. If the Panic() is called before the value
 // is sent, an error is returned.
-func SendIfNotFatal[T any](handler *FatalErrorHandler, channel chan<- any, value T) error {
+func Send[T any](handler *ErrorMonitor, channel chan<- any, value T) error {
 	select {
 	case channel <- value:
 		return nil
 	case <-handler.ImmediateShutdownRequired():
-		return fmt.Errorf("DB context cancelled")
+		return fmt.Errorf("context cancelled")
 	}
 }
 
-// ImmediateShutdownRequired returns a channel that is closed when the DB "panics". The channel might also be
-// closed if the parent context is cancelled, and so this channel being closed can't be used to infer that the
-// DB is in a panicked state. When this channel is closed, it is expected that all DB goroutines immediately shut down.
-func (h *FatalErrorHandler) ImmediateShutdownRequired() <-chan struct{} {
+// ImmediateShutdownRequired returns an output channel that is closed when Panic() is called. The channel might also be
+// closed if the parent context is cancelled, and so this channel being closed can't be used to infer that we are
+// in a panicked state.
+func (h *ErrorMonitor) ImmediateShutdownRequired() <-chan struct{} {
 	return h.ctx.Done()
 }
 
-// IsOk returns true if the DB is in a good state, and false if the DB is in a "panic" state.
-// The error returned is the error that caused the DB to panic, and does not indicate that
-// the call to IsOk() failed. If the DB has panicked multiple times, the error returned will
-// be the first error that caused the DB to panic.
-func (h *FatalErrorHandler) IsOk() (bool, error) {
+// IsOk returns true if the ErrorMonitor is in a good state, and false if in a "panic" or "shutdown" state.
+// If Panic() was called, the error returned is the error that caused the panic, and does not indicate that
+// the call to IsOk() failed. If the Panic() has been called multiple times, the error returned will
+// be the first error passed to Panic(). If Panic() has not been called and Shutdown() has not been called,
+// the error returned will describe the shutdown.
+func (h *ErrorMonitor) IsOk() (bool, error) {
 	err := h.error.Load()
 	if err != nil {
 		return false, *err
@@ -88,23 +91,19 @@ func (h *FatalErrorHandler) IsOk() (bool, error) {
 	return true, nil
 }
 
-// Shutdown causes the DB to enter a "shutdown" state. Once the DB is in a "shutdown" state,
-// it will refuse to do additional work. Does not cancel the context.
-func (h *FatalErrorHandler) Shutdown() {
-	err := fmt.Errorf("DB is shut down")
+// Shutdown causes the ErrorMonitor to enter a "shutdown" state. Causes ImmediateShutdownRequired() to signal.
+func (h *ErrorMonitor) Shutdown() {
+	err := fmt.Errorf("monitor is shut down")
 
 	// don't overwrite the error if there is already an error stored
 	h.error.CompareAndSwap(nil, &err)
 }
 
 // Panic time! Something just went very wrong. (╯°□°)╯︵ ┻━┻
-//
-// Panic causes the DB to enter a "panic" state. Once the DB is in a "panic" state, it will refuse to do
-// additional work. As a result of this method, the context managed by the DB is cancelled.
-func (h *FatalErrorHandler) Panic(err error) {
+func (h *ErrorMonitor) Panic(err error) {
 	stackTrace := string(debug.Stack())
 
-	h.logger.Errorf("LittDB encountered an unrecoverable error: %v\n%s", err, stackTrace)
+	h.logger.Errorf("monitor encountered an unrecoverable error: %v\n%s", err, stackTrace)
 
 	// only store the error if there isn't already an error stored
 	firstError := h.error.CompareAndSwap(nil, &err)

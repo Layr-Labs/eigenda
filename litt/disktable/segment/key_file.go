@@ -19,7 +19,7 @@ const KeyFileExtension = ".keys"
 
 // KeyFileSwapExtension is the file extension for the keys swap file. This file is used to atomically
 // update key files.
-const KeyFileSwapExtension = ".keys.swap"
+const KeyFileSwapExtension = KeyFileExtension + util.SwapFileExtension
 
 // keyFile tracks the keys in a segment. It is used to do garbage collection on the keymap.
 //
@@ -162,9 +162,9 @@ func (k *keyFile) atomicSwap() error {
 	k.swap = false
 	newPath := k.path()
 
-	err := os.Rename(swapPath, newPath)
+	err := util.AtomicRename(swapPath, newPath)
 	if err != nil {
-		return fmt.Errorf("failed to rename key file: %v", err)
+		return fmt.Errorf("failed to atomically swap key file %s with %s: %v", swapPath, newPath, err)
 	}
 
 	return nil

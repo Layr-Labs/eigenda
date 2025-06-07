@@ -7,6 +7,8 @@ import (
 	"path"
 	"strconv"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/litt/util"
 )
 
 const (
@@ -18,7 +20,7 @@ const (
 	// the metadata file by doing an atomic rename of the swap file to the metadata file. If this file is ever
 	// present when the database first starts, it is an artifact of a crash during a metadata update, and should be
 	// deleted.
-	MetadataSwapExtension = ".metadata.swap"
+	MetadataSwapExtension = MetadataFileExtension + util.SwapFileExtension
 
 	// V0MetadataSize is the size the metadata file at version 0 (aka OldHashFunctionSegmentVersion)
 	// This is a constant, so it's convenient to have it here.
@@ -180,16 +182,6 @@ func (m *metadataFile) path() string {
 	return path.Join(m.parentDirectory, m.name())
 }
 
-// SwapName returns the file name for the swap file for this metadata file.
-func (m *metadataFile) swapName() string {
-	return fmt.Sprintf("%d%s", m.index, MetadataSwapExtension)
-}
-
-// SwapPath returns the full path to the swap file for this metadata file.
-func (m *metadataFile) swapPath() string {
-	return path.Join(m.parentDirectory, m.swapName())
-}
-
 // Seal seals the segment. This action will atomically write the metadata file to disk one final time,
 // and should only be performed when all data that will be written to the key/value files has been made durable.
 func (m *metadataFile) seal(now time.Time, keyCount uint32) error {
@@ -349,27 +341,9 @@ func (m *metadataFile) deserialize(data []byte) error {
 
 // write atomically writes the metadata file to disk.
 func (m *metadataFile) write() error {
-	bytes := m.serialize()
-	swapPath := m.swapPath()
-	swapFile, err := os.Create(swapPath)
+	err := util.AtomicWrite(m.path(), m.serialize())
 	if err != nil {
-		return fmt.Errorf("failed to create swap file %s: %v", swapPath, err)
-	}
-
-	_, err = swapFile.Write(bytes)
-	if err != nil {
-		return fmt.Errorf("failed to write to swap file %s: %v", swapPath, err)
-	}
-
-	err = swapFile.Close()
-	if err != nil {
-		return fmt.Errorf("failed to close swap file %s: %v", swapPath, err)
-	}
-
-	metadataPath := m.path()
-	err = os.Rename(swapPath, metadataPath)
-	if err != nil {
-		return fmt.Errorf("failed to rename swap file %s to metadata file %s: %v", swapPath, metadataPath, err)
+		return fmt.Errorf("failed to write metadata file %s: %v", m.path(), err)
 	}
 
 	return nil

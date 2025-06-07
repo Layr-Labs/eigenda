@@ -320,7 +320,7 @@ func restartTest(t *testing.T, tableBuilder *tableBuilder) {
 
 		// Somewhere in the middle of the test, restart the table.
 		if i == restartIteration {
-			ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+			ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 			require.True(t, ok)
 			err = table.Close()
 			require.NoError(t, err)
@@ -394,7 +394,7 @@ func restartTest(t *testing.T, tableBuilder *tableBuilder) {
 		}
 	}
 
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -458,17 +458,17 @@ func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelet
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Close()
 	require.NoError(t, err)
 
-	fatalErrorHandler := table.(*DiskTable).fatalErrorHandler
+	errorMonitor := table.(*DiskTable).errorMonitor
 
 	// Delete a file in the middle of the sequence of segments.
 	lowestSegmentIndex, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
-		fatalErrorHandler,
+		errorMonitor,
 		[]string{directory + "/table/segments"},
 		time.Now())
 	require.NoError(t, err)
@@ -575,14 +575,14 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Close()
 	require.NoError(t, err)
 
 	lowestSegmentIndex, _, segments, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).fatalErrorHandler,
+		table.(*DiskTable).errorMonitor,
 		[]string{directory + "/table/segments"},
 		time.Now())
 	require.NoError(t, err)
@@ -694,7 +694,7 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 		}
 	}
 
-	ok, _ = table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ = table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -764,14 +764,14 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Close()
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).fatalErrorHandler,
+		table.(*DiskTable).errorMonitor,
 		[]string{directory + "/table/segments"},
 		time.Now())
 	require.NoError(t, err)
@@ -888,7 +888,7 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 		}
 	}
 
-	ok, _ = table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ = table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -963,7 +963,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	// if there is no data to be truncated.
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).fatalErrorHandler,
+		table.(*DiskTable).errorMonitor,
 		[]string{directory + "/table/segments"},
 		time.Now())
 	require.NoError(t, err)
@@ -981,14 +981,14 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Close()
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).fatalErrorHandler,
+		table.(*DiskTable).errorMonitor,
 		[]string{directory + "/table/segments"},
 		time.Now())
 	require.NoError(t, err)
@@ -1118,7 +1118,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		}
 	}
 
-	ok, _ = table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ = table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -1185,7 +1185,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).fatalErrorHandler,
+		table.(*DiskTable).errorMonitor,
 		[]string{directory + "/table/segments"},
 		time.Now())
 	require.NoError(t, err)
@@ -1203,14 +1203,14 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Close()
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).fatalErrorHandler,
+		table.(*DiskTable).errorMonitor,
 		[]string{directory + "/table/segments"},
 		time.Now())
 	require.NoError(t, err)
@@ -1358,7 +1358,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		}
 	}
 
-	ok, _ = table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ = table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -1428,7 +1428,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	// if there is no data left unflushed.
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).fatalErrorHandler,
+		table.(*DiskTable).errorMonitor,
 		[]string{directory + "/table/segments"},
 		time.Now())
 	require.NoError(t, err)
@@ -1445,14 +1445,14 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	}
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Close()
 	require.NoError(t, err)
 
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
-		table.(*DiskTable).fatalErrorHandler,
+		table.(*DiskTable).errorMonitor,
 		[]string{directory + "/table/segments"},
 		time.Now())
 	require.NoError(t, err)
@@ -1571,7 +1571,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	// do bad things if it is going to. Nothing bad should happen if the GC is implemented correctly.
 	time.Sleep(50 * time.Millisecond)
 
-	ok, _ = table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ = table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -1611,7 +1611,7 @@ func metadataPreservedOnRestartTest(t *testing.T, tableBuilder *tableBuilder) {
 	require.NoError(t, err)
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Close()
 	require.NoError(t, err)
@@ -1660,7 +1660,7 @@ func orphanedMetadataTest(t *testing.T, tableBuilder *tableBuilder) {
 	require.NoError(t, err)
 
 	// Stop the table
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Close()
 	require.NoError(t, err)
@@ -1723,7 +1723,7 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder *table
 
 		// Somewhere in the middle of the test, restart the table.
 		if i == restartIteration {
-			ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+			ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 			require.True(t, ok)
 			err = table.Close()
 			require.NoError(t, err)
@@ -1833,7 +1833,7 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder *table
 		}
 	}
 
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 	err = table.Destroy()
 	require.NoError(t, err)
@@ -1943,7 +1943,7 @@ func changingShardingFactorTest(t *testing.T, tableBuilder *tableBuilder) {
 		if i == restartIteration {
 			expectedShardCounts[getLatestSegmentIndex(table)] = shardingFactor
 
-			ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+			ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 			require.True(t, ok)
 			err = table.Close()
 			require.NoError(t, err)
@@ -2030,7 +2030,7 @@ func changingShardingFactorTest(t *testing.T, tableBuilder *tableBuilder) {
 		}
 	}
 
-	ok, _ := table.(*DiskTable).fatalErrorHandler.IsOk()
+	ok, _ := table.(*DiskTable).errorMonitor.IsOk()
 	require.True(t, ok)
 
 	err = table.Close()
