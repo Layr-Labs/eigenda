@@ -248,7 +248,7 @@ func setupPayloadDisperserWithRouter() error {
 		Port:     "32005",
 	}
 
-	disperserClient, err := clientsv2.NewDisperserClient(disperserClientConfig, signer, nil, nil)
+	disperserClient, err := clientsv2.NewDisperserClient(logger, disperserClientConfig, signer, nil, nil)
 	if err != nil {
 		return err
 	}
