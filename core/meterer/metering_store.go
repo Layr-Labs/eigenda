@@ -9,7 +9,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-const MinNumBins int32 = 3
+const MinNumBins uint32 = 3
 
 // MeteringStore defines the interface for storage backends
 // used to track reservation and payment usage data
@@ -27,8 +27,9 @@ type MeteringStore interface {
 	// RollbackOnDemandPayment rolls back a payment to the previous value
 	RollbackOnDemandPayment(ctx context.Context, accountID gethcommon.Address, newPayment, oldPayment *big.Int) error
 
-	// GetPeriodRecords fetches period records for the given account ID and reservation period
-	GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, reservationPeriod uint64) ([MinNumBins]*pb.PeriodRecord, error)
+	// GetPeriodRecords fetches period records for the given account ID and reservation period across multiple quorums
+	// Consider alternative replacement: singular quorumId and reservationPeriod as an input, require multiple calls
+	GetPeriodRecords(ctx context.Context, accountID gethcommon.Address, quorumIds []core.QuorumID, reservationPeriods []uint64, numBins uint32) (map[core.QuorumID]*pb.PeriodRecords, error)
 
 	// GetLargestCumulativePayment returns the largest cumulative payment for the given account
 	GetLargestCumulativePayment(ctx context.Context, accountID gethcommon.Address) (*big.Int, error)
