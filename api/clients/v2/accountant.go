@@ -1,7 +1,6 @@
 package clients
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	"sync"
@@ -24,22 +23,23 @@ type Accountant struct {
 	minNumSymbols     uint64
 
 	// local accounting
-	// contains 3 bins; circular wrapping of indices
+	// contains an array of period records, with length of max(MinNumBins, numBins)
+	// numBins can be arbitrarily bigger than MinNumBins if the client wants to track more history in the cache
 	periodRecords     []PeriodRecord
 	usageLock         sync.Mutex
 	cumulativePayment *big.Int
-
-	// number of bins in the circular accounting, restricted by minNumBins which is 3
-	numBins uint32
 }
 
+// PeriodRecord contains the index of the reservation period and the usage of the period
 type PeriodRecord struct {
+	// Index is start timestamp of the period in seconds; it is always a multiple of the reservation window
 	Index uint32
+	// Usage is the usage of the period in symbols
 	Usage uint64
 }
 
 func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint64, pricePerSymbol uint64, minNumSymbols uint64, numBins uint32) *Accountant {
-	periodRecords := make([]PeriodRecord, numBins)
+	periodRecords := make([]PeriodRecord, max(numBins, uint32(meterer.MinNumBins)))
 	for i := range periodRecords {
 		periodRecords[i] = PeriodRecord{Index: uint32(i), Usage: 0}
 	}
@@ -52,13 +52,12 @@ func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayme
 		minNumSymbols:     minNumSymbols,
 		periodRecords:     periodRecords,
 		cumulativePayment: big.NewInt(0),
-		numBins:           max(numBins, uint32(meterer.MinNumBins)),
 	}
 	// TODO: add a routine to refresh the on-chain state occasionally?
 	return &a
 }
 
-// BlobPaymentInfo calculates and records payment information. The accountant
+// blobPaymentInfo calculates and records payment information. The accountant
 // will attempt to use the active reservation first and check for quorum settings,
 // then on-demand if the reservation is not available. It takes in a timestamp at
 // the current UNIX time in nanoseconds, and returns a cumulative payment for on-
@@ -67,8 +66,7 @@ func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayme
 // indicating on-demand payment.
 // These generated values are used to create the payment header and signature, as specified in
 // api/proto/common/v2/common_v2.proto
-func (a *Accountant) BlobPaymentInfo(
-	ctx context.Context,
+func (a *Accountant) blobPaymentInfo(
 	numSymbols uint64,
 	quorumNumbers []uint8,
 	timestamp int64) (*big.Int, error) {
@@ -76,28 +74,28 @@ func (a *Accountant) BlobPaymentInfo(
 	symbolUsage := meterer.SymbolsCharged(numSymbols, a.minNumSymbols)
 
 	// Always try to use reservation first
-	payment, err := a.ReservationUsage(symbolUsage, quorumNumbers, timestamp)
+	payment, err := a.reservationUsage(symbolUsage, quorumNumbers, timestamp)
 	if err == nil {
 		return payment, nil
 	}
 
 	// Fall back to on-demand payment if reservation fails
-	return a.OnDemandUsage(symbolUsage, quorumNumbers)
+	return a.onDemandUsage(symbolUsage, quorumNumbers)
 }
 
-// ReservationUsage attempts to use the reservation for the given request.
+// reservationUsage attempts to use the reservation for the given request.
 // Returns (0, nil) if successful, or (nil, error) if reservation cannot be used.
-func (a *Accountant) ReservationUsage(
+func (a *Accountant) reservationUsage(
 	symbolUsage uint64,
 	quorumNumbers []uint8,
 	timestamp int64) (*big.Int, error) {
 
-	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, a.reservationWindow)
+	reservationWindow := a.reservationWindow
+	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, reservationWindow)
 
 	a.usageLock.Lock()
 	defer a.usageLock.Unlock()
-
-	relativePeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod)
+	relativePeriodRecord := a.getOrRefreshRelativePeriodRecord(currentReservationPeriod, reservationWindow)
 	relativePeriodRecord.Usage += symbolUsage
 
 	// Check if we can use the reservation within the bin limit
@@ -109,8 +107,8 @@ func (a *Accountant) ReservationUsage(
 		return big.NewInt(0), nil
 	}
 
-	// Try to use overflow bin if available
-	overflowPeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod + 2)
+	overflowPeriodRecord := a.getOrRefreshRelativePeriodRecord(currentReservationPeriod+2*reservationWindow, reservationWindow)
+	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
 	if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
 		if err := meterer.ValidateQuorum(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return nil, err
@@ -124,9 +122,9 @@ func (a *Accountant) ReservationUsage(
 	return nil, fmt.Errorf("insufficient reservation")
 }
 
-// OnDemandUsage attempts to use on-demand payment for the given request.
+// onDemandUsage attempts to use on-demand payment for the given request.
 // Returns the cumulative payment if successful, or an error if on-demand cannot be used.
-func (a *Accountant) OnDemandUsage(
+func (a *Accountant) onDemandUsage(
 	symbolUsage uint64,
 	quorumNumbers []uint8) (*big.Int, error) {
 
@@ -147,12 +145,11 @@ func (a *Accountant) OnDemandUsage(
 
 // AccountBlob accountant provides and records payment information
 func (a *Accountant) AccountBlob(
-	ctx context.Context,
 	timestamp int64,
 	numSymbols uint64,
 	quorums []uint8) (*core.PaymentMetadata, error) {
 
-	cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums, timestamp)
+	cumulativePayment, err := a.blobPaymentInfo(numSymbols, quorums, timestamp)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create payment infomation for reservation or on-demand. Consider depositing more eth to the PaymentVault contract for your account. For more details, see https://docs.eigenda.xyz/core-concepts/payments#disperser-client-requirements. Account: %s, Error: %s", a.accountID.Hex(), err.Error())
 	}
@@ -166,9 +163,14 @@ func (a *Accountant) AccountBlob(
 	return pm, nil
 }
 
-func (a *Accountant) GetRelativePeriodRecord(index uint64) *PeriodRecord {
-	relativeIndex := uint32(index % uint64(a.numBins))
-	if a.periodRecords[relativeIndex].Index != uint32(index) {
+// getOrRefreshRelativePeriodRecord returns the period record for the given index (which is in seconds and is the multiple of the reservation window),
+// wrapping around the circular buffer and clearing the record if the index is greater than the number of bins
+func (a *Accountant) getOrRefreshRelativePeriodRecord(index uint64, reservationWindow uint64) *PeriodRecord {
+	relativeIndex := uint32((index / reservationWindow) % uint64(len(a.periodRecords)))
+	if relativeIndex >= uint32(len(a.periodRecords)) {
+		panic(fmt.Sprintf("relativeIndex %d is greater than the number of bins %d cached", relativeIndex, len(a.periodRecords)))
+	}
+	if a.periodRecords[relativeIndex].Index < uint32(index) {
 		a.periodRecords[relativeIndex] = PeriodRecord{
 			Index: uint32(index),
 			Usage: 0,
