@@ -22,9 +22,6 @@ import (
 
 var _ litt.ManagedTable = (*DiskTable)(nil)
 
-// segmentDirectory is the directory where segment files are stored, relative to the root directory.
-const segmentDirectory = "segments"
-
 // keymapReloadBatchSize is the size of the batch used for reloading keys from segments into the keymap.
 const keymapReloadBatchSize = 1024
 
@@ -44,8 +41,8 @@ type DiskTable struct {
 	// The root directories for the disk table.
 	roots []string
 
-	// The directories where segment files are stored.
-	segmentDirectories []string
+	// Configures the location where segment data is stored.
+	segmentPaths []*segment.SegmentPath
 
 	// The table's name.
 	name string
@@ -116,21 +113,14 @@ func NewDiskTable(
 	}
 
 	// For each root directory, create a segment directory if it doesn't exist.
-	segDirs := make([]string, 0, len(roots))
-	for _, root := range roots {
-		segDir := path.Join(root, segmentDirectory)
-		segDirs = append(segDirs, segDir)
-
-		exists, err := util.Exists(segDir)
+	segmentPaths, err := segment.BuildSegmentPaths(roots, config.SnapshotDirectory, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build segment paths: %w", err)
+	}
+	for _, segmentPath := range segmentPaths {
+		err = segmentPath.MakeDirectories()
 		if err != nil {
-			return nil, fmt.Errorf("failed to check if segment directory exists: %w", err)
-		}
-
-		if !exists {
-			err := os.MkdirAll(segDir, 0755)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create segment directory: %w", err)
-			}
+			return nil, fmt.Errorf("failed to create segment directories: %w", err)
 		}
 	}
 
@@ -175,24 +165,24 @@ func NewDiskTable(
 	errorMonitor := util.NewErrorMonitor(config.CTX, config.Logger, config.FatalErrorCallback)
 
 	table := &DiskTable{
-		logger:             config.Logger,
-		errorMonitor:       errorMonitor,
-		clock:              config.Clock,
-		roots:              roots,
-		segmentDirectories: segDirs,
-		name:               name,
-		metadata:           metadata,
-		keymap:             keymap,
-		keymapPath:         keymapPath,
-		keymapTypeFile:     keymapTypeFile,
-		metrics:            metrics,
+		logger:         config.Logger,
+		errorMonitor:   errorMonitor,
+		clock:          config.Clock,
+		roots:          roots,
+		segmentPaths:   segmentPaths,
+		name:           name,
+		metadata:       metadata,
+		keymap:         keymap,
+		keymapPath:     keymapPath,
+		keymapTypeFile: keymapTypeFile,
+		metrics:        metrics,
 	}
 
 	lowestSegmentIndex, highestSegmentIndex, segments, err :=
 		segment.GatherSegmentFiles(
 			config.Logger,
 			errorMonitor,
-			table.segmentDirectories,
+			table.segmentPaths,
 			config.Clock())
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather segment files: %w", err)
@@ -227,7 +217,7 @@ func NewDiskTable(
 		config.Logger,
 		errorMonitor,
 		nextSegmentIndex,
-		segDirs,
+		segmentPaths,
 		metadata.GetShardingFactor(),
 		salt,
 		config.Fsync)
@@ -278,7 +268,7 @@ func NewDiskTable(
 		targetKeyFileSize:       config.TargetSegmentKeyFileSize,
 		maxKeyCount:             config.MaxSegmentKeyCount,
 		clock:                   config.Clock,
-		segmentDirectories:      segDirs,
+		segmentPaths:            segmentPaths,
 		saltShaker:              tableSaltShaker,
 		metadata:                metadata,
 		fsync:                   config.Fsync,
@@ -431,9 +421,9 @@ func (d *DiskTable) Destroy() error {
 		}
 	}
 
-	// delete all segment directories
-	for _, segDir := range d.segmentDirectories {
-		err = os.Remove(segDir)
+	// delete all segment directories (ignore snapshots -- this is the responsibility of an outside process to clean)
+	for _, segmentPath := range d.segmentPaths {
+		err = os.Remove(segmentPath.SegmentDirectory())
 		if err != nil {
 			return fmt.Errorf("failed to remove segment directory: %w", err)
 		}

@@ -466,10 +466,12 @@ func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelet
 	errorMonitor := table.(*DiskTable).errorMonitor
 
 	// Delete a file in the middle of the sequence of segments.
+	segmentPath, err := segment.NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
 	lowestSegmentIndex, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
 		errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
 		time.Now())
 	require.NoError(t, err)
 
@@ -580,10 +582,12 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 	err = table.Close()
 	require.NoError(t, err)
 
+	segmentPath, err := segment.NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
 	lowestSegmentIndex, _, segments, err := segment.GatherSegmentFiles(
 		logger,
 		table.(*DiskTable).errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
 		time.Now())
 	require.NoError(t, err)
 
@@ -769,10 +773,12 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 	err = table.Close()
 	require.NoError(t, err)
 
+	segmentPath, err := segment.NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
 		table.(*DiskTable).errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
 		time.Now())
 	require.NoError(t, err)
 
@@ -961,10 +967,12 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 
 	// If the last segment is empty, write a final value to make it non-empty. This test isn't interesting
 	// if there is no data to be truncated.
+	segmentPath, err := segment.NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
 		table.(*DiskTable).errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
 		time.Now())
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
@@ -989,7 +997,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
 		table.(*DiskTable).errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
 		time.Now())
 	require.NoError(t, err)
 
@@ -1183,10 +1191,12 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	err = table.Flush()
 	require.NoError(t, err)
 
+	segmentPath, err := segment.NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
 		table.(*DiskTable).errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
 		time.Now())
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
@@ -1211,7 +1221,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
 		table.(*DiskTable).errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
 		time.Now())
 	require.NoError(t, err)
 
@@ -1426,10 +1436,12 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 
 	// If the last segment is empty, write a final value to make it non-empty. This test isn't interesting
 	// if there is no data left unflushed.
+	segmentPath, err := segment.NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
 	_, highestSegmentIndex, _, err := segment.GatherSegmentFiles(
 		logger,
 		table.(*DiskTable).errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
 		time.Now())
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/table/segments/%d%s",
@@ -1453,7 +1465,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	_, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(
 		logger,
 		table.(*DiskTable).errorMonitor,
-		[]string{directory + "/table/segments"},
+		[]*segment.SegmentPath{segmentPath},
 		time.Now())
 	require.NoError(t, err)
 

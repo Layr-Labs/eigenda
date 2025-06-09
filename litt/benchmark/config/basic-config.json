@@ -3,5 +3,6 @@
     "Paths": ["~/benchmark/volume1", "~/benchmark/volume2", "~/benchmark/volume3"]
   },
   "TTLHours": 0.0834,
-  "MaximumWriteThroughputMB": 100
+  "MaximumWriteThroughputMB": 1024,
+  "MetricsLoggingPeriodSeconds": 1
 }

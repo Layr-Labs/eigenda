@@ -84,54 +84,32 @@ type Segment struct {
 	// segment but have not yet been flushed to the keymap. When the segment is eventually sealed, the code
 	// asserts that this value is zero. This check should never fail, but is a nice safety net.
 	unflushedKeyCount atomic.Int64
+
+	// If true, then take a snapshot of the segment when it is sealed.
+	snapshottingEnabled bool
 }
 
 // CreateSegment creates a new data segment.
-//
-// Note that shardingFactor and salt parameters are ignored if this is not a new segment. Segments loaded from
-// disk always use their original sharding factor and salt values
 func CreateSegment(
 	logger logging.Logger,
 	errorMonitor *util.ErrorMonitor,
 	index uint32,
-	parentDirectories []string,
+	segmentPaths []*SegmentPath,
 	shardingFactor uint32,
 	salt [16]byte,
 	fsync bool) (*Segment, error) {
 
-	if len(parentDirectories) == 0 {
-		return nil, errors.New("no parent directories provided")
+	if len(segmentPaths) == 0 {
+		return nil, errors.New("no segment paths provided")
 	}
+	snapshottingEnabled := segmentPaths[0].SnapshottingEnabled()
 
-	// look for the metadata file
-	metadataPath, err := lookForFile(parentDirectories, fmt.Sprintf("%d%s", index, MetadataFileExtension))
-	var metadataDir string
-	if err != nil {
-		return nil, fmt.Errorf("failed to find metadata file: %v", err)
-	}
-	if metadataPath != "" {
-		metadataDir = path.Dir(metadataPath)
-	} else {
-		// By default, put the metadata file in the first parent directory.
-		metadataDir = parentDirectories[0]
-	}
-	metadata, err := createMetadataFile(index, shardingFactor, salt, metadataDir)
+	metadata, err := createMetadataFile(index, shardingFactor, salt, segmentPaths[0])
 	if err != nil {
 		return nil, fmt.Errorf("failed to open metadata file: %v", err)
 	}
 
-	keysPath, err := lookForFile(parentDirectories, fmt.Sprintf("%d%s", index, KeyFileExtension))
-	var keysDirectory string
-	if err != nil {
-		return nil, fmt.Errorf("failed to find key file: %v", err)
-	}
-	if keysPath != "" {
-		keysDirectory = path.Dir(keysPath)
-	} else {
-		// By default, put the key file in the first parent directory.
-		keysDirectory = parentDirectories[0]
-	}
-	keys, err := createKeyFile(logger, index, keysDirectory, false)
+	keys, err := createKeyFile(logger, index, segmentPaths[0], false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open key file: %v", err)
 	}
@@ -140,13 +118,13 @@ func CreateSegment(
 
 	shards := make([]*valueFile, metadata.shardingFactor)
 	for shard := uint32(0); shard < metadata.shardingFactor; shard++ {
-		// Assign value files to parent directories in a round-robin fashion.
+		// Assign value files to available segment paths in a round-robin fashion.
 		// Assign the first shard to the directory at index 1. The first directory
 		// is used by the keymap, so if we have enough directories we don't want to
 		// use it for value files too.
-		parentDirectory := parentDirectories[int(shard+1)%len(parentDirectories)]
+		segmentPath := segmentPaths[int(shard+1)%len(segmentPaths)]
 
-		values, err := createValueFile(logger, index, shard, parentDirectory, fsync)
+		values, err := createValueFile(logger, index, shard, segmentPath, fsync)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open value file: %v", err)
 		}
@@ -166,17 +144,18 @@ func CreateSegment(
 	keyFileChannel := make(chan any, shardControlChannelCapacity*metadata.shardingFactor)
 
 	segment := &Segment{
-		logger:          logger,
-		errorMonitor:    errorMonitor,
-		index:           index,
-		metadata:        metadata,
-		keys:            keys,
-		shards:          shards,
-		shardSizes:      shardSizes,
-		keyFileSize:     keyFileSize,
-		shardChannels:   shardChannels,
-		keyFileChannel:  keyFileChannel,
-		deletionChannel: make(chan struct{}, 1),
+		logger:              logger,
+		errorMonitor:        errorMonitor,
+		index:               index,
+		metadata:            metadata,
+		keys:                keys,
+		shards:              shards,
+		shardSizes:          shardSizes,
+		keyFileSize:         keyFileSize,
+		shardChannels:       shardChannels,
+		keyFileChannel:      keyFileChannel,
+		deletionChannel:     make(chan struct{}, 1),
+		snapshottingEnabled: snapshottingEnabled,
 	}
 
 	// Segments are returned with an initial reference count of 1, as the caller of the constructor is considered to
@@ -197,21 +176,21 @@ func CreateSegment(
 func LoadSegment(logger logging.Logger,
 	errorMonitor *util.ErrorMonitor,
 	index uint32,
-	parentDirectories []string,
+	segmentPaths []*SegmentPath,
 	now time.Time) (*Segment, error) {
 
-	if len(parentDirectories) == 0 {
-		return nil, errors.New("no parent directories provided")
+	if len(segmentPaths) == 0 {
+		return nil, errors.New("no segment paths provided")
 	}
 
 	// Look for the metadata file.
-	metadata, err := loadMetadataFile(index, parentDirectories)
+	metadata, err := loadMetadataFile(index, segmentPaths)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open metadata file: %w", err)
 	}
 
 	// Look for the key file.
-	keys, err := loadKeyFile(logger, index, parentDirectories, metadata.segmentVersion)
+	keys, err := loadKeyFile(logger, index, segmentPaths, metadata.segmentVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open key file: %v", err)
 	}
@@ -220,7 +199,7 @@ func LoadSegment(logger logging.Logger,
 	// Look for the value files. There should be one for each shard.
 	shards := make([]*valueFile, metadata.shardingFactor)
 	for shard := uint32(0); shard < metadata.shardingFactor; shard++ {
-		values, err := loadValueFile(logger, index, shard, parentDirectories)
+		values, err := loadValueFile(logger, index, shard, segmentPaths)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open value file: %v", err)
 		}
@@ -292,7 +271,7 @@ func (s *Segment) sealLoadedSegment(now time.Time) error {
 		s.logger.Warnf("segment %d has %d unflushed value(s)",
 			s.index, len(badKeys))
 
-		swapFile, err := createKeyFile(s.logger, s.index, s.keys.parentDirectory, true)
+		swapFile, err := createKeyFile(s.logger, s.index, s.keys.segmentPath, true)
 		if err != nil {
 			return fmt.Errorf("failed to create swap key file: %w", err)
 		}
@@ -353,27 +332,27 @@ func (s *Segment) KeyCount() uint32 {
 }
 
 // lookForFile looks for a file in a list of directories. It returns an error if the file appears
-// in more than one directory, and an empty string if the file is not found. If the file is found and
-// there are no errors, this method returns the path to the file.
-func lookForFile(directories []string, fileName string) (string, error) {
-	locations := make([]string, 0, 1)
-	for _, directory := range directories {
-		potentialLocation := path.Join(directory, fileName)
+// in more than one directory, and nil if the file is not found. If the file is found and
+// there are no errors, this method returns the SegmentPath where the file was found.
+func lookForFile(paths []*SegmentPath, fileName string) (*SegmentPath, error) {
+	locations := make([]*SegmentPath, 0, 1)
+	for _, possiblePath := range paths {
+		potentialLocation := path.Join(possiblePath.segmentDirectory, fileName)
 		exists, err := util.Exists(potentialLocation)
 		if err != nil {
-			return "", fmt.Errorf("failed to check if file %s exists: %v", potentialLocation, err)
+			return nil, fmt.Errorf("failed to check if file %s exists: %v", potentialLocation, err)
 		}
 		if exists {
-			locations = append(locations, potentialLocation)
+			locations = append(locations, possiblePath)
 		}
 	}
 
 	if len(locations) > 1 {
-		return "", fmt.Errorf("file %s found in multiple directories: %v", fileName, locations)
+		return nil, fmt.Errorf("file %s found in multiple directories: %v", fileName, locations)
 	}
 
 	if len(locations) == 0 {
-		return "", nil
+		return nil, nil
 	}
 	return locations[0], nil
 }
@@ -545,6 +524,31 @@ func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 	}, nil
 }
 
+// Snapshot takes a snapshot of the files in the segment.
+func (s *Segment) Snapshot() error {
+
+	// TODO should this happen in the background?
+
+	err := s.metadata.snapshot()
+	if err != nil {
+		return fmt.Errorf("failed to snapshot metadata file: %w", err)
+	}
+
+	err = s.keys.snapshot()
+	if err != nil {
+		return fmt.Errorf("failed to snapshot key file: %w", err)
+	}
+
+	for shardIndex, shard := range s.shards {
+		err = shard.snapshot()
+		if err != nil {
+			return fmt.Errorf("failed to snapshot value file for shard %d: %w", shardIndex, err)
+		}
+	}
+
+	return nil
+}
+
 // Seal flushes all data to disk and finalizes the metadata. Returns addresses that became durable as a result of
 // this method call. After this method is called, no more data can be written to this segment.
 func (s *Segment) Seal(now time.Time) ([]*types.ScopedKey, error) {
@@ -566,6 +570,13 @@ func (s *Segment) Seal(now time.Time) ([]*types.ScopedKey, error) {
 	unflushedKeyCount := s.unflushedKeyCount.Load()
 	if s.unflushedKeyCount.Load() != 0 {
 		return nil, fmt.Errorf("segment %d has %d unflushedKeyCount keys", s.index, unflushedKeyCount)
+	}
+
+	if s.snapshottingEnabled {
+		err = s.Snapshot()
+		if err != nil {
+			return nil, fmt.Errorf("failed to snapshot segment: %w", err)
+		}
 	}
 
 	return addresses, nil
@@ -792,6 +803,10 @@ type keyFileFlushResponse struct {
 // for writing key-address pairs to the key file.
 func (s *Segment) keyFileControlLoop() {
 	unflushedKeys := make([]*types.ScopedKey, 0, unflushedKeysInitialCapacity)
+
+	defer func() {
+		fmt.Printf("stopping\n") // TODO
+	}()
 
 	for {
 		select {

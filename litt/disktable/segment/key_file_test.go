@@ -29,7 +29,9 @@ func TestReadWriteKeys(t *testing.T) {
 		keys[i] = &types.ScopedKey{Key: key, Address: address, ValueSize: valueSize}
 	}
 
-	file, err := createKeyFile(logger, index, directory, false)
+	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
+	file, err := createKeyFile(logger, index, segmentPath, false)
 	require.NoError(t, err)
 
 	for _, key := range keys {
@@ -60,7 +62,7 @@ func TestReadWriteKeys(t *testing.T) {
 	}
 
 	// Create a new in-memory instance from the on-disk file and verify that it behaves the same.
-	file2, err := loadKeyFile(logger, index, []string{directory}, ValueSizeSegmentVersion)
+	file2, err := loadKeyFile(logger, index, []*SegmentPath{segmentPath}, ValueSizeSegmentVersion)
 	require.NoError(t, err)
 	require.Equal(t, file.Size(), file2.Size())
 
@@ -100,7 +102,9 @@ func TestReadingTruncatedKeyFile(t *testing.T) {
 		keys[i] = &types.ScopedKey{Key: key, Address: address, ValueSize: valueSize}
 	}
 
-	file, err := createKeyFile(logger, index, directory, false)
+	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
+	file, err := createKeyFile(logger, index, segmentPath, false)
 	require.NoError(t, err)
 
 	for _, key := range keys {
@@ -179,7 +183,9 @@ func TestSwappingKeyFile(t *testing.T) {
 		keys[i] = &types.ScopedKey{Key: key, Address: address, ValueSize: valueSize}
 	}
 
-	file, err := createKeyFile(logger, index, directory, false)
+	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
+	file, err := createKeyFile(logger, index, segmentPath, false)
 	require.NoError(t, err)
 
 	for _, key := range keys {
@@ -210,7 +216,7 @@ func TestSwappingKeyFile(t *testing.T) {
 	}
 
 	// Create a new in-memory instance from the on-disk file and verify that it behaves the same.
-	file2, err := loadKeyFile(logger, index, []string{directory}, ValueSizeSegmentVersion)
+	file2, err := loadKeyFile(logger, index, []*SegmentPath{segmentPath}, ValueSizeSegmentVersion)
 	require.NoError(t, err)
 	require.Equal(t, file.Size(), file2.Size())
 
@@ -222,7 +228,7 @@ func TestSwappingKeyFile(t *testing.T) {
 
 	// Create a new version of the key file that only contains the keys at even indices. The intention is to replace
 	// the on-disk file with this new version.
-	swapFile, err := createKeyFile(logger, index, directory, true)
+	swapFile, err := createKeyFile(logger, index, segmentPath, true)
 	require.NoError(t, err)
 	for i := 0; i < int(keyCount); i += 2 {
 		err := swapFile.write(keys[i])
@@ -260,7 +266,7 @@ func TestSwappingKeyFile(t *testing.T) {
 	require.Equal(t, actualSize, reportedSize)
 
 	// Verify the contents of the new file. Reload it from disk just to ensure that we aren't "cheating" somehow.
-	file2, err = loadKeyFile(logger, index, []string{directory}, ValueSizeSegmentVersion)
+	file2, err = loadKeyFile(logger, index, []*SegmentPath{segmentPath}, ValueSizeSegmentVersion)
 	require.NoError(t, err)
 	readKeys, err = file2.readKeys()
 	require.NoError(t, err)

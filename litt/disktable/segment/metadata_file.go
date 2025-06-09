@@ -90,9 +90,8 @@ type metadataFile struct {
 	// to this segment. This value is encoded in the file.
 	sealed bool
 
-	// The parent directory containing this file. This value is not encoded in file, and is stored here
-	// for bookkeeping purposes.
-	parentDirectory string
+	// Path data for the segment file. This information is not serialized in the metadata file.
+	segmentPath *SegmentPath
 }
 
 // createMetadataFile creates a new metadata file. When this method returns, the metadata file will
@@ -101,11 +100,12 @@ func createMetadataFile(
 	index uint32,
 	shardingFactor uint32,
 	salt [16]byte,
-	parentDirectory string) (*metadataFile, error) {
+	path *SegmentPath,
+) (*metadataFile, error) {
 
 	file := &metadataFile{
-		index:           index,
-		parentDirectory: parentDirectory,
+		index:       index,
+		segmentPath: path,
 	}
 
 	file.segmentVersion = LatestSegmentVersion
@@ -121,29 +121,30 @@ func createMetadataFile(
 
 // loadMetadataFile loads the metadata file from disk, looking in the given parent directories until it finds the file.
 // If the file is not found, it returns an error.
-func loadMetadataFile(index uint32, parentDirectories []string) (*metadataFile, error) {
+func loadMetadataFile(index uint32, segmentPaths []*SegmentPath) (*metadataFile, error) {
 	metadataFileName := fmt.Sprintf("%d%s", index, MetadataFileExtension)
-	metadataPath, err := lookForFile(parentDirectories, metadataFileName)
+	metadataPath, err := lookForFile(segmentPaths, metadataFileName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find metadata file: %w", err)
 	}
-	if metadataPath == "" {
+	if metadataPath == nil {
 		return nil, fmt.Errorf("failed to find metadata file %s", metadataFileName)
 	}
-	parentDirectory := path.Dir(metadataPath)
 
 	file := &metadataFile{
-		index:           index,
-		parentDirectory: parentDirectory,
+		index:       index,
+		segmentPath: metadataPath,
 	}
 
-	data, err := os.ReadFile(metadataPath)
+	filePath := file.path()
+
+	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read metadata file %s: %v", metadataPath, err)
+		return nil, fmt.Errorf("failed to read metadata file %s: %v", filePath, err)
 	}
 	err = file.deserialize(data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize metadata file %s: %v", metadataPath, err)
+		return nil, fmt.Errorf("failed to deserialize metadata file %s: %v", filePath, err)
 	}
 
 	return file, nil
@@ -179,7 +180,7 @@ func (m *metadataFile) name() string {
 
 // Path returns the full path to this metadata file.
 func (m *metadataFile) path() string {
-	return path.Join(m.parentDirectory, m.name())
+	return path.Join(m.segmentPath.SegmentDirectory(), m.name())
 }
 
 // Seal seals the segment. This action will atomically write the metadata file to disk one final time,
@@ -344,6 +345,21 @@ func (m *metadataFile) write() error {
 	err := util.AtomicWrite(m.path(), m.serialize())
 	if err != nil {
 		return fmt.Errorf("failed to write metadata file %s: %v", m.path(), err)
+	}
+
+	return nil
+}
+
+// snapshot creates a hard link to the file in the snapshot directory, and a soft link to the hard linked file in the
+// soft link directory. Requires that the file is sealed and that snapshotting is enabled.
+func (m *metadataFile) snapshot() error {
+	if !m.sealed {
+		return fmt.Errorf("file %s is not sealed, cannot take Snapshot", m.path())
+	}
+
+	err := m.segmentPath.Snapshot(m.name())
+	if err != nil {
+		return fmt.Errorf("failed to create Snapshot: %v", err)
 	}
 
 	return nil

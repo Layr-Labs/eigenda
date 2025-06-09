@@ -140,6 +140,24 @@ type Config struct {
 	// a crashed goroutine, a full disk, etc.). If nil (the default), no callback is called. If called at all,
 	// this method is called exactly once.
 	FatalErrorCallback func(error)
+
+	// TODO readme docs on snapshotting
+
+	// If empty, snapshotting is disabled. If not empty, then this directory is used by the database to publish a
+	// rolling sequence of "snapshots". Using the data in the snapshot directory, an external process can safely
+	// get a consistent read-only views of the database.
+	//
+	// The snapshot directory will contain symbolic links to segment files that are safe for external processes to
+	// read/copy. If, at any point in time, an external process takes all data in the snapshot directory and loads
+	// it into a new LittDB instance, then that instance will have a consistent view of the database. (Note that there
+	// are some steps required to load this data into a new database instance.)
+	//
+	// Since data may be spread across multiple physical volumes, it is not possible to create a directory with hard
+	// linked files for all configurations (short of making cost-prohibitive copies). Each symbolic link in the
+	// snapshot directory points to a file that MUST be garbage collected by whatever external process is making use
+	// of database snapshots. Failing to clean up the hard linked files referenced by the symlinks will result in a
+	// disk space leak.
+	SnapshotDirectory string
 }
 
 // DefaultConfig returns a Config with default values.

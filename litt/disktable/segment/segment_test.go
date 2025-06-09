@@ -48,11 +48,13 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	expectedLargestShardSize := uint64(0)
 
 	salt := ([16]byte)(rand.Bytes(16))
+	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
 	seg, err := CreateSegment(
 		logger,
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
-		[]string{directory},
+		[]*SegmentPath{segmentPath},
 		1,
 		salt,
 		false)
@@ -140,7 +142,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 		logger,
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
-		[]string{directory},
+		[]*SegmentPath{segmentPath},
 		time.Now())
 	require.NoError(t, err)
 	require.True(t, seg2.IsSealed())
@@ -191,11 +193,13 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	addressMap := make(map[string]types.Address)
 
 	salt := ([16]byte)(rand.Bytes(16))
+	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
 	seg, err := CreateSegment(
 		logger,
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
-		[]string{directory},
+		[]*SegmentPath{segmentPath},
 		shardCount,
 		salt,
 		false)
@@ -288,7 +292,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 		logger,
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
-		[]string{directory},
+		[]*SegmentPath{segmentPath},
 		time.Now())
 	require.NoError(t, err)
 	require.True(t, seg2.IsSealed())
@@ -343,11 +347,13 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	addressMap := make(map[string]types.Address)
 
 	salt := ([16]byte)(rand.Bytes(16))
+	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
 	seg, err := CreateSegment(
 		logger,
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
-		[]string{directory},
+		[]*SegmentPath{segmentPath},
 		shardCount,
 		salt,
 		false)
@@ -406,7 +412,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 		logger,
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
-		[]string{directory},
+		[]*SegmentPath{segmentPath},
 		time.Now())
 	require.NoError(t, err)
 	require.True(t, seg2.IsSealed())
