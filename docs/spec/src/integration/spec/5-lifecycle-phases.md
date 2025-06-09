@@ -1,106 +1,64 @@
 
 # Lifecycle Phases
 
-## Encoding
+Secure interaction between a rollup and EigenDA is composed of three distinct system flows:
 
-This phase occurs inside the eigenda-proxy, because the proxy acts as the “bridge” between the Rollup Domain and Data Availability Domain (see [lifecycle](./2-rollup-payload-lifecycle.md) diagram).
+1. [**Dispersal**](#secure-dispersal): Submitting raw batch data to the DA network  
+2. [**Retrieval**](#secure-retrieval): Fetching batch data from the DA network  
+3. **Verification**: Ensuring the integrity and quorum-based certification of retrieved data
 
-A `payload` consists of an arbitrary byte array. The DisperseBlob endpoint accepts an `encodedPayload`, which needs to be a bn254 field element array.
+EigenDA *Proxy* is used as the main entrypoint for secure dispersal and retrieval.
 
-## BlobHeader Construction
+## Glossary
+- *Rollup Batcher*: Sequencer rollup node component responsible for constructing and submitting user transaction batches
+- *Rollup Nodes*: Refers to any rollup node (e,g, validator, verifier) which syncs current chain state through an onchain sequencer inbox
+- *Proxy*: Side car server as a part of rollup and used for secure and trustless communication with EigenDA 
 
-The BlobHeader contains 4 main sections that we need to construct.
-
-**Version**
-
-The blobHeader version refers to one of the versionedBlobParams struct defined in the [EigenDAThresholdRegistry](./4-contracts.md#eigendathreshold-registry) contract.
-
-**QuorumNumbers**
-
-QuorumNumbers represents a list a quorums that are required to sign over and make the blob available. Quorum 0 represents the ETH quorum, quorum 1 represents the EIGEN quorum, and both of these are always required. Custom quorums can also be added to this list.
-
-**BlobCommitment**
-
-The BlobCommitment is a binding commitment for an EigenDA Blob. Because of the length field, a BlobCommitment can only represent a single unique `Blob`. It is also used by the disperser to convince EigenDA validators that the chunks that they have received are indeed part of the blob (or its reed-solomon extension). It can either be computed locally from the blob, or one can ask the disperser to generate it via the `GetBlobCommitment` endpoint.
-
-```protobuf
-message BlobCommitment {
-  // A G1 commitment to the blob data.
-  bytes commitment = 1;
-  // A G2 commitment to the blob data.
-  bytes length_commitment = 2;
-    // Used with length_commitment to assert the correctness of the `length` field below.
-  bytes length_proof = 3;
-  // Length in bn254 field elements (32 bytes) of the blob. Must be a power of 2.
-  uint32 length = 4;
-}
-```
-
-Unlike Ethereum blobs which are all 128KiB, EigenDA blobs can be any power of 2 length between 32KiB and 16MiB (currently), and so the `commitment` alone is not sufficient to prevent certain attacks:
-
-- Why is a commitment to the length of the blob necessary?
-    
-    There are different variants of the attack. The basic invariant the system needs to satisfy is that with the chunks from sufficient set of validators, you can get back the full blob. So the total size of the chunks held by these validators needs to exceed the blob size. If I don't know the blob size (or at least an upper bound), there's no way for the system to validate this invariant.
-    Here’s a simple example. Assume a network of 8 DA nodes, and coding ratio 1/2. For a `blob` containing 128 field elements (FEs), each node gets 128*2/8=32 FEs, meaning that any 4 nodes can join forces and reconstruct the data. Now assume a world without length proof; a malicious disperser receives the same blob, uses the same commitment, but claims that the blob only had length 4 FEs. He sends each node 4*2/8=1 FE. The chunks submitted to the nodes match the commitment, so the nodes accept and sign over the blob’s batch. But now there are only 8 FEs in the system, which is not enough to reconstruct the original blob (need at least 128 for that).
-    
-
-> Note that the length here is the length of the blob (power of 2), which is different from the payload_length encoded as part of the `PayloadHeader` in the `blob` itself (see the [encoding section](#encoding)).
-> 
-
-**PaymentHeader**
-
-The paymentHeader specifies how the blob dispersal to the network will be paid for. There are 2 modes of payment, the permissionless pay-per-blob model and the permissioned reserved-bandwidth approach. See the [Payments](https://docs.eigenda.xyz/releases/payments) release doc for full details; we will only describe how to set these 4 fields here.
-
-```protobuf
-message PaymentHeader {
-  // The account ID of the disperser client. This should be a hex-encoded string of the ECDSA public key
-  // corresponding to the key used by the client to sign the BlobHeader.
-  string account_id = 1;
-  // UNIX timestamp in nanoseconds at the time of the dispersal request.
-  // Used to determine the reservation period, for the reserved-bandwidth payment model.
-  int64 timestamp = 2;
-  // Total amount of tokens paid by the requesting account, including the current request.
-  // Used for the pay-per-blob payment model.
-  bytes cumulative_payment = 3;
-}
-```
-
-Users who want to pay-per-blob need to set the cumulative_payment. `timestamp` is used by users who have paid for reserved-bandwidth. If both are set, reserved-bandwidth will be used first, and cumulative_payment only used if the entire bandwidth for the current reservation period has been used up.
-
-An rpc call to the Disperser’s `GetPaymentState` method can be made to query the current state of an `account_id`. A client can query for this information on startup, cache it, and then update it manually when making pay-per-blob payments. In this way, it can keep track of the cumulative_payment and set it correctly for subsequent dispersals.
 
 ## Secure Dispersal
+
 ### Diagram
 ![image.png](../../assets/integration/secure-blob-dispersal.png)
 
 
 ### System Flow
+1. *Proxy* takes a raw [payload](./3-datastructs.md#payload) bytes on `/put` endpoint and [converts](#payload-to-blob-encoding) it into a [blob](./3-datastructs.md#blob).
 
-1. Using `latest_block_number` (lbn) number fetched from ETH RPC node, *Proxy* calls the router to get the `verifier` address *most likely* (if using `EigenDACertVerifierRouter`) to be committed to by the RBN returned by the EigenDA disperser
+1. Using `latest_block_number` (lbn) number fetched from ETH RPC node, *Proxy* calls the router to get the `EigenDACertVerifier` [contract](./4-contracts.md#eigendacertverifier) address *most likely* (if using [`EigenDACertVerifierRouter`](./4-contracts.md#eigendacertverifierrouter)) to be committed to by the `reference_block_number` (rbn) returned by the EigenDA disperser.
 
-2. Using the `verifier`, Proxy fetches the `required_quorums` an embeds them into the `BlobHeader` as part of the disperser request
+2. Using the `verifier`, *Proxy* fetches the `required_quorums` an embeds them into the [`BlobHeader`](./3-datastructs.md#blobheader) as part of the disperser request.
 
-3. *Proxy* submits the payload blob request to the EigenDA disperser and waits for a `BlobStatusReply` (BSR)
+3. The *Proxy* submits the payload blob request to the EigenDA disperser and polls for a [`BlobStatusReply`](../../protobufs/generated/disperser_v2.md#blobstatusreply) (BSR). 
 
-4. While querying the disperser, *Proxy* periodically checks against the confirmation threshold as it’s updated in real-time by the disperser ([reference](#blob-dispersal-with-eigenda-disperser)) using `reference_block_number` (rbn) returned in the `BlobStatusReply`
+4. While querying the disperser, *Proxy* periodically checks against the confirmation threshold as it’s updated in real-time by the disperser using the rbn returned in the `BlobStatusReply` for fetching thresholds. ([ref](#blob-dispersal-with-eigenda-disperser))
 
-5. *Proxy* calls the `verifier`'s `certVersion()` method to get the `cert_version`
+5. Once confirmation thresholds are fulfilled, *Proxy* calls the `verifier`'s `certVersion()` method to get the `cert_version` and casts the `DACert` into a structured ABI binding type using the `cert_version` to dictate which certificate representation to use. ([ref](#blobstatusreply-→-cert))
 
-6.  *Proxy* casts the `DACert` into a structured ABI binding type using the `cert_version` to dictate which certificate representation to use
+7. *Proxy* then passes ABI encoded cert bytes via a call to the `verifier`'s `checkDACert` function which performs onchain cert verification [logic](./6-secure-integration.md#2-cert-validation) and returns a uint `verification_status_code`
 
-7. *Proxy* then passes ABI encoded cert bytes via a call to the `verifier`'s `checkDACert` function which returns a `verification_status_code`
+8. Using the `verification_status_code`, *Proxy* determines whether to return the certificate (`CertV2Lib.StatusCode.SUCCESS`) to the *Rollup Batcher* or retry a subsequent dispersal attempt
 
-8. Using the `verification_status_code`, proxy determines whether to return the certificate (`CertV2Lib.StatusCode.SUCCESS`) or retry a subsequent dispersal attempt
-
-
-### Adding New Verifiers — Synchronization Risk
-
-There is a synchronization risk that can temporarily cause dispersals to fail when adding a new `verifier'` to the `EigenDACertVerifierRouter` at a future activation block number (`abn'`). If `latest_block < abn'` **and** `rbn >= abn'`, dispersals may fail if the `required_quorums` set differs between `verifier` and `verifier'`. In this case, the quorums included in the client's `BlobHeader` (based on the old verifier) would not match those expected by `checkDACert` (using the new verifier). This mismatch results in **at most** a few failed dispersals, which will resolve once `latest_block >= abn'` and `reference_block_number >= abn'`, ensuring verifier consistency.
+9. If valid, *Proxy* converts the `DACert` into an [`altda-commitment`](./3-datastructs.md#altdacommitment), which is ready for direct submission to the batcher’s inbox without requiring any further processing or transformation by the rollup stack.
 
 
-### Blob Dispersal With EigenDA Disperser
+### Payload to Blob Encoding
 
-The `DisperseBlob` method takes a `blob` and `blob_header` as input. Dispersal entails taking a blob, reed-solomon encoding it into chunks, dispersing those to the EigenDA nodes, retrieving their signatures, creating a `DACert` from them, and returning that cert to the client. The disperser batches blobs for a few seconds before dispersing them to nodes, so an entire dispersal process can exceed 10 seconds. For this reason, the API has been designed asynchronously with 2 relevant methods:
+This phase occurs inside the eigenda-proxy, because the proxy acts as the “bridge” between the Rollup Domain and Data Availability Domain (see [lifecycle](./2-rollup-payload-lifecycle.md) diagram).
+
+A `payload` consists of an arbitrary byte array. The DisperseBlob endpoint accepts an `encodedPayload`, which needs to be a bn254 field element array.
+
+
+### Disperser polling
+
+The [`DisperseBlob`](../../protobufs/generated/eigenda-protos.md#disperser) method takes a `blob` and `blob_header` as input. Under the hood, the disperser performs the following steps:
+
+1. **Batching**: The blob is aggregated into a Merkle tree along with other blobs.
+2. **Reed-Solomon Encoding**: The blob is erasure-coded into chunks for fault tolerance.
+3. **Dispersal to Validators**: The chunks are distributed to EigenDA validator nodes based on the required quorum settings.
+4. **Signature Collection**: The disperser collects BLS signatures from participating validators.
+5. **Status Reporting**: A `BlobStatusReply` is returned to the client to reflect progress or terminal status.
+
+The disperser batches blobs for a few seconds before dispersing them to nodes, so an entire dispersal process can exceed 10 seconds. For this reason, the API has been designed asynchronously with 2 relevant methods.
 
 ```protobuf
 // Async call which queues up the blob for processing and immediately returns.
@@ -108,16 +66,6 @@ rpc DisperseBlob(DisperseBlobRequest) returns (DisperseBlobReply) {}
 // Polled for the blob status updates, until a terminal status is received
 rpc GetBlobStatus(BlobStatusRequest) returns (BlobStatusReply) {}
 
-message DisperseBlobRequest {
-  bytes blob = 1;
-  common.v2.BlobHeader blob_header = 2;
-  bytes signature = 3;
-}
-message BlobStatusReply {
-  BlobStatus status = 1;
-  SignedBatch signed_batch = 2;
-  BlobVerificationInfo blob_verification_info = 3;
-}
 
 // Intermediate states: QUEUED, ENCODED, GATHERING_SIGNATURES
 // Terminal states: UNKNOWN, COMPLETE, FAILED
@@ -131,7 +79,7 @@ enum BlobStatus {
 }
 ```
 
-After a successful DisperseBlob RPC call, the disperser returns `BlobStatus.QUEUED`. To retrieve a cert, the GetBlobStatus RPC should be polled until a terminal status is reached.
+After a successful *DisperseBlob* RPC call, the disperser returns `BlobStatus.QUEUED`. To retrieve a valid `BlobStatusResponse`, the *GetBlobStatus* RPC should be polled until a terminal status is reached.
 
 If `BlobStatus.GATHERING_SIGNATURES` is returned, the `signed_batch` and `blob_verification_info` fields will be present in the `BlobStatusReply`. These can be used to construct a `DACert`, which may be verified immediately against the configured threshold parameters stored in the `EigenDACertVerifier` contract. If the verification passes, the certificate can be accepted early. If verification fails, polling should continue.
 
@@ -139,15 +87,15 @@ Once `BlobStatus.COMPLETE` is returned, it indicates that the disperser has stop
 
 Any other terminal status indicates failure, and a new blob dispersal will need to be made.
 
-**Failover to Native Rollup DA**
+#### Failover to Native Rollup DA
 
-The proxy can be configured to retry `UNKNOWN`, `FAILED`, & `COMPLETE` dispersal `n` times, after which it returns to the rollup a `503` HTTP status code which rollup batchers can use to failover to EthDA or native rollup DA offerings (e.g, arbitrum anytrust). See [here](https://github.com/ethereum-optimism/specs/issues/434) for more info on the OP implementation and [here](https://hackmd.io/@epociask/SJUyIZlZkx) for Arbitrum. 
+*Proxy* can be configured to retry `UNKNOWN`, `FAILED`, & `COMPLETE` dispersal `n` times, after which it returns to the rollup a `503` HTTP status code which rollup batchers can use to failover to EthDA or native rollup DA offerings (e.g, arbitrum anytrust). See [here](https://github.com/ethereum-optimism/specs/issues/434) for more info on the OP implementation and [here](https://hackmd.io/@epociask/SJUyIZlZkx) for Arbitrum. 
 
 ### BlobStatusReply → Cert
 
-This is not necessarily part of the spec but is currently needed given that the disperser doesn't actually return a cert, so we need a bit of data processing to transform its returned value into a Cert. The transformation is visualized in the [Ultra High Res Diagram](../spec.md#ultra-high-resolution-diagram). 
+> **Implementation Note**: While not mandated by the EigenDA spec, clients must currently reconstruct the `DACert` from fields in the `BlobStatusReply`, as the disperser does not return a cert directly. The transformation is visualized in the [Ultra High Res Diagram](../spec.md#ultra-high-resolution-diagram). 
 
-In the updated implementation, a `CertBuilder` constructs the DA Cert through direct communication with the `OperatorStateRetriever` contract, which provides the necessary information about operator stake states. This approach ensures accurate on-chain data for certificate verification. The following pseudocode demonstrates this process:
+In the updated implementation, a `CertBuilder` constructs the DA Cert through direct communication with the [`OperatorStateRetriever`](./4-contracts.md#eigenda-managed-contracts) contract, which provides the necessary information about operator stake states. This approach ensures accurate on-chain data for certificate verification. The following pseudocode demonstrates this process:
 
 ```python
 class DACert:
@@ -201,9 +149,7 @@ def get_da_cert(blob_header_hash, operator_state_retriever, cert_version_uint8) 
     
     return DACert(batch_header, blob_verification_proof, nonsigner_stake_sigs, cert_version_uint8, signed_quorum_numbers)
 ```
-## Posting to Ethereum
 
-The proxy converts the `DACert` to an [`altda-commitment`](./3-datastructs.md#altdacommitment) ready to be submitted to the batcher’s inbox without any further modifications by the rollup stack.
 
 ## Secure Retrieval
 

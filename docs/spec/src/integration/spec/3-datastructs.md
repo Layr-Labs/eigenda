@@ -55,13 +55,69 @@ A `blob` is a bn254 field elements array that has a power of 2. It is interprete
 
 An `encodedPayload` can thus be transformed into a `blob` by being padded with 0s to a power of 2, with size currently limited to 16MiB. There is no minimum size, but any blob smaller than 128KiB will be charged for 128KiB.
 
-### BlobHeader And BlobCertificate
+### BlobHeader
 
 The `blobHeader` is submitted alongside the `blob` as part of the DisperseBlob request, and the hash of its rlp serialization (`blobKey` aka `blobHeaderHash`) is a unique identifier for a blob dispersal. This unique identifier is used to retrieve the blob.
 
-![image.png](../../assets/integration/blob-certificate.png)
+The BlobHeader contains 4 main sections that we need to construct. The `BlobHeader` is passed into the `DisperseBlobRequest` and is signed over for payment authorization.
 
-Refer to the eigenda [protobufs](../../protobufs/generated/disperser_v2.md) documentation for full details of this struct.
+**Version**
+
+The blobHeader version refers to one of the versionedBlobParams struct defined in the [EigenDAThresholdRegistry](./4-contracts.md#eigendathreshold-registry) contract.
+
+**QuorumNumbers**
+
+QuorumNumbers represents a list a quorums that are required to sign over and make the blob available. Quorum 0 represents the ETH quorum, quorum 1 represents the EIGEN quorum, and both of these are always required. Custom quorums can also be added to this list.
+
+**BlobCommitment**
+
+The BlobCommitment is a binding commitment for an EigenDA Blob. Because of the length field, a BlobCommitment can only represent a single unique `Blob`. It is also used by the disperser to convince EigenDA validators that the chunks that they have received are indeed part of the blob (or its reed-solomon extension). It can either be computed locally from the blob, or one can ask the disperser to generate it via the `GetBlobCommitment` endpoint.
+
+```protobuf
+message BlobCommitment {
+  // A G1 commitment to the blob data.
+  bytes commitment = 1;
+  // A G2 commitment to the blob data.
+  bytes length_commitment = 2;
+    // Used with length_commitment to assert the correctness of the `length` field below.
+  bytes length_proof = 3;
+  // Length in bn254 field elements (32 bytes) of the blob. Must be a power of 2.
+  uint32 length = 4;
+}
+```
+
+Unlike Ethereum blobs which are all 128KiB, EigenDA blobs can be any power of 2 length between 32KiB and 16MiB (currently), and so the `commitment` alone is not sufficient to prevent certain attacks:
+
+- Why is a commitment to the length of the blob necessary?
+    
+    There are different variants of the attack. The basic invariant the system needs to satisfy is that with the chunks from sufficient set of validators, you can get back the full blob. So the total size of the chunks held by these validators needs to exceed the blob size. If I don't know the blob size (or at least an upper bound), there's no way for the system to validate this invariant.
+    Here’s a simple example. Assume a network of 8 DA nodes, and coding ratio 1/2. For a `blob` containing 128 field elements (FEs), each node gets 128*2/8=32 FEs, meaning that any 4 nodes can join forces and reconstruct the data. Now assume a world without length proof; a malicious disperser receives the same blob, uses the same commitment, but claims that the blob only had length 4 FEs. He sends each node 4*2/8=1 FE. The chunks submitted to the nodes match the commitment, so the nodes accept and sign over the blob’s batch. But now there are only 8 FEs in the system, which is not enough to reconstruct the original blob (need at least 128 for that).
+    
+
+> Note that the length here is the length of the blob (power of 2), which is different from the payload_length encoded as part of the `PayloadHeader` in the `blob` itself (see the [encoding section](#encoding)).
+> 
+
+**PaymentHeader**
+
+The paymentHeader specifies how the blob dispersal to the network will be paid for. There are 2 modes of payment, the permissionless pay-per-blob model and the permissioned reserved-bandwidth approach. See the [Payments](https://docs.eigenda.xyz/releases/payments) release doc for full details; we will only describe how to set these 4 fields here.
+
+```protobuf
+message PaymentHeader {
+  // The account ID of the disperser client. This should be a hex-encoded string of the ECDSA public key
+  // corresponding to the key used by the client to sign the BlobHeader.
+  string account_id = 1;
+  // UNIX timestamp in nanoseconds at the time of the dispersal request.
+  // Used to determine the reservation period, for the reserved-bandwidth payment model.
+  int64 timestamp = 2;
+  // Total amount of tokens paid by the requesting account, including the current request.
+  // Used for the pay-per-blob payment model.
+  bytes cumulative_payment = 3;
+}
+```
+
+Users who want to pay-per-blob need to set the cumulative_payment. `timestamp` is used by users who have paid for reserved-bandwidth. If both are set, reserved-bandwidth will be used first, and cumulative_payment only used if the entire bandwidth for the current reservation period has been used up.
+
+An rpc call to the Disperser’s `GetPaymentState` method can be made to query the current state of an `account_id`. A client can query for this information on startup, cache it, and then update it manually when making pay-per-blob payments. In this way, it can keep track of the cumulative_payment and set it correctly for subsequent dispersals.
 
 ### DACertificate
 
