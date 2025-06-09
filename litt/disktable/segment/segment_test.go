@@ -50,6 +50,8 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	salt := ([16]byte)(rand.Bytes(16))
 	segmentPath, err := NewSegmentPath(directory, "", "table")
 	require.NoError(t, err)
+	err = segmentPath.MakeDirectories()
+	require.NoError(t, err)
 	seg, err := CreateSegment(
 		logger,
 		util.NewErrorMonitor(context.Background(), logger, nil),
@@ -160,12 +162,12 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	require.Equal(t, keysFromSegment, keysFromSegment2)
 
 	// delete the segment
-	require.Equal(t, 3, countFilesInDirectory(t, directory))
+	require.Equal(t, 3, countFilesInDirectory(t, segmentPath.SegmentDirectory()))
 
 	err = seg.delete()
 	require.NoError(t, err)
 
-	require.Equal(t, 0, countFilesInDirectory(t, directory))
+	require.Equal(t, 0, countFilesInDirectory(t, segmentPath.SegmentDirectory()))
 }
 
 func TestWriteAndReadSegmentMultiShard(t *testing.T) {
@@ -194,6 +196,8 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 
 	salt := ([16]byte)(rand.Bytes(16))
 	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
+	err = segmentPath.MakeDirectories()
 	require.NoError(t, err)
 	seg, err := CreateSegment(
 		logger,
@@ -313,12 +317,12 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	require.Equal(t, keysFromSegment, keysFromSegment2)
 
 	// delete the segment
-	require.Equal(t, int(2+shardCount), countFilesInDirectory(t, directory))
+	require.Equal(t, int(2+shardCount), countFilesInDirectory(t, segmentPath.SegmentDirectory()))
 
 	err = seg.delete()
 	require.NoError(t, err)
 
-	require.Equal(t, 0, countFilesInDirectory(t, directory))
+	require.Equal(t, 0, countFilesInDirectory(t, segmentPath.SegmentDirectory()))
 }
 
 // Tests writing and reading, but allocates more shards than values written to force some shards to be empty.
@@ -348,6 +352,8 @@ func TestWriteAndReadColdShard(t *testing.T) {
 
 	salt := ([16]byte)(rand.Bytes(16))
 	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
+	err = segmentPath.MakeDirectories()
 	require.NoError(t, err)
 	seg, err := CreateSegment(
 		logger,
@@ -433,10 +439,10 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	require.Equal(t, keysFromSegment, keysFromSegment2)
 
 	// delete the segment
-	require.Equal(t, int(2+shardCount), countFilesInDirectory(t, directory))
+	require.Equal(t, int(2+shardCount), countFilesInDirectory(t, segmentPath.SegmentDirectory()))
 
 	err = seg.delete()
 	require.NoError(t, err)
 
-	require.Equal(t, 0, countFilesInDirectory(t, directory))
+	require.Equal(t, 0, countFilesInDirectory(t, segmentPath.SegmentDirectory()))
 }

@@ -31,6 +31,8 @@ func TestWriteThenReadValues(t *testing.T) {
 
 	segmentPath, err := NewSegmentPath(directory, "", "table")
 	require.NoError(t, err)
+	err = segmentPath.MakeDirectories()
+	require.NoError(t, err)
 	file, err := createValueFile(logger, index, shard, segmentPath, false)
 	require.NoError(t, err)
 
@@ -113,6 +115,8 @@ func TestReadingTruncatedValueFile(t *testing.T) {
 	addressMap := make(map[uint32][]byte)
 
 	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
+	err = segmentPath.MakeDirectories()
 	require.NoError(t, err)
 	file, err := createValueFile(logger, index, shard, segmentPath, false)
 	require.NoError(t, err)

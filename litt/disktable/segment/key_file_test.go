@@ -31,6 +31,8 @@ func TestReadWriteKeys(t *testing.T) {
 
 	segmentPath, err := NewSegmentPath(directory, "", "table")
 	require.NoError(t, err)
+	err = segmentPath.MakeDirectories()
+	require.NoError(t, err)
 	file, err := createKeyFile(logger, index, segmentPath, false)
 	require.NoError(t, err)
 
@@ -103,6 +105,8 @@ func TestReadingTruncatedKeyFile(t *testing.T) {
 	}
 
 	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
+	err = segmentPath.MakeDirectories()
 	require.NoError(t, err)
 	file, err := createKeyFile(logger, index, segmentPath, false)
 	require.NoError(t, err)
@@ -184,6 +188,8 @@ func TestSwappingKeyFile(t *testing.T) {
 	}
 
 	segmentPath, err := NewSegmentPath(directory, "", "table")
+	require.NoError(t, err)
+	err = segmentPath.MakeDirectories()
 	require.NoError(t, err)
 	file, err := createKeyFile(logger, index, segmentPath, false)
 	require.NoError(t, err)
