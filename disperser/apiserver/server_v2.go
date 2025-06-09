@@ -304,11 +304,28 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 
 	// off-chain account specific payment state
 	now := time.Now().Unix()
-	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
-	periodRecords, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod)
-	if err != nil {
-		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountID)
+	quorumIds := s.onchainState.Load().getAllQuorumIds()
+	// Constructing the strictest period records across all quorums; a client should migrate to GetPaymentStateForAllQuorums for more precise state
+	// TODO(hopeyen): remove this in a subsequent PR. The logic here is complicated and only temporary
+	periods := make([]uint64, len(quorumIds))
+	for i, quorumId := range quorumIds {
+		periods[i] = meterer.GetReservationPeriod(now, s.meterer.ChainPaymentState.GetReservationWindow(quorumId))
 	}
+	records, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, quorumIds, periods, 3)
+	if err != nil {
+		s.logger.Debug("failed to get period records, use zero value", "err", err, "accountID", accountID)
+	}
+
+	highestPeriodRecords := make([]*pb.PeriodRecord, meterer.MinNumBins)
+	for _, records := range records {
+		for _, record := range records.Records {
+			idx := record.Index % uint32(meterer.MinNumBins)
+			if highestPeriodRecords[idx] == nil || record.Usage > highestPeriodRecords[idx].Usage {
+				highestPeriodRecords[idx] = record
+			}
+		}
+	}
+
 	var largestCumulativePaymentBytes []byte
 	largestCumulativePayment, err := s.meterer.MeteringStore.GetLargestCumulativePayment(ctx, accountID)
 	if err != nil {
@@ -317,8 +334,8 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	} else {
 		largestCumulativePaymentBytes = largestCumulativePayment.Bytes()
 	}
+
 	// on-Chain account state
-	quorumIds := s.onchainState.Load().getAllQuorumIds()
 	var pbReservation *pb.Reservation
 	reservations, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, accountID, quorumIds)
 	if err != nil {
@@ -362,7 +379,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// build reply
 	reply := &pb.GetPaymentStateReply{
 		PaymentGlobalParams:      &paymentGlobalParams,
-		PeriodRecords:            periodRecords[:],
+		PeriodRecords:            highestPeriodRecords,
 		Reservation:              pbReservation,
 		CumulativePayment:        largestCumulativePaymentBytes,
 		OnchainCumulativePayment: onchainCumulativePaymentBytes,

@@ -65,7 +65,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			return
 		}
 		for {
-			addr := fmt.Sprintf("%s:%s", localhost, config.V2DispersalPort)
+			addr := fmt.Sprintf("%s:%s", localhost, config.InternalV2DispersalPort)
 			listener, err := net.Listen("tcp", addr)
 			if err != nil {
 				logger.Fatalf("Could not start tcp listener: %v", err)
@@ -82,7 +82,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 
 			healthcheck.RegisterHealthServer("node.v2.Dispersal", gs)
 
-			logger.Info("v2 dispersal enabled on port", config.V2DispersalPort, "address", listener.Addr().String(), "GRPC Listening")
+			logger.Info("v2 dispersal enabled on port", config.InternalV2DispersalPort, "address", listener.Addr().String(), "GRPC Listening")
 			if err := gs.Serve(listener); err != nil {
 				logger.Error("dispersal v2 server failed; restarting.", "err", err)
 			}
@@ -126,7 +126,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 			return
 		}
 		for {
-			addr := fmt.Sprintf("%s:%s", localhost, config.V2RetrievalPort)
+			addr := fmt.Sprintf("%s:%s", localhost, config.InternalV2RetrievalPort)
 			listener, err := net.Listen("tcp", addr)
 			if err != nil {
 				logger.Fatalf("Could not start tcp listener: %v", err)
@@ -142,7 +142,7 @@ func RunServers(serverV1 *Server, serverV2 *ServerV2, config *node.Config, logge
 
 			healthcheck.RegisterHealthServer("node.v2.Retrieval", gs)
 
-			logger.Info("v2 retrieval enabled on port", config.V2RetrievalPort, "address", listener.Addr().String(), "GRPC Listening")
+			logger.Info("v2 retrieval enabled on port", config.InternalV2RetrievalPort, "address", listener.Addr().String(), "GRPC Listening")
 			if err := gs.Serve(listener); err != nil {
 				logger.Error("retrieval v2 server failed; restarting.", "err", err)
 			}
