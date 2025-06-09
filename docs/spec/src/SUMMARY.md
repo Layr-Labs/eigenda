@@ -1,14 +1,15 @@
 # Summary
 
 - [Introduction](./introduction.md)
-- [Protocol](./protocol.md)
+- [Core Protocol](./protocol.md)
   - [Architecture](./protocol/architecture.md)
     - [Encoding](./protocol/architecture/encoding.md)
       - [Amortized Proving](./protocol/architecture/amortized-proving.md)
     - [Assignment](./protocol/architecture/assignment.md)
     - [Bridging](./protocol/architecture/bridging.md)
   - [Contracts](./protocol/contracts.md)
-- [Integration](./integration.md)
+  - [EigenDA V1 (Deprecated)](./v1.md)
+- [Integrations](./integration.md)
   - [Spec](./integration/spec.md)
     - [APIs](./integration/spec/1-apis.md)
     - [Rollup Payload Lifecycle](./integration/spec/2-rollup-payload-lifecycle.md)
@@ -18,4 +19,3 @@
     - [Secure Integration](./integration/spec/6-secure-integration.md)
   - [Rollup Stacks](./integration/rollup-stacks.md)
     - [OP Secure Integration](./integration/rollup-stacks/1-op-secure-integration-workflow.md)
-- [V1](./v1.md)

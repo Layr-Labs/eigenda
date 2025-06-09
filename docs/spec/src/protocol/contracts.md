@@ -1,6 +1,6 @@
 # EigenDA Managed Contracts
 
-This page describe EigenDA contracts that are manage by EigenDA related actors (see the exact [roles](#governance-roles)). For EigenDA-related contracts that are managed by rollups, see the [rollup managed contracts](../integration/contracts.md) page.
+This page describes EigenDA contracts that are managed by EigenDA related actors (see the exact [roles](#governance-roles)). For EigenDA-related contracts that are managed by rollups, see the [rollup managed contracts](../integration/contracts.md) page.
 
 ## Middlewares Contracts
 
