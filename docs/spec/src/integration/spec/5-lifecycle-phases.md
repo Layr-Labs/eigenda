@@ -88,9 +88,9 @@ An rpc call to the Disperser’s `GetPaymentState` method can be made to query t
 
 6.  *Proxy* casts the `DACert` into a structured ABI binding type using the `cert_version` to dictate which certificate representation to use
 
-10. *Proxy* then passes ABI encoded cert bytes via a call to the `verifier`'s `checkDACert` function which returns a `verification_status_code`
+7. *Proxy* then passes ABI encoded cert bytes via a call to the `verifier`'s `checkDACert` function which returns a `verification_status_code`
 
-11. Using the `verification_status_code`, proxy determines whether to return the certificate (`CertV2Lib.StatusCode.SUCCESS`) or retry a subsequent dispersal attempt
+8. Using the `verification_status_code`, proxy determines whether to return the certificate (`CertV2Lib.StatusCode.SUCCESS`) or retry a subsequent dispersal attempt
 
 
 ### Adding New Verifiers — Synchronization Risk
