@@ -74,9 +74,9 @@ func (a *Accountant) blobPaymentInfo(
 	symbolUsage := meterer.SymbolsCharged(numSymbols, a.minNumSymbols)
 
 	// Always try to use reservation first
-	payment, err := a.reservationUsage(symbolUsage, quorumNumbers, timestamp)
+	err := a.reservationUsage(symbolUsage, quorumNumbers, timestamp)
 	if err == nil {
-		return payment, nil
+		return big.NewInt(0), nil
 	}
 
 	// Fall back to on-demand payment if reservation fails
@@ -88,7 +88,7 @@ func (a *Accountant) blobPaymentInfo(
 func (a *Accountant) reservationUsage(
 	symbolUsage uint64,
 	quorumNumbers []uint8,
-	timestamp int64) (*big.Int, error) {
+	timestamp int64) error {
 
 	reservationWindow := a.reservationWindow
 	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, reservationWindow)
@@ -102,32 +102,29 @@ func (a *Accountant) reservationUsage(
 	binLimit := a.reservation.SymbolsPerSecond * uint64(a.reservationWindow)
 	if relativePeriodRecord.Usage <= binLimit {
 		if err := meterer.ValidateQuorum(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
-			return nil, err
+			return err
 		}
-		return big.NewInt(0), nil
+		return nil
 	}
 
 	overflowPeriodRecord := a.getOrRefreshRelativePeriodRecord(currentReservationPeriod+2*reservationWindow, reservationWindow)
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
 	if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
 		if err := meterer.ValidateQuorum(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
-			return nil, err
+			return err
 		}
 		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
-		return big.NewInt(0), nil
+		return nil
 	}
 
 	// Reservation not sufficient for the request, rollback the usage
 	relativePeriodRecord.Usage -= symbolUsage
-	return nil, fmt.Errorf("insufficient reservation")
+	return fmt.Errorf("insufficient reservation")
 }
 
 // onDemandUsage attempts to use on-demand payment for the given request.
 // Returns the cumulative payment if successful, or an error if on-demand cannot be used.
-func (a *Accountant) onDemandUsage(
-	symbolUsage uint64,
-	quorumNumbers []uint8) (*big.Int, error) {
-
+func (a *Accountant) onDemandUsage(symbolUsage uint64, quorumNumbers []uint8) (*big.Int, error) {
 	incrementRequired := meterer.PaymentCharged(symbolUsage, a.pricePerSymbol)
 	resultingPayment := big.NewInt(0)
 	resultingPayment.Add(a.cumulativePayment, incrementRequired)
