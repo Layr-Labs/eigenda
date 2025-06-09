@@ -2,6 +2,8 @@ name: test-contracts
 
 on:
   push:
+    branches:
+      - master
   pull_request:
     types: [opened, reopened, synchronize]
 
@@ -25,13 +27,12 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
         with:
           submodules: recursive
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+      - uses: jdx/mise-action@v2
         with:
-          version: nightly
-      - run: make fmt
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+      - run: make fmt-check
         working-directory: ./contracts
-      - run: git diff --exit-code
 
   forge-tests:
     name: Foundry Project
@@ -41,20 +42,10 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+      - uses: jdx/mise-action@v2
         with:
-          version: nightly
-
-      - name: Set Node.js 16.x
-        uses: actions/setup-node@v3
-        with:
-          node-version: 16.x
-
-      - name: Run install
-        uses: borales/actions-yarn@v4
-        with:
-          cmd: install
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
 
       - name: Install forge dependencies
         run: |
@@ -74,24 +65,17 @@ jobs:
     name: Verify bindings are updated
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #4.2.2
         with:
           submodules: recursive
 
-      - name: Set Node.js 16.x
-        uses: actions/setup-node@v3
+      - uses: jdx/mise-action@v2
         with:
-          node-version: 16.x
-
-      - name: Run install
-        uses: borales/actions-yarn@v4
-        with:
-          cmd: install
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
+          version: ${{ env.MISE_VERSION }}
+          experimental: true
+      - run: |
+          forge --version
+          abigen --version
 
       - name: Install forge dependencies
         run: |
@@ -99,16 +83,5 @@ jobs:
           forge install
         working-directory: ./contracts
 
-      - uses: jdx/mise-action@v2
-        with:
-          version: ${{ env.MISE_VERSION }}
-          experimental: true
-      - run: go version
-
-      - name: Install abi gen
-        run:
-          go install github.com/ethereum/go-ethereum/cmd/abigen@latest
-
-          # TODO(0x0aa0): re-enable this once the failure is fixed
-          # - name: Bindings diff check
-          #   run: make compile-contracts && git diff --exit-code
+      - name: Bindings diff check
+        run: make compile-contracts && git diff --exit-code

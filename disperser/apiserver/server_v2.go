@@ -297,18 +297,35 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 	// on-chain global payment parameters
-	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetGlobalSymbolsPerSecond()
-	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols()
-	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol()
-	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow()
+	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetOnDemandGlobalSymbolsPerSecond(core.QuorumID(0))
+	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols(core.QuorumID(0))
+	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol(core.QuorumID(0))
+	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow(core.QuorumID(0))
 
 	// off-chain account specific payment state
 	now := time.Now().Unix()
-	currentReservationPeriod := meterer.GetReservationPeriod(now, reservationWindow)
-	periodRecords, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, currentReservationPeriod)
-	if err != nil {
-		s.logger.Debug("failed to get reservation records, use placeholders", "err", err, "accountID", accountID)
+	quorumIds := s.onchainState.Load().getAllQuorumIds()
+	// Constructing the strictest period records across all quorums; a client should migrate to GetPaymentStateForAllQuorums for more precise state
+	// TODO(hopeyen): remove this in a subsequent PR. The logic here is complicated and only temporary
+	periods := make([]uint64, len(quorumIds))
+	for i, quorumId := range quorumIds {
+		periods[i] = meterer.GetReservationPeriod(now, s.meterer.ChainPaymentState.GetReservationWindow(quorumId))
 	}
+	records, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, quorumIds, periods, 3)
+	if err != nil {
+		s.logger.Debug("failed to get period records, use zero value", "err", err, "accountID", accountID)
+	}
+
+	highestPeriodRecords := make([]*pb.PeriodRecord, meterer.MinNumBins)
+	for _, records := range records {
+		for _, record := range records.Records {
+			idx := record.Index % uint32(meterer.MinNumBins)
+			if highestPeriodRecords[idx] == nil || record.Usage > highestPeriodRecords[idx].Usage {
+				highestPeriodRecords[idx] = record
+			}
+		}
+	}
+
 	var largestCumulativePaymentBytes []byte
 	largestCumulativePayment, err := s.meterer.MeteringStore.GetLargestCumulativePayment(ctx, accountID)
 	if err != nil {
@@ -317,9 +334,10 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	} else {
 		largestCumulativePaymentBytes = largestCumulativePayment.Bytes()
 	}
+
 	// on-Chain account state
 	var pbReservation *pb.Reservation
-	reservations, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccount(ctx, accountID)
+	reservations, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, accountID, quorumIds)
 	if err != nil {
 		s.logger.Debug("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
 	} else {
@@ -361,7 +379,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// build reply
 	reply := &pb.GetPaymentStateReply{
 		PaymentGlobalParams:      &paymentGlobalParams,
-		PeriodRecords:            periodRecords[:],
+		PeriodRecords:            highestPeriodRecords,
 		Reservation:              pbReservation,
 		CumulativePayment:        largestCumulativePaymentBytes,
 		OnchainCumulativePayment: onchainCumulativePaymentBytes,
@@ -372,4 +390,16 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 // TODO(hopeyen): separate this into a subsequent PR
 func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, req *pb.GetPaymentStateForAllQuorumsRequest) (*pb.GetPaymentStateForAllQuorumsReply, error) {
 	return nil, api.NewErrorUnimplemented()
+}
+
+// getAllQuorumIds returns a slice of all quorum IDs (from 0 to quorumCount-1)
+// Returns an empty slice if the onchain state is not loaded
+func (o *OnchainState) getAllQuorumIds() []core.QuorumID {
+	quorumCount := o.QuorumCount
+	quorumIds := make([]core.QuorumID, quorumCount)
+	for i := range quorumIds {
+		quorumIds[i] = core.QuorumID(i)
+	}
+
+	return quorumIds
 }
