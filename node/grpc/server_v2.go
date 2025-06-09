@@ -172,7 +172,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 	// Batch metering validation
 	if s.batchMeterer != nil {
 		// If the batch meterer is configured, use it to validate the batch
-		err = s.batchMeterer.MeterBatch(ctx, batch, time.Now())
+		err = s.batchMeterer.MeterBatch(ctx, batch, time.Unix(int64(in.Timestamp), 0))
 		if err != nil {
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("batch metering validation failed: %v", err))
 		}

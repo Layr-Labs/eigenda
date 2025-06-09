@@ -301,11 +301,14 @@ func (b *BatchMeterer) incrementAndValidateUsage(
 	currentPeriod uint64,
 ) (uint64, error) {
 	accountUsage := b.getOrCreateAccountUsage(accountID)
-	periodRecord := b.getOrCreatePeriodRecord(accountUsage, quorumID, currentPeriod)
-	prevUsage := periodRecord.Usage
-	binLimit := reservation.SymbolsPerSecond * b.ChainPaymentState.GetReservationWindow()
+	accountUsage.Lock.Lock()
+	defer accountUsage.Lock.Unlock()
 
-	b.logger.Info("incrementAndValidateUsage",
+	periodRecord := b.getOrCreatePeriodRecord(accountUsage, quorumID, currentPeriod)
+	binLimit := reservation.SymbolsPerSecond * b.ChainPaymentState.GetReservationWindow()
+	prevUsage := periodRecord.Usage
+
+	b.logger.Debug("incrementAndValidateUsage",
 		"accountID", accountID.Hex(),
 		"quorumID", quorumID,
 		"prevUsage", prevUsage,
@@ -314,14 +317,8 @@ func (b *BatchMeterer) incrementAndValidateUsage(
 		"currentPeriod", currentPeriod,
 	)
 
-	// Write-first: increment usage
 	periodRecord.Usage += usage
 	newUsage := periodRecord.Usage
-
-	b.logger.Info("after increment",
-		"newTotalUsage", newUsage,
-		"isWithinBinLimit", newUsage <= binLimit,
-	)
 
 	// If new usage is within bin limit, done
 	if newUsage <= binLimit {
@@ -330,20 +327,14 @@ func (b *BatchMeterer) incrementAndValidateUsage(
 
 	// If bin was already full before this increment, revert and error
 	if prevUsage >= binLimit {
-		b.logger.Info("bin already full, reverting",
-			"prevUsage", prevUsage,
-			"binLimit", binLimit,
-		)
+		b.logger.Debug("bin already full, reverting", "accountID", accountID.Hex(), "quorumID", quorumID, "period", currentPeriod, "prevUsage", prevUsage, "binLimit", binLimit)
 		periodRecord.Usage = prevUsage
 		return 0, fmt.Errorf("bin has already been filled for quorum %d", quorumID)
 	}
 
 	// If new usage is more than 2x bin limit, revert and error
 	if newUsage > 2*binLimit {
-		b.logger.Info("usage exceeds 2x bin limit, reverting",
-			"newUsage", newUsage,
-			"2xBinLimit", 2*binLimit,
-		)
+		b.logger.Debug("usage exceeds 2x bin limit, reverting", "accountID", accountID.Hex(), "quorumID", quorumID, "period", currentPeriod, "prevUsage", prevUsage, "newUsage", newUsage, "2xBinLimit", 2*binLimit)
 		periodRecord.Usage = prevUsage
 		return 0, fmt.Errorf("overflow usage exceeds bin limit for quorum %d", quorumID)
 	}
@@ -352,14 +343,8 @@ func (b *BatchMeterer) incrementAndValidateUsage(
 	nextPeriod := currentPeriod + b.ChainPaymentState.GetReservationWindow()
 	endPeriod := meterer.GetReservationPeriod(int64(reservation.EndTimestamp), b.ChainPaymentState.GetReservationWindow())
 
-	b.logger.Info("checking overflow period",
-		"nextPeriod", nextPeriod,
-		"endPeriod", endPeriod,
-		"isWithinWindow", nextPeriod < endPeriod,
-	)
-
 	if nextPeriod >= endPeriod {
-		b.logger.Info("overflow period outside window, reverting")
+		b.logger.Debug("overflow period outside window, reverting", "accountID", accountID.Hex(), "quorumID", quorumID, "period", currentPeriod, "prevUsage", prevUsage, "nextPeriod", nextPeriod, "endPeriod", endPeriod)
 		periodRecord.Usage = prevUsage
 		return 0, fmt.Errorf("overflow period exceeds reservation window for quorum %d", quorumID)
 	}
@@ -370,18 +355,9 @@ func (b *BatchMeterer) incrementAndValidateUsage(
 	overflowRecord := b.getOrCreatePeriodRecord(accountUsage, quorumID, nextPeriod)
 	overflowPrev := overflowRecord.Usage
 	overflowRecord.Usage += overflow
-
-	b.logger.Info("handling overflow",
-		"overflow", overflow,
-		"overflowPrev", overflowPrev,
-		"overflowNew", overflowRecord.Usage,
-		"overflowBinLimit", binLimit,
-	)
-
 	// If overflow in next period exceeds bin limit, revert both and error
 	if overflowRecord.Usage > binLimit {
-		b.logger.Info("overflow in next period exceeds limit, reverting both")
-		// revert both writes
+		b.logger.Debug("overflow in next period exceeds limit, reverting both", "accountID", accountID.Hex(), "quorumID", quorumID, "period", currentPeriod, "prevUsage", prevUsage, "overflow", overflow, "overflowPrev", overflowPrev, "overflowNew", overflowRecord.Usage, "overflowBinLimit", binLimit)
 		periodRecord.Usage = prevUsage
 		overflowRecord.Usage = overflowPrev
 		return 0, fmt.Errorf("overflow usage exceeds bin limit for quorum %d in next period", quorumID)
