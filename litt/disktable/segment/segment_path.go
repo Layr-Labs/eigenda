@@ -16,7 +16,7 @@ const SegmentDirectory = "segments"
 
 // The name of the directory where hard links to segment files are stored for snapshotting (if enabled).
 // The hard link directory is created at "$STORAGE_PATH/$TABLE_NAME/Snapshot".
-const HardLinkDirectory = "Snapshot"
+const HardLinkDirectory = "snapshot"
 
 // TODO unit test this struct
 

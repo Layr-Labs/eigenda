@@ -610,7 +610,7 @@ func (s *Segment) Reserve() bool {
 
 // Release releases a reservation held on this segment. A segment cannot be deleted until all reservations on it
 // have been released. The last call to Release() that releases the final reservation schedules the segment for
-// asynchronous deletion.
+// asynchronous deletion
 func (s *Segment) Release() {
 	reservations := s.reservationCount.Add(-1)
 
