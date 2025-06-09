@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"slices"
 	"sync"
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
@@ -74,25 +73,26 @@ func (a *Accountant) BlobPaymentInfo(
 	quorumNumbers []uint8,
 	timestamp int64) (*big.Int, error) {
 
+	symbolUsage := meterer.SymbolsCharged(numSymbols, a.minNumSymbols)
+
 	// Always try to use reservation first
-	payment, err := a.ReservationUsage(numSymbols, quorumNumbers, timestamp)
+	payment, err := a.ReservationUsage(symbolUsage, quorumNumbers, timestamp)
 	if err == nil {
 		return payment, nil
 	}
 
 	// Fall back to on-demand payment if reservation fails
-	return a.OnDemandUsage(numSymbols, quorumNumbers)
+	return a.OnDemandUsage(symbolUsage, quorumNumbers)
 }
 
 // ReservationUsage attempts to use the reservation for the given request.
 // Returns (0, nil) if successful, or (nil, error) if reservation cannot be used.
 func (a *Accountant) ReservationUsage(
-	numSymbols uint64,
+	symbolUsage uint64,
 	quorumNumbers []uint8,
 	timestamp int64) (*big.Int, error) {
 
 	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, a.reservationWindow)
-	symbolUsage := a.SymbolsCharged(numSymbols)
 
 	a.usageLock.Lock()
 	defer a.usageLock.Unlock()
@@ -103,7 +103,7 @@ func (a *Accountant) ReservationUsage(
 	// Check if we can use the reservation within the bin limit
 	binLimit := a.reservation.SymbolsPerSecond * uint64(a.reservationWindow)
 	if relativePeriodRecord.Usage <= binLimit {
-		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
+		if err := meterer.ValidateQuorum(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return nil, err
 		}
 		return big.NewInt(0), nil
@@ -112,39 +112,37 @@ func (a *Accountant) ReservationUsage(
 	// Try to use overflow bin if available
 	overflowPeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod + 2)
 	if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
-		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
+		if err := meterer.ValidateQuorum(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 			return nil, err
 		}
 		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
 		return big.NewInt(0), nil
 	}
 
-	// Reservation not available, rollback the usage
+	// Reservation not sufficient for the request, rollback the usage
 	relativePeriodRecord.Usage -= symbolUsage
-	return nil, fmt.Errorf("reservation not available")
+	return nil, fmt.Errorf("insufficient reservation")
 }
 
 // OnDemandUsage attempts to use on-demand payment for the given request.
 // Returns the cumulative payment if successful, or an error if on-demand cannot be used.
 func (a *Accountant) OnDemandUsage(
-	numSymbols uint64,
+	symbolUsage uint64,
 	quorumNumbers []uint8) (*big.Int, error) {
 
-	incrementRequired := big.NewInt(int64(a.PaymentCharged(numSymbols)))
+	incrementRequired := meterer.PaymentCharged(symbolUsage, a.pricePerSymbol)
 	resultingPayment := big.NewInt(0)
 	resultingPayment.Add(a.cumulativePayment, incrementRequired)
 
 	if resultingPayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
-		if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
+		if err := meterer.ValidateQuorum(quorumNumbers, requiredQuorums); err != nil {
 			return nil, err
 		}
 		a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 		return a.cumulativePayment, nil
 	}
 
-	return nil, fmt.Errorf(
-		"no bandwidth reservation found for account %s, and current cumulativePayment balance insufficient "+
-			"to make an on-demand dispersal. Consider depositing more eth to the PaymentVault contract.", a.accountID.Hex())
+	return nil, fmt.Errorf("insufficient ondemand payment")
 }
 
 // AccountBlob accountant provides and records payment information
@@ -156,7 +154,7 @@ func (a *Accountant) AccountBlob(
 
 	cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums, timestamp)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot create payment infomation for reservation or on-demand. Consider depositing more eth to the PaymentVault contract for your account. For more details, see https://docs.eigenda.xyz/core-concepts/payments#disperser-client-requirements. Account: %s, Error: %s", a.accountID.Hex(), err.Error())
 	}
 
 	pm := &core.PaymentMetadata{
@@ -166,22 +164,6 @@ func (a *Accountant) AccountBlob(
 	}
 
 	return pm, nil
-}
-
-// TODO: PaymentCharged and SymbolsCharged copied from meterer, should be refactored
-// PaymentCharged returns the chargeable price for a given data length
-func (a *Accountant) PaymentCharged(numSymbols uint64) uint64 {
-	return a.SymbolsCharged(numSymbols) * a.pricePerSymbol
-}
-
-// SymbolsCharged returns the number of symbols charged for a given data length
-// being at least MinNumSymbols or the nearest rounded-up multiple of MinNumSymbols.
-func (a *Accountant) SymbolsCharged(numSymbols uint64) uint64 {
-	if numSymbols <= a.minNumSymbols {
-		return a.minNumSymbols
-	}
-	// Round up to the nearest multiple of MinNumSymbols
-	return core.RoundUpDivide(numSymbols, a.minNumSymbols) * a.minNumSymbols
 }
 
 func (a *Accountant) GetRelativePeriodRecord(index uint64) *PeriodRecord {
@@ -267,18 +249,5 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 		}
 	}
 	a.periodRecords = periodRecords
-	return nil
-}
-
-// QuorumCheck eagerly returns error if the check finds a quorum number not an element of the allowed quorum numbers
-func QuorumCheck(quorumNumbers []uint8, allowedNumbers []uint8) error {
-	if len(quorumNumbers) == 0 {
-		return fmt.Errorf("no quorum numbers provided")
-	}
-	for _, quorum := range quorumNumbers {
-		if !slices.Contains(allowedNumbers, quorum) {
-			return fmt.Errorf("provided quorum number %v not allowed", quorum)
-		}
-	}
 	return nil
 }

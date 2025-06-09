@@ -126,7 +126,7 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 	header, err := accountant.AccountBlob(ctx, now, numSymbols, quorums)
 	assert.NoError(t, err)
 
-	expectedPayment := big.NewInt(int64(numSymbols * pricePerSymbol))
+	expectedPayment := meterer.PaymentCharged(numSymbols, pricePerSymbol)
 	assert.NotEqual(t, uint64(0), header.Timestamp)
 	assert.Equal(t, expectedPayment, header.CumulativePayment)
 	assert.Equal(t, isRotation([]uint64{0, 0, 0}, mapRecordUsage(accountant.periodRecords)), true)
@@ -152,7 +152,7 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 	quorums := []uint8{0, 1}
 	now := time.Now().UnixNano()
 	_, err = accountant.AccountBlob(ctx, now, numSymbols, quorums)
-	assert.Contains(t, err.Error(), "no bandwidth reservation found for account")
+	assert.Contains(t, err.Error(), "cannot create payment infomation for reservation or on-demand. ")
 }
 
 func TestAccountBlobCallSeries(t *testing.T) {
@@ -205,7 +205,7 @@ func TestAccountBlobCallSeries(t *testing.T) {
 	now = time.Now().UnixNano()
 	_, err = accountant.AccountBlob(ctx, now, 600, quorums)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no bandwidth reservation found for account")
+	assert.Contains(t, err.Error(), "cannot create payment infomation for reservation or on-demand. ")
 }
 
 func TestAccountBlob_BinRotation(t *testing.T) {
@@ -404,34 +404,34 @@ func TestQuorumCheck(t *testing.T) {
 			quorumNumbers:  []uint8{},
 			allowedNumbers: []uint8{0, 1},
 			expectError:    true,
-			errorMessage:   "no quorum numbers provided",
+			errorMessage:   "no quorum numbers provided in the request",
 		},
 		{
 			name:           "invalid quorum number",
 			quorumNumbers:  []uint8{0, 2},
 			allowedNumbers: []uint8{0, 1},
 			expectError:    true,
-			errorMessage:   "provided quorum number 2 not allowed",
+			errorMessage:   "quorum number mismatch: 2",
 		},
 		{
 			name:           "empty allowed numbers",
 			quorumNumbers:  []uint8{0},
 			allowedNumbers: []uint8{},
 			expectError:    true,
-			errorMessage:   "provided quorum number 0 not allowed",
+			errorMessage:   "quorum number mismatch: 0",
 		},
 		{
 			name:           "multiple invalid quorums",
 			quorumNumbers:  []uint8{2, 3, 4},
 			allowedNumbers: []uint8{0, 1},
 			expectError:    true,
-			errorMessage:   "provided quorum number 2 not allowed",
+			errorMessage:   "quorum number mismatch: 2",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := QuorumCheck(tt.quorumNumbers, tt.allowedNumbers)
+			err := meterer.ValidateQuorum(tt.quorumNumbers, tt.allowedNumbers)
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMessage)
