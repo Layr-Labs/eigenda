@@ -205,7 +205,8 @@ contract DeployVerifiable is Script {
             implementations: implementations,
             registryCoordinatorParams: cfg.registryCoordinatorParams(),
             paymentVaultParams: cfg.paymentVaultParams(),
-            serviceManagerParams: cfg.serviceManagerParams()
+            serviceManagerParams: cfg.serviceManagerParams(),
+            disperserRegistryParams: cfg.disperserRegistryParams()
         });
     }
 }

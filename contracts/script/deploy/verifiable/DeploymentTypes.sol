@@ -43,6 +43,7 @@ struct ImmutableInitParams {
     ImmutableRegistryCoordinatorParams registryCoordinatorParams;
     ImmutablePaymentVaultParams paymentVaultParams;
     ImmutableServiceManagerParams serviceManagerParams;
+    ImmutableDisperserRegistryParams disperserRegistryParams;
 }
 
 struct DeployedAddresses {
@@ -74,6 +75,13 @@ struct ImmutablePaymentVaultParams {
 
 struct ImmutableServiceManagerParams {
     address rewardsInitiator;
+}
+
+struct ImmutableDisperserRegistryParams {
+    uint256 deposit;
+    uint256 refund;
+    address token;
+    uint64 lockPeriod;
 }
 
 library InitParamsLib {
@@ -142,6 +150,19 @@ library InitParamsLib {
     {
         return ImmutableServiceManagerParams({
             rewardsInitiator: stdToml.readAddress(configData, ".initParams.eigenDA.serviceManager.rewardsInitiator")
+        });
+    }
+
+    function disperserRegistryParams(string memory configData)
+        internal
+        pure
+        returns (ImmutableDisperserRegistryParams memory)
+    {
+        return ImmutableDisperserRegistryParams({
+            deposit: stdToml.readUint(configData, ".initParams.eigenDA.disperserRegistry.deposit"),
+            refund: stdToml.readUint(configData, ".initParams.eigenDA.disperserRegistry.refund"),
+            token: stdToml.readAddress(configData, ".initParams.eigenDA.disperserRegistry.token"),
+            lockPeriod: uint64(stdToml.readUint(configData, ".initParams.eigenDA.disperserRegistry.lockPeriod"))
         });
     }
 
