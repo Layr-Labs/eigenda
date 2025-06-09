@@ -10,9 +10,6 @@ We make use of eigenlayer-middleware contracts, which are fully documented [here
 
 ## EigenDA Specific Contracts
 
-<!-- Section copied over from https://www.notion.so/eigen-labs/EigenDA-V2-Integration-Spec-12d13c11c3e0800e8968f31ef2c6a2b3?pvs=4#18513c11c3e08058a034ddc9523a3197 -->
-<!-- TODO: arch to review and update -->
-
 The smart contracts can be found in our [repo](https://github.com/Layr-Labs/eigenda/tree/master/contracts/src/core), and the deployment addresses on different chains can be found in the [Networks](https://docs.eigenda.xyz/networks/mainnet#contract-addresses) section of our docs.
 
 ![image.png](../../assets/integration/contracts-eigenda.png)
@@ -80,7 +77,7 @@ Contains EigenDA network registered Dispersers’ Ethereum address. The EigenDA 
 
 ## Governance Roles
 
-<!-- TODO: import from https://www.notion.so/eigen-labs/EigenDA-V2-Governance-17513c11c3e0806999cfe5e8b9bf7e6a -->
-<!-- Do we want to make public everything in that doc?? -->
+<!-- TODO: we have this old doc https://www.notion.so/eigen-labs/EigenDA-V2-Governance-17513c11c3e0806999cfe5e8b9bf7e6a -->
+<!-- Not sure if it's still relevant or all outdated... will need to be written by @pakim249CAL once roles are stabilized. -->
 
 TODO
