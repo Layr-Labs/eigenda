@@ -161,7 +161,6 @@ func (a *Accountant) SymbolsCharged(numSymbols uint64) uint64 {
 }
 
 // GetRelativePeriodRecord returns the period record for the given index
-// Returns an empty record if there is no record for the relative index
 func (a *Accountant) GetRelativePeriodRecord(index uint64) *PeriodRecord {
 	relativeIndex := uint32((index / a.reservationWindow) % uint64(a.numBins))
 	// Return empty record if the index is greater than the number of bins (should never happen by accountant initialization)
