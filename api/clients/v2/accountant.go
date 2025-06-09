@@ -74,48 +74,75 @@ func (a *Accountant) BlobPaymentInfo(
 	quorumNumbers []uint8,
 	timestamp int64) (*big.Int, error) {
 
+	// Always try to use reservation first
+	payment, err := a.ReservationUsage(numSymbols, quorumNumbers, timestamp)
+	if err == nil {
+		return payment, nil
+	}
+
+	// Fall back to on-demand payment if reservation fails
+	return a.OnDemandUsage(numSymbols, quorumNumbers)
+}
+
+// ReservationUsage attempts to use the reservation for the given request.
+// Returns (0, nil) if successful, or (nil, error) if reservation cannot be used.
+func (a *Accountant) ReservationUsage(
+	numSymbols uint64,
+	quorumNumbers []uint8,
+	timestamp int64) (*big.Int, error) {
+
 	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, a.reservationWindow)
 	symbolUsage := a.SymbolsCharged(numSymbols)
 
 	a.usageLock.Lock()
 	defer a.usageLock.Unlock()
+
 	relativePeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod)
 	relativePeriodRecord.Usage += symbolUsage
 
-	// first attempt to use the active reservation
+	// Check if we can use the reservation within the bin limit
 	binLimit := a.reservation.SymbolsPerSecond * uint64(a.reservationWindow)
 	if relativePeriodRecord.Usage <= binLimit {
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
-			return big.NewInt(0), err
+			return nil, err
 		}
 		return big.NewInt(0), nil
 	}
 
+	// Try to use overflow bin if available
 	overflowPeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod + 2)
-	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
 	if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
-			return big.NewInt(0), err
+			return nil, err
 		}
 		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
 		return big.NewInt(0), nil
 	}
 
-	// reservation not available, rollback reservation records, attempt on-demand
-	//todo: rollback on-demand if disperser respond with some type of rejection?
+	// Reservation not available, rollback the usage
 	relativePeriodRecord.Usage -= symbolUsage
-	incrementRequired := big.NewInt(int64(a.PaymentCharged(numSymbols)))
+	return nil, fmt.Errorf("reservation not available")
+}
 
+// OnDemandUsage attempts to use on-demand payment for the given request.
+// Returns the cumulative payment if successful, or an error if on-demand cannot be used.
+func (a *Accountant) OnDemandUsage(
+	numSymbols uint64,
+	quorumNumbers []uint8) (*big.Int, error) {
+
+	incrementRequired := big.NewInt(int64(a.PaymentCharged(numSymbols)))
 	resultingPayment := big.NewInt(0)
 	resultingPayment.Add(a.cumulativePayment, incrementRequired)
+
 	if resultingPayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
 		if err := QuorumCheck(quorumNumbers, requiredQuorums); err != nil {
-			return big.NewInt(0), err
+			return nil, err
 		}
 		a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 		return a.cumulativePayment, nil
 	}
-	return big.NewInt(0), fmt.Errorf(
+
+	return nil, fmt.Errorf(
 		"no bandwidth reservation found for account %s, and current cumulativePayment balance insufficient "+
 			"to make an on-demand dispersal. Consider depositing more eth to the PaymentVault contract.", a.accountID.Hex())
 }
