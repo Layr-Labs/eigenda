@@ -15,8 +15,6 @@ We make use of eigenlayer-middleware contracts, which are fully documented [here
 
 The smart contracts can be found in our [repo](https://github.com/Layr-Labs/eigenda/tree/master/contracts/src/core), and the deployment addresses on different chains can be found in the [Networks](https://docs.eigenda.xyz/networks/mainnet#contract-addresses) section of our docs.
 
-The smart contracts can be found [here](https://github.com/Layr-Labs/eigenda/tree/master/contracts/src/core).
-
 ![image.png](../../assets/integration/contracts-eigenda.png)
 
 ### EigenDAThreshold Registry
