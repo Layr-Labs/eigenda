@@ -56,7 +56,6 @@ func TestMain(m *testing.M) {
 }
 
 func setup(_ *testing.M) {
-
 	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
 	if !deployLocalStack {
 		localStackPort = os.Getenv("LOCALSTACK_PORT")
@@ -152,10 +151,37 @@ func setup(_ *testing.M) {
 		panic("failed to create metering store")
 	}
 
-	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil).Maybe()
-	if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
-		panic("failed to make initial query to the on-chain state")
-	}
+	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(&meterer.PaymentVaultParams{
+		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+			0: {
+				ReservationSymbolsPerSecond: 100,
+				OnDemandSymbolsPerSecond:    100,
+				OnDemandPricePerSymbol:      1,
+			},
+			1: {
+				ReservationSymbolsPerSecond: 100,
+				OnDemandSymbolsPerSecond:    100,
+				OnDemandPricePerSymbol:      1,
+			},
+		},
+		QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+			0: {
+				MinNumSymbols:              3,
+				ReservationAdvanceWindow:   10,
+				ReservationRateLimitWindow: 10,
+				OnDemandRateLimitWindow:    10,
+				OnDemandEnabled:            true,
+			},
+			1: {
+				MinNumSymbols:              3,
+				ReservationAdvanceWindow:   10,
+				ReservationRateLimitWindow: 10,
+				OnDemandRateLimitWindow:    10,
+				OnDemandEnabled:            true,
+			},
+		},
+		OnDemandQuorumNumbers: []uint8{0, 1},
+	}, nil).Maybe()
 
 	// add some default sensible configs
 	mt = meterer.NewMeterer(
@@ -163,10 +189,13 @@ func setup(_ *testing.M) {
 		paymentChainState,
 		store,
 		logger,
-		// metrics.NewNoopMetrics(),
 	)
 
-	mt.Start(context.Background())
+	err = mt.Start(context.Background())
+	if err != nil {
+		teardown()
+		panic("failed to start meterer")
+	}
 }
 
 func teardown() {
@@ -181,6 +210,7 @@ func TestMetererReservations(t *testing.T) {
 	paymentChainState.On("GetOnDemandGlobalSymbolsPerSecond", testifymock.Anything).Return(uint64(1009), nil)
 	paymentChainState.On("GetOnDemandGlobalRatePeriodInterval", testifymock.Anything).Return(uint64(1), nil)
 	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint64(3), nil)
+	paymentChainState.On("GetPricePerSymbol", testifymock.Anything).Return(uint64(1), nil)
 
 	now := time.Now()
 	quoromNumbers := []uint8{0, 1}
@@ -327,10 +357,11 @@ func TestMetererReservations(t *testing.T) {
 func TestMetererOnDemand(t *testing.T) {
 	ctx := context.Background()
 	quorumNumbers := []uint8{0, 1}
-	paymentChainState.On("GetPricePerSymbol", testifymock.Anything, testifymock.Anything).Return(uint64(2), nil)
-	paymentChainState.On("GetMinNumSymbols", testifymock.Anything, testifymock.Anything).Return(uint64(3), nil)
+	paymentChainState.On("GetPricePerSymbol", testifymock.Anything).Return(uint64(2), nil)
+	paymentChainState.On("GetMinNumSymbols", testifymock.Anything).Return(uint64(3), nil)
 	paymentChainState.On("GetOnDemandGlobalSymbolsPerSecond", testifymock.Anything).Return(uint64(1009), nil)
 	paymentChainState.On("GetOnDemandGlobalRatePeriodInterval", testifymock.Anything).Return(uint64(1), nil)
+	paymentChainState.On("GetOnDemandQuorumNumbers", testifymock.Anything).Return(quorumNumbers, nil)
 	now := time.Now()
 
 	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.MatchedBy(func(account gethcommon.Address) bool {
@@ -340,7 +371,6 @@ func TestMetererOnDemand(t *testing.T) {
 		return account == accountID2
 	})).Return(account2OnDemandPayments, nil)
 	paymentChainState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(&core.OnDemandPayment{}, fmt.Errorf("payment not found"))
-	paymentChainState.On("GetOnDemandQuorumNumbers", testifymock.Anything).Return(quorumNumbers, nil)
 
 	// test unregistered account
 	unregisteredUser, err := crypto.GenerateKey()

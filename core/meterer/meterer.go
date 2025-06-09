@@ -54,7 +54,7 @@ func NewMeterer(
 }
 
 // Start starts to periodically refreshing the on-chain state
-func (m *Meterer) Start(ctx context.Context) {
+func (m *Meterer) Start(ctx context.Context) error {
 	go func() {
 		ticker := time.NewTicker(m.Config.UpdateInterval)
 		defer ticker.Stop()
@@ -62,15 +62,17 @@ func (m *Meterer) Start(ctx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				if err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx); err != nil {
-					m.logger.Error("Failed to refresh on-chain state", "error", err)
+				_, err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx)
+				if err != nil {
+					m.logger.Error("failed to refresh onchain state", "error", err)
 				}
-				m.logger.Debug("Refreshed on-chain state")
 			case <-ctx.Done():
 				return
 			}
 		}
 	}()
+
+	return nil
 }
 
 // MeterRequest validates a blob header and adds it to the meterer's state
@@ -120,7 +122,7 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, header core.Payme
 
 	// Validate the used reservations are active and is of valid periods
 	for quorumID, reservation := range reservations {
-		if !reservation.IsActiveByNanosecond(header.Timestamp) {
+		if !IsWithinTimeRange(reservation.StartTimestamp, reservation.EndTimestamp, header.Timestamp) {
 			return fmt.Errorf("reservation not active")
 		}
 		if !m.ValidateReservationPeriod(reservation, requestReservationPeriods[quorumID], reservationWindows[quorumID], receivedAt) {
@@ -321,7 +323,7 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged ui
 		return fmt.Errorf("failed to increment global bin usage: %w", err)
 	}
 	if newUsage > m.ChainPaymentState.GetOnDemandGlobalSymbolsPerSecond(OnDemandQuorumID)*uint64(m.ChainPaymentState.GetOnDemandGlobalRatePeriodInterval(OnDemandQuorumID)) {
-		return fmt.Errorf("global bin usage overflows")
+		return fmt.Errorf("global bin usage overflows: %d > %d", newUsage, m.ChainPaymentState.GetOnDemandGlobalSymbolsPerSecond(OnDemandQuorumID)*uint64(m.ChainPaymentState.GetOnDemandGlobalRatePeriodInterval(OnDemandQuorumID)))
 	}
 	return nil
 }
@@ -330,4 +332,13 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, symbolsCharged ui
 // Note: This is called per-quorum since reservation is for a single quorum.
 func (m *Meterer) GetReservationBinLimit(reservation *core.ReservedPayment, reservationWindow uint64) uint64 {
 	return reservation.SymbolsPerSecond * reservationWindow
+}
+
+// isWithinTimeRange checks if a timestamp falls within a given time range; startSeconds and endSeconds are in seconds and defined in the contracts as part of reservations
+// while timestampNanos is the request header timestamp and is in nanoseconds
+func IsWithinTimeRange(startSeconds, endSeconds uint64, timestampNanos int64) bool {
+	seconds := timestampNanos / 1e9
+	nanos := timestampNanos % 1e9
+	timestamp := time.Unix(seconds, nanos)
+	return time.Unix(int64(startSeconds), 0).Before(timestamp) && time.Unix(int64(endSeconds), 0).After(timestamp)
 }

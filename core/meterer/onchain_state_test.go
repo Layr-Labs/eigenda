@@ -30,10 +30,36 @@ var (
 func TestRefreshOnchainPaymentState(t *testing.T) {
 	mockState := &mock.MockOnchainPaymentState{}
 	ctx := context.Background()
-	mockState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil)
+	mockState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(&meterer.PaymentVaultParams{
+		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+			0: {
+				ReservationSymbolsPerSecond: 100,
+				OnDemandSymbolsPerSecond:    100,
+				OnDemandPricePerSymbol:      1,
+			},
+		},
+		QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+			0: {
+				MinNumSymbols:              1,
+				ReservationAdvanceWindow:   10,
+				ReservationRateLimitWindow: 10,
+				OnDemandRateLimitWindow:    10,
+				OnDemandEnabled:            true,
+			},
+		},
+		OnDemandQuorumNumbers: []uint8{0},
+	}, nil)
 
-	err := mockState.RefreshOnchainPaymentState(ctx)
+	params, err := mockState.RefreshOnchainPaymentState(ctx)
 	assert.NoError(t, err)
+	assert.NotNil(t, params)
+	assert.NotNil(t, params.QuorumPaymentConfigs[0])
+	assert.NotNil(t, params.QuorumProtocolConfigs[0])
+	assert.Equal(t, uint64(100), params.QuorumPaymentConfigs[0].OnDemandSymbolsPerSecond)
+	assert.Equal(t, uint64(1), params.QuorumPaymentConfigs[0].OnDemandPricePerSymbol)
+	assert.Equal(t, uint64(1), params.QuorumProtocolConfigs[0].MinNumSymbols)
+	assert.Equal(t, uint64(10), params.QuorumProtocolConfigs[0].ReservationRateLimitWindow)
+	assert.Equal(t, []uint8{0}, params.OnDemandQuorumNumbers)
 }
 
 func TestGetCurrentBlockNumber(t *testing.T) {
