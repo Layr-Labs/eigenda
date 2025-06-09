@@ -1,5 +1,3 @@
-
-
 ## Rollup Managed Contracts
 
 This page describes contracts that are managed by rollups, but are needed to secure the EigenDA integration. For EigenDA-managed core contracts, see the [core contracts](../../protocol/contracts.md) page.
