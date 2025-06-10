@@ -1,7 +1,6 @@
 package clients
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	"slices"
@@ -25,22 +24,23 @@ type Accountant struct {
 	minNumSymbols     uint64
 
 	// local accounting
-	// contains 3 bins; circular wrapping of indices
+	// contains an array of period records, with length of max(MinNumBins, numBins)
+	// numBins can be arbitrarily bigger than MinNumBins if the client wants to track more history in the cache
 	periodRecords     []PeriodRecord
 	usageLock         sync.Mutex
 	cumulativePayment *big.Int
-
-	// number of bins in the circular accounting, restricted by minNumBins which is 3
-	numBins uint32
 }
 
+// PeriodRecord contains the index of the reservation period and the usage of the period
 type PeriodRecord struct {
+	// Index is start timestamp of the period in seconds; it is always a multiple of the reservation window
 	Index uint32
+	// Usage is the usage of the period in symbols
 	Usage uint64
 }
 
 func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayment, onDemand *core.OnDemandPayment, reservationWindow uint64, pricePerSymbol uint64, minNumSymbols uint64, numBins uint32) *Accountant {
-	periodRecords := make([]PeriodRecord, numBins)
+	periodRecords := make([]PeriodRecord, max(numBins, uint32(meterer.MinNumBins)))
 	for i := range periodRecords {
 		periodRecords[i] = PeriodRecord{Index: uint32(i), Usage: 0}
 	}
@@ -53,13 +53,12 @@ func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayme
 		minNumSymbols:     minNumSymbols,
 		periodRecords:     periodRecords,
 		cumulativePayment: big.NewInt(0),
-		numBins:           max(numBins, uint32(meterer.MinNumBins)),
 	}
 	// TODO: add a routine to refresh the on-chain state occasionally?
 	return &a
 }
 
-// BlobPaymentInfo calculates and records payment information. The accountant
+// blobPaymentInfo calculates and records payment information. The accountant
 // will attempt to use the active reservation first and check for quorum settings,
 // then on-demand if the reservation is not available. It takes in a timestamp at
 // the current UNIX time in nanoseconds, and returns a cumulative payment for on-
@@ -68,18 +67,17 @@ func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayme
 // indicating on-demand payment.
 // These generated values are used to create the payment header and signature, as specified in
 // api/proto/common/v2/common_v2.proto
-func (a *Accountant) BlobPaymentInfo(
-	ctx context.Context,
+func (a *Accountant) blobPaymentInfo(
 	numSymbols uint64,
 	quorumNumbers []uint8,
 	timestamp int64) (*big.Int, error) {
-
-	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, a.reservationWindow)
-	symbolUsage := a.SymbolsCharged(numSymbols)
+	reservationWindow := a.reservationWindow
+	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, reservationWindow)
+	symbolUsage := a.symbolsCharged(numSymbols)
 
 	a.usageLock.Lock()
 	defer a.usageLock.Unlock()
-	relativePeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod)
+	relativePeriodRecord := a.getOrRefreshRelativePeriodRecord(currentReservationPeriod, reservationWindow)
 	relativePeriodRecord.Usage += symbolUsage
 
 	// first attempt to use the active reservation
@@ -91,7 +89,7 @@ func (a *Accountant) BlobPaymentInfo(
 		return big.NewInt(0), nil
 	}
 
-	overflowPeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod + 2)
+	overflowPeriodRecord := a.getOrRefreshRelativePeriodRecord(currentReservationPeriod+2*reservationWindow, reservationWindow)
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
 	if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
 		if err := QuorumCheck(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
@@ -104,7 +102,7 @@ func (a *Accountant) BlobPaymentInfo(
 	// reservation not available, rollback reservation records, attempt on-demand
 	//todo: rollback on-demand if disperser respond with some type of rejection?
 	relativePeriodRecord.Usage -= symbolUsage
-	incrementRequired := big.NewInt(int64(a.PaymentCharged(numSymbols)))
+	incrementRequired := big.NewInt(int64(a.paymentCharged(numSymbols)))
 
 	resultingPayment := big.NewInt(0)
 	resultingPayment.Add(a.cumulativePayment, incrementRequired)
@@ -116,18 +114,17 @@ func (a *Accountant) BlobPaymentInfo(
 		return a.cumulativePayment, nil
 	}
 	return big.NewInt(0), fmt.Errorf(
-		"no bandwidth reservation found for account %s, and current cumulativePayment balance insufficient "+
-			"to make an on-demand dispersal. Consider depositing more eth to the PaymentVault contract.", a.accountID.Hex())
+		"invalid payments: no available bandwidth reservation found for account %s, and current cumulativePayment balance insufficient "+
+			"to make an on-demand dispersal. Consider increasing reservation or cumulative payment on-chain. For more details, see https://docs.eigenda.xyz/core-concepts/payments#disperser-client-requirements", a.accountID.Hex())
 }
 
 // AccountBlob accountant provides and records payment information
 func (a *Accountant) AccountBlob(
-	ctx context.Context,
 	timestamp int64,
 	numSymbols uint64,
 	quorums []uint8) (*core.PaymentMetadata, error) {
 
-	cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums, timestamp)
+	cumulativePayment, err := a.blobPaymentInfo(numSymbols, quorums, timestamp)
 	if err != nil {
 		return nil, err
 	}
@@ -141,15 +138,15 @@ func (a *Accountant) AccountBlob(
 	return pm, nil
 }
 
-// TODO: PaymentCharged and SymbolsCharged copied from meterer, should be refactored
-// PaymentCharged returns the chargeable price for a given data length
-func (a *Accountant) PaymentCharged(numSymbols uint64) uint64 {
-	return a.SymbolsCharged(numSymbols) * a.pricePerSymbol
+// TODO: paymentCharged and symbolsCharged copied from meterer, should be refactored
+// paymentCharged returns the chargeable price for a given data length
+func (a *Accountant) paymentCharged(numSymbols uint64) uint64 {
+	return a.symbolsCharged(numSymbols) * a.pricePerSymbol
 }
 
-// SymbolsCharged returns the number of symbols charged for a given data length
+// symbolsCharged returns the number of symbols charged for a given data length
 // being at least MinNumSymbols or the nearest rounded-up multiple of MinNumSymbols.
-func (a *Accountant) SymbolsCharged(numSymbols uint64) uint64 {
+func (a *Accountant) symbolsCharged(numSymbols uint64) uint64 {
 	if numSymbols <= a.minNumSymbols {
 		return a.minNumSymbols
 	}
@@ -157,9 +154,14 @@ func (a *Accountant) SymbolsCharged(numSymbols uint64) uint64 {
 	return core.RoundUpDivide(numSymbols, a.minNumSymbols) * a.minNumSymbols
 }
 
-func (a *Accountant) GetRelativePeriodRecord(index uint64) *PeriodRecord {
-	relativeIndex := uint32(index % uint64(a.numBins))
-	if a.periodRecords[relativeIndex].Index != uint32(index) {
+// getOrRefreshRelativePeriodRecord returns the period record for the given index (which is in seconds and is the multiple of the reservation window),
+// wrapping around the circular buffer and clearing the record if the index is greater than the number of bins
+func (a *Accountant) getOrRefreshRelativePeriodRecord(index uint64, reservationWindow uint64) *PeriodRecord {
+	relativeIndex := uint32((index / reservationWindow) % uint64(len(a.periodRecords)))
+	if relativeIndex >= uint32(len(a.periodRecords)) {
+		panic(fmt.Sprintf("relativeIndex %d is greater than the number of bins %d cached", relativeIndex, len(a.periodRecords)))
+	}
+	if a.periodRecords[relativeIndex].Index < uint32(index) {
 		a.periodRecords[relativeIndex] = PeriodRecord{
 			Index: uint32(index),
 			Usage: 0,

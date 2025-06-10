@@ -46,7 +46,8 @@ group "all" {
     "traffic-generator",
     "traffic-generator-v2",
     "controller",
-    "relay"
+    "relay",
+    "blobapi"
   ]
 }
 
@@ -70,7 +71,8 @@ group "ci-release" {
     "churner",
     "dataapi",
     "controller",
-    "relay"
+    "relay",
+    "blobapi"
   ]
 }
 
@@ -87,7 +89,8 @@ group "internal-release" {
     "traffic-generator-internal",
     "traffic-generator-v2-internal",
     "controller-internal",
-    "relay-internal"
+    "relay-internal",
+    "blobapi-internal"
   ]
 }
 
@@ -264,6 +267,22 @@ target "controller-internal" {
     "${REGISTRY}/eigenda-controller:${BUILD_TAG}",
     "${REGISTRY}/eigenda-controller:${GIT_SHA}",
     "${REGISTRY}/eigenda-controller:sha-${GIT_SHORT_SHA}"
+  ]
+}
+
+target "blobapi" {
+  context    = "."
+  dockerfile = "./Dockerfile"
+  target     = "blobapi"
+  tags       = ["${REGISTRY}/${REPO}/blobapi:${BUILD_TAG}"]
+}
+
+target "blobapi-internal" {
+  inherits = ["blobapi"]
+  tags     = [
+    "${REGISTRY}/eigenda-blobapi:${BUILD_TAG}",
+    "${REGISTRY}/eigenda-blobapi:${GIT_SHA}",
+    "${REGISTRY}/eigenda-blobapi:sha-${GIT_SHORT_SHA}"
   ]
 }
 

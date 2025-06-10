@@ -387,3 +387,91 @@ func (c *EigenDACertV2) ComputeBlobKey() (*coreV2.BlobKey, error) {
 func (c *EigenDACertV2) Version() CertificateVersion {
 	return VersionTwoCert
 }
+
+// ToV3 converts an EigenDACertV2 to an EigenDACertV3
+func (c *EigenDACertV2) ToV3() (*EigenDACertV3, error) {
+	// Convert BlobInclusionInfo from V2 to V3 format
+	v3BlobInclusionInfo := certTypesBinding.EigenDATypesV2BlobInclusionInfo{
+		BlobCertificate: certTypesBinding.EigenDATypesV2BlobCertificate{
+			BlobHeader: certTypesBinding.EigenDATypesV2BlobHeaderV2{
+				Version:       c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version,
+				QuorumNumbers: c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+				Commitment: certTypesBinding.EigenDATypesV2BlobCommitment{
+					Commitment: certTypesBinding.BN254G1Point{
+						X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment.X,
+						Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment.Y,
+					},
+					LengthCommitment: certTypesBinding.BN254G2Point{
+						X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthCommitment.X,
+						Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthCommitment.Y,
+					},
+					LengthProof: certTypesBinding.BN254G2Point{
+						X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthProof.X,
+						Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthProof.Y,
+					},
+					Length: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length,
+				},
+				PaymentHeaderHash: c.BlobInclusionInfo.BlobCertificate.BlobHeader.PaymentHeaderHash,
+			},
+			Signature: c.BlobInclusionInfo.BlobCertificate.Signature,
+			RelayKeys: convertUint32SliceToRelayKeys(c.BlobInclusionInfo.BlobCertificate.RelayKeys),
+		},
+		BlobIndex:      c.BlobInclusionInfo.BlobIndex,
+		InclusionProof: c.BlobInclusionInfo.InclusionProof,
+	}
+
+	// Convert BatchHeader from V2 to V3 format
+	v3BatchHeader := certTypesBinding.EigenDATypesV2BatchHeaderV2{
+		BatchRoot:            c.BatchHeader.BatchRoot,
+		ReferenceBlockNumber: c.BatchHeader.ReferenceBlockNumber,
+	}
+
+	// Convert NonSignerStakesAndSignature from V2 to V3 format
+	v3NonSignerStakesAndSignature := certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature{
+		NonSignerQuorumBitmapIndices: c.NonSignerStakesAndSignature.NonSignerQuorumBitmapIndices,
+		NonSignerPubkeys:             convertV2PubkeysToV3(c.NonSignerStakesAndSignature.NonSignerPubkeys),
+		QuorumApks:                   convertV2PubkeysToV3(c.NonSignerStakesAndSignature.QuorumApks),
+		ApkG2: certTypesBinding.BN254G2Point{
+			X: c.NonSignerStakesAndSignature.ApkG2.X,
+			Y: c.NonSignerStakesAndSignature.ApkG2.Y,
+		},
+		Sigma: certTypesBinding.BN254G1Point{
+			X: c.NonSignerStakesAndSignature.Sigma.X,
+			Y: c.NonSignerStakesAndSignature.Sigma.Y,
+		},
+		QuorumApkIndices:      c.NonSignerStakesAndSignature.QuorumApkIndices,
+		TotalStakeIndices:     c.NonSignerStakesAndSignature.TotalStakeIndices,
+		NonSignerStakeIndices: c.NonSignerStakesAndSignature.NonSignerStakeIndices,
+	}
+
+	// Create the V3 certificate
+	certV3 := &EigenDACertV3{
+		BlobInclusionInfo:           v3BlobInclusionInfo,
+		BatchHeader:                 v3BatchHeader,
+		NonSignerStakesAndSignature: v3NonSignerStakesAndSignature,
+		SignedQuorumNumbers:         c.SignedQuorumNumbers,
+	}
+
+	return certV3, nil
+}
+
+// convertUint32SliceToRelayKeys converts []uint32 to []coreV2.RelayKey for V3 format
+func convertUint32SliceToRelayKeys(relayKeys []uint32) []coreV2.RelayKey {
+	result := make([]coreV2.RelayKey, len(relayKeys))
+	for i, key := range relayKeys {
+		result[i] = coreV2.RelayKey(key)
+	}
+	return result
+}
+
+// convertV2PubkeysToV3 converts V2 pubkeys format to V3 format
+func convertV2PubkeysToV3(v2Pubkeys []contractEigenDACertVerifierV2.BN254G1Point) []certTypesBinding.BN254G1Point {
+	result := make([]certTypesBinding.BN254G1Point, len(v2Pubkeys))
+	for i, pubkey := range v2Pubkeys {
+		result[i] = certTypesBinding.BN254G1Point{
+			X: pubkey.X,
+			Y: pubkey.Y,
+		}
+	}
+	return result
+}
