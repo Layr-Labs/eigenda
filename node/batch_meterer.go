@@ -126,12 +126,12 @@ func (b *BatchMeterer) BatchRequestUsage(batch *corev2.Batch) ([]UpdateRecord, e
 
 		accountID := cert.BlobHeader.PaymentMetadata.AccountID
 		numSymbols := uint64(cert.BlobHeader.BlobCommitments.Length)
-		symbolsCharged := b.symbolsCharged(numSymbols)
 
 		// Add usage for each quorum in the blob
 		for _, quorumID := range cert.BlobHeader.QuorumNumbers {
 			// Use current period as the index
-			currentPeriod := meterer.GetReservationPeriodByNanosecond(cert.BlobHeader.PaymentMetadata.Timestamp, b.ChainPaymentState.GetReservationWindow())
+			currentPeriod := meterer.GetReservationPeriodByNanosecond(cert.BlobHeader.PaymentMetadata.Timestamp, b.ChainPaymentState.GetReservationWindow(quorumID))
+			symbolsCharged := meterer.SymbolsCharged(numSymbols, b.ChainPaymentState.GetMinNumSymbols(quorumID))
 
 			// Create a unique key for this account/quorum/period combination
 			key := fmt.Sprintf("%s_%d_%d", accountID.Hex(), quorumID, currentPeriod)
@@ -221,7 +221,7 @@ func (b *BatchMeterer) BatchMeterRequest(
 			}
 
 			// Then validate reservation period
-			if !b.validateReservationPeriod(reservation, update.period, b.ChainPaymentState.GetReservationWindow(), batchReceivedAt) {
+			if !meterer.ValidateReservationPeriod(reservation, update.period, b.ChainPaymentState.GetReservationWindow(update.quorumID), batchReceivedAt) {
 				b.rollbackUpdates(successfulUpdates)
 				return fmt.Errorf("account %s has invalid reservation period for quorum %d", accountID.Hex(), update.quorumID)
 			}
@@ -300,7 +300,7 @@ func (b *BatchMeterer) incrementAndValidateUsage(
 	defer accountUsage.Lock.Unlock()
 
 	periodRecord := b.getOrCreatePeriodRecord(accountUsage, quorumID, currentPeriod)
-	binLimit := reservation.SymbolsPerSecond * b.ChainPaymentState.GetReservationWindow()
+	binLimit := reservation.SymbolsPerSecond * b.ChainPaymentState.GetReservationWindow(quorumID)
 	prevUsage := periodRecord.Usage
 
 	b.logger.Debug("incrementAndValidateUsage",
@@ -335,8 +335,8 @@ func (b *BatchMeterer) incrementAndValidateUsage(
 	}
 
 	// Check if overflow period is within reservation window
-	nextPeriod := currentPeriod + b.ChainPaymentState.GetReservationWindow()
-	endPeriod := meterer.GetReservationPeriod(int64(reservation.EndTimestamp), b.ChainPaymentState.GetReservationWindow())
+	nextPeriod := currentPeriod + b.ChainPaymentState.GetReservationWindow(quorumID)
+	endPeriod := meterer.GetReservationPeriod(int64(reservation.EndTimestamp), b.ChainPaymentState.GetReservationWindow(quorumID))
 
 	if nextPeriod >= endPeriod {
 		b.logger.Debug("overflow period outside window, reverting", "accountID", accountID.Hex(), "quorumID", quorumID, "period", currentPeriod, "prevUsage", prevUsage, "nextPeriod", nextPeriod, "endPeriod", endPeriod)
@@ -394,8 +394,8 @@ func (b *BatchMeterer) getOrCreatePeriodRecord(
 	}
 
 	// Calculate relative index in circular buffer
-	relativeIndex := uint32((period / b.ChainPaymentState.GetReservationWindow()) % uint64(meterer.MinNumBins))
-	b.logger.Info("getOrCreatePeriodRecord", "relativeIndex", relativeIndex, "period", period, "reservationWindow", b.ChainPaymentState.GetReservationWindow())
+	relativeIndex := uint32((period / b.ChainPaymentState.GetReservationWindow(quorumID)) % uint64(meterer.MinNumBins))
+	b.logger.Info("getOrCreatePeriodRecord", "relativeIndex", relativeIndex, "period", period, "reservationWindow", b.ChainPaymentState.GetReservationWindow(quorumID))
 
 	// Initialize record if needed
 	if accountUsage.PeriodRecords[quorumID][relativeIndex] == nil {
@@ -412,42 +412,4 @@ func (b *BatchMeterer) getOrCreatePeriodRecord(
 	}
 
 	return accountUsage.PeriodRecords[quorumID][relativeIndex]
-}
-
-// symbolsCharged returns the number of symbols charged for a given data length
-func (b *BatchMeterer) symbolsCharged(numSymbols uint64) uint64 {
-	minSymbols := b.ChainPaymentState.GetMinNumSymbols()
-	if numSymbols <= minSymbols {
-		return minSymbols
-	}
-	// Round up to the nearest multiple of MinNumSymbols
-	return core.RoundUpDivide(numSymbols, minSymbols) * minSymbols
-}
-
-// validateReservationPeriod checks if the provided reservation period is valid
-// Based on meterer.ValidateReservationPeriod
-// requestReservationPeriod is the period the request indicates the period it is using
-// receivedAt is the timestamp the request was received at and will be used to validate requestReservationPeriod
-func (b *BatchMeterer) validateReservationPeriod(reservation *core.ReservedPayment, requestReservationPeriod uint64, reservationWindow uint64, receivedAt time.Time) bool {
-	currentReservationPeriod := meterer.GetReservationPeriod(receivedAt.Unix(), reservationWindow)
-
-	// Valid reservation periods are either the current bin or the previous bin
-	isCurrentOrPreviousPeriod := requestReservationPeriod == currentReservationPeriod ||
-		requestReservationPeriod == (currentReservationPeriod-reservationWindow)
-
-	startPeriod := meterer.GetReservationPeriod(int64(reservation.StartTimestamp), reservationWindow)
-	endPeriod := meterer.GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow)
-
-	isWithinReservationWindow := startPeriod <= requestReservationPeriod && requestReservationPeriod < endPeriod
-
-	b.logger.Info("validateReservationPeriod debug",
-		"requestReservationPeriod", requestReservationPeriod,
-		"currentReservationPeriod", currentReservationPeriod,
-		"startPeriod", startPeriod,
-		"endPeriod", endPeriod,
-		"isCurrentOrPreviousPeriod", isCurrentOrPreviousPeriod,
-		"isWithinReservationWindow", isWithinReservationWindow,
-	)
-
-	return isCurrentOrPreviousPeriod && isWithinReservationWindow
 }

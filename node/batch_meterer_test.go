@@ -178,13 +178,16 @@ func setupTestFixtures(t *testing.T) *testFixtures {
 	mockState := new(coremock.MockOnchainPaymentState)
 	config := DefaultTestConfig()
 
-	mockState.On("GetMinNumSymbols").Return(config.MinNumSymbols)
-	mockState.On("GetReservationWindow").Return(config.ReservationWindow)
+	// Set up default mocks for all quorums
+	for i := uint8(0); i < 2; i++ {
+		mockState.On("GetMinNumSymbols", core.QuorumID(i)).Return(config.MinNumSymbols)
+		mockState.On("GetReservationWindow", core.QuorumID(i)).Return(config.ReservationWindow)
+	}
 
 	batchMeterer := NewBatchMeterer(meterer.Config{
 		ChainReadTimeout: config.ChainReadTimeout,
 		UpdateInterval:   config.UpdateInterval,
-	}, mockState, config.NumBins, logger)
+	}, mockState, logger)
 
 	return &testFixtures{
 		ctx:               ctx,
@@ -476,8 +479,10 @@ func TestBatchMeterMeterBatch(t *testing.T) {
 		f.mockState.Calls = nil
 
 		// Set up basic mock expectations
-		f.mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		f.mockState.On("GetReservationWindow").Return(uint64(reservationInterval)).Maybe()
+		for i := uint8(0); i < 2; i++ {
+			f.mockState.On("GetMinNumSymbols", core.QuorumID(i)).Return(uint64(32)).Maybe()
+			f.mockState.On("GetReservationWindow", core.QuorumID(i)).Return(uint64(reservationInterval)).Maybe()
+		}
 
 		// Create valid reservations for account 1
 		reservationsAcc1 := f.createTestReservationMap(testUsageAmount, time.Unix(0, 0), time.Unix(farFutureTimestamp, 0), f.quorum0)
@@ -846,8 +851,8 @@ func TestBatchMeterPeriodRecordEdgeCases(t *testing.T) {
 		// Create a reservation that spans multiple periods
 		reservations := f.createTestReservationMap(100, time.Unix(0, 0), time.Unix(farFutureTimestamp, 0), f.quorum0)
 
-		f.mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		f.mockState.On("GetReservationWindow").Return(uint64(reservationInterval)).Maybe()
+		f.mockState.On("GetMinNumSymbols", f.quorum0).Return(uint64(32)).Maybe()
+		f.mockState.On("GetReservationWindow", f.quorum0).Return(uint64(reservationInterval)).Maybe()
 		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
 			f.ctx,
 			f.account1,
@@ -1013,8 +1018,8 @@ func TestBatchMeterReservationEdgeCases(t *testing.T) {
 		now := time.Now()
 		reservations := f.createTestReservationMap(100, now, now.Add(24*time.Hour), f.quorum0)
 
-		f.mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		f.mockState.On("GetReservationWindow").Return(uint64(reservationInterval)).Maybe()
+		f.mockState.On("GetMinNumSymbols", f.quorum0).Return(uint64(32)).Maybe()
+		f.mockState.On("GetReservationWindow", f.quorum0).Return(uint64(reservationInterval)).Maybe()
 		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
 			f.ctx,
 			f.account1,
@@ -1045,8 +1050,8 @@ func TestBatchMeterReservationEdgeCases(t *testing.T) {
 		now := time.Now()
 		reservations := f.createTestReservationMap(0, now, now.Add(24*time.Hour), f.quorum0)
 
-		f.mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		f.mockState.On("GetReservationWindow").Return(uint64(reservationInterval)).Maybe()
+		f.mockState.On("GetMinNumSymbols", f.quorum0).Return(uint64(32)).Maybe()
+		f.mockState.On("GetReservationWindow", f.quorum0).Return(uint64(reservationInterval)).Maybe()
 		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
 			f.ctx,
 			f.account1,
@@ -1074,8 +1079,8 @@ func TestBatchMeterReservationEdgeCases(t *testing.T) {
 		now := time.Now()
 		reservations := f.createTestReservationMap(100, now.Add(-24*time.Hour), now, f.quorum0)
 
-		f.mockState.On("GetMinNumSymbols").Return(uint64(32)).Maybe()
-		f.mockState.On("GetReservationWindow").Return(uint64(reservationInterval)).Maybe()
+		f.mockState.On("GetMinNumSymbols", f.quorum0).Return(uint64(32)).Maybe()
+		f.mockState.On("GetReservationWindow", f.quorum0).Return(uint64(reservationInterval)).Maybe()
 		f.mockState.On("GetReservedPaymentByAccountAndQuorums",
 			f.ctx,
 			f.account1,
