@@ -8,7 +8,7 @@ import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeReg
 import {IEigenDAThresholdRegistry, EigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry, EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
-import {IEigenDADisperserRegistry, EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
+import {IDisperserRegistry, DisperserRegistry} from "src/core/DisperserRegistry.sol";
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {IRewardsCoordinator} from
     "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
@@ -87,6 +87,7 @@ contract DeploymentInitializer {
     uint256 public immutable DISPERSER_REFUND;
     address public immutable DISPERSER_TOKEN;
     uint64 public immutable DISPERSER_LOCK_PERIOD;
+    uint256 public immutable DISPERSER_UPDATE_FEE;
 
     constructor(ImmutableInitParams memory initParams) {
         {
@@ -144,6 +145,7 @@ contract DeploymentInitializer {
             DISPERSER_REFUND = initParams.disperserRegistryParams.refund;
             DISPERSER_TOKEN = initParams.disperserRegistryParams.token;
             DISPERSER_LOCK_PERIOD = initParams.disperserRegistryParams.lockPeriod;
+            DISPERSER_UPDATE_FEE = initParams.disperserRegistryParams.updateFee;
         }
     }
 
@@ -201,14 +203,15 @@ contract DeploymentInitializer {
         );
 
         upgrade(DISPERSER_REGISTRY, DISPERSER_REGISTRY_IMPL);
-        EigenDADisperserRegistry(DISPERSER_REGISTRY).initialize(
+        DisperserRegistry(DISPERSER_REGISTRY).initialize(
             INITIAL_OWNER,
             DisperserRegistryTypes.LockedDisperserDeposit({
                 deposit: DISPERSER_DEPOSIT,
                 refund: DISPERSER_REFUND,
                 token: DISPERSER_TOKEN,
                 lockPeriod: DISPERSER_LOCK_PERIOD
-            })
+            }),
+            DISPERSER_UPDATE_FEE
         );
 
         upgrade(SERVICE_MANAGER, SERVICE_MANAGER_IMPL);

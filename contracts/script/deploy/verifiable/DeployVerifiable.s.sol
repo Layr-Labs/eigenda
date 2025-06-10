@@ -18,7 +18,7 @@ import {IEigenDAThresholdRegistry, EigenDAThresholdRegistry} from "src/core/Eige
 import {IEigenDARelayRegistry, EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
-import {IEigenDADisperserRegistry, EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
+import {IDisperserRegistry, DisperserRegistry} from "src/core/DisperserRegistry.sol";
 import {EigenDAServiceManager, IServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {IAVSDirectory} from
     "lib/eigenlayer-middleware/lib/eigenlayer-contracts/src/contracts/interfaces/IAVSDirectory.sol";
@@ -180,7 +180,7 @@ contract DeployVerifiable is Script {
         implementations.thresholdRegistry = address(new EigenDAThresholdRegistry());
         implementations.relayRegistry = address(new EigenDARelayRegistry());
         implementations.paymentVault = address(new PaymentVault());
-        implementations.disperserRegistry = address(new EigenDADisperserRegistry());
+        implementations.disperserRegistry = address(new DisperserRegistry());
         implementations.serviceManager = address(
             new EigenDAServiceManager(
                 IAVSDirectory(cfg.avsDirectory()),
@@ -190,7 +190,7 @@ contract DeployVerifiable is Script {
                 IEigenDAThresholdRegistry(proxies.thresholdRegistry),
                 IEigenDARelayRegistry(proxies.relayRegistry),
                 IPaymentVault(proxies.paymentVault),
-                IEigenDADisperserRegistry(proxies.disperserRegistry)
+                IDisperserRegistry(proxies.disperserRegistry)
             )
         );
     }

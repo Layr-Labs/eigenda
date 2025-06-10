@@ -82,6 +82,7 @@ struct ImmutableDisperserRegistryParams {
     uint256 refund;
     address token;
     uint64 lockPeriod;
+    uint256 updateFee;
 }
 
 library InitParamsLib {
@@ -162,7 +163,8 @@ library InitParamsLib {
             deposit: stdToml.readUint(configData, ".initParams.eigenDA.disperserRegistry.deposit"),
             refund: stdToml.readUint(configData, ".initParams.eigenDA.disperserRegistry.refund"),
             token: stdToml.readAddress(configData, ".initParams.eigenDA.disperserRegistry.token"),
-            lockPeriod: uint64(stdToml.readUint(configData, ".initParams.eigenDA.disperserRegistry.lockPeriod"))
+            lockPeriod: uint64(stdToml.readUint(configData, ".initParams.eigenDA.disperserRegistry.lockPeriod")),
+            updateFee: stdToml.readUint(configData, ".initParams.eigenDA.disperserRegistry.updateFee")
         });
     }
 

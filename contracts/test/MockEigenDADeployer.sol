@@ -19,8 +19,9 @@ import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.s
 import {EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
-import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
-import {EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
+import {IDisperserRegistry} from "src/core/interfaces/IDisperserRegistry.sol";
+import {DisperserRegistry} from "src/core/DisperserRegistry.sol";
+import {DisperserRegistryTypes} from "src/core/libraries/v3/disperser/DisperserRegistryTypes.sol";
 import "forge-std/StdStorage.sol";
 
 contract MockEigenDADeployer is BLSMockAVSDeployer {
@@ -37,8 +38,8 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
     EigenDARelayRegistry eigenDARelayRegistryImplementation;
     EigenDAThresholdRegistry eigenDAThresholdRegistry;
     EigenDAThresholdRegistry eigenDAThresholdRegistryImplementation;
-    EigenDADisperserRegistry eigenDADisperserRegistry;
-    EigenDADisperserRegistry eigenDADisperserRegistryImplementation;
+    DisperserRegistry disperserRegistry;
+    DisperserRegistry disperserRegistryImplementation;
     PaymentVault paymentVault;
     PaymentVault paymentVaultImplementation;
     EigenDACertVerifier eigenDACertVerifier;
@@ -82,9 +83,8 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             payable(address(new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), "")))
         );
 
-        eigenDADisperserRegistry = EigenDADisperserRegistry(
-            address(new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), ""))
-        );
+        disperserRegistry =
+            DisperserRegistry(address(new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), "")));
 
         eigenDAServiceManagerImplementation = new EigenDAServiceManager(
             avsDirectory,
@@ -94,7 +94,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             eigenDAThresholdRegistry,
             eigenDARelayRegistry,
             paymentVault,
-            eigenDADisperserRegistry
+            disperserRegistry
         );
 
         address[] memory confirmers = new address[](1);
@@ -142,13 +142,16 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             abi.encodeWithSelector(EigenDARelayRegistry.initialize.selector, registryCoordinatorOwner)
         );
 
-        eigenDADisperserRegistryImplementation = new EigenDADisperserRegistry();
+        disperserRegistryImplementation = new DisperserRegistry();
+
+        DisperserRegistryTypes.LockedDisperserDeposit memory depositParams =
+            DisperserRegistryTypes.LockedDisperserDeposit({token: address(1), deposit: 0, refund: 0, lockPeriod: 0});
 
         cheats.prank(proxyAdminOwner);
         proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(eigenDADisperserRegistry))),
-            address(eigenDADisperserRegistryImplementation),
-            abi.encodeWithSelector(EigenDADisperserRegistry.initialize.selector, registryCoordinatorOwner)
+            TransparentUpgradeableProxy(payable(address(disperserRegistry))),
+            address(disperserRegistryImplementation),
+            abi.encodeWithSelector(DisperserRegistry.initialize.selector, registryCoordinatorOwner, depositParams, 0)
         );
 
         paymentVaultImplementation = PaymentVault(payable(address(new PaymentVault())));

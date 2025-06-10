@@ -16,7 +16,7 @@ import {IStakeRegistry} from "lib/eigenlayer-middleware/src/interfaces/IStakeReg
 import {IEigenDAThresholdRegistry} from "src/core/interfaces/IEigenDAThresholdRegistry.sol";
 import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
-import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
+import {IDisperserRegistry} from "src/core/interfaces/IDisperserRegistry.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
 import {EigenDAServiceManagerStorage} from "./EigenDAServiceManagerStorage.sol";
@@ -46,7 +46,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
         IEigenDAThresholdRegistry __eigenDAThresholdRegistry,
         IEigenDARelayRegistry __eigenDARelayRegistry,
         IPaymentVault __paymentVault,
-        IEigenDADisperserRegistry __eigenDADisperserRegistry
+        IDisperserRegistry __disperserRegistry
     )
         BLSSignatureChecker(__registryCoordinator)
         ServiceManagerBase(__avsDirectory, __rewardsCoordinator, __registryCoordinator, __stakeRegistry)
@@ -54,7 +54,7 @@ contract EigenDAServiceManager is EigenDAServiceManagerStorage, ServiceManagerBa
             __eigenDAThresholdRegistry,
             __eigenDARelayRegistry,
             __paymentVault,
-            __eigenDADisperserRegistry
+            __disperserRegistry
         )
     {
         _disableInitializers();
