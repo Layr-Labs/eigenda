@@ -28,7 +28,7 @@ EigenDA *Proxy* is used as the main entrypoint for secure dispersal and retrieva
 
 1. Using `latest_block_number` (lbn) number fetched from ETH RPC node, *Proxy* calls the router to get the `EigenDACertVerifier` [contract](./4-contracts.md#eigendacertverifier) address *most likely* (if using [`EigenDACertVerifierRouter`](./4-contracts.md#eigendacertverifierrouter)) to be committed to by the `reference_block_number` (rbn) returned by the EigenDA disperser.
 
-2. Using the `verifier`, *Proxy* fetches the `required_quorums` an embeds them into the [`BlobHeader`](./3-data-structs.md#blobheader) as part of the disperser request.
+2. Using the `verifier`, *Proxy* fetches the `required_quorums` and embeds them into the [`BlobHeader`](./3-data-structs.md#blobheader) as part of the disperser request.
 
 3. The *Proxy* submits the payload blob request to the EigenDA disperser and polls for a [`BlobStatusReply`](../../protobufs/generated/disperser_v2.md#blobstatusreply) (BSR). 
 
@@ -47,7 +47,7 @@ EigenDA *Proxy* is used as the main entrypoint for secure dispersal and retrieva
 
 This phase occurs inside the eigenda-proxy, because the proxy acts as the “bridge” between the Rollup Domain and Data Availability Domain (see [lifecycle](./2-rollup-payload-lifecycle.md) diagram).
 
-A `payload` consists of an arbitrary byte array. The DisperseBlob endpoint accepts an `encodedPayload`, which needs to be a bn254 field element array.
+A `payload` consists of an arbitrary byte array. The DisperseBlob endpoint accepts an `blob`, which needs to be an encoded bn254 field element array.
 
 
 ### Disperser polling
@@ -91,7 +91,7 @@ Any other terminal status indicates failure, and a new blob dispersal will need 
 
 #### Failover to Native Rollup DA
 
-*Proxy* can be configured to retry `UNKNOWN`, `FAILED`, & `COMPLETE` dispersal `n` times, after which it returns to the rollup a `503` HTTP status code which rollup batchers can use to failover to EthDA or native rollup DA offerings (e.g, arbitrum anytrust). See [here](https://github.com/ethereum-optimism/specs/issues/434) for more info on the OP implementation and [here](https://hackmd.io/@epociask/SJUyIZlZkx) for Arbitrum. 
+*Proxy* can be configured to retry `BlobStatus.UNKNOWN`, `BlobStatus.FAILED`, & `BlobStatus.COMPLETE` (if threshold check failed) dispersal `n` times, after which it returns to the rollup a `503` HTTP status code which rollup batchers can use to failover to EthDA or native rollup DA offerings (e.g, arbitrum anytrust). See [here](https://github.com/ethereum-optimism/specs/issues/434) for more info on the OP implementation and [here](https://hackmd.io/@epociask/SJUyIZlZkx) for Arbitrum. 
 
 ### BlobStatusReply → Cert
 

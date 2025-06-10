@@ -100,7 +100,7 @@ Unlike Ethereum blobs which are all 128KiB, EigenDA blobs can be any power of 2 
 
 **PaymentHeader**
 
-The paymentHeader specifies how the blob dispersal to the network will be paid for. There are 2 modes of payment, the permissionless pay-per-blob model and the permissioned reserved-bandwidth approach. See the [Payments](https://docs.eigenda.xyz/releases/payments) release doc for full details; we will only describe how to set these 4 fields here.
+The paymentHeader specifies how the blob dispersal to the network will be paid for. There are 2 modes of payment, the permissionless pay-per-blob model and the permissioned reserved-bandwidth approach. See the [Payments](https://docs.eigenda.xyz/core-concepts/payments#high-level-design) release doc for full details; we will only describe how to set these 4 fields here.
 
 ```protobuf
 message PaymentHeader {
