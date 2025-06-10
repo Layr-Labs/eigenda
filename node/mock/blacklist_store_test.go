@@ -392,25 +392,25 @@ func TestBlacklistStoreIsBlacklistedWithMockTime(t *testing.T) {
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
 
-	testDir := t.TempDir()
-
-	// Create mock time
-	mockTime := &MockTime{}
-	baseTime := time.Date(2023, 6, 15, 10, 0, 0, 0, time.UTC)
-
-	mockTime.NowFunc = func() time.Time {
-		return baseTime
-	}
-	mockTime.UnixFunc = func(sec int64, nsec int64) time.Time {
-		return time.Unix(sec, nsec)
-	}
-
-	store, err := node.NewLevelDBBlacklistStore(testDir, logger, false, false, mockTime)
-	require.NoError(t, err)
-
 	ctx := context.Background()
 
 	t.Run("SingleEntryExactlyOneHour", func(t *testing.T) {
+		testDir := t.TempDir()
+
+		// Create mock time
+		mockTime := &MockTime{}
+		baseTime := time.Date(2023, 6, 15, 10, 0, 0, 0, time.UTC)
+
+		mockTime.NowFunc = func() time.Time {
+			return baseTime
+		}
+		mockTime.UnixFunc = func(sec int64, nsec int64) time.Time {
+			return time.Unix(sec, nsec)
+		}
+
+		store, err := node.NewLevelDBBlacklistStore(testDir, logger, false, false, mockTime)
+		require.NoError(t, err)
+
 		disperserId := uint32(201)
 
 		// Add entry
@@ -431,6 +431,22 @@ func TestBlacklistStoreIsBlacklistedWithMockTime(t *testing.T) {
 	})
 
 	t.Run("TwoEntriesExactlyOneDay", func(t *testing.T) {
+		testDir := t.TempDir()
+
+		// Create mock time
+		mockTime := &MockTime{}
+		baseTime := time.Date(2023, 6, 15, 10, 0, 0, 0, time.UTC)
+
+		mockTime.NowFunc = func() time.Time {
+			return baseTime
+		}
+		mockTime.UnixFunc = func(sec int64, nsec int64) time.Time {
+			return time.Unix(sec, nsec)
+		}
+
+		store, err := node.NewLevelDBBlacklistStore(testDir, logger, false, false, mockTime)
+		require.NoError(t, err)
+
 		disperserId := uint32(202)
 
 		// Add two entries
@@ -453,6 +469,22 @@ func TestBlacklistStoreIsBlacklistedWithMockTime(t *testing.T) {
 	})
 
 	t.Run("ThreeEntriesExactlyOneWeek", func(t *testing.T) {
+		testDir := t.TempDir()
+
+		// Create mock time
+		mockTime := &MockTime{}
+		baseTime := time.Date(2023, 6, 15, 10, 0, 0, 0, time.UTC)
+
+		mockTime.NowFunc = func() time.Time {
+			return baseTime
+		}
+		mockTime.UnixFunc = func(sec int64, nsec int64) time.Time {
+			return time.Unix(sec, nsec)
+		}
+
+		store, err := node.NewLevelDBBlacklistStore(testDir, logger, false, false, mockTime)
+		require.NoError(t, err)
+
 		disperserId := uint32(203)
 
 		// Add three entries
@@ -477,6 +509,22 @@ func TestBlacklistStoreIsBlacklistedWithMockTime(t *testing.T) {
 	})
 
 	t.Run("FourEntriesSameAsThree", func(t *testing.T) {
+		testDir := t.TempDir()
+
+		// Create mock time
+		mockTime := &MockTime{}
+		baseTime := time.Date(2023, 6, 15, 10, 0, 0, 0, time.UTC)
+
+		mockTime.NowFunc = func() time.Time {
+			return baseTime
+		}
+		mockTime.UnixFunc = func(sec int64, nsec int64) time.Time {
+			return time.Unix(sec, nsec)
+		}
+
+		store, err := node.NewLevelDBBlacklistStore(testDir, logger, false, false, mockTime)
+		require.NoError(t, err)
+
 		disperserId := uint32(204)
 
 		// Add four entries (should behave same as 3+)
@@ -504,6 +552,22 @@ func TestBlacklistStoreIsBlacklistedWithMockTime(t *testing.T) {
 
 	// Test Case 5: 14 days after last update, should not be blacklisted
 	t.Run("FourteenDaysAfterLastUpdate1Entry", func(t *testing.T) {
+		testDir := t.TempDir()
+
+		// Create mock time
+		mockTime := &MockTime{}
+		baseTime := time.Date(2023, 6, 15, 10, 0, 0, 0, time.UTC)
+
+		mockTime.NowFunc = func() time.Time {
+			return baseTime
+		}
+		mockTime.UnixFunc = func(sec int64, nsec int64) time.Time {
+			return time.Unix(sec, nsec)
+		}
+
+		store, err := node.NewLevelDBBlacklistStore(testDir, logger, false, false, mockTime)
+		require.NoError(t, err)
+
 		disperserId := uint32(205)
 
 		// Add four entries (should behave same as 3+)
@@ -529,6 +593,22 @@ func TestBlacklistStoreIsBlacklistedWithMockTime(t *testing.T) {
 	})
 
 	t.Run("FourteenDaysAfterLastUpdate2Entries", func(t *testing.T) {
+		testDir := t.TempDir()
+
+		// Create mock time
+		mockTime := &MockTime{}
+		baseTime := time.Date(2023, 6, 15, 10, 0, 0, 0, time.UTC)
+
+		mockTime.NowFunc = func() time.Time {
+			return baseTime
+		}
+		mockTime.UnixFunc = func(sec int64, nsec int64) time.Time {
+			return time.Unix(sec, nsec)
+		}
+
+		store, err := node.NewLevelDBBlacklistStore(testDir, logger, false, false, mockTime)
+		require.NoError(t, err)
+
 		disperserId := uint32(206)
 
 		// Add two entries (should behave same as 3+)
@@ -556,6 +636,22 @@ func TestBlacklistStoreIsBlacklistedWithMockTime(t *testing.T) {
 	})
 
 	t.Run("FourteenDaysAfterLastUpdate3Entries", func(t *testing.T) {
+		testDir := t.TempDir()
+
+		// Create mock time
+		mockTime := &MockTime{}
+		baseTime := time.Date(2023, 6, 15, 10, 0, 0, 0, time.UTC)
+
+		mockTime.NowFunc = func() time.Time {
+			return baseTime
+		}
+		mockTime.UnixFunc = func(sec int64, nsec int64) time.Time {
+			return time.Unix(sec, nsec)
+		}
+
+		store, err := node.NewLevelDBBlacklistStore(testDir, logger, false, false, mockTime)
+		require.NoError(t, err)
+
 		disperserId := uint32(207)
 
 		// Add three entries (should behave same as 3+)
