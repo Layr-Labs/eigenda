@@ -1,6 +1,6 @@
 ## Data Structs
 
-The diagram below represents the transformation from a rollup `payload` to the different structs that are allowed to be dispersed
+The diagram below represents the transformation from a rollup `payload` to the different structs that are allowed to be dispersed.
 
 ![image.png](../../assets/integration/payload-to-blob-encoding.png)
 
@@ -69,13 +69,16 @@ A `DA Certicate` (or short `DACert`) contains all the information needed to retr
 
 ![image.png](../../assets/integration/v2-cert.png)
 
-A `DACert` contains the three data structs needed to call [verifyDACertV2](https://github.com/Layr-Labs/eigenda/blob/98e21397e3471d170f3131549cdbc7113c0cdfaf/contracts/src/core/EigenDACertVerifier.sol#L86) on the EigenDACertVerifier.sol contract. Please refer to the eigenda core spec for more details, but in short, the `BlobCertificate` is included as a leaf inside the merkle tree identified by the `batch_root` in the `BatchHeader`. The `BlobInclusionInfo` contains the information needed to prove this merkle tree inclusion. The `NonSignerStakesAndSignature` contains the aggregated BLS signature `sigma` of the EigenDA validators. `sigma` is a signature over the `BatchHeader`.
+A `DACert` contains the four data structs needed to call [checkDACert](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/EigenDACertVerifier.sol#L46-L56) on the EigenDACertVerifier.sol contract. Please refer to the eigenda core spec for more details, but in short, the `BlobCertificate` is included as a leaf inside the merkle tree identified by the `batch_root` in the `BatchHeader`. The `BlobInclusionInfo` contains the information needed to prove this merkle tree inclusion. The `NonSignerStakesAndSignature` contains the aggregated BLS signature `sigma` of the EigenDA validators. `sigma` is a signature over the `BatchHeader`. The `signedQuorumNumbers` contains the quorum IDs that DA nodes signed over for the blob.
 
 ![image.png](../../assets/integration/v2-batch-hashing-structure.png)
 
 ### AltDACommitment
 
-In order to be understood by each rollup stack’s derivation pipeline, the cert must be prepended with header bytes, to turn it into an [`altda-commitment`](https://github.com/Layr-Labs/eigenda-proxy?tab=readme-ov-file#commitment-schemas) respective to each stack:
+In order to be understood by each rollup stack’s derivation pipeline, the encoded `DACert` must be prepended with header bytes, to turn it into an [`altda-commitment`](https://github.com/Layr-Labs/eigenda-proxy?tab=readme-ov-file#commitment-schemas) respective to each stack:
 
 - [op](https://specs.optimism.io/experimental/alt-da.html#input-commitment-submission) prepends 3 bytes: `version_byte`, `commitment_type`, `da_layer_byte`
 - nitro prepends 1 byte: `version_byte`
+
+**NOTE**
+In the future we plan to support a custom encoding byte which allows a user to specify different encoding formats for the `DACert` (e.g, RLP, ABI).

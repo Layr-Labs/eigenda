@@ -71,7 +71,7 @@ An rpc call to the Disperser’s `GetPaymentState` method can be made to query t
 
 ## Blob Dispersal
 
-The `DisperseBlob` method takes a `blob` and `blob_header` as input. Dispersal entails taking a blob, reed-solomon encoding it into chunks, dispersing those to the EigenDA nodes, retrieving their signatures, creating a `cert` from them, and returning that cert to the client. The disperser batches blobs for a few seconds before dispersing them to nodes, so an entire dispersal process can exceed 10 seconds. For this reason, the API has been designed asynchronously with 2 relevant methods:
+The `DisperseBlob` method takes a `blob` and `blob_header` as input. Dispersal entails taking a blob, reed-solomon encoding it into chunks, dispersing those to the EigenDA nodes, retrieving their signatures, creating a `DACert` from them, and returning that cert to the client. The disperser batches blobs for a few seconds before dispersing them to nodes, so an entire dispersal process can exceed 10 seconds. For this reason, the API has been designed asynchronously with 2 relevant methods:
 
 ```protobuf
 // Async call which queues up the blob for processing and immediately returns.
@@ -90,77 +90,98 @@ message BlobStatusReply {
   BlobVerificationInfo blob_verification_info = 3;
 }
 
-// Intermediate states: QUEUED, ENCODED
-// Terminal states: CERTIFIED, UNKNOWN, FAILED, INSUFFICIENT_SIGNATURES
+// Intermediate states: QUEUED, ENCODED, GATHERING_SIGNATURES
+// Terminal states: UNKNOWN, COMPLETE, FAILED
 enum BlobStatus {
   UNKNOWN = 0; // functionally equivalent to FAILED but for unknown unknown bugs
   QUEUED = 1; // Initial state after a DisperseBlob call returns
   ENCODED = 2; // Reed-Solomon encoded into chunks ready to be dispersed to DA Nodes
-  CERTIFIED = 3; // blob has been dispersed and attested by NA nodes
-  FAILED = 4; // permanent failure (for reasons other than insufficient signatures)
-  INSUFFICIENT_SIGNATURES = 5;
+  GATHERING_SIGNATURES = 3; // blob chunks are actively being transmitted to validators
+  COMPLETE = 4; // blob has been dispersed and attested by DA nodes
+  FAILED = 5;
 }
 ```
 
-After a successful DisperseBlob rpc call, `BlobStatus.QUEUED` is returned. To retrieve a `cert`, the `GetBlobStatus` rpc shall be polled until a terminal status is reached. If `BlobStatus.CERTIFIED` is received, the `signed_batch` and `blob_verification_info` fields of the `BlobStatusReply` will be returned and can be used to create the `cert` . Any other terminal status indicates failure, and a new blob dispersal will need to be made.
+After a successful DisperseBlob RPC call, the disperser returns `BlobStatus.QUEUED`. To retrieve a cert, the GetBlobStatus RPC should be polled until a terminal status is reached.
 
-**Failover to EthDA**
+If `BlobStatus.GATHERING_SIGNATURES` is returned, the `signed_batch` and `blob_verification_info` fields will be present in the `BlobStatusReply`. These can be used to construct a `DACert`, which may be verified immediately against the configured threshold parameters stored in the `EigenDACertVerifier` contract. If the verification passes, the certificate can be accepted early. If verification fails, polling should continue.
 
-The proxy can be configured to retry `FAILED` dispersal n times, after which it returns to the rollup a `503` HTTP status code which rollup batchers can use to failover to EthDA. See [here](https://github.com/ethereum-optimism/specs/issues/434) for more info.
+Once `BlobStatus.COMPLETE` is returned, it indicates that the disperser has stopped collecting additional signatures, typically due to reaching a timeout or encountering an issue. While the `signed_batch` and `blob_verification_info` fields will be populated and can be used to construct a `DACert`, the `DACert` could still be invalid if an insufficient amount of signatures were collected in-regards to the threshold parameters.
+
+Any other terminal status indicates failure, and a new blob dispersal will need to be made.
+
+**Failover to Native Rollup DA**
+
+The proxy can be configured to retry `UNKNOWN`, `FAILED`, & `COMPLETE` dispersal `n` times, after which it returns to the rollup a `503` HTTP status code which rollup batchers can use to failover to EthDA or native rollup DA offerings (e.g, arbitrum anytrust). See [here](https://github.com/ethereum-optimism/specs/issues/434) for more info on the OP implementation and [here](https://hackmd.io/@epociask/SJUyIZlZkx) for Arbitrum. 
 
 ## BlobStatusReply → Cert
 
-This is not necessarily part of the spec but is currently needed given that the disperser doesn’t actually return a cert, so we need a bit of data processing to transform its returned value into a Cert. The transformation is visualized in the [Ultra High Res Diagram](../spec.md#ultra-high-resolution-diagram). The main difference is just calling the [`getNonSignerStakesAndSignature`](https://github.com/Layr-Labs/eigenda/blob/d9cf91e22b6812f85151f4d83aecc96bae967316/contracts/src/core/EigenDABlobVerifier.sol#L222) helper function within the new `EigenDACertVerifier` contract to create the `NonSignerStakesAndSignature` struct. The following pseudocode below exemplifies this necessary preprocessing step:
+This is not necessarily part of the spec but is currently needed given that the disperser doesn't actually return a cert, so we need a bit of data processing to transform its returned value into a Cert. The transformation is visualized in the [Ultra High Res Diagram](../spec.md#ultra-high-resolution-diagram). 
+
+In the updated implementation, a `CertBuilder` constructs the DA Cert through direct communication with the `OperatorStateRetriever` contract, which provides the necessary information about operator stake states. This approach ensures accurate on-chain data for certificate verification. The following pseudocode demonstrates this process:
 
 ```python
-
-class CertV2:
-    batch_header: any  # You can specify proper types here
+class DACert:
+    batch_header: any
     blob_verification_proof: any
     nonsigner_stake_sigs: any
+    cert_version: uint8
+    signedQuorumNumbers: bytes
 
-def get_cert_v2(blob_header_hash, blob_verifier_binding) -> CertV2:
+def get_da_cert(blob_header_hash, operator_state_retriever, cert_version_uint8) -> DACert:
     """
-    V2 cert construction pseudocode
+    DA Cert construction pseudocode with OperatorStateRetriever
     @param blob_header_hash: key used for referencing blob status from disperser
-    @param blob_verifier_binding: ABI contract binding used for generating nonsigner metadata
-    @return v2_cert: EigenDA V2 certificate used by rollup 
+    @param operator_state_retriever: ABI contract binding for retrieving operator state data
+    @param cert_version_uint8: uint8 version of the certificate format to use
+    @return DACert: EigenDA certificate used by rollup 
     """
-  # Call the disperser for the info needed to construct the cert
+    # Call the disperser for the info needed to construct the cert
     blob_status_reply = disperser_client.get_blob_status(blob_header_hash)
     
     # Validate the blob_header received, since it uniquely identifies
     # an EigenDA dispersal.
-    blob_header_hash_from_reply = blob_status_reply
-                                                                .blob_verification_info
-                                                                .blob_certificate
-                                                                .blob_header
-                                                                .Hash()
-    if blob_header_hash != blob_header_hash_from_reply {
+    blob_header_hash_from_reply = blob_status_reply.blob_verification_info.blob_certificate.blob_header.Hash()
+    if blob_header_hash \!= blob_header_hash_from_reply:
         throw/raise/panic
-    }
-
+    
     # Extract first 2 cert fields from blob status reply
     batch_header = blob_status_reply.signed_batch.batch_header
     blob_verification_proof = blob_status_reply.blob_verification_info
     
-    # Construct NonSignerStakesAndSignature
-    nonsigner_stake_sigs = blob_verifier_binding.getNonSignerStakesAndSignature(
-                                                     blob_status_reply.signed_batch)
-                                                 
-  return Cert(batch_header, blob_verification_proof, nonsigner_stake_sigs)
-```
+    # Get the reference block number from the batch header
+    reference_block_number = batch_header.reference_block_number
+    
+    # Get quorum IDs from the blob header
+    quorum_numbers = blob_verification_info.blob_certificate.blob_header.quorum_numbers
+    
+    # Retrieve operator state data directly from the OperatorStateRetriever contract
+    operator_states = operator_state_retriever.getOperatorState(
+        reference_block_number,
+        quorum_numbers,
+        blob_status_reply.signed_batch.signatures
+    )
+    
+    # Construct NonSignerStakesAndSignature using the operator state data
+    nonsigner_stake_sigs = construct_nonsigner_stakes_and_signature(
+        operator_states,
+        blob_status_reply.signed_batch.signatures
+    )
 
+    signed_quorum_numbers = blob_status_reply.signed_batch.quorum_numbers
+    
+    return DACert(batch_header, blob_verification_proof, nonsigner_stake_sigs, cert_version_uint8, signed_quorum_numbers)
+```
 ## Posting to Ethereum
 
-The proxy converts the `cert` to an [`altda-commitment`](./3-datastructs.md#altdacommitment) ready to be submitted to the batcher’s inbox without any further modifications by the rollup stack.
+The proxy converts the `DACert` to an [`altda-commitment`](./3-datastructs.md#altdacommitment) ready to be submitted to the batcher’s inbox without any further modifications by the rollup stack.
 
 ## Retrieval
 
 There are two main blob retrieval paths:
 
-1. decentralized retrieval: retrieve chunks from Validators are recreate the `blob` from them.
-2. centralized retrieval: the same [Relay API](https://docs.eigenda.xyz/releases/v2#relay-interfaces) that Validators use to download chunks, can also be used to retrieve full blobs.
+1. **decentralized retrieval:** retrieve chunks from Validators are recreate the `blob` from them.
+2. **centralized retrieval:** the same [Relay API](https://docs.eigenda.xyz/releases/v2#relay-interfaces) that Validators use to download chunks, can also be used to retrieve full blobs.
 
 EigenDA V2 has a new [Relay API](https://docs.eigenda.xyz/releases/v2#relay-interfaces) for retrieving blobs from the disperser. The `GetBlob` method takes a `blob_key` as input, which is a synonym for `blob_header_hash`. Note that `BlobCertificate` (different from `DACert`!) contains an array of `relay_keys`, which are the relays that can serve that specific blob. A relay’s URL can be retrieved from the [relayKeyToUrl](https://github.com/Layr-Labs/eigenda/blob/9a4bdc099b98f6e5116b11778f0cf1466f13779c/contracts/src/core/EigenDARelayRegistry.sol#L35) function on the EigenDARelayRegistry.sol contract.
 

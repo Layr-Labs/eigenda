@@ -43,18 +43,30 @@ relay.Relay.GetChunks
 
 ### Contracts
 
-The most important contract for rollups integrations is the EigenDACertVerifier, which presents a [function](https://github.com/Layr-Labs/eigenda/blob/98e21397e3471d170f3131549cdbc7113c0cdfaf/contracts/src/core/EigenDACertVerifier.sol#L86) to validate Certs:
+#### Immutable Cert Verifier
+The most important contract for rollups integrations is the `EigenDACertVerifier`, which presents a [function](https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/EigenDACertVerifier.sol#L46-L56) to validate DACerts:
 
 ```solidity
-/**
- * @notice Verifies a blob cert for the specified quorums with the default security thresholds
- * @param batchHeader The batch header of the blob 
- * @param blobInclusionInfo The inclusion proof for the blob cert
- * @param nonSignerStakesAndSignature The nonSignerStakesAndSignature to verify the blob cert against
- */
-function verifyDACertV2(
-    BatchHeaderV2 calldata batchHeader,
-    BlobInclusionInfo calldata blobInclusionInfo,
-    NonSignerStakesAndSignature calldata nonSignerStakesAndSignature
-) external view
+    /// @notice Check a DA cert's validity
+    /// @param abiEncodedCert The ABI encoded certificate. Any cert verifier should decode this ABI encoding based on the certificate version.
+    /// @return status An enum value. Success is always mapped to 1, and other values are errors specific to each CertVerifier.
+    function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8 status);
+
+    /// @notice Returns the EigenDA certificate version. Used off-chain to identify how to encode a certificate for this CertVerifier.
+    /// @return The EigenDA certificate version.
+    function certVersion() external view returns (uint8);
+```
+
+#### Upgradable Router
+`EigenDACertVerifierRouter` acts as an intermediary contract that maintains an internal mapping of `activation_block_number -> EigenDACertVerifier`. This contract can be used to enable seamless upgrades for new `EigenDACertVerifier` and provides a way for a rollup to securely introduce custom quorums and/or modify their security thresholds.
+```solidity
+    /// @notice Returns the address for the active cert verifier at a given reference block number.
+    ///         The reference block number must not be in the future.
+    function getCertVerifierAt(uint32 referenceBlockNumber) external view returns (address);
+
+    /// @notice Check a DA cert's validity
+    /// @param abiEncodedCert The ABI encoded certificate. Any cert verifier should decode this ABI encoding based on the certificate version.
+    /// @return status An enum value. Success is always mapped to 1, and other values are errors specific to each CertVerifier.
+    function checkDACert(bytes calldata abiEncodedCert) external view returns (uint8 status);
+
 ```
