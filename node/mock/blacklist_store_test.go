@@ -501,6 +501,93 @@ func TestBlacklistStoreIsBlacklistedWithMockTime(t *testing.T) {
 		}
 		require.False(t, store.IsBlacklisted(ctx, disperserId))
 	})
+
+	// Test Case 5: 14 days after last update, should not be blacklisted
+	t.Run("FourteenDaysAfterLastUpdate1Entry", func(t *testing.T) {
+		disperserId := uint32(205)
+
+		// Add four entries (should behave same as 3+)
+		err = store.AddEntry(ctx, disperserId, "context1", "violation1")
+		require.NoError(t, err)
+
+		// check if disperser is blacklisted
+		require.True(t, store.IsBlacklisted(ctx, disperserId))
+
+		// check if disperser is not blacklisted after 1 hour but entry exists
+		mockTime.SinceFunc = func(t time.Time) time.Duration {
+			return time.Hour
+		}
+		require.False(t, store.IsBlacklisted(ctx, disperserId))
+		require.True(t, store.HasDisperserID(ctx, disperserId))
+
+		// 14 days after last update, should not be blacklisted
+		mockTime.SinceFunc = func(t time.Time) time.Duration {
+			return 14 * 24 * time.Hour
+		}
+		require.False(t, store.IsBlacklisted(ctx, disperserId))
+		require.False(t, store.HasDisperserID(ctx, disperserId))
+	})
+
+	t.Run("FourteenDaysAfterLastUpdate2Entries", func(t *testing.T) {
+		disperserId := uint32(206)
+
+		// Add two entries (should behave same as 3+)
+		err = store.AddEntry(ctx, disperserId, "context1", "violation1")
+		require.NoError(t, err)
+		err = store.AddEntry(ctx, disperserId, "context2", "violation2")
+		require.NoError(t, err)
+
+		// check if disperser is blacklisted
+		require.True(t, store.IsBlacklisted(ctx, disperserId))
+
+		// check if disperser is not blacklisted after 1 hour but entry exists
+		mockTime.SinceFunc = func(t time.Time) time.Duration {
+			return 24 * time.Hour
+		}
+		require.False(t, store.IsBlacklisted(ctx, disperserId))
+		require.True(t, store.HasDisperserID(ctx, disperserId))
+
+		// 14 days after last update, should not be blacklisted
+		mockTime.SinceFunc = func(t time.Time) time.Duration {
+			return 14 * 24 * time.Hour
+		}
+		require.False(t, store.IsBlacklisted(ctx, disperserId))
+		require.False(t, store.HasDisperserID(ctx, disperserId))
+	})
+
+	t.Run("FourteenDaysAfterLastUpdate3Entries", func(t *testing.T) {
+		disperserId := uint32(207)
+
+		// Add three entries (should behave same as 3+)
+		err = store.AddEntry(ctx, disperserId, "context1", "violation1")
+		require.NoError(t, err)
+		err = store.AddEntry(ctx, disperserId, "context2", "violation2")
+		require.NoError(t, err)
+		err = store.AddEntry(ctx, disperserId, "context3", "violation3")
+		require.NoError(t, err)
+
+		// check if disperser is blacklisted
+		require.True(t, store.IsBlacklisted(ctx, disperserId))
+		// check if disperser is blacklisted for 1 week
+		mockTime.SinceFunc = func(t time.Time) time.Duration {
+			return 6 * 24 * time.Hour
+		}
+		require.True(t, store.IsBlacklisted(ctx, disperserId))
+
+		// check if disperser is not blacklisted after 7 days
+		mockTime.SinceFunc = func(t time.Time) time.Duration {
+			return 7 * 24 * time.Hour
+		}
+		require.False(t, store.IsBlacklisted(ctx, disperserId))
+
+		// check if disperser entry is deleted after 14 days
+		mockTime.SinceFunc = func(t time.Time) time.Duration {
+			return 14 * 24 * time.Hour
+		}
+		require.False(t, store.IsBlacklisted(ctx, disperserId))
+		require.False(t, store.HasDisperserID(ctx, disperserId))
+
+	})
 }
 
 // Note: Interface testing with mock is done in a separate test package to avoid import cycles

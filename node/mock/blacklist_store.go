@@ -41,11 +41,6 @@ func (m *MockBlacklistStore) HasDisperserID(ctx context.Context, disperserId uin
 	return args.Bool(0)
 }
 
-func (m *MockBlacklistStore) HasKey(ctx context.Context, key []byte) bool {
-	args := m.Called(ctx, key)
-	return args.Bool(0)
-}
-
 func (m *MockBlacklistStore) GetByDisperserID(ctx context.Context, disperserId uint32) (*node.Blacklist, error) {
 	args := m.Called(ctx, disperserId)
 	if args.Get(0) == nil {

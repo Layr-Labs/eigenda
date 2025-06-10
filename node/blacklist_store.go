@@ -92,11 +92,11 @@ func (s *blacklistStore) BlacklistDisperserFromBlobCert(request *pb.StoreChunksR
 func (s *blacklistStore) HasDisperserID(ctx context.Context, disperserId uint32) bool {
 	// hash the disperserId and look up
 	disperserIdHash := sha256.Sum256([]byte(fmt.Sprintf("%d", disperserId)))
-	return s.hasKey(ctx, disperserIdHash[:])
+	return s.hasKey(disperserIdHash[:])
 }
 
 // HasKey checks if a key exists in the store
-func (s *blacklistStore) hasKey(ctx context.Context, key []byte) bool {
+func (s *blacklistStore) hasKey(key []byte) bool {
 	_, err := s.db.Get(key)
 	return err == nil
 }
@@ -185,11 +185,13 @@ func (s *blacklistStore) IsBlacklisted(ctx context.Context, disperserId uint32) 
 		}
 	}
 
-	// The disperser is behaving correctly but did badly in the past and existing entries are no longer valid
-	// and so we need to remove the entries so as to not check each time and waste resources.
-	err = s.DeleteByDisperserID(ctx, disperserId)
-	if err != nil {
-		s.logger.Error("failed to delete disperser from blacklist", "disperserId", disperserId, "err", err)
+	// We check if the disperser has behaved correctly for 2 weeks since the last update
+	// If so, we delete the disperser from the blacklist to avoid checking each time and wasting resources.
+	if s.time.Since(s.time.Unix(int64(lastUpdated), 0)) >= time.Hour*24*14 {
+		err = s.DeleteByDisperserID(ctx, disperserId)
+		if err != nil {
+			s.logger.Error("failed to delete disperser from blacklist", "disperserId", disperserId, "err", err)
+		}
 	}
 
 	// if the disperser is not blacklisted, return false
