@@ -12,6 +12,25 @@ import (
 // SwapFileExtension is the file extension used for temporary swap files created during atomic writes.
 const SwapFileExtension = ".swap"
 
+// DeleteOrphanedSwapFiles deletes any swap files in the given directory, i.e. files that end with ".swap".
+func DeleteOrphanedSwapFiles(directory string) error {
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return fmt.Errorf("failed to read directory %s: %w", directory, err)
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == SwapFileExtension {
+			swapFilePath := filepath.Join(directory, entry.Name())
+			if err := os.Remove(swapFilePath); err != nil {
+				return fmt.Errorf("failed to remove swap file %s: %w", swapFilePath, err)
+			}
+		}
+	}
+
+	return nil
+}
+
 // SanitizePath returns a sanitized version of the given path, doing things like expanding
 // "~" to the user's home directory, converting to absolute path, normalizing slashes, etc.
 func SanitizePath(path string) (string, error) {

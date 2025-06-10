@@ -1085,3 +1085,214 @@ func TestAtomicRenameAcrossFilesystems(t *testing.T) {
 	}
 	// If it fails, that's also acceptable for cross-filesystem renames
 }
+
+func TestDeleteOrphanedSwapFiles(t *testing.T) {
+	// Setup
+	tempDir := t.TempDir()
+
+	// Test cases
+	tests := []struct {
+		name        string
+		setup       func() string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "delete swap files in directory with mixed files",
+			setup: func() string {
+				testDir := filepath.Join(tempDir, "mixed-files")
+				err := os.Mkdir(testDir, 0755)
+				require.NoError(t, err)
+
+				// Create regular files
+				err = os.WriteFile(filepath.Join(testDir, "regular1.txt"), []byte("content1"), 0644)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(testDir, "regular2.log"), []byte("content2"), 0644)
+				require.NoError(t, err)
+
+				// Create swap files
+				err = os.WriteFile(filepath.Join(testDir, "file1.txt"+SwapFileExtension), []byte("swap1"), 0644)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(testDir, "file2.log"+SwapFileExtension), []byte("swap2"), 0644)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(testDir, "orphaned"+SwapFileExtension), []byte("orphaned"), 0644)
+				require.NoError(t, err)
+
+				// Create a subdirectory (should be ignored)
+				subDir := filepath.Join(testDir, "subdir")
+				err = os.Mkdir(subDir, 0755)
+				require.NoError(t, err)
+
+				// Create a swap file in subdirectory (should not be deleted by this call)
+				err = os.WriteFile(filepath.Join(subDir, "nested"+SwapFileExtension), []byte("nested"), 0644)
+				require.NoError(t, err)
+
+				return testDir
+			},
+			expectError: false,
+		},
+		{
+			name: "empty directory",
+			setup: func() string {
+				testDir := filepath.Join(tempDir, "empty-dir")
+				err := os.Mkdir(testDir, 0755)
+				require.NoError(t, err)
+				return testDir
+			},
+			expectError: false,
+		},
+		{
+			name: "directory with only swap files",
+			setup: func() string {
+				testDir := filepath.Join(tempDir, "only-swap")
+				err := os.Mkdir(testDir, 0755)
+				require.NoError(t, err)
+
+				// Create only swap files
+				err = os.WriteFile(filepath.Join(testDir, "swap1"+SwapFileExtension), []byte("content1"), 0644)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(testDir, "swap2"+SwapFileExtension), []byte("content2"), 0644)
+				require.NoError(t, err)
+
+				return testDir
+			},
+			expectError: false,
+		},
+		{
+			name: "directory with no swap files",
+			setup: func() string {
+				testDir := filepath.Join(tempDir, "no-swap")
+				err := os.Mkdir(testDir, 0755)
+				require.NoError(t, err)
+
+				// Create only regular files
+				err = os.WriteFile(filepath.Join(testDir, "file1.txt"), []byte("content1"), 0644)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(testDir, "file2.log"), []byte("content2"), 0644)
+				require.NoError(t, err)
+
+				return testDir
+			},
+			expectError: false,
+		},
+		{
+			name: "non-existent directory",
+			setup: func() string {
+				return filepath.Join(tempDir, "non-existent")
+			},
+			expectError: true,
+			errorMsg:    "failed to read directory",
+		},
+		{
+			name: "path is a file not directory",
+			setup: func() string {
+				filePath := filepath.Join(tempDir, "not-a-dir.txt")
+				err := os.WriteFile(filePath, []byte("content"), 0644)
+				require.NoError(t, err)
+				return filePath
+			},
+			expectError: true,
+			errorMsg:    "failed to read directory",
+		},
+	}
+
+	// Run tests
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dirPath := tc.setup()
+
+			// Count files before deletion for verification
+			var beforeFiles []string
+			var beforeSwapFiles []string
+			if entries, err := os.ReadDir(dirPath); err == nil {
+				for _, entry := range entries {
+					if !entry.IsDir() {
+						beforeFiles = append(beforeFiles, entry.Name())
+						if filepath.Ext(entry.Name()) == SwapFileExtension {
+							beforeSwapFiles = append(beforeSwapFiles, entry.Name())
+						}
+					}
+				}
+			}
+
+			err := DeleteOrphanedSwapFiles(dirPath)
+
+			if tc.expectError {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.errorMsg)
+			} else {
+				require.NoError(t, err)
+
+				// Verify that all swap files were deleted
+				entries, err := os.ReadDir(dirPath)
+				require.NoError(t, err)
+
+				var afterFiles []string
+				var afterSwapFiles []string
+				for _, entry := range entries {
+					if !entry.IsDir() {
+						afterFiles = append(afterFiles, entry.Name())
+						if filepath.Ext(entry.Name()) == SwapFileExtension {
+							afterSwapFiles = append(afterSwapFiles, entry.Name())
+						}
+					}
+				}
+
+				// No swap files should remain
+				require.Empty(t, afterSwapFiles, "All swap files should be deleted")
+
+				// Regular files should remain unchanged
+				var beforeRegularFiles []string
+				var afterRegularFiles []string
+				for _, file := range beforeFiles {
+					if filepath.Ext(file) != SwapFileExtension {
+						beforeRegularFiles = append(beforeRegularFiles, file)
+					}
+				}
+				for _, file := range afterFiles {
+					if filepath.Ext(file) != SwapFileExtension {
+						afterRegularFiles = append(afterRegularFiles, file)
+					}
+				}
+				require.ElementsMatch(t, beforeRegularFiles, afterRegularFiles, "Regular files should be unchanged")
+
+				// Verify subdirectories are not affected
+				if tc.name == "delete swap files in directory with mixed files" {
+					subDirPath := filepath.Join(dirPath, "subdir")
+					subEntries, err := os.ReadDir(subDirPath)
+					require.NoError(t, err)
+					require.Len(t, subEntries, 1, "Subdirectory should still contain its swap file")
+					require.Equal(t, "nested"+SwapFileExtension, subEntries[0].Name())
+				}
+			}
+		})
+	}
+}
+
+func TestDeleteOrphanedSwapFilesPermissions(t *testing.T) {
+	// Test behavior with permission issues
+	tempDir := t.TempDir()
+
+	// Create a directory with swap files
+	testDir := filepath.Join(tempDir, "perm-test")
+	err := os.Mkdir(testDir, 0755)
+	require.NoError(t, err)
+
+	// Create a swap file
+	swapFile := filepath.Join(testDir, "test"+SwapFileExtension)
+	err = os.WriteFile(swapFile, []byte("content"), 0644)
+	require.NoError(t, err)
+
+	// Make the directory read-only (no write permissions)
+	err = os.Chmod(testDir, 0555) // read + execute only
+	require.NoError(t, err)
+
+	// Attempt to delete swap files should fail
+	err = DeleteOrphanedSwapFiles(testDir)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "failed to remove swap file")
+
+	// Restore permissions for cleanup
+	err = os.Chmod(testDir, 0755)
+	require.NoError(t, err)
+}

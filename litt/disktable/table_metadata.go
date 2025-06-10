@@ -13,12 +13,7 @@ import (
 )
 
 const tableMetadataSerializationVersion = 0
-
-const tableMetadataFileExtension = ".metadata"
-const tableMetadataFileName = "table" + tableMetadataFileExtension
-const tableMetadataSwapFileExtension = ".mswap"
-const tableMetadataSwapFileName = "table" + tableMetadataSwapFileExtension
-
+const tableMetadataFileName = "table.metadata"
 const tableMetadataSize = 16
 
 // tableMetadata contains table data that is preserved across restarts.
@@ -48,12 +43,7 @@ func newTableMetadata(
 	metadata.ttl.Store(&ttl)
 	metadata.shardingFactor.Store(shardingFactor)
 
-	err := metadata.deleteOrphanedSwapFile()
-	if err != nil {
-		return nil, fmt.Errorf("failed to delete orphaned swap file: %v", err)
-	}
-
-	err = metadata.write()
+	err := metadata.write()
 	if err != nil {
 		return nil, fmt.Errorf("failed to write table metadata: %v", err)
 	}
@@ -84,11 +74,6 @@ func loadTableMetadata(logger logging.Logger, tableDirectory string) (*tableMeta
 	}
 	metadata.logger = logger
 	metadata.tableDirectory = tableDirectory
-
-	err = metadata.deleteOrphanedSwapFile()
-	if err != nil {
-		return nil, fmt.Errorf("failed to delete orphaned swap file: %v", err)
-	}
 
 	return metadata, nil
 }
@@ -195,32 +180,4 @@ func (t *tableMetadata) delete() error {
 // path returns the path to the table metadata file.
 func metadataPath(tableDirectory string) string {
 	return path.Join(tableDirectory, tableMetadataFileName)
-}
-
-// swapPath returns the path to the table metadata swap file.
-func (t *tableMetadata) swapPath() string {
-	return path.Join(t.tableDirectory, tableMetadataSwapFileName)
-}
-
-// deleteOrphanedSwapFile deletes the orphaned swap file if it exists.
-// This can happen if the process crashes while writing the metadata file (recoverable).
-func (t *tableMetadata) deleteOrphanedSwapFile() error {
-	swapPath := t.swapPath()
-
-	exists, err := util.Exists(swapPath)
-	if err != nil {
-		return fmt.Errorf("failed to check if swap file exists: %v", err)
-	}
-
-	if exists {
-		t.logger.Warnf("Found orphaned table metadata swap file %s, deleting", swapPath)
-
-		// delete orphaned swap file
-		err = os.Remove(swapPath)
-		if err != nil {
-			return fmt.Errorf("failed to remove file %s: %v", swapPath, err)
-		}
-	}
-
-	return nil
 }

@@ -115,6 +115,14 @@ func NewDiskTable(
 		}
 	}
 
+	// Delete any orphaned swap files:
+	for _, root := range qualifiedRoots {
+		err = util.DeleteOrphanedSwapFiles(root)
+		if err != nil {
+			return nil, fmt.Errorf("failed to delete orphaned swap files in %s: %w", root, err)
+		}
+	}
+
 	var metadataFilePath string
 	var metadata *tableMetadata
 

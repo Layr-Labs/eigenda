@@ -803,11 +803,7 @@ type keyFileFlushResponse struct {
 // for writing key-address pairs to the key file.
 func (s *Segment) keyFileControlLoop() {
 	unflushedKeys := make([]*types.ScopedKey, 0, unflushedKeysInitialCapacity)
-
-	defer func() {
-		fmt.Printf("stopping\n") // TODO
-	}()
-
+	
 	for {
 		select {
 		case <-s.errorMonitor.ImmediateShutdownRequired():
