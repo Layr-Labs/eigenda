@@ -68,17 +68,11 @@ run_encoder: build_encoder
 run_dataapi_tests:
 	go test -v disperser/dataapi
 
+# You can override these defaults via CLI or environment variables
 run_blobapi: build_blobapi
 	./bin/blobapi \
-	--disperser-server.s3-bucket-name myDisperserBucket \
-	--disperser-server.dynamodb-table-name myDisperserTable \
 	--disperser-server.grpc-port 51002 \
-	--disperser-server.bls-operator-state-retriever 0x9d4454B023096f34B160D6B654540c56A1F81688 \
-	--disperser-server.eigenda-service-manager 0x67d269191c92Caf3cD7723F116c85e6E9bf55933 \
 	--disperser-server.enable-metrics=false \
-	--chain.rpc http://localhost:8545 \
-	--chain.private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
-	--disperser-server.aws.region us-east-1 \
 	--auth.registered-quorum 1 \
 	--auth.total-unauth-byte-rate 1000000 \
 	--auth.per-user-unauth-byte-rate 10000 \
@@ -87,11 +81,5 @@ run_blobapi: build_blobapi
 	--auth.retrieval-blob-rate 100 \
 	--auth.retrieval-throughput 100000 \
 	--relay.grpc-port 52002 \
-	--relay.bucket-name myRelayBucket \
-	--relay.metadata-table-name myRelayTable \
 	--relay.relay-keys 1 \
-	--relay.bls-operator-state-retriever-addr 0x9d4454B023096f34B160D6B654540c56A1F81688 \
-	--relay.eigen-da-service-manager-addr 0x67d269191c92Caf3cD7723F116c85e6E9bf55933 \
 	--relay.enable-metrics=false \
-	--relay.aws.region us-east-1 \
-	--thegraph.endpoint https://my.thegraph.node
