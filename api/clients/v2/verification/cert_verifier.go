@@ -71,7 +71,7 @@ func (cv *CertVerifier) CheckDACert(
 			return &CertVerifierInputError{Msg: fmt.Sprintf("expected cert to be of type EigenDACertV2, got %T", cert)}
 		}
 
-		certV3, err = coretypes.ConvertV2CertToV3(certV2)
+		certV3, err = certV2.ToV3()
 		if err != nil {
 			return &CertVerifierInternalError{Msg: "convert V2 cert to V3", Err: err}
 		}

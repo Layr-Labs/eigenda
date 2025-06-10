@@ -388,64 +388,60 @@ func (c *EigenDACertV2) Version() CertificateVersion {
 	return VersionTwoCert
 }
 
-// ConvertV2CertToV3 converts an EigenDACertV2 to an EigenDACertV3
-func ConvertV2CertToV3(certV2 *EigenDACertV2) (*EigenDACertV3, error) {
-	if certV2 == nil {
-		return nil, fmt.Errorf("input V2 certificate cannot be nil")
-	}
-
+// ToV3 converts an EigenDACertV2 to an EigenDACertV3
+func (c *EigenDACertV2) ToV3() (*EigenDACertV3, error) {
 	// Convert BlobInclusionInfo from V2 to V3 format
 	v3BlobInclusionInfo := certTypesBinding.EigenDATypesV2BlobInclusionInfo{
 		BlobCertificate: certTypesBinding.EigenDATypesV2BlobCertificate{
 			BlobHeader: certTypesBinding.EigenDATypesV2BlobHeaderV2{
-				Version:       certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.Version,
-				QuorumNumbers: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+				Version:       c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version,
+				QuorumNumbers: c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
 				Commitment: certTypesBinding.EigenDATypesV2BlobCommitment{
 					Commitment: certTypesBinding.BN254G1Point{
-						X: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment.X,
-						Y: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment.Y,
+						X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment.X,
+						Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment.Y,
 					},
 					LengthCommitment: certTypesBinding.BN254G2Point{
-						X: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthCommitment.X,
-						Y: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthCommitment.Y,
+						X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthCommitment.X,
+						Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthCommitment.Y,
 					},
 					LengthProof: certTypesBinding.BN254G2Point{
-						X: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthProof.X,
-						Y: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthProof.Y,
+						X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthProof.X,
+						Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthProof.Y,
 					},
-					Length: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length,
+					Length: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length,
 				},
-				PaymentHeaderHash: certV2.BlobInclusionInfo.BlobCertificate.BlobHeader.PaymentHeaderHash,
+				PaymentHeaderHash: c.BlobInclusionInfo.BlobCertificate.BlobHeader.PaymentHeaderHash,
 			},
-			Signature: certV2.BlobInclusionInfo.BlobCertificate.Signature,
-			RelayKeys: convertUint32SliceToRelayKeys(certV2.BlobInclusionInfo.BlobCertificate.RelayKeys),
+			Signature: c.BlobInclusionInfo.BlobCertificate.Signature,
+			RelayKeys: convertUint32SliceToRelayKeys(c.BlobInclusionInfo.BlobCertificate.RelayKeys),
 		},
-		BlobIndex:      certV2.BlobInclusionInfo.BlobIndex,
-		InclusionProof: certV2.BlobInclusionInfo.InclusionProof,
+		BlobIndex:      c.BlobInclusionInfo.BlobIndex,
+		InclusionProof: c.BlobInclusionInfo.InclusionProof,
 	}
 
 	// Convert BatchHeader from V2 to V3 format
 	v3BatchHeader := certTypesBinding.EigenDATypesV2BatchHeaderV2{
-		BatchRoot:            certV2.BatchHeader.BatchRoot,
-		ReferenceBlockNumber: certV2.BatchHeader.ReferenceBlockNumber,
+		BatchRoot:            c.BatchHeader.BatchRoot,
+		ReferenceBlockNumber: c.BatchHeader.ReferenceBlockNumber,
 	}
 
 	// Convert NonSignerStakesAndSignature from V2 to V3 format
 	v3NonSignerStakesAndSignature := certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature{
-		NonSignerQuorumBitmapIndices: certV2.NonSignerStakesAndSignature.NonSignerQuorumBitmapIndices,
-		NonSignerPubkeys:             convertV2PubkeysToV3(certV2.NonSignerStakesAndSignature.NonSignerPubkeys),
-		QuorumApks:                   convertV2PubkeysToV3(certV2.NonSignerStakesAndSignature.QuorumApks),
+		NonSignerQuorumBitmapIndices: c.NonSignerStakesAndSignature.NonSignerQuorumBitmapIndices,
+		NonSignerPubkeys:             convertV2PubkeysToV3(c.NonSignerStakesAndSignature.NonSignerPubkeys),
+		QuorumApks:                   convertV2PubkeysToV3(c.NonSignerStakesAndSignature.QuorumApks),
 		ApkG2: certTypesBinding.BN254G2Point{
-			X: certV2.NonSignerStakesAndSignature.ApkG2.X,
-			Y: certV2.NonSignerStakesAndSignature.ApkG2.Y,
+			X: c.NonSignerStakesAndSignature.ApkG2.X,
+			Y: c.NonSignerStakesAndSignature.ApkG2.Y,
 		},
 		Sigma: certTypesBinding.BN254G1Point{
-			X: certV2.NonSignerStakesAndSignature.Sigma.X,
-			Y: certV2.NonSignerStakesAndSignature.Sigma.Y,
+			X: c.NonSignerStakesAndSignature.Sigma.X,
+			Y: c.NonSignerStakesAndSignature.Sigma.Y,
 		},
-		QuorumApkIndices:      certV2.NonSignerStakesAndSignature.QuorumApkIndices,
-		TotalStakeIndices:     certV2.NonSignerStakesAndSignature.TotalStakeIndices,
-		NonSignerStakeIndices: certV2.NonSignerStakesAndSignature.NonSignerStakeIndices,
+		QuorumApkIndices:      c.NonSignerStakesAndSignature.QuorumApkIndices,
+		TotalStakeIndices:     c.NonSignerStakesAndSignature.TotalStakeIndices,
+		NonSignerStakeIndices: c.NonSignerStakesAndSignature.NonSignerStakeIndices,
 	}
 
 	// Create the V3 certificate
@@ -453,7 +449,7 @@ func ConvertV2CertToV3(certV2 *EigenDACertV2) (*EigenDACertV3, error) {
 		BlobInclusionInfo:           v3BlobInclusionInfo,
 		BatchHeader:                 v3BatchHeader,
 		NonSignerStakesAndSignature: v3NonSignerStakesAndSignature,
-		SignedQuorumNumbers:         certV2.SignedQuorumNumbers,
+		SignedQuorumNumbers:         c.SignedQuorumNumbers,
 	}
 
 	return certV3, nil
