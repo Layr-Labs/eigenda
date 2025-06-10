@@ -27,7 +27,7 @@ func generateValidSignature() (*ecdsa.PublicKey, []byte, []byte, error) {
 
 	// Define a message and compute its SHA-256 hash.
 	message := "Test message for ECDSA signature"
-	hash := 56.Sum256([]byte(message))
+	hash := sha256.Sum256([]byte(message))
 
 	// Sign the hash using the private key.
 	signatureBytes, err := crypto.Sign(hash[:], privateKey)
