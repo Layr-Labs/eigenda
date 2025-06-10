@@ -169,7 +169,7 @@ contract BeforeVerifiableDeploymentInitialization is Script, Test {
         assertEq(address(impl.eigenDAThresholdRegistry()), deploymentInitializer.THRESHOLD_REGISTRY());
         assertEq(address(impl.eigenDARelayRegistry()), deploymentInitializer.RELAY_REGISTRY());
         assertEq(address(impl.paymentVault()), deploymentInitializer.PAYMENT_VAULT());
-        assertEq(address(impl.eigenDADisperserRegistry()), deploymentInitializer.DISPERSER_REGISTRY());
+        assertEq(address(impl.disperserRegistry()), deploymentInitializer.DISPERSER_REGISTRY());
     }
 
     function _proxyHasImplementation(address proxy, address implementation) internal view returns (bool) {
