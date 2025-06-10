@@ -136,31 +136,6 @@ func TestBlacklistStoreHasDisperserID(t *testing.T) {
 	require.False(t, store.HasDisperserID(ctx, uint32(999)))
 }
 
-// TestBlacklistStoreHasKey tests the HasKey method which checks if a raw key
-// exists in the store.
-func TestBlacklistStoreHasKey(t *testing.T) {
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(t, err)
-
-	testDir := t.TempDir()
-	store, err := node.NewLevelDBBlacklistStore(testDir, logger, false, false, node.DefaultTime)
-	require.NoError(t, err)
-
-	ctx := context.Background()
-	testKey := []byte("test-key")
-	testValue := []byte("test-value")
-
-	// Should not exist initially
-	require.False(t, store.HasKey(ctx, testKey))
-
-	// Put data directly
-	err = store.Put(ctx, testKey, testValue)
-	require.NoError(t, err)
-
-	// Should exist now
-	require.True(t, store.HasKey(ctx, testKey))
-}
-
 // TestBlacklistStoreGetByDisperserID tests retrieval of blacklist data by disperser ID.
 // It verifies that the hashing and retrieval process works correctly.
 func TestBlacklistStoreGetByDisperserID(t *testing.T) {
@@ -410,27 +385,6 @@ func TestBlacklistStoreGetNonExistent(t *testing.T) {
 	// Should return error
 	_, err = store.Get(ctx, nonExistentKey)
 	require.Error(t, err)
-}
-
-// TestBlacklistStorePut tests the Put method which stores raw data in the store.
-func TestBlacklistStorePut(t *testing.T) {
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(t, err)
-
-	testDir := t.TempDir()
-	store, err := node.NewLevelDBBlacklistStore(testDir, logger, false, false, node.DefaultTime)
-	require.NoError(t, err)
-
-	ctx := context.Background()
-	testKey := []byte("put-test-key")
-	testValue := []byte("put-test-value")
-
-	// Put data
-	err = store.Put(ctx, testKey, testValue)
-	require.NoError(t, err)
-
-	// Verify it exists
-	require.True(t, store.HasKey(ctx, testKey))
 }
 
 // TestBlacklistStoreIsBlacklistedWithMockTime tests various blacklisting scenarios using mock time

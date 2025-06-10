@@ -18,9 +18,6 @@ type BlacklistStore interface {
 	// HasDisperserID checks if a disperser ID exists in the blacklist store
 	HasDisperserID(ctx context.Context, disperserId uint32) bool
 
-	// HasKey checks if a key exists in the store
-	HasKey(ctx context.Context, key []byte) bool
-
 	// GetByDisperserID retrieves a blacklist by disperser ID
 	GetByDisperserID(ctx context.Context, disperserId uint32) (*Blacklist, error)
 
@@ -39,7 +36,7 @@ type BlacklistStore interface {
 	// IsBlacklisted checks if a disperser is blacklisted
 	IsBlacklisted(ctx context.Context, disperserId uint32) bool
 
-	// blacklistDisperserFromBlobCert blacklists a disperser by retrieving the disperser's public key from the request and storing it in the blacklist store
+	// blacklistDisperserFromBlobCert blacklists a disperser by retrieving the disperser's ID from the request and storing it in the blacklist store
 	BlacklistDisperserFromBlobCert(request *pb.StoreChunksRequest, blobCert *corev2.BlobCertificate) error
 }
 
@@ -91,15 +88,15 @@ func (s *blacklistStore) BlacklistDisperserFromBlobCert(request *pb.StoreChunksR
 	return nil
 }
 
-// HasKey checks if a key exists in the store
+// HasDisperserID checks if a disperser ID exists in the store
 func (s *blacklistStore) HasDisperserID(ctx context.Context, disperserId uint32) bool {
 	// hash the disperserId and look up
 	disperserIdHash := sha256.Sum256([]byte(fmt.Sprintf("%d", disperserId)))
-	return s.HasKey(ctx, disperserIdHash[:])
+	return s.hasKey(ctx, disperserIdHash[:])
 }
 
 // HasKey checks if a key exists in the store
-func (s *blacklistStore) HasKey(ctx context.Context, key []byte) bool {
+func (s *blacklistStore) hasKey(ctx context.Context, key []byte) bool {
 	_, err := s.db.Get(key)
 	return err == nil
 }
@@ -188,8 +185,8 @@ func (s *blacklistStore) IsBlacklisted(ctx context.Context, disperserId uint32) 
 		}
 	}
 
-	// The disperser is behaving correctly but badly in the past and existing entries are no longer valid
-	// and so we need to remove the entries
+	// The disperser is behaving correctly but did badly in the past and existing entries are no longer valid
+	// and so we need to remove the entries so as to not check each time and waste resources.
 	err = s.DeleteByDisperserID(ctx, disperserId)
 	if err != nil {
 		s.logger.Error("failed to delete disperser from blacklist", "disperserId", disperserId, "err", err)
