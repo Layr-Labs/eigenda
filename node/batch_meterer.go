@@ -53,9 +53,6 @@ type BatchMeterer struct {
 	// AccountUsages tracks in-memory usage for accounts and quorums
 	AccountUsages sync.Map // map[gethcommon.Address]*AccountUsage
 
-	// Number of bins to track for each account's reservation usage
-	NumBins uint32
-
 	logger logging.Logger
 }
 
@@ -63,13 +60,11 @@ type BatchMeterer struct {
 func NewBatchMeterer(
 	config meterer.Config,
 	paymentChainState meterer.OnchainPayment,
-	numBins uint32,
 	logger logging.Logger,
 ) *BatchMeterer {
 	return &BatchMeterer{
 		Config:            config,
 		ChainPaymentState: paymentChainState,
-		NumBins:           max(numBins, meterer.MinNumBins),
 		logger:            logger.With("component", "BatchMeterer"),
 	}
 }
@@ -102,15 +97,15 @@ func (b *BatchMeterer) MeterBatch(
 	batchReceivedAt time.Time,
 ) error {
 	b.logger.Info("MeterBatch", "batch", batch, "batchReceivedAt", batchReceivedAt)
-	// Convert the batch to a map of account IDs to quorum IDs to symbols usage, aggregated over the batch's blobs
-	usageMap, err := b.BatchRequestUsage(batch)
+	// convert batch into usage records tracking account, quorum, reservation period, and usage
+	usages, err := b.BatchRequestUsage(batch)
 	if err != nil {
 		b.logger.Error("BatchRequestUsage", "error", err)
 		return err
 	}
 
 	// validate the usages against the accounts' reservations
-	return b.BatchMeterRequest(ctx, usageMap, batchReceivedAt)
+	return b.BatchMeterRequest(ctx, usages, batchReceivedAt)
 }
 
 // BatchRequestUsage aggregates the usage for each account and quorum in the batch
@@ -395,12 +390,12 @@ func (b *BatchMeterer) getOrCreatePeriodRecord(
 ) *pb.PeriodRecord {
 	// Initialize quorum records if needed
 	if _, exists := accountUsage.PeriodRecords[quorumID]; !exists {
-		accountUsage.PeriodRecords[quorumID] = make([]*pb.PeriodRecord, b.NumBins)
+		accountUsage.PeriodRecords[quorumID] = make([]*pb.PeriodRecord, meterer.MinNumBins)
 	}
 
 	// Calculate relative index in circular buffer
-	relativeIndex := uint32((period / b.ChainPaymentState.GetReservationWindow()) % uint64(b.NumBins))
-	b.logger.Info("getOrCreatePeriodRecord", "relativeIndex", relativeIndex, "period", period, "reservationWindow", b.ChainPaymentState.GetReservationWindow(), "numBins", b.NumBins)
+	relativeIndex := uint32((period / b.ChainPaymentState.GetReservationWindow()) % uint64(meterer.MinNumBins))
+	b.logger.Info("getOrCreatePeriodRecord", "relativeIndex", relativeIndex, "period", period, "reservationWindow", b.ChainPaymentState.GetReservationWindow())
 
 	// Initialize record if needed
 	if accountUsage.PeriodRecords[quorumID][relativeIndex] == nil {

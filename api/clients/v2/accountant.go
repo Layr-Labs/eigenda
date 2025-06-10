@@ -91,6 +91,7 @@ func (a *Accountant) BlobPaymentInfo(
 		return big.NewInt(0), nil
 	}
 
+	// Spillage from the current period goes to the period after the next period, thus + 2
 	overflowPeriodRecord := a.GetOrRefreshRelativePeriodRecord(currentReservationPeriod+2*reservationWindow, reservationWindow)
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
 	if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {

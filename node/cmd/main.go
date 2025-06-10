@@ -132,7 +132,6 @@ func NodeMain(ctx *cli.Context) error {
 				UpdateInterval:   5 * time.Minute,
 			},
 			onchainPaymentState,
-			uint32(config.ReservationNumBins),
 			logger,
 		)
 		serverV2, err = nodegrpc.NewServerV2(context.Background(), config, newNode, logger, ratelimiter, reg, reader, meterer)
