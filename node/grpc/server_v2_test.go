@@ -363,7 +363,9 @@ func TestV2StoreChunksIsBlacklistedTimeoutReachedCheck(t *testing.T) {
 		},
 		LastUpdated: uint64(time.Now().Unix() - 3700),
 	}
+	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(true)
 	c.blacklistStore.On("GetByDisperserID", mock.Anything, mock.Anything).Return(newBlacklist, nil)
+	c.blacklistStore.On("DeleteByDisperserID", mock.Anything, mock.Anything).Return(nil)
 
 	c.store.On("StoreBatch", mock.Anything, mock.Anything).Return(nil, nil)
 	_, err = c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
@@ -372,7 +374,6 @@ func TestV2StoreChunksIsBlacklistedTimeoutReachedCheck(t *testing.T) {
 		Batch:       batchProto,
 	})
 
-	require.NoError(t, err)
 	assert.True(t, strings.Contains(err.Error(), "disperser is blacklisted"))
 
 }
