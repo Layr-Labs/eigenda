@@ -769,7 +769,7 @@ func (env *Config) GenerateAllVariables() {
 		if err != nil {
 			log.Panicf("Error: %s", err.Error())
 		}
-		fmt.Println("composeFile", string(composeFile))
+
 		writeFile(composeFile, composeYaml)
 	}
 }
