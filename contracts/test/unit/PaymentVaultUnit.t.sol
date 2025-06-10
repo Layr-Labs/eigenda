@@ -1,315 +1,642 @@
-// SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: MIT
 pragma solidity =0.8.12;
 
-import "../MockEigenDADeployer.sol";
+import {Test} from "forge-std/Test.sol";
 
-contract PaymentVaultUnit is MockEigenDADeployer {
-    using stdStorage for StdStorage;
+import {PaymentVaultLib} from "src/core/libraries/v3/payment/PaymentVaultLib.sol";
+import {PaymentVaultTypes} from "src/core/libraries/v3/payment/PaymentVaultTypes.sol";
+import {PaymentVaultStorage} from "src/core/libraries/v3/payment/PaymentVaultStorage.sol";
+import {PaymentVault, IPaymentVault} from "src/core/PaymentVault.sol";
 
-    event ReservationUpdated(address indexed account, IPaymentVault.Reservation reservation);
-    event OnDemandPaymentUpdated(address indexed account, uint80 onDemandPayment, uint80 totalDeposit);
-    event GlobalSymbolsPerPeriodUpdated(uint64 previousValue, uint64 newValue);
-    event ReservationPeriodIntervalUpdated(uint64 previousValue, uint64 newValue);
-    event GlobalRatePeriodIntervalUpdated(uint64 previousValue, uint64 newValue);
-    event PriceParamsUpdated(
-        uint64 previousMinNumSymbols,
-        uint64 newMinNumSymbols,
-        uint64 previousPricePerSymbol,
-        uint64 newPricePerSymbol,
-        uint64 previousPriceUpdateCooldown,
-        uint64 newPriceUpdateCooldown
-    );
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-    address user = address(uint160(uint256(keccak256(abi.encodePacked("user")))));
-    address user2 = address(uint160(uint256(keccak256(abi.encodePacked("user2")))));
+contract ERC20Mintable is ERC20 {
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
 
-    bytes quorumNumbers = hex"0001";
-    bytes quorumSplits = hex"3232";
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+}
+
+contract PaymentVaultTestHarness is PaymentVault {
+    constructor(uint64 schedulePeriod) PaymentVault(schedulePeriod) {}
+
+    function checkReservation(uint64 quorumId, PaymentVaultTypes.Reservation memory reservation, uint64 schedulePeriod)
+        external
+        view
+    {
+        PaymentVaultLib.checkReservation(quorumId, reservation, schedulePeriod);
+    }
+
+    function increaseReservedSymbols(
+        uint64 quorumId,
+        uint64 startTimestamp,
+        uint64 endTimestamp,
+        uint64 symbolsPerSecond,
+        uint64 schedulePeriod
+    ) external {
+        PaymentVaultLib.increaseReservedSymbols(
+            quorumId, startTimestamp, endTimestamp, symbolsPerSecond, schedulePeriod
+        );
+    }
+
+    function decreaseReservedSymbols(
+        uint64 quorumId,
+        uint64 startTimestamp,
+        uint64 endTimestamp,
+        uint64 symbolsPerSecond,
+        uint64 schedulePeriod
+    ) external {
+        PaymentVaultLib.decreaseReservedSymbols(
+            quorumId, startTimestamp, endTimestamp, symbolsPerSecond, schedulePeriod
+        );
+    }
+}
+
+contract PaymentVaultUnit is Test {
+    PaymentVaultTestHarness paymentVault;
+
+    address constant OWNER = address(uint160(uint256(keccak256("EIGEN_DA_PAYMENT_VAULT_OWNER"))));
+    address constant QUORUM_OWNER_0 = address(uint160(uint256(keccak256("EIGEN_DA_PAYMENT_VAULT_QUORUM_OWNER_0"))));
+
+    uint64 constant SCHEDULE_PERIOD = 1 minutes;
+    uint64 constant START_PERIOD = 100;
+    uint64 constant MAX_NUM_PERIODS = 100000; // schedule period * maxNumPeriods should not overflow uint64
+    uint64 constant RESERVATION_ADVANCE_PERIODS = 100;
+    uint64 constant RESERVATION_ADVANCE_WINDOW = SCHEDULE_PERIOD * RESERVATION_ADVANCE_PERIODS;
+    uint64 constant MIN_NUM_SYMBOLS = 2;
+    uint64 constant RESERVATION_RATE_LIMIT_WINDOW = 3;
+    uint64 constant ON_DEMAND_RATE_LIMIT_WINDOW = 5;
+    uint64 constant RESERVATION_SYMBOLS_PER_SECOND = 100;
+    uint64 constant ON_DEMAND_SYMBOLS_PER_SECOND = 200;
+    uint64 constant ON_DEMAND_PRICE_PER_SYMBOL = 7;
+
+    ERC20Mintable public token;
+    address constant TEST_RECIPIENT = address(uint160(uint256(keccak256("EIGEN_DA_PAYMENT_VAULT_QUORUM_RECIPIENT"))));
 
     function setUp() public virtual {
-        _deployDA();
-    }
-
-    function test_initialize() public {
-        assertEq(paymentVault.owner(), registryCoordinatorOwner);
-        assertEq(paymentVault.minNumSymbols(), minNumSymbols);
-        assertEq(paymentVault.globalSymbolsPerPeriod(), globalSymbolsPerPeriod);
-        assertEq(paymentVault.pricePerSymbol(), pricePerSymbol);
-        assertEq(paymentVault.reservationPeriodInterval(), reservationPeriodInterval);
-        assertEq(paymentVault.priceUpdateCooldown(), priceUpdateCooldown);
-        assertEq(paymentVault.globalRatePeriodInterval(), globalRatePeriodInterval);
-
-        vm.expectRevert("Initializable: contract is already initialized");
-        paymentVault.initialize(address(0), 0, 0, 0, 0, 0, 0);
-    }
-
-    function test_setReservation(uint56 _seed) public {
-        uint64 _symbolsPerSecond = uint64(_seed);
-        uint64 _startTimestamp = uint64(_seed) + 1;
-        uint64 _endTimestamp = uint64(_seed) + 2;
-
-        address _account = address(uint160(_seed));
-
-        IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
-            symbolsPerSecond: _symbolsPerSecond,
-            startTimestamp: _startTimestamp,
-            endTimestamp: _endTimestamp,
-            quorumNumbers: quorumNumbers,
-            quorumSplits: quorumSplits
-        });
-
-        vm.expectEmit(address(paymentVault));
-        emit ReservationUpdated(_account, reservation);
-        vm.prank(registryCoordinatorOwner);
-        paymentVault.setReservation(_account, reservation);
-
-        assertEq(keccak256(abi.encode(paymentVault.getReservation(_account))), keccak256(abi.encode(reservation)));
-    }
-
-    function test_setReservation_revertInvalidQuorumSplits() public {
-        IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
-            symbolsPerSecond: 100,
-            startTimestamp: 101,
-            endTimestamp: 102,
-            quorumNumbers: hex"0001",
-            quorumSplits: hex"3233"
-        });
-
-        vm.expectRevert("sum of quorumSplits must be 100");
-        vm.prank(registryCoordinatorOwner);
-        paymentVault.setReservation(user, reservation);
-
-        reservation = IPaymentVault.Reservation({
-            symbolsPerSecond: 100,
-            startTimestamp: 101,
-            endTimestamp: 102,
-            quorumNumbers: hex"0001",
-            quorumSplits: hex"3231"
-        });
-
-        vm.expectRevert("sum of quorumSplits must be 100");
-        vm.prank(registryCoordinatorOwner);
-        paymentVault.setReservation(user, reservation);
-
-        reservation = IPaymentVault.Reservation({
-            symbolsPerSecond: 100,
-            startTimestamp: 101,
-            endTimestamp: 102,
-            quorumNumbers: hex"0001",
-            quorumSplits: hex"323334"
-        });
-
-        vm.expectRevert("arrays must have the same length");
-        vm.prank(registryCoordinatorOwner);
-        paymentVault.setReservation(user, reservation);
-    }
-
-    function test_setReservation_revertInvalidTimestamps() public {
-        IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
-            symbolsPerSecond: 100,
-            startTimestamp: 101,
-            endTimestamp: 100,
-            quorumNumbers: quorumNumbers,
-            quorumSplits: quorumSplits
-        });
-
-        vm.expectRevert("end timestamp must be greater than start timestamp");
-        vm.prank(registryCoordinatorOwner);
-        paymentVault.setReservation(user, reservation);
-    }
-
-    function test_depositOnDemand() public {
-        vm.deal(user, 200 ether);
-
-        vm.expectEmit(address(paymentVault));
-        emit OnDemandPaymentUpdated(user, 100 ether, 100 ether);
-        vm.prank(user);
-        paymentVault.depositOnDemand{value: 100 ether}(user);
-        assertEq(paymentVault.getOnDemandTotalDeposit(user), 100 ether);
-
-        vm.expectEmit(address(paymentVault));
-        emit OnDemandPaymentUpdated(user, 100 ether, 200 ether);
-        vm.prank(user);
-        paymentVault.depositOnDemand{value: 100 ether}(user);
-        assertEq(paymentVault.getOnDemandTotalDeposit(user), 200 ether);
-    }
-
-    function test_depositOnDemand_forOtherUser() public {
-        vm.deal(user, 100 ether);
-
-        vm.expectEmit(address(paymentVault));
-        emit OnDemandPaymentUpdated(user2, 100 ether, 100 ether);
-        vm.prank(user);
-        paymentVault.depositOnDemand{value: 100 ether}(user2);
-        assertEq(paymentVault.getOnDemandTotalDeposit(user2), 100 ether);
-        assertEq(paymentVault.getOnDemandTotalDeposit(user), 0);
-    }
-
-    function test_depositOnDemand_fallback() public {
-        vm.deal(user, 100 ether);
-
-        vm.expectEmit(address(paymentVault));
-        emit OnDemandPaymentUpdated(user, 100 ether, 100 ether);
-        vm.prank(user);
-        (bool success,) = payable(paymentVault).call{value: 100 ether}(hex"69");
-        require(success, "ETH transfer failed");
-        assertEq(paymentVault.getOnDemandTotalDeposit(user), 100 ether);
-    }
-
-    function test_depositOnDemand_recieve() public {
-        vm.deal(user, 100 ether);
-
-        vm.expectEmit(address(paymentVault));
-        emit OnDemandPaymentUpdated(user, 100 ether, 100 ether);
-        vm.prank(user);
-        (bool success,) = payable(paymentVault).call{value: 100 ether}("");
-        require(success, "ETH transfer failed");
-        assertEq(paymentVault.getOnDemandTotalDeposit(user), 100 ether);
-    }
-
-    function test_depositOnDemand_revertUint80Overflow() public {
-        vm.deal(user, uint256(type(uint80).max) + 1);
-        vm.expectRevert("amount must be less than or equal to 80 bits");
-        vm.prank(user);
-        paymentVault.depositOnDemand{value: uint256(type(uint80).max) + 1}(user);
-    }
-
-    function test_setPriceParams() public {
-        vm.warp(block.timestamp + priceUpdateCooldown);
-
-        vm.expectEmit(address(paymentVault));
-        emit PriceParamsUpdated(
-            minNumSymbols,
-            minNumSymbols + 1,
-            pricePerSymbol,
-            pricePerSymbol + 1,
-            priceUpdateCooldown,
-            priceUpdateCooldown + 1
+        vm.warp(SCHEDULE_PERIOD * START_PERIOD);
+        token = new ERC20Mintable("Test Token", "TTK");
+        paymentVault = new PaymentVaultTestHarness(SCHEDULE_PERIOD);
+        paymentVault.initialize(OWNER);
+        vm.prank(OWNER);
+        paymentVault.initializeQuorum(
+            0,
+            QUORUM_OWNER_0,
+            PaymentVaultTypes.QuorumProtocolConfig({
+                minNumSymbols: MIN_NUM_SYMBOLS,
+                reservationAdvanceWindow: RESERVATION_ADVANCE_WINDOW,
+                reservationRateLimitWindow: RESERVATION_RATE_LIMIT_WINDOW,
+                onDemandRateLimitWindow: ON_DEMAND_RATE_LIMIT_WINDOW,
+                onDemandEnabled: true
+            })
         );
-        vm.prank(registryCoordinatorOwner);
-        paymentVault.setPriceParams(minNumSymbols + 1, pricePerSymbol + 1, priceUpdateCooldown + 1);
-
-        assertEq(paymentVault.minNumSymbols(), minNumSymbols + 1);
-        assertEq(paymentVault.pricePerSymbol(), pricePerSymbol + 1);
-        assertEq(paymentVault.priceUpdateCooldown(), priceUpdateCooldown + 1);
-        assertEq(paymentVault.lastPriceUpdateTime(), block.timestamp);
+        vm.prank(QUORUM_OWNER_0);
+        paymentVault.setQuorumPaymentConfig(
+            0,
+            PaymentVaultTypes.QuorumConfig({
+                token: address(token),
+                recipient: TEST_RECIPIENT,
+                reservationSymbolsPerSecond: RESERVATION_SYMBOLS_PER_SECOND,
+                onDemandSymbolsPerSecond: ON_DEMAND_SYMBOLS_PER_SECOND,
+                onDemandPricePerSymbol: ON_DEMAND_PRICE_PER_SYMBOL
+            })
+        );
     }
 
-    function test_setPriceParams_revertCooldownNotSurpassed() public {
-        vm.warp(block.timestamp + priceUpdateCooldown - 1);
-
-        vm.expectRevert("price update cooldown not surpassed");
-        vm.prank(registryCoordinatorOwner);
-        paymentVault.setPriceParams(minNumSymbols + 1, pricePerSymbol + 1, priceUpdateCooldown + 1);
+    function boundTimestamps(uint256 timestampSeed)
+        internal
+        view
+        returns (uint64 startTimestamp, uint64 endTimestamp)
+    {
+        uint256 currentPeriod = uint64(block.timestamp / SCHEDULE_PERIOD);
+        uint256 startPeriod = bound(timestampSeed >> 64, START_PERIOD, currentPeriod + RESERVATION_ADVANCE_PERIODS - 1);
+        uint256 endPeriod = bound(timestampSeed, startPeriod + 1, currentPeriod + RESERVATION_ADVANCE_PERIODS);
+        startTimestamp = uint64(startPeriod * SCHEDULE_PERIOD);
+        endTimestamp = uint64(endPeriod * SCHEDULE_PERIOD);
     }
 
-    function test_setGlobalRatePeriodInterval() public {
-        vm.expectEmit(address(paymentVault));
-        emit GlobalRatePeriodIntervalUpdated(globalRatePeriodInterval, globalRatePeriodInterval + 1);
-        vm.prank(registryCoordinatorOwner);
-        paymentVault.setGlobalRatePeriodInterval(globalRatePeriodInterval + 1);
-        assertEq(paymentVault.globalRatePeriodInterval(), globalRatePeriodInterval + 1);
+    /// @notice Tests that we can add a reservation successfully.
+    function test_AddReservation(address account, uint256 timestampSeed, uint64 symbolsPerSecond) public {
+        vm.warp(SCHEDULE_PERIOD * START_PERIOD);
+        uint64 quorumId = 0;
+        (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
+        symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
+
+        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+            startTimestamp: startTimestamp,
+            endTimestamp: endTimestamp,
+            symbolsPerSecond: symbolsPerSecond
+        });
+        vm.expectEmit(true, true, true, true);
+        emit PaymentVaultLib.ReservationAdded(quorumId, account, reservation);
+        vm.prank(QUORUM_OWNER_0);
+        paymentVault.addReservation(quorumId, account, reservation);
+        PaymentVaultTypes.Reservation memory storedReservation = paymentVault.getReservation(quorumId, account);
+        assertEq(storedReservation.startTimestamp, reservation.startTimestamp);
+        assertEq(storedReservation.endTimestamp, reservation.endTimestamp);
+        assertEq(storedReservation.symbolsPerSecond, reservation.symbolsPerSecond);
+        for (uint64 i = startTimestamp / SCHEDULE_PERIOD; i < endTimestamp / SCHEDULE_PERIOD; i++) {
+            assertEq(paymentVault.getQuorumReservedSymbols(quorumId, i), symbolsPerSecond);
+        }
     }
 
-    function test_setGlobalSymbolsPerPeriod() public {
-        vm.expectEmit(address(paymentVault));
-        emit GlobalSymbolsPerPeriodUpdated(globalSymbolsPerPeriod, globalSymbolsPerPeriod + 1);
-        vm.prank(registryCoordinatorOwner);
-        paymentVault.setGlobalSymbolsPerPeriod(globalSymbolsPerPeriod + 1);
-        assertEq(paymentVault.globalSymbolsPerPeriod(), globalSymbolsPerPeriod + 1);
+    /// @notice Tests that adding a reservation reverts if a reservation is currently active.
+    function test_AddReservationRevertsIfReservationStillActive(
+        address account,
+        uint256 timestampSeed,
+        uint64 symbolsPerSecond
+    ) public {
+        vm.warp(SCHEDULE_PERIOD * START_PERIOD);
+        uint64 quorumId = 0;
+        (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
+        symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
+        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+            startTimestamp: startTimestamp,
+            endTimestamp: endTimestamp,
+            symbolsPerSecond: symbolsPerSecond
+        });
+        vm.prank(QUORUM_OWNER_0);
+        paymentVault.addReservation(quorumId, account, reservation);
+        vm.expectRevert(abi.encodeWithSelector(IPaymentVault.ReservationStillActive.selector, reservation.endTimestamp));
+        vm.prank(QUORUM_OWNER_0);
+        paymentVault.addReservation(quorumId, account, reservation);
     }
 
-    function test_setReservationPeriodInterval() public {
-        vm.expectEmit(address(paymentVault));
-        emit ReservationPeriodIntervalUpdated(reservationPeriodInterval, reservationPeriodInterval + 1);
-        vm.prank(registryCoordinatorOwner);
-        paymentVault.setReservationPeriodInterval(reservationPeriodInterval + 1);
-        assertEq(paymentVault.reservationPeriodInterval(), reservationPeriodInterval + 1);
+    /// @notice Tests that adding a reservation reverts if the start timestamp is in the past.
+    function test_AddReservationRevertsIfInvalidStartTimestamp(address account, uint64 symbolsPerSecond) public {
+        vm.warp(SCHEDULE_PERIOD * START_PERIOD);
+        uint64 quorumId = 0;
+        symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
+        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+            startTimestamp: (START_PERIOD - 1) * SCHEDULE_PERIOD,
+            endTimestamp: SCHEDULE_PERIOD * START_PERIOD,
+            symbolsPerSecond: symbolsPerSecond
+        });
+        vm.expectRevert(
+            abi.encodeWithSelector(IPaymentVault.InvalidStartTimestamp.selector, START_PERIOD * SCHEDULE_PERIOD)
+        );
+        vm.prank(QUORUM_OWNER_0);
+        paymentVault.addReservation(quorumId, account, reservation);
     }
 
-    function test_withdraw() public {
-        test_depositOnDemand();
-        vm.prank(registryCoordinatorOwner);
-        paymentVault.withdraw(100 ether);
-        assertEq(address(paymentVault).balance, 100 ether);
-    }
+    /// @notice Tests that we can successfully pass a reservation check.
+    function test_CheckReservation(uint256 timestampSeed, uint64 symbolsPerSecond) public view {
+        uint64 quorumId = 0;
+        (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
+        symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
 
-    function test_withdrawERC20() public {
-        deal(address(mockToken), address(paymentVault), 100 ether);
-        vm.prank(registryCoordinatorOwner);
-        paymentVault.withdrawERC20(mockToken, 100 ether);
-        assertEq(mockToken.balanceOf(address(registryCoordinatorOwner)), 100 ether);
-    }
-
-    function test_ownedFunctions() public {
-        IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
-            symbolsPerSecond: 100,
-            startTimestamp: 101,
-            endTimestamp: 102,
-            quorumNumbers: quorumNumbers,
-            quorumSplits: quorumSplits
+        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+            startTimestamp: startTimestamp,
+            endTimestamp: endTimestamp,
+            symbolsPerSecond: symbolsPerSecond
         });
 
-        vm.expectRevert("Ownable: caller is not the owner");
-        paymentVault.setReservation(user, reservation);
-        vm.expectRevert("Ownable: caller is not the owner");
-        paymentVault.withdraw(100 ether);
-        vm.expectRevert("Ownable: caller is not the owner");
-        paymentVault.withdrawERC20(mockToken, 100 ether);
-        vm.expectRevert("Ownable: caller is not the owner");
-        paymentVault.setPriceParams(minNumSymbols + 1, pricePerSymbol + 1, priceUpdateCooldown + 1);
-        vm.expectRevert("Ownable: caller is not the owner");
-        paymentVault.setGlobalRatePeriodInterval(globalRatePeriodInterval + 1);
-        vm.expectRevert("Ownable: caller is not the owner");
-        paymentVault.setGlobalSymbolsPerPeriod(globalSymbolsPerPeriod + 1);
-        vm.expectRevert("Ownable: caller is not the owner");
-        paymentVault.setReservationPeriodInterval(reservationPeriodInterval + 1);
+        paymentVault.checkReservation(quorumId, reservation, SCHEDULE_PERIOD);
     }
 
-    function test_getReservations() public {
-        IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
-            symbolsPerSecond: 100,
-            startTimestamp: 101,
-            endTimestamp: 102,
-            quorumNumbers: quorumNumbers,
-            quorumSplits: quorumSplits
+    /// @notice Tests that a start timestamp not in the schedule period reverts.
+    function test_CheckReservationRevertsIfStartTimestampNotInSchedulePeriod(
+        uint256 timestampSeed,
+        uint64 symbolsPerSecond
+    ) public {
+        uint64 quorumId = 0;
+        (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
+        startTimestamp += uint64(bound(timestampSeed >> 128, 1, SCHEDULE_PERIOD - 1));
+        symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
+
+        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+            startTimestamp: startTimestamp,
+            endTimestamp: endTimestamp,
+            symbolsPerSecond: symbolsPerSecond
         });
 
-        IPaymentVault.Reservation memory reservation2 = IPaymentVault.Reservation({
-            symbolsPerSecond: 200,
-            startTimestamp: 201,
-            endTimestamp: 202,
-            quorumNumbers: hex"0203",
-            quorumSplits: hex"0163"
-        });
-
-        vm.startPrank(registryCoordinatorOwner);
-        paymentVault.setReservation(user, reservation);
-        paymentVault.setReservation(user2, reservation2);
-        vm.stopPrank();
-
-        address[] memory accounts = new address[](2);
-        accounts[0] = user;
-        accounts[1] = user2;
-        IPaymentVault.Reservation[] memory reservations = paymentVault.getReservations(accounts);
-        assertEq(keccak256(abi.encode(reservations[0])), keccak256(abi.encode(reservation)));
-        assertEq(keccak256(abi.encode(reservations[1])), keccak256(abi.encode(reservation2)));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPaymentVault.TimestampSchedulePeriodMismatch.selector, startTimestamp, SCHEDULE_PERIOD
+            )
+        );
+        paymentVault.checkReservation(quorumId, reservation, SCHEDULE_PERIOD);
     }
 
-    function test_getOnDemandAmounts() public {
-        vm.deal(user, 300 ether);
+    /// @notice Tests that an end timestamp not in the schedule period reverts.
+    function test_CheckReservationRevertsIfEndTimestampNotInSchedulePeriod(
+        uint256 timestampSeed,
+        uint64 symbolsPerSecond
+    ) public {
+        uint64 quorumId = 0;
+        (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
+        endTimestamp -= uint64(bound(timestampSeed >> 128, 1, SCHEDULE_PERIOD - 1));
+        symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
 
-        vm.startPrank(user);
-        paymentVault.depositOnDemand{value: 100 ether}(user);
-        paymentVault.depositOnDemand{value: 200 ether}(user2);
-        vm.stopPrank();
+        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+            startTimestamp: startTimestamp,
+            endTimestamp: endTimestamp,
+            symbolsPerSecond: symbolsPerSecond
+        });
 
-        address[] memory accounts = new address[](2);
-        accounts[0] = user;
-        accounts[1] = user2;
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPaymentVault.TimestampSchedulePeriodMismatch.selector, endTimestamp, SCHEDULE_PERIOD
+            )
+        );
+        paymentVault.checkReservation(quorumId, reservation, SCHEDULE_PERIOD);
+    }
 
-        uint80[] memory payments = paymentVault.getOnDemandTotalDeposits(accounts);
-        assertEq(payments[0], 100 ether);
-        assertEq(payments[1], 200 ether);
+    /// @notice Tests that start timestamp must not be greater than the end timestamp.
+    function test_CheckReservationRevertsIfStartTimestampGreaterThanEndTimestamp(
+        uint256 timestampSeed,
+        uint64 symbolsPerSecond
+    ) public {
+        uint64 quorumId = 0;
+        (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
+        symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
+
+        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+            startTimestamp: endTimestamp,
+            endTimestamp: startTimestamp,
+            symbolsPerSecond: symbolsPerSecond
+        });
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPaymentVault.InvalidReservationPeriod.selector, reservation.startTimestamp, reservation.endTimestamp
+            )
+        );
+        paymentVault.checkReservation(quorumId, reservation, SCHEDULE_PERIOD);
+    }
+
+    /// @notice Tests that reservation length cannot exceed the quorum's reservation advance window
+    function test_CheckReservationRevertsIfReservationTooLong(uint256 timestampSeed, uint64 symbolsPerSecond) public {
+        uint64 quorumId = 0;
+        (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
+        symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
+
+        // Set the end timestamp to be too far in the future
+        endTimestamp = uint64(block.timestamp) + RESERVATION_ADVANCE_WINDOW + SCHEDULE_PERIOD;
+
+        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+            startTimestamp: startTimestamp,
+            endTimestamp: endTimestamp,
+            symbolsPerSecond: symbolsPerSecond
+        });
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPaymentVault.ReservationTooLong.selector,
+                endTimestamp - uint64(block.timestamp / SCHEDULE_PERIOD * SCHEDULE_PERIOD),
+                RESERVATION_ADVANCE_WINDOW
+            )
+        );
+        paymentVault.checkReservation(quorumId, reservation, SCHEDULE_PERIOD);
+    }
+
+    /// @notice Tests that increasing a reservation's reserved symbols successfully increases the quorum's reserved symbols
+    function test_IncreaseReservedSymbols(uint256 timestampSeed, uint64 symbolsPerSecond) public {
+        vm.warp(SCHEDULE_PERIOD * START_PERIOD);
+        uint64 quorumId = 0;
+        (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
+        symbolsPerSecond = uint64(bound(symbolsPerSecond, 0, 100));
+
+        paymentVault.increaseReservedSymbols(quorumId, startTimestamp, endTimestamp, symbolsPerSecond, SCHEDULE_PERIOD);
+
+        for (uint64 i = startTimestamp / SCHEDULE_PERIOD; i < endTimestamp / SCHEDULE_PERIOD; i++) {
+            assertEq(paymentVault.getQuorumReservedSymbols(quorumId, i), symbolsPerSecond);
+        }
+    }
+
+    /// @notice Tests that increasing a reservation's reserved symbols reverts if not enough symbols are available
+    function test_IncreaseReservedSymbolsRevertsIfNotEnoughSymbolsAvailable(
+        uint256 timestampSeed,
+        uint64 symbolsPerSecond
+    ) public {
+        vm.warp(SCHEDULE_PERIOD * START_PERIOD);
+        uint64 quorumId = 0;
+        (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
+        vm.assume(symbolsPerSecond > RESERVATION_SYMBOLS_PER_SECOND);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPaymentVault.NotEnoughSymbolsAvailable.selector,
+                startTimestamp,
+                symbolsPerSecond,
+                RESERVATION_SYMBOLS_PER_SECOND
+            )
+        );
+        paymentVault.increaseReservedSymbols(quorumId, startTimestamp, endTimestamp, symbolsPerSecond, SCHEDULE_PERIOD);
+    }
+
+    /// @notice Tests that decreasing a reservation's reserved symbols successfully decreases the quorum's reserved symbols
+    function test_DecreaseReservedSymbols(uint256 timestampSeed, uint64 symbolsPerSecond) public {
+        vm.warp(SCHEDULE_PERIOD * START_PERIOD);
+        uint64 quorumId = 0;
+        (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
+        symbolsPerSecond = uint64(bound(symbolsPerSecond, 0, 100));
+
+        paymentVault.increaseReservedSymbols(quorumId, startTimestamp, endTimestamp, symbolsPerSecond, SCHEDULE_PERIOD);
+        paymentVault.decreaseReservedSymbols(quorumId, startTimestamp, endTimestamp, symbolsPerSecond, SCHEDULE_PERIOD);
+
+        for (uint64 i = startTimestamp / SCHEDULE_PERIOD; i < endTimestamp / SCHEDULE_PERIOD; i++) {
+            assertEq(paymentVault.getQuorumReservedSymbols(quorumId, i), 0);
+        }
+    }
+
+    /// @notice Tests that a reservation can be increased successfully.
+    function test_IncreaseReservation(
+        address account,
+        uint256 timestampSeed,
+        uint64 symbolsPerSecond,
+        uint64 periodIncrease,
+        uint64 symbolIncrease
+    ) public {
+        vm.warp(SCHEDULE_PERIOD * START_PERIOD);
+        uint64 quorumId = 0;
+        (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
+        symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 50));
+        periodIncrease = uint64(bound(periodIncrease, 0, 10));
+        symbolIncrease = uint64(bound(symbolIncrease, 0, 50));
+
+        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+            startTimestamp: startTimestamp,
+            endTimestamp: endTimestamp,
+            symbolsPerSecond: symbolsPerSecond
+        });
+        vm.prank(QUORUM_OWNER_0);
+        paymentVault.addReservation(quorumId, account, reservation);
+
+        vm.warp(block.timestamp + SCHEDULE_PERIOD * periodIncrease);
+        vm.expectEmit(true, true, true, true);
+        reservation.endTimestamp += periodIncrease * SCHEDULE_PERIOD;
+        reservation.symbolsPerSecond += symbolIncrease;
+        emit PaymentVaultLib.ReservationIncreased(quorumId, account, reservation);
+        vm.prank(QUORUM_OWNER_0);
+        paymentVault.increaseReservation(quorumId, account, reservation);
+
+        PaymentVaultTypes.Reservation memory storedReservation = paymentVault.getReservation(quorumId, account);
+        assertEq(storedReservation.startTimestamp, reservation.startTimestamp);
+        assertEq(storedReservation.endTimestamp, reservation.endTimestamp);
+        assertEq(storedReservation.symbolsPerSecond, reservation.symbolsPerSecond);
+    }
+
+    /// @notice Tests that increasing a reservation reverts if the start timestamp does not match the reservation's start timestamp.
+    function test_IncreaseReservationRevertsIfStartTimestampDoesNotMatch(
+        address account,
+        uint256 timestampSeed,
+        uint64 symbolsPerSecond
+    ) public {
+        vm.warp(SCHEDULE_PERIOD * START_PERIOD);
+        uint64 quorumId = 0;
+        (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
+        symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
+
+        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+            startTimestamp: startTimestamp,
+            endTimestamp: endTimestamp,
+            symbolsPerSecond: symbolsPerSecond
+        });
+        vm.prank(QUORUM_OWNER_0);
+        paymentVault.addReservation(quorumId, account, reservation);
+        vm.warp(block.timestamp + SCHEDULE_PERIOD);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPaymentVault.StartTimestampMustMatch.selector, reservation.startTimestamp)
+        );
+        vm.prank(QUORUM_OWNER_0);
+        paymentVault.increaseReservation(
+            quorumId,
+            account,
+            PaymentVaultTypes.Reservation({
+                startTimestamp: startTimestamp + SCHEDULE_PERIOD,
+                endTimestamp: endTimestamp + SCHEDULE_PERIOD,
+                symbolsPerSecond: symbolsPerSecond
+            })
+        );
+    }
+
+    /// @notice Tests that increasing a reservation reverts if the reservation decreases.
+    function test_IncreaseReservationRevertsIfReservationDecreases(
+        address account,
+        uint256 timestampSeed,
+        uint64 symbolsPerSecond
+    ) public {
+        vm.warp(SCHEDULE_PERIOD * START_PERIOD);
+        uint64 quorumId = 0;
+        (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
+        symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
+
+        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+            startTimestamp: startTimestamp,
+            endTimestamp: endTimestamp,
+            symbolsPerSecond: symbolsPerSecond
+        });
+        vm.prank(QUORUM_OWNER_0);
+        paymentVault.addReservation(quorumId, account, reservation);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPaymentVault.ReservationMustIncrease.selector, reservation.endTimestamp, reservation.symbolsPerSecond
+            )
+        );
+        vm.prank(QUORUM_OWNER_0);
+        paymentVault.increaseReservation(
+            quorumId,
+            account,
+            PaymentVaultTypes.Reservation({
+                startTimestamp: startTimestamp,
+                endTimestamp: endTimestamp,
+                symbolsPerSecond: symbolsPerSecond - 1
+            })
+        );
+    }
+
+    /// @notice Tests that a reservation can be decreased successfully.
+    function test_DecreaseReservation(address account, uint256 timestampSeed, uint64 symbolsPerSecond) public {
+        vm.warp(SCHEDULE_PERIOD * START_PERIOD);
+        uint64 quorumId = 0;
+        (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
+        symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 50));
+
+        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+            startTimestamp: startTimestamp,
+            endTimestamp: endTimestamp,
+            symbolsPerSecond: symbolsPerSecond
+        });
+        vm.prank(QUORUM_OWNER_0);
+        paymentVault.addReservation(quorumId, account, reservation);
+
+        reservation.symbolsPerSecond -= 1; // Decrease the symbols per second by 1
+        vm.expectEmit(true, true, true, true);
+        emit PaymentVaultLib.ReservationDecreased(quorumId, account, reservation);
+        vm.prank(account);
+        paymentVault.decreaseReservation(quorumId, reservation);
+
+        PaymentVaultTypes.Reservation memory storedReservation = paymentVault.getReservation(quorumId, account);
+        assertEq(storedReservation.startTimestamp, reservation.startTimestamp);
+        assertEq(storedReservation.endTimestamp, reservation.endTimestamp);
+        assertEq(storedReservation.symbolsPerSecond, reservation.symbolsPerSecond);
+    }
+
+    /// @notice Tests that decreasing a reservation reverts if the start timestamp does not match the reservation's start timestamp.
+    function test_DecreaseReservationRevertsIfStartTimestampDoesNotMatch(
+        address account,
+        uint256 timestampSeed,
+        uint64 symbolsPerSecond
+    ) public {
+        vm.warp(SCHEDULE_PERIOD * START_PERIOD);
+        uint64 quorumId = 0;
+        (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
+        symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
+
+        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+            startTimestamp: startTimestamp,
+            endTimestamp: endTimestamp,
+            symbolsPerSecond: symbolsPerSecond
+        });
+        vm.prank(QUORUM_OWNER_0);
+        paymentVault.addReservation(quorumId, account, reservation);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPaymentVault.StartTimestampMustMatch.selector, reservation.startTimestamp)
+        );
+        vm.prank(account);
+        vm.warp(block.timestamp + SCHEDULE_PERIOD);
+        paymentVault.decreaseReservation(
+            quorumId,
+            PaymentVaultTypes.Reservation({
+                startTimestamp: startTimestamp + SCHEDULE_PERIOD,
+                endTimestamp: endTimestamp + SCHEDULE_PERIOD,
+                symbolsPerSecond: symbolsPerSecond
+            })
+        );
+    }
+
+    /// @notice Tests that decreasing a reservation reverts if the reservation increases.
+    function test_DecreaseReservationRevertsIfReservationIncreases(
+        address account,
+        uint256 timestampSeed,
+        uint64 symbolsPerSecond
+    ) public {
+        vm.warp(SCHEDULE_PERIOD * START_PERIOD);
+        uint64 quorumId = 0;
+        (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
+        symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
+
+        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+            startTimestamp: startTimestamp,
+            endTimestamp: endTimestamp,
+            symbolsPerSecond: symbolsPerSecond
+        });
+        vm.prank(QUORUM_OWNER_0);
+        paymentVault.addReservation(quorumId, account, reservation);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPaymentVault.ReservationMustDecrease.selector, reservation.endTimestamp, reservation.symbolsPerSecond
+            )
+        );
+
+        vm.prank(account);
+        paymentVault.decreaseReservation(
+            quorumId,
+            PaymentVaultTypes.Reservation({
+                startTimestamp: startTimestamp,
+                endTimestamp: endTimestamp,
+                symbolsPerSecond: symbolsPerSecond + 1
+            })
+        );
+    }
+
+    /// @notice Tests that a user can deposit on demand successfully.
+    function test_DepositOnDemand(address account, uint256 amount) public {
+        vm.assume(account != address(0));
+        uint64 quorumId = 0;
+        amount = bound(amount, 1, type(uint80).max);
+        token.mint(account, amount);
+
+        vm.prank(account);
+        token.approve(address(paymentVault), amount);
+
+        vm.expectEmit(true, true, true, true);
+        emit PaymentVaultLib.DepositOnDemand(quorumId, account, amount);
+        vm.prank(account);
+        paymentVault.depositOnDemand(quorumId, amount);
+        uint256 onDemandDeposit = paymentVault.getOnDemandDeposit(quorumId, account);
+        assertEq(onDemandDeposit, amount);
+    }
+
+    /// @notice Tests that depositing on demand fails if on demand is disabled.
+    function test_DepositOnDemandRevertsIfOnDemandDisabled(address account, uint256 amount) public {
+        vm.assume(account != address(0));
+        uint64 quorumId = 0;
+        amount = bound(amount, 1, type(uint80).max);
+        token.mint(account, amount);
+        vm.prank(QUORUM_OWNER_0);
+        paymentVault.setOnDemandEnabled(quorumId, false);
+
+        vm.prank(account);
+        token.approve(address(paymentVault), amount);
+
+        vm.expectRevert(abi.encodeWithSelector(IPaymentVault.OnDemandDisabled.selector, quorumId));
+        vm.prank(account);
+        paymentVault.depositOnDemand(quorumId, amount);
+    }
+
+    /// @notice Tests that these functions are properly gated to the owner.
+    function testOnlyOwnerFunctions(address account) public {
+        vm.assume(account != OWNER);
+        vm.startPrank(account);
+
+        vm.expectRevert();
+        paymentVault.transferOwnership(account);
+
+        vm.expectRevert();
+        paymentVault.initializeQuorum(
+            0,
+            account,
+            PaymentVaultTypes.QuorumProtocolConfig({
+                minNumSymbols: MIN_NUM_SYMBOLS,
+                reservationAdvanceWindow: RESERVATION_ADVANCE_WINDOW,
+                reservationRateLimitWindow: RESERVATION_RATE_LIMIT_WINDOW,
+                onDemandRateLimitWindow: ON_DEMAND_RATE_LIMIT_WINDOW,
+                onDemandEnabled: true
+            })
+        );
+
+        vm.expectRevert();
+        paymentVault.setReservationAdvanceWindow(0, RESERVATION_ADVANCE_WINDOW);
+
+        vm.expectRevert();
+        paymentVault.setOnDemandEnabled(0, true);
+    }
+
+    /// @notice Tests that these functions are properly gated to the quorum owner.
+    function testOnlyQuorumOwnerFunctions(address account) public {
+        vm.assume(account != QUORUM_OWNER_0);
+        vm.startPrank(account);
+
+        vm.expectRevert();
+        paymentVault.addReservation(
+            0, account, PaymentVaultTypes.Reservation({startTimestamp: 0, endTimestamp: 0, symbolsPerSecond: 0})
+        );
+
+        vm.expectRevert();
+        paymentVault.increaseReservation(
+            0, account, PaymentVaultTypes.Reservation({startTimestamp: 0, endTimestamp: 0, symbolsPerSecond: 0})
+        );
+
+        vm.expectRevert();
+        paymentVault.setQuorumPaymentConfig(
+            0,
+            PaymentVaultTypes.QuorumConfig({
+                token: address(token),
+                recipient: TEST_RECIPIENT,
+                reservationSymbolsPerSecond: RESERVATION_SYMBOLS_PER_SECOND,
+                onDemandSymbolsPerSecond: ON_DEMAND_SYMBOLS_PER_SECOND,
+                onDemandPricePerSymbol: ON_DEMAND_PRICE_PER_SYMBOL
+            })
+        );
+
+        vm.expectRevert();
+        paymentVault.transferQuorumOwnership(0, account);
     }
 }
