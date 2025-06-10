@@ -24,6 +24,9 @@ type BlacklistStore interface {
 	// GetByDisperserID retrieves a blacklist by disperser ID
 	GetByDisperserID(ctx context.Context, disperserId uint32) (*Blacklist, error)
 
+	// DeleteByDisperserID deletes a blacklist by disperser ID
+	DeleteByDisperserID(ctx context.Context, disperserId uint32) error
+
 	// Get retrieves a blacklist by key
 	Get(ctx context.Context, key []byte) (*Blacklist, error)
 
@@ -108,6 +111,12 @@ func (s *blacklistStore) GetByDisperserID(ctx context.Context, disperserId uint3
 }
 
 // Get retrieves a blacklist by key
+func (s *blacklistStore) DeleteByDisperserID(ctx context.Context, disperserId uint32) error {
+	disperserIdHash := sha256.Sum256(fmt.Appendf(nil, "%d", disperserId))
+	return s.db.Delete(disperserIdHash[:])
+}
+
+// Get retrieves a blacklist by key
 func (s *blacklistStore) Get(ctx context.Context, key []byte) (*Blacklist, error) {
 	rawBlackList, err := s.db.Get(key)
 	if err != nil {
@@ -177,6 +186,13 @@ func (s *blacklistStore) IsBlacklisted(ctx context.Context, disperserId uint32) 
 		if s.time.Since(s.time.Unix(int64(lastUpdated), 0)) < time.Hour*24*7 {
 			return true
 		}
+	}
+
+	// The disperser is behaving correctly but badly in the past and existing entries are no longer valid
+	// and so we need to remove the entries
+	err = s.DeleteByDisperserID(ctx, disperserId)
+	if err != nil {
+		s.logger.Error("failed to delete disperser from blacklist", "disperserId", disperserId, "err", err)
 	}
 
 	// if the disperser is not blacklisted, return false

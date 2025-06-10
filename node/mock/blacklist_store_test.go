@@ -71,6 +71,44 @@ func TestBlacklistStoreAddEntry(t *testing.T) {
 	require.Equal(t, "violation2", blacklist.Entries[1].Metadata.Reason)
 }
 
+func TestBlacklistStoreDeleteByDisperserID(t *testing.T) {
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
+	testDir := t.TempDir()
+	store, err := node.NewLevelDBBlacklistStore(testDir, logger, false, false, node.DefaultTime)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	disperserId := uint32(123)
+
+	// Initially, disperser should not exist
+	require.False(t, store.HasDisperserID(ctx, disperserId))
+
+	// Add first entry
+	err = store.AddEntry(ctx, disperserId, "context1", "violation1")
+	require.NoError(t, err)
+
+	// Disperser should now exist
+	require.True(t, store.HasDisperserID(ctx, disperserId))
+
+	// Get and verify the blacklist
+	blacklist, err := store.GetByDisperserID(ctx, disperserId)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(blacklist.Entries))
+	require.Equal(t, disperserId, blacklist.Entries[0].DisperserID)
+	require.Equal(t, "context1", blacklist.Entries[0].Metadata.ContextId)
+	require.Equal(t, "violation1", blacklist.Entries[0].Metadata.Reason)
+
+	// Delete the disperser
+	err = store.DeleteByDisperserID(ctx, disperserId)
+	require.NoError(t, err)
+
+	// Disperser should no longer exist
+	require.False(t, store.HasDisperserID(ctx, disperserId))
+
+}
+
 // TestBlacklistStoreHasDisperserID tests the HasDisperserID method which checks
 // if a disperser ID exists in the blacklist store by hashing the ID.
 func TestBlacklistStoreHasDisperserID(t *testing.T) {
