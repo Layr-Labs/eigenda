@@ -298,7 +298,7 @@ func GatherSegmentFiles(
 	errorMonitor *util.ErrorMonitor,
 	segmentPaths []*SegmentPath,
 	now time.Time) (lowestSegmentIndex uint32, highestSegmentIndex uint32, segments map[uint32]*Segment, err error) {
-
+	
 	// Scan the root directories for segment files.
 	metadataFiles, keyFiles, valueFiles, garbageFiles, highestSegmentIndex, lowestSegmentIndex, err :=
 		scanDirectories(logger, segmentPaths)

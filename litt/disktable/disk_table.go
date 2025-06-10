@@ -38,7 +38,7 @@ type DiskTable struct {
 	// broken state, it is much better to refuse to do work than to continue to do work and potentially corrupt data.
 	errorMonitor *util.ErrorMonitor
 
-	// The root directories for the disk table.
+	// The root directories for the disk table. Each of these directories' name matches the name of the table.
 	roots []string
 
 	// Configures the location where segment data is stored.
@@ -98,18 +98,9 @@ func NewDiskTable(
 		return nil, errors.New("garbage collection period must be greater than 0")
 	}
 
-	// If the root directories don't exist, create them.
-	for _, root := range roots {
-		exists, err := util.Exists(root)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check if root directory exists: %w", err)
-		}
-		if !exists {
-			err = os.MkdirAll(root, 0755)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create root directory: %w", err)
-			}
-		}
+	qualifiedRoots := make([]string, len(roots))
+	for i, root := range roots {
+		qualifiedRoots[i] = path.Join(root, name)
 	}
 
 	// For each root directory, create a segment directory if it doesn't exist.
@@ -128,7 +119,7 @@ func NewDiskTable(
 	var metadata *tableMetadata
 
 	// Find the table metadata file or create a new one.
-	for _, root := range roots {
+	for _, root := range qualifiedRoots {
 		possibleMetadataPath := metadataPath(root)
 		exists, err := util.Exists(possibleMetadataPath)
 		if err != nil {
@@ -147,7 +138,7 @@ func NewDiskTable(
 	if metadataFilePath == "" {
 		// No metadata file exists yet. Create a new one in the first root.
 		var err error
-		metadataDir := roots[0]
+		metadataDir := qualifiedRoots[0]
 		metadata, err = newTableMetadata(config.Logger, metadataDir, config.TTL, config.ShardingFactor)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create table metadata: %w", err)
@@ -168,7 +159,7 @@ func NewDiskTable(
 		logger:         config.Logger,
 		errorMonitor:   errorMonitor,
 		clock:          config.Clock,
-		roots:          roots,
+		roots:          qualifiedRoots,
 		segmentPaths:   segmentPaths,
 		name:           name,
 		metadata:       metadata,

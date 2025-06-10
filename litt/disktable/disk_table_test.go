@@ -31,19 +31,19 @@ type tableBuilder struct {
 
 // This test executes against different table implementations. This is useful for distinguishing between bugs that
 // are present in an implementation, and bugs that are present in the test scenario itself.
-var tableBuilders = []*tableBuilder{
-	//{ // TODO
-	//	name:    "MemKeyDiskTableSingleShard",
-	//	builder: buildMemKeyDiskTableSingleShard,
-	//},
-	//{
-	//	name:    "MemKeyDiskTableMultiShard",
-	//	builder: buildMemKeyDiskTableMultiShard,
-	//},
-	//{
-	//	name:    "LevelDBKeyDiskTableSingleShard",
-	//	builder: buildLevelDBKeyDiskTableSingleShard,
-	//},
+var tableBuilders = []*tableBuilder{ // TODO
+	{
+		name:    "MemKeyDiskTableSingleShard",
+		builder: buildMemKeyDiskTableSingleShard,
+	},
+	{
+		name:    "MemKeyDiskTableMultiShard",
+		builder: buildMemKeyDiskTableMultiShard,
+	},
+	{
+		name:    "LevelDBKeyDiskTableSingleShard",
+		builder: buildLevelDBKeyDiskTableSingleShard,
+	},
 	{
 		name:    "LevelDBKeyDiskTableMultiShard",
 		builder: buildLevelDBKeyDiskTableMultiShard,
@@ -252,7 +252,7 @@ func buildLevelDBKeyDiskTableMultiShard(
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
-	keymapPath := filepath.Join(paths[0], keymap.KeymapDirectoryName)
+	keymapPath := filepath.Join(paths[0], name, keymap.KeymapDirectoryName)
 	keymapTypeFile, err := setupKeymapTypeFile(keymapPath, keymap.UnsafeLevelDBKeymapType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load keymap type file: %w", err)
@@ -261,11 +261,6 @@ func buildLevelDBKeyDiskTableMultiShard(
 	keys, _, err := keymap.NewUnsafeLevelDBKeymap(logger, keymapPath, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create keymap: %w", err)
-	}
-
-	roots := make([]string, 0, len(paths))
-	for _, p := range paths {
-		roots = append(roots, path.Join(p, "table"))
 	}
 
 	config, err := litt.DefaultConfig(paths...)
@@ -287,7 +282,7 @@ func buildLevelDBKeyDiskTableMultiShard(
 		keys,
 		keymapPath,
 		keymapTypeFile,
-		roots,
+		paths,
 		false,
 		nil)
 
@@ -1678,7 +1673,7 @@ func orphanedMetadataTest(t *testing.T, tableBuilder *tableBuilder) {
 	require.NoError(t, err)
 
 	// Simulate an orphaned metadata file.
-	orphanedMetadataFileName := fmt.Sprintf("%s/table/%s", directory, tableMetadataSwapFileName)
+	orphanedMetadataFileName := fmt.Sprintf("%s/%s/%s", directory, tableName, tableMetadataSwapFileName)
 	orphanedFileBytes := rand.PrintableVariableBytes(1, 1024)
 	err = os.WriteFile(orphanedMetadataFileName, orphanedFileBytes, 0644)
 	require.NoError(t, err)
