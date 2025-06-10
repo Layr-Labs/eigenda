@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -26,8 +27,11 @@ type Accountant struct {
 	// contains an array of period records, with length of max(MinNumBins, numBins)
 	// numBins can be arbitrarily bigger than MinNumBins if the client wants to track more history in the cache
 	periodRecords     []PeriodRecord
-	usageLock         sync.Mutex
 	cumulativePayment *big.Int
+
+	// locks for concurrent access to period records and on-demand payment
+	periodRecordsLock sync.Mutex
+	onDemandLock      sync.Mutex
 }
 
 // PeriodRecord contains the index of the reservation period and the usage of the period
@@ -66,78 +70,77 @@ func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayme
 // indicating on-demand payment.
 // These generated values are used to create the payment header and signature, as specified in
 // api/proto/common/v2/common_v2.proto
-func (a *Accountant) blobPaymentInfo(
-	numSymbols uint64,
-	quorumNumbers []uint8,
-	timestamp int64) (*big.Int, error) {
+// func (a *Accountant) blobPaymentInfo(
+// 	numSymbols uint64,
+// 	quorumNumbers []uint8,
+// 	timestamp int64) (*big.Int, error) {
 
-	symbolUsage := meterer.SymbolsCharged(numSymbols, a.minNumSymbols)
+// 		symbolUsage := meterer.SymbolsCharged(numSymbols, a.minNumSymbols)
 
-	// Always try to use reservation first
-	err := a.reservationUsage(symbolUsage, quorumNumbers, timestamp)
-	if err == nil {
-		return big.NewInt(0), nil
-	}
+// 		// Always try to use reservation first
+// 		err := a.reservationUsage(symbolUsage, quorumNumbers, timestamp)
+// 		if err == nil {
+// 			return big.NewInt(0), nil
+// 		}
 
-	// Fall back to on-demand payment if reservation fails
-	return a.onDemandUsage(symbolUsage, quorumNumbers)
-}
+// 		// Fall back to on-demand payment if reservation fails
+// 		return a.onDemandUsage(symbolUsage, quorumNumbers)
+// }
 
 // reservationUsage attempts to use the reservation for the given request.
-// Returns (0, nil) if successful, or (nil, error) if reservation cannot be used.
 func (a *Accountant) reservationUsage(
 	symbolUsage uint64,
 	quorumNumbers []uint8,
 	timestamp int64) error {
+	if err := meterer.ValidateQuorum(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
+		return err
+	}
 
 	reservationWindow := a.reservationWindow
 	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, reservationWindow)
 
-	a.usageLock.Lock()
-	defer a.usageLock.Unlock()
+	a.periodRecordsLock.Lock()
+	defer a.periodRecordsLock.Unlock()
 	relativePeriodRecord := a.getOrRefreshRelativePeriodRecord(currentReservationPeriod, reservationWindow)
 	relativePeriodRecord.Usage += symbolUsage
 
 	// Check if we can use the reservation within the bin limit
-	binLimit := a.reservation.SymbolsPerSecond * uint64(a.reservationWindow)
+	binLimit := meterer.GetReservationBinLimit(a.reservation, a.reservationWindow)
 	if relativePeriodRecord.Usage <= binLimit {
-		if err := meterer.ValidateQuorum(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
-			return err
-		}
 		return nil
 	}
 
 	overflowPeriodRecord := a.getOrRefreshRelativePeriodRecord(currentReservationPeriod+2*reservationWindow, reservationWindow)
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
 	if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
-		if err := meterer.ValidateQuorum(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
-			return err
-		}
 		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
 		return nil
 	}
 
 	// Reservation not sufficient for the request, rollback the usage
 	relativePeriodRecord.Usage -= symbolUsage
-	return fmt.Errorf("insufficient reservation")
+	return errors.New("insufficient reservation")
 }
 
 // onDemandUsage attempts to use on-demand payment for the given request.
 // Returns the cumulative payment if successful, or an error if on-demand cannot be used.
 func (a *Accountant) onDemandUsage(symbolUsage uint64, quorumNumbers []uint8) (*big.Int, error) {
+	if err := meterer.ValidateQuorum(quorumNumbers, requiredQuorums); err != nil {
+		return nil, err
+	}
+
+	a.onDemandLock.Lock()
+	defer a.onDemandLock.Unlock()
+
 	incrementRequired := meterer.PaymentCharged(symbolUsage, a.pricePerSymbol)
-	resultingPayment := big.NewInt(0)
-	resultingPayment.Add(a.cumulativePayment, incrementRequired)
+	resultingPayment := new(big.Int).Add(a.cumulativePayment, incrementRequired)
 
 	if resultingPayment.Cmp(a.onDemand.CumulativePayment) <= 0 {
-		if err := meterer.ValidateQuorum(quorumNumbers, requiredQuorums); err != nil {
-			return nil, err
-		}
 		a.cumulativePayment.Add(a.cumulativePayment, incrementRequired)
 		return a.cumulativePayment, nil
 	}
 
-	return nil, fmt.Errorf("insufficient ondemand payment")
+	return nil, errors.New("insufficient ondemand payment")
 }
 
 // AccountBlob accountant provides and records payment information
@@ -146,9 +149,22 @@ func (a *Accountant) AccountBlob(
 	numSymbols uint64,
 	quorums []uint8) (*core.PaymentMetadata, error) {
 
-	cumulativePayment, err := a.blobPaymentInfo(numSymbols, quorums, timestamp)
+	symbolUsage := meterer.SymbolsCharged(numSymbols, a.minNumSymbols)
+
+	// Always try to use reservation first
+	err := a.reservationUsage(symbolUsage, quorums, timestamp)
+	if err == nil {
+		return &core.PaymentMetadata{
+			AccountID:         a.accountID,
+			Timestamp:         timestamp,
+			CumulativePayment: big.NewInt(0),
+		}, nil
+	}
+
+	// Fall back to on-demand payment if reservation fails
+	cumulativePayment, err := a.onDemandUsage(symbolUsage, quorums)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create payment infomation for reservation or on-demand. Consider depositing more eth to the PaymentVault contract for your account. For more details, see https://docs.eigenda.xyz/core-concepts/payments#disperser-client-requirements. Account: %s, Error: %s", a.accountID.Hex(), err.Error())
+		return nil, fmt.Errorf("cannot create payment infomation for reservation or on-demand. Consider depositing more eth to the PaymentVault contract for your account. For more details, see https://docs.eigenda.xyz/core-concepts/payments#disperser-client-requirements. Account: %s, Error: %w", a.accountID.Hex(), err)
 	}
 
 	pm := &core.PaymentMetadata{
