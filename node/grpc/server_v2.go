@@ -148,7 +148,7 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			if meterer.IsOnDemandPayment(&blob.BlobHeader.PaymentMetadata) {
 				// Batch contains on-demand payments, so the chunk must be from EigenLabsDisperser
 				if in.DisperserID != api.EigenLabsDisperserID {
-					return nil, api.NewErrorInvalidArg(fmt.Sprintf("on-demand payments are only allowed for EigenLabsDisperser; receiving disperser ID: %d", in.DisperserID))
+					return nil, api.NewErrorForbidden(fmt.Sprintf("on-demand payments are only allowed for EigenLabsDisperser; receiving disperser ID: %d", in.DisperserID))
 				}
 			}
 		}
