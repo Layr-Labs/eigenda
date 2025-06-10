@@ -5,7 +5,9 @@ Secure interaction between a rollup and EigenDA is composed of three distinct sy
 
 1. [**Dispersal**](#secure-dispersal): Submitting raw batch data to the DA network  
 2. [**Retrieval**](#secure-retrieval): Fetching batch data from the DA network  
-3. **Verification**: Ensuring the integrity and quorum-based certification of retrieved data
+3. **Verification**: Ensuring the integrity and quorum-based certification of retrieved data. Where and how verification is performed is often contingent on how an integration is implemented; e.g:
+- *Pessimistic Verification* where a `DACert` is checked as pre-inclusion check for a sequencer inbox
+- *Optimistic Verification* where a `DACert` is only verified in the worst-case challenge
 
 EigenDA *Proxy* is used as the main entrypoint for secure dispersal and retrieval.
 
@@ -22,11 +24,11 @@ EigenDA *Proxy* is used as the main entrypoint for secure dispersal and retrieva
 
 
 ### System Flow
-1. *Proxy* takes a raw [payload](./3-datastructs.md#payload) bytes on `/put` endpoint and [converts](#payload-to-blob-encoding) it into a [blob](./3-datastructs.md#blob).
+1. *Proxy* takes a raw [payload](./3-data-structs.md#payload) bytes on `/put` endpoint and [converts](#payload-to-blob-encoding) it into a [blob](./3-data-structs.md#blob).
 
 1. Using `latest_block_number` (lbn) number fetched from ETH RPC node, *Proxy* calls the router to get the `EigenDACertVerifier` [contract](./4-contracts.md#eigendacertverifier) address *most likely* (if using [`EigenDACertVerifierRouter`](./4-contracts.md#eigendacertverifierrouter)) to be committed to by the `reference_block_number` (rbn) returned by the EigenDA disperser.
 
-2. Using the `verifier`, *Proxy* fetches the `required_quorums` an embeds them into the [`BlobHeader`](./3-datastructs.md#blobheader) as part of the disperser request.
+2. Using the `verifier`, *Proxy* fetches the `required_quorums` an embeds them into the [`BlobHeader`](./3-data-structs.md#blobheader) as part of the disperser request.
 
 3. The *Proxy* submits the payload blob request to the EigenDA disperser and polls for a [`BlobStatusReply`](../../protobufs/generated/disperser_v2.md#blobstatusreply) (BSR). 
 
@@ -38,7 +40,7 @@ EigenDA *Proxy* is used as the main entrypoint for secure dispersal and retrieva
 
 8. Using the `verification_status_code`, *Proxy* determines whether to return the certificate (`CertV2Lib.StatusCode.SUCCESS`) to the *Rollup Batcher* or retry a subsequent dispersal attempt
 
-9. If valid, *Proxy* converts the `DACert` into an [`altda-commitment`](./3-datastructs.md#altdacommitment), which is ready for direct submission to the batcher’s inbox without requiring any further processing or transformation by the rollup stack.
+9. If valid, *Proxy* converts the `DACert` into an [`altda-commitment`](./3-data-structs.md#altdacommitment), which is ready for direct submission to the batcher’s inbox without requiring any further processing or transformation by the rollup stack.
 
 
 ### Payload to Blob Encoding
@@ -171,7 +173,7 @@ def get_da_cert(blob_header_hash, operator_state_retriever, cert_version_uint8) 
 
 6. Once fetched, *Proxy* verifies the blob's KZG commitments to ensure tamper resistance (i.e., confirming that what's returned from EigenDA matches what was committed to during dispersal).
 
-7. *Proxy* decodes the underlying blob into a `payload` type, which is returned to the *Rollup Node*.
+7. *Proxy* [decodes](#decoding) the underlying blob into a `payload` type, which is returned to the *Rollup Node*.
 
 ### Retrieval Paths
 There are two main blob retrieval paths:
@@ -181,6 +183,6 @@ There are two main blob retrieval paths:
 
 EigenDA V2 has a new [Relay API](https://docs.eigenda.xyz/releases/v2#relay-interfaces) for retrieving blobs from the disperser. The `GetBlob` method takes a `blob_key` as input, which is a synonym for `blob_header_hash`. Note that `BlobCertificate` (different from `DACert`!) contains an array of `relay_keys`, which are the relays that can serve that specific blob. A relay’s URL can be retrieved from the [relayKeyToUrl](https://github.com/Layr-Labs/eigenda/blob/9a4bdc099b98f6e5116b11778f0cf1466f13779c/contracts/src/core/EigenDARelayRegistry.sol#L35) function on the EigenDARelayRegistry.sol contract.
 
-## Decoding
+### Decoding
 
 Decoding performs the exact reverse operations that [Encoding](#encoding) did.

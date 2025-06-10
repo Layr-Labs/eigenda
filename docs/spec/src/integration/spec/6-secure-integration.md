@@ -76,6 +76,19 @@ Dispersal:
 
 Note: The verification steps in point 1. for dispersal are not currently implemented. This route only makes sense for clients that want to avoid having large amounts of SRS data, but KZG commitment verification via Fiat-Shamir is required to do the verification without this data. Until the alternate verification method is implemented, usage of `GetBlobCommitment` places a correctness trust assumption on the disperser generating the commitment.
 
+## Upgradable Security Params for Optimistic Verification
+![image.png](../../assets/integration/router-in-fraud-proof.png)
+
+The [`EigenDACertVerifierRouter`](./4-contracts.md#eigendacertverifierrouter) contract enables secure upgrades to a rollup’s [EigenDA security parameters](./3-data-structs.md#), such as quorum sets and thresholds, without compromising the integrity of previously submitted fraud proofs. It achieves this by routing certificate verification to the appropriate `EigenDACertVerifier` instance based on the `activation_block_number` associated with each cert's `reference_block_number`. This ensures backward compatibility, allowing older `DACert`s to be validated against the verifier version that was active at the time of their creation.
+
+The router is typically deployed behind an upgradable admin proxy and should use the same `ProxyAdmin` multisig as the rollup for consistent and secure access control.
+
+
+### Adding New Verifiers — Synchronization Risk
+
+There is a synchronization risk that can temporarily cause dispersals to fail when adding a new `verifier'` to the `EigenDACertVerifierRouter` at a future activation block number (`abn'`). If `latest_block < abn'` **and** `rbn >= abn'`, dispersals may fail if the `required_quorums` set differs between `verifier` and `verifier'`. In this case, the quorums included in the client's `BlobHeader` (based on the old verifier) would not match those expected by `checkDACert` (using the new verifier). This mismatch results in **at most** a few failed dispersals, which will resolve once `latest_block >= abn'` and `reference_block_number >= abn'`, ensuring verifier consistency. The EigenDA integrations team will explore mitigations in the future.
+
+
 ### Rollup Stack Secure Integrations
 
 |                     | Nitro V1       | OP V1 (insecure) | Nitro V2       | OP V2                                                                                |

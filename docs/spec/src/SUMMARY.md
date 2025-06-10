@@ -25,7 +25,7 @@
   - [Spec](./integration/spec.md)
     - [APIs](./integration/spec/1-apis.md)
     - [Rollup Payload Lifecycle](./integration/spec/2-rollup-payload-lifecycle.md)
-    - [DataStructs](./integration/spec/3-datastructs.md)
+    - [Data Structs](./integration/spec/3-data-structs.md)
     - [Contracts](./integration/spec/4-contracts.md)
     - [Lifecycle Phases](./integration/spec/5-lifecycle-phases.md)
     - [Secure Integration](./integration/spec/6-secure-integration.md)
