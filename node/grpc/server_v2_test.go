@@ -349,24 +349,7 @@ func TestV2StoreChunksIsBlacklistedTimeoutReachedCheck(t *testing.T) {
 		require.Equal(t, blobKeys[1], requests[1].BlobKey)
 	})
 
-	// 1 hour ago old entry
-	newBlacklist := &node.Blacklist{
-		Entries: []node.BlacklistEntry{
-			{
-				DisperserID: 0,
-				Metadata: node.BlacklistMetadata{
-					ContextId: "test",
-					Reason:    "test",
-				},
-				Timestamp: uint64(time.Now().Unix() - 3700),
-			},
-		},
-		LastUpdated: uint64(time.Now().Unix() - 3700),
-	}
 	c.blacklistStore.On("IsBlacklisted", mock.Anything, mock.Anything).Return(true)
-	c.blacklistStore.On("GetByDisperserID", mock.Anything, mock.Anything).Return(newBlacklist, nil)
-	c.blacklistStore.On("DeleteByDisperserID", mock.Anything, mock.Anything).Return(nil)
-
 	c.store.On("StoreBatch", mock.Anything, mock.Anything).Return(nil, nil)
 	_, err = c.server.StoreChunks(context.Background(), &validator.StoreChunksRequest{
 		DisperserID: 0,
