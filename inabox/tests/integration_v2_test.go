@@ -5,27 +5,23 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"math/big"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/api"
 	"github.com/Layr-Labs/eigenda/encoding"
-	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	"github.com/docker/go-units"
 	"google.golang.org/grpc"
 
-	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
-
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/relay"
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
-	disperserpb "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	nodegrpc "github.com/Layr-Labs/eigenda/api/grpc/validator"
 	"github.com/Layr-Labs/eigenda/api/hashing"
-	verifierbindings "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
 	"github.com/Layr-Labs/eigenda/core"
 
+	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
 	caws "github.com/Layr-Labs/eigenda/common/aws"
-	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
@@ -33,11 +29,9 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/Layr-Labs/eigenda/api/clients/codecs"
-	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
-	"golang.org/x/crypto/sha3"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"golang.org/x/crypto/sha3"
 )
 
 func RandomG1Point() (encoding.G1Commitment, error) {
