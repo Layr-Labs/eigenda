@@ -700,7 +700,7 @@ func (ar *ReservedPayment) IsActiveByNanosecond(currentTimestamp int64) bool {
 	return WithinTime(time.Unix(0, currentTimestamp), time.Unix(int64(ar.StartTimestamp), 0), time.Unix(int64(ar.EndTimestamp), 0))
 }
 
-// WithinTime returns true if the timestamp is within the time range
+// WithinTime returns true if the timestamp is within the time range, inclusive of the start and end timestamps
 func WithinTime(timestamp time.Time, startTimestamp time.Time, endTimestamp time.Time) bool {
-	return timestamp.After(startTimestamp) && timestamp.Before(endTimestamp)
+	return !timestamp.Before(startTimestamp) && !timestamp.After(endTimestamp)
 }
