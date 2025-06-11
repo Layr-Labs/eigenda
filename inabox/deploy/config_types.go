@@ -51,8 +51,10 @@ type TelemetryConfig struct {
 }
 
 type V1CertVerifierDeployConfig struct {
-	ThresholdRegistry string `json:"eigenDAThresholdRegistry"`
-	ServiceManager    string `json:"eigenDAServiceManager"`
+	ServiceManager                string   `json:"eigenDAServiceManager"`
+	RequiredQuorums               []uint32 `json:"requiredQuorums"`
+	RequiredAdversarialThresholds []uint32 `json:"adversaryThresholds"`
+	RequiredConfirmationQuorums   []uint32 `json:"confirmationThresholds"`
 }
 
 type EigenDADeployConfig struct {
