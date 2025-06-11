@@ -18,24 +18,29 @@
 ### 1. **Feature Freeze & Release Branch Creation**
 
 Enacting a feature freeze helps to ensure that the code we publish to production environments is well tested and
-mature. As a general rule of thumb, we should put in place a feature freeze two weeks prior to a release on testnet.
+mature. The start of a feature freeze is marked by the creation of a release branch, which allows development
+against `master` to continue uninterrupted while the release is prepared.
 
-#### Feature Freeze
+#### Plan Feature Freeze
 
-- **Trigger**: Either a date scheduled in advance, or tied to the completion of a key feature
-- **Action**: Announce feature freeze date and time to the team
-- **Result**: Development against `master` continues uninterrupted while release is prepared
+- A feature freeze may be tied either to a date scheduled in advance, or to the completion of a key feature.
+- As a general rule of thumb, a feature freeze should be planned such that there are two weeks between the freeze
+and the release on testnet.
+- The team should be notified of an upcoming feature freeze as soon as it has been planned.
 
-#### Create Release Branch
+#### Enact Feature Freeze
+
+A feature freeze is officially marked by the creation of a release branch:
 
 - From latest `master` commit:
   - `git checkout master && git pull`
   - `git checkout -b release-<MAJOR>.<MINOR>`
     - **Note:** there is no patch number in the branch name. The same branch is used across multiple patch versions.
   - Example: `release-1.1`
-- Push and protect the branch:
+- Push the branch:
   - `git push origin release-1.1`
-  - From the GitHub UI, set branch protections to prevent direct pushes and branch deletion
+  - GitHub policies are configured to automatically protect a branch prefixed with 'release', to prevent it from being
+  directly pushed to or deleted.
 
 ---
 
