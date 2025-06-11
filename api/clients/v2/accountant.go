@@ -61,32 +61,6 @@ func NewAccountant(accountID gethcommon.Address, reservation *core.ReservedPayme
 	return &a
 }
 
-// blobPaymentInfo calculates and records payment information. The accountant
-// will attempt to use the active reservation first and check for quorum settings,
-// then on-demand if the reservation is not available. It takes in a timestamp at
-// the current UNIX time in nanoseconds, and returns a cumulative payment for on-
-// demand payments in units of wei. Both timestamp and cumulative payment are used
-// to create the payment header and signature, with non-zero cumulative payment
-// indicating on-demand payment.
-// These generated values are used to create the payment header and signature, as specified in
-// api/proto/common/v2/common_v2.proto
-// func (a *Accountant) blobPaymentInfo(
-// 	numSymbols uint64,
-// 	quorumNumbers []uint8,
-// 	timestamp int64) (*big.Int, error) {
-
-// 		symbolUsage := meterer.SymbolsCharged(numSymbols, a.minNumSymbols)
-
-// 		// Always try to use reservation first
-// 		err := a.reservationUsage(symbolUsage, quorumNumbers, timestamp)
-// 		if err == nil {
-// 			return big.NewInt(0), nil
-// 		}
-
-// 		// Fall back to on-demand payment if reservation fails
-// 		return a.onDemandUsage(symbolUsage, quorumNumbers)
-// }
-
 // reservationUsage attempts to use the reservation for the given request.
 func (a *Accountant) reservationUsage(
 	symbolUsage uint64,
@@ -95,6 +69,12 @@ func (a *Accountant) reservationUsage(
 	if err := meterer.ValidateQuorum(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 		return err
 	}
+
+	fmt.Printf("timestamp: %d\n", timestamp)
+	if !a.reservation.IsActiveByNanosecond(timestamp) {
+		return fmt.Errorf("reservation is not active at timestamp %d", timestamp)
+	}
+	fmt.Printf("reservation: %v\n", a.reservation)
 
 	reservationWindow := a.reservationWindow
 	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, reservationWindow)
@@ -110,12 +90,14 @@ func (a *Accountant) reservationUsage(
 		return nil
 	}
 
-	overflowPeriodRecord := a.getOrRefreshRelativePeriodRecord(currentReservationPeriod+2*reservationWindow, reservationWindow)
+	fmt.Printf("currentReservationPeriod: %d, reservationWindow: %d\n", currentReservationPeriod, reservationWindow)
+	overflowPeriodRecord := a.getOrRefreshRelativePeriodRecord(meterer.GetOverflowPeriod(currentReservationPeriod, reservationWindow), reservationWindow)
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
 	if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
 		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
 		return nil
 	}
+	fmt.Printf("overflowPeriodRecord: %d\n", overflowPeriodRecord.Usage)
 
 	// Reservation not sufficient for the request, rollback the usage
 	relativePeriodRecord.Usage -= symbolUsage
@@ -143,7 +125,12 @@ func (a *Accountant) onDemandUsage(symbolUsage uint64, quorumNumbers []uint8) (*
 	return nil, errors.New("insufficient ondemand payment")
 }
 
-// AccountBlob accountant provides and records payment information
+// AccountBlob accountant generates payment information for a request. The accountant
+// takes in a timestamp at the current UNIX time in nanoseconds, number of symbols of the request,
+// and the quorums to disperse the request to. It will attempt to use the active reservation first
+// and then on-demand if the reservation is not available or insufficient for the request.
+// It returns a payment metadata object that will be used to create the payment header and signature,
+// as specified in api/proto/common/v2/common_v2.proto
 func (a *Accountant) AccountBlob(
 	timestamp int64,
 	numSymbols uint64,
@@ -164,7 +151,7 @@ func (a *Accountant) AccountBlob(
 	// Fall back to on-demand payment if reservation fails
 	cumulativePayment, err := a.onDemandUsage(symbolUsage, quorums)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create payment infomation for reservation or on-demand. Consider depositing more eth to the PaymentVault contract for your account. For more details, see https://docs.eigenda.xyz/core-concepts/payments#disperser-client-requirements. Account: %s, Error: %w", a.accountID.Hex(), err)
+		return nil, fmt.Errorf("cannot create payment information for reservation or on-demand. Consider depositing more eth to the PaymentVault contract for your account. For more details, see https://docs.eigenda.xyz/core-concepts/payments#disperser-client-requirements. Account: %s, Error: %w", a.accountID.Hex(), err)
 	}
 
 	pm := &core.PaymentMetadata{
@@ -198,7 +185,7 @@ func (a *Accountant) getOrRefreshRelativePeriodRecord(index uint64, reservationW
 // account level on/off-chain state. If on-chain fields are not present, we use
 // dummy values that disable accountant from using the corresponding payment method.
 // If off-chain fields are not present, we assume the account has no payment history
-// and set accoutant state to use initial values.
+// and set accountant state to use initial values.
 func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentStateReply) error {
 	if paymentState == nil {
 		return fmt.Errorf("payment state cannot be nil")
