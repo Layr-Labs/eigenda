@@ -34,11 +34,11 @@ A feature freeze is officially marked by the creation of a release branch:
 
 - From latest `master` commit:
   - `git checkout master && git pull`
-  - `git checkout -b release-<MAJOR>.<MINOR>`
+  - `git checkout -b release/<MAJOR>.<MINOR>`
     - **Note:** there is no patch number in the branch name. The same branch is used across multiple patch versions.
-  - Example: `release-1.1`
+  - Example: `release/1.1`
 - Push the branch:
-  - `git push origin release-1.1`
+  - `git push origin release/1.1`
   - GitHub policies are configured to automatically protect a branch prefixed with 'release', to prevent it from being
   directly pushed to or deleted.
 
@@ -71,7 +71,7 @@ sign-off, a PR targetting a release branch must still go through the standard pe
 - **When ready**, tag from HEAD of release branch:
   - Tag format: `v<MAJOR>.<MINOR>.<PATCH>`
   - Example: `v1.1.0`
-  - `git checkout release-1.1`
+  - `git checkout release/1.1`
   - `git tag v1.1.0`
   - `git push origin v1.1.0`
 - **⚠️ Tags are immutable:**
