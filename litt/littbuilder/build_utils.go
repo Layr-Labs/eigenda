@@ -199,18 +199,13 @@ func buildTable(
 		return nil, fmt.Errorf("error creating keymap: %w", err)
 	}
 
-	tableRoots := make([]string, len(config.Paths)) // TODO
-	for i, p := range config.Paths {
-		tableRoots[i] = path.Join(p, name)
-	}
-
 	table, err = disktable.NewDiskTable(
 		config,
 		name,
 		kmap,
 		keymapDirectory,
 		keymapTypeFile,
-		tableRoots,
+		config.Paths,
 		requiresReload,
 		metrics)
 
