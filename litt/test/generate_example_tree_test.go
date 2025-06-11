@@ -25,9 +25,11 @@ func TestGenerateExampleTree(t *testing.T) {
 	rootDirectories := []string{path.Join(testDir, "root0"), path.Join(testDir, "root1"), path.Join(testDir, "root2")}
 
 	config, err := litt.DefaultConfig(rootDirectories...)
+	require.NoError(t, err)
+
 	config.ShardingFactor = 4
 	config.TargetSegmentFileSize = 100 // use a small value to intentionally create several segments
-	require.NoError(t, err)
+	config.SnapshotDirectory = path.Join(testDir, "rolling_snapshot")
 
 	db, err := littbuilder.NewDB(config)
 	require.NoError(t, err)
@@ -57,8 +59,11 @@ func TestGenerateExampleTree(t *testing.T) {
 	err = tableC.Put([]byte("key1"), rand.Bytes(50))
 	require.NoError(t, err)
 
-	// Shut down the database to ensure all data is flushed to disk
-	err = db.Close()
+	err = tableA.Flush()
+	require.NoError(t, err)
+	err = tableB.Flush()
+	require.NoError(t, err)
+	err = tableC.Flush()
 	require.NoError(t, err)
 
 	// Run the tree command on testDir
@@ -74,4 +79,6 @@ func TestGenerateExampleTree(t *testing.T) {
 
 	fmt.Println(resultString)
 
+	err = db.Close()
+	require.NoError(t, err)
 }

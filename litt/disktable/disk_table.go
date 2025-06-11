@@ -81,6 +81,12 @@ type DiskTable struct {
 
 	// Encapsulates metrics for the database.
 	metrics *metrics.LittDBMetrics
+
+	// Set to true when the table is closed. This is used to prevent double closing.
+	closed atomic.Bool
+
+	// Set to true when the table is destroyed. This is used to prevent double destroying.
+	destroyed atomic.Bool
 }
 
 // NewDiskTable creates a new DiskTable.
@@ -371,6 +377,11 @@ func (d *DiskTable) Name() string {
 
 // Close stops the disk table. Flushes all data out to disk.
 func (d *DiskTable) Close() error {
+	firstTimeClosing := d.closed.CompareAndSwap(false, true)
+	if !firstTimeClosing {
+		return nil
+	}
+
 	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf("cannot process Stop() request, DB is in panicked state due to error: %w", err)
 	}
@@ -397,8 +408,9 @@ func (d *DiskTable) Close() error {
 
 // Destroy stops the disk table and delete all files.
 func (d *DiskTable) Destroy() error {
-	if ok, err := d.errorMonitor.IsOk(); !ok {
-		return fmt.Errorf("Cannot process Destroy() request, DB is in panicked state due to error: %w", err)
+	firstTimeDestroying := d.destroyed.CompareAndSwap(false, true)
+	if !firstTimeDestroying {
+		return nil // already destroyed
 	}
 
 	err := d.Close()

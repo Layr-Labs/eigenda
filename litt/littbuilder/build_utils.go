@@ -47,8 +47,8 @@ func FindKeymapLocation(
 	}
 
 	potentialKeymapDirectories := make([]string, len(rootPaths))
-	for i, p := range rootPaths {
-		potentialKeymapDirectories[i] = path.Join(p, tableName, keymap.KeymapDirectoryName)
+	for i, rootPath := range rootPaths {
+		potentialKeymapDirectories[i] = path.Join(rootPath, tableName, keymap.KeymapDirectoryName)
 	}
 
 	for _, directory := range potentialKeymapDirectories {
@@ -97,12 +97,7 @@ func buildKeymap(
 			fmt.Errorf("unsupported keymap type: %v", config.KeymapType)
 	}
 
-	potentialKeymapDirectories := make([]string, len(config.Paths))
-	for i, p := range config.Paths {
-		potentialKeymapDirectories[i] = path.Join(p, tableName, keymap.KeymapDirectoryName)
-	}
-
-	keymapDirectory, keymapInitialized, keymapTypeFile, err := FindKeymapLocation(potentialKeymapDirectories, tableName)
+	keymapDirectory, keymapInitialized, keymapTypeFile, err := FindKeymapLocation(config.Paths, tableName)
 	if err != nil {
 		return nil, "", nil, false,
 			fmt.Errorf("error finding keymap location: %w", err)
@@ -129,7 +124,7 @@ func buildKeymap(
 		newKeymap = true
 
 		// by convention, always select the first path as the keymap directory
-		keymapDirectory = potentialKeymapDirectories[0]
+		keymapDirectory = path.Join(config.Paths[0], tableName, keymap.KeymapDirectoryName)
 		keymapTypeFile = keymap.NewKeymapTypeFile(keymapDirectory, config.KeymapType)
 
 		// create the keymap directory

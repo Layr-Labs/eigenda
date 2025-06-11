@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
@@ -54,12 +55,15 @@ func buildMemDB(t *testing.T, path string) (litt.DB, error) {
 	require.NoError(t, err)
 
 	config.GCPeriod = 50 * time.Millisecond
+	config.Logger, err = common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
 
 	tb := func(
 		ctx context.Context,
 		logger logging.Logger,
 		name string,
-		metrics *metrics.LittDBMetrics) (litt.ManagedTable, error) {
+		metrics *metrics.LittDBMetrics,
+	) (litt.ManagedTable, error) {
 		return memtable.NewMemTable(config, name), nil
 	}
 
