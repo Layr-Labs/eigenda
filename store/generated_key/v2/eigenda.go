@@ -188,30 +188,50 @@ func (e Store) BackendType() common.BackendType {
 // Since v2 methods for fetching a payload are responsible for verifying the received bytes against the certificate,
 // this Verify method only needs to check the cert on chain. That is why the third parameter is ignored.
 func (e Store) Verify(ctx context.Context, versionedCert certs.VersionedCert, opts common.CertVerificationOpts) error {
+	var referenceBlockNumber uint64
+	var sumDACert coretypes.EigenDACert
+
 	switch versionedCert.Version {
-	case certs.V0VersionByte, certs.V1VersionByte:
-		e.log.Warn("EigenDA V2 certs are not supported anymore more for verification. Defaulting to successful verification.")
-		return nil
+	case certs.V0VersionByte:
+		return fmt.Errorf("version 0 byte certs should never be verified by the EigenDA V2 store")
+
+	case certs.V1VersionByte:
+		// convert v2 eigenda cert to v3 cert type for verification against the forward compatible
+		// cert verifier
+		var eigenDACertV2 coretypes.EigenDACertV2
+		err := rlp.DecodeBytes(versionedCert.SerializedCert, &eigenDACertV2)
+		if err != nil {
+			return fmt.Errorf("RLP decoding EigenDA v2 cert: %w", err)
+		}
+
+		referenceBlockNumber = eigenDACertV2.ReferenceBlockNumber()
+		sumDACert = &eigenDACertV2
 
 	case certs.V2VersionByte:
-		var eigenDACert coretypes.EigenDACertV3
-		err := rlp.DecodeBytes(versionedCert.SerializedCert, &eigenDACert)
+		var eigenDACertV3 coretypes.EigenDACertV3
+		err := rlp.DecodeBytes(versionedCert.SerializedCert, &eigenDACertV3)
 		if err != nil {
 			return fmt.Errorf("RLP decoding EigenDA v3 cert: %w", err)
 		}
 
-		err = verifyCertRBNRecencyCheck(eigenDACert.ReferenceBlockNumber(), opts.L1InclusionBlockNum, e.rbnRecencyWindowSize)
-		if err != nil {
-			return fmt.Errorf("rbn recency check failed: %w", err)
-		}
-
-		err = e.certVerifier.CheckDACert(ctx, &eigenDACert)
-		if err != nil {
-			return fmt.Errorf("verify v3 cert: %w", err)
-		}
+		referenceBlockNumber = eigenDACertV3.ReferenceBlockNumber()
+		sumDACert = &eigenDACertV3
 
 	default:
 		return fmt.Errorf("unsupported EigenDA cert version: %d", versionedCert.Version)
+	}
+
+	// check recency first since it requires less processing and no IO vs verifying the cert
+	err := verifyCertRBNRecencyCheck(referenceBlockNumber,
+		opts.L1InclusionBlockNum, e.rbnRecencyWindowSize)
+	if err != nil {
+		return fmt.Errorf("rbn recency check failed: %w", err)
+	}
+
+	// verify cert via simulation call to verifier contract
+	err = e.certVerifier.CheckDACert(ctx, sumDACert)
+	if err != nil {
+		return fmt.Errorf("verify v3 cert: %w", err)
 	}
 
 	return nil
