@@ -34,13 +34,18 @@ A feature freeze is officially marked by the creation of a release branch:
 
 - From latest `master` commit:
   - `git checkout master && git pull`
-  - `git checkout -b release/<MAJOR>.<MINOR>`
+  - `git checkout -b release/0.<MINOR>`
     - **Note:** there is no patch number in the branch name. The same branch is used across multiple patch versions.
-  - Example: `release/1.1`
+  - Example: `release/0.10`
 - Push the branch:
-  - `git push origin release/1.1`
+  - `git push origin release/0.10`
   - GitHub policies are configured to automatically protect a branch prefixed with 'release', to prevent it from being
   directly pushed to or deleted.
+
+Note: The current branch naming scheme is `release/0.<MINOR>`, so that a user can checkout and pull the release branch
+without necessarily being aware of what the latest patch release is. Once we release the first major semver version,
+the branch naming format will be changed to `release/<MAJOR>`, to enable a similar user flow (checking out the major
+version release branch, and pulling without needing to know the latest minor or patch versions).
 
 ---
 
@@ -70,10 +75,10 @@ sign-off, a PR targetting a release branch must still go through the standard pe
 
 - **When ready**, tag from HEAD of release branch:
   - Tag format: `v<MAJOR>.<MINOR>.<PATCH>`
-  - Example: `v1.1.0`
-  - `git checkout release/1.1`
-  - `git tag v1.1.0`
-  - `git push origin v1.1.0`
+  - Example: `v0.10.0`
+  - `git checkout release/0.10`
+  - `git tag v0.10.0`
+  - `git push origin v0.10.0`
 - **⚠️ Tags are immutable:**
   - NEVER force-push a tag to a different commit
   - If a mistake is made, create a new tag with incremented version
@@ -86,7 +91,7 @@ sign-off, a PR targetting a release branch must still go through the standard pe
 - **Follow same change policy** as described in [Section 2](#2-changes-to-a-release-branch)
 - **Do not tag reflexively** after every merge:
   - Accumulate changes until a meaningful patch set is ready
-  - Create new release tag with incremented patch version (e.g., `v1.1.1`, `v1.1.2`)
+  - Create new release tag with incremented patch version (e.g., `v0.10.1`, `v0.10.2`)
 - **Continue iteratively** until all critical issues are resolved
 
 ---
