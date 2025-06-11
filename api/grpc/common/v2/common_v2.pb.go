@@ -27,22 +27,41 @@ type BlobHeader struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The blob version. Blob versions are pushed onchain by EigenDA governance in an append only fashion and store the
-	// maximum number of operators, number of chunks, and coding rate for a blob. On blob verification, these values
-	// are checked against supplied or default security thresholds to validate the security assumptions of the
-	// blob's availability.
-	Version uint32 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
-	// quorum_numbers is the list of quorum numbers that the blob is part of.
-	// Each quorum will store the data, hence adding quorum numbers adds redundancy, making the blob more likely to be retrievable. Each quorum requires separate payment.
+	// The BlobParams version to use when encoding the blob into chunks to be dispersed to operators.
 	//
-	// On-demand dispersal is currently limited to using a subset of the following quorums:
+	// BlobParams versions are pushed onchain to the EigenDAThresholdRegistry by EigenDA governance in an append only fashion
+	// and store the maximum number of operators, number of chunks, and coding rate for a blob.
+	//
+	// A user can choose any of the onchain defined VersionedBlobParams, and must make sure to choose SecurityThresholds in its CertVerifier contract
+	// that along with the chosen VersionedBlobParams satisfy the checkSecurityParams function: https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/libraries/EigenDACertVerificationLib.sol#L188
+	// This function is called internally by the CertVerifier's checkDACert function.
+	//
+	// If a version that is not available on the ThresholdRegistry is chosen, the disperser will return an error.
+	//
+	// EigenDA maintained:
+	//
+	//	VersionedBlobParams definition: https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/core/libraries/v1/EigenDATypesV1.sol#L7
+	//	IEigenDAThresholdRegistry (stores the BlobParams): https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/core/interfaces/IEigenDAThresholdRegistry.sol
+	//	EigenDAServiceManager address (implements IEigenDAThresholdRegistry): https://docs.eigenda.xyz/networks/mainnet#contract-addresses
+	//
+	// Rollup maintained:
+	//
+	//	SecurityThresholds interface: https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/interfaces/IEigenDACertVerifier.sol#L23
+	//	checkDACert interface: https://github.com/Layr-Labs/eigenda/blob/3e670ff3dbd3a0a3f63b51e40544f528ac923b78/contracts/src/periphery/cert/interfaces/IEigenDACertVerifierBase.sol#L8
+	Version uint32 `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
+	// quorum_numbers is the list of quorum numbers that the blob shall be dispersed to.
+	// Each quorum will store the data independently, meaning that additional quorum numbers increase redundancy, making the blob more likely to be retrievable.
+	// Each quorum requires separate payment.
+	//
+	// On-demand bandwidth dispersals do not currently support custom quorums and hence are limited to dispersing to one or two of the following quorums only:
 	// - 0: ETH
 	// - 1: EIGEN
 	//
-	// Reserved-bandwidth dispersal is free to use multiple quorums, however those must be reserved ahead of time. The quorum_numbers specified here must be a subset of the ones allowed by the on-chain reservation.
-	// Check the allowed quorum numbers by looking up reservation struct: https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/interfaces/IPaymentVault.sol#L10
+	// Reserved-bandwidth dispersal do support custom quorums, as long as they are reserved onchain ahead of time. The quorum_numbers specified here must be a subset of the ones allowed by the on-chain reservation.
+	// Users can check their reserved quorum numbers on the IPaymentVault's reservation struct: https://github.com/Layr-Labs/eigenda/blob/1430d56258b4e814b388e497320fd76354bfb478/contracts/src/interfaces/IPaymentVault.sol#L10
 	QuorumNumbers []uint32 `protobuf:"varint,2,rep,packed,name=quorum_numbers,json=quorumNumbers,proto3" json:"quorum_numbers,omitempty"`
-	// commitment is the KZG commitment to the blob
+	// commitment is the KZG commitment to the blob.
+	// This commitment can either be constructed locally, or obtained by using the disperser's GetBlobCommitment RPC (see disperser_v2.proto).
 	Commitment *common.BlobCommitment `protobuf:"bytes,3,opt,name=commitment,proto3" json:"commitment,omitempty"`
 	// payment_header contains payment information for the blob
 	PaymentHeader *PaymentHeader `protobuf:"bytes,4,opt,name=payment_header,json=paymentHeader,proto3" json:"payment_header,omitempty"`

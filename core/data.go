@@ -648,6 +648,28 @@ type OnDemandPayment struct {
 	CumulativePayment *big.Int
 }
 
+// PaymentQuorumConfig contains the configuration for a quorum's payment configurations
+// This is pretty much the same as the PaymentVaultTypesQuorumConfig struct in the contracts/bindings/IPaymentVault/binding.go file
+type PaymentQuorumConfig struct {
+	ReservationSymbolsPerSecond uint64
+
+	// OnDemand is initially only enabled on Quorum 0
+	OnDemandSymbolsPerSecond uint64
+	OnDemandPricePerSymbol   uint64
+}
+
+// PaymentQuorumProtocolConfig contains the configuration for a quorum's ratelimiting configurations
+// This is pretty much the same as the PaymentVaultTypesQuorumProtocolConfig struct in the contracts/bindings/IPaymentVault/binding.go file
+type PaymentQuorumProtocolConfig struct {
+	MinNumSymbols              uint64
+	ReservationAdvanceWindow   uint64
+	ReservationRateLimitWindow uint64
+
+	// OnDemand is initially only enabled on Quorum 0
+	OnDemandRateLimitWindow uint64
+	OnDemandEnabled         bool
+}
+
 type BlobVersionParameters struct {
 	// CodingRate specifies the amount of redundancy that will be added when encoding the blob
 	// (Note that for the purposes of integer representation, this is the inverse of the standard
@@ -670,11 +692,15 @@ func (bvp *BlobVersionParameters) GetReconstructionThresholdBips() uint32 {
 
 // IsActive returns true if the reservation is active at the given timestamp
 func (ar *ReservedPayment) IsActive(currentTimestamp uint64) bool {
-	return ar.StartTimestamp <= currentTimestamp && ar.EndTimestamp >= currentTimestamp
+	return WithinTime(time.Unix(int64(currentTimestamp), 0), time.Unix(int64(ar.StartTimestamp), 0), time.Unix(int64(ar.EndTimestamp), 0))
 }
 
-// IsActive returns true if the reservation is active at the given timestamp
+// IsActiveByNanosecond returns true if the reservation is active at the given timestamp
 func (ar *ReservedPayment) IsActiveByNanosecond(currentTimestamp int64) bool {
-	timestamp := uint64((time.Duration(currentTimestamp) * time.Nanosecond).Seconds())
-	return ar.StartTimestamp <= timestamp && ar.EndTimestamp >= timestamp
+	return WithinTime(time.Unix(0, currentTimestamp), time.Unix(int64(ar.StartTimestamp), 0), time.Unix(int64(ar.EndTimestamp), 0))
+}
+
+// WithinTime returns true if the timestamp is within the time range, inclusive of the start and end timestamps
+func WithinTime(timestamp time.Time, startTimestamp time.Time, endTimestamp time.Time) bool {
+	return !timestamp.Before(startTimestamp) && !timestamp.After(endTimestamp)
 }
