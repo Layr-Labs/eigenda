@@ -49,9 +49,11 @@ A feature freeze is officially marked by the creation of a release branch:
 #### Change Policy
 
 - **High bar for inclusion**: Only critical bugfixes or business-critical features
-    - Even bugfixes should not be reflexively included: only high-severity issues
+  - Even bugfixes should not be reflexively included: only high-severity issues
 - **Team consensus required**: Single engineer cannot make the decision
-- **Public visibility**: Must have team discussion (e.g., Slack thread) before proceeding
+- **Public visibility**: Must have team discussion (e.g., Slack thread) before proceeding. Alternatively, management
+may sign-off that a feature should be included after a feature freeze has been enacted. Note that even with managment
+sign-off, a PR targetting a release branch must still go through the standard peer-review process.
 
 #### Change Process
 
