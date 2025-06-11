@@ -147,7 +147,7 @@ func NewDiskTable(
 		// No metadata file exists yet. Create a new one in the first root.
 		var err error
 		metadataDir := qualifiedRoots[0]
-		metadata, err = newTableMetadata(config.Logger, metadataDir, config.TTL, config.ShardingFactor)
+		metadata, err = newTableMetadata(config.Logger, metadataDir, config.TTL, config.ShardingFactor, config.Fsync)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create table metadata: %w", err)
 		}
@@ -182,7 +182,8 @@ func NewDiskTable(
 			config.Logger,
 			errorMonitor,
 			table.segmentPaths,
-			config.Clock())
+			config.Clock(),
+			config.Fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather segment files: %w", err)
 	}

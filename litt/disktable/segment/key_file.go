@@ -152,7 +152,7 @@ func (k *keyFile) path() string {
 }
 
 // atomicSwap atomically replaces the key file, replacing the old one.
-func (k *keyFile) atomicSwap() error {
+func (k *keyFile) atomicSwap(sync bool) error {
 	if !k.swap {
 		return fmt.Errorf("key file is not a swap file")
 	}
@@ -161,7 +161,7 @@ func (k *keyFile) atomicSwap() error {
 	k.swap = false
 	newPath := k.path()
 
-	err := util.AtomicRename(swapPath, newPath)
+	err := util.AtomicRename(swapPath, newPath, sync)
 	if err != nil {
 		return fmt.Errorf("failed to atomically swap key file %s with %s: %v", swapPath, newPath, err)
 	}

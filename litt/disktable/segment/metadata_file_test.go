@@ -33,7 +33,7 @@ func TestUnsealedSerialization(t *testing.T) {
 	err = m.write()
 	require.NoError(t, err)
 
-	deserialized, err := loadMetadataFile(index, []*SegmentPath{segmentPath})
+	deserialized, err := loadMetadataFile(index, []*SegmentPath{segmentPath}, false)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
@@ -86,7 +86,7 @@ func TestSealedSerialization(t *testing.T) {
 	actualSize := uint64(stat.Size())
 	require.Equal(t, actualSize, reportedSize)
 
-	deserialized, err := loadMetadataFile(index, []*SegmentPath{segmentPath})
+	deserialized, err := loadMetadataFile(index, []*SegmentPath{segmentPath}, false)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
@@ -114,7 +114,7 @@ func TestFreshFileSerialization(t *testing.T) {
 	require.NoError(t, err)
 	err = segmentPath.MakeDirectories()
 	require.NoError(t, err)
-	m, err := createMetadataFile(index, 1234, salt, segmentPath)
+	m, err := createMetadataFile(index, 1234, salt, segmentPath, false)
 	require.NoError(t, err)
 
 	require.Equal(t, index, m.index)
@@ -128,7 +128,7 @@ func TestFreshFileSerialization(t *testing.T) {
 	actualSize := uint64(stat.Size())
 	require.Equal(t, actualSize, reportedSize)
 
-	deserialized, err := loadMetadataFile(index, []*SegmentPath{segmentPath})
+	deserialized, err := loadMetadataFile(index, []*SegmentPath{segmentPath}, false)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
@@ -156,7 +156,7 @@ func TestSealing(t *testing.T) {
 	require.NoError(t, err)
 	err = segmentPath.MakeDirectories()
 	require.NoError(t, err)
-	m, err := createMetadataFile(index, 1234, salt, segmentPath)
+	m, err := createMetadataFile(index, 1234, salt, segmentPath, false)
 	require.NoError(t, err)
 
 	// seal the file
@@ -173,7 +173,7 @@ func TestSealing(t *testing.T) {
 	require.Equal(t, uint32(987), m.keyCount)
 
 	// load the file
-	deserialized, err := loadMetadataFile(index, []*SegmentPath{segmentPath})
+	deserialized, err := loadMetadataFile(index, []*SegmentPath{segmentPath}, false)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 

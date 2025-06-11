@@ -87,6 +87,10 @@ type Segment struct {
 
 	// If true, then take a snapshot of the segment when it is sealed.
 	snapshottingEnabled bool
+
+	// If true, then sync the file system for atomic operations. Should always be true in production, but can
+	// be set to false for tests to save time.
+	fsync bool
 }
 
 // CreateSegment creates a new data segment.
@@ -104,7 +108,7 @@ func CreateSegment(
 	}
 	snapshottingEnabled := segmentPaths[0].SnapshottingEnabled()
 
-	metadata, err := createMetadataFile(index, shardingFactor, salt, segmentPaths[0])
+	metadata, err := createMetadataFile(index, shardingFactor, salt, segmentPaths[0], fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open metadata file: %v", err)
 	}
@@ -156,6 +160,7 @@ func CreateSegment(
 		keyFileChannel:      keyFileChannel,
 		deletionChannel:     make(chan struct{}, 1),
 		snapshottingEnabled: snapshottingEnabled,
+		fsync:               fsync,
 	}
 
 	// Segments are returned with an initial reference count of 1, as the caller of the constructor is considered to
@@ -177,14 +182,16 @@ func LoadSegment(logger logging.Logger,
 	errorMonitor *util.ErrorMonitor,
 	index uint32,
 	segmentPaths []*SegmentPath,
-	now time.Time) (*Segment, error) {
+	now time.Time,
+	fsync bool,
+) (*Segment, error) {
 
 	if len(segmentPaths) == 0 {
 		return nil, errors.New("no segment paths provided")
 	}
 
 	// Look for the metadata file.
-	metadata, err := loadMetadataFile(index, segmentPaths)
+	metadata, err := loadMetadataFile(index, segmentPaths, fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open metadata file: %w", err)
 	}
@@ -216,6 +223,7 @@ func LoadSegment(logger logging.Logger,
 		keyFileSize:     keyFileSize,
 		keyCount:        metadata.keyCount,
 		deletionChannel: make(chan struct{}, 1),
+		fsync:           fsync,
 	}
 
 	// Segments are returned with an initial reference count of 1, as the caller of the constructor is considered to
@@ -287,7 +295,7 @@ func (s *Segment) sealLoadedSegment(now time.Time) error {
 			return fmt.Errorf("failed to seal swap file: %w", err)
 		}
 
-		err = swapFile.atomicSwap()
+		err = swapFile.atomicSwap(s.fsync)
 		if err != nil {
 			return fmt.Errorf("failed to swap key file: %w", err)
 		}
@@ -803,7 +811,7 @@ type keyFileFlushResponse struct {
 // for writing key-address pairs to the key file.
 func (s *Segment) keyFileControlLoop() {
 	unflushedKeys := make([]*types.ScopedKey, 0, unflushedKeysInitialCapacity)
-	
+
 	for {
 		select {
 		case <-s.errorMonitor.ImmediateShutdownRequired():

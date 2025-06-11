@@ -71,6 +71,9 @@ type Cohort struct {
 
 	// True iff the cohort has been loaded from disk. This value is NOT serialized to disk.
 	loadedFromDisk bool
+
+	// Whether fsync mode is enabled. Disable for faster unit tests.
+	fsync bool
 }
 
 // NewCohort creates a new cohort with the given index range.
@@ -79,7 +82,8 @@ func NewCohort(
 	cohortIndex uint64,
 	lowIndex uint64,
 	highIndex uint64,
-	valueSize uint64) (*Cohort, error) {
+	valueSize uint64,
+	fsync bool) (*Cohort, error) {
 
 	cohort := &Cohort{
 		parentDirectory:     parentDirectory,
@@ -90,6 +94,7 @@ func NewCohort(
 		nextKeyIndex:        lowIndex,
 		allValuesWritten:    false,
 		firstValueTimestamp: time.Now(),
+		fsync:               fsync,
 	}
 
 	err := cohort.Write()
@@ -159,7 +164,8 @@ func (c *Cohort) NextCohort(keyCount uint64, valueSize uint64) (*Cohort, error) 
 		nextIndex,
 		nextLowKeyIndex,
 		nextHighKeyIndex,
-		valueSize)
+		valueSize,
+		c.fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create next cohort: %w", err)
 	}
@@ -272,7 +278,7 @@ func (c *Cohort) Path() string {
 }
 
 func (c *Cohort) Write() error {
-	err := util.AtomicWrite(c.Path(), c.serialize())
+	err := util.AtomicWrite(c.Path(), c.serialize(), c.fsync)
 	if err != nil {
 		return fmt.Errorf("failed to write cohort file: %w", err)
 	}

@@ -143,6 +143,7 @@ func lookForMissingFiles(
 	metadataFiles map[uint32]string,
 	keyFiles map[uint32]string,
 	valueFiles map[uint32][]string,
+	fsync bool,
 ) (orphanedFiles []string, damagedSegments map[uint32]struct{}, error error) {
 
 	orphanedFiles = make([]string, 0)
@@ -206,7 +207,7 @@ func lookForMissingFiles(
 			metadataPath := metadataFiles[segment]
 			metadataDirectory := path.Dir(metadataPath)
 
-			metadata, err := loadMetadataFile(segment, []*SegmentPath{{segmentDirectory: metadataDirectory}})
+			metadata, err := loadMetadataFile(segment, []*SegmentPath{{segmentDirectory: metadataDirectory}}, fsync)
 			if err != nil {
 				return nil, nil,
 					fmt.Errorf("failed to load metadata file: %v", err)
@@ -297,8 +298,10 @@ func GatherSegmentFiles(
 	logger logging.Logger,
 	errorMonitor *util.ErrorMonitor,
 	segmentPaths []*SegmentPath,
-	now time.Time) (lowestSegmentIndex uint32, highestSegmentIndex uint32, segments map[uint32]*Segment, err error) {
-	
+	now time.Time,
+	fsync bool,
+) (lowestSegmentIndex uint32, highestSegmentIndex uint32, segments map[uint32]*Segment, err error) {
+
 	// Scan the root directories for segment files.
 	metadataFiles, keyFiles, valueFiles, garbageFiles, highestSegmentIndex, lowestSegmentIndex, err :=
 		scanDirectories(logger, segmentPaths)
@@ -326,7 +329,8 @@ func GatherSegmentFiles(
 		highestSegmentIndex,
 		metadataFiles,
 		keyFiles,
-		valueFiles)
+		valueFiles,
+		fsync)
 	if err != nil {
 		return 0, 0, nil,
 			fmt.Errorf("there are one or more missing files: %v", err)
@@ -350,7 +354,7 @@ func GatherSegmentFiles(
 
 		// Load all healthy segments.
 		for i := lowestSegmentIndex; i <= highestSegmentIndex; i++ {
-			segment, err := LoadSegment(logger, errorMonitor, i, segmentPaths, now)
+			segment, err := LoadSegment(logger, errorMonitor, i, segmentPaths, now, fsync)
 			if err != nil {
 				return 0, 0, nil,
 					fmt.Errorf("failed to create segment %d: %v", i, err)

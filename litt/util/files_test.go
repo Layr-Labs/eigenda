@@ -720,7 +720,7 @@ func TestAtomicWrite(t *testing.T) {
 			_, err := os.Stat(swapPath)
 			require.True(t, os.IsNotExist(err), "Swap file should not exist before test")
 
-			err = AtomicWrite(path, data)
+			err = AtomicWrite(path, data, true)
 
 			if tc.expectError {
 				require.Error(t, err)
@@ -771,7 +771,7 @@ func TestAtomicWriteSwapFileCleanup(t *testing.T) {
 	require.NoError(t, err)
 
 	// Now run AtomicWrite - it should overwrite the swap file and clean up
-	err = AtomicWrite(path, data)
+	err = AtomicWrite(path, data, true)
 	require.NoError(t, err)
 
 	// Verify the target file has the correct content
@@ -800,7 +800,7 @@ func TestAtomicWritePreservesOtherFiles(t *testing.T) {
 
 	// Perform atomic write on target file
 	targetData := []byte("target content")
-	err = AtomicWrite(targetFile, targetData)
+	err = AtomicWrite(targetFile, targetData, true)
 	require.NoError(t, err)
 
 	// Verify all files have correct content
@@ -845,7 +845,7 @@ func TestAtomicRename(t *testing.T) {
 				subDir := filepath.Join(tempDir, "subdir")
 				err := os.Mkdir(subDir, 0755)
 				require.NoError(t, err)
-				
+
 				oldPath := filepath.Join(tempDir, "file.txt")
 				newPath := filepath.Join(subDir, "moved-file.txt")
 				err = os.WriteFile(oldPath, []byte("content to move"), 0644)
@@ -859,15 +859,15 @@ func TestAtomicRename(t *testing.T) {
 			setup: func() (string, string) {
 				oldPath := filepath.Join(tempDir, "source.txt")
 				newPath := filepath.Join(tempDir, "target.txt")
-				
+
 				// Create source file
 				err := os.WriteFile(oldPath, []byte("source content"), 0644)
 				require.NoError(t, err)
-				
+
 				// Create target file that will be overwritten
 				err = os.WriteFile(newPath, []byte("target content"), 0644)
 				require.NoError(t, err)
-				
+
 				return oldPath, newPath
 			},
 			expectError: false,
@@ -899,14 +899,14 @@ func TestAtomicRename(t *testing.T) {
 			setup: func() (string, string) {
 				oldDir := filepath.Join(tempDir, "old-dir")
 				newDir := filepath.Join(tempDir, "new-dir")
-				
+
 				err := os.Mkdir(oldDir, 0755)
 				require.NoError(t, err)
-				
+
 				// Add a file inside the directory
 				err = os.WriteFile(filepath.Join(oldDir, "file.txt"), []byte("dir content"), 0644)
 				require.NoError(t, err)
-				
+
 				return oldDir, newDir
 			},
 			expectError: false,
@@ -927,7 +927,7 @@ func TestAtomicRename(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			oldPath, newPath := tc.setup()
-			
+
 			// Store original content if file exists
 			var originalContent []byte
 			var originalInfo os.FileInfo
@@ -939,12 +939,12 @@ func TestAtomicRename(t *testing.T) {
 				originalInfo = info
 			}
 
-			err := AtomicRename(oldPath, newPath)
+			err := AtomicRename(oldPath, newPath, true)
 
 			if tc.expectError {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.errorMsg)
-				
+
 				// Verify original file still exists (rename failed)
 				if originalInfo != nil {
 					_, err := os.Stat(oldPath)
@@ -954,18 +954,18 @@ func TestAtomicRename(t *testing.T) {
 				}
 			} else {
 				require.NoError(t, err)
-				
+
 				// Verify the rename was successful
 				if tc.name != "rename with same source and destination" {
 					// Old path should not exist
 					_, err := os.Stat(oldPath)
 					require.True(t, os.IsNotExist(err), "Old path should not exist after successful rename")
 				}
-				
+
 				// New path should exist
 				newInfo, err := os.Stat(newPath)
 				require.NoError(t, err, "New path should exist after successful rename")
-				
+
 				// Verify content and properties if it was a file
 				if originalInfo != nil && !originalInfo.IsDir() {
 					if tc.name != "rename with same source and destination" {
@@ -974,13 +974,13 @@ func TestAtomicRename(t *testing.T) {
 						require.NoError(t, err)
 						require.Equal(t, originalContent, newContent, "File content should be preserved")
 					}
-					
+
 					// Check that it's still a file
 					require.False(t, newInfo.IsDir(), "Renamed file should still be a file")
 				} else if originalInfo != nil && originalInfo.IsDir() {
 					// Check that it's still a directory
 					require.True(t, newInfo.IsDir(), "Renamed directory should still be a directory")
-					
+
 					// Check that directory contents are preserved
 					if tc.name == "rename directory" {
 						fileContent, err := os.ReadFile(filepath.Join(newPath, "file.txt"))
@@ -996,22 +996,22 @@ func TestAtomicRename(t *testing.T) {
 func TestAtomicRenamePreservesPermissions(t *testing.T) {
 	// Test that file permissions are preserved during atomic rename
 	tempDir := t.TempDir()
-	
+
 	oldPath := filepath.Join(tempDir, "source.txt")
 	newPath := filepath.Join(tempDir, "dest.txt")
-	
+
 	// Create file with specific permissions
 	err := os.WriteFile(oldPath, []byte("test content"), 0640)
 	require.NoError(t, err)
-	
+
 	// Get original permissions
 	originalInfo, err := os.Stat(oldPath)
 	require.NoError(t, err)
-	
+
 	// Perform atomic rename
-	err = AtomicRename(oldPath, newPath)
+	err = AtomicRename(oldPath, newPath, true)
 	require.NoError(t, err)
-	
+
 	// Verify permissions are preserved
 	newInfo, err := os.Stat(newPath)
 	require.NoError(t, err)
@@ -1023,29 +1023,29 @@ func TestAtomicRenameWithSymlink(t *testing.T) {
 	if !supportsSymlinks() {
 		t.Skip("Symlinks not supported on this platform/environment")
 	}
-	
+
 	tempDir := t.TempDir()
-	
+
 	// Create a target file
 	targetFile := filepath.Join(tempDir, "target.txt")
 	err := os.WriteFile(targetFile, []byte("target content"), 0644)
 	require.NoError(t, err)
-	
+
 	// Create a symlink
 	oldLink := filepath.Join(tempDir, "old-link")
 	err = os.Symlink(targetFile, oldLink)
 	require.NoError(t, err)
-	
+
 	// Rename the symlink
 	newLink := filepath.Join(tempDir, "new-link")
-	err = AtomicRename(oldLink, newLink)
+	err = AtomicRename(oldLink, newLink, true)
 	require.NoError(t, err)
-	
+
 	// Verify the symlink was renamed and still points to the same target
 	linkTarget, err := os.Readlink(newLink)
 	require.NoError(t, err)
 	require.Equal(t, targetFile, linkTarget)
-	
+
 	// Verify old symlink no longer exists
 	_, err = os.Stat(oldLink)
 	require.True(t, os.IsNotExist(err))
@@ -1055,22 +1055,22 @@ func TestAtomicRenameAcrossFilesystems(t *testing.T) {
 	// This test checks behavior when renaming across filesystem boundaries
 	// On most systems, this will fall back to copy+delete, but the function should still work
 	tempDir := t.TempDir()
-	
+
 	// Create source file
 	srcPath := filepath.Join(tempDir, "source.txt")
 	content := []byte("content for cross-filesystem test")
 	err := os.WriteFile(srcPath, content, 0644)
 	require.NoError(t, err)
-	
+
 	// Try to rename to /tmp (likely different filesystem on many systems)
 	// If this fails due to cross-filesystem issues, that's expected behavior
 	tmpDir, err := os.MkdirTemp("", "atomic-rename-test-")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
-	
+
 	dstPath := filepath.Join(tmpDir, "dest.txt")
-	
-	err = AtomicRename(srcPath, dstPath)
+
+	err = AtomicRename(srcPath, dstPath, true)
 	// This might succeed or fail depending on the system
 	// If it succeeds, verify the file was moved correctly
 	if err == nil {
@@ -1078,7 +1078,7 @@ func TestAtomicRenameAcrossFilesystems(t *testing.T) {
 		newContent, err := os.ReadFile(dstPath)
 		require.NoError(t, err)
 		require.Equal(t, content, newContent)
-		
+
 		// Verify source no longer exists
 		_, err = os.Stat(srcPath)
 		require.True(t, os.IsNotExist(err))
@@ -1203,14 +1203,10 @@ func TestDeleteOrphanedSwapFiles(t *testing.T) {
 
 			// Count files before deletion for verification
 			var beforeFiles []string
-			var beforeSwapFiles []string
 			if entries, err := os.ReadDir(dirPath); err == nil {
 				for _, entry := range entries {
 					if !entry.IsDir() {
 						beforeFiles = append(beforeFiles, entry.Name())
-						if filepath.Ext(entry.Name()) == SwapFileExtension {
-							beforeSwapFiles = append(beforeSwapFiles, entry.Name())
-						}
 					}
 				}
 			}

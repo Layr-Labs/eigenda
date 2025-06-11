@@ -21,7 +21,8 @@ func TestCohortSerialization(t *testing.T) {
 		cohortIndex,
 		lowIndex,
 		highIndex,
-		valueSize)
+		valueSize,
+		false)
 	require.NoError(t, err)
 
 	require.Equal(t, cohortIndex, cohort.CohortIndex())
@@ -83,7 +84,8 @@ func TestStandardCohortLifecycle(t *testing.T) {
 		cohortIndex,
 		lowIndex,
 		highIndex,
-		valueSize)
+		valueSize,
+		false)
 	require.NoError(t, err)
 
 	require.Equal(t, cohortIndex, cohort.CohortIndex())
@@ -148,7 +150,8 @@ func TestIncompleteCohortAllKeysExtractedLifecycle(t *testing.T) {
 		cohortIndex,
 		lowIndex,
 		highIndex,
-		valueSize)
+		valueSize,
+		false)
 	require.NoError(t, err)
 
 	require.Equal(t, cohortIndex, cohort.CohortIndex())
@@ -211,7 +214,8 @@ func TestIncompleteCohortSomeKeysExtractedLifecycle(t *testing.T) {
 		cohortIndex,
 		lowIndex,
 		highIndex,
-		valueSize)
+		valueSize,
+		false)
 	require.NoError(t, err)
 
 	require.Equal(t, cohortIndex, cohort.CohortIndex())
@@ -272,7 +276,8 @@ func TestNextCohort(t *testing.T) {
 		cohortIndex,
 		lowIndex,
 		highIndex,
-		valueSize)
+		valueSize,
+		false)
 	require.NoError(t, err)
 
 	require.Equal(t, cohortIndex, cohort.CohortIndex())

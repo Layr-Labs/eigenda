@@ -145,7 +145,8 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
 		[]*SegmentPath{segmentPath},
-		time.Now())
+		time.Now(),
+		false)
 	require.NoError(t, err)
 	require.True(t, seg2.IsSealed())
 
@@ -297,7 +298,8 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
 		[]*SegmentPath{segmentPath},
-		time.Now())
+		time.Now(),
+		false)
 	require.NoError(t, err)
 	require.True(t, seg2.IsSealed())
 
@@ -419,7 +421,8 @@ func TestWriteAndReadColdShard(t *testing.T) {
 		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
 		[]*SegmentPath{segmentPath},
-		time.Now())
+		time.Now(),
+		false)
 	require.NoError(t, err)
 	require.True(t, seg2.IsSealed())
 
