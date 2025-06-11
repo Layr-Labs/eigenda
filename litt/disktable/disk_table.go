@@ -253,6 +253,8 @@ func NewDiskTable(
 	table.flushLoop = fLoop
 	go fLoop.run()
 
+	// TODO finish snapshotting here?
+
 	// Start the control loop.
 	cLoop := &controlLoop{
 		logger:                  config.Logger,
