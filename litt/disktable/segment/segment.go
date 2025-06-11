@@ -534,8 +534,9 @@ func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 
 // Snapshot takes a snapshot of the files in the segment.
 func (s *Segment) Snapshot() error {
-
-	// TODO should this happen in the background?
+	if !s.snapshottingEnabled {
+		return nil
+	}
 
 	err := s.metadata.snapshot()
 	if err != nil {
@@ -578,13 +579,6 @@ func (s *Segment) Seal(now time.Time) ([]*types.ScopedKey, error) {
 	unflushedKeyCount := s.unflushedKeyCount.Load()
 	if s.unflushedKeyCount.Load() != 0 {
 		return nil, fmt.Errorf("segment %d has %d unflushedKeyCount keys", s.index, unflushedKeyCount)
-	}
-
-	if s.snapshottingEnabled {
-		err = s.Snapshot()
-		if err != nil {
-			return nil, fmt.Errorf("failed to snapshot segment: %w", err)
-		}
 	}
 
 	return addresses, nil

@@ -5,6 +5,11 @@
 # Find the directory of this script
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 
+(
+    cd "$SCRIPT_DIR/.."
+    make build
+)
+
 # Get the absolute path to the binary.
 BINARY_PATH="$SCRIPT_DIR/../bin/benchmark"
 BINARY_PATH="$(cd "$(dirname "$BINARY_PATH")" && pwd)/$(basename "$BINARY_PATH")"

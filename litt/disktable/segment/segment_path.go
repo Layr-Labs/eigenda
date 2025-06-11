@@ -52,7 +52,7 @@ func NewSegmentPath(
 
 	softlinkPath := ""
 	if softlinkRoot != "" {
-		softlinkPath = path.Join(softlinkPath, tableName, SegmentDirectory)
+		softlinkPath = path.Join(softlinkRoot, tableName, SegmentDirectory)
 	}
 
 	return &SegmentPath{

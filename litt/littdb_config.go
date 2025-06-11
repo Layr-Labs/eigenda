@@ -212,6 +212,14 @@ func (c *Config) SanitizePaths() error {
 		}
 	}
 
+	if c.SnapshotDirectory != "" {
+		var err error
+		c.SnapshotDirectory, err = util.SanitizePath(c.SnapshotDirectory)
+		if err != nil {
+			return fmt.Errorf("error sanitizing snapshot directory %s: %w", c.SnapshotDirectory, err)
+		}
+	}
+
 	return nil
 }
 

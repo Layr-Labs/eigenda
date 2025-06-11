@@ -112,6 +112,11 @@ func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, e
 		dbMetrics, metricsServer = buildMetrics(config, config.Logger)
 	}
 
+	if config.SnapshotDirectory != "" {
+		config.Logger.Infof("LittDB rolling snapshots enabled, snapshot data will be stored in %s",
+			config.SnapshotDirectory)
+	}
+
 	database := &db{
 		ctx:           config.CTX,
 		logger:        config.Logger,
