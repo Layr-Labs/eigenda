@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/urfave/cli/v2"
@@ -38,38 +37,19 @@ func buildCLIParser() *cli.App {
 		Commands: []*cli.Command{
 			{
 				Name:      "ls",
-				Usage:     "List tables in the database",
+				Usage:     "List tables in a LittDB instance",
 				ArgsUsage: "<path>",
-				Action:    lsCommand,
-				Flags: []cli.Flag{
+				Args:      true, // Require at least one argument
+				Flags: []cli.Flag{ // TODO remove verbose flag
 					&cli.BoolFlag{
 						Name:    "verbose",
 						Aliases: []string{"v"},
 						Usage:   "Enable verbose output",
 					},
 				},
+				Action: lsCommand,
 			},
 		},
 	}
 	return app
-}
-
-// lsCommand implements the "litt ls" command
-func lsCommand(ctx *cli.Context) error {
-	if ctx.NArg() != 1 {
-		return fmt.Errorf("ls command requires exactly one argument: <path>")
-	}
-
-	path := ctx.Args().Get(0)
-	verbose := ctx.Bool("verbose")
-
-	if verbose {
-		fmt.Printf("Listing tables in database at path: %s\n", path)
-	}
-
-	// TODO: Implement the actual ls functionality
-	fmt.Printf("ls command called with path: %s\n", path)
-	fmt.Println("Command implementation pending...")
-
-	return nil
 }

@@ -19,6 +19,7 @@ const SegmentDirectory = "segments"
 const HardLinkDirectory = "snapshot"
 
 // TODO unit test this struct
+// TODO unit test snapshotting
 
 // SegmentPath encapsulates various file paths utilized by segment files.
 type SegmentPath struct {
