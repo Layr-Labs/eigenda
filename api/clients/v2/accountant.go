@@ -69,12 +69,9 @@ func (a *Accountant) reservationUsage(
 	if err := meterer.ValidateQuorum(quorumNumbers, a.reservation.QuorumNumbers); err != nil {
 		return err
 	}
-
-	fmt.Printf("timestamp: %d\n", timestamp)
 	if !a.reservation.IsActiveByNanosecond(timestamp) {
 		return fmt.Errorf("reservation is not active at timestamp %d", timestamp)
 	}
-	fmt.Printf("reservation: %v\n", a.reservation)
 
 	reservationWindow := a.reservationWindow
 	currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, reservationWindow)
@@ -90,14 +87,12 @@ func (a *Accountant) reservationUsage(
 		return nil
 	}
 
-	fmt.Printf("currentReservationPeriod: %d, reservationWindow: %d\n", currentReservationPeriod, reservationWindow)
 	overflowPeriodRecord := a.getOrRefreshRelativePeriodRecord(meterer.GetOverflowPeriod(currentReservationPeriod, reservationWindow), reservationWindow)
 	// Allow one overflow when the overflow bin is empty, the current usage and new length are both less than the limit
 	if overflowPeriodRecord.Usage == 0 && relativePeriodRecord.Usage-symbolUsage < binLimit && symbolUsage <= binLimit {
 		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit
 		return nil
 	}
-	fmt.Printf("overflowPeriodRecord: %d\n", overflowPeriodRecord.Usage)
 
 	// Reservation not sufficient for the request, rollback the usage
 	relativePeriodRecord.Usage -= symbolUsage
