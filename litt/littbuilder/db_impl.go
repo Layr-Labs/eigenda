@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,10 +13,6 @@ import (
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
-
-// All table names must match this regex. Permits uppercase and lowercase letters, numbers, underscores, and dashes.
-// Must be at least one character long.
-var tableNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 var _ litt.DB = &db{}
 
@@ -164,18 +159,13 @@ func (d *db) lockFreeSize() uint64 {
 	return size
 }
 
-// isTableNameValid returns true if the table name is valid.
-func (d *db) isTableNameValid(name string) bool {
-	return tableNameRegex.MatchString(name)
-}
-
 func (d *db) GetTable(name string) (litt.Table, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
 	table, ok := d.tables[name]
 	if !ok {
-		if !d.isTableNameValid(name) {
+		if !litt.IsTableNameValid(name) {
 			return nil, fmt.Errorf(
 				"Table name '%s' is invalid, must be at least one character long and "+
 					"contain only letters, numbers, and underscores, and dashes.", name)

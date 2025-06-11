@@ -55,6 +55,8 @@ func lsCommand(ctx *cli.Context) error {
 		return fmt.Errorf("failed to sanitize path %s: %v", path, err)
 	}
 
+	// TODO grab litt lock
+
 	tables, err := ls(path)
 	if err != nil {
 		return fmt.Errorf("failed to list tables in path %s: %v", path, err)

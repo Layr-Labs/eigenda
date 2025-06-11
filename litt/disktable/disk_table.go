@@ -183,6 +183,7 @@ func NewDiskTable(
 			errorMonitor,
 			table.segmentPaths,
 			config.Clock(),
+			true,
 			config.Fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather segment files: %w", err)

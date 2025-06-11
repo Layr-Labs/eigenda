@@ -33,6 +33,57 @@ func cacheWeight(key string, value []byte) uint64 {
 	return uint64(len(key) + len(value))
 }
 
+// TODO unit test
+
+// Look for a table's keymap directory in the provided root paths.
+func FindKeymapLocation(
+	rootPaths []string,
+	tableName string,
+) (keymapDirectory string, keymapInitialized bool, keymapTypeFile *keymap.KeymapTypeFile, error error) {
+
+	if len(rootPaths) == 0 {
+		return "", false, nil,
+			fmt.Errorf("no root paths provided for keymap search")
+	}
+
+	potentialKeymapDirectories := make([]string, len(rootPaths))
+	for i, p := range rootPaths {
+		potentialKeymapDirectories[i] = path.Join(p, tableName, keymap.KeymapDirectoryName)
+	}
+
+	for _, directory := range potentialKeymapDirectories {
+		exists, err := util.Exists(directory)
+		if err != nil {
+			return "", false, nil,
+				fmt.Errorf("error checking for keymap type file: %w", err)
+		}
+		if exists {
+			if keymapDirectory != "" {
+				return "", false, nil,
+					fmt.Errorf("multiple keymap directories found: %s and %s", keymapDirectory, directory)
+			}
+
+			keymapDirectory = directory
+			keymapTypeFile, err = keymap.LoadKeymapTypeFile(directory)
+			if err != nil {
+				return "", false, nil,
+					fmt.Errorf("error loading keymap type file: %w", err)
+			}
+
+			initializedExists, err := util.Exists(path.Join(keymapDirectory, keymap.KeymapInitializedFileName))
+			if err != nil {
+				return "", false, nil,
+					fmt.Errorf("error checking for keymap initialized file: %w", err)
+			}
+			if initializedExists {
+				keymapInitialized = true
+			}
+		}
+	}
+
+	return keymapDirectory, keymapInitialized, keymapTypeFile, nil
+}
+
 // buildKeymap creates a new keymap based on the configuration.
 func buildKeymap(
 	config *litt.Config,
@@ -51,42 +102,10 @@ func buildKeymap(
 		potentialKeymapDirectories[i] = path.Join(p, tableName, keymap.KeymapDirectoryName)
 	}
 
-	// The directory where the keymap data is stored. There are multiple plausible directories, but there
-	// should only be keymap data that exists in at most one of them.
-	var keymapDirectory string
-
-	// If there is no keymap on disk or if the prior keymap was not fully initialized, this will be false. If false,
-	// the keymap will need to be reloaded as a part of the table initialization.
-	var keymapInitialized bool
-
-	for _, directory := range potentialKeymapDirectories {
-		exists, err := util.Exists(directory)
-		if err != nil {
-			return nil, "", nil, false,
-				fmt.Errorf("error checking for keymap type file: %w", err)
-		}
-		if exists {
-			if keymapDirectory != "" {
-				return nil, "", nil, false,
-					fmt.Errorf("multiple keymap directories found: %s and %s", keymapDirectory, directory)
-			}
-
-			keymapDirectory = directory
-			keymapTypeFile, err = keymap.LoadKeymapTypeFile(directory)
-			if err != nil {
-				return nil, "", nil, false,
-					fmt.Errorf("error loading keymap type file: %w", err)
-			}
-
-			initializedExists, err := util.Exists(path.Join(keymapDirectory, keymap.KeymapInitializedFileName))
-			if err != nil {
-				return nil, "", nil, false,
-					fmt.Errorf("error checking for keymap initialized file: %w", err)
-			}
-			if initializedExists {
-				keymapInitialized = true
-			}
-		}
+	keymapDirectory, keymapInitialized, keymapTypeFile, err := FindKeymapLocation(potentialKeymapDirectories, tableName)
+	if err != nil {
+		return nil, "", nil, false,
+			fmt.Errorf("error finding keymap location: %w", err)
 	}
 
 	if keymapTypeFile != nil && !keymapInitialized {

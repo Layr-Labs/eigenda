@@ -39,15 +39,23 @@ func buildCLIParser() *cli.App {
 				Name:      "ls",
 				Usage:     "List tables in a LittDB instance",
 				ArgsUsage: "<path>",
-				Args:      true, // Require at least one argument
-				Flags: []cli.Flag{ // TODO remove verbose flag
-					&cli.BoolFlag{
-						Name:    "verbose",
-						Aliases: []string{"v"},
-						Usage:   "Enable verbose output",
-					},
-				},
+				Args:      true,
+				//Flags: []cli.Flag{
+				//	&cli.BoolFlag{
+				//		Name:    "verbose",
+				//		Aliases: []string{"v"},
+				//		Usage:   "Enable verbose output",
+				//	},
+				//},
 				Action: lsCommand,
+			},
+			{
+				Name: "table-info",
+				Usage: "Get information about a LittDB table. " +
+					"If the DB is spread across multiple paths, all paths must be provided.",
+				ArgsUsage: "<table-name> <path1> ... <pathN>",
+				Args:      true,
+				Action:    tableInfoCommand,
 			},
 		},
 	}

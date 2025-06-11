@@ -292,13 +292,13 @@ func linkSegments(lowestSegmentIndex uint32, highestSegmentIndex uint32, segment
 	return nil
 }
 
-// GatherSegmentFiles scans a directory for segment files and loads them into memory. It also deletes
-// orphaned files and checks for corrupted files. It creates a new mutable segment at the end.
+// GatherSegmentFiles scans a directory for segment files and loads them into memory.
 func GatherSegmentFiles(
 	logger logging.Logger,
 	errorMonitor *util.ErrorMonitor,
 	segmentPaths []*SegmentPath,
 	now time.Time,
+	cleanOrphans bool,
 	fsync bool,
 ) (lowestSegmentIndex uint32, highestSegmentIndex uint32, segments map[uint32]*Segment, err error) {
 
@@ -336,11 +336,13 @@ func GatherSegmentFiles(
 			fmt.Errorf("there are one or more missing files: %v", err)
 	}
 
-	// Clean up any orphaned segment files.
-	err = deleteOrphanedFiles(logger, orphanedFiles)
-	if err != nil {
-		return 0, 0, nil,
-			fmt.Errorf("failed to delete orphaned files: %v", err)
+	if cleanOrphans {
+		// Clean up any orphaned segment files.
+		err = deleteOrphanedFiles(logger, orphanedFiles)
+		if err != nil {
+			return 0, 0, nil,
+				fmt.Errorf("failed to delete orphaned files: %v", err)
+		}
 	}
 
 	if len(metadataFiles) > 0 {

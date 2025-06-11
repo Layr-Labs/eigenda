@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"path"
 	"sync/atomic"
 	"time"
@@ -556,6 +557,21 @@ func (s *Segment) Snapshot() error {
 	}
 
 	return nil
+}
+
+// TODO unit test
+
+// Check if this segment is actually a snapshot. A snapshot will be backed up by symlinks, while a real segment
+// will have real files.
+func (s *Segment) IsSnapshot() (bool, error) {
+	metadataPath := s.metadata.path()
+
+	fileInfo, err := os.Lstat(metadataPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to get file info for metadata path %s: %w", metadataPath, err)
+	}
+
+	return fileInfo.Mode()&os.ModeSymlink != 0, nil
 }
 
 // Seal flushes all data to disk and finalizes the metadata. Returns addresses that became durable as a result of
