@@ -17,6 +17,9 @@
 
 ### 1. **Feature Freeze & Release Branch Creation**
 
+Enacting a feature freeze helps to ensure that the code we publish to production environments is well tested and
+mature. As a general rule of thumb, we should put in place a feature freeze two weeks prior to a release on testnet.
+
 #### Feature Freeze
 
 - **Trigger**: Either a date scheduled in advance, or tied to the completion of a key feature
