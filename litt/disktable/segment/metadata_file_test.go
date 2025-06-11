@@ -29,7 +29,7 @@ func TestUnsealedSerialization(t *testing.T) {
 	err := m.write()
 	require.NoError(t, err)
 
-	deserialized, err := loadMetadataFile(index, []string{m.parentDirectory})
+	deserialized, err := loadMetadataFile(index, []string{m.parentDirectory}, false)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
@@ -78,7 +78,7 @@ func TestSealedSerialization(t *testing.T) {
 	actualSize := uint64(stat.Size())
 	require.Equal(t, actualSize, reportedSize)
 
-	deserialized, err := loadMetadataFile(index, []string{m.parentDirectory})
+	deserialized, err := loadMetadataFile(index, []string{m.parentDirectory}, false)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
@@ -102,7 +102,7 @@ func TestFreshFileSerialization(t *testing.T) {
 	salt := ([16]byte)(rand.Bytes(16))
 
 	index := rand.Uint32()
-	m, err := createMetadataFile(index, 1234, salt, directory)
+	m, err := createMetadataFile(index, 1234, salt, directory, false)
 	require.NoError(t, err)
 
 	require.Equal(t, index, m.index)
@@ -117,7 +117,7 @@ func TestFreshFileSerialization(t *testing.T) {
 	actualSize := uint64(stat.Size())
 	require.Equal(t, actualSize, reportedSize)
 
-	deserialized, err := loadMetadataFile(index, []string{m.parentDirectory})
+	deserialized, err := loadMetadataFile(index, []string{m.parentDirectory}, false)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 
@@ -141,7 +141,7 @@ func TestSealing(t *testing.T) {
 	salt := ([16]byte)(rand.Bytes(16))
 
 	index := rand.Uint32()
-	m, err := createMetadataFile(index, 1234, salt, directory)
+	m, err := createMetadataFile(index, 1234, salt, directory, false)
 	require.NoError(t, err)
 
 	// seal the file
@@ -159,7 +159,7 @@ func TestSealing(t *testing.T) {
 	require.Equal(t, directory, m.parentDirectory)
 
 	// load the file
-	deserialized, err := loadMetadataFile(index, []string{m.parentDirectory})
+	deserialized, err := loadMetadataFile(index, []string{m.parentDirectory}, false)
 	require.NoError(t, err)
 	require.Equal(t, *m, *deserialized)
 

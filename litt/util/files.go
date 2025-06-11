@@ -43,7 +43,7 @@ func SanitizePath(path string) (string, error) {
 //
 // This method creates a temporary swap file in the same directory as the destination, but with SwapFileExtension
 // appended to the filename. If there is a crash during this method's execution, it may leave this swap file behind.
-func AtomicWrite(destination string, data []byte) error {
+func AtomicWrite(destination string, data []byte, fsync bool) error {
 
 	swapPath := destination + ".swap"
 
@@ -58,10 +58,12 @@ func AtomicWrite(destination string, data []byte) error {
 		return fmt.Errorf("failed to write to swap file: %v", err)
 	}
 
-	// Ensure the data in the swap file is fully written to disk.
-	err = swapFile.Sync()
-	if err != nil {
-		return fmt.Errorf("failed to sync swap file: %v", err)
+	if fsync {
+		// Ensure the data in the swap file is fully written to disk.
+		err = swapFile.Sync()
+		if err != nil {
+			return fmt.Errorf("failed to sync swap file: %v", err)
+		}
 	}
 
 	err = swapFile.Close()
@@ -70,7 +72,7 @@ func AtomicWrite(destination string, data []byte) error {
 	}
 
 	// Rename the swap file to the destination file.
-	err = AtomicRename(swapPath, destination)
+	err = AtomicRename(swapPath, destination, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to rename swap file: %v", err)
 	}
@@ -79,7 +81,7 @@ func AtomicWrite(destination string, data []byte) error {
 }
 
 // AtomicRename renames a file from oldPath to newPath atomically.
-func AtomicRename(oldPath string, newPath string) error {
+func AtomicRename(oldPath string, newPath string, fsync bool) error {
 	err := os.Rename(oldPath, newPath)
 	if err != nil {
 		return fmt.Errorf("failed to rename file: %w", err)
@@ -93,9 +95,11 @@ func AtomicRename(oldPath string, newPath string) error {
 		return fmt.Errorf("failed to open parent directory %s: %w", parentDirectory, err)
 	}
 
-	err = dirFile.Sync()
-	if err != nil {
-		return fmt.Errorf("failed to sync parent directory %s: %w", parentDirectory, err)
+	if fsync {
+		err = dirFile.Sync()
+		if err != nil {
+			return fmt.Errorf("failed to sync parent directory %s: %w", parentDirectory, err)
+		}
 	}
 
 	err = dirFile.Close()

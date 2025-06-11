@@ -149,7 +149,8 @@ func NewDataTracker(
 			0,
 			0,
 			config.CohortSize,
-			valueSize)
+			valueSize,
+			config.Fsync)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create genesis cohort: %w", err)
 		}

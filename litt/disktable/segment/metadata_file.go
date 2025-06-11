@@ -49,9 +49,6 @@ const (
 	// - 4 bytes for keyCount
 	// - and 1 byte for sealed.
 	V2MetadataSize = 37
-
-	// CurrentMetadataSize is the size of the metadata file at the current version.
-	CurrentMetadataSize = V2MetadataSize
 )
 
 // metadataFile contains metadata about a segment. This file contains metadata about the data segment, such as
@@ -93,6 +90,10 @@ type metadataFile struct {
 	// The parent directory containing this file. This value is not encoded in file, and is stored here
 	// for bookkeeping purposes.
 	parentDirectory string
+
+	// If true, then use fsync to make metadata updates atomic. Should always be true in production, but can be
+	// set to false in tests to speed up unit tests. Not serialized to the file.
+	fsync bool
 }
 
 // createMetadataFile creates a new metadata file. When this method returns, the metadata file will
@@ -101,11 +102,13 @@ func createMetadataFile(
 	index uint32,
 	shardingFactor uint32,
 	salt [16]byte,
-	parentDirectory string) (*metadataFile, error) {
+	parentDirectory string,
+	fsync bool) (*metadataFile, error) {
 
 	file := &metadataFile{
 		index:           index,
 		parentDirectory: parentDirectory,
+		fsync:           fsync,
 	}
 
 	file.segmentVersion = LatestSegmentVersion
@@ -121,7 +124,7 @@ func createMetadataFile(
 
 // loadMetadataFile loads the metadata file from disk, looking in the given parent directories until it finds the file.
 // If the file is not found, it returns an error.
-func loadMetadataFile(index uint32, parentDirectories []string) (*metadataFile, error) {
+func loadMetadataFile(index uint32, parentDirectories []string, fsync bool) (*metadataFile, error) {
 	metadataFileName := fmt.Sprintf("%d%s", index, MetadataFileExtension)
 	metadataPath, err := lookForFile(parentDirectories, metadataFileName)
 	if err != nil {
@@ -135,6 +138,7 @@ func loadMetadataFile(index uint32, parentDirectories []string) (*metadataFile, 
 	file := &metadataFile{
 		index:           index,
 		parentDirectory: parentDirectory,
+		fsync:           fsync,
 	}
 
 	data, err := os.ReadFile(metadataPath)
@@ -341,7 +345,7 @@ func (m *metadataFile) deserialize(data []byte) error {
 
 // write atomically writes the metadata file to disk.
 func (m *metadataFile) write() error {
-	err := util.AtomicWrite(m.path(), m.serialize())
+	err := util.AtomicWrite(m.path(), m.serialize(), m.fsync)
 	if err != nil {
 		return fmt.Errorf("failed to write metadata file %s: %v", m.path(), err)
 	}

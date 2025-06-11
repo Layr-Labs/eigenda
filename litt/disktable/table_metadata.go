@@ -32,6 +32,10 @@ type tableMetadata struct {
 
 	// the table's sharding factor, accessed/modified by concurrent goroutines
 	shardingFactor atomic.Uint32
+
+	// If true, metadata writes will be atomic. Should be set to true in production, but can be set to false
+	// to speed up unit tests.
+	fsync bool
 }
 
 // newTableMetadata creates a new table metadata object.
@@ -39,11 +43,13 @@ func newTableMetadata(
 	logger logging.Logger,
 	tableDirectory string,
 	ttl time.Duration,
-	shardingFactor uint32) (*tableMetadata, error) {
+	shardingFactor uint32,
+	fsync bool) (*tableMetadata, error) {
 
 	metadata := &tableMetadata{
 		logger:         logger,
 		tableDirectory: tableDirectory,
+		fsync:          fsync,
 	}
 	metadata.ttl.Store(&ttl)
 	metadata.shardingFactor.Store(shardingFactor)
@@ -130,7 +136,7 @@ func (t *tableMetadata) SetShardingFactor(shardingFactor uint32) error {
 
 // Store atomically stores the table metadata to disk.
 func (t *tableMetadata) write() error {
-	err := util.AtomicWrite(metadataPath(t.tableDirectory), t.serialize())
+	err := util.AtomicWrite(metadataPath(t.tableDirectory), t.serialize(), t.fsync)
 	if err != nil {
 		return fmt.Errorf("failed to write table metadata file: %v", err)
 	}

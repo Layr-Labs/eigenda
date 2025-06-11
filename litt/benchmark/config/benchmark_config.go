@@ -79,6 +79,9 @@ type BenchmarkConfig struct {
 	// the benchmark to read a key that is no longer present in the database. Until that bug is fixed,
 	// do not halt the benchmark on read failures by default.
 	PanicOnReadFailure bool
+
+	// If true, fsync cohort files to ensure atomicity. Can be set to false for unit tests that need to be fast.
+	Fsync bool
 }
 
 // DefaultBenchmarkConfig returns a default BenchmarkConfig with the given data paths.

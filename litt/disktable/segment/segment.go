@@ -84,6 +84,10 @@ type Segment struct {
 	// segment but have not yet been flushed to the keymap. When the segment is eventually sealed, the code
 	// asserts that this value is zero. This check should never fail, but is a nice safety net.
 	unflushedKeyCount atomic.Int64
+
+	// If true, then sync the file system for atomic operations. Should always be true in production, but can
+	// be set to false for tests to save time.
+	fsync bool
 }
 
 // CreateSegment creates a new data segment.
@@ -115,7 +119,7 @@ func CreateSegment(
 		// By default, put the metadata file in the first parent directory.
 		metadataDir = parentDirectories[0]
 	}
-	metadata, err := createMetadataFile(index, shardingFactor, salt, metadataDir)
+	metadata, err := createMetadataFile(index, shardingFactor, salt, metadataDir, fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open metadata file: %v", err)
 	}
@@ -177,6 +181,7 @@ func CreateSegment(
 		shardChannels:   shardChannels,
 		keyFileChannel:  keyFileChannel,
 		deletionChannel: make(chan struct{}, 1),
+		fsync:           fsync,
 	}
 
 	// Segments are returned with an initial reference count of 1, as the caller of the constructor is considered to
@@ -198,14 +203,16 @@ func LoadSegment(logger logging.Logger,
 	errorMonitor *util.ErrorMonitor,
 	index uint32,
 	parentDirectories []string,
-	now time.Time) (*Segment, error) {
+	now time.Time,
+	fsync bool,
+) (*Segment, error) {
 
 	if len(parentDirectories) == 0 {
 		return nil, errors.New("no parent directories provided")
 	}
 
 	// Look for the metadata file.
-	metadata, err := loadMetadataFile(index, parentDirectories)
+	metadata, err := loadMetadataFile(index, parentDirectories, fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open metadata file: %w", err)
 	}
@@ -237,6 +244,7 @@ func LoadSegment(logger logging.Logger,
 		keyFileSize:     keyFileSize,
 		keyCount:        metadata.keyCount,
 		deletionChannel: make(chan struct{}, 1),
+		fsync:           fsync,
 	}
 
 	// Segments are returned with an initial reference count of 1, as the caller of the constructor is considered to
@@ -308,7 +316,7 @@ func (s *Segment) sealLoadedSegment(now time.Time) error {
 			return fmt.Errorf("failed to seal swap file: %w", err)
 		}
 
-		err = swapFile.atomicSwap()
+		err = swapFile.atomicSwap(s.fsync)
 		if err != nil {
 			return fmt.Errorf("failed to swap key file: %w", err)
 		}
