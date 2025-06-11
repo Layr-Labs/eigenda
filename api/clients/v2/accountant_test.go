@@ -234,9 +234,38 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 	ctx := context.Background()
 	numSymbols := uint64(2000)
 	quorums := []uint8{0, 1}
-	now := time.Now().UnixNano()
-	_, err = accountant.AccountBlob(ctx, now, numSymbols, quorums)
-	assert.Contains(t, err.Error(), "no bandwidth reservation found for account")
+	baseTime := time.Now().UnixNano()
+
+	tests := []accountBlobInsufficientOnDemandTest{
+		{
+			name:         "Insufficient on-demand payment",
+			symbolLength: 2000,
+			expectError:  true,
+			errorMessage: "insufficient ondemand payment",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			now := baseTime
+			_, err := accountant.AccountBlob(now, tt.symbolLength, quorums)
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMessage)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+type accountBlobCallSeriesTest struct {
+	name           string
+	symbolLength   uint64
+	expectedHeader *core.PaymentMetadata
+	expectedState  periodRecordState
+	expectError    bool
+	errorMessage   string
 }
 
 func TestAccountBlobCallSeries(t *testing.T) {
@@ -279,34 +308,83 @@ func TestAccountBlobCallSeries(t *testing.T) {
 	ctx := context.Background()
 	quorums := []uint8{0, 1}
 
-	now := time.Now().UnixNano()
-	// First call: Use reservation
-	header, err := accountant.AccountBlob(ctx, now, 800, quorums)
-	assert.NoError(t, err)
-	timestamp := (time.Duration(header.Timestamp) * time.Nanosecond).Seconds()
-	assert.Equal(t, uint64(meterer.GetReservationPeriodByNanosecond(now, reservationWindow)), uint64(meterer.GetReservationPeriod(int64(timestamp), reservationWindow)))
-	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
+	tests := []accountBlobCallSeriesTest{
+		{
+			name:         "First call - Use reservation",
+			symbolLength: 800,
+			expectedHeader: &core.PaymentMetadata{
+				AccountID:         accountId,
+				CumulativePayment: big.NewInt(0),
+			},
+			expectedState: periodRecordState{
+				CurrentPeriodUsage: 800,
+				NextPeriodUsage:    0,
+				OverflowUsage:      0,
+			},
+		},
+		{
+			name:         "Second call - Use remaining reservation + overflow",
+			symbolLength: 300,
+			expectedHeader: &core.PaymentMetadata{
+				AccountID:         accountId,
+				CumulativePayment: big.NewInt(0),
+			},
+			expectedState: periodRecordState{
+				CurrentPeriodUsage: 1100,
+				NextPeriodUsage:    0,
+				OverflowUsage:      100,
+			},
+		},
+		{
+			name:         "Third call - Use on-demand",
+			symbolLength: 500,
+			expectedHeader: &core.PaymentMetadata{
+				AccountID:         accountId,
+				CumulativePayment: big.NewInt(500),
+			},
+			expectedState: periodRecordState{
+				CurrentPeriodUsage: 1100,
+				NextPeriodUsage:    0,
+				OverflowUsage:      100,
+			},
+		},
+		{
+			name:         "Fourth call - Insufficient on-demand",
+			symbolLength: 600,
+			expectError:  true,
+			errorMessage: "insufficient ondemand payment",
+		},
+	}
 
-	// Second call: Use remaining reservation + overflow
-	now = time.Now().UnixNano()
-	header, err = accountant.AccountBlob(ctx, now, 300, quorums)
-	assert.NoError(t, err)
-	timestamp = (time.Duration(header.Timestamp) * time.Nanosecond).Seconds()
-	assert.Equal(t, uint64(meterer.GetReservationPeriodByNanosecond(now, reservationWindow)), uint64(meterer.GetReservationPeriod(int64(timestamp), reservationWindow)))
-	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			now := baseTime.UnixNano()
+			header, err := accountant.AccountBlob(now, tt.symbolLength, quorums)
 
-	// Third call: Use on-demand
-	now = time.Now().UnixNano()
-	header, err = accountant.AccountBlob(ctx, now, 500, quorums)
-	assert.NoError(t, err)
-	assert.NotEqual(t, uint64(0), header.Timestamp)
-	assert.Equal(t, big.NewInt(500), header.CumulativePayment)
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMessage)
+			} else {
+				assert.NoError(t, err)
+				assert.NotEqual(t, uint64(0), header.Timestamp)
+				assert.Equal(t, tt.expectedHeader.AccountID, header.AccountID)
+				assert.Equal(t, tt.expectedHeader.CumulativePayment, header.CumulativePayment)
 
-	// Fourth call: Insufficient on-demand
-	now = time.Now().UnixNano()
-	_, err = accountant.AccountBlob(ctx, now, 600, quorums)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no bandwidth reservation found for account")
+				period := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+				assert.Equal(t, tt.expectedState.CurrentPeriodUsage, getRelativePeriodRecord(period, reservationWindow, accountant.periodRecords).Usage)
+				assert.Equal(t, tt.expectedState.NextPeriodUsage, getRelativePeriodRecord(period+reservationWindow, reservationWindow, accountant.periodRecords).Usage)
+				assert.Equal(t, tt.expectedState.OverflowUsage, getRelativePeriodRecord(meterer.GetOverflowPeriod(period, reservationWindow), reservationWindow, accountant.periodRecords).Usage)
+			}
+		})
+	}
+}
+
+type accountBlobBinRotationTest struct {
+	name           string
+	timeOffset     time.Duration
+	symbolLength   uint64
+	expectedHeader *core.PaymentMetadata
+	expectedState  periodRecordState
 }
 
 func TestAccountBlob_BinRotation(t *testing.T) {
@@ -634,34 +712,34 @@ func TestQuorumCheck(t *testing.T) {
 			quorumNumbers:  []uint8{},
 			allowedNumbers: []uint8{0, 1},
 			expectError:    true,
-			errorMessage:   "no quorum numbers provided",
+			errorMessage:   "no quorum numbers provided in the request",
 		},
 		{
 			name:           "invalid quorum number",
 			quorumNumbers:  []uint8{0, 2},
 			allowedNumbers: []uint8{0, 1},
 			expectError:    true,
-			errorMessage:   "provided quorum number 2 not allowed",
+			errorMessage:   "quorum number mismatch: 2",
 		},
 		{
 			name:           "empty allowed numbers",
 			quorumNumbers:  []uint8{0},
 			allowedNumbers: []uint8{},
 			expectError:    true,
-			errorMessage:   "provided quorum number 0 not allowed",
+			errorMessage:   "quorum number mismatch: 0",
 		},
 		{
 			name:           "multiple invalid quorums",
 			quorumNumbers:  []uint8{2, 3, 4},
 			allowedNumbers: []uint8{0, 1},
 			expectError:    true,
-			errorMessage:   "provided quorum number 2 not allowed",
+			errorMessage:   "quorum number mismatch: 2",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := QuorumCheck(tt.quorumNumbers, tt.allowedNumbers)
+			err := meterer.ValidateQuorum(tt.quorumNumbers, tt.allowedNumbers)
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMessage)

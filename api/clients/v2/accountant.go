@@ -31,12 +31,16 @@ type Accountant struct {
 	usageLock         sync.Mutex
 	cumulativePayment *big.Int
 
-	// number of bins in the circular accounting, restricted by minNumBins which is 3
-	numBins uint32
+	// locks for concurrent access to period records and on-demand payment
+	periodRecordsLock sync.Mutex
+	onDemandLock      sync.Mutex
 }
 
+// PeriodRecord contains the index of the reservation period and the usage of the period
 type PeriodRecord struct {
+	// Index is start timestamp of the period in seconds; it is always a multiple of the reservation window
 	Index uint32
+	// Usage is the usage of the period in symbols
 	Usage uint64
 }
 
@@ -230,14 +234,26 @@ func (a *Accountant) OnDemandUsage(numSymbols uint64, quorumNumbers []uint8) (*b
 
 // AccountBlob accountant provides and records payment information
 func (a *Accountant) AccountBlob(
-	ctx context.Context,
 	timestamp int64,
 	numSymbols uint64,
 	quorums []uint8) (*core.PaymentMetadata, error) {
 
-	cumulativePayment, err := a.BlobPaymentInfo(ctx, numSymbols, quorums, timestamp)
+	symbolUsage := meterer.SymbolsCharged(numSymbols, a.minNumSymbols)
+
+	// Always try to use reservation first
+	err := a.reservationUsage(symbolUsage, quorums, timestamp)
+	if err == nil {
+		return &core.PaymentMetadata{
+			AccountID:         a.accountID,
+			Timestamp:         timestamp,
+			CumulativePayment: big.NewInt(0),
+		}, nil
+	}
+
+	// Fall back to on-demand payment if reservation fails
+	cumulativePayment, err := a.onDemandUsage(symbolUsage, quorums)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot create payment information for reservation or on-demand. Consider depositing more eth to the PaymentVault contract for your account. For more details, see https://docs.eigenda.xyz/core-concepts/payments#disperser-client-requirements. Account: %s, Error: %w", a.accountID.Hex(), err)
 	}
 
 	pm := &core.PaymentMetadata{
