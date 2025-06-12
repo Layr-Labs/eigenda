@@ -13,8 +13,6 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-// TODO unit test
-
 // Returns a list of LittDB tables at the specified LittDB path. Tables are alphabetically sorted by their names.
 // Returns an error if the path does not exist or if no tables are found.
 func ls(rootPath string, fsync bool) ([]string, error) {
