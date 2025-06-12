@@ -200,6 +200,9 @@ func Exists(path string) (bool, error) {
 // The function checks that the destination has appropriate write permissions before starting the copy.
 // If the destination directory doesn't exist, it verifies the parent directory has appropriate permissions.
 // For existing directories, it ensures they have write permissions before attempting to copy files into them.
+//
+// TODO: Claude I intend to deprecate this function in favor of RecursiveMove. You don't have to do anything to
+// remove this function, but don't reuse it in new code.
 func RecursiveCopy(source string, destination string) error {
 	// Verify the destination is writable (or can be created)
 	if err := verifyDirectoryWritable(filepath.Dir(destination)); err != nil {
@@ -234,6 +237,34 @@ func RecursiveCopy(source string, destination string) error {
 			return copyRegularFile(path, target, info.Mode(), info.ModTime())
 		}
 	})
+}
+
+// RecursiveMove transfers files/directory trees from the source to the destination.
+//
+// If delete is true, then the files at the source will be deleted when this method returns.
+// If delete is false, then this function will leave behind a copy of the original files at the source.
+//
+// If deep is false, then this function will prefer hard-linking files instead of copying them. If the source and
+// destination are on different filesystems, this will fall back to copying the files instead. If deep is true,
+// then files are always copied, even if they are on the same filesystem.
+//
+// If preserveOriginal is true, then the original files at the source will be preserved after the move (they may
+// still be hard linked if deep is false). If preserveOriginal is false, then the original files at the source will be
+// deleted when this function returns.
+//
+// The fsync flag is intended to make this function faster for unit tests. If fsync is true, then the function will
+// ensure that all file operations are fully flushed to disk before returning. If fsync is false, then the function
+// will not perform any fsync operations, which may result in faster execution but less data safety in case of a crash.
+func RecursiveMove(
+	source string,
+	destination string,
+	deep bool,
+	preserveOriginal bool,
+	fsync bool,
+) error {
+
+	// TODO claude: implement this function and unit test it
+	return nil
 }
 
 // verifyDirectoryWritable checks if a directory exists and is writable.
