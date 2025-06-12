@@ -143,7 +143,6 @@ var _ = BeforeSuite(func() {
 
 		fmt.Println("Deploying experiment")
 		testConfig.DeployExperiment()
-
 		pk := testConfig.Pks.EcdsaMap[deployer.Name].PrivateKey
 		pk = strings.TrimPrefix(pk, "0x")
 		pk = strings.TrimPrefix(pk, "0X")
