@@ -8,6 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
@@ -204,8 +205,6 @@ func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*Pay
 	}, nil
 }
 
-// ============= Payment State Access Methods =============
-
 // GetReservedPaymentByAccountAndQuorums retrieves reserved payments for an account across specified quorums
 func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error) {
 	pcs.ReservationsLock.RLock()
@@ -271,8 +270,6 @@ func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context,
 	return res, nil
 }
 
-// ============= Quorum Config Methods =============
-
 // GetQuorumPaymentConfig retrieves payment configuration for a specific quorum
 func (pcs *OnchainPaymentState) GetQuorumPaymentConfig(quorumID core.QuorumID) (*core.PaymentQuorumConfig, error) {
 	params := pcs.PaymentVaultParams.Load()
@@ -300,8 +297,6 @@ func (pcs *OnchainPaymentState) GetQuorumPaymentConfigs() map[core.QuorumID]*cor
 func (pcs *OnchainPaymentState) GetQuorumProtocolConfigs() map[core.QuorumID]*core.PaymentQuorumProtocolConfig {
 	return pcs.PaymentVaultParams.Load().QuorumProtocolConfigs
 }
-
-// ============= On-demand Specific Methods =============
 
 // GetOnDemandQuorumNumbers retrieves the list of quorums enabled for on-demand payments
 func (pcs *OnchainPaymentState) GetOnDemandQuorumNumbers(ctx context.Context) ([]uint8, error) {
@@ -341,8 +336,6 @@ func (pcs *OnchainPaymentState) GetOnDemandGlobalRatePeriodInterval(quorumID cor
 	return params.GetOnDemandGlobalRatePeriodInterval(quorumID)
 }
 
-// ============= Payment Parameter Methods =============
-
 // GetMinNumSymbols retrieves the minimum number of symbols required for a quorum
 func (pcs *OnchainPaymentState) GetMinNumSymbols(quorumID core.QuorumID) (uint64, error) {
 	params := pcs.PaymentVaultParams.Load()
@@ -378,8 +371,6 @@ func (pcs *OnchainPaymentState) GetQuorumNumbers(ctx context.Context) ([]core.Qu
 	}
 	return params.GetQuorumNumbers(), nil
 }
-
-// ============= PaymentVaultParams Methods =============
 
 // GetQuorumPaymentConfig retrieves payment configuration for a specific quorum
 func (pvp *PaymentVaultParams) GetQuorumPaymentConfig(quorumID core.QuorumID) (*core.PaymentQuorumConfig, error) {
@@ -534,4 +525,51 @@ func (pvp *PaymentVaultParams) GetConfigs(quorumNumber core.QuorumID) (*core.Pay
 		return nil, nil, fmt.Errorf("payment quorum protocol config not found for quorum %d", quorumNumber)
 	}
 	return paymentQuorumConfig, protocolConfig, nil
+}
+
+// PaymentVaultParamsFromProtobuf converts a protobuf payment vault params to a core payment vault params
+func PaymentVaultParamsFromProtobuf(vaultParams *disperser_rpc.PaymentVaultParams) (*PaymentVaultParams, error) {
+	if vaultParams == nil {
+		return nil, fmt.Errorf("payment vault params cannot be nil")
+	}
+
+	if vaultParams.GetQuorumPaymentConfigs() == nil {
+		return nil, fmt.Errorf("payment quorum configs cannot be nil")
+	}
+
+	if vaultParams.GetQuorumProtocolConfigs() == nil {
+		return nil, fmt.Errorf("payment quorum protocol configs cannot be nil")
+	}
+
+	// Convert protobuf configs to core types
+	quorumPaymentConfigs := make(map[core.QuorumID]*core.PaymentQuorumConfig)
+	quorumProtocolConfigs := make(map[core.QuorumID]*core.PaymentQuorumProtocolConfig)
+
+	for quorumID, pbPaymentConfig := range vaultParams.GetQuorumPaymentConfigs() {
+		quorumPaymentConfigs[core.QuorumID(quorumID)] = &core.PaymentQuorumConfig{
+			ReservationSymbolsPerSecond: pbPaymentConfig.GetReservationSymbolsPerSecond(),
+			OnDemandSymbolsPerSecond:    pbPaymentConfig.GetOnDemandSymbolsPerSecond(),
+			OnDemandPricePerSymbol:      pbPaymentConfig.GetOnDemandPricePerSymbol(),
+		}
+	}
+
+	for quorumID, pbProtocolConfig := range vaultParams.GetQuorumProtocolConfigs() {
+		quorumProtocolConfigs[core.QuorumID(quorumID)] = &core.PaymentQuorumProtocolConfig{
+			MinNumSymbols:              pbProtocolConfig.GetMinNumSymbols(),
+			ReservationAdvanceWindow:   pbProtocolConfig.GetReservationAdvanceWindow(),
+			ReservationRateLimitWindow: pbProtocolConfig.GetReservationRateLimitWindow(),
+			OnDemandRateLimitWindow:    pbProtocolConfig.GetOnDemandRateLimitWindow(),
+			OnDemandEnabled:            pbProtocolConfig.GetOnDemandEnabled(),
+		}
+	}
+	// Convert uint32 slice to core.QuorumID slice
+	onDemandQuorumNumbers := make([]core.QuorumID, len(vaultParams.GetOnDemandQuorumNumbers()))
+	for i, num := range vaultParams.GetOnDemandQuorumNumbers() {
+		onDemandQuorumNumbers[i] = core.QuorumID(num)
+	}
+	return &PaymentVaultParams{
+		QuorumPaymentConfigs:  quorumPaymentConfigs,
+		QuorumProtocolConfigs: quorumProtocolConfigs,
+		OnDemandQuorumNumbers: onDemandQuorumNumbers,
+	}, nil
 }

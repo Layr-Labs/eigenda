@@ -153,7 +153,7 @@ func TestAccountant_Reservation(t *testing.T) {
 
 	// Check that usage for quorum 0 was updated properly
 	currentPeriod := meterer.GetReservationPeriodByNanosecond(now, window)
-	record := accountant.GetRelativePeriodRecord(currentPeriod, 0)
+	record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, 0)
 	assert.Equal(t, symbolLength, record.Usage)
 
 	symbolLength = uint64(700)
@@ -173,7 +173,7 @@ func TestAccountant_Reservation(t *testing.T) {
 	// Check overflow usage
 	overflowIndex := meterer.GetOverflowPeriod(currentPeriod, window)
 	expectedOverflow := symbolLength - (binLimit - 500) // 700 - (1000 - 500) = 200
-	relativeRecord := accountant.GetRelativePeriodRecord(overflowIndex, 0)
+	relativeRecord := accountant.periodRecords.GetRelativePeriodRecord(overflowIndex, 0)
 	assert.Equal(t, expectedOverflow, relativeRecord.Usage)
 
 	// Second call should use on-demand payment
@@ -276,7 +276,7 @@ type accountBlobCallSeriesTest struct {
 	name           string
 	symbolLength   uint64
 	expectedHeader *core.PaymentMetadata
-	expectedState  PeriodRecord
+	expectedState  meterer.PeriodRecord
 	expectError    bool
 	errorMessage   string
 }
@@ -318,7 +318,7 @@ func TestAccountant_AccountBlobCallSeries(t *testing.T) {
 				AccountID:         accountId,
 				CumulativePayment: big.NewInt(0),
 			},
-			expectedState: PeriodRecord{
+			expectedState: meterer.PeriodRecord{
 				Index: 800,
 				Usage: 800,
 			},
@@ -330,7 +330,7 @@ func TestAccountant_AccountBlobCallSeries(t *testing.T) {
 				AccountID:         accountId,
 				CumulativePayment: big.NewInt(0),
 			},
-			expectedState: PeriodRecord{
+			expectedState: meterer.PeriodRecord{
 				Index: 1100,
 				Usage: 100,
 			},
@@ -342,7 +342,7 @@ func TestAccountant_AccountBlobCallSeries(t *testing.T) {
 				AccountID:         accountId,
 				CumulativePayment: big.NewInt(500),
 			},
-			expectedState: PeriodRecord{
+			expectedState: meterer.PeriodRecord{
 				Index: 1100,
 				Usage: 100,
 			},
@@ -410,7 +410,7 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 
 	// Check bin 0 has usage 800 for charged quorums
 	for _, quorumNumber := range quorums {
-		record := accountant.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 		assert.Equal(t, uint64(800), record.Usage)
 	}
 
@@ -422,9 +422,9 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 
 	// Check bin 1 has usage 300
 	for _, quorumNumber := range quorums {
-		record := accountant.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 		assert.Equal(t, uint64(800), record.Usage)
-		record = accountant.GetRelativePeriodRecord(nextPeriod, quorumNumber)
+		record = accountant.periodRecords.GetRelativePeriodRecord(nextPeriod, quorumNumber)
 		assert.Equal(t, uint64(300), record.Usage)
 	}
 
@@ -434,9 +434,9 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 
 	// Check bin 1 now has usage 800
 	for _, quorumNumber := range quorums {
-		record := accountant.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 		assert.Equal(t, uint64(800), record.Usage)
-		record = accountant.GetRelativePeriodRecord(nextPeriod, quorumNumber)
+		record = accountant.periodRecords.GetRelativePeriodRecord(nextPeriod, quorumNumber)
 		assert.Equal(t, uint64(800), record.Usage)
 	}
 }
@@ -488,7 +488,7 @@ func TestAccountant_Concurrent(t *testing.T) {
 	// Check final state
 	for _, quorumNumber := range quorums {
 		currentPeriod := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
-		record := accountant.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 		assert.Equal(t, uint64(1000), record.Usage)
 	}
 }
@@ -531,7 +531,7 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 
 	// Check current period usage
 	for _, quorumNumber := range quorums {
-		record := accountant.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 		assert.Equal(t, uint64(800), record.Usage)
 	}
 	// Second call: Allow one overflow
@@ -542,13 +542,13 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	// Check current period is at limit
 	binLimit := accountant.reservations[0].SymbolsPerSecond * uint64(reservationWindow) // 1000
 	for _, quorumNumber := range quorums {
-		record := accountant.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 		assert.Equal(t, binLimit, record.Usage)
 	}
 
 	// Check overflow period has the overflow
 	for _, quorumNumber := range quorums {
-		overflowRecord := accountant.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, reservationWindow), quorumNumber)
+		overflowRecord := accountant.periodRecords.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, reservationWindow), quorumNumber)
 		assert.Equal(t, uint64(300), overflowRecord.Usage) // 800 + 500 - 1000 = 300
 	}
 
@@ -559,9 +559,9 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 	assert.NotEqual(t, uint64(0), header.Timestamp)
 	assert.Equal(t, big.NewInt(200), header.CumulativePayment)
 	for _, quorumNumber := range quorums {
-		record := accountant.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 		assert.Equal(t, uint64(binLimit), record.Usage)
-		record = accountant.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, reservationWindow), quorumNumber)
+		record = accountant.periodRecords.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, reservationWindow), quorumNumber)
 		assert.Equal(t, uint64(300), record.Usage)
 	}
 }
@@ -603,7 +603,7 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 
 	// Check current period is at limit
 	for _, quorumNumber := range quorums {
-		record := accountant.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 		assert.Equal(t, uint64(1000), record.Usage)
 	}
 
@@ -612,7 +612,7 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	header, err := accountant.AccountBlob(now, 500, quorums)
 	assert.NoError(t, err)
 	for _, quorumNumber := range quorums {
-		record := accountant.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 		assert.Equal(t, uint64(1000), record.Usage)
 	}
 	assert.Equal(t, big.NewInt(500), header.CumulativePayment)
@@ -630,7 +630,7 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 
 	// Check next period has usage 500
 	for _, quorumNumber := range quorums {
-		record := accountant.GetRelativePeriodRecord(nextPeriod, quorumNumber)
+		record := accountant.periodRecords.GetRelativePeriodRecord(nextPeriod, quorumNumber)
 		assert.Equal(t, uint64(500), record.Usage)
 	}
 }
@@ -893,31 +893,31 @@ func TestAccountant_MultipleOverflows(t *testing.T) {
 	_, err = acc.AccountBlob(now.UnixNano(), 50, []uint8{0})
 	require.NoError(t, err)
 	currentPeriod := meterer.GetReservationPeriodByNanosecond(now.UnixNano(), 1)
-	record := acc.GetRelativePeriodRecord(currentPeriod, 0)
+	record := acc.periodRecords.GetRelativePeriodRecord(currentPeriod, 0)
 	assert.Equal(t, uint64(50), record.Usage)
-	record = acc.GetRelativePeriodRecord(currentPeriod+1*binInterval, 0)
+	record = acc.periodRecords.GetRelativePeriodRecord(currentPeriod+1*binInterval, 0)
 	assert.Equal(t, uint64(0), record.Usage)
-	record = acc.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, binInterval), 0)
+	record = acc.periodRecords.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, binInterval), 0)
 	assert.Equal(t, uint64(0), record.Usage)
 
 	// Second call: Overflow
 	_, err = acc.AccountBlob(now.UnixNano(), 100, []uint8{0})
 	require.NoError(t, err)
-	record = acc.GetRelativePeriodRecord(currentPeriod, 0)
+	record = acc.periodRecords.GetRelativePeriodRecord(currentPeriod, 0)
 	assert.Equal(t, uint64(100), record.Usage)
-	record = acc.GetRelativePeriodRecord(currentPeriod+1*binInterval, 0)
+	record = acc.periodRecords.GetRelativePeriodRecord(currentPeriod+1*binInterval, 0)
 	assert.Equal(t, uint64(0), record.Usage)
-	record = acc.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, binInterval), 0)
+	record = acc.periodRecords.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, binInterval), 0)
 	assert.Equal(t, uint64(50), record.Usage)
 
 	// Third call: Cannot overflow again
 	_, err = acc.AccountBlob(now.UnixNano(), 100, []uint8{0})
 	require.NoError(t, err)
-	record = acc.GetRelativePeriodRecord(currentPeriod, 0)
+	record = acc.periodRecords.GetRelativePeriodRecord(currentPeriod, 0)
 	assert.Equal(t, uint64(100), record.Usage)
-	record = acc.GetRelativePeriodRecord(currentPeriod+1*binInterval, 0)
+	record = acc.periodRecords.GetRelativePeriodRecord(currentPeriod+1*binInterval, 0)
 	assert.Equal(t, uint64(0), record.Usage)
-	record = acc.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, binInterval), 0)
+	record = acc.periodRecords.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, binInterval), 0)
 	assert.Equal(t, uint64(50), record.Usage)
 }
 
@@ -1051,17 +1051,17 @@ func TestAccountant_ReservationRollback(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify first quorum was updated
-	record := accountant.GetRelativePeriodRecord(currentPeriod, moreUsedQuorum)
+	record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, moreUsedQuorum)
 	assert.Equal(t, uint64(50), record.Usage)
 
 	// Use both quorums, more used quorum overflows
 	_, err = accountant.AccountBlob(now, 60, []uint8{moreUsedQuorum, lessUsedQuorum})
 	assert.NoError(t, err)
-	record = accountant.GetRelativePeriodRecord(currentPeriod, moreUsedQuorum)
+	record = accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, moreUsedQuorum)
 	assert.Equal(t, uint64(100), record.Usage)
-	record = accountant.GetRelativePeriodRecord(currentPeriod, lessUsedQuorum)
+	record = accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, lessUsedQuorum)
 	assert.Equal(t, uint64(60), record.Usage)
-	record = accountant.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, reservationWindow), moreUsedQuorum)
+	record = accountant.periodRecords.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, reservationWindow), moreUsedQuorum)
 	assert.Equal(t, uint64(10), record.Usage)
 
 	// Use both quorums, more used quorum cannot overflow again
@@ -1070,11 +1070,11 @@ func TestAccountant_ReservationRollback(t *testing.T) {
 	assert.Contains(t, err.Error(), "reservation limit exceeded")
 
 	// No reservation updates were made
-	record = accountant.GetRelativePeriodRecord(currentPeriod, moreUsedQuorum)
+	record = accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, moreUsedQuorum)
 	assert.Equal(t, uint64(100), record.Usage)
-	record = accountant.GetRelativePeriodRecord(currentPeriod, lessUsedQuorum)
+	record = accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, lessUsedQuorum)
 	assert.Equal(t, uint64(60), record.Usage)
-	record = accountant.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, reservationWindow), moreUsedQuorum)
+	record = accountant.periodRecords.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, reservationWindow), moreUsedQuorum)
 	assert.Equal(t, uint64(10), record.Usage)
 
 	// Test rollback when a quorum doesn't exist
@@ -1082,7 +1082,7 @@ func TestAccountant_ReservationRollback(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "quorum number mismatch")
 	// quorum usage rolled back
-	record = accountant.GetRelativePeriodRecord(currentPeriod, lessUsedQuorum)
+	record = accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, lessUsedQuorum)
 	assert.Equal(t, uint64(60), record.Usage)
 
 	// Test rollback when config is missing
@@ -1092,6 +1092,6 @@ func TestAccountant_ReservationRollback(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "quorum config not found")
 	// quorum usage stays the same
-	record = accountant.GetRelativePeriodRecord(currentPeriod, lessUsedQuorum)
+	record = accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, lessUsedQuorum)
 	assert.Equal(t, uint64(60), record.Usage)
 }
