@@ -130,7 +130,7 @@ func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("error getting account ID: %w", err)
 		}
-		c.accountant = NewAccountant(accountId, nil, nil)
+		c.accountant = NewAccountant(accountId)
 	}
 
 	paymentState, err := c.GetPaymentState(ctx)

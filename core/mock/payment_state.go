@@ -24,13 +24,9 @@ func (m *MockOnchainPaymentState) GetCurrentBlockNumber(ctx context.Context) (ui
 	return value, args.Error(1)
 }
 
-func (m *MockOnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context) (*meterer.PaymentVaultParams, error) {
+func (m *MockOnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context) error {
 	args := m.Called(ctx)
-	var value *meterer.PaymentVaultParams
-	if args.Get(0) != nil {
-		value = args.Get(0).(*meterer.PaymentVaultParams)
-	}
-	return value, args.Error(1)
+	return args.Error(0)
 }
 
 func (m *MockOnchainPaymentState) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[core.QuorumID]*core.ReservedPayment, error) {

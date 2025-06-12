@@ -9,7 +9,6 @@ import (
 	"time"
 
 	commonpbv2 "github.com/Layr-Labs/eigenda/api/grpc/common/v2"
-	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -643,8 +642,6 @@ type ReservedPayment struct {
 	// // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
 	// QuorumSplits []byte
 }
-
-type QuorumReservation = disperser_rpc.QuorumReservation
 
 type OnDemandPayment struct {
 	// Total amount deposited by the user

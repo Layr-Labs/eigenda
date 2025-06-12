@@ -154,37 +154,7 @@ func setup(_ *testing.M) {
 		panic("failed to create metering store")
 	}
 
-	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(&meterer.PaymentVaultParams{
-		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
-			0: {
-				ReservationSymbolsPerSecond: 100,
-				OnDemandSymbolsPerSecond:    100,
-				OnDemandPricePerSymbol:      1,
-			},
-			1: {
-				ReservationSymbolsPerSecond: 100,
-				OnDemandSymbolsPerSecond:    100,
-				OnDemandPricePerSymbol:      1,
-			},
-		},
-		QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
-			0: {
-				MinNumSymbols:              3,
-				ReservationAdvanceWindow:   10,
-				ReservationRateLimitWindow: 10,
-				OnDemandRateLimitWindow:    10,
-				OnDemandEnabled:            true,
-			},
-			1: {
-				MinNumSymbols:              3,
-				ReservationAdvanceWindow:   10,
-				ReservationRateLimitWindow: 10,
-				OnDemandRateLimitWindow:    10,
-				OnDemandEnabled:            true,
-			},
-		},
-		OnDemandQuorumNumbers: []uint8{0, 1},
-	}, nil).Maybe()
+	paymentChainState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil).Maybe()
 
 	// add some default sensible configs
 	mt = meterer.NewMeterer(

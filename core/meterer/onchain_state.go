@@ -19,7 +19,7 @@ import (
 // OnchainPaymentState is an interface for getting information about the current chain state for payments.
 type OnchainPayment interface {
 	// Core state refresh and access methods
-	RefreshOnchainPaymentState(ctx context.Context) (*PaymentVaultParams, error)
+	RefreshOnchainPaymentState(ctx context.Context) error
 	GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error)
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error)
 	GetQuorumNumbers(ctx context.Context) ([]core.QuorumID, error)
@@ -67,8 +67,6 @@ type PaymentVaultParams struct {
 	OnDemandQuorumNumbers []core.QuorumID
 }
 
-// ============= Constructor Methods =============
-
 // NewOnchainPaymentState creates a new OnchainPaymentState instance and initializes it with current chain state
 func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader, logger logging.Logger) (*OnchainPaymentState, error) {
 	state := OnchainPaymentState{
@@ -79,11 +77,10 @@ func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader, logger logging.
 		PaymentVaultParams: atomic.Pointer[PaymentVaultParams]{},
 	}
 
-	params, err := state.RefreshOnchainPaymentState(ctx)
+	err := state.RefreshOnchainPaymentState(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize payment state: %w", err)
 	}
-	state.PaymentVaultParams.Store(params)
 
 	return &state, nil
 }
@@ -101,13 +98,11 @@ func NewOnchainPaymentStateEmpty(ctx context.Context, tx *eth.Reader, logger log
 	return &state, nil
 }
 
-// ============= State Refresh Methods =============
-
 // RefreshOnchainPaymentState updates the payment state with current chain data
-func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context) (*PaymentVaultParams, error) {
+func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context) error {
 	paymentVaultParams, err := pcs.GetPaymentVaultParams(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get payment vault params: %w", err)
+		return fmt.Errorf("failed to get payment vault params: %w", err)
 	}
 	pcs.PaymentVaultParams.Store(paymentVaultParams)
 
@@ -124,13 +119,11 @@ func (pcs *OnchainPaymentState) RefreshOnchainPaymentState(ctx context.Context) 
 	}
 
 	if refreshErr != nil {
-		return paymentVaultParams, fmt.Errorf("failed to refresh payment state: %w", refreshErr)
+		return fmt.Errorf("failed to refresh payment state: %w", refreshErr)
 	}
 
-	return paymentVaultParams, nil
+	return nil
 }
-
-// ============= Payment Vault Parameter Methods =============
 
 // GetPaymentVaultParams retrieves the current payment vault parameters from the chain
 func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*PaymentVaultParams, error) {
@@ -526,4 +519,19 @@ func (pcs *OnchainPaymentState) refreshOnDemandPayments(ctx context.Context) err
 	}
 	pcs.OnDemandPayments = onDemandPayments
 	return nil
+}
+
+func (pvp *PaymentVaultParams) GetConfigs(quorumNumber core.QuorumID) (*core.PaymentQuorumConfig, *core.PaymentQuorumProtocolConfig, error) {
+	if pvp == nil {
+		return nil, nil, fmt.Errorf("payment vault params is nil")
+	}
+	paymentQuorumConfig, ok := pvp.QuorumPaymentConfigs[quorumNumber]
+	if !ok {
+		return nil, nil, fmt.Errorf("payment quorum config not found for quorum %d", quorumNumber)
+	}
+	protocolConfig, ok := pvp.QuorumProtocolConfigs[quorumNumber]
+	if !ok {
+		return nil, nil, fmt.Errorf("payment quorum protocol config not found for quorum %d", quorumNumber)
+	}
+	return paymentQuorumConfig, protocolConfig, nil
 }

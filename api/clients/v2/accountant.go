@@ -38,12 +38,21 @@ type PeriodRecord struct {
 	Usage uint64
 }
 
-// NewAccountant initializes an accountant with the given account ID, reservations, on-demand payment, and number of bins
-// TODO: Consider making this initialization take all the fields as arguments or entirely empty as clients are typically
-// syncing the onchain configurations and offchain usage with the disperser server
-func NewAccountant(accountID gethcommon.Address, reservations map[uint8]*core.ReservedPayment, onDemand *core.OnDemandPayment) *Accountant {
-	periodRecords := CreateEmptyReservationUsage(reservations)
-	a := Accountant{
+// updateRecord tracks a successful update for rollback purposes
+type updateRecord struct {
+	quorumNumber  core.QuorumID
+	period        uint64
+	originalUsage uint64
+}
+
+// NewAccountant initializes an accountant with the given account ID. The accountant must call SetPaymentState to populate the state.
+func NewAccountant(accountID gethcommon.Address) *Accountant {
+	reservations := make(map[core.QuorumID]*core.ReservedPayment)
+	onDemand := &core.OnDemandPayment{
+		CumulativePayment: big.NewInt(0),
+	}
+	periodRecords := make(map[core.QuorumID][]PeriodRecord)
+	return &Accountant{
 		accountID:    accountID,
 		reservations: reservations,
 		onDemand:     onDemand,
@@ -55,26 +64,17 @@ func NewAccountant(accountID gethcommon.Address, reservations map[uint8]*core.Re
 		periodRecords:     periodRecords,
 		cumulativePayment: big.NewInt(0),
 	}
-	// TODO: add a routine to refresh the on-chain state occasionally?
-	return &a
 }
 
 // updateReservationUsage updates the usage records for a quorum's reservation
-func (a *Accountant) updateReservationUsage(quorumNumber core.QuorumID, currentPeriod uint64, symbolUsage uint64) error {
-	res, exists := a.reservations[quorumNumber]
-	if !exists {
-		return fmt.Errorf("reservation not found for quorum %d", quorumNumber)
+func (a *Accountant) updateReservationUsage(quorumNumber core.QuorumID, reservation *core.ReservedPayment, reservationWindow uint64, currentPeriod uint64, symbolUsage uint64) error {
+	binLimit := reservation.SymbolsPerSecond * uint64(reservationWindow)
+	if symbolUsage > binLimit {
+		return fmt.Errorf("symbol usage exceeds bin limit")
 	}
 
 	relativePeriodRecord := a.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 	relativePeriodRecord.Usage += symbolUsage
-
-	quorumReservationWindow, err := a.GetReservationWindow(quorumNumber)
-	if err != nil {
-		return fmt.Errorf("failed to get reservation window for quorum %d: %w", quorumNumber, err)
-	}
-
-	binLimit := res.SymbolsPerSecond * uint64(quorumReservationWindow)
 
 	// Check if we're within the bin limit
 	if relativePeriodRecord.Usage <= binLimit {
@@ -82,7 +82,7 @@ func (a *Accountant) updateReservationUsage(quorumNumber core.QuorumID, currentP
 	}
 
 	// Try to use overflow bin if we're over the limit
-	overflowPeriodRecord := a.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, quorumReservationWindow), quorumNumber)
+	overflowPeriodRecord := a.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, reservationWindow), quorumNumber)
 	canUseOverflow := overflowPeriodRecord.Usage == 0 &&
 		relativePeriodRecord.Usage-symbolUsage < binLimit &&
 		symbolUsage <= binLimit
@@ -108,25 +108,55 @@ func (a *Accountant) reservationUsage(numSymbols uint64, quorumNumbers []core.Qu
 	a.periodRecordsLock.Lock()
 	defer a.periodRecordsLock.Unlock()
 
-	for _, quorumNumber := range quorumNumbers {
-		// Calculate current period and symbol usage
-		reservationWindow, err := a.GetReservationWindow(quorumNumber)
-		if err != nil {
-			return fmt.Errorf("failed to get reservation window for quorum %d: %w", quorumNumber, err)
-		}
-		currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, reservationWindow)
-		minNumSymbols, err := a.GetMinNumSymbols(quorumNumber)
-		if err != nil {
-			return err
-		}
-		symbolUsage := meterer.SymbolsCharged(numSymbols, minNumSymbols)
+	// Track successful updates for rollback
+	successfulUpdates := make([]updateRecord, 0, len(quorumNumbers))
 
-		if err := a.updateReservationUsage(quorumNumber, currentReservationPeriod, symbolUsage); err != nil {
-			// Rollback usage for this quorum
-			relativePeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod, quorumNumber)
-			relativePeriodRecord.Usage -= symbolUsage
+	for _, quorumNumber := range quorumNumbers {
+		reservation, exists := a.reservations[quorumNumber]
+		if !exists {
+			// Rollback all successful updates
+			for i := len(successfulUpdates) - 1; i >= 0; i-- {
+				update := successfulUpdates[i]
+				record := a.GetRelativePeriodRecord(update.period, update.quorumNumber)
+				record.Usage = update.originalUsage
+			}
+			return fmt.Errorf("reservation not found for quorum %d", quorumNumber)
+		}
+		_, protocolConfig, err := a.paymentVaultParams.GetConfigs(quorumNumber)
+		if err != nil {
+			// Rollback all successful updates
+			for i := len(successfulUpdates) - 1; i >= 0; i-- {
+				update := successfulUpdates[i]
+				record := a.GetRelativePeriodRecord(update.period, update.quorumNumber)
+				record.Usage = update.originalUsage
+			}
 			return err
 		}
+		currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, protocolConfig.ReservationRateLimitWindow)
+		symbolUsage := meterer.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
+
+		// Store original usage before update
+		relativePeriodRecord := a.GetRelativePeriodRecord(currentReservationPeriod, quorumNumber)
+		originalUsage := relativePeriodRecord.Usage
+
+		if err := a.updateReservationUsage(quorumNumber, reservation, protocolConfig.ReservationRateLimitWindow, currentReservationPeriod, symbolUsage); err != nil {
+			// Rollback all successful updates
+			for i := len(successfulUpdates) - 1; i >= 0; i-- {
+				update := successfulUpdates[i]
+				record := a.GetRelativePeriodRecord(update.period, update.quorumNumber)
+				record.Usage = update.originalUsage
+			}
+			// Rollback current quorum
+			relativePeriodRecord.Usage = originalUsage
+			return err
+		}
+
+		// Track successful update
+		successfulUpdates = append(successfulUpdates, updateRecord{
+			quorumNumber:  quorumNumber,
+			period:        currentReservationPeriod,
+			originalUsage: originalUsage,
+		})
 	}
 
 	return nil
@@ -134,22 +164,21 @@ func (a *Accountant) reservationUsage(numSymbols uint64, quorumNumbers []core.Qu
 
 // OnDemandUsage handles the on-demand payment calculation and validation
 func (a *Accountant) onDemandUsage(numSymbols uint64, quorumNumbers []core.QuorumID) (*big.Int, error) {
-	// Verify quorum requirements
+	// on-demand payment requires at least one quorum, and limited to OnDemand enabled quorums
+	if len(quorumNumbers) == 0 {
+		return nil, fmt.Errorf("no quorums provided")
+	}
 	if err := meterer.ValidateQuorum(quorumNumbers, a.paymentVaultParams.OnDemandQuorumNumbers); err != nil {
 		return nil, err
 	}
 
-	// Calculate payment needed for the number of symbols
-	pricePerSymbol, err := a.GetPricePerSymbol(meterer.OnDemandQuorumID)
+	paymentQuorumConfig, protocolConfig, err := a.paymentVaultParams.GetConfigs(meterer.OnDemandQuorumID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get price per symbol for on-demand quorum: %w", err)
+		return nil, err
 	}
-	minNumSymbols, err := a.GetMinNumSymbols(meterer.OnDemandQuorumID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get min num symbols for on-demand quorum: %w", err)
-	}
-	symbolsCharged := meterer.SymbolsCharged(numSymbols, minNumSymbols)
-	paymentCharged := meterer.PaymentCharged(symbolsCharged, pricePerSymbol)
+
+	symbolsCharged := meterer.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
+	paymentCharged := meterer.PaymentCharged(symbolsCharged, paymentQuorumConfig.OnDemandPricePerSymbol)
 
 	// Calculate the increment required to add to the cumulative payment
 	a.onDemandLock.Lock()
@@ -170,10 +199,16 @@ func (a *Accountant) AccountBlob(
 	timestamp int64,
 	numSymbols uint64,
 	quorums []uint8) (*core.PaymentMetadata, error) {
+	if len(quorums) == 0 {
+		return nil, fmt.Errorf("no quorums provided")
+	}
+	if numSymbols == 0 {
+		return nil, fmt.Errorf("zero symbols requested")
+	}
 
 	// Always try to use reservation first
-	err := a.reservationUsage(numSymbols, quorums, timestamp)
-	if err == nil {
+	rezErr := a.reservationUsage(numSymbols, quorums, timestamp)
+	if rezErr == nil {
 		return &core.PaymentMetadata{
 			AccountID:         a.accountID,
 			Timestamp:         timestamp,
@@ -182,9 +217,9 @@ func (a *Accountant) AccountBlob(
 	}
 
 	// Fall back to on-demand payment if reservation fails
-	cumulativePayment, err := a.onDemandUsage(numSymbols, quorums)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create payment information for reservation or on-demand. Consider depositing more eth to the PaymentVault contract for your account. For more details, see https://docs.eigenda.xyz/core-concepts/payments#disperser-client-requirements. Account: %s, Error: %w", a.accountID.Hex(), err)
+	cumulativePayment, onDemandErr := a.onDemandUsage(numSymbols, quorums)
+	if onDemandErr != nil {
+		return nil, fmt.Errorf("cannot create payment information for reservation or on-demand. Consider depositing more eth to the PaymentVault contract for your account. For more details, see https://docs.eigenda.xyz/core-concepts/payments#disperser-client-requirements. Account: %s, Reservation Error: %v, On-demand Error: %v", a.accountID.Hex(), rezErr, onDemandErr)
 	}
 
 	pm := &core.PaymentMetadata{
@@ -196,32 +231,11 @@ func (a *Accountant) AccountBlob(
 	return pm, nil
 }
 
-// GetMinNumSymbols returns the minimum number of symbols for a given quorum
-func (a *Accountant) GetMinNumSymbols(quorumID core.QuorumID) (uint64, error) {
-	if a.paymentVaultParams == nil {
-		return 0, fmt.Errorf("payment vault params is nil")
-	}
-	return a.paymentVaultParams.GetMinNumSymbols(quorumID)
-}
-
-// GetPricePerSymbol returns the price per symbol for a given quorum
-func (a *Accountant) GetPricePerSymbol(quorumID core.QuorumID) (uint64, error) {
-	if a.paymentVaultParams == nil {
-		return 0, fmt.Errorf("payment vault params is nil")
-	}
-	return a.paymentVaultParams.GetPricePerSymbol(quorumID)
-}
-
-// GetReservationWindow returns the reservation window for a given quorum
-func (a *Accountant) GetReservationWindow(quorumID core.QuorumID) (uint64, error) {
-	if a.paymentVaultParams == nil {
-		return 0, fmt.Errorf("payment vault params is nil")
-	}
-	return a.paymentVaultParams.GetReservationWindow(quorumID)
-}
-
 func (a *Accountant) GetRelativePeriodRecord(index uint64, quorumNumber core.QuorumID) *PeriodRecord {
 	relativeIndex := uint32(index % uint64(meterer.MinNumBins))
+	if _, exists := a.periodRecords[quorumNumber]; !exists {
+		a.periodRecords[quorumNumber] = make([]PeriodRecord, meterer.MinNumBins)
+	}
 	if a.periodRecords[quorumNumber][relativeIndex].Index != uint32(index) {
 		a.periodRecords[quorumNumber][relativeIndex] = PeriodRecord{
 			Index: uint32(index),
@@ -309,39 +323,29 @@ func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentState
 		a.reservations = make(map[core.QuorumID]*core.ReservedPayment)
 	} else {
 		a.reservations = make(map[core.QuorumID]*core.ReservedPayment)
+		a.periodRecords = make(map[core.QuorumID][]PeriodRecord)
 		for quorumNumber, reservation := range paymentState.GetReservations() {
-			a.reservations[core.QuorumID(quorumNumber)] = &core.ReservedPayment{
+			quorumID := core.QuorumID(quorumNumber)
+			a.reservations[quorumID] = &core.ReservedPayment{
 				SymbolsPerSecond: reservation.GetSymbolsPerSecond(),
 				StartTimestamp:   uint64(reservation.GetStartTimestamp()),
 				EndTimestamp:     uint64(reservation.GetEndTimestamp()),
 			}
-		}
-		a.periodRecords = CreateEmptyReservationUsage(a.reservations)
-		fmt.Println("created empty periodRecords", a.periodRecords)
-		for quorumNumber, periodRecords := range paymentState.GetPeriodRecords() {
-			if periodRecords != nil {
-				for _, record := range periodRecords.GetRecords() {
-					idx := record.Index % uint32(meterer.MinNumBins)
-					a.periodRecords[core.QuorumID(quorumNumber)][idx] = PeriodRecord{
-						Index: record.Index,
-						Usage: record.Usage,
-					}
+			a.periodRecords[quorumID] = make([]PeriodRecord, meterer.MinNumBins)
+			// Initialize period records to 0
+			for i := range a.periodRecords[quorumID] {
+				a.periodRecords[quorumID][i] = PeriodRecord{Index: uint32(i), Usage: 0}
+			}
+			// populate period records to the values from the server
+			for _, record := range paymentState.GetPeriodRecords()[quorumNumber].GetRecords() {
+				idx := record.Index % uint32(meterer.MinNumBins)
+				a.periodRecords[quorumID][idx] = PeriodRecord{
+					Index: record.Index,
+					Usage: record.Usage,
 				}
 			}
 		}
 	}
 
 	return nil
-}
-
-// CreateEmptyReservationUsage creates empty reservation usage records for the provided quorum numbers
-func CreateEmptyReservationUsage(quorumNumbers map[core.QuorumID]*core.ReservedPayment) map[core.QuorumID][]PeriodRecord {
-	reservationUsage := make(map[core.QuorumID][]PeriodRecord)
-	for quorumNumber := range quorumNumbers {
-		reservationUsage[quorumNumber] = make([]PeriodRecord, meterer.MinNumBins)
-		for i := range reservationUsage[quorumNumber] {
-			reservationUsage[quorumNumber][i] = PeriodRecord{Index: uint32(i), Usage: 0}
-		}
-	}
-	return reservationUsage
 }

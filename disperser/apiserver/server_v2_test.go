@@ -515,7 +515,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 
 	// append test name to each table name for an unique store
 	mockState := &mock.MockOnchainPaymentState{}
-	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(&meterer.PaymentVaultParams{}, nil)
+	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil)
 	mockState.On("GetReservationWindow", tmock.Anything).Return(uint64(1), nil)
 	mockState.On("GetPricePerSymbol", tmock.Anything).Return(uint64(2), nil)
 	mockState.On("GetOnDemandGlobalSymbolsPerSecond", tmock.Anything).Return(uint64(1009), nil)
@@ -530,7 +530,7 @@ func newTestServerV2(t *testing.T) *testComponents {
 	mockState.On("GetOnDemandPaymentByAccount", tmock.Anything, tmock.Anything).Return(&core.OnDemandPayment{CumulativePayment: big.NewInt(3864)}, nil)
 	mockState.On("GetOnDemandQuorumNumbers", tmock.Anything).Return([]uint8{0, 1}, nil)
 
-	if _, err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
+	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
 	table_names := []string{"reservations_server_" + t.Name(), "ondemand_server_" + t.Name(), "global_server_" + t.Name()}

@@ -93,7 +93,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create onchain payment state: %w", err)
 		}
-		if _, err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
+		if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
 			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
 		}
 

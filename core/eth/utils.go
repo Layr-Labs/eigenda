@@ -148,10 +148,6 @@ func ConvertToReservedPayments(reservation paymentvault.IPaymentVaultReservation
 			SymbolsPerSecond: reservation.SymbolsPerSecond,
 			StartTimestamp:   reservation.StartTimestamp,
 			EndTimestamp:     reservation.EndTimestamp,
-			// // They are now handled at the quorum level in the new contract design; right now we are keeping for minimal changes
-			// // TODO: the core type will be updated to be specific to a single quorum
-			// QuorumNumbers: []byte{},
-			// QuorumSplits:  []uint8{},
 		}
 	}
 

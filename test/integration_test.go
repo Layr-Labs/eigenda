@@ -242,7 +242,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	mockState.On("GetPricePerSymbol", mock.Anything).Return(uint32(1), nil)
 	mockState.On("GetMinNumSymbols", mock.Anything).Return(uint32(128), nil)
 	mockState.On("GetReservationWindow", mock.Anything).Return(uint32(60), nil)
-	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(&meterer.PaymentVaultParams{}, nil).Maybe()
+	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(nil).Maybe()
 
 	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
 	if !deployLocalStack {
@@ -294,8 +294,8 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 		panic("failed to create offchain store")
 	}
 
-	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(&meterer.PaymentVaultParams{}, nil).Maybe()
-	if _, err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
+	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(nil).Maybe()
+	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
 

@@ -62,7 +62,7 @@ func (m *Meterer) Start(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				_, err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx)
+				err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx)
 				if err != nil {
 					m.logger.Error("failed to refresh onchain state", "error", err)
 				}
@@ -304,9 +304,10 @@ func GetOverflowPeriod(reservationPeriod uint64, reservationWindow uint64) uint6
 
 // PaymentCharged returns the chargeable price for a given number of symbols
 func PaymentCharged(numSymbols, pricePerSymbol uint64) *big.Int {
-	numSymbolsBig := new(big.Int).SetUint64(numSymbols)
-	pricePerSymbolBig := new(big.Int).SetUint64(pricePerSymbol)
-	return new(big.Int).Mul(numSymbolsBig, pricePerSymbolBig)
+	// directly convert to uint64 to avoid overflow
+	numSymbolsInt := new(big.Int).SetUint64(numSymbols)
+	pricePerSymbolInt := new(big.Int).SetUint64(pricePerSymbol)
+	return new(big.Int).Mul(numSymbolsInt, pricePerSymbolInt)
 }
 
 // SymbolsCharged returns the number of symbols charged for a given data length
@@ -359,6 +360,10 @@ func ValidateReservations(reservations map[core.QuorumID]*core.ReservedPayment, 
 	// Gather quorums the user had an reservations on and relevant quorum configurations
 	for quorumID := range reservations {
 		reservationQuorums = append(reservationQuorums, uint8(quorumID))
+		_, ok := quorumConfigs[quorumID]
+		if !ok {
+			return fmt.Errorf("quorum config not found for quorum %d", quorumID)
+		}
 		reservationWindows[quorumID] = quorumConfigs[quorumID].ReservationRateLimitWindow
 		requestReservationPeriods[quorumID] = GetReservationPeriodByNanosecond(timestamp, quorumConfigs[quorumID].ReservationRateLimitWindow)
 	}

@@ -26,41 +26,6 @@ var (
 	}
 )
 
-func TestRefreshOnchainPaymentState(t *testing.T) {
-	mockState := &mock.MockOnchainPaymentState{}
-	ctx := context.Background()
-	mockState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(&meterer.PaymentVaultParams{
-		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
-			0: {
-				ReservationSymbolsPerSecond: 100,
-				OnDemandSymbolsPerSecond:    100,
-				OnDemandPricePerSymbol:      1,
-			},
-		},
-		QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
-			0: {
-				MinNumSymbols:              1,
-				ReservationAdvanceWindow:   10,
-				ReservationRateLimitWindow: 10,
-				OnDemandRateLimitWindow:    10,
-				OnDemandEnabled:            true,
-			},
-		},
-		OnDemandQuorumNumbers: []uint8{0},
-	}, nil)
-
-	params, err := mockState.RefreshOnchainPaymentState(ctx)
-	assert.NoError(t, err)
-	assert.NotNil(t, params)
-	assert.NotNil(t, params.QuorumPaymentConfigs[0])
-	assert.NotNil(t, params.QuorumProtocolConfigs[0])
-	assert.Equal(t, uint64(100), params.QuorumPaymentConfigs[0].OnDemandSymbolsPerSecond)
-	assert.Equal(t, uint64(1), params.QuorumPaymentConfigs[0].OnDemandPricePerSymbol)
-	assert.Equal(t, uint64(1), params.QuorumProtocolConfigs[0].MinNumSymbols)
-	assert.Equal(t, uint64(10), params.QuorumProtocolConfigs[0].ReservationRateLimitWindow)
-	assert.Equal(t, []uint8{0}, params.OnDemandQuorumNumbers)
-}
-
 func TestGetCurrentBlockNumber(t *testing.T) {
 	mockState := &mock.MockOnchainPaymentState{}
 	mockState.On("GetCurrentBlockNumber").Return(uint32(1000), nil)
@@ -319,4 +284,51 @@ func TestNilAssignmentPanicScenario(t *testing.T) {
 		_, exists := state.ReservedPayments[account]
 		assert.False(t, exists)
 	})
+}
+
+func TestPaymentVaultParams_GetConfigs(t *testing.T) {
+	paymentVaultParams := &meterer.PaymentVaultParams{
+		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+			0: {
+				ReservationSymbolsPerSecond: 1,
+				OnDemandSymbolsPerSecond:    2,
+				OnDemandPricePerSymbol:      3,
+			},
+			1: {
+				ReservationSymbolsPerSecond: 4,
+				OnDemandSymbolsPerSecond:    5,
+				OnDemandPricePerSymbol:      6,
+			},
+		},
+		QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+			0: {
+				MinNumSymbols:              7,
+				ReservationAdvanceWindow:   8,
+				ReservationRateLimitWindow: 9,
+				OnDemandRateLimitWindow:    10,
+				OnDemandEnabled:            true,
+			},
+			1: {
+				MinNumSymbols:              11,
+				ReservationAdvanceWindow:   12,
+				ReservationRateLimitWindow: 13,
+				OnDemandRateLimitWindow:    14,
+				OnDemandEnabled:            false,
+			},
+		},
+		OnDemandQuorumNumbers: []core.QuorumID{0, 1},
+	}
+
+	// Test with non-existent quorum
+	_, _, err := paymentVaultParams.GetConfigs(99)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "config not found")
+
+	paymentQuorumConfig, protocolConfig, err := paymentVaultParams.GetConfigs(0)
+	assert.NoError(t, err)
+	assert.NotNil(t, paymentQuorumConfig)
+	assert.NotNil(t, protocolConfig)
+	assert.Equal(t, uint64(7), protocolConfig.MinNumSymbols)
+	assert.Equal(t, uint64(3), paymentQuorumConfig.OnDemandPricePerSymbol)
+	assert.Equal(t, []core.QuorumID{0, 1}, paymentVaultParams.OnDemandQuorumNumbers)
 }

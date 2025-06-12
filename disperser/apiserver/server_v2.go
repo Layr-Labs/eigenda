@@ -314,7 +314,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	}
 
 	// Get fresh onchain parameters
-	params, err := s.meterer.ChainPaymentState.RefreshOnchainPaymentState(ctx)
+	err := s.meterer.ChainPaymentState.RefreshOnchainPaymentState(ctx)
 	if err != nil {
 		s.logger.Error("failed to refresh onchain payment state", "err", err)
 		return nil, api.NewErrorInternal("failed to refresh onchain payment state")
@@ -388,8 +388,8 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	for _, quorumNumber := range quorumIds {
 		quorumID := uint32(quorumNumber)
 
-		quorumPaymentConfig, ok := params.QuorumPaymentConfigs[quorumNumber]
-		if !ok {
+		quorumPaymentConfig, err := s.meterer.ChainPaymentState.GetQuorumPaymentConfig(quorumNumber)
+		if err != nil {
 			s.logger.Debug("failed to get quorum payment config, use zero value", "quorumNumber", quorumNumber)
 		} else {
 			quorumPaymentConfigs[quorumID] = &pb.PaymentQuorumConfig{
@@ -400,8 +400,8 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 		}
 
 		// Protocol configuration for this quorum
-		quorumProtocolConfig, ok := params.QuorumProtocolConfigs[quorumNumber]
-		if !ok {
+		quorumProtocolConfig, err := s.meterer.ChainPaymentState.GetQuorumProtocolConfig(quorumNumber)
+		if err != nil {
 			s.logger.Debug("failed to get quorum protocol config, use zero value", "quorumNumber", quorumNumber)
 			continue
 		}

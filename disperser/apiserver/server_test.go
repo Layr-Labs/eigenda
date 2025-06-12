@@ -747,8 +747,8 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	}
 
 	mockState := &mock.MockOnchainPaymentState{}
-	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(&meterer.PaymentVaultParams{}, nil)
-	if _, err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
+	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil)
+	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
 
@@ -800,7 +800,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 		panic("failed to create metering store")
 	}
 	mt := meterer.NewMeterer(meterer.Config{}, mockState, store, logger)
-	_, err = mt.ChainPaymentState.RefreshOnchainPaymentState(context.Background())
+	err = mt.ChainPaymentState.RefreshOnchainPaymentState(context.Background())
 	if err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
