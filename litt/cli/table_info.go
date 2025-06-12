@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -36,14 +37,24 @@ type TableInfo struct {
 }
 
 // tableInfo retrieves information about a table at the specified path.
-func tableInfo(tableName string, paths []string) (*TableInfo, error) {
+func tableInfo(tableName string, paths []string, fsync bool) (*TableInfo, error) {
 	if !litt.IsTableNameValid(tableName) {
 		return nil, fmt.Errorf("table name '%s' is invalid, "+
 			"must be at least one character long and contain only letters, numbers, underscores, and dashes",
 			tableName)
 	}
 
-	// TODO grab litt lock
+	// Forbid touching tables in active use.
+	for _, rootPath := range paths {
+		lockPath := path.Join(rootPath, littbuilder.LockfileName)
+		lock, err := util.NewFileLock(lockPath, fsync)
+		if err != nil {
+			return nil, fmt.Errorf("failed to acquire lock on %s: %v", rootPath, err)
+		}
+		defer func() {
+			_ = lock.Release()
+		}()
+	}
 
 	segmentPaths, err := segment.BuildSegmentPaths(paths, "", tableName)
 	if err != nil {
@@ -142,7 +153,7 @@ func tableInfoCommand(ctx *cli.Context) error {
 		paths[i-1] = path
 	}
 
-	info, err := tableInfo(tableName, paths)
+	info, err := tableInfo(tableName, paths, true)
 	if err != nil {
 		return fmt.Errorf("failed to get table info for table %s at paths %v: %v", tableName, paths, err)
 	}
