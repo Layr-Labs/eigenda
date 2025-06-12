@@ -456,6 +456,7 @@ func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelet
 		errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
 
@@ -575,6 +576,7 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 		table.(*DiskTable).errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
 
@@ -767,6 +769,7 @@ func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete 
 		table.(*DiskTable).errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
 
@@ -964,6 +967,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		table.(*DiskTable).errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/%s/segments/%d%s",
@@ -990,6 +994,7 @@ func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		table.(*DiskTable).errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
 
@@ -1190,6 +1195,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		table.(*DiskTable).errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/%s/segments/%d%s",
@@ -1216,6 +1222,7 @@ func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 		table.(*DiskTable).errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
 
@@ -1437,6 +1444,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 		table.(*DiskTable).errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
 	keyFileName := fmt.Sprintf("%s/%s/segments/%d%s",
@@ -1462,6 +1470,7 @@ func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 		table.(*DiskTable).errorMonitor,
 		[]*segment.SegmentPath{segmentPath},
 		time.Now(),
+		true,
 		false)
 	require.NoError(t, err)
 

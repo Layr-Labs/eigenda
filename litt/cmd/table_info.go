@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
 )
 
@@ -62,6 +63,7 @@ func tableInfo(tableName string, paths []string) (*TableInfo, error) {
 	}
 
 	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(nil, err)
 	errorMonitor := util.NewErrorMonitor(context.Background(), logger, nil)
 
 	lowestSegmentIndex, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(

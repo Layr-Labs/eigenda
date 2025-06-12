@@ -16,8 +16,8 @@ type FileLock struct {
 	file *os.File
 }
 
-// isProcessAlive checks if a process with the given PID is still running
-func isProcessAlive(pid int) bool {
+// IsProcessAlive checks if a process with the given PID is still running
+func IsProcessAlive(pid int) bool {
 	if pid <= 0 {
 		return false
 	}
@@ -75,7 +75,7 @@ func parseLockFile(path string) (int, error) {
 // NewFileLock attempts to create a lock file at the specified path. Fails if another process has already created a
 // lock file. Useful for situations where a process wants to hold a mutual exclusion lock on a resource.
 // The caller is responsible for calling Release() to release the lock.
-func NewFileLock(path string) (*FileLock, error) {
+func NewFileLock(path string, fsync bool) (*FileLock, error) {
 	path, err := SanitizePath(path)
 	if err != nil {
 		return nil, fmt.Errorf("sanitize path failed: %v", err)
@@ -87,7 +87,7 @@ func NewFileLock(path string) (*FileLock, error) {
 		if os.IsExist(err) {
 			// Lock file exists, check if it's stale
 			if pid, parseErr := parseLockFile(path); parseErr == nil {
-				if !isProcessAlive(pid) {
+				if !IsProcessAlive(pid) {
 					// Process is dead, remove stale lock file and try again
 					if removeErr := os.Remove(path); removeErr != nil {
 						return nil, fmt.Errorf("failed to remove stale lock file %s: %w", path, removeErr)
@@ -129,18 +129,27 @@ func NewFileLock(path string) (*FileLock, error) {
 		return nil, fmt.Errorf("failed to write to lock file %s: %w", path, err)
 	}
 
-	err = file.Sync()
-	if err != nil {
-		// Close and remove the file if we can't sync it
-		_ = file.Close()
-		_ = os.Remove(path)
-		return nil, fmt.Errorf("failed to sync lock file %s: %w", path, err)
+	if fsync {
+		err = file.Sync()
+		if err != nil {
+			// Close and remove the file if we can't sync it
+			_ = file.Close()
+			_ = os.Remove(path)
+			return nil, fmt.Errorf("failed to sync lock file %s: %w", path, err)
+		}
 	}
 
 	return &FileLock{
 		path: path,
 		file: file,
 	}, nil
+}
+
+// WriteLockFile writes the current process ID and timestamp to the lock file.
+func WriteLockFile(lockFile *os.File, pid int) error {
+	lockInfo := fmt.Sprintf("PID: %d\nTimestamp: %s\n", pid, time.Now().Format(time.RFC3339))
+	_, err := lockFile.WriteString(lockInfo)
+	return err
 }
 
 // Release releases the file lock by closing and removing the lock file

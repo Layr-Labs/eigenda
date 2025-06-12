@@ -122,7 +122,7 @@ func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, e
 
 	fileLocks := make([]*util.FileLock, 0, len(config.Paths))
 	for _, rootPath := range config.Paths {
-		fileLock, err := util.NewFileLock(path.Join(rootPath, LockfileName))
+		fileLock, err := util.NewFileLock(path.Join(rootPath, LockfileName), config.Fsync)
 		if err != nil {
 			return nil, fmt.Errorf("error creating file lock for path %s: %w", rootPath, err)
 		}

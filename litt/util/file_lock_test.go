@@ -88,13 +88,13 @@ func TestNewFileLock(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			lockPath := tc.setup()
 
-			lock, err := NewFileLock(lockPath)
+			lock, err := NewFileLock(lockPath, true)
 
 			if tc.expectError {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.errorMsg)
 				require.Nil(t, lock)
-				
+
 				// Check for specific error messages
 				switch tc.name {
 				case "lock already exists with live process":
@@ -131,7 +131,7 @@ func TestFileLockRelease(t *testing.T) {
 	lockPath := filepath.Join(tempDir, "test.lock")
 
 	// Create a lock
-	lock, err := NewFileLock(lockPath)
+	lock, err := NewFileLock(lockPath, true)
 	require.NoError(t, err)
 	require.NotNil(t, lock)
 
@@ -157,9 +157,12 @@ func TestFileLockPath(t *testing.T) {
 	tempDir := t.TempDir()
 	lockPath := filepath.Join(tempDir, "test.lock")
 
-	lock, err := NewFileLock(lockPath)
+	lock, err := NewFileLock(lockPath, true)
 	require.NoError(t, err)
-	defer lock.Release()
+	defer func() {
+		err = lock.Release()
+		require.NoError(t, err)
+	}()
 
 	// Path should be sanitized (absolute)
 	returnedPath := lock.Path()
@@ -184,7 +187,7 @@ func TestFileLockConcurrency(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 
-			lock, err := NewFileLock(lockPath)
+			lock, err := NewFileLock(lockPath, true)
 			if err != nil {
 				results <- false
 				return
@@ -224,7 +227,7 @@ func TestFileLockCleanupOnFailure(t *testing.T) {
 		// We'll test the error path by creating a lock and verifying it's cleaned up
 		lockPath := filepath.Join(tempDir, "cleanup-test.lock")
 
-		lock, err := NewFileLock(lockPath)
+		lock, err := NewFileLock(lockPath, true)
 		require.NoError(t, err)
 		require.NotNil(t, lock)
 
@@ -255,10 +258,13 @@ func TestFileLockEdgeCases(t *testing.T) {
 	t.Run("path sanitization", func(t *testing.T) {
 		// Test that paths are properly sanitized
 		relativePath := "test.lock"
-		
-		lock, err := NewFileLock(relativePath)
+
+		lock, err := NewFileLock(relativePath, true)
 		require.NoError(t, err)
-		defer lock.Release()
+		defer func() {
+			err = lock.Release()
+			require.NoError(t, err)
+		}()
 
 		// Path should be absolute
 		lockPath := lock.Path()
@@ -269,7 +275,7 @@ func TestFileLockEdgeCases(t *testing.T) {
 	t.Run("double release protection", func(t *testing.T) {
 		lockPath := filepath.Join(tempDir, "double-release.lock")
 
-		lock, err := NewFileLock(lockPath)
+		lock, err := NewFileLock(lockPath, true)
 		require.NoError(t, err)
 
 		// First release should succeed
@@ -288,11 +294,11 @@ func TestFileLockDebugInfo(t *testing.T) {
 	lockPath := filepath.Join(tempDir, "debug-test.lock")
 
 	// Create first lock
-	lock1, err := NewFileLock(lockPath)
+	lock1, err := NewFileLock(lockPath, true)
 	require.NoError(t, err)
 
 	// Try to create second lock - should fail with debug info
-	lock2, err := NewFileLock(lockPath)
+	lock2, err := NewFileLock(lockPath, true)
 	require.Error(t, err)
 	require.Nil(t, lock2)
 
@@ -311,9 +317,12 @@ func TestFileLockContentsFormat(t *testing.T) {
 	tempDir := t.TempDir()
 	lockPath := filepath.Join(tempDir, "content-test.lock")
 
-	lock, err := NewFileLock(lockPath)
+	lock, err := NewFileLock(lockPath, true)
 	require.NoError(t, err)
-	defer lock.Release()
+	defer func() {
+		err = lock.Release()
+		require.NoError(t, err)
+	}()
 
 	// Read and verify lock file contents
 	content, err := os.ReadFile(lockPath)
@@ -332,7 +341,7 @@ func TestFileLockContentsFormat(t *testing.T) {
 
 	// Check timestamp line
 	require.True(t, strings.HasPrefix(lines[1], "Timestamp: "))
-	
+
 	// Verify timestamp is valid RFC3339 format
 	timestampStr := strings.TrimPrefix(lines[1], "Timestamp: ")
 	_, err = time.Parse(time.RFC3339, timestampStr)
@@ -374,7 +383,7 @@ func TestIsProcessAlive(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := isProcessAlive(tc.pid)
+			result := IsProcessAlive(tc.pid)
 			require.Equal(t, tc.expected, result)
 		})
 	}
@@ -454,7 +463,7 @@ func TestStaleLockRecovery(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try to acquire the lock - should succeed by removing stale lock
-	lock, err := NewFileLock(lockPath)
+	lock, err := NewFileLock(lockPath, true)
 	require.NoError(t, err)
 	require.NotNil(t, lock)
 
