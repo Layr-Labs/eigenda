@@ -502,117 +502,6 @@ func TestEnsureDirectoryExists(t *testing.T) {
 	}
 }
 
-func TestCopyDirectoryRecursively(t *testing.T) {
-	// Setup
-	tempDir := t.TempDir()
-
-	// Create a source directory structure
-	sourceDir := filepath.Join(tempDir, "source")
-	err := os.Mkdir(sourceDir, 0755)
-	require.NoError(t, err)
-
-	// Create some files in the source directory
-	err = os.WriteFile(filepath.Join(sourceDir, "file1.txt"), []byte("file1 content"), 0644)
-	require.NoError(t, err)
-	err = os.WriteFile(filepath.Join(sourceDir, "file2.txt"), []byte("file2 content"), 0644)
-	require.NoError(t, err)
-
-	// Create a subdirectory
-	subDir := filepath.Join(sourceDir, "subdir")
-	err = os.Mkdir(subDir, 0755)
-	require.NoError(t, err)
-
-	// Create files in the subdirectory
-	err = os.WriteFile(filepath.Join(subDir, "file3.txt"), []byte("file3 content"), 0644)
-	require.NoError(t, err)
-
-	// Create a symlink if supported
-	supportsLinks := supportsSymlinks()
-	var symlinkPath string
-	if supportsLinks {
-		symlinkPath = filepath.Join(sourceDir, "symlink")
-		err = os.Symlink(filepath.Join(sourceDir, "file1.txt"), symlinkPath)
-		require.NoError(t, err)
-	}
-
-	// Test cases
-	tests := []struct {
-		name        string
-		destDir     string
-		expectError bool
-	}{
-		{
-			name:        "copy to new destination",
-			destDir:     filepath.Join(tempDir, "dest"),
-			expectError: false,
-		},
-		{
-			name:        "copy to existing destination",
-			destDir:     filepath.Join(tempDir, "existing-dest"),
-			expectError: false,
-		},
-	}
-
-	// Run tests
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			// For the "existing destination" test, create the directory first
-			if tc.name == "copy to existing destination" {
-				err := os.Mkdir(tc.destDir, 0755)
-				require.NoError(t, err)
-
-				// Add a pre-existing file
-				err = os.WriteFile(filepath.Join(tc.destDir, "existing.txt"), []byte("existing content"), 0644)
-				require.NoError(t, err)
-			}
-
-			err := RecursiveCopy(sourceDir, tc.destDir)
-
-			if tc.expectError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-
-				// Verify the directory was copied correctly
-
-				// Check for file1.txt
-				content, err := os.ReadFile(filepath.Join(tc.destDir, "file1.txt"))
-				require.NoError(t, err)
-				require.Equal(t, "file1 content", string(content))
-
-				// Check for file2.txt
-				content, err = os.ReadFile(filepath.Join(tc.destDir, "file2.txt"))
-				require.NoError(t, err)
-				require.Equal(t, "file2 content", string(content))
-
-				// Check for subdirectory and its file
-				subDirPath := filepath.Join(tc.destDir, "subdir")
-				info, err := os.Stat(subDirPath)
-				require.NoError(t, err)
-				require.True(t, info.IsDir())
-
-				content, err = os.ReadFile(filepath.Join(subDirPath, "file3.txt"))
-				require.NoError(t, err)
-				require.Equal(t, "file3 content", string(content))
-
-				// Check for symlink if supported
-				if supportsLinks {
-					linkTarget, err := os.Readlink(filepath.Join(tc.destDir, "symlink"))
-					require.NoError(t, err)
-					require.Equal(t, filepath.Join(sourceDir, "file1.txt"), linkTarget)
-				}
-
-				// For the "existing destination" test, verify the pre-existing file is still there
-				if tc.name == "copy to existing destination" {
-					content, err = os.ReadFile(filepath.Join(tc.destDir, "existing.txt"))
-					require.NoError(t, err)
-					require.Equal(t, "existing content", string(content))
-				}
-			}
-		})
-	}
-}
-
 // Helper function to check if symlinks are supported in the current environment
 func supportsSymlinks() bool {
 	tempDir, err := os.MkdirTemp("", "symlink-test")
@@ -2221,7 +2110,7 @@ func TestRecursiveMoveWithSymlinksIntegration(t *testing.T) {
 			source, dest := tc.setup()
 
 			err := RecursiveMove(source, dest, tc.deep, tc.preserveOriginal, false)
-			
+
 			if tc.name == "error - directory with internal symlinks and deep copy" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), "cannot deep copy symlink")

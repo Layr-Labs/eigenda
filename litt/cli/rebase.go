@@ -41,10 +41,10 @@ func rebaseCommand(ctx *cli.Context) error {
 		}
 	}
 
-	deep := ctx.Bool("deep")
-	leaveOld := ctx.Bool("leave-old")
+	deep := !ctx.Bool("shallow")
+	preserveOriginal := ctx.Bool("preserve")
 
-	return rebase(sources, destinations, deep, leaveOld, true)
+	return rebase(sources, destinations, deep, preserveOriginal, true)
 }
 
 // Files to manage during a rebase:
@@ -61,7 +61,7 @@ func rebase(
 	sources []string,
 	destinations []string,
 	deep bool,
-	leaveOld bool,
+	preserveOriginal bool,
 	fsync bool,
 ) error {
 
@@ -107,7 +107,7 @@ func rebase(
 	// For each directory that is going away, transfer its data to the new destination.
 	for source := range sourceSet {
 		if _, ok := destinationSet[source]; !ok {
-			err := transferDataInDirectory(source, destinations, fsync)
+			err := transferDataInDirectory(source, destinations, deep, preserveOriginal, fsync)
 			if err != nil {
 				return fmt.Errorf("error transferring data from %s to %v: %w",
 					source, destinations, err)
@@ -119,7 +119,13 @@ func rebase(
 }
 
 // transfers all data in a directory to the specified destinations.
-func transferDataInDirectory(source string, destinations []string, fsync bool) error {
+func transferDataInDirectory(
+	source string,
+	destinations []string,
+	deep bool,
+	preserveOriginal bool,
+	fsync bool,
+) error {
 	exists, err := util.Exists(source)
 	if err != nil {
 		return fmt.Errorf("failed to check if source directory %s exists: %w", source, err)
@@ -149,7 +155,7 @@ func transferDataInDirectory(source string, destinations []string, fsync bool) e
 			continue
 		}
 
-		err = transferDataInTable(source, child.Name(), destinations)
+		err = transferDataInTable(source, child.Name(), destinations, deep, preserveOriginal, fsync)
 		if err != nil {
 			return fmt.Errorf("error transferring data in table %s: %w", child.Name(), err)
 		}
@@ -170,23 +176,31 @@ func transferDataInDirectory(source string, destinations []string, fsync bool) e
 	return nil
 }
 
-func transferDataInTable(source string, tableName string, destinations []string) error {
+func transferDataInTable(
+	source string,
+	tableName string,
+	destinations []string,
+	deep bool,
+	preserveOriginal bool,
+	fsync bool,
+) error {
+
 	err := createDestinationTableDirectories(destinations, tableName)
 	if err != nil {
 		return fmt.Errorf("failed to create destination table directories for table %s: %w", tableName, err)
 	}
 
-	err = transferKeymap(source, tableName, destinations)
+	err = transferKeymap(source, tableName, destinations, deep, preserveOriginal, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to transfer keymap for table %s: %w", tableName, err)
 	}
 
-	err = transferTableMetadata(source, tableName, destinations)
+	err = transferTableMetadata(source, tableName, destinations, deep, preserveOriginal, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to transfer table metadata for table %s: %w", tableName, err)
 	}
 
-	err = transferSegmentData(source, tableName, destinations)
+	err = transferSegmentData(source, tableName, destinations, deep, preserveOriginal, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to transfer segment data for table %s: %w", tableName, err)
 	}
@@ -248,7 +262,15 @@ func createDestinationTableDirectories(destinations []string, tableName string) 
 }
 
 // Transfer the keymap (if it is present in the source directory).
-func transferKeymap(source string, tableName string, destinations []string) error {
+func transferKeymap(
+	source string,
+	tableName string,
+	destinations []string,
+	deep bool,
+	preserveOriginal bool,
+	fsync bool,
+) error {
+
 	sourceKeymapPath := filepath.Join(source, tableName, keymap.KeymapDirectoryName)
 	exists, err := util.Exists(sourceKeymapPath)
 	if err != nil {
@@ -265,16 +287,11 @@ func transferKeymap(source string, tableName string, destinations []string) erro
 
 	destinationKeymapPath := filepath.Join(destination, tableName, keymap.KeymapDirectoryName)
 
-	// TODO verify what happens if files are already partially copied
-	// TODO do some hard link shenanigans if destination is on the same filesystem and deep=false
-
-	err = util.RecursiveCopy(sourceKeymapPath, destinationKeymapPath)
+	err = util.RecursiveMove(sourceKeymapPath, destinationKeymapPath, deep, preserveOriginal, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to copy keymap from %s to %s: %w",
 			sourceKeymapPath, destinationKeymapPath, err)
 	}
-
-	// TODO fsync on destination?
 
 	// Now that we've copied the keymap, we can delete the original.
 	err = os.RemoveAll(sourceKeymapPath)
@@ -286,7 +303,15 @@ func transferKeymap(source string, tableName string, destinations []string) erro
 }
 
 // transfers data in the segments/ directory
-func transferSegmentData(source string, tableName string, destinations []string) error {
+func transferSegmentData(
+	source string,
+	tableName string,
+	destinations []string,
+	deep bool,
+	preserveOriginal bool,
+	fsync bool,
+) error {
+
 	sourceTableDir := filepath.Join(source, tableName)
 
 	sourceSegmentDir := filepath.Join(sourceTableDir, segment.SegmentDirectory)
@@ -305,7 +330,14 @@ func transferSegmentData(source string, tableName string, destinations []string)
 
 	for _, segmentFile := range segmentFiles {
 		segmentFilePath := filepath.Join(sourceSegmentDir, segmentFile.Name())
-		err = transferSegmentFile(segmentFile.Name(), segmentFilePath, tableName, destinations)
+		err = transferSegmentFile(
+			segmentFile.Name(),
+			segmentFilePath,
+			tableName,
+			destinations,
+			deep,
+			preserveOriginal,
+			fsync)
 		if err != nil {
 			return fmt.Errorf("failed to transfer segment file %s for table %s: %w",
 				segmentFilePath, tableName, err)
@@ -322,7 +354,15 @@ func transferSegmentData(source string, tableName string, destinations []string)
 }
 
 // Transfer a single segment file (i.e. *.metadata, *.keys, *.values).
-func transferSegmentFile(segmentName string, segmentFilePath string, tableName string, destinations []string) error {
+func transferSegmentFile(
+	segmentName string,
+	segmentFilePath string,
+	tableName string,
+	destinations []string,
+	deep bool,
+	preserveOriginal bool,
+	fsync bool,
+) error {
 
 	destination, err := determineDestination(segmentFilePath, destinations)
 	if err != nil {
@@ -331,9 +371,7 @@ func transferSegmentFile(segmentName string, segmentFilePath string, tableName s
 
 	destinationSegmentPath := filepath.Join(destination, tableName, segment.SegmentDirectory, segmentName)
 
-	// TODO does this work on regular files?
-
-	err = util.RecursiveCopy(segmentFilePath, destinationSegmentPath)
+	err = util.RecursiveMove(segmentFilePath, destinationSegmentPath, deep, preserveOriginal, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to copy segment file from %s to %s: %w",
 			segmentFilePath, destinationSegmentPath, err)
@@ -349,7 +387,15 @@ func transferSegmentFile(segmentName string, segmentFilePath string, tableName s
 }
 
 // transfers the table metadata file, if it is present.
-func transferTableMetadata(source string, tableName string, destinations []string) error {
+func transferTableMetadata(
+	source string,
+	tableName string,
+	destinations []string,
+	deep bool,
+	preserveOriginal bool,
+	fsync bool,
+) error {
+
 	sourceTableDir := filepath.Join(source, tableName)
 
 	sourceMetadataPath := filepath.Join(sourceTableDir, disktable.TableMetadataFileName)
@@ -369,16 +415,11 @@ func transferTableMetadata(source string, tableName string, destinations []strin
 
 	destinationMetadataPath := filepath.Join(destination, tableName, disktable.TableMetadataFileName)
 
-	// TODO does this work on regular files?
-	// TODO handle deep/shallow, and what happens if the file is already partially copied
-
-	err = util.RecursiveCopy(sourceMetadataPath, destinationMetadataPath)
+	err = util.RecursiveMove(sourceMetadataPath, destinationMetadataPath, deep, preserveOriginal, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to copy table metadata from %s to %s: %w",
 			sourceMetadataPath, destinationMetadataPath, err)
 	}
-
-	// TODO fsync on destination?
 
 	// Now that we've copied the file, we can delete the original.
 	err = os.Remove(sourceMetadataPath)

@@ -59,15 +59,16 @@ func buildCLIParser() *cli.App {
 						Required: true,
 					},
 					&cli.BoolFlag{
-						Name:     "deep",
-						Aliases:  []string{"D"},
-						Usage:    "Copy each file, even if the source and destination are on the same filesystem.",
+						Name:    "shallow",
+						Aliases: []string{"D"},
+						Usage: "If true, then copies are made shallowly " +
+							"(e.g. with symlinks and hardlinks, where possible). ",
 						Required: false,
 					},
 					&cli.BoolFlag{
-						Name:     "leave-old",
-						Aliases:  []string{"l"},
-						Usage:    "Leave the old files in place after rebasing (i.e. don't delete source files).",
+						Name:     "preserve",
+						Aliases:  []string{"p"},
+						Usage:    "If enabled, then the old files are not removed.",
 						Required: false,
 					},
 				},

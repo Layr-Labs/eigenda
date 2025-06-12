@@ -191,55 +191,6 @@ func Exists(path string) (bool, error) {
 	return false, fmt.Errorf("error checking if path %s exists: %w", path, err)
 }
 
-// RecursiveCopy creates a deep copy of the file/directory rooted at source and writes it to destination.
-// It preserves file permissions, timestamps, and properly handles symlinks.
-//
-// The function performs a recursive copy of all files and directories, maintaining the same
-// relative path structure and file metadata. If the destination directory exists, it will
-// merge the source content into it, potentially overwriting files with the same names.
-//
-// The function checks that the destination has appropriate write permissions before starting the copy.
-// If the destination directory doesn't exist, it verifies the parent directory has appropriate permissions.
-// For existing directories, it ensures they have write permissions before attempting to copy files into them.
-//
-// TODO: Claude I intend to deprecate this function in favor of RecursiveMove. You don't have to do anything to
-// remove this function, but don't reuse it in new code.
-func RecursiveCopy(source string, destination string) error {
-	// Verify the destination is writable (or can be created)
-	if err := verifyDirectoryWritable(filepath.Dir(destination)); err != nil {
-		return err
-	}
-
-	return filepath.WalkDir(source, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return fmt.Errorf("failed to walk path %s: %w", path, err)
-		}
-
-		// Compute the path relative to source, then build the destination path
-		rel, err := filepath.Rel(source, path)
-		if err != nil {
-			return fmt.Errorf("failed to get relative path from %s to %s: %w", source, path, err)
-		}
-		target := filepath.Join(destination, rel)
-
-		info, err := d.Info()
-		if err != nil {
-			return fmt.Errorf("failed to get file info for %s: %w", path, err)
-		}
-
-		switch {
-		case d.IsDir():
-			return ensureDirectoryExists(target, info.Mode())
-
-		case (info.Mode() & os.ModeSymlink) != 0:
-			return copySymlink(path, target)
-
-		default:
-			return copyRegularFile(path, target, info.Mode(), info.ModTime())
-		}
-	})
-}
-
 // RecursiveMove transfers files/directory trees from the source to the destination.
 //
 // If delete is true, then the files at the source will be deleted when this method returns.
@@ -249,7 +200,7 @@ func RecursiveCopy(source string, destination string) error {
 // destination are on different filesystems, this will fall back to copying the files instead. If deep is true,
 // then files are always copied, even if they are on the same filesystem. Deep=true also influences how symlinks
 // are treated. If deep is false, then symlinks are copied as symlinks. If deep is true, then the file the symlink
-// points to is copied instead. // TODO claude: I added some extra information in this paragraph relating to symlinks. Implement this and test it.
+// points to is copied instead.
 //
 // If preserveOriginal is true, then the original files at the source will be preserved after the move (they may
 // still be hard linked if deep is false). If preserveOriginal is false, then the original files at the source will be
