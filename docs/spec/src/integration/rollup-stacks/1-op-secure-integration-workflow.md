@@ -57,7 +57,7 @@ Both eigenda-proxy and hokulea hold those properties.
 ## Proving correctness on L1
 
 The security of rollup is determined by if there are provable ways to challenge incorrect L2 state posted on L1.
-In this section, we discuss our OP secure integraton library **Hokulea**.
+In this section, we discuss our OP secure integration library **Hokulea**.
 
 ### Short intro to OP FPVM
 
@@ -83,7 +83,7 @@ More information about the communication spec is at [Hokulea](https://github.com
 oracle and derivation logics allows for 
 
 - deterministically deriving a rollup payload from an EigenDA certificate
-- discarding DA certs that can stall the derivation pipeline
+- discarding DA Certs that can stall the derivation pipeline
 
 ### Canoe
 

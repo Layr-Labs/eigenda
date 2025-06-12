@@ -3,7 +3,7 @@
 go = "1.21"
 
 # Tooling Dependencies
-"go:github.com/golangci/golangci-lint/cmd/golangci-lint" = "1.60.3"
+golangci-lint = "1.60.3"
 "go:github.com/ethereum/go-ethereum/cmd/abigen" = "v1.14.0"
 # Belive yarn is needed for foundry deps (see contracts/remappings.txt) and subgraph stuff.
 # TODO: document exactly why these are needed.
