@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -399,7 +400,7 @@ func recursiveMoveDirectory(
 
 		case (info.Mode() & os.ModeSymlink) != 0:
 			// Handle symlink
-			if err := handleSymlink(path, destPath, deep, preserveOriginal, fsync); err != nil {
+			if err := handleSymlink(path, destPath, deep, preserveOriginal, fsync, source); err != nil {
 				return fmt.Errorf("failed to handle symlink: %w", err)
 			}
 
@@ -492,7 +493,16 @@ func syncDirectory(path string) error {
 // handleSymlink handles symlink copying based on the deep parameter.
 // If deep is false, copies the symlink as a symlink.
 // If deep is true, copies the target file that the symlink points to.
-func handleSymlink(source string, destination string, deep bool, preserveOriginal bool, fsync bool) error {
+// sourceRoot parameter is optional and used to check for nested directory conflicts.
+func handleSymlink(
+	source string,
+	destination string,
+	deep bool,
+	preserveOriginal bool,
+	fsync bool,
+	sourceRoot ...string,
+) error {
+
 	if !deep {
 		// Copy symlink as symlink
 		return copySymlink(source, destination)
@@ -504,6 +514,24 @@ func handleSymlink(source string, destination string, deep bool, preserveOrigina
 		return fmt.Errorf("failed to resolve symlink %s: %w", source, err)
 	}
 
+	// Check if target is within the source root (which would cause conflicts)
+	if len(sourceRoot) > 0 {
+		// Resolve symlinks and ensure both paths are absolute for comparison
+		absSourceRoot, err1 := filepath.Abs(sourceRoot[0])
+		realSourceRoot, err2 := filepath.EvalSymlinks(absSourceRoot)
+		realTarget, err3 := filepath.EvalSymlinks(target)
+		if err1 == nil && err2 == nil && err3 == nil {
+			// Check if target is within the source root directory
+			relPath, err := filepath.Rel(realSourceRoot, realTarget)
+			if err == nil && !strings.HasPrefix(relPath, "..") && relPath != "." {
+				// Target is within source root, this would cause conflicts
+				return fmt.Errorf(
+					"cannot deep copy symlink %s: target %s is within the source directory being moved",
+					source, target)
+			}
+		}
+	}
+
 	// Get target file info
 	targetInfo, err := os.Stat(target)
 	if err != nil {
@@ -512,8 +540,7 @@ func handleSymlink(source string, destination string, deep bool, preserveOrigina
 
 	if targetInfo.IsDir() {
 		// Target is a directory, recursively copy it
-		// TODO claude: actually, don't preserve the original always, please use the setting preserveOriginal
-		return recursiveMoveDirectory(target, destination, deep, true, fsync) // Always preserve when following symlinks
+		return recursiveMoveDirectory(target, destination, deep, preserveOriginal, fsync)
 	} else {
 		// Target is a file, copy it
 		if err := copyRegularFile(target, destination, targetInfo.Mode(), targetInfo.ModTime()); err != nil {
@@ -524,6 +551,13 @@ func handleSymlink(source string, destination string, deep bool, preserveOrigina
 		if fsync {
 			if err := syncFile(destination); err != nil {
 				return fmt.Errorf("failed to sync copied symlink target: %w", err)
+			}
+		}
+
+		// Remove original target file if not preserving original
+		if !preserveOriginal {
+			if err := os.Remove(target); err != nil {
+				return fmt.Errorf("failed to remove original symlink target: %w", err)
 			}
 		}
 	}
