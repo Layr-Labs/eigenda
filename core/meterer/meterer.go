@@ -315,6 +315,9 @@ func SymbolsCharged(numSymbols uint64, minSymbols uint64) uint64 {
 	if numSymbols <= minSymbols {
 		return minSymbols
 	}
+	if minSymbols == 0 {
+		return numSymbols
+	}
 	// Round up to the nearest multiple of MinNumSymbols
 	roundedUp := core.RoundUpDivide(numSymbols, minSymbols) * minSymbols
 	// Check for overflow; this case should never happen

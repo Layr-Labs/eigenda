@@ -59,16 +59,6 @@ func NewAccountant(accountID gethcommon.Address, reservations map[uint8]*core.Re
 	return &a
 }
 
-// calculateReservationUsage calculates the symbol usage for a given number of symbols and quorum
-func (a *Accountant) calculateReservationUsage(numSymbols uint64, quorumNumber core.QuorumID) (uint64, error) {
-	minNumSymbols, err := a.GetMinNumSymbols(quorumNumber)
-	if err != nil {
-		return 0, err
-	}
-	symbolsCharged := meterer.SymbolsCharged(numSymbols, minNumSymbols)
-	return symbolsCharged, nil
-}
-
 // updateReservationUsage updates the usage records for a quorum's reservation
 func (a *Accountant) updateReservationUsage(quorumNumber core.QuorumID, currentPeriod uint64, symbolUsage uint64) error {
 	res, exists := a.reservations[quorumNumber]

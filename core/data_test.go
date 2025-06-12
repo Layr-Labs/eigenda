@@ -266,7 +266,7 @@ func TestWithinTime(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			isInRange := core.WithinTime(tt.start, tt.end, tt.checkTime)
+			isInRange := core.WithinTime(tt.checkTime, tt.start, tt.end)
 			assert.Equal(t, tt.wantInRange, isInRange)
 		})
 	}

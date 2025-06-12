@@ -79,7 +79,7 @@ func TestNewAccountant(t *testing.T) {
 	assert.NotNil(t, acc.periodRecords)
 }
 
-func TestAccountBlob_Reservation(t *testing.T) {
+func TestAccountant_Reservation(t *testing.T) {
 	reservation := &v2.QuorumReservation{
 		SymbolsPerSecond: 200,
 		StartTimestamp:   uint32(time.Now().Unix()),
@@ -154,7 +154,7 @@ func TestAccountBlob_Reservation(t *testing.T) {
 	assert.Equal(t, big.NewInt(300), header.CumulativePayment)
 }
 
-func TestAccountBlob_OnDemand(t *testing.T) {
+func TestAccountant_OnDemand(t *testing.T) {
 	numSymbols := uint64(1500)
 	quorums := []uint8{0, 1}
 
@@ -213,7 +213,7 @@ type accountBlobInsufficientOnDemandTest struct {
 	errorMessage string
 }
 
-func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
+func TestAccountant_InsufficientOnDemand(t *testing.T) {
 	reservation := map[uint8]*core.ReservedPayment{} // Empty reservation map
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
@@ -268,7 +268,7 @@ type accountBlobCallSeriesTest struct {
 	errorMessage   string
 }
 
-func TestAccountBlobCallSeries(t *testing.T) {
+func TestAccountant_AccountBlobCallSeries(t *testing.T) {
 	reservation := &core.ReservedPayment{
 		SymbolsPerSecond: 200,
 		StartTimestamp:   uint64(time.Now().Unix()),
@@ -368,14 +368,6 @@ func TestAccountBlobCallSeries(t *testing.T) {
 			}
 		})
 	}
-}
-
-type accountBlobBinRotationTest struct {
-	name           string
-	timeOffset     time.Duration
-	symbolLength   uint64
-	expectedHeader *core.PaymentMetadata
-	expectedState  PeriodRecord
 }
 
 func TestAccountBlob_BinRotation(t *testing.T) {
@@ -680,64 +672,7 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 	}
 }
 
-func TestQuorumCheck(t *testing.T) {
-	tests := []struct {
-		name           string
-		quorumNumbers  []uint8
-		allowedNumbers []uint8
-		expectError    bool
-		errorMessage   string
-	}{
-		{
-			name:           "valid quorum numbers",
-			quorumNumbers:  []uint8{0, 1},
-			allowedNumbers: []uint8{0, 1, 2},
-			expectError:    false,
-		},
-		{
-			name:           "empty quorum numbers",
-			quorumNumbers:  []uint8{},
-			allowedNumbers: []uint8{0, 1},
-			expectError:    true,
-			errorMessage:   "no quorum numbers provided in the request",
-		},
-		{
-			name:           "invalid quorum number",
-			quorumNumbers:  []uint8{0, 2},
-			allowedNumbers: []uint8{0, 1},
-			expectError:    true,
-			errorMessage:   "quorum number mismatch: 2",
-		},
-		{
-			name:           "empty allowed numbers",
-			quorumNumbers:  []uint8{0},
-			allowedNumbers: []uint8{},
-			expectError:    true,
-			errorMessage:   "quorum number mismatch: 0",
-		},
-		{
-			name:           "multiple invalid quorums",
-			quorumNumbers:  []uint8{2, 3, 4},
-			allowedNumbers: []uint8{0, 1},
-			expectError:    true,
-			errorMessage:   "quorum number mismatch: 2",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := meterer.ValidateQuorum(tt.quorumNumbers, tt.allowedNumbers)
-			if tt.expectError {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorMessage)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestSetPaymentState(t *testing.T) {
+func TestAccountant_SetPaymentState(t *testing.T) {
 	accountID := gethcommon.HexToAddress("0x123")
 	acc := NewAccountant(accountID, nil, nil)
 
@@ -800,7 +735,6 @@ func TestSetPaymentState(t *testing.T) {
 				assert.Contains(t, err.Error(), tt.errMsg)
 			} else {
 				require.NoError(t, err)
-				// Verify state was set correctly
 				assert.NotNil(t, acc.paymentVaultParams.QuorumPaymentConfigs[0])
 				assert.NotNil(t, acc.paymentVaultParams.QuorumProtocolConfigs[0])
 				assert.NotNil(t, acc.reservations[0])
@@ -809,13 +743,13 @@ func TestSetPaymentState(t *testing.T) {
 	}
 }
 
-func TestGetMinNumSymbols(t *testing.T) {
+func TestAccountant_GetMinNumSymbols(t *testing.T) {
 	accountant := NewAccountant(gethcommon.Address{}, map[uint8]*core.ReservedPayment{}, &core.OnDemandPayment{})
 
 	// Test with non-existent quorum
 	_, err := accountant.GetMinNumSymbols(99)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not found in protocol configs")
+	assert.Contains(t, err.Error(), "protocol config not found")
 
 	// Test with existing quorum after setting payment state
 	paymentState := &v2.GetPaymentStateForAllQuorumsReply{
@@ -829,13 +763,13 @@ func TestGetMinNumSymbols(t *testing.T) {
 	assert.Equal(t, uint64(100), minSymbols)
 }
 
-func TestGetPricePerSymbol(t *testing.T) {
+func TestAccountant_GetPricePerSymbol(t *testing.T) {
 	accountant := NewAccountant(gethcommon.Address{}, map[uint8]*core.ReservedPayment{}, &core.OnDemandPayment{})
 
 	// Test with non-existent quorum
 	_, err := accountant.GetPricePerSymbol(99)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not found in payment configs")
+	assert.Contains(t, err.Error(), "payment config not found")
 
 	// Test with existing quorum after setting payment state
 	paymentState := &v2.GetPaymentStateForAllQuorumsReply{
@@ -849,13 +783,13 @@ func TestGetPricePerSymbol(t *testing.T) {
 	assert.Equal(t, uint64(1), price)
 }
 
-func TestGetReservationWindow(t *testing.T) {
+func TestAccountant_GetReservationWindow(t *testing.T) {
 	accountant := NewAccountant(gethcommon.Address{}, map[uint8]*core.ReservedPayment{}, &core.OnDemandPayment{})
 
 	// Test with non-existent quorum
 	_, err := accountant.GetReservationWindow(99)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not found in protocol configs")
+	assert.Contains(t, err.Error(), "protocol config not found")
 
 	// Test with existing quorum after setting payment state
 	paymentState := &v2.GetPaymentStateForAllQuorumsReply{
@@ -869,7 +803,7 @@ func TestGetReservationWindow(t *testing.T) {
 	assert.Equal(t, uint64(6), window)
 }
 
-func TestAccountBlob_UseReservation(t *testing.T) {
+func TestAccountant_UseReservation(t *testing.T) {
 	accountID := gethcommon.HexToAddress("0x123")
 	now := time.Now().UnixNano()
 	reservations := map[uint8]*core.ReservedPayment{
@@ -954,7 +888,7 @@ func TestAccountBlob_UseReservation(t *testing.T) {
 	}
 }
 
-func TestAccountBlob_UseOnDemand(t *testing.T) {
+func TestAccountant_UseOnDemand(t *testing.T) {
 	accountID := gethcommon.HexToAddress("0x123")
 	now := time.Now().UnixNano()
 	reservations := map[uint8]*core.ReservedPayment{
@@ -1027,7 +961,7 @@ func TestAccountBlob_UseOnDemand(t *testing.T) {
 	}
 }
 
-func TestProcessQuorumReservation(t *testing.T) {
+func TestAccountant_ProcessQuorumReservation(t *testing.T) {
 	accountID := gethcommon.HexToAddress("0x123")
 	now := time.Now()
 	reservations := map[uint8]*core.ReservedPayment{
@@ -1052,7 +986,6 @@ func TestProcessQuorumReservation(t *testing.T) {
 		name             string
 		quorumNumber     uint8
 		reservation      *core.ReservedPayment
-		currentPeriod    uint64
 		symbolUsage      uint64
 		initialUsage     uint64
 		wantErr          bool
@@ -1064,7 +997,6 @@ func TestProcessQuorumReservation(t *testing.T) {
 			name:          "within bin limit",
 			quorumNumber:  0,
 			reservation:   reservations[0],
-			currentPeriod: 1,
 			symbolUsage:   50,
 			initialUsage:  0,
 			wantErr:       false,
@@ -1074,7 +1006,6 @@ func TestProcessQuorumReservation(t *testing.T) {
 			name:          "exact bin limit",
 			quorumNumber:  0,
 			reservation:   reservations[0],
-			currentPeriod: 1,
 			symbolUsage:   100,
 			initialUsage:  0,
 			wantErr:       false,
@@ -1084,7 +1015,6 @@ func TestProcessQuorumReservation(t *testing.T) {
 			name:             "overflow bin usage",
 			quorumNumber:     0,
 			reservation:      reservations[0],
-			currentPeriod:    1,
 			symbolUsage:      50,
 			initialUsage:     80,
 			wantErr:          false,
@@ -1092,21 +1022,21 @@ func TestProcessQuorumReservation(t *testing.T) {
 			expectedOverflow: 30,
 		},
 		{
-			name:          "exceeds limit",
-			quorumNumber:  0,
-			reservation:   reservations[0],
-			currentPeriod: 1,
-			symbolUsage:   150,
-			initialUsage:  0,
-			wantErr:       true,
-			errMsg:        "reservation limit exceeded",
+			name:         "exceeds limit",
+			quorumNumber: 0,
+			reservation:  reservations[0],
+			symbolUsage:  150,
+			initialUsage: 0,
+			wantErr:      true,
+			errMsg:       "reservation limit exceeded",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set initial usage
-			periodRecord := acc.GetRelativePeriodRecord(tt.currentPeriod, tt.quorumNumber)
+			currentPeriod := meterer.GetReservationPeriodByNanosecond(now.UnixNano(), binInterval)
+			periodRecord := acc.GetRelativePeriodRecord(currentPeriod, tt.quorumNumber)
 			periodRecord.Usage = tt.initialUsage
 
 			err := acc.reservationUsage(tt.symbolUsage, []uint8{tt.quorumNumber}, now.UnixNano())
@@ -1117,7 +1047,7 @@ func TestProcessQuorumReservation(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, tt.expectedUsage, periodRecord.Usage)
 				if tt.expectedOverflow > 0 {
-					overflowRecord := acc.GetRelativePeriodRecord(meterer.GetOverflowPeriod(tt.currentPeriod, binInterval), tt.quorumNumber)
+					overflowRecord := acc.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, binInterval), tt.quorumNumber)
 					assert.Equal(t, tt.expectedOverflow, overflowRecord.Usage)
 				}
 			}
@@ -1125,7 +1055,7 @@ func TestProcessQuorumReservation(t *testing.T) {
 	}
 }
 
-func TestAccountBlob_FutureReservation(t *testing.T) {
+func TestAccountant_FutureReservation(t *testing.T) {
 	accountID := gethcommon.HexToAddress("0x123")
 	now := time.Now()
 	reservations := map[uint8]*core.ReservedPayment{
@@ -1162,7 +1092,7 @@ func TestAccountBlob_FutureReservation(t *testing.T) {
 	assert.True(t, payment.CumulativePayment.Cmp(big.NewInt(0)) > 0)
 }
 
-func TestAccountBlob_MultipleOverflows(t *testing.T) {
+func TestAccountant_MultipleOverflows(t *testing.T) {
 	accountID := gethcommon.HexToAddress("0x123")
 	now := time.Now()
 	reservations := map[uint8]*core.ReservedPayment{
@@ -1224,7 +1154,7 @@ func TestAccountBlob_MultipleOverflows(t *testing.T) {
 	assert.Equal(t, uint64(50), record.Usage)
 }
 
-func TestAccountBlob_MixedReservationStates(t *testing.T) {
+func TestAccountant_MixedReservationStates(t *testing.T) {
 	accountID := gethcommon.HexToAddress("0x123")
 	now := time.Now()
 	reservations := map[uint8]*core.ReservedPayment{
@@ -1286,7 +1216,7 @@ func TestAccountBlob_MixedReservationStates(t *testing.T) {
 
 }
 
-func TestAccountBlob_ZeroPayment(t *testing.T) {
+func TestAccountant_ZeroPayment(t *testing.T) {
 	accountID := gethcommon.HexToAddress("0x123")
 	now := time.Now()
 	reservations := map[uint8]*core.ReservedPayment{
@@ -1326,7 +1256,7 @@ func TestAccountBlob_ZeroPayment(t *testing.T) {
 	assert.Nil(t, payment)
 }
 
-func TestAccountBlob_MaximumPayment(t *testing.T) {
+func TestAccountant_MaximumPayment(t *testing.T) {
 	accountID := gethcommon.HexToAddress("0x123")
 	now := time.Now()
 	reservations := map[uint8]*core.ReservedPayment{
