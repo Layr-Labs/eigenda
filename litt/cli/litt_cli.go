@@ -73,6 +73,13 @@ func buildCLIParser() *cli.App {
 				},
 				Action: rebaseCommand,
 			},
+			{
+				Name:      "benchmark",
+				Usage:     "Run a LittDB benchmark.",
+				ArgsUsage: "<path/to/benchmark/config.json>",
+				Args:      true,
+				Action:    benchmarkCommand,
+			},
 		},
 	}
 	return app
