@@ -638,10 +638,10 @@ type ReservedPayment struct {
 	// reservation expiration timestamp
 	EndTimestamp uint64
 
-	// allowed quorums
-	QuorumNumbers []uint8
-	// ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
-	QuorumSplits []byte
+	// // allowed quorums
+	// QuorumNumbers []uint8
+	// // ordered mapping of quorum number to payment split; on-chain validation should ensure split <= 100
+	// QuorumSplits []byte
 }
 
 type QuorumReservation = disperser_rpc.QuorumReservation

@@ -3,6 +3,8 @@ package lib
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
@@ -23,7 +25,6 @@ import (
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli"
-	"time"
 )
 
 func RunDisperserServer(ctx *cli.Context) error {
@@ -92,7 +93,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to create onchain payment state: %w", err)
 		}
-		if err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
+		if _, err := paymentChainState.RefreshOnchainPaymentState(context.Background()); err != nil {
 			return fmt.Errorf("failed to make initial query to the on-chain state: %w", err)
 		}
 

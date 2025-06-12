@@ -2,7 +2,6 @@ package meterer_test
 
 import (
 	"context"
-	"math"
 	"math/big"
 	"testing"
 
@@ -20,7 +19,7 @@ var (
 		SymbolsPerSecond: 100,
 		StartTimestamp:   1000,
 		EndTimestamp:     2000,
-		QuorumSplits:     []byte{50, 50},
+		// QuorumSplits:     []byte{50, 50},
 	}
 	dummyOnDemandPayment = &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -108,11 +107,26 @@ func TestOnchainPaymentStateNilAssignmentProtection(t *testing.T) {
 		stateWithNilParams, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
 		assert.NoError(t, err)
 
-		assert.Equal(t, uint64(0), stateWithNilParams.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(0), stateWithNilParams.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(math.MaxUint64), stateWithNilParams.GetMinNumSymbols(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(math.MaxUint64), stateWithNilParams.GetPricePerSymbol(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(0), stateWithNilParams.GetReservationWindow(meterer.OnDemandQuorumID))
+		// Test that nil PaymentVaultParams returns appropriate errors
+		_, err = stateWithNilParams.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "payment vault params not initialized")
+
+		_, err = stateWithNilParams.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "payment vault params not initialized")
+
+		_, err = stateWithNilParams.GetMinNumSymbols(meterer.OnDemandQuorumID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "payment vault params not initialized")
+
+		_, err = stateWithNilParams.GetPricePerSymbol(meterer.OnDemandQuorumID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "payment vault params not initialized")
+
+		_, err = stateWithNilParams.GetReservationWindow(meterer.OnDemandQuorumID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "payment vault params not initialized")
 	})
 
 	t.Run("PaymentVaultParams_MissingQuorum", func(t *testing.T) {
@@ -124,11 +138,26 @@ func TestOnchainPaymentStateNilAssignmentProtection(t *testing.T) {
 		}
 		state.PaymentVaultParams.Store(params)
 
-		assert.Equal(t, uint64(0), state.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(0), state.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(math.MaxUint64), state.GetMinNumSymbols(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(math.MaxUint64), state.GetPricePerSymbol(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(0), state.GetReservationWindow(meterer.OnDemandQuorumID))
+		// Test that missing quorum returns appropriate errors
+		_, err = state.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "payment config not found for quorum")
+
+		_, err = state.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "protocol config not found for quorum")
+
+		_, err = state.GetMinNumSymbols(meterer.OnDemandQuorumID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "protocol config not found for quorum")
+
+		_, err = state.GetPricePerSymbol(meterer.OnDemandQuorumID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "payment config not found for quorum")
+
+		_, err = state.GetReservationWindow(meterer.OnDemandQuorumID)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "protocol config not found for quorum")
 	})
 
 	t.Run("PaymentVaultParams_ValidConfig", func(t *testing.T) {
@@ -152,11 +181,21 @@ func TestOnchainPaymentStateNilAssignmentProtection(t *testing.T) {
 		}
 		state.PaymentVaultParams.Store(params)
 
-		assert.Equal(t, uint64(100), state.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(400), state.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(300), state.GetMinNumSymbols(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(200), state.GetPricePerSymbol(meterer.OnDemandQuorumID))
-		assert.Equal(t, uint64(500), state.GetReservationWindow(meterer.OnDemandQuorumID))
+		globalSymbolsPerSecond, err := state.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(100), globalSymbolsPerSecond)
+		globalPeriodInterval, err := state.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(400), globalPeriodInterval)
+		minNumSymbols, err := state.GetMinNumSymbols(meterer.OnDemandQuorumID)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(300), minNumSymbols)
+		pricePerSymbol, err := state.GetPricePerSymbol(meterer.OnDemandQuorumID)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(200), pricePerSymbol)
+		reservationWindow, err := state.GetReservationWindow(meterer.OnDemandQuorumID)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(500), reservationWindow)
 	})
 
 	t.Run("NilMapAssignment_Protection", func(t *testing.T) {

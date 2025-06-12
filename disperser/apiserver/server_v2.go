@@ -341,7 +341,12 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	now := time.Now().Unix()
 	periods := make([]uint64, len(quorumIds))
 	for i, quorumId := range quorumIds {
-		periods[i] = meterer.GetReservationPeriod(now, s.meterer.ChainPaymentState.GetReservationWindow(quorumId))
+		reservationWindow, err := s.meterer.ChainPaymentState.GetReservationWindow(quorumId)
+		if err != nil {
+			s.logger.Debug("failed to get reservation window, use zero value", "err", err, "quorumId", quorumId)
+			continue
+		}
+		periods[i] = meterer.GetReservationPeriod(now, reservationWindow)
 	}
 
 	records, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, quorumIds, periods, 3)
