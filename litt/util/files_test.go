@@ -565,7 +565,7 @@ func TestCopyDirectoryRecursively(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			err := CopyDirectoryRecursively(sourceDir, tc.destDir)
+			err := RecursiveCopy(sourceDir, tc.destDir)
 
 			if tc.expectError {
 				require.Error(t, err)

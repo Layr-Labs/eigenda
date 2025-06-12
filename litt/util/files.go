@@ -190,7 +190,7 @@ func Exists(path string) (bool, error) {
 	return false, fmt.Errorf("error checking if path %s exists: %w", path, err)
 }
 
-// CopyDirectoryRecursively creates a deep copy of the directory tree rooted at source and writes it to destination.
+// RecursiveCopy creates a deep copy of the file/directory rooted at source and writes it to destination.
 // It preserves file permissions, timestamps, and properly handles symlinks.
 //
 // The function performs a recursive copy of all files and directories, maintaining the same
@@ -200,7 +200,7 @@ func Exists(path string) (bool, error) {
 // The function checks that the destination has appropriate write permissions before starting the copy.
 // If the destination directory doesn't exist, it verifies the parent directory has appropriate permissions.
 // For existing directories, it ensures they have write permissions before attempting to copy files into them.
-func CopyDirectoryRecursively(source string, destination string) error {
+func RecursiveCopy(source string, destination string) error {
 	// Verify the destination is writable (or can be created)
 	if err := verifyDirectoryWritable(filepath.Dir(destination)); err != nil {
 		return err

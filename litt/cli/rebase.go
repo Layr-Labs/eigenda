@@ -268,7 +268,7 @@ func transferKeymap(source string, tableName string, destinations []string) erro
 	// TODO verify what happens if files are already partially copied
 	// TODO do some hard link shenanigans if destination is on the same filesystem and deep=false
 
-	err = util.CopyDirectoryRecursively(sourceKeymapPath, destinationKeymapPath)
+	err = util.RecursiveCopy(sourceKeymapPath, destinationKeymapPath)
 	if err != nil {
 		return fmt.Errorf("failed to copy keymap from %s to %s: %w",
 			sourceKeymapPath, destinationKeymapPath, err)
@@ -333,7 +333,7 @@ func transferSegmentFile(segmentName string, segmentFilePath string, tableName s
 
 	// TODO does this work on regular files?
 
-	err = util.CopyDirectoryRecursively(segmentFilePath, destinationSegmentPath)
+	err = util.RecursiveCopy(segmentFilePath, destinationSegmentPath)
 	if err != nil {
 		return fmt.Errorf("failed to copy segment file from %s to %s: %w",
 			segmentFilePath, destinationSegmentPath, err)
@@ -372,7 +372,7 @@ func transferTableMetadata(source string, tableName string, destinations []strin
 	// TODO does this work on regular files?
 	// TODO handle deep/shallow, and what happens if the file is already partially copied
 
-	err = util.CopyDirectoryRecursively(sourceMetadataPath, destinationMetadataPath)
+	err = util.RecursiveCopy(sourceMetadataPath, destinationMetadataPath)
 	if err != nil {
 		return fmt.Errorf("failed to copy table metadata from %s to %s: %w",
 			sourceMetadataPath, destinationMetadataPath, err)

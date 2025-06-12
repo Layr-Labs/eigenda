@@ -114,7 +114,7 @@ func testMigration(t *testing.T, migrationPath string) {
 	require.NoError(t, err)
 
 	// Copy the test data directory to our temporary directory
-	err = util.CopyDirectoryRecursively(migrationPath, testDir)
+	err = util.RecursiveCopy(migrationPath, testDir)
 	require.NoError(t, err)
 
 	// Now open the database and verify the data matches our expectations
