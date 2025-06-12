@@ -1,5 +1,7 @@
 ## Assignment Module
 
+> Warning: this page describes the assignment logic for EigenDA V1. We need to update it with Blazar assignment logic which is very different.
+
 The assignment module is essentially a rule which takes in the Ethereum chain state and outputs an allocation of chunks to DA operators. This can be generalized to a function that outputs a set of valid allocations.
 
 A chunk assignment has the following parameters: 

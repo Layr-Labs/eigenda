@@ -173,7 +173,7 @@ func (m *Meterer) IncrementBinUsage(ctx context.Context, header core.PaymentMeta
 		} else if prevUsage >= usageLimit {
 			// Bin was already filled before this increment
 			return fmt.Errorf("bin has already been filled for quorum %d", quorumID)
-		} else if newUsage <= 2*usageLimit && requestReservationPeriods[quorumID]+2 <= GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow) {
+		} else if charges[quorumID] <= usageLimit && GetOverflowPeriod(requestReservationPeriods[quorumID], reservationWindow) <= GetReservationPeriod(int64(reservation.EndTimestamp), reservationWindow) {
 			// Needs to go to overflow bin
 			overflowCandidates[quorumID] = struct{}{}
 			overflowAmounts[quorumID] = newUsage - usageLimit
@@ -274,6 +274,12 @@ func GetReservationPeriod(timestamp int64, binInterval uint64) uint64 {
 		return 0
 	}
 	return uint64(timestamp) / binInterval * binInterval
+}
+
+// GetOverflowPeriod returns the overflow period by adding the overflow offset to the current reservation period
+// the offset is 2*reservationWindow, skipping the immediate next period for the period that will be used for overflow from the current period
+func GetOverflowPeriod(reservationPeriod uint64, reservationWindow uint64) uint64 {
+	return reservationPeriod + reservationWindow*2
 }
 
 // PaymentCharged returns the chargeable price for a given number of symbols

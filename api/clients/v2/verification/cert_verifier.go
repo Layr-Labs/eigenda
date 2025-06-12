@@ -55,39 +55,44 @@ func (cv *CertVerifier) CheckDACert(
 	// 1 - switch on the certificate version to determine which underlying type to decode into
 	//     and which contract to call
 
-	var certVerifierCaller *certVerifierBinding.ContractEigenDACertVerifier
-	var certBytes []byte
+	// EigenDACertV3 is the only version that is supported by the CheckDACert function
+	var certV3 *coretypes.EigenDACertV3
 	var err error
 	switch cert.Version() {
 	case coretypes.VersionThreeCert:
-		certV3, ok := cert.(*coretypes.EigenDACertV3)
+		var ok bool
+		certV3, ok = cert.(*coretypes.EigenDACertV3)
 		if !ok {
 			return &CertVerifierInputError{Msg: fmt.Sprintf("expected cert to be of type EigenDACertV3, got %T", cert)}
 		}
-
-		// TODO: Determine adequate future proofing strategy for EigenDACertVerifierRouter to be compliant
-		//       with future reference timestamp change which deprecates the reference block number
-		//       used for quorum stake check-pointing.
-		certVerifierCaller, err = cv.getVerifierCallerFromBlockNumber(ctx, certV3.ReferenceBlockNumber())
-		if err != nil {
-			return &CertVerifierInternalError{Msg: "get verifier caller", Err: err}
-		}
-
-		certBytes, err = certV3.Serialize(coretypes.CertSerializationABI)
-		if err != nil {
-			return &CertVerifierInternalError{Msg: "serialize cert", Err: err}
-		}
 	case coretypes.VersionTwoCert:
-		_, ok := cert.(*coretypes.EigenDACertV2)
+		certV2, ok := cert.(*coretypes.EigenDACertV2)
 		if !ok {
 			return &CertVerifierInputError{Msg: fmt.Sprintf("expected cert to be of type EigenDACertV2, got %T", cert)}
 		}
-		return nil // noop verification. only used on V2 testnets and no mainnets
+
+		certV3, err = certV2.ToV3()
+		if err != nil {
+			return &CertVerifierInternalError{Msg: "convert V2 cert to V3", Err: err}
+		}
 	default:
 		return &CertVerifierInputError{Msg: fmt.Sprintf("unsupported cert version: %d", cert.Version())}
 	}
 
 	// 2 - Call the contract method CheckDACert to verify the certificate
+	// TODO: Determine adequate future proofing strategy for EigenDACertVerifierRouter to be compliant
+	//       with future reference timestamp change which deprecates the reference block number
+	//       used for quorum stake check-pointing.
+	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, certV3.ReferenceBlockNumber())
+	if err != nil {
+		return &CertVerifierInternalError{Msg: "get verifier caller", Err: err}
+	}
+
+	certBytes, err := certV3.Serialize(coretypes.CertSerializationABI)
+	if err != nil {
+		return &CertVerifierInternalError{Msg: "serialize cert", Err: err}
+	}
+
 	// TODO: determine if there's any merit in passing call options to impose better determinism and
 	// safety on the operation
 	result, err := certVerifierCaller.CheckDACert(

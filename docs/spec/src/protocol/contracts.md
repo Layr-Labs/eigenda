@@ -1,27 +1,25 @@
 # EigenDA Managed Contracts
 
-This page describe EigenDA contracts that are manage by EigenDA related actors (see the exact [roles](#governance-roles)). For EigenDA-related contracts that are managed by rollups, see the [rollup managed contracts](../integration/contracts.md) page.
+This page describes EigenDA contracts that are managed by EigenDA related actors (see the exact [roles](#governance-roles)). For EigenDA-related contracts that are managed by rollups, see the [rollup managed contracts](../integration/spec/4-contracts.md) page.
+
+> Warning: This page is incomplete and a work in progress as we are undergoing refactors of our contracts as well as some protocol upgrades. The details will change, but the information contained here should at least help to understand the important concepts.
 
 ## Middlewares Contracts
 
+We make use of eigenlayer-middleware contracts, which are fully documented [here](https://github.com/Layr-Labs/eigenlayer-middleware/tree/dev/docs).
+
 ## EigenDA Specific Contracts
 
-<!-- Section copied over from https://www.notion.so/eigen-labs/EigenDA-V2-Integration-Spec-12d13c11c3e0800e8968f31ef2c6a2b3?pvs=4#18513c11c3e08058a034ddc9523a3197 -->
-<!-- TODO: arch to review and update -->
+The smart contracts can be found in our [repo](https://github.com/Layr-Labs/eigenda/tree/master/contracts/src/core), and the deployment addresses on different chains can be found in the [Networks](https://docs.eigenda.xyz/networks/mainnet#contract-addresses) section of our docs.
 
-The smart contracts can be found [here](https://github.com/Layr-Labs/eigenda/tree/master/contracts/src/core).
-
-
-
-#### EigenDACertVerifier
-
-Contains a single function verifyDACertV2 which is used to verify `certs`. This function’s logic is described in the [Cert Validation](https://www.notion.so/EigenDA-V2-Integration-Spec-12d13c11c3e0800e8968f31ef2c6a2b3?pvs=21) section.
+![image.png](../../assets/integration/contracts-eigenda.png)
 
 ### EigenDAThreshold Registry
 
 The [EigenDAThresholdRegistry](https://github.com/Layr-Labs/eigenda/blob/c4567f90e835678fae4749f184857dea10ff330c/contracts/src/core/EigenDAThresholdRegistryStorage.sol#L22) contains two sets of fundamental parameters:
 
 ```solidity
+
 /// @notice mapping of blob version id to the params of the blob version
 mapping(uint16 => VersionedBlobParams) public versionedBlobParams;
 struct VersionedBlobParams {
@@ -38,27 +36,26 @@ struct SecurityThresholds {
 }
 ```
 
-The securityThresholds are currently immutable. These are the same as the [previously called](https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/overview.md#security-model) liveness and safety thresholds:
+The securityThresholds are currently immutable. Confirmation and adversary thresholds are sometimes also [referred to](https://docs.eigenda.xyz/overview#optimal-da-sharding) as liveness and safety thresholds:
 
-- Confirmation Threshold (fka liveness threshold): minimum percentage of stake which an attacker must control in order to mount a liveness attack on the system.
-- Adversary Threshold (fka safety threshold): total percentage of stake which an attacker must control in order to mount a first-order safety attack on the system.
+- **Confirmation Threshold (aka liveness threshold)**: minimum percentage of stake which an attacker must control in order to mount a liveness attack on the system.
+- **Adversary Threshold (aka safety threshold)**: total percentage of stake which an attacker must control in order to mount a first-order safety attack on the system.
 
-Their values are
+Their default values are currently set as:
 
 ```solidity
 defaultSecurityThresholdsV2 = {
-	confirmationThreshold = ??,
-	adversaryThreshold = ??,
+    confirmationThreshold = 55,
+    adversaryThreshold = 33,
 }
 ```
-
-A new BlobParam version is very infrequently introduced by the EigenDA Foundation Governance, and rollups can choose which version they wish to use when dispersing a blob. Currently there is only version 0 defined, with parameters:
+A new BlobParam version is rarely introduced by the EigenDA Foundation Governance. When dispersing a blob, rollups explicitly specify the version they wish to use. Currently, only version `0` is defined, with the following parameters ((reference)[https://etherscan.io/address/0xdb4c89956eEa6F606135E7d366322F2bDE609F1]):
 
 ```solidity
 versionedBlobParams[0] = {
-	maxNumOperators = ??,
-	numChunks = 8192,
-	codingRate = ??,
+    maxNumOperators =  3537,
+    numChunks = 8192,
+    codingRate = 8,
 }
 ```
 
@@ -68,21 +65,19 @@ $$
 numChunks \cdot (1 - \frac{100}{\gamma * codingRate}) \geq maxNumOperators
 $$
 
-where $\gamma$ = confirmationThreshold - adversaryThreshold
+where $\gamma = confirmationThreshold - adversaryThreshold$
 
 ### EigenDARelayRegistry
 
-Contains EigenDA network registered Relays’ Ethereum address and DNS hostname or IP address. `BlobCertificate`s contain `relayKey`(s), which can be transformed into that relay’s URL by calling [relayKeyToUrl](https://github.com/Layr-Labs/eigenda/blob/77d4442aa1b37bdc275173a6b27d917cc161474c/contracts/src/core/EigenDARelayRegistry.sol#L35).
+Contains EigenDA network registered Relays’ Ethereum address and DNS hostname or IP address. `BlobCertificates` contain `relayKeys`, which can be transformed into that relay’s URL by calling [relayKeyToUrl](https://github.com/Layr-Labs/eigenda/blob/77d4442aa1b37bdc275173a6b27d917cc161474c/contracts/src/core/EigenDARelayRegistry.sol#L35).
 
 ### EigenDADisperserRegistry
 
 Contains EigenDA network registered Dispersers’ Ethereum address. The EigenDA Network currently only supports a single Disperser, hosted by EigenLabs. The Disperser’s URL is currently static and unchanging, and can be found on our docs site in the [Networks](https://docs.eigenda.xyz/networks/mainnet) section.
 
-## Deployments
-
-<!-- TODO: add deployed contract addresses table -->
-
 ## Governance Roles
 
-<!-- TODO: import from https://www.notion.so/eigen-labs/EigenDA-V2-Governance-17513c11c3e0806999cfe5e8b9bf7e6a -->
-<!-- Do we want to make public everything in that doc?? -->
+<!-- TODO: we have this old doc https://www.notion.so/eigen-labs/EigenDA-V2-Governance-17513c11c3e0806999cfe5e8b9bf7e6a -->
+<!-- Not sure if it's still relevant or all outdated... will need to be written by @pakim249CAL once roles are stabilized. -->
+
+TODO

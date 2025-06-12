@@ -103,6 +103,16 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     make build
 
+# BlobAPI (Combined API Server and Relay) build stage
+FROM common-builder AS blobapi-builder
+WORKDIR /app/disperser
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -ldflags="-X main.version=${SEMVER} \
+                       -X main.gitCommit=${GITCOMMIT} \
+                       -X main.gitDate=${GITDATE}" \
+      -o ./bin/blobapi ./cmd/blobapi
+
 # Final stages for each component
 FROM alpine:3.22 AS churner
 COPY --from=churner-builder /app/operators/bin/churner /usr/local/bin
@@ -151,3 +161,7 @@ ENTRYPOINT ["generator"]
 FROM alpine:3.22 AS generator2
 COPY --from=generator2-builder /app/test/v2/bin/load /usr/local/bin
 ENTRYPOINT ["load", "-", "-"]
+
+FROM alpine:3.18 AS blobapi
+COPY --from=blobapi-builder /app/disperser/bin/blobapi /usr/local/bin
+ENTRYPOINT ["blobapi"]
