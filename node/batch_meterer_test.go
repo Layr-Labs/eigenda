@@ -91,16 +91,6 @@ func CreateTestReservation(symbolsPerSecond uint64, startTime, endTime time.Time
 	}
 }
 
-// CreateTestUpdateRecord creates a test update record
-func CreateTestUpdateRecord(accountID common.Address, quorumID core.QuorumID, period uint64, usage uint64) UpdateRecord {
-	return UpdateRecord{
-		accountID: accountID,
-		quorumID:  quorumID,
-		period:    period,
-		usage:     usage,
-	}
-}
-
 // InitializePeriodRecord initializes a period record for the given account and quorum
 func InitializePeriodRecord(batchMeterer *BatchMeterer, accountID common.Address, quorumID core.QuorumID, period uint64) {
 	accountUsage := batchMeterer.getOrCreateAccountUsage(accountID)
@@ -239,8 +229,8 @@ func (f *testFixtures) verifyUsage(t *testing.T, accountID common.Address, quoru
 	assert.Equal(t, expectedUsage, accountUsage.PeriodRecords[quorumID][relativeIndex].Usage)
 }
 
-// TestBatchMeterRequest tests the BatchMeterRequest function
-func TestBatchMeterRequest(t *testing.T) {
+// TestBatchMeterProcessBatch tests the processBatch function
+func TestBatchMeterProcessBatch(t *testing.T) {
 	f := setupTestFixtures(t)
 
 	t.Run("valid reservation", func(t *testing.T) {
@@ -259,11 +249,11 @@ func TestBatchMeterRequest(t *testing.T) {
 		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
 		f.setupPeriodRecord(f.account1, f.quorum0, currentPeriod)
 
-		updates := []UpdateRecord{
-			CreateTestUpdateRecord(f.account1, f.quorum0, currentPeriod, testUsageAmount),
+		updates := []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod, testUsageAmount),
 		}
 
-		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err := f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.NoError(t, err)
 
 		f.verifyUsage(t, f.account1, f.quorum0, currentPeriod, testUsageAmount)
@@ -291,34 +281,24 @@ func TestBatchMeterRequest(t *testing.T) {
 		f.setupPeriodRecord(f.account1, f.quorum0, nextPeriod)
 
 		// Create updates array for current period
-		updates := []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    currentPeriod,
-				usage:     testUsageAmount,
-			},
+		updates := []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod, testUsageAmount),
 		}
 
 		// Process the request
-		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err := f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.NoError(t, err)
 
 		// Create usage map for next period
 		nextNow := now.Add(time.Duration(reservationInterval) * time.Second)
 
 		// Create updates array for next period
-		updatesNext := []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    nextPeriod,
-				usage:     testUsageAmount,
-			},
+		updatesNext := []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, nextPeriod, testUsageAmount),
 		}
 
 		// Process the request for next period
-		err = f.batchMeterer.BatchMeterRequest(f.ctx, updatesNext, nextNow)
+		err = f.batchMeterer.processBatch(f.ctx, updatesNext, nextNow)
 		require.NoError(t, err)
 
 		// Verify both periods were updated correctly
@@ -348,23 +328,13 @@ func TestBatchMeterRequest(t *testing.T) {
 		f.setupPeriodRecord(f.account1, f.quorum0, prevPeriod)
 
 		// Create updates array with both periods
-		updates := []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    currentPeriod,
-				usage:     testUsageAmount,
-			},
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    prevPeriod,
-				usage:     testUsageAmount,
-			},
+		updates := []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod, testUsageAmount),
+			newUpdateRecord(f.account1, f.quorum0, prevPeriod, testUsageAmount),
 		}
 
 		// Process both periods in a single request
-		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err := f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.NoError(t, err)
 
 		// Verify both periods were updated correctly
@@ -390,15 +360,10 @@ func TestBatchMeterRequest(t *testing.T) {
 		for i := 0; i < 4; i++ {
 			periodTime := now.Add(time.Duration(i*reservationInterval) * time.Second)
 			periodIndex := meterer.GetReservationPeriod(periodTime.Unix(), f.reservationWindow)
-			updates := []UpdateRecord{
-				{
-					accountID: f.account1,
-					quorumID:  f.quorum0,
-					period:    periodIndex,
-					usage:     testUsageAmount,
-				},
+			updates := []*UpdateRecord{
+				newUpdateRecord(f.account1, f.quorum0, periodIndex, testUsageAmount),
 			}
-			err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, periodTime)
+			err := f.batchMeterer.processBatch(f.ctx, updates, periodTime)
 			require.NoError(t, err)
 		}
 
@@ -548,8 +513,8 @@ func TestBatchMeterMeterBatch(t *testing.T) {
 	})
 }
 
-// TestBatchRequestUsageEdgeCases tests edge cases in batch request usage calculation
-func TestBatchMeterRequestUsageEdgeCases(t *testing.T) {
+// TestProcessBatchUsageEdgeCases tests edge cases in batch request usage calculation
+func TestProcessBatchUsageEdgeCases(t *testing.T) {
 	f := setupTestFixtures(t)
 
 	t.Run("empty batch", func(t *testing.T) {
@@ -557,7 +522,7 @@ func TestBatchMeterRequestUsageEdgeCases(t *testing.T) {
 			BatchHeader:      &corev2.BatchHeader{},
 			BlobCertificates: []*corev2.BlobCertificate{},
 		}
-		_, err := f.batchMeterer.BatchRequestUsage(batch)
+		_, err := f.batchMeterer.batchRequestUsage(batch)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "batch is nil or empty")
 	})
@@ -571,7 +536,7 @@ func TestBatchMeterRequestUsageEdgeCases(t *testing.T) {
 				},
 			},
 		}
-		_, err := f.batchMeterer.BatchRequestUsage(batch)
+		_, err := f.batchMeterer.batchRequestUsage(batch)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "blob certificate has nil header")
 	})
@@ -588,7 +553,7 @@ func TestBatchMeterRequestUsageEdgeCases(t *testing.T) {
 		})
 		// Set blob length to 0 explicitly
 		batch.BlobCertificates[0].BlobHeader.BlobCommitments.Length = 0
-		updates, err := f.batchMeterer.BatchRequestUsage(batch)
+		updates, err := f.batchMeterer.batchRequestUsage(batch)
 		require.NoError(t, err)
 		currentPeriod := meterer.GetReservationPeriodByNanosecond(0, reservationInterval)
 		var found bool
@@ -618,7 +583,7 @@ func TestBatchMeterRequestUsageEdgeCases(t *testing.T) {
 				blobLength:        testBlobLengthForRounding,
 			},
 		})
-		updates, err := f.batchMeterer.BatchRequestUsage(batch)
+		updates, err := f.batchMeterer.batchRequestUsage(batch)
 		require.NoError(t, err)
 		currentPeriod := meterer.GetReservationPeriodByNanosecond(0, reservationInterval)
 		var found bool
@@ -643,7 +608,7 @@ func TestBatchMeterRequestUsageEdgeCases(t *testing.T) {
 		})
 		// Set blob length to a very large value
 		batch.BlobCertificates[0].BlobHeader.BlobCommitments.Length = testLargeUsage
-		updates, err := f.batchMeterer.BatchRequestUsage(batch)
+		updates, err := f.batchMeterer.batchRequestUsage(batch)
 		require.NoError(t, err)
 		currentPeriod := meterer.GetReservationPeriodByNanosecond(0, reservationInterval)
 		var found bool
@@ -689,16 +654,11 @@ func TestBatchMeterOverflowEdgeCases(t *testing.T) {
 		accountUsage.Lock.Unlock()
 
 		// Try to use exactly bin limit
-		updates := []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    currentPeriod,
-				usage:     binLimit,
-			},
+		updates := []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod, binLimit),
 		}
 
-		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err := f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.NoError(t, err)
 
 		// Verify usage is exactly at bin limit
@@ -733,16 +693,11 @@ func TestBatchMeterOverflowEdgeCases(t *testing.T) {
 		accountUsage.Lock.Unlock()
 
 		// Try to use just over bin limit
-		updates := []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    currentPeriod,
-				usage:     2, // Add 2 more to exceed limit
-			},
+		updates := []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod, 2), // Add 2 more to exceed limit
 		}
 
-		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err := f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.NoError(t, err)
 
 		// Verify overflow was handled
@@ -777,16 +732,11 @@ func TestBatchMeterOverflowEdgeCases(t *testing.T) {
 		accountUsage.Lock.Unlock()
 
 		// Try to use exactly 2x bin limit
-		updates := []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    currentPeriod,
-				usage:     2 * binLimit,
-			},
+		updates := []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod, 2*binLimit),
 		}
 
-		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err := f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.NoError(t, err)
 
 		// Verify overflow was handled
@@ -825,16 +775,11 @@ func TestBatchMeterOverflowEdgeCases(t *testing.T) {
 		// Try to use over 2x bin limit
 		now := time.Now()
 		currentPeriod := meterer.GetReservationPeriod(now.Unix(), reservationInterval)
-		updates := []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    currentPeriod,
-				usage:     2*binLimit + 1,
-			},
+		updates := []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod, 2*binLimit+1),
 		}
 
-		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err := f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "overflow usage exceeds bin limit")
 	})
@@ -864,17 +809,12 @@ func TestBatchMeterPeriodRecordEdgeCases(t *testing.T) {
 		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
 
 		// Create an update to trigger period record initialization
-		updates := []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    currentPeriod,
-				usage:     100,
-			},
+		updates := []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod, 100),
 		}
 
 		// Process the request to initialize the period record
-		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err := f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.NoError(t, err)
 
 		// Verify period record was initialized correctly
@@ -907,15 +847,10 @@ func TestBatchMeterPeriodRecordEdgeCases(t *testing.T) {
 		for i := 0; i < 4; i++ {
 			periodTime := now.Add(time.Duration(i*reservationInterval) * time.Second)
 			periodIndex := meterer.GetReservationPeriod(periodTime.Unix(), f.reservationWindow)
-			updates := []UpdateRecord{
-				{
-					accountID: f.account1,
-					quorumID:  f.quorum0,
-					period:    periodIndex,
-					usage:     100,
-				},
+			updates := []*UpdateRecord{
+				newUpdateRecord(f.account1, f.quorum0, periodIndex, 100),
 			}
-			err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, periodTime)
+			err := f.batchMeterer.processBatch(f.ctx, updates, periodTime)
 			require.NoError(t, err)
 		}
 
@@ -956,16 +891,11 @@ func TestBatchMeterReservationEdgeCases(t *testing.T) {
 		accountUsage.Lock.Unlock()
 
 		// Try to use without reservation
-		updates := []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    currentPeriod,
-				usage:     100,
-			},
+		updates := []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod, 100),
 		}
 
-		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err := f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no reservation")
 	})
@@ -995,16 +925,11 @@ func TestBatchMeterReservationEdgeCases(t *testing.T) {
 		accountUsage.Lock.Unlock()
 
 		// Try to use with invalid period
-		updates := []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    currentPeriod + testPeriodOffset, // Period too far in the future
-				usage:     100,
-			},
+		updates := []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod+testPeriodOffset, 100),
 		}
 
-		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err := f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid reservation period for quorum")
 	})
@@ -1028,16 +953,11 @@ func TestBatchMeterReservationEdgeCases(t *testing.T) {
 
 		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
 		f.setupPeriodRecord(f.account1, f.quorum0, currentPeriod)
-		updates := []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    currentPeriod,
-				usage:     100,
-			},
+		updates := []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod, 100),
 		}
 
-		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err := f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.NoError(t, err)
 	})
 
@@ -1060,16 +980,11 @@ func TestBatchMeterReservationEdgeCases(t *testing.T) {
 
 		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
 		f.setupPeriodRecord(f.account1, f.quorum0, currentPeriod)
-		updates := []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    currentPeriod,
-				usage:     100,
-			},
+		updates := []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod, 100),
 		}
 
-		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err := f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed usage validation for quorum")
 	})
@@ -1089,23 +1004,18 @@ func TestBatchMeterReservationEdgeCases(t *testing.T) {
 
 		currentPeriod := meterer.GetReservationPeriod(now.Unix(), f.reservationWindow)
 		f.setupPeriodRecord(f.account1, f.quorum0, currentPeriod)
-		updates := []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    currentPeriod,
-				usage:     100,
-			},
+		updates := []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod, 100),
 		}
 
-		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err := f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid reservation period for quorum")
 	})
 }
 
-// TestBatchMeterRequestRollback tests the rollback functionality in BatchMeterRequest
-func TestBatchMeterRequestRollback(t *testing.T) {
+// TestBatchMeterRollback tests the rollback functionality in processBatch
+func TestBatchMeterRollback(t *testing.T) {
 	f := setupTestFixtures(t)
 
 	t.Run("rollback on reservation error", func(t *testing.T) {
@@ -1136,17 +1046,12 @@ func TestBatchMeterRequestRollback(t *testing.T) {
 		accountUsage.Lock.Unlock()
 
 		// Create updates
-		updates := []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    currentPeriod,
-				usage:     50,
-			},
+		updates := []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod, 50),
 		}
 
 		// Process the request
-		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err := f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.NoError(t, err)
 
 		// Verify usage was updated
@@ -1162,17 +1067,12 @@ func TestBatchMeterRequestRollback(t *testing.T) {
 		).Return(nil, errors.New("reservation not found")).Once()
 
 		// Create updates for invalid reservation
-		updates = []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    currentPeriod,
-				usage:     100,
-			},
+		updates = []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod, 100),
 		}
 
 		// Process the request
-		err = f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err = f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "reservation not found")
 
@@ -1210,31 +1110,21 @@ func TestBatchMeterRequestRollback(t *testing.T) {
 		accountUsage.Lock.Unlock()
 
 		// Create updates
-		updates := []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    currentPeriod,
-				usage:     50,
-			},
+		updates := []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod, 50),
 		}
 
 		// Process the request
-		err := f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err := f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.NoError(t, err)
 
 		// Create updates for invalid period (far future period)
-		updates = []UpdateRecord{
-			{
-				accountID: f.account1,
-				quorumID:  f.quorum0,
-				period:    currentPeriod + testPeriodMultiplier*reservationInterval, // Far future period, should be invalid
-				usage:     100,
-			},
+		updates = []*UpdateRecord{
+			newUpdateRecord(f.account1, f.quorum0, currentPeriod+testPeriodMultiplier*reservationInterval, 100),
 		}
 
 		// Process the request
-		err = f.batchMeterer.BatchMeterRequest(f.ctx, updates, now)
+		err = f.batchMeterer.processBatch(f.ctx, updates, now)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid reservation period for quorum")
 

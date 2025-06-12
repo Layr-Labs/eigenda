@@ -19,7 +19,7 @@ import (
 type AccountUsage struct {
 	// Circular buffer of usage records, with minimum length MinNumBins
 	PeriodRecords map[core.QuorumID][]*pb.PeriodRecord
-	// Lock to protect concurrent access to usage records
+	// Each account has a lock to protect concurrent access to period records
 	Lock sync.RWMutex
 }
 
@@ -27,31 +27,30 @@ type AccountUsage struct {
 type UpdateRecord struct {
 	accountID gethcommon.Address
 	quorumID  core.QuorumID
-	period    uint64
-	usage     uint64 // The usage value to restore during rollback
+	// period is the reservation rate limit period
+	period uint64
+	usage  uint64
 }
 
 // newUpdateRecord creates a new UpdateRecord with validation
-func newUpdateRecord(accountID gethcommon.Address, quorumID core.QuorumID, period, usage uint64) (UpdateRecord, error) {
-	record := UpdateRecord{
+func newUpdateRecord(accountID gethcommon.Address, quorumID core.QuorumID, period, usage uint64) *UpdateRecord {
+	return &UpdateRecord{
 		accountID: accountID,
 		quorumID:  quorumID,
 		period:    period,
 		usage:     usage,
 	}
-	return record, nil
 }
 
-// BatchMeterer handles metering for batches of requests that may contain multiple accounts
+// BatchMeterer handles metering for batches of requests that may contain multiple accounts, quorums, and periods
 type BatchMeterer struct {
 	// Configuration for the batch meterer
 	Config meterer.Config
 
-	// ChainPaymentState reads on-chain payment state
 	ChainPaymentState meterer.OnchainPayment
 
-	// AccountUsages tracks in-memory usage for accounts and quorums
-	AccountUsages sync.Map // map[gethcommon.Address]*AccountUsage
+	// AccountUsages tracks in-memory usage for a map of accounts to AccountUsage
+	AccountUsages sync.Map
 
 	logger logging.Logger
 }
@@ -65,6 +64,7 @@ func NewBatchMeterer(
 	return &BatchMeterer{
 		Config:            config,
 		ChainPaymentState: paymentChainState,
+		AccountUsages:     sync.Map{},
 		logger:            logger.With("component", "BatchMeterer"),
 	}
 }
@@ -81,7 +81,6 @@ func (b *BatchMeterer) Start(ctx context.Context) {
 				if err := b.ChainPaymentState.RefreshOnchainPaymentState(ctx); err != nil {
 					b.logger.Error("Failed to refresh on-chain state", "error", err)
 				}
-				b.logger.Debug("Refreshed on-chain state")
 			case <-ctx.Done():
 				return
 			}
@@ -98,20 +97,20 @@ func (b *BatchMeterer) MeterBatch(
 ) error {
 	b.logger.Info("MeterBatch", "batch", batch, "batchReceivedAt", batchReceivedAt)
 	// convert batch into usage records tracking account, quorum, reservation period, and usage
-	usages, err := b.BatchRequestUsage(batch)
+	usages, err := b.batchRequestUsage(batch)
 	if err != nil {
-		b.logger.Error("BatchRequestUsage", "error", err)
+		b.logger.Error("batchRequestUsage", "error", err)
 		return err
 	}
 
 	// validate the usages against the accounts' reservations
-	return b.BatchMeterRequest(ctx, usages, batchReceivedAt)
+	return b.processBatch(ctx, usages, batchReceivedAt)
 }
 
-// BatchRequestUsage aggregates the usage for each account and quorum in the batch
+// batchRequestUsage aggregates the usage for each account and quorum in the batch
 // Returns an array of UpdateRecord representing the usage updates
-func (b *BatchMeterer) BatchRequestUsage(batch *corev2.Batch) ([]UpdateRecord, error) {
-	b.logger.Info("BatchRequestUsage", "batch", batch)
+func (b *BatchMeterer) batchRequestUsage(batch *corev2.Batch) ([]*UpdateRecord, error) {
+	b.logger.Info("batchRequestUsage", "batch", batch)
 	if batch == nil || len(batch.BlobCertificates) == 0 {
 		return nil, fmt.Errorf("batch is nil or empty")
 	}
@@ -141,49 +140,43 @@ func (b *BatchMeterer) BatchRequestUsage(batch *corev2.Batch) ([]UpdateRecord, e
 				existingRecord.usage += symbolsCharged
 			} else {
 				// Create new record if none exists
-				record, err := newUpdateRecord(accountID, quorumID, currentPeriod, symbolsCharged)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create update record: %w", err)
-				}
-				updatesMap[key] = &record
+				record := newUpdateRecord(accountID, quorumID, currentPeriod, symbolsCharged)
+				updatesMap[key] = record
 			}
 		}
 	}
 
 	// Convert map to slice
-	updates := make([]UpdateRecord, 0, len(updatesMap))
+	updates := make([]*UpdateRecord, 0, len(updatesMap))
 	for _, record := range updatesMap {
-		updates = append(updates, *record)
+		updates = append(updates, record)
 	}
 
-	b.logger.Info("BatchRequestUsage", "numUpdates", len(updates))
 	return updates, nil
 }
 
-// BatchMeterRequest validates and tracks usage for a batch of requests
+// processBatch validates and tracks usage for a batch of requests
 // For each account and quorum:
 // 1. Validates against reservation limits
 // 2. Checks reservation period validity
 // 3. Tracks usage in period records
-func (b *BatchMeterer) BatchMeterRequest(
+func (b *BatchMeterer) processBatch(
 	ctx context.Context,
-	updates []UpdateRecord,
+	updates []*UpdateRecord,
 	batchReceivedAt time.Time,
 ) error {
-	b.logger.Info("BatchMeterRequest", "numUpdates", len(updates), "batchReceivedAt", batchReceivedAt)
+	b.logger.Info("processBatch", "numUpdates", len(updates), "batchReceivedAt", batchReceivedAt)
 
-	// Track successful updates for potential rollback
-	successfulUpdates := make([]UpdateRecord, 0)
+	successfulUpdates := make([]*UpdateRecord, 0)
 
 	// Group updates by account for efficient reservation lookup
-	accountUpdates := make(map[gethcommon.Address][]UpdateRecord)
+	accountUpdates := make(map[gethcommon.Address][]*UpdateRecord)
 	for _, update := range updates {
 		accountUpdates[update.accountID] = append(accountUpdates[update.accountID], update)
 	}
 
-	// Process each account's updates
 	for accountID, accountUpdates := range accountUpdates {
-		b.logger.Info("Processing account updates", "accountID", accountID.Hex(), "numUpdates", len(accountUpdates))
+		b.logger.Info("processing account updates", "accountID", accountID.Hex(), "numUpdates", len(accountUpdates))
 
 		// Get unique quorum IDs for this account
 		quorumSet := make(map[core.QuorumID]struct{})
@@ -195,7 +188,6 @@ func (b *BatchMeterer) BatchMeterRequest(
 			quorumIDs = append(quorumIDs, quorumID)
 		}
 		slices.Sort(quorumIDs)
-		b.logger.Info("Sorted quorum IDs", "quorumIDs", quorumIDs)
 
 		// Get active reservations for this account's quorums
 		reservations, err := b.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, accountID, quorumIDs)
@@ -203,46 +195,35 @@ func (b *BatchMeterer) BatchMeterRequest(
 			b.rollbackUpdates(successfulUpdates)
 			return fmt.Errorf("failed to get reservations for account %s: %w", accountID.Hex(), err)
 		}
-		b.logger.Info("Got reservations", "reservations", reservations)
 
 		// Process each update for this account
 		for _, update := range accountUpdates {
-			b.logger.Debug("Processing update", "update", update)
 			reservation, ok := reservations[update.quorumID]
 			if !ok {
 				b.rollbackUpdates(successfulUpdates)
 				return fmt.Errorf("account %s has no reservation for quorum %d", accountID.Hex(), update.quorumID)
 			}
 
+			// TODO: Validating reservations can be refactored after the other refactoring PR
 			// Check if reservation is active first
 			if !reservation.IsActive(uint64(batchReceivedAt.Unix())) {
 				b.rollbackUpdates(successfulUpdates)
 				return fmt.Errorf("account %s has inactive reservation for quorum %d", accountID.Hex(), update.quorumID)
 			}
-
-			// Then validate reservation period
 			if !meterer.ValidateReservationPeriod(reservation, update.period, b.ChainPaymentState.GetReservationWindow(update.quorumID), batchReceivedAt) {
 				b.rollbackUpdates(successfulUpdates)
 				return fmt.Errorf("account %s has invalid reservation period for quorum %d", accountID.Hex(), update.quorumID)
 			}
 
-			// Track and validate usage
-			b.logger.Info("Incrementing and validating usage", "accountID", accountID.Hex(), "quorumID", update.quorumID, "usage", update.usage, "period", update.period)
+			b.logger.Info("incrementing and validating usage", "accountID", accountID.Hex(), "quorumID", update.quorumID, "usage", update.usage, "period", update.period)
 			prevUsage, err := b.incrementAndValidateUsage(accountID, update.quorumID, update.usage, reservation, update.period)
 			if err != nil {
 				b.logger.Error("Failed to increment and validate usage", "error", err)
 				b.rollbackUpdates(successfulUpdates)
 				return fmt.Errorf("account %s failed usage validation for quorum %d: %w", accountID.Hex(), update.quorumID, err)
 			}
-			b.logger.Info("Incremented and validated usage", "accountID", accountID.Hex(), "quorumID", update.quorumID, "usage", update.usage, "period", update.period, "prevUsage", prevUsage)
 			// Record successful update for potential rollback
-			record, err := newUpdateRecord(accountID, update.quorumID, update.period, prevUsage)
-			if err != nil {
-				b.rollbackUpdates(successfulUpdates)
-				return fmt.Errorf("failed to create update record: %w", err)
-			}
-			b.logger.Info("Created update record", "accountID", accountID.Hex(), "quorumID", update.quorumID, "period", update.period, "prevUsage", prevUsage)
-			successfulUpdates = append(successfulUpdates, record)
+			successfulUpdates = append(successfulUpdates, newUpdateRecord(accountID, update.quorumID, update.period, prevUsage))
 		}
 	}
 
@@ -250,13 +231,11 @@ func (b *BatchMeterer) BatchMeterRequest(
 }
 
 // rollbackUpdates reverts all successful updates in reverse order
-func (b *BatchMeterer) rollbackUpdates(updates []UpdateRecord) {
+func (b *BatchMeterer) rollbackUpdates(updates []*UpdateRecord) {
 	b.logger.Info("Rolling back updates", "numUpdates", len(updates))
 	if len(updates) == 0 {
 		return
 	}
-
-	b.logger.Info("Starting rollback", "numUpdates", len(updates))
 
 	// Process updates in reverse order to maintain consistency
 	for i := len(updates) - 1; i >= 0; i-- {
@@ -265,22 +244,10 @@ func (b *BatchMeterer) rollbackUpdates(updates []UpdateRecord) {
 
 		// Lock only for the duration of this update
 		accountUsage.Lock.Lock()
-		periodRecord := b.getOrCreatePeriodRecord(accountUsage, update.quorumID, update.period)
-
-		// Log the state before rollback
-		b.logger.Info("Rolling back update",
-			"accountID", update.accountID.Hex(),
-			"quorumID", update.quorumID,
-			"period", update.period,
-			"currentUsage", periodRecord.Usage,
-			"restoredUsage", update.usage,
-		)
-
+		periodRecord := b.getOrRefreshPeriodRecord(accountUsage, update.quorumID, update.period)
 		periodRecord.Usage = update.usage
 		accountUsage.Lock.Unlock()
 	}
-
-	b.logger.Info("Completed rollback", "numUpdates", len(updates))
 }
 
 // incrementAndValidateUsage validates and increments usage for an account and quorum
@@ -299,7 +266,7 @@ func (b *BatchMeterer) incrementAndValidateUsage(
 	accountUsage.Lock.Lock()
 	defer accountUsage.Lock.Unlock()
 
-	periodRecord := b.getOrCreatePeriodRecord(accountUsage, quorumID, currentPeriod)
+	periodRecord := b.getOrRefreshPeriodRecord(accountUsage, quorumID, currentPeriod)
 	binLimit := reservation.SymbolsPerSecond * b.ChainPaymentState.GetReservationWindow(quorumID)
 	prevUsage := periodRecord.Usage
 
@@ -347,7 +314,7 @@ func (b *BatchMeterer) incrementAndValidateUsage(
 	// Move overflow to next period
 	overflow := newUsage - binLimit
 	periodRecord.Usage = binLimit
-	overflowRecord := b.getOrCreatePeriodRecord(accountUsage, quorumID, nextPeriod)
+	overflowRecord := b.getOrRefreshPeriodRecord(accountUsage, quorumID, nextPeriod)
 	overflowPrev := overflowRecord.Usage
 	overflowRecord.Usage += overflow
 	// If overflow in next period exceeds bin limit, revert both and error
@@ -375,29 +342,24 @@ func (b *BatchMeterer) getOrCreateAccountUsage(accountID gethcommon.Address) *Ac
 	// Use LoadOrStore to ensure thread-safe creation
 	actual, loaded := b.AccountUsages.LoadOrStore(accountID, accountUsage)
 	if loaded {
-		// Another goroutine created the account usage first
 		return actual.(*AccountUsage)
 	}
 
 	return accountUsage
 }
 
-// getOrCreatePeriodRecord gets or creates a period record for an account and quorum
-func (b *BatchMeterer) getOrCreatePeriodRecord(
+// getOrRefreshPeriodRecord gets or creates a period record for an account and quorum
+func (b *BatchMeterer) getOrRefreshPeriodRecord(
 	accountUsage *AccountUsage,
 	quorumID core.QuorumID,
 	period uint64,
 ) *pb.PeriodRecord {
-	// Initialize quorum records if needed
 	if _, exists := accountUsage.PeriodRecords[quorumID]; !exists {
 		accountUsage.PeriodRecords[quorumID] = make([]*pb.PeriodRecord, meterer.MinNumBins)
 	}
 
 	// Calculate relative index in circular buffer
 	relativeIndex := uint32((period / b.ChainPaymentState.GetReservationWindow(quorumID)) % uint64(meterer.MinNumBins))
-	b.logger.Info("getOrCreatePeriodRecord", "relativeIndex", relativeIndex, "period", period, "reservationWindow", b.ChainPaymentState.GetReservationWindow(quorumID))
-
-	// Initialize record if needed
 	if accountUsage.PeriodRecords[quorumID][relativeIndex] == nil {
 		accountUsage.PeriodRecords[quorumID][relativeIndex] = &pb.PeriodRecord{
 			Index: uint32(period),
