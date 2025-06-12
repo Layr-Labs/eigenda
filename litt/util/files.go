@@ -262,8 +262,221 @@ func RecursiveMove(
 	preserveOriginal bool,
 	fsync bool,
 ) error {
+	// Sanitize paths
+	source, err := SanitizePath(source)
+	if err != nil {
+		return fmt.Errorf("failed to sanitize source path: %w", err)
+	}
 
-	// TODO claude: implement this function and unit test it
+	destination, err = SanitizePath(destination)
+	if err != nil {
+		return fmt.Errorf("failed to sanitize destination path: %w", err)
+	}
+
+	// Verify source exists
+	sourceInfo, err := os.Stat(source)
+	if err != nil {
+		return fmt.Errorf("source path %s does not exist: %w", source, err)
+	}
+
+	// Verify destination parent directory is writable
+	if err := verifyDirectoryWritable(filepath.Dir(destination)); err != nil {
+		return fmt.Errorf("destination parent directory not writable: %w", err)
+	}
+
+	// If source is a file, handle it directly
+	if !sourceInfo.IsDir() {
+		return recursiveMoveFile(source, destination, deep, preserveOriginal, fsync)
+	}
+
+	// Source is a directory, handle recursively
+	return recursiveMoveDirectory(source, destination, deep, preserveOriginal, fsync)
+}
+
+// recursiveMoveFile handles moving a single file
+func recursiveMoveFile(source string, destination string, deep bool, preserveOriginal bool, fsync bool) error {
+	sourceInfo, err := os.Stat(source)
+	if err != nil {
+		return fmt.Errorf("failed to stat source file: %w", err)
+	}
+
+	// Ensure parent directory exists
+	if err := ensureParentDirExists(destination); err != nil {
+		return fmt.Errorf("failed to ensure parent directory exists: %w", err)
+	}
+
+	// If not preserving original, try to move the file first (regardless of deep mode)
+	if !preserveOriginal {
+		// Try simple rename first (works if on same filesystem)
+		if err := os.Rename(source, destination); err == nil {
+			return nil
+		}
+		// Rename failed (likely different filesystem), fall back to copy+delete
+	}
+
+	// If preserving original or rename failed, use copy-based approach
+	if preserveOriginal && !deep {
+		// Try hard link if preserving original and not doing deep copy
+		if err := os.Link(source, destination); err == nil {
+			return nil
+		}
+		// Hard link failed, fall back to copy
+	}
+
+	// Check if source is a symlink
+	if sourceInfo.Mode()&os.ModeSymlink != 0 {
+		return copySymlink(source, destination)
+	}
+
+	// Copy the file
+	if err := copyRegularFile(source, destination, sourceInfo.Mode(), sourceInfo.ModTime()); err != nil {
+		return fmt.Errorf("failed to copy file: %w", err)
+	}
+
+	// Sync if requested
+	if fsync {
+		if err := syncFile(destination); err != nil {
+			return fmt.Errorf("failed to sync destination file: %w", err)
+		}
+	}
+
+	// Remove source if not preserving original
+	if !preserveOriginal {
+		if err := os.Remove(source); err != nil {
+			return fmt.Errorf("failed to remove source file: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// recursiveMoveDirectory handles moving a directory and its contents
+func recursiveMoveDirectory(source, destination string, deep, preserveOriginal, fsync bool) error {
+	// Create destination directory if it doesn't exist
+	if err := ensureDirectoryExists(destination, 0755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	// Walk through source directory
+	err := filepath.WalkDir(source, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return fmt.Errorf("failed to walk path %s: %w", path, err)
+		}
+
+		// Skip the root directory itself
+		if path == source {
+			return nil
+		}
+
+		// Calculate relative path and destination path
+		relPath, err := filepath.Rel(source, path)
+		if err != nil {
+			return fmt.Errorf("failed to get relative path: %w", err)
+		}
+
+		destPath := filepath.Join(destination, relPath)
+
+		info, err := d.Info()
+		if err != nil {
+			return fmt.Errorf("failed to get file info for %s: %w", path, err)
+		}
+
+		switch {
+		case d.IsDir():
+			// Create directory at destination
+			if err := ensureDirectoryExists(destPath, info.Mode()); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", destPath, err)
+			}
+
+		case (info.Mode() & os.ModeSymlink) != 0:
+			// Handle symlink
+			if err := copySymlink(path, destPath); err != nil {
+				return fmt.Errorf("failed to copy symlink: %w", err)
+			}
+
+		default:
+			// Handle regular file
+			if !deep {
+				// Try hard link first
+				if err := ensureParentDirExists(destPath); err != nil {
+					return fmt.Errorf("failed to ensure parent dir exists: %w", err)
+				}
+
+				if err := os.Link(path, destPath); err == nil {
+					// Hard link succeeded
+					if fsync {
+						if err := syncFile(destPath); err != nil {
+							return fmt.Errorf("failed to sync hard-linked file: %w", err)
+						}
+					}
+					return nil
+				}
+				// Hard link failed, fall back to copy
+			}
+
+			// Copy the file
+			if err := copyRegularFile(path, destPath, info.Mode(), info.ModTime()); err != nil {
+				return fmt.Errorf("failed to copy regular file: %w", err)
+			}
+
+			if fsync {
+				if err := syncFile(destPath); err != nil {
+					return fmt.Errorf("failed to sync copied file: %w", err)
+				}
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// Sync destination directory if requested
+	if fsync {
+		if err := syncDirectory(destination); err != nil {
+			return fmt.Errorf("failed to sync destination directory: %w", err)
+		}
+	}
+
+	// Remove source directory if not preserving original
+	if !preserveOriginal {
+		if err := os.RemoveAll(source); err != nil {
+			return fmt.Errorf("failed to remove source directory: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// syncFile syncs a file to disk
+func syncFile(path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("failed to open file for sync: %w", err)
+	}
+	defer file.Close()
+
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync file: %w", err)
+	}
+
+	return nil
+}
+
+// syncDirectory syncs a directory to disk
+func syncDirectory(path string) error {
+	dir, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("failed to open directory for sync: %w", err)
+	}
+	defer dir.Close()
+
+	if err := dir.Sync(); err != nil {
+		return fmt.Errorf("failed to sync directory: %w", err)
+	}
+
 	return nil
 }
 

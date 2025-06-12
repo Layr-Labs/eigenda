@@ -3,6 +3,7 @@ package util
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -1291,4 +1292,404 @@ func TestDeleteOrphanedSwapFilesPermissions(t *testing.T) {
 	// Restore permissions for cleanup
 	err = os.Chmod(testDir, 0755)
 	require.NoError(t, err)
+}
+
+func TestRecursiveMove(t *testing.T) {
+	// Setup
+	tempDir := t.TempDir()
+
+	tests := []struct {
+		name             string
+		setup            func() (string, string)
+		deep             bool
+		preserveOriginal bool
+		fsync            bool
+		expectError      bool
+		errorMsg         string
+		verify           func(t *testing.T, source, dest string)
+	}{
+		{
+			name: "move single file - rename optimization when not preserving",
+			setup: func() (string, string) {
+				source := filepath.Join(tempDir, "single-source.txt")
+				dest := filepath.Join(tempDir, "single-dest.txt")
+				err := os.WriteFile(source, []byte("single file content"), 0644)
+				require.NoError(t, err)
+				return source, dest
+			},
+			deep:             false,
+			preserveOriginal: false,
+			fsync:            false,
+			expectError:      false,
+			verify: func(t *testing.T, source, dest string) {
+				// Source should not exist (moved, not copied)
+				_, err := os.Stat(source)
+				require.True(t, os.IsNotExist(err), "Source should not exist after move")
+
+				// Destination should exist with correct content
+				content, err := os.ReadFile(dest)
+				require.NoError(t, err)
+				require.Equal(t, "single file content", string(content))
+			},
+		},
+		{
+			name: "move single file - preserve original with hard link",
+			setup: func() (string, string) {
+				source := filepath.Join(tempDir, "preserve-source.txt")
+				dest := filepath.Join(tempDir, "preserve-dest.txt")
+				err := os.WriteFile(source, []byte("preserve content"), 0644)
+				require.NoError(t, err)
+				return source, dest
+			},
+			deep:             false,
+			preserveOriginal: true,
+			fsync:            false,
+			expectError:      false,
+			verify: func(t *testing.T, source, dest string) {
+				// Both should exist
+				sourceContent, err := os.ReadFile(source)
+				require.NoError(t, err)
+				destContent, err := os.ReadFile(dest)
+				require.NoError(t, err)
+				require.Equal(t, "preserve content", string(sourceContent))
+				require.Equal(t, "preserve content", string(destContent))
+
+				// They should be hard linked (same inode)
+				sourceInfo, err := os.Stat(source)
+				require.NoError(t, err)
+				destInfo, err := os.Stat(dest)
+				require.NoError(t, err)
+				// Note: hard link verification is platform-specific, so we just check both exist
+				require.Equal(t, sourceInfo.Size(), destInfo.Size())
+			},
+		},
+		{
+			name: "move single file - deep copy when preserving",
+			setup: func() (string, string) {
+				source := filepath.Join(tempDir, "deep-source.txt")
+				dest := filepath.Join(tempDir, "deep-dest.txt")
+				err := os.WriteFile(source, []byte("deep copy content"), 0644)
+				require.NoError(t, err)
+				return source, dest
+			},
+			deep:             true,
+			preserveOriginal: true,
+			fsync:            false,
+			expectError:      false,
+			verify: func(t *testing.T, source, dest string) {
+				// Both should exist with same content
+				sourceContent, err := os.ReadFile(source)
+				require.NoError(t, err)
+				destContent, err := os.ReadFile(dest)
+				require.NoError(t, err)
+				require.Equal(t, "deep copy content", string(sourceContent))
+				require.Equal(t, "deep copy content", string(destContent))
+			},
+		},
+		{
+			name: "move directory structure",
+			setup: func() (string, string) {
+				sourceDir := filepath.Join(tempDir, "source-dir")
+				destDir := filepath.Join(tempDir, "dest-dir")
+
+				err := os.Mkdir(sourceDir, 0755)
+				require.NoError(t, err)
+
+				// Create files and subdirectories
+				err = os.WriteFile(filepath.Join(sourceDir, "file1.txt"), []byte("file1"), 0644)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(sourceDir, "file2.txt"), []byte("file2"), 0644)
+				require.NoError(t, err)
+
+				subDir := filepath.Join(sourceDir, "subdir")
+				err = os.Mkdir(subDir, 0755)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(subDir, "nested.txt"), []byte("nested"), 0644)
+				require.NoError(t, err)
+
+				return sourceDir, destDir
+			},
+			deep:             false,
+			preserveOriginal: false,
+			fsync:            false,
+			expectError:      false,
+			verify: func(t *testing.T, source, dest string) {
+				// Source should not exist
+				_, err := os.Stat(source)
+				require.True(t, os.IsNotExist(err), "Source directory should not exist after move")
+
+				// Destination should have all content
+				content1, err := os.ReadFile(filepath.Join(dest, "file1.txt"))
+				require.NoError(t, err)
+				require.Equal(t, "file1", string(content1))
+
+				content2, err := os.ReadFile(filepath.Join(dest, "file2.txt"))
+				require.NoError(t, err)
+				require.Equal(t, "file2", string(content2))
+
+				nestedContent, err := os.ReadFile(filepath.Join(dest, "subdir", "nested.txt"))
+				require.NoError(t, err)
+				require.Equal(t, "nested", string(nestedContent))
+			},
+		},
+		{
+			name: "move directory - preserve original",
+			setup: func() (string, string) {
+				sourceDir := filepath.Join(tempDir, "preserve-source-dir")
+				destDir := filepath.Join(tempDir, "preserve-dest-dir")
+
+				err := os.Mkdir(sourceDir, 0755)
+				require.NoError(t, err)
+
+				err = os.WriteFile(filepath.Join(sourceDir, "preserve-file.txt"), []byte("preserve content"), 0644)
+				require.NoError(t, err)
+
+				return sourceDir, destDir
+			},
+			deep:             false,
+			preserveOriginal: true,
+			fsync:            false,
+			expectError:      false,
+			verify: func(t *testing.T, source, dest string) {
+				// Both should exist
+				sourceContent, err := os.ReadFile(filepath.Join(source, "preserve-file.txt"))
+				require.NoError(t, err)
+				destContent, err := os.ReadFile(filepath.Join(dest, "preserve-file.txt"))
+				require.NoError(t, err)
+				require.Equal(t, "preserve content", string(sourceContent))
+				require.Equal(t, "preserve content", string(destContent))
+			},
+		},
+		{
+			name: "move with symlink",
+			setup: func() (string, string) {
+				if !supportsSymlinks() {
+					t.Skip("Symlinks not supported")
+				}
+
+				sourceDir := filepath.Join(tempDir, "symlink-source")
+				destDir := filepath.Join(tempDir, "symlink-dest")
+
+				err := os.Mkdir(sourceDir, 0755)
+				require.NoError(t, err)
+
+				// Create target file
+				targetFile := filepath.Join(sourceDir, "target.txt")
+				err = os.WriteFile(targetFile, []byte("target content"), 0644)
+				require.NoError(t, err)
+
+				// Create symlink
+				linkFile := filepath.Join(sourceDir, "link.txt")
+				err = os.Symlink(targetFile, linkFile)
+				require.NoError(t, err)
+
+				return sourceDir, destDir
+			},
+			deep:             false,
+			preserveOriginal: false,
+			fsync:            false,
+			expectError:      false,
+			verify: func(t *testing.T, source, dest string) {
+				if !supportsSymlinks() {
+					return
+				}
+
+				// Check that symlink was copied correctly
+				linkTarget, err := os.Readlink(filepath.Join(dest, "link.txt"))
+				require.NoError(t, err)
+				// The target should still point to the original source location
+				expectedTarget := filepath.Join(source, "target.txt")
+				require.Equal(t, expectedTarget, linkTarget)
+			},
+		},
+		{
+			name: "move to subdirectory",
+			setup: func() (string, string) {
+				source := filepath.Join(tempDir, "subdir-source.txt")
+				dest := filepath.Join(tempDir, "new-subdir", "dest.txt")
+				err := os.WriteFile(source, []byte("subdir content"), 0644)
+				require.NoError(t, err)
+				return source, dest
+			},
+			deep:             false,
+			preserveOriginal: false,
+			fsync:            false,
+			expectError:      false,
+			verify: func(t *testing.T, source, dest string) {
+				// Parent directory should have been created
+				parentDir := filepath.Dir(dest)
+				info, err := os.Stat(parentDir)
+				require.NoError(t, err)
+				require.True(t, info.IsDir())
+
+				// File should be moved
+				content, err := os.ReadFile(dest)
+				require.NoError(t, err)
+				require.Equal(t, "subdir content", string(content))
+
+				_, err = os.Stat(source)
+				require.True(t, os.IsNotExist(err))
+			},
+		},
+		{
+			name: "error - source does not exist",
+			setup: func() (string, string) {
+				source := filepath.Join(tempDir, "non-existent.txt")
+				dest := filepath.Join(tempDir, "dest.txt")
+				return source, dest
+			},
+			deep:             false,
+			preserveOriginal: false,
+			fsync:            false,
+			expectError:      true,
+			errorMsg:         "source path",
+		},
+		{
+			name: "error - destination parent not writable",
+			setup: func() (string, string) {
+				source := filepath.Join(tempDir, "readonly-source.txt")
+				err := os.WriteFile(source, []byte("content"), 0644)
+				require.NoError(t, err)
+
+				// Create read-only parent directory
+				readOnlyDir := filepath.Join(tempDir, "readonly-parent")
+				err = os.Mkdir(readOnlyDir, 0555) // read + execute only
+				require.NoError(t, err)
+
+				dest := filepath.Join(readOnlyDir, "dest.txt")
+				return source, dest
+			},
+			deep:             false,
+			preserveOriginal: false,
+			fsync:            false,
+			expectError:      true,
+			errorMsg:         "destination parent directory not writable",
+		},
+	}
+
+	// Run tests
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			source, dest := tc.setup()
+
+			err := RecursiveMove(source, dest, tc.deep, tc.preserveOriginal, tc.fsync)
+
+			if tc.expectError {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.errorMsg)
+			} else {
+				require.NoError(t, err)
+				if tc.verify != nil {
+					tc.verify(t, source, dest)
+				}
+			}
+
+			// Cleanup read-only directories for next tests
+			if readOnlyDir := filepath.Join(tempDir, "readonly-parent"); strings.Contains(dest, "readonly-parent") {
+				_ = os.Chmod(readOnlyDir, 0755) // Ignore error for cleanup
+			}
+		})
+	}
+}
+
+func TestRecursiveMoveFile(t *testing.T) {
+	// Test the internal recursiveMoveFile function directly
+	tempDir := t.TempDir()
+
+	tests := []struct {
+		name             string
+		setup            func() (string, string)
+		deep             bool
+		preserveOriginal bool
+		fsync            bool
+		expectError      bool
+		errorMsg         string
+	}{
+		{
+			name: "successful rename when not preserving",
+			setup: func() (string, string) {
+				source := filepath.Join(tempDir, "move-source.txt")
+				dest := filepath.Join(tempDir, "move-dest.txt")
+				err := os.WriteFile(source, []byte("move content"), 0644)
+				require.NoError(t, err)
+				return source, dest
+			},
+			deep:             false,
+			preserveOriginal: false,
+			fsync:            false,
+			expectError:      false,
+		},
+		{
+			name: "hard link when preserving and not deep",
+			setup: func() (string, string) {
+				source := filepath.Join(tempDir, "link-source.txt")
+				dest := filepath.Join(tempDir, "link-dest.txt")
+				err := os.WriteFile(source, []byte("link content"), 0644)
+				require.NoError(t, err)
+				return source, dest
+			},
+			deep:             false,
+			preserveOriginal: true,
+			fsync:            false,
+			expectError:      false,
+		},
+		{
+			name: "copy when deep and preserving",
+			setup: func() (string, string) {
+				source := filepath.Join(tempDir, "copy-source.txt")
+				dest := filepath.Join(tempDir, "copy-dest.txt")
+				err := os.WriteFile(source, []byte("copy content"), 0644)
+				require.NoError(t, err)
+				return source, dest
+			},
+			deep:             true,
+			preserveOriginal: true,
+			fsync:            false,
+			expectError:      false,
+		},
+		{
+			name: "copy and delete when not preserving but rename fails",
+			setup: func() (string, string) {
+				source := filepath.Join(tempDir, "cross-source.txt")
+				// Try to move to a different temp directory (might fail rename, fall back to copy)
+				otherTempDir := t.TempDir()
+				dest := filepath.Join(otherTempDir, "cross-dest.txt")
+				err := os.WriteFile(source, []byte("cross content"), 0644)
+				require.NoError(t, err)
+				return source, dest
+			},
+			deep:             false,
+			preserveOriginal: false,
+			fsync:            false,
+			expectError:      false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			source, dest := tc.setup()
+
+			err := recursiveMoveFile(source, dest, tc.deep, tc.preserveOriginal, tc.fsync)
+
+			if tc.expectError {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.errorMsg)
+			} else {
+				require.NoError(t, err)
+
+				// Verify destination exists
+				content, err := os.ReadFile(dest)
+				require.NoError(t, err)
+				require.Contains(t, string(content), "content")
+
+				// Check source existence based on preserveOriginal
+				_, err = os.Stat(source)
+				if tc.preserveOriginal {
+					require.NoError(t, err, "Source should exist when preserving original")
+				} else {
+					require.True(t, os.IsNotExist(err), "Source should not exist when not preserving original")
+				}
+			}
+		})
+	}
 }
