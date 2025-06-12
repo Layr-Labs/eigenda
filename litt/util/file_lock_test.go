@@ -147,10 +147,9 @@ func TestFileLockRelease(t *testing.T) {
 	_, err = os.Stat(lockPath)
 	require.True(t, os.IsNotExist(err))
 
-	// Try to release again (should fail)
+	// Try to release again (should not)
 	err = lock.Release()
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "lock is already released")
+	require.NoError(t, err)
 }
 
 func TestFileLockPath(t *testing.T) {
@@ -251,8 +250,7 @@ func TestFileLockEdgeCases(t *testing.T) {
 	t.Run("release nil lock", func(t *testing.T) {
 		lock := &FileLock{}
 		err := lock.Release()
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "lock is already released")
+		require.NoError(t, err)
 	})
 
 	t.Run("path sanitization", func(t *testing.T) {
@@ -284,8 +282,7 @@ func TestFileLockEdgeCases(t *testing.T) {
 
 		// Second release should fail gracefully
 		err = lock.Release()
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "lock is already released")
+		require.NoError(t, err)
 	})
 }
 

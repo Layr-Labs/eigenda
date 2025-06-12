@@ -90,9 +90,15 @@ func TestLs(t *testing.T) {
 		_, err = ls(root, false)
 		require.Error(t, err)
 	}
+	_, err = lsPaths(roots, false)
+	require.Error(t, err)
 
 	// Even when the DB is running, it should always be possible to ls the snapshot directory.
 	lsResult, err := ls(snapshotDir, false)
+	require.NoError(t, err)
+	require.Equal(t, tableNames, lsResult)
+
+	lsResult, err = lsPaths([]string{snapshotDir}, false)
 	require.NoError(t, err)
 	require.Equal(t, tableNames, lsResult)
 
@@ -106,6 +112,10 @@ func TestLs(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, tableNames, lsResult)
 	}
+
+	lsResult, err = lsPaths(roots, true)
+	require.NoError(t, err)
+	require.Equal(t, tableNames, lsResult)
 
 	// Data should still be present in the snapshot directory.
 	lsResult, err = ls(snapshotDir, false)

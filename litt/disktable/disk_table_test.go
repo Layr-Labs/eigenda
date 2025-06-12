@@ -1773,9 +1773,9 @@ func restartWithMultipleStorageDirectoriesTest(t *testing.T, tableBuilder *table
 
 			// Shuffle the table metadata location. This should not cause problems.
 			metadataDir := path.Join(directories[0], tableName)
-			mPath := path.Join(metadataDir, tableMetadataFileName)
+			mPath := path.Join(metadataDir, TableMetadataFileName)
 			newMetadataDir := path.Join(directories[rand.Uint32Range(1, uint32(len(directories)))], tableName)
-			newMPath := path.Join(newMetadataDir, tableMetadataFileName)
+			newMPath := path.Join(newMetadataDir, TableMetadataFileName)
 			err = os.MkdirAll(newMetadataDir, 0755)
 			require.NoError(t, err)
 			err = os.Rename(mPath, newMPath)

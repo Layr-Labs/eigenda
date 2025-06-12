@@ -13,7 +13,7 @@ import (
 )
 
 const tableMetadataSerializationVersion = 0
-const tableMetadataFileName = "table.metadata"
+const TableMetadataFileName = "table.metadata"
 const tableMetadataSize = 16
 
 // tableMetadata contains table data that is preserved across restarts.
@@ -175,7 +175,7 @@ func deserialize(data []byte) (*tableMetadata, error) {
 
 // delete deletes the table metadata from disk.
 func (t *tableMetadata) delete() error {
-	metadataPath := path.Join(t.tableDirectory, tableMetadataFileName)
+	metadataPath := path.Join(t.tableDirectory, TableMetadataFileName)
 	err := os.Remove(metadataPath)
 	if err != nil {
 		return fmt.Errorf("failed to delete table metadata file %s: %v", metadataPath, err)
@@ -185,5 +185,5 @@ func (t *tableMetadata) delete() error {
 
 // path returns the path to the table metadata file.
 func metadataPath(tableDirectory string) string {
-	return path.Join(tableDirectory, tableMetadataFileName)
+	return path.Join(tableDirectory, TableMetadataFileName)
 }

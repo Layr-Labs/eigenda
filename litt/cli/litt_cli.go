@@ -1,33 +1,8 @@
 package main
 
 import (
-	"os"
-
 	"github.com/urfave/cli/v2"
 )
-
-// Claude, ignore the comments in this block. I don't want to implement them yet.
-// Snapshot commands:
-// - clean a snapshot directory by deleting partial segments, should explode if middle segments are missing
-// - sanity check a snapshot directory, should utilize an optional checksum maybe
-// - garbage collect a snapshot directory
-//   - option to GC by TTL
-//   - option to GC by maximum size after GC
-//   - option to GC by segment number
-// - replicate a snapshot directory to another location
-// - queries
-//   - get high/low segment indices
-//   - get the age of a particular segment
-//   - get the contents of a segment metadata file
-//   - list keys in a keyfile, or export them to a csv
-//   - list the values in a value file, or export them to a csv
-// - commands to redistribute the files between variable numbers of root paths
-// - command to rsync files from a backup to a new validator, should take a variable number of root paths
-
-// runs the LittDB CLI
-func run() error {
-	return buildCLIParser().Run(os.Args)
-}
 
 // buildCliParser creates a command line parser for the LittDB CLI tool.
 func buildCLIParser() *cli.App {
@@ -38,24 +13,65 @@ func buildCLIParser() *cli.App {
 			{
 				Name:      "ls",
 				Usage:     "List tables in a LittDB instance",
-				ArgsUsage: "<path>",
-				Args:      true,
-				//Flags: []cli.Flag{
-				//	&cli.BoolFlag{
-				//		Name:    "verbose",
-				//		Aliases: []string{"v"},
-				//		Usage:   "Enable verbose output",
-				//	},
-				//},
+				ArgsUsage: "--src <path1> ... --src <pathN>",
+				Flags: []cli.Flag{
+					&cli.StringSliceFlag{
+						Name:     "src",
+						Aliases:  []string{"s"},
+						Usage:    "Source paths where the DB data is found, at least one is required.",
+						Required: true,
+					},
+				},
 				Action: lsCommand,
 			},
 			{
 				Name: "table-info",
 				Usage: "Get information about a LittDB table. " +
 					"If the DB is spread across multiple paths, all paths must be provided.",
-				ArgsUsage: "<table-name> <path1> ... <pathN>",
+				ArgsUsage: "--src <path1> ... --src <pathN> <table-name>",
 				Args:      true,
-				Action:    tableInfoCommand,
+				Flags: []cli.Flag{
+					&cli.StringSliceFlag{
+						Name:     "src",
+						Aliases:  []string{"s"},
+						Usage:    "Source paths where the DB data is found, at least one is required.",
+						Required: true,
+					},
+				},
+				Action: tableInfoCommand,
+			},
+			{
+				Name:  "rebase",
+				Usage: "Restructure LittDB file system layout.",
+				ArgsUsage: "--src <source-path1> ... --src <source-pathN> " +
+					"--dest <destination-path1> ... --dest <destination-pathN>",
+				Flags: []cli.Flag{
+					&cli.StringSliceFlag{
+						Name:     "src",
+						Aliases:  []string{"s"},
+						Usage:    "Source paths where the data is found, at least one is required.",
+						Required: true,
+					},
+					&cli.StringSliceFlag{
+						Name:     "dest",
+						Aliases:  []string{"d"},
+						Usage:    "Destination paths for the rebased LittDB, at least one is required.",
+						Required: true,
+					},
+					&cli.BoolFlag{
+						Name:     "deep",
+						Aliases:  []string{"D"},
+						Usage:    "Copy each file, even if the source and destination are on the same filesystem.",
+						Required: false,
+					},
+					&cli.BoolFlag{
+						Name:     "leave-old",
+						Aliases:  []string{"l"},
+						Usage:    "Leave the old files in place after rebasing (i.e. don't delete source files).",
+						Required: false,
+					},
+				},
+				Action: rebaseCommand,
 			},
 		},
 	}

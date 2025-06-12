@@ -152,10 +152,11 @@ func WriteLockFile(lockFile *os.File, pid int) error {
 	return err
 }
 
-// Release releases the file lock by closing and removing the lock file
+// Release releases the file lock by closing and removing the lock file.
+// This is a no-op if the lock is already released.
 func (fl *FileLock) Release() error {
 	if fl.file == nil {
-		return fmt.Errorf("lock is already released")
+		return nil
 	}
 
 	// Close the file first

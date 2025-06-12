@@ -36,6 +36,53 @@ type TableInfo struct {
 	KeymapType string
 }
 
+// tableInfoCommand is the CLI command handler for the "table-info" command.
+func tableInfoCommand(ctx *cli.Context) error {
+	if ctx.NArg() != 1 {
+		return fmt.Errorf(
+			"table-info command requires exactly at least two arguments: <table-name> <path1> ... <pathN> ")
+	}
+
+	tableName := ctx.Args().Get(0)
+
+	sources := ctx.StringSlice("src")
+	if len(sources) == 0 {
+		return fmt.Errorf("no sources provided")
+	}
+	for i, src := range sources {
+		var err error
+		sources[i], err = util.SanitizePath(src)
+		if err != nil {
+			return fmt.Errorf("Invalid source path: %s", src)
+		}
+	}
+
+	info, err := tableInfo(tableName, sources, true)
+	if err != nil {
+		return fmt.Errorf("failed to get table info for table %s at paths %v: %v", tableName, sources, err)
+	}
+
+	oldestSegmentAge := uint64(time.Since(info.OldestSegmentSealTime).Nanoseconds())
+	newestSegmentAge := uint64(time.Since(info.NewestSegmentSealTime).Nanoseconds())
+	segmentSpan := oldestSegmentAge - newestSegmentAge
+
+	// Print table information in a human-readable format
+	fmt.Printf("Table:                       %s\n", tableName)
+	fmt.Printf("Key count:                   %s\n", util.CommaOMatic(info.KeyCount))
+	fmt.Printf("Size:                        %s\n", util.PrettyPrintBytes(info.Size))
+	fmt.Printf("Is snapshot:                 %t\n", info.IsSnapshot)
+	fmt.Printf("Oldest segment age:          %s\n", util.PrettyPrintTime(oldestSegmentAge))
+	fmt.Printf("Oldest segment seal time:    %s\n", info.OldestSegmentSealTime.Format(time.RFC3339))
+	fmt.Printf("Newest segment age:          %s\n", util.PrettyPrintTime(newestSegmentAge))
+	fmt.Printf("Newest segment seal time:    %s\n", info.NewestSegmentSealTime.Format(time.RFC3339))
+	fmt.Printf("Segment span:                %s\n", util.PrettyPrintTime(segmentSpan))
+	fmt.Printf("Lowest segment index:        %d\n", info.LowestSegmentIndex)
+	fmt.Printf("Highest segment index:       %d\n", info.HighestSegmentIndex)
+	fmt.Printf("Key map type:                %s\n", info.KeymapType)
+
+	return nil
+}
+
 // tableInfo retrieves information about a table at the specified path.
 func tableInfo(tableName string, paths []string, fsync bool) (*TableInfo, error) {
 	if !litt.IsTableNameValid(tableName) {
@@ -132,49 +179,4 @@ func tableInfo(tableName string, paths []string, fsync bool) (*TableInfo, error)
 		HighestSegmentIndex:   highestSegmentIndex,
 		KeymapType:            keymapType,
 	}, nil
-}
-
-// tableInfoCommand is the CLI command handler for the "table-info" command.
-func tableInfoCommand(ctx *cli.Context) error {
-	if ctx.NArg() < 2 {
-		return fmt.Errorf(
-			"table-info command requires exactly at least two arguments: <table-name> <path1> ... <pathN> ")
-	}
-
-	tableName := ctx.Args().Get(0)
-
-	paths := make([]string, ctx.NArg()-1)
-	for i := 1; i < ctx.NArg(); i++ {
-		path := ctx.Args().Get(i)
-		path, err := util.SanitizePath(path)
-		if err != nil {
-			return fmt.Errorf("failed to sanitize path %s: %v", path, err)
-		}
-		paths[i-1] = path
-	}
-
-	info, err := tableInfo(tableName, paths, true)
-	if err != nil {
-		return fmt.Errorf("failed to get table info for table %s at paths %v: %v", tableName, paths, err)
-	}
-
-	oldestSegmentAge := uint64(time.Since(info.OldestSegmentSealTime).Nanoseconds())
-	newestSegmentAge := uint64(time.Since(info.NewestSegmentSealTime).Nanoseconds())
-	segmentSpan := oldestSegmentAge - newestSegmentAge
-
-	// Print table information in a human-readable format
-	fmt.Printf("Table:                       %s\n", tableName)
-	fmt.Printf("Key count:                   %s\n", util.CommaOMatic(info.KeyCount))
-	fmt.Printf("Size:                        %s\n", util.PrettyPrintBytes(info.Size))
-	fmt.Printf("Is snapshot:                 %t\n", info.IsSnapshot)
-	fmt.Printf("Oldest segment age:          %s\n", util.PrettyPrintTime(oldestSegmentAge))
-	fmt.Printf("Oldest segment seal time:    %s\n", info.OldestSegmentSealTime.Format(time.RFC3339))
-	fmt.Printf("Newest segment age:          %s\n", util.PrettyPrintTime(newestSegmentAge))
-	fmt.Printf("Newest segment seal time:    %s\n", info.NewestSegmentSealTime.Format(time.RFC3339))
-	fmt.Printf("Segment span:                %s\n", util.PrettyPrintTime(segmentSpan))
-	fmt.Printf("Lowest segment index:        %d\n", info.LowestSegmentIndex)
-	fmt.Printf("Highest segment index:       %d\n", info.HighestSegmentIndex)
-	fmt.Printf("Key map type:                %s\n", info.KeymapType)
-
-	return nil
 }
