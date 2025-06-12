@@ -246,7 +246,9 @@ func RecursiveCopy(source string, destination string) error {
 //
 // If deep is false, then this function will prefer hard-linking files instead of copying them. If the source and
 // destination are on different filesystems, this will fall back to copying the files instead. If deep is true,
-// then files are always copied, even if they are on the same filesystem.
+// then files are always copied, even if they are on the same filesystem. Deep=true also influences how symlinks
+// are treated. If deep is false, then symlinks are copied as symlinks. If deep is true, then the file the symlink
+// points to is copied instead. // TODO claude: I added some extra information in this paragraph relating to symlinks. Implement this and test it.
 //
 // If preserveOriginal is true, then the original files at the source will be preserved after the move (they may
 // still be hard linked if deep is false). If preserveOriginal is false, then the original files at the source will be
@@ -325,7 +327,7 @@ func recursiveMoveFile(source string, destination string, deep bool, preserveOri
 
 	// Check if source is a symlink
 	if sourceInfo.Mode()&os.ModeSymlink != 0 {
-		return copySymlink(source, destination)
+		return handleSymlink(source, destination, deep, preserveOriginal, fsync)
 	}
 
 	// Copy the file
@@ -351,7 +353,14 @@ func recursiveMoveFile(source string, destination string, deep bool, preserveOri
 }
 
 // recursiveMoveDirectory handles moving a directory and its contents
-func recursiveMoveDirectory(source, destination string, deep, preserveOriginal, fsync bool) error {
+func recursiveMoveDirectory(
+	source string,
+	destination string,
+	deep bool,
+	preserveOriginal bool,
+	fsync bool,
+) error {
+
 	// Create destination directory if it doesn't exist
 	if err := ensureDirectoryExists(destination, 0755); err != nil {
 		return fmt.Errorf("failed to create destination directory: %w", err)
@@ -390,8 +399,8 @@ func recursiveMoveDirectory(source, destination string, deep, preserveOriginal, 
 
 		case (info.Mode() & os.ModeSymlink) != 0:
 			// Handle symlink
-			if err := copySymlink(path, destPath); err != nil {
-				return fmt.Errorf("failed to copy symlink: %w", err)
+			if err := handleSymlink(path, destPath, deep, preserveOriginal, fsync); err != nil {
+				return fmt.Errorf("failed to handle symlink: %w", err)
 			}
 
 		default:
@@ -475,6 +484,48 @@ func syncDirectory(path string) error {
 
 	if err := dir.Sync(); err != nil {
 		return fmt.Errorf("failed to sync directory: %w", err)
+	}
+
+	return nil
+}
+
+// handleSymlink handles symlink copying based on the deep parameter.
+// If deep is false, copies the symlink as a symlink.
+// If deep is true, copies the target file that the symlink points to.
+func handleSymlink(source string, destination string, deep bool, preserveOriginal bool, fsync bool) error {
+	if !deep {
+		// Copy symlink as symlink
+		return copySymlink(source, destination)
+	}
+
+	// Deep copy: follow the symlink and copy the target
+	target, err := filepath.EvalSymlinks(source)
+	if err != nil {
+		return fmt.Errorf("failed to resolve symlink %s: %w", source, err)
+	}
+
+	// Get target file info
+	targetInfo, err := os.Stat(target)
+	if err != nil {
+		return fmt.Errorf("failed to stat symlink target %s: %w", target, err)
+	}
+
+	if targetInfo.IsDir() {
+		// Target is a directory, recursively copy it
+		// TODO claude: actually, don't preserve the original always, please use the setting preserveOriginal
+		return recursiveMoveDirectory(target, destination, deep, true, fsync) // Always preserve when following symlinks
+	} else {
+		// Target is a file, copy it
+		if err := copyRegularFile(target, destination, targetInfo.Mode(), targetInfo.ModTime()); err != nil {
+			return fmt.Errorf("failed to copy symlink target: %w", err)
+		}
+
+		// Sync if requested
+		if fsync {
+			if err := syncFile(destination); err != nil {
+				return fmt.Errorf("failed to sync copied symlink target: %w", err)
+			}
+		}
 	}
 
 	return nil

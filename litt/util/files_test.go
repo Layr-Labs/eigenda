@@ -1494,12 +1494,17 @@ func TestRecursiveMove(t *testing.T) {
 					return
 				}
 
-				// Check that symlink was copied correctly
+				// Check that symlink was copied correctly (shallow copy preserves symlink)
 				linkTarget, err := os.Readlink(filepath.Join(dest, "link.txt"))
 				require.NoError(t, err)
 				// The target should still point to the original source location
 				expectedTarget := filepath.Join(source, "target.txt")
 				require.Equal(t, expectedTarget, linkTarget)
+
+				// Check that target file was also moved
+				content, err := os.ReadFile(filepath.Join(dest, "target.txt"))
+				require.NoError(t, err)
+				require.Equal(t, "target content", string(content))
 			},
 		},
 		{
@@ -1689,6 +1694,455 @@ func TestRecursiveMoveFile(t *testing.T) {
 				} else {
 					require.True(t, os.IsNotExist(err), "Source should not exist when not preserving original")
 				}
+			}
+		})
+	}
+}
+
+func TestHandleSymlink(t *testing.T) {
+	if !supportsSymlinks() {
+		t.Skip("Symlinks not supported on this platform/environment")
+	}
+
+	tempDir := t.TempDir()
+
+	tests := []struct {
+		name             string
+		setup            func() (string, string, string) // Returns source symlink, destination, and target file/dir
+		deep             bool
+		preserveOriginal bool
+		fsync            bool
+		expectError      bool
+		errorMsg         string
+		verify           func(t *testing.T, sourceSymlink, dest, target string)
+	}{
+		{
+			name: "shallow copy - symlink to file copied as symlink",
+			setup: func() (string, string, string) {
+				// Create target file
+				target := filepath.Join(tempDir, "target-file.txt")
+				err := os.WriteFile(target, []byte("target content"), 0644)
+				require.NoError(t, err)
+
+				// Create symlink
+				sourceSymlink := filepath.Join(tempDir, "source-link")
+				err = os.Symlink(target, sourceSymlink)
+				require.NoError(t, err)
+
+				dest := filepath.Join(tempDir, "dest-link")
+				return sourceSymlink, dest, target
+			},
+			deep:             false,
+			preserveOriginal: false,
+			fsync:            false,
+			expectError:      false,
+			verify: func(t *testing.T, sourceSymlink, dest, target string) {
+				// Destination should be a symlink
+				linkTarget, err := os.Readlink(dest)
+				require.NoError(t, err)
+				require.Equal(t, target, linkTarget)
+
+				// Verify we can read through the symlink
+				content, err := os.ReadFile(dest)
+				require.NoError(t, err)
+				require.Equal(t, "target content", string(content))
+			},
+		},
+		{
+			name: "deep copy - symlink to file copied as actual file",
+			setup: func() (string, string, string) {
+				// Create target file
+				target := filepath.Join(tempDir, "deep-target-file.txt")
+				err := os.WriteFile(target, []byte("deep target content"), 0644)
+				require.NoError(t, err)
+
+				// Create symlink
+				sourceSymlink := filepath.Join(tempDir, "deep-source-link")
+				err = os.Symlink(target, sourceSymlink)
+				require.NoError(t, err)
+
+				dest := filepath.Join(tempDir, "deep-dest-file")
+				return sourceSymlink, dest, target
+			},
+			deep:             true,
+			preserveOriginal: false,
+			fsync:            false,
+			expectError:      false,
+			verify: func(t *testing.T, sourceSymlink, dest, target string) {
+				// Destination should be a regular file, not a symlink
+				destInfo, err := os.Stat(dest)
+				require.NoError(t, err)
+				require.False(t, destInfo.Mode()&os.ModeSymlink != 0, "Destination should not be a symlink")
+
+				// Content should match the target file
+				content, err := os.ReadFile(dest)
+				require.NoError(t, err)
+				require.Equal(t, "deep target content", string(content))
+
+				// Verify target file still exists and has same content
+				targetContent, err := os.ReadFile(target)
+				require.NoError(t, err)
+				require.Equal(t, "deep target content", string(targetContent))
+			},
+		},
+		{
+			name: "shallow copy - symlink to directory copied as symlink",
+			setup: func() (string, string, string) {
+				// Create target directory
+				targetDir := filepath.Join(tempDir, "target-dir")
+				err := os.Mkdir(targetDir, 0755)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(targetDir, "file.txt"), []byte("dir content"), 0644)
+				require.NoError(t, err)
+
+				// Create symlink to directory
+				sourceSymlink := filepath.Join(tempDir, "source-dir-link")
+				err = os.Symlink(targetDir, sourceSymlink)
+				require.NoError(t, err)
+
+				dest := filepath.Join(tempDir, "dest-dir-link")
+				return sourceSymlink, dest, targetDir
+			},
+			deep:             false,
+			preserveOriginal: false,
+			fsync:            false,
+			expectError:      false,
+			verify: func(t *testing.T, sourceSymlink, dest, targetDir string) {
+				// Destination should be a symlink
+				linkTarget, err := os.Readlink(dest)
+				require.NoError(t, err)
+				require.Equal(t, targetDir, linkTarget)
+
+				// Verify we can access directory through the symlink
+				content, err := os.ReadFile(filepath.Join(dest, "file.txt"))
+				require.NoError(t, err)
+				require.Equal(t, "dir content", string(content))
+			},
+		},
+		{
+			name: "deep copy - symlink to directory copied as actual directory",
+			setup: func() (string, string, string) {
+				// Create target directory
+				targetDir := filepath.Join(tempDir, "deep-target-dir")
+				err := os.Mkdir(targetDir, 0755)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(targetDir, "deep-file.txt"), []byte("deep dir content"), 0644)
+				require.NoError(t, err)
+
+				// Create subdirectory
+				subDir := filepath.Join(targetDir, "subdir")
+				err = os.Mkdir(subDir, 0755)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(subDir, "nested.txt"), []byte("nested content"), 0644)
+				require.NoError(t, err)
+
+				// Create symlink to directory
+				sourceSymlink := filepath.Join(tempDir, "deep-source-dir-link")
+				err = os.Symlink(targetDir, sourceSymlink)
+				require.NoError(t, err)
+
+				dest := filepath.Join(tempDir, "deep-dest-dir")
+				return sourceSymlink, dest, targetDir
+			},
+			deep:             true,
+			preserveOriginal: false,
+			fsync:            false,
+			expectError:      false,
+			verify: func(t *testing.T, sourceSymlink, dest, targetDir string) {
+				// Destination should be a regular directory, not a symlink
+				destInfo, err := os.Stat(dest)
+				require.NoError(t, err)
+				require.True(t, destInfo.IsDir(), "Destination should be a directory")
+				require.False(t, destInfo.Mode()&os.ModeSymlink != 0, "Destination should not be a symlink")
+
+				// Content should be copied
+				content, err := os.ReadFile(filepath.Join(dest, "deep-file.txt"))
+				require.NoError(t, err)
+				require.Equal(t, "deep dir content", string(content))
+
+				// Nested content should be copied
+				nestedContent, err := os.ReadFile(filepath.Join(dest, "subdir", "nested.txt"))
+				require.NoError(t, err)
+				require.Equal(t, "nested content", string(nestedContent))
+
+				// Original target directory should still exist
+				originalContent, err := os.ReadFile(filepath.Join(targetDir, "deep-file.txt"))
+				require.NoError(t, err)
+				require.Equal(t, "deep dir content", string(originalContent))
+			},
+		},
+		{
+			name: "error - broken symlink with deep copy",
+			setup: func() (string, string, string) {
+				// Create symlink pointing to non-existent file
+				sourceSymlink := filepath.Join(tempDir, "broken-link")
+				nonExistentTarget := filepath.Join(tempDir, "non-existent.txt")
+				err := os.Symlink(nonExistentTarget, sourceSymlink)
+				require.NoError(t, err)
+
+				dest := filepath.Join(tempDir, "broken-dest")
+				return sourceSymlink, dest, nonExistentTarget
+			},
+			deep:             true,
+			preserveOriginal: false,
+			fsync:            false,
+			expectError:      true,
+			errorMsg:         "failed to resolve symlink",
+		},
+		{
+			name: "shallow copy - broken symlink copied as symlink",
+			setup: func() (string, string, string) {
+				// Create symlink pointing to non-existent file
+				sourceSymlink := filepath.Join(tempDir, "broken-shallow-link")
+				nonExistentTarget := filepath.Join(tempDir, "non-existent-shallow.txt")
+				err := os.Symlink(nonExistentTarget, sourceSymlink)
+				require.NoError(t, err)
+
+				dest := filepath.Join(tempDir, "broken-shallow-dest")
+				return sourceSymlink, dest, nonExistentTarget
+			},
+			deep:             false,
+			preserveOriginal: false,
+			fsync:            false,
+			expectError:      false,
+			verify: func(t *testing.T, sourceSymlink, dest, target string) {
+				// Destination should be a symlink pointing to the same (non-existent) target
+				linkTarget, err := os.Readlink(dest)
+				require.NoError(t, err)
+				require.Equal(t, target, linkTarget)
+
+				// Trying to read through the symlink should fail
+				_, err = os.ReadFile(dest)
+				require.Error(t, err)
+			},
+		},
+		{
+			name: "chain of symlinks - deep copy follows to final target",
+			setup: func() (string, string, string) {
+				// Create final target
+				finalTarget := filepath.Join(tempDir, "final-target.txt")
+				err := os.WriteFile(finalTarget, []byte("final content"), 0644)
+				require.NoError(t, err)
+
+				// Create intermediate symlink
+				intermediateLink := filepath.Join(tempDir, "intermediate-link")
+				err = os.Symlink(finalTarget, intermediateLink)
+				require.NoError(t, err)
+
+				// Create source symlink pointing to intermediate
+				sourceSymlink := filepath.Join(tempDir, "chain-source-link")
+				err = os.Symlink(intermediateLink, sourceSymlink)
+				require.NoError(t, err)
+
+				dest := filepath.Join(tempDir, "chain-dest")
+				return sourceSymlink, dest, finalTarget
+			},
+			deep:             true,
+			preserveOriginal: false,
+			fsync:            false,
+			expectError:      false,
+			verify: func(t *testing.T, sourceSymlink, dest, finalTarget string) {
+				// Destination should be a regular file with final target content
+				destInfo, err := os.Stat(dest)
+				require.NoError(t, err)
+				require.False(t, destInfo.Mode()&os.ModeSymlink != 0, "Destination should not be a symlink")
+
+				content, err := os.ReadFile(dest)
+				require.NoError(t, err)
+				require.Equal(t, "final content", string(content))
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sourceSymlink, dest, target := tc.setup()
+
+			err := handleSymlink(sourceSymlink, dest, tc.deep, tc.preserveOriginal, tc.fsync)
+
+			if tc.expectError {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.errorMsg)
+			} else {
+				require.NoError(t, err)
+				if tc.verify != nil {
+					tc.verify(t, sourceSymlink, dest, target)
+				}
+			}
+		})
+	}
+}
+
+func TestRecursiveMoveWithSymlinksIntegration(t *testing.T) {
+	if !supportsSymlinks() {
+		t.Skip("Symlinks not supported on this platform/environment")
+	}
+
+	tempDir := t.TempDir()
+
+	tests := []struct {
+		name             string
+		setup            func() (string, string)
+		deep             bool
+		preserveOriginal bool
+		verify           func(t *testing.T, source, dest string)
+	}{
+		{
+			name: "directory with mixed symlinks - shallow copy",
+			setup: func() (string, string) {
+				sourceDir := filepath.Join(tempDir, "mixed-source")
+				destDir := filepath.Join(tempDir, "mixed-dest-shallow")
+
+				err := os.Mkdir(sourceDir, 0755)
+				require.NoError(t, err)
+
+				// Create regular file
+				regularFile := filepath.Join(sourceDir, "regular.txt")
+				err = os.WriteFile(regularFile, []byte("regular content"), 0644)
+				require.NoError(t, err)
+
+				// Create target for symlink
+				targetFile := filepath.Join(sourceDir, "target.txt")
+				err = os.WriteFile(targetFile, []byte("target content"), 0644)
+				require.NoError(t, err)
+
+				// Create symlink to file
+				fileLink := filepath.Join(sourceDir, "file-link")
+				err = os.Symlink(targetFile, fileLink)
+				require.NoError(t, err)
+
+				// Create target directory
+				targetSubDir := filepath.Join(sourceDir, "target-subdir")
+				err = os.Mkdir(targetSubDir, 0755)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(targetSubDir, "sub-file.txt"), []byte("sub content"), 0644)
+				require.NoError(t, err)
+
+				// Create symlink to directory
+				dirLink := filepath.Join(sourceDir, "dir-link")
+				err = os.Symlink(targetSubDir, dirLink)
+				require.NoError(t, err)
+
+				return sourceDir, destDir
+			},
+			deep:             false,
+			preserveOriginal: false,
+			verify: func(t *testing.T, source, dest string) {
+				// Regular file should be copied
+				content, err := os.ReadFile(filepath.Join(dest, "regular.txt"))
+				require.NoError(t, err)
+				require.Equal(t, "regular content", string(content))
+
+				// Target file should be copied
+				content, err = os.ReadFile(filepath.Join(dest, "target.txt"))
+				require.NoError(t, err)
+				require.Equal(t, "target content", string(content))
+
+				// File symlink should still be a symlink
+				linkTarget, err := os.Readlink(filepath.Join(dest, "file-link"))
+				require.NoError(t, err)
+				expectedTarget := filepath.Join(source, "target.txt")
+				require.Equal(t, expectedTarget, linkTarget)
+
+				// Directory symlink should still be a symlink
+				linkTarget, err = os.Readlink(filepath.Join(dest, "dir-link"))
+				require.NoError(t, err)
+				expectedDirTarget := filepath.Join(source, "target-subdir")
+				require.Equal(t, expectedDirTarget, linkTarget)
+
+				// Source should not exist (moved)
+				_, err = os.Stat(source)
+				require.True(t, os.IsNotExist(err))
+			},
+		},
+		{
+			name: "directory with mixed symlinks - deep copy",
+			setup: func() (string, string) {
+				sourceDir := filepath.Join(tempDir, "mixed-deep-source")
+				destDir := filepath.Join(tempDir, "mixed-dest-deep")
+
+				err := os.Mkdir(sourceDir, 0755)
+				require.NoError(t, err)
+
+				// Create regular file
+				regularFile := filepath.Join(sourceDir, "regular-deep.txt")
+				err = os.WriteFile(regularFile, []byte("regular deep content"), 0644)
+				require.NoError(t, err)
+
+				// Create target for symlink
+				targetFile := filepath.Join(sourceDir, "target-deep.txt")
+				err = os.WriteFile(targetFile, []byte("target deep content"), 0644)
+				require.NoError(t, err)
+
+				// Create symlink to file
+				fileLink := filepath.Join(sourceDir, "file-link-deep")
+				err = os.Symlink(targetFile, fileLink)
+				require.NoError(t, err)
+
+				// Create target directory
+				targetSubDir := filepath.Join(sourceDir, "target-subdir-deep")
+				err = os.Mkdir(targetSubDir, 0755)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(targetSubDir, "sub-file-deep.txt"), []byte("sub deep content"), 0644)
+				require.NoError(t, err)
+
+				// Create symlink to directory
+				dirLink := filepath.Join(sourceDir, "dir-link-deep")
+				err = os.Symlink(targetSubDir, dirLink)
+				require.NoError(t, err)
+
+				return sourceDir, destDir
+			},
+			deep:             true,
+			preserveOriginal: false,
+			verify: func(t *testing.T, source, dest string) {
+				// Regular file should be copied
+				content, err := os.ReadFile(filepath.Join(dest, "regular-deep.txt"))
+				require.NoError(t, err)
+				require.Equal(t, "regular deep content", string(content))
+
+				// Target file should be copied
+				content, err = os.ReadFile(filepath.Join(dest, "target-deep.txt"))
+				require.NoError(t, err)
+				require.Equal(t, "target deep content", string(content))
+
+				// File symlink should be resolved to actual file
+				destFileFromLink := filepath.Join(dest, "file-link-deep")
+				info, err := os.Stat(destFileFromLink)
+				require.NoError(t, err)
+				require.False(t, info.Mode()&os.ModeSymlink != 0, "File symlink should be resolved to actual file")
+
+				content, err = os.ReadFile(destFileFromLink)
+				require.NoError(t, err)
+				require.Equal(t, "target deep content", string(content))
+
+				// Directory symlink should be resolved to actual directory
+				destDirFromLink := filepath.Join(dest, "dir-link-deep")
+				info, err = os.Stat(destDirFromLink)
+				require.NoError(t, err)
+				require.True(t, info.IsDir(), "Directory symlink should be resolved to actual directory")
+				require.False(t, info.Mode()&os.ModeSymlink != 0, "Directory symlink should not be a symlink")
+
+				content, err = os.ReadFile(filepath.Join(destDirFromLink, "sub-file-deep.txt"))
+				require.NoError(t, err)
+				require.Equal(t, "sub deep content", string(content))
+
+				// Source should not exist (moved)
+				_, err = os.Stat(source)
+				require.True(t, os.IsNotExist(err))
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			source, dest := tc.setup()
+
+			err := RecursiveMove(source, dest, tc.deep, tc.preserveOriginal, false)
+			require.NoError(t, err)
+
+			if tc.verify != nil {
+				tc.verify(t, source, dest)
 			}
 		})
 	}
