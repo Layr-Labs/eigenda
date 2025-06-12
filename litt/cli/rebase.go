@@ -293,12 +293,6 @@ func transferKeymap(
 			sourceKeymapPath, destinationKeymapPath, err)
 	}
 
-	// Now that we've copied the keymap, we can delete the original.
-	err = os.RemoveAll(sourceKeymapPath)
-	if err != nil {
-		return fmt.Errorf("failed to remove keymap directory %s: %w", sourceKeymapPath, err)
-	}
-
 	return nil
 }
 
@@ -377,12 +371,6 @@ func transferSegmentFile(
 			segmentFilePath, destinationSegmentPath, err)
 	}
 
-	// now that we've copied the file, we can delete the original.
-	err = os.Remove(segmentFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to remove segment file %s: %w", segmentFilePath, err)
-	}
-
 	return nil
 }
 
@@ -419,12 +407,6 @@ func transferTableMetadata(
 	if err != nil {
 		return fmt.Errorf("failed to copy table metadata from %s to %s: %w",
 			sourceMetadataPath, destinationMetadataPath, err)
-	}
-
-	// Now that we've copied the file, we can delete the original.
-	err = os.Remove(sourceMetadataPath)
-	if err != nil {
-		return fmt.Errorf("failed to remove table metadata file %s: %w", sourceMetadataPath, err)
 	}
 
 	return nil

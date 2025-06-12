@@ -60,7 +60,7 @@ func buildCLIParser() *cli.App {
 					},
 					&cli.BoolFlag{
 						Name:    "shallow",
-						Aliases: []string{"D"},
+						Aliases: []string{"S"},
 						Usage: "If true, then copies are made shallowly " +
 							"(e.g. with symlinks and hardlinks, where possible). ",
 						Required: false,
