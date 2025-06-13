@@ -17,13 +17,19 @@ contract EigenDAEjectionManager {
     address internal immutable _registryCoordinator;
     address internal immutable _signatureVerifier;
 
-    bytes32 internal constant CANCEL_EJECTION_TYPEHASH =
-        keccak256("CancelEjection(address operator, uint64 proceedingTime, uint64 lastProceedingInitiated, bytes quorums, address recipient)");
-    bytes32 internal constant CANCEL_CHURN_TYPEHASH =
-        keccak256("CancelChurn(address operator, address lowerStakeOperator, bytes quorums, uint64 proceedingTime, uint64 lastProceedingInitiated, address recipient)");
+    bytes32 internal constant CANCEL_EJECTION_TYPEHASH = keccak256(
+        "CancelEjection(address operator, uint64 proceedingTime, uint64 lastProceedingInitiated, bytes quorums, address recipient)"
+    );
+    bytes32 internal constant CANCEL_CHURN_TYPEHASH = keccak256(
+        "CancelChurn(address operator, address lowerStakeOperator, bytes quorums, uint64 proceedingTime, uint64 lastProceedingInitiated, address recipient)"
+    );
 
-
-    constructor(address depositToken_, uint256 depositAmount_, address registryCoordinator_, address signatureVerifier_) {
+    constructor(
+        address depositToken_,
+        uint256 depositAmount_,
+        address registryCoordinator_,
+        address signatureVerifier_
+    ) {
         _depositToken = depositToken_;
         _depositAmount = depositAmount_;
         _registryCoordinator = registryCoordinator_;
@@ -77,8 +83,19 @@ contract EigenDAEjectionManager {
 
     /// OPERATOR FUNCTIONS
 
-    function cancelEjectionWithSig(address operator, BN254.G2Point memory apkG2, BN254.G1Point memory sigma, address recipient) external {
-        (BN254.G1Point memory apk, ) = IRegistryCoordinator(_registryCoordinator).blsApkRegistry().getRegisteredPubkey(operator);
+    /// @notice Cancels the ejection process for a given operator with their signature.
+    /// @param operator The address of the operator whose ejection is being cancelled.
+    /// @param apkG2 The G2 point of the operator's public key.
+    /// @param sigma The BLS signature of the operator.
+    /// @param recipient The address to which the deposit will be returned.
+    function cancelEjectionWithSig(
+        address operator,
+        BN254.G2Point memory apkG2,
+        BN254.G1Point memory sigma,
+        address recipient
+    ) external {
+        (BN254.G1Point memory apk,) =
+            IRegistryCoordinator(_registryCoordinator).blsApkRegistry().getRegisteredPubkey(operator);
         _verifySig(_cancelEjectionMessageHash(operator, recipient), apk, apkG2, sigma);
 
         operator.cancelEjection();
@@ -91,11 +108,28 @@ contract EigenDAEjectionManager {
         _returnDeposit(msg.sender);
     }
 
-
-    function cancelChurnWithSig(address operator, address lowerStakeOperator, bytes memory quorums, BN254.G2Point memory apkG2, BN254.G1Point memory sigma, address recipient) external {
-        (BN254.G1Point memory apk, ) = IRegistryCoordinator(_registryCoordinator).blsApkRegistry().getRegisteredPubkey(operator);
+    /// @notice Cancels the churn process for a given operator with their signature.
+    /// @param operator The address of the operator whose churn is being cancelled.
+    /// @param lowerStakeOperator The address of the operator with lower stake.
+    /// @param quorums The quorums for which the churn is being cancelled.
+    /// @param apkG2 The G2 point of the operator's public key.
+    /// @param sigma The BLS signature of the operator.
+    /// @param recipient The address to which the deposit will be returned.
+    function cancelChurnWithSig(
+        address operator,
+        address lowerStakeOperator,
+        bytes memory quorums,
+        BN254.G2Point memory apkG2,
+        BN254.G1Point memory sigma,
+        address recipient
+    ) external {
+        (BN254.G1Point memory apk,) =
+            IRegistryCoordinator(_registryCoordinator).blsApkRegistry().getRegisteredPubkey(operator);
         _verifySig(_cancelChurnMessageHash(operator, lowerStakeOperator, quorums, recipient), apk, apkG2, sigma);
-        
+        require(
+            _isOperatorWeightsGreater(operator, lowerStakeOperator, quorums),
+            "EigenDAEjectionManager: Operator does not have greater weights"
+        );
         operator.cancelChurn();
         _returnDeposit(recipient);
     }
@@ -213,14 +247,14 @@ contract EigenDAEjectionManager {
         try IRegistryCoordinator(_registryCoordinator).ejectOperator(operator, quorums) {} catch {}
     }
 
-    function _cancelEjectionMessageHash(
-        address operator,
-        address recipient
-    ) internal view returns (bytes32) {
+    function _cancelEjectionMessageHash(address operator, address recipient) internal view returns (bytes32) {
         return keccak256(
             abi.encode(
-                CANCEL_EJECTION_TYPEHASH,EigenDAEjectionLib.ejectionStorage().operatorProceedingParams[operator], recipient
-            ));
+                CANCEL_EJECTION_TYPEHASH,
+                EigenDAEjectionLib.ejectionStorage().operatorProceedingParams[operator],
+                recipient
+            )
+        );
     }
 
     function _cancelChurnMessageHash(
@@ -231,8 +265,13 @@ contract EigenDAEjectionManager {
     ) internal view returns (bytes32) {
         return keccak256(
             abi.encode(
-                CANCEL_CHURN_TYPEHASH,EigenDAEjectionLib.churnStorage().operatorProceedingParams[operator], lowerStakeOperator, quorums, recipient
-            ));
+                CANCEL_CHURN_TYPEHASH,
+                EigenDAEjectionLib.churnStorage().operatorProceedingParams[operator],
+                lowerStakeOperator,
+                quorums,
+                recipient
+            )
+        );
     }
 
     function _verifySig(
@@ -241,7 +280,8 @@ contract EigenDAEjectionManager {
         BN254.G2Point memory apkG2,
         BN254.G1Point memory sigma
     ) internal view {
-        (bool paired, bool valid) = BLSSignatureChecker(_signatureVerifier).trySignatureAndApkVerification(messageHash, apk, apkG2, sigma);
+        (bool paired, bool valid) =
+            BLSSignatureChecker(_signatureVerifier).trySignatureAndApkVerification(messageHash, apk, apkG2, sigma);
         require(paired, "EigenDAEjectionManager: Pairing failed");
         require(valid, "EigenDAEjectionManager: Invalid signature");
     }
