@@ -40,7 +40,7 @@ type TableInfo struct {
 func tableInfoCommand(ctx *cli.Context) error {
 	if ctx.NArg() != 1 {
 		return fmt.Errorf(
-			"table-info command requires exactly at least two arguments: <table-name> <path1> ... <pathN> ")
+			"table-info command requires exactly at least one argument: <table-name>")
 	}
 
 	tableName := ctx.Args().Get(0)

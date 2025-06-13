@@ -533,6 +533,8 @@ func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 	}, nil
 }
 
+// TODO unit test snapshotting
+
 // Snapshot takes a snapshot of the files in the segment.
 func (s *Segment) Snapshot() error {
 	if !s.snapshottingEnabled {
@@ -558,8 +560,6 @@ func (s *Segment) Snapshot() error {
 
 	return nil
 }
-
-// TODO unit test
 
 // Check if this segment is actually a snapshot. A snapshot will be backed up by symlinks, while a real segment
 // will have real files.

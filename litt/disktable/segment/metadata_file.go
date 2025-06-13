@@ -371,9 +371,28 @@ func (m *metadataFile) snapshot() error {
 
 // delete deletes the metadata file from disk.
 func (m *metadataFile) delete() error {
-	err := os.Remove(m.path())
+	filePath := m.path()
+
+	fileInfo, err := os.Lstat(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to remove metadata file %s: %v", m.path(), err)
+		return fmt.Errorf("failed to call lstat for %s: %v", filePath, err)
+	}
+	isSymlink := fileInfo.Mode()&os.ModeSymlink != 0
+
+	if isSymlink {
+		// remove the file where the symlink points
+		actualFile, err := os.Readlink(filePath)
+		if err != nil {
+			return fmt.Errorf("failed to read symlink %s: %v", filePath, err)
+		}
+		if err := os.Remove(actualFile); err != nil {
+			return fmt.Errorf("failed to remove actual file %s: %v", actualFile, err)
+		}
+	}
+
+	err = os.Remove(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to remove file %s: %v", filePath, err)
 	}
 
 	return nil

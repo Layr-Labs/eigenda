@@ -45,8 +45,11 @@ func rebaseCommand(ctx *cli.Context) error {
 
 	deep := !ctx.Bool("shallow")
 	preserveOriginal := ctx.Bool("preserve")
+	verbose := !ctx.Bool("quiet")
 
-	return rebase(sources, destinations, deep, preserveOriginal, true, true)
+	// TODO figure out how rebasing a snapshot directory works
+
+	return rebase(sources, destinations, deep, preserveOriginal, true, verbose)
 }
 
 // Files to manage during a rebase:

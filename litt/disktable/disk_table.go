@@ -183,6 +183,7 @@ func NewDiskTable(
 		metrics:        metrics,
 	}
 
+	// Load segments.
 	lowestSegmentIndex, highestSegmentIndex, segments, err :=
 		segment.GatherSegmentFiles(
 			config.Logger,
@@ -247,20 +248,35 @@ func NewDiskTable(
 
 	tableSaltShaker := rand.New(rand.NewSource(config.SaltShaker.Int63()))
 
+	// Initialize snapshot files if snapshotting is enabled.
+	var upperBoundSnapshotFile *BoundaryFile
+	if config.SnapshotDirectory != "" {
+		//lowerBoundSnapshotFile, err := LoadBoundaryFile(true, config.SnapshotDirectory)
+		//if err != nil {
+		//	return nil, fmt.Errorf("failed to load snapshot boundary file: %w", err)
+		//}
+
+		upperBoundSnapshotFile, err = LoadBoundaryFile(false, path.Join(config.SnapshotDirectory, name))
+		if err != nil {
+			return nil, fmt.Errorf("failed to load snapshot boundary file: %w", err)
+		}
+
+		// TODO finish snapshotting here?
+	}
+
 	// Start the flush loop.
 	fLoop := &flushLoop{
-		logger:       config.Logger,
-		diskTable:    table,
-		errorMonitor: errorMonitor,
-		flushChannel: make(chan any, tableFlushChannelCapacity),
-		metrics:      metrics,
-		clock:        config.Clock,
-		name:         name,
+		logger:                 config.Logger,
+		diskTable:              table,
+		errorMonitor:           errorMonitor,
+		flushChannel:           make(chan any, tableFlushChannelCapacity),
+		metrics:                metrics,
+		clock:                  config.Clock,
+		name:                   name,
+		upperBoundSnapshotFile: upperBoundSnapshotFile,
 	}
 	table.flushLoop = fLoop
 	go fLoop.run()
-
-	// TODO finish snapshotting here?
 
 	// Start the control loop.
 	cLoop := &controlLoop{

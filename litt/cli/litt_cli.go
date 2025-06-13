@@ -71,6 +71,12 @@ func buildCLIParser() *cli.App {
 						Usage:    "If enabled, then the old files are not removed.",
 						Required: false,
 					},
+					&cli.BoolFlag{
+						Name:     "quiet",
+						Aliases:  []string{"q"},
+						Usage:    "Reduces the verbosity of the output.",
+						Required: false,
+					},
 				},
 				Action: rebaseCommand,
 			},
@@ -80,6 +86,34 @@ func buildCLIParser() *cli.App {
 				ArgsUsage: "<path/to/benchmark/config.json>",
 				Args:      true,
 				Action:    benchmarkCommand,
+			},
+			{
+				Name:      "prune",
+				Usage:     "Delete data from a LittDB database/snapshot.",
+				ArgsUsage: "--src <path1> ... --src <pathN> --max-age <duration in seconds>",
+				Flags: []cli.Flag{
+					&cli.StringSliceFlag{
+						Name:     "src",
+						Aliases:  []string{"s"},
+						Usage:    "Source paths where the DB data is found, at least one is required.",
+						Required: true,
+					},
+					&cli.StringSliceFlag{
+						Name:     "table",
+						Aliases:  []string{"t"},
+						Usage:    "Prune this table. If not specified, all tables will be pruned.",
+						Required: false,
+					},
+					&cli.Uint64Flag{
+						Name:    "max-age",
+						Aliases: []string{"a"},
+						Usage: "Maximum age of segments to keep, in seconds. " +
+							"Segments older than this will be deleted.",
+						Value:    0, // Default to 0, meaning no age limit
+						Required: true,
+					},
+				},
+				Action: pruneCommand,
 			},
 		},
 	}
