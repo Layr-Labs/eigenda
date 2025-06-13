@@ -54,8 +54,8 @@ func LoggerCLIFlags(envPrefix string, flagPrefix string) []cli.Flag {
 
 // DefaultLoggerConfig returns a LoggerConfig with the default settings for a JSON logger.
 // In general, this should be the baseline config for most services running in production.
-func DefaultLoggerConfig() LoggerConfig {
-	return LoggerConfig{
+func DefaultLoggerConfig() *LoggerConfig {
+	return &LoggerConfig{
 		Format:       JSONLogFormat,
 		OutputWriter: os.Stdout,
 		HandlerOpts: logging.SLoggerOptions{
@@ -68,8 +68,8 @@ func DefaultLoggerConfig() LoggerConfig {
 
 // DefaultTextLoggerConfig returns a LoggerConfig with the default settings for a text logger.
 // For use in tests or other scenarios where the logs are consumed by humans.
-func DefaultTextLoggerConfig() LoggerConfig {
-	return LoggerConfig{
+func DefaultTextLoggerConfig() *LoggerConfig {
+	return &LoggerConfig{
 		Format:       TextLogFormat,
 		OutputWriter: os.Stdout,
 		HandlerOpts: logging.SLoggerOptions{
@@ -83,8 +83,8 @@ func DefaultTextLoggerConfig() LoggerConfig {
 // DefaultConsoleLoggerConfig returns a LoggerConfig with the default settings
 // for logging to a console (i.e. with human eyeballs). Adds color, and so should
 // not be used when logs are captured in a file.
-func DefaultConsoleLoggerConfig() LoggerConfig {
-	return LoggerConfig{
+func DefaultConsoleLoggerConfig() *LoggerConfig {
+	return &LoggerConfig{
 		Format:       TextLogFormat,
 		OutputWriter: os.Stdout,
 		HandlerOpts: logging.SLoggerOptions{
@@ -122,10 +122,10 @@ func ReadLoggerCLIConfig(ctx *cli.Context, flagPrefix string) (*LoggerConfig, er
 	}
 	cfg.HandlerOpts.Level = level
 
-	return &cfg, nil
+	return cfg, nil
 }
 
-func NewLogger(cfg LoggerConfig) (logging.Logger, error) {
+func NewLogger(cfg *LoggerConfig) (logging.Logger, error) {
 	if cfg.Format == JSONLogFormat {
 		return logging.NewJsonSLogger(cfg.OutputWriter, &cfg.HandlerOpts), nil
 	}
