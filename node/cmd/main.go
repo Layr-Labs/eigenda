@@ -10,6 +10,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/memory"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	rpccalls "github.com/Layr-Labs/eigensdk-go/metrics/collectors/rpc_calls"
 	"github.com/docker/go-units"
 
@@ -102,14 +103,14 @@ func NodeMain(ctx *cli.Context) error {
 	}
 
 	// Create the node.
-	node, err := node.NewNode(reg, config, pubIPProvider, client, logger)
+	newNode, err := node.NewNode(reg, config, pubIPProvider, client, logger)
 	if err != nil {
 		return err
 	}
 
-	err = node.Start(context.Background())
+	err = newNode.Start(context.Background())
 	if err != nil {
-		node.Logger.Error("could not start node", "error", err)
+		newNode.Logger.Error("could not start node", "error", err)
 		return err
 	}
 
@@ -117,11 +118,23 @@ func NodeMain(ctx *cli.Context) error {
 
 	// TODO(cody-littley): the metrics server is currently started by eigenmetrics, which is in another repo.
 	//  When we fully remove v1 support, we need to start the metrics server inside the v2 metrics code.
-	server := nodegrpc.NewServer(config, node, logger, ratelimiter)
+	server := nodegrpc.NewServer(config, newNode, logger, ratelimiter)
 
 	var serverV2 *nodegrpc.ServerV2
 	if config.EnableV2 {
-		serverV2, err = nodegrpc.NewServerV2(context.Background(), config, node, logger, ratelimiter, reg, reader)
+		onchainPaymentState, err := meterer.NewOnchainPaymentState(context.Background(), reader, logger)
+		if err != nil {
+			return fmt.Errorf("failed to create onchain payment state: %v", err)
+		}
+		meterer := node.NewBatchMeterer(
+			meterer.Config{
+				ChainReadTimeout: 5 * time.Second,
+				UpdateInterval:   5 * time.Minute,
+			},
+			onchainPaymentState,
+			logger,
+		)
+		serverV2, err = nodegrpc.NewServerV2(context.Background(), config, newNode, logger, ratelimiter, reg, reader, meterer)
 		if err != nil {
 			return fmt.Errorf("failed to create server v2: %v", err)
 		}

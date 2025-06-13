@@ -118,7 +118,9 @@ func newTestComponents(t *testing.T, config *node.Config) *testComponents {
 		logger,
 		ratelimiter,
 		prometheus.NewRegistry(),
-		reader)
+		reader,
+		nil,
+	)
 
 	require.NoError(t, err)
 	return &testComponents{
