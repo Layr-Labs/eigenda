@@ -76,10 +76,10 @@ Dispersal:
 
 Note: The verification steps in point 1. for dispersal are not currently implemented. This route only makes sense for clients that want to avoid having large amounts of SRS data, but KZG commitment verification via Fiat-Shamir is required to do the verification without this data. Until the alternate verification method is implemented, usage of `GetBlobCommitment` places a correctness trust assumption on the disperser generating the commitment.
 
-## Upgradable Security Params for Optimistic Verification
+## Upgradable Quorums and Thresholds for Optimistic Verification
 ![image.png](../../assets/integration/router-in-fraud-proof.png)
 
-The [`EigenDACertVerifierRouter`](./4-contracts.md#eigendacertverifierrouter) contract enables secure upgrades to a rollup’s [EigenDA security parameters](./3-data-structs.md#), such as quorum sets and thresholds, without compromising the integrity of previously submitted fraud proofs. It achieves this by routing certificate verification to the appropriate `EigenDACertVerifier` instance based on the `activation_block_number` associated with each cert's `reference_block_number`. This ensures backward compatibility, allowing older `DACert`s to be validated against the verifier version that was active at the time of their creation.
+The [`EigenDACertVerifierRouter`](./4-contracts.md#eigendacertverifierrouter) contract enables secure upgrades to a rollup’s required quorums and thresholds without compromising the integrity of previously submitted state commitments. It achieves this by routing certificate verification to the appropriate `EigenDACertVerifier` instance based on the `activation_block_number` associated with each cert's `reference_block_number`. This ensures backward compatibility, allowing older `DACert`s to be validated against the verifier version that was active at the time of their creation.
 
 The router is typically deployed behind an upgradable admin proxy and should use the same `ProxyAdmin` multisig as the rollup for consistent and secure access control.
 

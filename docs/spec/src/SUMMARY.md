@@ -1,6 +1,7 @@
 # Summary
 
 - [Introduction](./introduction.md)
+- [Glossary](./glossary.md)
 - [Protocol](./protocol.md)
   - [Architecture](./protocol/architecture.md)
     - [Encoding](./protocol/architecture/encoding.md)
