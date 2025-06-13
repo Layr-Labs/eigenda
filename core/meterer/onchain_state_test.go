@@ -20,318 +20,466 @@ var (
 		SymbolsPerSecond: 100,
 		StartTimestamp:   1000,
 		EndTimestamp:     2000,
-		// QuorumSplits:     []byte{50, 50},
 	}
 	dummyOnDemandPayment = &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
 	}
+	testAccount = gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
 )
 
-func TestGetCurrentBlockNumber(t *testing.T) {
-	mockState := &mock.MockOnchainPaymentState{}
-	mockState.On("GetCurrentBlockNumber").Return(uint32(1000), nil)
-	ctx := context.Background()
-	blockNumber, err := mockState.GetCurrentBlockNumber(ctx)
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1000), blockNumber)
-}
+func TestMockOnchainPaymentState(t *testing.T) {
+	tests := []struct {
+		name string
+		test func(t *testing.T)
+	}{
+		{
+			name: "GetOnDemandPaymentByAccount_Success",
+			test: func(t *testing.T) {
+				mockState := &mock.MockOnchainPaymentState{}
+				ctx := context.Background()
+				mockState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(dummyOnDemandPayment, nil)
 
-func TestGetReservedPaymentByAccount(t *testing.T) {
-	mockState := &mock.MockOnchainPaymentState{}
-	ctx := context.Background()
-	mockState.On("GetReservedPaymentByAccount", testifymock.Anything, testifymock.Anything).Return(map[core.QuorumID]*core.ReservedPayment{0: dummyReservedPayment}, nil)
-
-	reservations, err := mockState.GetReservedPaymentByAccount(ctx, gethcommon.Address{})
-	assert.NoError(t, err)
-	assert.Equal(t, map[core.QuorumID]*core.ReservedPayment{0: dummyReservedPayment}, reservations)
-}
-
-func TestGetOnDemandPaymentByAccount(t *testing.T) {
-	mockState := &mock.MockOnchainPaymentState{}
-	ctx := context.Background()
-	mockState.On("GetOnDemandPaymentByAccount", testifymock.Anything, testifymock.Anything, testifymock.Anything).Return(dummyOnDemandPayment, nil)
-
-	payment, err := mockState.GetOnDemandPaymentByAccount(ctx, gethcommon.Address{})
-	assert.NoError(t, err)
-	assert.Equal(t, dummyOnDemandPayment, payment)
-}
-
-func TestGetOnDemandQuorumNumbers(t *testing.T) {
-	mockState := &mock.MockOnchainPaymentState{}
-	ctx := context.Background()
-	mockState.On("GetOnDemandQuorumNumbers", testifymock.Anything, testifymock.Anything).Return([]uint8{0, 1}, nil)
-
-	quorumNumbers, err := mockState.GetOnDemandQuorumNumbers(ctx)
-	assert.NoError(t, err)
-	assert.Equal(t, []uint8{0, 1}, quorumNumbers)
-}
-
-// TestOnchainPaymentStateNilAssignmentProtection tests that the OnchainPaymentState
-// properly handles nil map assignments and doesn't panic
-func TestOnchainPaymentStateNilAssignmentProtection(t *testing.T) {
-	t.Run("PaymentVaultParams_NilProtection", func(t *testing.T) {
-		stateWithNilParams, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
-		assert.NoError(t, err)
-
-		// Test that nil PaymentVaultParams returns appropriate errors
-		_, err = stateWithNilParams.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "payment vault params not initialized")
-
-		_, err = stateWithNilParams.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "payment vault params not initialized")
-
-		_, err = stateWithNilParams.GetMinNumSymbols(meterer.OnDemandQuorumID)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "payment vault params not initialized")
-
-		_, err = stateWithNilParams.GetPricePerSymbol(meterer.OnDemandQuorumID)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "payment vault params not initialized")
-
-		_, err = stateWithNilParams.GetReservationWindow(meterer.OnDemandQuorumID)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "payment vault params not initialized")
-	})
-
-	t.Run("PaymentVaultParams_MissingQuorum", func(t *testing.T) {
-		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
-		assert.NoError(t, err)
-		params := &meterer.PaymentVaultParams{
-			QuorumPaymentConfigs:  make(map[core.QuorumID]*core.PaymentQuorumConfig),
-			QuorumProtocolConfigs: make(map[core.QuorumID]*core.PaymentQuorumProtocolConfig),
-		}
-		state.PaymentVaultParams.Store(params)
-
-		// Test that missing quorum returns appropriate errors
-		_, err = state.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "payment config not found for quorum")
-
-		_, err = state.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "protocol config not found for quorum")
-
-		_, err = state.GetMinNumSymbols(meterer.OnDemandQuorumID)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "protocol config not found for quorum")
-
-		_, err = state.GetPricePerSymbol(meterer.OnDemandQuorumID)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "payment config not found for quorum")
-
-		_, err = state.GetReservationWindow(meterer.OnDemandQuorumID)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "protocol config not found for quorum")
-	})
-
-	t.Run("PaymentVaultParams_ValidConfig", func(t *testing.T) {
-		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
-		assert.NoError(t, err)
-
-		params := &meterer.PaymentVaultParams{
-			QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
-				meterer.OnDemandQuorumID: {
-					OnDemandSymbolsPerSecond: 100,
-					OnDemandPricePerSymbol:   200,
-				},
+				payment, err := mockState.GetOnDemandPaymentByAccount(ctx, gethcommon.Address{})
+				assert.NoError(t, err)
+				assert.Equal(t, dummyOnDemandPayment, payment)
 			},
-			QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
-				meterer.OnDemandQuorumID: {
-					MinNumSymbols:              300,
-					OnDemandRateLimitWindow:    400,
-					ReservationRateLimitWindow: 500,
-				},
+		},
+		{
+			name: "GetReservedPaymentByAccountAndQuorums_Success",
+			test: func(t *testing.T) {
+				mockState := &mock.MockOnchainPaymentState{}
+				ctx := context.Background()
+				quorumNumbers := []core.QuorumID{0, 1}
+
+				expectedPayments := map[core.QuorumID]*core.ReservedPayment{
+					0: dummyReservedPayment,
+					1: {
+						SymbolsPerSecond: 200,
+						StartTimestamp:   1500,
+						EndTimestamp:     2500,
+					},
+				}
+
+				mockState.On("GetReservedPaymentByAccountAndQuorums", testifymock.Anything, testifymock.Anything, testifymock.Anything).Return(expectedPayments, nil)
+
+				payments, err := mockState.GetReservedPaymentByAccountAndQuorums(ctx, testAccount, quorumNumbers)
+				assert.NoError(t, err)
+				assert.Equal(t, expectedPayments, payments)
+				assert.Equal(t, 2, len(payments))
+				assert.Equal(t, dummyReservedPayment, payments[0])
+				assert.Equal(t, uint64(200), payments[1].SymbolsPerSecond)
 			},
-		}
-		state.PaymentVaultParams.Store(params)
+		},
+		{
+			name: "RefreshOnchainPaymentState_Success",
+			test: func(t *testing.T) {
+				mockState := &mock.MockOnchainPaymentState{}
+				ctx := context.Background()
 
-		globalSymbolsPerSecond, err := state.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID)
-		assert.NoError(t, err)
-		assert.Equal(t, uint64(100), globalSymbolsPerSecond)
-		globalPeriodInterval, err := state.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID)
-		assert.NoError(t, err)
-		assert.Equal(t, uint64(400), globalPeriodInterval)
-		minNumSymbols, err := state.GetMinNumSymbols(meterer.OnDemandQuorumID)
-		assert.NoError(t, err)
-		assert.Equal(t, uint64(300), minNumSymbols)
-		pricePerSymbol, err := state.GetPricePerSymbol(meterer.OnDemandQuorumID)
-		assert.NoError(t, err)
-		assert.Equal(t, uint64(200), pricePerSymbol)
-		reservationWindow, err := state.GetReservationWindow(meterer.OnDemandQuorumID)
-		assert.NoError(t, err)
-		assert.Equal(t, uint64(500), reservationWindow)
-	})
+				mockState.On("RefreshOnchainPaymentState", testifymock.Anything).Return(nil)
 
-	t.Run("NilMapAssignment_Protection", func(t *testing.T) {
-		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
-		assert.NoError(t, err)
+				err := mockState.RefreshOnchainPaymentState(ctx)
+				assert.NoError(t, err)
 
-		account := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
+				mockState.AssertExpectations(t)
+			},
+		},
+		{
+			name: "GetPaymentGlobalParams_Success",
+			test: func(t *testing.T) {
+				mockState := &mock.MockOnchainPaymentState{}
+				mockParams := &meterer.PaymentVaultParams{
+					QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+						0: {
+							OnDemandSymbolsPerSecond: 100,
+							OnDemandPricePerSymbol:   200,
+						},
+					},
+					QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+						0: {
+							MinNumSymbols:           300,
+							OnDemandRateLimitWindow: 400,
+						},
+					},
+					OnDemandQuorumNumbers: []core.QuorumID{0, 1},
+				}
+				mockState.On("GetPaymentGlobalParams").Return(mockParams, nil)
 
-		reservations, exists := state.ReservedPayments[account]
-		assert.False(t, exists)
-		assert.Nil(t, reservations)
+				params, err := mockState.GetPaymentGlobalParams()
+				assert.NoError(t, err)
+				assert.Equal(t, mockParams, params)
+			},
+		},
+	}
 
-		state.ReservedPayments[account] = make(map[core.QuorumID]*core.ReservedPayment)
-		state.ReservedPayments[account][0] = &core.ReservedPayment{
-			SymbolsPerSecond: 100,
-			StartTimestamp:   1000,
-			EndTimestamp:     2000,
-		}
-
-		assert.NotNil(t, state.ReservedPayments[account])
-		assert.NotNil(t, state.ReservedPayments[account][0])
-		assert.Equal(t, uint64(100), state.ReservedPayments[account][0].SymbolsPerSecond)
-
-		// Test the nil protection pattern
-		testAccount := gethcommon.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
-		if state.ReservedPayments[testAccount] == nil {
-			state.ReservedPayments[testAccount] = make(map[core.QuorumID]*core.ReservedPayment)
-		}
-		state.ReservedPayments[testAccount][1] = &core.ReservedPayment{
-			SymbolsPerSecond: 200,
-			StartTimestamp:   1000,
-			EndTimestamp:     2000,
-		}
-
-		assert.NotNil(t, state.ReservedPayments[testAccount])
-		assert.NotNil(t, state.ReservedPayments[testAccount][1])
-		assert.Equal(t, uint64(200), state.ReservedPayments[testAccount][1].SymbolsPerSecond)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, tt.test)
+	}
 }
 
-// TestNilAssignmentPanicScenario tests the "assignment to entry in nil map" panic scenario
-func TestNilAssignmentPanicScenario(t *testing.T) {
-	t.Run("OriginalPanicScenario_NowFixed", func(t *testing.T) {
-		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
-		assert.NoError(t, err)
+func TestOnchainPaymentState_NilProtection(t *testing.T) {
+	tests := []struct {
+		name string
+		test func(t *testing.T)
+	}{
+		{
+			name: "PaymentVaultParams_NilProtection",
+			test: func(t *testing.T) {
+				stateWithNilParams, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+				assert.NoError(t, err)
 
-		account := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
-		quorumNumbers := []core.QuorumID{0, 1}
+				// Test that nil PaymentVaultParams returns appropriate errors
+				_, err = stateWithNilParams.GetPaymentGlobalParams()
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "payment vault params not initialized")
+			},
+		},
+		{
+			name: "PaymentVaultParams_MissingQuorum",
+			test: func(t *testing.T) {
+				state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+				assert.NoError(t, err)
+				params := &meterer.PaymentVaultParams{
+					QuorumPaymentConfigs:  make(map[core.QuorumID]*core.PaymentQuorumConfig),
+					QuorumProtocolConfigs: make(map[core.QuorumID]*core.PaymentQuorumProtocolConfig),
+				}
+				state.PaymentVaultParams.Store(params)
 
-		chainData := map[core.QuorumID]*core.ReservedPayment{
-			0: {SymbolsPerSecond: 100, StartTimestamp: 1000, EndTimestamp: 2000},
-			1: {SymbolsPerSecond: 200, StartTimestamp: 1000, EndTimestamp: 2000},
-		}
+				// Test that we can get params but missing quorum configs will cause errors when accessing them
+				retrievedParams, err := state.GetPaymentGlobalParams()
+				assert.NoError(t, err)
+				assert.NotNil(t, retrievedParams)
 
-		_, exists := state.ReservedPayments[account]
-		assert.False(t, exists)
+				// Test that missing quorum returns appropriate errors through the PaymentVaultParams methods
+				_, err = retrievedParams.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID)
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "payment config not found for quorum")
 
-		// Apply nil protection fix
-		if state.ReservedPayments[account] == nil {
-			state.ReservedPayments[account] = make(map[core.QuorumID]*core.ReservedPayment)
-		}
+				_, err = retrievedParams.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID)
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "protocol config not found for quorum")
 
-		for _, quorumNumber := range quorumNumbers {
-			if reservation, ok := chainData[quorumNumber]; ok {
-				state.ReservedPayments[account][quorumNumber] = reservation
-			}
-		}
+				_, err = retrievedParams.GetMinNumSymbols(meterer.OnDemandQuorumID)
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "protocol config not found for quorum")
 
-		assert.NotNil(t, state.ReservedPayments[account])
-		assert.Equal(t, 2, len(state.ReservedPayments[account]))
+				_, err = retrievedParams.GetPricePerSymbol(meterer.OnDemandQuorumID)
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "payment config not found for quorum")
 
-		for _, quorumNumber := range quorumNumbers {
-			assert.NotNil(t, state.ReservedPayments[account][quorumNumber])
-			assert.Equal(t, chainData[quorumNumber], state.ReservedPayments[account][quorumNumber])
-		}
-	})
+				_, err = retrievedParams.GetReservationWindow(meterer.OnDemandQuorumID)
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "protocol config not found for quorum")
+			},
+		},
+		{
+			name: "PaymentVaultParams_ValidConfig",
+			test: func(t *testing.T) {
+				state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+				assert.NoError(t, err)
 
-	t.Run("MultipleAccounts_ConcurrentSafe", func(t *testing.T) {
-		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
-		assert.NoError(t, err)
+				params := &meterer.PaymentVaultParams{
+					QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+						meterer.OnDemandQuorumID: {
+							OnDemandSymbolsPerSecond: 100,
+							OnDemandPricePerSymbol:   200,
+						},
+					},
+					QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+						meterer.OnDemandQuorumID: {
+							MinNumSymbols:              300,
+							OnDemandRateLimitWindow:    400,
+							ReservationRateLimitWindow: 500,
+						},
+					},
+				}
+				state.PaymentVaultParams.Store(params)
 
-		accounts := []gethcommon.Address{
-			gethcommon.HexToAddress("0x1234567890123456789012345678901234567890"),
-			gethcommon.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"),
-			gethcommon.HexToAddress("0x9876543210987654321098765432109876543210"),
-		}
+				// Test access through the new interface
+				retrievedParams, err := state.GetPaymentGlobalParams()
+				assert.NoError(t, err)
+				assert.NotNil(t, retrievedParams)
 
-		for i, account := range accounts {
-			if state.ReservedPayments[account] == nil {
-				state.ReservedPayments[account] = make(map[core.QuorumID]*core.ReservedPayment)
-			}
+				globalSymbolsPerSecond, err := retrievedParams.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID)
+				assert.NoError(t, err)
+				assert.Equal(t, uint64(100), globalSymbolsPerSecond)
+				globalPeriodInterval, err := retrievedParams.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID)
+				assert.NoError(t, err)
+				assert.Equal(t, uint64(400), globalPeriodInterval)
+				minNumSymbols, err := retrievedParams.GetMinNumSymbols(meterer.OnDemandQuorumID)
+				assert.NoError(t, err)
+				assert.Equal(t, uint64(300), minNumSymbols)
+				pricePerSymbol, err := retrievedParams.GetPricePerSymbol(meterer.OnDemandQuorumID)
+				assert.NoError(t, err)
+				assert.Equal(t, uint64(200), pricePerSymbol)
+				reservationWindow, err := retrievedParams.GetReservationWindow(meterer.OnDemandQuorumID)
+				assert.NoError(t, err)
+				assert.Equal(t, uint64(500), reservationWindow)
+			},
+		},
+		{
+			name: "NilMapAssignment_Protection",
+			test: func(t *testing.T) {
+				state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+				assert.NoError(t, err)
 
-			for quorum := 0; quorum < 3; quorum++ {
-				state.ReservedPayments[account][core.QuorumID(quorum)] = &core.ReservedPayment{
-					SymbolsPerSecond: uint64((i + 1) * (quorum + 1) * 100),
+				reservations, exists := state.ReservedPayments[testAccount]
+				assert.False(t, exists)
+				assert.Nil(t, reservations)
+
+				state.ReservedPayments[testAccount] = make(map[core.QuorumID]*core.ReservedPayment)
+				state.ReservedPayments[testAccount][0] = &core.ReservedPayment{
+					SymbolsPerSecond: 100,
 					StartTimestamp:   1000,
 					EndTimestamp:     2000,
 				}
-			}
-		}
 
-		for i, account := range accounts {
-			assert.NotNil(t, state.ReservedPayments[account])
-			assert.Equal(t, 3, len(state.ReservedPayments[account]))
+				assert.NotNil(t, state.ReservedPayments[testAccount])
+				assert.NotNil(t, state.ReservedPayments[testAccount][0])
+				assert.Equal(t, uint64(100), state.ReservedPayments[testAccount][0].SymbolsPerSecond)
 
-			for quorum := 0; quorum < 3; quorum++ {
-				reservation := state.ReservedPayments[account][core.QuorumID(quorum)]
-				assert.NotNil(t, reservation)
-				expectedRate := uint64((i + 1) * (quorum + 1) * 100)
-				assert.Equal(t, expectedRate, reservation.SymbolsPerSecond)
-			}
-		}
-	})
+				// Test the nil protection pattern
+				testAccount2 := gethcommon.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd")
+				if state.ReservedPayments[testAccount2] == nil {
+					state.ReservedPayments[testAccount2] = make(map[core.QuorumID]*core.ReservedPayment)
+				}
+				state.ReservedPayments[testAccount2][1] = &core.ReservedPayment{
+					SymbolsPerSecond: 200,
+					StartTimestamp:   1000,
+					EndTimestamp:     2000,
+				}
 
-	t.Run("WithoutProtection_WouldPanic", func(t *testing.T) {
-		state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
-		assert.NoError(t, err)
+				assert.NotNil(t, state.ReservedPayments[testAccount2])
+				assert.NotNil(t, state.ReservedPayments[testAccount2][1])
+				assert.Equal(t, uint64(200), state.ReservedPayments[testAccount2][1].SymbolsPerSecond)
+			},
+		},
+	}
 
-		account := gethcommon.HexToAddress("0x1234567890123456789012345678901234567890")
+	for _, tt := range tests {
+		t.Run(tt.name, tt.test)
+	}
+}
 
-		_, exists := state.ReservedPayments[account]
-		assert.False(t, exists)
-	})
+func TestNilAssignmentPanicScenarios(t *testing.T) {
+	tests := []struct {
+		name string
+		test func(t *testing.T)
+	}{
+		{
+			name: "OriginalPanicScenario_NowFixed",
+			test: func(t *testing.T) {
+				state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+				assert.NoError(t, err)
+
+				quorumNumbers := []core.QuorumID{0, 1}
+
+				chainData := map[core.QuorumID]*core.ReservedPayment{
+					0: {SymbolsPerSecond: 100, StartTimestamp: 1000, EndTimestamp: 2000},
+					1: {SymbolsPerSecond: 200, StartTimestamp: 1000, EndTimestamp: 2000},
+				}
+
+				_, exists := state.ReservedPayments[testAccount]
+				assert.False(t, exists)
+
+				// Apply nil protection fix
+				if state.ReservedPayments[testAccount] == nil {
+					state.ReservedPayments[testAccount] = make(map[core.QuorumID]*core.ReservedPayment)
+				}
+
+				for _, quorumNumber := range quorumNumbers {
+					if reservation, ok := chainData[quorumNumber]; ok {
+						state.ReservedPayments[testAccount][quorumNumber] = reservation
+					}
+				}
+
+				assert.NotNil(t, state.ReservedPayments[testAccount])
+				assert.Equal(t, 2, len(state.ReservedPayments[testAccount]))
+
+				for _, quorumNumber := range quorumNumbers {
+					assert.NotNil(t, state.ReservedPayments[testAccount][quorumNumber])
+					assert.Equal(t, chainData[quorumNumber], state.ReservedPayments[testAccount][quorumNumber])
+				}
+			},
+		},
+		{
+			name: "MultipleAccounts_ConcurrentSafe",
+			test: func(t *testing.T) {
+				state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+				assert.NoError(t, err)
+
+				accounts := []gethcommon.Address{
+					gethcommon.HexToAddress("0x1234567890123456789012345678901234567890"),
+					gethcommon.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"),
+					gethcommon.HexToAddress("0x9876543210987654321098765432109876543210"),
+				}
+
+				for i, account := range accounts {
+					if state.ReservedPayments[account] == nil {
+						state.ReservedPayments[account] = make(map[core.QuorumID]*core.ReservedPayment)
+					}
+
+					for quorum := 0; quorum < 3; quorum++ {
+						state.ReservedPayments[account][core.QuorumID(quorum)] = &core.ReservedPayment{
+							SymbolsPerSecond: uint64((i + 1) * (quorum + 1) * 100),
+							StartTimestamp:   1000,
+							EndTimestamp:     2000,
+						}
+					}
+				}
+
+				for i, account := range accounts {
+					assert.NotNil(t, state.ReservedPayments[account])
+					assert.Equal(t, 3, len(state.ReservedPayments[account]))
+
+					for quorum := 0; quorum < 3; quorum++ {
+						reservation := state.ReservedPayments[account][core.QuorumID(quorum)]
+						assert.NotNil(t, reservation)
+						expectedRate := uint64((i + 1) * (quorum + 1) * 100)
+						assert.Equal(t, expectedRate, reservation.SymbolsPerSecond)
+					}
+				}
+			},
+		},
+		{
+			name: "WithoutProtection_WouldPanic",
+			test: func(t *testing.T) {
+				state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+				assert.NoError(t, err)
+
+				_, exists := state.ReservedPayments[testAccount]
+				assert.False(t, exists)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, tt.test)
+	}
 }
 
 func TestPaymentVaultParams_GetQuorumConfigs(t *testing.T) {
-	paymentVaultParams := &meterer.PaymentVaultParams{
-		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
-			0: {
-				ReservationSymbolsPerSecond: 1,
-				OnDemandSymbolsPerSecond:    2,
-				OnDemandPricePerSymbol:      3,
+	tests := []struct {
+		name           string
+		params         *meterer.PaymentVaultParams
+		quorumID       core.QuorumID
+		expectedErr    string
+		validateResult func(t *testing.T, paymentConfig *core.PaymentQuorumConfig, protocolConfig *core.PaymentQuorumProtocolConfig)
+	}{
+		{
+			name: "ValidQuorum_Success",
+			params: &meterer.PaymentVaultParams{
+				QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+					0: {
+						ReservationSymbolsPerSecond: 1,
+						OnDemandSymbolsPerSecond:    2,
+						OnDemandPricePerSymbol:      3,
+					},
+				},
+				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+					0: {
+						MinNumSymbols:              7,
+						ReservationAdvanceWindow:   8,
+						ReservationRateLimitWindow: 9,
+						OnDemandRateLimitWindow:    10,
+						OnDemandEnabled:            true,
+					},
+				},
+				OnDemandQuorumNumbers: []core.QuorumID{0, 1},
 			},
-			1: {
-				ReservationSymbolsPerSecond: 4,
-				OnDemandSymbolsPerSecond:    5,
-				OnDemandPricePerSymbol:      6,
+			quorumID: 0,
+			validateResult: func(t *testing.T, paymentConfig *core.PaymentQuorumConfig, protocolConfig *core.PaymentQuorumProtocolConfig) {
+				assert.NotNil(t, paymentConfig)
+				assert.NotNil(t, protocolConfig)
+				assert.Equal(t, uint64(7), protocolConfig.MinNumSymbols)
+				assert.Equal(t, uint64(3), paymentConfig.OnDemandPricePerSymbol)
 			},
 		},
-		QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
-			0: {
-				MinNumSymbols:              7,
-				ReservationAdvanceWindow:   8,
-				ReservationRateLimitWindow: 9,
-				OnDemandRateLimitWindow:    10,
-				OnDemandEnabled:            true,
+		{
+			name: "NonExistentQuorum_Error",
+			params: &meterer.PaymentVaultParams{
+				QuorumPaymentConfigs:  map[core.QuorumID]*core.PaymentQuorumConfig{},
+				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{},
+				OnDemandQuorumNumbers: []core.QuorumID{0, 1},
 			},
-			1: {
-				MinNumSymbols:              11,
-				ReservationAdvanceWindow:   12,
-				ReservationRateLimitWindow: 13,
-				OnDemandRateLimitWindow:    14,
-				OnDemandEnabled:            false,
-			},
+			quorumID:    99,
+			expectedErr: "config not found",
 		},
-		OnDemandQuorumNumbers: []core.QuorumID{0, 1},
 	}
 
-	// Test with non-existent quorum
-	_, _, err := paymentVaultParams.GetQuorumConfigs(99)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "config not found")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			paymentConfig, protocolConfig, err := tt.params.GetQuorumConfigs(tt.quorumID)
 
-	paymentQuorumConfig, protocolConfig, err := paymentVaultParams.GetQuorumConfigs(0)
-	assert.NoError(t, err)
-	assert.NotNil(t, paymentQuorumConfig)
-	assert.NotNil(t, protocolConfig)
-	assert.Equal(t, uint64(7), protocolConfig.MinNumSymbols)
-	assert.Equal(t, uint64(3), paymentQuorumConfig.OnDemandPricePerSymbol)
-	assert.Equal(t, []core.QuorumID{0, 1}, paymentVaultParams.OnDemandQuorumNumbers)
+			if tt.expectedErr != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+			} else {
+				assert.NoError(t, err)
+				if tt.validateResult != nil {
+					tt.validateResult(t, paymentConfig, protocolConfig)
+				}
+			}
+		})
+	}
+}
+
+func TestOnchainPaymentState_CacheOperations(t *testing.T) {
+	tests := []struct {
+		name string
+		test func(t *testing.T)
+	}{
+		{
+			name: "GetReservedPaymentByAccountAndQuorums_CacheHit",
+			test: func(t *testing.T) {
+				state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+				assert.NoError(t, err)
+
+				quorumNumbers := []core.QuorumID{0, 1}
+
+				// Pre-populate cache
+				state.ReservedPayments[testAccount] = map[core.QuorumID]*core.ReservedPayment{
+					0: dummyReservedPayment,
+					1: {SymbolsPerSecond: 200, StartTimestamp: 1500, EndTimestamp: 2500},
+				}
+
+				payments, err := state.GetReservedPaymentByAccountAndQuorums(context.Background(), testAccount, quorumNumbers)
+				assert.NoError(t, err)
+				assert.Equal(t, 2, len(payments))
+				assert.Equal(t, dummyReservedPayment, payments[0])
+				assert.Equal(t, uint64(200), payments[1].SymbolsPerSecond)
+			},
+		},
+		{
+			name: "GetOnDemandPaymentByAccount_CacheHit",
+			test: func(t *testing.T) {
+				state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+				assert.NoError(t, err)
+
+				// Pre-populate cache
+				state.OnDemandPayments[testAccount] = dummyOnDemandPayment
+
+				payment, err := state.GetOnDemandPaymentByAccount(context.Background(), testAccount)
+				assert.NoError(t, err)
+				assert.Equal(t, dummyOnDemandPayment, payment)
+			},
+		},
+		{
+			name: "GetQuorumNumbers_ParamsNotInitialized",
+			test: func(t *testing.T) {
+				state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
+				assert.NoError(t, err)
+
+				_, err = state.GetQuorumNumbers(context.Background())
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "payment vault params not initialized")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, tt.test)
+	}
 }
 
 func TestPaymentVaultParamsFromProtobuf(t *testing.T) {
