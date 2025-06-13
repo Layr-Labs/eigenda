@@ -284,7 +284,10 @@ func GetOverflowPeriod(reservationPeriod uint64, reservationWindow uint64) uint6
 
 // PaymentCharged returns the chargeable price for a given number of symbols
 func PaymentCharged(numSymbols, pricePerSymbol uint64) *big.Int {
-	return new(big.Int).Mul(big.NewInt(int64(numSymbols)), big.NewInt(int64(pricePerSymbol)))
+	// directly convert to uint64 to avoid overflow
+	numSymbolsInt := new(big.Int).SetUint64(numSymbols)
+	pricePerSymbolInt := new(big.Int).SetUint64(pricePerSymbol)
+	return new(big.Int).Mul(numSymbolsInt, pricePerSymbolInt)
 }
 
 // SymbolsCharged returns the number of symbols charged for a given data length
@@ -292,6 +295,9 @@ func PaymentCharged(numSymbols, pricePerSymbol uint64) *big.Int {
 func SymbolsCharged(numSymbols uint64, minSymbols uint64) uint64 {
 	if numSymbols <= minSymbols {
 		return minSymbols
+	}
+	if minSymbols == 0 {
+		return numSymbols
 	}
 	// Round up to the nearest multiple of MinNumSymbols
 	roundedUp := core.RoundUpDivide(numSymbols, minSymbols) * minSymbols
