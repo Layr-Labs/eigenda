@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"hash/fnv"
 	"os"
 	"path"
 	"path/filepath"
+	"sync/atomic"
 
 	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
@@ -44,7 +46,7 @@ func rebaseCommand(ctx *cli.Context) error {
 	deep := !ctx.Bool("shallow")
 	preserveOriginal := ctx.Bool("preserve")
 
-	return rebase(sources, destinations, deep, preserveOriginal, true)
+	return rebase(sources, destinations, deep, preserveOriginal, true, true)
 }
 
 // Files to manage during a rebase:
@@ -63,6 +65,7 @@ func rebase(
 	deep bool,
 	preserveOriginal bool,
 	fsync bool,
+	verbose bool,
 ) error {
 
 	sourceSet := make(map[string]struct{})
@@ -104,18 +107,94 @@ func rebase(
 		}()
 	}
 
-	// For each directory that is going away, transfer its data to the new destination.
+	directoriesGoingAway := make([]string, 0, len(sourceSet))
 	for source := range sourceSet {
+		// If the source directory is not in the destination set, it is going away.
 		if _, ok := destinationSet[source]; !ok {
-			err := transferDataInDirectory(source, destinations, deep, preserveOriginal, fsync)
-			if err != nil {
-				return fmt.Errorf("error transferring data from %s to %v: %w",
-					source, destinations, err)
-			}
+			directoriesGoingAway = append(directoriesGoingAway, source)
 		}
 	}
 
+	var totalSegmentFileCount int64
+	var segmentFileCount atomic.Int64
+	if verbose {
+		var err error
+		totalSegmentFileCount, err = countSegmentFiles(directoriesGoingAway)
+		if err != nil {
+			return fmt.Errorf("failed to count segment files in sources %v: %w", sources, err)
+		}
+	}
+
+	// For each directory that is going away, transfer its data to the new destination.
+	for _, source := range directoriesGoingAway {
+		err := transferDataInDirectory(
+			source,
+			destinations,
+			deep,
+			preserveOriginal,
+			fsync,
+			verbose,
+			totalSegmentFileCount,
+			&segmentFileCount)
+		if err != nil {
+			return fmt.Errorf("error transferring data from %s to %v: %w",
+				source, destinations, err)
+		}
+	}
+
+	if verbose {
+		fmt.Println()
+	}
+
 	return nil
+}
+
+// Get a count of the segment files in the source directories.
+func countSegmentFiles(sources []string) (int64, error) {
+	count := int64(0)
+
+	for _, source := range sources {
+		exists, err := util.Exists(source)
+		if err != nil {
+			return 0, fmt.Errorf("failed to check if source directory %s exists: %w", source, err)
+		}
+		if !exists {
+			continue
+		}
+
+		// Walk the file tree to find all files ending with .metadata, .keys, or .values.
+		err = filepath.WalkDir(source, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return fmt.Errorf("error walking directory %s: %w", path, err)
+			}
+
+			if d.IsDir() {
+				// Skip directories
+				return nil
+			}
+
+			// Ignore "table.metadata" files, as they are not segment files.
+			if d.Name() == disktable.TableMetadataFileName {
+				return nil
+			}
+
+			// Check if the file is a segment file.
+			extension := filepath.Ext(path)
+			if extension == segment.MetadataFileExtension ||
+				extension == segment.KeyFileExtension ||
+				extension == segment.ValuesFileExtension {
+				count++
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			return 0, fmt.Errorf("error counting segment files in source directories: %w", err)
+		}
+	}
+
+	return count, nil
 }
 
 // transfers all data in a directory to the specified destinations.
@@ -125,6 +204,9 @@ func transferDataInDirectory(
 	deep bool,
 	preserveOriginal bool,
 	fsync bool,
+	verbose bool,
+	totalSegmentFileCount int64,
+	segmentFileCount *atomic.Int64,
 ) error {
 	exists, err := util.Exists(source)
 	if err != nil {
@@ -155,7 +237,16 @@ func transferDataInDirectory(
 			continue
 		}
 
-		err = transferDataInTable(source, child.Name(), destinations, deep, preserveOriginal, fsync)
+		err = transferDataInTable(
+			source,
+			child.Name(),
+			destinations,
+			deep,
+			preserveOriginal,
+			fsync,
+			verbose,
+			totalSegmentFileCount,
+			segmentFileCount)
 		if err != nil {
 			return fmt.Errorf("error transferring data in table %s: %w", child.Name(), err)
 		}
@@ -167,10 +258,12 @@ func transferDataInDirectory(
 		return fmt.Errorf("failed to release lock on source directory %s: %w", source, err)
 	}
 
-	// Delete the directory.
-	err = os.Remove(source)
-	if err != nil {
-		return fmt.Errorf("failed to remove source directory %s: %w", source, err)
+	if !preserveOriginal {
+		// Delete the directory.
+		err = os.Remove(source)
+		if err != nil {
+			return fmt.Errorf("failed to remove source directory %s: %w", source, err)
+		}
 	}
 
 	return nil
@@ -183,6 +276,9 @@ func transferDataInTable(
 	deep bool,
 	preserveOriginal bool,
 	fsync bool,
+	verbose bool,
+	totalSegmentFileCount int64,
+	segmentFileCount *atomic.Int64,
 ) error {
 
 	err := createDestinationTableDirectories(destinations, tableName)
@@ -190,38 +286,49 @@ func transferDataInTable(
 		return fmt.Errorf("failed to create destination table directories for table %s: %w", tableName, err)
 	}
 
-	err = transferKeymap(source, tableName, destinations, deep, preserveOriginal, fsync)
+	err = transferKeymap(source, tableName, destinations, deep, preserveOriginal, fsync, verbose)
 	if err != nil {
 		return fmt.Errorf("failed to transfer keymap for table %s: %w", tableName, err)
 	}
 
-	err = transferTableMetadata(source, tableName, destinations, deep, preserveOriginal, fsync)
+	err = transferTableMetadata(source, tableName, destinations, deep, preserveOriginal, fsync, verbose)
 	if err != nil {
 		return fmt.Errorf("failed to transfer table metadata for table %s: %w", tableName, err)
 	}
 
-	err = transferSegmentData(source, tableName, destinations, deep, preserveOriginal, fsync)
+	err = transferSegmentData(
+		source,
+		tableName,
+		destinations,
+		deep,
+		preserveOriginal,
+		fsync,
+		verbose,
+		totalSegmentFileCount,
+		segmentFileCount)
 	if err != nil {
 		return fmt.Errorf("failed to transfer segment data for table %s: %w", tableName, err)
 	}
 
-	err = deleteSnapshotDirectory(source, tableName)
-	if err != nil {
-		return fmt.Errorf("failed to delete snapshot directory for table %s: %w", tableName, err)
-	}
+	if !preserveOriginal {
+		err = deleteSnapshotDirectory(source, tableName, true)
+		if err != nil {
+			return fmt.Errorf("failed to delete snapshot directory for table %s: %w", tableName, err)
+		}
 
-	// Once all data in a table is transferred, delete the table directory.
-	sourceTableDir := filepath.Join(source, tableName)
-	err = os.Remove(sourceTableDir)
-	if err != nil {
-		return fmt.Errorf("failed to remove table directory %s: %w", sourceTableDir, err)
+		// Once all data in a table is transferred, delete the table directory.
+		sourceTableDir := filepath.Join(source, tableName)
+		err = os.Remove(sourceTableDir)
+		if err != nil {
+			return fmt.Errorf("failed to remove table directory %s: %w", sourceTableDir, err)
+		}
 	}
 
 	return nil
 }
 
 // delete the old snapshot directory for a table. This will be reconstructed the next time the DB is loaded.
-func deleteSnapshotDirectory(source string, tableName string) error {
+func deleteSnapshotDirectory(source string, tableName string, verbose bool) error {
 	snapshotDir := filepath.Join(source, tableName, segment.HardLinkDirectory)
 
 	exists, err := util.Exists(snapshotDir)
@@ -230,6 +337,10 @@ func deleteSnapshotDirectory(source string, tableName string) error {
 	}
 	if !exists {
 		return nil
+	}
+
+	if verbose {
+		fmt.Printf("Deleting snapshot directory: %s\n", snapshotDir)
 	}
 
 	err = os.RemoveAll(snapshotDir)
@@ -269,6 +380,7 @@ func transferKeymap(
 	deep bool,
 	preserveOriginal bool,
 	fsync bool,
+	verbose bool,
 ) error {
 
 	sourceKeymapPath := filepath.Join(source, tableName, keymap.KeymapDirectoryName)
@@ -287,6 +399,13 @@ func transferKeymap(
 
 	destinationKeymapPath := filepath.Join(destination, tableName, keymap.KeymapDirectoryName)
 
+	if verbose {
+		text := fmt.Sprintf("Transferring table '%s' keymap", tableName)
+		writer := bufio.NewWriter(os.Stdout)
+		_, _ = fmt.Fprintf(writer, "\r%-100s", text)
+		_ = writer.Flush()
+	}
+
 	err = util.RecursiveMove(sourceKeymapPath, destinationKeymapPath, deep, preserveOriginal, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to copy keymap from %s to %s: %w",
@@ -304,6 +423,9 @@ func transferSegmentData(
 	deep bool,
 	preserveOriginal bool,
 	fsync bool,
+	verbose bool,
+	totalSegmentFileCount int64,
+	segmentFileCount *atomic.Int64,
 ) error {
 
 	sourceTableDir := filepath.Join(source, tableName)
@@ -331,17 +453,22 @@ func transferSegmentData(
 			destinations,
 			deep,
 			preserveOriginal,
-			fsync)
+			fsync,
+			verbose,
+			totalSegmentFileCount,
+			segmentFileCount)
 		if err != nil {
 			return fmt.Errorf("failed to transfer segment file %s for table %s: %w",
 				segmentFilePath, tableName, err)
 		}
 	}
 
-	// Now that we've copied the segment files, we can delete the original directory.
-	err = os.Remove(sourceSegmentDir)
-	if err != nil {
-		return fmt.Errorf("failed to remove segment directory %s: %w", sourceSegmentDir, err)
+	if !preserveOriginal {
+		// Now that we've copied the segment files, we can delete the original directory.
+		err = os.Remove(sourceSegmentDir)
+		if err != nil {
+			return fmt.Errorf("failed to remove segment directory %s: %w", sourceSegmentDir, err)
+		}
 	}
 
 	return nil
@@ -356,6 +483,9 @@ func transferSegmentFile(
 	deep bool,
 	preserveOriginal bool,
 	fsync bool,
+	verbose bool,
+	totalSegmentFileCount int64,
+	segmentFileCount *atomic.Int64,
 ) error {
 
 	destination, err := determineDestination(segmentFilePath, destinations)
@@ -364,6 +494,15 @@ func transferSegmentFile(
 	}
 
 	destinationSegmentPath := filepath.Join(destination, tableName, segment.SegmentDirectory, segmentName)
+
+	if verbose {
+		count := segmentFileCount.Add(1)
+		text := fmt.Sprintf("Transferring Segment File %d/%d: %s from table '%s'",
+			count, totalSegmentFileCount, filepath.Base(segmentFilePath), tableName)
+		writer := bufio.NewWriter(os.Stdout)
+		_, _ = fmt.Fprintf(writer, "\r%-100s", text)
+		_ = writer.Flush()
+	}
 
 	err = util.RecursiveMove(segmentFilePath, destinationSegmentPath, deep, preserveOriginal, fsync)
 	if err != nil {
@@ -382,6 +521,7 @@ func transferTableMetadata(
 	deep bool,
 	preserveOriginal bool,
 	fsync bool,
+	verbose bool,
 ) error {
 
 	sourceTableDir := filepath.Join(source, tableName)
@@ -402,6 +542,13 @@ func transferTableMetadata(
 	}
 
 	destinationMetadataPath := filepath.Join(destination, tableName, disktable.TableMetadataFileName)
+
+	if verbose {
+		text := fmt.Sprintf("Transferring table '%s' metadata", tableName)
+		writer := bufio.NewWriter(os.Stdout)
+		_, _ = fmt.Fprintf(writer, "\r%-100s", text)
+		_ = writer.Flush()
+	}
 
 	err = util.RecursiveMove(sourceMetadataPath, destinationMetadataPath, deep, preserveOriginal, fsync)
 	if err != nil {
