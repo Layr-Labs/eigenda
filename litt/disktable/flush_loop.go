@@ -85,6 +85,15 @@ func (f *flushLoop) handleSealRequest(req *flushLoopSealRequest) {
 	}
 
 	req.responseChan <- struct{}{}
+
+	// Snapshotting can wait until after we have sent a response. No need for the Flush() caller to wait for
+	// snapshotting. Flush() only cares about the data's crash durability, and is completely independent of
+	// snapshotting.
+	err = req.segmentToSeal.Snapshot()
+	if err != nil {
+		f.errorMonitor.Panic(fmt.Errorf("failed to snapshot segment %s: %w", req.segmentToSeal.String(), err))
+		return
+	}
 }
 
 // handleFlushRequest handles the part of the flush that is performed on the flush loop.

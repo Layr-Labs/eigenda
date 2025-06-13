@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
+	"os"
+	"path"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,9 +16,8 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// All table names must match this regex. Permits uppercase and lowercase letters, numbers, underscores, and dashes.
-// Must be at least one character long.
-var tableNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+// The name of the LittDB lockfile. Protects against DBs in multiple processes from accessing the same data directory.
+const LockfileName = "litt.lock"
 
 var _ litt.DB = &db{}
 
@@ -59,20 +59,25 @@ type db struct {
 
 	// The HTTP server for metrics. nil if metrics are disabled or if an external party is managing the server.
 	metricsServer *http.Server
+
+	// Locks to prevent multiple processes from accessing the same data directories.
+	fileLocks []*util.FileLock
+
+	// Set to true when the database is closed.
+	closed bool
 }
 
 // NewDB creates a new DB instance. After this method is called, the config object should not be modified.
 func NewDB(config *litt.Config) (litt.DB, error) {
-	var err error
-
 	if config.Logger == nil {
+		var err error
 		config.Logger, err = buildLogger(config)
 		if err != nil {
 			return nil, fmt.Errorf("error building logger: %w", err)
 		}
 	}
 
-	err = config.SanityCheck()
+	err := config.SanityCheck()
 	if err != nil {
 		return nil, fmt.Errorf("error checking config: %w", err)
 	}
@@ -99,6 +104,31 @@ func NewDB(config *litt.Config) (litt.DB, error) {
 func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, error) {
 	var err error
 
+	for _, rootPath := range config.Paths {
+		exists, err := util.Exists(rootPath)
+		if err != nil {
+			return nil, fmt.Errorf("error checking if path %s exists: %w", rootPath, err)
+		}
+		if !exists {
+			err = os.MkdirAll(rootPath, 0755)
+			if err != nil {
+				return nil, fmt.Errorf("error creating path %s: %w", rootPath, err)
+			}
+			config.Logger.Infof("Created directory %s", rootPath)
+		} else {
+			config.Logger.Infof("Using existing directory %s", rootPath)
+		}
+	}
+
+	fileLocks := make([]*util.FileLock, 0, len(config.Paths))
+	for _, rootPath := range config.Paths {
+		fileLock, err := util.NewFileLock(path.Join(rootPath, LockfileName), config.Fsync)
+		if err != nil {
+			return nil, fmt.Errorf("error creating file lock for path %s: %w", rootPath, err)
+		}
+		fileLocks = append(fileLocks, fileLock)
+	}
+
 	if config.Logger == nil {
 		config.Logger, err = buildLogger(config)
 		if err != nil {
@@ -112,6 +142,11 @@ func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, e
 		dbMetrics, metricsServer = buildMetrics(config, config.Logger)
 	}
 
+	if config.SnapshotDirectory != "" {
+		config.Logger.Infof("LittDB rolling snapshots enabled, snapshot data will be stored in %s",
+			config.SnapshotDirectory)
+	}
+
 	database := &db{
 		ctx:           config.CTX,
 		logger:        config.Logger,
@@ -122,6 +157,7 @@ func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, e
 		tables:        make(map[string]litt.ManagedTable),
 		metrics:       dbMetrics,
 		metricsServer: metricsServer,
+		fileLocks:     fileLocks,
 	}
 
 	if config.MetricsEnabled {
@@ -159,18 +195,13 @@ func (d *db) lockFreeSize() uint64 {
 	return size
 }
 
-// isTableNameValid returns true if the table name is valid.
-func (d *db) isTableNameValid(name string) bool {
-	return tableNameRegex.MatchString(name)
-}
-
 func (d *db) GetTable(name string) (litt.Table, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
 	table, ok := d.tables[name]
 	if !ok {
-		if !d.isTableNameValid(name) {
+		if !litt.IsTableNameValid(name) {
 			return nil, fmt.Errorf(
 				"Table name '%s' is invalid, must be at least one character long and "+
 					"contain only letters, numbers, and underscores, and dashes.", name)
@@ -215,6 +246,14 @@ func (d *db) DropTable(name string) error {
 func (d *db) Close() error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
+	return d.closeUnsafe()
+}
+
+func (d *db) closeUnsafe() error {
+	if d.closed {
+		// closing more than once is a no-op
+		return nil
+	}
 
 	d.logger.Infof("Stopping LittDB, estimated data size: %d", d.lockFreeSize())
 	d.stopped.Store(true)
@@ -226,6 +265,13 @@ func (d *db) Close() error {
 		}
 	}
 
+	for _, fileLock := range d.fileLocks {
+		err := fileLock.Release()
+		if err != nil {
+			return fmt.Errorf("error releasing file lock: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -233,7 +279,10 @@ func (d *db) Destroy() error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
-	d.stopped.Store(true)
+	err := d.closeUnsafe()
+	if err != nil {
+		return fmt.Errorf("error closing database: %w", err)
+	}
 
 	for name, table := range d.tables {
 		err := table.Destroy()
