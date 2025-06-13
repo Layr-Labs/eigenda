@@ -107,23 +107,27 @@ func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*Pay
 		quorumNumbers[i] = uint8(i)
 	}
 
-	// TODO(hopeyen): the construction of quorum configs will be updated with payment vault interface updates
+	// Get global parameters
 	globalSymbolsPerSecond, err := pcs.tx.GetOnDemandGlobalSymbolsPerSecond(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get global symbols per second: %w", err)
 	}
+
 	globalRatePeriodInterval, err := pcs.tx.GetOnDemandGlobalRatePeriodInterval(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get global rate period interval: %w", err)
 	}
+
 	minNumSymbols, err := pcs.tx.GetMinNumSymbols(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get min num symbols: %w", err)
 	}
+
 	pricePerSymbol, err := pcs.tx.GetPricePerSymbol(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get price per symbol: %w", err)
 	}
+
 	reservationWindow, err := pcs.tx.GetReservationWindow(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reservation window: %w", err)
