@@ -115,9 +115,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 			logger,
 			// metrics.NewNoopMetrics(),
 		)
-		if err := meterer.Start(context.Background()); err != nil {
-			return fmt.Errorf("failed to start meterer: %w", err)
-		}
+		meterer.Start(context.Background())
 	}
 
 	var ratelimiter common.RateLimiter

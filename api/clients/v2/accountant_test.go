@@ -52,7 +52,7 @@ func createTestPaymentVaultParams(reservationWindow, pricePerSymbol, minNumSymbo
 	}
 }
 
-func TestNewAccountant(t *testing.T) {
+func TestAccountant(t *testing.T) {
 	accountID := gethcommon.HexToAddress("0x123")
 	reservations := map[uint8]*core.ReservedPayment{
 		0: {
@@ -111,7 +111,7 @@ func TestNewAccountant(t *testing.T) {
 	maxSymbols := uint64(math.MaxUint64)
 	header, err = acc.AccountBlob(now.UnixNano(), maxSymbols, []uint8{0})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "current cumulativePayment balance insufficient")
+	assert.Contains(t, err.Error(), "insufficient ondemand payment")
 	assert.Nil(t, header)
 }
 
@@ -252,7 +252,7 @@ func TestAccountant_InsufficientOnDemand(t *testing.T) {
 			name:         "Insufficient on-demand payment",
 			symbolLength: 2000,
 			expectError:  true,
-			errorMessage: "balance insufficient to make an on-demand dispersal",
+			errorMessage: "insufficient ondemand payment",
 		},
 	}
 
@@ -351,7 +351,7 @@ func TestAccountant_AccountBlobCallSeries(t *testing.T) {
 			name:         "Fourth call - Insufficient on-demand",
 			symbolLength: 600,
 			expectError:  true,
-			errorMessage: "balance insufficient to make an on-demand dispersal",
+			errorMessage: "insufficient ondemand payment",
 		},
 	}
 
@@ -830,7 +830,7 @@ func TestAccountant_UseOnDemand(t *testing.T) {
 			quorumNumbers: []uint8{0, 1},
 			timestamp:     now,
 			wantErr:       true,
-			errMsg:        "current cumulativePayment balance insufficient",
+			errMsg:        "insufficient ondemand payment",
 		},
 		{
 			name:          "invalid quorum",

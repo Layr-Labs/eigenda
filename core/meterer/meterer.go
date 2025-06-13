@@ -54,7 +54,7 @@ func NewMeterer(
 }
 
 // Start starts to periodically refreshing the on-chain state
-func (m *Meterer) Start(ctx context.Context) error {
+func (m *Meterer) Start(ctx context.Context) {
 	go func() {
 		ticker := time.NewTicker(m.Config.UpdateInterval)
 		defer ticker.Stop()
@@ -62,17 +62,15 @@ func (m *Meterer) Start(ctx context.Context) error {
 		for {
 			select {
 			case <-ticker.C:
-				err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx)
-				if err != nil {
-					m.logger.Error("failed to refresh onchain state", "error", err)
+				if err := m.ChainPaymentState.RefreshOnchainPaymentState(ctx); err != nil {
+					m.logger.Error("Failed to refresh on-chain state", "error", err)
 				}
+				m.logger.Debug("Refreshed on-chain state")
 			case <-ctx.Done():
 				return
 			}
 		}
 	}()
-
-	return nil
 }
 
 // MeterRequest validates a blob header and adds it to the meterer's state
@@ -98,6 +96,9 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 		}
 	}
 
+	// TODO(hopeyen): each quorum can have different min num symbols; the returned symbolsCharged is only for used for metrics.
+	// for now we simply return the charge for quorum 0, as quorums are likely to share the same min num symbols
+	// we can make this more granular by adding metrics to the meterer later on
 	minNumSymbols, err := m.ChainPaymentState.GetMinNumSymbols(OnDemandQuorumID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get min num symbols: %w", err)

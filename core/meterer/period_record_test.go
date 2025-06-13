@@ -104,10 +104,10 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 		name                  string
 		initialRecords        meterer.QuorumPeriodRecords
 		quorumNumber          core.QuorumID
-		currentPeriod         uint64
-		overflowPeriod        uint64
-		symbolUsage           uint64
-		binLimit              uint64
+		timestamp             int64
+		numSymbols            uint64
+		reservation           *core.ReservedPayment
+		protocolConfig        *core.PaymentQuorumProtocolConfig
 		expectedError         string
 		expectedCurrentUsage  uint64
 		expectedOverflowUsage uint64
@@ -120,32 +120,70 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 			name:           "symbol usage exceeds bin limit",
 			initialRecords: make(meterer.QuorumPeriodRecords),
 			quorumNumber:   core.QuorumID(1),
-			currentPeriod:  1,
-			overflowPeriod: 2,
-			symbolUsage:    150,
-			binLimit:       100,
-			expectedError:  "symbol usage exceeds bin limit",
+			timestamp:      1000000000000, // 1 second in nanoseconds
+			numSymbols:     550,
+			reservation: &core.ReservedPayment{
+				SymbolsPerSecond: 50, // This will create bin limit of 50 * 10 = 500
+				StartTimestamp:   0,
+				EndTimestamp:     2000,
+			},
+			protocolConfig: &core.PaymentQuorumProtocolConfig{
+				MinNumSymbols:              100, // min symbols is 100, so 550 -> 600
+				ReservationRateLimitWindow: 10,
+			},
+			expectedError: "symbol usage exceeds bin limit",
 		},
 		{
-			name:                 "usage within bin limit",
-			initialRecords:       make(meterer.QuorumPeriodRecords),
-			quorumNumber:         core.QuorumID(1),
-			currentPeriod:        1,
-			overflowPeriod:       2,
-			symbolUsage:          50,
-			binLimit:             100,
+			name:           "usage within bin limit",
+			initialRecords: make(meterer.QuorumPeriodRecords),
+			quorumNumber:   core.QuorumID(1),
+			timestamp:      1000000000000,
+			numSymbols:     50,
+			reservation: &core.ReservedPayment{
+				SymbolsPerSecond: 100,
+				StartTimestamp:   0,
+				EndTimestamp:     2000,
+			},
+			protocolConfig: &core.PaymentQuorumProtocolConfig{
+				MinNumSymbols:              10,
+				ReservationRateLimitWindow: 10,
+			},
 			expectedCurrentUsage: 50,
 		},
 		{
-			name:                  "usage exceeds limit but overflow available",
-			initialRecords:        make(meterer.QuorumPeriodRecords),
-			quorumNumber:          core.QuorumID(1),
-			currentPeriod:         1,
-			overflowPeriod:        2,
-			symbolUsage:           80,
-			binLimit:              100,
-			setupCurrentRecord:    true,
-			currentRecordUsage:    30,
+			name:           "usage with minimum symbols applied",
+			initialRecords: make(meterer.QuorumPeriodRecords),
+			quorumNumber:   core.QuorumID(1),
+			timestamp:      1000000000000,
+			numSymbols:     5, // Below min symbols
+			reservation: &core.ReservedPayment{
+				SymbolsPerSecond: 100,
+				StartTimestamp:   0,
+				EndTimestamp:     2000,
+			},
+			protocolConfig: &core.PaymentQuorumProtocolConfig{
+				MinNumSymbols:              20, // Min symbols enforced
+				ReservationRateLimitWindow: 10,
+			},
+			expectedCurrentUsage: 20, // Should use min symbols
+		},
+		{
+			name:               "usage exceeds limit but overflow available",
+			initialRecords:     make(meterer.QuorumPeriodRecords),
+			quorumNumber:       core.QuorumID(1),
+			timestamp:          1000000000000,
+			numSymbols:         80,
+			setupCurrentRecord: true,
+			currentRecordUsage: 30,
+			reservation: &core.ReservedPayment{
+				SymbolsPerSecond: 10, // bin limit = 10 * 10 = 100
+				StartTimestamp:   0,
+				EndTimestamp:     2000,
+			},
+			protocolConfig: &core.PaymentQuorumProtocolConfig{
+				MinNumSymbols:              1,
+				ReservationRateLimitWindow: 10,
+			},
 			expectedCurrentUsage:  100, // capped at bin limit
 			expectedOverflowUsage: 10,  // 30 + 80 - 100 = 10
 		},
@@ -153,82 +191,206 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 			name:               "current usage already at limit",
 			initialRecords:     make(meterer.QuorumPeriodRecords),
 			quorumNumber:       core.QuorumID(1),
-			currentPeriod:      1,
-			overflowPeriod:     2,
-			symbolUsage:        10,
-			binLimit:           100,
+			timestamp:          1000000000000,
+			numSymbols:         10,
 			setupCurrentRecord: true,
 			currentRecordUsage: 100,
-			expectedError:      "reservation limit exceeded for quorum 1",
+			reservation: &core.ReservedPayment{
+				SymbolsPerSecond: 10, // bin limit = 100
+				StartTimestamp:   0,
+				EndTimestamp:     2000,
+			},
+			protocolConfig: &core.PaymentQuorumProtocolConfig{
+				MinNumSymbols:              1,
+				ReservationRateLimitWindow: 10,
+			},
+			expectedError: "reservation limit exceeded for quorum 1",
 		},
 		{
 			name:               "current usage exceeds limit",
 			initialRecords:     make(meterer.QuorumPeriodRecords),
 			quorumNumber:       core.QuorumID(1),
-			currentPeriod:      1,
-			overflowPeriod:     2,
-			symbolUsage:        10,
-			binLimit:           100,
+			timestamp:          1000000000000,
+			numSymbols:         10,
 			setupCurrentRecord: true,
 			currentRecordUsage: 150,
-			expectedError:      "reservation limit exceeded for quorum 1",
+			reservation: &core.ReservedPayment{
+				SymbolsPerSecond: 10, // bin limit = 100
+				StartTimestamp:   0,
+				EndTimestamp:     2000,
+			},
+			protocolConfig: &core.PaymentQuorumProtocolConfig{
+				MinNumSymbols:              1,
+				ReservationRateLimitWindow: 10,
+			},
+			expectedError: "reservation limit exceeded for quorum 1",
 		},
 		{
 			name:                "overflow bin already in use",
 			initialRecords:      make(meterer.QuorumPeriodRecords),
 			quorumNumber:        core.QuorumID(1),
-			currentPeriod:       1,
-			overflowPeriod:      2,
-			symbolUsage:         80,
-			binLimit:            100,
+			timestamp:           1000000000000,
+			numSymbols:          80,
 			setupCurrentRecord:  true,
 			setupOverflowRecord: true,
 			currentRecordUsage:  30,
 			overflowRecordUsage: 50,
-			expectedError:       "reservation limit exceeded for quorum 1",
+			reservation: &core.ReservedPayment{
+				SymbolsPerSecond: 10, // bin limit = 100
+				StartTimestamp:   0,
+				EndTimestamp:     2000,
+			},
+			protocolConfig: &core.PaymentQuorumProtocolConfig{
+				MinNumSymbols:              1,
+				ReservationRateLimitWindow: 10,
+			},
+			expectedError: "reservation limit exceeded for quorum 1",
 		},
 		{
-			name:                 "exactly at bin limit",
-			initialRecords:       make(meterer.QuorumPeriodRecords),
-			quorumNumber:         core.QuorumID(1),
-			currentPeriod:        1,
-			overflowPeriod:       2,
-			symbolUsage:          100,
-			binLimit:             100,
+			name:           "exactly at bin limit",
+			initialRecords: make(meterer.QuorumPeriodRecords),
+			quorumNumber:   core.QuorumID(1),
+			timestamp:      1000000000000,
+			numSymbols:     100,
+			reservation: &core.ReservedPayment{
+				SymbolsPerSecond: 10, // bin limit = 100
+				StartTimestamp:   0,
+				EndTimestamp:     2000,
+			},
+			protocolConfig: &core.PaymentQuorumProtocolConfig{
+				MinNumSymbols:              1,
+				ReservationRateLimitWindow: 10,
+			},
 			expectedCurrentUsage: 100,
 		},
 		{
-			name:                 "zero usage",
-			initialRecords:       make(meterer.QuorumPeriodRecords),
-			quorumNumber:         core.QuorumID(1),
-			currentPeriod:        1,
-			overflowPeriod:       2,
-			symbolUsage:          0,
-			binLimit:             100,
-			setupCurrentRecord:   true,
-			currentRecordUsage:   50,
+			name:               "zero usage (enforces min symbols)",
+			initialRecords:     make(meterer.QuorumPeriodRecords),
+			quorumNumber:       core.QuorumID(1),
+			timestamp:          1000000000000,
+			numSymbols:         0,
+			setupCurrentRecord: true,
+			currentRecordUsage: 50,
+			reservation: &core.ReservedPayment{
+				SymbolsPerSecond: 100,
+				StartTimestamp:   0,
+				EndTimestamp:     2000,
+			},
+			protocolConfig: &core.PaymentQuorumProtocolConfig{
+				MinNumSymbols:              5, // Min symbols enforced even for 0 input
+				ReservationRateLimitWindow: 10,
+			},
+			expectedCurrentUsage: 55, // 50 + 5 (min symbols)
+		},
+		{
+			name:           "negative timestamp",
+			initialRecords: make(meterer.QuorumPeriodRecords),
+			quorumNumber:   core.QuorumID(1),
+			timestamp:      -1000000000000,
+			numSymbols:     50,
+			reservation: &core.ReservedPayment{
+				SymbolsPerSecond: 100,
+				StartTimestamp:   0,
+				EndTimestamp:     2000,
+			},
+			protocolConfig: &core.PaymentQuorumProtocolConfig{
+				MinNumSymbols:              1,
+				ReservationRateLimitWindow: 10,
+			},
+			expectedCurrentUsage: 50, // Should handle negative timestamp gracefully
+		},
+		{
+			name:           "large reservation window",
+			initialRecords: make(meterer.QuorumPeriodRecords),
+			quorumNumber:   core.QuorumID(1),
+			timestamp:      1000000000000,
+			numSymbols:     1000,
+			reservation: &core.ReservedPayment{
+				SymbolsPerSecond: 1,
+				StartTimestamp:   0,
+				EndTimestamp:     2000,
+			},
+			protocolConfig: &core.PaymentQuorumProtocolConfig{
+				MinNumSymbols:              1,
+				ReservationRateLimitWindow: 10000, // Large window = large bin limit
+			},
+			expectedCurrentUsage: 1000,
+		},
+		{
+			name:           "zero min symbols",
+			initialRecords: make(meterer.QuorumPeriodRecords),
+			quorumNumber:   core.QuorumID(1),
+			timestamp:      1000000000000,
+			numSymbols:     50,
+			reservation: &core.ReservedPayment{
+				SymbolsPerSecond: 100,
+				StartTimestamp:   0,
+				EndTimestamp:     2000,
+			},
+			protocolConfig: &core.PaymentQuorumProtocolConfig{
+				MinNumSymbols:              0, // Zero min symbols
+				ReservationRateLimitWindow: 10,
+			},
+			expectedCurrentUsage: 50, // Should use actual symbols since min is 0
+		},
+		{
+			name:           "zero symbols per second (zero bin limit)",
+			initialRecords: make(meterer.QuorumPeriodRecords),
+			quorumNumber:   core.QuorumID(1),
+			timestamp:      1000000000000,
+			numSymbols:     1,
+			reservation: &core.ReservedPayment{
+				SymbolsPerSecond: 0, // Zero symbols per second
+				StartTimestamp:   0,
+				EndTimestamp:     2000,
+			},
+			protocolConfig: &core.PaymentQuorumProtocolConfig{
+				MinNumSymbols:              1,
+				ReservationRateLimitWindow: 10,
+			},
+			expectedError: "symbol usage exceeds bin limit", // bin limit would be 0
+		},
+		{
+			name:           "different quorum numbers",
+			initialRecords: make(meterer.QuorumPeriodRecords),
+			quorumNumber:   core.QuorumID(255), // Max quorum ID
+			timestamp:      1000000000000,
+			numSymbols:     50,
+			reservation: &core.ReservedPayment{
+				SymbolsPerSecond: 100,
+				StartTimestamp:   0,
+				EndTimestamp:     2000,
+			},
+			protocolConfig: &core.PaymentQuorumProtocolConfig{
+				MinNumSymbols:              1,
+				ReservationRateLimitWindow: 10,
+			},
 			expectedCurrentUsage: 50,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Calculate expected periods for setup
+			currentPeriod := meterer.GetReservationPeriodByNanosecond(tt.timestamp, tt.protocolConfig.ReservationRateLimitWindow)
+			overflowPeriod := meterer.GetOverflowPeriod(currentPeriod, tt.protocolConfig.ReservationRateLimitWindow)
+
 			// Setup initial records if needed
 			if tt.setupCurrentRecord {
-				currentRecord := tt.initialRecords.GetRelativePeriodRecord(tt.currentPeriod, tt.quorumNumber)
+				currentRecord := tt.initialRecords.GetRelativePeriodRecord(currentPeriod, tt.quorumNumber)
 				currentRecord.Usage = tt.currentRecordUsage
 			}
 			if tt.setupOverflowRecord {
-				overflowRecord := tt.initialRecords.GetRelativePeriodRecord(tt.overflowPeriod, tt.quorumNumber)
+				overflowRecord := tt.initialRecords.GetRelativePeriodRecord(overflowPeriod, tt.quorumNumber)
 				overflowRecord.Usage = tt.overflowRecordUsage
 			}
 
 			err := tt.initialRecords.UpdateUsage(
 				tt.quorumNumber,
-				tt.currentPeriod,
-				tt.overflowPeriod,
-				tt.symbolUsage,
-				tt.binLimit,
+				tt.timestamp,
+				tt.numSymbols,
+				tt.reservation,
+				tt.protocolConfig,
 			)
 
 			if tt.expectedError != "" {
@@ -238,12 +400,12 @@ func TestQuorumPeriodRecords_UpdateUsage(t *testing.T) {
 				assert.NoError(t, err)
 
 				// Check current record usage
-				currentRecord := tt.initialRecords.GetRelativePeriodRecord(tt.currentPeriod, tt.quorumNumber)
+				currentRecord := tt.initialRecords.GetRelativePeriodRecord(currentPeriod, tt.quorumNumber)
 				assert.Equal(t, tt.expectedCurrentUsage, currentRecord.Usage)
 
 				// Check overflow record usage if expected
 				if tt.expectedOverflowUsage > 0 {
-					overflowRecord := tt.initialRecords.GetRelativePeriodRecord(tt.overflowPeriod, tt.quorumNumber)
+					overflowRecord := tt.initialRecords.GetRelativePeriodRecord(overflowPeriod, tt.quorumNumber)
 					assert.Equal(t, tt.expectedOverflowUsage, overflowRecord.Usage)
 				}
 			}

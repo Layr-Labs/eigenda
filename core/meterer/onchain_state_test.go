@@ -287,7 +287,7 @@ func TestNilAssignmentPanicScenario(t *testing.T) {
 	})
 }
 
-func TestPaymentVaultParams_GetConfigs(t *testing.T) {
+func TestPaymentVaultParams_GetQuorumConfigs(t *testing.T) {
 	paymentVaultParams := &meterer.PaymentVaultParams{
 		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
 			0: {
@@ -321,11 +321,11 @@ func TestPaymentVaultParams_GetConfigs(t *testing.T) {
 	}
 
 	// Test with non-existent quorum
-	_, _, err := paymentVaultParams.GetConfigs(99)
+	_, _, err := paymentVaultParams.GetQuorumConfigs(99)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "config not found")
 
-	paymentQuorumConfig, protocolConfig, err := paymentVaultParams.GetConfigs(0)
+	paymentQuorumConfig, protocolConfig, err := paymentVaultParams.GetQuorumConfigs(0)
 	assert.NoError(t, err)
 	assert.NotNil(t, paymentQuorumConfig)
 	assert.NotNil(t, protocolConfig)

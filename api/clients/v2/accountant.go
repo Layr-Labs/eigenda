@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -70,16 +71,12 @@ func (a *Accountant) reservationUsage(numSymbols uint64, quorumNumbers []core.Qu
 			a.periodRecords = originalPeriodRecords
 			return fmt.Errorf("reservation not found for quorum %d", quorumNumber)
 		}
-		_, protocolConfig, err := a.paymentVaultParams.GetConfigs(quorumNumber)
+		_, protocolConfig, err := a.paymentVaultParams.GetQuorumConfigs(quorumNumber)
 		if err != nil {
 			a.periodRecords = originalPeriodRecords
 			return err
 		}
-		currentReservationPeriod := meterer.GetReservationPeriodByNanosecond(timestamp, protocolConfig.ReservationRateLimitWindow)
-		symbolUsage := meterer.SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
-		binLimit := reservation.SymbolsPerSecond * uint64(protocolConfig.ReservationRateLimitWindow)
-		overflowPeriod := meterer.GetOverflowPeriod(currentReservationPeriod, protocolConfig.ReservationRateLimitWindow)
-		if err := a.periodRecords.UpdateUsage(quorumNumber, currentReservationPeriod, overflowPeriod, symbolUsage, binLimit); err != nil {
+		if err := a.periodRecords.UpdateUsage(quorumNumber, timestamp, numSymbols, reservation, protocolConfig); err != nil {
 			a.periodRecords = originalPeriodRecords
 			return err
 		}
@@ -95,7 +92,7 @@ func (a *Accountant) onDemandUsage(numSymbols uint64, quorumNumbers []core.Quoru
 		return nil, err
 	}
 
-	paymentQuorumConfig, protocolConfig, err := a.paymentVaultParams.GetConfigs(meterer.OnDemandQuorumID)
+	paymentQuorumConfig, protocolConfig, err := a.paymentVaultParams.GetQuorumConfigs(meterer.OnDemandQuorumID)
 	if err != nil {
 		return nil, err
 	}
@@ -111,9 +108,7 @@ func (a *Accountant) onDemandUsage(numSymbols uint64, quorumNumbers []core.Quoru
 		return a.cumulativePayment, nil
 	}
 
-	return nil, fmt.Errorf(
-		"no bandwidth reservation found for account %s, and current cumulativePayment balance insufficient "+
-			"to make an on-demand dispersal. Consider depositing more eth to the PaymentVault contract.", a.accountID.Hex())
+	return nil, errors.New("insufficient ondemand payment")
 }
 
 // AccountBlob accountant generates payment information for a request. The accountant
@@ -146,7 +141,7 @@ func (a *Accountant) AccountBlob(
 	// Fall back to on-demand payment if reservation fails
 	cumulativePayment, onDemandErr := a.onDemandUsage(numSymbols, quorums)
 	if onDemandErr != nil {
-		return nil, fmt.Errorf("cannot create payment information for reservation or on-demand. Consider depositing more eth to the PaymentVault contract for your account. For more details, see https://docs.eigenda.xyz/core-concepts/payments#disperser-client-requirements. Account: %s, Reservation Error: %v, On-demand Error: %v", a.accountID.Hex(), rezErr, onDemandErr)
+		return nil, fmt.Errorf("cannot create payment information for reservation or on-demand. Consider depositing more eth to the PaymentVault contract for your account. For more details, see https://docs.eigenda.xyz/core-concepts/payments#disperser-client-requirements. Account: %s, Reservation Error: %w, On-demand Error: %w", a.accountID.Hex(), rezErr, onDemandErr)
 	}
 
 	pm := &core.PaymentMetadata{

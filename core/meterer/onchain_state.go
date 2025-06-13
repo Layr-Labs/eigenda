@@ -49,15 +49,12 @@ type OnchainPaymentState struct {
 	tx     *eth.Reader
 	logger logging.Logger
 
-	// Maps to store payment state
 	ReservedPayments map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment
 	OnDemandPayments map[gethcommon.Address]*core.OnDemandPayment
 
-	// Locks for thread-safe access
 	ReservationsLock sync.RWMutex
 	OnDemandLocks    sync.RWMutex
 
-	// Atomic pointer to store payment vault parameters
 	PaymentVaultParams atomic.Pointer[PaymentVaultParams]
 }
 
@@ -224,7 +221,7 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx contex
 	}
 	pcs.ReservationsLock.RUnlock()
 
-	// Fetch from chain if not found in cache
+	// pulls the chain state
 	res, err := pcs.tx.GetReservedPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reserved payment: %w", err)
@@ -257,7 +254,7 @@ func (pcs *OnchainPaymentState) GetOnDemandPaymentByAccount(ctx context.Context,
 	}
 	pcs.OnDemandLocks.RUnlock()
 
-	// Fetch from chain if not found in cache
+	// pulls the chain state
 	res, err := pcs.tx.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get on-demand payment: %w", err)
@@ -290,12 +287,20 @@ func (pcs *OnchainPaymentState) GetQuorumProtocolConfig(quorumID core.QuorumID) 
 
 // GetQuorumPaymentConfigs retrieves all quorum payment configurations
 func (pcs *OnchainPaymentState) GetQuorumPaymentConfigs() map[core.QuorumID]*core.PaymentQuorumConfig {
-	return pcs.PaymentVaultParams.Load().QuorumPaymentConfigs
+	params := pcs.PaymentVaultParams.Load()
+	if params == nil {
+		return nil
+	}
+	return params.QuorumPaymentConfigs
 }
 
 // GetQuorumProtocolConfigs retrieves all quorum protocol configurations
 func (pcs *OnchainPaymentState) GetQuorumProtocolConfigs() map[core.QuorumID]*core.PaymentQuorumProtocolConfig {
-	return pcs.PaymentVaultParams.Load().QuorumProtocolConfigs
+	params := pcs.PaymentVaultParams.Load()
+	if params == nil {
+		return nil
+	}
+	return params.QuorumProtocolConfigs
 }
 
 // GetOnDemandQuorumNumbers retrieves the list of quorums enabled for on-demand payments
@@ -512,7 +517,7 @@ func (pcs *OnchainPaymentState) refreshOnDemandPayments(ctx context.Context) err
 	return nil
 }
 
-func (pvp *PaymentVaultParams) GetConfigs(quorumNumber core.QuorumID) (*core.PaymentQuorumConfig, *core.PaymentQuorumProtocolConfig, error) {
+func (pvp *PaymentVaultParams) GetQuorumConfigs(quorumNumber core.QuorumID) (*core.PaymentQuorumConfig, *core.PaymentQuorumProtocolConfig, error) {
 	if pvp == nil {
 		return nil, nil, fmt.Errorf("payment vault params is nil")
 	}

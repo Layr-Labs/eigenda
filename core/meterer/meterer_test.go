@@ -164,11 +164,7 @@ func setup(_ *testing.M) {
 		logger,
 	)
 
-	err = mt.Start(context.Background())
-	if err != nil {
-		teardown()
-		panic("failed to start meterer")
-	}
+	mt.Start(context.Background())
 }
 
 func teardown() {

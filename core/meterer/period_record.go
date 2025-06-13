@@ -43,15 +43,19 @@ func (pr QuorumPeriodRecords) GetRelativePeriodRecord(index uint64, quorumNumber
 // Returns error if the update would exceed the bin limit and cannot use overflow bin
 func (pr QuorumPeriodRecords) UpdateUsage(
 	quorumNumber core.QuorumID,
-	currentPeriod uint64,
-	overflowPeriod uint64,
-	symbolUsage uint64,
-	binLimit uint64,
+	timestamp int64,
+	numSymbols uint64,
+	reservation *core.ReservedPayment,
+	protocolConfig *core.PaymentQuorumProtocolConfig,
 ) error {
+	symbolUsage := SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
+	binLimit := GetReservationBinLimit(reservation, protocolConfig.ReservationRateLimitWindow)
+
 	if symbolUsage > binLimit {
 		return fmt.Errorf("symbol usage exceeds bin limit")
 	}
 
+	currentPeriod := GetReservationPeriodByNanosecond(timestamp, protocolConfig.ReservationRateLimitWindow)
 	relativePeriodRecord := pr.GetRelativePeriodRecord(currentPeriod, quorumNumber)
 	oldUsage := relativePeriodRecord.Usage
 	relativePeriodRecord.Usage += symbolUsage
@@ -66,6 +70,7 @@ func (pr QuorumPeriodRecords) UpdateUsage(
 	}
 
 	// overflow bin if we're over the limit
+	overflowPeriod := GetOverflowPeriod(currentPeriod, protocolConfig.ReservationRateLimitWindow)
 	overflowPeriodRecord := pr.GetRelativePeriodRecord(overflowPeriod, quorumNumber)
 	if overflowPeriodRecord.Usage == 0 {
 		overflowPeriodRecord.Usage += relativePeriodRecord.Usage - binLimit

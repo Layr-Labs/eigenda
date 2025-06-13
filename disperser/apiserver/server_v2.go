@@ -280,18 +280,6 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	return nil, api.NewErrorUnimplemented()
 }
 
-// getAllQuorumIds returns a slice of all quorum IDs (from 0 to quorumCount-1)
-// Returns an empty slice if the onchain state is not loaded
-func (o *OnchainState) getAllQuorumIds() []core.QuorumID {
-	quorumCount := o.QuorumCount
-	quorumIds := make([]core.QuorumID, quorumCount)
-	for i := range quorumIds {
-		quorumIds[i] = core.QuorumID(i)
-	}
-
-	return quorumIds
-}
-
 func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, req *pb.GetPaymentStateForAllQuorumsRequest) (*pb.GetPaymentStateForAllQuorumsReply, error) {
 	if s.meterer == nil {
 		return nil, errors.New("payment meterer is not enabled")
@@ -441,4 +429,16 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	}
 	s.logger.Debug("Served Payment State For All Quorums for account", "accountID", accountID, "quorumIds", quorumIds, "reply", reply)
 	return reply, nil
+}
+
+// getAllQuorumIds returns a slice of all quorum IDs (from 0 to quorumCount-1)
+// Returns an empty slice if the onchain state is not loaded
+func (o *OnchainState) getAllQuorumIds() []core.QuorumID {
+	quorumCount := o.QuorumCount
+	quorumIds := make([]core.QuorumID, quorumCount)
+	for i := range quorumIds {
+		quorumIds[i] = core.QuorumID(i)
+	}
+
+	return quorumIds
 }
