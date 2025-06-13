@@ -61,8 +61,9 @@ The `blobHeader` is submitted alongside the `blob` as part of the `DisperseBlob`
 
 The `BlobHeader` contains four main sections that must be constructed. It is passed into the `DisperseBlobRequest` and is signed over for payment authorization.
 
-#### Version
+Refer to the eigenda [protobufs](https://github.com/Layr-Labs/eigenda/blob/master/api/proto/disperser/v2/disperser_v2.proto) for full details of this struct.
 
+#### Version
 The `blobHeader` version refers to one of the `versionedBlobParams` structs defined in the [`EigenDAThresholdRegistry`](./4-contracts.md#eigendathreshold-registry) contract.
 
 #### QuorumNumbers
