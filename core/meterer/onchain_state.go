@@ -135,27 +135,23 @@ func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*Pay
 		quorumNumbers[i] = uint8(i)
 	}
 
-	// Get global parameters
+	// TODO(hopeyen): the construction of quorum configs will be updated with payment vault interface updates
 	globalSymbolsPerSecond, err := pcs.tx.GetOnDemandGlobalSymbolsPerSecond(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get global symbols per second: %w", err)
 	}
-
 	globalRatePeriodInterval, err := pcs.tx.GetOnDemandGlobalRatePeriodInterval(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get global rate period interval: %w", err)
 	}
-
 	minNumSymbols, err := pcs.tx.GetMinNumSymbols(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get min num symbols: %w", err)
 	}
-
 	pricePerSymbol, err := pcs.tx.GetPricePerSymbol(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get price per symbol: %w", err)
 	}
-
 	reservationWindow, err := pcs.tx.GetReservationWindow(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reservation window: %w", err)
@@ -295,24 +291,6 @@ func (pvp *PaymentVaultParams) GetQuorumProtocolConfig(quorumID core.QuorumID) (
 	return config, nil
 }
 
-// GetOnDemandGlobalSymbolsPerSecond retrieves the global symbols per second rate for on-demand payments
-func (pvp *PaymentVaultParams) GetOnDemandGlobalSymbolsPerSecond(quorumID core.QuorumID) (uint64, error) {
-	config, err := pvp.GetQuorumPaymentConfig(quorumID)
-	if err != nil {
-		return 0, err
-	}
-	return config.OnDemandSymbolsPerSecond, nil
-}
-
-// GetOnDemandGlobalRatePeriodInterval retrieves the rate period interval for on-demand payments
-func (pvp *PaymentVaultParams) GetOnDemandGlobalRatePeriodInterval(quorumID core.QuorumID) (uint64, error) {
-	config, err := pvp.GetQuorumProtocolConfig(quorumID)
-	if err != nil {
-		return 0, err
-	}
-	return config.OnDemandRateLimitWindow, nil
-}
-
 // GetMinNumSymbols retrieves the minimum number of symbols required for a quorum
 func (pvp *PaymentVaultParams) GetMinNumSymbols(quorumID core.QuorumID) (uint64, error) {
 	config, err := pvp.GetQuorumProtocolConfig(quorumID)
@@ -415,21 +393,6 @@ func (pcs *OnchainPaymentState) refreshOnDemandPayments(ctx context.Context) err
 	}
 	pcs.OnDemandPayments = onDemandPayments
 	return nil
-}
-
-func (pvp *PaymentVaultParams) GetQuorumConfigs(quorumNumber core.QuorumID) (*core.PaymentQuorumConfig, *core.PaymentQuorumProtocolConfig, error) {
-	if pvp == nil {
-		return nil, nil, fmt.Errorf("payment vault params is nil")
-	}
-	paymentQuorumConfig, ok := pvp.QuorumPaymentConfigs[quorumNumber]
-	if !ok {
-		return nil, nil, fmt.Errorf("payment quorum config not found for quorum %d", quorumNumber)
-	}
-	protocolConfig, ok := pvp.QuorumProtocolConfigs[quorumNumber]
-	if !ok {
-		return nil, nil, fmt.Errorf("payment quorum protocol config not found for quorum %d", quorumNumber)
-	}
-	return paymentQuorumConfig, protocolConfig, nil
 }
 
 // PaymentVaultParamsFromProtobuf converts a protobuf payment vault params to a core payment vault params

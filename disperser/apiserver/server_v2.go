@@ -304,19 +304,19 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		s.logger.Error("failed to get payment global params", "err", err)
 		return nil, api.NewErrorInternal("failed to get payment parameters")
 	}
-	
+
 	paymentConfig, err := params.GetQuorumPaymentConfig(core.QuorumID(0))
 	if err != nil {
 		s.logger.Error("failed to get payment config for quorum 0", "err", err)
 		return nil, api.NewErrorInternal("failed to get payment configuration")
 	}
-	
+
 	protocolConfig, err := params.GetQuorumProtocolConfig(core.QuorumID(0))
 	if err != nil {
 		s.logger.Error("failed to get protocol config for quorum 0", "err", err)
 		return nil, api.NewErrorInternal("failed to get protocol configuration")
 	}
-	
+
 	globalSymbolsPerSecond := paymentConfig.OnDemandSymbolsPerSecond
 	minNumSymbols := protocolConfig.MinNumSymbols
 	pricePerSymbol := paymentConfig.OnDemandPricePerSymbol

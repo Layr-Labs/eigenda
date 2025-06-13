@@ -151,11 +151,11 @@ func TestOnchainPaymentState_NilProtection(t *testing.T) {
 				assert.NotNil(t, retrievedParams)
 
 				// Test that missing quorum returns appropriate errors through the PaymentVaultParams methods
-				_, err = retrievedParams.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID)
+				_, err = retrievedParams.GetQuorumPaymentConfig(meterer.OnDemandQuorumID)
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "payment config not found for quorum")
 
-				_, err = retrievedParams.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID)
+				_, err = retrievedParams.GetQuorumProtocolConfig(meterer.OnDemandQuorumID)
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "protocol config not found for quorum")
 
@@ -200,12 +200,14 @@ func TestOnchainPaymentState_NilProtection(t *testing.T) {
 				assert.NoError(t, err)
 				assert.NotNil(t, retrievedParams)
 
-				globalSymbolsPerSecond, err := retrievedParams.GetOnDemandGlobalSymbolsPerSecond(meterer.OnDemandQuorumID)
+				// Test payment config access
+				paymentConfig, err := retrievedParams.GetQuorumPaymentConfig(meterer.OnDemandQuorumID)
 				assert.NoError(t, err)
-				assert.Equal(t, uint64(100), globalSymbolsPerSecond)
-				globalPeriodInterval, err := retrievedParams.GetOnDemandGlobalRatePeriodInterval(meterer.OnDemandQuorumID)
+				assert.Equal(t, uint64(100), paymentConfig.OnDemandSymbolsPerSecond)
+				// Test protocol config access
+				protocolConfig, err := retrievedParams.GetQuorumProtocolConfig(meterer.OnDemandQuorumID)
 				assert.NoError(t, err)
-				assert.Equal(t, uint64(400), globalPeriodInterval)
+				assert.Equal(t, uint64(400), protocolConfig.OnDemandRateLimitWindow)
 				minNumSymbols, err := retrievedParams.GetMinNumSymbols(meterer.OnDemandQuorumID)
 				assert.NoError(t, err)
 				assert.Equal(t, uint64(300), minNumSymbols)
@@ -358,71 +360,6 @@ func TestNilAssignmentPanicScenarios(t *testing.T) {
 	}
 }
 
-func TestPaymentVaultParams_GetQuorumConfigs(t *testing.T) {
-	tests := []struct {
-		name           string
-		params         *meterer.PaymentVaultParams
-		quorumID       core.QuorumID
-		expectedErr    string
-		validateResult func(t *testing.T, paymentConfig *core.PaymentQuorumConfig, protocolConfig *core.PaymentQuorumProtocolConfig)
-	}{
-		{
-			name: "ValidQuorum_Success",
-			params: &meterer.PaymentVaultParams{
-				QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
-					0: {
-						ReservationSymbolsPerSecond: 1,
-						OnDemandSymbolsPerSecond:    2,
-						OnDemandPricePerSymbol:      3,
-					},
-				},
-				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
-					0: {
-						MinNumSymbols:              7,
-						ReservationAdvanceWindow:   8,
-						ReservationRateLimitWindow: 9,
-						OnDemandRateLimitWindow:    10,
-						OnDemandEnabled:            true,
-					},
-				},
-				OnDemandQuorumNumbers: []core.QuorumID{0, 1},
-			},
-			quorumID: 0,
-			validateResult: func(t *testing.T, paymentConfig *core.PaymentQuorumConfig, protocolConfig *core.PaymentQuorumProtocolConfig) {
-				assert.NotNil(t, paymentConfig)
-				assert.NotNil(t, protocolConfig)
-				assert.Equal(t, uint64(7), protocolConfig.MinNumSymbols)
-				assert.Equal(t, uint64(3), paymentConfig.OnDemandPricePerSymbol)
-			},
-		},
-		{
-			name: "NonExistentQuorum_Error",
-			params: &meterer.PaymentVaultParams{
-				QuorumPaymentConfigs:  map[core.QuorumID]*core.PaymentQuorumConfig{},
-				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{},
-				OnDemandQuorumNumbers: []core.QuorumID{0, 1},
-			},
-			quorumID:    99,
-			expectedErr: "config not found",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			paymentConfig, protocolConfig, err := tt.params.GetQuorumConfigs(tt.quorumID)
-
-			if tt.expectedErr != "" {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedErr)
-			} else {
-				assert.NoError(t, err)
-				if tt.validateResult != nil {
-					tt.validateResult(t, paymentConfig, protocolConfig)
-				}
-			}
-		})
-	}
-}
 
 func TestOnchainPaymentState_CacheOperations(t *testing.T) {
 	tests := []struct {
