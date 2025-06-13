@@ -47,8 +47,7 @@ type requestAuthenticator struct {
 	// reloaded from the chain state in case the key has been changed.
 	keyTimeoutDuration time.Duration
 
-	// disperserIDFilter is a function that returns true if the given disperser ID is valid.
-	disperserIDFilter func(uint32) bool
+	//TODO: add blacklistedDispersers is a set of disperser IDs that are blacklisted.
 }
 
 // NewRequestAuthenticator creates a new RequestAuthenticator.
@@ -57,7 +56,6 @@ func NewRequestAuthenticator(
 	chainReader core.Reader,
 	keyCacheSize int,
 	keyTimeoutDuration time.Duration,
-	disperserIDFilter func(uint32) bool,
 	now time.Time) (RequestAuthenticator, error) {
 
 	keyCache, err := lru.New[uint32, *keyWithTimeout](keyCacheSize)
@@ -69,7 +67,6 @@ func NewRequestAuthenticator(
 		chainReader:        chainReader,
 		keyCache:           keyCache,
 		keyTimeoutDuration: keyTimeoutDuration,
-		disperserIDFilter:  disperserIDFilter,
 	}
 
 	err = authenticator.preloadCache(ctx, now)
@@ -81,7 +78,7 @@ func NewRequestAuthenticator(
 }
 
 func (a *requestAuthenticator) preloadCache(ctx context.Context, now time.Time) error {
-	// this will need to be updated for decentralized dispersers
+	//TODO: preload disperser blacklist from storage
 	_, err := a.getDisperserKey(ctx, now, api.EigenLabsDisperserID)
 	if err != nil {
 		return fmt.Errorf("failed to get operator key: %w", err)
@@ -114,9 +111,7 @@ func (a *requestAuthenticator) getDisperserKey(
 	now time.Time,
 	disperserID uint32) (*gethcommon.Address, error) {
 
-	if !a.disperserIDFilter(disperserID) {
-		return nil, fmt.Errorf("invalid disperser ID: %d", disperserID)
-	}
+	//TODO: Reject blacklisted dispersers
 
 	key, ok := a.keyCache.Get(disperserID)
 	if ok {
