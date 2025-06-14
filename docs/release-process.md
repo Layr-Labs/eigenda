@@ -1,0 +1,124 @@
+# GitHub Release Management Process
+
+## Table of Contents
+
+1. [Feature Freeze & Release Branch Creation](#1-feature-freeze--release-branch-creation)
+2. [Changes to a Release Branch](#2-changes-to-a-release-branch)
+   - [Change Policy](#change-policy)
+   - [Change Process](#change-process)
+3. [Tagging a Release](#3-tagging-a-release)
+4. [Updates After Release Tag Has Been Cut](#4-updates-after-release-tag-has-been-cut)
+5. [Official Release & Notes](#5-official-release--notes)
+   - [Creating the Release](#creating-the-release)
+   - [Release Notes (TODO)](#release-notes-todo)
+6. [Post-Release Updates](#6-post-release-updates)
+
+---
+
+### 1. **Feature Freeze & Release Branch Creation**
+
+Enacting a feature freeze helps to ensure that the code we publish to production environments is well tested and
+mature. The start of a feature freeze is marked by the creation of a release branch, which allows development
+against `master` to continue uninterrupted while the release is prepared.
+
+#### Plan Feature Freeze
+
+- A feature freeze may be tied either to a date scheduled in advance, or to the completion of a key feature.
+- As a general rule of thumb, a feature freeze should be planned such that there are two weeks between the freeze
+and the release on testnet.
+- The team should be notified of an upcoming feature freeze as soon as it has been planned.
+
+#### Enact Feature Freeze
+
+A feature freeze is officially marked by the creation of a release branch:
+
+- From latest `master` commit:
+  - `git checkout master && git pull`
+  - `git checkout -b release/0.<MINOR>`
+    - **Note:** there is no patch number in the branch name. The same branch is used across multiple patch versions.
+  - Example: `release/0.10`
+- Push the branch:
+  - `git push origin release/0.10`
+  - GitHub policies are configured to automatically protect a branch prefixed with 'release', to prevent it from being
+  directly pushed to or deleted.
+
+Note: The current branch naming scheme is `release/0.<MINOR>`, so that a user can checkout and pull the release branch
+without necessarily being aware of what the latest patch release is. Once we release the first major semver version,
+the branch naming format will be changed to `release/<MAJOR>`, to enable a similar user flow (checking out the major
+version release branch, and pulling without needing to know the latest minor or patch versions).
+
+---
+
+### 2. **Changes to a Release Branch**
+
+#### Change Policy
+
+- **High bar for inclusion**: Only critical bugfixes or business-critical features
+  - Even bugfixes should not be reflexively included: only high-severity issues
+- **Team consensus required**: Single engineer cannot make the decision
+- **Public visibility**: Must have team discussion (e.g., Slack thread) before proceeding. Alternatively, management
+may sign-off that a feature should be included after a feature freeze has been enacted. Note that even with managment
+sign-off, a PR targetting a release branch must still go through the standard peer-review process.
+
+#### Change Process
+
+- **If change is also needed on `master`:**
+  1. Submit PR and merge into `master` first
+  2. Cherry-pick the squashed commit into the release branch
+- **If change is release-only:**
+  - Submit PR directly against the release branch
+- **⚠️ NEVER push directly to the release branch**
+
+---
+
+### 3. **Tagging a Release**
+
+- **When ready**, tag from HEAD of release branch:
+  - Tag format: `v<MAJOR>.<MINOR>.<PATCH>`
+  - Example: `v0.10.0`
+  - `git checkout release/0.10`
+  - `git tag v0.10.0`
+  - `git push origin v0.10.0`
+- **⚠️ Tags are immutable:**
+  - NEVER force-push a tag to a different commit
+  - If a mistake is made, create a new tag with incremented version
+
+---
+
+### 4. **Updates After Release Tag Has Been Cut**
+
+- **Additional fixes** after initial tag may be required
+- **Follow same change policy** as described in [Section 2](#2-changes-to-a-release-branch)
+- **Do not tag reflexively** after every merge:
+  - Accumulate changes until a meaningful patch set is ready
+  - Create new release tag with incremented patch version (e.g., `v0.10.1`, `v0.10.2`)
+- **Continue iteratively** until all critical issues are resolved
+
+---
+
+### 5. **Official Release & Notes**
+
+#### Creating the Release
+
+- **When ready to make the release public:**
+  - If necessary, tag final patch version from release branch HEAD
+  - Create GitHub release via UI, targeting the most recent tag
+  - **Note**: Release will likely have non-zero patch version
+
+#### Release Notes (TODO)
+
+- Define a consistent format and content structure
+- Include tooling guidance (likely an LLM prompt)
+- Notes should include:
+  - Feature summary
+  - Fixes included
+  - Contributor acknowledgments
+
+---
+
+### 6. **Post-Release Updates**
+
+- **Additional patch updates** after release shipping follow the same process:
+  - Merge new code into the release branch following [Section 2](#2-changes-to-a-release-branch) policy
+  - Cut new tags as needed following [Section 3](#3-tagging-a-release) process
+  - Create new GitHub releases targeting updated tags following [Section 5](#5-official-release--notes) process
