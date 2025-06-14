@@ -478,3 +478,50 @@ func PaymentVaultParamsFromProtobuf(vaultParams *disperser_rpc.PaymentVaultParam
 		OnDemandQuorumNumbers: onDemandQuorumNumbers,
 	}, nil
 }
+
+// PaymentVaultParamsToProtobuf converts core payment vault params to protobuf format
+func (pvp *PaymentVaultParams) PaymentVaultParamsToProtobuf() (*disperser_rpc.PaymentVaultParams, error) {
+	if pvp == nil {
+		return nil, fmt.Errorf("payment vault params cannot be nil")
+	}
+
+	if pvp.QuorumPaymentConfigs == nil {
+		return nil, fmt.Errorf("payment quorum configs cannot be nil")
+	}
+
+	if pvp.QuorumProtocolConfigs == nil {
+		return nil, fmt.Errorf("payment quorum protocol configs cannot be nil")
+	}
+
+	quorumPaymentConfigs := make(map[uint32]*disperser_rpc.PaymentQuorumConfig)
+	quorumProtocolConfigs := make(map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig)
+
+	for quorumID, paymentConfig := range pvp.QuorumPaymentConfigs {
+		quorumPaymentConfigs[uint32(quorumID)] = &disperser_rpc.PaymentQuorumConfig{
+			ReservationSymbolsPerSecond: paymentConfig.ReservationSymbolsPerSecond,
+			OnDemandSymbolsPerSecond:    paymentConfig.OnDemandSymbolsPerSecond,
+			OnDemandPricePerSymbol:      paymentConfig.OnDemandPricePerSymbol,
+		}
+	}
+
+	for quorumID, protocolConfig := range pvp.QuorumProtocolConfigs {
+		quorumProtocolConfigs[uint32(quorumID)] = &disperser_rpc.PaymentQuorumProtocolConfig{
+			MinNumSymbols:              protocolConfig.MinNumSymbols,
+			ReservationAdvanceWindow:   protocolConfig.ReservationAdvanceWindow,
+			ReservationRateLimitWindow: protocolConfig.ReservationRateLimitWindow,
+			OnDemandRateLimitWindow:    protocolConfig.OnDemandRateLimitWindow,
+			OnDemandEnabled:            protocolConfig.OnDemandEnabled,
+		}
+	}
+
+	onDemandQuorumNumbers := make([]uint32, len(pvp.OnDemandQuorumNumbers))
+	for i, num := range pvp.OnDemandQuorumNumbers {
+		onDemandQuorumNumbers[i] = uint32(num)
+	}
+
+	return &disperser_rpc.PaymentVaultParams{
+		QuorumPaymentConfigs:  quorumPaymentConfigs,
+		QuorumProtocolConfigs: quorumProtocolConfigs,
+		OnDemandQuorumNumbers: onDemandQuorumNumbers,
+	}, nil
+}
