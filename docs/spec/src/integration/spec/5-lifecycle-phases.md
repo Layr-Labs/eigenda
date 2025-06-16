@@ -4,7 +4,7 @@
 Secure interaction between a rollup and EigenDA is composed of three distinct system flows:
 
 1. [**Dispersal**](#secure-dispersal): Submitting payload data to the DA network  
-2. [**Retrieval**](#secure-retrieval): Fetching batch data from the DA network  
+2. [**Retrieval**](#secure-retrieval): Fetching payload data from the DA network  
 3. **Verification**: Ensuring the integrity and quorum-based certification of data availability. Where and how verification is performed is often contingent on how an integration is implemented; e.g:
     - *Pessimistic Verification* where a `DACert` is checked as pre-inclusion check for a sequencer inbox
     - *Optimistic Verification* where a `DACert` is only verified in a worst-case challenge
@@ -17,28 +17,28 @@ Secure interaction between a rollup and EigenDA is composed of three distinct sy
 
 
 ### System Flow
-1. *EigenDA Client* takes a raw [payload](./3-data-structs.md#payload) bytes and [converts](#payload-to-blob-encoding) it into a [blob](./3-data-structs.md#blob).
+1. *[EigenDA Client](../../glossary.md#eigenda-client)* takes a raw [payload](./3-data-structs.md#payload) bytes and [converts](#payload-to-blob-encoding) it into a [blob](./3-data-structs.md#blob).
 
-1. Using `latest_block_number` (lbn) number fetched from ETH RPC node, *EigenDA Client* calls the router to get the `EigenDACertVerifier` [contract](./4-contracts.md#eigendacertverifier) address *most likely* (if using [`EigenDACertVerifierRouter`](./4-contracts.md#eigendacertverifierrouter)) to be committed to by the `reference_block_number` (rbn) returned by the EigenDA disperser.
+2. Using `latest_block_number` (lbn) number fetched from ETH RPC node, *[EigenDA Client](../../glossary.md#eigenda-client)* calls the router to get the `EigenDACertVerifier` [contract](./4-contracts.md#eigendacertverifier) address *most likely* (if using [`EigenDACertVerifierRouter`](./4-contracts.md#eigendacertverifierrouter)) to be committed to by the `reference_block_number` (rbn) returned by the EigenDA disperser.
 
-2. Using the `verifier`, *EigenDA Client* fetches the `required_quorums` and embeds them into the [`BlobHeader`](./3-data-structs.md#blobheader) as part of the disperser request.
+3. Using the `verifier`, *[EigenDA Client](../../glossary.md#eigenda-client)* fetches the `required_quorums` and embeds them into the [`BlobHeader`](./3-data-structs.md#blobheader) as part of the disperser request.
 
-3. The *EigenDA Client* submits the payload blob request to the EigenDA disperser via `DisperseBlob` [endpoint](./../../protobufs/generated/disperser_v2.md#disperserv2disperser_v2proto###disperser) and polls for a [`BlobStatusReply`](../../protobufs/generated/disperser_v2.md#blobstatusreply) (BSR). 
+4. The *[EigenDA Client](../../glossary.md#eigenda-client)* submits the payload blob request to the EigenDA disperser via `DisperseBlob` [endpoint](./../../protobufs/generated/disperser_v2.md#disperserv2disperser_v2proto###disperser) and polls for a [`BlobStatusReply`](../../protobufs/generated/disperser_v2.md#blobstatusreply) (BSR). 
 
-4. While querying the disperser's `GetBlobStatus` [endpoint](./../../protobufs/generated/disperser_v2.md#disperserv2disperser_v2proto###disperser), *EigenDA Client* periodically checks against the confirmation threshold as it’s updated in real-time by the disperser using the rbn returned in the `BlobStatusReply` for fetching thresholds. ([ref](#blob-dispersal-with-eigenda-disperser))
+5. While querying the disperser's `GetBlobStatus` [endpoint](./../../protobufs/generated/disperser_v2.md#disperserv2disperser_v2proto###disperser), *[EigenDA Client](../../glossary.md#eigenda-client)* periodically checks against the confirmation threshold as it’s updated in real-time by the disperser using the rbn returned in the `BlobStatusReply` for fetching thresholds. ([ref](#blob-dispersal-with-eigenda-disperser))
 
-5. Once confirmation thresholds are fulfilled, *EigenDA Client* calls the `verifier`'s `certVersion()` method to get the `cert_version` and casts the `DACert` into a structured ABI binding type using the `cert_version` to dictate which certificate representation to use. ([ref](#blobstatusreply-→-cert))
+6. Once confirmation thresholds are fulfilled, *[EigenDA Client](../../glossary.md#eigenda-client)* calls the `verifier`'s `certVersion()` method to get the `cert_version` and casts the `DACert` into a structured ABI binding type using the `cert_version` to dictate which certificate representation to use. ([ref](#blobstatusreply-→-cert))
 
-7. *EigenDA Client* then passes ABI encoded cert bytes via a call to the `verifier`'s `checkDACert` function which performs onchain cert verification [logic](./6-secure-integration.md#2-cert-validation) and returns a uint `verification_status_code`
+7. *[EigenDA Client](../../glossary.md#eigenda-client)* then passes ABI encoded cert bytes via a call to the `verifier`'s `checkDACert` function which performs onchain cert verification [logic](./6-secure-integration.md#2-cert-validation) and returns a uint `verification_status_code`
 
-8. Using the `verification_status_code`, *EigenDA Client* determines whether to return the certificate (`CertV2Lib.StatusCode.SUCCESS`) to the *Rollup Batcher* or retry a subsequent dispersal attempt
+8. Using the `verification_status_code`, *[EigenDA Client](../../glossary.md#eigenda-client)* determines whether to return the certificate (`CertV2Lib.StatusCode.SUCCESS`) to the *Rollup Batcher* or retry a subsequent dispersal attempt
 
 
 ### Payload to Blob Encoding
 
 This phase occurs inside the eigenda-proxy, because the proxy acts as the “bridge” between the Rollup Domain and Data Availability Domain (see [lifecycle](./2-rollup-payload-lifecycle.md) diagram).
 
-A `payload` consists of an arbitrary byte array. The DisperseBlob endpoint accepts an `blob`, which needs to be an encoded bn254 field element array.
+A `payload` consists of an arbitrary byte array. The DisperseBlob endpoint accepts a `blob`, which needs to be an encoded bn254 field element array.
 
 
 ### Disperser polling
