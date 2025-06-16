@@ -31,7 +31,11 @@ func withLogging(
 
 		if err != nil {
 			args = append(args, "error", err.Error())
-			log.Error("request completed with error", args...)
+			if scw.status >= 400 && scw.status < 500 {
+				log.Warn("request completed with 4xx error", args...)
+			} else {
+				log.Error("request completed with error", args...)
+			}
 		} else {
 			// This log line largely duplicates the logging in the handlers.
 			// Only difference being that we have duration here, whereas the handlers log the cert.

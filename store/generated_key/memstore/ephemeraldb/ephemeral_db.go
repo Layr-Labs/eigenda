@@ -2,6 +2,7 @@ package ephemeraldb
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -91,7 +92,7 @@ func (db *DB) FetchEntry(key []byte) ([]byte, error) {
 	payload, exists := db.store[string(key)]
 
 	if !exists {
-		return nil, fmt.Errorf("payload not found for key: %s", string(key))
+		return nil, fmt.Errorf("payload not found for key: %s", hex.EncodeToString(key))
 	}
 
 	return payload, nil

@@ -132,8 +132,6 @@ func (m *Manager) Get(ctx context.Context,
 			return data, nil
 		}
 
-		m.log.Error(err.Error())
-
 		// 3 - read blob from fallbacks if enabled and data is non-retrievable from EigenDA
 		if m.secondary.FallbackEnabled() {
 			data, err = m.secondary.MultiSourceRead(ctx, versionedCert.SerializedCert, true, verifyMethod, verifyOpts)
