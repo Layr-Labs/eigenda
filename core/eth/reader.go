@@ -228,14 +228,14 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 	var contractEigenDADisperserRegistry *disperserreg.ContractEigenDADisperserRegistry
 	disperserRegistryAddr, err := contractEigenDAServiceManager.EigenDADisperserRegistry(&bind.CallOpts{})
 	if err != nil {
-		t.logger.Error("Failed to fetch DisperserRegistry address", "err", err)
+		t.logger.Error("Failed to fetch EigenDADisperserRegistry address", "err", err)
 		// TODO(cody-littley): return err when the contract is deployed
 		// return err
 	} else {
 		contractEigenDADisperserRegistry, err =
 			disperserreg.NewContractEigenDADisperserRegistry(disperserRegistryAddr, t.ethClient)
 		if err != nil {
-			t.logger.Error("Failed to fetch EigenDADisperserRegistry  contract", "err", err)
+			t.logger.Error("Failed to fetch EigenDADisperserRegistry contract", "err", err)
 			return err
 		}
 	}
