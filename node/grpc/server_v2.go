@@ -15,6 +15,7 @@ import (
 	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/core"
 	coreauthv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
+	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -38,17 +39,19 @@ type ServerV2 struct {
 	chunkAuthenticator auth.RequestAuthenticator
 	blobAuthenticator  corev2.BlobRequestAuthenticator
 	replayGuardian     replay.ReplayGuardian
+	batchMeterer       *node.BatchMeterer
 }
 
 // NewServerV2 creates a new Server instance with the provided parameters.
 func NewServerV2(
 	ctx context.Context,
 	config *node.Config,
-	node *node.Node,
+	n *node.Node,
 	logger logging.Logger,
 	ratelimiter common.RateLimiter,
 	registry *prometheus.Registry,
-	reader core.Reader) (*ServerV2, error) {
+	reader core.Reader,
+) (*ServerV2, error) {
 
 	metrics, err := NewV2Metrics(logger, registry)
 	if err != nil {
@@ -57,6 +60,7 @@ func NewServerV2(
 
 	var chunkAuthenticator auth.RequestAuthenticator
 	var blobAuthenticator corev2.BlobRequestAuthenticator
+	var batchMeterer *node.BatchMeterer
 	if !config.DisableDispersalAuthentication {
 		chunkAuthenticator, err = auth.NewRequestAuthenticator(
 			ctx,
@@ -68,7 +72,22 @@ func NewServerV2(
 			return nil, fmt.Errorf("failed to create authenticator: %w", err)
 		}
 		blobAuthenticator = coreauthv2.NewBlobRequestAuthenticator()
+
+		// TODO(hopeyen): BatchMeterer meterer config is left as a placeholder.
+		onchainPaymentState, err := meterer.NewOnchainPaymentState(context.Background(), reader.(*eth.Reader), logger)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create onchain payment state: %v", err)
+		}
+		batchMeterer = node.NewBatchMeterer(
+			meterer.Config{
+				ChainReadTimeout: 5 * time.Second,
+				UpdateInterval:   5 * time.Minute,
+			},
+			onchainPaymentState,
+			logger,
+		)
 	}
+
 	replayGuardian := replay.NewReplayGuardian(
 		time.Now,
 		config.StoreChunksRequestMaxPastAge,
@@ -76,13 +95,14 @@ func NewServerV2(
 
 	return &ServerV2{
 		config:             config,
-		node:               node,
+		node:               n,
 		ratelimiter:        ratelimiter,
 		logger:             logger,
 		metrics:            metrics,
 		chunkAuthenticator: chunkAuthenticator,
 		blobAuthenticator:  blobAuthenticator,
 		replayGuardian:     replayGuardian,
+		batchMeterer:       batchMeterer,
 	}, nil
 }
 
@@ -164,6 +184,19 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 			}
 		}
 	}
+
+	// Batch metering validation
+	if s.batchMeterer != nil {
+		// If the batch meterer is configured, use it to validate the batch
+		err = s.batchMeterer.MeterBatch(ctx, batch, time.Unix(int64(in.Timestamp), 0))
+		if err != nil {
+			return nil, api.NewErrorInvalidArg(fmt.Sprintf("batch metering validation failed: %v", err))
+		}
+	} else {
+		// Log that batch metering is skipped (it's not configured)
+		s.logger.Debug("Batch metering skipped - no batch meterer configured")
+	}
+
 	probe.SetStage("get_operator_state")
 	s.logger.Info("new StoreChunks request",
 		"batchHeaderHash", hex.EncodeToString(batchHeaderHash[:]),
