@@ -200,6 +200,8 @@ type Config struct {
 
 	// DisperserAddress is the address of disperser 0 (aka the only disperser at the current time)
 	DisperserAddress common.Address
+	// DisperserURL is the URL of disperser 0
+	DisperserURL string
 
 	// DisperserKMSKeyID is the KMS key ID used to encrypt disperser data
 	DisperserKMSKeyID string
