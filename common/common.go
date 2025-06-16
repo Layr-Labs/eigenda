@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -82,6 +83,13 @@ const (
 	V1EigenDABackend EigenDABackend = iota + 1
 	V2EigenDABackend
 )
+
+// Used when marshalling the proxy config and logging to stdout at proxy startup.
+// []uint8 gets marshalled as a base64 string by default, which is unreadable.
+// This makes it so that it'll be marshalled as an array of strings instead.
+func (e EigenDABackend) MarshalJSON() ([]byte, error) {
+	return json.Marshal(EigenDABackendToString(e))
+}
 
 type InvalidBackendError struct {
 	Backend string
