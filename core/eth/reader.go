@@ -12,7 +12,7 @@ import (
 	avsdir "github.com/Layr-Labs/eigenda/contracts/bindings/AVSDirectory"
 	blsapkreg "github.com/Layr-Labs/eigenda/contracts/bindings/BLSApkRegistry"
 	delegationmgr "github.com/Layr-Labs/eigenda/contracts/bindings/DelegationManager"
-	disperserreg "github.com/Layr-Labs/eigenda/contracts/bindings/DisperserRegistry"
+	disperserreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDADisperserRegistry"
 	relayreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDARelayRegistry"
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
@@ -51,7 +51,7 @@ type ContractBindings struct {
 	PaymentVault          *paymentvault.ContractPaymentVault
 	RelayRegistry         *relayreg.ContractEigenDARelayRegistry
 	ThresholdRegistry     *thresholdreg.ContractEigenDAThresholdRegistry
-	DisperserRegistry     *disperserreg.ContractDisperserRegistry
+	DisperserRegistry     *disperserreg.ContractEigenDADisperserRegistry
 }
 
 type Reader struct {
@@ -225,17 +225,17 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		}
 	}
 
-	var contractDisperserRegistry *disperserreg.ContractDisperserRegistry
-	disperserRegistryAddr, err := contractEigenDAServiceManager.DisperserRegistry(&bind.CallOpts{})
+	var contractEigenDADisperserRegistry *disperserreg.ContractEigenDADisperserRegistry
+	disperserRegistryAddr, err := contractEigenDAServiceManager.EigenDADisperserRegistry(&bind.CallOpts{})
 	if err != nil {
 		t.logger.Error("Failed to fetch DisperserRegistry address", "err", err)
 		// TODO(cody-littley): return err when the contract is deployed
 		// return err
 	} else {
-		contractDisperserRegistry, err =
-			disperserreg.NewContractDisperserRegistry(disperserRegistryAddr, t.ethClient)
+		contractEigenDADisperserRegistry, err =
+			disperserreg.NewContractEigenDADisperserRegistry(disperserRegistryAddr, t.ethClient)
 		if err != nil {
-			t.logger.Error("Failed to fetch DisperserRegistry contract", "err", err)
+			t.logger.Error("Failed to fetch EigenDADisperserRegistry  contract", "err", err)
 			return err
 		}
 	}
@@ -256,7 +256,7 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		DelegationManager:     contractDelegationManager,
 		PaymentVault:          contractPaymentVault,
 		ThresholdRegistry:     contractThresholdRegistry,
-		DisperserRegistry:     contractDisperserRegistry,
+		DisperserRegistry:     contractEigenDADisperserRegistry,
 	}
 	return nil
 }
