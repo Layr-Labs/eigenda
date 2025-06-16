@@ -67,15 +67,12 @@ func prune(sources []string, allowedTables []string, maxAgeSeconds uint64, fsync
 
 	// Prune each table.
 	for _, table := range tables {
-
-		fmt.Printf("Pruning table %s\n", table) // TODO
-
 		bytesDeleted, err := pruneTable(logger, sources, table, maxAgeSeconds, fsync)
 		if err != nil {
 			return fmt.Errorf("failed to prune table %s in paths %v: %v", table, sources, err)
 		}
 
-		fmt.Printf("Deleted %s from table '%s'.", util.PrettyPrintBytes(bytesDeleted), table)
+		fmt.Printf("Deleted %s from table '%s'.\n", util.PrettyPrintBytes(bytesDeleted), table)
 	}
 
 	return nil

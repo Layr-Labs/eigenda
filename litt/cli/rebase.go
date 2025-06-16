@@ -319,11 +319,52 @@ func transferDataInTable(
 			return fmt.Errorf("failed to delete snapshot directory for table %s: %w", tableName, err)
 		}
 
+		err = deleteBoundaryFiles(source, tableName, verbose)
+		if err != nil {
+			return fmt.Errorf("failed to delete boundary files for table %s: %w", tableName, err)
+		}
+
 		// Once all data in a table is transferred, delete the table directory.
 		sourceTableDir := filepath.Join(source, tableName)
 		err = os.Remove(sourceTableDir)
 		if err != nil {
 			return fmt.Errorf("failed to remove table directory %s: %w", sourceTableDir, err)
+		}
+	}
+
+	return nil
+}
+
+// deleteBoundaryFiles deletes the boundary files for a table. Only will be present if the source
+// directory contains symlink snapshots.
+func deleteBoundaryFiles(source string, tableName string, verbose bool) error {
+	lowerBoundPath := path.Join(source, tableName, disktable.LowerBoundFileName)
+	exists, err := util.Exists(lowerBoundPath)
+	if err != nil {
+		return fmt.Errorf("failed to check if lower bound file %s exists: %w", lowerBoundPath, err)
+	}
+	if exists {
+		if verbose {
+			fmt.Printf("Deleting lower bound file: %s\n", lowerBoundPath)
+		}
+		err = os.Remove(lowerBoundPath)
+		if err != nil {
+			return fmt.Errorf("failed to remove lower bound file %s: %w", lowerBoundPath, err)
+		}
+	}
+
+	upperBoundPath := path.Join(source, tableName, disktable.UpperBoundFileName)
+	exists, err = util.Exists(upperBoundPath)
+	if err != nil {
+		return fmt.Errorf("failed to check if upper bound file %s exists: %w", upperBoundPath, err)
+	}
+	if exists {
+		if verbose {
+			fmt.Printf("Deleting upper bound file: %s\n", upperBoundPath)
+		}
+		err = os.Remove(upperBoundPath)
+		if err != nil {
+			return fmt.Errorf("failed to remove upper bound file %s: %w", upperBoundPath, err)
 		}
 	}
 

@@ -136,6 +136,24 @@ func (b *BenchmarkEngine) Logger() logging.Logger {
 // encounters an error.
 func (b *BenchmarkEngine) Run() error {
 
+	if b.config.TimeLimitSeconds > 0 {
+		// If a time limit is set, create a timer to cancel the context after the specified duration
+		timeLimit := time.Duration(b.config.TimeLimitSeconds * float64(time.Second))
+		timer := time.NewTimer(timeLimit)
+
+		b.logger.Infof("Benchmark will auto-terminate after %s", timeLimit)
+
+		go func() {
+			select {
+			case <-timer.C:
+				b.logger.Infof("Time limit reached, stopping benchmark.")
+				b.cancel()
+			case <-b.ctx.Done():
+				timer.Stop()
+			}
+		}()
+	}
+
 	// multiply 2 to make configured value the average
 	sleepFactor := b.config.StartupSleepFactorSeconds * float64(time.Second) * 2.0
 
@@ -158,10 +176,14 @@ func (b *BenchmarkEngine) Run() error {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	// Wait for signal
-	<-sigChan
-
-	// Cancel the context when signal is received
-	b.cancel()
+	select {
+	case <-b.ctx.Done():
+		b.logger.Infof("Received shutdown signal, stopping benchmark.")
+		return nil
+	case <-sigChan:
+		// Cancel the context when signal is received
+		b.cancel()
+	}
 
 	return nil
 }
