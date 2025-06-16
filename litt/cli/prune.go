@@ -11,6 +11,7 @@ import (
 	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
+	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/urfave/cli/v2"
@@ -86,7 +87,17 @@ func pruneTable(
 	maxAgeSeconds uint64,
 	fsync bool) (uint64, error) {
 
-	// TODO grab lock files!
+	// Forbid touching tables in active use.
+	for _, rootPath := range sources {
+		lockPath := path.Join(rootPath, littbuilder.LockfileName)
+		lock, err := util.NewFileLock(lockPath, fsync)
+		if err != nil {
+			return 0, fmt.Errorf("failed to acquire lock on %s: %v", rootPath, err)
+		}
+		defer func() {
+			_ = lock.Release()
+		}()
+	}
 
 	errorMonitor := util.NewErrorMonitor(context.Background(), logger, nil)
 
@@ -119,21 +130,18 @@ func pruneTable(
 	}
 
 	if isSnapshot {
-		// If we are dealing with a snapshot, respect the snapshot boundary file.
-
+		// If we are dealing with a snapshot, respect the snapshot upper bound specified by LittDB.
 		if len(sources) > 1 {
 			return 0, fmt.Errorf("this is a symlinked snapshot directory, " +
 				"snapshot directory cannot be spread across multiple sources.")
 		}
-
-		boundaryFile, err := disktable.LoadBoundaryFile(false, path.Join(sources[0], tableName))
+		upperBoundFile, err := disktable.LoadBoundaryFile(false, path.Join(sources[0], tableName))
 		if err != nil {
 			return 0, fmt.Errorf("failed to load boundary file for table %s at path %s: %v",
 				tableName, sources[0], err)
 		}
-
-		if boundaryFile.IsDefined() {
-			highestSegmentIndex = boundaryFile.BoundaryIndex()
+		if upperBoundFile.IsDefined() {
+			highestSegmentIndex = upperBoundFile.BoundaryIndex()
 		}
 	}
 
@@ -167,7 +175,21 @@ func pruneTable(
 		return 0, fmt.Errorf("error monitor reports errors: %v", err)
 	}
 
-	if !isSnapshot {
+	if isSnapshot {
+		// This is a snapshot. Write a lower bound file to tell the DB not to re-snapshot files than have been pruned.
+		if len(deletedSegments) > 1 {
+			lowerBoundFile, err := disktable.LoadBoundaryFile(true, path.Join(sources[0], tableName))
+			if err != nil {
+				return 0, fmt.Errorf("failed to load boundary file for table %s at path %s: %v",
+					tableName, sources[0], err)
+			}
+			err = lowerBoundFile.Update(deletedSegments[len(deletedSegments)-1].SegmentIndex())
+			if err != nil {
+				return 0, fmt.Errorf("failed to update lower bound file for table %s at path %s: %v",
+					tableName, sources[0], err)
+			}
+		}
+	} else {
 		// If we are doing GC on a table that isn't a snapshot, then we need to delete the snapshots/keymap
 		// for the table. The DB will automatically rebuild the snapshots directory & keymap on the next startup.
 

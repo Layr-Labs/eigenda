@@ -151,6 +151,12 @@ func (b *BoundaryFile) IsDefined() bool {
 }
 
 // Get the boundary index described by this file.
+//
+// If this is a lower bound, then it describes the highest segment index in a snapshot directory that has been garbage
+// collected. As a result, LittDB will not snapshot any segments with this index or lower.
+//
+// If this is an upper bound, then it describes the highest segment index that LittDB has fully taken a snapshot of.
+// External processes using the snapshot should ignore any segment with an index greater than this.
 func (b *BoundaryFile) BoundaryIndex() uint32 {
 	if b == nil {
 		return 0
