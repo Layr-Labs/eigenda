@@ -155,7 +155,7 @@ func (p *SegmentPath) Snapshot(fileName string) error {
 	symlinkPath := filepath.Join(p.softlinkPath, fileName)
 
 	err := os.Link(sourcePath, hardlinkPath)
-	if err != nil {
+	if err != nil && !os.IsExist(err) {
 		return fmt.Errorf("failed to create hard link from %s to %s: %v", sourcePath, hardlinkPath, err)
 	}
 

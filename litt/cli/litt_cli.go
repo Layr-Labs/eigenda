@@ -1,6 +1,10 @@
 package main
 
 import (
+	"bufio"
+	"fmt"
+	"os"
+
 	"github.com/urfave/cli/v2"
 )
 
@@ -9,6 +13,14 @@ func buildCLIParser() *cli.App {
 	app := &cli.App{
 		Name:  "litt",
 		Usage: "LittDB command line interface",
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:    "debug",
+				Aliases: []string{"d"},
+				Usage:   "Enable debug mode. Program will pause for a debugger to attach.",
+			},
+		},
+		Before: handleDebugMode,
 		Commands: []*cli.Command{
 			{
 				Name:      "ls",
@@ -118,4 +130,22 @@ func buildCLIParser() *cli.App {
 		},
 	}
 	return app
+}
+
+// If the --debug flag is set, this function will block until SIGUSR1 is received to allow a debugger to attach.
+func handleDebugMode(ctx *cli.Context) error {
+	debugModeEnabled := ctx.Bool("debug")
+
+	if !debugModeEnabled {
+		return nil
+	}
+
+	pid := os.Getpid()
+	fmt.Printf("Waiting for debugger to attach (pid: %d).\n", pid)
+
+	fmt.Print("Press Enter to continue...")
+	reader := bufio.NewReader(os.Stdin)
+	_, _ = reader.ReadString('\n') // block until newline is read
+
+	return nil
 }

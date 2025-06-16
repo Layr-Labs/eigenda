@@ -12,7 +12,6 @@ import (
 	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
-	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/urfave/cli/v2"
 )
@@ -52,13 +51,7 @@ func rebaseCommand(ctx *cli.Context) error {
 	return rebase(sources, destinations, deep, preserveOriginal, true, verbose)
 }
 
-// Files to manage during a rebase:
-// - litt.lock: delete if discovered in directory that is going to be deleted
-// - table/keymap: copy/move if source goes away
-// - table/segments: copy/move if source goes away
-// - table/segments/{metadata/keys/values}: copy/move if source goes away
-// - table/table.metadata: move/copy if source goes away
-// - table/snapshot: if it exists and the source goes away, ensure that there are equivalent snapshots in the destination
+// TODO ensure rebase respects boundary files
 
 // rebase moves LittDB database files from one location to another (locally). This function is idempotent. If it
 // crashes part of the way through, just run it again and it will continue where it left off.
@@ -100,7 +93,7 @@ func rebase(
 		}
 
 		// Acquire locks on all destination directories.
-		lockPath := path.Join(dest, littbuilder.LockfileName)
+		lockPath := path.Join(dest, util.LockfileName)
 		lock, err := util.NewFileLock(lockPath, fsync)
 		if err != nil {
 			return fmt.Errorf("failed to acquire lock on %s: %v", dest, err)
@@ -220,7 +213,7 @@ func transferDataInDirectory(
 	}
 
 	// Acquire a lock on the source directory.
-	lockPath := path.Join(source, littbuilder.LockfileName)
+	lockPath := path.Join(source, util.LockfileName)
 	lock, err := util.NewFileLock(lockPath, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to acquire lock on %s: %w", source, err)

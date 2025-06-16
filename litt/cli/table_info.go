@@ -36,6 +36,8 @@ type TableInfo struct {
 	KeymapType string
 }
 
+// TODO ensure boundary files are respected
+
 // tableInfoCommand is the CLI command handler for the "table-info" command.
 func tableInfoCommand(ctx *cli.Context) error {
 	if ctx.NArg() != 1 {
@@ -93,7 +95,7 @@ func tableInfo(tableName string, paths []string, fsync bool) (*TableInfo, error)
 
 	// Forbid touching tables in active use.
 	for _, rootPath := range paths {
-		lockPath := path.Join(rootPath, littbuilder.LockfileName)
+		lockPath := path.Join(rootPath, util.LockfileName)
 		lock, err := util.NewFileLock(lockPath, fsync)
 		if err != nil {
 			return nil, fmt.Errorf("failed to acquire lock on %s: %v", rootPath, err)

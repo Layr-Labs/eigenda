@@ -8,7 +8,6 @@ import (
 	"sort"
 
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
-	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/urfave/cli/v2"
 )
@@ -67,7 +66,7 @@ func lsPaths(rootPaths []string, fsync bool) ([]string, error) {
 func ls(rootPath string, fsync bool) ([]string, error) {
 
 	// Forbid touching tables in active use.
-	lockPath := path.Join(rootPath, littbuilder.LockfileName)
+	lockPath := path.Join(rootPath, util.LockfileName)
 	lock, err := util.NewFileLock(lockPath, fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire lock on %s: %v", rootPath, err)

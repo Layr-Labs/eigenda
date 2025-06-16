@@ -11,7 +11,6 @@ import (
 	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
-	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/urfave/cli/v2"
@@ -89,7 +88,7 @@ func pruneTable(
 
 	// Forbid touching tables in active use.
 	for _, rootPath := range sources {
-		lockPath := path.Join(rootPath, littbuilder.LockfileName)
+		lockPath := path.Join(rootPath, util.LockfileName)
 		lock, err := util.NewFileLock(lockPath, fsync)
 		if err != nil {
 			return 0, fmt.Errorf("failed to acquire lock on %s: %v", rootPath, err)

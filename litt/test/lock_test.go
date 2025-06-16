@@ -208,7 +208,7 @@ func TestDeadProcessSimulation(t *testing.T) {
 
 	// Write lock files for the simulated dead process.
 	for _, root := range roots {
-		lockFilePath := fmt.Sprintf("%s/%s", root, littbuilder.LockfileName)
+		lockFilePath := fmt.Sprintf("%s/%s", root, util.LockfileName)
 		lockFile, err := os.Create(lockFilePath)
 		require.NoError(t, err, "Failed to create lock file for simulated dead process at %s", lockFilePath)
 

@@ -190,6 +190,7 @@ func LoadSegment(logger logging.Logger,
 	if len(segmentPaths) == 0 {
 		return nil, errors.New("no segment paths provided")
 	}
+	snapshottingEnabled := segmentPaths[0].SnapshottingEnabled()
 
 	// Look for the metadata file.
 	metadata, err := loadMetadataFile(index, segmentPaths, fsync)
@@ -215,16 +216,17 @@ func LoadSegment(logger logging.Logger,
 	}
 
 	segment := &Segment{
-		logger:          logger,
-		errorMonitor:    errorMonitor,
-		index:           index,
-		metadata:        metadata,
-		keys:            keys,
-		shards:          shards,
-		keyFileSize:     keyFileSize,
-		keyCount:        metadata.keyCount,
-		deletionChannel: make(chan struct{}, 1),
-		fsync:           fsync,
+		logger:              logger,
+		errorMonitor:        errorMonitor,
+		index:               index,
+		metadata:            metadata,
+		keys:                keys,
+		shards:              shards,
+		keyFileSize:         keyFileSize,
+		keyCount:            metadata.keyCount,
+		deletionChannel:     make(chan struct{}, 1),
+		snapshottingEnabled: snapshottingEnabled,
+		fsync:               fsync,
 	}
 
 	// Segments are returned with an initial reference count of 1, as the caller of the constructor is considered to

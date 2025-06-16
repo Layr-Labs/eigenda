@@ -248,20 +248,18 @@ func NewDiskTable(
 
 	tableSaltShaker := rand.New(rand.NewSource(config.SaltShaker.Int63()))
 
-	// Initialize snapshot files if snapshotting is enabled.
 	var upperBoundSnapshotFile *BoundaryFile
 	if config.SnapshotDirectory != "" {
-		//lowerBoundSnapshotFile, err := LoadBoundaryFile(true, config.SnapshotDirectory)
-		//if err != nil {
-		//	return nil, fmt.Errorf("failed to load snapshot boundary file: %w", err)
-		//}
-
-		upperBoundSnapshotFile, err = LoadBoundaryFile(false, path.Join(config.SnapshotDirectory, name))
+		// Initialize snapshot files if snapshotting is enabled.
+		upperBoundSnapshotFile, err = table.repairSnapshot(
+			config.SnapshotDirectory,
+			upperBoundSnapshotFile,
+			lowestSegmentIndex,
+			highestSegmentIndex,
+			segments)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load snapshot boundary file: %w", err)
+			return nil, fmt.Errorf("failed to repair snapshot: %w", err)
 		}
-
-		// TODO finish snapshotting here?
 	}
 
 	// Start the flush loop.
@@ -319,6 +317,100 @@ func (d *DiskTable) KeyCount() uint64 {
 
 func (d *DiskTable) Size() uint64 {
 	return d.size.Load()
+}
+
+// repairSnapshot is responsible for making any required repairs to the snapshot directories. This is needed
+// if there is a crash, resulting in a segment not being fully snapshotted. It is also needed if LittDB has
+// been rebased (which breaks symlinks) or manually modified (e.g. by the LittDB cli).
+func (d *DiskTable) repairSnapshot(
+	symlinkDirectory string,
+	upperBoundSnapshotFile *BoundaryFile,
+	lowestSegmentIndex uint32,
+	highestSegmentIndex uint32,
+	segments map[uint32]*segment.Segment) (*BoundaryFile, error) {
+
+	symlinkTableDirectory := path.Join(symlinkDirectory, d.name)
+	exists, err := util.Exists(symlinkTableDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if symlink table directory exists: %w", err)
+	}
+	if !exists {
+		err = os.MkdirAll(symlinkTableDirectory, 0755)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create symlink table directory: %w", err)
+		}
+	}
+
+	upperBoundSnapshotFile, err = LoadBoundaryFile(false, symlinkTableDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load snapshot boundary file: %w", err)
+	}
+
+	// Prevent other processes from messing with the symlink table directory while we are working on it.
+	lockPath := path.Join(symlinkTableDirectory, util.LockfileName)
+	lock, err := util.NewFileLock(lockPath, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire lock on symlink table directory: %w", err)
+	}
+	defer func() {
+		_ = lock.Release()
+	}()
+
+	symlinkSegmentsDirectory := path.Join(symlinkTableDirectory, segment.SegmentDirectory)
+	exists, err = util.Exists(symlinkSegmentsDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if symlink segments directory exists: %w", err)
+	}
+	if exists {
+		// Delete all data from the previous snapshot. This directory will contain a bunch of symlinks. It's a lot
+		// simpler to just rebuild this from scratch than it is to try to figure out which symlinks are valid
+		// and which are not. Building this is super fast, so this is not a performance concern.
+		err = os.RemoveAll(symlinkSegmentsDirectory)
+		if err != nil {
+			return nil, fmt.Errorf("failed to remove symlink segments directory: %w", err)
+		}
+	}
+
+	err = os.MkdirAll(symlinkSegmentsDirectory, 0755)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create symlink segments directory: %w", err)
+	}
+
+	if len(segments) <= 1 {
+		// There is only the mutable segment, nothing else to do.
+		return upperBoundSnapshotFile, nil
+	}
+
+	lowerBoundSnapshotFile, err := LoadBoundaryFile(true, symlinkTableDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load snapshot boundary file: %w", err)
+	}
+
+	firstSegmentToConsider := lowestSegmentIndex
+	if lowerBoundSnapshotFile.IsDefined() {
+		// The lower bound file contains the index of the highest segment that has been GC'd by an external process.
+		// We should ignore the segment at this index, and all segments with lower indices.
+		firstSegmentToConsider = lowerBoundSnapshotFile.BoundaryIndex() + 1
+	}
+
+	// Skip iterating over the highest segment index (i.e. don't do i <= highestSegmentIndex). The highest segment
+	// index is mutable and cannot be snapshotted until it has been sealed.
+	for i := firstSegmentToConsider; i < highestSegmentIndex; i++ {
+		seg := segments[i]
+		err = seg.Snapshot()
+		if err != nil {
+			return nil, fmt.Errorf("failed to snapshot segment %d: %w", i, err)
+		}
+	}
+
+	// Signal that the segment files are now fully snapshotted and safe to use.
+	// The highest segment index is the mutable segment, which is not snapshotted.
+	err = upperBoundSnapshotFile.Update(highestSegmentIndex - 1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update upper bound snapshot file: %w", err)
+	}
+
+	return upperBoundSnapshotFile, nil
 }
 
 // reloadKeymap reloads the keymap from the segments. This is necessary when the keymap is lost, the keymap doesn't

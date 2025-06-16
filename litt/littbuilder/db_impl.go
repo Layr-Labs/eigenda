@@ -16,9 +16,6 @@ import (
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
-// The name of the LittDB lockfile. Protects against DBs in multiple processes from accessing the same data directory.
-const LockfileName = "litt.lock"
-
 var _ litt.DB = &db{}
 
 // TableBuilderFunc is a function that creates a new table.
@@ -122,7 +119,7 @@ func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, e
 
 	fileLocks := make([]*util.FileLock, 0, len(config.Paths))
 	for _, rootPath := range config.Paths {
-		fileLock, err := util.NewFileLock(path.Join(rootPath, LockfileName), config.Fsync)
+		fileLock, err := util.NewFileLock(path.Join(rootPath, util.LockfileName), config.Fsync)
 		if err != nil {
 			return nil, fmt.Errorf("error creating file lock for path %s: %w", rootPath, err)
 		}
