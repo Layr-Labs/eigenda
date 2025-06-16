@@ -1001,7 +1001,7 @@ func (t *Reader) GetDisperserAddress(ctx context.Context, disperserID uint32) (g
 		return gethcommon.Address{}, errors.New("disperser registry not deployed")
 	}
 
-	address, err := registry.DisperserKeyToAddress(
+	address, err := registry.GetDisperserAddress(
 		&bind.CallOpts{
 			Context: ctx,
 		},
