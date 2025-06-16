@@ -82,7 +82,7 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 		return 0, fmt.Errorf("failed to get payment global params: %w", err)
 	}
 	// Validate against the payment method
-	if header.CumulativePayment.Sign() == 0 {
+	if !IsOnDemandPayment(&header) {
 		reservations, err := m.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, header.AccountID, quorumNumbers)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get active reservation by account: %w", err)
@@ -372,4 +372,8 @@ func ValidateReservationPeriod(reservation *core.ReservedPayment, requestReserva
 		return false
 	}
 	return true
+}
+
+func IsOnDemandPayment(paymentMetadata *core.PaymentMetadata) bool {
+	return paymentMetadata.CumulativePayment.Cmp(big.NewInt(0)) > 0
 }

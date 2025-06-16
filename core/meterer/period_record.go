@@ -1,12 +1,14 @@
 package meterer
 
 import (
+	"errors"
 	"fmt"
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 )
 
+// QuorumPeriodRecords is a map of quorum number to a slice of period records
 type QuorumPeriodRecords map[core.QuorumID][]*PeriodRecord
 
 // PeriodRecord contains the index of the reservation period and the usage of the period
@@ -41,6 +43,20 @@ func (pr QuorumPeriodRecords) GetRelativePeriodRecord(index uint64, quorumNumber
 
 // UpdateUsage attempts to update the usage for a quorum's reservation period
 // Returns error if the update would exceed the bin limit and cannot use overflow bin
+//
+// The function maintains a fixed-size circular buffer of numBins slots
+// to track usage across an unbounded sequence of time periods by mapping each
+// "absolute" period index onto a "relative" buffer index via modular arithmetic.
+//
+// Incoming timestamps are first bucketed into discrete reservation periods of
+// length reservationWindow, yielding an integer period index. When a request
+// for period p arrives, the system computes its buffer slot i = p mod numBins;
+// if the stored period at slot i differs from p, the slot is reset (index
+// updated, usage cleared) before accumulating usage.
+//
+// Controlled overflow allows unused capacity in a full bin to spill into future
+// bins under strict conditions, and a sliding valid-period window ensures only
+// recent periods are accepted.
 func (pr QuorumPeriodRecords) UpdateUsage(
 	quorumNumber core.QuorumID,
 	timestamp int64,
@@ -48,11 +64,18 @@ func (pr QuorumPeriodRecords) UpdateUsage(
 	reservation *core.ReservedPayment,
 	protocolConfig *core.PaymentQuorumProtocolConfig,
 ) error {
+	if reservation == nil {
+		return errors.New("reservation cannot be nil")
+	}
+	if protocolConfig == nil {
+		return errors.New("protocolConfig cannot be nil")
+	}
+
 	symbolUsage := SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
 	binLimit := GetReservationBinLimit(reservation, protocolConfig.ReservationRateLimitWindow)
 
 	if symbolUsage > binLimit {
-		return fmt.Errorf("symbol usage exceeds bin limit")
+		return errors.New("symbol usage exceeds bin limit")
 	}
 
 	currentPeriod := GetReservationPeriodByNanosecond(timestamp, protocolConfig.ReservationRateLimitWindow)

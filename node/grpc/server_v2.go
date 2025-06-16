@@ -67,9 +67,6 @@ func NewServerV2(
 			reader,
 			config.DispersalAuthenticationKeyCacheSize,
 			config.DisperserKeyTimeout,
-			func(id uint32) bool {
-				return id == api.EigenLabsDisperserID
-			},
 			time.Now())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create authenticator: %w", err)
@@ -165,6 +162,15 @@ func (s *ServerV2) StoreChunks(ctx context.Context, in *pb.StoreChunksRequest) (
 		err = s.replayGuardian.VerifyRequest(hash, timestamp)
 		if err != nil {
 			return nil, api.NewErrorInvalidArg(fmt.Sprintf("failed to verify request: %v", err))
+		}
+		// TODO: move to blob authenticator later
+		for _, blob := range batch.BlobCertificates {
+			if meterer.IsOnDemandPayment(&blob.BlobHeader.PaymentMetadata) {
+				// Batch contains on-demand payments, so the chunk must be from EigenLabsDisperser
+				if in.DisperserID != api.EigenLabsDisperserID {
+					return nil, api.NewErrorForbidden(fmt.Sprintf("on-demand payments are only allowed for EigenLabsDisperser; receiving disperser ID: %d", in.DisperserID))
+				}
+			}
 		}
 	}
 	if s.blobAuthenticator != nil {
