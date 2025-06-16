@@ -55,11 +55,3 @@ globalRatePeriodInterval = 0
 [initParams.eigenDA.serviceManager]
 rewardsInitiator = "0x8C8c2D07b69983c97C06d5B8AFD8Da85D8385Deb"
 batchConfirmers = ["0x42b5eC487B9bA90Cba1D0B8603ad793e640285eC"]
-
-# Parameters for the disperser registry
-[initParams.eigenDA.disperserRegistry]
-deposit = 0
-refund = 0
-token = "0x0000000000000000000000000000000000000000"
-lockPeriod = 0
-updateFee = 0

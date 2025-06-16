@@ -28,8 +28,8 @@ import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVe
 import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
-import {DisperserRegistry} from "src/core/DisperserRegistry.sol";
-import {IDisperserRegistry} from "src/core/interfaces/IDisperserRegistry.sol";
+import {EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
+import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
 import {EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
 import {ISocketRegistry, SocketRegistry} from "../lib/eigenlayer-middleware/src/SocketRegistry.sol";
 import {
@@ -66,7 +66,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     OperatorStateRetriever public operatorStateRetriever;
     IPaymentVault public paymentVault;
     EigenDARelayRegistry public eigenDARelayRegistry;
-    IDisperserRegistry public disperserRegistry;
+    IEigenDADisperserRegistry public eigenDADisperserRegistry;
 
     BLSApkRegistry public apkRegistryImplementation;
     EigenDAServiceManager public eigenDAServiceManagerImplementation;
@@ -78,7 +78,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     EigenDARelayRegistry public eigenDARelayRegistryImplementation;
     ISocketRegistry public socketRegistryImplementation;
     IPaymentVault public paymentVaultImplementation;
-    IDisperserRegistry public disperserRegistryImplementation;
+    IEigenDADisperserRegistry public eigenDADisperserRegistryImplementation;
 
     uint64 _minNumSymbols = 4096;
     uint64 _pricePerSymbol = 0.447 gwei;
@@ -180,7 +180,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
             );
 
-            disperserRegistry = IDisperserRegistry(
+            eigenDADisperserRegistry = IEigenDADisperserRegistry(
                 address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
             );
 
@@ -202,12 +202,12 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             );
         }
 
-        disperserRegistryImplementation = new DisperserRegistry();
+        eigenDADisperserRegistryImplementation = new EigenDADisperserRegistry();
 
         eigenDAProxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(disperserRegistry))),
-            address(disperserRegistryImplementation),
-            abi.encodeWithSelector(DisperserRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig)
+            TransparentUpgradeableProxy(payable(address(eigenDADisperserRegistry))),
+            address(eigenDADisperserRegistryImplementation),
+            abi.encodeWithSelector(EigenDADisperserRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig)
         );
 
         indexRegistryImplementation = new IndexRegistry(registryCoordinator);
@@ -286,7 +286,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
             eigenDAThresholdRegistry,
             eigenDARelayRegistry,
             paymentVault,
-            disperserRegistry
+            eigenDADisperserRegistry
         );
 
         address[] memory confirmers = new address[](1);
