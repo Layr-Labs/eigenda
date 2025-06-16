@@ -46,12 +46,8 @@ func rebaseCommand(ctx *cli.Context) error {
 	preserveOriginal := ctx.Bool("preserve")
 	verbose := !ctx.Bool("quiet")
 
-	// TODO figure out how rebasing a snapshot directory works
-
 	return rebase(sources, destinations, deep, preserveOriginal, true, verbose)
 }
-
-// TODO ensure rebase respects boundary files
 
 // rebase moves LittDB database files from one location to another (locally). This function is idempotent. If it
 // crashes part of the way through, just run it again and it will continue where it left off.
@@ -111,13 +107,24 @@ func rebase(
 		}
 	}
 
-	var totalSegmentFileCount int64
 	var segmentFileCount atomic.Int64
-	if verbose {
-		var err error
-		totalSegmentFileCount, err = countSegmentFiles(directoriesGoingAway)
-		if err != nil {
-			return fmt.Errorf("failed to count segment files in sources %v: %w", sources, err)
+	totalSegmentFileCount, symlinkFound, err := countSegmentFiles(directoriesGoingAway)
+	if err != nil {
+		return fmt.Errorf("failed to count segment files in sources %v: %w", sources, err)
+	}
+
+	if symlinkFound {
+		// If any of the segment files are symlinks, that means that we are dealing with a snapshot.
+		if len(sources) > 1 {
+			return fmt.Errorf(
+				"Snapshot detected (source files contain symlinks), but multiple source paths provided. " +
+					"Snapshots are not supported if they are spread over multiple paths.")
+		}
+		if !preserveOriginal || !deep {
+			return fmt.Errorf(
+				"Snapshot detected (source files contain symlinks). When rebasing from a snapshot, " +
+					"--shallow is not allowed, and --preserve is required.")
+
 		}
 	}
 
@@ -146,13 +153,12 @@ func rebase(
 }
 
 // Get a count of the segment files in the source directories.
-func countSegmentFiles(sources []string) (int64, error) {
-	count := int64(0)
-
+// Also checks whether any of the segment files are symlinks.
+func countSegmentFiles(sources []string) (count int64, symlinkFound bool, err error) {
 	for _, source := range sources {
 		exists, err := util.Exists(source)
 		if err != nil {
-			return 0, fmt.Errorf("failed to check if source directory %s exists: %w", source, err)
+			return 0, false, fmt.Errorf("failed to check if source directory %s exists: %w", source, err)
 		}
 		if !exists {
 			continue
@@ -179,6 +185,14 @@ func countSegmentFiles(sources []string) (int64, error) {
 			if extension == segment.MetadataFileExtension ||
 				extension == segment.KeyFileExtension ||
 				extension == segment.ValuesFileExtension {
+
+				fileInfo, err := os.Lstat(path)
+				if err != nil {
+					return fmt.Errorf("failed to get file info for %s: %w", path, err)
+				}
+				isSymlink := fileInfo.Mode()&os.ModeSymlink != 0
+				symlinkFound = isSymlink || symlinkFound
+
 				count++
 			}
 
@@ -186,11 +200,11 @@ func countSegmentFiles(sources []string) (int64, error) {
 		})
 
 		if err != nil {
-			return 0, fmt.Errorf("error counting segment files in source directories: %w", err)
+			return 0, false, fmt.Errorf("error counting segment files in source directories: %w", err)
 		}
 	}
 
-	return count, nil
+	return count, symlinkFound, nil
 }
 
 // transfers all data in a directory to the specified destinations.

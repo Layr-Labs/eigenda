@@ -8,6 +8,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/litt"
+	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/util"
@@ -35,8 +36,6 @@ type TableInfo struct {
 	// a keymap the next time it is loaded).
 	KeymapType string
 }
-
-// TODO ensure boundary files are respected
 
 // tableInfoCommand is the CLI command handler for the "table-info" command.
 func tableInfoCommand(ctx *cli.Context) error {
@@ -148,9 +147,36 @@ func tableInfo(tableName string, paths []string, fsync bool) (*TableInfo, error)
 		return nil, fmt.Errorf("no segments found for table %s at paths %v", tableName, paths)
 	}
 
+	isSnapshot, err := segments[lowestSegmentIndex].IsSnapshot()
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if segment %d is a snapshot: %v", lowestSegmentIndex, err)
+	}
+
+	if isSnapshot {
+		if len(paths) != 1 {
+			return nil, fmt.Errorf("table %s is a snapshot, but multiple paths were provided: %v",
+				tableName, paths)
+		}
+
+		upperBoundFile, err := disktable.LoadBoundaryFile(false, path.Join(paths[0], tableName))
+		if err != nil {
+			return nil, fmt.Errorf("failed to load boundary file for table %s at path %s: %v",
+				tableName, paths[0], err)
+		}
+
+		if upperBoundFile.IsDefined() {
+			highestSegmentIndex = upperBoundFile.BoundaryIndex()
+		}
+	}
+
 	keyCount := uint64(0)
 	size := uint64(0)
 	for _, seg := range segments {
+		if seg.SegmentIndex() > highestSegmentIndex {
+			// Do not attempt to read segments outside the limit set by the boundary file.
+			break
+		}
+
 		keyCount += uint64(seg.KeyCount())
 		size += seg.Size()
 	}
@@ -164,11 +190,6 @@ func tableInfo(tableName string, paths []string, fsync bool) (*TableInfo, error)
 	keymapType := "none (will be rebuilt on next LittDB startup)"
 	if keymapTypeFile != nil {
 		keymapType = (string)(keymapTypeFile.Type())
-	}
-
-	isSnapshot, err := segments[lowestSegmentIndex].IsSnapshot()
-	if err != nil {
-		return nil, fmt.Errorf("failed to check if segment %d is a snapshot: %v", lowestSegmentIndex, err)
 	}
 
 	return &TableInfo{
