@@ -1,165 +1,150 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {AccessControlLib} from "src/core/libraries/AccessControlLib.sol";
-import {PaymentVaultStorage} from "src/core/libraries/v3/payment/PaymentVaultStorage.sol";
-import {PaymentVaultTypes} from "src/core/libraries/v3/payment/PaymentVaultTypes.sol";
-import {PaymentVaultLib} from "src/core/libraries/v3/payment/PaymentVaultLib.sol";
-import {Constants} from "src/core/libraries/Constants.sol";
-import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
-import {InitializableLib} from "src/core/libraries/InitializableLib.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {PaymentVaultStorage} from "./PaymentVaultStorage.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract PaymentVault is IPaymentVault {
-    uint64 public immutable SCHEDULE_PERIOD;
-
-    using PaymentVaultLib for PaymentVaultTypes.Reservation;
-
-    modifier onlyOwner() {
-        _onlyOwner();
-        _;
+/**
+ * @title Entrypoint for making reservations and on demand payments for EigenDA.
+ * @author Layr Labs, Inc.
+ *
+ */
+contract PaymentVault is OwnableUpgradeable, PaymentVaultStorage {
+    constructor() {
+        _disableInitializers();
     }
 
-    modifier onlyQuorumOwner(uint64 quorumId) {
-        _onlyQuorumOwner(quorumId);
-        _;
+    receive() external payable {
+        _deposit(msg.sender, msg.value);
     }
 
-    modifier onlyOnDemandEnabled(uint64 quorumId) {
-        if (!ps().quorum[quorumId].protocolCfg.onDemandEnabled) {
-            revert IPaymentVault.OnDemandDisabled(quorumId);
+    fallback() external payable {
+        _deposit(msg.sender, msg.value);
+    }
+
+    function initialize(
+        address _initialOwner,
+        uint64 _minNumSymbols,
+        uint64 _pricePerSymbol,
+        uint64 _priceUpdateCooldown,
+        uint64 _globalSymbolsPerPeriod,
+        uint64 _reservationPeriodInterval,
+        uint64 _globalRatePeriodInterval
+    ) public initializer {
+        _transferOwnership(_initialOwner);
+
+        minNumSymbols = _minNumSymbols;
+        pricePerSymbol = _pricePerSymbol;
+        priceUpdateCooldown = _priceUpdateCooldown;
+        lastPriceUpdateTime = uint64(block.timestamp);
+
+        globalSymbolsPerPeriod = _globalSymbolsPerPeriod;
+        reservationPeriodInterval = _reservationPeriodInterval;
+        globalRatePeriodInterval = _globalRatePeriodInterval;
+    }
+
+    /**
+     * @notice This function is called by EigenDA governance to store reservations
+     * @param _account is the address to submit the reservation for
+     * @param _reservation is the Reservation struct containing details of the reservation
+     */
+    function setReservation(address _account, Reservation memory _reservation) external onlyOwner {
+        _checkQuorumSplit(_reservation.quorumNumbers, _reservation.quorumSplits);
+        require(
+            _reservation.endTimestamp > _reservation.startTimestamp,
+            "end timestamp must be greater than start timestamp"
+        );
+        reservations[_account] = _reservation;
+        emit ReservationUpdated(_account, _reservation);
+    }
+
+    /**
+     * @notice This function is called to deposit funds for on demand payment
+     * @param _account is the address to deposit the funds for
+     */
+    function depositOnDemand(address _account) external payable {
+        _deposit(_account, msg.value);
+    }
+
+    function setPriceParams(uint64 _minNumSymbols, uint64 _pricePerSymbol, uint64 _priceUpdateCooldown)
+        external
+        onlyOwner
+    {
+        require(block.timestamp >= lastPriceUpdateTime + priceUpdateCooldown, "price update cooldown not surpassed");
+
+        emit PriceParamsUpdated(
+            minNumSymbols, _minNumSymbols, pricePerSymbol, _pricePerSymbol, priceUpdateCooldown, _priceUpdateCooldown
+        );
+
+        pricePerSymbol = _pricePerSymbol;
+        minNumSymbols = _minNumSymbols;
+        priceUpdateCooldown = _priceUpdateCooldown;
+        lastPriceUpdateTime = uint64(block.timestamp);
+    }
+
+    function setGlobalSymbolsPerPeriod(uint64 _globalSymbolsPerPeriod) external onlyOwner {
+        emit GlobalSymbolsPerPeriodUpdated(globalSymbolsPerPeriod, _globalSymbolsPerPeriod);
+        globalSymbolsPerPeriod = _globalSymbolsPerPeriod;
+    }
+
+    function setReservationPeriodInterval(uint64 _reservationPeriodInterval) external onlyOwner {
+        emit ReservationPeriodIntervalUpdated(reservationPeriodInterval, _reservationPeriodInterval);
+        reservationPeriodInterval = _reservationPeriodInterval;
+    }
+
+    function setGlobalRatePeriodInterval(uint64 _globalRatePeriodInterval) external onlyOwner {
+        emit GlobalRatePeriodIntervalUpdated(globalRatePeriodInterval, _globalRatePeriodInterval);
+        globalRatePeriodInterval = _globalRatePeriodInterval;
+    }
+
+    function withdraw(uint256 _amount) external onlyOwner {
+        (bool success,) = payable(owner()).call{value: _amount}("");
+        require(success);
+    }
+
+    function withdrawERC20(IERC20 _token, uint256 _amount) external onlyOwner {
+        _token.transfer(owner(), _amount);
+    }
+
+    function _checkQuorumSplit(bytes memory _quorumNumbers, bytes memory _quorumSplits) internal pure {
+        require(_quorumNumbers.length == _quorumSplits.length, "arrays must have the same length");
+        uint8 total;
+        for (uint256 i; i < _quorumSplits.length; ++i) {
+            total += uint8(_quorumSplits[i]);
         }
-        _;
+        require(total == 100, "sum of quorumSplits must be 100");
     }
 
-    modifier initializer() {
-        InitializableLib.setInitializedVersion(1);
-        _;
+    function _deposit(address _account, uint256 _amount) internal {
+        require(_amount <= type(uint80).max, "amount must be less than or equal to 80 bits");
+        onDemandPayments[_account].totalDeposit += uint80(_amount);
+        emit OnDemandPaymentUpdated(_account, uint80(_amount), onDemandPayments[_account].totalDeposit);
     }
 
-    constructor(uint64 schedulePeriod) {
-        if (schedulePeriod == 0) {
-            revert IPaymentVault.SchedulePeriodCannotBeZero();
+    /// @notice Fetches the current reservation for an account
+    function getReservation(address _account) external view returns (Reservation memory) {
+        return reservations[_account];
+    }
+
+    /// @notice Fetches the current reservations for a set of accounts
+    function getReservations(address[] memory _accounts) external view returns (Reservation[] memory _reservations) {
+        _reservations = new Reservation[](_accounts.length);
+        for (uint256 i; i < _accounts.length; ++i) {
+            _reservations[i] = reservations[_accounts[i]];
         }
-        SCHEDULE_PERIOD = schedulePeriod;
     }
 
-    function initialize(address owner) external initializer {
-        AccessControlLib.grantRole(Constants.OWNER_ROLE, owner);
+    /// @notice Fetches the current total on demand balance of an account
+    function getOnDemandTotalDeposit(address _account) external view returns (uint80) {
+        return onDemandPayments[_account].totalDeposit;
     }
 
-    /// USER
-
-    function decreaseReservation(uint64 quorumId, PaymentVaultTypes.Reservation memory reservation) external {
-        PaymentVaultLib.decreaseReservation(quorumId, msg.sender, reservation, SCHEDULE_PERIOD);
-    }
-
-    function depositOnDemand(uint64 quorumId, uint256 amount) external onlyOnDemandEnabled(quorumId) {
-        PaymentVaultLib.depositOnDemand(quorumId, msg.sender, amount);
-    }
-
-    /// OWNER
-
-    function transferOwnership(address newOwner) external onlyOwner {
-        if (newOwner == address(0)) {
-            revert IPaymentVault.OwnerIsZeroAddress();
+    /// @notice Fetches the current total on demand balances for a set of accounts
+    function getOnDemandTotalDeposits(address[] memory _accounts) external view returns (uint80[] memory _payments) {
+        _payments = new uint80[](_accounts.length);
+        for (uint256 i; i < _accounts.length; ++i) {
+            _payments[i] = onDemandPayments[_accounts[i]].totalDeposit;
         }
-        AccessControlLib.transferRole(Constants.OWNER_ROLE, msg.sender, newOwner);
-    }
-
-    function initializeQuorum(
-        uint64 quorumId,
-        address newOwner,
-        PaymentVaultTypes.QuorumProtocolConfig memory protocolCfg
-    ) external onlyOwner {
-        if (AccessControlLib.getRoleMemberCount(Constants.QUORUM_OWNER_ROLE(quorumId)) > 0) {
-            revert IPaymentVault.QuorumOwnerAlreadySet(quorumId);
-        }
-        AccessControlLib.grantRole(Constants.QUORUM_OWNER_ROLE(quorumId), newOwner);
-        ps().quorum[quorumId].protocolCfg = protocolCfg;
-    }
-
-    function setReservationAdvanceWindow(uint64 quorumId, uint64 reservationAdvanceWindow)
-        external
-        onlyQuorumOwner(quorumId)
-    {
-        ps().quorum[quorumId].protocolCfg.reservationAdvanceWindow = reservationAdvanceWindow;
-    }
-
-    function setOnDemandEnabled(uint64 quorumId, bool enabled) external onlyQuorumOwner(quorumId) {
-        ps().quorum[quorumId].protocolCfg.onDemandEnabled = enabled;
-    }
-
-    /// QUORUM OWNER
-
-    function addReservation(uint64 quorumId, address account, PaymentVaultTypes.Reservation memory reservation)
-        external
-        onlyQuorumOwner(quorumId)
-    {
-        PaymentVaultLib.addReservation(quorumId, account, reservation, SCHEDULE_PERIOD);
-    }
-
-    function increaseReservation(uint64 quorumId, address account, PaymentVaultTypes.Reservation memory reservation)
-        external
-        onlyQuorumOwner(quorumId)
-    {
-        PaymentVaultLib.increaseReservation(quorumId, account, reservation, SCHEDULE_PERIOD);
-    }
-
-    function setQuorumPaymentConfig(uint64 quorumId, PaymentVaultTypes.QuorumConfig memory paymentConfig)
-        external
-        onlyQuorumOwner(quorumId)
-    {
-        ps().quorum[quorumId].cfg = paymentConfig;
-    }
-
-    function transferQuorumOwnership(uint64 quorumId, address newOwner) external onlyQuorumOwner(quorumId) {
-        if (newOwner == address(0)) {
-            revert IPaymentVault.OwnerIsZeroAddress();
-        }
-        AccessControlLib.transferRole(Constants.QUORUM_OWNER_ROLE(quorumId), msg.sender, newOwner);
-    }
-
-    /// GETTERS
-
-    function getOnDemandDeposit(uint64 quorumId, address account) external view returns (uint256) {
-        return ps().quorum[quorumId].user[account].deposit;
-    }
-
-    function getReservation(uint64 quorumId, address account)
-        external
-        view
-        returns (PaymentVaultTypes.Reservation memory)
-    {
-        return ps().quorum[quorumId].user[account].reservation;
-    }
-
-    function getQuorumProtocolConfig(uint64 quorumId)
-        external
-        view
-        returns (PaymentVaultTypes.QuorumProtocolConfig memory)
-    {
-        return ps().quorum[quorumId].protocolCfg;
-    }
-
-    function getQuorumPaymentConfig(uint64 quorumId) external view returns (PaymentVaultTypes.QuorumConfig memory) {
-        return ps().quorum[quorumId].cfg;
-    }
-
-    function getQuorumReservedSymbols(uint64 quorumId, uint64 period) external view returns (uint64) {
-        return ps().quorum[quorumId].reservedSymbols[period];
-    }
-
-    /// HELPER
-
-    function ps() internal pure returns (PaymentVaultStorage.Layout storage) {
-        return PaymentVaultStorage.layout();
-    }
-
-    function _onlyOwner() internal view virtual {
-        AccessControlLib.checkRole(Constants.OWNER_ROLE, msg.sender);
-    }
-
-    function _onlyQuorumOwner(uint64 quorumId) internal view virtual {
-        AccessControlLib.checkRole(Constants.QUORUM_OWNER_ROLE(quorumId), msg.sender);
     }
 }

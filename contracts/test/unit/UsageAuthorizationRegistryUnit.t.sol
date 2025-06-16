@@ -3,10 +3,10 @@ pragma solidity =0.8.12;
 
 import {Test} from "forge-std/Test.sol";
 
-import {PaymentVaultLib} from "src/core/libraries/v3/payment/PaymentVaultLib.sol";
-import {PaymentVaultTypes} from "src/core/libraries/v3/payment/PaymentVaultTypes.sol";
-import {PaymentVaultStorage} from "src/core/libraries/v3/payment/PaymentVaultStorage.sol";
-import {PaymentVault, IPaymentVault} from "src/core/PaymentVault.sol";
+import {UsageAuthorizationLib} from "src/core/libraries/v3/usage-authorization/UsageAuthorizationLib.sol";
+import {UsageAuthorizationTypes} from "src/core/libraries/v3/usage-authorization/UsageAuthorizationTypes.sol";
+import {UsageAuthorizationStorage} from "src/core/libraries/v3/usage-authorization/UsageAuthorizationStorage.sol";
+import {UsageAuthorizationRegistry, IUsageAuthorizationRegistry} from "src/core/UsageAuthorizationRegistry.sol";
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
@@ -18,14 +18,15 @@ contract ERC20Mintable is ERC20 {
     }
 }
 
-contract PaymentVaultTestHarness is PaymentVault {
-    constructor(uint64 schedulePeriod) PaymentVault(schedulePeriod) {}
+contract UsageAuthorizationRegistryTestHarness is UsageAuthorizationRegistry {
+    constructor(uint64 schedulePeriod) UsageAuthorizationRegistry(schedulePeriod) {}
 
-    function checkReservation(uint64 quorumId, PaymentVaultTypes.Reservation memory reservation, uint64 schedulePeriod)
-        external
-        view
-    {
-        PaymentVaultLib.checkReservation(quorumId, reservation, schedulePeriod);
+    function checkReservation(
+        uint64 quorumId,
+        UsageAuthorizationTypes.Reservation memory reservation,
+        uint64 schedulePeriod
+    ) external view {
+        UsageAuthorizationLib.checkReservation(quorumId, reservation, schedulePeriod);
     }
 
     function increaseReservedSymbols(
@@ -35,7 +36,7 @@ contract PaymentVaultTestHarness is PaymentVault {
         uint64 symbolsPerSecond,
         uint64 schedulePeriod
     ) external {
-        PaymentVaultLib.increaseReservedSymbols(
+        UsageAuthorizationLib.increaseReservedSymbols(
             quorumId, startTimestamp, endTimestamp, symbolsPerSecond, schedulePeriod
         );
     }
@@ -47,17 +48,18 @@ contract PaymentVaultTestHarness is PaymentVault {
         uint64 symbolsPerSecond,
         uint64 schedulePeriod
     ) external {
-        PaymentVaultLib.decreaseReservedSymbols(
+        UsageAuthorizationLib.decreaseReservedSymbols(
             quorumId, startTimestamp, endTimestamp, symbolsPerSecond, schedulePeriod
         );
     }
 }
 
-contract PaymentVaultUnit is Test {
-    PaymentVaultTestHarness paymentVault;
+contract UsageAuthorizationRegistryUnit is Test {
+    UsageAuthorizationRegistryTestHarness usageAuthorizationRegistry;
 
-    address constant OWNER = address(uint160(uint256(keccak256("EIGEN_DA_PAYMENT_VAULT_OWNER"))));
-    address constant QUORUM_OWNER_0 = address(uint160(uint256(keccak256("EIGEN_DA_PAYMENT_VAULT_QUORUM_OWNER_0"))));
+    address constant OWNER = address(uint160(uint256(keccak256("EIGEN_DA_USAGE_AUTHORIZATION_REGISTRY_OWNER"))));
+    address constant QUORUM_OWNER_0 =
+        address(uint160(uint256(keccak256("EIGEN_DA_USAGE_AUTHORIZATION_REGISTRY_QUORUM_OWNER_0"))));
 
     uint64 constant SCHEDULE_PERIOD = 1 minutes;
     uint64 constant START_PERIOD = 100;
@@ -72,18 +74,19 @@ contract PaymentVaultUnit is Test {
     uint64 constant ON_DEMAND_PRICE_PER_SYMBOL = 7;
 
     ERC20Mintable public token;
-    address constant TEST_RECIPIENT = address(uint160(uint256(keccak256("EIGEN_DA_PAYMENT_VAULT_QUORUM_RECIPIENT"))));
+    address constant TEST_RECIPIENT =
+        address(uint160(uint256(keccak256("EIGEN_DA_USAGE_AUTHORIZATION_REGISTRY_QUORUM_RECIPIENT"))));
 
     function setUp() public virtual {
         vm.warp(SCHEDULE_PERIOD * START_PERIOD);
         token = new ERC20Mintable("Test Token", "TTK");
-        paymentVault = new PaymentVaultTestHarness(SCHEDULE_PERIOD);
-        paymentVault.initialize(OWNER);
+        usageAuthorizationRegistry = new UsageAuthorizationRegistryTestHarness(SCHEDULE_PERIOD);
+        usageAuthorizationRegistry.initialize(OWNER);
         vm.prank(OWNER);
-        paymentVault.initializeQuorum(
+        usageAuthorizationRegistry.initializeQuorum(
             0,
             QUORUM_OWNER_0,
-            PaymentVaultTypes.QuorumProtocolConfig({
+            UsageAuthorizationTypes.QuorumProtocolConfig({
                 minNumSymbols: MIN_NUM_SYMBOLS,
                 reservationAdvanceWindow: RESERVATION_ADVANCE_WINDOW,
                 reservationRateLimitWindow: RESERVATION_RATE_LIMIT_WINDOW,
@@ -92,9 +95,9 @@ contract PaymentVaultUnit is Test {
             })
         );
         vm.prank(QUORUM_OWNER_0);
-        paymentVault.setQuorumPaymentConfig(
+        usageAuthorizationRegistry.setQuorumPaymentConfig(
             0,
-            PaymentVaultTypes.QuorumConfig({
+            UsageAuthorizationTypes.QuorumConfig({
                 token: address(token),
                 recipient: TEST_RECIPIENT,
                 reservationSymbolsPerSecond: RESERVATION_SYMBOLS_PER_SECOND,
@@ -123,21 +126,22 @@ contract PaymentVaultUnit is Test {
         (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
         symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
 
-        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+        UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
             startTimestamp: startTimestamp,
             endTimestamp: endTimestamp,
             symbolsPerSecond: symbolsPerSecond
         });
         vm.expectEmit(true, true, true, true);
-        emit PaymentVaultLib.ReservationAdded(quorumId, account, reservation);
+        emit UsageAuthorizationLib.ReservationAdded(quorumId, account, reservation);
         vm.prank(QUORUM_OWNER_0);
-        paymentVault.addReservation(quorumId, account, reservation);
-        PaymentVaultTypes.Reservation memory storedReservation = paymentVault.getReservation(quorumId, account);
+        usageAuthorizationRegistry.addReservation(quorumId, account, reservation);
+        UsageAuthorizationTypes.Reservation memory storedReservation =
+            usageAuthorizationRegistry.getReservation(quorumId, account);
         assertEq(storedReservation.startTimestamp, reservation.startTimestamp);
         assertEq(storedReservation.endTimestamp, reservation.endTimestamp);
         assertEq(storedReservation.symbolsPerSecond, reservation.symbolsPerSecond);
         for (uint64 i = startTimestamp / SCHEDULE_PERIOD; i < endTimestamp / SCHEDULE_PERIOD; i++) {
-            assertEq(paymentVault.getQuorumReservedSymbols(quorumId, i), symbolsPerSecond);
+            assertEq(usageAuthorizationRegistry.getQuorumReservedSymbols(quorumId, i), symbolsPerSecond);
         }
     }
 
@@ -151,16 +155,20 @@ contract PaymentVaultUnit is Test {
         uint64 quorumId = 0;
         (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
         symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
-        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+        UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
             startTimestamp: startTimestamp,
             endTimestamp: endTimestamp,
             symbolsPerSecond: symbolsPerSecond
         });
         vm.prank(QUORUM_OWNER_0);
-        paymentVault.addReservation(quorumId, account, reservation);
-        vm.expectRevert(abi.encodeWithSelector(IPaymentVault.ReservationStillActive.selector, reservation.endTimestamp));
+        usageAuthorizationRegistry.addReservation(quorumId, account, reservation);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IUsageAuthorizationRegistry.ReservationStillActive.selector, reservation.endTimestamp
+            )
+        );
         vm.prank(QUORUM_OWNER_0);
-        paymentVault.addReservation(quorumId, account, reservation);
+        usageAuthorizationRegistry.addReservation(quorumId, account, reservation);
     }
 
     /// @notice Tests that adding a reservation reverts if the start timestamp is in the past.
@@ -168,16 +176,18 @@ contract PaymentVaultUnit is Test {
         vm.warp(SCHEDULE_PERIOD * START_PERIOD);
         uint64 quorumId = 0;
         symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
-        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+        UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
             startTimestamp: (START_PERIOD - 1) * SCHEDULE_PERIOD,
             endTimestamp: SCHEDULE_PERIOD * START_PERIOD,
             symbolsPerSecond: symbolsPerSecond
         });
         vm.expectRevert(
-            abi.encodeWithSelector(IPaymentVault.InvalidStartTimestamp.selector, START_PERIOD * SCHEDULE_PERIOD)
+            abi.encodeWithSelector(
+                IUsageAuthorizationRegistry.InvalidStartTimestamp.selector, START_PERIOD * SCHEDULE_PERIOD
+            )
         );
         vm.prank(QUORUM_OWNER_0);
-        paymentVault.addReservation(quorumId, account, reservation);
+        usageAuthorizationRegistry.addReservation(quorumId, account, reservation);
     }
 
     /// @notice Tests that we can successfully pass a reservation check.
@@ -186,13 +196,13 @@ contract PaymentVaultUnit is Test {
         (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
         symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
 
-        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+        UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
             startTimestamp: startTimestamp,
             endTimestamp: endTimestamp,
             symbolsPerSecond: symbolsPerSecond
         });
 
-        paymentVault.checkReservation(quorumId, reservation, SCHEDULE_PERIOD);
+        usageAuthorizationRegistry.checkReservation(quorumId, reservation, SCHEDULE_PERIOD);
     }
 
     /// @notice Tests that a start timestamp not in the schedule period reverts.
@@ -205,7 +215,7 @@ contract PaymentVaultUnit is Test {
         startTimestamp += uint64(bound(timestampSeed >> 128, 1, SCHEDULE_PERIOD - 1));
         symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
 
-        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+        UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
             startTimestamp: startTimestamp,
             endTimestamp: endTimestamp,
             symbolsPerSecond: symbolsPerSecond
@@ -213,10 +223,10 @@ contract PaymentVaultUnit is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPaymentVault.TimestampSchedulePeriodMismatch.selector, startTimestamp, SCHEDULE_PERIOD
+                IUsageAuthorizationRegistry.TimestampSchedulePeriodMismatch.selector, startTimestamp, SCHEDULE_PERIOD
             )
         );
-        paymentVault.checkReservation(quorumId, reservation, SCHEDULE_PERIOD);
+        usageAuthorizationRegistry.checkReservation(quorumId, reservation, SCHEDULE_PERIOD);
     }
 
     /// @notice Tests that an end timestamp not in the schedule period reverts.
@@ -229,7 +239,7 @@ contract PaymentVaultUnit is Test {
         endTimestamp -= uint64(bound(timestampSeed >> 128, 1, SCHEDULE_PERIOD - 1));
         symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
 
-        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+        UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
             startTimestamp: startTimestamp,
             endTimestamp: endTimestamp,
             symbolsPerSecond: symbolsPerSecond
@@ -237,10 +247,10 @@ contract PaymentVaultUnit is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPaymentVault.TimestampSchedulePeriodMismatch.selector, endTimestamp, SCHEDULE_PERIOD
+                IUsageAuthorizationRegistry.TimestampSchedulePeriodMismatch.selector, endTimestamp, SCHEDULE_PERIOD
             )
         );
-        paymentVault.checkReservation(quorumId, reservation, SCHEDULE_PERIOD);
+        usageAuthorizationRegistry.checkReservation(quorumId, reservation, SCHEDULE_PERIOD);
     }
 
     /// @notice Tests that start timestamp must not be greater than the end timestamp.
@@ -252,7 +262,7 @@ contract PaymentVaultUnit is Test {
         (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
         symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
 
-        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+        UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
             startTimestamp: endTimestamp,
             endTimestamp: startTimestamp,
             symbolsPerSecond: symbolsPerSecond
@@ -260,10 +270,12 @@ contract PaymentVaultUnit is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPaymentVault.InvalidReservationPeriod.selector, reservation.startTimestamp, reservation.endTimestamp
+                IUsageAuthorizationRegistry.InvalidReservationPeriod.selector,
+                reservation.startTimestamp,
+                reservation.endTimestamp
             )
         );
-        paymentVault.checkReservation(quorumId, reservation, SCHEDULE_PERIOD);
+        usageAuthorizationRegistry.checkReservation(quorumId, reservation, SCHEDULE_PERIOD);
     }
 
     /// @notice Tests that reservation length cannot exceed the quorum's reservation advance window
@@ -275,7 +287,7 @@ contract PaymentVaultUnit is Test {
         // Set the end timestamp to be too far in the future
         endTimestamp = uint64(block.timestamp) + RESERVATION_ADVANCE_WINDOW + SCHEDULE_PERIOD;
 
-        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+        UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
             startTimestamp: startTimestamp,
             endTimestamp: endTimestamp,
             symbolsPerSecond: symbolsPerSecond
@@ -283,12 +295,12 @@ contract PaymentVaultUnit is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPaymentVault.ReservationTooLong.selector,
+                IUsageAuthorizationRegistry.ReservationTooLong.selector,
                 endTimestamp - uint64(block.timestamp / SCHEDULE_PERIOD * SCHEDULE_PERIOD),
                 RESERVATION_ADVANCE_WINDOW
             )
         );
-        paymentVault.checkReservation(quorumId, reservation, SCHEDULE_PERIOD);
+        usageAuthorizationRegistry.checkReservation(quorumId, reservation, SCHEDULE_PERIOD);
     }
 
     /// @notice Tests that increasing a reservation's reserved symbols successfully increases the quorum's reserved symbols
@@ -298,10 +310,12 @@ contract PaymentVaultUnit is Test {
         (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
         symbolsPerSecond = uint64(bound(symbolsPerSecond, 0, 100));
 
-        paymentVault.increaseReservedSymbols(quorumId, startTimestamp, endTimestamp, symbolsPerSecond, SCHEDULE_PERIOD);
+        usageAuthorizationRegistry.increaseReservedSymbols(
+            quorumId, startTimestamp, endTimestamp, symbolsPerSecond, SCHEDULE_PERIOD
+        );
 
         for (uint64 i = startTimestamp / SCHEDULE_PERIOD; i < endTimestamp / SCHEDULE_PERIOD; i++) {
-            assertEq(paymentVault.getQuorumReservedSymbols(quorumId, i), symbolsPerSecond);
+            assertEq(usageAuthorizationRegistry.getQuorumReservedSymbols(quorumId, i), symbolsPerSecond);
         }
     }
 
@@ -317,13 +331,15 @@ contract PaymentVaultUnit is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPaymentVault.NotEnoughSymbolsAvailable.selector,
+                IUsageAuthorizationRegistry.NotEnoughSymbolsAvailable.selector,
                 startTimestamp,
                 symbolsPerSecond,
                 RESERVATION_SYMBOLS_PER_SECOND
             )
         );
-        paymentVault.increaseReservedSymbols(quorumId, startTimestamp, endTimestamp, symbolsPerSecond, SCHEDULE_PERIOD);
+        usageAuthorizationRegistry.increaseReservedSymbols(
+            quorumId, startTimestamp, endTimestamp, symbolsPerSecond, SCHEDULE_PERIOD
+        );
     }
 
     /// @notice Tests that decreasing a reservation's reserved symbols successfully decreases the quorum's reserved symbols
@@ -333,11 +349,15 @@ contract PaymentVaultUnit is Test {
         (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
         symbolsPerSecond = uint64(bound(symbolsPerSecond, 0, 100));
 
-        paymentVault.increaseReservedSymbols(quorumId, startTimestamp, endTimestamp, symbolsPerSecond, SCHEDULE_PERIOD);
-        paymentVault.decreaseReservedSymbols(quorumId, startTimestamp, endTimestamp, symbolsPerSecond, SCHEDULE_PERIOD);
+        usageAuthorizationRegistry.increaseReservedSymbols(
+            quorumId, startTimestamp, endTimestamp, symbolsPerSecond, SCHEDULE_PERIOD
+        );
+        usageAuthorizationRegistry.decreaseReservedSymbols(
+            quorumId, startTimestamp, endTimestamp, symbolsPerSecond, SCHEDULE_PERIOD
+        );
 
         for (uint64 i = startTimestamp / SCHEDULE_PERIOD; i < endTimestamp / SCHEDULE_PERIOD; i++) {
-            assertEq(paymentVault.getQuorumReservedSymbols(quorumId, i), 0);
+            assertEq(usageAuthorizationRegistry.getQuorumReservedSymbols(quorumId, i), 0);
         }
     }
 
@@ -356,23 +376,24 @@ contract PaymentVaultUnit is Test {
         periodIncrease = uint64(bound(periodIncrease, 0, 10));
         symbolIncrease = uint64(bound(symbolIncrease, 0, 50));
 
-        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+        UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
             startTimestamp: startTimestamp,
             endTimestamp: endTimestamp,
             symbolsPerSecond: symbolsPerSecond
         });
         vm.prank(QUORUM_OWNER_0);
-        paymentVault.addReservation(quorumId, account, reservation);
+        usageAuthorizationRegistry.addReservation(quorumId, account, reservation);
 
         vm.warp(block.timestamp + SCHEDULE_PERIOD * periodIncrease);
         vm.expectEmit(true, true, true, true);
         reservation.endTimestamp += periodIncrease * SCHEDULE_PERIOD;
         reservation.symbolsPerSecond += symbolIncrease;
-        emit PaymentVaultLib.ReservationIncreased(quorumId, account, reservation);
+        emit UsageAuthorizationLib.ReservationIncreased(quorumId, account, reservation);
         vm.prank(QUORUM_OWNER_0);
-        paymentVault.increaseReservation(quorumId, account, reservation);
+        usageAuthorizationRegistry.increaseReservation(quorumId, account, reservation);
 
-        PaymentVaultTypes.Reservation memory storedReservation = paymentVault.getReservation(quorumId, account);
+        UsageAuthorizationTypes.Reservation memory storedReservation =
+            usageAuthorizationRegistry.getReservation(quorumId, account);
         assertEq(storedReservation.startTimestamp, reservation.startTimestamp);
         assertEq(storedReservation.endTimestamp, reservation.endTimestamp);
         assertEq(storedReservation.symbolsPerSecond, reservation.symbolsPerSecond);
@@ -389,23 +410,25 @@ contract PaymentVaultUnit is Test {
         (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
         symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
 
-        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+        UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
             startTimestamp: startTimestamp,
             endTimestamp: endTimestamp,
             symbolsPerSecond: symbolsPerSecond
         });
         vm.prank(QUORUM_OWNER_0);
-        paymentVault.addReservation(quorumId, account, reservation);
+        usageAuthorizationRegistry.addReservation(quorumId, account, reservation);
         vm.warp(block.timestamp + SCHEDULE_PERIOD);
 
         vm.expectRevert(
-            abi.encodeWithSelector(IPaymentVault.StartTimestampMustMatch.selector, reservation.startTimestamp)
+            abi.encodeWithSelector(
+                IUsageAuthorizationRegistry.StartTimestampMustMatch.selector, reservation.startTimestamp
+            )
         );
         vm.prank(QUORUM_OWNER_0);
-        paymentVault.increaseReservation(
+        usageAuthorizationRegistry.increaseReservation(
             quorumId,
             account,
-            PaymentVaultTypes.Reservation({
+            UsageAuthorizationTypes.Reservation({
                 startTimestamp: startTimestamp + SCHEDULE_PERIOD,
                 endTimestamp: endTimestamp + SCHEDULE_PERIOD,
                 symbolsPerSecond: symbolsPerSecond
@@ -424,24 +447,26 @@ contract PaymentVaultUnit is Test {
         (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
         symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
 
-        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+        UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
             startTimestamp: startTimestamp,
             endTimestamp: endTimestamp,
             symbolsPerSecond: symbolsPerSecond
         });
         vm.prank(QUORUM_OWNER_0);
-        paymentVault.addReservation(quorumId, account, reservation);
+        usageAuthorizationRegistry.addReservation(quorumId, account, reservation);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPaymentVault.ReservationMustIncrease.selector, reservation.endTimestamp, reservation.symbolsPerSecond
+                IUsageAuthorizationRegistry.ReservationMustIncrease.selector,
+                reservation.endTimestamp,
+                reservation.symbolsPerSecond
             )
         );
         vm.prank(QUORUM_OWNER_0);
-        paymentVault.increaseReservation(
+        usageAuthorizationRegistry.increaseReservation(
             quorumId,
             account,
-            PaymentVaultTypes.Reservation({
+            UsageAuthorizationTypes.Reservation({
                 startTimestamp: startTimestamp,
                 endTimestamp: endTimestamp,
                 symbolsPerSecond: symbolsPerSecond - 1
@@ -456,21 +481,22 @@ contract PaymentVaultUnit is Test {
         (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
         symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 50));
 
-        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+        UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
             startTimestamp: startTimestamp,
             endTimestamp: endTimestamp,
             symbolsPerSecond: symbolsPerSecond
         });
         vm.prank(QUORUM_OWNER_0);
-        paymentVault.addReservation(quorumId, account, reservation);
+        usageAuthorizationRegistry.addReservation(quorumId, account, reservation);
 
         reservation.symbolsPerSecond -= 1; // Decrease the symbols per second by 1
         vm.expectEmit(true, true, true, true);
-        emit PaymentVaultLib.ReservationDecreased(quorumId, account, reservation);
+        emit UsageAuthorizationLib.ReservationDecreased(quorumId, account, reservation);
         vm.prank(account);
-        paymentVault.decreaseReservation(quorumId, reservation);
+        usageAuthorizationRegistry.decreaseReservation(quorumId, reservation);
 
-        PaymentVaultTypes.Reservation memory storedReservation = paymentVault.getReservation(quorumId, account);
+        UsageAuthorizationTypes.Reservation memory storedReservation =
+            usageAuthorizationRegistry.getReservation(quorumId, account);
         assertEq(storedReservation.startTimestamp, reservation.startTimestamp);
         assertEq(storedReservation.endTimestamp, reservation.endTimestamp);
         assertEq(storedReservation.symbolsPerSecond, reservation.symbolsPerSecond);
@@ -487,22 +513,24 @@ contract PaymentVaultUnit is Test {
         (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
         symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
 
-        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+        UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
             startTimestamp: startTimestamp,
             endTimestamp: endTimestamp,
             symbolsPerSecond: symbolsPerSecond
         });
         vm.prank(QUORUM_OWNER_0);
-        paymentVault.addReservation(quorumId, account, reservation);
+        usageAuthorizationRegistry.addReservation(quorumId, account, reservation);
 
         vm.expectRevert(
-            abi.encodeWithSelector(IPaymentVault.StartTimestampMustMatch.selector, reservation.startTimestamp)
+            abi.encodeWithSelector(
+                IUsageAuthorizationRegistry.StartTimestampMustMatch.selector, reservation.startTimestamp
+            )
         );
         vm.prank(account);
         vm.warp(block.timestamp + SCHEDULE_PERIOD);
-        paymentVault.decreaseReservation(
+        usageAuthorizationRegistry.decreaseReservation(
             quorumId,
-            PaymentVaultTypes.Reservation({
+            UsageAuthorizationTypes.Reservation({
                 startTimestamp: startTimestamp + SCHEDULE_PERIOD,
                 endTimestamp: endTimestamp + SCHEDULE_PERIOD,
                 symbolsPerSecond: symbolsPerSecond
@@ -521,24 +549,26 @@ contract PaymentVaultUnit is Test {
         (uint64 startTimestamp, uint64 endTimestamp) = boundTimestamps(timestampSeed);
         symbolsPerSecond = uint64(bound(symbolsPerSecond, 1, 100));
 
-        PaymentVaultTypes.Reservation memory reservation = PaymentVaultTypes.Reservation({
+        UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
             startTimestamp: startTimestamp,
             endTimestamp: endTimestamp,
             symbolsPerSecond: symbolsPerSecond
         });
         vm.prank(QUORUM_OWNER_0);
-        paymentVault.addReservation(quorumId, account, reservation);
+        usageAuthorizationRegistry.addReservation(quorumId, account, reservation);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPaymentVault.ReservationMustDecrease.selector, reservation.endTimestamp, reservation.symbolsPerSecond
+                IUsageAuthorizationRegistry.ReservationMustDecrease.selector,
+                reservation.endTimestamp,
+                reservation.symbolsPerSecond
             )
         );
 
         vm.prank(account);
-        paymentVault.decreaseReservation(
+        usageAuthorizationRegistry.decreaseReservation(
             quorumId,
-            PaymentVaultTypes.Reservation({
+            UsageAuthorizationTypes.Reservation({
                 startTimestamp: startTimestamp,
                 endTimestamp: endTimestamp,
                 symbolsPerSecond: symbolsPerSecond + 1
@@ -554,13 +584,13 @@ contract PaymentVaultUnit is Test {
         token.mint(account, amount);
 
         vm.prank(account);
-        token.approve(address(paymentVault), amount);
+        token.approve(address(usageAuthorizationRegistry), amount);
 
         vm.expectEmit(true, true, true, true);
-        emit PaymentVaultLib.DepositOnDemand(quorumId, account, amount);
+        emit UsageAuthorizationLib.DepositOnDemand(quorumId, account, amount);
         vm.prank(account);
-        paymentVault.depositOnDemand(quorumId, amount);
-        uint256 onDemandDeposit = paymentVault.getOnDemandDeposit(quorumId, account);
+        usageAuthorizationRegistry.depositOnDemand(quorumId, amount);
+        uint256 onDemandDeposit = usageAuthorizationRegistry.getOnDemandDeposit(quorumId, account);
         assertEq(onDemandDeposit, amount);
     }
 
@@ -571,14 +601,14 @@ contract PaymentVaultUnit is Test {
         amount = bound(amount, 1, type(uint80).max);
         token.mint(account, amount);
         vm.prank(QUORUM_OWNER_0);
-        paymentVault.setOnDemandEnabled(quorumId, false);
+        usageAuthorizationRegistry.setOnDemandEnabled(quorumId, false);
 
         vm.prank(account);
-        token.approve(address(paymentVault), amount);
+        token.approve(address(usageAuthorizationRegistry), amount);
 
-        vm.expectRevert(abi.encodeWithSelector(IPaymentVault.OnDemandDisabled.selector, quorumId));
+        vm.expectRevert(abi.encodeWithSelector(IUsageAuthorizationRegistry.OnDemandDisabled.selector, quorumId));
         vm.prank(account);
-        paymentVault.depositOnDemand(quorumId, amount);
+        usageAuthorizationRegistry.depositOnDemand(quorumId, amount);
     }
 
     /// @notice Tests that these functions are properly gated to the owner.
@@ -587,13 +617,13 @@ contract PaymentVaultUnit is Test {
         vm.startPrank(account);
 
         vm.expectRevert();
-        paymentVault.transferOwnership(account);
+        usageAuthorizationRegistry.transferOwnership(account);
 
         vm.expectRevert();
-        paymentVault.initializeQuorum(
+        usageAuthorizationRegistry.initializeQuorum(
             0,
             account,
-            PaymentVaultTypes.QuorumProtocolConfig({
+            UsageAuthorizationTypes.QuorumProtocolConfig({
                 minNumSymbols: MIN_NUM_SYMBOLS,
                 reservationAdvanceWindow: RESERVATION_ADVANCE_WINDOW,
                 reservationRateLimitWindow: RESERVATION_RATE_LIMIT_WINDOW,
@@ -603,10 +633,10 @@ contract PaymentVaultUnit is Test {
         );
 
         vm.expectRevert();
-        paymentVault.setReservationAdvanceWindow(0, RESERVATION_ADVANCE_WINDOW);
+        usageAuthorizationRegistry.setReservationAdvanceWindow(0, RESERVATION_ADVANCE_WINDOW);
 
         vm.expectRevert();
-        paymentVault.setOnDemandEnabled(0, true);
+        usageAuthorizationRegistry.setOnDemandEnabled(0, true);
     }
 
     /// @notice Tests that these functions are properly gated to the quorum owner.
@@ -615,19 +645,19 @@ contract PaymentVaultUnit is Test {
         vm.startPrank(account);
 
         vm.expectRevert();
-        paymentVault.addReservation(
-            0, account, PaymentVaultTypes.Reservation({startTimestamp: 0, endTimestamp: 0, symbolsPerSecond: 0})
+        usageAuthorizationRegistry.addReservation(
+            0, account, UsageAuthorizationTypes.Reservation({startTimestamp: 0, endTimestamp: 0, symbolsPerSecond: 0})
         );
 
         vm.expectRevert();
-        paymentVault.increaseReservation(
-            0, account, PaymentVaultTypes.Reservation({startTimestamp: 0, endTimestamp: 0, symbolsPerSecond: 0})
+        usageAuthorizationRegistry.increaseReservation(
+            0, account, UsageAuthorizationTypes.Reservation({startTimestamp: 0, endTimestamp: 0, symbolsPerSecond: 0})
         );
 
         vm.expectRevert();
-        paymentVault.setQuorumPaymentConfig(
+        usageAuthorizationRegistry.setQuorumPaymentConfig(
             0,
-            PaymentVaultTypes.QuorumConfig({
+            UsageAuthorizationTypes.QuorumConfig({
                 token: address(token),
                 recipient: TEST_RECIPIENT,
                 reservationSymbolsPerSecond: RESERVATION_SYMBOLS_PER_SECOND,
@@ -637,6 +667,6 @@ contract PaymentVaultUnit is Test {
         );
 
         vm.expectRevert();
-        paymentVault.transferQuorumOwnership(0, account);
+        usageAuthorizationRegistry.transferQuorumOwnership(0, account);
     }
 }

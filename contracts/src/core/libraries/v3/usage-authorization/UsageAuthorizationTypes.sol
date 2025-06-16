@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-library PaymentVaultTypes {
+library UsageAuthorizationTypes {
     /// @param deposit The total on-demand deposit of the user.
     /// @param reservation The reservation of the user.
     struct User {

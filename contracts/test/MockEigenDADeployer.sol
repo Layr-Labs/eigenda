@@ -151,7 +151,7 @@ contract MockEigenDADeployer is BLSMockAVSDeployer {
             abi.encodeWithSelector(EigenDADisperserRegistry.initialize.selector, registryCoordinatorOwner)
         );
 
-        paymentVaultImplementation = PaymentVault(payable(address(new PaymentVault(100))));
+        paymentVaultImplementation = PaymentVault(payable(address(new PaymentVault())));
 
         paymentVault = PaymentVault(
             payable(

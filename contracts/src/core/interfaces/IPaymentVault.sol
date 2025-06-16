@@ -1,50 +1,61 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-import {PaymentVaultTypes} from "src/core/libraries/v3/payment/PaymentVaultTypes.sol";
-
 interface IPaymentVault {
-    error OnDemandDisabled(uint64 quorumId);
+    struct Reservation {
+        uint64 symbolsPerSecond; // Number of symbols reserved per second
+        uint64 startTimestamp; // timestamp of epoch where reservation begins
+        uint64 endTimestamp; // timestamp of epoch where reservation ends
+        bytes quorumNumbers; // quorum numbers in an ordered bytes array
+        bytes quorumSplits; // quorum splits in a bytes array that correspond to the quorum numbers
+    }
 
-    error ReservationStillActive(uint64 endTimestamp);
+    struct OnDemandPayment {
+        uint80 totalDeposit;
+    }
 
-    error InvalidStartTimestamp(uint64 startTimestamp);
+    /// @notice Emitted when a reservation is created or updated
+    event ReservationUpdated(address indexed account, Reservation reservation);
+    /// @notice Emitted when an on-demand payment is created or updated
+    event OnDemandPaymentUpdated(address indexed account, uint80 onDemandPayment, uint80 totalDeposit);
+    /// @notice Emitted when globalSymbolsPerPeriod is updated
+    event GlobalSymbolsPerPeriodUpdated(uint64 previousValue, uint64 newValue);
+    /// @notice Emitted when reservationPeriodInterval is updated
+    event ReservationPeriodIntervalUpdated(uint64 previousValue, uint64 newValue);
+    /// @notice Emitted when globalRatePeriodInterval is updated
+    event GlobalRatePeriodIntervalUpdated(uint64 previousValue, uint64 newValue);
+    /// @notice Emitted when priceParams are updated
+    event PriceParamsUpdated(
+        uint64 previousMinNumSymbols,
+        uint64 newMinNumSymbols,
+        uint64 previousPricePerSymbol,
+        uint64 newPricePerSymbol,
+        uint64 previousPriceUpdateCooldown,
+        uint64 newPriceUpdateCooldown
+    );
 
-    error StartTimestampMustMatch(uint64 startTimestamp);
+    /**
+     * @notice This function is called by EigenDA governance to store reservations
+     * @param _account is the address to submit the reservation for
+     * @param _reservation is the Reservation struct containing details of the reservation
+     */
+    function setReservation(address _account, Reservation memory _reservation) external;
 
-    error ReservationMustIncrease(uint64 endTimestamp, uint64 symbolsPerSecond);
+    /**
+     * @notice This function is called to deposit funds for on demand payment
+     * @param _account is the address to deposit the funds for
+     */
+    function depositOnDemand(address _account) external payable;
 
-    error ReservationMustDecrease(uint64 endTimestamp, uint64 symbolsPerSecond);
+    /// @notice Fetches the current reservation for an account
+    function getReservation(address _account) external view returns (Reservation memory);
 
-    error TimestampSchedulePeriodMismatch(uint64 timestamp, uint64 schedulePeriod);
+    /// @notice Fetches the current reservations for a set of accounts
+    function getReservations(address[] memory _accounts) external view returns (Reservation[] memory _reservations);
 
-    error InvalidReservationPeriod(uint64 startTimestamp, uint64 endTimestamp);
+    /// @notice Fetches the current total on demand balance of an account
+    function getOnDemandTotalDeposit(address _account) external view returns (uint80);
 
-    error ReservationTooLong(uint64 length, uint64 maxLength);
-
-    error NotEnoughSymbolsAvailable(uint64 timestamp, uint64 requiredSymbols, uint64 availableSymbols);
-
-    error AmountTooLarge(uint256 amount, uint256 maxAmount);
-
-    error SchedulePeriodCannotBeZero();
-
-    error OwnerIsZeroAddress();
-
-    error QuorumOwnerAlreadySet(uint64 quorumId);
-
-    function getOnDemandDeposit(uint64 quorumId, address account) external view returns (uint256);
-
-    function getReservation(uint64 quorumId, address account)
-        external
-        view
-        returns (PaymentVaultTypes.Reservation memory);
-
-    function getQuorumProtocolConfig(uint64 quorumId)
-        external
-        view
-        returns (PaymentVaultTypes.QuorumProtocolConfig memory);
-
-    function getQuorumPaymentConfig(uint64 quorumId) external view returns (PaymentVaultTypes.QuorumConfig memory);
-
-    function getQuorumReservedSymbols(uint64 quorumId, uint64 period) external view returns (uint64);
+    /// @notice Fetches the current total on demand balances for a set of accounts
+    function getOnDemandTotalDeposits(address[] memory _accounts) external view returns (uint80[] memory _payments);
 }

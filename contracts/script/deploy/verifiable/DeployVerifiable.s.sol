@@ -179,7 +179,7 @@ contract DeployVerifiable is Script {
         );
         implementations.thresholdRegistry = address(new EigenDAThresholdRegistry());
         implementations.relayRegistry = address(new EigenDARelayRegistry());
-        implementations.paymentVault = address(new PaymentVault(100));
+        implementations.paymentVault = address(new PaymentVault());
         implementations.disperserRegistry = address(new EigenDADisperserRegistry());
         implementations.serviceManager = address(
             new EigenDAServiceManager(

@@ -184,7 +184,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
             );
 
-            paymentVaultImplementation = new PaymentVault(100);
+            paymentVaultImplementation = new PaymentVault();
 
             eigenDAProxyAdmin.upgradeAndCall(
                 TransparentUpgradeableProxy(payable(address(paymentVault))),
