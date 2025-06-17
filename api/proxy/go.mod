@@ -1,5 +1,7 @@
 module github.com/Layr-Labs/eigenda-proxy
 
+// TODO: this go.mod should be removed and merged with the root go.mod
+// once we upgrade the eigenda go.mod to go version >= 1.22
 go 1.22.0
 
 toolchain go1.22.7
