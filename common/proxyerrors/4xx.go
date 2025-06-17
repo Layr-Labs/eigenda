@@ -5,8 +5,9 @@ import (
 	"fmt"
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
-	eigendav2store "github.com/Layr-Labs/eigenda-proxy/store/generated_key/v2"
+	_ "github.com/Layr-Labs/eigenda-proxy/store/generated_key/v2"
 	"github.com/Layr-Labs/eigenda-proxy/store/secondary/s3"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -35,8 +36,8 @@ func Is400(err error) bool {
 // See https://github.com/Layr-Labs/optimism/pull/45 for how this is
 // used in optimism's derivation pipeline.
 func Is418(err error) bool {
-	var rbnRecencyCheckFailedErr eigendav2store.RBNRecencyCheckFailedError
-	return errors.As(err, &rbnRecencyCheckFailedErr)
+	var invalidCertErr *verification.CertVerificationFailedError
+	return errors.As(err, &invalidCertErr)
 }
 
 // 429 TOO_MANY_REQUESTS is returned to the client to inform them that they are getting rate-limited
@@ -129,6 +130,8 @@ func (me UnmarshalJSONError) Error() string {
 
 // ParsingError is a very coarse-grained error that's used as a catch-all for any parsing errors
 // like parsing a hex string, or parsing a version byte from the request path, reading a query param, etc.
+// TODO: should all of these be returned as [eigenda.StatusCertParsingFailed] errors instead,
+// to return TEAPOTs instead of 400s?
 type ParsingError struct {
 	err error
 }

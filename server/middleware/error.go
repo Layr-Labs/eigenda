@@ -1,9 +1,13 @@
 package middleware
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/Layr-Labs/eigenda-proxy/common/proxyerrors"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 )
 
 // Error handling middleware (innermost) transforms internal errors to HTTP errors,
@@ -20,11 +24,23 @@ func withErrorHandling(
 		// commitment mode, cert version, etc. to the error?
 		// Or maybe we should just add a requestID to the error, and log the request-specific information
 		// in the logging middleware, so that we can correlate the error with the request?
+		var certVerificationFailedErr *verification.CertVerificationFailedError
 		switch {
 		case proxyerrors.Is400(err):
 			http.Error(w, err.Error(), http.StatusBadRequest)
-		case proxyerrors.Is418(err):
-			http.Error(w, err.Error(), http.StatusTeapot)
+		// 418 TEAPOT errors don't follow the pattern proxyerrors.Is418(err),
+		// because we need to unwrap the certVerificationFailedError from any errors that have been added on top,
+		// such that we marshal the correct json body.
+		case errors.As(err, &certVerificationFailedErr):
+			_, errMarshal := json.Marshal(certVerificationFailedErr)
+			if errMarshal != nil {
+				panic(fmt.Errorf("failed to marshal cert verification failed error: %w", errMarshal))
+			}
+			w.WriteHeader(http.StatusTeapot)
+			encodingErr := json.NewEncoder(w).Encode(certVerificationFailedErr)
+			if encodingErr != nil {
+				panic(fmt.Errorf("failed to encode cert verification failed error: %w", encodingErr))
+			}
 		case proxyerrors.Is429(err):
 			http.Error(w, err.Error(), http.StatusTooManyRequests)
 		case proxyerrors.Is503(err):

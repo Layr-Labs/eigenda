@@ -521,7 +521,13 @@ func buildPayloadDisperser(
 		return nil, fmt.Errorf("build local signer: %w", err)
 	}
 
-	disperserClient, err := clients_v2.NewDisperserClient(log, &clientConfigV2.DisperserClientCfg, signer, kzgProver, nil)
+	disperserClient, err := clients_v2.NewDisperserClient(
+		log,
+		&clientConfigV2.DisperserClientCfg,
+		signer,
+		kzgProver,
+		nil,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser client: %w", err)
 	}

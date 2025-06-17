@@ -32,7 +32,12 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 			"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
 			"{"+routingVarNameCommitTypeByteHex+":00}"+ // 00 for keccak256 commitments
 			"{"+routingVarNameKeccakCommitmentHex+"}",
-		middleware.WithCertMiddlewares(svr.handleGetOPKeccakCommitment, svr.log, svr.m, commitments.OptimismKeccakCommitmentMode),
+		middleware.WithCertMiddlewares(
+			svr.handleGetOPKeccakCommitment,
+			svr.log,
+			svr.m,
+			commitments.OptimismKeccakCommitmentMode,
+		),
 	)
 	// op generic commitments (write to EigenDA)
 	subrouterGET.HandleFunc(
@@ -42,7 +47,12 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 			"{da_layer_byte:[0-9a-fA-F]{2}}"+ // should always be 0x00 for eigenDA but we let others through to return a 404
 			"{"+routingVarNameVersionByteHex+":[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a 404
 			"{"+routingVarNamePayloadHex+"}",
-		middleware.WithCertMiddlewares(svr.handleGetOPGenericCommitment, svr.log, svr.m, commitments.OptimismGenericCommitmentMode),
+		middleware.WithCertMiddlewares(
+			svr.handleGetOPGenericCommitment,
+			svr.log,
+			svr.m,
+			commitments.OptimismGenericCommitmentMode,
+		),
 	)
 	// unrecognized op commitment type (not 00 or 01)
 	subrouterGET.HandleFunc("/"+
@@ -70,16 +80,31 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 			"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
 			"{"+routingVarNameCommitTypeByteHex+":00}"+ // 00 for keccak256 commitments
 			"{"+routingVarNameKeccakCommitmentHex+"}",
-		middleware.WithCertMiddlewares(svr.handlePostOPKeccakCommitment, svr.log, svr.m, commitments.OptimismKeccakCommitmentMode),
+		middleware.WithCertMiddlewares(
+			svr.handlePostOPKeccakCommitment,
+			svr.log,
+			svr.m,
+			commitments.OptimismKeccakCommitmentMode,
+		),
 	)
 	// op generic commitments (write to EigenDA)
 	subrouterPOST.HandleFunc(
 		"", // commitment is calculated by the server using the body data
-		middleware.WithCertMiddlewares(svr.handlePostOPGenericCommitment, svr.log, svr.m, commitments.OptimismGenericCommitmentMode),
+		middleware.WithCertMiddlewares(
+			svr.handlePostOPGenericCommitment,
+			svr.log,
+			svr.m,
+			commitments.OptimismGenericCommitmentMode,
+		),
 	)
 	subrouterPOST.HandleFunc(
 		"/", // commitment is calculated by the server using the body data
-		middleware.WithCertMiddlewares(svr.handlePostOPGenericCommitment, svr.log, svr.m, commitments.OptimismGenericCommitmentMode),
+		middleware.WithCertMiddlewares(
+			svr.handlePostOPGenericCommitment,
+			svr.log,
+			svr.m,
+			commitments.OptimismGenericCommitmentMode,
+		),
 	)
 
 	// TODO: should prob setup metrics middlewares to also work for the below routes...

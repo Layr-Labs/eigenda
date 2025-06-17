@@ -2,6 +2,7 @@ package eigenda
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -50,7 +51,6 @@ func NewStore(
 	disperser *payloaddispersal.PayloadDisperser,
 	retrievers []clients.PayloadRetriever,
 	certVerifier *verification.CertVerifier,
-
 ) (*Store, error) {
 	if putTries == 0 {
 		return nil, fmt.Errorf(
@@ -180,28 +180,32 @@ func (e Store) BackendType() common.BackendType {
 	return common.EigenDAV2BackendType
 }
 
-// TODO: this whole function should be upstreamed to a new eigenda VerifyingPayloadRetrieval client
-// that would verify certs, and then retrieve the payloads (from relay with fallback to eigenda validators if needed).
-// Then proxy could remain a very thing server wrapper around eigenda clients.
 // Verify verifies an EigenDACert by calling the verifyEigenDACertV2 view function
 //
 // Since v2 methods for fetching a payload are responsible for verifying the received bytes against the certificate,
 // this Verify method only needs to check the cert on chain. That is why the third parameter is ignored.
+//
+// TODO: this whole function should be upstreamed to a new eigenda VerifyingPayloadRetrieval client
+// that would verify certs, and then retrieve the payloads (from relay with fallback to eigenda validators if needed).
+// Then proxy could remain a very thing server wrapper around eigenda clients.
 func (e Store) Verify(ctx context.Context, versionedCert certs.VersionedCert, opts common.CertVerificationOpts) error {
 	var referenceBlockNumber uint64
 	var sumDACert coretypes.EigenDACert
 
 	switch versionedCert.Version {
 	case certs.V0VersionByte:
-		return fmt.Errorf("version 0 byte certs should never be verified by the EigenDA V2 store")
+		return NewCertParsingFailedError(
+			hex.EncodeToString(versionedCert.SerializedCert),
+			"version 0 byte certs should never be verified by the EigenDA V2 store",
+		)
 
 	case certs.V1VersionByte:
-		// convert v2 eigenda cert to v3 cert type for verification against the forward compatible
-		// cert verifier
+		// convert v2 eigenda cert to v3 cert type for verification against the forward compatible cert verifier
 		var eigenDACertV2 coretypes.EigenDACertV2
 		err := rlp.DecodeBytes(versionedCert.SerializedCert, &eigenDACertV2)
 		if err != nil {
-			return fmt.Errorf("RLP decoding EigenDA v2 cert: %w", err)
+			return NewCertParsingFailedError(
+				hex.EncodeToString(versionedCert.SerializedCert), fmt.Sprintf("RLP decoding EigenDA v1 cert: %v", err))
 		}
 
 		referenceBlockNumber = eigenDACertV2.ReferenceBlockNumber()
@@ -211,27 +215,32 @@ func (e Store) Verify(ctx context.Context, versionedCert certs.VersionedCert, op
 		var eigenDACertV3 coretypes.EigenDACertV3
 		err := rlp.DecodeBytes(versionedCert.SerializedCert, &eigenDACertV3)
 		if err != nil {
-			return fmt.Errorf("RLP decoding EigenDA v3 cert: %w", err)
+			return NewCertParsingFailedError(
+				hex.EncodeToString(versionedCert.SerializedCert), fmt.Sprintf("RLP decoding EigenDA v3 cert: %v", err))
 		}
 
 		referenceBlockNumber = eigenDACertV3.ReferenceBlockNumber()
 		sumDACert = &eigenDACertV3
 
 	default:
-		return fmt.Errorf("unsupported EigenDA cert version: %d", versionedCert.Version)
+		return NewCertParsingFailedError(
+			hex.EncodeToString(versionedCert.SerializedCert),
+			fmt.Sprintf("unknown EigenDA cert version: %d", versionedCert.Version))
 	}
 
 	// check recency first since it requires less processing and no IO vs verifying the cert
-	err := verifyCertRBNRecencyCheck(referenceBlockNumber,
-		opts.L1InclusionBlockNum, e.rbnRecencyWindowSize)
+	err := verifyCertRBNRecencyCheck(referenceBlockNumber, opts.L1InclusionBlockNum, e.rbnRecencyWindowSize)
 	if err != nil {
-		return fmt.Errorf("rbn recency check failed: %w", err)
+		// Already a structured error converted to a 418 HTTP error by the error middleware.
+		return err
 	}
 
 	// verify cert via simulation call to verifier contract
 	err = e.certVerifier.CheckDACert(ctx, sumDACert)
 	if err != nil {
-		return fmt.Errorf("verify v3 cert: %w", err)
+		// CheckDACert already returns a structured error that is converted to a 418 HTTP error by the error middleware.
+		// We still wrap it to provide more context.
+		return fmt.Errorf("eth-call to CertVerifier.checkDACert: %w", err)
 	}
 
 	return nil
@@ -283,12 +292,7 @@ func verifyCertRBNRecencyCheck(certRBN uint64, certL1IBN uint64, rbnRecencyWindo
 
 	// Actual Recency Check
 	if !(certL1IBN <= certRBN+rbnRecencyWindowSize) {
-		//nolint:gosec // disable G115 // We checked the length of thresholds above
-		return RBNRecencyCheckFailedError{
-			certRBN:              uint32(certRBN),
-			certL1IBN:            certL1IBN,
-			rbnRecencyWindowSize: rbnRecencyWindowSize,
-		}
+		return NewRBNRecencyCheckFailedError(certRBN, certL1IBN, rbnRecencyWindowSize)
 	}
 	return nil
 }

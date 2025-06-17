@@ -58,7 +58,10 @@ func CreateTestSuite(
 		panic(fmt.Sprintf("convert config json to string: %v", err))
 	}
 
-	logger.Infof("Creating EigenDA proxy server for testSuite with config (\"*****\" fields are hidden): %v", configString)
+	logger.Infof(
+		"Creating EigenDA proxy server for testSuite with config (\"*****\" fields are hidden): %v",
+		configString,
+	)
 
 	storeManager, err := builder.BuildStoreManager(
 		ctx,

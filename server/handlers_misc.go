@@ -74,7 +74,15 @@ func (svr *Server) handleSetEigenDADispersalBackend(w http.ResponseWriter, r *ht
 	backend, err := common.StringToEigenDABackend(eigenDADispersalBackendToSet.EigenDADispersalBackend)
 	if err != nil {
 		// already a structured error that error middleware knows how to handle
-		svr.log.Error("failed to convert string to EigenDABackend", "method", r.Method, "path", r.URL.Path, "error", err)
+		svr.log.Error(
+			"failed to convert string to EigenDABackend",
+			"method",
+			r.Method,
+			"path",
+			r.URL.Path,
+			"error",
+			err,
+		)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

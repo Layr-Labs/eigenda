@@ -24,17 +24,19 @@ var (
 	SignerPaymentKeyHexFlagName                       = withFlagPrefix("signer-payment-key-hex")
 	DisperseBlobTimeoutFlagName                       = withFlagPrefix("disperse-blob-timeout")
 	BlobCertifiedTimeoutFlagName                      = withFlagPrefix("blob-certified-timeout")
-	CertVerifierRouterOrImmutableVerifierAddrFlagName = withFlagPrefix("cert-verifier-router-or-immutable-verifier-addr")
-	ServiceManagerAddrFlagName                        = withFlagPrefix("service-manager-addr")
-	BLSOperatorStateRetrieverFlagName                 = withFlagPrefix("bls-operator-state-retriever-addr")
-	RelayTimeoutFlagName                              = withFlagPrefix("relay-timeout")
-	ValidatorTimeoutFlagName                          = withFlagPrefix("validator-timeout")
-	ContractCallTimeoutFlagName                       = withFlagPrefix("contract-call-timeout")
-	BlobParamsVersionFlagName                         = withFlagPrefix("blob-version")
-	EthRPCURLFlagName                                 = withFlagPrefix("eth-rpc")
-	MaxBlobLengthFlagName                             = withFlagPrefix("max-blob-length")
-	NetworkFlagName                                   = withFlagPrefix("network")
-	RBNRecencyWindowSizeFlagName                      = withFlagPrefix("rbn-recency-window-size")
+	CertVerifierRouterOrImmutableVerifierAddrFlagName = withFlagPrefix(
+		"cert-verifier-router-or-immutable-verifier-addr",
+	)
+	ServiceManagerAddrFlagName        = withFlagPrefix("service-manager-addr")
+	BLSOperatorStateRetrieverFlagName = withFlagPrefix("bls-operator-state-retriever-addr")
+	RelayTimeoutFlagName              = withFlagPrefix("relay-timeout")
+	ValidatorTimeoutFlagName          = withFlagPrefix("validator-timeout")
+	ContractCallTimeoutFlagName       = withFlagPrefix("contract-call-timeout")
+	BlobParamsVersionFlagName         = withFlagPrefix("blob-version")
+	EthRPCURLFlagName                 = withFlagPrefix("eth-rpc")
+	MaxBlobLengthFlagName             = withFlagPrefix("max-blob-length")
+	NetworkFlagName                   = withFlagPrefix("network")
+	RBNRecencyWindowSizeFlagName      = withFlagPrefix("rbn-recency-window-size")
 )
 
 func withFlagPrefix(s string) string {
@@ -262,7 +264,10 @@ func ReadClientConfigV2(ctx *cli.Context) (common.ClientConfigV2, error) {
 		// both retrieval methods enabled. This could be exposed in the future, if necessary.
 		// Note the order of these retrievers, which is significant: the relay retriever will be
 		// tried first, and the validator retriever will only be tried if the relay retriever fails
-		RetrieversToEnable:                 []common.RetrieverType{common.RelayRetrieverType, common.ValidatorRetrieverType},
+		RetrieversToEnable: []common.RetrieverType{
+			common.RelayRetrieverType,
+			common.ValidatorRetrieverType,
+		},
 		BLSOperatorStateRetrieverAddr:      blsOperatorStateRetrieverAddress,
 		EigenDACertVerifierOrRouterAddress: ctx.String(CertVerifierRouterOrImmutableVerifierAddrFlagName),
 		EigenDAServiceManagerAddr:          serviceManagerAddress,
