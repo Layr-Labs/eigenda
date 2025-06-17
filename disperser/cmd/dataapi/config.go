@@ -33,6 +33,7 @@ type Config struct {
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
+	UsageAuthorizationRegistryAddr string
 
 	DisperserHostname  string
 	ChurnerHostname    string
@@ -63,6 +64,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		SubgraphApiOperatorStateAddr:  ctx.GlobalString(flags.SubgraphApiOperatorStateAddrFlag.Name),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		UsageAuthorizationRegistryAddr: ctx.GlobalString(flags.UsageAuthorizationRegistryFlag.Name),
 		ServerMode:                    ctx.GlobalString(flags.ServerModeFlag.Name),
 		ServerVersion:                 version,
 		PrometheusConfig: prometheus.Config{

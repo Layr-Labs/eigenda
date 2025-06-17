@@ -31,6 +31,7 @@ type Config struct {
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
+	UsageAuthorizationRegistryAddr string
 
 	EnableGnarkBundleEncoding bool
 }
@@ -82,10 +83,11 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			EnableMetrics: ctx.GlobalBool(flags.EnableMetrics.Name),
 		},
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
-		UseGraph:                      ctx.Bool(flags.UseGraphFlag.Name),
-		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
-		IndexerDataDir:                ctx.GlobalString(flags.IndexerDataDirFlag.Name),
+		UseGraph:                       ctx.Bool(flags.UseGraphFlag.Name),
+		BLSOperatorStateRetrieverAddr:  ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
+		EigenDAServiceManagerAddr:      ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		UsageAuthorizationRegistryAddr: ctx.GlobalString(flags.UsageAuthorizationRegistryFlag.Name),
+		IndexerDataDir:                 ctx.GlobalString(flags.IndexerDataDirFlag.Name),
 		IndexerConfig:                 indexer.ReadIndexerConfig(ctx),
 		KMSKeyConfig:                  kmsConfig,
 		EnableGnarkBundleEncoding:     ctx.Bool(flags.EnableGnarkBundleEncodingFlag.Name),

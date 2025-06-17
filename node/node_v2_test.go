@@ -154,7 +154,6 @@ func TestRefreshOnchainStateFailure(t *testing.T) {
 	c.tx.On("GetRelayURLs", mock.Anything).Return(nil, assert.AnError)
 	c.tx.On("GetCurrentBlockNumber", mock.Anything).Return(uint32(10), nil)
 	c.tx.On("GetQuorumCount", mock.Anything).Return(uint8(2), nil)
-	c.tx.On("GetMinNumSymbols", mock.Anything).Return(uint64(4096), nil)
 
 	err := c.node.RefreshOnchainState(newCtx)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
@@ -233,7 +232,6 @@ func TestRefreshOnchainStateSuccess(t *testing.T) {
 	}, nil)
 	c.tx.On("GetCurrentBlockNumber", mock.Anything).Return(uint32(10), nil)
 	c.tx.On("GetQuorumCount", mock.Anything).Return(uint8(2), nil)
-	c.tx.On("GetMinNumSymbols", mock.Anything).Return(uint64(4096), nil)
 
 	err = c.node.RefreshOnchainState(newCtx)
 	require.ErrorIs(t, err, context.DeadlineExceeded)

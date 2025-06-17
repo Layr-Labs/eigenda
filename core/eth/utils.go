@@ -8,7 +8,7 @@ import (
 	"github.com/Layr-Labs/eigenda/core"
 
 	eigendasrvmg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAServiceManager"
-	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
+	usageauthreg "github.com/Layr-Labs/eigenda/contracts/bindings/IUsageAuthorizationRegistry"
 
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -129,7 +129,7 @@ func bitmapToBytesArray(bitmap *big.Int) []byte {
 	return bytesArray
 }
 
-func isZeroValuedReservation(reservation paymentvault.IPaymentVaultReservation) bool {
+func isZeroValuedReservation(reservation usageauthreg.UsageAuthorizationTypesReservation) bool {
 	return reservation.SymbolsPerSecond == 0 &&
 		reservation.StartTimestamp == 0 &&
 		reservation.EndTimestamp == 0
@@ -137,25 +137,16 @@ func isZeroValuedReservation(reservation paymentvault.IPaymentVaultReservation) 
 
 // ConvertToReservedPayments converts a upstream binding data structure to local definition.
 // Returns an error if the input reservation is zero-valued.
-func ConvertToReservedPayments(reservation paymentvault.IPaymentVaultReservation) (map[core.QuorumID]*core.ReservedPayment, error) {
+func ConvertToReservedPayments(reservation usageauthreg.UsageAuthorizationTypesReservation) (*core.ReservedPayment, error) {
 	if isZeroValuedReservation(reservation) {
 		return nil, fmt.Errorf("reservation is not a valid active reservation")
 	}
 
-	reservedPayments := make(map[core.QuorumID]*core.ReservedPayment)
-	for _, quorumId := range reservation.QuorumNumbers {
-		reservedPayments[core.QuorumID(quorumId)] = &core.ReservedPayment{
-			SymbolsPerSecond: reservation.SymbolsPerSecond,
-			StartTimestamp:   reservation.StartTimestamp,
-			EndTimestamp:     reservation.EndTimestamp,
-			// They are now handled at the quorum level in the new contract design; right now we are keeping for minimal changes
-			// TODO: the core type will be updated to be specific to a single quorum
-			QuorumNumbers: []byte{},
-			QuorumSplits:  []uint8{},
-		}
-	}
-
-	return reservedPayments, nil
+	return &core.ReservedPayment{
+		SymbolsPerSecond: reservation.SymbolsPerSecond,
+		StartTimestamp:   reservation.StartTimestamp,
+		EndTimestamp:     reservation.EndTimestamp,
+	}, nil
 }
 
 // GetAllQuorumIDs returns a slice of all possible QuorumIDs from 0 to quorumCount-1

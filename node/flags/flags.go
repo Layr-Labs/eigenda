@@ -168,6 +168,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
+	UsageAuthorizationRegistryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "usage-authorization-registry"),
+		Usage:    "Address of the Usage Authorization Registry",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(EnvVarPrefix, "USAGE_AUTHORIZATION_REGISTRY"),
+	}
 	ChurnerUrlFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "churner-url"),
 		Usage:    "URL of the Churner",
@@ -580,6 +586,7 @@ var optionalFlags = []cli.Flag{
 	ChurnerUseSecureGRPC,
 	EcdsaKeyFileFlag,
 	EcdsaKeyPasswordFlag,
+	UsageAuthorizationRegistryFlag,
 	DataApiUrlFlag,
 	DisableNodeInfoResourcesFlag,
 	EnableGnarkBundleEncodingFlag,

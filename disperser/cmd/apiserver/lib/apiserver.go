@@ -3,6 +3,8 @@ package lib
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	"github.com/Layr-Labs/eigenda/common/aws/s3"
@@ -23,7 +25,6 @@ import (
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/urfave/cli"
-	"time"
 )
 
 func RunDisperserServer(ctx *cli.Context) error {
@@ -51,7 +52,7 @@ func RunDisperserServer(ctx *cli.Context) error {
 		return err
 	}
 
-	transactor, err := eth.NewReader(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	transactor, err := eth.NewReader(logger, client, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr, config.UsageAuthorizationRegistryAddr)
 	if err != nil {
 		return err
 	}

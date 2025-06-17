@@ -83,6 +83,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
+	UsageAuthorizationRegistryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "usage-authorization-registry"),
+		Usage:    "Address of the Usage Authorization Registry",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USAGE_AUTHORIZATION_REGISTRY"),
+	}
 	ServerModeFlag = cli.StringFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "server-mode"),
 		Usage:    "Set the mode of the server (debug, release or test)",
@@ -164,6 +170,7 @@ var optionalFlags = []cli.Flag{
 	ServerModeFlag,
 	MetricsHTTPPort,
 	DataApiServerVersionFlag,
+	UsageAuthorizationRegistryFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

@@ -127,17 +127,29 @@ type Reader interface {
 	// GetAllVersionedBlobParams returns the blob version parameters for all blob versions at the given block number.
 	GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*BlobVersionParameters, error)
 
-	// GetReservedPayments returns active reservations (end timestamp > current timestamp)
-	GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]map[QuorumID]*ReservedPayment, error)
+	// // GetReservedPayments returns active reservations (end timestamp > current timestamp)
+	// GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]map[QuorumID]*ReservedPayment, error)
 
-	// GetReservedPaymentByAccount returns active reservation by account ID
-	GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[QuorumID]*ReservedPayment, error)
+	// // GetReservedPaymentByAccount returns active reservation by account ID
+	// GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[QuorumID]*ReservedPayment, error)
 
-	// GetOnDemandPayments returns all on-demand payments
-	GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*OnDemandPayment, error)
+	// // GetOnDemandPayments returns all on-demand payments
+	// GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*OnDemandPayment, error)
 
-	// GetOnDemandPaymentByAccount returns on-demand payment of an account
+	// // GetOnDemandPaymentByAccount returns on-demand payment of an account
+	// GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*OnDemandPayment, error)
+
+	// GetReservedPaymentByAccountAndQuorums returns the reserved payment for the account and quorum numbers.
+	GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []QuorumID) (map[QuorumID]*ReservedPayment, error)
+
+	// GetOnDemandPaymentByAccount returns the on-demand payment for the account.
 	GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*OnDemandPayment, error)
+
+	// GetQuorumPaymentConfig returns the quorum payment config.
+	GetQuorumPaymentConfig(ctx context.Context, quorumID QuorumID) (*PaymentQuorumConfig, error)
+
+	// GetQuorumProtocolConfig returns the quorum protocol config.
+	GetQuorumProtocolConfig(ctx context.Context, quorumID QuorumID) (*PaymentQuorumProtocolConfig, error)
 
 	// GetDisperserAddress returns the disperser address with the given ID.
 	GetDisperserAddress(ctx context.Context, disperserID uint32) (gethcommon.Address, error)

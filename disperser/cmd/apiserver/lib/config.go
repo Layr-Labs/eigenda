@@ -49,6 +49,7 @@ type Config struct {
 
 	BLSOperatorStateRetrieverAddr   string
 	EigenDAServiceManagerAddr       string
+	UsageAuthorizationRegistryAddr  string
 	AuthPmtStateRequestMaxPastAge   time.Duration
 	AuthPmtStateRequestMaxFutureAge time.Duration
 
@@ -133,6 +134,7 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 
 		BLSOperatorStateRetrieverAddr:   ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:       ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		UsageAuthorizationRegistryAddr:  ctx.GlobalString(flags.UsageAuthorizationRegistryFlag.Name),
 		AuthPmtStateRequestMaxPastAge:   ctx.GlobalDuration(flags.AuthPmtStateRequestMaxPastAge.Name),
 		AuthPmtStateRequestMaxFutureAge: ctx.GlobalDuration(flags.AuthPmtStateRequestMaxFutureAge.Name),
 		NtpServer:                       ctx.GlobalString(flags.NtpServerFlag.Name),

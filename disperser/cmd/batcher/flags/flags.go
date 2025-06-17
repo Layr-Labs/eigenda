@@ -48,6 +48,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
+	UsageAuthorizationRegistryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "usage-authorization-registry"),
+		Usage:    "Address of the Usage Authorization Registry",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USAGE_AUTHORIZATION_REGISTRY"),
+	}
 	EncoderSocket = cli.StringFlag{
 		Name:     "encoder-socket",
 		Usage:    "the http ip:port which the distributed encoder server is listening",
@@ -256,6 +262,7 @@ var optionalFlags = []cli.Flag{
 	MaxNodeConnectionsFlag,
 	MaxNumRetriesPerDispersalFlag,
 	EnableGnarkBundleEncodingFlag,
+	UsageAuthorizationRegistryFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.
