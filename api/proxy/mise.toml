@@ -1,16 +1,11 @@
 [tools]
 
+# TODO: merge this file with ../../mise.toml after we update ../../go.mod to use go >=1.22
 # Core Dependencies
 go = "1.22.7"
 
 # Go Dependencies
-"go:github.com/golangci/golangci-lint/cmd/golangci-lint" = "1.64.5"
+golangci-lint = "1.64.5"
 "go:go.uber.org/mock/mockgen" = "0.5.0"
 "go:gotest.tools/gotestsum" = "1.12.0"
 "go:github.com/segmentio/golines" = "0.12.0"
-
-# Forge Dependencies
-cast = "v1.0.0"
-
-[alias]
-cast = "ubi:foundry-rs/foundry[exe=cast]"
