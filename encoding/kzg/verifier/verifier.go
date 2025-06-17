@@ -91,7 +91,6 @@ func NewVerifier(config *kzg.KzgConfig, encoderConfig *encoding.Config) (*Verifi
 		return nil, fmt.Errorf("failed to create SRS: %v", err)
 	}
 
-
 	encoder, err := rs.NewEncoder(encoderConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create encoder: %v", err)

@@ -37,7 +37,7 @@ func init() {
 // CertificateVersion denotes the version of the EigenDA certificate
 // and is interpreted from querying the EigenDACertVerifier contract's
 // CertVersion() view function
-type CertificateVersion = uint64
+type CertificateVersion = uint8
 
 const (
 	// starting at two since we never formally defined a V1 cert in the core codebase
@@ -84,6 +84,7 @@ func (s VerificationStatusCode) String() string {
 }
 
 type CertSerializationType byte
+
 const (
 	// CertSerializationRLP is the RLP encoding of the certificate
 	CertSerializationRLP CertSerializationType = iota
@@ -91,17 +92,28 @@ const (
 	CertSerializationABI
 )
 
+// EigenDACert is a sum type interface returned by the payload disperser
 type EigenDACert interface {
 	Version() CertificateVersion
+}
+
+// RetrievableEigenDACert is an interface that defines data field accessor methods
+// used for retrieving the EigenDA certificate from the relay subnet or validator nodes
+type RetrievableEigenDACert interface {
+	RelayKeys() []coreV2.RelayKey
+	QuorumNumbers() []byte
+	ReferenceBlockNumber() uint64
+	ComputeBlobKey() (*coreV2.BlobKey, error)
+	BlobHeader() (*coreV2.BlobHeaderWithHashedPayment, error)
+	Commitments() (*encoding.BlobCommitments, error)
+	Serialize(ct CertSerializationType) ([]byte, error)
 }
 
 var _ EigenDACert = &EigenDACertV2{}
 var _ EigenDACert = &EigenDACertV3{}
 
-
 // This struct represents the composition of a EigenDA V3 certificate, as it would exist in a rollup inbox.
 type EigenDACertV3 certTypesBinding.EigenDACertTypesEigenDACertV3
-
 
 // NewEigenDACertV3 creates a new EigenDACertV3 from a BlobStatusReply, and NonSignerStakesAndSignature
 func NewEigenDACertV3(
@@ -149,11 +161,6 @@ func (c *EigenDACertV3) ReferenceBlockNumber() uint64 {
 	return uint64(c.BatchHeader.ReferenceBlockNumber)
 }
 
-// BlobVersion returns the blob version of the blob header
-func (c *EigenDACertV3) BlobVersion()coreV2.BlobVersion {
-	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version
-}
-
 // ComputeBlobKey computes the blob key used for looking up the blob against an EigenDA network retrieval
 // entrypoint (e.g, a relay or a validator node)
 func (c *EigenDACertV3) ComputeBlobKey() (*coreV2.BlobKey, error) {
@@ -163,7 +170,7 @@ func (c *EigenDACertV3) ComputeBlobKey() (*coreV2.BlobKey, error) {
 		return nil, fmt.Errorf("blob commitments from protobuf: %w", err)
 	}
 
-	blobKeyBytes, err :=coreV2.ComputeBlobKey(
+	blobKeyBytes, err := coreV2.ComputeBlobKey(
 		blobHeader.Version,
 		*blobCommitments,
 		blobHeader.QuorumNumbers,
@@ -172,24 +179,24 @@ func (c *EigenDACertV3) ComputeBlobKey() (*coreV2.BlobKey, error) {
 	if err != nil {
 		return nil, fmt.Errorf("compute blob key: %w", err)
 	}
-	blobKey, err :=coreV2.BytesToBlobKey(blobKeyBytes[:])
+	blobKey, err := coreV2.BytesToBlobKey(blobKeyBytes[:])
 	if err != nil {
 		return nil, fmt.Errorf("bytes to blob key: %w", err)
 	}
 	return &blobKey, nil
 }
 
+// BlobHeader returns the blob header of the EigenDACertV3
 func (c *EigenDACertV3) BlobHeader() (*coreV2.BlobHeaderWithHashedPayment, error) {
-
 	commitments, err := c.Commitments()
 	if err != nil {
-		return nil, fmt.Errorf("get commitments: %w", err)
+		return nil, fmt.Errorf("calculate coretype commitments: %w", err)
 	}
 
 	blobHeader := &coreV2.BlobHeaderWithHashedPayment{
-		BlobVersion: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version,
-		BlobCommitments: *commitments,
-		QuorumNumbers: c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+		BlobVersion:         c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version,
+		BlobCommitments:     *commitments,
+		QuorumNumbers:       c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
 		PaymentMetadataHash: c.BlobInclusionInfo.BlobCertificate.BlobHeader.PaymentHeaderHash,
 	}
 
@@ -216,34 +223,33 @@ func (c *EigenDACertV3) Serialize(ct CertSerializationType) ([]byte, error) {
 		return nil, fmt.Errorf("unknown serialization type: %d", ct)
 	}
 
-	
 }
 
-// Commitments returns the blob's cryptographic kzg commitments 
+// Commitments returns the blob's cryptographic kzg commitments
 func (c *EigenDACertV3) Commitments() (*encoding.BlobCommitments, error) {
-		// TODO: figure out how to remove this casting entirely
-		commitments := contractEigenDACertVerifierV2.EigenDATypesV2BlobCommitment{
-			Commitment: contractEigenDACertVerifierV2.BN254G1Point{
-				X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment.X,
-				Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment.Y,
-			},
-			LengthCommitment: contractEigenDACertVerifierV2.BN254G2Point{
-				X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthCommitment.X,
-				Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthCommitment.Y,
-			},
-			LengthProof: contractEigenDACertVerifierV2.BN254G2Point{
-				X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthProof.X,
-				Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthProof.Y,
-			},
-			Length: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length,
-		}
-	
-		blobCommitments, err := BlobCommitmentsBindingToInternal(&commitments)
-		if err != nil {
-			return nil, fmt.Errorf("blob commitments from protobuf: %w", err)
-		}
+	// TODO: figure out how to remove this casting entirely
+	commitments := contractEigenDACertVerifierV2.EigenDATypesV2BlobCommitment{
+		Commitment: contractEigenDACertVerifierV2.BN254G1Point{
+			X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment.X,
+			Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment.Y,
+		},
+		LengthCommitment: contractEigenDACertVerifierV2.BN254G2Point{
+			X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthCommitment.X,
+			Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthCommitment.Y,
+		},
+		LengthProof: contractEigenDACertVerifierV2.BN254G2Point{
+			X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthProof.X,
+			Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthProof.Y,
+		},
+		Length: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length,
+	}
 
-		return blobCommitments, nil
+	blobCommitments, err := BlobCommitmentsBindingToInternal(&commitments)
+	if err != nil {
+		return nil, fmt.Errorf("blob commitments from protobuf: %w", err)
+	}
+
+	return blobCommitments, nil
 }
 
 // Version returns the version of the EigenDA certificate
@@ -253,7 +259,8 @@ func (c *EigenDACertV3) Version() CertificateVersion {
 
 // This struct represents the composition of an EigenDA V2 certificate
 // NOTE: This type is hardforked from the V3 type and will no longer
-//       be supported for dispersals after the CertV3 hardfork
+//
+//	be supported for dispersals after the CertV3 hardfork
 type EigenDACertV2 struct {
 	BlobInclusionInfo           contractEigenDACertVerifierV2.EigenDATypesV2BlobInclusionInfo
 	BatchHeader                 contractEigenDACertVerifierV2.EigenDATypesV2BatchHeaderV2
@@ -291,12 +298,13 @@ func BuildEigenDAV2Cert(
 		SignedQuorumNumbers:         quorumNumbers,
 	}, nil
 }
+
 // RelayKeys returns the relay keys used for reading blob contents from disperser relays
 func (c *EigenDACertV2) RelayKeys() []coreV2.RelayKey {
 	return c.BlobInclusionInfo.BlobCertificate.RelayKeys
 }
 
-// Commitments returns the blob's cryptographic kzg commitments 
+// Commitments returns the blob's cryptographic kzg commitments
 func (c *EigenDACertV2) Commitments() (*encoding.BlobCommitments, error) {
 	return BlobCommitmentsBindingToInternal(
 		&c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment)
@@ -307,13 +315,25 @@ func (c *EigenDACertV2) ReferenceBlockNumber() uint64 {
 	return uint64(c.BatchHeader.ReferenceBlockNumber)
 }
 
-// BlobVersion returns the blob version of the blob header
-func (c *EigenDACertV2) BlobVersion()coreV2.BlobVersion {
-	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version
-}
 // QuorumNumbers returns the quorum numbers requested
 func (c *EigenDACertV2) QuorumNumbers() []byte {
 	return c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers
+}
+
+// BlobHeader returns the blob header of the EigenDACertV2
+func (c *EigenDACertV2) BlobHeader() (*coreV2.BlobHeaderWithHashedPayment, error) {
+	commitments, err := c.Commitments()
+	if err != nil {
+		return nil, fmt.Errorf("calculate coretype commitments: %w", err)
+	}
+
+	blobHeader := &coreV2.BlobHeaderWithHashedPayment{
+		BlobVersion:         c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version,
+		BlobCommitments:     *commitments,
+		QuorumNumbers:       c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+		PaymentMetadataHash: c.BlobInclusionInfo.BlobCertificate.BlobHeader.PaymentHeaderHash,
+	}
+	return blobHeader, nil
 }
 
 // Serialize serializes the EigenDACertV2 to bytes
@@ -335,7 +355,6 @@ func (c *EigenDACertV2) Serialize(ct CertSerializationType) ([]byte, error) {
 	}
 }
 
-
 // ComputeBlobKey computes the BlobKey of the blob that belongs to the EigenDACertV2
 func (c *EigenDACertV2) ComputeBlobKey() (*coreV2.BlobKey, error) {
 	blobHeader := c.BlobInclusionInfo.BlobCertificate.BlobHeader
@@ -345,7 +364,7 @@ func (c *EigenDACertV2) ComputeBlobKey() (*coreV2.BlobKey, error) {
 		return nil, fmt.Errorf("blob commitments from protobuf: %w", err)
 	}
 
-	blobKeyBytes, err :=coreV2.ComputeBlobKey(
+	blobKeyBytes, err := coreV2.ComputeBlobKey(
 		blobHeader.Version,
 		*blobCommitments,
 		blobHeader.QuorumNumbers,
@@ -356,7 +375,7 @@ func (c *EigenDACertV2) ComputeBlobKey() (*coreV2.BlobKey, error) {
 		return nil, fmt.Errorf("compute blob key: %w", err)
 	}
 
-	blobKey, err :=coreV2.BytesToBlobKey(blobKeyBytes[:])
+	blobKey, err := coreV2.BytesToBlobKey(blobKeyBytes[:])
 	if err != nil {
 		return nil, fmt.Errorf("bytes to blob key: %w", err)
 	}
@@ -367,4 +386,92 @@ func (c *EigenDACertV2) ComputeBlobKey() (*coreV2.BlobKey, error) {
 // Version returns the version of the EigenDA certificate
 func (c *EigenDACertV2) Version() CertificateVersion {
 	return VersionTwoCert
+}
+
+// ToV3 converts an EigenDACertV2 to an EigenDACertV3
+func (c *EigenDACertV2) ToV3() (*EigenDACertV3, error) {
+	// Convert BlobInclusionInfo from V2 to V3 format
+	v3BlobInclusionInfo := certTypesBinding.EigenDATypesV2BlobInclusionInfo{
+		BlobCertificate: certTypesBinding.EigenDATypesV2BlobCertificate{
+			BlobHeader: certTypesBinding.EigenDATypesV2BlobHeaderV2{
+				Version:       c.BlobInclusionInfo.BlobCertificate.BlobHeader.Version,
+				QuorumNumbers: c.BlobInclusionInfo.BlobCertificate.BlobHeader.QuorumNumbers,
+				Commitment: certTypesBinding.EigenDATypesV2BlobCommitment{
+					Commitment: certTypesBinding.BN254G1Point{
+						X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment.X,
+						Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Commitment.Y,
+					},
+					LengthCommitment: certTypesBinding.BN254G2Point{
+						X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthCommitment.X,
+						Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthCommitment.Y,
+					},
+					LengthProof: certTypesBinding.BN254G2Point{
+						X: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthProof.X,
+						Y: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.LengthProof.Y,
+					},
+					Length: c.BlobInclusionInfo.BlobCertificate.BlobHeader.Commitment.Length,
+				},
+				PaymentHeaderHash: c.BlobInclusionInfo.BlobCertificate.BlobHeader.PaymentHeaderHash,
+			},
+			Signature: c.BlobInclusionInfo.BlobCertificate.Signature,
+			RelayKeys: convertUint32SliceToRelayKeys(c.BlobInclusionInfo.BlobCertificate.RelayKeys),
+		},
+		BlobIndex:      c.BlobInclusionInfo.BlobIndex,
+		InclusionProof: c.BlobInclusionInfo.InclusionProof,
+	}
+
+	// Convert BatchHeader from V2 to V3 format
+	v3BatchHeader := certTypesBinding.EigenDATypesV2BatchHeaderV2{
+		BatchRoot:            c.BatchHeader.BatchRoot,
+		ReferenceBlockNumber: c.BatchHeader.ReferenceBlockNumber,
+	}
+
+	// Convert NonSignerStakesAndSignature from V2 to V3 format
+	v3NonSignerStakesAndSignature := certTypesBinding.EigenDATypesV1NonSignerStakesAndSignature{
+		NonSignerQuorumBitmapIndices: c.NonSignerStakesAndSignature.NonSignerQuorumBitmapIndices,
+		NonSignerPubkeys:             convertV2PubkeysToV3(c.NonSignerStakesAndSignature.NonSignerPubkeys),
+		QuorumApks:                   convertV2PubkeysToV3(c.NonSignerStakesAndSignature.QuorumApks),
+		ApkG2: certTypesBinding.BN254G2Point{
+			X: c.NonSignerStakesAndSignature.ApkG2.X,
+			Y: c.NonSignerStakesAndSignature.ApkG2.Y,
+		},
+		Sigma: certTypesBinding.BN254G1Point{
+			X: c.NonSignerStakesAndSignature.Sigma.X,
+			Y: c.NonSignerStakesAndSignature.Sigma.Y,
+		},
+		QuorumApkIndices:      c.NonSignerStakesAndSignature.QuorumApkIndices,
+		TotalStakeIndices:     c.NonSignerStakesAndSignature.TotalStakeIndices,
+		NonSignerStakeIndices: c.NonSignerStakesAndSignature.NonSignerStakeIndices,
+	}
+
+	// Create the V3 certificate
+	certV3 := &EigenDACertV3{
+		BlobInclusionInfo:           v3BlobInclusionInfo,
+		BatchHeader:                 v3BatchHeader,
+		NonSignerStakesAndSignature: v3NonSignerStakesAndSignature,
+		SignedQuorumNumbers:         c.SignedQuorumNumbers,
+	}
+
+	return certV3, nil
+}
+
+// convertUint32SliceToRelayKeys converts []uint32 to []coreV2.RelayKey for V3 format
+func convertUint32SliceToRelayKeys(relayKeys []uint32) []coreV2.RelayKey {
+	result := make([]coreV2.RelayKey, len(relayKeys))
+	for i, key := range relayKeys {
+		result[i] = coreV2.RelayKey(key)
+	}
+	return result
+}
+
+// convertV2PubkeysToV3 converts V2 pubkeys format to V3 format
+func convertV2PubkeysToV3(v2Pubkeys []contractEigenDACertVerifierV2.BN254G1Point) []certTypesBinding.BN254G1Point {
+	result := make([]certTypesBinding.BN254G1Point, len(v2Pubkeys))
+	for i, pubkey := range v2Pubkeys {
+		result[i] = certTypesBinding.BN254G1Point{
+			X: pubkey.X,
+			Y: pubkey.Y,
+		}
+	}
+	return result
 }

@@ -55,43 +55,44 @@ func (cv *CertVerifier) CheckDACert(
 	// 1 - switch on the certificate version to determine which underlying type to decode into
 	//     and which contract to call
 
-	var certVerifierCaller *certVerifierBinding.ContractEigenDACertVerifier
-	var certBytes []byte
+	// EigenDACertV3 is the only version that is supported by the CheckDACert function
+	var certV3 *coretypes.EigenDACertV3
 	var err error
 	switch cert.Version() {
 	case coretypes.VersionThreeCert:
-		certV3, ok := cert.(*coretypes.EigenDACertV3)
+		var ok bool
+		certV3, ok = cert.(*coretypes.EigenDACertV3)
 		if !ok {
-			return fmt.Errorf("expected cert to be of type EigenDACertV3, got %T", cert)
+			return &CertVerifierInputError{Msg: fmt.Sprintf("expected cert to be of type EigenDACertV3, got %T", cert)}
 		}
-
-		// TODO: Determine adequate future proofing strategy for EigenDACertVerifierRouter to be compliant
-		//       with future reference timestamp change which deprecates the reference block number
-		//       used for quorum stake check-pointing.
-		certVerifierCaller, err = cv.getVerifierCallerFromBlockNumber(ctx, certV3.ReferenceBlockNumber())
-		if err != nil {
-			return fmt.Errorf("get verifier caller: %w", err)
-		}
-
-		certBytes, err = certV3.Serialize(coretypes.CertSerializationABI)
-		if err != nil {
-			return fmt.Errorf("serialize cert: %w", err)
-		}
-	
 	case coretypes.VersionTwoCert:
-		_, ok := cert.(*coretypes.EigenDACertV2)
+		certV2, ok := cert.(*coretypes.EigenDACertV2)
 		if !ok {
-			return fmt.Errorf("expected cert to be of type EigenDACertV2, got %T", cert)
+			return &CertVerifierInputError{Msg: fmt.Sprintf("expected cert to be of type EigenDACertV2, got %T", cert)}
 		}
 
-		return nil // noop verification. only used on V2 testnets and no mainnets
-
+		certV3, err = certV2.ToV3()
+		if err != nil {
+			return &CertVerifierInternalError{Msg: "convert V2 cert to V3", Err: err}
+		}
 	default:
-		return fmt.Errorf("unsupported cert version: %d", cert.Version())
-
+		return &CertVerifierInputError{Msg: fmt.Sprintf("unsupported cert version: %d", cert.Version())}
 	}
 
 	// 2 - Call the contract method CheckDACert to verify the certificate
+	// TODO: Determine adequate future proofing strategy for EigenDACertVerifierRouter to be compliant
+	//       with future reference timestamp change which deprecates the reference block number
+	//       used for quorum stake check-pointing.
+	certVerifierCaller, err := cv.getVerifierCallerFromBlockNumber(ctx, certV3.ReferenceBlockNumber())
+	if err != nil {
+		return &CertVerifierInternalError{Msg: "get verifier caller", Err: err}
+	}
+
+	certBytes, err := certV3.Serialize(coretypes.CertSerializationABI)
+	if err != nil {
+		return &CertVerifierInternalError{Msg: "serialize cert", Err: err}
+	}
+
 	// TODO: determine if there's any merit in passing call options to impose better determinism and
 	// safety on the operation
 	result, err := certVerifierCaller.CheckDACert(
@@ -99,16 +100,19 @@ func (cv *CertVerifier) CheckDACert(
 		certBytes,
 	)
 	if err != nil {
-		return fmt.Errorf("check da cert: %w", err)
+		return &CertVerifierInternalError{Msg: "checkDACert eth call", Err: err}
 	}
 
 	// 3 - Cast result to structured enum type and check for success
 	verifyResultCode := coretypes.VerificationStatusCode(result)
-
-	if verifyResultCode != coretypes.StatusSuccess {
-		return fmt.Errorf("check da cert error status code: (%d) %s", verifyResultCode, verifyResultCode.String())
+	if verifyResultCode == coretypes.StatusNullError {
+		return &CertVerifierInternalError{Msg: fmt.Sprintf("checkDACert eth-call bug: %s", verifyResultCode.String())}
+	} else if verifyResultCode != coretypes.StatusSuccess {
+		return &CertVerificationFailedError{
+			StatusCode: verifyResultCode,
+			Msg:        fmt.Sprintf("cert verification failed: status code (%d) %s", verifyResultCode, verifyResultCode.String()),
+		}
 	}
-
 	return nil
 }
 
@@ -243,7 +247,7 @@ func (cv *CertVerifier) GetConfirmationThreshold(ctx context.Context, referenceB
 // This method will return the version from an internal cache if it is already known for the cert
 // verifier which corresponds to the input reference block number. Otherwise, this method will query the version
 // and cache the result for future use.
-func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber uint64) (uint64, error) {
+func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber uint64) (uint8, error) {
 	certVerifierAddress, err := cv.addressProvider.GetCertVerifierAddress(ctx, referenceBlockNumber)
 	if err != nil {
 		return 0, fmt.Errorf("get cert verifier address: %w", err)
@@ -252,9 +256,9 @@ func (cv *CertVerifier) GetCertVersion(ctx context.Context, referenceBlockNumber
 	// if the version for the active cert verifier address has already been cached, return it immediately
 	cachedVersion, ok := cv.versions.Load(certVerifierAddress)
 	if ok {
-		castVersion, ok := cachedVersion.(uint64)
+		castVersion, ok := cachedVersion.(uint8)
 		if !ok {
-			return 0, fmt.Errorf("expected version to be uint8")
+			return 0, fmt.Errorf("expected version to be uint64")
 		}
 		return castVersion, nil
 	}

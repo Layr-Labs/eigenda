@@ -124,11 +124,11 @@ func ReverseBitOrderFr(values []fr.Element) error {
 	var tmp fr.Element
 	err := ReverseBitOrder(uint32(len(values)), func(i, j uint32) {
 		tmp.Set(&values[i])
-		
+
 		values[i].Set(&values[j])
-		
+
 		values[j].Set(&tmp)
-		
+
 	})
 	return err
 }

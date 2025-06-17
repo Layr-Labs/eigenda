@@ -51,10 +51,11 @@ type TelemetryConfig struct {
 }
 
 type V1CertVerifierDeployConfig struct {
-	ThresholdRegistry string `json:"eigenDAThresholdRegistry"`
-	ServiceManager  string `json:"eigenDAServiceManager"`
+	ServiceManager                string   `json:"eigenDAServiceManager"`
+	RequiredQuorums               []uint32 `json:"requiredQuorums"`
+	RequiredAdversarialThresholds []uint32 `json:"adversaryThresholds"`
+	RequiredConfirmationQuorums   []uint32 `json:"confirmationThresholds"`
 }
-
 
 type EigenDADeployConfig struct {
 	UseDefaults         bool       `json:"useDefaults"`
@@ -110,12 +111,12 @@ func (cfg *EigenDADeployConfig) MarshalJSON() ([]byte, error) {
 type EigenDAContract struct {
 	Deployer               string `yaml:"deployer"`
 	ServiceManager         string `json:"eigenDAServiceManager"`
-	OperatorStateRetreiver string `json:"operatorStateRetriever"`
+	OperatorStateRetriever string `json:"operatorStateRetriever"`
 	BlsApkRegistry         string `json:"blsApkRegistry"`
 	RegistryCoordinator    string `json:"registryCoordinator"`
-	CertVerifierLegacy 	string `json:"eigenDALegacyCertVerifier"`
-	CertVerifier 	   	   string `json:"eigenDACertVerifier"`
-	CertVerifierRouter   string `json:"eigenDACertVerifierRouter"`
+	CertVerifierLegacy     string `json:"eigenDALegacyCertVerifier"`
+	CertVerifier           string `json:"eigenDACertVerifier"`
+	CertVerifierRouter     string `json:"eigenDACertVerifierRouter"`
 }
 
 type Stakes struct {
@@ -175,10 +176,10 @@ type Config struct {
 
 	Deployers []*ContractDeployer `yaml:"deployers"`
 
-	EigenDA           EigenDAContract     `yaml:"eigenda"`
-	BlobVersionParams []*BlobVersionParam `yaml:"blobVersions"`
-	EigenDAV1CertVerifier        string              `yaml:"v1CertVerifier" json:"v1CertVerifier"`
-	EigenDAV2CertVerifier        string              `yaml:"v2CertVerifier" json:"v2CertVerifier"`
+	EigenDA               EigenDAContract     `yaml:"eigenda"`
+	BlobVersionParams     []*BlobVersionParam `yaml:"blobVersions"`
+	EigenDAV1CertVerifier string              `yaml:"v1CertVerifier" json:"v1CertVerifier"`
+	EigenDAV2CertVerifier string              `yaml:"v2CertVerifier" json:"v2CertVerifier"`
 
 	Pks *PkConfig `yaml:"privateKeys"`
 
