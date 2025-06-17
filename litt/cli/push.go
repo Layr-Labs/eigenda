@@ -221,18 +221,61 @@ func pushTable(
 		}
 	}
 
-	// TODO transfer the data
+	// Transfer the files.
 	for i := lowestSegmentIndex; i <= highestSegmentIndex; i++ {
 		seg := segments[i]
+		filesToTransfer := seg.GetFilePaths()
 
-		// TODO transfer the files in the segment
-		// TODO figure out where each segment file should go
-		// TODO delete segment files locally after transfer
+		for _, filePath := range filesToTransfer {
+			fileName := path.Base(filePath)
 
+			destination := ""
+			if existingDest, exists := existingFilesMap[fileName]; exists {
+				destination = existingDest
+			} else {
+				destination, err = determineDestination(fileName, destinations)
+				if err != nil {
+					return fmt.Errorf("failed to determine destination for file %s: %v", fileName, err)
+				}
+			}
+
+			targetLocation := path.Join(destination, tableName, segment.SegmentDirectory, fileName)
+
+			err = connection.Rsync(filePath, targetLocation)
+			if err != nil {
+				return fmt.Errorf("failed to rsync file %s to %s: %v", filePath, targetLocation, err)
+			}
+		}
 	}
 
-	// TODO delete segments as necessary
-	// TODO write a boundary file if we are dealing with a snapshot
+	// Now that we have transferred the files, we can delete them if requested.
+	if deleteAfterTransfer {
+		for _, seg := range segments {
+			seg.Release()
+		}
+		for _, seg := range segments {
+			err = seg.BlockUntilFullyDeleted()
+			if err != nil {
+				return fmt.Errorf("failed to delete segment %d for table %s: %v",
+					seg.SegmentIndex(), tableName, err)
+			}
+		}
+
+		if isSnapshot {
+			// If we are dealing with a snapshot, update the lower bound file.
+			boundaryFile, err := disktable.LoadBoundaryFile(true, path.Join(destinations[0], tableName))
+			if err != nil {
+				return fmt.Errorf("failed to load boundary file for table %s at path %s: %v",
+					tableName, destinations[0], err)
+			}
+
+			err = boundaryFile.Update(highestSegmentIndex)
+			if err != nil {
+				return fmt.Errorf("failed to update boundary file for table %s at path %s: %v",
+					tableName, destinations[0], err)
+			}
+		}
+	}
 
 	return nil
 }

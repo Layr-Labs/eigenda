@@ -851,3 +851,16 @@ func (s *Segment) keyFileControlLoop() {
 		}
 	}
 }
+
+// TODO unit test this
+
+// GetFilePaths returns a list of file paths for all files that make up this segment.
+func (s *Segment) GetFilePaths() []string {
+	filePaths := make([]string, 0, 2+len(s.shards))
+	filePaths = append(filePaths, s.metadata.path())
+	filePaths = append(filePaths, s.keys.path())
+	for _, shard := range s.shards {
+		filePaths = append(filePaths, shard.path())
+	}
+	return filePaths
+}

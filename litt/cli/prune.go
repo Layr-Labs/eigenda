@@ -50,9 +50,16 @@ func prune(logger logging.Logger, sources []string, allowedTables []string, maxA
 		allowedTablesSet[table] = struct{}{}
 	}
 
+	// Forbid touching tables in active use.
+	releaseLocks, err := util.LockDirectories(logger, sources, util.LockfileName, fsync)
+	if err != nil {
+		return fmt.Errorf("failed to acquire locks on paths %v: %v", sources, err)
+	}
+	defer releaseLocks()
+
 	// Determine which tables to prune.
 	var tables []string
-	foundTables, err := lsPaths(logger, sources, fsync)
+	foundTables, err := lsPaths(logger, sources, false, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to list tables in paths %v: %v", sources, err)
 	}
