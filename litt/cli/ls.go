@@ -33,7 +33,7 @@ func lsCommand(ctx *cli.Context) error {
 		}
 	}
 
-	tables, err := lsPaths(logger, sources, true)
+	tables, err := lsPaths(logger, sources, true, true)
 	if err != nil {
 		return fmt.Errorf("failed to list tables in paths %v: %v", sources, err)
 	}
@@ -50,11 +50,11 @@ func lsCommand(ctx *cli.Context) error {
 }
 
 // Similar to ls, but searches for tables in multiple paths.
-func lsPaths(logger logging.Logger, rootPaths []string, fsync bool) ([]string, error) {
+func lsPaths(logger logging.Logger, rootPaths []string, lock bool, fsync bool) ([]string, error) {
 	tableSet := make(map[string]struct{})
 
 	for _, rootPath := range rootPaths {
-		tables, err := ls(logger, rootPath, fsync)
+		tables, err := ls(logger, rootPath, lock, fsync)
 		if err != nil {
 			return nil, fmt.Errorf("error finding tables: %v", err)
 		}
@@ -75,15 +75,17 @@ func lsPaths(logger logging.Logger, rootPaths []string, fsync bool) ([]string, e
 
 // Returns a list of LittDB tables at the specified LittDB path. Tables are alphabetically sorted by their names.
 // Returns an error if the path does not exist or if no tables are found.
-func ls(logger logging.Logger, rootPath string, fsync bool) ([]string, error) {
+func ls(logger logging.Logger, rootPath string, lock bool, fsync bool) ([]string, error) {
 
-	// Forbid touching tables in active use.
-	lockPath := path.Join(rootPath, util.LockfileName)
-	lock, err := util.NewFileLock(logger, lockPath, fsync)
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire lock on %s: %v", rootPath, err)
+	if lock {
+		// Forbid touching tables in active use.
+		lockPath := path.Join(rootPath, util.LockfileName)
+		fLock, err := util.NewFileLock(logger, lockPath, fsync)
+		if err != nil {
+			return nil, fmt.Errorf("failed to acquire lock on %s: %v", rootPath, err)
+		}
+		defer fLock.Release()
 	}
-	defer lock.Release()
 
 	// LittDB has one directory under the root directory per table, with the name
 	// of the table being the name of the directory.
