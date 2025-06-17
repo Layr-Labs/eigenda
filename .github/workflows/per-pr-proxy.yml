@@ -1,9 +1,15 @@
-name: CI # this name appears in the badge on the README
+name: Proxy CI # this name appears in the badge on the README
 
 on:
   push:
-    branches: ["main"]
+    branches: ["master"]
+    paths:
+      - "api/proxy/**"
+      - ".github/workflows/per-pr-proxy.yml"
   pull_request:
+    paths:
+      - "api/proxy/**"
+      - ".github/workflows/per-pr-proxy.yml"
 
 env:
   MISE_VERSION: 2024.12.14
@@ -11,13 +17,18 @@ env:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api/proxy
     steps:
       - uses: actions/checkout@v4
       - uses: jdx/mise-action@v2
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
+          working_directory: api/proxy
       - run: make lint
+        working-directory: api/proxy
 
   # This checks that the flags in .env.exampleV1.holesky, .env.exampleV2.holesky, and .env.exampleV1AndV2.holesky are
   # valid, and allow the proxy to start.
@@ -40,8 +51,9 @@ jobs:
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
+          working_directory: api/proxy
       - name: Run flag test
-        run: ${{ github.workspace }}/scripts/test-proxy-startup-with-env-vars.sh ${{ matrix.env-file }}
+        run: ${{ github.workspace }}/api/proxy/scripts/test-proxy-startup-with-env-vars.sh ${{ matrix.env-file }}
 
   # This ensures that std output generated when running binary with `--help` is reflected in docs/help_out.txt
   help-output-check:
@@ -52,7 +64,9 @@ jobs:
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
+          working_directory: api/proxy
       - run: make gen-static-help-output && git diff --exit-code
+        working-directory: api/proxy
 
   unit-tests:
     runs-on: ubuntu-latest
@@ -64,10 +78,11 @@ jobs:
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
-      - name: Install dependencies
-        run: make deps
+          working_directory: api/proxy
       - run: go mod download
+        working-directory: api/proxy
       - run: make test-unit
+        working-directory: api/proxy
 
   e2e-tests-local:
     runs-on: ubuntu-latest
@@ -79,10 +94,11 @@ jobs:
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
-      - name: Install dependencies
-        run: make deps
+          working_directory: api/proxy
       - run: go mod download
+        working-directory: api/proxy
       - run: make test-e2e-local
+        working-directory: api/proxy
 
   e2e-tests-testnet:
     runs-on: ubuntu-latest
@@ -94,10 +110,11 @@ jobs:
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
-      - name: Install dependencies
-        run: make deps
+          working_directory: api/proxy
       - run: go mod download
+        working-directory: api/proxy
       - run: make test-e2e-testnet
+        working-directory: api/proxy
         env:
           SIGNER_PRIVATE_KEY: ${{ secrets.SIGNER_PRIVATE_KEY }}
           ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
@@ -112,14 +129,15 @@ jobs:
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
-      - name: Install dependencies
-        run: make deps
+          working_directory: api/proxy
       - run: go mod download
+        working-directory: api/proxy
       - run: make test-e2e-preprod
+        working-directory: api/proxy
         env:
           SIGNER_PRIVATE_KEY: ${{ secrets.SIGNER_PRIVATE_KEY }}
           ETHEREUM_RPC: ${{ secrets.ETHEREUM_RPC }}
-  
+
   e2e-tests-sepolia:
     runs-on: ubuntu-latest
     steps:
@@ -130,10 +148,11 @@ jobs:
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
-      - name: Install dependencies
-        run: make deps
+          working_directory: api/proxy
       - run: go mod download
+        working-directory: api/proxy
       - run: make test-e2e-sepolia
+        working-directory: api/proxy
         env:
           SIGNER_PRIVATE_KEY: ${{ secrets.SIGNER_SEPOLIA_PRIVATE_KEY }}
           ETHEREUM_RPC: ${{ secrets.ETHEREUM_SEPOLIA_RPC }}
@@ -148,8 +167,11 @@ jobs:
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
+          working_directory: api/proxy
       - run: go mod download
+        working-directory: api/proxy
       - run: make test-fuzz
+        working-directory: api/proxy
 
   build-binary:
     runs-on: ubuntu-latest
@@ -159,7 +181,9 @@ jobs:
         with:
           version: ${{ env.MISE_VERSION }}
           experimental: true
+          working_directory: api/proxy
       - run: make build
+        working-directory: api/proxy
 
   build-docker:
     runs-on: ubuntu-latest
@@ -168,7 +192,7 @@ jobs:
       - uses: docker/build-push-action@v5
         with:
           push: false
-          context: .
+          context: api/proxy
           tags: eigenda-proxy
       # We also test that the docker container starts up correctly.
       - name: Run container as background process
@@ -180,7 +204,8 @@ jobs:
           -e EIGENDA_PROXY_PORT=6666 \
           -e EIGENDA_PROXY_MEMSTORE_ENABLED=true \
           eigenda-proxy
+        working-directory: api/proxy
       - name: Wait for rpc to come up
         shell: bash
         run: |
-          ${{ github.workspace }}/scripts/wait-for.sh
+          ${{ github.workspace }}/api/proxy/scripts/wait-for.sh
