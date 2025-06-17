@@ -1,15 +1,15 @@
-name: Push Release Image to ghcr # This name is displayed in the badge
+name: Push Proxy Release Image to ghcr # This name is displayed in the badge
 
 on:
   push:
     branches:
-      - 'main'
+      - 'master'
     tags:
-      - 'v*'
+      - 'proxy/v*'
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: eigenda-proxy
 
 jobs:
   build:
@@ -34,7 +34,8 @@ jobs:
       - name: Build and push the Docker image
         uses: docker/build-push-action@v4
         with:
-          context: .
+          context: ./api/proxy
           push: true
+          # TODO: this might not work after we moved this action to the monorepo...
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
