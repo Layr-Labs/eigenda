@@ -2,38 +2,24 @@ package eigenda
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/utils"
 	"github.com/Layr-Labs/eigenda/api/clients/v2"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/payloaddispersal"
+	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/avast/retry-go/v4"
 	"github.com/ethereum/go-ethereum/rlp"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
-
-// Returned when `cert.L1InclusionBlock > batch.RBN + rbnRecencyWindowSize`,
-// to indicate that the cert should be discarded from rollups' derivation pipeline.
-// This should get converted by the proxy to an HTTP 418 TEAPOT error code.
-type RBNRecencyCheckFailedError struct {
-	certRBN              uint32
-	certL1IBN            uint64
-	rbnRecencyWindowSize uint64
-}
-
-func (e RBNRecencyCheckFailedError) Error() string {
-	return fmt.Sprintf(
-		"Invalid cert (rbn recency check failed): "+
-			"certL1InclusionBlockNumber (%d) > cert.RBN (%d) + RBNRecencyWindowSize (%d)",
-		e.certL1IBN, e.certRBN, e.rbnRecencyWindowSize,
-	)
-}
 
 // Store does storage interactions and verifications for blobs with the EigenDA V2 protocol.
 type Store struct {
@@ -51,12 +37,12 @@ type Store struct {
 	// This check is optional and will be skipped when rbnRecencyWindowSize is set to 0.
 	rbnRecencyWindowSize uint64
 
-	disperser  *payloaddispersal.PayloadDisperser
-	retrievers []clients.PayloadRetriever
-	verifier   clients.ICertVerifier
+	disperser    *payloaddispersal.PayloadDisperser
+	retrievers   []clients.PayloadRetriever
+	certVerifier *verification.CertVerifier
 }
 
-var _ common.EigenDAStore = (*Store)(nil)
+var _ common.EigenDAV2Store = (*Store)(nil)
 
 func NewStore(
 	log logging.Logger,
@@ -64,7 +50,7 @@ func NewStore(
 	rbnRecencyWindowSize uint64,
 	disperser *payloaddispersal.PayloadDisperser,
 	retrievers []clients.PayloadRetriever,
-	verifier clients.ICertVerifier,
+	certVerifier *verification.CertVerifier,
 ) (*Store, error) {
 	if putTries == 0 {
 		return nil, fmt.Errorf(
@@ -77,23 +63,40 @@ func NewStore(
 		rbnRecencyWindowSize: rbnRecencyWindowSize,
 		disperser:            disperser,
 		retrievers:           retrievers,
-		verifier:             verifier,
+		certVerifier:         certVerifier,
 	}, nil
 }
 
 // Get fetches a blob from DA using certificate fields and verifies blob
 // against commitment to ensure data is valid and non-tampered.
-func (e Store) Get(ctx context.Context, key []byte) ([]byte, error) {
-	var cert coretypes.EigenDACert
-	err := rlp.DecodeBytes(key, &cert)
-	if err != nil {
-		return nil, fmt.Errorf("RLP decoding EigenDA v2 cert: %w", err)
+func (e Store) Get(ctx context.Context, versionedCert certs.VersionedCert) ([]byte, error) {
+	var cert coretypes.RetrievableEigenDACert
+
+	switch versionedCert.Version {
+	case certs.V0VersionByte, certs.V1VersionByte:
+		var v2Cert coretypes.EigenDACertV2
+		err := rlp.DecodeBytes(versionedCert.SerializedCert, &v2Cert)
+		if err != nil {
+			return nil, fmt.Errorf("RLP decoding EigenDA v2 cert: %w", err)
+		}
+		cert = &v2Cert
+
+	case certs.V2VersionByte:
+		var v3Cert coretypes.EigenDACertV3
+		err := rlp.DecodeBytes(versionedCert.SerializedCert, &v3Cert)
+		if err != nil {
+			return nil, fmt.Errorf("RLP decoding EigenDA v3 cert: %w", err)
+		}
+		cert = &v3Cert
+
+	default:
+		return nil, fmt.Errorf("unknown certificate version: %d", versionedCert.Version)
 	}
 
 	// Try each retriever in sequence until one succeeds
 	var errs []error
 	for _, retriever := range e.retrievers {
-		payload, err := retriever.GetPayload(ctx, &cert)
+		payload, err := retriever.GetPayload(ctx, cert)
 		if err == nil {
 			return payload.Serialize(), nil
 		}
@@ -116,7 +119,7 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 	payload := coretypes.NewPayload(value)
 
 	cert, err := retry.DoWithData(
-		func() (*coretypes.EigenDACert, error) {
+		func() (coretypes.EigenDACert, error) {
 			return e.disperser.SendPayload(ctx, payload)
 		},
 		retry.RetryIf(
@@ -155,7 +158,21 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	return rlp.EncodeToBytes(cert)
+	switch cert.Version() {
+	case coretypes.VersionTwoCert:
+		return nil, fmt.Errorf("EigenDA V2 certs are not supported anymore, use V3 instead")
+
+	case coretypes.VersionThreeCert:
+		eigenDACertV3, ok := cert.(*coretypes.EigenDACertV3)
+		if !ok {
+			return nil, fmt.Errorf("expected EigenDACertV3, got %T", cert)
+		}
+
+		return eigenDACertV3.Serialize(coretypes.CertSerializationRLP)
+
+	default:
+		return nil, fmt.Errorf("unsupported EigenDA cert version: %d", cert.Version())
+	}
 }
 
 // BackendType returns the backend type for EigenDA Store
@@ -170,20 +187,63 @@ func (e Store) BackendType() common.BackendType {
 //
 // TODO: this whole function should be upstreamed to a new eigenda VerifyingPayloadRetrieval client
 // that would verify certs, and then retrieve the payloads (from relay with fallback to eigenda validators if needed).
-// Then proxy could remain a very thin server wrapper around eigenda clients.
-func (e Store) Verify(ctx context.Context, certBytes []byte, _ []byte, opts common.CertVerificationOpts) error {
-	var eigenDACert coretypes.EigenDACert
-	err := rlp.DecodeBytes(certBytes, &eigenDACert)
-	if err != nil {
-		return fmt.Errorf("RLP decoding EigenDA v2 cert: %w", err)
-	}
-	err = verifyCertRBNRecencyCheck(eigenDACert.BatchHeader.ReferenceBlockNumber,
-		opts.L1InclusionBlockNum, e.rbnRecencyWindowSize)
-	if err != nil {
-		return fmt.Errorf("rbn recency check failed: %w", err)
+// Then proxy could remain a very thing server wrapper around eigenda clients.
+func (e Store) Verify(ctx context.Context, versionedCert certs.VersionedCert, opts common.CertVerificationOpts) error {
+	var referenceBlockNumber uint64
+	var sumDACert coretypes.EigenDACert
+
+	switch versionedCert.Version {
+	case certs.V0VersionByte:
+		return NewCertParsingFailedError(
+			hex.EncodeToString(versionedCert.SerializedCert),
+			"version 0 byte certs should never be verified by the EigenDA V2 store",
+		)
+
+	case certs.V1VersionByte:
+		// convert v2 eigenda cert to v3 cert type for verification against the forward compatible cert verifier
+		var eigenDACertV2 coretypes.EigenDACertV2
+		err := rlp.DecodeBytes(versionedCert.SerializedCert, &eigenDACertV2)
+		if err != nil {
+			return NewCertParsingFailedError(
+				hex.EncodeToString(versionedCert.SerializedCert), fmt.Sprintf("RLP decoding EigenDA v1 cert: %v", err))
+		}
+
+		referenceBlockNumber = eigenDACertV2.ReferenceBlockNumber()
+		sumDACert = &eigenDACertV2
+
+	case certs.V2VersionByte:
+		var eigenDACertV3 coretypes.EigenDACertV3
+		err := rlp.DecodeBytes(versionedCert.SerializedCert, &eigenDACertV3)
+		if err != nil {
+			return NewCertParsingFailedError(
+				hex.EncodeToString(versionedCert.SerializedCert), fmt.Sprintf("RLP decoding EigenDA v3 cert: %v", err))
+		}
+
+		referenceBlockNumber = eigenDACertV3.ReferenceBlockNumber()
+		sumDACert = &eigenDACertV3
+
+	default:
+		return NewCertParsingFailedError(
+			hex.EncodeToString(versionedCert.SerializedCert),
+			fmt.Sprintf("unknown EigenDA cert version: %d", versionedCert.Version))
 	}
 
-	return e.verifier.VerifyCertV2(ctx, &eigenDACert)
+	// check recency first since it requires less processing and no IO vs verifying the cert
+	err := verifyCertRBNRecencyCheck(referenceBlockNumber, opts.L1InclusionBlockNum, e.rbnRecencyWindowSize)
+	if err != nil {
+		// Already a structured error converted to a 418 HTTP error by the error middleware.
+		return err
+	}
+
+	// verify cert via simulation call to verifier contract
+	err = e.certVerifier.CheckDACert(ctx, sumDACert)
+	if err != nil {
+		// CheckDACert already returns a structured error that is converted to a 418 HTTP error by the error middleware.
+		// We still wrap it to provide more context.
+		return fmt.Errorf("eth-call to CertVerifier.checkDACert: %w", err)
+	}
+
+	return nil
 }
 
 // verifyCertRBNRecencyCheck arguments:
@@ -211,7 +271,7 @@ func (e Store) Verify(ctx context.Context, certBytes []byte, _ []byte, opts comm
 //     in the batcher inbox (see https://github.com/ethereum-optimism/design-docs/pull/229)
 //  2. Optimistic approach: verify the check in op-program or hokulea (kona)'s derivation pipeline. See
 //     https://github.com/Layr-Labs/hokulea/blob/8c4c89bc4f/crates/eigenda/src/eigenda.rs#L90
-func verifyCertRBNRecencyCheck(certRBN uint32, certL1IBN uint64, rbnRecencyWindowSize uint64) error {
+func verifyCertRBNRecencyCheck(certRBN uint64, certL1IBN uint64, rbnRecencyWindowSize uint64) error {
 	// Input Validation
 	if certL1IBN == 0 || rbnRecencyWindowSize == 0 {
 		return nil
@@ -219,7 +279,7 @@ func verifyCertRBNRecencyCheck(certRBN uint32, certL1IBN uint64, rbnRecencyWindo
 	if certRBN == 0 {
 		return fmt.Errorf("certRBN should never be 0, this is likely a bug")
 	}
-	if certL1IBN <= uint64(certRBN) {
+	if certL1IBN <= certRBN {
 		return fmt.Errorf(
 			"cert's l1 inclusion block number (%d) <= cert reference block number (%d), but this is physically impossible "+
 				"since the cert has to be signed by all eigenda validators before being submitted to the batcher inbox, "+
@@ -231,12 +291,8 @@ func verifyCertRBNRecencyCheck(certRBN uint32, certL1IBN uint64, rbnRecencyWindo
 	}
 
 	// Actual Recency Check
-	if !(certL1IBN <= uint64(certRBN)+rbnRecencyWindowSize) {
-		return RBNRecencyCheckFailedError{
-			certRBN:              certRBN,
-			certL1IBN:            certL1IBN,
-			rbnRecencyWindowSize: rbnRecencyWindowSize,
-		}
+	if !(certL1IBN <= certRBN+rbnRecencyWindowSize) {
+		return NewRBNRecencyCheckFailedError(certRBN, certL1IBN, rbnRecencyWindowSize)
 	}
 	return nil
 }

@@ -10,7 +10,7 @@ func TestVerifyCertRBNRecencyCheck(t *testing.T) {
 
 	testTable := []struct {
 		name                  string
-		certRBN               uint32
+		certRBN               uint64
 		certL1IBN             uint64
 		rbnRecencyWindowSize  uint64
 		expectError           bool
@@ -54,16 +54,12 @@ func TestVerifyCertRBNRecencyCheck(t *testing.T) {
 			expectError:          false,
 		},
 		{
-			name:                 "error: certL1IBN > certRBN + rbnRecencyWindowSize",
-			certRBN:              100,
-			certL1IBN:            201,
-			rbnRecencyWindowSize: 100,
-			expectError:          true,
-			expectedErrorContains: RBNRecencyCheckFailedError{
-				certRBN:              100,
-				certL1IBN:            201,
-				rbnRecencyWindowSize: 100,
-			}.Error(),
+			name:                  "error: certL1IBN > certRBN + rbnRecencyWindowSize",
+			certRBN:               100,
+			certL1IBN:             201,
+			rbnRecencyWindowSize:  100,
+			expectError:           true,
+			expectedErrorContains: NewRBNRecencyCheckFailedError(100, 201, 100).Error(),
 		},
 	}
 

@@ -39,20 +39,6 @@ func (n EigenDANetwork) GetDisperserAddress() (string, error) {
 	}
 }
 
-// GetCertVerifierAddress returns, as a string, the address of the EigenDACertVerifier contract for the network.
-func (n EigenDANetwork) GetCertVerifierAddress() (string, error) {
-	switch n {
-	case HoleskyTestnetEigenDANetwork:
-		return "0xFe52fE1940858DCb6e12153E2104aD0fDFbE1162", nil
-	case HoleskyPreprodEigenDANetwork:
-		return "0xd973fA62E22BC2779F8489258F040C0344B03C21", nil
-	case SepoliaTestnetEigenDANetwork:
-		return "0x73818fed0743085c4557a736a7630447fb57c662", nil
-	default:
-		return "", fmt.Errorf("unknown network type: %s", n)
-	}
-}
-
 // GetBLSOperatorStateRetrieverAddress returns, as a string, the address of the OperatorStateRetriever contract for the
 // network
 func (n EigenDANetwork) GetBLSOperatorStateRetrieverAddress() (string, error) {

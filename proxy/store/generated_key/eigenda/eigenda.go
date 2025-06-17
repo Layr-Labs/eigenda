@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/common/proxyerrors"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/eigenda/verify"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/utils"
 	"github.com/Layr-Labs/eigenda/api/clients"
@@ -43,7 +44,7 @@ type Store struct {
 	log      logging.Logger
 }
 
-var _ common.EigenDAStore = (*Store)(nil)
+var _ common.EigenDAV1Store = (*Store)(nil)
 
 // NewStoreConfig creates a new StoreConfig with validation for PutTries.
 // PutTries==0 is not permitted, and will return an error
@@ -116,7 +117,7 @@ func (e Store) Put(ctx context.Context, value []byte) ([]byte, error) {
 	if uint64(len(encodedBlob)) > e.cfg.MaxBlobSizeBytes {
 		return nil, fmt.Errorf(
 			"%w: blob length %d, max blob size %d",
-			common.ErrProxyOversizedBlob,
+			proxyerrors.ErrProxyOversizedBlob,
 			len(value),
 			e.cfg.MaxBlobSizeBytes,
 		)

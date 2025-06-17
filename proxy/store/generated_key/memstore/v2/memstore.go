@@ -12,11 +12,12 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/Layr-Labs/eigenda-proxy/common"
+	"github.com/Layr-Labs/eigenda-proxy/common/types/certs"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/ephemeraldb"
 	"github.com/Layr-Labs/eigenda-proxy/store/generated_key/memstore/memconfig"
 	"github.com/Layr-Labs/eigenda/api/clients/codecs"
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
-	cert_verifier_binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierV2"
+	cert_types_binding "github.com/Layr-Labs/eigenda/contracts/bindings/IEigenDACertTypeBindings"
 
 	"github.com/Layr-Labs/eigensdk-go/logging"
 )
@@ -44,7 +45,7 @@ func unsafeRandInt(maxValue int64) *big.Int {
 	return randInt
 }
 
-func unsafeRandUint32() uint32 {
+func unsafeRandCeilAt32() uint32 {
 	// #nosec G115 - downcasting only on random value
 	return uint32(unsafeRandInt(32).Uint64())
 }
@@ -63,7 +64,7 @@ type MemStore struct {
 	codec codecs.BlobCodec
 }
 
-var _ common.EigenDAStore = (*MemStore)(nil)
+var _ common.EigenDAV2Store = (*MemStore)(nil)
 
 // New ... constructor
 func New(
@@ -79,7 +80,7 @@ func New(
 }
 
 // generateRandomCert ... generates a pseudo random EigenDA V2 certificate
-func (e *MemStore) generateRandomCert(blobContents []byte) (*coretypes.EigenDACert, error) {
+func (e *MemStore) generateRandomCert(blobContents []byte) (coretypes.EigenDACert, error) {
 	// compute kzg data commitment. this is useful for testing
 	// READPREIMAGE functionality in the arbitrum x eigenda integration since
 	// preimage key is computed within the VM from hashing a recomputation of the data
@@ -92,22 +93,22 @@ func (e *MemStore) generateRandomCert(blobContents []byte) (*coretypes.EigenDACe
 	x := dataCommitment.X.BigInt(&big.Int{})
 	y := dataCommitment.Y.BigInt(&big.Int{})
 
-	g1CommitPoint := cert_verifier_binding.BN254G1Point{
+	g1CommitPoint := cert_types_binding.BN254G1Point{
 		X: x,
 		Y: y,
 	}
 
-	pseudoRandomBlobInclusionInfo := cert_verifier_binding.EigenDATypesV2BlobInclusionInfo{
-		BlobCertificate: cert_verifier_binding.EigenDATypesV2BlobCertificate{
-			BlobHeader: cert_verifier_binding.EigenDATypesV2BlobHeaderV2{
+	pseudoRandomBlobInclusionInfo := cert_types_binding.EigenDATypesV2BlobInclusionInfo{
+		BlobCertificate: cert_types_binding.EigenDATypesV2BlobCertificate{
+			BlobHeader: cert_types_binding.EigenDATypesV2BlobHeaderV2{
 				Version:       0,                            // only supported version as of now
 				QuorumNumbers: []byte{byte(0x0), byte(0x1)}, // quorum 0 && quorum 1
-				Commitment: cert_verifier_binding.EigenDATypesV2BlobCommitment{
-					LengthCommitment: cert_verifier_binding.BN254G2Point{
+				Commitment: cert_types_binding.EigenDATypesV2BlobCommitment{
+					LengthCommitment: cert_types_binding.BN254G2Point{
 						X: [2]*big.Int{unsafeRandInt(1000), unsafeRandInt(1000)},
 						Y: [2]*big.Int{unsafeRandInt(1000), unsafeRandInt(1000)},
 					},
-					LengthProof: cert_verifier_binding.BN254G2Point{
+					LengthProof: cert_types_binding.BN254G2Point{
 						X: [2]*big.Int{unsafeRandInt(1), unsafeRandInt(1)},
 						Y: [2]*big.Int{unsafeRandInt(1), unsafeRandInt(1)},
 					},
@@ -118,49 +119,56 @@ func (e *MemStore) generateRandomCert(blobContents []byte) (*coretypes.EigenDACe
 				PaymentHeaderHash: [32]byte(unsafeRandomBytes(32)),
 			},
 			Signature: unsafeRandomBytes(48), // 384 bits
-			RelayKeys: []uint32{unsafeRandUint32(), unsafeRandUint32()},
+			RelayKeys: []uint32{unsafeRandCeilAt32(), unsafeRandCeilAt32()},
 		},
 		// #nosec G115 - max value 1000 guaranteed to be safe for uint32
 		BlobIndex:      uint32(unsafeRandInt(1_000).Uint64()),
 		InclusionProof: unsafeRandomBytes(128),
 	}
 
-	randomBatchHeader := cert_verifier_binding.EigenDATypesV2BatchHeaderV2{
-		BatchRoot:            [32]byte(unsafeRandomBytes(32)),
-		ReferenceBlockNumber: unsafeRandUint32(),
+	randomBatchHeader := cert_types_binding.EigenDATypesV2BatchHeaderV2{
+		BatchRoot: [32]byte(unsafeRandomBytes(32)),
+		// increase the rbn of cert to a high enough number 4294967200 < 2^32 = 4294967296
+		// where random part is chosen from 0 to 32. So there is no chance of overflow.
+		// a large RBN is useful to avoid failing the recency check when testing
+		// See https://github.com/Layr-Labs/eigenda/blob/master/docs/spec/src/integration/spec/6-secure-integration.md
+		// where the check is often done by checking the failure condition
+		// certL1InclusionBlock > RecencyWindowSize + cert.RBN
+		// once we increase the RBN, the above failure condition will never trigger
+		ReferenceBlockNumber: unsafeRandCeilAt32() + 4294967200,
 	}
 
-	randomNonSignerStakesAndSigs := cert_verifier_binding.EigenDATypesV1NonSignerStakesAndSignature{
-		NonSignerQuorumBitmapIndices: []uint32{unsafeRandUint32(), unsafeRandUint32()},
-		NonSignerPubkeys: []cert_verifier_binding.BN254G1Point{
+	randomNonSignerStakesAndSigs := cert_types_binding.EigenDATypesV1NonSignerStakesAndSignature{
+		NonSignerQuorumBitmapIndices: []uint32{unsafeRandCeilAt32(), unsafeRandCeilAt32()},
+		NonSignerPubkeys: []cert_types_binding.BN254G1Point{
 			{
 				X: unsafeRandInt(1000),
 				Y: unsafeRandInt(1000),
 			},
 		},
-		QuorumApks: []cert_verifier_binding.BN254G1Point{
+		QuorumApks: []cert_types_binding.BN254G1Point{
 			{
 				X: unsafeRandInt(1000),
 				Y: unsafeRandInt(1000),
 			},
 		},
-		ApkG2: cert_verifier_binding.BN254G2Point{
+		ApkG2: cert_types_binding.BN254G2Point{
 			X: [2]*big.Int{unsafeRandInt(1000), unsafeRandInt(10000)},
 			Y: [2]*big.Int{unsafeRandInt(1000), unsafeRandInt(1000)},
 		},
-		QuorumApkIndices:  []uint32{unsafeRandUint32(), unsafeRandUint32()},
-		TotalStakeIndices: []uint32{unsafeRandUint32(), unsafeRandUint32(), unsafeRandUint32()},
+		QuorumApkIndices:  []uint32{unsafeRandCeilAt32(), unsafeRandCeilAt32()},
+		TotalStakeIndices: []uint32{unsafeRandCeilAt32(), unsafeRandCeilAt32(), unsafeRandCeilAt32()},
 		NonSignerStakeIndices: [][]uint32{
-			{unsafeRandUint32(), unsafeRandUint32()},
-			{unsafeRandUint32(), unsafeRandUint32()},
+			{unsafeRandCeilAt32(), unsafeRandCeilAt32()},
+			{unsafeRandCeilAt32(), unsafeRandCeilAt32()},
 		},
-		Sigma: cert_verifier_binding.BN254G1Point{
+		Sigma: cert_types_binding.BN254G1Point{
 			X: unsafeRandInt(1000),
 			Y: unsafeRandInt(1000),
 		},
 	}
 
-	return &coretypes.EigenDACert{
+	return &coretypes.EigenDACertV3{
 		BlobInclusionInfo:           pseudoRandomBlobInclusionInfo,
 		BatchHeader:                 randomBatchHeader,
 		NonSignerStakesAndSignature: randomNonSignerStakesAndSigs,
@@ -168,8 +176,8 @@ func (e *MemStore) generateRandomCert(blobContents []byte) (*coretypes.EigenDACe
 }
 
 // Get fetches a value from the store.
-func (e *MemStore) Get(_ context.Context, commit []byte) ([]byte, error) {
-	encodedBlob, err := e.FetchEntry(crypto.Keccak256Hash(commit).Bytes())
+func (e *MemStore) Get(_ context.Context, versionedCert certs.VersionedCert) ([]byte, error) {
+	encodedBlob, err := e.FetchEntry(crypto.Keccak256Hash(versionedCert.SerializedCert).Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("fetching entry via v2 memstore: %w", err)
 	}
@@ -205,7 +213,8 @@ func (e *MemStore) Put(_ context.Context, value []byte) ([]byte, error) {
 	return certBytes, nil
 }
 
-func (e *MemStore) Verify(_ context.Context, _, _ []byte, _ common.CertVerificationOpts) error {
+func (e *MemStore) Verify(_ context.Context, _ certs.VersionedCert,
+	_ common.CertVerificationOpts) error {
 	return nil
 }
 

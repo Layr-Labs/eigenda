@@ -14,6 +14,7 @@ import (
 	"github.com/Layr-Labs/eigenda-proxy/store/secondary"
 	"github.com/Layr-Labs/eigenda-proxy/test/testutils"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
+	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/utils/codec"
 	altda "github.com/ethereum-optimism/optimism/op-alt-da"
 	"github.com/stretchr/testify/assert"
@@ -187,7 +188,7 @@ func testProxyClientServerIntegration(t *testing.T, dispersalBackend common.Eige
 					err.Error(),
 					"404") && !isNilPtrDerefPanic(err.Error()))
 
-			testCert = []byte{2}
+			testCert = []byte{3}
 			_, err = daClient.GetData(ts.Ctx, testCert)
 			require.Error(t, err)
 			assert.True(
@@ -485,8 +486,8 @@ func testMaxBlobSize(t *testing.T, dispersalBackend common.EigenDABackend) {
 	defer kill()
 
 	// the payload has things added to it during encoding, so it has a slightly lower limit than max blob size
-	maxPayloadSize, err := codec.GetMaxPermissiblePayloadLength(
-		uint32(tsConfig.StoreBuilderConfig.ClientConfigV2.MaxBlobSizeBytes / 32))
+	maxPayloadSize, err := codec.BlobSymbolsToMaxPayloadSize(
+		uint32(tsConfig.StoreBuilderConfig.ClientConfigV2.MaxBlobSizeBytes / encoding.BYTES_PER_SYMBOL))
 	require.NoError(t, err)
 
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(int(maxPayloadSize)))

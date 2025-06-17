@@ -88,18 +88,18 @@ func (mr *MockIManagerMockRecorder) GetOPKeccakValueFromS3(ctx, key any) *gomock
 }
 
 // Put mocks base method.
-func (m *MockIManager) Put(ctx context.Context, cm commitments.CommitmentMode, key, value []byte) ([]byte, error) {
+func (m *MockIManager) Put(ctx context.Context, cm commitments.CommitmentMode, value []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Put", ctx, cm, key, value)
+	ret := m.ctrl.Call(m, "Put", ctx, cm, value)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Put indicates an expected call of Put.
-func (mr *MockIManagerMockRecorder) Put(ctx, cm, key, value any) *gomock.Call {
+func (mr *MockIManagerMockRecorder) Put(ctx, cm, value any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockIManager)(nil).Put), ctx, cm, key, value)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockIManager)(nil).Put), ctx, cm, value)
 }
 
 // PutOPKeccakPairInS3 mocks base method.

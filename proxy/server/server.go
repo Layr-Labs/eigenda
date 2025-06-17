@@ -116,12 +116,6 @@ func (svr *Server) SetDispersalBackend(backend common.EigenDABackend) {
 	svr.sm.SetDispersalBackend(backend)
 }
 
-func (svr *Server) writeResponse(w http.ResponseWriter, data []byte) {
-	if _, err := w.Write(data); err != nil {
-		http.Error(w, fmt.Sprintf("failed to write response: %v", err), http.StatusInternalServerError)
-	}
-}
-
 func (svr *Server) Port() int {
 	// read from listener
 	_, portStr, _ := net.SplitHostPort(svr.listener.Addr().String())

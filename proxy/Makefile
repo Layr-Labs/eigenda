@@ -18,7 +18,7 @@ docker-build:
 	@docker build -t ghcr.io/layr-labs/eigenda-proxy:dev .
 
 run-memstore-server: build
-	./bin/eigenda-proxy --memstore.enabled --metrics.enabled
+	./bin/eigenda-proxy --memstore.enabled --metrics.enabled  --storage.backends-to-enable v2
 
 disperse-test-blob:
 	curl -X POST -d my-blob-content http://127.0.0.1:3100/put/ | xxd -p | tr -d '\n'

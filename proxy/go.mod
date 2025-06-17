@@ -5,7 +5,7 @@ go 1.22.0
 toolchain go1.22.7
 
 require (
-	github.com/Layr-Labs/eigenda v0.9.1-0.20250520184231-dbc01a215a28
+	github.com/Layr-Labs/eigenda v0.9.0-rc.3.0.20250610184531-da8095c1c9b5
 	github.com/Layr-Labs/eigenda-proxy/clients v1.0.1
 	github.com/Layr-Labs/eigensdk-go v0.2.0-beta.1.0.20250118004418-2a25f31b3b28
 	github.com/avast/retry-go/v4 v4.6.0
@@ -30,9 +30,9 @@ require (
 // TODO: Remove this after we have published v0.1.0 of the new clients module.
 replace github.com/Layr-Labs/eigenda-proxy/clients => ./clients/
 
-// Pointing to latest eigenda-develop commit that contains https://github.com/Layr-Labs/optimism/pull/45
+// Pointing to latest eigenda-develop commit that contains https://github.com/Layr-Labs/optimism/pull/49
 // TODO: update to a proper version once we make the next release.
-replace github.com/ethereum-optimism/optimism => github.com/Layr-Labs/optimism v0.0.0-20250522152001-fd05472cd253
+replace github.com/ethereum-optimism/optimism => github.com/Layr-Labs/optimism v1.13.1-0.20250616152614-59132dd56ae5
 
 // This is copied over from op's go.mod file.
 // https://github.com/ethereum-optimism/optimism/blob/5662448279e4fb16e073e00baeb6e458b12a59b2/go.mod#L253C90-L253C106

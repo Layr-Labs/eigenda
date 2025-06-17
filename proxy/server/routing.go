@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/Layr-Labs/eigenda-proxy/common/types/commitments"
+	"github.com/Layr-Labs/eigenda-proxy/server/middleware"
 	"github.com/gorilla/mux"
 )
 
@@ -23,7 +24,7 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 		"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
 		"{"+routingVarNameVersionByteHex+":[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a 404
 		"{"+routingVarNamePayloadHex+":[0-9a-fA-F]*}",
-		withLogging(withMetrics(svr.handleGetStdCommitment, svr.m, commitments.StandardCommitmentMode), svr.log),
+		middleware.WithCertMiddlewares(svr.handleGetStdCommitment, svr.log, svr.m, commitments.StandardCommitmentMode),
 	).Queries("commitment_mode", "standard")
 	// op keccak256 commitments (write to S3)
 	subrouterGET.HandleFunc(
@@ -31,9 +32,11 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 			"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
 			"{"+routingVarNameCommitTypeByteHex+":00}"+ // 00 for keccak256 commitments
 			"{"+routingVarNameKeccakCommitmentHex+"}",
-		withLogging(
-			withMetrics(svr.handleGetOPKeccakCommitment, svr.m, commitments.OptimismKeccakCommitmentMode),
+		middleware.WithCertMiddlewares(
+			svr.handleGetOPKeccakCommitment,
 			svr.log,
+			svr.m,
+			commitments.OptimismKeccakCommitmentMode,
 		),
 	)
 	// op generic commitments (write to EigenDA)
@@ -44,9 +47,11 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 			"{da_layer_byte:[0-9a-fA-F]{2}}"+ // should always be 0x00 for eigenDA but we let others through to return a 404
 			"{"+routingVarNameVersionByteHex+":[0-9a-fA-F]{2}}"+ // should always be 0x00 for now but we let others through to return a 404
 			"{"+routingVarNamePayloadHex+"}",
-		withLogging(
-			withMetrics(svr.handleGetOPGenericCommitment, svr.m, commitments.OptimismGenericCommitmentMode),
+		middleware.WithCertMiddlewares(
+			svr.handleGetOPGenericCommitment,
 			svr.log,
+			svr.m,
+			commitments.OptimismGenericCommitmentMode,
 		),
 	)
 	// unrecognized op commitment type (not 00 or 01)
@@ -67,7 +72,7 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 	subrouterPOST := r.Methods("POST").PathPrefix("/put").Subrouter()
 	// std commitments (for nitro)
 	subrouterPOST.HandleFunc("", // commitment is calculated by the server using the body data
-		withLogging(withMetrics(svr.handlePostStdCommitment, svr.m, commitments.StandardCommitmentMode), svr.log),
+		middleware.WithCertMiddlewares(svr.handlePostStdCommitment, svr.log, svr.m, commitments.StandardCommitmentMode),
 	).Queries("commitment_mode", "standard")
 	// op keccak256 commitments (write to S3)
 	subrouterPOST.HandleFunc(
@@ -75,31 +80,39 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 			"{optional_prefix:(?:0x)?}"+ // commitments can be prefixed with 0x
 			"{"+routingVarNameCommitTypeByteHex+":00}"+ // 00 for keccak256 commitments
 			"{"+routingVarNameKeccakCommitmentHex+"}",
-		withLogging(
-			withMetrics(svr.handlePostOPKeccakCommitment, svr.m, commitments.OptimismKeccakCommitmentMode),
+		middleware.WithCertMiddlewares(
+			svr.handlePostOPKeccakCommitment,
 			svr.log,
+			svr.m,
+			commitments.OptimismKeccakCommitmentMode,
 		),
 	)
 	// op generic commitments (write to EigenDA)
 	subrouterPOST.HandleFunc(
 		"", // commitment is calculated by the server using the body data
-		withLogging(
-			withMetrics(svr.handlePostOPGenericCommitment, svr.m, commitments.OptimismGenericCommitmentMode),
+		middleware.WithCertMiddlewares(
+			svr.handlePostOPGenericCommitment,
 			svr.log,
+			svr.m,
+			commitments.OptimismGenericCommitmentMode,
 		),
 	)
 	subrouterPOST.HandleFunc(
 		"/", // commitment is calculated by the server using the body data
-		withLogging(
-			withMetrics(svr.handlePostOPGenericCommitment, svr.m, commitments.OptimismGenericCommitmentMode),
+		middleware.WithCertMiddlewares(
+			svr.handlePostOPGenericCommitment,
 			svr.log,
+			svr.m,
+			commitments.OptimismGenericCommitmentMode,
 		),
 	)
 
-	r.HandleFunc("/health", withLogging(svr.handleHealth, svr.log)).Methods("GET")
+	// TODO: should prob setup metrics middlewares to also work for the below routes...
+	// right now they only work for the main GET/POST routes.
+	r.HandleFunc("/health", svr.handleHealth).Methods("GET")
 
 	// this is done to explicitly log capture potential redirect errors
-	r.HandleFunc("/put", withLogging(svr.logDispersalGetError, svr.log)).Methods("GET")
+	r.HandleFunc("/put", svr.logDispersalGetError).Methods("GET")
 
 	// Only register admin endpoints if explicitly enabled in configuration
 	//
@@ -109,10 +122,8 @@ func (svr *Server) RegisterRoutes(r *mux.Router) {
 	if svr.config.IsAPIEnabled(AdminAPIType) {
 		svr.log.Warn("Admin API endpoints are enabled")
 		// Admin endpoints to check and set EigenDA backend used for dispersal
-		r.HandleFunc("/admin/eigenda-dispersal-backend",
-			withLogging(svr.handleGetEigenDADispersalBackend, svr.log)).Methods("GET")
-		r.HandleFunc("/admin/eigenda-dispersal-backend",
-			withLogging(svr.handleSetEigenDADispersalBackend, svr.log)).Methods("PUT")
+		r.HandleFunc("/admin/eigenda-dispersal-backend", svr.handleGetEigenDADispersalBackend).Methods("GET")
+		r.HandleFunc("/admin/eigenda-dispersal-backend", svr.handleSetEigenDADispersalBackend).Methods("PUT")
 	}
 }
 

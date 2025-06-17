@@ -2,8 +2,10 @@ package builder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
+	"regexp"
 	"slices"
 	"time"
 
@@ -27,6 +29,8 @@ import (
 	"github.com/Layr-Labs/eigenda/api/clients/v2/verification"
 	common_eigenda "github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
+	binding "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDACertVerifierRouter"
+
 	auth "github.com/Layr-Labs/eigenda/core/auth/v2"
 	"github.com/Layr-Labs/eigenda/core/eth"
 	core_v2 "github.com/Layr-Labs/eigenda/core/v2"
@@ -34,8 +38,10 @@ import (
 	kzgverifier "github.com/Layr-Labs/eigenda/encoding/kzg/verifier"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	geth_common "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 // BuildStoreManager is the main builder for proxy's store.
@@ -51,7 +57,8 @@ func BuildStoreManager(
 	var err error
 	var s3Store *s3.Store
 	var redisStore *redis.Store
-	var eigenDAV1Store, eigenDAV2Store common.EigenDAStore
+	var eigenDAV1Store common.EigenDAV1Store
+	var eigenDAV2Store common.EigenDAV2Store
 
 	if config.S3Config.Bucket != "" {
 		log.Info("Using S3 storage backend")
@@ -177,6 +184,24 @@ func buildSecondaries(
 	return stores
 }
 
+// A regexp matching "execution reverted" errors returned from the parent chain RPC.
+var executionRevertedRegexp = regexp.MustCompile(`(?i)execution reverted|VM execution error\.?`)
+
+// IsExecutionReverted returns true if the error is an "execution reverted" error
+// or if the error is a rpc.Error with ErrorCode 3.
+// Taken from
+func isExecutionReverted(err error) bool {
+	if executionRevertedRegexp.MatchString(err.Error()) {
+		return true
+	}
+	var rpcError rpc.Error
+	ok := errors.As(err, &rpcError)
+	if ok && rpcError.ErrorCode() == 3 {
+		return true
+	}
+	return false
+}
+
 // buildEigenDAV2Backend ... Builds EigenDA V2 storage backend
 func buildEigenDAV2Backend(
 	ctx context.Context,
@@ -184,7 +209,7 @@ func buildEigenDAV2Backend(
 	config Config,
 	secrets common.SecretConfigV2,
 	kzgVerifier *kzgverifier.Verifier,
-) (common.EigenDAStore, error) {
+) (common.EigenDAV2Store, error) {
 	// This is a bit of a hack. The kzg config is used by both v1 AND v2, but the `LoadG2Points` field has special
 	// requirements. For v1, it must always be false. For v2, it must always be true. Ideally, we would modify
 	// the underlying core library to be more flexible, but that is a larger change for another time. As a stopgap, we
@@ -206,18 +231,56 @@ func buildEigenDAV2Backend(
 		return nil, fmt.Errorf("build eth client: %w", err)
 	}
 
-	certVerifierAddressProvider := verification.NewStaticCertVerifierAddressProvider(
-		geth_common.HexToAddress(config.ClientConfigV2.EigenDACertVerifierAddress))
-
-	certVerifier, err := verification.NewCertVerifier(
-		log, ethClient, certVerifierAddressProvider)
+	routerOrImmutableVerifierAddr := geth_common.HexToAddress(config.ClientConfigV2.EigenDACertVerifierOrRouterAddress)
+	caller, err := binding.NewContractEigenDACertVerifierRouterCaller(routerOrImmutableVerifierAddr, ethClient)
 	if err != nil {
-		return nil, fmt.Errorf("new cert verifier: %w", err)
+		return nil, fmt.Errorf("new cert verifier router caller: %w", err)
+	}
+
+	isRouter := true
+	// Check if the router address is actually a router. if method `getCertVerifierAt` fails, it means that the
+	// address is not a router, and we should treat it as an immutable cert verifier instead
+	_, err = caller.GetCertVerifierAt(&bind.CallOpts{Context: ctx}, 0)
+	switch {
+	case err != nil && isExecutionReverted(err):
+		log.Warnf("EigenDA cert verifier router address was detected to not be a router at address (%s), "+
+			"using it as an immutable cert verifier instead", routerOrImmutableVerifierAddr.Hex())
+		isRouter = false
+	case err != nil:
+		return nil, fmt.Errorf("failed to determine whether cert verifier is immutable or "+
+			"deployed behind a router at address (%s) : %w", routerOrImmutableVerifierAddr.Hex(), err)
+	default:
+		log.Infof("EigenDA cert verifier address was detected as an EigenDACertVerifierRouter "+
+			"at address (%s), using it as such", routerOrImmutableVerifierAddr.Hex())
+	}
+
+	var provider clients_v2.CertVerifierAddressProvider
+	if !isRouter {
+		provider = verification.NewStaticCertVerifierAddressProvider(
+			routerOrImmutableVerifierAddr)
+	} else {
+		provider, err = verification.BuildRouterAddressProvider(
+			routerOrImmutableVerifierAddr,
+			ethClient,
+			log,
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf("build router address provider: %w", err)
+		}
 	}
 
 	ethReader, err := buildEthReader(log, config.ClientConfigV2, ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("build eth reader: %w", err)
+	}
+	certVerifier, err := verification.NewCertVerifier(
+		log,
+		ethClient,
+		provider,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new cert verifier: %w", err)
 	}
 
 	var retrievers []clients_v2.PayloadRetriever
@@ -257,6 +320,7 @@ func buildEigenDAV2Backend(
 		ethClient,
 		kzgProver,
 		certVerifier,
+		ethReader,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build payload disperser: %w", err)
@@ -268,7 +332,8 @@ func buildEigenDAV2Backend(
 		config.ClientConfigV2.RBNRecencyWindowSize,
 		payloadDisperser,
 		retrievers,
-		certVerifier)
+		certVerifier,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("create v2 store: %w", err)
 	}
@@ -282,7 +347,7 @@ func buildEigenDAV1Backend(
 	log logging.Logger,
 	config Config,
 	kzgVerifier *kzgverifier.Verifier,
-) (common.EigenDAStore, error) {
+) (common.EigenDAV1Store, error) {
 	verifier, err := verify.NewVerifier(&config.VerifierConfigV1, kzgVerifier, log)
 	if err != nil {
 		return nil, fmt.Errorf("new verifier: %w", err)
@@ -449,21 +514,51 @@ func buildPayloadDisperser(
 	ethClient common_eigenda.EthClient,
 	kzgProver *prover.Prover,
 	certVerifier *verification.CertVerifier,
+	ethReader *eth.Reader,
 ) (*payloaddispersal.PayloadDisperser, error) {
 	signer, err := buildLocalSigner(ctx, log, secrets, ethClient)
 	if err != nil {
 		return nil, fmt.Errorf("build local signer: %w", err)
 	}
 
-	disperserClient, err := clients_v2.NewDisperserClient(&clientConfigV2.DisperserClientCfg, signer, kzgProver, nil)
+	disperserClient, err := clients_v2.NewDisperserClient(
+		log,
+		&clientConfigV2.DisperserClientCfg,
+		signer,
+		kzgProver,
+		nil,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("new disperser client: %w", err)
+	}
+
+	blockNumMonitor, err := verification.NewBlockNumberMonitor(
+		log,
+		ethClient,
+		time.Second*1, // NOTE: this polling interval works for e.g Ethereum but is too slow for L2 chains
+		//       which have block times of 2 seconds or less.
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new block number monitor: %w", err)
+	}
+
+	certBuilder, err := clients_v2.NewCertBuilder(
+		log,
+		geth_common.HexToAddress(clientConfigV2.BLSOperatorStateRetrieverAddr),
+		ethReader.GetRegistryCoordinatorAddress(),
+		ethClient,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("new cert builder: %w", err)
 	}
 
 	payloadDisperser, err := payloaddispersal.NewPayloadDisperser(
 		log,
 		clientConfigV2.PayloadDisperserCfg,
 		disperserClient,
+		blockNumMonitor,
+		certBuilder,
 		certVerifier,
 		nil)
 	if err != nil {
