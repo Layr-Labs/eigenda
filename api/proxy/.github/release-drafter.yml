@@ -1,7 +1,0 @@
-# From https://github.com/marketplace/actions/release-drafter
-# Works with .github/workflows/release-drafter.yml which 
-# will add every merged PR to the $CHANGES list below
-template: |
-  ## What’s Changed
-
-  $CHANGES
