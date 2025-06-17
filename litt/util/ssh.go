@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -14,6 +15,7 @@ import (
 
 // SSHSession encapsulates an SSH session with a remote host.
 type SSHSession struct {
+	logger  logging.Logger
 	client  *ssh.Client
 	session *ssh.Session
 	user    string
@@ -25,6 +27,7 @@ type SSHSession struct {
 
 // Create a new SSH session to a remote host.
 func NewSSHSession(
+	logger logging.Logger,
 	user string,
 	host string,
 	port uint64,
@@ -55,6 +58,7 @@ func NewSSHSession(
 	}
 
 	return &SSHSession{
+		logger:  logger,
 		client:  client,
 		session: session,
 		user:    user,
@@ -88,7 +92,7 @@ func (s *SSHSession) Ls(path string) ([]string, error) {
 
 	command := fmt.Sprintf("ls '%s'", path)
 	if s.verbose {
-		fmt.Println(command)
+		s.logger.Infof("Executing remotely: %s", command)
 	}
 
 	if err := s.session.Run(command); err != nil {
@@ -105,7 +109,7 @@ func (s *SSHSession) FindRegex(root string, regex string) ([]string, error) {
 
 	command := fmt.Sprintf("find '%s' -type f | grep -E '%s'", root, regex)
 	if s.verbose {
-		fmt.Println(command)
+		s.logger.Infof("Executing remotely: %s", command)
 	}
 
 	var stdoutBuf bytes.Buffer
@@ -127,7 +131,7 @@ func (s *SSHSession) FindRegex(root string, regex string) ([]string, error) {
 func (s *SSHSession) Mkdirs(path string) error {
 	command := fmt.Sprintf("mkdir -p '%s'", path)
 	if s.verbose {
-		fmt.Println(command)
+		s.logger.Infof("Executing remotely: %s", command)
 	}
 
 	var stderrBuf bytes.Buffer
@@ -155,7 +159,7 @@ func (s *SSHSession) Rsync(sourceFile string, destFile string) error {
 	}
 
 	if s.verbose {
-		fmt.Printf("%s\n", strings.Join(arguments, " "))
+		s.logger.Infof("Executing remotely: %s", strings.Join(arguments, " "))
 	}
 
 	cmd := exec.Command(arguments[0], arguments[1:]...)

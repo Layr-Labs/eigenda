@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/urfave/cli/v2"
 )
 
@@ -187,10 +188,15 @@ func handleDebugMode(ctx *cli.Context) error {
 		return nil
 	}
 
-	pid := os.Getpid()
-	fmt.Printf("Waiting for debugger to attach (pid: %d).\n", pid)
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create logger: %v", err)
+	}
 
-	fmt.Print("Press Enter to continue...")
+	pid := os.Getpid()
+	logger.Infof("Waiting for debugger to attach (pid: %d).\n", pid)
+
+	logger.Infof("Press Enter to continue...")
 	reader := bufio.NewReader(os.Stdin)
 	_, _ = reader.ReadString('\n') // block until newline is read
 
