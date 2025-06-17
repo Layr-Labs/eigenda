@@ -439,6 +439,14 @@ func mustMakeOperators(t *testing.T, cst *coremock.ChainDataMock, logger logging
 		disperserAddress := gethcommon.Address{}
 		reader := &coremock.MockWriter{}
 		reader.On("GetDisperserAddress", uint32(0)).Return(disperserAddress, nil)
+		reader.On("GetCurrentBlockNumber", mock.Anything).Return(uint32(100), nil)
+		reader.On("GetQuorumCount", mock.Anything, mock.Anything).Return(uint8(1), nil)
+		reader.On("GetRequiredQuorumNumbers", mock.Anything, mock.Anything).Return([]uint8{0}, nil)
+		reader.On("GetOnDemandGlobalSymbolsPerSecond", mock.Anything, mock.Anything).Return(uint64(1024), nil)
+		reader.On("GetOnDemandGlobalRatePeriodInterval", mock.Anything, mock.Anything).Return(uint64(60), nil)
+		reader.On("GetMinNumSymbols", mock.Anything, mock.Anything).Return(uint64(128), nil)
+		reader.On("GetPricePerSymbol", mock.Anything, mock.Anything).Return(uint64(1), nil)
+		reader.On("GetReservationWindow", mock.Anything, mock.Anything).Return(uint64(60), nil)
 
 		serverV1 := nodegrpc.NewServer(config, n, logger, rateLimiter)
 		serverV2, err := nodegrpc.NewServerV2(

@@ -15,7 +15,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common/replay"
 	"github.com/Layr-Labs/eigenda/core"
 	coreauthv2 "github.com/Layr-Labs/eigenda/core/auth/v2"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -74,7 +73,7 @@ func NewServerV2(
 		blobAuthenticator = coreauthv2.NewBlobRequestAuthenticator()
 
 		// TODO(hopeyen): BatchMeterer meterer config is left as a placeholder.
-		onchainPaymentState, err := meterer.NewOnchainPaymentState(context.Background(), reader.(*eth.Reader), logger)
+		onchainPaymentState, err := meterer.NewOnchainPaymentState(context.Background(), reader, logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create onchain payment state: %v", err)
 		}
