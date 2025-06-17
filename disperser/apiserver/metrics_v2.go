@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/disperser"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
@@ -90,7 +92,7 @@ func newAPIServerV2Metrics(registry *prometheus.Registry, metricsConfig disperse
 			Name:      "disperse_blob_metered_bytes",
 			Help:      "The number of bytes charged for the blob.",
 		},
-		[]string{},
+		[]string{"quorum_number"},
 	)
 
 	validateDispersalRequestLatency := promauto.With(registry).NewSummaryVec(
@@ -171,8 +173,12 @@ func (m *metricsV2) reportDisperseBlobSize(size int) {
 	m.disperseBlobSize.WithLabelValues().Add(float64(size))
 }
 
-func (m *metricsV2) reportDisperseMeteredBytes(usageInBytes int) {
-	m.disperseBlobMeteredBytes.WithLabelValues().Add(float64(usageInBytes))
+func (m *metricsV2) reportDisperseMeteredBytes(quorumNumbers []uint8, symbolsCharges map[core.QuorumID]uint64) {
+	for _, quorumNumber := range quorumNumbers {
+		if charge, ok := symbolsCharges[core.QuorumID(quorumNumber)]; ok {
+			m.disperseBlobMeteredBytes.WithLabelValues(strconv.FormatUint(uint64(quorumNumber), 10)).Add(float64(charge))
+		}
+	}
 }
 
 func (m *metricsV2) reportValidateDispersalRequestLatency(duration time.Duration) {
