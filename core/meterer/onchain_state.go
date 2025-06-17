@@ -9,7 +9,6 @@ import (
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -36,7 +35,7 @@ var _ OnchainPayment = (*OnchainPaymentState)(nil)
 
 // OnchainPaymentState manages the state of on-chain payments including reservations and on-demand payments
 type OnchainPaymentState struct {
-	tx     *eth.Reader
+	tx     core.Reader
 	logger logging.Logger
 
 	ReservedPayments map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment
@@ -56,7 +55,7 @@ type PaymentVaultParams struct {
 }
 
 // NewOnchainPaymentState creates a new OnchainPaymentState instance and initializes it with current chain state
-func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader, logger logging.Logger) (*OnchainPaymentState, error) {
+func NewOnchainPaymentState(ctx context.Context, tx core.Reader, logger logging.Logger) (*OnchainPaymentState, error) {
 	state := OnchainPaymentState{
 		tx:                 tx,
 		logger:             logger.With("component", "OnchainPaymentState"),
@@ -74,7 +73,7 @@ func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader, logger logging.
 }
 
 // NewOnchainPaymentStateEmpty creates a new OnchainPaymentState instance without initializing chain state
-func NewOnchainPaymentStateEmpty(ctx context.Context, tx *eth.Reader, logger logging.Logger) (*OnchainPaymentState, error) {
+func NewOnchainPaymentStateEmpty(ctx context.Context, tx core.Reader, logger logging.Logger) (*OnchainPaymentState, error) {
 	state := OnchainPaymentState{
 		tx:                 tx,
 		logger:             logger.With("component", "OnchainPaymentState"),
