@@ -79,7 +79,7 @@ Note: The verification steps in point 1. for dispersal are not currently impleme
 ## Upgradable Quorums and Thresholds for Optimistic Verification
 ![image.png](../../assets/integration/router-in-fraud-proof.png)
 
-The [`EigenDACertVerifierRouter`](./4-contracts.md#eigendacertverifierrouter) contract enables secure upgrades to a rollup’s required quorums and thresholds without compromising the integrity of previously submitted state commitments. It achieves this by routing certificate verification to the appropriate `EigenDACertVerifier` instance based on the `activation_block_number` associated with each cert's `reference_block_number`. This ensures backward compatibility, allowing older `DACert`s to be validated against the verifier version that was active at the time of their creation.
+The [`EigenDACertVerifierRouter`](./4-contracts.md#eigendacertverifierrouter) contract enables secure upgrades to a rollup’s required quorums and thresholds without compromising the integrity of previously submitted state commitments. It achieves this by routing certificate verification to the appropriate `EigenDACertVerifier` instance based on the `reference_block_number` embedded in the cert, which dictates the verifier whose activation block was effective at that time. This ensures backward compatibility, allowing older `DACert`s to be validated against the verifier version that was active at the time of their creation.
 
 The router is typically deployed behind an upgradable admin proxy and should use the same `ProxyAdmin` multisig as the rollup for consistent and secure access control.
 
