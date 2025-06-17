@@ -127,6 +127,53 @@ func buildCLIParser() *cli.App {
 				},
 				Action: pruneCommand,
 			},
+			{
+				Name:  "push",
+				Usage: "Push data to a remote location using ssh and rsync.",
+				ArgsUsage: "--src <source-path1> ... --src <source-pathN> " +
+					"--dst <remote-path1> ... --dst <remote-pathN> " +
+					"[-i path/to/key] [-p port] [-P password] [-v PASSWORD_VARIABLE] [--no-gc] " +
+					"<user>@<host>",
+				Args: true,
+				Flags: []cli.Flag{
+					&cli.StringSliceFlag{
+						Name:     "src",
+						Aliases:  []string{"s"},
+						Usage:    "Source paths where the data is found, at least one is required.",
+						Required: true,
+					},
+					&cli.StringSliceFlag{
+						Name:     "dest",
+						Aliases:  []string{"d"},
+						Usage:    "Remote destination paths, at least one is required.",
+						Required: true,
+					},
+					&cli.Uint64Flag{
+						Name:    "port",
+						Aliases: []string{"p"},
+						Usage:   "SSH port to connect to the remote host.",
+						Value:   22,
+					},
+					&cli.StringFlag{
+						Name:    "key",
+						Aliases: []string{"i"},
+						Usage:   "Path to the SSH private key file for authentication.",
+						Value:   "~/.ssh/id_rsa",
+					},
+					&cli.BoolFlag{
+						Name:    "no-gc",
+						Aliases: []string{"n"},
+						Usage:   "If true, do not delete files pushed to the remote host.",
+					},
+					&cli.BoolFlag{
+						Name:     "quiet",
+						Aliases:  []string{"q"},
+						Usage:    "Reduces the verbosity of the output.",
+						Required: false,
+					},
+				},
+				Action: pushCommand,
+			},
 		},
 	}
 	return app

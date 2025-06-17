@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -57,8 +56,8 @@ type db struct {
 	// The HTTP server for metrics. nil if metrics are disabled or if an external party is managing the server.
 	metricsServer *http.Server
 
-	// Locks to prevent multiple processes from accessing the same data directories.
-	fileLocks []*util.FileLock
+	// A function that releases file locks.
+	releaseLocks func()
 
 	// Set to true when the database is closed.
 	closed bool
@@ -117,13 +116,9 @@ func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, e
 		}
 	}
 
-	fileLocks := make([]*util.FileLock, 0, len(config.Paths))
-	for _, rootPath := range config.Paths {
-		fileLock, err := util.NewFileLock(path.Join(rootPath, util.LockfileName), config.Fsync)
-		if err != nil {
-			return nil, fmt.Errorf("error creating file lock for path %s: %w", rootPath, err)
-		}
-		fileLocks = append(fileLocks, fileLock)
+	releaseLocks, err := util.LockDirectories(config.Logger, config.Paths, util.LockfileName, config.Fsync)
+	if err != nil {
+		return nil, fmt.Errorf("error acquiring locks on paths %v: %w", config.Paths, err)
 	}
 
 	if config.Logger == nil {
@@ -154,7 +149,7 @@ func NewDBUnsafe(config *litt.Config, tableBuilder TableBuilderFunc) (litt.DB, e
 		tables:        make(map[string]litt.ManagedTable),
 		metrics:       dbMetrics,
 		metricsServer: metricsServer,
-		fileLocks:     fileLocks,
+		releaseLocks:  releaseLocks,
 	}
 
 	if config.MetricsEnabled {
@@ -262,12 +257,7 @@ func (d *db) closeUnsafe() error {
 		}
 	}
 
-	for _, fileLock := range d.fileLocks {
-		err := fileLock.Release()
-		if err != nil {
-			return fmt.Errorf("error releasing file lock: %w", err)
-		}
-	}
+	d.releaseLocks()
 
 	return nil
 }

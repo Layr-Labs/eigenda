@@ -4,6 +4,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
@@ -20,6 +21,9 @@ func rebaseTest(
 	preserveOriginal bool,
 	verbose bool,
 ) {
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
 
 	if overlap > 0 && preserveOriginal {
 		require.Fail(t, "Invalid test configuration, cannot preserve original when there is overlap")
@@ -135,7 +139,7 @@ func rebaseTest(
 	}
 
 	// Rebasing with the DB still open should fail.
-	err = rebase(sourceDirList, destDirList, shallow, preserveOriginal, false, verbose)
+	err = rebase(logger, sourceDirList, destDirList, shallow, preserveOriginal, false, verbose)
 	require.Error(t, err)
 
 	// None of the source dirs should have been deleted.
@@ -163,7 +167,7 @@ func rebaseTest(
 	err = db.Close()
 	require.NoError(t, err, "failed to close DB")
 
-	err = rebase(sourceDirList, destDirList, shallow, preserveOriginal, false, verbose)
+	err = rebase(logger, sourceDirList, destDirList, shallow, preserveOriginal, false, verbose)
 	require.NoError(t, err, "failed to rebase DB")
 
 	// Verify the new directories.
@@ -320,3 +324,5 @@ func TestRebaseNtoNOverlap(t *testing.T) {
 		rebaseTest(t, sourceDirs, destDirs, 2, true, false, false)
 	})
 }
+
+// TODO test rebasing a snapshot directory

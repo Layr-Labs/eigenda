@@ -9,15 +9,22 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/urfave/cli/v2"
 )
 
 // rebaseCommand is the command to rebase a LittDB database.
 func rebaseCommand(ctx *cli.Context) error {
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create logger: %v", err)
+	}
+
 	sources := ctx.StringSlice("src")
 	if len(sources) == 0 {
 		return fmt.Errorf("no sources provided")
@@ -46,12 +53,13 @@ func rebaseCommand(ctx *cli.Context) error {
 	preserveOriginal := ctx.Bool("preserve")
 	verbose := !ctx.Bool("quiet")
 
-	return rebase(sources, destinations, deep, preserveOriginal, true, verbose)
+	return rebase(logger, sources, destinations, deep, preserveOriginal, true, verbose)
 }
 
 // rebase moves LittDB database files from one location to another (locally). This function is idempotent. If it
 // crashes part of the way through, just run it again and it will continue where it left off.
 func rebase(
+	logger logging.Logger,
 	sources []string,
 	destinations []string,
 	deep bool,
@@ -61,8 +69,6 @@ func rebase(
 ) error {
 
 	sourceSet := make(map[string]struct{})
-	destinationSet := make(map[string]struct{})
-
 	for _, src := range sources {
 		exists, err := util.Exists(src)
 		if err != nil {
@@ -74,6 +80,7 @@ func rebase(
 		}
 	}
 
+	destinationSet := make(map[string]struct{})
 	for _, dest := range destinations {
 		destinationSet[dest] = struct{}{}
 
@@ -87,18 +94,16 @@ func rebase(
 				return fmt.Errorf("error creating destination path %s: %w", dest, err)
 			}
 		}
-
-		// Acquire locks on all destination directories.
-		lockPath := path.Join(dest, util.LockfileName)
-		lock, err := util.NewFileLock(lockPath, fsync)
-		if err != nil {
-			return fmt.Errorf("failed to acquire lock on %s: %v", dest, err)
-		}
-		defer func() {
-			_ = lock.Release()
-		}()
 	}
 
+	// Acquire locks on all destination directories.
+	releaseDestinationLocks, err := util.LockDirectories(logger, destinations, util.LockfileName, fsync)
+	if err != nil {
+		return fmt.Errorf("failed to acquire locks on destination directories %v: %w", destinations, err)
+	}
+	defer releaseDestinationLocks()
+
+	// Figure out which directories are going away. We will need to transfer their data to new locations.
 	directoriesGoingAway := make([]string, 0, len(sourceSet))
 	for source := range sourceSet {
 		// If the source directory is not in the destination set, it is going away.
@@ -131,6 +136,7 @@ func rebase(
 	// For each directory that is going away, transfer its data to the new destination.
 	for _, source := range directoriesGoingAway {
 		err := transferDataInDirectory(
+			logger,
 			source,
 			destinations,
 			deep,
@@ -143,10 +149,6 @@ func rebase(
 			return fmt.Errorf("error transferring data from %s to %v: %w",
 				source, destinations, err)
 		}
-	}
-
-	if verbose {
-		fmt.Println()
 	}
 
 	return nil
@@ -209,6 +211,7 @@ func countSegmentFiles(sources []string) (count int64, symlinkFound bool, err er
 
 // transfers all data in a directory to the specified destinations.
 func transferDataInDirectory(
+	logger logging.Logger,
 	source string,
 	destinations []string,
 	deep bool,
@@ -228,14 +231,11 @@ func transferDataInDirectory(
 
 	// Acquire a lock on the source directory.
 	lockPath := path.Join(source, util.LockfileName)
-	lock, err := util.NewFileLock(lockPath, fsync)
+	lock, err := util.NewFileLock(logger, lockPath, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to acquire lock on %s: %w", source, err)
 	}
-	defer func() {
-		// double release is a no-op
-		_ = lock.Release()
-	}()
+	defer lock.Release() // double release is a no-op
 
 	// Transfer each table stored in this directory.
 	children, err := os.ReadDir(source)
@@ -248,6 +248,7 @@ func transferDataInDirectory(
 		}
 
 		err = transferDataInTable(
+			logger,
 			source,
 			child.Name(),
 			destinations,
@@ -263,10 +264,7 @@ func transferDataInDirectory(
 	}
 
 	// Release the lock so we can delete the directory.
-	err = lock.Release()
-	if err != nil {
-		return fmt.Errorf("failed to release lock on source directory %s: %w", source, err)
-	}
+	lock.Release()
 
 	if !preserveOriginal {
 		// Delete the directory.
@@ -280,6 +278,7 @@ func transferDataInDirectory(
 }
 
 func transferDataInTable(
+	logger logging.Logger,
 	source string,
 	tableName string,
 	destinations []string,
@@ -321,12 +320,12 @@ func transferDataInTable(
 	}
 
 	if !preserveOriginal {
-		err = deleteSnapshotDirectory(source, tableName, true)
+		err = deleteSnapshotDirectory(logger, source, tableName, true)
 		if err != nil {
 			return fmt.Errorf("failed to delete snapshot directory for table %s: %w", tableName, err)
 		}
 
-		err = deleteBoundaryFiles(source, tableName, verbose)
+		err = deleteBoundaryFiles(logger, source, tableName, verbose)
 		if err != nil {
 			return fmt.Errorf("failed to delete boundary files for table %s: %w", tableName, err)
 		}
@@ -344,7 +343,7 @@ func transferDataInTable(
 
 // deleteBoundaryFiles deletes the boundary files for a table. Only will be present if the source
 // directory contains symlink snapshots.
-func deleteBoundaryFiles(source string, tableName string, verbose bool) error {
+func deleteBoundaryFiles(logger logging.Logger, source string, tableName string, verbose bool) error {
 	lowerBoundPath := path.Join(source, tableName, disktable.LowerBoundFileName)
 	exists, err := util.Exists(lowerBoundPath)
 	if err != nil {
@@ -352,7 +351,7 @@ func deleteBoundaryFiles(source string, tableName string, verbose bool) error {
 	}
 	if exists {
 		if verbose {
-			fmt.Printf("Deleting lower bound file: %s\n", lowerBoundPath)
+			logger.Infof("Deleting lower bound file: %s", lowerBoundPath)
 		}
 		err = os.Remove(lowerBoundPath)
 		if err != nil {
@@ -367,7 +366,7 @@ func deleteBoundaryFiles(source string, tableName string, verbose bool) error {
 	}
 	if exists {
 		if verbose {
-			fmt.Printf("Deleting upper bound file: %s\n", upperBoundPath)
+			logger.Infof("Deleting upper bound file: %s", upperBoundPath)
 		}
 		err = os.Remove(upperBoundPath)
 		if err != nil {
@@ -379,7 +378,7 @@ func deleteBoundaryFiles(source string, tableName string, verbose bool) error {
 }
 
 // delete the old snapshot directory for a table. This will be reconstructed the next time the DB is loaded.
-func deleteSnapshotDirectory(source string, tableName string, verbose bool) error {
+func deleteSnapshotDirectory(logger logging.Logger, source string, tableName string, verbose bool) error {
 	snapshotDir := filepath.Join(source, tableName, segment.HardLinkDirectory)
 
 	exists, err := util.Exists(snapshotDir)
@@ -391,7 +390,7 @@ func deleteSnapshotDirectory(source string, tableName string, verbose bool) erro
 	}
 
 	if verbose {
-		fmt.Printf("Deleting snapshot directory: %s\n", snapshotDir)
+		logger.Infof("Deleting snapshot directory: %s", snapshotDir)
 	}
 
 	err = os.RemoveAll(snapshotDir)

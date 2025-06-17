@@ -18,6 +18,12 @@ import (
 
 // pruneCommand can be used to remove data from a LittDB instance/snapshot.
 func pruneCommand(ctx *cli.Context) error {
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create logger: %v", err)
+	}
+
 	sources := ctx.StringSlice("src")
 	if len(sources) == 0 {
 		return fmt.Errorf("no sources provided")
@@ -34,11 +40,11 @@ func pruneCommand(ctx *cli.Context) error {
 
 	maxAgeSeconds := ctx.Uint64("max-age")
 
-	return prune(sources, tables, maxAgeSeconds, true)
+	return prune(logger, sources, tables, maxAgeSeconds, true)
 }
 
 // prune deletes data from a littDB database/snapshot.
-func prune(sources []string, allowedTables []string, maxAgeSeconds uint64, fsync bool) error {
+func prune(logger logging.Logger, sources []string, allowedTables []string, maxAgeSeconds uint64, fsync bool) error {
 	allowedTablesSet := make(map[string]struct{})
 	for _, table := range allowedTables {
 		allowedTablesSet[table] = struct{}{}
@@ -46,7 +52,7 @@ func prune(sources []string, allowedTables []string, maxAgeSeconds uint64, fsync
 
 	// Determine which tables to prune.
 	var tables []string
-	foundTables, err := lsPaths(sources, fsync)
+	foundTables, err := lsPaths(logger, sources, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to list tables in paths %v: %v", sources, err)
 	}
@@ -60,11 +66,6 @@ func prune(sources []string, allowedTables []string, maxAgeSeconds uint64, fsync
 		}
 	}
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	if err != nil {
-		return fmt.Errorf("failed to create logger: %v", err)
-	}
-
 	// Prune each table.
 	for _, table := range tables {
 		bytesDeleted, err := pruneTable(logger, sources, table, maxAgeSeconds, fsync)
@@ -72,7 +73,7 @@ func prune(sources []string, allowedTables []string, maxAgeSeconds uint64, fsync
 			return fmt.Errorf("failed to prune table %s in paths %v: %v", table, sources, err)
 		}
 
-		fmt.Printf("Deleted %s from table '%s'.\n", util.PrettyPrintBytes(bytesDeleted), table)
+		logger.Infof("Deleted %s from table '%s'.", util.PrettyPrintBytes(bytesDeleted), table)
 	}
 
 	return nil
@@ -87,16 +88,11 @@ func pruneTable(
 	fsync bool) (uint64, error) {
 
 	// Forbid touching tables in active use.
-	for _, rootPath := range sources {
-		lockPath := path.Join(rootPath, util.LockfileName)
-		lock, err := util.NewFileLock(lockPath, fsync)
-		if err != nil {
-			return 0, fmt.Errorf("failed to acquire lock on %s: %v", rootPath, err)
-		}
-		defer func() {
-			_ = lock.Release()
-		}()
+	releaseLocks, err := util.LockDirectories(logger, sources, util.LockfileName, fsync)
+	if err != nil {
+		return 0, fmt.Errorf("failed to acquire locks on paths %v: %v", sources, err)
 	}
+	defer releaseLocks()
 
 	errorMonitor := util.NewErrorMonitor(context.Background(), logger, nil)
 

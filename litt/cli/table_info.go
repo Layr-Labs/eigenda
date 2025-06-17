@@ -12,7 +12,7 @@ import (
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/util"
-	"github.com/stretchr/testify/require"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/urfave/cli/v2"
 )
 
@@ -44,6 +44,11 @@ func tableInfoCommand(ctx *cli.Context) error {
 			"table-info command requires exactly at least one argument: <table-name>")
 	}
 
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create logger: %v", err)
+	}
+
 	tableName := ctx.Args().Get(0)
 
 	sources := ctx.StringSlice("src")
@@ -58,7 +63,7 @@ func tableInfoCommand(ctx *cli.Context) error {
 		}
 	}
 
-	info, err := tableInfo(tableName, sources, true)
+	info, err := tableInfo(logger, tableName, sources, true)
 	if err != nil {
 		return fmt.Errorf("failed to get table info for table %s at paths %v: %v", tableName, sources, err)
 	}
@@ -68,24 +73,24 @@ func tableInfoCommand(ctx *cli.Context) error {
 	segmentSpan := oldestSegmentAge - newestSegmentAge
 
 	// Print table information in a human-readable format
-	fmt.Printf("Table:                       %s\n", tableName)
-	fmt.Printf("Key count:                   %s\n", util.CommaOMatic(info.KeyCount))
-	fmt.Printf("Size:                        %s\n", util.PrettyPrintBytes(info.Size))
-	fmt.Printf("Is snapshot:                 %t\n", info.IsSnapshot)
-	fmt.Printf("Oldest segment age:          %s\n", util.PrettyPrintTime(oldestSegmentAge))
-	fmt.Printf("Oldest segment seal time:    %s\n", info.OldestSegmentSealTime.Format(time.RFC3339))
-	fmt.Printf("Newest segment age:          %s\n", util.PrettyPrintTime(newestSegmentAge))
-	fmt.Printf("Newest segment seal time:    %s\n", info.NewestSegmentSealTime.Format(time.RFC3339))
-	fmt.Printf("Segment span:                %s\n", util.PrettyPrintTime(segmentSpan))
-	fmt.Printf("Lowest segment index:        %d\n", info.LowestSegmentIndex)
-	fmt.Printf("Highest segment index:       %d\n", info.HighestSegmentIndex)
-	fmt.Printf("Key map type:                %s\n", info.KeymapType)
+	logger.Infof("Table:                       %s", tableName)
+	logger.Infof("Key count:                   %s", util.CommaOMatic(info.KeyCount))
+	logger.Infof("Size:                        %s", util.PrettyPrintBytes(info.Size))
+	logger.Infof("Is snapshot:                 %t", info.IsSnapshot)
+	logger.Infof("Oldest segment age:          %s", util.PrettyPrintTime(oldestSegmentAge))
+	logger.Infof("Oldest segment seal time:    %s", info.OldestSegmentSealTime.Format(time.RFC3339))
+	logger.Infof("Newest segment age:          %s", util.PrettyPrintTime(newestSegmentAge))
+	logger.Infof("Newest segment seal time:    %s", info.NewestSegmentSealTime.Format(time.RFC3339))
+	logger.Infof("Segment span:                %s", util.PrettyPrintTime(segmentSpan))
+	logger.Infof("Lowest segment index:        %d", info.LowestSegmentIndex)
+	logger.Infof("Highest segment index:       %d", info.HighestSegmentIndex)
+	logger.Infof("Key map type:                %s", info.KeymapType)
 
 	return nil
 }
 
 // tableInfo retrieves information about a table at the specified path.
-func tableInfo(tableName string, paths []string, fsync bool) (*TableInfo, error) {
+func tableInfo(logger logging.Logger, tableName string, paths []string, fsync bool) (*TableInfo, error) {
 	if !litt.IsTableNameValid(tableName) {
 		return nil, fmt.Errorf("table name '%s' is invalid, "+
 			"must be at least one character long and contain only letters, numbers, underscores, and dashes",
@@ -93,16 +98,11 @@ func tableInfo(tableName string, paths []string, fsync bool) (*TableInfo, error)
 	}
 
 	// Forbid touching tables in active use.
-	for _, rootPath := range paths {
-		lockPath := path.Join(rootPath, util.LockfileName)
-		lock, err := util.NewFileLock(lockPath, fsync)
-		if err != nil {
-			return nil, fmt.Errorf("failed to acquire lock on %s: %v", rootPath, err)
-		}
-		defer func() {
-			_ = lock.Release()
-		}()
+	releaseLocks, err := util.LockDirectories(logger, paths, util.LockfileName, fsync)
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire locks on paths %v: %v", paths, err)
 	}
+	defer releaseLocks()
 
 	segmentPaths, err := segment.BuildSegmentPaths(paths, "", tableName)
 	if err != nil {
@@ -121,8 +121,6 @@ func tableInfo(tableName string, paths []string, fsync bool) (*TableInfo, error)
 		}
 	}
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
-	require.NoError(nil, err)
 	errorMonitor := util.NewErrorMonitor(context.Background(), logger, nil)
 
 	lowestSegmentIndex, highestSegmentIndex, segments, err := segment.GatherSegmentFiles(

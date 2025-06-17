@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
@@ -15,6 +16,9 @@ func TestTableInfo(t *testing.T) {
 
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
 
 	// Spread data across several root directories.
 	rootCount := rand.Uint32Range(2, 5)
@@ -82,16 +86,16 @@ func TestTableInfo(t *testing.T) {
 	}
 
 	// We should not be able to call table-info on the core directories while the table holds a lock.
-	_, err = tableInfo(tableNames[0], config.Paths, false)
+	_, err = tableInfo(logger, tableNames[0], config.Paths, false)
 	require.Error(t, err)
 
 	// Even when the DB is running, it should always be possible to check the snapshot directory.
-	lsResult, err := ls(snapshotDir, false)
+	lsResult, err := ls(logger, snapshotDir, false)
 	require.NoError(t, err)
 	require.Equal(t, tableNames, lsResult)
 
 	for _, tableName := range tableNames {
-		info, err := tableInfo(tableName, []string{snapshotDir}, false)
+		info, err := tableInfo(logger, tableName, []string{snapshotDir}, false)
 		require.NoError(t, err)
 
 		require.True(t, info.IsSnapshot)
@@ -102,7 +106,7 @@ func TestTableInfo(t *testing.T) {
 	}
 
 	// Getting info on a table that doesn't exist should return an error.
-	_, err = tableInfo("nonexistent-table", config.Paths, false)
+	_, err = tableInfo(logger, "nonexistent-table", config.Paths, false)
 	require.Error(t, err)
 
 	err = db.Close()
@@ -110,7 +114,7 @@ func TestTableInfo(t *testing.T) {
 
 	// Now that the DB is closed, we should be able to call table-info on the core directories.
 	for _, tableName := range tableNames {
-		info, err := tableInfo(tableName, config.Paths, false)
+		info, err := tableInfo(logger, tableName, config.Paths, false)
 		require.NoError(t, err)
 
 		require.False(t, info.IsSnapshot)
@@ -120,6 +124,6 @@ func TestTableInfo(t *testing.T) {
 	}
 
 	// A non-existent table should return an error for the core directories as well.
-	_, err = tableInfo("nonexistent-table", config.Paths, false)
+	_, err = tableInfo(logger, "nonexistent-table", config.Paths, false)
 	require.Error(t, err, "Expected error when querying info for a non-existent table after DB close")
 }

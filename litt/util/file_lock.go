@@ -4,16 +4,20 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/Layr-Labs/eigensdk-go/logging"
 )
 
 // FileLock represents a file-based lock
 type FileLock struct {
-	path string
-	file *os.File
+	logger logging.Logger
+	path   string
+	file   *os.File
 }
 
 // IsProcessAlive checks if a process with the given PID is still running
@@ -75,7 +79,7 @@ func parseLockFile(path string) (int, error) {
 // NewFileLock attempts to create a lock file at the specified path. Fails if another process has already created a
 // lock file. Useful for situations where a process wants to hold a mutual exclusion lock on a resource.
 // The caller is responsible for calling Release() to release the lock.
-func NewFileLock(path string, fsync bool) (*FileLock, error) {
+func NewFileLock(logger logging.Logger, path string, fsync bool) (*FileLock, error) {
 	path, err := SanitizePath(path)
 	if err != nil {
 		return nil, fmt.Errorf("sanitize path failed: %v", err)
@@ -96,7 +100,8 @@ func NewFileLock(path string, fsync bool) (*FileLock, error) {
 					// Try to create the lock file again
 					file, err = os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 					if err != nil {
-						return nil, fmt.Errorf("failed to create lock file after removing stale lock %s: %w", path, err)
+						return nil, fmt.Errorf("failed to create lock file after removing stale lock %s: %w",
+							path, err)
 					}
 				} else {
 					// Process is still alive, cannot acquire lock
@@ -104,7 +109,8 @@ func NewFileLock(path string, fsync bool) (*FileLock, error) {
 					if content, readErr := os.ReadFile(path); readErr == nil {
 						debugInfo = fmt.Sprintf(" (existing lock info: %s)", strings.TrimSpace(string(content)))
 					}
-					return nil, fmt.Errorf("lock file already exists and process %d is still running: %s%s", pid, path, debugInfo)
+					return nil, fmt.Errorf("lock file already exists and process %d is still running: %s%s",
+						pid, path, debugInfo)
 				}
 			} else {
 				// Cannot parse lock file, treat as existing lock with debug info
@@ -140,23 +146,17 @@ func NewFileLock(path string, fsync bool) (*FileLock, error) {
 	}
 
 	return &FileLock{
-		path: path,
-		file: file,
+		logger: logger,
+		path:   path,
+		file:   file,
 	}, nil
-}
-
-// WriteLockFile writes the current process ID and timestamp to the lock file.
-func WriteLockFile(lockFile *os.File, pid int) error {
-	lockInfo := fmt.Sprintf("PID: %d\nTimestamp: %s\n", pid, time.Now().Format(time.RFC3339))
-	_, err := lockFile.WriteString(lockInfo)
-	return err
 }
 
 // Release releases the file lock by closing and removing the lock file.
 // This is a no-op if the lock is already released.
-func (fl *FileLock) Release() error {
+func (fl *FileLock) Release() {
 	if fl.file == nil {
-		return nil
+		return
 	}
 
 	// Close the file first
@@ -164,19 +164,49 @@ func (fl *FileLock) Release() error {
 	fl.file = nil
 
 	if err != nil {
-		return fmt.Errorf("failed to close lock file %s: %w", fl.path, err)
+		fl.logger.Errorf("failed to close lock file %s: %w", fl.path, err)
+		return
 	}
 
 	// Remove the lock file
 	err = os.Remove(fl.path)
 	if err != nil {
-		return fmt.Errorf("failed to remove lock file %s: %w", fl.path, err)
+		fl.logger.Errorf("failed to remove lock file %s: %w", fl.path, err)
+		return
 	}
-
-	return nil
 }
 
 // Path returns the path of the lock file
 func (fl *FileLock) Path() string {
 	return fl.path
+}
+
+// TODO unit test this function
+
+// Create a lock on multiple directories. Returns a function that can be used to release all locks.
+func LockDirectories(
+	logger logging.Logger,
+	directories []string,
+	lockFileName string,
+	fsync bool) (func(), error) {
+
+	locks := make([]*FileLock, 0, len(directories))
+	for _, dir := range directories {
+		lockFilePath := path.Join(dir, lockFileName)
+		lock, err := NewFileLock(logger, lockFilePath, fsync)
+		if err != nil {
+			// Release all previously acquired locks before returning an error
+			for _, l := range locks {
+				l.Release()
+			}
+			return nil, fmt.Errorf("failed to acquire lock on directory %s: %v", dir, err)
+		}
+		locks = append(locks, lock)
+	}
+
+	return func() {
+		for _, lock := range locks {
+			lock.Release()
+		}
+	}, nil
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
@@ -212,7 +213,7 @@ func TestDeadProcessSimulation(t *testing.T) {
 		lockFile, err := os.Create(lockFilePath)
 		require.NoError(t, err, "Failed to create lock file for simulated dead process at %s", lockFilePath)
 
-		err = util.WriteLockFile(lockFile, pid)
+		err = WriteLockFile(lockFile, pid)
 		require.NoError(t, err, "Failed to write lock file for simulated dead process at %s", lockFilePath)
 	}
 
@@ -240,4 +241,11 @@ func TestDeadProcessSimulation(t *testing.T) {
 
 	err = db.Destroy()
 	require.NoError(t, err, "Failed to destroy the database after testing locking")
+}
+
+// WriteLockFile writes the current process ID and timestamp to the lock file.
+func WriteLockFile(lockFile *os.File, pid int) error {
+	lockInfo := fmt.Sprintf("PID: %d\nTimestamp: %s\n", pid, time.Now().Format(time.RFC3339))
+	_, err := lockFile.WriteString(lockInfo)
+	return err
 }

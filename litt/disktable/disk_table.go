@@ -253,7 +253,6 @@ func NewDiskTable(
 		// Initialize snapshot files if snapshotting is enabled.
 		upperBoundSnapshotFile, err = table.repairSnapshot(
 			config.SnapshotDirectory,
-			upperBoundSnapshotFile,
 			lowestSegmentIndex,
 			highestSegmentIndex,
 			segments)
@@ -324,7 +323,6 @@ func (d *DiskTable) Size() uint64 {
 // been rebased (which breaks symlinks) or manually modified (e.g. by the LittDB cli).
 func (d *DiskTable) repairSnapshot(
 	symlinkDirectory string,
-	upperBoundSnapshotFile *BoundaryFile,
 	lowestSegmentIndex uint32,
 	highestSegmentIndex uint32,
 	segments map[uint32]*segment.Segment) (*BoundaryFile, error) {
@@ -341,20 +339,18 @@ func (d *DiskTable) repairSnapshot(
 		}
 	}
 
-	upperBoundSnapshotFile, err = LoadBoundaryFile(false, symlinkTableDirectory)
+	upperBoundSnapshotFile, err := LoadBoundaryFile(false, symlinkTableDirectory)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load snapshot boundary file: %w", err)
 	}
 
 	// Prevent other processes from messing with the symlink table directory while we are working on it.
 	lockPath := path.Join(symlinkTableDirectory, util.LockfileName)
-	lock, err := util.NewFileLock(lockPath, false)
+	lock, err := util.NewFileLock(d.logger, lockPath, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire lock on symlink table directory: %w", err)
 	}
-	defer func() {
-		_ = lock.Release()
-	}()
+	defer lock.Release()
 
 	symlinkSegmentsDirectory := path.Join(symlinkTableDirectory, segment.SegmentDirectory)
 	exists, err = util.Exists(symlinkSegmentsDirectory)

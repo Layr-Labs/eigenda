@@ -6,13 +6,21 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strings"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/util"
+	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/urfave/cli/v2"
 )
 
 func lsCommand(ctx *cli.Context) error {
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	if err != nil {
+		return fmt.Errorf("failed to create logger: %v", err)
+	}
+
 	sources := ctx.StringSlice("src")
 	if len(sources) == 0 {
 		return fmt.Errorf("no sources provided")
@@ -25,24 +33,28 @@ func lsCommand(ctx *cli.Context) error {
 		}
 	}
 
-	tables, err := lsPaths(sources, true)
+	tables, err := lsPaths(logger, sources, true)
 	if err != nil {
 		return fmt.Errorf("failed to list tables in paths %v: %v", sources, err)
 	}
 
+	sb := &strings.Builder{}
 	for _, table := range tables {
-		fmt.Println(table)
+		sb.WriteString(table)
+		sb.WriteString("\n")
 	}
+
+	logger.Info("Tables found:\n%s", sb.String())
 
 	return nil
 }
 
 // Similar to ls, but searches for tables in multiple paths.
-func lsPaths(rootPaths []string, fsync bool) ([]string, error) {
+func lsPaths(logger logging.Logger, rootPaths []string, fsync bool) ([]string, error) {
 	tableSet := make(map[string]struct{})
 
 	for _, rootPath := range rootPaths {
-		tables, err := ls(rootPath, fsync)
+		tables, err := ls(logger, rootPath, fsync)
 		if err != nil {
 			return nil, fmt.Errorf("error finding tables: %v", err)
 		}
@@ -63,17 +75,15 @@ func lsPaths(rootPaths []string, fsync bool) ([]string, error) {
 
 // Returns a list of LittDB tables at the specified LittDB path. Tables are alphabetically sorted by their names.
 // Returns an error if the path does not exist or if no tables are found.
-func ls(rootPath string, fsync bool) ([]string, error) {
+func ls(logger logging.Logger, rootPath string, fsync bool) ([]string, error) {
 
 	// Forbid touching tables in active use.
 	lockPath := path.Join(rootPath, util.LockfileName)
-	lock, err := util.NewFileLock(lockPath, fsync)
+	lock, err := util.NewFileLock(logger, lockPath, fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire lock on %s: %v", rootPath, err)
 	}
-	defer func() {
-		_ = lock.Release()
-	}()
+	defer lock.Release()
 
 	// LittDB has one directory under the root directory per table, with the name
 	// of the table being the name of the directory.

@@ -5,6 +5,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
@@ -13,6 +14,9 @@ import (
 
 func TestLs(t *testing.T) {
 	t.Parallel()
+
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
 
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
@@ -87,18 +91,18 @@ func TestLs(t *testing.T) {
 
 	// We should not be able to call ls on the core directories while the table holds a lock.
 	for _, root := range roots {
-		_, err = ls(root, false)
+		_, err = ls(logger, root, false)
 		require.Error(t, err)
 	}
-	_, err = lsPaths(roots, false)
+	_, err = lsPaths(logger, roots, false)
 	require.Error(t, err)
 
 	// Even when the DB is running, it should always be possible to ls the snapshot directory.
-	lsResult, err := ls(snapshotDir, false)
+	lsResult, err := ls(logger, snapshotDir, false)
 	require.NoError(t, err)
 	require.Equal(t, tableNames, lsResult)
 
-	lsResult, err = lsPaths([]string{snapshotDir}, false)
+	lsResult, err = lsPaths(logger, []string{snapshotDir}, false)
 	require.NoError(t, err)
 	require.Equal(t, tableNames, lsResult)
 
@@ -108,17 +112,17 @@ func TestLs(t *testing.T) {
 	// Now that the DB is closed, we should be able to ls it. We should find all tables defined regardless of which
 	// root directory we peer into.
 	for _, root := range roots {
-		lsResult, err = ls(root, false)
+		lsResult, err = ls(logger, root, false)
 		require.NoError(t, err)
 		require.Equal(t, tableNames, lsResult)
 	}
 
-	lsResult, err = lsPaths(roots, true)
+	lsResult, err = lsPaths(logger, roots, true)
 	require.NoError(t, err)
 	require.Equal(t, tableNames, lsResult)
 
 	// Data should still be present in the snapshot directory.
-	lsResult, err = ls(snapshotDir, false)
+	lsResult, err = ls(logger, snapshotDir, false)
 	require.NoError(t, err)
 	require.Equal(t, tableNames, lsResult)
 }

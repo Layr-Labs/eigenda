@@ -9,11 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Layr-Labs/eigenda/common"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewFileLock(t *testing.T) {
 	tempDir := t.TempDir()
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
 
 	tests := []struct {
 		name        string
@@ -88,7 +91,7 @@ func TestNewFileLock(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			lockPath := tc.setup()
 
-			lock, err := NewFileLock(lockPath, true)
+			lock, err := NewFileLock(logger, lockPath, true)
 
 			if tc.expectError {
 				require.Error(t, err)
@@ -119,8 +122,7 @@ func TestNewFileLock(t *testing.T) {
 				require.Contains(t, contentStr, "Timestamp:")
 
 				// Clean up
-				err = lock.Release()
-				require.NoError(t, err)
+				lock.Release()
 			}
 		})
 	}
@@ -130,8 +132,11 @@ func TestFileLockRelease(t *testing.T) {
 	tempDir := t.TempDir()
 	lockPath := filepath.Join(tempDir, "test.lock")
 
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
 	// Create a lock
-	lock, err := NewFileLock(lockPath, true)
+	lock, err := NewFileLock(logger, lockPath, true)
 	require.NoError(t, err)
 	require.NotNil(t, lock)
 
@@ -140,28 +145,26 @@ func TestFileLockRelease(t *testing.T) {
 	require.NoError(t, err)
 
 	// Release the lock
-	err = lock.Release()
-	require.NoError(t, err)
+	lock.Release()
 
 	// Verify lock file was removed
 	_, err = os.Stat(lockPath)
 	require.True(t, os.IsNotExist(err))
 
 	// Try to release again (should not)
-	err = lock.Release()
-	require.NoError(t, err)
+	lock.Release()
 }
 
 func TestFileLockPath(t *testing.T) {
 	tempDir := t.TempDir()
 	lockPath := filepath.Join(tempDir, "test.lock")
 
-	lock, err := NewFileLock(lockPath, true)
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
-	defer func() {
-		err = lock.Release()
-		require.NoError(t, err)
-	}()
+
+	lock, err := NewFileLock(logger, lockPath, true)
+	require.NoError(t, err)
+	defer lock.Release()
 
 	// Path should be sanitized (absolute)
 	returnedPath := lock.Path()
@@ -180,13 +183,16 @@ func TestFileLockConcurrency(t *testing.T) {
 	var wg sync.WaitGroup
 	results := make(chan bool, numGoroutines)
 
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
 	// Launch multiple goroutines trying to acquire the same lock
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
 
-			lock, err := NewFileLock(lockPath, true)
+			lock, err := NewFileLock(logger, lockPath, true)
 			if err != nil {
 				results <- false
 				return
@@ -195,8 +201,7 @@ func TestFileLockConcurrency(t *testing.T) {
 			// Hold the lock for a short time
 			time.Sleep(duration)
 
-			err = lock.Release()
-			require.NoError(t, err)
+			lock.Release()
 
 			results <- true
 		}(i)
@@ -220,13 +225,16 @@ func TestFileLockConcurrency(t *testing.T) {
 func TestFileLockCleanupOnFailure(t *testing.T) {
 	tempDir := t.TempDir()
 
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
 	// Test that failed lock creation cleans up partial files
 	t.Run("sync failure cleanup", func(t *testing.T) {
 		// This is harder to test directly since sync failures are rare
 		// We'll test the error path by creating a lock and verifying it's cleaned up
 		lockPath := filepath.Join(tempDir, "cleanup-test.lock")
 
-		lock, err := NewFileLock(lockPath, true)
+		lock, err := NewFileLock(logger, lockPath, true)
 		require.NoError(t, err)
 		require.NotNil(t, lock)
 
@@ -235,8 +243,7 @@ func TestFileLockCleanupOnFailure(t *testing.T) {
 		require.NoError(t, err)
 
 		// Clean up
-		err = lock.Release()
-		require.NoError(t, err)
+		lock.Release()
 
 		// Verify cleanup
 		_, err = os.Stat(lockPath)
@@ -247,9 +254,12 @@ func TestFileLockCleanupOnFailure(t *testing.T) {
 func TestFileLockEdgeCases(t *testing.T) {
 	tempDir := t.TempDir()
 
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
 	t.Run("release nil lock", func(t *testing.T) {
 		lock := &FileLock{}
-		err := lock.Release()
+		lock.Release()
 		require.NoError(t, err)
 	})
 
@@ -257,12 +267,9 @@ func TestFileLockEdgeCases(t *testing.T) {
 		// Test that paths are properly sanitized
 		relativePath := "test.lock"
 
-		lock, err := NewFileLock(relativePath, true)
+		lock, err := NewFileLock(logger, relativePath, true)
 		require.NoError(t, err)
-		defer func() {
-			err = lock.Release()
-			require.NoError(t, err)
-		}()
+		defer lock.Release()
 
 		// Path should be absolute
 		lockPath := lock.Path()
@@ -273,16 +280,14 @@ func TestFileLockEdgeCases(t *testing.T) {
 	t.Run("double release protection", func(t *testing.T) {
 		lockPath := filepath.Join(tempDir, "double-release.lock")
 
-		lock, err := NewFileLock(lockPath, true)
+		lock, err := NewFileLock(logger, lockPath, true)
 		require.NoError(t, err)
 
 		// First release should succeed
-		err = lock.Release()
-		require.NoError(t, err)
+		lock.Release()
 
 		// Second release should fail gracefully
-		err = lock.Release()
-		require.NoError(t, err)
+		lock.Release()
 	})
 }
 
@@ -290,12 +295,15 @@ func TestFileLockDebugInfo(t *testing.T) {
 	tempDir := t.TempDir()
 	lockPath := filepath.Join(tempDir, "debug-test.lock")
 
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
 	// Create first lock
-	lock1, err := NewFileLock(lockPath, true)
+	lock1, err := NewFileLock(logger, lockPath, true)
 	require.NoError(t, err)
 
 	// Try to create second lock - should fail with debug info
-	lock2, err := NewFileLock(lockPath, true)
+	lock2, err := NewFileLock(logger, lockPath, true)
 	require.Error(t, err)
 	require.Nil(t, lock2)
 
@@ -306,20 +314,19 @@ func TestFileLockDebugInfo(t *testing.T) {
 	require.Contains(t, err.Error(), "Timestamp:")
 
 	// Clean up
-	err = lock1.Release()
-	require.NoError(t, err)
+	lock1.Release()
 }
 
 func TestFileLockContentsFormat(t *testing.T) {
 	tempDir := t.TempDir()
 	lockPath := filepath.Join(tempDir, "content-test.lock")
 
-	lock, err := NewFileLock(lockPath, true)
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
 	require.NoError(t, err)
-	defer func() {
-		err = lock.Release()
-		require.NoError(t, err)
-	}()
+
+	lock, err := NewFileLock(logger, lockPath, true)
+	require.NoError(t, err)
+	defer lock.Release()
 
 	// Read and verify lock file contents
 	content, err := os.ReadFile(lockPath)
@@ -449,10 +456,13 @@ func TestStaleLockRecovery(t *testing.T) {
 	tempDir := t.TempDir()
 	lockPath := filepath.Join(tempDir, "stale-recovery.lock")
 
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
 	// Create a stale lock file with a definitely dead PID
 	stalePID := 999999
 	staleContent := fmt.Sprintf("PID: %d\nTimestamp: 2023-01-01T00:00:00Z\n", stalePID)
-	err := os.WriteFile(lockPath, []byte(staleContent), 0644)
+	err = os.WriteFile(lockPath, []byte(staleContent), 0644)
 	require.NoError(t, err)
 
 	// Verify the lock file exists
@@ -460,7 +470,7 @@ func TestStaleLockRecovery(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try to acquire the lock - should succeed by removing stale lock
-	lock, err := NewFileLock(lockPath, true)
+	lock, err := NewFileLock(logger, lockPath, true)
 	require.NoError(t, err)
 	require.NotNil(t, lock)
 
@@ -470,6 +480,5 @@ func TestStaleLockRecovery(t *testing.T) {
 	require.Contains(t, string(content), fmt.Sprintf("PID: %d", os.Getpid()))
 
 	// Clean up
-	err = lock.Release()
-	require.NoError(t, err)
+	lock.Release()
 }
