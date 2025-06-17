@@ -305,16 +305,10 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		return nil, api.NewErrorInternal("failed to get payment parameters")
 	}
 
-	paymentConfig, err := params.GetQuorumPaymentConfig(core.QuorumID(0))
+	paymentConfig, protocolConfig, err := params.GetQuorumConfigs(core.QuorumID(0))
 	if err != nil {
 		s.logger.Error("failed to get payment config for quorum 0", "err", err)
 		return nil, api.NewErrorInternal("failed to get payment configuration")
-	}
-
-	protocolConfig, err := params.GetQuorumProtocolConfig(core.QuorumID(0))
-	if err != nil {
-		s.logger.Error("failed to get protocol config for quorum 0", "err", err)
-		return nil, api.NewErrorInternal("failed to get protocol configuration")
 	}
 
 	globalSymbolsPerSecond := paymentConfig.OnDemandSymbolsPerSecond
@@ -329,7 +323,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// TODO(hopeyen): remove this in a subsequent PR. The logic here is complicated and only temporary
 	periods := make([]uint64, len(quorumIds))
 	for i, quorumId := range quorumIds {
-		quorumProtocolConfig, err := params.GetQuorumProtocolConfig(quorumId)
+		_, quorumProtocolConfig, err := params.GetQuorumConfigs(quorumId)
 		if err != nil {
 			s.logger.Error("failed to get protocol config for quorum", "quorumId", quorumId, "err", err)
 			return nil, api.NewErrorInternal("failed to get quorum protocol configuration")

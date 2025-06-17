@@ -83,12 +83,13 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 		return 0, fmt.Errorf("failed to get payment global params: %w", err)
 	}
 
-	protocolConfig, err := params.GetQuorumProtocolConfig(OnDemandQuorumID)
+	// TODO(hopeyen): symbols calculations are moved to be quorum-specific in the next PR
+	_, protocolConfig, err := params.GetQuorumConfigs(OnDemandQuorumID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get protocol config for on-demand quorum: %w", err)
 	}
-
 	symbolsCharged := SymbolsCharged(numSymbols, protocolConfig.MinNumSymbols)
+
 	// Validate against the payment method
 	if !IsOnDemandPayment(&header) {
 		reservations, err := m.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, header.AccountID, quorumNumbers)
@@ -122,7 +123,7 @@ func (m *Meterer) ServeReservationRequest(ctx context.Context, params *PaymentVa
 	// Gather quorums the user had an reservations on and relevant quorum configurations
 	for quorumID := range reservations {
 		quorumIDs = append(quorumIDs, quorumID)
-		protocolConfig, err := params.GetQuorumProtocolConfig(quorumID)
+		_, protocolConfig, err := params.GetQuorumConfigs(quorumID)
 		if err != nil {
 			return fmt.Errorf("failed to get protocol config for quorum %d: %w", quorumID, err)
 		}
@@ -230,7 +231,7 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, params *PaymentVault
 		return fmt.Errorf("request claims a cumulative payment greater than the on-chain deposit")
 	}
 
-	paymentConfig, err := params.GetQuorumPaymentConfig(OnDemandQuorumID)
+	paymentConfig, _, err := params.GetQuorumConfigs(OnDemandQuorumID)
 	if err != nil {
 		return fmt.Errorf("failed to get payment config for on-demand quorum: %w", err)
 	}
@@ -258,14 +259,9 @@ func (m *Meterer) ServeOnDemandRequest(ctx context.Context, params *PaymentVault
 
 // IncrementGlobalBinUsage increments the bin usage atomically and checks for overflow
 func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, params *PaymentVaultParams, symbolsCharged uint64, receivedAt time.Time) error {
-	paymentConfig, err := params.GetQuorumPaymentConfig(OnDemandQuorumID)
+	paymentConfig, protocolConfig, err := params.GetQuorumConfigs(OnDemandQuorumID)
 	if err != nil {
-		return fmt.Errorf("failed to get payment config for on-demand quorum: %w", err)
-	}
-
-	protocolConfig, err := params.GetQuorumProtocolConfig(OnDemandQuorumID)
-	if err != nil {
-		return fmt.Errorf("failed to get protocol config for on-demand quorum: %w", err)
+		return fmt.Errorf("failed to get quorum configs for on-demand quorum: %w", err)
 	}
 
 	globalPeriod := GetReservationPeriod(receivedAt.Unix(), protocolConfig.OnDemandRateLimitWindow)
@@ -274,7 +270,7 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, params *PaymentVa
 	if err != nil {
 		return fmt.Errorf("failed to increment global bin usage: %w", err)
 	}
-	if newUsage > paymentConfig.OnDemandSymbolsPerSecond*protocolConfig.OnDemandRateLimitWindow {
+	if newUsage > GetBinLimit(paymentConfig.OnDemandSymbolsPerSecond, protocolConfig.OnDemandRateLimitWindow) {
 		return fmt.Errorf("global bin usage overflows")
 	}
 	return nil
@@ -283,7 +279,12 @@ func (m *Meterer) IncrementGlobalBinUsage(ctx context.Context, params *PaymentVa
 // GetReservationBinLimit returns the bin limit for a given reservation
 // Note: This is called per-quorum since reservation is for a single quorum.
 func GetReservationBinLimit(reservation *core.ReservedPayment, reservationWindow uint64) uint64 {
-	return reservation.SymbolsPerSecond * reservationWindow
+	return GetBinLimit(reservation.SymbolsPerSecond, reservationWindow)
+}
+
+// GetBinLimit returns the bin limit given the bin interval and the symbols per second
+func GetBinLimit(symbolsPerSecond uint64, binInterval uint64) uint64 {
+	return symbolsPerSecond * binInterval
 }
 
 // GetReservationPeriodByNanosecondTimestamp returns the current reservation period by finding the nearest lower multiple of the bin interval;

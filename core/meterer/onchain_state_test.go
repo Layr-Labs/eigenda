@@ -2,6 +2,7 @@ package meterer_test
 
 import (
 	"context"
+	"math"
 	"math/big"
 	"testing"
 
@@ -151,25 +152,13 @@ func TestOnchainPaymentState_NilProtection(t *testing.T) {
 				assert.NotNil(t, retrievedParams)
 
 				// Test that missing quorum returns appropriate errors through the PaymentVaultParams methods
-				_, err = retrievedParams.GetQuorumPaymentConfig(meterer.OnDemandQuorumID)
+				_, _, err = retrievedParams.GetQuorumConfigs(meterer.OnDemandQuorumID)
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "payment config not found for quorum")
+				assert.Contains(t, err.Error(), "config not found for quorum")
 
-				_, err = retrievedParams.GetQuorumProtocolConfig(meterer.OnDemandQuorumID)
+				_, _, err = retrievedParams.GetQuorumConfigs(meterer.OnDemandQuorumID)
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "protocol config not found for quorum")
-
-				_, err = retrievedParams.GetMinNumSymbols(meterer.OnDemandQuorumID)
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "protocol config not found for quorum")
-
-				_, err = retrievedParams.GetPricePerSymbol(meterer.OnDemandQuorumID)
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "payment config not found for quorum")
-
-				_, err = retrievedParams.GetReservationWindow(meterer.OnDemandQuorumID)
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "protocol config not found for quorum")
+				assert.Contains(t, err.Error(), "config not found for quorum")
 			},
 		},
 		{
@@ -201,22 +190,13 @@ func TestOnchainPaymentState_NilProtection(t *testing.T) {
 				assert.NotNil(t, retrievedParams)
 
 				// Test payment config access
-				paymentConfig, err := retrievedParams.GetQuorumPaymentConfig(meterer.OnDemandQuorumID)
+				paymentConfig, protocolConfig, err := retrievedParams.GetQuorumConfigs(meterer.OnDemandQuorumID)
 				assert.NoError(t, err)
 				assert.Equal(t, uint64(100), paymentConfig.OnDemandSymbolsPerSecond)
-				// Test protocol config access
-				protocolConfig, err := retrievedParams.GetQuorumProtocolConfig(meterer.OnDemandQuorumID)
-				assert.NoError(t, err)
 				assert.Equal(t, uint64(400), protocolConfig.OnDemandRateLimitWindow)
-				minNumSymbols, err := retrievedParams.GetMinNumSymbols(meterer.OnDemandQuorumID)
-				assert.NoError(t, err)
-				assert.Equal(t, uint64(300), minNumSymbols)
-				pricePerSymbol, err := retrievedParams.GetPricePerSymbol(meterer.OnDemandQuorumID)
-				assert.NoError(t, err)
-				assert.Equal(t, uint64(200), pricePerSymbol)
-				reservationWindow, err := retrievedParams.GetReservationWindow(meterer.OnDemandQuorumID)
-				assert.NoError(t, err)
-				assert.Equal(t, uint64(500), reservationWindow)
+				assert.Equal(t, uint64(300), protocolConfig.MinNumSymbols)
+				assert.Equal(t, uint64(200), paymentConfig.OnDemandPricePerSymbol)
+				assert.Equal(t, uint64(500), protocolConfig.ReservationRateLimitWindow)
 			},
 		},
 		{
@@ -360,7 +340,6 @@ func TestNilAssignmentPanicScenarios(t *testing.T) {
 	}
 }
 
-
 func TestOnchainPaymentState_CacheOperations(t *testing.T) {
 	tests := []struct {
 		name string
@@ -399,17 +378,6 @@ func TestOnchainPaymentState_CacheOperations(t *testing.T) {
 				payment, err := state.GetOnDemandPaymentByAccount(context.Background(), testAccount)
 				assert.NoError(t, err)
 				assert.Equal(t, dummyOnDemandPayment, payment)
-			},
-		},
-		{
-			name: "GetQuorumNumbers_ParamsNotInitialized",
-			test: func(t *testing.T) {
-				state, err := meterer.NewOnchainPaymentStateEmpty(context.Background(), nil, testutils.GetLogger())
-				assert.NoError(t, err)
-
-				_, err = state.GetQuorumNumbers(context.Background())
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "payment vault params not initialized")
 			},
 		},
 	}
@@ -821,6 +789,180 @@ func TestPaymentVaultParamsFromProtobuf(t *testing.T) {
 				for i, expectedQuorum := range tt.expected.OnDemandQuorumNumbers {
 					assert.Equal(t, expectedQuorum, result.OnDemandQuorumNumbers[i])
 				}
+			}
+		})
+	}
+}
+
+func TestPaymentVaultParamsToProtobuf(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       *meterer.PaymentVaultParams
+		expectedErr string
+		validate    func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams)
+	}{
+		{
+			name: "valid complete params",
+			input: &meterer.PaymentVaultParams{
+				QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+					1: {
+						ReservationSymbolsPerSecond: 100,
+						OnDemandSymbolsPerSecond:    200,
+						OnDemandPricePerSymbol:      300,
+					},
+					2: {
+						ReservationSymbolsPerSecond: 400,
+						OnDemandSymbolsPerSecond:    500,
+						OnDemandPricePerSymbol:      600,
+					},
+				},
+				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+					1: {
+						MinNumSymbols:              10,
+						ReservationAdvanceWindow:   20,
+						ReservationRateLimitWindow: 30,
+						OnDemandRateLimitWindow:    40,
+						OnDemandEnabled:            true,
+					},
+					2: {
+						MinNumSymbols:              50,
+						ReservationAdvanceWindow:   60,
+						ReservationRateLimitWindow: 70,
+						OnDemandRateLimitWindow:    80,
+						OnDemandEnabled:            false,
+					},
+				},
+				OnDemandQuorumNumbers: []core.QuorumID{1, 2},
+			},
+			validate: func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams) {
+				assert.Equal(t, 2, len(pbParams.QuorumPaymentConfigs))
+				assert.Equal(t, 2, len(pbParams.QuorumProtocolConfigs))
+				assert.Equal(t, 2, len(pbParams.OnDemandQuorumNumbers))
+
+				// Verify quorum 1
+				assert.Equal(t, uint64(100), pbParams.QuorumPaymentConfigs[1].ReservationSymbolsPerSecond)
+				assert.Equal(t, uint64(200), pbParams.QuorumPaymentConfigs[1].OnDemandSymbolsPerSecond)
+				assert.Equal(t, uint64(300), pbParams.QuorumPaymentConfigs[1].OnDemandPricePerSymbol)
+				assert.Equal(t, uint64(10), pbParams.QuorumProtocolConfigs[1].MinNumSymbols)
+				assert.True(t, pbParams.QuorumProtocolConfigs[1].OnDemandEnabled)
+
+				// Verify quorum 2
+				assert.Equal(t, uint64(400), pbParams.QuorumPaymentConfigs[2].ReservationSymbolsPerSecond)
+				assert.Equal(t, uint64(500), pbParams.QuorumPaymentConfigs[2].OnDemandSymbolsPerSecond)
+				assert.Equal(t, uint64(600), pbParams.QuorumPaymentConfigs[2].OnDemandPricePerSymbol)
+				assert.Equal(t, uint64(50), pbParams.QuorumProtocolConfigs[2].MinNumSymbols)
+				assert.False(t, pbParams.QuorumProtocolConfigs[2].OnDemandEnabled)
+
+				// Verify round-trip conversion
+				convertedCoreParams, err := meterer.PaymentVaultParamsFromProtobuf(pbParams)
+				assert.NoError(t, err)
+				assert.Equal(t, coreParams, convertedCoreParams)
+			},
+		},
+		{
+			name:        "nil params",
+			input:       nil,
+			expectedErr: "payment vault params cannot be nil",
+		},
+		{
+			name: "nil payment configs",
+			input: &meterer.PaymentVaultParams{
+				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+					1: {MinNumSymbols: 10},
+				},
+				OnDemandQuorumNumbers: []core.QuorumID{1},
+			},
+			expectedErr: "payment quorum configs cannot be nil",
+		},
+		{
+			name: "nil protocol configs",
+			input: &meterer.PaymentVaultParams{
+				QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+					1: {ReservationSymbolsPerSecond: 100},
+				},
+				OnDemandQuorumNumbers: []core.QuorumID{1},
+			},
+			expectedErr: "payment quorum protocol configs cannot be nil",
+		},
+		{
+			name: "empty maps",
+			input: &meterer.PaymentVaultParams{
+				QuorumPaymentConfigs:  map[core.QuorumID]*core.PaymentQuorumConfig{},
+				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{},
+				OnDemandQuorumNumbers: []core.QuorumID{},
+			},
+			validate: func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams) {
+				assert.Empty(t, pbParams.QuorumPaymentConfigs)
+				assert.Empty(t, pbParams.QuorumProtocolConfigs)
+				assert.Empty(t, pbParams.OnDemandQuorumNumbers)
+			},
+		},
+		{
+			name: "max uint32 quorum ID",
+			input: &meterer.PaymentVaultParams{
+				QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+					core.QuorumID(255): {ReservationSymbolsPerSecond: 100},
+				},
+				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+					core.QuorumID(255): {MinNumSymbols: 10},
+				},
+				OnDemandQuorumNumbers: []core.QuorumID{core.QuorumID(255)},
+			},
+			validate: func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams) {
+				assert.Equal(t, uint64(100), pbParams.QuorumPaymentConfigs[255].ReservationSymbolsPerSecond)
+				assert.Equal(t, uint64(10), pbParams.QuorumProtocolConfigs[255].MinNumSymbols)
+				assert.Equal(t, uint32(255), pbParams.OnDemandQuorumNumbers[0])
+			},
+		},
+		{
+			name: "max uint64 values",
+			input: &meterer.PaymentVaultParams{
+				QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+					1: {
+						ReservationSymbolsPerSecond: math.MaxUint64,
+						OnDemandSymbolsPerSecond:    math.MaxUint64,
+						OnDemandPricePerSymbol:      math.MaxUint64,
+					},
+				},
+				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+					1: {
+						MinNumSymbols:              math.MaxUint64,
+						ReservationAdvanceWindow:   math.MaxUint64,
+						ReservationRateLimitWindow: math.MaxUint64,
+						OnDemandRateLimitWindow:    math.MaxUint64,
+						OnDemandEnabled:            true,
+					},
+				},
+				OnDemandQuorumNumbers: []core.QuorumID{1},
+			},
+			validate: func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams) {
+				assert.Equal(t, uint64(math.MaxUint64), pbParams.QuorumPaymentConfigs[1].ReservationSymbolsPerSecond)
+				assert.Equal(t, uint64(math.MaxUint64), pbParams.QuorumPaymentConfigs[1].OnDemandSymbolsPerSecond)
+				assert.Equal(t, uint64(math.MaxUint64), pbParams.QuorumPaymentConfigs[1].OnDemandPricePerSymbol)
+				assert.Equal(t, uint64(math.MaxUint64), pbParams.QuorumProtocolConfigs[1].MinNumSymbols)
+				assert.Equal(t, uint64(math.MaxUint64), pbParams.QuorumProtocolConfigs[1].ReservationAdvanceWindow)
+				assert.Equal(t, uint64(math.MaxUint64), pbParams.QuorumProtocolConfigs[1].ReservationRateLimitWindow)
+				assert.Equal(t, uint64(math.MaxUint64), pbParams.QuorumProtocolConfigs[1].OnDemandRateLimitWindow)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test conversion to protobuf
+			pbParams, err := tt.input.PaymentVaultParamsToProtobuf()
+			if tt.expectedErr != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.NotNil(t, pbParams)
+
+			// Run validation if provided
+			if tt.validate != nil {
+				tt.validate(t, pbParams, tt.input)
 			}
 		})
 	}
