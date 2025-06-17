@@ -292,6 +292,8 @@ func (c *disperserClient) DisperseBlobWithProbe(
 
 	reply, err := c.client.DisperseBlob(ctx, request)
 	if err != nil {
+		// TODO: rollback payment for the accountant if the blob fails to disperse
+		// because ondemand request hits global ratelimit.
 		return nil, [32]byte{}, fmt.Errorf("error while calling DisperseBlob: %w", err)
 	}
 
