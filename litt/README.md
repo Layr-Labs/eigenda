@@ -334,8 +334,7 @@ to the database and then turns around and attempts to read that [value](#value) 
 Note that in LittDB, values are never permitted to be mutated. But when values grow older than their [TTL](#ttl),
 the value can be deleted. From a consistency point of view, the garbage collection process is equivalent to an update.
 That is to say, if a thread writes a [value](#value), waits a very long time, then reads that same [value](#value)
-back again, it is not a violation of read-your-writes consistency if the [value](#value) is not present because the
-[garbage collector](#garbage-collection) has deleted it.
+back again, it is not a violation of read-your-writes consistency if the [value](#value) is not present because the garbage collector has deleted it.
 
 An "eventual consistent" database does not necessarily provide read-your-writes consistency. In the author's experience,
 such systems can be very difficult to reason about, and can lead to subtle bugs that are difficult to track down.
