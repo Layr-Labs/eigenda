@@ -2,6 +2,7 @@ package meterer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -113,7 +114,15 @@ func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata,
 }
 
 // serveReservationRequest handles the rate limiting logic for incoming requests
-func (m *Meterer) serveReservationRequest(ctx context.Context, globalParams *PaymentVaultParams, header core.PaymentMetadata, reservations map[core.QuorumID]*core.ReservedPayment, numSymbols uint64, quorumNumbers []uint8, receivedAt time.Time) error {
+func (m *Meterer) serveReservationRequest(
+	ctx context.Context,
+	globalParams *PaymentVaultParams,
+	header core.PaymentMetadata,
+	reservations map[core.QuorumID]*core.ReservedPayment,
+	numSymbols uint64,
+	quorumNumbers []uint8,
+	receivedAt time.Time,
+) error {
 	m.logger.Debug("Recording and validating reservation usage", "header", header, "reservation", reservations)
 	if err := ValidateReservations(reservations, globalParams.QuorumProtocolConfigs, quorumNumbers, header.Timestamp, receivedAt); err != nil {
 		return fmt.Errorf("invalid reservation: %w", err)
@@ -127,7 +136,12 @@ func (m *Meterer) serveReservationRequest(ctx context.Context, globalParams *Pay
 }
 
 // incrementBinUsage increments the bin usage atomically and checks for overflow
-func (m *Meterer) incrementBinUsage(ctx context.Context, header core.PaymentMetadata, reservations map[core.QuorumID]*core.ReservedPayment, globalParams *PaymentVaultParams, numSymbols uint64) error {
+func (m *Meterer) incrementBinUsage(
+	ctx context.Context, header core.PaymentMetadata,
+	reservations map[core.QuorumID]*core.ReservedPayment,
+	globalParams *PaymentVaultParams,
+	numSymbols uint64,
+) error {
 	charges := make(map[core.QuorumID]uint64)
 	quorumNumbers := make([]core.QuorumID, 0, len(reservations))
 	reservationWindows := make(map[core.QuorumID]uint64, len(reservations))
@@ -344,12 +358,22 @@ func ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) error {
 	return nil
 }
 
-// ValidateReservations ensures that the quorums listed in the blobHeader are present within allowedQuorums
-// timestamp is in nanoseconds
-// Note: A reservation that does not utilize all of the allowed quorums will be accepted. However, it
-// will still charge against all of the allowed quorums. A on-demand requests require and only allow
-// the ETH and EIGEN quorums.
-func ValidateReservations(reservations map[core.QuorumID]*core.ReservedPayment, quorumConfigs map[core.QuorumID]*core.PaymentQuorumProtocolConfig, quorumNumbers []uint8, timestamp int64, receivedAt time.Time) error {
+// ValidateReservations ensures that the quorums listed in the blobHeader are present within allowedQuorums.
+//
+// Parameters:
+//   - timestamp: time in nanoseconds
+//
+// Notes:
+//   - Reservations that don't use all allowed quorums are still accepted
+//   - Charges apply to ALL allowed quorums, even if not all are used
+//   - On-demand requests have special requirements: they must use ETH and EIGEN quorums only
+func ValidateReservations(
+	reservations map[core.QuorumID]*core.ReservedPayment,
+	quorumConfigs map[core.QuorumID]*core.PaymentQuorumProtocolConfig,
+	quorumNumbers []uint8,
+	timestamp int64,
+	receivedAt time.Time,
+) error {
 	reservationQuorums := make([]uint8, 0, len(reservations))
 	reservationWindows := make(map[core.QuorumID]uint64, len(reservations))
 	requestReservationPeriods := make(map[core.QuorumID]uint64, len(reservations))
@@ -371,7 +395,7 @@ func ValidateReservations(reservations map[core.QuorumID]*core.ReservedPayment, 
 	for _, quorumID := range quorumNumbers {
 		reservation := reservations[core.QuorumID(quorumID)]
 		if !reservation.IsActiveByNanosecond(timestamp) {
-			return fmt.Errorf("reservation not active")
+			return errors.New("reservation not active")
 		}
 		if !ValidateReservationPeriod(reservation, requestReservationPeriods[quorumID], reservationWindows[quorumID], receivedAt) {
 			return fmt.Errorf("invalid reservation period for reservation on quorum %d", quorumID)
