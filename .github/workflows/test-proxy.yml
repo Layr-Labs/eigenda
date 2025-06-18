@@ -1,4 +1,4 @@
-name: Proxy CI # this name appears in the badge on the README
+name: test-proxy # this name appears in the badge on the README
 
 on:
   push:
@@ -54,6 +54,7 @@ jobs:
           working_directory: api/proxy
       - name: Run flag test
         run: ${{ github.workspace }}/api/proxy/scripts/test-proxy-startup-with-env-vars.sh ${{ matrix.env-file }}
+        working-directory: api/proxy
 
   # This ensures that std output generated when running binary with `--help` is reflected in docs/help_out.txt
   help-output-check:
