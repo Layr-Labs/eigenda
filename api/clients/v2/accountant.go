@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	gethcommon "github.com/ethereum/go-ethereum/common"
@@ -17,18 +16,21 @@ type Accountant struct {
 	// on-chain states
 	accountID    gethcommon.Address
 	reservations map[core.QuorumID]*core.ReservedPayment
-	onDemand     *core.OnDemandPayment
+	// OnDemand initially only enabled on quorum. Accountant must be updated to be quorum specific
+	// after the protocol decides to support onDemand on custom quorums and decentralized ratelimiting.
+	onDemand *core.OnDemandPayment
 
 	paymentVaultParams *meterer.PaymentVaultParams
 
 	// local accounting
-	// contains 3 bins; circular wrapping of indices
+	// contains a fixed meterer.MinNumBins bins per quorum
 	periodRecords     meterer.QuorumPeriodRecords
 	cumulativePayment *big.Int
 
-	// locks for concurrent access to period records and on-demand payment
+	// locks for concurrent access to period records
 	periodRecordsLock sync.Mutex
-	onDemandLock      sync.Mutex
+	// lock for concurrent access to on-demand payment
+	onDemandLock sync.Mutex
 }
 
 // NewAccountant initializes an accountant with the given account ID. The accountant must call SetPaymentState to populate the state.
@@ -53,35 +55,32 @@ func NewAccountant(accountID gethcommon.Address) *Accountant {
 }
 
 // ReservationUsage attempts to use the reservation for the requested quorums; if any quorum fails to use the reservation, the entire operation is rolled back.
-func (a *Accountant) reservationUsage(numSymbols uint64, quorumNumbers []core.QuorumID, timestamp int64) error {
-	// The two timestamps are the same for the accountant client for validating the reservation period; the second timestamp is the received at time for the server
-	if err := meterer.ValidateReservations(a.reservations, a.paymentVaultParams.QuorumProtocolConfigs, quorumNumbers, timestamp, time.Unix(0, timestamp)); err != nil {
+func (a *Accountant) reservationUsage(numSymbols uint64, quorumNumbers []core.QuorumID, timestampNs int64) error {
+	if err := meterer.ValidateReservations(a.reservations, a.paymentVaultParams.QuorumProtocolConfigs, quorumNumbers, timestampNs, time.Now()); err != nil {
 		return err
 	}
 
 	a.periodRecordsLock.Lock()
 	defer a.periodRecordsLock.Unlock()
-	// deep copy of periodRecords for rollback in case of errors
-	originalPeriodRecords := a.periodRecords.DeepCopy()
+
+	periodRecordsCopy := a.periodRecords.DeepCopy()
 
 	for _, quorumNumber := range quorumNumbers {
 		reservation, exists := a.reservations[quorumNumber]
 		if !exists {
 			// this case should never happen because ValidateReservations should have already checked this; handle it just in case
-			a.periodRecords = originalPeriodRecords
 			return fmt.Errorf("reservation not found for quorum %d", quorumNumber)
 		}
 		_, protocolConfig, err := a.paymentVaultParams.GetQuorumConfigs(quorumNumber)
 		if err != nil {
-			a.periodRecords = originalPeriodRecords
 			return err
 		}
-		if err := a.periodRecords.UpdateUsage(quorumNumber, timestamp, numSymbols, reservation, protocolConfig); err != nil {
-			a.periodRecords = originalPeriodRecords
+		if err := periodRecordsCopy.UpdateUsage(quorumNumber, timestampNs, numSymbols, reservation, protocolConfig); err != nil {
 			return err
 		}
 	}
 
+	a.periodRecords = periodRecordsCopy
 	return nil
 }
 
