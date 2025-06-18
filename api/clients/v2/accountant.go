@@ -153,51 +153,50 @@ func (a *Accountant) AccountBlob(
 	return pm, nil
 }
 
-// SetPaymentState sets the accountant's state from the disperser's response
-// We require disperser to return a valid set of global parameters, but optional
-// account level on/off-chain state. If on-chain fields are not present, we use
-// dummy values that disable accountant from using the corresponding payment method.
-// If off-chain fields are not present, we assume the account has no payment history
-// and set accountant state to use initial values.
-func (a *Accountant) SetPaymentState(paymentState *disperser_rpc.GetPaymentStateForAllQuorumsReply) error {
-	if paymentState == nil {
-		return fmt.Errorf("payment state cannot be nil")
+// SetPaymentState sets the accountant's state, requiring valid payment vault parameters, but
+// optional account level on/off-chain state. If on-chain fields are not present, we use dummy
+// values that disable accountant from using the corresponding payment method. If off-chain
+// fields are not present, we assume the account has no payment history and set accountant state
+// to use initial values.
+func (a *Accountant) SetPaymentState(
+	paymentVaultParams *meterer.PaymentVaultParams,
+	reservations map[core.QuorumID]*core.ReservedPayment,
+	cumulativePayment *big.Int,
+	onchainCumulativePayment *big.Int,
+	periodRecords meterer.QuorumPeriodRecords,
+) error {
+	if paymentVaultParams == nil {
+		return fmt.Errorf("payment vault params cannot be nil")
 	}
-	paymentVaultParams, err := meterer.PaymentVaultParamsFromProtobuf(paymentState.GetPaymentVaultParams())
-	if err != nil {
-		return err
-	}
+
 	a.paymentVaultParams = paymentVaultParams
 
-	if paymentState.GetOnchainCumulativePayment() == nil {
+	if onchainCumulativePayment == nil {
 		a.onDemand = &core.OnDemandPayment{
 			CumulativePayment: big.NewInt(0),
 		}
 	} else {
 		a.onDemand = &core.OnDemandPayment{
-			CumulativePayment: new(big.Int).SetBytes(paymentState.GetOnchainCumulativePayment()),
+			CumulativePayment: new(big.Int).Set(onchainCumulativePayment),
 		}
 	}
 
-	if paymentState.GetCumulativePayment() == nil {
+	if cumulativePayment == nil {
 		a.cumulativePayment = big.NewInt(0)
 	} else {
-		a.cumulativePayment = new(big.Int).SetBytes(paymentState.GetCumulativePayment())
+		a.cumulativePayment = new(big.Int).Set(cumulativePayment)
 	}
 
-	if paymentState.GetReservations() == nil {
+	if reservations == nil {
 		a.reservations = make(map[core.QuorumID]*core.ReservedPayment)
+		a.periodRecords = make(meterer.QuorumPeriodRecords)
 	} else {
-		a.reservations = make(map[core.QuorumID]*core.ReservedPayment)
-		for quorumNumber, reservation := range paymentState.GetReservations() {
-			quorumID := core.QuorumID(quorumNumber)
-			a.reservations[quorumID] = &core.ReservedPayment{
-				SymbolsPerSecond: reservation.GetSymbolsPerSecond(),
-				StartTimestamp:   uint64(reservation.GetStartTimestamp()),
-				EndTimestamp:     uint64(reservation.GetEndTimestamp()),
-			}
+		a.reservations = reservations
+		if periodRecords == nil {
+			a.periodRecords = make(meterer.QuorumPeriodRecords)
+		} else {
+			a.periodRecords = periodRecords
 		}
-		a.periodRecords = meterer.FromProtoRecords(paymentState.GetPeriodRecords())
 	}
 
 	return nil

@@ -388,7 +388,7 @@ func TestOnchainPaymentState_CacheOperations(t *testing.T) {
 	}
 }
 
-func TestPaymentVaultParamsConversion(t *testing.T) {
+func TestConversionPaymentVaultParams(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       *meterer.PaymentVaultParams
@@ -562,7 +562,7 @@ func TestPaymentVaultParamsConversion(t *testing.T) {
 	}
 }
 
-func TestPaymentVaultParamsFromProtobuf(t *testing.T) {
+func TestConversionPaymentVaultParamsFromProtobuf(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       *disperser_rpc.PaymentVaultParams
@@ -629,7 +629,7 @@ func TestPaymentVaultParamsFromProtobuf(t *testing.T) {
 	}
 }
 
-func TestPaymentVaultParamsToProtobuf(t *testing.T) {
+func TestConversionPaymentVaultParamsToProtobuf(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       *meterer.PaymentVaultParams
@@ -798,6 +798,271 @@ func TestPaymentVaultParamsToProtobuf(t *testing.T) {
 			// Run validation if provided
 			if tt.validate != nil {
 				tt.validate(t, pbParams, tt.input)
+			}
+		})
+	}
+}
+
+func TestConversionReservationsFromProtobuf(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    map[uint32]*disperser_rpc.QuorumReservation
+		expected map[core.QuorumID]*core.ReservedPayment
+	}{
+		{
+			name:     "nil input",
+			input:    nil,
+			expected: nil,
+		},
+		{
+			name:     "empty map",
+			input:    map[uint32]*disperser_rpc.QuorumReservation{},
+			expected: map[core.QuorumID]*core.ReservedPayment{},
+		},
+		{
+			name: "single reservation",
+			input: map[uint32]*disperser_rpc.QuorumReservation{
+				0: {
+					SymbolsPerSecond: 100,
+					StartTimestamp:   1000,
+					EndTimestamp:     2000,
+				},
+			},
+			expected: map[core.QuorumID]*core.ReservedPayment{
+				0: {
+					SymbolsPerSecond: 100,
+					StartTimestamp:   1000,
+					EndTimestamp:     2000,
+				},
+			},
+		},
+		{
+			name: "multiple reservations with max values",
+			input: map[uint32]*disperser_rpc.QuorumReservation{
+				0: {
+					SymbolsPerSecond: 100,
+					StartTimestamp:   1000,
+					EndTimestamp:     2000,
+				},
+				255: {
+					SymbolsPerSecond: math.MaxUint64,
+					StartTimestamp:   math.MaxUint32,
+					EndTimestamp:     math.MaxUint32,
+				},
+			},
+			expected: map[core.QuorumID]*core.ReservedPayment{
+				0: {
+					SymbolsPerSecond: 100,
+					StartTimestamp:   1000,
+					EndTimestamp:     2000,
+				},
+				255: {
+					SymbolsPerSecond: math.MaxUint64,
+					StartTimestamp:   math.MaxUint32,
+					EndTimestamp:     math.MaxUint32,
+				},
+			},
+		},
+		{
+			name: "reservation with nil entry",
+			input: map[uint32]*disperser_rpc.QuorumReservation{
+				0: {
+					SymbolsPerSecond: 100,
+					StartTimestamp:   1000,
+					EndTimestamp:     2000,
+				},
+				1: nil, // This should be skipped
+			},
+			expected: map[core.QuorumID]*core.ReservedPayment{
+				0: {
+					SymbolsPerSecond: 100,
+					StartTimestamp:   1000,
+					EndTimestamp:     2000,
+				},
+			},
+		},
+		{
+			name: "zero values",
+			input: map[uint32]*disperser_rpc.QuorumReservation{
+				0: {
+					SymbolsPerSecond: 0,
+					StartTimestamp:   0,
+					EndTimestamp:     0,
+				},
+			},
+			expected: map[core.QuorumID]*core.ReservedPayment{
+				0: {
+					SymbolsPerSecond: 0,
+					StartTimestamp:   0,
+					EndTimestamp:     0,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := meterer.ReservationsFromProtobuf(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestConversionCumulativePaymentFromProtobuf(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected *big.Int
+	}{
+		{
+			name:     "nil input",
+			input:    nil,
+			expected: nil,
+		},
+		{
+			name:     "empty bytes",
+			input:    []byte{},
+			expected: big.NewInt(0),
+		},
+		{
+			name:     "small positive value",
+			input:    big.NewInt(123).Bytes(),
+			expected: big.NewInt(123),
+		},
+		{
+			name:     "large positive value",
+			input:    new(big.Int).SetUint64(math.MaxUint64).Bytes(),
+			expected: new(big.Int).SetUint64(math.MaxUint64),
+		},
+		{
+			name: "very large value",
+			input: func() []byte {
+				val, _ := new(big.Int).SetString("123456789012345678901234567890", 10)
+				return val.Bytes()
+			}(),
+			expected: func() *big.Int {
+				val, _ := new(big.Int).SetString("123456789012345678901234567890", 10)
+				return val
+			}(),
+		},
+		{
+			name:     "multi-byte value",
+			input:    []byte{0x01, 0x00, 0x00},
+			expected: big.NewInt(65536), // 2^16
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := meterer.CumulativePaymentFromProtobuf(tt.input)
+			if tt.expected == nil {
+				assert.Nil(t, result)
+			} else {
+				require.NotNil(t, result)
+				assert.Equal(t, 0, tt.expected.Cmp(result), "expected %s, got %s", tt.expected.String(), result.String())
+			}
+		})
+	}
+}
+
+func TestConversionPaymentStateFromProtobuf(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       *disperser_rpc.GetPaymentStateForAllQuorumsReply
+		expectedErr string
+		validate    func(t *testing.T, vaultParams *meterer.PaymentVaultParams, reservations map[core.QuorumID]*core.ReservedPayment, cumulative, onchainCumulative *big.Int, periodRecords meterer.QuorumPeriodRecords)
+	}{
+		{
+			name:        "nil input",
+			input:       nil,
+			expectedErr: "payment state cannot be nil",
+		},
+		{
+			name: "invalid payment vault params",
+			input: &disperser_rpc.GetPaymentStateForAllQuorumsReply{
+				PaymentVaultParams: nil,
+			},
+			expectedErr: "error converting payment vault params",
+		},
+		{
+			name: "complete valid input",
+			input: &disperser_rpc.GetPaymentStateForAllQuorumsReply{
+				PaymentVaultParams: &disperser_rpc.PaymentVaultParams{
+					QuorumPaymentConfigs: map[uint32]*disperser_rpc.PaymentQuorumConfig{
+						0: {
+							ReservationSymbolsPerSecond: 100,
+							OnDemandSymbolsPerSecond:    200,
+							OnDemandPricePerSymbol:      300,
+						},
+					},
+					QuorumProtocolConfigs: map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig{
+						0: {
+							MinNumSymbols:              10,
+							ReservationAdvanceWindow:   20,
+							ReservationRateLimitWindow: 30,
+							OnDemandRateLimitWindow:    40,
+							OnDemandEnabled:            true,
+						},
+					},
+					OnDemandQuorumNumbers: []uint32{0},
+				},
+				Reservations: map[uint32]*disperser_rpc.QuorumReservation{
+					0: {
+						SymbolsPerSecond: 500,
+						StartTimestamp:   1000,
+						EndTimestamp:     2000,
+					},
+				},
+				CumulativePayment:        big.NewInt(12345).Bytes(),
+				OnchainCumulativePayment: big.NewInt(67890).Bytes(),
+			},
+			validate: func(t *testing.T, vaultParams *meterer.PaymentVaultParams, reservations map[core.QuorumID]*core.ReservedPayment, cumulative, onchainCumulative *big.Int, periodRecords meterer.QuorumPeriodRecords) {
+				require.NotNil(t, vaultParams)
+				assert.Len(t, vaultParams.QuorumPaymentConfigs, 1)
+				assert.Equal(t, uint64(100), vaultParams.QuorumPaymentConfigs[0].ReservationSymbolsPerSecond)
+
+				require.NotNil(t, reservations)
+				assert.Len(t, reservations, 1)
+				assert.Equal(t, uint64(500), reservations[0].SymbolsPerSecond)
+
+				require.NotNil(t, cumulative)
+				assert.Equal(t, 0, big.NewInt(12345).Cmp(cumulative))
+				require.NotNil(t, onchainCumulative)
+				assert.Equal(t, 0, big.NewInt(67890).Cmp(onchainCumulative))
+			},
+		},
+		{
+			name: "minimal valid input",
+			input: &disperser_rpc.GetPaymentStateForAllQuorumsReply{
+				PaymentVaultParams: &disperser_rpc.PaymentVaultParams{
+					QuorumPaymentConfigs:  map[uint32]*disperser_rpc.PaymentQuorumConfig{},
+					QuorumProtocolConfigs: map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig{},
+					OnDemandQuorumNumbers: []uint32{},
+				},
+			},
+			validate: func(t *testing.T, vaultParams *meterer.PaymentVaultParams, reservations map[core.QuorumID]*core.ReservedPayment, cumulative, onchainCumulative *big.Int, periodRecords meterer.QuorumPeriodRecords) {
+				require.NotNil(t, vaultParams)
+				assert.Empty(t, vaultParams.QuorumPaymentConfigs)
+				assert.Nil(t, reservations)
+				assert.Nil(t, cumulative)
+				assert.Nil(t, onchainCumulative)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vaultParams, reservations, cumulative, onchainCumulative, periodRecords, err := meterer.ConvertPaymentStateFromProtobuf(tt.input)
+
+			if tt.expectedErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectedErr)
+				return
+			}
+
+			require.NoError(t, err)
+			if tt.validate != nil {
+				tt.validate(t, vaultParams, reservations, cumulative, onchainCumulative, periodRecords)
 			}
 		})
 	}
