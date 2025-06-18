@@ -54,3 +54,7 @@ any `v0.10.0-rc.X` tags
 13. Create production tag `v0.10.1`
 
     <img src="images/13-production-tag.svg" alt="create production tag v0.10.1" />
+
+(Note for document maintainers: the source diagrams can be found [here](https://link.excalidraw.com/l/1XPZRMVbRNH/32yMzzv0C50).
+Please be sure to use consistent svg format by exporting from Excalidraw. Output svgs should be scaled down to 40% of the original
+size, for the sake of consistency.)
