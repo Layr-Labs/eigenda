@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"sync"
 	"time"
 
 	pb "github.com/Layr-Labs/eigenda/api/grpc/validator"
@@ -41,6 +42,7 @@ type BlacklistStore interface {
 }
 
 type blacklistStore struct {
+	mu     sync.RWMutex
 	db     kvstore.Store[[]byte]
 	logger logging.Logger
 	time   Time
@@ -71,7 +73,6 @@ func NewLevelDBBlacklistStore(
 }
 
 func (s *blacklistStore) BlacklistDisperserFromBlobCert(request *pb.StoreChunksRequest, blobCert *corev2.BlobCertificate) error {
-
 	ctx := context.Background()
 	s.logger.Info("blacklisting disperser from storeChunks request due to blobCert validation failure", "disperserID", request.DisperserID)
 
@@ -90,6 +91,9 @@ func (s *blacklistStore) BlacklistDisperserFromBlobCert(request *pb.StoreChunksR
 
 // HasDisperserID checks if a disperser ID exists in the store
 func (s *blacklistStore) HasDisperserID(ctx context.Context, disperserId uint32) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	// hash the disperserId and look up
 	disperserIdHash := sha256.Sum256([]byte(fmt.Sprintf("%d", disperserId)))
 	return s.hasKey(disperserIdHash[:])
@@ -103,18 +107,32 @@ func (s *blacklistStore) hasKey(key []byte) bool {
 
 // Get retrieves a blacklist by key
 func (s *blacklistStore) GetByDisperserID(ctx context.Context, disperserId uint32) (*Blacklist, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	disperserIdHash := sha256.Sum256(fmt.Appendf(nil, "%d", disperserId))
-	return s.Get(ctx, disperserIdHash[:])
+	return s.get(ctx, disperserIdHash[:])
 }
 
 // Get retrieves a blacklist by key
 func (s *blacklistStore) DeleteByDisperserID(ctx context.Context, disperserId uint32) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	disperserIdHash := sha256.Sum256(fmt.Appendf(nil, "%d", disperserId))
 	return s.db.Delete(disperserIdHash[:])
 }
 
 // Get retrieves a blacklist by key
 func (s *blacklistStore) Get(ctx context.Context, key []byte) (*Blacklist, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.get(ctx, key)
+}
+
+// get is the internal unlocked version of Get
+func (s *blacklistStore) get(ctx context.Context, key []byte) (*Blacklist, error) {
 	rawBlackList, err := s.db.Get(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get blacklist data: %w", err)
@@ -130,16 +148,25 @@ func (s *blacklistStore) Get(ctx context.Context, key []byte) (*Blacklist, error
 
 // Put stores raw blacklist data
 func (s *blacklistStore) Put(ctx context.Context, key []byte, value []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	return s.db.Put(key, value)
 }
 
 // AddEntry adds or updates a blacklist entry for a disperser
 func (s *blacklistStore) AddEntry(ctx context.Context, disperserId uint32, contextId, reason string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	var blacklist *Blacklist
 	var err error
 
-	if s.HasDisperserID(ctx, disperserId) {
-		blacklist, err = s.GetByDisperserID(ctx, disperserId)
+	disperserIdHash := sha256.Sum256(fmt.Appendf(nil, "%d", disperserId))
+
+	// Check if disperser exists (using internal unlocked hasKey)
+	if s.hasKey(disperserIdHash[:]) {
+		blacklist, err = s.get(ctx, disperserIdHash[:])
 		if err != nil {
 			return fmt.Errorf("failed to get existing blacklist: %w", err)
 		}
@@ -155,14 +182,18 @@ func (s *blacklistStore) AddEntry(ctx context.Context, disperserId uint32, conte
 	}
 
 	s.logger.Info("Adding entry to blacklist", "disperserId", disperserId, "contextId", contextId, "reason", reason)
-	disperserIdHash := sha256.Sum256(fmt.Appendf(nil, "%d", disperserId))
 	return s.db.Put(disperserIdHash[:], data)
 }
 
 // IsBlacklisted checks if a disperser is blacklisted
 func (s *blacklistStore) IsBlacklisted(ctx context.Context, disperserId uint32) bool {
-	blacklist, err := s.GetByDisperserID(ctx, disperserId)
+	// Start with read lock for the common case (no deletion needed)
+	s.mu.RLock()
+
+	disperserIdHash := sha256.Sum256(fmt.Appendf(nil, "%d", disperserId))
+	blacklist, err := s.get(ctx, disperserIdHash[:])
 	if err != nil {
+		s.mu.RUnlock()
 		return false
 	}
 
@@ -171,27 +202,49 @@ func (s *blacklistStore) IsBlacklisted(ctx context.Context, disperserId uint32) 
 	// So it is 1 hour, 1 day and 1 week for the 3 offences and is based on the LastUpdated timestamp
 	// Uses the mockable time interface
 	lastUpdated := blacklist.LastUpdated
+	timeSinceLastUpdate := s.time.Since(s.time.Unix(int64(lastUpdated), 0))
+
+	// Check if currently blacklisted based on entry count and time
+	isCurrentlyBlacklisted := false
 	if len(blacklist.Entries) == 1 {
-		if s.time.Since(s.time.Unix(int64(lastUpdated), 0)) < time.Hour {
-			return true
-		}
+		isCurrentlyBlacklisted = timeSinceLastUpdate < time.Hour
 	} else if len(blacklist.Entries) == 2 {
-		if s.time.Since(s.time.Unix(int64(lastUpdated), 0)) < time.Hour*24 {
-			return true
-		}
+		isCurrentlyBlacklisted = timeSinceLastUpdate < time.Hour*24
 	} else if len(blacklist.Entries) >= 3 {
-		if s.time.Since(s.time.Unix(int64(lastUpdated), 0)) < time.Hour*24*7 {
-			return true
-		}
+		isCurrentlyBlacklisted = timeSinceLastUpdate < time.Hour*24*7
 	}
 
-	// We check if the disperser has behaved correctly for 2 weeks since the last update
-	// If so, we delete the disperser from the blacklist to avoid checking each time and wasting resources.
-	if s.time.Since(s.time.Unix(int64(lastUpdated), 0)) >= time.Hour*24*14 {
-		err = s.DeleteByDisperserID(ctx, disperserId)
+	// If currently blacklisted, return early with read unlock
+	if isCurrentlyBlacklisted {
+		s.mu.RUnlock()
+		return true
+	}
+
+	// Check if we need to delete expired entry (14+ days old)
+	needsCleanup := timeSinceLastUpdate >= time.Hour*24*14
+
+	if needsCleanup {
+		// Upgrade to write lock for deletion
+		s.mu.RUnlock()
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
+		// Double-check the entry still exists after lock upgrade (avoid race condition)
+		blacklist, err = s.get(ctx, disperserIdHash[:])
 		if err != nil {
-			s.logger.Error("failed to delete disperser from blacklist", "disperserId", disperserId, "err", err)
+			// Entry was already deleted by another goroutine
+			return false
 		}
+
+		// Verify it still needs cleanup (time could have changed or entry could have been updated)
+		if s.time.Since(s.time.Unix(int64(blacklist.LastUpdated), 0)) >= time.Hour*24*14 {
+			err = s.db.Delete(disperserIdHash[:])
+			if err != nil {
+				s.logger.Error("failed to delete disperser from blacklist", "disperserId", disperserId, "err", err)
+			}
+		}
+	} else {
+		s.mu.RUnlock()
 	}
 
 	// if the disperser is not blacklisted, return false

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -686,4 +687,232 @@ func TestBlacklistStoreIsBlacklistedWithMockTime(t *testing.T) {
 	})
 }
 
-// Note: Interface testing with mock is done in a separate test package to avoid import cycles
+// TestBlacklistStoreReadWriteExclusion tests basic locking behavior
+func TestBlacklistStoreReadWriteExclusion(t *testing.T) {
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
+	testDir := t.TempDir()
+	store, err := node.NewLevelDBBlacklistStore(testDir, logger, false, false, node.DefaultTime)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+
+	// Test that concurrent operations don't cause data corruption
+	t.Run("ConcurrentReadWriteIntegrity", func(t *testing.T) {
+		const disperserId = uint32(400)
+		const numOperations = 50
+
+		var wg sync.WaitGroup
+
+		// Start multiple writers
+		for i := 0; i < 5; i++ {
+			wg.Add(1)
+			go func(writerID int) {
+				defer wg.Done()
+				for j := 0; j < numOperations; j++ {
+					_ = store.AddEntry(ctx, disperserId, fmt.Sprintf("writer%d-op%d", writerID, j), "violation")
+				}
+			}(i)
+		}
+
+		// Start multiple readers
+		for i := 0; i < 10; i++ {
+			wg.Add(1)
+			go func(readerID int) {
+				defer wg.Done()
+				for j := 0; j < numOperations; j++ {
+					_ = store.HasDisperserID(ctx, disperserId)
+					_, _ = store.GetByDisperserID(ctx, disperserId)
+					_ = store.IsBlacklisted(ctx, disperserId)
+				}
+			}(i)
+		}
+
+		// Wait for all operations to complete
+		wg.Wait()
+
+		// Verify final state is consistent
+		blacklist, err := store.GetByDisperserID(ctx, disperserId)
+		if err == nil {
+			// If blacklist exists, it should have some entries
+			require.Greater(t, len(blacklist.Entries), 0, "Blacklist should have entries")
+			require.LessOrEqual(t, len(blacklist.Entries), 5*numOperations, "Should not have more entries than written")
+		}
+		// If err != nil, that's also valid (blacklist might have been cleaned up)
+	})
+}
+
+// TestBlacklistStoreWriteExclusion tests that write operations are properly serialized
+func TestBlacklistStoreWriteExclusion(t *testing.T) {
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
+	testDir := t.TempDir()
+	store, err := node.NewLevelDBBlacklistStore(testDir, logger, false, false, node.DefaultTime)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	const disperserId = uint32(500)
+	const numWriters = 5
+
+	startCh := make(chan struct{})
+	completionOrder := make(chan int, numWriters)
+
+	// Start multiple writers
+	for i := 0; i < numWriters; i++ {
+		go func(writerID int) {
+			<-startCh // Wait for start signal
+
+			// Each writer adds multiple entries
+			for j := 0; j < 3; j++ {
+				err := store.AddEntry(ctx, disperserId, fmt.Sprintf("writer%d-entry%d", writerID, j), "violation")
+				require.NoError(t, err)
+			}
+
+			completionOrder <- writerID
+		}(i)
+	}
+
+	// Start all writers at the "same" time
+	close(startCh)
+
+	// Collect completion order
+	var completedWriters []int
+	for i := 0; i < numWriters; i++ {
+		writerID := <-completionOrder
+		completedWriters = append(completedWriters, writerID)
+	}
+
+	// Verify all writers completed
+	require.Len(t, completedWriters, numWriters)
+
+	// Verify final state - should have numWriters * 3 entries
+	blacklist, err := store.GetByDisperserID(ctx, disperserId)
+	require.NoError(t, err)
+	require.Len(t, blacklist.Entries, numWriters*3)
+}
+
+// TestBlacklistStoreIsBlacklistedConcurrency tests concurrent IsBlacklisted calls
+func TestBlacklistStoreIsBlacklistedConcurrency(t *testing.T) {
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
+	testDir := t.TempDir()
+
+	// Create mock time to control blacklist behavior
+	mockTime := &MockTime{}
+	baseTime := time.Date(2023, 6, 15, 10, 0, 0, 0, time.UTC)
+	mockTime.NowFunc = func() time.Time { return baseTime }
+	mockTime.UnixFunc = func(sec int64, nsec int64) time.Time { return time.Unix(sec, nsec) }
+	mockTime.SinceFunc = func(t time.Time) time.Duration { return 30 * time.Minute } // Not blacklisted
+
+	store, err := node.NewLevelDBBlacklistStore(testDir, logger, false, false, mockTime)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	disperserId := uint32(600)
+
+	// Add an entry
+	err = store.AddEntry(ctx, disperserId, "context1", "violation1")
+	require.NoError(t, err)
+
+	const numCheckers = 20
+	const checksPerChecker = 50
+
+	startCh := make(chan struct{})
+	resultCh := make(chan bool, numCheckers*checksPerChecker)
+
+	// Start multiple IsBlacklisted checkers
+	for i := 0; i < numCheckers; i++ {
+		go func() {
+			<-startCh
+			for j := 0; j < checksPerChecker; j++ {
+				isBlacklisted := store.IsBlacklisted(ctx, disperserId)
+				resultCh <- isBlacklisted
+			}
+		}()
+	}
+
+	// Start all checkers
+	start := time.Now()
+	close(startCh)
+
+	// Collect results
+	trueCount := 0
+	for i := 0; i < numCheckers*checksPerChecker; i++ {
+		if <-resultCh {
+			trueCount++
+		}
+	}
+
+	duration := time.Since(start)
+	t.Logf("Concurrent IsBlacklisted calls completed in %v", duration)
+
+	// All should return true (blacklisted) since we set 30 minute duration
+	require.Equal(t, numCheckers*checksPerChecker, trueCount)
+
+	// Should complete quickly due to concurrent reads
+	maxExpectedDuration := time.Millisecond * 200
+	require.Less(t, duration, maxExpectedDuration, "Concurrent IsBlacklisted calls took too long")
+}
+
+// TestBlacklistStoreRaceConditions tests for race conditions using mixed operations
+func TestBlacklistStoreRaceConditions(t *testing.T) {
+	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	require.NoError(t, err)
+
+	testDir := t.TempDir()
+	store, err := node.NewLevelDBBlacklistStore(testDir, logger, false, false, node.DefaultTime)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	const numGoroutines = 10
+	const operationsPerGoroutine = 50
+
+	startCh := make(chan struct{})
+	doneCh := make(chan struct{}, numGoroutines)
+
+	// Mix of different operations
+	for i := 0; i < numGoroutines; i++ {
+		go func(goroutineID int) {
+			defer func() { doneCh <- struct{}{} }()
+			<-startCh
+
+			for j := 0; j < operationsPerGoroutine; j++ {
+				disperserId := uint32(700 + (goroutineID*10 + j%10)) // Spread across different IDs
+
+				switch j % 6 {
+				case 0: // Add entry
+					_ = store.AddEntry(ctx, disperserId, fmt.Sprintf("g%d-j%d", goroutineID, j), "violation")
+				case 1: // Check if exists
+					_ = store.HasDisperserID(ctx, disperserId)
+				case 2: // Get by disperser ID
+					_, _ = store.GetByDisperserID(ctx, disperserId)
+				case 3: // Check if blacklisted
+					_ = store.IsBlacklisted(ctx, disperserId)
+				case 4: // Delete
+					_ = store.DeleteByDisperserID(ctx, disperserId)
+				case 5: // Add another entry
+					_ = store.AddEntry(ctx, disperserId, fmt.Sprintf("g%d-j%d-second", goroutineID, j), "another violation")
+				}
+			}
+		}(i)
+	}
+
+	// Start all goroutines
+	close(startCh)
+
+	// Wait for all to complete
+	for i := 0; i < numGoroutines; i++ {
+		select {
+		case <-doneCh:
+			// Continue
+		case <-time.After(time.Second * 10):
+			t.Fatal("Race condition test timed out - possible deadlock")
+		}
+	}
+
+	// If we get here without panics or deadlocks, the locking is working
+	t.Log("Race condition test completed successfully")
+}
