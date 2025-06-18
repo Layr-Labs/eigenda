@@ -49,7 +49,7 @@ At a high-level, a rollup sequencer needs to make its `payload` available for do
 
 As an example, an op-stack Ethereum rollup’s `payload` is a compressed batch of txs (called a [frame](https://specs.optimism.io/protocol/derivation.html#frame-format)). This frame gets sent to Ethereum to be made available either as a simple tx, or as a [`4844 blob`](https://eips.ethereum.org/EIPS/eip-4844#type-aliases) (using a [blob tx](https://eips.ethereum.org/EIPS/eip-4844#blob-transaction)). Using EigenDA instead of Ethereum for data availability works similarly: the payloads are encoded into an `eigenda blob`  and dispersed to the EigenDA network via an EigenDA disperser. The disperser eventually returns a `DACert` containing signatures of EigenDA operators certifying the availability of the data, which is then posted to Ethereum as the `input` field of a normal tx. Note that due to the rollup settling on Ethereum, Ethereum DA is needed, but only to make the `DACert` available, which is much smaller than the `blob` itself.
 
-[**Data structs**](./3-datastructs.md)
+[**Data structs**](./3-data-structs.md)
 
 - `Payload`: piece of data that an EigenDA client (rollup, avs, etc.) wants to make available. This is typically compressed batches of transactions or state transition diffs.
 - `EncodedPayload`: payload encoded into a list of bn254 field elements (each 32 bytes), typically with a prefixed field element containing the payload length in bytes, such that the payload can be decoded.
