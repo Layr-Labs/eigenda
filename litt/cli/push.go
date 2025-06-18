@@ -121,14 +121,6 @@ func Push(
 		return fmt.Errorf("failed to create SSH session to %s@%s port %d: %v", user, host, port, err)
 	}
 
-	// Figure out where data currently exists at the destination(s). We don't want this operation to cause a file
-	// to exist in multiple places.
-	// TODO make sure this handles when there are multiple tables.
-	existingFilesMap, err := mapExistingFiles(logger, destinations, connection)
-	if err != nil {
-		return fmt.Errorf("failed to map existing files at destinations: %v", err)
-	}
-
 	tables, err := lsPaths(logger, sources, false, fsync)
 	if err != nil {
 		return fmt.Errorf("failed to list tables in source paths %v: %v", sources, err)
@@ -141,7 +133,6 @@ func Push(
 			sources,
 			destinations,
 			connection,
-			existingFilesMap,
 			deleteAfterTransfer,
 			fsync,
 			throttleMB,
@@ -163,6 +154,7 @@ func Push(
 func mapExistingFiles(
 	logger logging.Logger,
 	destinations []string,
+	tableName string,
 	connection *util.SSHSession) (map[string]string, error) {
 
 	existingFiles := make(map[string]string)
@@ -170,7 +162,8 @@ func mapExistingFiles(
 	extensions := []string{segment.MetadataFileExtension, segment.KeyFileExtension, segment.ValuesFileExtension}
 
 	for _, dest := range destinations {
-		filePaths, err := connection.FindFiles(dest, extensions)
+		tableDestination := path.Join(dest, tableName, segment.SegmentDirectory)
+		filePaths, err := connection.FindFiles(tableDestination, extensions)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list files in destination %s: %v", dest, err)
 		}
@@ -196,11 +189,17 @@ func pushTable(
 	sources []string,
 	destinations []string,
 	connection *util.SSHSession,
-	existingFilesMap map[string]string,
 	deleteAfterTransfer bool,
 	fsync bool,
 	throttleMB float64,
 	threads uint64) error {
+
+	// Figure out where data currently exists at the destination(s). We don't want this operation to cause a file
+	// to exist in multiple places.
+	existingFilesMap, err := mapExistingFiles(logger, destinations, tableName, connection)
+	if err != nil {
+		return fmt.Errorf("failed to map existing files at destinations: %v", err)
+	}
 
 	segmentPaths, err := segment.BuildSegmentPaths(sources, "", tableName)
 	if err != nil {
