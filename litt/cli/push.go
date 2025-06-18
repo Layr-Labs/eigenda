@@ -62,6 +62,7 @@ func pushCommand(ctx *cli.Context) error {
 	deleteAfterTransfer := !ctx.Bool("no-gc")
 	threads := ctx.Uint64("threads")
 	verbose := !ctx.Bool("quiet")
+	throttleMB := ctx.Float64("throttle")
 
 	return Push(
 		logger,
@@ -74,6 +75,7 @@ func pushCommand(ctx *cli.Context) error {
 		deleteAfterTransfer,
 		true,
 		threads,
+		throttleMB,
 		verbose)
 }
 
@@ -89,6 +91,7 @@ func Push(
 	deleteAfterTransfer bool,
 	fsync bool,
 	threads uint64,
+	throttleMB float64,
 	verbose bool) error {
 
 	if len(sources) == 0 {
@@ -97,6 +100,12 @@ func Push(
 	if len(destinations) == 0 {
 		return fmt.Errorf("no destination paths provided")
 	}
+	if threads == 0 {
+		return fmt.Errorf("threads must be greater than 0")
+	}
+
+	// split bandwidth between workers
+	throttleMB /= float64(threads)
 
 	// Lock source files. It would be nice to also lock the remote directories, but that's tricky given that
 	// we are interacting with the remote machine via SSH and rsync.
@@ -135,8 +144,8 @@ func Push(
 			existingFilesMap,
 			deleteAfterTransfer,
 			fsync,
+			throttleMB,
 			threads,
-			verbose,
 		)
 
 		if err != nil {
@@ -190,8 +199,8 @@ func pushTable(
 	existingFilesMap map[string]string,
 	deleteAfterTransfer bool,
 	fsync bool,
-	threads uint64,
-	verbose bool) error {
+	throttleMB float64,
+	threads uint64) error {
 
 	segmentPaths, err := segment.BuildSegmentPaths(sources, "", tableName)
 	if err != nil {
@@ -281,7 +290,7 @@ func pushTable(
 
 			boundFilePath := filePath
 			go func() {
-				err = connection.Rsync(boundFilePath, targetLocation)
+				err = connection.Rsync(boundFilePath, targetLocation, throttleMB)
 				if err != nil {
 					errorMonitor.Panic(err)
 				}

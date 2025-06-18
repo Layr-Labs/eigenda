@@ -35,7 +35,7 @@ func NewSSHSession(
 ) (*SSHSession, error) {
 	config := &ssh.ClientConfig{
 		User:            user,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
 	exists, err := Exists(keyPath)
@@ -191,8 +191,9 @@ func (s *SSHSession) Mkdirs(path string) error {
 	return nil
 }
 
-// Rsync transfers files from the local machine to the remote machine using rsync.
-func (s *SSHSession) Rsync(sourceFile string, destFile string) error {
+// Rsync transfers files from the local machine to the remote machine using rsync. The throttle is ignored
+// if less than or equal to 0.
+func (s *SSHSession) Rsync(sourceFile string, destFile string, throttleMB float64) error {
 	sshCmd := fmt.Sprintf("ssh -i %s -p %d", s.keyPath, s.port)
 	target := fmt.Sprintf("%s@%s:%s", s.user, s.host, destFile)
 
@@ -214,10 +215,15 @@ func (s *SSHSession) Rsync(sourceFile string, destFile string) error {
 	arguments := []string{
 		"rsync",
 		"-z",
-		"-e", sshCmd,
-		sourceFile,
-		target,
 	}
+
+	if throttleMB > 0 {
+		// rsync interprets --bwlimit in KB/s, so we convert MB to KB
+		throttleKB := int(throttleMB * 1024)
+		arguments = append(arguments, fmt.Sprintf("--bwlimit=%d", throttleKB))
+	}
+
+	arguments = append(arguments, "-e", sshCmd, sourceFile, target)
 
 	if s.verbose {
 		s.logger.Infof("Executing: %s", strings.Join(arguments, " "))
