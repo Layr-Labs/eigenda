@@ -21,56 +21,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// requireDispersalRetrievalEigenDA ... ensure that blob was successfully dispersed/read to/from EigenDA
-func requireDispersalRetrievalEigenDA(t *testing.T, cm *metrics.CountMap, mode commitments.CommitmentMode) {
-	writeCount, err := cm.Get(string(mode), http.MethodPost)
-	require.NoError(t, err)
-	require.True(t, writeCount > 0)
-
-	readCount, err := cm.Get(string(mode), http.MethodGet)
-	require.NoError(t, err)
-	require.True(t, readCount > 0)
+func TestProxyClientWriteReadV1(t *testing.T) {
+	testProxyClientWriteRead(t, common.V1EigenDABackend)
 }
 
-// requireWriteReadSecondary ... ensure that secondary backend was successfully written/read to/from
-func requireWriteReadSecondary(t *testing.T, cm *metrics.CountMap, bt common.BackendType) {
-	writeCount, err := cm.Get(http.MethodPut, secondary.Success, bt.String())
-	require.NoError(t, err)
-	require.True(t, writeCount > 0)
-
-	readCount, err := cm.Get(http.MethodGet, secondary.Success, bt.String())
-	require.NoError(t, err)
-	require.True(t, readCount > 0)
+func TestProxyClientWriteReadV2(t *testing.T) {
+	testProxyClientWriteRead(t, common.V2EigenDABackend)
 }
 
-// requireStandardClientSetGet ... ensures that std proxy client can disperse and read a blob
-func requireStandardClientSetGet(t *testing.T, ts testutils.TestSuite, blob []byte) {
-	cfg := &standard_client.Config{
-		URL: ts.Address(),
-	}
-	daClient := standard_client.New(cfg)
+// TestProxyClientWriteRead tests that the proxy client can write and read data to the proxy server.
+//
+// This is the "basic" proxy test: "is proxy working?"
+func testProxyClientWriteRead(t *testing.T, dispersalBackend common.EigenDABackend) {
+	t.Parallel()
 
-	t.Log("Setting input data on proxy server...")
-	blobInfo, err := daClient.SetData(ts.Ctx, blob)
-	require.NoError(t, err)
+	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
+	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
+	ts, kill := testutils.CreateTestSuite(tsConfig)
+	defer kill()
 
-	t.Log("Getting input data from proxy server...")
-	preimage, err := daClient.GetData(ts.Ctx, blobInfo)
-	require.NoError(t, err)
-	require.Equal(t, blob, preimage)
-
-}
-
-// requireOPClientSetGet ... ensures that alt-da client can disperse and read a blob
-func requireOPClientSetGet(t *testing.T, ts testutils.TestSuite, blob []byte, precompute bool) {
-	daClient := altda.NewDAClient(ts.Address(), false, precompute)
-
-	commit, err := daClient.SetInput(ts.Ctx, blob)
-	require.NoError(t, err)
-
-	preimage, err := daClient.GetInput(ts.Ctx, commit, 0)
-	require.NoError(t, err)
-	require.Equal(t, blob, preimage)
+	requireStandardClientSetGet(t, ts, testutils.RandBytes(100))
+	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
 }
 
 func TestOptimismClientWithKeccak256CommitmentV1(t *testing.T) {
@@ -201,60 +172,6 @@ func testProxyClientServerIntegration(t *testing.T, dispersalBackend common.Eige
 			require.Error(t, err)
 			assert.True(t, strings.Contains(err.Error(), "400") && !isNilPtrDerefPanic(err.Error()))
 		})
-}
-
-func TestProxyClientV1(t *testing.T) {
-	testProxyClient(t, common.V1EigenDABackend)
-}
-
-func TestProxyClientV2(t *testing.T) {
-	testProxyClient(t, common.V2EigenDABackend)
-}
-
-func testProxyClient(t *testing.T, dispersalBackend common.EigenDABackend) {
-	t.Parallel()
-
-	testCfg := testutils.NewTestConfig(testutils.GetBackend(), dispersalBackend, nil)
-	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-
-	ts, kill := testutils.CreateTestSuite(tsConfig)
-	defer kill()
-
-	cfg := &standard_client.Config{
-		URL: ts.Address(),
-	}
-	daClient := standard_client.New(cfg)
-
-	testPreimage := testutils.RandBytes(100)
-
-	t.Log("Setting input data on proxy server...")
-	daCommitment, err := daClient.SetData(ts.Ctx, testPreimage)
-	require.NoError(t, err)
-
-	t.Log("Getting input data from proxy server...")
-	preimage, err := daClient.GetData(ts.Ctx, daCommitment)
-	require.NoError(t, err)
-	require.Equal(t, testPreimage, preimage)
-}
-
-func TestProxyClientWriteReadV1(t *testing.T) {
-	testProxyClientWriteRead(t, common.V1EigenDABackend)
-}
-
-func TestProxyClientWriteReadV2(t *testing.T) {
-	testProxyClientWriteRead(t, common.V2EigenDABackend)
-}
-
-func testProxyClientWriteRead(t *testing.T, dispersalBackend common.EigenDABackend) {
-	t.Parallel()
-
-	testCfg := testutils.NewTestConfig(testutils.MemstoreBackend, dispersalBackend, nil)
-	tsConfig := testutils.BuildTestSuiteConfig(testCfg)
-	ts, kill := testutils.CreateTestSuite(tsConfig)
-	defer kill()
-
-	requireStandardClientSetGet(t, ts, testutils.RandBytes(100))
-	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
 }
 
 func TestProxyCachingV1(t *testing.T) {
@@ -510,4 +427,56 @@ func TestV2ValidatorRetrieverOnly(t *testing.T) {
 
 	requireStandardClientSetGet(t, ts, testutils.RandBytes(1000))
 	requireDispersalRetrievalEigenDA(t, ts.Metrics.HTTPServerRequestsTotal, commitments.StandardCommitmentMode)
+}
+
+// requireDispersalRetrievalEigenDA ... ensure that blob was successfully dispersed/read to/from EigenDA
+func requireDispersalRetrievalEigenDA(t *testing.T, cm *metrics.CountMap, mode commitments.CommitmentMode) {
+	writeCount, err := cm.Get(string(mode), http.MethodPost)
+	require.NoError(t, err)
+	require.True(t, writeCount > 0)
+
+	readCount, err := cm.Get(string(mode), http.MethodGet)
+	require.NoError(t, err)
+	require.True(t, readCount > 0)
+}
+
+// requireWriteReadSecondary ... ensure that secondary backend was successfully written/read to/from
+func requireWriteReadSecondary(t *testing.T, cm *metrics.CountMap, bt common.BackendType) {
+	writeCount, err := cm.Get(http.MethodPut, secondary.Success, bt.String())
+	require.NoError(t, err)
+	require.True(t, writeCount > 0)
+
+	readCount, err := cm.Get(http.MethodGet, secondary.Success, bt.String())
+	require.NoError(t, err)
+	require.True(t, readCount > 0)
+}
+
+// requireStandardClientSetGet ... ensures that std proxy client can disperse and read a blob
+func requireStandardClientSetGet(t *testing.T, ts testutils.TestSuite, blob []byte) {
+	cfg := &standard_client.Config{
+		URL: ts.Address(),
+	}
+	daClient := standard_client.New(cfg)
+
+	t.Log("Setting input data on proxy server...")
+	blobInfo, err := daClient.SetData(ts.Ctx, blob)
+	require.NoError(t, err)
+
+	t.Log("Getting input data from proxy server...")
+	preimage, err := daClient.GetData(ts.Ctx, blobInfo)
+	require.NoError(t, err)
+	require.Equal(t, blob, preimage)
+
+}
+
+// requireOPClientSetGet ... ensures that alt-da client can disperse and read a blob
+func requireOPClientSetGet(t *testing.T, ts testutils.TestSuite, blob []byte, precompute bool) {
+	daClient := altda.NewDAClient(ts.Address(), false, precompute)
+
+	commit, err := daClient.SetInput(ts.Ctx, blob)
+	require.NoError(t, err)
+
+	preimage, err := daClient.GetInput(ts.Ctx, commit, 0)
+	require.NoError(t, err)
+	require.Equal(t, blob, preimage)
 }
