@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"errors"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -32,7 +31,6 @@ func TestValidRequest(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
@@ -66,7 +64,6 @@ func TestInvalidRequestWrongHash(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
@@ -100,7 +97,6 @@ func TestInvalidRequestWrongKey(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
@@ -126,7 +122,7 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 	require.NoError(t, err)
 	disperserAddress0 := crypto.PubkeyToAddress(*publicKey0)
 
-	// This disperser will be loaded on chain (simulated), but will fail the valid disperser ID filter.
+	// Non EigenLabs disperser is registered on-chain
 	publicKey1, privateKey1, err := rand.ECDSA()
 	require.NoError(t, err)
 	disperserAddress1 := crypto.PubkeyToAddress(*publicKey1)
@@ -137,20 +133,13 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 	chainReader.Mock.On("GetDisperserAddress", uint32(1234)).Return(
 		nil, errors.New("disperser not found"))
 
-	filterCallCount := atomic.Uint32{}
-
 	authenticator, err := NewRequestAuthenticator(
 		context.Background(),
 		&chainReader,
 		10,
 		time.Minute,
-		func(id uint32) bool {
-			filterCallCount.Add(1)
-			return id != uint32(1)
-		},
 		start)
 	require.NoError(t, err)
-	require.Equal(t, uint32(1), filterCallCount.Load())
 
 	request := RandomStoreChunksRequest(rand)
 	request.DisperserID = 0
@@ -162,14 +151,16 @@ func TestInvalidRequestInvalidDisperserID(t *testing.T) {
 	expectedHash, err := hashing.HashStoreChunksRequest(request)
 	require.NoError(t, err)
 	require.Equal(t, expectedHash, hash)
-	require.Equal(t, uint32(2), filterCallCount.Load())
 
 	request.DisperserID = 1
 	signature, err = SignStoreChunksRequest(privateKey1, request)
 	require.NoError(t, err)
 	request.Signature = signature
-	_, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
-	require.Error(t, err)
+	hash, err = authenticator.AuthenticateStoreChunksRequest(context.Background(), request, start)
+	require.NoError(t, err)
+	expectedHash, err = hashing.HashStoreChunksRequest(request)
+	require.NoError(t, err)
+	require.Equal(t, expectedHash, hash)
 
 	request.DisperserID = 1234
 	signature, err = SignStoreChunksRequest(privateKey1, request)
@@ -196,7 +187,6 @@ func TestKeyExpiry(t *testing.T) {
 		&chainReader,
 		10,
 		time.Minute,
-		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
@@ -260,7 +250,6 @@ func TestKeyCacheSize(t *testing.T) {
 		&chainReader,
 		cacheSize,
 		time.Minute,
-		func(uint32) bool { return true },
 		start)
 	require.NoError(t, err)
 
