@@ -769,6 +769,7 @@ func (env *Config) GenerateAllVariables() {
 		if err != nil {
 			log.Panicf("Error: %s", err.Error())
 		}
+
 		writeFile(composeFile, composeYaml)
 	}
 }
