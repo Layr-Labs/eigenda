@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
@@ -59,10 +60,21 @@ func pushCommand(ctx *cli.Context) error {
 	}
 
 	deleteAfterTransfer := !ctx.Bool("no-gc")
-
+	threads := ctx.Uint64("threads")
 	verbose := !ctx.Bool("quiet")
 
-	return Push(logger, sources, destinations, user, host, port, keyPath, deleteAfterTransfer, true, verbose)
+	return Push(
+		logger,
+		sources,
+		destinations,
+		user,
+		host,
+		port,
+		keyPath,
+		deleteAfterTransfer,
+		true,
+		threads,
+		verbose)
 }
 
 // Push uses rsync to transfer LittDB data to the remote location(s)
@@ -76,6 +88,7 @@ func Push(
 	keyPath string,
 	deleteAfterTransfer bool,
 	fsync bool,
+	threads uint64,
 	verbose bool) error {
 
 	if len(sources) == 0 {
@@ -122,6 +135,7 @@ func Push(
 			existingFilesMap,
 			deleteAfterTransfer,
 			fsync,
+			threads,
 			verbose,
 		)
 
@@ -176,6 +190,7 @@ func pushTable(
 	existingFilesMap map[string]string,
 	deleteAfterTransfer bool,
 	fsync bool,
+	threads uint64,
 	verbose bool) error {
 
 	segmentPaths, err := segment.BuildSegmentPaths(sources, "", tableName)
@@ -222,6 +237,8 @@ func pushTable(
 		if boundaryFile.IsDefined() {
 			highestSegmentIndex = boundaryFile.BoundaryIndex()
 		}
+	} else if deleteAfterTransfer {
+		return fmt.Errorf("--no-gc is required when pushing a non-snapshot table.")
 	}
 
 	// Ensure the remote segment directories exists.
@@ -233,6 +250,11 @@ func pushTable(
 				segmentDir, dest, err)
 		}
 	}
+
+	// Used to limit rsync concurrency.
+	rsyncLimiter := make(chan struct{}, threads)
+
+	rsyncsInProgress := atomic.Int64{}
 
 	// Transfer the files.
 	for i := lowestSegmentIndex; i <= highestSegmentIndex; i++ {
@@ -254,18 +276,39 @@ func pushTable(
 
 			targetLocation := path.Join(destination, tableName, segment.SegmentDirectory, fileName)
 
-			err = connection.Rsync(filePath, targetLocation)
-			if err != nil {
-				return fmt.Errorf("failed to rsync file %s to %s: %v", filePath, targetLocation, err)
-			}
+			rsyncLimiter <- struct{}{}
+			rsyncsInProgress.Add(1)
+
+			boundFilePath := filePath
+			go func() {
+				err = connection.Rsync(boundFilePath, targetLocation)
+				if err != nil {
+					errorMonitor.Panic(err)
+				}
+				<-rsyncLimiter
+				rsyncsInProgress.Add(-1)
+			}()
 		}
+	}
+
+	// Wait for all rsyncs to complete.
+	for rsyncsInProgress.Load() > 0 {
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	// Check if there were any errors during the transfer.
+	if ok, err := errorMonitor.IsOk(); !ok {
+		return fmt.Errorf("error detected during transfer: %v", err)
 	}
 
 	// Now that we have transferred the files, we can delete them if requested.
 	if deleteAfterTransfer {
+
+		// Delete the segments.
 		for _, seg := range segments {
 			seg.Release()
 		}
+		// Wait for deletion to complete.
 		for _, seg := range segments {
 			err = seg.BlockUntilFullyDeleted()
 			if err != nil {
@@ -276,7 +319,7 @@ func pushTable(
 
 		if isSnapshot {
 			// If we are dealing with a snapshot, update the lower bound file.
-			boundaryFile, err := disktable.LoadBoundaryFile(true, path.Join(destinations[0], tableName))
+			boundaryFile, err := disktable.LoadBoundaryFile(true, path.Join(sources[0], tableName))
 			if err != nil {
 				return fmt.Errorf("failed to load boundary file for table %s at path %s: %v",
 					tableName, destinations[0], err)

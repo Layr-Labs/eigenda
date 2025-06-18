@@ -94,13 +94,6 @@ func pruneTable(
 	maxAgeSeconds uint64,
 	fsync bool) (uint64, error) {
 
-	// Forbid touching tables in active use.
-	releaseLocks, err := util.LockDirectories(logger, sources, util.LockfileName, fsync)
-	if err != nil {
-		return 0, fmt.Errorf("failed to acquire locks on paths %v: %v", sources, err)
-	}
-	defer releaseLocks()
-
 	errorMonitor := util.NewErrorMonitor(context.Background(), logger, nil)
 
 	segmentPaths, err := segment.BuildSegmentPaths(sources, "", tableName)

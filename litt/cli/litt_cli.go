@@ -166,12 +166,18 @@ func buildCLIParser() *cli.App {
 						Aliases: []string{"n"},
 						Usage:   "If true, do not delete files pushed to the remote host.",
 					},
-					&cli.BoolFlag{
+					&cli.BoolFlag{ // TODO is this actually used?
 						Name:     "quiet",
 						Aliases:  []string{"q"},
 						Usage:    "Reduces the verbosity of the output.",
 						Required: false,
 					},
+					&cli.Uint64Flag{
+						Name:    "threads",
+						Aliases: []string{"t"},
+						Usage:   "Number of parallel rsync operations.",
+						Value:   8,
+					}, // TODO add a throttle
 				},
 				Action: pushCommand,
 			},

@@ -17,7 +17,7 @@ func main() {
 
 	err = buildCLIParser().Run(os.Args)
 	if err != nil {
-		logger.Errorf("Failed to build CLI parser: %v\n", err)
+		logger.Errorf("Execution failed: %v\n", err)
 		os.Exit(1)
 	}
 }

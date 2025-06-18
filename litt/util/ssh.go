@@ -162,10 +162,6 @@ func (s *SSHSession) FindFiles(root string, extensions []string) ([]string, erro
 		}
 	}
 
-	for _, file := range filteredFiles {
-		fmt.Printf("    Found file: %s\n", file) // TODO
-	}
-
 	return filteredFiles, nil
 }
 
@@ -217,7 +213,7 @@ func (s *SSHSession) Rsync(sourceFile string, destFile string) error {
 
 	arguments := []string{
 		"rsync",
-		"-avz", // TODO look into flag use
+		"-z",
 		"-e", sshCmd,
 		sourceFile,
 		target,
