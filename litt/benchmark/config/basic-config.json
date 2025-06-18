@@ -3,7 +3,6 @@
     "Paths": ["~/benchmark/volume1", "~/benchmark/volume2", "~/benchmark/volume3"],
     "SnapshotDirectory": "~/snapshot"
   },
-  "TTLHours": 0.0834,
   "MaximumWriteThroughputMB": 1024,
   "MetricsLoggingPeriodSeconds": 1
 }

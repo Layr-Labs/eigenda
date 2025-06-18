@@ -44,7 +44,7 @@ func lsCommand(ctx *cli.Context) error {
 		sb.WriteString("\n")
 	}
 
-	logger.Info("Tables found:\n%s", sb.String())
+	logger.Infof("Tables found:\n%s", sb.String())
 
 	return nil
 }

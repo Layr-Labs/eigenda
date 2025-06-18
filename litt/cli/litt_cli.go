@@ -66,7 +66,7 @@ func buildCLIParser() *cli.App {
 						Required: true,
 					},
 					&cli.StringSliceFlag{
-						Name:     "dest",
+						Name:     "dst",
 						Aliases:  []string{"d"},
 						Usage:    "Destination paths for the rebased LittDB, at least one is required.",
 						Required: true,
@@ -144,7 +144,7 @@ func buildCLIParser() *cli.App {
 						Required: true,
 					},
 					&cli.StringSliceFlag{
-						Name:     "dest",
+						Name:     "dst",
 						Aliases:  []string{"d"},
 						Usage:    "Remote destination paths, at least one is required.",
 						Required: true,

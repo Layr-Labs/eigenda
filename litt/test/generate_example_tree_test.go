@@ -10,6 +10,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
+	"github.com/Layr-Labs/eigenda/litt/disktable"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/stretchr/testify/require"
 )
@@ -65,6 +66,14 @@ func TestGenerateExampleTree(t *testing.T) {
 	require.NoError(t, err)
 	err = tableC.Flush()
 	require.NoError(t, err)
+
+	// Simulate a lower bound files. This normally only gets generated when there is GC done externally.
+	for _, tableName := range []string{"tableA", "tableB", "tableC"} {
+		lowerBoundFile, err := disktable.LoadBoundaryFile(true, path.Join(testDir, "rolling_snapshot", tableName))
+		require.NoError(t, err)
+		err = lowerBoundFile.Update(0)
+		require.NoError(t, err)
+	}
 
 	// Run the tree command on testDir
 	output, err := exec.Command("tree", testDir).CombinedOutput()
