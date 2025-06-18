@@ -299,10 +299,22 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 	// on-chain global payment parameters
-	globalSymbolsPerSecond := s.meterer.ChainPaymentState.GetOnDemandGlobalSymbolsPerSecond(core.QuorumID(0))
-	minNumSymbols := s.meterer.ChainPaymentState.GetMinNumSymbols(core.QuorumID(0))
-	pricePerSymbol := s.meterer.ChainPaymentState.GetPricePerSymbol(core.QuorumID(0))
-	reservationWindow := s.meterer.ChainPaymentState.GetReservationWindow(core.QuorumID(0))
+	params, err := s.meterer.ChainPaymentState.GetPaymentGlobalParams()
+	if err != nil {
+		s.logger.Error("failed to get payment global params", "err", err)
+		return nil, api.NewErrorInternal("failed to get payment parameters")
+	}
+
+	paymentConfig, protocolConfig, err := params.GetQuorumConfigs(core.QuorumID(0))
+	if err != nil {
+		s.logger.Error("failed to get payment config for quorum 0", "err", err)
+		return nil, api.NewErrorInternal("failed to get payment configuration")
+	}
+
+	globalSymbolsPerSecond := paymentConfig.OnDemandSymbolsPerSecond
+	minNumSymbols := protocolConfig.MinNumSymbols
+	pricePerSymbol := paymentConfig.OnDemandPricePerSymbol
+	reservationWindow := protocolConfig.ReservationRateLimitWindow
 
 	// off-chain account specific payment state
 	now := time.Now().Unix()
@@ -311,7 +323,12 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// TODO(hopeyen): remove this in a subsequent PR. The logic here is complicated and only temporary
 	periods := make([]uint64, len(quorumIds))
 	for i, quorumId := range quorumIds {
-		periods[i] = meterer.GetReservationPeriod(now, s.meterer.ChainPaymentState.GetReservationWindow(quorumId))
+		_, quorumProtocolConfig, err := params.GetQuorumConfigs(quorumId)
+		if err != nil {
+			s.logger.Error("failed to get protocol config for quorum", "quorumId", quorumId, "err", err)
+			return nil, api.NewErrorInternal("failed to get quorum protocol configuration")
+		}
+		periods[i] = meterer.GetReservationPeriod(now, quorumProtocolConfig.ReservationRateLimitWindow)
 	}
 	records, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, quorumIds, periods, 3)
 	if err != nil {
