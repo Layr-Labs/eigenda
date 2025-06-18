@@ -11,6 +11,7 @@
     - [Overview](#overview)
     - [Getting Started](#getting-started)
     - [Configuration Options](#configuration-options)
+    - [CLI](#littdb-cli)
 - [Definitions](#definitions)
 - [Architecture](./docs/architecture.md)
 - [Filesystem Layout](./docs/filesystem_layout.md)
@@ -43,6 +44,8 @@ The following features are currently supported by LittDB:
 - multi-drive support (data can be spread across multiple physical volumes)
 - incremental backups (both local and remote)
 - keys and values up to 2^32 bytes in size
+- incremental snapshots
+- incremental remote backups
 
 ## Consistency Guarantees
 
@@ -67,15 +70,11 @@ enough need is demonstrated:
 
 - dynamic multi-drive support: Drives can currently only be added/removed with a DB restart.
   It's currently fast, but not instantaneous. With this feature, drives can be added/removed on the fly.
-- full snapshots/backups
-- differential snapshots/backups
 - read-only mode from an outside process
-- CLI utility for managing the DB without the need for custom code
-  (e.g. getting info, setting TTLs, adding/removing drives, etc.)
 - DB iteration (this is plausible to implement without high overhead, but we don't currently have
   a good use case to justify the implementation effort)
 - more keymap implementations (e.g. badgerDB, a custom solution, etc.)
-- data check-summing and verification (to protect/detect things like disk corruption)
+- data check-summing and verification (to protect/detect disk corruption)
 - keys and values up to 2^64 bytes in size
 
 ## Anti-Features
@@ -187,6 +186,11 @@ return err
 ## Configuration Options
 
 For more information about configuration, see [littdb_config.go](littdb_config.go).
+
+## LittDB CLI
+
+The LittDB has a CLI utility for offline manipulation of DB files. See the [LittDB CLI](docs/littdb_cli.md) docs
+for more information on how to use it.
 
 # Definitions
 
