@@ -111,7 +111,7 @@ func (s *blacklistStore) GetByDisperserID(ctx context.Context, disperserId uint3
 	defer s.mu.RUnlock()
 
 	disperserIdHash := sha256.Sum256(fmt.Appendf(nil, "%d", disperserId))
-	return s.get(ctx, disperserIdHash[:])
+	return s.get(disperserIdHash[:])
 }
 
 // Get retrieves a blacklist by key
@@ -128,11 +128,11 @@ func (s *blacklistStore) Get(ctx context.Context, key []byte) (*Blacklist, error
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.get(ctx, key)
+	return s.get(key)
 }
 
 // get is the internal unlocked version of Get
-func (s *blacklistStore) get(ctx context.Context, key []byte) (*Blacklist, error) {
+func (s *blacklistStore) get(key []byte) (*Blacklist, error) {
 	rawBlackList, err := s.db.Get(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get blacklist data: %w", err)
@@ -166,7 +166,7 @@ func (s *blacklistStore) AddEntry(ctx context.Context, disperserId uint32, conte
 
 	// Check if disperser exists (using internal unlocked hasKey)
 	if s.hasKey(disperserIdHash[:]) {
-		blacklist, err = s.get(ctx, disperserIdHash[:])
+		blacklist, err = s.get(disperserIdHash[:])
 		if err != nil {
 			return fmt.Errorf("failed to get existing blacklist: %w", err)
 		}
@@ -191,7 +191,7 @@ func (s *blacklistStore) IsBlacklisted(ctx context.Context, disperserId uint32) 
 	s.mu.RLock()
 
 	disperserIdHash := sha256.Sum256(fmt.Appendf(nil, "%d", disperserId))
-	blacklist, err := s.get(ctx, disperserIdHash[:])
+	blacklist, err := s.get(disperserIdHash[:])
 	if err != nil {
 		s.mu.RUnlock()
 		return false
@@ -230,7 +230,7 @@ func (s *blacklistStore) IsBlacklisted(ctx context.Context, disperserId uint32) 
 		defer s.mu.Unlock()
 
 		// Double-check the entry still exists after lock upgrade (avoid race condition)
-		blacklist, err = s.get(ctx, disperserIdHash[:])
+		blacklist, err = s.get(disperserIdHash[:])
 		if err != nil {
 			// Entry was already deleted by another goroutine
 			return false
