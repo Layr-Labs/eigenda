@@ -1,6 +1,11 @@
 [tools]
-# Core Dependencies
-go = "1.21"
+
+# The exact version here doesn't matter because the `go` command is forward compatible,
+# meaning that it will automatically download a golang version (as a module) to match the
+# go and toolchain versions specified in the go.mod file.
+# See https://go.dev/blog/toolchain for more details.
+# We still want *some* go version here so that the `go` command is available though.
+go = "1.24"
 
 # Tooling Dependencies
 golangci-lint = "1.60.3"
