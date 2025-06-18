@@ -277,9 +277,106 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 }
 
 // GetPaymentState returns the payment state for a given account and the related on-chain parameters
-// Deprecated: Use GetPaymentStateForAllQuorums instead.
+// Deprecating soon: use GetPaymentStateForAllQuorums instead.
 func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
-	return nil, api.NewErrorUnimplemented()
+	allQuorumsReq := &pb.GetPaymentStateForAllQuorumsRequest{
+		AccountId: req.AccountId,
+		Signature: req.Signature,
+		Timestamp: req.Timestamp,
+	}
+
+	allQuorumsReply, err := s.GetPaymentStateForAllQuorums(ctx, allQuorumsReq)
+	if err != nil {
+		return nil, err
+	}
+
+	// For PaymentVaultParams, use quorum 0 for protocol level parameters and on-demand quorum numbers
+	var paymentGlobalParams *pb.PaymentGlobalParams
+	if allQuorumsReply.PaymentVaultParams != nil &&
+		allQuorumsReply.PaymentVaultParams.QuorumPaymentConfigs != nil &&
+		allQuorumsReply.PaymentVaultParams.QuorumProtocolConfigs != nil {
+		quorum0Config, ok := allQuorumsReply.PaymentVaultParams.QuorumPaymentConfigs[0]
+		quorum0ProtocolConfig, ok2 := allQuorumsReply.PaymentVaultParams.QuorumProtocolConfigs[0]
+		if ok && ok2 {
+			paymentGlobalParams = &pb.PaymentGlobalParams{
+				GlobalSymbolsPerSecond: quorum0Config.OnDemandSymbolsPerSecond,
+				MinNumSymbols:          quorum0ProtocolConfig.MinNumSymbols,
+				PricePerSymbol:         quorum0Config.OnDemandPricePerSymbol,
+				ReservationWindow:      quorum0ProtocolConfig.ReservationRateLimitWindow,
+				OnDemandQuorumNumbers:  allQuorumsReply.PaymentVaultParams.OnDemandQuorumNumbers,
+			}
+		}
+	}
+
+	// Find most restrictive reservation parameters across all quorums
+	var reservation *pb.Reservation
+	if allQuorumsReply.Reservations != nil && len(allQuorumsReply.Reservations) > 0 {
+		var minSymbolsPerSecond uint64 = ^uint64(0) // max uint64
+		var latestStartTimestamp uint32
+		var earliestEndTimestamp uint32 = ^uint32(0) // max uint32
+		var reservedQuorums []uint32
+
+		for quorumId, quorumReservation := range allQuorumsReply.Reservations {
+			if quorumReservation == nil {
+				continue
+			}
+
+			reservedQuorums = append(reservedQuorums, quorumId)
+
+			// Find most restrictive parameters
+			if quorumReservation.SymbolsPerSecond < minSymbolsPerSecond {
+				minSymbolsPerSecond = quorumReservation.SymbolsPerSecond
+			}
+			if quorumReservation.StartTimestamp > latestStartTimestamp {
+				latestStartTimestamp = quorumReservation.StartTimestamp
+			}
+			if quorumReservation.EndTimestamp < earliestEndTimestamp {
+				earliestEndTimestamp = quorumReservation.EndTimestamp
+			}
+		}
+
+		if minSymbolsPerSecond != ^uint64(0) {
+			reservation = &pb.Reservation{
+				SymbolsPerSecond: minSymbolsPerSecond,
+				StartTimestamp:   latestStartTimestamp,
+				EndTimestamp:     earliestEndTimestamp,
+				QuorumNumbers:    reservedQuorums,
+				QuorumSplits:     []uint32{}, // not used anywhere
+			}
+		}
+	}
+
+	// Build period records by selecting highest usage for each period index across all quorums
+	var periodRecords []*pb.PeriodRecord
+	if allQuorumsReply.PeriodRecords != nil && len(allQuorumsReply.PeriodRecords) > 0 {
+		highestPeriodRecords := make([]*pb.PeriodRecord, meterer.MinNumBins)
+		for _, quorumRecords := range allQuorumsReply.PeriodRecords {
+			if quorumRecords == nil {
+				continue
+			}
+			for _, record := range quorumRecords.Records {
+				if record == nil {
+					continue
+				}
+				idx := record.Index % uint32(meterer.MinNumBins)
+				if highestPeriodRecords[idx] == nil || record.Usage > highestPeriodRecords[idx].Usage {
+					highestPeriodRecords[idx] = record
+				}
+			}
+		}
+		periodRecords = highestPeriodRecords
+	} else if quorum0Records, ok := allQuorumsReply.PeriodRecords[0]; ok && quorum0Records != nil {
+		// Fallback to quorum 0 if no records found
+		periodRecords = quorum0Records.Records
+	}
+
+	return &pb.GetPaymentStateReply{
+		PaymentGlobalParams:      paymentGlobalParams,
+		PeriodRecords:            periodRecords,
+		Reservation:              reservation,
+		CumulativePayment:        allQuorumsReply.CumulativePayment,
+		OnchainCumulativePayment: allQuorumsReply.OnchainCumulativePayment,
+	}, nil
 }
 
 func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, req *pb.GetPaymentStateForAllQuorumsRequest) (*pb.GetPaymentStateForAllQuorumsReply, error) {
@@ -299,7 +396,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 
 	// validate the signature
 	if err := s.blobRequestAuthenticator.AuthenticatePaymentStateForAllQuorumsRequest(accountID, req); err != nil {
-		s.logger.Debug("failed to validate signature", "err", err, "accountID", accountID)
+		s.logger.Error("failed to validate signature", "err", err, "accountID", accountID)
 		return nil, api.NewErrorInvalidArg(fmt.Sprintf("authentication failed: %s", err.Error()))
 	}
 
@@ -336,7 +433,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	reservationQuorumIds := []core.QuorumID{}
 	reservationCurrentPeriods := []uint64{}
 	if err != nil {
-		s.logger.Debug("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
+		s.logger.Error("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
 	} else {
 		for quorumId, reservation := range reservations {
 			pbReservation[uint32(quorumId)] = &pb.QuorumReservation{
@@ -349,7 +446,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 			}
 			_, quorumProtocolConfig, err := params.GetQuorumConfigs(quorumId)
 			if err != nil {
-				s.logger.Debug("failed to get quorum protocol config, use zero value", "quorumId", quorumId)
+				s.logger.Error("failed to get quorum protocol config, use zero value", "quorumId", quorumId)
 				continue
 			}
 			reservationQuorumIds = append(reservationQuorumIds, quorumId)
@@ -360,7 +457,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	// Get off-chain period records for all reserved quorums
 	records, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, reservationQuorumIds, reservationCurrentPeriods, 3)
 	if err != nil {
-		s.logger.Debug("failed to get period records, use zero value", "err", err, "accountID", accountID)
+		s.logger.Error("failed to get period records, use zero value", "err", err, "accountID", accountID)
 	}
 	for quorumId, record := range records {
 		periodRecords[uint32(quorumId)] = &pb.PeriodRecords{
@@ -372,7 +469,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	var largestCumulativePaymentBytes []byte
 	largestCumulativePayment, err := s.meterer.MeteringStore.GetLargestCumulativePayment(ctx, accountID)
 	if err != nil {
-		s.logger.Debug("failed to get largest cumulative payment, use zero value", "err", err, "accountID", accountID)
+		s.logger.Error("failed to get largest cumulative payment, use zero value", "err", err, "accountID", accountID)
 	} else {
 		largestCumulativePaymentBytes = largestCumulativePayment.Bytes()
 	}
@@ -381,7 +478,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	var onchainCumulativePaymentBytes []byte
 	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
-		s.logger.Debug("failed to get ondemand payment, use zero value", "err", err, "accountID", accountID)
+		s.logger.Error("failed to get ondemand payment, use zero value", "err", err, "accountID", accountID)
 	} else {
 		onchainCumulativePaymentBytes = onDemandPayment.CumulativePayment.Bytes()
 	}
