@@ -64,7 +64,7 @@ func pushCommand(ctx *cli.Context) error {
 	verbose := !ctx.Bool("quiet")
 	throttleMB := ctx.Float64("throttle")
 
-	return Push(
+	return push(
 		logger,
 		sources,
 		destinations,
@@ -79,8 +79,8 @@ func pushCommand(ctx *cli.Context) error {
 		verbose)
 }
 
-// Push uses rsync to transfer LittDB data to the remote location(s)
-func Push(
+// push uses rsync to transfer LittDB data to the remote location(s)
+func push(
 	logger logging.Logger,
 	sources []string,
 	destinations []string,

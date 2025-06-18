@@ -133,7 +133,7 @@ func buildCLIParser() *cli.App {
 				Usage: "Push data to a remote location using ssh and rsync.",
 				ArgsUsage: "--src <source-path1> ... --src <source-pathN> " +
 					"--dst <remote-path1> ... --dst <remote-pathN> " +
-					"[-i path/to/key] [-p port] [-P password] [-v PASSWORD_VARIABLE] [--no-gc] " +
+					"[-i path/to/key] [-p port] [--no-gc] [--quiet] [--threads 42] [--throttle 100]" +
 					"<user>@<host>",
 				Args: true,
 				Flags: []cli.Flag{
@@ -186,41 +186,6 @@ func buildCLIParser() *cli.App {
 					},
 				},
 				Action: pushCommand,
-			},
-			{
-				Name:  "pull",
-				Usage: "Pull data from a remote location using ssh and rsync.",
-				ArgsUsage: "--src <remote-path1> ... --src <remote-pathN> " +
-					"--dst <local-path1> ... --dst <local-pathN> " +
-					"[-i path/to/key] [-p port] [-P password] [-v PASSWORD_VARIABLE] " +
-					"<user>@<host>",
-				Args: true,
-				Flags: []cli.Flag{
-					&cli.StringSliceFlag{
-						Name:     "src",
-						Aliases:  []string{"s"},
-						Usage:    "Remote source paths, at least one is required.",
-						Required: true,
-					},
-					&cli.StringSliceFlag{
-						Name:     "dest",
-						Aliases:  []string{"d"},
-						Usage:    "Local destination paths, at least one is required.",
-						Required: true,
-					},
-					&cli.Uint64Flag{
-						Name:    "port",
-						Aliases: []string{"p"},
-						Usage:   "SSH port to connect to the remote host.",
-						Value:   22,
-					},
-					&cli.StringFlag{
-						Name:    "key",
-						Aliases: []string{"i"},
-						Usage:   "Path to the SSH private key file for authentication.",
-						Value:   "~/.ssh/id_rsa",
-					},
-				},
 			},
 		},
 	}
