@@ -17,7 +17,7 @@ func TestTableInfo(t *testing.T) {
 	rand := random.NewTestRandom()
 	directory := t.TempDir()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	// Spread data across several root directories.
@@ -90,7 +90,7 @@ func TestTableInfo(t *testing.T) {
 	require.Error(t, err)
 
 	// Even when the DB is running, it should always be possible to check the snapshot directory.
-	lsResult, err := ls(logger, snapshotDir, false)
+	lsResult, err := ls(logger, snapshotDir, true, false)
 	require.NoError(t, err)
 	require.Equal(t, tableNames, lsResult)
 

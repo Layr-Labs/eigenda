@@ -81,7 +81,7 @@ func buildMemKeyDiskTableSingleShard(
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
@@ -134,7 +134,7 @@ func buildMemKeyDiskTableMultiShard(
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
@@ -185,7 +185,7 @@ func buildLevelDBKeyDiskTableSingleShard(
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
@@ -235,7 +235,7 @@ func buildLevelDBKeyDiskTableMultiShard(
 	name string,
 	paths []string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
@@ -402,7 +402,7 @@ func TestRestart(t *testing.T) {
 func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete string) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	directory := t.TempDir()
@@ -525,7 +525,7 @@ func TestMiddleFileMissing(t *testing.T) {
 func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete string) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	directory := t.TempDir()
@@ -718,7 +718,7 @@ func TestInitialFileMissing(t *testing.T) {
 func lastFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelete string) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	directory := t.TempDir()
@@ -917,7 +917,7 @@ func TestLastFileMissing(t *testing.T) {
 func truncatedKeyFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	directory := t.TempDir()
@@ -1147,7 +1147,7 @@ func TestTruncatedKeyFile(t *testing.T) {
 func truncatedValueFileTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	directory := t.TempDir()
@@ -1394,7 +1394,7 @@ func TestTruncatedValueFile(t *testing.T) {
 func unflushedKeysTest(t *testing.T, tableBuilder *tableBuilder) {
 	rand := random.NewTestRandom()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	directory := t.TempDir()

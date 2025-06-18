@@ -9,7 +9,7 @@ import (
 
 // main is the entry point for the LittDB cli.
 func main() {
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Failed to create logger: %v\n", err)
 		os.Exit(1)

@@ -15,7 +15,7 @@ import (
 
 func TestNewFileLock(t *testing.T) {
 	tempDir := t.TempDir()
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -132,7 +132,7 @@ func TestFileLockRelease(t *testing.T) {
 	tempDir := t.TempDir()
 	lockPath := filepath.Join(tempDir, "test.lock")
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	// Create a lock
@@ -159,7 +159,7 @@ func TestFileLockPath(t *testing.T) {
 	tempDir := t.TempDir()
 	lockPath := filepath.Join(tempDir, "test.lock")
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	lock, err := NewFileLock(logger, lockPath, true)
@@ -183,7 +183,7 @@ func TestFileLockConcurrency(t *testing.T) {
 	var wg sync.WaitGroup
 	results := make(chan bool, numGoroutines)
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	// Launch multiple goroutines trying to acquire the same lock
@@ -225,7 +225,7 @@ func TestFileLockConcurrency(t *testing.T) {
 func TestFileLockCleanupOnFailure(t *testing.T) {
 	tempDir := t.TempDir()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	// Test that failed lock creation cleans up partial files
@@ -254,7 +254,7 @@ func TestFileLockCleanupOnFailure(t *testing.T) {
 func TestFileLockEdgeCases(t *testing.T) {
 	tempDir := t.TempDir()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	t.Run("release nil lock", func(t *testing.T) {
@@ -295,7 +295,7 @@ func TestFileLockDebugInfo(t *testing.T) {
 	tempDir := t.TempDir()
 	lockPath := filepath.Join(tempDir, "debug-test.lock")
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	// Create first lock
@@ -321,7 +321,7 @@ func TestFileLockContentsFormat(t *testing.T) {
 	tempDir := t.TempDir()
 	lockPath := filepath.Join(tempDir, "content-test.lock")
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	lock, err := NewFileLock(logger, lockPath, true)
@@ -456,7 +456,7 @@ func TestStaleLockRecovery(t *testing.T) {
 	tempDir := t.TempDir()
 	lockPath := filepath.Join(tempDir, "stale-recovery.lock")
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	// Create a stale lock file with a definitely dead PID

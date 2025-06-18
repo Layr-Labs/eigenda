@@ -268,6 +268,10 @@ func (b *BenchmarkEngine) reader() {
 			break
 		default:
 			readInfo := b.dataTracker.GetReadInfo()
+			if readInfo == nil {
+				// This can happen when the context gets cancelled.
+				return
+			}
 
 			reservation := throttle.ReserveN(time.Now(), len(readInfo.Value))
 			if !reservation.OK() {

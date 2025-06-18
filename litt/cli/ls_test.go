@@ -15,7 +15,7 @@ import (
 func TestLs(t *testing.T) {
 	t.Parallel()
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	rand := random.NewTestRandom()
@@ -91,18 +91,18 @@ func TestLs(t *testing.T) {
 
 	// We should not be able to call ls on the core directories while the table holds a lock.
 	for _, root := range roots {
-		_, err = ls(logger, root, false)
+		_, err = ls(logger, root, true, false)
 		require.Error(t, err)
 	}
-	_, err = lsPaths(logger, roots, false)
+	_, err = lsPaths(logger, roots, true, false)
 	require.Error(t, err)
 
 	// Even when the DB is running, it should always be possible to ls the snapshot directory.
-	lsResult, err := ls(logger, snapshotDir, false)
+	lsResult, err := ls(logger, snapshotDir, true, false)
 	require.NoError(t, err)
 	require.Equal(t, tableNames, lsResult)
 
-	lsResult, err = lsPaths(logger, []string{snapshotDir}, false)
+	lsResult, err = lsPaths(logger, []string{snapshotDir}, true, false)
 	require.NoError(t, err)
 	require.Equal(t, tableNames, lsResult)
 
@@ -112,17 +112,17 @@ func TestLs(t *testing.T) {
 	// Now that the DB is closed, we should be able to ls it. We should find all tables defined regardless of which
 	// root directory we peer into.
 	for _, root := range roots {
-		lsResult, err = ls(logger, root, false)
+		lsResult, err = ls(logger, root, true, false)
 		require.NoError(t, err)
 		require.Equal(t, tableNames, lsResult)
 	}
 
-	lsResult, err = lsPaths(logger, roots, true)
+	lsResult, err = lsPaths(logger, roots, true, true)
 	require.NoError(t, err)
 	require.Equal(t, tableNames, lsResult)
 
 	// Data should still be present in the snapshot directory.
-	lsResult, err = ls(logger, snapshotDir, false)
+	lsResult, err = ls(logger, snapshotDir, true, false)
 	require.NoError(t, err)
 	require.Equal(t, tableNames, lsResult)
 }

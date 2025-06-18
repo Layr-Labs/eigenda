@@ -20,7 +20,7 @@ import (
 
 // rebaseCommand is the command to rebase a LittDB database.
 func rebaseCommand(ctx *cli.Context) error {
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		return fmt.Errorf("failed to create logger: %v", err)
 	}

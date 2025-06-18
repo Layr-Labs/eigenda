@@ -55,7 +55,7 @@ func buildMemDB(t *testing.T, path string) (litt.DB, error) {
 	require.NoError(t, err)
 
 	config.GCPeriod = 50 * time.Millisecond
-	config.Logger, err = common.NewLogger(common.DefaultTextLoggerConfig())
+	config.Logger, err = common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	tb := func(

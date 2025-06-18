@@ -20,7 +20,7 @@ func pushCommand(ctx *cli.Context) error {
 		return fmt.Errorf("not enough arguments provided, must provide USER@HOST")
 	}
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		return fmt.Errorf("failed to create logger: %v", err)
 	}
@@ -40,13 +40,6 @@ func pushCommand(ctx *cli.Context) error {
 	destinations := ctx.StringSlice("dest")
 	if len(destinations) == 0 {
 		return fmt.Errorf("no destinations provided")
-	}
-	for i, dest := range destinations {
-		var err error
-		destinations[i], err = util.SanitizePath(dest)
-		if err != nil {
-			return fmt.Errorf("Invalid source path: %s", dest)
-		}
 	}
 
 	userHost := ctx.Args().First()
@@ -103,17 +96,22 @@ func Push(
 	// Create an SSH session to the remote host.
 	connection, err := util.NewSSHSession(logger, user, host, port, keyPath, verbose)
 	if err != nil {
-		return fmt.Errorf("failed to create SSH session to %s@%s:%d: %v", user, host, port, err)
+		return fmt.Errorf("failed to create SSH session to %s@%s port %d: %v", user, host, port, err)
 	}
 
 	// Figure out where data currently exists at the destination(s). We don't want this operation to cause a file
 	// to exist in multiple places.
+	// TODO make sure this handles when there are multiple tables.
 	existingFilesMap, err := mapExistingFiles(logger, destinations, connection)
 	if err != nil {
 		return fmt.Errorf("failed to map existing files at destinations: %v", err)
 	}
 
 	tables, err := lsPaths(logger, sources, false, fsync)
+	if err != nil {
+		return fmt.Errorf("failed to list tables in source paths %v: %v", sources, err)
+	}
+
 	for _, tableName := range tables {
 		err = pushTable(
 			logger,
@@ -145,10 +143,11 @@ func mapExistingFiles(
 	connection *util.SSHSession) (map[string]string, error) {
 
 	existingFiles := make(map[string]string)
-	regex := "^.*\\.(metadata|values|keys)$"
+
+	extensions := []string{segment.MetadataFileExtension, segment.KeyFileExtension, segment.ValuesFileExtension}
 
 	for _, dest := range destinations {
-		filePaths, err := connection.FindRegex(dest, regex)
+		filePaths, err := connection.FindFiles(dest, extensions)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list files in destination %s: %v", dest, err)
 		}
@@ -194,6 +193,10 @@ func pushTable(
 		time.Now(),
 		false,
 		fsync)
+	if err != nil {
+		return fmt.Errorf("failed to gather segment files for table %s at paths %v: %v",
+			tableName, sources, err)
+	}
 
 	if len(segments) == 0 {
 		logger.Infof("No segments found for table %s", tableName)
@@ -206,8 +209,8 @@ func pushTable(
 		return fmt.Errorf("failed to check if segment %d is a snapshot: %v", lowestSegmentIndex, err)
 	}
 	if isSnapshot {
-		if len(segments) > 1 {
-			return fmt.Errorf("table %s is a snapshot, but multiple segments found: %v", tableName, segments)
+		if len(sources) > 1 {
+			return fmt.Errorf("table %s is a snapshot, but source directories found: %v", tableName, sources)
 		}
 
 		boundaryFile, err := disktable.LoadBoundaryFile(false, path.Join(sources[0], tableName))
@@ -218,6 +221,16 @@ func pushTable(
 
 		if boundaryFile.IsDefined() {
 			highestSegmentIndex = boundaryFile.BoundaryIndex()
+		}
+	}
+
+	// Ensure the remote segment directories exists.
+	for _, dest := range destinations {
+		segmentDir := path.Join(dest, tableName, segment.SegmentDirectory)
+		err = connection.Mkdirs(segmentDir)
+		if err != nil {
+			return fmt.Errorf("failed to create segment directory %s at destination %s: %v",
+				segmentDir, dest, err)
 		}
 	}
 

@@ -19,7 +19,7 @@ import (
 // pruneCommand can be used to remove data from a LittDB instance/snapshot.
 func pruneCommand(ctx *cli.Context) error {
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		return fmt.Errorf("failed to create logger: %v", err)
 	}

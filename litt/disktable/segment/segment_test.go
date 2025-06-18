@@ -25,7 +25,7 @@ func countFilesInDirectory(t *testing.T, directory string) int {
 func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()
 
@@ -174,7 +174,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()
 
@@ -331,7 +331,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 func TestWriteAndReadColdShard(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()
 

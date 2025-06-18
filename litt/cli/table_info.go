@@ -44,7 +44,7 @@ func tableInfoCommand(ctx *cli.Context) error {
 			"table-info command requires exactly at least one argument: <table-name>")
 	}
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		return fmt.Errorf("failed to create logger: %v", err)
 	}

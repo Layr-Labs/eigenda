@@ -22,7 +22,7 @@ func rebaseTest(
 	verbose bool,
 ) {
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	if overlap > 0 && preserveOriginal {

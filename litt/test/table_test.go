@@ -117,7 +117,7 @@ func buildMemKeyDiskTable(
 	name string,
 	path string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
@@ -167,7 +167,7 @@ func buildLevelDBKeyDiskTable(
 	name string,
 	path string) (litt.ManagedTable, error) {
 
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}

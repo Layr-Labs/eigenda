@@ -14,7 +14,7 @@ import (
 func TestReadWriteKeys(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()
 
@@ -89,7 +89,7 @@ func TestReadWriteKeys(t *testing.T) {
 func TestReadingTruncatedKeyFile(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()
 
@@ -172,7 +172,7 @@ func TestReadingTruncatedKeyFile(t *testing.T) {
 func TestSwappingKeyFile(t *testing.T) {
 	t.Parallel()
 	rand := random.NewTestRandom()
-	logger, err := common.NewLogger(common.DefaultTextLoggerConfig())
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 	directory := t.TempDir()
 
