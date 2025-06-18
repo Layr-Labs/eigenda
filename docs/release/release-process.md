@@ -1,4 +1,4 @@
-# GitHub Release Management Process
+# Release Management Process
 
 ## Table of Contents
 
@@ -7,11 +7,9 @@
    - [Change Policy](#change-policy)
    - [Change Process](#change-process)
 3. [Tagging a Release](#3-tagging-a-release)
-4. [Updates After Release Tag Has Been Cut](#4-updates-after-release-tag-has-been-cut)
-5. [Official Release & Notes](#5-official-release--notes)
+4. [Github Release](#4-github-release)
    - [Creating the Release](#creating-the-release)
-   - [Release Notes (TODO)](#release-notes-todo)
-6. [Post-Release Updates](#6-post-release-updates)
+   - [Release Notes](#release-notes)
 
 ---
 
@@ -56,8 +54,8 @@ version release branch, and pulling without needing to know the latest minor or 
 - **High bar for inclusion**: Only critical bugfixes or business-critical features
   - Even bugfixes should not be reflexively included: only high-severity issues
 - **Team consensus required**: Single engineer cannot make the decision
-- **Public visibility**: Must have team discussion (e.g., Slack thread) before proceeding. Alternatively, management
-may sign-off that a feature should be included after a feature freeze has been enacted. Note that even with managment
+- **Public visibility**: Must have team discussion (e.g. Slack thread) before proceeding. Alternatively, management
+may sign-off that a feature should be included after a feature freeze has been enacted. Note that even with management
 sign-off, a PR targetting a release branch must still go through the standard peer-review process.
 
 #### Change Process
@@ -73,30 +71,38 @@ sign-off, a PR targetting a release branch must still go through the standard pe
 
 ### 3. **Tagging a Release**
 
-- **When ready**, tag from HEAD of release branch:
+**⚠️ Tags are immutable:** NEVER force-push a tag to a different commit
+
+#### Release Candidate Tags
+
+- **Cut release candidate tags for initial testing** (e.g. preprod environments):
+  - Tag format: `v<MAJOR>.<MINOR>.<PATCH>-rc.<NUMBER>`
+  - Example: `v0.10.0-rc.1`
+  - Release candidates enable iterative testing without causing the patch version to increase
+  - Release candidate tags clearly indicate to operators and users that a release is **not production-ready**
+  - Commands:
+    - `git checkout release/0.10`
+    - `git tag v0.10.0-rc.1`
+    - `git push origin v0.10.0-rc.1`
+- **Tag additional release candidates** with incremented RC number (e.g. `v0.10.0-rc.2`, `v0.10.0-rc.3`)
+
+#### Production Release Tags
+
+- **Tag first production release** when ready to deploy to testnet:
   - Tag format: `v<MAJOR>.<MINOR>.<PATCH>`
   - Example: `v0.10.0`
-  - `git checkout release/0.10`
-  - `git tag v0.10.0`
-  - `git push origin v0.10.0`
-- **⚠️ Tags are immutable:**
-  - NEVER force-push a tag to a different commit
-  - If a mistake is made, create a new tag with incremented version
+  - Commands:
+    - `git checkout release/0.10`
+    - `git tag v0.10.0`
+    - `git push origin v0.10.0`
+- **Additional release candidate tags** may be cut even after the first production release has been tagged
+  - Do this when testing of a production release reveals that additional iterations are necessary
+
+See the [Release Example](release-example.md) document for a step-by-step release procedure example.
 
 ---
 
-### 4. **Updates After Release Tag Has Been Cut**
-
-- **Additional fixes** after initial tag may be required
-- **Follow same change policy** as described in [Section 2](#2-changes-to-a-release-branch)
-- **Do not tag reflexively** after every merge:
-  - Accumulate changes until a meaningful patch set is ready
-  - Create new release tag with incremented patch version (e.g., `v0.10.1`, `v0.10.2`)
-- **Continue iteratively** until all critical issues are resolved
-
----
-
-### 5. **Official Release & Notes**
+### 4. **Github Release**
 
 #### Creating the Release
 
@@ -108,12 +114,3 @@ sign-off, a PR targetting a release branch must still go through the standard pe
 #### Release Notes
 
 - Follow the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format
-
----
-
-### 6. **Post-Release Updates**
-
-- **Additional patch updates** after release shipping follow the same process:
-  - Merge new code into the release branch following [Section 2](#2-changes-to-a-release-branch) policy
-  - Cut new tags as needed following [Section 3](#3-tagging-a-release) process
-  - Create new GitHub releases targeting updated tags following [Section 5](#5-official-release--notes) process
