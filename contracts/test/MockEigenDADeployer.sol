@@ -8,9 +8,9 @@ import {EigenDAServiceManager, IRewardsCoordinator} from "src/core/EigenDAServic
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {EigenDATypesV1 as DATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 import {EigenDATypesV2 as DATypesV2} from "src/core/libraries/v2/EigenDATypesV2.sol";
-import {EigenDACertVerificationV1Lib} from "src/periphery/cert/legacy/v1/EigenDACertVerificationV1Lib.sol";
+import {EigenDACertVerificationV1Lib} from "src/integrations/cert/legacy/v1/EigenDACertVerificationV1Lib.sol";
 import {IEigenDAServiceManager} from "src/core/interfaces/IEigenDAServiceManager.sol";
-import {EigenDACertVerifier} from "src/periphery/cert/EigenDACertVerifier.sol";
+import {EigenDACertVerifier} from "src/integrations/cert/EigenDACertVerifier.sol";
 import {EigenDAThresholdRegistry, IEigenDAThresholdRegistry} from "src/core/EigenDAThresholdRegistry.sol";
 import {IEigenDABatchMetadataStorage} from "src/core/interfaces/IEigenDABatchMetadataStorage.sol";
 import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVerifier.sol";
