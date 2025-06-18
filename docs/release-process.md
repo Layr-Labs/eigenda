@@ -105,14 +105,9 @@ sign-off, a PR targetting a release branch must still go through the standard pe
   - Create GitHub release via UI, targeting the most recent tag
   - **Note**: Release will likely have non-zero patch version
 
-#### Release Notes (TODO)
+#### Release Notes
 
-- Define a consistent format and content structure
-- Include tooling guidance (likely an LLM prompt)
-- Notes should include:
-  - Feature summary
-  - Fixes included
-  - Contributor acknowledgments
+- Follow the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format
 
 ---
 
