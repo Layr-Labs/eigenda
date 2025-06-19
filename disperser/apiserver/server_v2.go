@@ -310,7 +310,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 
 	// Find most restrictive reservation parameters across all quorums
 	var reservation *pb.Reservation
-	if allQuorumsReply.Reservations != nil && len(allQuorumsReply.Reservations) > 0 {
+	if len(allQuorumsReply.Reservations) > 0 {
 		var minSymbolsPerSecond uint64 = ^uint64(0) // max uint64
 		var latestStartTimestamp uint32
 		var earliestEndTimestamp uint32 = ^uint32(0) // max uint32
@@ -348,7 +348,7 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 
 	// Build period records by selecting highest usage for each period index across all quorums
 	var periodRecords []*pb.PeriodRecord
-	if allQuorumsReply.PeriodRecords != nil && len(allQuorumsReply.PeriodRecords) > 0 {
+	if len(allQuorumsReply.PeriodRecords) > 0 {
 		highestPeriodRecords := make([]*pb.PeriodRecord, meterer.MinNumBins)
 		for _, quorumRecords := range allQuorumsReply.PeriodRecords {
 			if quorumRecords == nil {
