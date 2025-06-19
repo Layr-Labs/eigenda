@@ -5,9 +5,9 @@ initialOwner = "0x002721B4790d97dC140a049936aA710152Ba92D5"
 
 # Parameters shared across various deployed contracts
 [initParams.shared]
-rewardsCoordinator = ""
-avsDirectory = ""
-delegationManager = ""
+rewardsCoordinator = "0x7750d328b314EfFa365A0402CcfD489B80B0adda"
+avsDirectory = "0x135DDa560e946695d6f155dACaFC6f1F25C1F5AF"
+delegationManager = "0x39053D51B77DC0d36036Fc1fCc8Cb819df8Ef37A"
 initialPausedStatus = 0
 
 # Parameters for the pauser registry contract
@@ -20,7 +20,7 @@ unpauser = "0x002721B4790d97dC140a049936aA710152Ba92D5"
 # Parameters for the registry coordinator contract. Copied from mainnet.
 [initParams.middleware.registryCoordinator]
 churnApprover = "0xe0550117Cb066D3b330eBd764B0d75D3BA378734"
-minimumStakes = [32000000000000000000, 1000000000000000000, 1000000000000000000]
+minimumStakes = ["32000000000000000000", "1000000000000000000", "1000000000000000000"]
 strategyParams = [
     [
         { 0_strategy = "0xbeaC0eeEeeeeEEeEeEEEEeeEEeEeeeEeeEEBEaC0", 1_multiplier = 1000000000000000000 },

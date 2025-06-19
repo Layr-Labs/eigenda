@@ -71,7 +71,7 @@ contract DeployMainnet is Script {
 
     string cfg;
 
-    function initConfig() internal virtual  {
+    function initConfig() internal virtual {
         cfg = vm.readFile(vm.envString("DEPLOY_MAINNET_CONFIG"));
     }
 
@@ -86,12 +86,9 @@ contract DeployMainnet is Script {
 
         // DEPLOY MOCK IMPLEMENTATION
         impl[EMPTY_CONTRACT] = address(new EmptyContract());
-        
 
         // DEPLOY PAUSER
-        deployed[PAUSER_REGISTRY] = address(
-            new PauserRegistry(cfg.pausers(), cfg.unpauser())
-        );
+        deployed[PAUSER_REGISTRY] = address(new PauserRegistry(cfg.pausers(), cfg.unpauser()));
         impl[PAUSER_REGISTRY] = deployed[PAUSER_REGISTRY];
         upgraded[PAUSER_REGISTRY] = true;
 
@@ -103,53 +100,39 @@ contract DeployMainnet is Script {
         // SOCKET REGISTRY
         // BLS APK REGISTRY
         // SERVICE MANAGER
-        deployed[INDEX_REGISTRY] = address(new TransparentUpgradeableProxy(
-            impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""
-        ));
-        deployed[SOCKET_REGISTRY] = address(new TransparentUpgradeableProxy(
-            impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""
-        ));
-        deployed[BLS_APK_REGISTRY] = address(new TransparentUpgradeableProxy(
-            impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""
-        ));
+        deployed[INDEX_REGISTRY] =
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
+        deployed[SOCKET_REGISTRY] =
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
+        deployed[BLS_APK_REGISTRY] =
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
         impl[MOCK_STAKE_REGISTRY] = address(new MockStakeRegistry(IDelegationManager(cfg.delegationManager())));
         // The service manager implementation requires the stake registry to expose the delegation manager on construction.
-        deployed[STAKE_REGISTRY] = address(new TransparentUpgradeableProxy(
-            impl[MOCK_STAKE_REGISTRY], deployed[PROXY_ADMIN], ""
-        ));
+        deployed[STAKE_REGISTRY] =
+            address(new TransparentUpgradeableProxy(impl[MOCK_STAKE_REGISTRY], deployed[PROXY_ADMIN], ""));
         // The service manager implementation requires the registry coordinator to expose the stake registry and bls APK registry on construction.
         // And this can only be done after the stake registry and bls APK registry proxies are known.
-        impl[MOCK_REGISTRY_COORDINATOR] = address(new MockRegistryCoordinator(
-            IStakeRegistry(deployed[STAKE_REGISTRY]),
-            IBLSApkRegistry(deployed[BLS_APK_REGISTRY])
-        ));
-        deployed[REGISTRY_COORDINATOR] = address(new TransparentUpgradeableProxy(
-            impl[MOCK_REGISTRY_COORDINATOR], deployed[PROXY_ADMIN], ""
-        ));
-        deployed[THRESHOLD_REGISTRY] = address(new TransparentUpgradeableProxy(
-            impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""
-        ));
-        deployed[RELAY_REGISTRY] = address(new TransparentUpgradeableProxy(
-            impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""
-        ));
-        deployed[DISPERSER_REGISTRY] = address(new TransparentUpgradeableProxy(
-            impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""
-        ));
-        deployed[PAYMENT_VAULT] = address(new TransparentUpgradeableProxy(
-            impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""
-        ));
-        deployed[SERVICE_MANAGER] = address(new TransparentUpgradeableProxy(
-            impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""
-        ));
-        deployed[EJECTION_MANAGER] = address(new TransparentUpgradeableProxy(
-            impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""
-        ));
-
-
-
-        impl[INDEX_REGISTRY] = address(
-            new IndexRegistry(IRegistryCoordinator(deployed[REGISTRY_COORDINATOR]))
+        impl[MOCK_REGISTRY_COORDINATOR] = address(
+            new MockRegistryCoordinator(
+                IStakeRegistry(deployed[STAKE_REGISTRY]), IBLSApkRegistry(deployed[BLS_APK_REGISTRY])
+            )
         );
+        deployed[REGISTRY_COORDINATOR] =
+            address(new TransparentUpgradeableProxy(impl[MOCK_REGISTRY_COORDINATOR], deployed[PROXY_ADMIN], ""));
+        deployed[THRESHOLD_REGISTRY] =
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
+        deployed[RELAY_REGISTRY] =
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
+        deployed[DISPERSER_REGISTRY] =
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
+        deployed[PAYMENT_VAULT] =
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
+        deployed[SERVICE_MANAGER] =
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
+        deployed[EJECTION_MANAGER] =
+            address(new TransparentUpgradeableProxy(impl[EMPTY_CONTRACT], deployed[PROXY_ADMIN], ""));
+
+        impl[INDEX_REGISTRY] = address(new IndexRegistry(IRegistryCoordinator(deployed[REGISTRY_COORDINATOR])));
         upgrade(INDEX_REGISTRY, "");
 
         impl[STAKE_REGISTRY] = address(
@@ -159,16 +142,11 @@ contract DeployMainnet is Script {
         );
         upgrade(STAKE_REGISTRY, "");
 
-        impl[SOCKET_REGISTRY] = address(
-            new SocketRegistry(IRegistryCoordinator(deployed[REGISTRY_COORDINATOR]))
-        );
+        impl[SOCKET_REGISTRY] = address(new SocketRegistry(IRegistryCoordinator(deployed[REGISTRY_COORDINATOR])));
         upgrade(SOCKET_REGISTRY, "");
 
-        impl[BLS_APK_REGISTRY] = address(
-            new BLSApkRegistry(IRegistryCoordinator(deployed[REGISTRY_COORDINATOR]))
-        );
+        impl[BLS_APK_REGISTRY] = address(new BLSApkRegistry(IRegistryCoordinator(deployed[REGISTRY_COORDINATOR])));
         upgrade(BLS_APK_REGISTRY, "");
-
 
         impl[REGISTRY_COORDINATOR] = address(
             new RegistryCoordinator(
@@ -176,22 +154,25 @@ contract DeployMainnet is Script {
                 IStakeRegistry(deployed[STAKE_REGISTRY]),
                 IBLSApkRegistry(deployed[BLS_APK_REGISTRY]),
                 IIndexRegistry(deployed[INDEX_REGISTRY]),
-                ISocketRegistry(deployed[SOCKET_REGISTRY]
+                ISocketRegistry(deployed[SOCKET_REGISTRY])
             )
-        ));
-        upgrade(REGISTRY_COORDINATOR, abi.encodeCall(
-            RegistryCoordinator.initialize,
-            (
-                cfg.initialOwner(),
-                cfg.churnApprover(),
-                deployed[EJECTION_MANAGER],
-                IPauserRegistry(deployed[PAUSER_REGISTRY]),
-                cfg.initialPausedStatus(),
-                cfg.operatorSetParams(),
-                cfg.minimumStakes(),
-                cfg.strategyParams()
+        );
+        upgrade(
+            REGISTRY_COORDINATOR,
+            abi.encodeCall(
+                RegistryCoordinator.initialize,
+                (
+                    cfg.initialOwner(),
+                    cfg.churnApprover(),
+                    deployed[EJECTION_MANAGER],
+                    IPauserRegistry(deployed[PAUSER_REGISTRY]),
+                    cfg.initialPausedStatus(),
+                    cfg.operatorSetParams(),
+                    cfg.minimumStakes(),
+                    cfg.strategyParams()
+                )
             )
-        ));
+        );
 
         impl[SERVICE_MANAGER] = address(
             new EigenDAServiceManager(
@@ -205,77 +186,72 @@ contract DeployMainnet is Script {
                 IEigenDADisperserRegistry(deployed[DISPERSER_REGISTRY])
             )
         );
-        upgrade(SERVICE_MANAGER, abi.encodeCall(
-            EigenDAServiceManager.initialize,
-            (
-                IPauserRegistry(deployed[PAUSER_REGISTRY]),
-                cfg.initialPausedStatus(),
-                cfg.initialOwner(),
-                cfg.batchConfirmers(),
-                cfg.rewardsInitiator()
+        upgrade(
+            SERVICE_MANAGER,
+            abi.encodeCall(
+                EigenDAServiceManager.initialize,
+                (
+                    IPauserRegistry(deployed[PAUSER_REGISTRY]),
+                    cfg.initialPausedStatus(),
+                    cfg.initialOwner(),
+                    cfg.batchConfirmers(),
+                    cfg.rewardsInitiator()
+                )
             )
-        ));
+        );
 
-
-        impl[EJECTION_MANAGER] = address(new EjectionManager(
-            IRegistryCoordinator(deployed[REGISTRY_COORDINATOR]),
-            IStakeRegistry(deployed[STAKE_REGISTRY])
-        ));
-        upgrade(EJECTION_MANAGER, abi.encodeCall(
-            EjectionManager.initialize,
-            (
-                cfg.initialOwner(),
-                cfg.ejectors(),
-                cfg.quorumEjectionParams()
+        impl[EJECTION_MANAGER] = address(
+            new EjectionManager(
+                IRegistryCoordinator(deployed[REGISTRY_COORDINATOR]), IStakeRegistry(deployed[STAKE_REGISTRY])
             )
-        ));
+        );
+        upgrade(
+            EJECTION_MANAGER,
+            abi.encodeCall(EjectionManager.initialize, (cfg.initialOwner(), cfg.ejectors(), cfg.quorumEjectionParams()))
+        );
 
         impl[THRESHOLD_REGISTRY] = address(new EigenDAThresholdRegistry());
-        upgrade(THRESHOLD_REGISTRY, abi.encodeCall(
-            EigenDAThresholdRegistry.initialize,
-            (
-                cfg.initialOwner(),
-                cfg.quorumAdversaryThresholdPercentages(),
-                cfg.quorumConfirmationThresholdPercentages(),
-                cfg.quorumNumbersRequired(),
-                cfg.versionedBlobParams()
+        upgrade(
+            THRESHOLD_REGISTRY,
+            abi.encodeCall(
+                EigenDAThresholdRegistry.initialize,
+                (
+                    cfg.initialOwner(),
+                    cfg.quorumAdversaryThresholdPercentages(),
+                    cfg.quorumConfirmationThresholdPercentages(),
+                    cfg.quorumNumbersRequired(),
+                    cfg.versionedBlobParams()
+                )
             )
-        ));
+        );
 
         impl[RELAY_REGISTRY] = address(new EigenDARelayRegistry());
-        upgrade(RELAY_REGISTRY, abi.encodeCall(
-            EigenDARelayRegistry.initialize,
-            (
-                cfg.initialOwner()
-            )
-        ));
-        
+        upgrade(RELAY_REGISTRY, abi.encodeCall(EigenDARelayRegistry.initialize, (cfg.initialOwner())));
+
         impl[DISPERSER_REGISTRY] = address(new EigenDADisperserRegistry());
-        upgrade(DISPERSER_REGISTRY, abi.encodeCall(
-            EigenDADisperserRegistry.initialize,
-            (cfg.initialOwner())
-        ));
+        upgrade(DISPERSER_REGISTRY, abi.encodeCall(EigenDADisperserRegistry.initialize, (cfg.initialOwner())));
 
         impl[PAYMENT_VAULT] = address(new PaymentVault());
-        upgrade(PAYMENT_VAULT, abi.encodeCall(
-            PaymentVault.initialize,
-            (
-                cfg.initialOwner(),
-                cfg.minNumSymbols(),
-                cfg.pricePerSymbol(),
-                cfg.priceUpdateCooldown(),
-                cfg.globalSymbolsPerPeriod(),
-                cfg.reservationPeriodInterval(),
-                cfg.globalRatePeriodInterval()
+        upgrade(
+            PAYMENT_VAULT,
+            abi.encodeCall(
+                PaymentVault.initialize,
+                (
+                    cfg.initialOwner(),
+                    cfg.minNumSymbols(),
+                    cfg.pricePerSymbol(),
+                    cfg.priceUpdateCooldown(),
+                    cfg.globalSymbolsPerPeriod(),
+                    cfg.reservationPeriodInterval(),
+                    cfg.globalRatePeriodInterval()
+                )
             )
-        ));
-
-        deployed[OPERATOR_STATE_RETRIEVER] = address(
-            new OperatorStateRetriever()
         );
+
+        deployed[OPERATOR_STATE_RETRIEVER] = address(new OperatorStateRetriever());
         impl[OPERATOR_STATE_RETRIEVER] = deployed[OPERATOR_STATE_RETRIEVER];
         upgraded[OPERATOR_STATE_RETRIEVER] = true;
-        
+
         deployed[CERT_VERIFIER] = address(
             new EigenDACertVerifier(
                 IEigenDAThresholdRegistry(deployed[THRESHOLD_REGISTRY]),
@@ -314,10 +290,7 @@ contract DeployMainnet is Script {
         require(upgraded[contractName], string.concat("Contract not upgraded: ", contractName));
     }
 
-    function upgrade(
-        string memory contractName,
-        bytes memory initData
-    ) internal {
+    function upgrade(string memory contractName, bytes memory initData) internal {
         require(!upgraded[contractName], string.concat("Contract already upgraded: ", contractName));
         require(deployed[contractName] != address(0), string.concat("Contract not deployed: ", contractName));
 
@@ -331,5 +304,4 @@ contract DeployMainnet is Script {
         }
         upgraded[contractName] = true;
     }
-
 }

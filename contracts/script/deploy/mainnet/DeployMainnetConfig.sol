@@ -11,8 +11,6 @@ import {IEjectionManager} from "lib/eigenlayer-middleware/src/interfaces/IEjecti
 import "forge-std/StdToml.sol";
 import {EigenDATypesV1} from "src/core/libraries/v1/EigenDATypesV1.sol";
 
-
-
 library InitParamsLib {
     function initialOwner(string memory configData) internal pure returns (address) {
         return stdToml.readAddress(configData, ".initialOwner");
@@ -41,7 +39,7 @@ library InitParamsLib {
     function initialPausedStatus(string memory configData) internal pure returns (uint256) {
         return stdToml.readUint(configData, ".initParams.shared.initialPausedStatus");
     }
-    
+
     function churnApprover(string memory configData) internal pure returns (address) {
         return stdToml.readAddress(configData, ".initParams.middleware.registryCoordinator.churnApprover");
     }
@@ -56,10 +54,13 @@ library InitParamsLib {
         return abi.decode(operatorConfigsRaw, (IRegistryCoordinator.OperatorSetParam[]));
     }
 
-    function minimumStakes(string memory configData) internal pure returns (uint96[] memory) {
-        bytes memory stakesConfigsRaw =
-            stdToml.parseRaw(configData, ".initParams.middleware.registryCoordinator.minimumStakes");
-        return abi.decode(stakesConfigsRaw, (uint96[]));
+    function minimumStakes(string memory configData) internal pure returns (uint96[] memory res) {
+        uint256[] memory minimumStakesRaw =
+            stdToml.readUintArray(configData, ".initParams.middleware.registryCoordinator.minimumStakes");
+        res = new uint96[](minimumStakesRaw.length);
+        for (uint256 i = 0; i < minimumStakesRaw.length; i++) {
+            res[i] = uint96(minimumStakesRaw[i]);
+        }
     }
 
     function strategyParams(string memory configData)
@@ -148,8 +149,10 @@ library InitParamsLib {
         pure
         returns (EigenDATypesV1.SecurityThresholds memory thresholds)
     {
-        thresholds.confirmationThreshold = uint8(stdToml.readUint(configData, ".initParams.eigenDA.certVerifier.confirmationThreshold"));
-        thresholds.adversaryThreshold = uint8(stdToml.readUint(configData, ".initParams.eigenDA.certVerifier.adversaryThreshold"));
+        thresholds.confirmationThreshold =
+            uint8(stdToml.readUint(configData, ".initParams.eigenDA.certVerifier.confirmationThreshold"));
+        thresholds.adversaryThreshold =
+            uint8(stdToml.readUint(configData, ".initParams.eigenDA.certVerifier.adversaryThreshold"));
     }
 
     function certVerifierQuorumNumbersRequired(string memory configData) internal pure returns (bytes memory) {
@@ -162,7 +165,5 @@ library InitParamsLib {
             quorumNumbersRequiredBytes[i] = bytes1(uint8(certQuorumNumbersRequired[i]));
         }
         return quorumNumbersRequiredBytes;
-
     }
-
 }
