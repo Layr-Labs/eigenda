@@ -100,7 +100,7 @@ func NewBenchmarkEngine(configPath string) (*BenchmarkEngine, error) {
 	writeBytesPerSecondPerThread := writeBytesPerSecond / uint64(cfg.WriterParallelism)
 
 	// If we set the write burst size smaller than an individual value, then the rate limiter will never
-	// permit any writes. Ideally, we'd just set the burst size to 0 since we don't want busty/volatile writes,
+	// permit any writes. Ideally, we'd just set the burst size to 0 since we don't want bursty/volatile writes,
 	// but since we are using the rate.Limiter utility, we are required to set a burst size, and a bust size
 	// smaller than an individual value will cause the rate limiter to never permit writes.
 	writeBurstSize := uint64(cfg.ValueSizeMB * float64(units.MiB))
