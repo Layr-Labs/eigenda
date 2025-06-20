@@ -31,7 +31,7 @@ type tableBuilder struct {
 
 // This test executes against different table implementations. This is useful for distinguishing between bugs that
 // are present in an implementation, and bugs that are present in the test scenario itself.
-var tableBuilders = []*tableBuilder{ // TODO
+var tableBuilders = []*tableBuilder{
 	{
 		name:    "MemKeyDiskTableSingleShard",
 		builder: buildMemKeyDiskTableSingleShard,

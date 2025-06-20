@@ -449,3 +449,58 @@ func TestWriteAndReadColdShard(t *testing.T) {
 
 	require.Equal(t, 0, countFilesInDirectory(t, segmentPath.SegmentDirectory()))
 }
+
+func TestGetFilePaths(t *testing.T) {
+	rand := random.NewTestRandom()
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
+	require.NoError(t, err)
+	errorMonitor := util.NewErrorMonitor(context.Background(), logger, nil)
+
+	index := rand.Uint32()
+	shardingFactor := rand.Uint32Range(1, 10)
+	salt := make([]byte, 16)
+
+	segmentPath, err := NewSegmentPath(t.TempDir(), "", "table")
+	require.NoError(t, err)
+
+	err = os.MkdirAll(segmentPath.SegmentDirectory(), 0755)
+	require.NoError(t, err)
+
+	segment, err := CreateSegment(
+		logger,
+		errorMonitor,
+		index,
+		[]*SegmentPath{segmentPath},
+		shardingFactor,
+		([16]byte)(salt),
+		false)
+	require.NoError(t, err)
+
+	files := segment.GetFilePaths()
+	filesSet := make(map[string]struct{})
+	for _, file := range files {
+		filesSet[file] = struct{}{}
+	}
+
+	expectedCount := 0
+
+	// metadata
+	_, found := filesSet[segment.metadata.path()]
+	require.True(t, found)
+	expectedCount++
+
+	// key file
+	_, found = filesSet[segment.keys.path()]
+	require.True(t, found)
+	expectedCount++
+
+	// value files
+	for i := uint32(0); i < shardingFactor; i++ {
+		_, found = filesSet[segment.shards[i].path()]
+		require.True(t, found)
+		expectedCount++
+	}
+
+	// make sure there aren't any additional files
+	require.Equal(t, expectedCount, len(filesSet))
+}

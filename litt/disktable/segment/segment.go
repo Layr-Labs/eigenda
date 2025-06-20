@@ -535,8 +535,6 @@ func (s *Segment) flush(seal bool) (FlushWaitFunction, error) {
 	}, nil
 }
 
-// TODO unit test snapshotting
-
 // Snapshot takes a snapshot of the files in the segment.
 func (s *Segment) Snapshot() error {
 	if !s.snapshottingEnabled {
@@ -851,8 +849,6 @@ func (s *Segment) keyFileControlLoop() {
 		}
 	}
 }
-
-// TODO unit test this
 
 // GetFilePaths returns a list of file paths for all files that make up this segment.
 func (s *Segment) GetFilePaths() []string {

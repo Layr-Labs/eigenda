@@ -19,6 +19,8 @@ import (
 )
 
 func TestSnapshot(t *testing.T) {
+	t.Parallel()
+
 	rand := random.NewTestRandom()
 	testDirectory := t.TempDir()
 
@@ -212,6 +214,8 @@ func TestSnapshot(t *testing.T) {
 
 // This test verifies that LittDB rebuilds the snapshot directory correctly every time it starts up.
 func TestSnapshotRebuilding(t *testing.T) {
+	t.Parallel()
+
 	rand := random.NewTestRandom()
 	testDirectory := t.TempDir()
 
@@ -426,6 +430,8 @@ func TestSnapshotRebuilding(t *testing.T) {
 
 // The DB should not attempt to rebuild snapshot files that are below the specified lower bound.
 func TestSnapshotLowerBound(t *testing.T) {
+	t.Parallel()
+
 	rand := random.NewTestRandom()
 	testDirectory := t.TempDir()
 
