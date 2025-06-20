@@ -16,7 +16,7 @@ type Accountant struct {
 	// on-chain states
 	accountID    gethcommon.Address
 	reservations map[core.QuorumID]*core.ReservedPayment
-	// OnDemand initially only enabled on quorum. Accountant must be updated to be quorum specific
+	// OnDemand is initially only enabled on quorum 0. Accountant must be updated to be quorum specific
 	// after the protocol decides to support onDemand on custom quorums and decentralized ratelimiting.
 	onDemand *core.OnDemandPayment
 
