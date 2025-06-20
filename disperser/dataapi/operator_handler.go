@@ -281,8 +281,8 @@ func (oh *OperatorHandler) GetOperatorsStakeAtBlock(ctx context.Context, operato
 		for i, op := range operators {
 			if len(operatorId) == 0 || operatorId == op.OperatorId.Hex() {
 				weiToEth := new(big.Float).SetFloat64(1e18)
-				stakeAmountWei := new(big.Float).Quo(&op.StakeAmount, weiToEth)
-				stakeAmount, _ := stakeAmountWei.Float64()
+				stakeAmountEth := new(big.Float).Quo(&op.StakeAmount, weiToEth)
+				stakeAmount, _ := stakeAmountEth.Float64()
 				stakeRanked[quorum] = append(stakeRanked[quorum], &OperatorStake{
 					QuorumId:        quorum,
 					OperatorId:      op.OperatorId.Hex(),
