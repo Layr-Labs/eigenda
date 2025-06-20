@@ -10,12 +10,22 @@ contract EigenDAAddressDirectory is OwnableUpgradeable, IEigenDAAddressDirectory
         _transferOwnership(_initialOwner);
     }
 
-    function setAddress(bytes32 key, address value) external onlyOwner {
+    /// @inheritdoc IEigenDAAddressDirectory
+    function setAddress(string memory name, address value) external onlyOwner {
         AddressDirectoryStorage.Layout storage s = AddressDirectoryStorage.layout();
+        bytes32 key = keccak256(abi.encodePacked(name));
         s.addresses[key] = value;
-        emit AddressSet(key, value);
+        emit AddressSet(name, value);
     }
 
+    /// @inheritdoc IEigenDAAddressDirectory
+    function getAddress(string memory name) external view returns (address) {
+        AddressDirectoryStorage.Layout storage s = AddressDirectoryStorage.layout();
+        bytes32 key = keccak256(abi.encodePacked(name));
+        return s.addresses[key];
+    }
+
+    /// @inheritdoc IEigenDAAddressDirectory
     function getAddress(bytes32 key) external view returns (address) {
         AddressDirectoryStorage.Layout storage s = AddressDirectoryStorage.layout();
         return s.addresses[key];
