@@ -58,6 +58,13 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
         UsageAuthorizationLib.depositOnDemand(quorumId, msg.sender, amount);
     }
 
+    function depositOnDemandForAccount(uint64 quorumId, address account, uint256 amount)
+        external
+        onlyOnDemandEnabled(quorumId)
+    {
+        UsageAuthorizationLib.depositOnDemand(quorumId, account, amount);
+    }
+
     /// OWNER
 
     function transferOwnership(address newOwner) external onlyOwner {

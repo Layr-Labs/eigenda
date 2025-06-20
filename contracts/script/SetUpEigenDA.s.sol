@@ -129,14 +129,7 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
                 1, clientAddress, reservation
             );
         }
-        vm.stopBroadcast();
 
-        vm.startBroadcast(msg.sender);
-        // Make on-demand deposits
-        UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).depositOnDemand(
-            0, // quorumId
-            0.1 ether // amount
-        );
         vm.stopBroadcast();
     }
 
@@ -258,6 +251,25 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
                 metadataURI
             );
         }
+
+        // Register Reservations for client as the eigenDACommunityMultisig
+        vm.startBroadcast(msg.sender);
+        address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
+        // Allocate tokens to client address (tokens come from msg.sender who has them from initial minting)
+        _allocate(IERC20(deployedStrategyArray[0].underlyingToken()), toArray(clientAddress), toArray(0.1 ether));
+        vm.stopBroadcast();
+
+        // Client needs to approve the transfer
+        vm.startBroadcast(clientAddress);
+        IERC20(deployedStrategyArray[0].underlyingToken()).approve(address(usageAuthorizationRegistry), 0.1 ether);
+        vm.stopBroadcast();
+
+        // Now deployer can call depositOnDemandForAccount
+        vm.startBroadcast(msg.sender);
+        UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).depositOnDemandForAccount(
+            0, clientAddress, 0.1 ether
+        );
+        vm.stopBroadcast();
 
         // Deposit stakers into EigenLayer and delegate to operators
         for (uint256 i = 0; i < stakerPrivateKeys.length; i++) {
