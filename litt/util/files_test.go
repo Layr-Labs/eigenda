@@ -2125,3 +2125,156 @@ func TestRecursiveMoveWithSymlinksIntegration(t *testing.T) {
 		})
 	}
 }
+
+func TestSanitizePath(t *testing.T) {
+	// Get the current working directory and home directory for test expectations
+	cwd, err := os.Getwd()
+	require.NoError(t, err)
+
+	homeDir, err := os.UserHomeDir()
+	require.NoError(t, err)
+
+	// Test cases
+	tests := []struct {
+		name           string
+		input          string
+		expectedResult func() string // Function to compute expected result
+		expectError    bool
+		errorMsg       string
+	}{
+		{
+			name:  "tilde expansion - home directory only",
+			input: "~",
+			expectedResult: func() string {
+				return homeDir
+			},
+			expectError: false,
+		},
+		{
+			name:  "tilde expansion - home directory with subdirectory",
+			input: "~/Documents/test.txt",
+			expectedResult: func() string {
+				return filepath.Join(homeDir, "Documents/test.txt")
+			},
+			expectError: false,
+		},
+		{
+			name:  "tilde expansion - home directory with nested subdirectories",
+			input: "~/Documents/Projects/test-project/file.txt",
+			expectedResult: func() string {
+				return filepath.Join(homeDir, "Documents/Projects/test-project/file.txt")
+			},
+			expectError: false,
+		},
+		{
+			name:  "absolute path - no changes needed",
+			input: "/usr/local/bin/test",
+			expectedResult: func() string {
+				return "/usr/local/bin/test"
+			},
+			expectError: false,
+		},
+		{
+			name:  "relative path - converted to absolute",
+			input: "test-file.txt",
+			expectedResult: func() string {
+				return filepath.Join(cwd, "test-file.txt")
+			},
+			expectError: false,
+		},
+		{
+			name:  "relative path with subdirectory",
+			input: "subdir/test-file.txt",
+			expectedResult: func() string {
+				return filepath.Join(cwd, "subdir/test-file.txt")
+			},
+			expectError: false,
+		},
+		{
+			name:  "path with redundant elements",
+			input: "/usr/local/../local/bin/./test",
+			expectedResult: func() string {
+				return "/usr/local/bin/test"
+			},
+			expectError: false,
+		},
+		{
+			name:  "path with current directory reference",
+			input: "./test-file.txt",
+			expectedResult: func() string {
+				return filepath.Join(cwd, "test-file.txt")
+			},
+			expectError: false,
+		},
+		{
+			name:  "path with parent directory reference",
+			input: "../test-file.txt",
+			expectedResult: func() string {
+				return filepath.Join(filepath.Dir(cwd), "test-file.txt")
+			},
+			expectError: false,
+		},
+		{
+			name:  "empty path",
+			input: "",
+			expectedResult: func() string {
+				return cwd
+			},
+			expectError: false,
+		},
+		{
+			name:  "path with multiple slashes",
+			input: "/usr//local///bin/test",
+			expectedResult: func() string {
+				return "/usr/local/bin/test"
+			},
+			expectError: false,
+		},
+		{
+			name:  "tilde in middle of path - not expanded",
+			input: "/path/to/~user/file.txt",
+			expectedResult: func() string {
+				return "/path/to/~user/file.txt"
+			},
+			expectError: false,
+		},
+		{
+			name:  "complex relative path with redundant elements",
+			input: "./subdir/../another/./file.txt",
+			expectedResult: func() string {
+				return filepath.Join(cwd, "another/file.txt")
+			},
+			expectError: false,
+		},
+		{
+			name:  "tilde with complex path",
+			input: "~/Documents/../Downloads/./file.txt",
+			expectedResult: func() string {
+				return filepath.Join(homeDir, "Downloads/file.txt")
+			},
+			expectError: false,
+		},
+	}
+
+	// Run tests
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := SanitizePath(tc.input)
+
+			if tc.expectError {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.errorMsg)
+			} else {
+				require.NoError(t, err)
+				expected := tc.expectedResult()
+				require.Equal(t, expected, result)
+
+				// Verify the result is an absolute path
+				require.True(t, filepath.IsAbs(result), "Result should be an absolute path")
+
+				// Verify the path is clean (no redundant elements)
+				require.Equal(t, filepath.Clean(result), result, "Result should be clean")
+			}
+		})
+	}
+}
