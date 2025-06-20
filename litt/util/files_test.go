@@ -1090,7 +1090,7 @@ func TestSanitizePath(t *testing.T) {
 	// Get the current working directory and home directory for test expectations
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
-	
+
 	homeDir, err := os.UserHomeDir()
 	require.NoError(t, err)
 
@@ -1228,10 +1228,10 @@ func TestSanitizePath(t *testing.T) {
 				require.NoError(t, err)
 				expected := tc.expectedResult()
 				require.Equal(t, expected, result)
-				
+
 				// Verify the result is an absolute path
 				require.True(t, filepath.IsAbs(result), "Result should be an absolute path")
-				
+
 				// Verify the path is clean (no redundant elements)
 				require.Equal(t, filepath.Clean(result), result, "Result should be clean")
 			}
