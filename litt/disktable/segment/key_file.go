@@ -164,7 +164,7 @@ func (k *keyFile) atomicSwap(sync bool) error {
 
 	err := util.AtomicRename(swapPath, newPath, sync)
 	if err != nil {
-		return fmt.Errorf("failed to atomically swap key file %s with %s: %v", swapPath, newPath, err)
+		return fmt.Errorf("failed to atomically swap key file %s with %s: %w", swapPath, newPath, err)
 	}
 
 	return nil

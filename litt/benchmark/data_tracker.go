@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	config2 "github.com/Layr-Labs/eigenda/litt/benchmark/config"
+	"github.com/Layr-Labs/eigenda/litt/benchmark/config"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/docker/go-units"
 )
@@ -43,7 +43,7 @@ type DataTracker struct {
 	rand *rand.Rand
 
 	// The configuration for the benchmark.
-	config *config2.BenchmarkConfig
+	config *config.BenchmarkConfig
 
 	// The directory where cohort files are stored.
 	cohortDirectory string
@@ -105,7 +105,7 @@ type DataTracker struct {
 // NewDataTracker creates a new DataTracker instance, loading all relevant cohorts from disk.
 func NewDataTracker(
 	ctx context.Context,
-	config *config2.BenchmarkConfig,
+	config *config.BenchmarkConfig,
 	errorMonitor *util.ErrorMonitor,
 ) (*DataTracker, error) {
 
@@ -172,7 +172,7 @@ func NewDataTracker(
 	safeTTL := ttl - safetyMargin
 
 	closedChan := make(chan struct{}, 1)
-	closedChan <- struct{}{} // Initially closed, will be drained when the DataTracker is closed.
+	closedChan <- struct{}{} // Will be drained when the DataTracker is closed.
 
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -205,6 +205,8 @@ func NewDataTracker(
 	return tracker, nil
 }
 
+// gatherCohorts loads cohorts from files on disk. The lowest/highest cohort indices are valid if and only if the
+// cohorts map is not empty. If no cohorts are found, the lowest and highest cohort indices will be 0.
 func gatherCohorts(cohortDirPath string) (
 	lowestCohortIndex uint64,
 	highestCohortIndex uint64,
@@ -245,7 +247,7 @@ func gatherCohorts(cohortDirPath string) (
 				lowestCohortIndex = cohort.CohortIndex()
 			}
 			if cohort.cohortIndex > highestCohortIndex {
-				highestCohortIndex = cohort.cohortIndex
+				highestCohortIndex = cohort.CohortIndex()
 			}
 		} else if strings.HasSuffix(filePath, CohortSwapFileExtension) {
 			// Delete any swap files discovered

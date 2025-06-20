@@ -46,7 +46,7 @@ func prettyPrintUnit(quantity uint64, steps []unitStep) string {
 	floatQuantity := float64(quantity)
 
 	for i := 1; i < len(steps); i++ {
-		if floatQuantity > float64(steps[i].multiple) {
+		if floatQuantity >= float64(steps[i].multiple) {
 			floatQuantity /= float64(steps[i].multiple)
 			unit = steps[i].name
 		} else {

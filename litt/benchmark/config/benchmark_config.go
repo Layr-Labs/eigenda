@@ -84,7 +84,7 @@ type BenchmarkConfig struct {
 	Fsync bool
 }
 
-// DefaultBenchmarkConfig returns a default BenchmarkConfig with the given data paths.
+// DefaultBenchmarkConfig returns a default BenchmarkConfig.
 func DefaultBenchmarkConfig() *BenchmarkConfig {
 
 	littConfig := litt.DefaultConfigNoPaths()

@@ -38,7 +38,7 @@ func NewDataGenerator(seed int64, poolSize uint64) *DataGenerator {
 	}
 }
 
-// Key generates a new key. The value id deterministic for the same index and seed.
+// Key generates a new key. The value is deterministic for the same index and seed.
 func (g *DataGenerator) Key(index uint64) []byte {
 	rng := g.randPool.Get().(*rand.Rand)
 	rng.Seed(g.seed + int64(index))

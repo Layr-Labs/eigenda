@@ -229,9 +229,8 @@ func TestIncompleteCohortSomeKeysExtractedLifecycle(t *testing.T) {
 		key, err := cohort.GetKeyIndexForWriting()
 		require.NoError(t, err)
 		require.Equal(t, i, key)
-
-		shouldBeExhausted := i == highIndex
-		require.Equal(t, shouldBeExhausted, cohort.IsExhausted())
+		
+		require.Equal(t, false, cohort.IsExhausted())
 
 		// Attempting to mark as complete now should fail.
 		err = cohort.MarkComplete()

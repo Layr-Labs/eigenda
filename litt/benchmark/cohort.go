@@ -22,9 +22,9 @@ const CohortSwapFileExtension = CohortFileExtension + util.SwapFileExtension
 
 /* The lifecycle of a cohort:
 
-    +-----+     +-----------+     +----------+
-    | new | --> | exhausted | --> | complete |
-    +-----+     +-----------+     +----------+
+    +-----+     +-----------+     +----------+     +---------+
+    | new | --> | exhausted | --> | complete | --> | expired |
+    +-----+     +-----------+     +----------+     +---------+
        |              |
        v              |
     +-----------+     |
@@ -32,16 +32,30 @@ const CohortSwapFileExtension = CohortFileExtension + util.SwapFileExtension
     +-----------+
 
 - new: the cohort was just created and is currently being used to supply keys for writing.
-- exhausted: all keys in the cohort have taken to be written, but the DB may not have ingested them all yet.
+- exhausted: all keys in the cohort have been scheduled for writing, but the DB may not have ingested them all yet.
 - complete: all keys in the cohort have been written to the DB and are safe to read.
 - abandoned: before becoming complete, the benchmark was restarted. It will never be thread safe to read or write
               any keys in this cohort.
+- expired: the cohort has been marked as complete, but it can no longer be read because the TTL has expired
+            (or is about to expire).
 */
 
 // A Cohort is a grouping of key-value pairs used for benchmarking.
 //
+// If a benchmark wants to read values, it must somehow figure out which keys have been written to the database.
+// If it wants to verify the validity of the data it reads, it must also be able to determine the correct value
+// that should be associated with any particular key, and it must also be able to determine when keys are
+// expected to be removed from the database due to TTL expiration.
+//
+// Tracking the sort of metadata required to do reads in a benchmark is not a trivial thing, especially when
+// the scale of the benchmark is large (i.e. tens or hundreds of millions of keys over weeks or months of time).
+// Storing this information in memory is simply not plausible, and storing it on disk requires database scale similar
+// to what LittDB is handling, unless we are clever about it. A "cohort" is that clever mechanism. Each cohort tracks a
+// large collection of key-value pairs in the database, and it does it in a way that uses very little disk space.
+//
 // Key-value pairs each have unique indices, and knowing the index of a key-value pair allows the data to be
-// regenerated deterministically. All key-value pairs in a cohort have sequential indices.
+// regenerated deterministically. All key-value pairs in a cohort have sequential indices. A single cohort can
+// track multiple gigabytes worth of key-value pairs, but on disk it only requires a few dozen bytes of data.
 type Cohort struct {
 	// The directory where the cohort file is stored.
 	parentDirectory string
@@ -105,9 +119,12 @@ func NewCohort(
 	return cohort, nil
 }
 
+// LoadCohort loads a cohort from the given path.
 func LoadCohort(path string) (*Cohort, error) {
 
 	parentDirectory := filepath.Dir(path)
+	// Cohort file names are in the format "X.cohort", where X is the cohort index.
+	// Replacing ".cohort" with an empty string gives us the cohort index in string form.
 	indexString := strings.Replace(filepath.Base(path), CohortFileExtension, "", 1)
 	cohortIndex, err := strconv.ParseUint(indexString, 10, 64)
 	if err != nil {
@@ -222,7 +239,7 @@ func (c *Cohort) GetKeyIndexForWriting() (uint64, error) {
 	if c.allValuesWritten {
 		return 0, fmt.Errorf("cannot allocate key for writing: cohort is already complete")
 	}
-	if c.nextKeyIndex > c.highKeyIndex {
+	if c.IsExhausted() {
 		return 0, fmt.Errorf("cannot allocate key for writing: cohort is exhausted")
 	}
 
@@ -277,6 +294,8 @@ func (c *Cohort) Path() string {
 	return path.Join(c.parentDirectory, fmt.Sprintf("%d%s", c.cohortIndex, CohortFileExtension))
 }
 
+// Write the data in this cohort to its file on disk. When this method returns, the cohort file is guaranteed to be
+// crash durable.
 func (c *Cohort) Write() error {
 	err := util.AtomicWrite(c.Path(), c.serialize(), c.fsync)
 	if err != nil {
@@ -338,7 +357,7 @@ func (c *Cohort) deserialize(data []byte) error {
 // IsExpired returns true if the cohort has expired (i.e. it is no longer safe to read).
 func (c *Cohort) IsExpired(now time.Time, maxAge time.Duration) bool {
 	if !c.IsComplete() {
-		if c.loadedFromDisk && !c.IsComplete() {
+		if c.loadedFromDisk {
 			// Incomplete cohorts loaded from disk are instantly expired.
 			return true
 		} else {

@@ -136,7 +136,7 @@ func (b *BenchmarkEngine) Logger() logging.Logger {
 // encounters an error.
 func (b *BenchmarkEngine) Run() error {
 
-	// multiply 2 to make configured value the average
+	// multiply by 2 to make configured value the average
 	sleepFactor := b.config.StartupSleepFactorSeconds * float64(time.Second) * 2.0
 
 	for i := 0; i < b.config.WriterParallelism; i++ {
@@ -271,7 +271,7 @@ func (b *BenchmarkEngine) reader() {
 					b.errorMonitor.Panic(fmt.Errorf("key %s not found in database", readInfo.Key))
 					return
 				} else {
-					b.logger.Warnf("key %s not found in database", readInfo.Key)
+					b.logger.Errorf("key %s not found in database", readInfo.Key)
 					continue
 				}
 			}
