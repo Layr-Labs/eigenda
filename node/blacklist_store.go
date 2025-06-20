@@ -26,7 +26,7 @@ type BlacklistStore interface {
 	DeleteByDisperserID(ctx context.Context, disperserId uint32) error
 
 	// Get retrieves a blacklist by key
-	Get(ctx context.Context, key []byte) (*Blacklist, error)
+	Get(key []byte) (*Blacklist, error)
 
 	// Put stores raw blacklist data
 	Put(ctx context.Context, key []byte, value []byte) error
@@ -124,7 +124,7 @@ func (s *blacklistStore) DeleteByDisperserID(ctx context.Context, disperserId ui
 }
 
 // Get retrieves a blacklist by key
-func (s *blacklistStore) Get(ctx context.Context, key []byte) (*Blacklist, error) {
+func (s *blacklistStore) Get(key []byte) (*Blacklist, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

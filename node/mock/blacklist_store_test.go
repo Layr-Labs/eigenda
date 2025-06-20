@@ -363,7 +363,7 @@ func TestBlacklistStoreGet(t *testing.T) {
 	require.NoError(t, err)
 
 	// Retrieve and verify
-	retrieved, err := store.Get(ctx, testKey)
+	retrieved, err := store.Get(testKey)
 	require.NoError(t, err)
 	require.Equal(t, blacklist.LastUpdated, retrieved.LastUpdated)
 	require.Equal(t, len(blacklist.Entries), len(retrieved.Entries))
@@ -380,11 +380,10 @@ func TestBlacklistStoreGetNonExistent(t *testing.T) {
 	store, err := node.NewLevelDBBlacklistStore(testDir, logger, false, false, node.DefaultTime)
 	require.NoError(t, err)
 
-	ctx := context.Background()
 	nonExistentKey := []byte("does-not-exist")
 
 	// Should return error
-	_, err = store.Get(ctx, nonExistentKey)
+	_, err = store.Get(nonExistentKey)
 	require.Error(t, err)
 }
 

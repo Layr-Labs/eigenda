@@ -54,8 +54,8 @@ func (m *MockBlacklistStore) DeleteByDisperserID(ctx context.Context, disperserI
 	return args.Error(0)
 }
 
-func (m *MockBlacklistStore) Get(ctx context.Context, key []byte) (*node.Blacklist, error) {
-	args := m.Called(ctx, key)
+func (m *MockBlacklistStore) Get(key []byte) (*node.Blacklist, error) {
+	args := m.Called(key)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
