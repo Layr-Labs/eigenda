@@ -63,7 +63,7 @@ func run(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatalf("failed to parse the command line flags: %v", err)
 	}
-	logger, err := common.NewLogger(config.LoggerConfig)
+	logger, err := common.NewLogger(&config.LoggerConfig)
 	if err != nil {
 		log.Fatalf("failed to create logger: %v", err)
 	}

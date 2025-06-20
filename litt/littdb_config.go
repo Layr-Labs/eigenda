@@ -9,6 +9,7 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/litt/disktable/keymap"
+	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	"github.com/docker/go-units"
 	"github.com/prometheus/client_golang/prometheus"
@@ -147,6 +148,15 @@ func DefaultConfig(paths ...string) (*Config, error) {
 		return nil, fmt.Errorf("at least one path must be provided")
 	}
 
+	config := DefaultConfigNoPaths()
+	config.Paths = paths
+
+	return config, nil
+}
+
+// DefaultConfigNoPaths returns a Config with default values, and does not require any paths to be provided.
+// If paths are not set prior to use, then the DB will return an error at startup.
+func DefaultConfigNoPaths() *Config {
 	seed := time.Now().UnixNano()
 	saltShaker := rand.New(rand.NewSource(seed))
 
@@ -154,8 +164,7 @@ func DefaultConfig(paths ...string) (*Config, error) {
 
 	return &Config{
 		CTX:                      context.Background(),
-		Paths:                    paths,
-		LoggerConfig:             &loggerConfig,
+		LoggerConfig:             loggerConfig,
 		Clock:                    time.Now,
 		GCPeriod:                 5 * time.Minute,
 		GCBatchSize:              10_000,
@@ -172,7 +181,20 @@ func DefaultConfig(paths ...string) (*Config, error) {
 		MetricsNamespace:         "litt",
 		MetricsPort:              9101,
 		MetricsUpdateInterval:    time.Second,
-	}, nil
+	}
+}
+
+// SanitizePaths replaces any paths that start with '~' with the user's home directory.
+func (c *Config) SanitizePaths() error {
+	for i, path := range c.Paths {
+		var err error
+		c.Paths[i], err = util.SanitizePath(path)
+		if err != nil {
+			return fmt.Errorf("error sanitizing path %s: %w", path, err)
+		}
+	}
+
+	return nil
 }
 
 // SanityCheck performs a sanity check on the configuration, returning an error if any of the configuration
