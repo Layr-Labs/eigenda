@@ -3,6 +3,7 @@ package dataapi
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/Layr-Labs/eigenda/core"
@@ -279,11 +280,15 @@ func (oh *OperatorHandler) GetOperatorsStakeAtBlock(ctx context.Context, operato
 		stakeRanked[quorum] = make([]*OperatorStake, 0)
 		for i, op := range operators {
 			if len(operatorId) == 0 || operatorId == op.OperatorId.Hex() {
+				weiToEth := new(big.Float).SetFloat64(1e18)
+				stakeAmountEth := new(big.Float).Quo(&op.StakeAmount, weiToEth)
+				stakeAmount, _ := stakeAmountEth.Float64()
 				stakeRanked[quorum] = append(stakeRanked[quorum], &OperatorStake{
 					QuorumId:        quorum,
 					OperatorId:      op.OperatorId.Hex(),
 					StakePercentage: op.StakeShare / 100.0,
 					Rank:            i + 1,
+					StakeAmount:     stakeAmount,
 				})
 			}
 		}

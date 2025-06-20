@@ -8,8 +8,9 @@ import (
 )
 
 type OperatorStakeShare struct {
-	OperatorId core.OperatorID
-	StakeShare float64
+	OperatorId  core.OperatorID
+	StakeShare  float64
+	StakeAmount big.Float
 }
 
 // The GetRankedOperators returns ranked operators list, by total-quorum-stake and by individual
@@ -26,7 +27,7 @@ func GetRankedOperators(state *core.OperatorState) ([]*OperatorStakeShare, map[u
 			share, _ := new(big.Float).Quo(
 				new(big.Float).Mul(opStake, big.NewFloat(10000)),
 				totalStake).Float64()
-			operatorStakeShares = append(operatorStakeShares, &OperatorStakeShare{OperatorId: opId, StakeShare: share})
+			operatorStakeShares = append(operatorStakeShares, &OperatorStakeShare{OperatorId: opId, StakeShare: share, StakeAmount: *opStake})
 		}
 		// Descending order by stake share in the quorum.
 		sort.Slice(operatorStakeShares, func(i, j int) bool {

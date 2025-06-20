@@ -128,6 +128,7 @@ type (
 		OperatorAddress string  `json:"operator_address"`
 		StakePercentage float64 `json:"stake_percentage"`
 		Rank            int     `json:"rank"`
+		StakeAmount     float64 `json:"stake_amount"`
 	}
 
 	OperatorsStakeResponse struct {
