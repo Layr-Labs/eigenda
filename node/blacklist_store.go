@@ -95,7 +95,7 @@ func (s *blacklistStore) HasDisperserID(ctx context.Context, disperserId uint32)
 	defer s.mu.RUnlock()
 
 	// hash the disperserId and look up
-	disperserIdHash := sha256.Sum256([]byte(fmt.Sprintf("%d", disperserId)))
+	disperserIdHash := sha256.Sum256(fmt.Appendf(nil, "%d", disperserId))
 	return s.hasKey(disperserIdHash[:])
 }
 
