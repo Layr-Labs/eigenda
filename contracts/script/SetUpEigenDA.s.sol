@@ -43,6 +43,92 @@ function toArray(uint256 element) pure returns (uint256[] memory) {
 contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
     string deployConfigPath = "script/input/eigenda_deploy_config.json";
 
+    function _setupUsageAuthorization(AddressConfig memory addressConfig) internal {
+        address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
+
+        // Initialize quorum 0
+        vm.startBroadcast();
+        {
+            UsageAuthorizationTypes.QuorumProtocolConfig memory protocolConfig0 = UsageAuthorizationTypes
+                .QuorumProtocolConfig({
+                minNumSymbols: 1,
+                reservationAdvanceWindow: 3600000, // 1000 hours to allow long reservations for testing
+                reservationRateLimitWindow: 300, // 5 minutes
+                onDemandRateLimitWindow: 300, // 5 minutes
+                onDemandEnabled: true
+            });
+            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).initializeQuorum(
+                0, addressConfig.eigenDACommunityMultisig, protocolConfig0
+            );
+        }
+        vm.stopBroadcast();
+
+        // Initialize quorum 1
+        vm.startBroadcast();
+        {
+            UsageAuthorizationTypes.QuorumProtocolConfig memory protocolConfig1 = UsageAuthorizationTypes
+                .QuorumProtocolConfig({
+                minNumSymbols: 1,
+                reservationAdvanceWindow: 3600000, // 1000 hours to allow long reservations for testing
+                reservationRateLimitWindow: 300, // 5 minutes
+                onDemandRateLimitWindow: 300, // 5 minutes
+                onDemandEnabled: true
+            });
+            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).initializeQuorum(
+                1, addressConfig.eigenDACommunityMultisig, protocolConfig1
+            );
+        }
+        vm.stopBroadcast();
+
+        // Set payment configs and reservations
+        vm.startBroadcast(addressConfig.eigenDACommunityMultisig);
+        {
+            // Set payment config for quorum 0
+            UsageAuthorizationTypes.QuorumConfig memory paymentConfig0 = UsageAuthorizationTypes.QuorumConfig({
+                token: address(deployedStrategyArray[0].underlyingToken()),
+                recipient: addressConfig.eigenDACommunityMultisig,
+                reservationSymbolsPerSecond: 452198,
+                onDemandSymbolsPerSecond: 452198,
+                onDemandPricePerSymbol: 1000000000000000 // 0.001 ether per symbol
+            });
+            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setQuorumPaymentConfig(0, paymentConfig0);
+        }
+        vm.stopBroadcast();
+
+        vm.startBroadcast(addressConfig.eigenDACommunityMultisig);
+        {
+            // Set payment config for quorum 1
+            UsageAuthorizationTypes.QuorumConfig memory paymentConfig1 = UsageAuthorizationTypes.QuorumConfig({
+                token: address(deployedStrategyArray[1].underlyingToken()),
+                recipient: addressConfig.eigenDACommunityMultisig,
+                reservationSymbolsPerSecond: 452198,
+                onDemandSymbolsPerSecond: 452198,
+                onDemandPricePerSymbol: 1000000000000000 // 0.001 ether per symbol
+            });
+            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setQuorumPaymentConfig(1, paymentConfig1);
+
+            // Add reservations
+            uint64 schedulePeriod = 3600;
+            uint64 currentPeriod = uint64(block.timestamp) / schedulePeriod;
+            uint64 alignedStartTimestamp = (currentPeriod + 1) * schedulePeriod;
+            uint64 alignedEndTimestamp = (currentPeriod + 1000) * schedulePeriod;
+
+            UsageAuthorizationTypes.Reservation memory reservation = UsageAuthorizationTypes.Reservation({
+                symbolsPerSecond: 452198,
+                startTimestamp: alignedStartTimestamp,
+                endTimestamp: alignedEndTimestamp
+            });
+            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).addReservation(
+                0, clientAddress, reservation
+            );
+            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).addReservation(
+                1, clientAddress, reservation
+            );
+        }
+
+        vm.stopBroadcast();
+    }
+
     // deploy all the EigenDA contracts. Relies on many EL contracts having already been deployed.
     function run() external {
         // READ JSON CONFIG DATA
@@ -156,18 +242,12 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         }
 
         // Register Reservations for client as the eigenDACommunityMultisig
-        IPaymentVault.Reservation memory reservation = IPaymentVault.Reservation({
-            symbolsPerSecond: 452198,
-            startTimestamp: uint64(block.timestamp),
-            endTimestamp: uint64(block.timestamp + 1000000000),
-            quorumNumbers: hex"0001",
-            quorumSplits: hex"3232"
-        });
-        address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
         vm.startBroadcast(msg.sender);
-        paymentVault.setReservation(clientAddress, reservation);
-        // Deposit OnDemand
-        paymentVault.depositOnDemand{value: 0.1 ether}(clientAddress);
+        address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
+        IERC20(deployedStrategyArray[0].underlyingToken()).approve(address(usageAuthorizationRegistry), 0.2 ether);
+        UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).depositOnDemandForAccount(
+            0, clientAddress, 0.1 ether
+        );
         vm.stopBroadcast();
 
         // Deposit stakers into EigenLayer and delegate to operators
