@@ -38,22 +38,18 @@ This file is a visual example of the release process outlined in [Release Proces
 
     <img src="images/09-production-tag.svg" alt="create production tag v0.10.0" />
 
-10. Commit `feature 5` to `master`
+10. Merge hotfix PR directly to `release/0.10`
 
-    <img src="images/10-feature.svg" alt="commit feature 5 to master" />
+    <img src="images/10-hotfix.svg" alt="merge hotfix to release/0.10" />
 
-11. Cherry pick `feature 5` to `release/0.10`
-
-    <img src="images/11-cherry-pick.svg" alt="cherry pick feature 5 to release/0.10" />
-
-12. Create tag `v0.10.1-rc.1`. Since production tag `v0.10.0` has already been created, it is no longer permissible to create
+11. Create tag `v0.10.1-rc.1`. Since production tag `v0.10.0` has already been created, it is no longer permissible to create
 any `v0.10.0-rc.X` tags
 
-    <img src="images/12-rc-tag.svg" alt="create tag v0.10.1-rc.1" />
+    <img src="images/11-rc-tag.svg" alt="create tag v0.10.1-rc.1" />
 
-13. Create production tag `v0.10.1`
+12. Create production tag `v0.10.1`
 
-    <img src="images/13-production-tag.svg" alt="create production tag v0.10.1" />
+    <img src="images/12-production-tag.svg" alt="create production tag v0.10.1" />
 
 (Note for document maintainers: the source diagrams can be found [here](https://link.excalidraw.com/l/1XPZRMVbRNH/32yMzzv0C50).
 Please be sure to use consistent svg format by exporting from Excalidraw. Output svgs should be scaled down to 40% of the original
