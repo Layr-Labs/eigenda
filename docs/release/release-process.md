@@ -56,7 +56,7 @@ version release branch, and pulling without needing to know the latest minor or 
 - **Team consensus required**: Single engineer cannot make the decision
 - **Public visibility**: Must have team discussion (e.g. Slack thread) before proceeding. Alternatively, management
 may sign-off that a feature should be included after a feature freeze has been enacted. Note that even with management
-sign-off, a PR targetting a release branch must still go through the standard peer-review process.
+sign-off, a PR targeting a release branch must still go through the standard peer-review process.
 
 #### Change Process
 
