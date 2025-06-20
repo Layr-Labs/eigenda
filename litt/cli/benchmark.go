@@ -1,23 +1,19 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"os"
 
 	"github.com/Layr-Labs/eigenda/litt/benchmark"
+	"github.com/urfave/cli/v2"
 )
 
-func main() {
-	// Check for required argument
-	if len(os.Args) != 2 {
-		_, _ = fmt.Fprintf(os.Stderr, "Usage: run.sh <config-file-path>\n")
-		_, _ = fmt.Fprintf(os.Stderr, "\nExample:\n")
-		_, _ = fmt.Fprintf(os.Stderr, "  run.sh config/basic-config.json\n")
-		os.Exit(1)
+// A launcher for the benchmark.
+func benchmarkCommand(ctx *cli.Context) error {
+	if ctx.NArg() != 1 {
+		return cli.Exit("benchmark command requires exactly one argument: <config-path>", 1)
 	}
 
-	configPath := os.Args[1]
+	configPath := ctx.Args().Get(0)
 
 	// Create the benchmark engine
 	engine, err := benchmark.NewBenchmarkEngine(configPath)
@@ -31,8 +27,10 @@ func main() {
 
 	err = engine.Run()
 	if err != nil {
-		engine.Logger().Fatalf("Benchmark failed: %v", err)
+		return err
 	} else {
 		engine.Logger().Info("Benchmark Terminated")
 	}
+
+	return nil
 }

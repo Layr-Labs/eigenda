@@ -32,8 +32,8 @@ type keyFile struct {
 	// The segment index.
 	index uint32
 
-	// The parent directory containing this file.
-	parentDirectory string
+	// Path data for the segment file.
+	segmentPath *SegmentPath
 
 	// The writer for the file. If the file is sealed, this value is nil.
 	writer *bufio.Writer
@@ -53,16 +53,16 @@ type keyFile struct {
 func createKeyFile(
 	logger logging.Logger,
 	index uint32,
-	parentDirectory string,
+	segmentPath *SegmentPath,
 	swap bool,
 ) (*keyFile, error) {
 
 	keys := &keyFile{
-		logger:          logger,
-		index:           index,
-		parentDirectory: parentDirectory,
-		segmentVersion:  ValueSizeSegmentVersion,
-		swap:            swap,
+		logger:         logger,
+		index:          index,
+		segmentPath:    segmentPath,
+		segmentVersion: ValueSizeSegmentVersion,
+		swap:           swap,
 	}
 
 	filePath := keys.path()
@@ -93,25 +93,24 @@ func createKeyFile(
 func loadKeyFile(
 	logger logging.Logger,
 	index uint32,
-	parentDirectories []string,
+	segmentPaths []*SegmentPath,
 	segmentVersion SegmentVersion,
 ) (*keyFile, error) {
 
 	keyFileName := fmt.Sprintf("%d%s", index, KeyFileExtension)
-	keysPath, err := lookForFile(parentDirectories, keyFileName)
+	keysPath, err := lookForFile(segmentPaths, keyFileName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find key file: %w", err)
 	}
-	if keysPath == "" {
+	if keysPath == nil {
 		return nil, fmt.Errorf("failed to find key file %s", keyFileName)
 	}
-	parentDirectory := path.Dir(keysPath)
 
 	keys := &keyFile{
-		logger:          logger,
-		index:           index,
-		parentDirectory: parentDirectory,
-		segmentVersion:  segmentVersion,
+		logger:         logger,
+		index:          index,
+		segmentPath:    keysPath,
+		segmentVersion: segmentVersion,
 	}
 
 	filePath := keys.path()
@@ -149,7 +148,7 @@ func (k *keyFile) name() string {
 
 // path returns the full path to the key file.
 func (k *keyFile) path() string {
-	return path.Join(k.parentDirectory, k.name())
+	return path.Join(k.segmentPath.SegmentDirectory(), k.name())
 }
 
 // atomicSwap atomically replaces the key file, replacing the old one.
@@ -325,7 +324,50 @@ func (k *keyFile) readKeys() ([]*types.ScopedKey, error) {
 	return keys, nil
 }
 
+// snapshot creates a hard link to the file in the snapshot directory, and a soft link to the hard linked file in the
+// soft link directory. Requires that the file is sealed and that snapshotting is enabled.
+func (k *keyFile) snapshot() error {
+	if k.writer != nil {
+		return fmt.Errorf("file %s is not sealed, cannot take Snapshot", k.path())
+	}
+
+	err := k.segmentPath.Snapshot(k.name())
+	if err != nil {
+		return fmt.Errorf("failed to create Snapshot: %v", err)
+	}
+
+	return nil
+}
+
 // delete deletes the key file.
 func (k *keyFile) delete() error {
-	return os.Remove(k.path())
+	if k.writer != nil {
+		return fmt.Errorf("key file %s is not sealed, cannot delete", k.path())
+	}
+
+	filePath := k.path()
+
+	fileInfo, err := os.Lstat(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to call lstat for %s: %v", filePath, err)
+	}
+	isSymlink := fileInfo.Mode()&os.ModeSymlink != 0
+
+	if isSymlink {
+		// remove the file where the symlink points
+		actualFile, err := os.Readlink(filePath)
+		if err != nil {
+			return fmt.Errorf("failed to read symlink %s: %v", filePath, err)
+		}
+		if err := os.Remove(actualFile); err != nil {
+			return fmt.Errorf("failed to remove actual file %s: %v", actualFile, err)
+		}
+	}
+
+	err = os.Remove(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to remove file %s: %v", filePath, err)
+	}
+
+	return nil
 }
