@@ -13,6 +13,9 @@ import {IIndexRegistry} from "../lib/eigenlayer-middleware/src/interfaces/IIndex
 import {EigenDAServiceManager} from "src/core/EigenDAServiceManager.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
+import {UsageAuthorizationRegistry} from "src/core/UsageAuthorizationRegistry.sol";
+import {IUsageAuthorizationRegistry} from "src/core/interfaces/IUsageAuthorizationRegistry.sol";
+import {UsageAuthorizationTypes} from "src/core/libraries/v3/usage-authorization/UsageAuthorizationTypes.sol";
 import {EigenDADeployer} from "./EigenDADeployer.s.sol";
 import {EigenLayerUtils} from "./EigenLayerUtils.s.sol";
 
@@ -92,11 +95,12 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
                 onDemandPricePerSymbol: 1000000000000000 // 0.001 ether per symbol
             });
             UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setQuorumPaymentConfig(0, paymentConfig0);
-        }
-        vm.stopBroadcast();
+            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setOnDemandEnabled(0, true);
+            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setReservationAdvanceWindow(0, 3600000);
+            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setMinNumSymbols(0, 4096);
+            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setReservationRateLimitWindow(0, 300);
+            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setOnDemandRateLimitWindow(0, 30);
 
-        vm.startBroadcast(addressConfig.eigenDACommunityMultisig);
-        {
             // Set payment config for quorum 1
             UsageAuthorizationTypes.QuorumConfig memory paymentConfig1 = UsageAuthorizationTypes.QuorumConfig({
                 token: address(deployedStrategyArray[1].underlyingToken()),
@@ -106,6 +110,11 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
                 onDemandPricePerSymbol: 1000000000000000 // 0.001 ether per symbol
             });
             UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setQuorumPaymentConfig(1, paymentConfig1);
+            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setOnDemandEnabled(1, false);
+            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setReservationAdvanceWindow(0, 3600000);
+            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setMinNumSymbols(0, 4096);
+            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setReservationRateLimitWindow(0, 300);
+            UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).setOnDemandRateLimitWindow(0, 30);
 
             // Add reservations
             uint64 schedulePeriod = 3600;
@@ -245,9 +254,7 @@ contract SetupEigenDA is EigenDADeployer, EigenLayerUtils {
         vm.startBroadcast(msg.sender);
         address clientAddress = address(0x1aa8226f6d354380dDE75eE6B634875c4203e522);
         IERC20(deployedStrategyArray[0].underlyingToken()).approve(address(usageAuthorizationRegistry), 0.2 ether);
-        UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).depositOnDemandForAccount(
-            0, clientAddress, 0.1 ether
-        );
+        UsageAuthorizationRegistry(address(usageAuthorizationRegistry)).depositOnDemand(0, clientAddress, 0.1 ether);
         vm.stopBroadcast();
 
         // Deposit stakers into EigenLayer and delegate to operators

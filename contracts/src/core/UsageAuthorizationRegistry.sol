@@ -58,13 +58,6 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
         UsageAuthorizationLib.depositOnDemand(quorumId, account, amount, msg.sender);
     }
 
-    function depositOnDemandForAccount(uint64 quorumId, address account, uint256 amount)
-        external
-        onlyOnDemandEnabled(quorumId)
-    {
-        UsageAuthorizationLib.depositOnDemand(quorumId, account, amount);
-    }
-
     /// OWNER
 
     function transferOwnership(address newOwner) external onlyOwner {
@@ -91,6 +84,27 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
         onlyQuorumOwner(quorumId)
     {
         ps().quorum[quorumId].protocolCfg.reservationAdvanceWindow = reservationAdvanceWindow;
+    }
+
+    function setReservationRateLimitWindow(uint64 quorumId, uint64 reservationRateLimitWindow)
+        external
+        onlyQuorumOwner(quorumId)
+    {
+        ps().quorum[quorumId].protocolCfg.reservationRateLimitWindow = reservationRateLimitWindow;
+    }
+
+    function setOnDemandRateLimitWindow(uint64 quorumId, uint64 onDemandRateLimitWindow)
+        external
+        onlyQuorumOwner(quorumId)
+    {
+        ps().quorum[quorumId].protocolCfg.onDemandRateLimitWindow = onDemandRateLimitWindow;
+    }
+
+    function setMinNumSymbols(uint64 quorumId, uint64 minNumSymbols)
+        external
+        onlyQuorumOwner(quorumId)
+    {
+        ps().quorum[quorumId].protocolCfg.minNumSymbols = minNumSymbols;
     }
 
     function setOnDemandEnabled(uint64 quorumId, bool enabled) external onlyQuorumOwner(quorumId) {

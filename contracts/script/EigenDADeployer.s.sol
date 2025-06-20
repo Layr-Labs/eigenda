@@ -193,6 +193,10 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
             );
 
+            usageAuthorizationRegistry = UsageAuthorizationRegistry(
+                address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+            );
+
             paymentVaultImplementation = new PaymentVault();
 
             eigenDAProxyAdmin.upgradeAndCall(
