@@ -136,11 +136,11 @@ func (env *Config) applyDefaults(c any, prefix, stub string, ind int) {
 // Generates churner .env
 func (env *Config) generateChurnerVars(ind int, graphUrl, logPath, grpcPort string) ChurnerVars {
 	v := ChurnerVars{
-		CHURNER_LOG_FORMAT:                  "text",
-		CHURNER_HOSTNAME:                    "",
-		CHURNER_GRPC_PORT:                   grpcPort,
-		CHURNER_BLS_OPERATOR_STATE_RETRIVER: env.EigenDA.OperatorStateRetriever,
-		CHURNER_EIGENDA_SERVICE_MANAGER:     env.EigenDA.ServiceManager,
+		CHURNER_LOG_FORMAT:                   "text",
+		CHURNER_HOSTNAME:                     "",
+		CHURNER_GRPC_PORT:                    grpcPort,
+		CHURNER_BLS_OPERATOR_STATE_RETRIVER:  env.EigenDA.OperatorStateRetriever,
+		CHURNER_EIGENDA_SERVICE_MANAGER:      env.EigenDA.ServiceManager,
 		CHURNER_USAGE_AUTHORIZATION_REGISTRY: env.EigenDA.UsageAuthorizationRegistry,
 
 		CHURNER_CHAIN_RPC:   "",
@@ -188,9 +188,9 @@ func (env *Config) generateDisperserVars(ind int, logPath, dbPath, grpcPort stri
 		DISPERSER_SERVER_BUCKET_MULTIPLIERS: "1",
 		DISPERSER_SERVER_COUNT_FAILED:       "true",
 
-		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER:    env.EigenDA.OperatorStateRetriever,
-		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:        env.EigenDA.ServiceManager,
-		DISPERSER_SERVER_USAGE_AUTHORIZATION_REGISTRY:   env.EigenDA.UsageAuthorizationRegistry,
+		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER:  env.EigenDA.OperatorStateRetriever,
+		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:      env.EigenDA.ServiceManager,
+		DISPERSER_SERVER_USAGE_AUTHORIZATION_REGISTRY: env.EigenDA.UsageAuthorizationRegistry,
 	}
 
 	env.applyDefaults(&v, "DISPERSER_SERVER", "dis", ind)
@@ -227,10 +227,10 @@ func (env *Config) generateDisperserV2Vars(ind int, logPath, dbPath, grpcPort st
 		DISPERSER_SERVER_BUCKET_MULTIPLIERS: "1",
 		DISPERSER_SERVER_COUNT_FAILED:       "true",
 
-		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER:    env.EigenDA.OperatorStateRetriever,
-		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:        env.EigenDA.ServiceManager,
-		DISPERSER_SERVER_USAGE_AUTHORIZATION_REGISTRY:   env.EigenDA.UsageAuthorizationRegistry,
-		DISPERSER_SERVER_DISPERSER_VERSION:              "2",
+		DISPERSER_SERVER_BLS_OPERATOR_STATE_RETRIVER:  env.EigenDA.OperatorStateRetriever,
+		DISPERSER_SERVER_EIGENDA_SERVICE_MANAGER:      env.EigenDA.ServiceManager,
+		DISPERSER_SERVER_USAGE_AUTHORIZATION_REGISTRY: env.EigenDA.UsageAuthorizationRegistry,
+		DISPERSER_SERVER_DISPERSER_VERSION:            "2",
 
 		DISPERSER_SERVER_ENABLE_PAYMENT_METERER:  "true",
 		DISPERSER_SERVER_RESERVED_ONLY:           "false",
@@ -252,11 +252,11 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 		BATCHER_DYNAMODB_TABLE_NAME:           "test-BlobMetadata",
 		BATCHER_ENABLE_METRICS:                "true",
 		BATCHER_METRICS_HTTP_PORT:             "9094",
-		BATCHER_PULL_INTERVAL:                   "5s",
-		BATCHER_BLS_OPERATOR_STATE_RETRIVER:     env.EigenDA.OperatorStateRetriever,
-		BATCHER_EIGENDA_SERVICE_MANAGER:         env.EigenDA.ServiceManager,
-		BATCHER_USAGE_AUTHORIZATION_REGISTRY:    env.EigenDA.UsageAuthorizationRegistry,
-		BATCHER_SRS_ORDER:                       "300000",
+		BATCHER_PULL_INTERVAL:                 "5s",
+		BATCHER_BLS_OPERATOR_STATE_RETRIVER:   env.EigenDA.OperatorStateRetriever,
+		BATCHER_EIGENDA_SERVICE_MANAGER:       env.EigenDA.ServiceManager,
+		BATCHER_USAGE_AUTHORIZATION_REGISTRY:  env.EigenDA.UsageAuthorizationRegistry,
+		BATCHER_SRS_ORDER:                     "300000",
 		BATCHER_CHAIN_RPC:                     "",
 		BATCHER_PRIVATE_KEY:                   key[2:],
 		BATCHER_GRAPH_URL:                     graphUrl,
@@ -282,24 +282,24 @@ func (env *Config) generateBatcherVars(ind int, key, graphUrl, logPath string) B
 
 func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 	v := EncoderVars{
-		DISPERSER_ENCODER_LOG_FORMAT:                     "text",
-		DISPERSER_ENCODER_AWS_REGION:                     "",
-		DISPERSER_ENCODER_AWS_ACCESS_KEY_ID:              "",
-		DISPERSER_ENCODER_AWS_SECRET_ACCESS_KEY:          "",
-		DISPERSER_ENCODER_AWS_ENDPOINT_URL:               "",
-		DISPERSER_ENCODER_GRPC_PORT:                      grpcPort,
-		DISPERSER_ENCODER_ENABLE_METRICS:                 "true",
-		DISPERSER_ENCODER_USAGE_AUTHORIZATION_REGISTRY:   env.EigenDA.UsageAuthorizationRegistry,
-		DISPERSER_ENCODER_G1_PATH:                        "",
-		DISPERSER_ENCODER_G2_PATH:                        "",
-		DISPERSER_ENCODER_SRS_ORDER:                      "",
-		DISPERSER_ENCODER_SRS_LOAD:                       "",
-		DISPERSER_ENCODER_CACHE_PATH:                     "",
-		DISPERSER_ENCODER_VERBOSE:                        "",
-		DISPERSER_ENCODER_NUM_WORKERS:                    fmt.Sprint(runtime.GOMAXPROCS(0)),
-		DISPERSER_ENCODER_MAX_CONCURRENT_REQUESTS:        "16",
-		DISPERSER_ENCODER_REQUEST_POOL_SIZE:              "32",
-		DISPERSER_ENCODER_REQUEST_QUEUE_SIZE:             "32",
+		DISPERSER_ENCODER_LOG_FORMAT:                   "text",
+		DISPERSER_ENCODER_AWS_REGION:                   "",
+		DISPERSER_ENCODER_AWS_ACCESS_KEY_ID:            "",
+		DISPERSER_ENCODER_AWS_SECRET_ACCESS_KEY:        "",
+		DISPERSER_ENCODER_AWS_ENDPOINT_URL:             "",
+		DISPERSER_ENCODER_GRPC_PORT:                    grpcPort,
+		DISPERSER_ENCODER_ENABLE_METRICS:               "true",
+		DISPERSER_ENCODER_USAGE_AUTHORIZATION_REGISTRY: env.EigenDA.UsageAuthorizationRegistry,
+		DISPERSER_ENCODER_G1_PATH:                      "",
+		DISPERSER_ENCODER_G2_PATH:                      "",
+		DISPERSER_ENCODER_SRS_ORDER:                    "",
+		DISPERSER_ENCODER_SRS_LOAD:                     "",
+		DISPERSER_ENCODER_CACHE_PATH:                   "",
+		DISPERSER_ENCODER_VERBOSE:                      "",
+		DISPERSER_ENCODER_NUM_WORKERS:                  fmt.Sprint(runtime.GOMAXPROCS(0)),
+		DISPERSER_ENCODER_MAX_CONCURRENT_REQUESTS:      "16",
+		DISPERSER_ENCODER_REQUEST_POOL_SIZE:            "32",
+		DISPERSER_ENCODER_REQUEST_QUEUE_SIZE:           "32",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_ENCODER", "enc", ind)
@@ -309,26 +309,26 @@ func (env *Config) generateEncoderVars(ind int, grpcPort string) EncoderVars {
 
 func (env *Config) generateEncoderV2Vars(ind int, grpcPort string) EncoderVars {
 	v := EncoderVars{
-		DISPERSER_ENCODER_LOG_FORMAT:                     "text",
-		DISPERSER_ENCODER_AWS_REGION:                     "",
-		DISPERSER_ENCODER_AWS_ACCESS_KEY_ID:              "",
-		DISPERSER_ENCODER_AWS_SECRET_ACCESS_KEY:          "",
-		DISPERSER_ENCODER_AWS_ENDPOINT_URL:               "",
-		DISPERSER_ENCODER_GRPC_PORT:                      grpcPort,
-		DISPERSER_ENCODER_ENABLE_METRICS:                 "true",
-		DISPERSER_ENCODER_USAGE_AUTHORIZATION_REGISTRY:   env.EigenDA.UsageAuthorizationRegistry,
-		DISPERSER_ENCODER_G1_PATH:                        "",
-		DISPERSER_ENCODER_G2_PATH:                        "",
-		DISPERSER_ENCODER_SRS_ORDER:                      "",
-		DISPERSER_ENCODER_SRS_LOAD:                       "",
-		DISPERSER_ENCODER_CACHE_PATH:                     "",
-		DISPERSER_ENCODER_VERBOSE:                        "",
-		DISPERSER_ENCODER_NUM_WORKERS:                    fmt.Sprint(runtime.GOMAXPROCS(0)),
-		DISPERSER_ENCODER_MAX_CONCURRENT_REQUESTS:        "16",
-		DISPERSER_ENCODER_REQUEST_POOL_SIZE:              "32",
-		DISPERSER_ENCODER_ENCODER_VERSION:                "2",
-		DISPERSER_ENCODER_S3_BUCKET_NAME:                 "test-eigenda-blobstore",
-		DISPERSER_ENCODER_REQUEST_QUEUE_SIZE:             "32",
+		DISPERSER_ENCODER_LOG_FORMAT:                   "text",
+		DISPERSER_ENCODER_AWS_REGION:                   "",
+		DISPERSER_ENCODER_AWS_ACCESS_KEY_ID:            "",
+		DISPERSER_ENCODER_AWS_SECRET_ACCESS_KEY:        "",
+		DISPERSER_ENCODER_AWS_ENDPOINT_URL:             "",
+		DISPERSER_ENCODER_GRPC_PORT:                    grpcPort,
+		DISPERSER_ENCODER_ENABLE_METRICS:               "true",
+		DISPERSER_ENCODER_USAGE_AUTHORIZATION_REGISTRY: env.EigenDA.UsageAuthorizationRegistry,
+		DISPERSER_ENCODER_G1_PATH:                      "",
+		DISPERSER_ENCODER_G2_PATH:                      "",
+		DISPERSER_ENCODER_SRS_ORDER:                    "",
+		DISPERSER_ENCODER_SRS_LOAD:                     "",
+		DISPERSER_ENCODER_CACHE_PATH:                   "",
+		DISPERSER_ENCODER_VERBOSE:                      "",
+		DISPERSER_ENCODER_NUM_WORKERS:                  fmt.Sprint(runtime.GOMAXPROCS(0)),
+		DISPERSER_ENCODER_MAX_CONCURRENT_REQUESTS:      "16",
+		DISPERSER_ENCODER_REQUEST_POOL_SIZE:            "32",
+		DISPERSER_ENCODER_ENCODER_VERSION:              "2",
+		DISPERSER_ENCODER_S3_BUCKET_NAME:               "test-eigenda-blobstore",
+		DISPERSER_ENCODER_REQUEST_QUEUE_SIZE:           "32",
 	}
 
 	env.applyDefaults(&v, "DISPERSER_ENCODER", "enc", ind)
@@ -341,28 +341,28 @@ func (env *Config) generateControllerVars(
 	graphUrl string) ControllerVars {
 
 	v := ControllerVars{
-		CONTROLLER_LOG_FORMAT:                    "text",
-		CONTROLLER_DYNAMODB_TABLE_NAME:           "test-BlobMetadata-v2",
-		CONTROLLER_BLS_OPERATOR_STATE_RETRIVER:   env.EigenDA.OperatorStateRetriever,
-		CONTROLLER_EIGENDA_SERVICE_MANAGER:       env.EigenDA.ServiceManager,
-		CONTROLLER_USAGE_AUTHORIZATION_REGISTRY:  env.EigenDA.UsageAuthorizationRegistry,
-		CONTROLLER_USE_GRAPH:                     "true",
-		CONTROLLER_GRAPH_URL:                   graphUrl,
-		CONTROLLER_ENCODING_PULL_INTERVAL:      "1s",
-		CONTROLLER_AVAILABLE_RELAYS:            "0,1,2,3",
-		CONTROLLER_DISPATCHER_PULL_INTERVAL:    "3s",
-		CONTROLLER_ATTESTATION_TIMEOUT:         "5s",
-		CONTROLLER_BATCH_ATTESTATION_TIMEOUT:   "6s",
-		CONTROLLER_CHAIN_RPC:                   "",
-		CONTROLLER_PRIVATE_KEY:                 "123",
-		CONTROLLER_NUM_CONFIRMATIONS:           "0",
-		CONTROLLER_INDEXER_PULL_INTERVAL:       "1s",
-		CONTROLLER_AWS_REGION:                  "",
-		CONTROLLER_AWS_ACCESS_KEY_ID:           "",
-		CONTROLLER_AWS_SECRET_ACCESS_KEY:       "",
-		CONTROLLER_AWS_ENDPOINT_URL:            "",
-		CONTROLLER_ENCODER_ADDRESS:             "0.0.0.0:34001",
-		CONTROLLER_FINALIZATION_BLOCK_DELAY:    "5", // set to 5 to ensure payload disperser checkDACert calls pass in integration_v2 test since
+		CONTROLLER_LOG_FORMAT:                   "text",
+		CONTROLLER_DYNAMODB_TABLE_NAME:          "test-BlobMetadata-v2",
+		CONTROLLER_BLS_OPERATOR_STATE_RETRIVER:  env.EigenDA.OperatorStateRetriever,
+		CONTROLLER_EIGENDA_SERVICE_MANAGER:      env.EigenDA.ServiceManager,
+		CONTROLLER_USAGE_AUTHORIZATION_REGISTRY: env.EigenDA.UsageAuthorizationRegistry,
+		CONTROLLER_USE_GRAPH:                    "true",
+		CONTROLLER_GRAPH_URL:                    graphUrl,
+		CONTROLLER_ENCODING_PULL_INTERVAL:       "1s",
+		CONTROLLER_AVAILABLE_RELAYS:             "0,1,2,3",
+		CONTROLLER_DISPATCHER_PULL_INTERVAL:     "3s",
+		CONTROLLER_ATTESTATION_TIMEOUT:          "5s",
+		CONTROLLER_BATCH_ATTESTATION_TIMEOUT:    "6s",
+		CONTROLLER_CHAIN_RPC:                    "",
+		CONTROLLER_PRIVATE_KEY:                  "123",
+		CONTROLLER_NUM_CONFIRMATIONS:            "0",
+		CONTROLLER_INDEXER_PULL_INTERVAL:        "1s",
+		CONTROLLER_AWS_REGION:                   "",
+		CONTROLLER_AWS_ACCESS_KEY_ID:            "",
+		CONTROLLER_AWS_SECRET_ACCESS_KEY:        "",
+		CONTROLLER_AWS_ENDPOINT_URL:             "",
+		CONTROLLER_ENCODER_ADDRESS:              "0.0.0.0:34001",
+		CONTROLLER_FINALIZATION_BLOCK_DELAY:     "5", // set to 5 to ensure payload disperser checkDACert calls pass in integration_v2 test since
 		// disperser chooses rbn = latest_block_number - finalization_block_delay
 		CONTROLLER_DISPERSER_STORE_CHUNKS_SIGNING_DISABLED: "false",
 		CONTROLLER_DISPERSER_KMS_KEY_ID:                    env.DisperserKMSKeyID,
@@ -473,14 +473,14 @@ func (env *Config) generateOperatorVars(ind int, name, key, churnerUrl, logPath,
 // Generates retriever .env
 func (env *Config) generateRetrieverVars(ind int, key string, graphUrl, logPath, grpcPort string) RetrieverVars {
 	v := RetrieverVars{
-		RETRIEVER_LOG_FORMAT:                     "text",
-		RETRIEVER_HOSTNAME:                       "",
-		RETRIEVER_GRPC_PORT:                      grpcPort,
-		RETRIEVER_TIMEOUT:                        "10s",
-		RETRIEVER_BLS_OPERATOR_STATE_RETRIEVER:   env.EigenDA.OperatorStateRetriever,
-		RETRIEVER_EIGENDA_SERVICE_MANAGER:        env.EigenDA.ServiceManager,
-		RETRIEVER_USAGE_AUTHORIZATION_REGISTRY:   env.EigenDA.UsageAuthorizationRegistry,
-		RETRIEVER_NUM_CONNECTIONS:                "10",
+		RETRIEVER_LOG_FORMAT:                   "text",
+		RETRIEVER_HOSTNAME:                     "",
+		RETRIEVER_GRPC_PORT:                    grpcPort,
+		RETRIEVER_TIMEOUT:                      "10s",
+		RETRIEVER_BLS_OPERATOR_STATE_RETRIEVER: env.EigenDA.OperatorStateRetriever,
+		RETRIEVER_EIGENDA_SERVICE_MANAGER:      env.EigenDA.ServiceManager,
+		RETRIEVER_USAGE_AUTHORIZATION_REGISTRY: env.EigenDA.UsageAuthorizationRegistry,
+		RETRIEVER_NUM_CONNECTIONS:              "10",
 
 		RETRIEVER_CHAIN_RPC:   "",
 		RETRIEVER_PRIVATE_KEY: key[2:],
@@ -779,6 +779,7 @@ func (env *Config) GenerateAllVariables() {
 		if err != nil {
 			log.Panicf("Error: %s", err.Error())
 		}
+
 		writeFile(composeFile, composeYaml)
 	}
 }

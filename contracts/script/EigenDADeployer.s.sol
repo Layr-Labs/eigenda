@@ -216,8 +216,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 TransparentUpgradeableProxy(payable(address(usageAuthorizationRegistry))),
                 address(usageAuthorizationRegistryImplementation),
                 abi.encodeWithSelector(
-                    UsageAuthorizationRegistry.initialize.selector,
-                    addressConfig.eigenDACommunityMultisig
+                    UsageAuthorizationRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig
                 )
             );
         }
