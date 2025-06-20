@@ -15,9 +15,9 @@ import (
 // process to report the error and to elegantly spin itself down.
 //
 // Even though this utility can "panic", it is not the same as the panic that is built into Go. The Panic() method
-// should be called in situations where recovery is not possible, i.e. the same situations where one would otherwise use
-// as a golang panic. The big difference is that calling Panic() will not result in the process immediately being torn
-// down.
+// should be called in situations where recovery is not possible, i.e. the same situations where one would otherwise
+// call golang's panic(). The big difference is that calling Panic() will not result in the process immediately being
+// torn down.
 type ErrorMonitor struct {
 	ctx    context.Context
 	cancel context.CancelFunc

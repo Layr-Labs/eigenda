@@ -83,6 +83,11 @@ func NewDB(config *litt.Config) (litt.DB, error) {
 		return nil, fmt.Errorf("error expanding tildes in config: %w", err)
 	}
 
+	if !config.Fsync {
+		config.Logger.Warnf(
+			"Fsync is disabled. Ok for unit tests that need to run fast, NOT OK FOR PRODUCTION USE.")
+	}
+
 	tableBuilder := func(
 		ctx context.Context,
 		logger logging.Logger,

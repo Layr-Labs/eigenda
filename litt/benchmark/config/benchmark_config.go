@@ -87,7 +87,7 @@ type BenchmarkConfig struct {
 	TimeLimitSeconds float64
 }
 
-// DefaultBenchmarkConfig returns a default BenchmarkConfig with the given data paths.
+// DefaultBenchmarkConfig returns a default BenchmarkConfig.
 func DefaultBenchmarkConfig() *BenchmarkConfig {
 
 	littConfig := litt.DefaultConfigNoPaths()

@@ -65,7 +65,7 @@ func SanitizePath(path string) (string, error) {
 // appended to the filename. If there is a crash during this method's execution, it may leave this swap file behind.
 func AtomicWrite(destination string, data []byte, fsync bool) error {
 
-	swapPath := destination + ".swap"
+	swapPath := destination + SwapFileExtension
 
 	// Write the data into the swap file.
 	swapFile, err := os.Create(swapPath)
