@@ -255,34 +255,28 @@ func (t *MockWriter) PubkeyHashToOperator(ctx context.Context, operatorId core.O
 	return result.(gethcommon.Address), args.Error(1)
 }
 
-func (t *MockWriter) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment, error) {
-	args := t.Called(ctx, accountIDs)
-	var value map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment
-	if args.Get(0) != nil {
-		value = args.Get(0).(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment)
-	}
-	return value, args.Error(1)
-}
-
-func (t *MockWriter) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[core.QuorumID]*core.ReservedPayment, error) {
-	args := t.Called(ctx, accountID)
-	var value map[core.QuorumID]*core.ReservedPayment
-	if args.Get(0) != nil {
-		value = args.Get(0).(map[core.QuorumID]*core.ReservedPayment)
-	}
-	return value, args.Error(1)
-}
-
-func (t *MockWriter) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {
-	args := t.Called()
+func (t *MockWriter) GetReservedPaymentByAccountAndQuorums(ctx context.Context, accountID gethcommon.Address, quorumNumbers []core.QuorumID) (map[core.QuorumID]*core.ReservedPayment, error) {
+	args := t.Called(ctx, accountID, quorumNumbers)
 	result := args.Get(0)
-	return result.(map[gethcommon.Address]*core.OnDemandPayment), args.Error(1)
+	return result.(map[core.QuorumID]*core.ReservedPayment), args.Error(1)
 }
 
 func (t *MockWriter) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
-	args := t.Called()
+	args := t.Called(ctx, accountID)
 	result := args.Get(0)
 	return result.(*core.OnDemandPayment), args.Error(1)
+}
+
+func (t *MockWriter) GetQuorumPaymentConfig(ctx context.Context, quorumID core.QuorumID) (*core.PaymentQuorumConfig, error) {
+	args := t.Called(ctx, quorumID)
+	result := args.Get(0)
+	return result.(*core.PaymentQuorumConfig), args.Error(1)
+}
+
+func (t *MockWriter) GetQuorumProtocolConfig(ctx context.Context, quorumID core.QuorumID) (*core.PaymentQuorumProtocolConfig, error) {
+	args := t.Called(ctx, quorumID)
+	result := args.Get(0)
+	return result.(*core.PaymentQuorumProtocolConfig), args.Error(1)
 }
 
 func (t *MockWriter) GetOperatorSocket(ctx context.Context, operatorID core.OperatorID) (string, error) {

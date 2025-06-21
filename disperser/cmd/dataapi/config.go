@@ -31,8 +31,9 @@ type Config struct {
 	ServerMode                   string
 	AllowOrigins                 []string
 
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
+	BLSOperatorStateRetrieverAddr  string
+	EigenDAServiceManagerAddr      string
+	UsageAuthorizationRegistryAddr string
 
 	DisperserHostname  string
 	ChurnerHostname    string
@@ -55,16 +56,17 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 			BucketName: ctx.GlobalString(flags.S3BucketNameFlag.Name),
 			TableName:  ctx.GlobalString(flags.DynamoTableNameFlag.Name),
 		},
-		AwsClientConfig:               aws.ReadClientConfig(ctx, flags.FlagPrefix),
-		EthClientConfig:               ethClientConfig,
-		LoggerConfig:                  *loggerConfig,
-		SocketAddr:                    ctx.GlobalString(flags.SocketAddrFlag.Name),
-		SubgraphApiBatchMetadataAddr:  ctx.GlobalString(flags.SubgraphApiBatchMetadataAddrFlag.Name),
-		SubgraphApiOperatorStateAddr:  ctx.GlobalString(flags.SubgraphApiOperatorStateAddrFlag.Name),
-		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
-		ServerMode:                    ctx.GlobalString(flags.ServerModeFlag.Name),
-		ServerVersion:                 version,
+		AwsClientConfig:                aws.ReadClientConfig(ctx, flags.FlagPrefix),
+		EthClientConfig:                ethClientConfig,
+		LoggerConfig:                   *loggerConfig,
+		SocketAddr:                     ctx.GlobalString(flags.SocketAddrFlag.Name),
+		SubgraphApiBatchMetadataAddr:   ctx.GlobalString(flags.SubgraphApiBatchMetadataAddrFlag.Name),
+		SubgraphApiOperatorStateAddr:   ctx.GlobalString(flags.SubgraphApiOperatorStateAddrFlag.Name),
+		BLSOperatorStateRetrieverAddr:  ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
+		EigenDAServiceManagerAddr:      ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		UsageAuthorizationRegistryAddr: ctx.GlobalString(flags.UsageAuthorizationRegistryFlag.Name),
+		ServerMode:                     ctx.GlobalString(flags.ServerModeFlag.Name),
+		ServerVersion:                  version,
 		PrometheusConfig: prometheus.Config{
 			ServerURL: ctx.GlobalString(flags.PrometheusServerURLFlag.Name),
 			Username:  ctx.GlobalString(flags.PrometheusServerUsernameFlag.Name),

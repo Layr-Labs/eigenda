@@ -334,6 +334,7 @@ func createEthReader(logger logging.Logger, ethClient common.EthClient) (*eth.Re
 		ethClient,
 		blsOperatorStateRetrieverAddress,
 		eigenDAServiceManagerAddress,
+		"",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new reader: %w", err)

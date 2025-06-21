@@ -34,8 +34,9 @@ type Config struct {
 	ChainStateConfig                    thegraph.Config
 	UseGraph                            bool
 
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
+	BLSOperatorStateRetrieverAddr  string
+	EigenDAServiceManagerAddr      string
+	UsageAuthorizationRegistryAddr string
 
 	MetricsPort                  int
 	ControllerReadinessProbePath string
@@ -99,11 +100,12 @@ func NewConfig(ctx *cli.Context) (Config, error) {
 		ChainStateConfig:               thegraph.ReadCLIConfig(ctx),
 		UseGraph:                       ctx.GlobalBool(flags.UseGraphFlag.Name),
 
-		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
-		MetricsPort:                   ctx.GlobalInt(flags.MetricsPortFlag.Name),
-		ControllerReadinessProbePath:  ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
-		ControllerHealthProbePath:     ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
+		BLSOperatorStateRetrieverAddr:  ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
+		EigenDAServiceManagerAddr:      ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		UsageAuthorizationRegistryAddr: ctx.GlobalString(flags.UsageAuthorizationRegistryFlag.Name),
+		MetricsPort:                    ctx.GlobalInt(flags.MetricsPortFlag.Name),
+		ControllerReadinessProbePath:   ctx.GlobalString(flags.ControllerReadinessProbePathFlag.Name),
+		ControllerHealthProbePath:      ctx.GlobalString(flags.ControllerHealthProbePathFlag.Name),
 	}
 	if !config.DisperserStoreChunksSigningDisabled && config.DisperserKMSKeyID == "" {
 		return Config{}, fmt.Errorf("DisperserKMSKeyID is required when StoreChunks() signing is enabled")

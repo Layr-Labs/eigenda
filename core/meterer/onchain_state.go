@@ -33,7 +33,7 @@ var _ OnchainPayment = (*OnchainPaymentState)(nil)
 
 // OnchainPaymentState manages the state of on-chain payments including reservations and on-demand payments
 type OnchainPaymentState struct {
-	tx     *eth.Reader
+	tx     core.Reader
 	logger logging.Logger
 
 	ReservedPayments map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment
@@ -106,51 +106,21 @@ func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*Pay
 		quorumNumbers[i] = uint8(i)
 	}
 
-	// TODO(hopeyen): the construction of quorum configs will be updated with payment vault interface updates
-	globalSymbolsPerSecond, err := pcs.tx.GetOnDemandGlobalSymbolsPerSecond(ctx, blockNumber)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get global symbols per second: %w", err)
-	}
-	globalRatePeriodInterval, err := pcs.tx.GetOnDemandGlobalRatePeriodInterval(ctx, blockNumber)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get global rate period interval: %w", err)
-	}
-	minNumSymbols, err := pcs.tx.GetMinNumSymbols(ctx, blockNumber)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get min num symbols: %w", err)
-	}
-	pricePerSymbol, err := pcs.tx.GetPricePerSymbol(ctx, blockNumber)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get price per symbol: %w", err)
-	}
-	reservationWindow, err := pcs.tx.GetReservationWindow(ctx, blockNumber)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get reservation window: %w", err)
-	}
-
-	// Initialize config maps
 	quorumPaymentConfigs := make(map[core.QuorumID]*core.PaymentQuorumConfig)
 	quorumProtocolConfigs := make(map[core.QuorumID]*core.PaymentQuorumProtocolConfig)
-
-	// Populate configs for each quorum
 	for _, quorumNumber := range quorumNumbers {
-		quorumPaymentConfigs[quorumNumber] = &core.PaymentQuorumConfig{
-			OnDemandSymbolsPerSecond:    globalSymbolsPerSecond,
-			OnDemandPricePerSymbol:      pricePerSymbol,
-			ReservationSymbolsPerSecond: 0, // placeholder
+		quorumPaymentConfig, err := pcs.tx.GetQuorumPaymentConfig(ctx, core.QuorumID(quorumNumber))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get quorum payment config: %w", err)
 		}
+		quorumPaymentConfigs[core.QuorumID(quorumNumber)] = quorumPaymentConfig
 
-		quorumProtocolConfigs[quorumNumber] = &core.PaymentQuorumProtocolConfig{
-			ReservationRateLimitWindow: reservationWindow,
-			OnDemandRateLimitWindow:    globalRatePeriodInterval,
-			MinNumSymbols:              minNumSymbols,
-			OnDemandEnabled:            false, // placeholder
-			ReservationAdvanceWindow:   0,     // placeholder
+		quorumProtocolConfig, err := pcs.tx.GetQuorumProtocolConfig(ctx, core.QuorumID(quorumNumber))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get quorum protocol config: %w", err)
 		}
+		quorumProtocolConfigs[core.QuorumID(quorumNumber)] = quorumProtocolConfig
 	}
-
-	// Enable on-demand for Quorum 0
-	quorumProtocolConfigs[OnDemandQuorumID].OnDemandEnabled = true
 
 	return &PaymentVaultParams{
 		OnDemandQuorumNumbers: requiredQuorumNumbers,
@@ -216,19 +186,16 @@ func (pcs *OnchainPaymentState) refreshReservedPayments(ctx context.Context) err
 
 	// TODO(hopeyen): with payment vault update, this function will take quorum numbers;
 	// Currently we just build the same reservation for each quorum
-	reservedPayments, err := pcs.tx.GetReservedPayments(ctx, accountIDs)
-	if err != nil {
-		return err
+	reservedPayments := make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment)
+	for _, accountID := range accountIDs {
+		reservations, err := pcs.tx.GetReservedPaymentByAccountAndQuorums(ctx, accountID, quorumNumbers)
+		if err != nil {
+			return err
+		}
+		reservedPayments[accountID] = reservations
 	}
 
-	reservedPaymentsByQuorum := make(map[gethcommon.Address]map[uint8]*core.ReservedPayment)
-	for accountID, payments := range reservedPayments {
-		reservedPaymentsByQuorum[accountID] = make(map[uint8]*core.ReservedPayment)
-		for quorumNumber, reservation := range payments {
-			reservedPaymentsByQuorum[accountID][uint8(quorumNumber)] = reservation
-		}
-	}
-	pcs.ReservedPayments = reservedPaymentsByQuorum
+	pcs.ReservedPayments = reservedPayments
 	return nil
 }
 
@@ -246,9 +213,13 @@ func (pcs *OnchainPaymentState) refreshOnDemandPayments(ctx context.Context) err
 		accountIDs = append(accountIDs, accountID)
 	}
 
-	onDemandPayments, err := pcs.tx.GetOnDemandPayments(ctx, accountIDs)
-	if err != nil {
-		return err
+	onDemandPayments := make(map[gethcommon.Address]*core.OnDemandPayment)
+	for _, accountID := range accountIDs {
+		onDemandPayment, err := pcs.tx.GetOnDemandPaymentByAccount(ctx, accountID)
+		if err != nil {
+			return err
+		}
+		onDemandPayments[accountID] = onDemandPayment
 	}
 	pcs.OnDemandPayments = onDemandPayments
 	return nil
@@ -274,7 +245,7 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx contex
 	pcs.ReservationsLock.RUnlock()
 
 	// pulls the chain state
-	allRes, err := pcs.tx.GetReservedPaymentByAccount(ctx, accountID)
+	allRes, err := pcs.tx.GetReservedPaymentByAccountAndQuorums(ctx, accountID, quorumNumbers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reserved payment: %w", err)
 	}

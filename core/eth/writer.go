@@ -38,7 +38,8 @@ func NewWriter(
 	logger logging.Logger,
 	client common.EthClient,
 	blsOperatorStateRetrieverHexAddr string,
-	eigenDAServiceManagerHexAddr string) (*Writer, error) {
+	eigenDAServiceManagerHexAddr string,
+	usageAuthRegHexAddr string) (*Writer, error) {
 
 	r := &Reader{
 		ethClient: client,
@@ -53,7 +54,12 @@ func NewWriter(
 
 	blsOperatorStateRetrieverAddr := gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
 	eigenDAServiceManagerAddr := gethcommon.HexToAddress(eigenDAServiceManagerHexAddr)
-	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
+	var usageAuthRegAddr *gethcommon.Address
+	if usageAuthRegHexAddr != "" {
+		addr := gethcommon.HexToAddress(usageAuthRegHexAddr)
+		usageAuthRegAddr = &addr
+	}
+	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr, usageAuthRegAddr)
 
 	return e, err
 }

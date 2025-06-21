@@ -14,6 +14,7 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -387,408 +388,242 @@ func TestOnchainPaymentState_CacheOperations(t *testing.T) {
 	}
 }
 
-func TestPaymentVaultParamsFromProtobuf(t *testing.T) {
+func TestPaymentVaultParamsConversion(t *testing.T) {
 	tests := []struct {
 		name        string
-		vaultParams *disperser_rpc.PaymentVaultParams
-		expected    *meterer.PaymentVaultParams
+		input       *meterer.PaymentVaultParams
 		expectedErr string
+		validate    func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams)
 	}{
 		{
-			name:        "nil vault params",
-			vaultParams: nil,
+			name: "valid complete params",
+			input: &meterer.PaymentVaultParams{
+				QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+					1: {
+						ReservationSymbolsPerSecond: 100,
+						OnDemandSymbolsPerSecond:    200,
+						OnDemandPricePerSymbol:      300,
+					},
+					2: {
+						ReservationSymbolsPerSecond: 400,
+						OnDemandSymbolsPerSecond:    500,
+						OnDemandPricePerSymbol:      600,
+					},
+				},
+				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+					1: {
+						MinNumSymbols:              10,
+						ReservationAdvanceWindow:   20,
+						ReservationRateLimitWindow: 30,
+						OnDemandRateLimitWindow:    40,
+						OnDemandEnabled:            true,
+					},
+					2: {
+						MinNumSymbols:              50,
+						ReservationAdvanceWindow:   60,
+						ReservationRateLimitWindow: 70,
+						OnDemandRateLimitWindow:    80,
+						OnDemandEnabled:            false,
+					},
+				},
+				OnDemandQuorumNumbers: []core.QuorumID{1, 2},
+			},
+			validate: func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams) {
+				require.Equal(t, 2, len(pbParams.QuorumPaymentConfigs))
+				require.Equal(t, 2, len(pbParams.QuorumProtocolConfigs))
+				require.Equal(t, 2, len(pbParams.OnDemandQuorumNumbers))
+
+				// Verify quorum 1
+				require.Equal(t, uint64(100), pbParams.QuorumPaymentConfigs[1].ReservationSymbolsPerSecond)
+				require.Equal(t, uint64(200), pbParams.QuorumPaymentConfigs[1].OnDemandSymbolsPerSecond)
+				require.Equal(t, uint64(300), pbParams.QuorumPaymentConfigs[1].OnDemandPricePerSymbol)
+				require.Equal(t, uint64(10), pbParams.QuorumProtocolConfigs[1].MinNumSymbols)
+				require.True(t, pbParams.QuorumProtocolConfigs[1].OnDemandEnabled)
+
+				// Verify quorum 2
+				require.Equal(t, uint64(400), pbParams.QuorumPaymentConfigs[2].ReservationSymbolsPerSecond)
+				require.Equal(t, uint64(500), pbParams.QuorumPaymentConfigs[2].OnDemandSymbolsPerSecond)
+				require.Equal(t, uint64(600), pbParams.QuorumPaymentConfigs[2].OnDemandPricePerSymbol)
+				require.Equal(t, uint64(50), pbParams.QuorumProtocolConfigs[2].MinNumSymbols)
+				require.False(t, pbParams.QuorumProtocolConfigs[2].OnDemandEnabled)
+
+				// Verify round-trip conversion
+				convertedCoreParams, err := meterer.PaymentVaultParamsFromProtobuf(pbParams)
+				require.NoError(t, err)
+				require.Equal(t, coreParams, convertedCoreParams)
+			},
+		},
+		{
+			name:        "nil params",
+			input:       nil,
 			expectedErr: "payment vault params cannot be nil",
 		},
 		{
-			name: "nil quorum payment configs",
-			vaultParams: &disperser_rpc.PaymentVaultParams{
-				QuorumPaymentConfigs:  nil,
-				QuorumProtocolConfigs: map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig{},
-				OnDemandQuorumNumbers: []uint32{},
+			name: "nil payment configs",
+			input: &meterer.PaymentVaultParams{
+				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
+					1: {MinNumSymbols: 10},
+				},
+				OnDemandQuorumNumbers: []core.QuorumID{1},
 			},
 			expectedErr: "payment quorum configs cannot be nil",
 		},
 		{
-			name: "nil quorum protocol configs",
-			vaultParams: &disperser_rpc.PaymentVaultParams{
-				QuorumPaymentConfigs:  map[uint32]*disperser_rpc.PaymentQuorumConfig{},
-				QuorumProtocolConfigs: nil,
-				OnDemandQuorumNumbers: []uint32{},
+			name: "nil protocol configs",
+			input: &meterer.PaymentVaultParams{
+				QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
+					1: {ReservationSymbolsPerSecond: 100},
+				},
+				OnDemandQuorumNumbers: []core.QuorumID{1},
 			},
 			expectedErr: "payment quorum protocol configs cannot be nil",
 		},
 		{
-			name: "empty configs",
-			vaultParams: &disperser_rpc.PaymentVaultParams{
-				QuorumPaymentConfigs:  map[uint32]*disperser_rpc.PaymentQuorumConfig{},
-				QuorumProtocolConfigs: map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig{},
-				OnDemandQuorumNumbers: []uint32{},
-			},
-			expected: &meterer.PaymentVaultParams{
+			name: "empty maps",
+			input: &meterer.PaymentVaultParams{
 				QuorumPaymentConfigs:  map[core.QuorumID]*core.PaymentQuorumConfig{},
 				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{},
 				OnDemandQuorumNumbers: []core.QuorumID{},
 			},
+			validate: func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams) {
+				require.Empty(t, pbParams.QuorumPaymentConfigs)
+				require.Empty(t, pbParams.QuorumProtocolConfigs)
+				require.Empty(t, pbParams.OnDemandQuorumNumbers)
+			},
 		},
 		{
-			name: "single quorum config",
-			vaultParams: &disperser_rpc.PaymentVaultParams{
-				QuorumPaymentConfigs: map[uint32]*disperser_rpc.PaymentQuorumConfig{
-					0: {
-						ReservationSymbolsPerSecond: 100,
-						OnDemandSymbolsPerSecond:    200,
-						OnDemandPricePerSymbol:      300,
-					},
-				},
-				QuorumProtocolConfigs: map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig{
-					0: {
-						MinNumSymbols:              400,
-						ReservationAdvanceWindow:   500,
-						ReservationRateLimitWindow: 600,
-						OnDemandRateLimitWindow:    700,
-						OnDemandEnabled:            true,
-					},
-				},
-				OnDemandQuorumNumbers: []uint32{0},
-			},
-			expected: &meterer.PaymentVaultParams{
+			name: "max uint32 quorum ID",
+			input: &meterer.PaymentVaultParams{
 				QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
-					0: {
-						ReservationSymbolsPerSecond: 100,
-						OnDemandSymbolsPerSecond:    200,
-						OnDemandPricePerSymbol:      300,
-					},
+					core.QuorumID(255): {ReservationSymbolsPerSecond: 100},
 				},
 				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
-					0: {
-						MinNumSymbols:              400,
-						ReservationAdvanceWindow:   500,
-						ReservationRateLimitWindow: 600,
-						OnDemandRateLimitWindow:    700,
-						OnDemandEnabled:            true,
-					},
+					core.QuorumID(255): {MinNumSymbols: 10},
 				},
-				OnDemandQuorumNumbers: []core.QuorumID{0},
+				OnDemandQuorumNumbers: []core.QuorumID{core.QuorumID(255)},
+			},
+			validate: func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams) {
+				require.Equal(t, uint64(100), pbParams.QuorumPaymentConfigs[255].ReservationSymbolsPerSecond)
+				require.Equal(t, uint64(10), pbParams.QuorumProtocolConfigs[255].MinNumSymbols)
+				require.Equal(t, uint32(255), pbParams.OnDemandQuorumNumbers[0])
 			},
 		},
 		{
-			name: "multiple quorum configs",
-			vaultParams: &disperser_rpc.PaymentVaultParams{
-				QuorumPaymentConfigs: map[uint32]*disperser_rpc.PaymentQuorumConfig{
-					0: {
-						ReservationSymbolsPerSecond: 100,
-						OnDemandSymbolsPerSecond:    200,
-						OnDemandPricePerSymbol:      300,
-					},
-					1: {
-						ReservationSymbolsPerSecond: 1100,
-						OnDemandSymbolsPerSecond:    1200,
-						OnDemandPricePerSymbol:      1300,
-					},
-					255: {
-						ReservationSymbolsPerSecond: 25500,
-						OnDemandSymbolsPerSecond:    25600,
-						OnDemandPricePerSymbol:      25700,
-					},
-				},
-				QuorumProtocolConfigs: map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig{
-					0: {
-						MinNumSymbols:              400,
-						ReservationAdvanceWindow:   500,
-						ReservationRateLimitWindow: 600,
-						OnDemandRateLimitWindow:    700,
-						OnDemandEnabled:            true,
-					},
-					1: {
-						MinNumSymbols:              1400,
-						ReservationAdvanceWindow:   1500,
-						ReservationRateLimitWindow: 1600,
-						OnDemandRateLimitWindow:    1700,
-						OnDemandEnabled:            false,
-					},
-					255: {
-						MinNumSymbols:              25800,
-						ReservationAdvanceWindow:   25900,
-						ReservationRateLimitWindow: 26000,
-						OnDemandRateLimitWindow:    26100,
-						OnDemandEnabled:            true,
-					},
-				},
-				OnDemandQuorumNumbers: []uint32{0, 1, 255},
-			},
-			expected: &meterer.PaymentVaultParams{
+			name: "max uint64 values",
+			input: &meterer.PaymentVaultParams{
 				QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
-					0: {
-						ReservationSymbolsPerSecond: 100,
-						OnDemandSymbolsPerSecond:    200,
-						OnDemandPricePerSymbol:      300,
-					},
 					1: {
-						ReservationSymbolsPerSecond: 1100,
-						OnDemandSymbolsPerSecond:    1200,
-						OnDemandPricePerSymbol:      1300,
-					},
-					255: {
-						ReservationSymbolsPerSecond: 25500,
-						OnDemandSymbolsPerSecond:    25600,
-						OnDemandPricePerSymbol:      25700,
-					},
-				},
-				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
-					0: {
-						MinNumSymbols:              400,
-						ReservationAdvanceWindow:   500,
-						ReservationRateLimitWindow: 600,
-						OnDemandRateLimitWindow:    700,
-						OnDemandEnabled:            true,
-					},
-					1: {
-						MinNumSymbols:              1400,
-						ReservationAdvanceWindow:   1500,
-						ReservationRateLimitWindow: 1600,
-						OnDemandRateLimitWindow:    1700,
-						OnDemandEnabled:            false,
-					},
-					255: {
-						MinNumSymbols:              25800,
-						ReservationAdvanceWindow:   25900,
-						ReservationRateLimitWindow: 26000,
-						OnDemandRateLimitWindow:    26100,
-						OnDemandEnabled:            true,
-					},
-				},
-				OnDemandQuorumNumbers: []core.QuorumID{0, 1, 255},
-			},
-		},
-		{
-			name: "zero values",
-			vaultParams: &disperser_rpc.PaymentVaultParams{
-				QuorumPaymentConfigs: map[uint32]*disperser_rpc.PaymentQuorumConfig{
-					0: {
-						ReservationSymbolsPerSecond: 0,
-						OnDemandSymbolsPerSecond:    0,
-						OnDemandPricePerSymbol:      0,
-					},
-				},
-				QuorumProtocolConfigs: map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig{
-					0: {
-						MinNumSymbols:              0,
-						ReservationAdvanceWindow:   0,
-						ReservationRateLimitWindow: 0,
-						OnDemandRateLimitWindow:    0,
-						OnDemandEnabled:            false,
-					},
-				},
-				OnDemandQuorumNumbers: []uint32{0},
-			},
-			expected: &meterer.PaymentVaultParams{
-				QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
-					0: {
-						ReservationSymbolsPerSecond: 0,
-						OnDemandSymbolsPerSecond:    0,
-						OnDemandPricePerSymbol:      0,
-					},
-				},
-				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
-					0: {
-						MinNumSymbols:              0,
-						ReservationAdvanceWindow:   0,
-						ReservationRateLimitWindow: 0,
-						OnDemandRateLimitWindow:    0,
-						OnDemandEnabled:            false,
-					},
-				},
-				OnDemandQuorumNumbers: []core.QuorumID{0},
-			},
-		},
-		{
-			name: "max values",
-			vaultParams: &disperser_rpc.PaymentVaultParams{
-				QuorumPaymentConfigs: map[uint32]*disperser_rpc.PaymentQuorumConfig{
-					0: {
-						ReservationSymbolsPerSecond: ^uint64(0), // max uint64
-						OnDemandSymbolsPerSecond:    ^uint64(0),
-						OnDemandPricePerSymbol:      ^uint64(0),
-					},
-				},
-				QuorumProtocolConfigs: map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig{
-					0: {
-						MinNumSymbols:              ^uint64(0),
-						ReservationAdvanceWindow:   ^uint64(0),
-						ReservationRateLimitWindow: ^uint64(0),
-						OnDemandRateLimitWindow:    ^uint64(0),
-						OnDemandEnabled:            true,
-					},
-				},
-				OnDemandQuorumNumbers: []uint32{0},
-			},
-			expected: &meterer.PaymentVaultParams{
-				QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
-					0: {
-						ReservationSymbolsPerSecond: ^uint64(0),
-						OnDemandSymbolsPerSecond:    ^uint64(0),
-						OnDemandPricePerSymbol:      ^uint64(0),
-					},
-				},
-				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
-					0: {
-						MinNumSymbols:              ^uint64(0),
-						ReservationAdvanceWindow:   ^uint64(0),
-						ReservationRateLimitWindow: ^uint64(0),
-						OnDemandRateLimitWindow:    ^uint64(0),
-						OnDemandEnabled:            true,
-					},
-				},
-				OnDemandQuorumNumbers: []core.QuorumID{0},
-			},
-		},
-		{
-			name: "empty on-demand quorum numbers",
-			vaultParams: &disperser_rpc.PaymentVaultParams{
-				QuorumPaymentConfigs: map[uint32]*disperser_rpc.PaymentQuorumConfig{
-					0: {
-						ReservationSymbolsPerSecond: 100,
-						OnDemandSymbolsPerSecond:    200,
-						OnDemandPricePerSymbol:      300,
-					},
-				},
-				QuorumProtocolConfigs: map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig{
-					0: {
-						MinNumSymbols:              400,
-						ReservationAdvanceWindow:   500,
-						ReservationRateLimitWindow: 600,
-						OnDemandRateLimitWindow:    700,
-						OnDemandEnabled:            true,
-					},
-				},
-				OnDemandQuorumNumbers: []uint32{},
-			},
-			expected: &meterer.PaymentVaultParams{
-				QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
-					0: {
-						ReservationSymbolsPerSecond: 100,
-						OnDemandSymbolsPerSecond:    200,
-						OnDemandPricePerSymbol:      300,
-					},
-				},
-				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
-					0: {
-						MinNumSymbols:              400,
-						ReservationAdvanceWindow:   500,
-						ReservationRateLimitWindow: 600,
-						OnDemandRateLimitWindow:    700,
-						OnDemandEnabled:            true,
-					},
-				},
-				OnDemandQuorumNumbers: []core.QuorumID{},
-			},
-		},
-		{
-			name: "mismatched quorum configs",
-			vaultParams: &disperser_rpc.PaymentVaultParams{
-				QuorumPaymentConfigs: map[uint32]*disperser_rpc.PaymentQuorumConfig{
-					0: {
-						ReservationSymbolsPerSecond: 100,
-						OnDemandSymbolsPerSecond:    200,
-						OnDemandPricePerSymbol:      300,
-					},
-					2: {
-						ReservationSymbolsPerSecond: 2100,
-						OnDemandSymbolsPerSecond:    2200,
-						OnDemandPricePerSymbol:      2300,
-					},
-				},
-				QuorumProtocolConfigs: map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig{
-					1: {
-						MinNumSymbols:              1400,
-						ReservationAdvanceWindow:   1500,
-						ReservationRateLimitWindow: 1600,
-						OnDemandRateLimitWindow:    1700,
-						OnDemandEnabled:            false,
-					},
-					3: {
-						MinNumSymbols:              3400,
-						ReservationAdvanceWindow:   3500,
-						ReservationRateLimitWindow: 3600,
-						OnDemandRateLimitWindow:    3700,
-						OnDemandEnabled:            true,
-					},
-				},
-				OnDemandQuorumNumbers: []uint32{0, 1, 2, 3},
-			},
-			expected: &meterer.PaymentVaultParams{
-				QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
-					0: {
-						ReservationSymbolsPerSecond: 100,
-						OnDemandSymbolsPerSecond:    200,
-						OnDemandPricePerSymbol:      300,
-					},
-					2: {
-						ReservationSymbolsPerSecond: 2100,
-						OnDemandSymbolsPerSecond:    2200,
-						OnDemandPricePerSymbol:      2300,
+						ReservationSymbolsPerSecond: math.MaxUint64,
+						OnDemandSymbolsPerSecond:    math.MaxUint64,
+						OnDemandPricePerSymbol:      math.MaxUint64,
 					},
 				},
 				QuorumProtocolConfigs: map[core.QuorumID]*core.PaymentQuorumProtocolConfig{
 					1: {
-						MinNumSymbols:              1400,
-						ReservationAdvanceWindow:   1500,
-						ReservationRateLimitWindow: 1600,
-						OnDemandRateLimitWindow:    1700,
-						OnDemandEnabled:            false,
-					},
-					3: {
-						MinNumSymbols:              3400,
-						ReservationAdvanceWindow:   3500,
-						ReservationRateLimitWindow: 3600,
-						OnDemandRateLimitWindow:    3700,
+						MinNumSymbols:              math.MaxUint64,
+						ReservationAdvanceWindow:   math.MaxUint64,
+						ReservationRateLimitWindow: math.MaxUint64,
+						OnDemandRateLimitWindow:    math.MaxUint64,
 						OnDemandEnabled:            true,
 					},
 				},
-				OnDemandQuorumNumbers: []core.QuorumID{0, 1, 2, 3},
+				OnDemandQuorumNumbers: []core.QuorumID{1},
+			},
+			validate: func(t *testing.T, pbParams *disperser_rpc.PaymentVaultParams, coreParams *meterer.PaymentVaultParams) {
+				require.Equal(t, uint64(math.MaxUint64), pbParams.QuorumPaymentConfigs[1].ReservationSymbolsPerSecond)
+				require.Equal(t, uint64(math.MaxUint64), pbParams.QuorumPaymentConfigs[1].OnDemandSymbolsPerSecond)
+				require.Equal(t, uint64(math.MaxUint64), pbParams.QuorumPaymentConfigs[1].OnDemandPricePerSymbol)
+				require.Equal(t, uint64(math.MaxUint64), pbParams.QuorumProtocolConfigs[1].MinNumSymbols)
+				require.Equal(t, uint64(math.MaxUint64), pbParams.QuorumProtocolConfigs[1].ReservationAdvanceWindow)
+				require.Equal(t, uint64(math.MaxUint64), pbParams.QuorumProtocolConfigs[1].ReservationRateLimitWindow)
+				require.Equal(t, uint64(math.MaxUint64), pbParams.QuorumProtocolConfigs[1].OnDemandRateLimitWindow)
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := meterer.PaymentVaultParamsFromProtobuf(tt.vaultParams)
-
+			// Test conversion to protobuf
+			pbParams, err := tt.input.PaymentVaultParamsToProtobuf()
 			if tt.expectedErr != "" {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedErr)
-				assert.Nil(t, result)
-			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, result)
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectedErr)
+				return
+			}
 
-				// Compare QuorumPaymentConfigs
-				assert.Equal(t, len(tt.expected.QuorumPaymentConfigs), len(result.QuorumPaymentConfigs))
-				for quorumID, expectedConfig := range tt.expected.QuorumPaymentConfigs {
-					actualConfig, exists := result.QuorumPaymentConfigs[quorumID]
-					assert.True(t, exists, "QuorumPaymentConfig for quorum %d should exist", quorumID)
-					assert.Equal(t, expectedConfig.ReservationSymbolsPerSecond, actualConfig.ReservationSymbolsPerSecond)
-					assert.Equal(t, expectedConfig.OnDemandSymbolsPerSecond, actualConfig.OnDemandSymbolsPerSecond)
-					assert.Equal(t, expectedConfig.OnDemandPricePerSymbol, actualConfig.OnDemandPricePerSymbol)
-				}
+			require.NoError(t, err)
+			require.NotNil(t, pbParams)
 
-				// Compare QuorumProtocolConfigs
-				assert.Equal(t, len(tt.expected.QuorumProtocolConfigs), len(result.QuorumProtocolConfigs))
-				for quorumID, expectedConfig := range tt.expected.QuorumProtocolConfigs {
-					actualConfig, exists := result.QuorumProtocolConfigs[quorumID]
-					assert.True(t, exists, "QuorumProtocolConfig for quorum %d should exist", quorumID)
-					assert.Equal(t, expectedConfig.MinNumSymbols, actualConfig.MinNumSymbols)
-					assert.Equal(t, expectedConfig.ReservationAdvanceWindow, actualConfig.ReservationAdvanceWindow)
-					assert.Equal(t, expectedConfig.ReservationRateLimitWindow, actualConfig.ReservationRateLimitWindow)
-					assert.Equal(t, expectedConfig.OnDemandRateLimitWindow, actualConfig.OnDemandRateLimitWindow)
-					assert.Equal(t, expectedConfig.OnDemandEnabled, actualConfig.OnDemandEnabled)
-				}
+			// Run validation if provided
+			if tt.validate != nil {
+				tt.validate(t, pbParams, tt.input)
+			}
+		})
+	}
+}
 
-				// Compare OnDemandQuorumNumbers
-				assert.Equal(t, len(tt.expected.OnDemandQuorumNumbers), len(result.OnDemandQuorumNumbers))
-				for i, expectedQuorum := range tt.expected.OnDemandQuorumNumbers {
-					assert.Equal(t, expectedQuorum, result.OnDemandQuorumNumbers[i])
-				}
+func TestPaymentVaultParamsFromProtobuf(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       *disperser_rpc.PaymentVaultParams
+		expectedErr string
+		validate    func(t *testing.T, coreParams *meterer.PaymentVaultParams)
+	}{
+		{
+			name:        "nil params",
+			input:       nil,
+			expectedErr: "payment vault params cannot be nil",
+		},
+		{
+			name: "nil payment configs",
+			input: &disperser_rpc.PaymentVaultParams{
+				QuorumProtocolConfigs: map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig{
+					1: {MinNumSymbols: 10},
+				},
+				OnDemandQuorumNumbers: []uint32{1},
+			},
+			expectedErr: "payment quorum configs cannot be nil",
+		},
+		{
+			name: "nil protocol configs",
+			input: &disperser_rpc.PaymentVaultParams{
+				QuorumPaymentConfigs: map[uint32]*disperser_rpc.PaymentQuorumConfig{
+					1: {ReservationSymbolsPerSecond: 100},
+				},
+				OnDemandQuorumNumbers: []uint32{1},
+			},
+			expectedErr: "payment quorum protocol configs cannot be nil",
+		},
+		{
+			name: "empty maps",
+			input: &disperser_rpc.PaymentVaultParams{
+				QuorumPaymentConfigs:  map[uint32]*disperser_rpc.PaymentQuorumConfig{},
+				QuorumProtocolConfigs: map[uint32]*disperser_rpc.PaymentQuorumProtocolConfig{},
+				OnDemandQuorumNumbers: []uint32{},
+			},
+			validate: func(t *testing.T, coreParams *meterer.PaymentVaultParams) {
+				require.Empty(t, coreParams.QuorumPaymentConfigs)
+				require.Empty(t, coreParams.QuorumProtocolConfigs)
+				require.Empty(t, coreParams.OnDemandQuorumNumbers)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			coreParams, err := meterer.PaymentVaultParamsFromProtobuf(tt.input)
+			if tt.expectedErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectedErr)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, coreParams)
+
+			// Run validation if provided
+			if tt.validate != nil {
+				tt.validate(t, coreParams)
 			}
 		})
 	}

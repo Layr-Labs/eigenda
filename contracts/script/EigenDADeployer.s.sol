@@ -28,6 +28,8 @@ import {IEigenDASignatureVerifier} from "src/core/interfaces/IEigenDASignatureVe
 import {IEigenDARelayRegistry} from "src/core/interfaces/IEigenDARelayRegistry.sol";
 import {IPaymentVault} from "src/core/interfaces/IPaymentVault.sol";
 import {PaymentVault} from "src/core/PaymentVault.sol";
+import {IUsageAuthorizationRegistry} from "src/core/interfaces/IUsageAuthorizationRegistry.sol";
+import {UsageAuthorizationRegistry} from "src/core/UsageAuthorizationRegistry.sol";
 import {EigenDADisperserRegistry} from "src/core/EigenDADisperserRegistry.sol";
 import {IEigenDADisperserRegistry} from "src/core/interfaces/IEigenDADisperserRegistry.sol";
 import {EigenDARelayRegistry} from "src/core/EigenDARelayRegistry.sol";
@@ -65,6 +67,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     ISocketRegistry public socketRegistry;
     OperatorStateRetriever public operatorStateRetriever;
     IPaymentVault public paymentVault;
+    IUsageAuthorizationRegistry public usageAuthorizationRegistry;
     EigenDARelayRegistry public eigenDARelayRegistry;
     IEigenDADisperserRegistry public eigenDADisperserRegistry;
 
@@ -78,6 +81,7 @@ contract EigenDADeployer is DeployOpenEigenLayer {
     EigenDARelayRegistry public eigenDARelayRegistryImplementation;
     ISocketRegistry public socketRegistryImplementation;
     IPaymentVault public paymentVaultImplementation;
+    IUsageAuthorizationRegistry public usageAuthorizationRegistryImplementation;
     IEigenDADisperserRegistry public eigenDADisperserRegistryImplementation;
 
     uint64 _minNumSymbols = 4096;
@@ -180,6 +184,10 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                 address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
             );
 
+            usageAuthorizationRegistry = IUsageAuthorizationRegistry(
+                address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
+            );
+
             eigenDADisperserRegistry = IEigenDADisperserRegistry(
                 address(new TransparentUpgradeableProxy(address(emptyContract), address(eigenDAProxyAdmin), ""))
             );
@@ -198,6 +206,17 @@ contract EigenDADeployer is DeployOpenEigenLayer {
                     _globalSymbolsPerPeriod,
                     _reservationPeriodInterval,
                     _globalRatePeriodInterval
+                )
+            );
+
+            uint64 schedulePeriod = 1 hours;
+            usageAuthorizationRegistryImplementation = new UsageAuthorizationRegistry(schedulePeriod);
+
+            eigenDAProxyAdmin.upgradeAndCall(
+                TransparentUpgradeableProxy(payable(address(usageAuthorizationRegistry))),
+                address(usageAuthorizationRegistryImplementation),
+                abi.encodeWithSelector(
+                    UsageAuthorizationRegistry.initialize.selector, addressConfig.eigenDACommunityMultisig
                 )
             );
         }

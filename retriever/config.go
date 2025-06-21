@@ -17,10 +17,11 @@ type Config struct {
 	LoggerConfig    common.LoggerConfig
 	MetricsConfig   MetricsConfig
 
-	Timeout                       time.Duration
-	NumConnections                int
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
+	Timeout                        time.Duration
+	NumConnections                 int
+	BLSOperatorStateRetrieverAddr  string
+	EigenDAServiceManagerAddr      string
+	UsageAuthorizationRegistryAddr string
 
 	EigenDAVersion int
 }
@@ -42,10 +43,11 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		MetricsConfig: MetricsConfig{
 			HTTPPort: ctx.GlobalString(flags.MetricsHTTPPortFlag.Name),
 		},
-		Timeout:                       ctx.Duration(flags.TimeoutFlag.Name),
-		NumConnections:                ctx.Int(flags.NumConnectionsFlag.Name),
-		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
-		EigenDAVersion:                version,
+		Timeout:                        ctx.Duration(flags.TimeoutFlag.Name),
+		NumConnections:                 ctx.Int(flags.NumConnectionsFlag.Name),
+		BLSOperatorStateRetrieverAddr:  ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
+		EigenDAServiceManagerAddr:      ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		UsageAuthorizationRegistryAddr: ctx.GlobalString(flags.UsageAuthorizationRegistryFlag.Name),
+		EigenDAVersion:                 version,
 	}, nil
 }

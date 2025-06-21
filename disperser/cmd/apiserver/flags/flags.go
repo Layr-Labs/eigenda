@@ -58,6 +58,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
+	UsageAuthorizationRegistryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "usage-authorization-registry"),
+		Usage:    "Address of the Usage Authorization Registry",
+		Required: false,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USAGE_AUTHORIZATION_REGISTRY"),
+	}
 	/* Optional Flags*/
 	DisperserVersionFlag = cli.UintFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-version"),
@@ -295,6 +301,7 @@ var optionalFlags = []cli.Flag{
 	NtpServerFlag,
 	NtpSyncIntervalFlag,
 	ReservedOnly,
+	UsageAuthorizationRegistryFlag,
 }
 
 // Flags contains the list of configuration options available to the binary.

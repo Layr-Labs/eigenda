@@ -96,7 +96,8 @@ func NodeMain(ctx *cli.Context) error {
 		logger,
 		client,
 		config.BLSOperatorStateRetrieverAddr,
-		config.EigenDAServiceManagerAddr)
+		config.EigenDAServiceManagerAddr,
+		config.UsageAuthorizationRegistryAddr)
 	if err != nil {
 		return fmt.Errorf("cannot create eth.Reader: %w", err)
 	}
