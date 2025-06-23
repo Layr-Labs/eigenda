@@ -15,6 +15,61 @@ import (
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
 
+// BatchMeterError represents a standardized error from the batch meterer
+type BatchMeterError struct {
+	Code      string `json:"code"`
+	Message   string `json:"message"`
+	AccountID string `json:"account_id,omitempty"`
+	QuorumID  uint8  `json:"quorum_id,omitempty"`
+}
+
+// Error implements the error interface
+func (e *BatchMeterError) Error() string {
+	if e.AccountID != "" && e.QuorumID != 0 {
+		return fmt.Sprintf("[%s] %s (account: %s, quorum: %d)", e.Code, e.Message, e.AccountID, e.QuorumID)
+	}
+	if e.AccountID != "" {
+		return fmt.Sprintf("[%s] %s (account: %s)", e.Code, e.Message, e.AccountID)
+	}
+	return fmt.Sprintf("[%s] %s", e.Code, e.Message)
+}
+
+// Batch meter error codes
+const (
+	ErrCodeBatchEmpty           = "BATCH_EMPTY"
+	ErrCodeBlobHeaderNil        = "BLOB_HEADER_NIL"
+	ErrCodePaymentParamsFailed  = "PAYMENT_PARAMS_FAILED"
+	ErrCodeReservationNotFound  = "RESERVATION_NOT_FOUND"
+	ErrCodeReservationLookup    = "RESERVATION_LOOKUP_FAILED"
+	ErrCodeReservationInactive  = "RESERVATION_INACTIVE"
+	ErrCodeReservationPeriod    = "RESERVATION_PERIOD_INVALID"
+	ErrCodeBinAlreadyFull       = "BIN_ALREADY_FULL"
+	ErrCodeUsageExceedsLimit    = "USAGE_EXCEEDS_LIMIT"
+	ErrCodeOverflowPeriodLimit  = "OVERFLOW_PERIOD_LIMIT"
+	ErrCodeOverflowWindowLimit  = "OVERFLOW_WINDOW_LIMIT"
+)
+
+// Error constructors for standardized error creation
+func newBatchMeterError(code, message string) *BatchMeterError {
+	return &BatchMeterError{Code: code, Message: message}
+}
+
+func newAccountError(code, message string, accountID gethcommon.Address) *BatchMeterError {
+	return &BatchMeterError{Code: code, Message: message, AccountID: accountID.Hex()}
+}
+
+func newAccountQuorumError(code, message string, accountID gethcommon.Address, quorumID core.QuorumID) *BatchMeterError {
+	return &BatchMeterError{Code: code, Message: message, AccountID: accountID.Hex(), QuorumID: uint8(quorumID)}
+}
+
+// IsBatchMeterError checks if an error is a BatchMeterError and returns it
+func IsBatchMeterError(err error) (*BatchMeterError, bool) {
+	if bmErr, ok := err.(*BatchMeterError); ok {
+		return bmErr, true
+	}
+	return nil, false
+}
+
 // AccountUsage tracks usage for a specific account across quorums
 type AccountUsage struct {
 	// Circular buffer of usage records, with minimum length MinNumBins
@@ -98,7 +153,7 @@ func (b *BatchMeterer) MeterBatch(
 	b.logger.Info("MeterBatch", "batch", batch, "batchReceivedAt", batchReceivedAt)
 	params, err := b.ChainPaymentState.GetPaymentGlobalParams()
 	if err != nil {
-		return fmt.Errorf("failed to get payment global params: %w", err)
+		return newBatchMeterError(ErrCodePaymentParamsFailed, fmt.Sprintf("failed to get payment global params: %v", err))
 	}
 	// convert batch into usage records tracking account, quorum, reservation period, and usage
 	usages, err := b.batchRequestUsage(params, batch)
@@ -116,7 +171,7 @@ func (b *BatchMeterer) MeterBatch(
 func (b *BatchMeterer) batchRequestUsage(params *meterer.PaymentVaultParams, batch *corev2.Batch) ([]*UpdateRecord, error) {
 	b.logger.Info("batchRequestUsage", "batch", batch)
 	if batch == nil || len(batch.BlobCertificates) == 0 {
-		return nil, fmt.Errorf("batch is nil or empty")
+		return nil, newBatchMeterError(ErrCodeBatchEmpty, "batch is nil or empty")
 	}
 
 	// Use a map to track existing updates by account, quorum, and period
@@ -124,7 +179,7 @@ func (b *BatchMeterer) batchRequestUsage(params *meterer.PaymentVaultParams, bat
 
 	for _, cert := range batch.BlobCertificates {
 		if cert.BlobHeader == nil {
-			return nil, fmt.Errorf("blob certificate has nil header")
+			return nil, newBatchMeterError(ErrCodeBlobHeaderNil, "blob certificate has nil header")
 		}
 
 		accountID := cert.BlobHeader.PaymentMetadata.AccountID
@@ -198,7 +253,7 @@ func (b *BatchMeterer) processBatch(
 		reservations, err := b.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, accountID, quorumIDs)
 		if err != nil {
 			b.rollbackUpdates(params, successfulUpdates)
-			return fmt.Errorf("failed to get reservations for account %s: %w", accountID.Hex(), err)
+			return newAccountError(ErrCodeReservationLookup, fmt.Sprintf("failed to get reservations: %v", err), accountID)
 		}
 
 		// Process each update for this account
@@ -206,18 +261,18 @@ func (b *BatchMeterer) processBatch(
 			reservation, ok := reservations[update.quorumID]
 			if !ok {
 				b.rollbackUpdates(params, successfulUpdates)
-				return fmt.Errorf("account %s has no reservation for quorum %d", accountID.Hex(), update.quorumID)
+				return newAccountQuorumError(ErrCodeReservationNotFound, "no reservation found", accountID, update.quorumID)
 			}
 
 			// TODO: Validating reservations can be refactored after the other refactoring PR
 			// Check if reservation is active first
 			if !reservation.IsActive(uint64(batchReceivedAt.Unix())) {
 				b.rollbackUpdates(params, successfulUpdates)
-				return fmt.Errorf("account %s has inactive reservation for quorum %d", accountID.Hex(), update.quorumID)
+				return newAccountQuorumError(ErrCodeReservationInactive, "reservation is inactive", accountID, update.quorumID)
 			}
 			if !meterer.ValidateReservationPeriod(reservation, update.period, params.QuorumProtocolConfigs[update.quorumID].ReservationRateLimitWindow, batchReceivedAt) {
 				b.rollbackUpdates(params, successfulUpdates)
-				return fmt.Errorf("account %s has invalid reservation period for quorum %d", accountID.Hex(), update.quorumID)
+				return newAccountQuorumError(ErrCodeReservationPeriod, "reservation period is invalid", accountID, update.quorumID)
 			}
 
 			b.logger.Info("incrementing and validating usage", "accountID", accountID.Hex(), "quorumID", update.quorumID, "usage", update.usage, "period", update.period)
@@ -225,7 +280,7 @@ func (b *BatchMeterer) processBatch(
 			if err != nil {
 				b.logger.Error("Failed to increment and validate usage", "error", err)
 				b.rollbackUpdates(params, successfulUpdates)
-				return fmt.Errorf("account %s failed usage validation for quorum %d: %w", accountID.Hex(), update.quorumID, err)
+				return err
 			}
 			// Record successful update for potential rollback
 			successfulUpdates = append(successfulUpdates, newUpdateRecord(accountID, update.quorumID, update.period, prevUsage))
@@ -297,14 +352,14 @@ func (b *BatchMeterer) incrementAndValidateUsage(
 	if prevUsage >= binLimit {
 		b.logger.Debug("bin already full, reverting", "accountID", accountID.Hex(), "quorumID", quorumID, "period", currentPeriod, "prevUsage", prevUsage, "binLimit", binLimit)
 		periodRecord.Usage = prevUsage
-		return 0, fmt.Errorf("bin has already been filled for quorum %d", quorumID)
+		return 0, newAccountQuorumError(ErrCodeBinAlreadyFull, "rate limit bin is already full", accountID, quorumID)
 	}
 
 	// If new usage is more than 2x bin limit, revert and error
 	if newUsage > 2*binLimit {
 		b.logger.Debug("usage exceeds 2x bin limit, reverting", "accountID", accountID.Hex(), "quorumID", quorumID, "period", currentPeriod, "prevUsage", prevUsage, "newUsage", newUsage, "2xBinLimit", 2*binLimit)
 		periodRecord.Usage = prevUsage
-		return 0, fmt.Errorf("overflow usage exceeds bin limit for quorum %d", quorumID)
+		return 0, newAccountQuorumError(ErrCodeUsageExceedsLimit, "usage exceeds 2x rate limit", accountID, quorumID)
 	}
 
 	// Check if overflow period is within reservation window
@@ -314,7 +369,7 @@ func (b *BatchMeterer) incrementAndValidateUsage(
 	if nextPeriod >= endPeriod {
 		b.logger.Debug("overflow period outside window, reverting", "accountID", accountID.Hex(), "quorumID", quorumID, "period", currentPeriod, "prevUsage", prevUsage, "nextPeriod", nextPeriod, "endPeriod", endPeriod)
 		periodRecord.Usage = prevUsage
-		return 0, fmt.Errorf("overflow period exceeds reservation window for quorum %d", quorumID)
+		return 0, newAccountQuorumError(ErrCodeOverflowWindowLimit, "overflow period exceeds reservation window", accountID, quorumID)
 	}
 
 	// Move overflow to next period
@@ -328,7 +383,7 @@ func (b *BatchMeterer) incrementAndValidateUsage(
 		b.logger.Debug("overflow in next period exceeds limit, reverting both", "accountID", accountID.Hex(), "quorumID", quorumID, "period", currentPeriod, "prevUsage", prevUsage, "overflow", overflow, "overflowPrev", overflowPrev, "overflowNew", overflowRecord.Usage, "overflowBinLimit", binLimit)
 		periodRecord.Usage = prevUsage
 		overflowRecord.Usage = overflowPrev
-		return 0, fmt.Errorf("overflow usage exceeds bin limit for quorum %d in next period", quorumID)
+		return 0, newAccountQuorumError(ErrCodeOverflowPeriodLimit, "overflow usage exceeds next period limit", accountID, quorumID)
 	}
 
 	return prevUsage, nil

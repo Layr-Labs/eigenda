@@ -967,7 +967,7 @@ func TestBatchMeterReservationEdgeCases(t *testing.T) {
 
 		err := f.batchMeterer.processBatch(f.ctx, params, updates, now)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid reservation period for quorum")
+		assert.Contains(t, err.Error(), "RESERVATION_PERIOD_INVALID")
 	})
 
 	t.Run("just started reservation", func(t *testing.T) {
@@ -1042,7 +1042,7 @@ func TestBatchMeterReservationEdgeCases(t *testing.T) {
 
 		err := f.batchMeterer.processBatch(f.ctx, params, updates, now)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed usage validation for quorum")
+		assert.Contains(t, err.Error(), "BIN_ALREADY_FULL")
 	})
 
 	t.Run("invalid timestamps", func(t *testing.T) {
@@ -1069,7 +1069,7 @@ func TestBatchMeterReservationEdgeCases(t *testing.T) {
 
 		err := f.batchMeterer.processBatch(f.ctx, params, updates, now)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid reservation period for quorum")
+		assert.Contains(t, err.Error(), "RESERVATION_PERIOD_INVALID")
 	})
 }
 
@@ -1189,7 +1189,7 @@ func TestBatchMeterRollback(t *testing.T) {
 		params, _ = f.mockState.GetPaymentGlobalParams()
 		err = f.batchMeterer.processBatch(f.ctx, params, updates, now)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid reservation period for quorum")
+		assert.Contains(t, err.Error(), "RESERVATION_PERIOD_INVALID")
 
 		// Verify usage was rolled back
 		accountUsage.Lock.RLock()
