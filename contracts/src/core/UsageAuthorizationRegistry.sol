@@ -54,8 +54,8 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
         UsageAuthorizationLib.decreaseReservation(quorumId, msg.sender, reservation, SCHEDULE_PERIOD);
     }
 
-    function depositOnDemand(uint64 quorumId, uint256 amount) external onlyOnDemandEnabled(quorumId) {
-        UsageAuthorizationLib.depositOnDemand(quorumId, msg.sender, amount);
+    function depositOnDemand(uint64 quorumId, address account, uint256 amount) external onlyOnDemandEnabled(quorumId) {
+        UsageAuthorizationLib.depositOnDemand(quorumId, account, amount, msg.sender);
     }
 
     /// OWNER

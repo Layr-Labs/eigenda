@@ -577,38 +577,40 @@ contract UsageAuthorizationRegistryUnit is Test {
     }
 
     /// @notice Tests that a user can deposit on demand successfully.
-    function test_DepositOnDemand(address account, uint256 amount) public {
+    function test_DepositOnDemand(address account, address payer, uint256 amount) public {
         vm.assume(account != address(0));
+        vm.assume(payer != address(0));
         uint64 quorumId = 0;
         amount = bound(amount, 1, type(uint80).max);
-        token.mint(account, amount);
+        token.mint(payer, amount);
 
-        vm.prank(account);
+        vm.prank(payer);
         token.approve(address(usageAuthorizationRegistry), amount);
 
         vm.expectEmit(true, true, true, true);
-        emit UsageAuthorizationLib.DepositOnDemand(quorumId, account, amount);
-        vm.prank(account);
-        usageAuthorizationRegistry.depositOnDemand(quorumId, amount);
+        emit UsageAuthorizationLib.DepositOnDemand(quorumId, account, amount, payer);
+        vm.prank(payer);
+        usageAuthorizationRegistry.depositOnDemand(quorumId, account, amount);
         uint256 onDemandDeposit = usageAuthorizationRegistry.getOnDemandDeposit(quorumId, account);
         assertEq(onDemandDeposit, amount);
     }
 
     /// @notice Tests that depositing on demand fails if on demand is disabled.
-    function test_DepositOnDemandRevertsIfOnDemandDisabled(address account, uint256 amount) public {
+    function test_DepositOnDemandRevertsIfOnDemandDisabled(address payer, address account, uint256 amount) public {
         vm.assume(account != address(0));
+        vm.assume(payer != address(0));
         uint64 quorumId = 0;
         amount = bound(amount, 1, type(uint80).max);
-        token.mint(account, amount);
+        token.mint(payer, amount);
         vm.prank(QUORUM_OWNER_0);
         usageAuthorizationRegistry.setOnDemandEnabled(quorumId, false);
 
-        vm.prank(account);
+        vm.prank(payer);
         token.approve(address(usageAuthorizationRegistry), amount);
 
         vm.expectRevert(abi.encodeWithSelector(IUsageAuthorizationRegistry.OnDemandDisabled.selector, quorumId));
-        vm.prank(account);
-        usageAuthorizationRegistry.depositOnDemand(quorumId, amount);
+        vm.prank(payer);
+        usageAuthorizationRegistry.depositOnDemand(quorumId, account, amount);
     }
 
     /// @notice Tests that these functions are properly gated to the owner.

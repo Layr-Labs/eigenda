@@ -21,7 +21,7 @@ library UsageAuthorizationLib {
         uint64 indexed quorumId, address indexed account, UsageAuthorizationTypes.Reservation reservation
     );
 
-    event DepositOnDemand(uint64 indexed quorumId, address indexed account, uint256 amount);
+    event DepositOnDemand(uint64 indexed quorumId, address indexed account, uint256 amount, address indexed payer);
 
     function s() internal pure returns (UsageAuthorizationStorage.Layout storage) {
         return UsageAuthorizationStorage.layout();
@@ -176,7 +176,7 @@ library UsageAuthorizationLib {
     }
 
     /// @notice Deposits an amount on-demand for a user in a quorum. Requires that the amount does not exceed the maximum allowed deposit.
-    function depositOnDemand(uint64 quorumId, address account, uint256 amount) internal {
+    function depositOnDemand(uint64 quorumId, address account, uint256 amount, address payer) internal {
         UsageAuthorizationTypes.Quorum storage quorum = s().quorum[quorumId];
         UsageAuthorizationTypes.User storage user = quorum.user[account];
         UsageAuthorizationTypes.QuorumConfig storage cfg = quorum.cfg;
@@ -186,10 +186,10 @@ library UsageAuthorizationLib {
             revert IUsageAuthorizationRegistry.AmountTooLarge(newAmount, type(uint80).max);
         }
 
-        IERC20(cfg.token).safeTransferFrom(account, cfg.recipient, amount);
+        IERC20(cfg.token).safeTransferFrom(payer, cfg.recipient, amount);
 
         user.deposit = newAmount;
-        emit DepositOnDemand(quorumId, account, amount);
+        emit DepositOnDemand(quorumId, account, amount, payer);
     }
 
     /// @notice Increases the reserved symbols for a quorum in a given period. Requires that the start and end timestamps are multiples of the schedule period.
