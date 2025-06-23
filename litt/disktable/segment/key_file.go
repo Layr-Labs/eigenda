@@ -276,7 +276,7 @@ func (k *keyFile) readKeys() ([]*types.ScopedKey, error) {
 	index := 0
 	for {
 		// We need at least 4 bytes to read the length of the key.
-		if index+4 > len(keyBytes) {
+		if index+4 > len(keyBytes) { //nolint:staticcheck // QF1006
 			// There are fewer than 4 bytes left in the file.
 			break
 		}

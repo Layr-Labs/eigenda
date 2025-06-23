@@ -56,7 +56,7 @@ func (f *flushLoop) run() {
 				req.shutdownCompleteChan <- struct{}{}
 				return
 			} else {
-				f.fatalErrorHandler.Panic(fmt.Errorf("Unknown flush message type %T", message))
+				f.fatalErrorHandler.Panic(fmt.Errorf("unknown flush message type %T", message))
 				return
 			}
 		}

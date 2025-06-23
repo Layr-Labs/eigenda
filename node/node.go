@@ -211,7 +211,7 @@ func NewNode(
 		"v2RetrievalPort", config.V2RetrievalPort,
 		"internalV2RetrievalPort", config.InternalV2RetrievalPort,
 		"churnerUrl", config.ChurnerUrl,
-		"quorumIDs", fmt.Sprint(config.QuorumIDList),
+		"quorumIDs", fmt.Sprint(config.QuorumIDList), //nolint:staticcheck // QF1010
 		"registerNodeAtStart", config.RegisterNodeAtStart,
 		"pubIPCheckInterval", config.PubIPCheckInterval,
 		"eigenDAServiceManagerAddr", config.EigenDAServiceManagerAddr,
@@ -342,7 +342,7 @@ func (n *Node) Start(ctx context.Context) error {
 			"retrievalPort", n.Config.RetrievalPort,
 			"v2RetrievalPort", n.Config.V2RetrievalPort,
 			"churnerUrl", n.Config.ChurnerUrl,
-			"quorumIds", fmt.Sprint(n.Config.QuorumIDList))
+			"quorumIds", fmt.Sprintf("%v", n.Config.QuorumIDList))
 		privateKey, err := crypto.HexToECDSA(n.Config.EthClientConfig.PrivateKeyString)
 		if err != nil {
 			return fmt.Errorf("NewClient: cannot parse private key: %w", err)

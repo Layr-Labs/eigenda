@@ -21,14 +21,12 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common/aws"
 	"github.com/Layr-Labs/eigenda/common/aws/dynamodb"
-	commondynamodb "github.com/Layr-Labs/eigenda/common/aws/dynamodb"
 	test_utils "github.com/Layr-Labs/eigenda/common/aws/dynamodb/utils"
 	"github.com/Layr-Labs/eigenda/common/testutils"
 	"github.com/Layr-Labs/eigenda/core"
 	coremock "github.com/Layr-Labs/eigenda/core/mock"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	commonv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
-	v2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	blobstorev2 "github.com/Layr-Labs/eigenda/disperser/common/v2/blobstore"
 	"github.com/Layr-Labs/eigenda/disperser/dataapi"
 	prommock "github.com/Layr-Labs/eigenda/disperser/dataapi/prometheus/mock"
@@ -151,7 +149,7 @@ func teardown() {
 
 func setup(m *testing.M) {
 	// Start localstack
-	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
 		localStackPort = os.Getenv("LOCALSTACK_PORT")
 	}
@@ -264,7 +262,7 @@ func executeRequest(t *testing.T, router *gin.Engine, method, url string) *httpt
 
 func decodeResponseBody[T any](t *testing.T, w *httptest.ResponseRecorder) T {
 	body := w.Result().Body
-	defer body.Close()
+	defer core.CloseLogOnError(body, "response body", mockLogger)
 	data, err := io.ReadAll(body)
 	require.NoError(t, err)
 
@@ -295,7 +293,7 @@ func checkCursor(t *testing.T, token string, requestedAt uint64, blobKey corev2.
 	assert.True(t, cursor.Equal(requestedAt, &blobKey))
 }
 
-func deleteItems(t *testing.T, keys []commondynamodb.Key) {
+func deleteItems(t *testing.T, keys []dynamodb.Key) {
 	failed, err := dynamoClient.DeleteItems(context.Background(), metadataTableName, keys)
 	assert.NoError(t, err)
 	assert.Len(t, failed, 0)
@@ -345,7 +343,7 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 	dispersedAt := make([]uint64, numRequests)
 	batchHeaders := make([]*corev2.BatchHeader, numRequests)
 	signatures := make([][32]byte, numRequests)
-	dynamoKeys := make([]commondynamodb.Key, numRequests)
+	dynamoKeys := make([]dynamodb.Key, numRequests)
 	for i := 0; i < numRequests; i++ {
 		dispersedAt[i] = firstRequestTs + uint64(i)*nanoSecsPerRequest
 		batchHeaders[i] = &corev2.BatchHeader{
@@ -373,9 +371,9 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		err := blobMetadataStore.PutDispersalResponse(ctx, dispersalResponse)
 		require.NoError(t, err)
 
-		bhh, err := dispersalRequest.BatchHeader.Hash()
+		bhh, err := dispersalRequest.BatchHeader.Hash() // go:nolint QF1008
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "DispersalResponse#" + opID.Hex()},
 		}
@@ -629,7 +627,7 @@ func TestFetchBlobFeed(t *testing.T) {
 
 	// Actually create blobs
 	firstBlobKeys := make([][32]byte, 3)
-	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
 	for i := 0; i < numBlobs; i++ {
 		blobHeader := makeBlobHeaderV2(t)
 		blobKey, err := blobHeader.BlobKey()
@@ -643,10 +641,10 @@ func TestFetchBlobFeed(t *testing.T) {
 		}
 
 		now := time.Now()
-		metadata := &v2.BlobMetadata{
+		metadata := &commonv2.BlobMetadata{
 			BlobHeader:  blobHeader,
 			Signature:   []byte{0, 1, 2, 3, 4},
-			BlobStatus:  v2.Encoded,
+			BlobStatus:  commonv2.Encoded,
 			Expiry:      uint64(now.Add(time.Hour).Unix()),
 			NumRetries:  0,
 			UpdatedAt:   uint64(now.UnixNano()),
@@ -654,7 +652,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		}
 		err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		}
@@ -1178,7 +1176,7 @@ func TestFetchBlobAttestationInfo(t *testing.T) {
 
 	mockTx.ExpectedCalls = nil
 	mockTx.Calls = nil
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
@@ -1391,7 +1389,7 @@ func TestFetchBatch(t *testing.T) {
 
 	mockTx.ExpectedCalls = nil
 	mockTx.Calls = nil
-	deleteItems(t, []commondynamodb.Key{
+	deleteItems(t, []dynamodb.Key{
 		{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + batchHeaderHash},
 			"SK": &types.AttributeValueMemberS{Value: "BatchHeader"},
@@ -1418,7 +1416,7 @@ func TestFetchBatchFeed(t *testing.T) {
 	nanoSecsPerBatch := uint64(time.Minute.Nanoseconds()) // 1 batch per minute
 	attestedAt := make([]uint64, numBatches)
 	batchHeaders := make([]*corev2.BatchHeader, numBatches)
-	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	dynamoKeys := make([]dynamodb.Key, numBatches)
 	for i := 0; i < numBatches; i++ {
 		batchHeaders[i] = &corev2.BatchHeader{
 			BatchRoot:            [32]byte{1, 2, byte(i)},
@@ -1453,7 +1451,7 @@ func TestFetchBatchFeed(t *testing.T) {
 		}
 		err = blobMetadataStore.PutAttestation(ctx, attestation)
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
 		}
@@ -1897,14 +1895,14 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		{operatorG1s[2], operatorG1s[4]},
 		{operatorG1s[4]},
 	}
-	dynamoKeys := make([]commondynamodb.Key, numBatches)
+	dynamoKeys := make([]dynamodb.Key, numBatches)
 	for i := 0; i < numBatches; i++ {
 		attestation := createAttestation(t, referenceBlockNum[i], attestedAt[i], nonsigners[i], quorums[i])
 		err := blobMetadataStore.PutAttestation(ctx, attestation)
 		require.NoError(t, err)
-		bhh, err := attestation.BatchHeader.Hash()
+		bhh, err := attestation.BatchHeader.Hash() // go:nolint QF1008
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BatchHeader#" + hex.EncodeToString(bhh[:])},
 			"SK": &types.AttributeValueMemberS{Value: "Attestation"},
 		}
@@ -2273,7 +2271,7 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 
 	// Create blobs for testing
 	requestedAt := make([]uint64, numBlobs)
-	dynamoKeys := make([]commondynamodb.Key, numBlobs)
+	dynamoKeys := make([]dynamodb.Key, numBlobs)
 	for i := 0; i < numBlobs; i++ {
 		blobHeader := makeBlobHeaderV2(t)
 		blobHeader.PaymentMetadata.AccountID = accountId
@@ -2281,10 +2279,10 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 		require.NoError(t, err)
 		requestedAt[i] = firstBlobTime + nanoSecsPerBlob*uint64(i)
 		now := time.Now()
-		metadata := &v2.BlobMetadata{
+		metadata := &commonv2.BlobMetadata{
 			BlobHeader:  blobHeader,
 			Signature:   []byte{1, 2, 3},
-			BlobStatus:  v2.Encoded,
+			BlobStatus:  commonv2.Encoded,
 			Expiry:      uint64(now.Add(time.Hour).Unix()),
 			NumRetries:  0,
 			UpdatedAt:   uint64(now.UnixNano()),
@@ -2292,7 +2290,7 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 		}
 		err = blobMetadataStore.PutBlobMetadata(ctx, metadata)
 		require.NoError(t, err)
-		dynamoKeys[i] = commondynamodb.Key{
+		dynamoKeys[i] = dynamodb.Key{
 			"PK": &types.AttributeValueMemberS{Value: "BlobKey#" + blobKey.Hex()},
 			"SK": &types.AttributeValueMemberS{Value: "BlobMetadata"},
 		}
@@ -2533,11 +2531,12 @@ func TestFetchOperatorsStake(t *testing.T) {
 		func(ids []core.OperatorID) []gethcommon.Address {
 			result := make([]gethcommon.Address, len(ids))
 			for i, id := range ids {
-				if id == opId0 {
+				switch id {
+				case opId0:
 					result[i] = addr0
-				} else if id == opId1 {
+				case opId1:
 					result[i] = addr1
-				} else {
+				default:
 					result[i] = gethcommon.Address{}
 				}
 			}

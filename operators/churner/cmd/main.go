@@ -10,7 +10,6 @@ import (
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
 	"github.com/Layr-Labs/eigenda/common/healthcheck"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	coreeth "github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigenda/core/thegraph"
 	"github.com/Layr-Labs/eigenda/operators/churner"
@@ -74,7 +73,7 @@ func run(ctx *cli.Context) error {
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	tx, err := eth.NewWriter(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := coreeth.NewWriter(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
 	if err != nil {
 		log.Fatalln("could not create new transactor", err)
 	}

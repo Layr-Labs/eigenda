@@ -6,7 +6,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/geth"
-	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/operators/churner"
 	"github.com/stretchr/testify/assert"
 
@@ -57,7 +56,7 @@ func TestProcessChurnRequest(t *testing.T) {
 
 	request.OperatorRequestSignature = keyPair.SignMessage(requestHash)
 
-	mockIndexer.On("GetIndexedOperatorInfoByOperatorId").Return(&core.IndexedOperatorInfo{
+	mockIndexer.On("GetIndexedOperatorInfoByOperatorId").Return(&dacore.IndexedOperatorInfo{
 		PubkeyG1: keyPair.PubKey,
 	}, nil)
 

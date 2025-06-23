@@ -55,7 +55,6 @@ import (
 	"github.com/Layr-Labs/eigenda/disperser/common/inmem"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/node"
-	"github.com/Layr-Labs/eigenda/node/grpc"
 	nodegrpc "github.com/Layr-Labs/eigenda/node/grpc"
 
 	nodepb "github.com/Layr-Labs/eigenda/api/grpc/node"
@@ -266,7 +265,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 	mockState.On("GetPaymentGlobalParams").Return(integrationMockParams, nil)
 	mockState.On("RefreshOnchainPaymentState", mock.Anything).Return(nil).Maybe()
 
-	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
 		localStackPort = os.Getenv("LOCALSTACK_PORT")
 	}
@@ -549,7 +548,7 @@ func TestDispersalAndRetrieval(t *testing.T) {
 		assert.NoError(t, err)
 
 		fmt.Println("Starting server")
-		err = grpc.RunServers(op.ServerV1, op.ServerV2, op.Node.Config, logger)
+		err = nodegrpc.RunServers(op.ServerV1, op.ServerV2, op.Node.Config, logger)
 		assert.NoError(t, err)
 	}
 

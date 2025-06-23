@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -618,7 +619,11 @@ func supportsSymlinks() bool {
 	if err != nil {
 		return false
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to clean up temp directory %s: %v\n", tempDir, err)
+		}
+	}()
 
 	source := filepath.Join(tempDir, "source")
 	target := filepath.Join(tempDir, "target")
