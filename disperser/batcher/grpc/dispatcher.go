@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	commonpb "github.com/Layr-Labs/eigenda/api/grpc/common"
@@ -21,6 +22,69 @@ import (
 type Config struct {
 	Timeout                   time.Duration
 	EnableGnarkBundleEncoding bool
+
+	// Retry configuration
+	EnableRetryAggregator       bool    // Enable failure aggregation and retry decision logic
+	MaxAccountFailurePercentage float64 // Maximum percentage of stake failed for any single account before triggering retry
+}
+
+// DefaultRetryConfig returns default retry configuration values
+func DefaultRetryConfig() *Config {
+	return &Config{
+		EnableRetryAggregator:       false, // Disabled by default until retry logic implemented
+		MaxAccountFailurePercentage: 50.0,  // 50% of account-related failures
+	}
+}
+
+// getOperatorStake calculates total stake for an operator across all quorums
+func (c *dispatcher) getOperatorStake(state *core.IndexedOperatorState, operatorID core.OperatorID) *big.Int {
+	totalStake := big.NewInt(0)
+	for _, quorumOperators := range state.Operators {
+		if opInfo, exists := quorumOperators[operatorID]; exists {
+			totalStake.Add(totalStake, opInfo.Stake)
+		}
+	}
+	return totalStake
+}
+
+// filterBlobsByAccountIDs filters out blobs from the specified account IDs
+func (c *dispatcher) filterBlobsByAccountIDs(blobs []core.EncodedBlob, excludeAccountIDs []string) []core.EncodedBlob {
+	if len(excludeAccountIDs) == 0 {
+		return blobs
+	}
+
+	// Create a map for faster lookup
+	excludeMap := make(map[string]bool)
+	for _, accountID := range excludeAccountIDs {
+		excludeMap[accountID] = true
+	}
+
+	var filteredBlobs []core.EncodedBlob
+	excludedCount := 0
+
+	for _, blob := range blobs {
+		if blob.BlobHeader != nil && excludeMap[blob.BlobHeader.AccountID] {
+			excludedCount++
+			if c.logger != nil {
+				c.logger.Info("Excluding blob from retry batch",
+					"account_id", blob.BlobHeader.AccountID,
+				)
+			}
+			continue
+		}
+		filteredBlobs = append(filteredBlobs, blob)
+	}
+
+	if excludedCount > 0 && c.logger != nil {
+		c.logger.Info("Filtered blobs for retry batch",
+			"original_count", len(blobs),
+			"filtered_count", len(filteredBlobs),
+			"excluded_count", excludedCount,
+			"excluded_accounts", excludeAccountIDs,
+		)
+	}
+
+	return filteredBlobs
 }
 
 type dispatcher struct {
@@ -44,6 +108,7 @@ func NewDispatcher(
 
 var _ disperser.Dispatcher = (*dispatcher)(nil)
 
+// DisperseBatch distributes encoded blobs to all indexed operators and tracks failures
 func (c *dispatcher) DisperseBatch(
 	ctx context.Context,
 	state *core.IndexedOperatorState,
@@ -52,21 +117,80 @@ func (c *dispatcher) DisperseBatch(
 ) chan core.SigningMessage {
 	update := make(chan core.SigningMessage, len(state.IndexedOperators))
 
-	// Disperse
-	c.sendAllChunks(ctx, state, blobs, batchHeader, update)
+	// Send chunks to all operators with integrated failure analysis and logging
+	retryDecision := c.sendAllChunks(ctx, state, blobs, batchHeader, update)
+
+	// If retry is needed, create a filtered batch and dispatch again
+	if c.EnableRetryAggregator && retryDecision != nil && retryDecision.ShouldRetry && len(retryDecision.TriggeringAccounts) > 0 {
+		c.logger.Warn("Initiating batch retry with filtered blobs",
+			"triggering_accounts", retryDecision.TriggeringAccounts,
+			"original_blob_count", len(blobs),
+		)
+
+		// Filter out blobs from triggering accounts
+		filteredBlobs := c.filterBlobsByAccountIDs(blobs, retryDecision.TriggeringAccounts)
+
+		// Only retry if we have remaining blobs after filtering
+		if len(filteredBlobs) > 0 {
+			c.logger.Info("Dispatching retry batch",
+				"filtered_blob_count", len(filteredBlobs),
+				"excluded_accounts", retryDecision.TriggeringAccounts,
+			)
+
+			// Create new update channel for retry batch
+			retryUpdate := make(chan core.SigningMessage, len(state.IndexedOperators))
+
+			// Send filtered blobs (without retry aggregator to avoid infinite recursion)
+			go func() {
+				defer close(retryUpdate)
+
+				// Temporarily disable retry aggregator for the retry attempt
+				originalRetryEnabled := c.EnableRetryAggregator
+				c.EnableRetryAggregator = false
+
+				c.sendAllChunks(ctx, state, filteredBlobs, batchHeader, retryUpdate)
+
+				// Restore original retry setting
+				c.EnableRetryAggregator = originalRetryEnabled
+			}()
+
+			// Forward retry results to original update channel
+			go func() {
+				for retryMsg := range retryUpdate {
+					update <- retryMsg
+				}
+			}()
+		} else {
+			c.logger.Warn("No blobs remaining after filtering triggering accounts",
+				"excluded_accounts", retryDecision.TriggeringAccounts,
+			)
+		}
+	}
 
 	return update
 }
 
+// sendAllChunks distributes chunks to operators and aggregates failures with stake tracking
 func (c *dispatcher) sendAllChunks(
 	ctx context.Context,
 	state *core.IndexedOperatorState,
 	blobs []core.EncodedBlob,
 	batchHeader *core.BatchHeader,
 	update chan core.SigningMessage,
-) {
+) *RetryDecision {
+	// Only create failure aggregator if retry analysis is enabled
+	var failureAggregator *FailureAggregator
+	if c.EnableRetryAggregator {
+		failureAggregator = NewFailureAggregator(c.logger)
+	}
+
 	for id, op := range state.IndexedOperators {
-		go func(op core.IndexedOperatorInfo, id core.OperatorID) {
+		operatorStake := c.getOperatorStake(state, id)
+		if failureAggregator != nil {
+			failureAggregator.AddTotalStake(operatorStake)
+		}
+
+		go func(op core.IndexedOperatorInfo, id core.OperatorID, stake *big.Int) {
 			blobMessages := make([]*core.EncodedBlobMessage, 0)
 			hasAnyBundles := false
 			batchHeaderHash, err := batchHeader.GetBatchHeaderHash()
@@ -106,6 +230,15 @@ func (c *dispatcher) sendAllChunks(
 			sig, err := c.sendChunks(ctx, blobMessages, batchHeader, &op)
 			latencyMs := float64(time.Since(requestedAt).Milliseconds())
 			if err != nil {
+				// Track operator failure with batch meterer error parsing if aggregator enabled
+				if failureAggregator != nil {
+					operatorFailure := failureAggregator.createOperatorFailure(id, op.Socket, stake, err)
+					failureAggregator.AddFailure(operatorFailure)
+
+					// Log batch meterer errors for account-level monitoring
+					failureAggregator.LogBatchMeterError(operatorFailure, id, op.Socket)
+				}
+
 				update <- core.SigningMessage{
 					Err:                  err,
 					Signature:            nil,
@@ -129,8 +262,18 @@ func (c *dispatcher) sendAllChunks(
 			PubkeyG1: op.PubkeyG1,
 			PubkeyG2: op.PubkeyG2,
 			Socket:   op.Socket,
-		}, id)
+		}, id, operatorStake)
 	}
+
+	// Perform failure analysis and logging if aggregator is enabled
+	var retryDecision *RetryDecision
+	if c.EnableRetryAggregator && failureAggregator != nil {
+		retryDecision = failureAggregator.ShouldRetryBatch(c.MaxAccountFailurePercentage)
+		failureAggregator.LogRetryDecision(retryDecision)
+		failureAggregator.LogFailureStatistics()
+	}
+
+	return retryDecision
 }
 
 func (c *dispatcher) sendChunks(
@@ -183,6 +326,7 @@ func (c *dispatcher) sendChunks(
 	sig := &core.Signature{G1Point: point}
 	return sig, nil
 }
+
 func GetStoreChunksRequest(
 	blobMessages []*core.EncodedBlobMessage,
 	batchHeader *core.BatchHeader,

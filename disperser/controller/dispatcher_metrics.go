@@ -265,12 +265,12 @@ func (m *dispatcherMetrics) reportBatchMeterError(errorCode string, category Bat
 	case ErrorCategorySystem:
 		categoryStr = "system"
 	}
-	
+
 	retriedStr := "false"
 	if retried {
 		retriedStr = "true"
 	}
-	
+
 	m.batchMeterErrors.WithLabelValues(errorCode, categoryStr, retriedStr).Inc()
 }
 
