@@ -52,7 +52,7 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 	// Handle before parameter
 	beforeTime := now
 	if c.Query("before") != "" {
-		beforeTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("before"))
+		beforeTime, err = parseQueryParamTime(c.Query("before"))
 		if err != nil {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
 			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse `before` param: %w", err))
@@ -71,7 +71,7 @@ func (s *ServerV2) FetchBlobFeed(c *gin.Context) {
 	// Handle after parameter
 	afterTime := beforeTime.Add(-time.Hour)
 	if c.Query("after") != "" {
-		afterTime, err = time.Parse("2006-01-02T15:04:05Z", c.Query("after"))
+		afterTime, err = parseQueryParamTime(c.Query("after"))
 		if err != nil {
 			s.metrics.IncrementInvalidArgRequestNum("FetchBlobFeed")
 			invalidParamsErrorResponse(c, fmt.Errorf("failed to parse `after` param: %w", err))

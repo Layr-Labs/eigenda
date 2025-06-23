@@ -103,6 +103,10 @@ var (
 	})
 )
 
+// TODO: we need to make sure that this is always aligned with the timeFormat that
+// the dataapi server uses to parse timestamps from the request.
+const timeFormat = time.RFC3339Nano
+
 type MockSubgraphClient struct {
 	mock.Mock
 }
@@ -429,8 +433,8 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 			{
 				name: "after >= before",
 				queryParams: map[string]string{
-					"after":  now.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05.999999999Z"),
-					"before": now.Add(-time.Hour).UTC().Format("2006-01-02T15:04:05.999999999Z"),
+					"after":  serverv2.FormatQueryParamTime(now.Add(-time.Minute)),
+					"before": serverv2.FormatQueryParamTime(now.Add(-time.Hour)),
 				},
 				wantError: "must be earlier than `before` timestamp",
 			},
@@ -510,7 +514,7 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		}
 
 		// Test 2: 2-hour window captures all test batches
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s", baseUrl, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
@@ -522,10 +526,8 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		}
 
 		// Teste 3: custom end time
-		after := time.Unix(0, int64(dispersedAt[20])).UTC()
-		afterTime = after.Format("2006-01-02T15:04:05.999999999Z")
-		before := time.Unix(0, int64(dispersedAt[50])).UTC()
-		beforeTime := before.Format("2006-01-02T15:04:05.999999999Z")
+		afterTime = time.Unix(0, int64(dispersedAt[20])).UTC().Format(time.RFC3339Nano)
+		beforeTime := time.Unix(0, int64(dispersedAt[50])).UTC().Format(time.RFC3339Nano)
 		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1", baseUrl, beforeTime, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
@@ -550,7 +552,7 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		}
 
 		// Test 2: 2-hour window captures all test batches
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s&direction=backward", baseUrl, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
@@ -562,10 +564,8 @@ func TestFetchOperatorDispersalFeed(t *testing.T) {
 		}
 
 		// Teste 3: custom end time
-		after := time.Unix(0, int64(dispersedAt[20])).UTC()
-		afterTime = after.Format("2006-01-02T15:04:05.999999999Z")
-		before := time.Unix(0, int64(dispersedAt[50])).UTC()
-		beforeTime := before.Format("2006-01-02T15:04:05.999999999Z")
+		afterTime = serverv2.FormatQueryParamTime(time.Unix(0, int64(dispersedAt[20])))
+		beforeTime := serverv2.FormatQueryParamTime(time.Unix(0, int64(dispersedAt[50])))
 		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1&direction=backward", baseUrl, beforeTime, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.OperatorDispersalFeedResponse](t, w)
@@ -711,8 +711,8 @@ func TestFetchBlobFeed(t *testing.T) {
 			{
 				name: "after >= before",
 				queryParams: map[string]string{
-					"after":  now.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05.999999999Z"),
-					"before": now.Add(-time.Hour).UTC().Format("2006-01-02T15:04:05.999999999Z"),
+					"after":  now.Add(-time.Minute).UTC().Format(timeFormat),
+					"before": now.Add(-time.Hour).UTC().Format(timeFormat),
 				},
 				wantError: "must be earlier than `before` timestamp",
 			},
@@ -789,7 +789,7 @@ func TestFetchBlobFeed(t *testing.T) {
 
 		// Test 2: 2-hour window captures all test blobs
 		// Verifies correct ordering of timestamp-colliding blobs
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?after=%s&limit=-1", afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -808,7 +808,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// Test 3: Custom end time with 1-hour window
 		// Retrieves keys[41] through keys[100]
 		tm := time.Unix(0, int64(requestedAt[100])+1).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		endTime := tm.Format(timeFormat)
 		reqUrl = fmt.Sprintf("/v2/blobs/feed?before=%s&limit=-1", endTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -836,7 +836,7 @@ func TestFetchBlobFeed(t *testing.T) {
 
 		// Test 2: 2-hour window captures all test blobs
 		// Verifies correct ordering of timestamp-colliding blobs
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?direction=backward&after=%s&limit=-1", afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -855,7 +855,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// Test 3: Custom end time with 1-hour window
 		// Retrieves keys[100] through keys[41]
 		tm := time.Unix(0, int64(requestedAt[100])+1).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		endTime := tm.Format(timeFormat)
 		reqUrl = fmt.Sprintf("/v2/blobs/feed?direction=backward&before=%s&limit=-1", endTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -875,8 +875,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// Verifies:
 		// - Correct sequencing across pages
 		// - Proper token handling
-		tm := time.Unix(0, time.Now().UnixNano()).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		endTime := serverv2.FormatQueryParamTime(time.Unix(0, time.Now().UnixNano()))
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?before=%s&limit=20", endTime)
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -908,8 +907,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// Verifies:
 		// - Correct sequencing across pages
 		// - Proper token handling (cursor is exclusive)
-		tm := time.Unix(0, int64(requestedAt[80])).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		endTime := serverv2.FormatQueryParamTime(time.Unix(0, int64(requestedAt[80])))
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?direction=backward&after=%s&limit=20", endTime)
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.BlobFeedResponse](t, w)
@@ -939,8 +937,7 @@ func TestFetchBlobFeed(t *testing.T) {
 		// - We have 3 blobs with identical timestamp (firstBlobTime): firstBlobKeys[0,1,2]
 		// - These are followed by sequential blobs: keys[3,4] with different timestamps
 		// - End time is set to requestedAt[5]
-		tm := time.Unix(0, int64(requestedAt[5])).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		endTime := serverv2.FormatQueryParamTime(time.Unix(0, int64(requestedAt[5])))
 
 		// First page: fetch 2 blobs, which have same requestedAt timestamp
 		reqUrl := fmt.Sprintf("/v2/blobs/feed?before=%s&limit=2", endTime)
@@ -1515,8 +1512,8 @@ func TestFetchBatchFeed(t *testing.T) {
 			{
 				name: "after >= before",
 				queryParams: map[string]string{
-					"after":  now.Add(-time.Minute).UTC().Format("2006-01-02T15:04:05.999999999Z"),
-					"before": now.Add(-time.Hour).UTC().Format("2006-01-02T15:04:05.999999999Z"),
+					"after":  now.Add(-time.Minute).UTC().Format(timeFormat),
+					"before": now.Add(-time.Hour).UTC().Format(timeFormat),
 				},
 				wantError: "must be earlier than `before` timestamp",
 			},
@@ -1584,7 +1581,7 @@ func TestFetchBatchFeed(t *testing.T) {
 		}
 
 		// Test 2: 2-hour window captures all test batches
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("/v2/batches/feed?limit=-1&after=%s", afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
@@ -1598,7 +1595,7 @@ func TestFetchBatchFeed(t *testing.T) {
 		// Test 3: Custom end time with 1-hour window
 		// With 1h ending time at attestedAt[66], this retrieves batch[7] throught batch[65] (59 batches, as the `before` is exclusive)
 		tm := time.Unix(0, int64(attestedAt[66])).UTC()
-		beforeTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		beforeTime := tm.Format(timeFormat)
 		reqUrl = fmt.Sprintf("/v2/batches/feed?before=%s&limit=-1", beforeTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
@@ -1623,7 +1620,7 @@ func TestFetchBatchFeed(t *testing.T) {
 		}
 
 		// Test 2: 2-hour window captures all test batches
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("/v2/batches/feed?direction=backward&limit=-1&after=%s", afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
@@ -1638,7 +1635,7 @@ func TestFetchBatchFeed(t *testing.T) {
 		// With 1h ending time at attestedAt[66], this retrieves batch[65] throught batch[7] (59 batches,
 		// as the `before` is exclusive)
 		tm := time.Unix(0, int64(attestedAt[66])).UTC()
-		beforeTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		beforeTime := tm.Format(timeFormat)
 		reqUrl = fmt.Sprintf("/v2/batches/feed?direction=backward&before=%s&limit=-1", beforeTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.BatchFeedResponse](t, w)
@@ -2135,7 +2132,7 @@ func TestFetchOperatorSigningInfo(t *testing.T) {
 		// +------------------+-------------------+------------------+--------------+
 
 		tm := time.Unix(0, int64(now)+1).UTC()
-		endTime := tm.Format("2006-01-02T15:04:05.999999999Z")
+		endTime := tm.Format(timeFormat)
 		reqUrl := fmt.Sprintf("/v2/operators/signing-info?end=%s&interval=1000", endTime)
 		w := executeRequest(t, r, http.MethodGet, reqUrl)
 		response := decodeResponseBody[serverv2.OperatorsSigningInfoResponse](t, w)
@@ -2402,7 +2399,7 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 		}
 
 		// Test 2: 2-hour window captures all test blobs
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s", baseUrl, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
@@ -2414,9 +2411,9 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 
 		// Teste 3: custom end time
 		after := time.Unix(0, int64(requestedAt[20])).UTC()
-		afterTime = after.Format("2006-01-02T15:04:05.999999999Z")
+		afterTime = after.Format(timeFormat)
 		before := time.Unix(0, int64(requestedAt[50])).UTC()
-		beforeTime := before.Format("2006-01-02T15:04:05.999999999Z")
+		beforeTime := before.Format(timeFormat)
 		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1", baseUrl, beforeTime, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
@@ -2438,7 +2435,7 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 		}
 
 		// Test 2: 2-hour window captures all test blobs
-		afterTime := time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05.999999999Z") // nano precision format
+		afterTime := serverv2.FormatQueryParamTime(time.Now().Add(-2 * time.Hour))
 		reqUrl := fmt.Sprintf("%s?limit=-1&after=%s&direction=backward", baseUrl, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)
@@ -2450,9 +2447,9 @@ func TestFetchAccountBlobFeed(t *testing.T) {
 
 		// Teste 3: custom end time
 		after := time.Unix(0, int64(requestedAt[20])).UTC()
-		afterTime = after.Format("2006-01-02T15:04:05.999999999Z")
+		afterTime = after.Format(timeFormat)
 		before := time.Unix(0, int64(requestedAt[50])).UTC()
-		beforeTime := before.Format("2006-01-02T15:04:05.999999999Z")
+		beforeTime := before.Format(timeFormat)
 		reqUrl = fmt.Sprintf("%s?before=%s&after=%s&limit=-1&direction=backward", baseUrl, beforeTime, afterTime)
 		w = executeRequest(t, r, http.MethodGet, reqUrl)
 		response = decodeResponseBody[serverv2.AccountBlobFeedResponse](t, w)

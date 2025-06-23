@@ -17,7 +17,7 @@ type flushLoop struct {
 	diskTable *DiskTable
 
 	// Responsible for handling fatal DB errors.
-	fatalErrorHandler *util.FatalErrorHandler
+	errorMonitor *util.ErrorMonitor
 
 	// flushChannel is a channel used to enqueue work on the flush loop.
 	flushChannel chan any
@@ -34,7 +34,7 @@ type flushLoop struct {
 
 // enqueue sends work to be handled on the flush loop. Will return an error if the DB is panicking.
 func (f *flushLoop) enqueue(request flushLoopMessage) error {
-	return util.SendIfNotFatal(f.fatalErrorHandler, f.flushChannel, request)
+	return util.Send(f.errorMonitor, f.flushChannel, request)
 }
 
 // run is responsible for handling operations that flush data (i.e. calls to Flush() and when the mutable segment
@@ -44,7 +44,7 @@ func (f *flushLoop) enqueue(request flushLoopMessage) error {
 func (f *flushLoop) run() {
 	for {
 		select {
-		case <-f.fatalErrorHandler.ImmediateShutdownRequired():
+		case <-f.errorMonitor.ImmediateShutdownRequired():
 			f.logger.Infof("context done, shutting down disk table flush loop")
 			return
 		case message := <-f.flushChannel:
@@ -56,7 +56,7 @@ func (f *flushLoop) run() {
 				req.shutdownCompleteChan <- struct{}{}
 				return
 			} else {
-				f.fatalErrorHandler.Panic(fmt.Errorf("unknown flush message type %T", message))
+				f.errorMonitor.Panic(fmt.Errorf("unknown flush message type %T", message))
 				return
 			}
 		}
@@ -73,14 +73,14 @@ func (f *flushLoop) run() {
 func (f *flushLoop) handleSealRequest(req *flushLoopSealRequest) {
 	durableKeys, err := req.segmentToSeal.Seal(req.now)
 	if err != nil {
-		f.fatalErrorHandler.Panic(fmt.Errorf("failed to seal segment %s: %w", req.segmentToSeal.String(), err))
+		f.errorMonitor.Panic(fmt.Errorf("failed to seal segment %s: %w", req.segmentToSeal.String(), err))
 		return
 	}
 
 	// Flush the keys that are now durable in the segment.
 	err = f.diskTable.writeKeysToKeymap(durableKeys)
 	if err != nil {
-		f.fatalErrorHandler.Panic(fmt.Errorf("failed to flush keys: %w", err))
+		f.errorMonitor.Panic(fmt.Errorf("failed to flush keys: %w", err))
 		return
 	}
 
@@ -96,7 +96,7 @@ func (f *flushLoop) handleFlushRequest(req *flushLoopFlushRequest) {
 
 	durableKeys, err := req.flushWaitFunction()
 	if err != nil {
-		f.fatalErrorHandler.Panic(fmt.Errorf("failed to flush mutable segment: %w", err))
+		f.errorMonitor.Panic(fmt.Errorf("failed to flush mutable segment: %w", err))
 		return
 	}
 
@@ -108,7 +108,7 @@ func (f *flushLoop) handleFlushRequest(req *flushLoopFlushRequest) {
 
 	err = f.diskTable.writeKeysToKeymap(durableKeys)
 	if err != nil {
-		f.fatalErrorHandler.Panic(fmt.Errorf("failed to flush keys: %w", err))
+		f.errorMonitor.Panic(fmt.Errorf("failed to flush keys: %w", err))
 		return
 	}
 

@@ -163,7 +163,7 @@ func setupMockWriter() {
 
 func newTestServer(t *testing.T) *churner.Server {
 	config := &churner.Config{
-		LoggerConfig: common.DefaultLoggerConfig(),
+		LoggerConfig: *common.DefaultLoggerConfig(),
 		EthClientConfig: geth.EthClientConfig{
 			PrivateKeyString: churnerPrivateKeyHex,
 			NumRetries:       numRetries,
