@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"sync"
 	"sync/atomic"
 
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
-	"github.com/Layr-Labs/eigenda/core/eth"
 	"github.com/Layr-Labs/eigensdk-go/logging"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -33,7 +33,7 @@ var _ OnchainPayment = (*OnchainPaymentState)(nil)
 
 // OnchainPaymentState manages the state of on-chain payments including reservations and on-demand payments
 type OnchainPaymentState struct {
-	tx     *eth.Reader
+	tx     core.Reader
 	logger logging.Logger
 
 	ReservedPayments map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment
@@ -53,7 +53,7 @@ type PaymentVaultParams struct {
 }
 
 // NewOnchainPaymentState creates a new OnchainPaymentState instance and initializes it with current chain state
-func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader, logger logging.Logger) (*OnchainPaymentState, error) {
+func NewOnchainPaymentState(ctx context.Context, tx core.Reader, logger logging.Logger) (*OnchainPaymentState, error) {
 	state := OnchainPaymentState{
 		tx:                 tx,
 		logger:             logger.With("component", "OnchainPaymentState"),
@@ -71,7 +71,7 @@ func NewOnchainPaymentState(ctx context.Context, tx *eth.Reader, logger logging.
 }
 
 // NewOnchainPaymentStateEmpty creates a new OnchainPaymentState instance without initializing chain state
-func NewOnchainPaymentStateEmpty(ctx context.Context, tx *eth.Reader, logger logging.Logger) (*OnchainPaymentState, error) {
+func NewOnchainPaymentStateEmpty(ctx context.Context, tx core.Reader, logger logging.Logger) (*OnchainPaymentState, error) {
 	state := OnchainPaymentState{
 		tx:                 tx,
 		logger:             logger.With("component", "OnchainPaymentState"),
@@ -106,23 +106,27 @@ func (pcs *OnchainPaymentState) GetPaymentVaultParams(ctx context.Context) (*Pay
 		quorumNumbers[i] = uint8(i)
 	}
 
-	// TODO(hopeyen): the construction of quorum configs will be updated with payment vault interface updates
+	// Get global parameters
 	globalSymbolsPerSecond, err := pcs.tx.GetOnDemandGlobalSymbolsPerSecond(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get global symbols per second: %w", err)
 	}
+
 	globalRatePeriodInterval, err := pcs.tx.GetOnDemandGlobalRatePeriodInterval(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get global rate period interval: %w", err)
 	}
+
 	minNumSymbols, err := pcs.tx.GetMinNumSymbols(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get min num symbols: %w", err)
 	}
+
 	pricePerSymbol, err := pcs.tx.GetPricePerSymbol(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get price per symbol: %w", err)
 	}
+
 	reservationWindow, err := pcs.tx.GetReservationWindow(ctx, blockNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reservation window: %w", err)
@@ -435,4 +439,64 @@ func (pvp *PaymentVaultParams) PaymentVaultParamsToProtobuf() (*disperser_rpc.Pa
 		QuorumProtocolConfigs: quorumProtocolConfigs,
 		OnDemandQuorumNumbers: onDemandQuorumNumbers,
 	}, nil
+}
+
+// ReservationsFromProtobuf converts protobuf reservations to native types
+func ReservationsFromProtobuf(pbReservations map[uint32]*disperser_rpc.QuorumReservation) map[core.QuorumID]*core.ReservedPayment {
+	if pbReservations == nil {
+		return nil
+	}
+
+	reservations := make(map[core.QuorumID]*core.ReservedPayment)
+	for quorumNumber, reservation := range pbReservations {
+		if reservation == nil {
+			continue
+		}
+		quorumID := core.QuorumID(quorumNumber)
+		reservations[quorumID] = &core.ReservedPayment{
+			SymbolsPerSecond: reservation.GetSymbolsPerSecond(),
+			StartTimestamp:   uint64(reservation.GetStartTimestamp()),
+			EndTimestamp:     uint64(reservation.GetEndTimestamp()),
+		}
+	}
+	return reservations
+}
+
+// CumulativePaymentFromProtobuf converts protobuf payment bytes to *big.Int
+func CumulativePaymentFromProtobuf(paymentBytes []byte) *big.Int {
+	if paymentBytes == nil {
+		return nil
+	}
+	return new(big.Int).SetBytes(paymentBytes)
+}
+
+// ConvertPaymentStateFromProtobuf converts a protobuf GetPaymentStateForAllQuorumsReply to native types
+func ConvertPaymentStateFromProtobuf(paymentStateProto *disperser_rpc.GetPaymentStateForAllQuorumsReply) (
+	*PaymentVaultParams,
+	map[core.QuorumID]*core.ReservedPayment,
+	*big.Int,
+	*big.Int,
+	QuorumPeriodRecords,
+	error,
+) {
+	if paymentStateProto == nil {
+		return nil, nil, nil, nil, nil, fmt.Errorf("payment state cannot be nil")
+	}
+
+	paymentVaultParams, err := PaymentVaultParamsFromProtobuf(paymentStateProto.GetPaymentVaultParams())
+	if err != nil {
+		return nil, nil, nil, nil, nil, fmt.Errorf("error converting payment vault params: %w", err)
+	}
+
+	reservations := ReservationsFromProtobuf(paymentStateProto.GetReservations())
+
+	cumulativePayment := CumulativePaymentFromProtobuf(paymentStateProto.GetCumulativePayment())
+	onchainCumulativePayment := CumulativePaymentFromProtobuf(paymentStateProto.GetOnchainCumulativePayment())
+
+	var periodRecords QuorumPeriodRecords
+	if paymentStateProto.GetPeriodRecords() != nil {
+		periodRecords = FromProtoRecords(paymentStateProto.GetPeriodRecords())
+	}
+
+	return paymentVaultParams, reservations, cumulativePayment, onchainCumulativePayment, periodRecords, nil
 }
