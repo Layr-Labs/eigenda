@@ -35,11 +35,11 @@ type DiskTable struct {
 	// The logger for the disk table.
 	logger logging.Logger
 
-	// fatalErrorHandler is a struct that permits the DB to "panic". There are many goroutines that function under the
+	// errorMonitor is a struct that permits the DB to "panic". There are many goroutines that function under the
 	// hood, and many of these threads could, in theory, encounter errors which are unrecoverable. In such situations,
 	// the desirable outcome is for the DB to report the error and then refuse to do additional work. If the DB is in a
 	// broken state, it is much better to refuse to do work than to continue to do work and potentially corrupt data.
-	fatalErrorHandler *util.FatalErrorHandler
+	errorMonitor *util.ErrorMonitor
 
 	// The root directories for the disk table.
 	roots []string
@@ -158,7 +158,7 @@ func NewDiskTable(
 		// No metadata file exists yet. Create a new one in the first root.
 		var err error
 		metadataDir := roots[0]
-		metadata, err = newTableMetadata(config.Logger, metadataDir, config.TTL, config.ShardingFactor)
+		metadata, err = newTableMetadata(config.Logger, metadataDir, config.TTL, config.ShardingFactor, config.Fsync)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create table metadata: %w", err)
 		}
@@ -172,11 +172,11 @@ func NewDiskTable(
 		}
 	}
 
-	fatalErrorHandler := util.NewFatalErrorHandler(config.CTX, config.Logger, config.FatalErrorCallback)
+	errorMonitor := util.NewErrorMonitor(config.CTX, config.Logger, config.FatalErrorCallback)
 
 	table := &DiskTable{
 		logger:             config.Logger,
-		fatalErrorHandler:  fatalErrorHandler,
+		errorMonitor:       errorMonitor,
 		clock:              config.Clock,
 		roots:              roots,
 		segmentDirectories: segDirs,
@@ -191,9 +191,10 @@ func NewDiskTable(
 	lowestSegmentIndex, highestSegmentIndex, segments, err :=
 		segment.GatherSegmentFiles(
 			config.Logger,
-			fatalErrorHandler,
+			errorMonitor,
 			table.segmentDirectories,
-			config.Clock())
+			config.Clock(),
+			config.Fsync)
 	if err != nil {
 		return nil, fmt.Errorf("failed to gather segment files: %w", err)
 	}
@@ -225,7 +226,7 @@ func NewDiskTable(
 	}
 	mutableSegment, err := segment.CreateSegment(
 		config.Logger,
-		fatalErrorHandler,
+		errorMonitor,
 		nextSegmentIndex,
 		segDirs,
 		metadata.GetShardingFactor(),
@@ -252,13 +253,13 @@ func NewDiskTable(
 
 	// Start the flush loop.
 	fLoop := &flushLoop{
-		logger:            config.Logger,
-		diskTable:         table,
-		fatalErrorHandler: fatalErrorHandler,
-		flushChannel:      make(chan any, tableFlushChannelCapacity),
-		metrics:           metrics,
-		clock:             config.Clock,
-		name:              name,
+		logger:       config.Logger,
+		diskTable:    table,
+		errorMonitor: errorMonitor,
+		flushChannel: make(chan any, tableFlushChannelCapacity),
+		metrics:      metrics,
+		clock:        config.Clock,
+		name:         name,
 	}
 	table.flushLoop = fLoop
 	go fLoop.run()
@@ -267,7 +268,7 @@ func NewDiskTable(
 	cLoop := &controlLoop{
 		logger:                  config.Logger,
 		diskTable:               table,
-		fatalErrorHandler:       fatalErrorHandler,
+		errorMonitor:            errorMonitor,
 		controllerChannel:       make(chan any, config.ControlChannelSize),
 		lowestSegmentIndex:      lowestSegmentIndex,
 		highestSegmentIndex:     highestSegmentIndex,
@@ -378,11 +379,11 @@ func (d *DiskTable) Name() string {
 
 // Close stops the disk table. Flushes all data out to disk.
 func (d *DiskTable) Close() error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf("cannot process Stop() request, DB is in panicked state due to error: %w", err)
 	}
 
-	d.fatalErrorHandler.Shutdown()
+	d.errorMonitor.Shutdown()
 
 	shutdownCompleteChan := make(chan struct{}, 1)
 	request := &controlLoopShutdownRequest{
@@ -394,7 +395,7 @@ func (d *DiskTable) Close() error {
 		return fmt.Errorf("failed to send shutdown request: %w", err)
 	}
 
-	_, err = util.AwaitIfNotFatal(d.fatalErrorHandler, shutdownCompleteChan)
+	_, err = util.Await(d.errorMonitor, shutdownCompleteChan)
 	if err != nil {
 		return fmt.Errorf("failed to shutdown: %w", err)
 	}
@@ -404,7 +405,7 @@ func (d *DiskTable) Close() error {
 
 // Destroy stops the disk table and delete all files.
 func (d *DiskTable) Destroy() error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf("Cannot process Destroy() request, DB is in panicked state due to error: %w", err)
 	}
 
@@ -479,7 +480,7 @@ func (d *DiskTable) Destroy() error {
 // SetTTL sets the TTL for the disk table. If set to 0, no TTL is enforced. This setting affects both new
 // data and data already written.
 func (d *DiskTable) SetTTL(ttl time.Duration) error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf("Cannot process SetTTL() request, DB is in panicked state due to error: %w", err)
 	}
 
@@ -491,7 +492,7 @@ func (d *DiskTable) SetTTL(ttl time.Duration) error {
 }
 
 func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf(
 			"Cannot process SetShardingFactor() request, DB is in panicked state due to error: %w", err)
 	}
@@ -512,7 +513,7 @@ func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
 }
 
 func (d *DiskTable) Get(key []byte) (value []byte, exists bool, err error) {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return nil, false, fmt.Errorf(
 			"Cannot process Get() request, DB is in panicked state due to error: %w", err)
 	}
@@ -554,7 +555,7 @@ func (d *DiskTable) CacheAwareGet(
 	onlyReadFromCache bool,
 ) (value []byte, exists bool, hot bool, err error) {
 
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return nil, false, false, fmt.Errorf(
 			"Cannot process CacheAwareGet() request, DB is in panicked state due to error: %w", err)
 	}
@@ -606,7 +607,7 @@ func (d *DiskTable) Put(key []byte, value []byte) error {
 }
 
 func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf("Cannot process PutBatch() request, DB is in panicked state due to error: %w", err)
 	}
 
@@ -669,7 +670,7 @@ func (d *DiskTable) Exists(key []byte) (bool, error) {
 
 // Flush flushes all data to disk. Blocks until all data previously submitted to Put has been written to disk.
 func (d *DiskTable) Flush() error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf("Cannot process Flush() request, DB is in panicked state due to error: %w", err)
 	}
 
@@ -690,7 +691,7 @@ func (d *DiskTable) Flush() error {
 		return fmt.Errorf("failed to send flush request: %w", err)
 	}
 
-	_, err = util.AwaitIfNotFatal(d.fatalErrorHandler, flushReq.responseChan)
+	_, err = util.Await(d.errorMonitor, flushReq.responseChan)
 	if err != nil {
 		return fmt.Errorf("failed to flush: %w", err)
 	}
@@ -699,7 +700,7 @@ func (d *DiskTable) Flush() error {
 }
 
 func (d *DiskTable) SetWriteCacheSize(size uint64) error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf(
 			"Cannot process SetWriteCacheSize() request, DB is in panicked state due to error: %w", err)
 	}
@@ -709,7 +710,7 @@ func (d *DiskTable) SetWriteCacheSize(size uint64) error {
 }
 
 func (d *DiskTable) SetReadCacheSize(size uint64) error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf(
 			"Cannot process SetReadCacheSize() request, DB is in panicked state due to error: %w", err)
 	}
@@ -719,7 +720,7 @@ func (d *DiskTable) SetReadCacheSize(size uint64) error {
 }
 
 func (d *DiskTable) RunGC() error {
-	if ok, err := d.fatalErrorHandler.IsOk(); !ok {
+	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf(
 			"Cannot process RunGC() request, DB is in panicked state due to error: %w", err)
 	}
@@ -733,7 +734,7 @@ func (d *DiskTable) RunGC() error {
 		return fmt.Errorf("failed to send GC request: %w", err)
 	}
 
-	_, err = util.AwaitIfNotFatal(d.fatalErrorHandler, request.completionChan)
+	_, err = util.Await(d.errorMonitor, request.completionChan)
 	if err != nil {
 		return fmt.Errorf("failed to await GC completion: %w", err)
 	}
