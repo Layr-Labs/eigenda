@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/core"
 )
 
 // SwapFileExtension is the file extension used for temporary swap files created during atomic writes.
@@ -584,7 +586,7 @@ func copyRegularFile(src string, dst string, fileMode os.FileMode, modTime time.
 	if err != nil {
 		return fmt.Errorf("failed to open source file %s: %w", src, err)
 	}
-	defer in.Close()
+	defer core.CloseLogOnError(in, src, nil)
 
 	// If there is already a file at the destination, remove it.
 	// This ensures we don't have issues with file permissions or existing symlinks
@@ -600,7 +602,7 @@ func copyRegularFile(src string, dst string, fileMode os.FileMode, modTime time.
 	if err != nil {
 		return fmt.Errorf("failed to create destination file %s: %w", dst, err)
 	}
-	defer out.Close()
+	defer core.CloseLogOnError(out, dst, nil)
 
 	// Copy content
 	if _, err := io.Copy(out, in); err != nil {

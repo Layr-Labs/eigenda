@@ -158,7 +158,7 @@ func NewValidatorStore(
 	}
 
 	if writeCacheSize+readCacheSize >= maxMemory {
-		return nil, fmt.Errorf("Write cache size + read cache size must be less than max memory. "+
+		return nil, fmt.Errorf("write cache size + read cache size must be less than max memory. "+
 			"Write cache size: %d, read cache size: %d, max memory: %d", writeCacheSize, readCacheSize, maxMemory)
 	}
 

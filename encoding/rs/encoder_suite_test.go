@@ -27,7 +27,10 @@ func setupSuite(t *testing.T) func(t *testing.T) {
 	return func(t *testing.T) {
 		log.Println("Tearing down suite")
 
-		os.RemoveAll("./data")
+		err := os.RemoveAll("./data")
+		if err != nil {
+			t.Logf("failed to remove data directory ./data: %v", err)
+		}
 	}
 }
 

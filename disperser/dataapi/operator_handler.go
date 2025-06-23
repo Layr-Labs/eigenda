@@ -226,7 +226,7 @@ func checkServiceOnline(ctx context.Context, serviceName string, socket string, 
 	if err != nil {
 		return false, err.Error()
 	}
-	defer conn.Close()
+	defer core.CloseLogOnError(conn, fmt.Sprintf("grpc connection to %s", socket), nil)
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 

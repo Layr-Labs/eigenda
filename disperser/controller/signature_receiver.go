@@ -156,16 +156,15 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 	operatorCount := len(sr.indexedOperatorState.IndexedOperators)
 
 	// we expect a single SigningMessage from each operator
+forLoop:
 	for len(sr.signatureMessageReceived) < operatorCount {
-		breakLoop := false
 		select {
 		case <-ctx.Done():
 			sr.logger.Infof(
 				"global batch attestation timeout exceeded for batch %s. Received and processed %d/%d signing "+
 					"messages. %d of the signing messages caused an error during processing", hex.EncodeToString(
 					sr.batchHeaderHash[:]), len(sr.signatureMessageReceived), operatorCount, sr.errorCount)
-			breakLoop = true
-			break
+			break forLoop
 		case signingMessage, ok := <-sr.signingMessageChan:
 			if !ok {
 				sr.logger.Errorf(
@@ -175,22 +174,16 @@ func (sr *signatureReceiver) receiveSigningMessages(ctx context.Context, attesta
 					len(sr.signatureMessageReceived),
 					operatorCount,
 					sr.errorCount)
-				breakLoop = true
-				break
+				break forLoop
 			}
 
 			sr.handleNextSignature(signingMessage, attestationChan)
-
 		// The ticker case is intentionally ordered after the message receiving case. If there are SigningMessages
 		// waiting to be handled, we shouldn't delay their processing for the sake of yielding a QuorumAttestation.
 		// The most likely time for there to be a backlog of SigningMessages is early-on in the signature gathering
 		// process, when we are unlikely to have reached a threshold of signatures anyway.
 		case <-sr.ticker.C:
 			sr.buildAndSubmitAttestation(attestationChan)
-		}
-
-		if breakLoop {
-			break
 		}
 	}
 
