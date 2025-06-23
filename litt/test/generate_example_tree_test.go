@@ -84,7 +84,7 @@ func TestGenerateExampleTree(t *testing.T) {
 	resultString := string(output)
 
 	// replace the root name with "root".
-	resultString = strings.Replace(resultString, testDir, "root", -1)
+	resultString = strings.ReplaceAll(resultString, testDir, "root")
 
 	fmt.Println(resultString)
 

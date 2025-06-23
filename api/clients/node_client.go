@@ -47,7 +47,7 @@ func (c client) GetBlobHeader(
 	if err != nil {
 		return nil, nil, err
 	}
-	defer conn.Close()
+	defer core.CloseLogOnError(conn, "connection to node client", nil)
 
 	n := grpcnode.NewRetrievalClient(conn)
 	nodeCtx, cancel := context.WithTimeout(ctx, c.timeout)

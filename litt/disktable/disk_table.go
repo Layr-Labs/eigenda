@@ -589,7 +589,7 @@ func (d *DiskTable) Destroy() error {
 // data and data already written.
 func (d *DiskTable) SetTTL(ttl time.Duration) error {
 	if ok, err := d.errorMonitor.IsOk(); !ok {
-		return fmt.Errorf("Cannot process SetTTL() request, DB is in panicked state due to error: %w", err)
+		return fmt.Errorf("cannot process SetTTL() request, DB is in panicked state due to error: %w", err)
 	}
 
 	err := d.metadata.SetTTL(ttl)
@@ -602,7 +602,7 @@ func (d *DiskTable) SetTTL(ttl time.Duration) error {
 func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
 	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf(
-			"Cannot process SetShardingFactor() request, DB is in panicked state due to error: %w", err)
+			"cannot process SetShardingFactor() request, DB is in panicked state due to error: %w", err)
 	}
 
 	if shardingFactor == 0 {
@@ -623,7 +623,7 @@ func (d *DiskTable) SetShardingFactor(shardingFactor uint32) error {
 func (d *DiskTable) Get(key []byte) (value []byte, exists bool, err error) {
 	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return nil, false, fmt.Errorf(
-			"Cannot process Get() request, DB is in panicked state due to error: %w", err)
+			"cannot process Get() request, DB is in panicked state due to error: %w", err)
 	}
 
 	// First, check if the key is in the unflushed data map.
@@ -665,7 +665,7 @@ func (d *DiskTable) CacheAwareGet(
 
 	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return nil, false, false, fmt.Errorf(
-			"Cannot process CacheAwareGet() request, DB is in panicked state due to error: %w", err)
+			"cannot process CacheAwareGet() request, DB is in panicked state due to error: %w", err)
 	}
 
 	// First, check if the key is in the unflushed data map. If so, return it from there.
@@ -716,7 +716,7 @@ func (d *DiskTable) Put(key []byte, value []byte) error {
 
 func (d *DiskTable) PutBatch(batch []*types.KVPair) error {
 	if ok, err := d.errorMonitor.IsOk(); !ok {
-		return fmt.Errorf("Cannot process PutBatch() request, DB is in panicked state due to error: %w", err)
+		return fmt.Errorf("cannot process PutBatch() request, DB is in panicked state due to error: %w", err)
 	}
 
 	if d.metrics != nil {
@@ -779,7 +779,7 @@ func (d *DiskTable) Exists(key []byte) (bool, error) {
 // Flush flushes all data to disk. Blocks until all data previously submitted to Put has been written to disk.
 func (d *DiskTable) Flush() error {
 	if ok, err := d.errorMonitor.IsOk(); !ok {
-		return fmt.Errorf("Cannot process Flush() request, DB is in panicked state due to error: %w", err)
+		return fmt.Errorf("cannot process Flush() request, DB is in panicked state due to error: %w", err)
 	}
 
 	if d.metrics != nil {
@@ -810,7 +810,7 @@ func (d *DiskTable) Flush() error {
 func (d *DiskTable) SetWriteCacheSize(size uint64) error {
 	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf(
-			"Cannot process SetWriteCacheSize() request, DB is in panicked state due to error: %w", err)
+			"cannot process SetWriteCacheSize() request, DB is in panicked state due to error: %w", err)
 	}
 
 	// this implementation does not provide a cache, if a cache is needed then it must be provided by a wrapper
@@ -820,7 +820,7 @@ func (d *DiskTable) SetWriteCacheSize(size uint64) error {
 func (d *DiskTable) SetReadCacheSize(size uint64) error {
 	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf(
-			"Cannot process SetReadCacheSize() request, DB is in panicked state due to error: %w", err)
+			"cannot process SetReadCacheSize() request, DB is in panicked state due to error: %w", err)
 	}
 
 	// this implementation does not provide a cache, if a cache is needed then it must be provided by a wrapper
@@ -830,7 +830,7 @@ func (d *DiskTable) SetReadCacheSize(size uint64) error {
 func (d *DiskTable) RunGC() error {
 	if ok, err := d.errorMonitor.IsOk(); !ok {
 		return fmt.Errorf(
-			"Cannot process RunGC() request, DB is in panicked state due to error: %w", err)
+			"cannot process RunGC() request, DB is in panicked state due to error: %w", err)
 	}
 
 	request := &controlLoopGCRequest{

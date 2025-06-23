@@ -200,8 +200,8 @@ func (d *db) GetTable(name string) (litt.Table, error) {
 	if !ok {
 		if !litt.IsTableNameValid(name) {
 			return nil, fmt.Errorf(
-				"Table name '%s' is invalid, must be at least one character long and "+
-					"contain only letters, numbers, and underscores, and dashes.", name)
+				"table name '%s' is invalid, must be at least one character long and "+
+					"contain only letters, numbers, and underscores, and dashes", name)
 		}
 
 		var err error

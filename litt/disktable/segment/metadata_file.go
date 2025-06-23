@@ -168,11 +168,12 @@ func getMetadataFileIndex(fileName string) (uint32, error) {
 
 // Size returns the size of the metadata file in bytes.
 func (m *metadataFile) Size() uint64 {
-	if m.segmentVersion == OldHashFunctionSegmentVersion {
+	switch m.segmentVersion {
+	case OldHashFunctionSegmentVersion:
 		return V0MetadataSize
-	} else if m.segmentVersion == SipHashSegmentVersion {
+	case SipHashSegmentVersion:
 		return V1MetadataSize
-	} else {
+	default:
 		return V2MetadataSize
 	}
 }

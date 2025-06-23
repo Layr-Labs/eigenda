@@ -139,7 +139,7 @@ func (c *controlLoop) run() {
 				c.doGarbageCollection()
 				req.completionChan <- struct{}{}
 			} else {
-				c.errorMonitor.Panic(fmt.Errorf("Unknown control message type %T", message))
+				c.errorMonitor.Panic(fmt.Errorf("unknown control message type %T", message))
 				return
 			}
 		case <-ticker.C:

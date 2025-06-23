@@ -93,7 +93,7 @@ var clientBuilders = []*clientBuilder{
 }
 
 func setupLocalstack() error {
-	deployLocalStack := !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
 	if deployLocalStack {
 		var err error
@@ -107,7 +107,7 @@ func setupLocalstack() error {
 }
 
 func teardownLocalstack() {
-	deployLocalStack := !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack := (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 
 	if deployLocalStack {
 		deploy.PurgeDockertestResources(dockertestPool, dockertestResource)

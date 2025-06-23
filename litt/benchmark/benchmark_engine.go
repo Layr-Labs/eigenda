@@ -198,7 +198,7 @@ func (b *BenchmarkEngine) writer() {
 	for {
 		select {
 		case <-b.errorMonitor.ImmediateShutdownRequired():
-			break
+			return
 		default:
 			batchSize := uint64(0)
 
@@ -267,7 +267,7 @@ func (b *BenchmarkEngine) reader() {
 	for {
 		select {
 		case <-b.errorMonitor.ImmediateShutdownRequired():
-			break
+			return
 		default:
 			readInfo := b.dataTracker.GetReadInfo()
 			if readInfo == nil {
