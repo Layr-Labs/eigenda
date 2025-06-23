@@ -100,10 +100,7 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
         ps().quorum[quorumId].protocolCfg.onDemandRateLimitWindow = onDemandRateLimitWindow;
     }
 
-    function setMinNumSymbols(uint64 quorumId, uint64 minNumSymbols)
-        external
-        onlyQuorumOwner(quorumId)
-    {
+    function setMinNumSymbols(uint64 quorumId, uint64 minNumSymbols) external onlyQuorumOwner(quorumId) {
         ps().quorum[quorumId].protocolCfg.minNumSymbols = minNumSymbols;
     }
 

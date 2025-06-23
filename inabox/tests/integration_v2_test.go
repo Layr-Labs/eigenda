@@ -21,7 +21,6 @@ import (
 
 	"github.com/Layr-Labs/eigenda/api/clients/v2/coretypes"
 	aws2 "github.com/Layr-Labs/eigenda/common/aws"
-	caws "github.com/Layr-Labs/eigenda/common/aws"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
@@ -155,7 +154,7 @@ var _ = Describe("Inabox v2 blacklisting Integration test", func() {
 		}
 		keyID := keys.Keys[0].KeyId
 
-		publicKey, err := caws.LoadPublicKeyKMS(ctx, keyManager, *keyID)
+		publicKey, err := aws2.LoadPublicKeyKMS(ctx, keyManager, *keyID)
 		if err != nil {
 			Fail("failed to load public key")
 		}
