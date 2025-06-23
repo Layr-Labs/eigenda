@@ -26,7 +26,7 @@ func TestFailureAggregator_ShouldRetryBatch(t *testing.T) {
 		{
 			name: "account failure exceeds threshold",
 			failures: []OperatorFailure{
-				{AccountID: "0x123", Stake: big.NewInt(300)}, // 30% for account
+				{AccountID: "0x123", Stake: big.NewInt(300), IsBatchMeterError: true, BatchMeterCode: "RESERVATION_NOT_FOUND"}, // 30% for account
 			},
 			totalStake:                  big.NewInt(1000),
 			maxAccountFailurePercentage: 20.0,
@@ -37,8 +37,8 @@ func TestFailureAggregator_ShouldRetryBatch(t *testing.T) {
 		{
 			name: "multiple accounts exceed threshold",
 			failures: []OperatorFailure{
-				{AccountID: "0x123", Stake: big.NewInt(300)}, // 30% for account
-				{AccountID: "0x456", Stake: big.NewInt(250)}, // 25% for account
+				{AccountID: "0x123", Stake: big.NewInt(300), IsBatchMeterError: true, BatchMeterCode: "RESERVATION_NOT_FOUND"}, // 30% for account
+				{AccountID: "0x456", Stake: big.NewInt(250), IsBatchMeterError: true, BatchMeterCode: "RESERVATION_INACTIVE"},  // 25% for account
 			},
 			totalStake:                  big.NewInt(1000),
 			maxAccountFailurePercentage: 20.0,
@@ -49,7 +49,7 @@ func TestFailureAggregator_ShouldRetryBatch(t *testing.T) {
 		{
 			name: "no retry conditions met",
 			failures: []OperatorFailure{
-				{AccountID: "0x123", Stake: big.NewInt(100)}, // 10% - under threshold
+				{AccountID: "0x123", Stake: big.NewInt(100), IsBatchMeterError: true, BatchMeterCode: "RESERVATION_NOT_FOUND"}, // 10% - under threshold
 			},
 			totalStake:                  big.NewInt(1000),
 			maxAccountFailurePercentage: 20.0,
@@ -103,46 +103,46 @@ func TestFailureAggregator_ShouldRetryBatch(t *testing.T) {
 
 func TestDispatcher_FilterBlobsByAccountIDs(t *testing.T) {
 	tests := []struct {
-		name               string
-		blobs              []core.EncodedBlob
-		excludeAccountIDs  []string
-		expectedBlobCount  int
-		expectedExcluded   int
+		name              string
+		blobs             []core.EncodedBlob
+		excludeAccountIDs []string
+		expectedBlobCount int
+		expectedExcluded  int
 	}{
 		{
-			name:               "no exclusions",
-			blobs:              createTestBlobs([]string{"0x123", "0x456"}),
-			excludeAccountIDs:  []string{},
-			expectedBlobCount:  2,
-			expectedExcluded:   0,
+			name:              "no exclusions",
+			blobs:             createTestBlobs([]string{"0x123", "0x456"}),
+			excludeAccountIDs: []string{},
+			expectedBlobCount: 2,
+			expectedExcluded:  0,
 		},
 		{
-			name:               "exclude one account",
-			blobs:              createTestBlobs([]string{"0x123", "0x456", "0x789"}),
-			excludeAccountIDs:  []string{"0x456"},
-			expectedBlobCount:  2,
-			expectedExcluded:   1,
+			name:              "exclude one account",
+			blobs:             createTestBlobs([]string{"0x123", "0x456", "0x789"}),
+			excludeAccountIDs: []string{"0x456"},
+			expectedBlobCount: 2,
+			expectedExcluded:  1,
 		},
 		{
-			name:               "exclude multiple accounts",
-			blobs:              createTestBlobs([]string{"0x123", "0x456", "0x789"}),
-			excludeAccountIDs:  []string{"0x123", "0x789"},
-			expectedBlobCount:  1,
-			expectedExcluded:   2,
+			name:              "exclude multiple accounts",
+			blobs:             createTestBlobs([]string{"0x123", "0x456", "0x789"}),
+			excludeAccountIDs: []string{"0x123", "0x789"},
+			expectedBlobCount: 1,
+			expectedExcluded:  2,
 		},
 		{
-			name:               "exclude all accounts",
-			blobs:              createTestBlobs([]string{"0x123", "0x456"}),
-			excludeAccountIDs:  []string{"0x123", "0x456"},
-			expectedBlobCount:  0,
-			expectedExcluded:   2,
+			name:              "exclude all accounts",
+			blobs:             createTestBlobs([]string{"0x123", "0x456"}),
+			excludeAccountIDs: []string{"0x123", "0x456"},
+			expectedBlobCount: 0,
+			expectedExcluded:  2,
 		},
 		{
-			name:               "exclude non-existent account",
-			blobs:              createTestBlobs([]string{"0x123", "0x456"}),
-			excludeAccountIDs:  []string{"0x999"},
-			expectedBlobCount:  2,
-			expectedExcluded:   0,
+			name:              "exclude non-existent account",
+			blobs:             createTestBlobs([]string{"0x123", "0x456"}),
+			excludeAccountIDs: []string{"0x999"},
+			expectedBlobCount: 2,
+			expectedExcluded:  0,
 		},
 	}
 
@@ -151,18 +151,18 @@ func TestDispatcher_FilterBlobsByAccountIDs(t *testing.T) {
 			d := &dispatcher{
 				logger: nil, // Will be handled by the function
 			}
-			
+
 			filteredBlobs := d.filterBlobsByAccountIDs(tt.blobs, tt.excludeAccountIDs)
-			
+
 			if len(filteredBlobs) != tt.expectedBlobCount {
 				t.Errorf("Filtered blob count = %v, want %v", len(filteredBlobs), tt.expectedBlobCount)
 			}
-			
+
 			excludedCount := len(tt.blobs) - len(filteredBlobs)
 			if excludedCount != tt.expectedExcluded {
 				t.Errorf("Excluded blob count = %v, want %v", excludedCount, tt.expectedExcluded)
 			}
-			
+
 			// Verify that excluded accounts are not in filtered blobs
 			for _, blob := range filteredBlobs {
 				if blob.BlobHeader != nil {
