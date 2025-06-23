@@ -503,4 +503,12 @@ func TestGetFilePaths(t *testing.T) {
 
 	// make sure there aren't any additional files
 	require.Equal(t, expectedCount, len(filesSet))
+
+	// Compare values to functions that return specific file paths.
+	require.Equal(t, segment.metadata.path(), segment.GetMetadataFilePath())
+	require.Equal(t, segment.keys.path(), segment.GetKeyFilePath())
+	valueFiles := segment.GetValueFilePaths()
+	for i := uint32(0); i < shardingFactor; i++ {
+		require.Equal(t, segment.shards[i].path(), valueFiles[i])
+	}
 }

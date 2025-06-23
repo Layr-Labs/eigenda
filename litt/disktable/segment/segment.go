@@ -850,13 +850,30 @@ func (s *Segment) keyFileControlLoop() {
 	}
 }
 
+// GetMetadataFilePath returns the path to the metadata file for this segment.
+func (s *Segment) GetMetadataFilePath() string {
+	return s.metadata.path()
+}
+
+// GetKeyFilePath returns the path to the key file for this segment.
+func (s *Segment) GetKeyFilePath() string {
+	return s.keys.path()
+}
+
+// / GetValueFilePaths returns a list of file paths for all value files in this segment.
+func (s *Segment) GetValueFilePaths() []string {
+	paths := make([]string, 0, len(s.shards))
+	for _, shard := range s.shards {
+		paths = append(paths, shard.path())
+	}
+	return paths
+}
+
 // GetFilePaths returns a list of file paths for all files that make up this segment.
 func (s *Segment) GetFilePaths() []string {
 	filePaths := make([]string, 0, 2+len(s.shards))
-	filePaths = append(filePaths, s.metadata.path())
-	filePaths = append(filePaths, s.keys.path())
-	for _, shard := range s.shards {
-		filePaths = append(filePaths, shard.path())
-	}
+	filePaths = append(filePaths, s.GetMetadataFilePath())
+	filePaths = append(filePaths, s.GetKeyFilePath())
+	filePaths = append(filePaths, s.GetValueFilePaths()...)
 	return filePaths
 }
