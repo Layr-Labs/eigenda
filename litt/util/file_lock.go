@@ -181,8 +181,6 @@ func (fl *FileLock) Path() string {
 	return fl.path
 }
 
-// TODO unit test this function
-
 // Create a lock on multiple directories. Returns a function that can be used to release all locks.
 func LockDirectories(
 	logger logging.Logger,
