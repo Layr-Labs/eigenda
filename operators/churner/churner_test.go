@@ -21,7 +21,7 @@ func TestProcessChurnRequest(t *testing.T) {
 	setupMockWriter()
 	mockIndexer := &indexermock.MockIndexedChainState{}
 	config := &churner.Config{
-		LoggerConfig: common.DefaultLoggerConfig(),
+		LoggerConfig: *common.DefaultLoggerConfig(),
 		EthClientConfig: geth.EthClientConfig{
 			PrivateKeyString: churnerPrivateKeyHex,
 			NumConfirmations: 0,

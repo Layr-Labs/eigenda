@@ -9,6 +9,107 @@ import (
 	"time"
 )
 
+// SwapFileExtension is the file extension used for temporary swap files created during atomic writes.
+const SwapFileExtension = ".swap"
+
+// SanitizePath returns a sanitized version of the given path, doing things like expanding
+// "~" to the user's home directory, converting to absolute path, normalizing slashes, etc.
+func SanitizePath(path string) (string, error) {
+	if len(path) > 0 && path[0] == '~' {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get user home directory: %w", err)
+		}
+
+		if len(path) == 1 {
+			path = homeDir
+		} else if len(path) > 1 && path[1] == '/' {
+			path = homeDir + path[1:]
+		}
+	}
+
+	path = filepath.Clean(path)
+	path = filepath.ToSlash(path)
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve absolute path: %w", err)
+	}
+
+	return path, nil
+}
+
+// AtomicWrite writes data to a file atomically. The parent directory must exist and be writable.
+// If the destination file already exists, it will be overwritten.
+//
+// This method creates a temporary swap file in the same directory as the destination, but with SwapFileExtension
+// appended to the filename. If there is a crash during this method's execution, it may leave this swap file behind.
+func AtomicWrite(destination string, data []byte, fsync bool) error {
+
+	swapPath := destination + SwapFileExtension
+
+	// Write the data into the swap file.
+	swapFile, err := os.Create(swapPath)
+	if err != nil {
+		return fmt.Errorf("failed to create swap file: %v", err)
+	}
+
+	_, err = swapFile.Write(data)
+	if err != nil {
+		return fmt.Errorf("failed to write to swap file: %v", err)
+	}
+
+	if fsync {
+		// Ensure the data in the swap file is fully written to disk.
+		err = swapFile.Sync()
+		if err != nil {
+			return fmt.Errorf("failed to sync swap file: %v", err)
+		}
+	}
+
+	err = swapFile.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close swap file: %v", err)
+	}
+
+	// Rename the swap file to the destination file.
+	err = AtomicRename(swapPath, destination, fsync)
+	if err != nil {
+		return fmt.Errorf("failed to rename swap file: %v", err)
+	}
+
+	return nil
+}
+
+// AtomicRename renames a file from oldPath to newPath atomically.
+func AtomicRename(oldPath string, newPath string, fsync bool) error {
+	err := os.Rename(oldPath, newPath)
+	if err != nil {
+		return fmt.Errorf("failed to rename file: %w", err)
+	}
+
+	parentDirectory := filepath.Dir(newPath)
+
+	// Ensure that the rename is committed to disk.
+	dirFile, err := os.Open(parentDirectory)
+	if err != nil {
+		return fmt.Errorf("failed to open parent directory %s: %w", parentDirectory, err)
+	}
+
+	if fsync {
+		err = dirFile.Sync()
+		if err != nil {
+			return fmt.Errorf("failed to sync parent directory %s: %w", parentDirectory, err)
+		}
+	}
+
+	err = dirFile.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close parent directory %s: %w", parentDirectory, err)
+	}
+
+	return nil
+}
+
 // VerifyFileProperties checks if a file has read/write permissions and is a regular file (if it exists),
 // returning an error if it does not if the file permissions or file type is not as expected.
 // Also returns a boolean indicating if the file exists and its size (to save on additional os.Stat calls).
