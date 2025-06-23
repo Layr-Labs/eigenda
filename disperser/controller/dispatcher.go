@@ -347,7 +347,7 @@ func (d *Dispatcher) HandleBatch(
 						"batchHeader", hex.EncodeToString(batchData.BatchHeaderHash[:]),
 						"err", lastErr)
 				}
-
+				
 				storeErr := d.blobMetadataStore.PutDispersalResponse(ctx, &corev2.DispersalResponse{
 					DispersalRequest: req,
 					RespondedAt:      uint64(time.Now().UnixNano()),
