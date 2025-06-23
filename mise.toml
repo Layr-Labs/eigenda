@@ -8,7 +8,7 @@
 go = "1.24"
 
 # Tooling Dependencies
-golangci-lint = "1.60.3"
+golangci-lint = "2.1.6"
 # abigen v2 was release in v1.15.6: https://github.com/ethereum/go-ethereum/releases/tag/v1.15.6
 # So we need to keep this version below 1.15.6 until we're ready to upgrade and fix whatever breaks.
 "go:github.com/ethereum/go-ethereum/cmd/abigen" = "v1.15.0"
