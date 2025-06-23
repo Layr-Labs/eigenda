@@ -50,16 +50,19 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
 
     /// USER
 
+    /// @inheritdoc IUsageAuthorizationRegistry
     function decreaseReservation(uint64 quorumId, UsageAuthorizationTypes.Reservation memory reservation) external {
         UsageAuthorizationLib.decreaseReservation(quorumId, msg.sender, reservation, SCHEDULE_PERIOD);
     }
 
+    /// @inheritdoc IUsageAuthorizationRegistry
     function depositOnDemand(uint64 quorumId, address account, uint256 amount) external onlyOnDemandEnabled(quorumId) {
         UsageAuthorizationLib.depositOnDemand(quorumId, account, amount, msg.sender);
     }
 
     /// OWNER
 
+    /// @inheritdoc IUsageAuthorizationRegistry
     function transferOwnership(address newOwner) external onlyOwner {
         if (newOwner == address(0)) {
             revert IUsageAuthorizationRegistry.OwnerIsZeroAddress();
@@ -67,6 +70,7 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
         AccessControlLib.transferRole(Constants.OWNER_ROLE, msg.sender, newOwner);
     }
 
+    /// @inheritdoc IUsageAuthorizationRegistry
     function initializeQuorum(
         uint64 quorumId,
         address newOwner,
@@ -79,19 +83,19 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
         ps().quorum[quorumId].protocolCfg = protocolCfg;
     }
 
-    function setReservationAdvanceWindow(uint64 quorumId, uint64 reservationAdvanceWindow)
-        external
-        onlyQuorumOwner(quorumId)
-    {
+    /// @inheritdoc IUsageAuthorizationRegistry
+    function setReservationAdvanceWindow(uint64 quorumId, uint64 reservationAdvanceWindow) external onlyOwner {
         ps().quorum[quorumId].protocolCfg.reservationAdvanceWindow = reservationAdvanceWindow;
     }
 
-    function setOnDemandEnabled(uint64 quorumId, bool enabled) external onlyQuorumOwner(quorumId) {
+    /// @inheritdoc IUsageAuthorizationRegistry
+    function setOnDemandEnabled(uint64 quorumId, bool enabled) external onlyOwner {
         ps().quorum[quorumId].protocolCfg.onDemandEnabled = enabled;
     }
 
     /// QUORUM OWNER
 
+    /// @inheritdoc IUsageAuthorizationRegistry
     function addReservation(uint64 quorumId, address account, UsageAuthorizationTypes.Reservation memory reservation)
         external
         onlyQuorumOwner(quorumId)
@@ -99,6 +103,7 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
         UsageAuthorizationLib.addReservation(quorumId, account, reservation, SCHEDULE_PERIOD);
     }
 
+    /// @inheritdoc IUsageAuthorizationRegistry
     function increaseReservation(
         uint64 quorumId,
         address account,
@@ -107,6 +112,7 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
         UsageAuthorizationLib.increaseReservation(quorumId, account, reservation, SCHEDULE_PERIOD);
     }
 
+    /// @inheritdoc IUsageAuthorizationRegistry
     function setQuorumPaymentConfig(uint64 quorumId, UsageAuthorizationTypes.QuorumConfig memory paymentConfig)
         external
         onlyQuorumOwner(quorumId)
@@ -114,6 +120,7 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
         ps().quorum[quorumId].cfg = paymentConfig;
     }
 
+    /// @inheritdoc IUsageAuthorizationRegistry
     function transferQuorumOwnership(uint64 quorumId, address newOwner) external onlyQuorumOwner(quorumId) {
         if (newOwner == address(0)) {
             revert IUsageAuthorizationRegistry.OwnerIsZeroAddress();
@@ -123,10 +130,12 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
 
     /// GETTERS
 
+    /// @inheritdoc IUsageAuthorizationRegistry
     function getOnDemandDeposit(uint64 quorumId, address account) external view returns (uint256) {
         return ps().quorum[quorumId].user[account].deposit;
     }
 
+    /// @inheritdoc IUsageAuthorizationRegistry
     function getReservation(uint64 quorumId, address account)
         external
         view
@@ -135,6 +144,7 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
         return ps().quorum[quorumId].user[account].reservation;
     }
 
+    /// @inheritdoc IUsageAuthorizationRegistry
     function getQuorumProtocolConfig(uint64 quorumId)
         external
         view
@@ -143,6 +153,7 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
         return ps().quorum[quorumId].protocolCfg;
     }
 
+    /// @inheritdoc IUsageAuthorizationRegistry
     function getQuorumPaymentConfig(uint64 quorumId)
         external
         view
@@ -151,6 +162,7 @@ contract UsageAuthorizationRegistry is IUsageAuthorizationRegistry {
         return ps().quorum[quorumId].cfg;
     }
 
+    /// @inheritdoc IUsageAuthorizationRegistry
     function getQuorumReservedSymbols(uint64 quorumId, uint64 period) external view returns (uint64) {
         return ps().quorum[quorumId].reservedSymbols[period];
     }

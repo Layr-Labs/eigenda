@@ -11,11 +11,13 @@ library UsageAuthorizationTypes {
 
     /// @param protocolCfg The protocol configuration for the quorum, only settable by the contract owner.
     /// @param cfg The quorum configuration, settable by the quorum owner.
+    /// @param user The mapping of users to their on-demand deposits and reservations.
+    /// @param reservedSymbols The mapping of reserved symbols per period in this quorum.
     struct Quorum {
         QuorumProtocolConfig protocolCfg;
         QuorumConfig cfg;
         mapping(address => User) user;
-        mapping(uint64 => uint64) reservedSymbols; // reserved symbols per period in this quorum
+        mapping(uint64 => uint64) reservedSymbols;
     }
 
     /// @param token The address of the token used for on-demand payments.

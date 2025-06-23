@@ -56,7 +56,7 @@ type UsageAuthorizationTypesReservation struct {
 
 // ContractIUsageAuthorizationRegistryMetaData contains all meta data concerning the ContractIUsageAuthorizationRegistry contract.
 var ContractIUsageAuthorizationRegistryMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"function\",\"name\":\"getOnDemandDeposit\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getQuorumPaymentConfig\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structUsageAuthorizationTypes.QuorumConfig\",\"components\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"reservationSymbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandSymbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandPricePerSymbol\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getQuorumProtocolConfig\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structUsageAuthorizationTypes.QuorumProtocolConfig\",\"components\":[{\"name\":\"minNumSymbols\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservationAdvanceWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservationRateLimitWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandRateLimitWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getQuorumReservedSymbols\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"period\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getReservation\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structUsageAuthorizationTypes.Reservation\",\"components\":[{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"stateMutability\":\"view\"},{\"type\":\"error\",\"name\":\"AmountTooLarge\",\"inputs\":[{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"maxAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"InvalidReservationPeriod\",\"inputs\":[{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"InvalidStartTimestamp\",\"inputs\":[{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"NotEnoughSymbolsAvailable\",\"inputs\":[{\"name\":\"timestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"requiredSymbols\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"availableSymbols\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"OnDemandDisabled\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"OwnerIsZeroAddress\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"QuorumOwnerAlreadySet\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"ReservationMustDecrease\",\"inputs\":[{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"ReservationMustIncrease\",\"inputs\":[{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"ReservationStillActive\",\"inputs\":[{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"ReservationTooLong\",\"inputs\":[{\"name\":\"length\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"maxLength\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"SchedulePeriodCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"StartTimestampMustMatch\",\"inputs\":[{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"TimestampSchedulePeriodMismatch\",\"inputs\":[{\"name\":\"timestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"schedulePeriod\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}]",
+	ABI: "[{\"type\":\"function\",\"name\":\"addReservation\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"reservation\",\"type\":\"tuple\",\"internalType\":\"structUsageAuthorizationTypes.Reservation\",\"components\":[{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"decreaseReservation\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservation\",\"type\":\"tuple\",\"internalType\":\"structUsageAuthorizationTypes.Reservation\",\"components\":[{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"depositOnDemand\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getOnDemandDeposit\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getQuorumPaymentConfig\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structUsageAuthorizationTypes.QuorumConfig\",\"components\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"reservationSymbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandSymbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandPricePerSymbol\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getQuorumProtocolConfig\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structUsageAuthorizationTypes.QuorumProtocolConfig\",\"components\":[{\"name\":\"minNumSymbols\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservationAdvanceWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservationRateLimitWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandRateLimitWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getQuorumReservedSymbols\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"period\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getReservation\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structUsageAuthorizationTypes.Reservation\",\"components\":[{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"increaseReservation\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"reservation\",\"type\":\"tuple\",\"internalType\":\"structUsageAuthorizationTypes.Reservation\",\"components\":[{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"initializeQuorum\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"protocolCfg\",\"type\":\"tuple\",\"internalType\":\"structUsageAuthorizationTypes.QuorumProtocolConfig\",\"components\":[{\"name\":\"minNumSymbols\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservationAdvanceWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservationRateLimitWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandRateLimitWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandEnabled\",\"type\":\"bool\",\"internalType\":\"bool\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setOnDemandEnabled\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"enabled\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setQuorumPaymentConfig\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"config\",\"type\":\"tuple\",\"internalType\":\"structUsageAuthorizationTypes.QuorumConfig\",\"components\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"reservationSymbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandSymbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"onDemandPricePerSymbol\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setReservationAdvanceWindow\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"reservationAdvanceWindow\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"transferQuorumOwnership\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"error\",\"name\":\"AmountTooLarge\",\"inputs\":[{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"maxAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"InvalidReservationPeriod\",\"inputs\":[{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"InvalidStartTimestamp\",\"inputs\":[{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"NotEnoughSymbolsAvailable\",\"inputs\":[{\"name\":\"timestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"requiredSymbols\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"availableSymbols\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"OnDemandDisabled\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"OwnerIsZeroAddress\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"QuorumOwnerAlreadySet\",\"inputs\":[{\"name\":\"quorumId\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"ReservationMustDecrease\",\"inputs\":[{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"ReservationMustIncrease\",\"inputs\":[{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"symbolsPerSecond\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"ReservationStillActive\",\"inputs\":[{\"name\":\"endTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"ReservationTooLong\",\"inputs\":[{\"name\":\"length\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"maxLength\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"SchedulePeriodCannotBeZero\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"StartTimestampMustMatch\",\"inputs\":[{\"name\":\"startTimestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"TimestampSchedulePeriodMismatch\",\"inputs\":[{\"name\":\"timestamp\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"schedulePeriod\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}]",
 }
 
 // ContractIUsageAuthorizationRegistryABI is the input ABI used to generate the binding from.
@@ -358,4 +358,214 @@ func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryS
 // Solidity: function getReservation(uint64 quorumId, address account) view returns((uint64,uint64,uint64))
 func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryCallerSession) GetReservation(quorumId uint64, account common.Address) (UsageAuthorizationTypesReservation, error) {
 	return _ContractIUsageAuthorizationRegistry.Contract.GetReservation(&_ContractIUsageAuthorizationRegistry.CallOpts, quorumId, account)
+}
+
+// AddReservation is a paid mutator transaction binding the contract method 0x11d86be0.
+//
+// Solidity: function addReservation(uint64 quorumId, address account, (uint64,uint64,uint64) reservation) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactor) AddReservation(opts *bind.TransactOpts, quorumId uint64, account common.Address, reservation UsageAuthorizationTypesReservation) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.contract.Transact(opts, "addReservation", quorumId, account, reservation)
+}
+
+// AddReservation is a paid mutator transaction binding the contract method 0x11d86be0.
+//
+// Solidity: function addReservation(uint64 quorumId, address account, (uint64,uint64,uint64) reservation) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistrySession) AddReservation(quorumId uint64, account common.Address, reservation UsageAuthorizationTypesReservation) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.AddReservation(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, account, reservation)
+}
+
+// AddReservation is a paid mutator transaction binding the contract method 0x11d86be0.
+//
+// Solidity: function addReservation(uint64 quorumId, address account, (uint64,uint64,uint64) reservation) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactorSession) AddReservation(quorumId uint64, account common.Address, reservation UsageAuthorizationTypesReservation) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.AddReservation(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, account, reservation)
+}
+
+// DecreaseReservation is a paid mutator transaction binding the contract method 0x3b50e8b8.
+//
+// Solidity: function decreaseReservation(uint64 quorumId, (uint64,uint64,uint64) reservation) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactor) DecreaseReservation(opts *bind.TransactOpts, quorumId uint64, reservation UsageAuthorizationTypesReservation) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.contract.Transact(opts, "decreaseReservation", quorumId, reservation)
+}
+
+// DecreaseReservation is a paid mutator transaction binding the contract method 0x3b50e8b8.
+//
+// Solidity: function decreaseReservation(uint64 quorumId, (uint64,uint64,uint64) reservation) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistrySession) DecreaseReservation(quorumId uint64, reservation UsageAuthorizationTypesReservation) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.DecreaseReservation(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, reservation)
+}
+
+// DecreaseReservation is a paid mutator transaction binding the contract method 0x3b50e8b8.
+//
+// Solidity: function decreaseReservation(uint64 quorumId, (uint64,uint64,uint64) reservation) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactorSession) DecreaseReservation(quorumId uint64, reservation UsageAuthorizationTypesReservation) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.DecreaseReservation(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, reservation)
+}
+
+// DepositOnDemand is a paid mutator transaction binding the contract method 0x5c0ffe4c.
+//
+// Solidity: function depositOnDemand(uint64 quorumId, address account, uint256 amount) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactor) DepositOnDemand(opts *bind.TransactOpts, quorumId uint64, account common.Address, amount *big.Int) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.contract.Transact(opts, "depositOnDemand", quorumId, account, amount)
+}
+
+// DepositOnDemand is a paid mutator transaction binding the contract method 0x5c0ffe4c.
+//
+// Solidity: function depositOnDemand(uint64 quorumId, address account, uint256 amount) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistrySession) DepositOnDemand(quorumId uint64, account common.Address, amount *big.Int) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.DepositOnDemand(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, account, amount)
+}
+
+// DepositOnDemand is a paid mutator transaction binding the contract method 0x5c0ffe4c.
+//
+// Solidity: function depositOnDemand(uint64 quorumId, address account, uint256 amount) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactorSession) DepositOnDemand(quorumId uint64, account common.Address, amount *big.Int) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.DepositOnDemand(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, account, amount)
+}
+
+// IncreaseReservation is a paid mutator transaction binding the contract method 0xe453a058.
+//
+// Solidity: function increaseReservation(uint64 quorumId, address account, (uint64,uint64,uint64) reservation) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactor) IncreaseReservation(opts *bind.TransactOpts, quorumId uint64, account common.Address, reservation UsageAuthorizationTypesReservation) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.contract.Transact(opts, "increaseReservation", quorumId, account, reservation)
+}
+
+// IncreaseReservation is a paid mutator transaction binding the contract method 0xe453a058.
+//
+// Solidity: function increaseReservation(uint64 quorumId, address account, (uint64,uint64,uint64) reservation) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistrySession) IncreaseReservation(quorumId uint64, account common.Address, reservation UsageAuthorizationTypesReservation) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.IncreaseReservation(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, account, reservation)
+}
+
+// IncreaseReservation is a paid mutator transaction binding the contract method 0xe453a058.
+//
+// Solidity: function increaseReservation(uint64 quorumId, address account, (uint64,uint64,uint64) reservation) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactorSession) IncreaseReservation(quorumId uint64, account common.Address, reservation UsageAuthorizationTypesReservation) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.IncreaseReservation(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, account, reservation)
+}
+
+// InitializeQuorum is a paid mutator transaction binding the contract method 0x063a5d56.
+//
+// Solidity: function initializeQuorum(uint64 quorumId, address newOwner, (uint64,uint64,uint64,uint64,bool) protocolCfg) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactor) InitializeQuorum(opts *bind.TransactOpts, quorumId uint64, newOwner common.Address, protocolCfg UsageAuthorizationTypesQuorumProtocolConfig) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.contract.Transact(opts, "initializeQuorum", quorumId, newOwner, protocolCfg)
+}
+
+// InitializeQuorum is a paid mutator transaction binding the contract method 0x063a5d56.
+//
+// Solidity: function initializeQuorum(uint64 quorumId, address newOwner, (uint64,uint64,uint64,uint64,bool) protocolCfg) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistrySession) InitializeQuorum(quorumId uint64, newOwner common.Address, protocolCfg UsageAuthorizationTypesQuorumProtocolConfig) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.InitializeQuorum(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, newOwner, protocolCfg)
+}
+
+// InitializeQuorum is a paid mutator transaction binding the contract method 0x063a5d56.
+//
+// Solidity: function initializeQuorum(uint64 quorumId, address newOwner, (uint64,uint64,uint64,uint64,bool) protocolCfg) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactorSession) InitializeQuorum(quorumId uint64, newOwner common.Address, protocolCfg UsageAuthorizationTypesQuorumProtocolConfig) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.InitializeQuorum(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, newOwner, protocolCfg)
+}
+
+// SetOnDemandEnabled is a paid mutator transaction binding the contract method 0xed0de5a3.
+//
+// Solidity: function setOnDemandEnabled(uint64 quorumId, bool enabled) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactor) SetOnDemandEnabled(opts *bind.TransactOpts, quorumId uint64, enabled bool) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.contract.Transact(opts, "setOnDemandEnabled", quorumId, enabled)
+}
+
+// SetOnDemandEnabled is a paid mutator transaction binding the contract method 0xed0de5a3.
+//
+// Solidity: function setOnDemandEnabled(uint64 quorumId, bool enabled) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistrySession) SetOnDemandEnabled(quorumId uint64, enabled bool) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.SetOnDemandEnabled(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, enabled)
+}
+
+// SetOnDemandEnabled is a paid mutator transaction binding the contract method 0xed0de5a3.
+//
+// Solidity: function setOnDemandEnabled(uint64 quorumId, bool enabled) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactorSession) SetOnDemandEnabled(quorumId uint64, enabled bool) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.SetOnDemandEnabled(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, enabled)
+}
+
+// SetQuorumPaymentConfig is a paid mutator transaction binding the contract method 0xe631f82c.
+//
+// Solidity: function setQuorumPaymentConfig(uint64 quorumId, (address,address,uint64,uint64,uint64) config) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactor) SetQuorumPaymentConfig(opts *bind.TransactOpts, quorumId uint64, config UsageAuthorizationTypesQuorumConfig) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.contract.Transact(opts, "setQuorumPaymentConfig", quorumId, config)
+}
+
+// SetQuorumPaymentConfig is a paid mutator transaction binding the contract method 0xe631f82c.
+//
+// Solidity: function setQuorumPaymentConfig(uint64 quorumId, (address,address,uint64,uint64,uint64) config) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistrySession) SetQuorumPaymentConfig(quorumId uint64, config UsageAuthorizationTypesQuorumConfig) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.SetQuorumPaymentConfig(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, config)
+}
+
+// SetQuorumPaymentConfig is a paid mutator transaction binding the contract method 0xe631f82c.
+//
+// Solidity: function setQuorumPaymentConfig(uint64 quorumId, (address,address,uint64,uint64,uint64) config) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactorSession) SetQuorumPaymentConfig(quorumId uint64, config UsageAuthorizationTypesQuorumConfig) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.SetQuorumPaymentConfig(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, config)
+}
+
+// SetReservationAdvanceWindow is a paid mutator transaction binding the contract method 0xd2a3499c.
+//
+// Solidity: function setReservationAdvanceWindow(uint64 quorumId, uint64 reservationAdvanceWindow) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactor) SetReservationAdvanceWindow(opts *bind.TransactOpts, quorumId uint64, reservationAdvanceWindow uint64) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.contract.Transact(opts, "setReservationAdvanceWindow", quorumId, reservationAdvanceWindow)
+}
+
+// SetReservationAdvanceWindow is a paid mutator transaction binding the contract method 0xd2a3499c.
+//
+// Solidity: function setReservationAdvanceWindow(uint64 quorumId, uint64 reservationAdvanceWindow) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistrySession) SetReservationAdvanceWindow(quorumId uint64, reservationAdvanceWindow uint64) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.SetReservationAdvanceWindow(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, reservationAdvanceWindow)
+}
+
+// SetReservationAdvanceWindow is a paid mutator transaction binding the contract method 0xd2a3499c.
+//
+// Solidity: function setReservationAdvanceWindow(uint64 quorumId, uint64 reservationAdvanceWindow) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactorSession) SetReservationAdvanceWindow(quorumId uint64, reservationAdvanceWindow uint64) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.SetReservationAdvanceWindow(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, reservationAdvanceWindow)
+}
+
+// TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
+//
+// Solidity: function transferOwnership(address newOwner) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactor) TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.contract.Transact(opts, "transferOwnership", newOwner)
+}
+
+// TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
+//
+// Solidity: function transferOwnership(address newOwner) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistrySession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.TransferOwnership(&_ContractIUsageAuthorizationRegistry.TransactOpts, newOwner)
+}
+
+// TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
+//
+// Solidity: function transferOwnership(address newOwner) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.TransferOwnership(&_ContractIUsageAuthorizationRegistry.TransactOpts, newOwner)
+}
+
+// TransferQuorumOwnership is a paid mutator transaction binding the contract method 0xede57a2d.
+//
+// Solidity: function transferQuorumOwnership(uint64 quorumId, address newOwner) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactor) TransferQuorumOwnership(opts *bind.TransactOpts, quorumId uint64, newOwner common.Address) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.contract.Transact(opts, "transferQuorumOwnership", quorumId, newOwner)
+}
+
+// TransferQuorumOwnership is a paid mutator transaction binding the contract method 0xede57a2d.
+//
+// Solidity: function transferQuorumOwnership(uint64 quorumId, address newOwner) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistrySession) TransferQuorumOwnership(quorumId uint64, newOwner common.Address) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.TransferQuorumOwnership(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, newOwner)
+}
+
+// TransferQuorumOwnership is a paid mutator transaction binding the contract method 0xede57a2d.
+//
+// Solidity: function transferQuorumOwnership(uint64 quorumId, address newOwner) returns()
+func (_ContractIUsageAuthorizationRegistry *ContractIUsageAuthorizationRegistryTransactorSession) TransferQuorumOwnership(quorumId uint64, newOwner common.Address) (*types.Transaction, error) {
+	return _ContractIUsageAuthorizationRegistry.Contract.TransferQuorumOwnership(&_ContractIUsageAuthorizationRegistry.TransactOpts, quorumId, newOwner)
 }

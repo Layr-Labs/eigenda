@@ -602,7 +602,7 @@ contract UsageAuthorizationRegistryUnit is Test {
         uint64 quorumId = 0;
         amount = bound(amount, 1, type(uint80).max);
         token.mint(payer, amount);
-        vm.prank(QUORUM_OWNER_0);
+        vm.prank(OWNER);
         usageAuthorizationRegistry.setOnDemandEnabled(quorumId, false);
 
         vm.prank(payer);
