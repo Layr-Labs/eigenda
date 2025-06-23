@@ -277,7 +277,7 @@ func (s *DispersalServerV2) RefreshOnchainState(ctx context.Context) error {
 }
 
 // GetPaymentState returns the payment state for a given account and the related on-chain parameters
-// Deprecating soon: use GetPaymentStateForAllQuorums instead.
+// Deprecated: Use GetPaymentStateForAllQuorums instead.
 func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaymentStateRequest) (*pb.GetPaymentStateReply, error) {
 	allQuorumsReq := &pb.GetPaymentStateForAllQuorumsRequest{
 		AccountId: req.AccountId,

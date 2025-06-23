@@ -55,8 +55,8 @@ func NewAccountant(accountID gethcommon.Address) *Accountant {
 }
 
 // ReservationUsage attempts to use the reservation for the requested quorums; if any quorum fails to use the reservation, the entire operation is rolled back.
-func (a *Accountant) reservationUsage(numSymbols uint64, quorumNumbers []core.QuorumID, timestampNs int64) error {
-	if err := meterer.ValidateReservations(a.reservations, a.paymentVaultParams.QuorumProtocolConfigs, quorumNumbers, timestampNs, time.Now()); err != nil {
+func (a *Accountant) reservationUsage(numSymbols uint64, quorumNumbers []core.QuorumID, paymentHeaderTimestampNs int64) error {
+	if err := meterer.ValidateReservations(a.reservations, a.paymentVaultParams.QuorumProtocolConfigs, quorumNumbers, paymentHeaderTimestampNs, time.Now().UnixNano()); err != nil {
 		return err
 	}
 
@@ -75,7 +75,7 @@ func (a *Accountant) reservationUsage(numSymbols uint64, quorumNumbers []core.Qu
 		if err != nil {
 			return err
 		}
-		if err := periodRecordsCopy.UpdateUsage(quorumNumber, timestampNs, numSymbols, reservation, protocolConfig); err != nil {
+		if err := periodRecordsCopy.UpdateUsage(quorumNumber, paymentHeaderTimestampNs, numSymbols, reservation, protocolConfig); err != nil {
 			return err
 		}
 	}
