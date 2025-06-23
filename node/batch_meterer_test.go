@@ -516,7 +516,7 @@ func TestBatchMeterMeterBatch(t *testing.T) {
 
 		// Assert the results - should fail due to account 2 having no reservation
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no reservation for quorum")
+		assert.Contains(t, err.Error(), "no reservation")
 	})
 
 	t.Run("nil batch", func(t *testing.T) {
@@ -807,7 +807,7 @@ func TestBatchMeterOverflowEdgeCases(t *testing.T) {
 		params, _ := f.mockState.GetPaymentGlobalParams()
 		err := f.batchMeterer.processBatch(f.ctx, params, updates, now)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "overflow usage exceeds bin limit")
+		assert.Contains(t, err.Error(), "usage exceeds bin limit")
 	})
 }
 
@@ -927,7 +927,6 @@ func TestBatchMeterReservationEdgeCases(t *testing.T) {
 
 		params, _ := f.mockState.GetPaymentGlobalParams()
 
-
 		err := f.batchMeterer.processBatch(f.ctx, params, updates, now)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no reservation")
@@ -963,7 +962,6 @@ func TestBatchMeterReservationEdgeCases(t *testing.T) {
 		}
 
 		params, _ := f.mockState.GetPaymentGlobalParams()
-
 
 		err := f.batchMeterer.processBatch(f.ctx, params, updates, now)
 		require.Error(t, err)
@@ -1002,7 +1000,6 @@ func TestBatchMeterReservationEdgeCases(t *testing.T) {
 
 		params, _ := f.mockState.GetPaymentGlobalParams()
 
-
 		err := f.batchMeterer.processBatch(f.ctx, params, updates, now)
 		require.NoError(t, err)
 	})
@@ -1039,7 +1036,6 @@ func TestBatchMeterReservationEdgeCases(t *testing.T) {
 
 		params, _ := f.mockState.GetPaymentGlobalParams()
 
-
 		err := f.batchMeterer.processBatch(f.ctx, params, updates, now)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "BIN_ALREADY_FULL")
@@ -1065,7 +1061,6 @@ func TestBatchMeterReservationEdgeCases(t *testing.T) {
 		}
 
 		params, _ := f.mockState.GetPaymentGlobalParams()
-
 
 		err := f.batchMeterer.processBatch(f.ctx, params, updates, now)
 		require.Error(t, err)

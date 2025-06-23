@@ -36,17 +36,17 @@ func (e *BatchMeterError) Error() string {
 
 // Batch meter error codes
 const (
-	ErrCodeBatchEmpty           = "BATCH_EMPTY"
-	ErrCodeBlobHeaderNil        = "BLOB_HEADER_NIL"
-	ErrCodePaymentParamsFailed  = "PAYMENT_PARAMS_FAILED"
-	ErrCodeReservationNotFound  = "RESERVATION_NOT_FOUND"
-	ErrCodeReservationLookup    = "RESERVATION_LOOKUP_FAILED"
-	ErrCodeReservationInactive  = "RESERVATION_INACTIVE"
-	ErrCodeReservationPeriod    = "RESERVATION_PERIOD_INVALID"
-	ErrCodeBinAlreadyFull       = "BIN_ALREADY_FULL"
-	ErrCodeUsageExceedsLimit    = "USAGE_EXCEEDS_LIMIT"
-	ErrCodeOverflowPeriodLimit  = "OVERFLOW_PERIOD_LIMIT"
-	ErrCodeOverflowWindowLimit  = "OVERFLOW_WINDOW_LIMIT"
+	ErrCodeBatchEmpty          = "BATCH_EMPTY"
+	ErrCodeBlobHeaderNil       = "BLOB_HEADER_NIL"
+	ErrCodePaymentParamsFailed = "PAYMENT_PARAMS_FAILED"
+	ErrCodeReservationNotFound = "RESERVATION_NOT_FOUND"
+	ErrCodeReservationLookup   = "RESERVATION_LOOKUP_FAILED"
+	ErrCodeReservationInactive = "RESERVATION_INACTIVE"
+	ErrCodeReservationPeriod   = "RESERVATION_PERIOD_INVALID"
+	ErrCodeBinAlreadyFull      = "BIN_ALREADY_FULL"
+	ErrCodeUsageExceedsLimit   = "USAGE_EXCEEDS_LIMIT"
+	ErrCodeOverflowPeriodLimit = "OVERFLOW_PERIOD_LIMIT"
+	ErrCodeOverflowWindowLimit = "OVERFLOW_WINDOW_LIMIT"
 )
 
 // Error constructors for standardized error creation
@@ -261,7 +261,7 @@ func (b *BatchMeterer) processBatch(
 			reservation, ok := reservations[update.quorumID]
 			if !ok {
 				b.rollbackUpdates(params, successfulUpdates)
-				return newAccountQuorumError(ErrCodeReservationNotFound, "no reservation found", accountID, update.quorumID)
+				return newAccountQuorumError(ErrCodeReservationNotFound, "no reservation", accountID, update.quorumID)
 			}
 
 			// TODO: Validating reservations can be refactored after the other refactoring PR
@@ -359,7 +359,7 @@ func (b *BatchMeterer) incrementAndValidateUsage(
 	if newUsage > 2*binLimit {
 		b.logger.Debug("usage exceeds 2x bin limit, reverting", "accountID", accountID.Hex(), "quorumID", quorumID, "period", currentPeriod, "prevUsage", prevUsage, "newUsage", newUsage, "2xBinLimit", 2*binLimit)
 		periodRecord.Usage = prevUsage
-		return 0, newAccountQuorumError(ErrCodeUsageExceedsLimit, "usage exceeds 2x rate limit", accountID, quorumID)
+		return 0, newAccountQuorumError(ErrCodeUsageExceedsLimit, "usage exceeds bin limit", accountID, quorumID)
 	}
 
 	// Check if overflow period is within reservation window

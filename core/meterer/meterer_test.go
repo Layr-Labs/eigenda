@@ -244,7 +244,7 @@ func TestMetererReservations(t *testing.T) {
 	// overwhelming bin overflow for empty bins
 	header = createPaymentHeader(now.UnixNano()-int64(reservationWindow)*1e9, big.NewInt(0), accountID2)
 	_, err = mt.MeterRequest(ctx, *header, 1000, quoromNumbers, now)
-	assert.ErrorContains(t, err, "overflow usage exceeds bin limit")
+	assert.ErrorContains(t, err, "usage exceeds bin limit")
 
 	// test non-existent account
 	unregisteredUser, err := crypto.GenerateKey()

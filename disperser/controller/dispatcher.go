@@ -304,25 +304,55 @@ func (d *Dispatcher) HandleBatch(
 					break
 				}
 
-				d.logger.Warn("failed to send chunks",
-					"operator", opID.Hex(),
-					"NumAttempts", i,
-					"batchHeader", hex.EncodeToString(batchData.BatchHeaderHash[:]),
-					"err", err)
+				// Parse batch meterer error for metrics collection
+				if bmErr, parsed := ParseBatchMeterError(err.Error()); parsed {
+					LogBatchMeterError(d.logger, bmErr, err)
+
+					// Report metrics for batch meterer errors
+					if d.metrics != nil {
+						category := GetBatchMeterErrorCategory(bmErr)
+						willRetry := i < d.NumRequestRetries
+						d.metrics.reportBatchMeterError(bmErr.Code, category, willRetry)
+					}
+				} else {
+					d.logger.Warn("failed to send chunks",
+						"operator", opID.Hex(),
+						"NumAttempts", i,
+						"batchHeader", hex.EncodeToString(batchData.BatchHeaderHash[:]),
+						"err", err)
+				}
 				time.Sleep(time.Duration(math.Pow(2, float64(i))) * time.Second) // Wait before retrying
 			}
 
 			if lastErr != nil {
-				d.logger.Warn("failed to send chunks",
-					"operator", opID.Hex(),
-					"NumAttempts", i,
-					"batchHeader", hex.EncodeToString(batchData.BatchHeaderHash[:]),
-					"err", lastErr)
+				// Enhanced error logging with batch meterer error details
+				errorStr := lastErr.Error()
+				if bmErr, parsed := ParseBatchMeterError(errorStr); parsed {
+					summary := GetBatchMeterErrorSummary(bmErr)
+					d.logger.Error("batch meterer validation failed after retries",
+						"operator", opID.Hex(),
+						"NumAttempts", i,
+						"batchHeader", hex.EncodeToString(batchData.BatchHeaderHash[:]),
+						"errorCode", bmErr.Code,
+						"accountID", bmErr.AccountID,
+						"quorumID", bmErr.QuorumID,
+						"summary", summary,
+						"originalError", lastErr)
+					// Store the structured error summary for better analysis
+					errorStr = fmt.Sprintf("[%s] %s", bmErr.Code, summary)
+				} else {
+					d.logger.Warn("failed to send chunks",
+						"operator", opID.Hex(),
+						"NumAttempts", i,
+						"batchHeader", hex.EncodeToString(batchData.BatchHeaderHash[:]),
+						"err", lastErr)
+				}
+
 				storeErr := d.blobMetadataStore.PutDispersalResponse(ctx, &corev2.DispersalResponse{
 					DispersalRequest: req,
 					RespondedAt:      uint64(time.Now().UnixNano()),
 					Signature:        [32]byte{}, // all zero sig for failed dispersal
-					Error:            lastErr.Error(),
+					Error:            errorStr,
 				})
 				if storeErr != nil {
 					d.logger.Error("failed to store a failed dispersal response", "err", storeErr)

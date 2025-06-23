@@ -28,6 +28,7 @@ type dispatcherMetrics struct {
 	updateBatchStatusLatency     *prometheus.SummaryVec
 	blobE2EDispersalLatency      *prometheus.SummaryVec
 	completedBlobs               *prometheus.CounterVec
+	batchMeterErrors             *prometheus.CounterVec
 	attestation                  *prometheus.GaugeVec
 	blobSetSize                  *prometheus.GaugeVec
 	batchStageTimer              *common.StageTimer
@@ -175,6 +176,15 @@ func newDispatcherMetrics(
 		[]string{"state", "data"},
 	)
 
+	batchMeterErrors := promauto.With(registry).NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: dispatcherNamespace,
+			Name:      "batch_meter_errors_total",
+			Help:      "The number of batch meterer errors by error code, category, and retry decision.",
+		},
+		[]string{"error_code", "category", "retried"},
+	)
+
 	blobSetSize := promauto.With(registry).NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: dispatcherNamespace,
@@ -229,6 +239,7 @@ func newDispatcherMetrics(
 		updateBatchStatusLatency:     updateBatchStatusLatency,
 		blobE2EDispersalLatency:      blobE2EDispersalLatency,
 		completedBlobs:               completedBlobs,
+		batchMeterErrors:             batchMeterErrors,
 		attestation:                  attestation,
 		blobSetSize:                  blobSetSize,
 		batchStageTimer:              batchStageTimer,
@@ -240,6 +251,27 @@ func newDispatcherMetrics(
 
 func (m *dispatcherMetrics) reportSendChunksRetryCount(retries float64) {
 	m.sendChunksRetryCount.WithLabelValues().Set(retries)
+}
+
+func (m *dispatcherMetrics) reportBatchMeterError(errorCode string, category BatchMeterErrorCategory, retried bool) {
+	categoryStr := "unknown"
+	switch category {
+	case ErrorCategoryRateLimit:
+		categoryStr = "rate_limit"
+	case ErrorCategoryReservation:
+		categoryStr = "reservation"
+	case ErrorCategoryValidation:
+		categoryStr = "validation"
+	case ErrorCategorySystem:
+		categoryStr = "system"
+	}
+
+	retriedStr := "false"
+	if retried {
+		retriedStr = "true"
+	}
+
+	m.batchMeterErrors.WithLabelValues(errorCode, categoryStr, retriedStr).Inc()
 }
 
 func (m *dispatcherMetrics) reportProcessSigningMessageLatency(duration time.Duration) {
