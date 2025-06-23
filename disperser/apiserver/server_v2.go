@@ -311,9 +311,9 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	// Find most restrictive reservation parameters across all quorums
 	var reservation *pb.Reservation
 	if len(allQuorumsReply.Reservations) > 0 {
-		var minSymbolsPerSecond uint64 = ^uint64(0) // max uint64
+		var minSymbolsPerSecond = ^uint64(0) // max uint64
 		var latestStartTimestamp uint32
-		var earliestEndTimestamp uint32 = ^uint32(0) // max uint32
+		var earliestEndTimestamp = ^uint32(0) // max uint32
 		var reservedQuorums []uint32
 
 		for quorumId, quorumReservation := range allQuorumsReply.Reservations {
