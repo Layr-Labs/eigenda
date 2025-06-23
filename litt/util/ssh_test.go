@@ -33,7 +33,7 @@ func generateSSHKeyPair(privateKeyPath, publicKeyPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create private key file: %w", err)
 	}
-	defer privateKeyFile.Close()
+	defer func() { _ = privateKeyFile.Close() }()
 
 	err = pem.Encode(privateKeyFile, privateKeyPEM)
 	if err != nil {
@@ -75,7 +75,7 @@ func waitForSSH(t *testing.T, sshPort, privateKeyPath string) {
 			privateKeyPath,
 			false)
 		if err == nil {
-			session.Close()
+			_ = session.Close()
 			return
 		}
 		time.Sleep(1 * time.Second)
@@ -87,7 +87,7 @@ func waitForSSH(t *testing.T, sshPort, privateKeyPath string) {
 // parsePort converts string port to uint64
 func parsePort(port string) uint64 {
 	var p uint64
-	fmt.Sscanf(port, "%d", &p)
+	_, _ = fmt.Sscanf(port, "%d", &p)
 	return p
 }
 
@@ -97,7 +97,7 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 	t.Parallel()
 
 	container := setupSSHTestContainer(t)
-	defer container.cleanup()
+	defer func() { _ = container.cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
@@ -112,7 +112,7 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 		true)
 	require.NoError(t, err)
 	require.NotNil(t, session)
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Test with non-existent key
 	_, err = NewSSHSession(
@@ -140,7 +140,7 @@ func TestSSHSession_Ls(t *testing.T) {
 	t.Parallel()
 
 	container := setupSSHTestContainer(t)
-	defer container.cleanup()
+	defer func() { _ = container.cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
@@ -154,7 +154,7 @@ func TestSSHSession_Ls(t *testing.T) {
 		container.privateKey,
 		true)
 	require.NoError(t, err)
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Test listing home directory
 	files, err := session.Ls("/home/testuser")
@@ -170,7 +170,7 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 	t.Parallel()
 
 	container := setupSSHTestContainer(t)
-	defer container.cleanup()
+	defer func() { _ = container.cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
@@ -183,7 +183,7 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 		container.privateKey,
 		true)
 	require.NoError(t, err)
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Test creating directory
 	testDir := "/mnt/test/newdir/subdir"
@@ -200,7 +200,7 @@ func TestSSHSession_FindFiles(t *testing.T) {
 	t.Parallel()
 
 	container := setupSSHTestContainer(t)
-	defer container.cleanup()
+	defer func() { _ = container.cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
@@ -213,7 +213,7 @@ func TestSSHSession_FindFiles(t *testing.T) {
 		container.privateKey,
 		true)
 	require.NoError(t, err)
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Create test directory structure
 	err = session.Mkdirs("/mnt/test/search")
@@ -248,7 +248,7 @@ func TestSSHSession_Rsync(t *testing.T) {
 	t.Parallel()
 
 	container := setupSSHTestContainer(t)
-	defer container.cleanup()
+	defer func() { _ = container.cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
@@ -261,7 +261,7 @@ func TestSSHSession_Rsync(t *testing.T) {
 		container.privateKey,
 		true)
 	require.NoError(t, err)
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Create test directory on remote
 	err = session.Mkdirs("/mnt/test/rsync")

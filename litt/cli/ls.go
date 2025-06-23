@@ -29,7 +29,7 @@ func lsCommand(ctx *cli.Context) error {
 		var err error
 		sources[i], err = util.SanitizePath(src)
 		if err != nil {
-			return fmt.Errorf("Invalid source path: %s", src)
+			return fmt.Errorf("invalid source path: %s", src)
 		}
 	}
 

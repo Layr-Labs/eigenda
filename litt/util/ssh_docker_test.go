@@ -86,7 +86,7 @@ func (c *SSHTestContainer) cleanup() error {
 		return fmt.Errorf("failed to stop container: %w", err)
 	}
 
-	err = c.client.ContainerRemove(ctx, c.containerID, types.ContainerRemoveOptions{})
+	err = c.client.ContainerRemove(ctx, c.containerID, container.RemoveOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to remove container: %w", err)
 	}
@@ -141,7 +141,7 @@ func buildSSHTestImage(
 	if err != nil {
 		return fmt.Errorf("failed to create build context archive: %w", err)
 	}
-	defer buildCtx.Close()
+	defer func() { _ = buildCtx.Close() }()
 
 	// Build the image
 	buildOptions := types.ImageBuildOptions{
@@ -155,7 +155,7 @@ func buildSSHTestImage(
 	if err != nil {
 		return fmt.Errorf("failed to build image: %w", err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	// Read build output (helpful for debugging)
 	_, err = io.Copy(io.Discard, response.Body)
@@ -210,7 +210,7 @@ func startSSHContainer(
 		return "", "", fmt.Errorf("failed to create container: %w", err)
 	}
 
-	err = cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{})
+	err = cli.ContainerStart(ctx, resp.ID, container.StartOptions{})
 	if err != nil {
 		return "", "", fmt.Errorf("failed to start container: %w", err)
 	}
@@ -231,15 +231,15 @@ func archiveDirectory(srcDir string) (io.ReadCloser, error) {
 	pr, pw := io.Pipe()
 
 	go func() {
-		defer pw.Close()
+		defer func() { _ = pw.Close() }()
 
 		gw := gzip.NewWriter(pw)
-		defer gw.Close()
+		defer func() { _ = gw.Close() }()
 
 		tw := tar.NewWriter(gw)
-		defer tw.Close()
+		defer func() { _ = tw.Close() }()
 
-		filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
+		_ = filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
@@ -272,7 +272,7 @@ func archiveDirectory(srcDir string) (io.ReadCloser, error) {
 			if err != nil {
 				return err
 			}
-			defer file.Close()
+			defer func() { _ = file.Close() }()
 
 			_, err = io.Copy(tw, file)
 			return err

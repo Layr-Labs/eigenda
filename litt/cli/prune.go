@@ -32,7 +32,7 @@ func pruneCommand(ctx *cli.Context) error {
 		var err error
 		sources[i], err = util.SanitizePath(src)
 		if err != nil {
-			return fmt.Errorf("Invalid source path: %s", src)
+			return fmt.Errorf("invalid source path: %s", src)
 		}
 	}
 
@@ -128,7 +128,7 @@ func pruneTable(
 		// If we are dealing with a snapshot, respect the snapshot upper bound specified by LittDB.
 		if len(sources) > 1 {
 			return 0, fmt.Errorf("this is a symlinked snapshot directory, " +
-				"snapshot directory cannot be spread across multiple sources.")
+				"snapshot directory cannot be spread across multiple sources")
 		}
 		upperBoundFile, err := disktable.LoadBoundaryFile(false, path.Join(sources[0], tableName))
 		if err != nil {

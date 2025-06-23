@@ -34,7 +34,7 @@ func pushCommand(ctx *cli.Context) error {
 		var err error
 		sources[i], err = util.SanitizePath(src)
 		if err != nil {
-			return fmt.Errorf("Invalid source path: %s", src)
+			return fmt.Errorf("invalid source path: %s", src)
 		}
 	}
 
@@ -56,7 +56,7 @@ func pushCommand(ctx *cli.Context) error {
 	keyPath := ctx.String("key")
 	keyPath, err = util.SanitizePath(keyPath)
 	if err != nil {
-		return fmt.Errorf("Invalid key path: %s", keyPath)
+		return fmt.Errorf("invalid key path: %s", keyPath)
 	}
 
 	deleteAfterTransfer := !ctx.Bool("no-gc")
@@ -246,7 +246,7 @@ func pushTable(
 			highestSegmentIndex = boundaryFile.BoundaryIndex()
 		}
 	} else if deleteAfterTransfer {
-		return fmt.Errorf("--no-gc is required when pushing a non-snapshot table.")
+		return fmt.Errorf("--no-gc is required when pushing a non-snapshot table")
 	}
 
 	// Ensure the remote segment directories exists.

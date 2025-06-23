@@ -33,7 +33,7 @@ func rebaseCommand(ctx *cli.Context) error {
 		var err error
 		sources[i], err = util.SanitizePath(src)
 		if err != nil {
-			return fmt.Errorf("Invalid source path: %s", src)
+			return fmt.Errorf("invalid source path: %s", src)
 		}
 	}
 
@@ -45,7 +45,7 @@ func rebaseCommand(ctx *cli.Context) error {
 		var err error
 		destinations[i], err = util.SanitizePath(dest)
 		if err != nil {
-			return fmt.Errorf("Invalid source path: %s", dest)
+			return fmt.Errorf("invalid destination path: %s", dest)
 		}
 	}
 
@@ -122,13 +122,13 @@ func rebase(
 		// If any of the segment files are symlinks, that means that we are dealing with a snapshot.
 		if len(sources) > 1 {
 			return fmt.Errorf(
-				"Snapshot detected (source files contain symlinks), but multiple source paths provided. " +
-					"Snapshots are not supported if they are spread over multiple paths.")
+				"snapshot detected (source files contain symlinks), but multiple source paths provided. " +
+					"Snapshots are not supported if they are spread over multiple paths")
 		}
 		if !preserveOriginal || !deep {
 			return fmt.Errorf(
-				"Snapshot detected (source files contain symlinks). When rebasing from a snapshot, " +
-					"--shallow is not allowed, and --preserve is required.")
+				"snapshot detected (source files contain symlinks). When rebasing from a snapshot, " +
+					"--shallow is not allowed, and --preserve is required")
 
 		}
 	}
