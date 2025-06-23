@@ -419,7 +419,9 @@ func syncFile(path string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file for sync: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	if err := file.Sync(); err != nil {
 		return fmt.Errorf("failed to sync file: %w", err)
@@ -434,7 +436,9 @@ func syncDirectory(path string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open directory for sync: %w", err)
 	}
-	defer dir.Close()
+	defer func() {
+		_ = dir.Close()
+	}()
 
 	if err := dir.Sync(); err != nil {
 		return fmt.Errorf("failed to sync directory: %w", err)
