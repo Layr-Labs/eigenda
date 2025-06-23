@@ -6,11 +6,31 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
 // SwapFileExtension is the file extension used for temporary swap files created during atomic writes.
 const SwapFileExtension = ".swap"
+
+// DeleteOrphanedSwapFiles deletes any swap files in the given directory, i.e. files that end with ".swap".
+func DeleteOrphanedSwapFiles(directory string) error {
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return fmt.Errorf("failed to read directory %s: %w", directory, err)
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == SwapFileExtension {
+			swapFilePath := filepath.Join(directory, entry.Name())
+			if err := os.Remove(swapFilePath); err != nil {
+				return fmt.Errorf("failed to remove swap file %s: %w", swapFilePath, err)
+			}
+		}
+	}
+
+	return nil
+}
 
 // SanitizePath returns a sanitized version of the given path, doing things like expanding
 // "~" to the user's home directory, converting to absolute path, normalizing slashes, etc.
@@ -171,33 +191,151 @@ func Exists(path string) (bool, error) {
 	return false, fmt.Errorf("error checking if path %s exists: %w", path, err)
 }
 
-// CopyDirectoryRecursively creates a deep copy of the directory tree rooted at source and writes it to destination.
-// It preserves file permissions, timestamps, and properly handles symlinks.
+// RecursiveMove transfers files/directory trees from the source to the destination.
 //
-// The function performs a recursive copy of all files and directories, maintaining the same
-// relative path structure and file metadata. If the destination directory exists, it will
-// merge the source content into it, potentially overwriting files with the same names.
+// If delete is true, then the files at the source will be deleted when this method returns.
+// If delete is false, then this function will leave behind a copy of the original files at the source.
 //
-// The function checks that the destination has appropriate write permissions before starting the copy.
-// If the destination directory doesn't exist, it verifies the parent directory has appropriate permissions.
-// For existing directories, it ensures they have write permissions before attempting to copy files into them.
-func CopyDirectoryRecursively(source string, destination string) error {
-	// Verify the destination is writable (or can be created)
-	if err := verifyDirectoryWritable(filepath.Dir(destination)); err != nil {
-		return err
+// If deep is false, then this function will prefer hard-linking files instead of copying them. If the source and
+// destination are on different filesystems, this will fall back to copying the files instead. If deep is true,
+// then files are always copied, even if they are on the same filesystem. Deep=true also influences how symlinks
+// are treated. If deep is false, then symlinks are copied as symlinks. If deep is true, then the file the symlink
+// points to is copied instead.
+//
+// If preserveOriginal is true, then the original files at the source will be preserved after the move (they may
+// still be hard linked if deep is false). If preserveOriginal is false, then the original files at the source will be
+// deleted when this function returns.
+//
+// The fsync flag is intended to make this function faster for unit tests. If fsync is true, then the function will
+// ensure that all file operations are fully flushed to disk before returning. If fsync is false, then the function
+// will not perform any fsync operations, which may result in faster execution but less data safety in case of a crash.
+func RecursiveMove(
+	source string,
+	destination string,
+	deep bool,
+	preserveOriginal bool,
+	fsync bool,
+) error {
+	// Sanitize paths
+	source, err := SanitizePath(source)
+	if err != nil {
+		return fmt.Errorf("failed to sanitize source path: %w", err)
 	}
 
-	return filepath.WalkDir(source, func(path string, d fs.DirEntry, err error) error {
+	destination, err = SanitizePath(destination)
+	if err != nil {
+		return fmt.Errorf("failed to sanitize destination path: %w", err)
+	}
+
+	// Verify source exists
+	sourceInfo, err := os.Stat(source)
+	if err != nil {
+		return fmt.Errorf("source path %s does not exist: %w", source, err)
+	}
+
+	// Verify destination parent directory is writable
+	if err := verifyDirectoryWritable(filepath.Dir(destination)); err != nil {
+		return fmt.Errorf("destination parent directory not writable: %w", err)
+	}
+
+	// If source is a file, handle it directly
+	if !sourceInfo.IsDir() {
+		return recursiveMoveFile(source, destination, deep, preserveOriginal, fsync)
+	}
+
+	// Source is a directory, handle recursively
+	return recursiveMoveDirectory(source, destination, deep, preserveOriginal, fsync)
+}
+
+// recursiveMoveFile handles moving a single file
+func recursiveMoveFile(source string, destination string, deep bool, preserveOriginal bool, fsync bool) error {
+	sourceInfo, err := os.Stat(source)
+	if err != nil {
+		return fmt.Errorf("failed to stat source file: %w", err)
+	}
+
+	// Ensure parent directory exists
+	if err := ensureParentDirExists(destination); err != nil {
+		return fmt.Errorf("failed to ensure parent directory exists: %w", err)
+	}
+
+	// If not preserving original, try to move the file first (regardless of deep mode)
+	if !preserveOriginal {
+		// Try simple rename first (works if on same filesystem)
+		if err := os.Rename(source, destination); err == nil {
+			return nil
+		}
+		// Rename failed (likely different filesystem), fall back to copy+delete
+	}
+
+	// If preserving original or rename failed, use copy-based approach
+	if preserveOriginal && !deep {
+		// Try hard link if preserving original and not doing deep copy
+		if err := os.Link(source, destination); err == nil {
+			return nil
+		}
+		// Hard link failed, fall back to copy
+	}
+
+	// Check if source is a symlink
+	if sourceInfo.Mode()&os.ModeSymlink != 0 {
+		return handleSymlink(source, destination, deep, preserveOriginal, fsync)
+	}
+
+	// Copy the file
+	if err := copyRegularFile(source, destination, sourceInfo.Mode(), sourceInfo.ModTime()); err != nil {
+		return fmt.Errorf("failed to copy file: %w", err)
+	}
+
+	// Sync if requested
+	if fsync {
+		if err := syncFile(destination); err != nil {
+			return fmt.Errorf("failed to sync destination file: %w", err)
+		}
+	}
+
+	// Remove source if not preserving original
+	if !preserveOriginal {
+		if err := os.Remove(source); err != nil {
+			return fmt.Errorf("failed to remove source file: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// recursiveMoveDirectory handles moving a directory and its contents
+func recursiveMoveDirectory(
+	source string,
+	destination string,
+	deep bool,
+	preserveOriginal bool,
+	fsync bool,
+) error {
+
+	// Create destination directory if it doesn't exist
+	if err := ensureDirectoryExists(destination, 0755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	// Walk through source directory
+	err := filepath.WalkDir(source, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return fmt.Errorf("failed to walk path %s: %w", path, err)
 		}
 
-		// Compute the path relative to source, then build the destination path
-		rel, err := filepath.Rel(source, path)
-		if err != nil {
-			return fmt.Errorf("failed to get relative path from %s to %s: %w", source, path, err)
+		// Skip the root directory itself
+		if path == source {
+			return nil
 		}
-		target := filepath.Join(destination, rel)
+
+		// Calculate relative path and destination path
+		relPath, err := filepath.Rel(source, path)
+		if err != nil {
+			return fmt.Errorf("failed to get relative path: %w", err)
+		}
+
+		destPath := filepath.Join(destination, relPath)
 
 		info, err := d.Info()
 		if err != nil {
@@ -206,15 +344,176 @@ func CopyDirectoryRecursively(source string, destination string) error {
 
 		switch {
 		case d.IsDir():
-			return ensureDirectoryExists(target, info.Mode())
+			// Create directory at destination
+			if err := ensureDirectoryExists(destPath, info.Mode()); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", destPath, err)
+			}
 
 		case (info.Mode() & os.ModeSymlink) != 0:
-			return copySymlink(path, target)
+			// Handle symlink
+			if err := handleSymlink(path, destPath, deep, preserveOriginal, fsync, source); err != nil {
+				return fmt.Errorf("failed to handle symlink: %w", err)
+			}
 
 		default:
-			return copyRegularFile(path, target, info.Mode(), info.ModTime())
+			// Handle regular file
+			if !deep {
+				// Try hard link first
+				if err := ensureParentDirExists(destPath); err != nil {
+					return fmt.Errorf("failed to ensure parent dir exists: %w", err)
+				}
+
+				if err := os.Link(path, destPath); err == nil {
+					// Hard link succeeded
+					if fsync {
+						if err := syncFile(destPath); err != nil {
+							return fmt.Errorf("failed to sync hard-linked file: %w", err)
+						}
+					}
+					return nil
+				}
+				// Hard link failed, fall back to copy
+			}
+
+			// Copy the file
+			if err := copyRegularFile(path, destPath, info.Mode(), info.ModTime()); err != nil {
+				return fmt.Errorf("failed to copy regular file: %w", err)
+			}
+
+			if fsync {
+				if err := syncFile(destPath); err != nil {
+					return fmt.Errorf("failed to sync copied file: %w", err)
+				}
+			}
 		}
+
+		return nil
 	})
+
+	if err != nil {
+		return err
+	}
+
+	// Sync destination directory if requested
+	if fsync {
+		if err := syncDirectory(destination); err != nil {
+			return fmt.Errorf("failed to sync destination directory: %w", err)
+		}
+	}
+
+	// Remove source directory if not preserving original
+	if !preserveOriginal {
+		if err := os.RemoveAll(source); err != nil {
+			return fmt.Errorf("failed to remove source directory: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// syncFile syncs a file to disk
+func syncFile(path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("failed to open file for sync: %w", err)
+	}
+	defer file.Close()
+
+	if err := file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync file: %w", err)
+	}
+
+	return nil
+}
+
+// syncDirectory syncs a directory to disk
+func syncDirectory(path string) error {
+	dir, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("failed to open directory for sync: %w", err)
+	}
+	defer dir.Close()
+
+	if err := dir.Sync(); err != nil {
+		return fmt.Errorf("failed to sync directory: %w", err)
+	}
+
+	return nil
+}
+
+// handleSymlink handles symlink copying based on the deep parameter.
+// If deep is false, copies the symlink as a symlink.
+// If deep is true, copies the target file that the symlink points to.
+// sourceRoot parameter is optional and used to check for nested directory conflicts.
+func handleSymlink(
+	source string,
+	destination string,
+	deep bool,
+	preserveOriginal bool,
+	fsync bool,
+	sourceRoot ...string,
+) error {
+
+	if !deep {
+		// Copy symlink as symlink
+		return copySymlink(source, destination)
+	}
+
+	// Deep copy: follow the symlink and copy the target
+	target, err := filepath.EvalSymlinks(source)
+	if err != nil {
+		return fmt.Errorf("failed to resolve symlink %s: %w", source, err)
+	}
+
+	// Check if target is within the source root (which would cause conflicts)
+	if len(sourceRoot) > 0 {
+		// Resolve symlinks and ensure both paths are absolute for comparison
+		absSourceRoot, err1 := filepath.Abs(sourceRoot[0])
+		realSourceRoot, err2 := filepath.EvalSymlinks(absSourceRoot)
+		realTarget, err3 := filepath.EvalSymlinks(target)
+		if err1 == nil && err2 == nil && err3 == nil {
+			// Check if target is within the source root directory
+			relPath, err := filepath.Rel(realSourceRoot, realTarget)
+			if err == nil && !strings.HasPrefix(relPath, "..") && relPath != "." {
+				// Target is within source root, this would cause conflicts
+				return fmt.Errorf(
+					"cannot deep copy symlink %s: target %s is within the source directory being moved",
+					source, target)
+			}
+		}
+	}
+
+	// Get target file info
+	targetInfo, err := os.Stat(target)
+	if err != nil {
+		return fmt.Errorf("failed to stat symlink target %s: %w", target, err)
+	}
+
+	if targetInfo.IsDir() {
+		// Target is a directory, recursively copy it
+		return recursiveMoveDirectory(target, destination, deep, preserveOriginal, fsync)
+	} else {
+		// Target is a file, copy it
+		if err := copyRegularFile(target, destination, targetInfo.Mode(), targetInfo.ModTime()); err != nil {
+			return fmt.Errorf("failed to copy symlink target: %w", err)
+		}
+
+		// Sync if requested
+		if fsync {
+			if err := syncFile(destination); err != nil {
+				return fmt.Errorf("failed to sync copied symlink target: %w", err)
+			}
+		}
+
+		// Remove original target file if not preserving original
+		if !preserveOriginal {
+			if err := os.Remove(target); err != nil {
+				return fmt.Errorf("failed to remove original symlink target: %w", err)
+			}
+		}
+	}
+
+	return nil
 }
 
 // verifyDirectoryWritable checks if a directory exists and is writable.
