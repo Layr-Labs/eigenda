@@ -360,9 +360,6 @@ func ValidateQuorum(headerQuorums []uint8, allowedQuorums []uint8) error {
 
 // ValidateReservations ensures that the quorums listed in the blobHeader are present within allowedQuorums.
 //
-// Parameters:
-//   - timestamp: time in nanoseconds
-//
 // Notes:
 //   - Reservations that don't use all allowed quorums are still accepted
 //   - Charges apply to ALL allowed quorums, even if not all are used
