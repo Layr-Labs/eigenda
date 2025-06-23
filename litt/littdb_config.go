@@ -141,8 +141,6 @@ type Config struct {
 	// this method is called exactly once.
 	FatalErrorCallback func(error)
 
-	// TODO readme docs on snapshotting
-
 	// If empty, snapshotting is disabled. If not empty, then this directory is used by the database to publish a
 	// rolling sequence of "snapshots". Using the data in the snapshot directory, an external process can safely
 	// get a consistent read-only views of the database.
