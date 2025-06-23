@@ -95,7 +95,14 @@ func (c *SSHTestContainer) cleanup() error {
 }
 
 // buildSSHTestImage builds the SSH test image with the provided public key
-func buildSSHTestImage(ctx context.Context, cli *client.Client, tempDir, imageName, publicKey string) error {
+func buildSSHTestImage(
+	ctx context.Context,
+	cli *client.Client,
+	tempDir string,
+	imageName string,
+	publicKey string,
+) error {
+
 	// Get the Dockerfile path
 	_, currentFile, _, ok := runtime.Caller(0)
 	if !ok {
@@ -160,7 +167,13 @@ func buildSSHTestImage(ctx context.Context, cli *client.Client, tempDir, imageNa
 }
 
 // startSSHContainer starts the SSH container and returns container ID and SSH port
-func startSSHContainer(ctx context.Context, cli *client.Client, imageName, mountDir string) (string, string, error) {
+func startSSHContainer(
+	ctx context.Context,
+	cli *client.Client,
+	imageName string,
+	mountDir string,
+) (string, string, error) {
+
 	containerConfig := &container.Config{
 		Image: imageName,
 		ExposedPorts: nat.PortSet{
