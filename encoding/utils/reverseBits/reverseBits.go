@@ -98,8 +98,7 @@ func ReverseBitsLimited(length uint32, value uint32) uint32 {
 }
 
 func ReverseBitOrder(length uint32, swap func(i, j uint32)) error {
-	if !(length > 0 || (length&(length-1) == 0)) {
-		// panic("length is not a power of 2")
+	if length == 0 || (length&(length-1) == 0) {
 		return ErrRBOInvalidLength
 	}
 	// swap bits:
