@@ -34,7 +34,7 @@ func (c client) EncodeBlob(ctx context.Context, data []byte, encodingParams enco
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial encoder: %w", err)
 	}
-	core.CloseLogOnError(conn, "encoder client connection", nil)
+	defer core.CloseLogOnError(conn, "encoder client connection", nil)
 
 	encoder := pb.NewEncoderClient(conn)
 	reply, err := encoder.EncodeBlob(ctx, &pb.EncodeBlobRequest{
