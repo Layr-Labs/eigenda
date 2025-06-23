@@ -11,8 +11,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// TODO consider dropping password support
-
 // SSHSession encapsulates an SSH session with a remote host.
 type SSHSession struct {
 	logger  logging.Logger
