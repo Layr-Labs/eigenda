@@ -99,7 +99,7 @@ func (s *SSHSession) Ls(path string) ([]string, error) {
 	session.Stdout = &stdoutBuf
 	session.Stderr = &stderrBuf
 
-	command := fmt.Sprintf("ls '%s'", path)
+	command := fmt.Sprintf("ls -a '%s'", path)
 	if s.verbose {
 		s.logger.Infof("Executing remotely: %s", command)
 	}
@@ -109,7 +109,11 @@ func (s *SSHSession) Ls(path string) ([]string, error) {
 			command, err, stderrBuf.String())
 	}
 
-	files := strings.Split(stdoutBuf.String(), "\n")
+	output := strings.TrimSpace(stdoutBuf.String())
+	if output == "" {
+		return []string{}, nil
+	}
+	files := strings.Split(output, "\n")
 	return files, nil
 }
 
@@ -192,7 +196,7 @@ func (s *SSHSession) Mkdirs(path string) error {
 // Rsync transfers files from the local machine to the remote machine using rsync. The throttle is ignored
 // if less than or equal to 0.
 func (s *SSHSession) Rsync(sourceFile string, destFile string, throttleMB float64) error {
-	sshCmd := fmt.Sprintf("ssh -i %s -p %d", s.keyPath, s.port)
+	sshCmd := fmt.Sprintf("ssh -i %s -p %d -o StrictHostKeyChecking=no", s.keyPath, s.port)
 	target := fmt.Sprintf("%s@%s:%s", s.user, s.host, destFile)
 
 	// If the source file is a symlink, we actually want to send the thing the symlink points to.

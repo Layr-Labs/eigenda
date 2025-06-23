@@ -94,6 +94,8 @@ func parsePort(port string) uint64 {
 // Test functions
 
 func TestSSHSession_NewSSHSession(t *testing.T) {
+	t.Parallel()
+
 	container := setupSSHTestContainer(t)
 	defer container.cleanup()
 
@@ -135,6 +137,8 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 }
 
 func TestSSHSession_Ls(t *testing.T) {
+	t.Parallel()
+
 	container := setupSSHTestContainer(t)
 	defer container.cleanup()
 
@@ -163,6 +167,8 @@ func TestSSHSession_Ls(t *testing.T) {
 }
 
 func TestSSHSession_Mkdirs(t *testing.T) {
+	t.Parallel()
+
 	container := setupSSHTestContainer(t)
 	defer container.cleanup()
 
@@ -191,6 +197,8 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 }
 
 func TestSSHSession_FindFiles(t *testing.T) {
+	t.Parallel()
+
 	container := setupSSHTestContainer(t)
 	defer container.cleanup()
 
@@ -237,6 +245,8 @@ func TestSSHSession_FindFiles(t *testing.T) {
 }
 
 func TestSSHSession_Rsync(t *testing.T) {
+	t.Parallel()
+
 	container := setupSSHTestContainer(t)
 	defer container.cleanup()
 

@@ -120,7 +120,8 @@ func buildSSHTestImage(ctx context.Context, cli *client.Client, tempDir, imageNa
 	publicKeySetup := fmt.Sprintf(
 		"\n# Add test SSH public key\n"+
 			"RUN echo '%s' > /home/testuser/.ssh/authorized_keys\n"+
-			"RUN chmod 600 /home/testuser/.ssh/authorized_keys\n", strings.TrimSpace(publicKey))
+			"RUN chmod 600 /home/testuser/.ssh/authorized_keys\n"+
+			"RUN chown testuser:testuser /home/testuser/.ssh/authorized_keys\n", strings.TrimSpace(publicKey))
 	modifiedDockerfile := string(dockerfileContent) + publicKeySetup
 
 	err = os.WriteFile(filepath.Join(buildContext, "Dockerfile"), []byte(modifiedDockerfile), 0644)
