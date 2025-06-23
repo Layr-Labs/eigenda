@@ -748,12 +748,12 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	}
 
 	mockState := &mock.MockOnchainPaymentState{}
-	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil).Maybe()
+	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil)
 	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
 
-	// Setup mock payment vault params for server test  
+	// Setup mock payment vault params for server test
 	serverTestMockParams := &meterer.PaymentVaultParams{
 		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
 			0: {
@@ -787,8 +787,6 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 			SymbolsPerSecond: 2048,
 			StartTimestamp:   0,
 			EndTimestamp:     math.MaxUint32,
-			QuorumNumbers:    []uint8{0, 1},
-			QuorumSplits:     []byte{50, 50},
 		},
 	}, nil)
 	// append test name to each table name for an unique store

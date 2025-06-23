@@ -77,8 +77,7 @@ func (m *Meterer) Start(ctx context.Context) {
 // MeterRequest validates a blob header and adds it to the meterer's state
 // TODO: return error if there's a rejection (with reasoning) or internal error (should be very rare)
 func (m *Meterer) MeterRequest(ctx context.Context, header core.PaymentMetadata, numSymbols uint64, quorumNumbers []uint8, receivedAt time.Time) (uint64, error) {
-	m.logger.Info("Validating incoming request's payment metadata", "paymentMetadata", header, "numSymbols", numSymbols, "quorumNumbers", quorumNumbers)
-
+	m.logger.Debug("Validating incoming request's payment metadata", "paymentMetadata", header, "numSymbols", numSymbols, "quorumNumbers", quorumNumbers)
 	params, err := m.ChainPaymentState.GetPaymentGlobalParams()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get payment global params: %w", err)
