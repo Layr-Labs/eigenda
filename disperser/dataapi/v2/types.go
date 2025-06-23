@@ -219,7 +219,7 @@ func createBatchHeader(bh *corev2.BatchHeader) *BatchHeader {
 func createBlobInclusionInfo(bi *corev2.BlobInclusionInfo) *BlobInclusionInfo {
 	return &BlobInclusionInfo{
 		BatchHeader:    createBatchHeader(bi.BatchHeader),
-		BlobKey:        bi.BlobKey.Hex(),
+		BlobKey:        bi.BlobKey.Hex(), // go:nolint QF1008
 		BlobIndex:      bi.BlobIndex,
 		InclusionProof: hex.EncodeToString(bi.InclusionProof),
 	}

@@ -30,7 +30,7 @@ func Example_validatorPayloadRetrieval() {
 	if err != nil {
 		panic(fmt.Sprintf("create payload disperser: %v", err))
 	}
-	defer payloadDisperser.Close()
+	defer payloadDisperser.Close() //nolint:errcheck // just an example, so we ignore the error
 
 	payload, err := createRandomPayload(4 * 1024) // (4KB of random data)
 	if err != nil {

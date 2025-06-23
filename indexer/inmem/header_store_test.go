@@ -59,10 +59,13 @@ func newTestHeaders(t *testing.T, fork int) indexer.Headers {
 
 	var data []byte
 	var err error
-	if fork == 1 {
+	switch fork {
+	case 1:
 		data, err = os.ReadFile("testdata/fork1.json")
-	} else if fork == 2 {
+	case 2:
 		data, err = os.ReadFile("testdata/fork2.json")
+	default:
+		t.Fatalf("unknown fork: %d", fork)
 	}
 
 	assert.NoError(t, err)

@@ -120,7 +120,7 @@ func (p *SequenceProbe) SetStage(stage string) {
 	p.currentStage = stage
 
 	if p.history != nil {
-		p.history.WriteString(fmt.Sprintf(":%0.1f,%s", elapsed, stage))
+		fmt.Fprintf(p.history, ":%0.1f,%s", elapsed, stage)
 	}
 }
 
@@ -139,7 +139,7 @@ func (p *SequenceProbe) End() {
 	p.stageTimer.stageCount.WithLabelValues(p.currentStage).Dec()
 
 	if p.history != nil {
-		p.history.WriteString(fmt.Sprintf(":%0.1f", elapsed))
+		fmt.Fprintf(p.history, ":%0.1f", elapsed)
 	}
 }
 

@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/Layr-Labs/eigenda/core"
 )
 
 // srsHashFile represents a file containing SRS file hashes
@@ -58,7 +60,7 @@ func (sf *srsHashFile) save() error {
 	if err != nil {
 		return fmt.Errorf("creating hash file: %w", err)
 	}
-	defer file.Close()
+	defer core.CloseLogOnError(file, file.Name(), nil)
 
 	// Write header
 	timeStr := sf.generatedAt.Format("2006-01-02 15:04:05 UTC")
@@ -95,7 +97,7 @@ func getFileHashInfo(outputDir string, fileName string) (*fileHashInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening file for hashing: %w", err)
 	}
-	defer file.Close()
+	defer core.CloseLogOnError(file, fileName, nil)
 
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {
