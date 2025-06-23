@@ -45,20 +45,20 @@ func (c client) EncodeBlob(ctx context.Context, data []byte, encodingParams enco
 		},
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("encoder.EncodeBlob: %w", err)
 	}
 
 	commitment, err := new(encoding.G1Commitment).Deserialize(reply.GetCommitment().GetCommitment())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("deserialize commitment: %w", err)
 	}
 	lengthCommitment, err := new(encoding.G2Commitment).Deserialize(reply.GetCommitment().GetLengthCommitment())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("deserialize length commitment: %w", err)
 	}
 	lengthProof, err := new(encoding.LengthProof).Deserialize(reply.GetCommitment().GetLengthProof())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("deserialize length proof: %w", err)
 	}
 	var format core.ChunkEncodingFormat
 	switch reply.GetChunkEncodingFormat() {

@@ -218,9 +218,7 @@ func mustMakeDisperser(t *testing.T, cst core.IndexedChainState, store disperser
 
 	// this is disperser client's private key used in tests
 	privateKey, err := crypto.HexToECDSA("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcded") // Remove "0x" prefix
-	if err != nil {
-		panic("failed to convert hex to ECDSA")
-	}
+	require.NoError(t, err, "failed to create ECDSA private key from hex string")
 	publicKey := crypto.PubkeyToAddress(privateKey.PublicKey)
 
 	mockState := &coremock.MockOnchainPaymentState{}
