@@ -433,7 +433,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	reservationQuorumIds := []core.QuorumID{}
 	reservationCurrentPeriods := []uint64{}
 	if err != nil {
-		s.logger.Error("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
+		s.logger.Warn("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
 	} else {
 		for quorumId, reservation := range reservations {
 			pbReservation[uint32(quorumId)] = &pb.QuorumReservation{
@@ -446,7 +446,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 			}
 			_, quorumProtocolConfig, err := params.GetQuorumConfigs(quorumId)
 			if err != nil {
-				s.logger.Error("failed to get quorum protocol config, use zero value", "quorumId", quorumId)
+				s.logger.Warn("failed to get quorum protocol config, use zero value", "quorumId", quorumId)
 				continue
 			}
 			reservationQuorumIds = append(reservationQuorumIds, quorumId)
@@ -457,7 +457,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	// Get off-chain period records for all reserved quorums
 	records, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, reservationQuorumIds, reservationCurrentPeriods, 3)
 	if err != nil {
-		s.logger.Error("failed to get period records, use zero value", "err", err, "accountID", accountID)
+		s.logger.Warn("failed to get period records, use zero value", "err", err, "accountID", accountID)
 	}
 	for quorumId, record := range records {
 		periodRecords[uint32(quorumId)] = &pb.PeriodRecords{
@@ -469,7 +469,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	var largestCumulativePaymentBytes []byte
 	largestCumulativePayment, err := s.meterer.MeteringStore.GetLargestCumulativePayment(ctx, accountID)
 	if err != nil {
-		s.logger.Error("failed to get largest cumulative payment, use zero value", "err", err, "accountID", accountID)
+		s.logger.Warn("failed to get largest cumulative payment, use zero value", "err", err, "accountID", accountID)
 	} else {
 		largestCumulativePaymentBytes = largestCumulativePayment.Bytes()
 	}
@@ -478,7 +478,7 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	var onchainCumulativePaymentBytes []byte
 	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
-		s.logger.Error("failed to get ondemand payment, use zero value", "err", err, "accountID", accountID)
+		s.logger.Warn("failed to get ondemand payment, use zero value", "err", err, "accountID", accountID)
 	} else {
 		onchainCumulativePaymentBytes = onDemandPayment.CumulativePayment.Bytes()
 	}
