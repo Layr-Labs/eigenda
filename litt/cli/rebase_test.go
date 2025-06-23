@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
+	"os"
 	"path"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/common/testutils/random"
 	"github.com/Layr-Labs/eigenda/litt"
+	"github.com/Layr-Labs/eigenda/litt/disktable/segment"
 	"github.com/Layr-Labs/eigenda/litt/littbuilder"
 	"github.com/Layr-Labs/eigenda/litt/util"
 	"github.com/stretchr/testify/require"
@@ -325,4 +330,181 @@ func TestRebaseNtoNOverlap(t *testing.T) {
 	})
 }
 
-// TODO test rebasing a snapshot directory
+// Verify the behavior when we attempt to rebase a snapshot directory.
+func TestRebaseSnapshot(t *testing.T) {
+	t.Parallel()
+
+	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
+	require.NoError(t, err)
+
+	rand := random.NewTestRandom()
+	testDir := t.TempDir()
+
+	tableCount := rand.Uint64Range(2, 4)
+	tableNames := make([]string, 0, tableCount)
+	for i := uint64(0); i < tableCount; i++ {
+		tableNames = append(tableNames, rand.String(32))
+	}
+
+	shardingFactor := rand.Uint32Range(1, 4)
+	roots := make([]string, 0, shardingFactor)
+	for i := uint32(0); i < shardingFactor; i++ {
+		roots = append(roots, path.Join(testDir, rand.String(32)))
+	}
+
+	snapshotDir := path.Join(testDir, "snapshot")
+
+	config, err := litt.DefaultConfig(roots...)
+	require.NoError(t, err)
+	config.DoubleWriteProtection = true
+	config.ShardingFactor = shardingFactor
+	config.Fsync = false
+	config.SnapshotDirectory = snapshotDir
+	config.TargetSegmentFileSize = 100
+
+	db, err := littbuilder.NewDB(config)
+	require.NoError(t, err)
+
+	expectedData := make(map[string] /*table*/ map[string] /*value*/ []byte)
+	for _, tableName := range tableNames {
+		expectedData[tableName] = make(map[string][]byte)
+	}
+
+	// Insert data into the tables.
+	keyCount := uint64(1024)
+	for i := uint64(0); i < keyCount; i++ {
+		tableIndex := rand.Uint64Range(0, tableCount)
+		table, err := db.GetTable(tableNames[tableIndex])
+		require.NoError(t, err)
+		key := rand.PrintableBytes(32)
+		value := rand.PrintableVariableBytes(10, 100)
+
+		expectedData[table.Name()][string(key)] = value
+		err = table.Put(key, value)
+		require.NoError(t, err, "failed to put key %s in table %s", key, table.Name())
+	}
+
+	// Flush all tables.
+	for _, tableName := range tableNames {
+		table, err := db.GetTable(tableName)
+		require.NoError(t, err)
+		err = table.Flush()
+		require.NoError(t, err, "failed to flush table %s", table.Name())
+	}
+
+	// Verify the data in the DB.
+	for tableName := range expectedData {
+		table, err := db.GetTable(tableName)
+		require.NoError(t, err, "failed to get table %s", tableName)
+		for key := range expectedData[tableName] {
+			value, ok, err := table.Get([]byte(key))
+			require.NoError(t, err, "failed to get key %s in table %s", key, tableName)
+			require.True(t, ok, "key %s not found in table %s", key, tableName)
+			require.Equal(t, expectedData[tableName][key], value,
+				"value for key %s in table %s does not match expected value", key, tableName)
+		}
+	}
+
+	destinationDir := path.Join(testDir, "destination")
+
+	// Begin the rebase without shutting down the DB. Lock files on the snapshot directory shouldn't interfere.
+	err = rebase(
+		logger,
+		[]string{snapshotDir},
+		[]string{destinationDir},
+		true,
+		true,
+		false,
+		false)
+	require.NoError(t, err, "failed to rebase DB")
+
+	// Verify the data in the DB old copy of the DB. This shouldn't have led to any data loss.
+	for tableName := range expectedData {
+		table, err := db.GetTable(tableName)
+		require.NoError(t, err, "failed to get table %s", tableName)
+		for key := range expectedData[tableName] {
+			value, ok, err := table.Get([]byte(key))
+			require.NoError(t, err, "failed to get key %s in table %s", key, tableName)
+			require.True(t, ok, "key %s not found in table %s", key, tableName)
+			require.Equal(t, expectedData[tableName][key], value,
+				"value for key %s in table %s does not match expected value", key, tableName)
+		}
+	}
+
+	err = db.Close()
+	require.NoError(t, err, "failed to close DB after rebase")
+
+	// Inspect the destination directory. None of these files should be symlinks.
+	err = filepath.Walk(destinationDir, func(filePath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Check if the file is a symlink
+		if info.Mode()&os.ModeSymlink != 0 {
+			require.Fail(t, "found symlink at %s, but expected no symlinks in destination directory", filePath)
+		}
+
+		return nil
+	})
+	require.NoError(t, err, "failed to walk destination directory %s", destinationDir)
+
+	errorMonitor := util.NewErrorMonitor(context.Background(), logger, nil)
+
+	// For each table, inspect the segment files in the destination directory, compared with the segment files
+	// in the snapshot directory. The contents should match exactly (other than the fact that the original files are
+	// symlinks.
+	for _, tableName := range tableNames {
+		newSegmentPath, err := segment.NewSegmentPath(destinationDir, "", tableName)
+		require.NoError(t, err, "failed to create segment path for new directory")
+		newFirstSegmentIndex, newLastSegmentIndex, newSegments, err := segment.GatherSegmentFiles(
+			logger,
+			errorMonitor,
+			[]*segment.SegmentPath{newSegmentPath},
+			time.Now(),
+			false,
+			false)
+		require.NoError(t, err)
+
+		snapshotSegmentPath, err := segment.NewSegmentPath(snapshotDir, "", tableName)
+		require.NoError(t, err, "failed to create segment path for snapshot directory")
+		snapshotFirstSegmentIndex, snapshotLastSegmentIndex, snapshotSegments, err := segment.GatherSegmentFiles(
+			logger,
+			errorMonitor,
+			[]*segment.SegmentPath{snapshotSegmentPath},
+			time.Now(),
+			false,
+			false)
+		require.NoError(t, err)
+
+		require.Equal(t, newFirstSegmentIndex, snapshotFirstSegmentIndex)
+		require.Equal(t, newLastSegmentIndex, snapshotLastSegmentIndex)
+
+		for index := newFirstSegmentIndex; index <= newLastSegmentIndex; index++ {
+			newSegment := newSegments[index]
+			snapshotSegment := snapshotSegments[index]
+
+			newSegmentFiles := newSegment.GetFilePaths()
+			snapshotSegmentFiles := snapshotSegment.GetFilePaths()
+
+			// Compare each pair of files to ensure the bytes match exactly
+			require.Equal(t, len(newSegmentFiles), len(snapshotSegmentFiles),
+				"segment %d should have same number of files in both directories", index)
+
+			for i, newFile := range newSegmentFiles {
+				snapshotFile := snapshotSegmentFiles[i]
+
+				// Read contents of both files
+				newContent, err := os.ReadFile(newFile)
+				require.NoError(t, err, "failed to read new segment file %s", newFile)
+
+				snapshotContent, err := os.ReadFile(snapshotFile)
+				require.NoError(t, err, "failed to read snapshot segment file %s", snapshotFile)
+
+				// Compare file contents byte-for-byte
+				require.Equal(t, snapshotContent, newContent,
+					"file contents should match exactly between %s and %s", newFile, snapshotFile)
+			}
+		}
+	}
+}

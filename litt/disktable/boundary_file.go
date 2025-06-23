@@ -16,8 +16,6 @@ const LowerBoundFileName = "lower-bound.txt"
 // The name of the file that defines the upper bound of a LittDB snapshot directory.
 const UpperBoundFileName = "upper-bound.txt"
 
-// TODO unit test
-
 type BoundaryFile struct {
 	// If true, then this represents a lower bound file. If false, then it represents an upper bound file.
 	lower bool

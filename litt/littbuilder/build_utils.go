@@ -33,8 +33,6 @@ func cacheWeight(key string, value []byte) uint64 {
 	return uint64(len(key) + len(value))
 }
 
-// TODO unit test
-
 // Look for a table's keymap directory in the provided root paths.
 func FindKeymapLocation(
 	rootPaths []string,
