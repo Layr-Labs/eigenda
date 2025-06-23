@@ -144,6 +144,13 @@ type Reader interface {
 
 	// GetRelayRegistryAddress returns the Address of the EigenDARelayRegistry contract
 	GetRelayRegistryAddress() gethcommon.Address
+
+	// Payment-related methods
+	GetOnDemandGlobalSymbolsPerSecond(ctx context.Context, blockNumber uint32) (uint64, error)
+	GetOnDemandGlobalRatePeriodInterval(ctx context.Context, blockNumber uint32) (uint64, error)
+	GetMinNumSymbols(ctx context.Context, blockNumber uint32) (uint64, error)
+	GetPricePerSymbol(ctx context.Context, blockNumber uint32) (uint64, error)
+	GetReservationWindow(ctx context.Context, blockNumber uint32) (uint64, error)
 }
 
 type Writer interface {

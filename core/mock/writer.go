@@ -313,3 +313,28 @@ func (t *MockWriter) GetRelayRegistryAddress() gethcommon.Address {
 	result := args.Get(0)
 	return result.(gethcommon.Address)
 }
+
+func (t *MockWriter) GetOnDemandGlobalSymbolsPerSecond(ctx context.Context, blockNumber uint32) (uint64, error) {
+	args := t.Called(ctx, blockNumber)
+	return args.Get(0).(uint64), args.Error(1)
+}
+
+func (t *MockWriter) GetOnDemandGlobalRatePeriodInterval(ctx context.Context, blockNumber uint32) (uint64, error) {
+	args := t.Called(ctx, blockNumber)
+	return args.Get(0).(uint64), args.Error(1)
+}
+
+func (t *MockWriter) GetMinNumSymbols(ctx context.Context, blockNumber uint32) (uint64, error) {
+	args := t.Called(ctx, blockNumber)
+	return args.Get(0).(uint64), args.Error(1)
+}
+
+func (t *MockWriter) GetPricePerSymbol(ctx context.Context, blockNumber uint32) (uint64, error) {
+	args := t.Called(ctx, blockNumber)
+	return args.Get(0).(uint64), args.Error(1)
+}
+
+func (t *MockWriter) GetReservationWindow(ctx context.Context, blockNumber uint32) (uint64, error) {
+	args := t.Called(ctx, blockNumber)
+	return args.Get(0).(uint64), args.Error(1)
+}
