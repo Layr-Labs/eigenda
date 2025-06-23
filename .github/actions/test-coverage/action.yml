@@ -14,9 +14,6 @@ inputs:
   amend:
     description: Amend wiki, avoiding spurious commits.
     default: false
-  go-version:
-    description: The Go version to download (if necessary) and use.
-    default: "1.21"
 
 runs:
   using: "composite"

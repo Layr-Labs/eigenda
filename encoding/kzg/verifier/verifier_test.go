@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/encoding"
 	"github.com/Layr-Labs/eigenda/encoding/kzg"
 	"github.com/Layr-Labs/eigenda/encoding/kzg/prover"
@@ -54,7 +55,10 @@ func setup() {
 
 func teardown() {
 	log.Println("Tearing down")
-	os.RemoveAll("./data")
+	err := os.RemoveAll("./data")
+	if err != nil {
+		log.Printf("Error removing data directory ./data: %v", err)
+	}
 }
 
 // var control interface{ Stop() }
@@ -74,9 +78,9 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open file for writing: %v", err)
 	}
-	defer file.Close()
+	defer core.CloseLogOnError(file, file.Name(), nil)
 
-	fmt.Fprintln(file, "numChunks,chunkLength,ns/op,allocs/op")
+	_, _ = fmt.Fprintln(file, "numChunks,chunkLength,ns/op,allocs/op")
 
 	for _, chunkLength := range chunkLengths {
 
@@ -108,7 +112,7 @@ func TestBenchmarkVerifyChunks(t *testing.T) {
 				}
 			})
 			// Print results in CSV format
-			fmt.Fprintf(file, "%d,%d,%d,%d\n", numChunks, chunkLength, result.NsPerOp(), result.AllocsPerOp())
+			_, _ = fmt.Fprintf(file, "%d,%d,%d,%d\n", numChunks, chunkLength, result.NsPerOp(), result.AllocsPerOp())
 
 		}
 	}
