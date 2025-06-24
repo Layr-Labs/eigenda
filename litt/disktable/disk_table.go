@@ -548,6 +548,21 @@ func (d *DiskTable) Destroy() error {
 		}
 	}
 
+	// delete the snapshot hardlink directory
+	for _, root := range d.roots {
+		snapshotDir := path.Join(root, segment.HardLinkDirectory)
+		exists, err := util.Exists(snapshotDir)
+		if err != nil {
+			return fmt.Errorf("failed to check if snapshot directory exists: %w", err)
+		}
+		if exists {
+			err = os.RemoveAll(snapshotDir)
+			if err != nil {
+				return fmt.Errorf("failed to remove snapshot directory: %w", err)
+			}
+		}
+	}
+
 	// destroy the keymap
 	err = d.keymap.Destroy()
 	if err != nil {

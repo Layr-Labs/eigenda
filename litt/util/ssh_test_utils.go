@@ -150,7 +150,7 @@ func WaitForSSH(t *testing.T, sshPort uint64, privateKeyPath string) {
 	require.NoError(t, err)
 
 	// Try to connect multiple times with backoff
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 100; i++ {
 		session, err := NewSSHSession(
 			logger,
 			"testuser",
