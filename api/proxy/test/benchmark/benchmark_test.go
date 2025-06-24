@@ -1,7 +1,6 @@
 package benchmark
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -46,7 +45,7 @@ func putsWithSecondary(b *testing.B, testCfg testutils.TestConfig) {
 
 	for i := 0; i < b.N; i++ {
 		_, err := daClient.SetData(
-			context.Background(),
+			b.Context(),
 			[]byte("I am a blob and I only live for 14 days on EigenDA"))
 		if err != nil {
 			panic(err)

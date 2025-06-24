@@ -291,7 +291,7 @@ func verifyCertRBNRecencyCheck(certRBN uint64, certL1IBN uint64, rbnRecencyWindo
 	}
 
 	// Actual Recency Check
-	if !(certL1IBN <= certRBN+rbnRecencyWindowSize) { //nolint:staticcheck // we want equation to always show positive inequality
+	if !(certL1IBN <= certRBN+rbnRecencyWindowSize) { //nolint:staticcheck // inequality is clearer as is
 		return NewRBNRecencyCheckFailedError(certRBN, certL1IBN, rbnRecencyWindowSize)
 	}
 	return nil

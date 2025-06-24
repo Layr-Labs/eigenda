@@ -157,6 +157,7 @@ func ReadLoggerCLIConfig(ctx *cli.Context) (*LoggerConfig, error) {
 
 	path := ctx.String(common.PrefixFlag(FlagPrefix, PathFlagName))
 	if path != "" {
+		// nolint:gosec // file is only written to for logging, so no sensitive data is at risk of being read.
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
 			return nil, err

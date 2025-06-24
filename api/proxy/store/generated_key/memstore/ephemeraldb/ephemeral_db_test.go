@@ -1,7 +1,6 @@
 package ephemeraldb
 
 import (
-	"context"
 	"os"
 	"testing"
 	"time"
@@ -32,10 +31,8 @@ func testConfig() *memconfig.SafeConfig {
 
 func TestGetSet(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
-	db := New(ctx, testConfig(), testLogger)
+	db := New(t.Context(), testConfig(), testLogger)
 
 	testKey := []byte("bland")
 	expected := []byte(testPreimage)
@@ -49,12 +46,10 @@ func TestGetSet(t *testing.T) {
 
 func TestExpiration(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	cfg := testConfig()
 	cfg.SetBlobExpiration(10 * time.Millisecond)
-	db := New(ctx, cfg, testLogger)
+	db := New(t.Context(), cfg, testLogger)
 
 	preimage := []byte(testPreimage)
 	testKey := []byte("bland")
@@ -75,13 +70,10 @@ func TestLatency(t *testing.T) {
 	putLatency := 1 * time.Second
 	getLatency := 1 * time.Second
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	config := testConfig()
 	config.SetLatencyPUTRoute(putLatency)
 	config.SetLatencyGETRoute(getLatency)
-	db := New(ctx, config, testLogger)
+	db := New(t.Context(), config, testLogger)
 
 	preimage := []byte(testPreimage)
 	testKey := []byte("bland")
@@ -101,11 +93,8 @@ func TestLatency(t *testing.T) {
 func TestPutReturnsFailoverErrorConfig(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	config := testConfig()
-	db := New(ctx, config, testLogger)
+	db := New(t.Context(), config, testLogger)
 	testKey := []byte("som-key")
 
 	err := db.InsertEntry(testKey, []byte("some-value"))

@@ -1,7 +1,6 @@
 package memstore
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -34,13 +33,10 @@ func TestGetSet(t *testing.T) {
 	g1Srs, err := kzg.ReadG1Points("../../../../resources/g1.point", 3000, 2)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	require.NoError(t, err)
 
 	msV2, err := New(
-		ctx,
+		t.Context(),
 		testLogger,
 		getDefaultMemStoreTestConfig(),
 		g1Srs,
@@ -49,12 +45,12 @@ func TestGetSet(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := []byte(testPreimage)
-	key, err := msV2.Put(ctx, expected)
+	key, err := msV2.Put(t.Context(), expected)
 	require.NoError(t, err)
 
 	cert := certs.NewVersionedCert(key, coretypes.VersionThreeCert)
 
-	actual, err := msV2.Get(ctx, cert)
+	actual, err := msV2.Get(t.Context(), cert)
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)
 }

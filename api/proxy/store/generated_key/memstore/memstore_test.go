@@ -1,7 +1,6 @@
 package memstore
 
 import (
-	"context"
 	"os"
 	"runtime"
 	"testing"
@@ -32,9 +31,6 @@ func getDefaultMemStoreTestConfig() *memconfig.SafeConfig {
 }
 
 func TestGetSet(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	verifierConfig := &verify.Config{
 		VerifyCerts: false,
 	}
@@ -57,7 +53,7 @@ func TestGetSet(t *testing.T) {
 	require.NoError(t, err)
 
 	ms, err := New(
-		ctx,
+		t.Context(),
 		verifier,
 		testLogger,
 		getDefaultMemStoreTestConfig(),
@@ -66,10 +62,10 @@ func TestGetSet(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := []byte(testPreimage)
-	key, err := ms.Put(ctx, expected)
+	key, err := ms.Put(t.Context(), expected)
 	require.NoError(t, err)
 
-	actual, err := ms.Get(ctx, key)
+	actual, err := ms.Get(t.Context(), key)
 	require.NoError(t, err)
 	require.Equal(t, expected, actual)
 }
