@@ -657,6 +657,21 @@ contract UsageAuthorizationRegistryUnit is Test {
         );
 
         vm.expectRevert();
+        usageAuthorizationRegistry.setMinNumSymbols(0, MIN_NUM_SYMBOLS);
+
+        vm.expectRevert();
+        usageAuthorizationRegistry.setReservationAdvanceWindow(0, RESERVATION_ADVANCE_WINDOW);
+
+        vm.expectRevert();
+        usageAuthorizationRegistry.setReservationRateLimitWindow(0, RESERVATION_RATE_LIMIT_WINDOW);
+
+        vm.expectRevert();
+        usageAuthorizationRegistry.setOnDemandRateLimitWindow(0, ON_DEMAND_RATE_LIMIT_WINDOW);
+
+        vm.expectRevert();
+        usageAuthorizationRegistry.setOnDemandEnabled(0, true);
+
+        vm.expectRevert();
         usageAuthorizationRegistry.setQuorumPaymentConfig(
             0,
             UsageAuthorizationTypes.QuorumConfig({

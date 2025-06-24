@@ -130,10 +130,25 @@ interface IUsageAuthorizationRegistry {
         UsageAuthorizationTypes.QuorumProtocolConfig memory protocolCfg
     ) external;
 
+    /// @notice Sets the minimum number of symbols required for a quorum.
+    /// @param quorumId The ID of the quorum.
+    /// @param minNumSymbols The new minimum number of symbols required for the quorum.
+    function setMinNumSymbols(uint64 quorumId, uint64 minNumSymbols) external;
+
+    /// @notice Sets the reservation rate limit window for a quorum.
+    /// @param quorumId The ID of the quorum.
+    /// @param reservationRateLimitWindow The new reservation rate limit window in seconds.
+    function setReservationRateLimitWindow(uint64 quorumId, uint64 reservationRateLimitWindow) external;
+
     /// @notice Sets the reservation advance window for a quorum. Reservations cannot extend beyond the current time plus this window.
     /// @param quorumId The ID of the quorum.
     /// @param reservationAdvanceWindow The new reservation advance window in seconds.
     function setReservationAdvanceWindow(uint64 quorumId, uint64 reservationAdvanceWindow) external;
+
+    /// @notice Sets the on-demand rate limit window for a quorum.
+    /// @param quorumId The ID of the quorum.
+    /// @param onDemandRateLimitWindow The new on-demand rate limit window in seconds.
+    function setOnDemandRateLimitWindow(uint64 quorumId, uint64 onDemandRateLimitWindow) external;
 
     /// @notice Sets the on-demand enabled status for a quorum.
     /// @param quorumId The ID of the quorum.
