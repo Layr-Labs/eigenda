@@ -306,7 +306,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			PutTries:         3,
 		},
 		VerifierConfigV1: verify.Config{
-			VerifyCerts:          false,
+			VerifyCerts:          true,
 			RPCURL:               ethRPC,
 			SvcManagerAddr:       svcManagerAddress,
 			EthConfirmationDepth: 1,
@@ -321,6 +321,7 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 			SRSOrder:        eigendaflags.SrsOrder,
 			SRSNumberToLoad: maxBlobLengthBytes / 32,
 			NumWorker:       uint64(runtime.GOMAXPROCS(0)), // #nosec G115
+			LoadG2Points:    true,
 		},
 		MemstoreConfig: memconfig.NewSafeConfig(
 			memconfig.Config{
@@ -357,6 +358,8 @@ func BuildTestSuiteConfig(testCfg TestConfig) config.AppConfig {
 		builderConfig.ClientConfigV1.EdaClientCfg.SignerPrivateKeyHex =
 			"0000000000000000000100000000000000000000000000000000000000000000"
 		builderConfig.ClientConfigV1.EdaClientCfg.SvcManagerAddr = "0x00000000069"
+		builderConfig.KzgConfig.LoadG2Points = false
+		builderConfig.VerifierConfigV1.VerifyCerts = false
 	}
 	switch {
 	case testCfg.UseKeccak256ModeS3:
