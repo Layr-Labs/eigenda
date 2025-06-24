@@ -1,97 +1,13 @@
 package util
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/ssh"
 )
-
-// generateSSHKeyPair creates an RSA key pair for testing
-func generateSSHKeyPair(privateKeyPath, publicKeyPath string) error {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return fmt.Errorf("failed to generate private key: %w", err)
-	}
-
-	// Save private key
-	privateKeyPEM := &pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
-	}
-
-	privateKeyFile, err := os.Create(privateKeyPath)
-	if err != nil {
-		return fmt.Errorf("failed to create private key file: %w", err)
-	}
-	defer func() { _ = privateKeyFile.Close() }()
-
-	err = pem.Encode(privateKeyFile, privateKeyPEM)
-	if err != nil {
-		return fmt.Errorf("failed to encode private key: %w", err)
-	}
-
-	err = os.Chmod(privateKeyPath, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to set private key permissions: %w", err)
-	}
-
-	// Save public key
-	publicKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
-	if err != nil {
-		return fmt.Errorf("failed to create SSH public key: %w", err)
-	}
-
-	publicKeyBytes := ssh.MarshalAuthorizedKey(publicKey)
-	err = os.WriteFile(publicKeyPath, publicKeyBytes, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write public key: %w", err)
-	}
-
-	return nil
-}
-
-// waitForSSH waits for the SSH server to be ready
-func waitForSSH(t *testing.T, sshPort, privateKeyPath string) {
-	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
-	require.NoError(t, err)
-
-	// Try to connect multiple times with backoff
-	for i := 0; i < 30; i++ {
-		session, err := NewSSHSession(
-			logger,
-			"testuser",
-			"localhost",
-			parsePort(sshPort),
-			privateKeyPath,
-			false)
-		if err == nil {
-			_ = session.Close()
-			return
-		}
-		time.Sleep(1 * time.Second)
-	}
-
-	require.Fail(t, "SSH server did not become ready in time")
-}
-
-// parsePort converts string port to uint64
-func parsePort(port string) uint64 {
-	var p uint64
-	_, _ = fmt.Sscanf(port, "%d", &p)
-	return p
-}
-
-// Test functions
 
 func TestSSHSession_NewSSHSession(t *testing.T) {
 	t.Parallel()
