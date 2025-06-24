@@ -3,6 +3,7 @@ package apiserver_test
 import (
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"math"
@@ -357,7 +358,7 @@ func TestRetrieveBlob(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, reply.GetStatus(), pb.BlobStatus_PROCESSING)
 
-		fmt.Println("requestID", requestID)
+		fmt.Println("requestID", hex.EncodeToString(requestID))
 
 		// Simulate blob confirmation so that we can retrieve the blob
 		securityParams := []*core.SecurityParam{
@@ -615,7 +616,7 @@ func setup() {
 		panic("failed to create allowlist file")
 	}
 
-	deployLocalStack = !(os.Getenv("DEPLOY_LOCALSTACK") == "false")
+	deployLocalStack = (os.Getenv("DEPLOY_LOCALSTACK") != "false")
 	if !deployLocalStack {
 		localStackPort = os.Getenv("LOCALSTACK_PORT")
 	}
@@ -747,12 +748,12 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	}
 
 	mockState := &mock.MockOnchainPaymentState{}
-	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil).Maybe()
+	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil)
 	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
 
-	// Setup mock payment vault params for server test  
+	// Setup mock payment vault params for server test
 	serverTestMockParams := &meterer.PaymentVaultParams{
 		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
 			0: {
@@ -786,8 +787,6 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 			SymbolsPerSecond: 2048,
 			StartTimestamp:   0,
 			EndTimestamp:     math.MaxUint32,
-			QuorumNumbers:    []uint8{0, 1},
-			QuorumSplits:     []byte{50, 50},
 		},
 	}, nil)
 	// append test name to each table name for an unique store

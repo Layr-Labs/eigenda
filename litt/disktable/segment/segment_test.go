@@ -50,7 +50,7 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	salt := ([16]byte)(rand.Bytes(16))
 	seg, err := CreateSegment(
 		logger,
-		util.NewFatalErrorHandler(context.Background(), logger, nil),
+		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
 		[]string{directory},
 		1,
@@ -138,10 +138,11 @@ func TestWriteAndReadSegmentSingleShard(t *testing.T) {
 	// Reopen the segment and read all keys and values.
 	seg2, err := LoadSegment(
 		logger,
-		util.NewFatalErrorHandler(context.Background(), logger, nil),
+		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
 		[]string{directory},
-		time.Now())
+		time.Now(),
+		false)
 	require.NoError(t, err)
 	require.True(t, seg2.IsSealed())
 
@@ -193,7 +194,7 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	salt := ([16]byte)(rand.Bytes(16))
 	seg, err := CreateSegment(
 		logger,
-		util.NewFatalErrorHandler(context.Background(), logger, nil),
+		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
 		[]string{directory},
 		shardCount,
@@ -286,10 +287,11 @@ func TestWriteAndReadSegmentMultiShard(t *testing.T) {
 	// Reopen the segment and read all keys and values.
 	seg2, err := LoadSegment(
 		logger,
-		util.NewFatalErrorHandler(context.Background(), logger, nil),
+		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
 		[]string{directory},
-		time.Now())
+		time.Now(),
+		false)
 	require.NoError(t, err)
 	require.True(t, seg2.IsSealed())
 
@@ -345,7 +347,7 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	salt := ([16]byte)(rand.Bytes(16))
 	seg, err := CreateSegment(
 		logger,
-		util.NewFatalErrorHandler(context.Background(), logger, nil),
+		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
 		[]string{directory},
 		shardCount,
@@ -404,10 +406,11 @@ func TestWriteAndReadColdShard(t *testing.T) {
 	// Reopen the segment and read all keys and values.
 	seg2, err := LoadSegment(
 		logger,
-		util.NewFatalErrorHandler(context.Background(), logger, nil),
+		util.NewErrorMonitor(context.Background(), logger, nil),
 		index,
 		[]string{directory},
-		time.Now())
+		time.Now(),
+		false)
 	require.NoError(t, err)
 	require.True(t, seg2.IsSealed())
 

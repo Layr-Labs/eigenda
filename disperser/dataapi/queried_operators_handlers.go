@@ -257,6 +257,6 @@ func checkIsOperatorPortOpen(socket string, timeoutSecs int, logger logging.Logg
 		logger.Warn("port check timeout", "socket", socket, "timeout", timeoutSecs, "error", err)
 		return false
 	}
-	defer conn.Close() // Close the connection after checking
+	core.CloseLogOnError(conn, "checkIsOperatorPortOpen connection", nil) // close connection after checking
 	return true
 }
