@@ -747,7 +747,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 	}
 
 	mockState := &mock.MockOnchainPaymentState{}
-	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil).Maybe()
+	mockState.On("RefreshOnchainPaymentState", tmock.Anything).Return(nil)
 	if err := mockState.RefreshOnchainPaymentState(context.Background()); err != nil {
 		panic("failed to make initial query to the on-chain state")
 	}
