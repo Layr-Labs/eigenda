@@ -37,6 +37,7 @@ type SSHTestContainer struct {
 	publicKey   string
 	user        string
 	host        string
+	dataDir     string // Path to the mounted data directory from container's perspective
 }
 
 // GetSSHPort returns the SSH port of the test container
@@ -67,6 +68,11 @@ func (c *SSHTestContainer) GetUser() string {
 // GetHost returns the host address for the SSH connection
 func (c *SSHTestContainer) GetHost() string {
 	return c.host
+}
+
+// GetDataDir returns the path to the mounted data directory from container's perspective
+func (c *SSHTestContainer) GetDataDir() string {
+	return c.dataDir
 }
 
 // Cleanup removes the Docker container and cleans up resources
@@ -163,7 +169,8 @@ func WaitForSSH(t *testing.T, sshPort uint64, privateKeyPath string) {
 }
 
 // SetupSSHTestContainer creates and starts a Docker container with SSH server
-func SetupSSHTestContainer(t *testing.T) *SSHTestContainer {
+// If dataDir is not empty, it will be mounted in the container at /mnt/data
+func SetupSSHTestContainer(t *testing.T, dataDir string) *SSHTestContainer {
 	ctx := context.Background()
 
 	// Create Docker client
@@ -192,11 +199,17 @@ func SetupSSHTestContainer(t *testing.T) *SSHTestContainer {
 	require.NoError(t, err)
 
 	// Start container
-	containerID, sshPort, err := StartSSHContainer(ctx, cli, imageName, mountDir)
+	containerID, sshPort, err := StartSSHContainer(ctx, cli, imageName, mountDir, dataDir)
 	require.NoError(t, err)
 
 	// Wait for SSH to be ready
 	WaitForSSH(t, sshPort, privateKeyPath)
+
+	// Set dataDir path from container's perspective
+	containerDataDir := ""
+	if dataDir != "" {
+		containerDataDir = "/mnt/data"
+	}
 
 	return &SSHTestContainer{
 		client:      cli,
@@ -207,6 +220,7 @@ func SetupSSHTestContainer(t *testing.T) *SSHTestContainer {
 		publicKey:   publicKeyPath,
 		user:        "testuser",
 		host:        "localhost",
+		dataDir:     containerDataDir,
 	}
 }
 
@@ -283,11 +297,13 @@ func BuildSSHTestImage(
 }
 
 // StartSSHContainer starts the SSH container and returns container ID and SSH port
+// If dataDir is not empty, it will be mounted at /mnt/data in the container
 func StartSSHContainer(
 	ctx context.Context,
 	cli *client.Client,
 	imageName string,
 	mountDir string,
+	dataDir string,
 ) (string, uint64, error) {
 
 	containerConfig := &container.Config{
@@ -306,13 +322,23 @@ func StartSSHContainer(
 				},
 			},
 		},
-		Mounts: []mount.Mount{
-			{
-				Type:   mount.TypeBind,
-				Source: mountDir,
-				Target: "/mnt/test",
-			},
-		},
+		Mounts: func() []mount.Mount {
+			mounts := []mount.Mount{
+				{
+					Type:   mount.TypeBind,
+					Source: mountDir,
+					Target: "/mnt/test",
+				},
+			}
+			if dataDir != "" {
+				mounts = append(mounts, mount.Mount{
+					Type:   mount.TypeBind,
+					Source: dataDir,
+					Target: "/mnt/data",
+				})
+			}
+			return mounts
+		}(),
 	}
 
 	resp, err := cli.ContainerCreate(

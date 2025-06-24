@@ -12,7 +12,7 @@ import (
 func TestSSHSession_NewSSHSession(t *testing.T) {
 	t.Parallel()
 
-	container := SetupSSHTestContainer(t)
+	container := SetupSSHTestContainer(t, "")
 	defer func() { _ = container.Cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
@@ -55,7 +55,7 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 func TestSSHSession_Ls(t *testing.T) {
 	t.Parallel()
 
-	container := SetupSSHTestContainer(t)
+	container := SetupSSHTestContainer(t, "")
 	defer func() { _ = container.Cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
@@ -84,7 +84,7 @@ func TestSSHSession_Ls(t *testing.T) {
 func TestSSHSession_Mkdirs(t *testing.T) {
 	t.Parallel()
 
-	container := SetupSSHTestContainer(t)
+	container := SetupSSHTestContainer(t, "")
 	defer func() { _ = container.Cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
@@ -114,7 +114,7 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 func TestSSHSession_FindFiles(t *testing.T) {
 	t.Parallel()
 
-	container := SetupSSHTestContainer(t)
+	container := SetupSSHTestContainer(t, "")
 	defer func() { _ = container.Cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
@@ -162,7 +162,9 @@ func TestSSHSession_FindFiles(t *testing.T) {
 func TestSSHSession_Rsync(t *testing.T) {
 	t.Parallel()
 
-	container := SetupSSHTestContainer(t)
+	// Create a temporary data directory for testing
+	dataDir := t.TempDir()
+	container := SetupSSHTestContainer(t, dataDir)
 	defer func() { _ = container.Cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
@@ -178,36 +180,36 @@ func TestSSHSession_Rsync(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = session.Close() }()
 
-	// Create test directory on remote
-	err = session.Mkdirs("/mnt/test/rsync")
-	require.NoError(t, err)
-
 	// Create local test file
 	localFile := filepath.Join(container.GetTempDir(), "test_rsync.txt")
 	testContent := []byte("This is test content for rsync")
 	err = os.WriteFile(localFile, testContent, 0644)
 	require.NoError(t, err)
 
-	// Test rsync without throttling
-	err = session.Rsync(localFile, "/mnt/test/rsync/remote_file.txt", 0)
+	// Test rsync without throttling - sync to data directory
+	remoteFile := filepath.Join(container.GetDataDir(), "remote_file.txt")
+	err = session.Rsync(localFile, remoteFile, 0)
 	require.NoError(t, err)
 
-	// Verify file was transferred (via mounted directory)
-	mountedFile := filepath.Join(container.GetTempDir(), "ssh_mount", "rsync", "remote_file.txt")
-	transferredContent, err := os.ReadFile(mountedFile)
+	// Verify file was transferred via the mounted data directory
+	transferredFile := filepath.Join(dataDir, "remote_file.txt")
+	transferredContent, err := os.ReadFile(transferredFile)
 	require.NoError(t, err)
 	require.Equal(t, testContent, transferredContent)
 
 	// Test rsync with throttling
 	localFile2 := filepath.Join(container.GetTempDir(), "test_rsync2.txt")
-	err = os.WriteFile(localFile2, []byte("throttled content"), 0644)
+	throttledContent := []byte("throttled content")
+	err = os.WriteFile(localFile2, throttledContent, 0644)
 	require.NoError(t, err)
 
-	err = session.Rsync(localFile2, "/mnt/test/rsync/throttled_file.txt", 1.0) // 1MB/s throttle
+	remoteFile2 := filepath.Join(container.GetDataDir(), "throttled_file.txt")
+	err = session.Rsync(localFile2, remoteFile2, 1.0) // 1MB/s throttle
 	require.NoError(t, err)
 
-	// Verify throttled file was transferred
-	mountedFile2 := filepath.Join(container.GetTempDir(), "ssh_mount", "rsync", "throttled_file.txt")
-	_, err = os.Stat(mountedFile2)
+	// Verify throttled file was transferred via the mounted data directory
+	transferredFile2 := filepath.Join(dataDir, "throttled_file.txt")
+	transferredContent2, err := os.ReadFile(transferredFile2)
 	require.NoError(t, err)
+	require.Equal(t, throttledContent, transferredContent2)
 }

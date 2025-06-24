@@ -81,6 +81,7 @@ func rebaseTest(
 	config.DoubleWriteProtection = true
 	config.ShardingFactor = uint32(shardingFactor)
 	config.Fsync = false
+	config.TargetSegmentFileSize = 100
 
 	db, err := littbuilder.NewDB(config)
 	require.NoError(t, err)
