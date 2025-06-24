@@ -281,7 +281,7 @@ func recursiveMoveFile(source string, destination string, deep bool, preserveOri
 
 	// Check if source is a symlink
 	if sourceInfo.Mode()&os.ModeSymlink != 0 {
-		return handleSymlink(source, destination, deep, preserveOriginal, fsync)
+		return moveSymlink(source, destination, deep, preserveOriginal, fsync)
 	}
 
 	// Copy the file
@@ -306,7 +306,18 @@ func recursiveMoveFile(source string, destination string, deep bool, preserveOri
 	return nil
 }
 
-// recursiveMoveDirectory handles moving a directory and its contents
+// recursiveMoveDirectory handles moving a directory and its contents.
+//
+//   - If preserveOriginal is true, the original directory and its contents will be preserved after the move.
+//   - If preserveOriginal is false, the original directory and its contents will be deleted after the move.
+//     If the original contains symlinks, then both the symlinks and the files the symlinks point to will be deleted.
+//     This is intentional, and designed to support semantics needed by LittDB snapshotting operations.
+//
+// - If deep is false, then files will be hard linked where possible, and symlinks will be copied as symlinks.
+// - If deep is true, then files will always be copied, and symlinks will be followed and copied as regular files.
+//
+// There is a special interaction if preserveOriginal is false and deep is true. If the source and the destination
+// are on the same filesystem, then the file is moved instead of copied.
 func recursiveMoveDirectory(
 	source string,
 	destination string,
@@ -353,7 +364,7 @@ func recursiveMoveDirectory(
 
 		case (info.Mode() & os.ModeSymlink) != 0:
 			// Handle symlink
-			if err := handleSymlink(path, destPath, deep, preserveOriginal, fsync, source); err != nil {
+			if err := moveSymlink(path, destPath, deep, preserveOriginal, fsync, source); err != nil {
 				return fmt.Errorf("failed to handle symlink: %w", err)
 			}
 
@@ -447,11 +458,16 @@ func syncDirectory(path string) error {
 	return nil
 }
 
-// handleSymlink handles symlink copying based on the deep parameter.
+// moveSymlink handles symlink copying based on the deep parameter.
+//
 // If deep is false, copies the symlink as a symlink.
 // If deep is true, copies the target file that the symlink points to.
-// sourceRoot parameter is optional and used to check for nested directory conflicts.
-func handleSymlink(
+//
+// The sourceRoot parameter is optional and used to check for nested directory conflicts.
+//
+// If preserveOriginal is false, then this method will remove the original symlink and the file it points to, not
+// just the symlink.
+func moveSymlink(
 	source string,
 	destination string,
 	deep bool,
@@ -511,10 +527,20 @@ func handleSymlink(
 			}
 		}
 
-		// Remove original target file if not preserving original
+		// Remove original target file if not preserving original.
 		if !preserveOriginal {
-			if err := os.Remove(target); err != nil {
+			// Note that the "target" is not the destination, it's the file that the symlink points to.
+			// When this method removes a symlink, the desired behavior is to remove both the symlink and
+			// the file it points to.
+			err = os.Remove(target)
+			if err != nil {
 				return fmt.Errorf("failed to remove original symlink target: %w", err)
+			}
+
+			// Remove the symlink itself
+			err = os.Remove(source)
+			if err != nil {
+				return fmt.Errorf("failed to remove original symlink %s: %w", source, err)
 			}
 		}
 	}
