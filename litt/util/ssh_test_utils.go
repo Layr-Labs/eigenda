@@ -37,15 +37,53 @@ type SSHTestContainer struct {
 	publicKey   string
 }
 
-// parsePort converts string port to uint64
-func parsePort(port string) uint64 {
+// GetSSHPort returns the SSH port of the test container
+func (c *SSHTestContainer) GetSSHPort() string {
+	return c.sshPort
+}
+
+// GetPrivateKeyPath returns the path to the private key file
+func (c *SSHTestContainer) GetPrivateKeyPath() string {
+	return c.privateKey
+}
+
+// GetPublicKeyPath returns the path to the public key file
+func (c *SSHTestContainer) GetPublicKeyPath() string {
+	return c.publicKey
+}
+
+// GetTempDir returns the temporary directory used by the container
+func (c *SSHTestContainer) GetTempDir() string {
+	return c.tempDir
+}
+
+// Cleanup removes the Docker container and cleans up resources
+func (c *SSHTestContainer) Cleanup() error {
+	ctx := context.Background()
+
+	// Stop and remove container
+	err := c.client.ContainerStop(ctx, c.containerID, container.StopOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to stop container: %w", err)
+	}
+
+	err = c.client.ContainerRemove(ctx, c.containerID, container.RemoveOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to remove container: %w", err)
+	}
+
+	return nil
+}
+
+// ParsePort converts string port to uint64
+func ParsePort(port string) uint64 {
 	var p uint64
 	_, _ = fmt.Sscanf(port, "%d", &p)
 	return p
 }
 
-// generateSSHKeyPair creates an RSA key pair for testing
-func generateSSHKeyPair(privateKeyPath string, publicKeyPath string) error {
+// GenerateSSHKeyPair creates an RSA key pair for testing
+func GenerateSSHKeyPair(privateKeyPath, publicKeyPath string) error {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return fmt.Errorf("failed to generate private key: %w", err)
@@ -88,8 +126,8 @@ func generateSSHKeyPair(privateKeyPath string, publicKeyPath string) error {
 	return nil
 }
 
-// waitForSSH waits for the SSH server to be ready
-func waitForSSH(t *testing.T, sshPort string, privateKeyPath string) {
+// WaitForSSH waits for the SSH server to be ready
+func WaitForSSH(t *testing.T, sshPort, privateKeyPath string) {
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
@@ -99,7 +137,7 @@ func waitForSSH(t *testing.T, sshPort string, privateKeyPath string) {
 			logger,
 			"testuser",
 			"localhost",
-			parsePort(sshPort),
+			ParsePort(sshPort),
 			privateKeyPath,
 			false)
 		if err == nil {
@@ -112,8 +150,8 @@ func waitForSSH(t *testing.T, sshPort string, privateKeyPath string) {
 	require.Fail(t, "SSH server did not become ready in time")
 }
 
-// setupSSHTestContainer creates and starts a Docker container with SSH server
-func setupSSHTestContainer(t *testing.T) *SSHTestContainer {
+// SetupSSHTestContainer creates and starts a Docker container with SSH server
+func SetupSSHTestContainer(t *testing.T) *SSHTestContainer {
 	ctx := context.Background()
 
 	// Create Docker client
@@ -125,7 +163,7 @@ func setupSSHTestContainer(t *testing.T) *SSHTestContainer {
 	privateKeyPath := filepath.Join(tempDir, "test_ssh_key")
 	publicKeyPath := filepath.Join(tempDir, "test_ssh_key.pub")
 
-	err = generateSSHKeyPair(privateKeyPath, publicKeyPath)
+	err = GenerateSSHKeyPair(privateKeyPath, publicKeyPath)
 	require.NoError(t, err)
 
 	publicKeyContent, err := os.ReadFile(publicKeyPath)
@@ -138,15 +176,15 @@ func setupSSHTestContainer(t *testing.T) *SSHTestContainer {
 
 	// Build Docker image
 	imageName := "ssh-test:latest"
-	err = buildSSHTestImage(ctx, cli, tempDir, imageName, string(publicKeyContent))
+	err = BuildSSHTestImage(ctx, cli, tempDir, imageName, string(publicKeyContent))
 	require.NoError(t, err)
 
 	// Start container
-	containerID, sshPort, err := startSSHContainer(ctx, cli, imageName, mountDir)
+	containerID, sshPort, err := StartSSHContainer(ctx, cli, imageName, mountDir)
 	require.NoError(t, err)
 
 	// Wait for SSH to be ready
-	waitForSSH(t, sshPort, privateKeyPath)
+	WaitForSSH(t, sshPort, privateKeyPath)
 
 	return &SSHTestContainer{
 		client:      cli,
@@ -158,26 +196,8 @@ func setupSSHTestContainer(t *testing.T) *SSHTestContainer {
 	}
 }
 
-// cleanup removes the Docker container and cleans up resources
-func (c *SSHTestContainer) cleanup() error {
-	ctx := context.Background()
-
-	// Stop and remove container
-	err := c.client.ContainerStop(ctx, c.containerID, container.StopOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to stop container: %w", err)
-	}
-
-	err = c.client.ContainerRemove(ctx, c.containerID, container.RemoveOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to remove container: %w", err)
-	}
-
-	return nil
-}
-
-// buildSSHTestImage builds the SSH test image with the provided public key
-func buildSSHTestImage(
+// BuildSSHTestImage builds the SSH test image with the provided public key
+func BuildSSHTestImage(
 	ctx context.Context,
 	cli *client.Client,
 	tempDir string,
@@ -219,7 +239,7 @@ func buildSSHTestImage(
 	}
 
 	// Create tar archive for build context
-	buildCtx, err := archiveDirectory(buildContext)
+	buildCtx, err := ArchiveDirectory(buildContext)
 	if err != nil {
 		return fmt.Errorf("failed to create build context archive: %w", err)
 	}
@@ -248,8 +268,8 @@ func buildSSHTestImage(
 	return nil
 }
 
-// startSSHContainer starts the SSH container and returns container ID and SSH port
-func startSSHContainer(
+// StartSSHContainer starts the SSH container and returns container ID and SSH port
+func StartSSHContainer(
 	ctx context.Context,
 	cli *client.Client,
 	imageName string,
@@ -308,8 +328,8 @@ func startSSHContainer(
 	return resp.ID, sshPort, nil
 }
 
-// archiveDirectory creates a tar.gz archive of a directory for Docker build context
-func archiveDirectory(srcDir string) (io.ReadCloser, error) {
+// ArchiveDirectory creates a tar.gz archive of a directory for Docker build context
+func ArchiveDirectory(srcDir string) (io.ReadCloser, error) {
 	pr, pw := io.Pipe()
 
 	go func() {

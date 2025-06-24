@@ -12,8 +12,8 @@ import (
 func TestSSHSession_NewSSHSession(t *testing.T) {
 	t.Parallel()
 
-	container := setupSSHTestContainer(t)
-	defer func() { _ = container.cleanup() }()
+	container := SetupSSHTestContainer(t)
+	defer func() { _ = container.Cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
@@ -23,8 +23,8 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 		logger,
 		"testuser",
 		"localhost",
-		parsePort(container.sshPort),
-		container.privateKey,
+		ParsePort(container.GetSSHPort()),
+		container.GetPrivateKeyPath(),
 		true)
 	require.NoError(t, err)
 	require.NotNil(t, session)
@@ -35,7 +35,7 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 		logger,
 		"testuser",
 		"localhost",
-		parsePort(container.sshPort),
+		ParsePort(container.GetSSHPort()),
 		"/nonexistent/key",
 		false)
 	require.Error(t, err)
@@ -46,8 +46,8 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 		logger,
 		"wronguser",
 		"localhost",
-		parsePort(container.sshPort),
-		container.privateKey,
+		ParsePort(container.GetSSHPort()),
+		container.GetPrivateKeyPath(),
 		false)
 	require.Error(t, err)
 }
@@ -55,19 +55,18 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 func TestSSHSession_Ls(t *testing.T) {
 	t.Parallel()
 
-	container := setupSSHTestContainer(t)
-	defer func() { _ = container.cleanup() }()
+	container := SetupSSHTestContainer(t)
+	defer func() { _ = container.Cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
 	session, err := NewSSHSession(
 		logger,
-		"testuse"+
-			"r",
+		"testuser",
 		"localhost",
-		parsePort(container.sshPort),
-		container.privateKey,
+		ParsePort(container.GetSSHPort()),
+		container.GetPrivateKeyPath(),
 		true)
 	require.NoError(t, err)
 	defer func() { _ = session.Close() }()
@@ -85,8 +84,8 @@ func TestSSHSession_Ls(t *testing.T) {
 func TestSSHSession_Mkdirs(t *testing.T) {
 	t.Parallel()
 
-	container := setupSSHTestContainer(t)
-	defer func() { _ = container.cleanup() }()
+	container := SetupSSHTestContainer(t)
+	defer func() { _ = container.Cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
@@ -95,8 +94,8 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 		logger,
 		"testuser",
 		"localhost",
-		parsePort(container.sshPort),
-		container.privateKey,
+		ParsePort(container.GetSSHPort()),
+		container.GetPrivateKeyPath(),
 		true)
 	require.NoError(t, err)
 	defer func() { _ = session.Close() }()
@@ -115,8 +114,8 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 func TestSSHSession_FindFiles(t *testing.T) {
 	t.Parallel()
 
-	container := setupSSHTestContainer(t)
-	defer func() { _ = container.cleanup() }()
+	container := SetupSSHTestContainer(t)
+	defer func() { _ = container.Cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
@@ -125,8 +124,8 @@ func TestSSHSession_FindFiles(t *testing.T) {
 		logger,
 		"testuser",
 		"localhost",
-		parsePort(container.sshPort),
-		container.privateKey,
+		ParsePort(container.GetSSHPort()),
+		container.GetPrivateKeyPath(),
 		true)
 	require.NoError(t, err)
 	defer func() { _ = session.Close() }()
@@ -136,7 +135,7 @@ func TestSSHSession_FindFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create test files using the mounted directory
-	mountDir := filepath.Join(container.tempDir, "ssh_mount", "search")
+	mountDir := filepath.Join(container.GetTempDir(), "ssh_mount", "search")
 	err = os.MkdirAll(mountDir, 0755)
 	require.NoError(t, err)
 
@@ -163,8 +162,8 @@ func TestSSHSession_FindFiles(t *testing.T) {
 func TestSSHSession_Rsync(t *testing.T) {
 	t.Parallel()
 
-	container := setupSSHTestContainer(t)
-	defer func() { _ = container.cleanup() }()
+	container := SetupSSHTestContainer(t)
+	defer func() { _ = container.Cleanup() }()
 
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
@@ -173,8 +172,8 @@ func TestSSHSession_Rsync(t *testing.T) {
 		logger,
 		"testuser",
 		"localhost",
-		parsePort(container.sshPort),
-		container.privateKey,
+		ParsePort(container.GetSSHPort()),
+		container.GetPrivateKeyPath(),
 		true)
 	require.NoError(t, err)
 	defer func() { _ = session.Close() }()
@@ -184,7 +183,7 @@ func TestSSHSession_Rsync(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create local test file
-	localFile := filepath.Join(container.tempDir, "test_rsync.txt")
+	localFile := filepath.Join(container.GetTempDir(), "test_rsync.txt")
 	testContent := []byte("This is test content for rsync")
 	err = os.WriteFile(localFile, testContent, 0644)
 	require.NoError(t, err)
@@ -194,13 +193,13 @@ func TestSSHSession_Rsync(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify file was transferred (via mounted directory)
-	mountedFile := filepath.Join(container.tempDir, "ssh_mount", "rsync", "remote_file.txt")
+	mountedFile := filepath.Join(container.GetTempDir(), "ssh_mount", "rsync", "remote_file.txt")
 	transferredContent, err := os.ReadFile(mountedFile)
 	require.NoError(t, err)
 	require.Equal(t, testContent, transferredContent)
 
 	// Test rsync with throttling
-	localFile2 := filepath.Join(container.tempDir, "test_rsync2.txt")
+	localFile2 := filepath.Join(container.GetTempDir(), "test_rsync2.txt")
 	err = os.WriteFile(localFile2, []byte("throttled content"), 0644)
 	require.NoError(t, err)
 
@@ -208,7 +207,7 @@ func TestSSHSession_Rsync(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify throttled file was transferred
-	mountedFile2 := filepath.Join(container.tempDir, "ssh_mount", "rsync", "throttled_file.txt")
+	mountedFile2 := filepath.Join(container.GetTempDir(), "ssh_mount", "rsync", "throttled_file.txt")
 	_, err = os.Stat(mountedFile2)
 	require.NoError(t, err)
 }
