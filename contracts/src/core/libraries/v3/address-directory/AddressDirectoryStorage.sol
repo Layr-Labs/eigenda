@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
+/// @notice Defines the storage layout for an address directory based on ERC-7201
+///         https://eips.ethereum.org/EIPS/eip-7201
 library AddressDirectoryStorage {
+    /// @custom: storage-location erc7201:address.directory.storage
     struct Layout {
         mapping(bytes32 => address) addresses;
     }
