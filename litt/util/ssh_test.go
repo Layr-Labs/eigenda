@@ -21,9 +21,9 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 	// Test successful connection
 	session, err := NewSSHSession(
 		logger,
-		"testuser",
-		"localhost",
-		ParsePort(container.GetSSHPort()),
+		container.GetUser(),
+		container.GetHost(),
+		container.GetSSHPort(),
 		container.GetPrivateKeyPath(),
 		true)
 	require.NoError(t, err)
@@ -33,9 +33,9 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 	// Test with non-existent key
 	_, err = NewSSHSession(
 		logger,
-		"testuser",
-		"localhost",
-		ParsePort(container.GetSSHPort()),
+		container.GetUser(),
+		container.GetHost(),
+		container.GetSSHPort(),
 		"/nonexistent/key",
 		false)
 	require.Error(t, err)
@@ -45,8 +45,8 @@ func TestSSHSession_NewSSHSession(t *testing.T) {
 	_, err = NewSSHSession(
 		logger,
 		"wronguser",
-		"localhost",
-		ParsePort(container.GetSSHPort()),
+		container.GetHost(),
+		container.GetSSHPort(),
 		container.GetPrivateKeyPath(),
 		false)
 	require.Error(t, err)
@@ -63,9 +63,9 @@ func TestSSHSession_Ls(t *testing.T) {
 
 	session, err := NewSSHSession(
 		logger,
-		"testuser",
-		"localhost",
-		ParsePort(container.GetSSHPort()),
+		container.GetUser(),
+		container.GetHost(),
+		container.GetSSHPort(),
 		container.GetPrivateKeyPath(),
 		true)
 	require.NoError(t, err)
@@ -92,9 +92,9 @@ func TestSSHSession_Mkdirs(t *testing.T) {
 
 	session, err := NewSSHSession(
 		logger,
-		"testuser",
-		"localhost",
-		ParsePort(container.GetSSHPort()),
+		container.GetUser(),
+		container.GetHost(),
+		container.GetSSHPort(),
 		container.GetPrivateKeyPath(),
 		true)
 	require.NoError(t, err)
@@ -122,9 +122,9 @@ func TestSSHSession_FindFiles(t *testing.T) {
 
 	session, err := NewSSHSession(
 		logger,
-		"testuser",
-		"localhost",
-		ParsePort(container.GetSSHPort()),
+		container.GetUser(),
+		container.GetHost(),
+		container.GetSSHPort(),
 		container.GetPrivateKeyPath(),
 		true)
 	require.NoError(t, err)
@@ -170,9 +170,9 @@ func TestSSHSession_Rsync(t *testing.T) {
 
 	session, err := NewSSHSession(
 		logger,
-		"testuser",
-		"localhost",
-		ParsePort(container.GetSSHPort()),
+		container.GetUser(),
+		container.GetHost(),
+		container.GetSSHPort(),
 		container.GetPrivateKeyPath(),
 		true)
 	require.NoError(t, err)

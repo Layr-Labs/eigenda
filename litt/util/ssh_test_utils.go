@@ -31,14 +31,16 @@ import (
 type SSHTestContainer struct {
 	client      *client.Client
 	containerID string
-	sshPort     string
+	sshPort     uint64
 	tempDir     string
 	privateKey  string
 	publicKey   string
+	user        string
+	host        string
 }
 
 // GetSSHPort returns the SSH port of the test container
-func (c *SSHTestContainer) GetSSHPort() string {
+func (c *SSHTestContainer) GetSSHPort() uint64 {
 	return c.sshPort
 }
 
@@ -55,6 +57,16 @@ func (c *SSHTestContainer) GetPublicKeyPath() string {
 // GetTempDir returns the temporary directory used by the container
 func (c *SSHTestContainer) GetTempDir() string {
 	return c.tempDir
+}
+
+// GetUser returns the SSH user for the test container
+func (c *SSHTestContainer) GetUser() string {
+	return c.user
+}
+
+// GetHost returns the host address for the SSH connection
+func (c *SSHTestContainer) GetHost() string {
+	return c.host
 }
 
 // Cleanup removes the Docker container and cleans up resources
@@ -127,7 +139,7 @@ func GenerateSSHKeyPair(privateKeyPath, publicKeyPath string) error {
 }
 
 // WaitForSSH waits for the SSH server to be ready
-func WaitForSSH(t *testing.T, sshPort, privateKeyPath string) {
+func WaitForSSH(t *testing.T, sshPort uint64, privateKeyPath string) {
 	logger, err := common.NewLogger(common.DefaultConsoleLoggerConfig())
 	require.NoError(t, err)
 
@@ -137,7 +149,7 @@ func WaitForSSH(t *testing.T, sshPort, privateKeyPath string) {
 			logger,
 			"testuser",
 			"localhost",
-			ParsePort(sshPort),
+			sshPort,
 			privateKeyPath,
 			false)
 		if err == nil {
@@ -193,6 +205,8 @@ func SetupSSHTestContainer(t *testing.T) *SSHTestContainer {
 		tempDir:     tempDir,
 		privateKey:  privateKeyPath,
 		publicKey:   publicKeyPath,
+		user:        "testuser",
+		host:        "localhost",
 	}
 }
 
@@ -274,7 +288,7 @@ func StartSSHContainer(
 	cli *client.Client,
 	imageName string,
 	mountDir string,
-) (string, string, error) {
+) (string, uint64, error) {
 
 	containerConfig := &container.Config{
 		Image: imageName,
@@ -309,21 +323,21 @@ func StartSSHContainer(
 		nil,
 		"")
 	if err != nil {
-		return "", "", fmt.Errorf("failed to create container: %w", err)
+		return "", 0, fmt.Errorf("failed to create container: %w", err)
 	}
 
 	err = cli.ContainerStart(ctx, resp.ID, container.StartOptions{})
 	if err != nil {
-		return "", "", fmt.Errorf("failed to start container: %w", err)
+		return "", 0, fmt.Errorf("failed to start container: %w", err)
 	}
 
 	// Get the assigned SSH port
 	containerInfo, err := cli.ContainerInspect(ctx, resp.ID)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to inspect container: %w", err)
+		return "", 0, fmt.Errorf("failed to inspect container: %w", err)
 	}
 
-	sshPort := containerInfo.NetworkSettings.Ports["22/tcp"][0].HostPort
+	sshPort := ParsePort(containerInfo.NetworkSettings.Ports["22/tcp"][0].HostPort)
 
 	return resp.ID, sshPort, nil
 }

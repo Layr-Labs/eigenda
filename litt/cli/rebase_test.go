@@ -44,7 +44,7 @@ func rebaseTest(
 
 	for i := uint64(0); i < sourceDirs; i++ {
 		sourceDir := path.Join(testDir, rand.String(32))
-		sourceDirList = append(sourceDirList, path.Join(testDir, rand.String(32)))
+		sourceDirList = append(sourceDirList, path.Join(testDir, sourceDir)) // TODO figure out how this passed with a random string
 		sourceDirSet[sourceDir] = struct{}{}
 
 		if i < overlap {
