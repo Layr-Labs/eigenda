@@ -10,6 +10,7 @@ import (
 	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/common"
 	"github.com/Layr-Labs/eigenda/core"
+	"github.com/Layr-Labs/eigenda/core/meterer"
 	corev2 "github.com/Layr-Labs/eigenda/core/v2"
 	dispv2 "github.com/Layr-Labs/eigenda/disperser/common/v2"
 	"github.com/Layr-Labs/eigenda/encoding"
@@ -130,15 +131,21 @@ func (c *disperserClient) PopulateAccountant(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("error getting account ID: %w", err)
 		}
-		c.accountant = NewAccountant(accountId, nil, nil, 0, 0, 0, 0)
+		c.accountant = NewAccountant(accountId)
 	}
 
-	paymentState, err := c.GetPaymentState(ctx)
+	paymentStateProto, err := c.GetPaymentState(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting payment state for initializing accountant: %w", err)
 	}
 
-	err = c.accountant.SetPaymentState(paymentState)
+	// Convert protobuf types to native Go types using meterer conversion function
+	paymentVaultParams, reservations, cumulativePayment, onchainCumulativePayment, periodRecords, err := meterer.ConvertPaymentStateFromProtobuf(paymentStateProto)
+	if err != nil {
+		return fmt.Errorf("error converting payment state from protobuf: %w", err)
+	}
+
+	err = c.accountant.SetPaymentState(paymentVaultParams, reservations, cumulativePayment, onchainCumulativePayment, periodRecords)
 	if err != nil {
 		return fmt.Errorf("error setting payment state for accountant: %w", err)
 	}
@@ -359,7 +366,7 @@ func (c *disperserClient) GetBlobStatus(ctx context.Context, blobKey corev2.Blob
 }
 
 // GetPaymentState returns the payment state of the disperser client
-func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateReply, error) {
+func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.GetPaymentStateForAllQuorumsReply, error) {
 	err := c.initOnceGrpcConnection()
 	if err != nil {
 		return nil, api.NewErrorInternal(err.Error())
@@ -377,12 +384,12 @@ func (c *disperserClient) GetPaymentState(ctx context.Context) (*disperser_rpc.G
 		return nil, fmt.Errorf("error signing payment state request: %w", err)
 	}
 
-	request := &disperser_rpc.GetPaymentStateRequest{
+	request := &disperser_rpc.GetPaymentStateForAllQuorumsRequest{
 		AccountId: accountID.Hex(),
 		Signature: signature,
 		Timestamp: timestamp,
 	}
-	return c.client.GetPaymentState(ctx, request)
+	return c.client.GetPaymentStateForAllQuorums(ctx, request)
 }
 
 // GetBlobCommitment is a utility method that calculates commitment for a blob payload.

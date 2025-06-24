@@ -1,6 +1,9 @@
 FROM nvidia/cuda:12.2.2-devel-ubuntu22.04 AS builder
 
 # Install Go
+# TODO: this probably won't work given that we've updated go.mod to use go 1.24.
+# However `docker buildx bake encoder-icicle` is failing on current master (0a61560a77)
+# so I'm a bit confused about the state of this Dockerfile...
 ENV GOLANG_VERSION=1.21.13
 ENV GOLANG_SHA256=502fc16d5910562461e6a6631fb6377de2322aad7304bf2bcd23500ba9dab4a7
 
