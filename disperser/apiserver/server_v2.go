@@ -379,6 +379,8 @@ func (s *DispersalServerV2) GetPaymentState(ctx context.Context, req *pb.GetPaym
 	}, nil
 }
 
+// GetPaymentStateForAllQuorums returns payment state for all quorums including vault parameters,
+// reservations, period records, and cumulative payments. Returns error on any chain read failure.
 func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, req *pb.GetPaymentStateForAllQuorumsRequest) (*pb.GetPaymentStateForAllQuorumsReply, error) {
 	if s.meterer == nil {
 		return nil, errors.New("payment meterer is not enabled")
@@ -430,11 +432,13 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	periodRecords := make(map[uint32]*pb.PeriodRecords)
 	quorumIds := s.onchainState.Load().getAllQuorumIds()
 	reservations, err := s.meterer.ChainPaymentState.GetReservedPaymentByAccountAndQuorums(ctx, accountID, quorumIds)
+	if err != nil {
+		s.logger.Error("failed to get onchain reservation", "err", err, "accountID", accountID)
+		return nil, api.NewErrorInternal("failed to get onchain reservation")
+	}
 	reservationQuorumIds := []core.QuorumID{}
 	reservationCurrentPeriods := []uint64{}
-	if err != nil {
-		s.logger.Warn("failed to get onchain reservation, use zero values", "err", err, "accountID", accountID)
-	} else {
+	if len(reservations) > 0 {
 		for quorumId, reservation := range reservations {
 			pbReservation[uint32(quorumId)] = &pb.QuorumReservation{
 				SymbolsPerSecond: reservation.SymbolsPerSecond,
@@ -446,8 +450,8 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 			}
 			_, quorumProtocolConfig, err := params.GetQuorumConfigs(quorumId)
 			if err != nil {
-				s.logger.Warn("failed to get quorum protocol config, use zero value", "quorumId", quorumId)
-				continue
+				s.logger.Error("failed to get quorum protocol config", "quorumId", quorumId, "err", err)
+				return nil, api.NewErrorInternal("failed to get quorum protocol config")
 			}
 			reservationQuorumIds = append(reservationQuorumIds, quorumId)
 			reservationCurrentPeriods = append(reservationCurrentPeriods, meterer.GetReservationPeriodByNanosecond(int64(req.Timestamp), quorumProtocolConfig.ReservationRateLimitWindow))
@@ -457,7 +461,8 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	// Get off-chain period records for all reserved quorums
 	records, err := s.meterer.MeteringStore.GetPeriodRecords(ctx, accountID, reservationQuorumIds, reservationCurrentPeriods, 3)
 	if err != nil {
-		s.logger.Warn("failed to get period records, use zero value", "err", err, "accountID", accountID)
+		s.logger.Error("failed to get period records", "err", err, "accountID", accountID)
+		return nil, api.NewErrorInternal("failed to get period records")
 	}
 	for quorumId, record := range records {
 		periodRecords[uint32(quorumId)] = &pb.PeriodRecords{
@@ -469,7 +474,8 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	var largestCumulativePaymentBytes []byte
 	largestCumulativePayment, err := s.meterer.MeteringStore.GetLargestCumulativePayment(ctx, accountID)
 	if err != nil {
-		s.logger.Warn("failed to get largest cumulative payment, use zero value", "err", err, "accountID", accountID)
+		s.logger.Error("failed to get largest cumulative payment", "err", err, "accountID", accountID)
+		return nil, api.NewErrorInternal("failed to get largest cumulative payment")
 	} else {
 		largestCumulativePaymentBytes = largestCumulativePayment.Bytes()
 	}
@@ -478,7 +484,8 @@ func (s *DispersalServerV2) GetPaymentStateForAllQuorums(ctx context.Context, re
 	var onchainCumulativePaymentBytes []byte
 	onDemandPayment, err := s.meterer.ChainPaymentState.GetOnDemandPaymentByAccount(ctx, accountID)
 	if err != nil {
-		s.logger.Warn("failed to get ondemand payment, use zero value", "err", err, "accountID", accountID)
+		s.logger.Error("failed to get ondemand payment", "err", err, "accountID", accountID)
+		return nil, api.NewErrorInternal("failed to get ondemand payment")
 	} else {
 		onchainCumulativePaymentBytes = onDemandPayment.CumulativePayment.Bytes()
 	}
