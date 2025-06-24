@@ -190,11 +190,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/build-push-action@v5
-        with:
-          push: false
-          context: api/proxy
-          tags: eigenda-proxy
+      - run: make docker-build
+        working-directory: api/proxy
       # We also test that the docker container starts up correctly.
       - name: Run container as background process
         shell: bash
@@ -204,7 +201,7 @@ jobs:
           -e EIGENDA_PROXY_ADDR=0.0.0.0 \
           -e EIGENDA_PROXY_PORT=6666 \
           -e EIGENDA_PROXY_MEMSTORE_ENABLED=true \
-          eigenda-proxy
+          ghcr.io/layr-labs/eigenda-proxy:dev
         working-directory: api/proxy
       - name: Wait for rpc to come up
         shell: bash
