@@ -753,7 +753,7 @@ func newTestServer(transactor core.Writer, testName string) *apiserver.Dispersal
 		panic("failed to make initial query to the on-chain state")
 	}
 
-	// Setup mock payment vault params for server test  
+	// Setup mock payment vault params for server test
 	serverTestMockParams := &meterer.PaymentVaultParams{
 		QuorumPaymentConfigs: map[core.QuorumID]*core.PaymentQuorumConfig{
 			0: {
