@@ -111,7 +111,17 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go build -ldflags="-X main.version=${SEMVER} \
                        -X main.gitCommit=${GITCOMMIT} \
                        -X main.gitDate=${GITDATE}" \
-      -o ./bin/blobapi ./cmd/blobapi
+        -o ./bin/blobapi ./cmd/blobapi
+
+# Proxy build stage
+FROM common-builder AS proxy-builder
+WORKDIR /app/api/proxy
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+        go build -ldflags="-X main.version=${SEMVER} \
+                       -X main.gitCommit=${GITCOMMIT} \
+                       -X main.gitDate=${GITDATE}" \
+        -o ./bin/eigenda-proxy ./cmd/server
 
 # Final stages for each component
 FROM alpine:3.22 AS churner
@@ -165,3 +175,9 @@ ENTRYPOINT ["load", "-", "-"]
 FROM alpine:3.22 AS blobapi
 COPY --from=blobapi-builder /app/disperser/bin/blobapi /usr/local/bin
 ENTRYPOINT ["blobapi"]
+
+FROM alpine:3.22 AS proxy
+COPY --from=proxy-builder /app/api/proxy/bin/eigenda-proxy /usr/local/bin
+COPY --from=proxy-builder /app/api/proxy/resources/ /app/resources/
+EXPOSE 4242 7300
+ENTRYPOINT ["eigenda-proxy"]
