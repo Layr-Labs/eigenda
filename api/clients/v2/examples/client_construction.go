@@ -28,12 +28,13 @@ import (
 // These constants are specific to the EigenDA holesky testnet. To execute the provided examples on a different
 // network, you will need to set these constants to the correct values, based on the chosen network.
 const (
-	ethRPCURL                        = "https://ethereum-holesky-rpc.publicnode.com"
-	disperserHostname                = "disperser-testnet-holesky.eigenda.xyz"
-	certVerifierRouterAddress        = "0x7F40A8e1B62aa1c8Afed23f6E8bAe0D340A4BC4e"
-	registryCoordinatorAddress       = "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490"
-	blsOperatorStateRetrieverAddress = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
-	eigenDAServiceManagerAddress     = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
+	ethRPCURL                         = "https://ethereum-holesky-rpc.publicnode.com"
+	disperserHostname                 = "disperser-testnet-holesky.eigenda.xyz"
+	certVerifierRouterAddress         = "0x7F40A8e1B62aa1c8Afed23f6E8bAe0D340A4BC4e"
+	registryCoordinatorAddress        = "0x53012C69A189cfA2D9d29eb6F19B32e0A2EA3490"
+	blsOperatorStateRetrieverAddress  = "0x003497Dd77E5B73C40e8aCbB562C8bb0410320E7"
+	eigenDAServiceManagerAddress      = "0xD4A7E1Bd8015057293f0D0A557088c286942e84b"
+	usageAuthorizationRegistryAddress = "0x0000000000000000000000000000000000000000"
 )
 
 func createPayloadDisperser(privateKey string) (*payloaddispersal.PayloadDisperser, error) {
@@ -334,6 +335,7 @@ func createEthReader(logger logging.Logger, ethClient common.EthClient) (*eth.Re
 		ethClient,
 		blsOperatorStateRetrieverAddress,
 		eigenDAServiceManagerAddress,
+		usageAuthorizationRegistryAddress,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("new reader: %w", err)

@@ -44,6 +44,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
+	UsageAuthorizationRegistryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "usage-authorization-registry"),
+		Usage:    "Address of the Usage Authorization Registry",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "USAGE_AUTHORIZATION_REGISTRY"),
+	}
 	PerPublicKeyRateLimit = cli.DurationFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "per-public-key-rate-limit"),
 		Usage:    "Rate limit interval for each public key",
@@ -79,6 +85,7 @@ var requiredFlags = []cli.Flag{
 	GrpcPortFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	UsageAuthorizationRegistryFlag,
 	EnableMetrics,
 }
 

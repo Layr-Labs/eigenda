@@ -18,6 +18,7 @@ import (
 	thresholdreg "github.com/Layr-Labs/eigenda/contracts/bindings/EigenDAThresholdRegistry"
 	ejectionmg "github.com/Layr-Labs/eigenda/contracts/bindings/EjectionManager"
 	indexreg "github.com/Layr-Labs/eigenda/contracts/bindings/IIndexRegistry"
+	usageauthreg "github.com/Layr-Labs/eigenda/contracts/bindings/IUsageAuthorizationRegistry"
 	opstateretriever "github.com/Layr-Labs/eigenda/contracts/bindings/OperatorStateRetriever"
 	paymentvault "github.com/Layr-Labs/eigenda/contracts/bindings/PaymentVault"
 	regcoordinator "github.com/Layr-Labs/eigenda/contracts/bindings/RegistryCoordinator"
@@ -35,23 +36,24 @@ import (
 )
 
 type ContractBindings struct {
-	RegCoordinatorAddr    gethcommon.Address
-	ServiceManagerAddr    gethcommon.Address
-	RelayRegistryAddress  gethcommon.Address
-	DelegationManager     *delegationmgr.ContractDelegationManager
-	OpStateRetriever      *opstateretriever.ContractOperatorStateRetriever
-	BLSApkRegistry        *blsapkreg.ContractBLSApkRegistry
-	IndexRegistry         *indexreg.ContractIIndexRegistry
-	RegistryCoordinator   *regcoordinator.ContractRegistryCoordinator
-	StakeRegistry         *stakereg.ContractStakeRegistry
-	EigenDAServiceManager *eigendasrvmg.ContractEigenDAServiceManager
-	EjectionManager       *ejectionmg.ContractEjectionManager
-	AVSDirectory          *avsdir.ContractAVSDirectory
-	SocketRegistry        *socketreg.ContractSocketRegistry
-	PaymentVault          *paymentvault.ContractPaymentVault
-	RelayRegistry         *relayreg.ContractEigenDARelayRegistry
-	ThresholdRegistry     *thresholdreg.ContractEigenDAThresholdRegistry
-	DisperserRegistry     *disperserreg.ContractEigenDADisperserRegistry
+	RegCoordinatorAddr         gethcommon.Address
+	ServiceManagerAddr         gethcommon.Address
+	RelayRegistryAddress       gethcommon.Address
+	DelegationManager          *delegationmgr.ContractDelegationManager
+	OpStateRetriever           *opstateretriever.ContractOperatorStateRetriever
+	BLSApkRegistry             *blsapkreg.ContractBLSApkRegistry
+	IndexRegistry              *indexreg.ContractIIndexRegistry
+	RegistryCoordinator        *regcoordinator.ContractRegistryCoordinator
+	StakeRegistry              *stakereg.ContractStakeRegistry
+	EigenDAServiceManager      *eigendasrvmg.ContractEigenDAServiceManager
+	EjectionManager            *ejectionmg.ContractEjectionManager
+	AVSDirectory               *avsdir.ContractAVSDirectory
+	SocketRegistry             *socketreg.ContractSocketRegistry
+	PaymentVault               *paymentvault.ContractPaymentVault
+	RelayRegistry              *relayreg.ContractEigenDARelayRegistry
+	ThresholdRegistry          *thresholdreg.ContractEigenDAThresholdRegistry
+	DisperserRegistry          *disperserreg.ContractEigenDADisperserRegistry
+	UsageAuthorizationRegistry *usageauthreg.ContractIUsageAuthorizationRegistry
 }
 
 type Reader struct {
@@ -66,7 +68,8 @@ func NewReader(
 	logger logging.Logger,
 	client common.EthClient,
 	blsOperatorStateRetrieverHexAddr string,
-	eigenDAServiceManagerHexAddr string) (*Reader, error) {
+	eigenDAServiceManagerHexAddr string,
+	usageAuthorizationRegistryHexAddr string) (*Reader, error) {
 
 	e := &Reader{
 		ethClient: client,
@@ -75,12 +78,13 @@ func NewReader(
 
 	blsOperatorStateRetrieverAddr := gethcommon.HexToAddress(blsOperatorStateRetrieverHexAddr)
 	eigenDAServiceManagerAddr := gethcommon.HexToAddress(eigenDAServiceManagerHexAddr)
-	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr)
+	usageAuthorizationRegistryAddr := gethcommon.HexToAddress(usageAuthorizationRegistryHexAddr)
+	err := e.updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr, usageAuthorizationRegistryAddr)
 
 	return e, err
 }
 
-func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address) error {
+func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDAServiceManagerAddr gethcommon.Address, usageAuthorizationRegistryAddr gethcommon.Address) error {
 
 	contractEigenDAServiceManager, err := eigendasrvmg.NewContractEigenDAServiceManager(eigenDAServiceManagerAddr, t.ethClient)
 	if err != nil {
@@ -147,7 +151,7 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		return err
 	}
 
-	t.logger.Debug("Addresses", "blsOperatorStateRetrieverAddr", blsOperatorStateRetrieverAddr.Hex(), "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "registryCoordinatorAddr", registryCoordinatorAddr.Hex(), "blsPubkeyRegistryAddr", blsPubkeyRegistryAddr.Hex())
+	t.logger.Debug("Addresses", "blsOperatorStateRetrieverAddr", blsOperatorStateRetrieverAddr.Hex(), "eigenDAServiceManagerAddr", eigenDAServiceManagerAddr.Hex(), "registryCoordinatorAddr", registryCoordinatorAddr.Hex(), "blsPubkeyRegistryAddr", blsPubkeyRegistryAddr.Hex(), "usageAuthorizationRegistryAddr", usageAuthorizationRegistryAddr.Hex())
 
 	contractBLSPubkeyReg, err := blsapkreg.NewContractBLSApkRegistry(blsPubkeyRegistryAddr, t.ethClient)
 	if err != nil {
@@ -240,23 +244,30 @@ func (t *Reader) updateContractBindings(blsOperatorStateRetrieverAddr, eigenDASe
 		}
 	}
 
+	contractUsageAuthorizationRegistry, err := usageauthreg.NewContractIUsageAuthorizationRegistry(usageAuthorizationRegistryAddr, t.ethClient)
+	if err != nil {
+		t.logger.Error("Failed to fetch IUsageAuthorizationRegistry contract", "err", err)
+		return err
+	}
+
 	t.bindings = &ContractBindings{
-		ServiceManagerAddr:    eigenDAServiceManagerAddr,
-		RegCoordinatorAddr:    registryCoordinatorAddr,
-		RelayRegistryAddress:  relayRegistryAddress,
-		AVSDirectory:          contractAVSDirectory,
-		SocketRegistry:        contractSocketRegistry,
-		OpStateRetriever:      contractBLSOpStateRetr,
-		BLSApkRegistry:        contractBLSPubkeyReg,
-		IndexRegistry:         contractIIndexReg,
-		RegistryCoordinator:   contractIRegistryCoordinator,
-		EjectionManager:       contractEjectionManager,
-		StakeRegistry:         contractStakeRegistry,
-		EigenDAServiceManager: contractEigenDAServiceManager,
-		DelegationManager:     contractDelegationManager,
-		PaymentVault:          contractPaymentVault,
-		ThresholdRegistry:     contractThresholdRegistry,
-		DisperserRegistry:     contractEigenDADisperserRegistry,
+		ServiceManagerAddr:         eigenDAServiceManagerAddr,
+		RegCoordinatorAddr:         registryCoordinatorAddr,
+		RelayRegistryAddress:       relayRegistryAddress,
+		AVSDirectory:               contractAVSDirectory,
+		SocketRegistry:             contractSocketRegistry,
+		OpStateRetriever:           contractBLSOpStateRetr,
+		BLSApkRegistry:             contractBLSPubkeyReg,
+		IndexRegistry:              contractIIndexReg,
+		RegistryCoordinator:        contractIRegistryCoordinator,
+		EjectionManager:            contractEjectionManager,
+		StakeRegistry:              contractStakeRegistry,
+		EigenDAServiceManager:      contractEigenDAServiceManager,
+		DelegationManager:          contractDelegationManager,
+		PaymentVault:               contractPaymentVault,
+		ThresholdRegistry:          contractThresholdRegistry,
+		DisperserRegistry:          contractEigenDADisperserRegistry,
+		UsageAuthorizationRegistry: contractUsageAuthorizationRegistry,
 	}
 	return nil
 }
@@ -804,60 +815,75 @@ func (t *Reader) GetAllVersionedBlobParams(ctx context.Context) (map[uint16]*cor
 	return res, nil
 }
 
-// TODO: later add quorumIds specifications
-func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment, error) {
-	if t.bindings.PaymentVault == nil {
-		return nil, errors.New("payment vault not deployed")
-	}
-
+// GetReservedPayments returns the reserved payments for the given accountIDs and quorumIDs
+// If the UsageAuthorizationRegistry is deployed, it will be used to get the reservations
+// The calls are currently made iteratively, and a future PR will add multicall3 to batch the calls
+// If the UsageAuthorizationRegistry is not deployed, it will fallback to the PaymentVault
+// If both are not deployed, it will return an error
+func (t *Reader) GetReservedPayments(ctx context.Context, accountIDs []gethcommon.Address, quorumIDs []core.QuorumID) (map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment, error) {
 	reservationsMap := make(map[gethcommon.Address]map[core.QuorumID]*core.ReservedPayment)
+	if t.bindings.UsageAuthorizationRegistry != nil {
+		for _, accountID := range accountIDs {
+			for _, quorumID := range quorumIDs {
+				if _, ok := reservationsMap[accountID]; !ok {
+					reservationsMap[accountID] = make(map[core.QuorumID]*core.ReservedPayment)
+				}
 
-	// In the new API, we need to query reservations per quorum and account
-	// For now, there's only one reservation per account, applied to multiple quorums
-	// TODO: update this to handle multiple quorums
-	for _, accountID := range accountIDs {
-		//TODO: add quorumId to the call
-		reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
-			Context: ctx,
-		}, accountID)
+				reservation, err := t.bindings.UsageAuthorizationRegistry.GetReservation(&bind.CallOpts{
+					Context: ctx,
+				}, uint64(quorumID), accountID)
 
-		if err != nil {
-			t.logger.Warn("failed to get reservation", "account", accountID, "err", err)
-			continue
+				if err != nil {
+					t.logger.Warn("failed to get reservation", "account", accountID, "quorum", quorumID, "err", err)
+					continue
+				}
+
+				res, err := ConvertUsageAuthorizationReservationToReservedPayment(reservation)
+				if err != nil {
+					t.logger.Warn("failed to convert reservation", "account", accountID, "quorum", quorumID, "err", err)
+					continue
+				}
+
+				reservationsMap[accountID][quorumID] = res
+			}
 		}
-
-		res, err := ConvertToReservedPayments(reservation)
-		if err != nil {
-			t.logger.Warn("failed to convert reservation", "account", accountID, "err", err)
-			continue
-		}
-
-		reservationsMap[accountID] = res
 	}
 
-	return reservationsMap, nil
-}
-
-// TODO: this function should take in a list of quorumIds
-func (t *Reader) GetReservedPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (map[core.QuorumID]*core.ReservedPayment, error) {
+	// PaymentVault is preserved for a short while, and will be removed as users migrate to the new API
 	if t.bindings.PaymentVault == nil {
-		return nil, errors.New("payment vault not deployed")
+		for _, accountID := range accountIDs {
+			reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
+				Context: ctx,
+			}, accountID)
+
+			if err != nil {
+				t.logger.Warn("failed to get reservation", "account", accountID, "err", err)
+				continue
+			}
+
+			res, err := ConvertToReservedPayments(reservation)
+			if err != nil {
+				t.logger.Warn("failed to convert reservation", "account", accountID, "err", err)
+				continue
+			}
+
+			reservationsMap[accountID] = res
+		}
 	}
-
-	reservation, err := t.bindings.PaymentVault.GetReservation(&bind.CallOpts{
-		Context: ctx,
-	}, accountID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return ConvertToReservedPayments(reservation)
+	return nil, errors.New("payment vault not deployed")
 }
 
 func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommon.Address) (map[gethcommon.Address]*core.OnDemandPayment, error) {
-	if t.bindings.PaymentVault == nil {
-		return nil, errors.New("payment vault not deployed")
+	// Use UsageAuthorizationRegistry if available, otherwise fall back to PaymentVault
+	if t.bindings.UsageAuthorizationRegistry != nil {
+		// TODO: Implement UsageAuthorizationRegistry method for getting on-demand payments
+		// For now, use the nested approach - check UsageAuthorizationRegistry first, then PaymentVault
+		if t.bindings.PaymentVault == nil {
+			return nil, errors.New("payment vault not deployed for fallback")
+		}
+		// Use PaymentVault as nested fallback within UsageAuthorizationRegistry context
+	} else if t.bindings.PaymentVault == nil {
+		return nil, errors.New("both payment vault and usage authorization registry not deployed")
 	}
 
 	paymentsMap := make(map[gethcommon.Address]*core.OnDemandPayment)
@@ -888,8 +914,16 @@ func (t *Reader) GetOnDemandPayments(ctx context.Context, accountIDs []gethcommo
 }
 
 func (t *Reader) GetOnDemandPaymentByAccount(ctx context.Context, accountID gethcommon.Address) (*core.OnDemandPayment, error) {
-	if t.bindings.PaymentVault == nil {
-		return nil, errors.New("payment vault not deployed")
+	// Use UsageAuthorizationRegistry if available, otherwise fall back to PaymentVault
+	if t.bindings.UsageAuthorizationRegistry != nil {
+		// TODO: Implement UsageAuthorizationRegistry method for getting on-demand payment by account
+		// For now, use the nested approach - check UsageAuthorizationRegistry first, then PaymentVault
+		if t.bindings.PaymentVault == nil {
+			return nil, errors.New("payment vault not deployed for fallback")
+		}
+		// Use PaymentVault as nested fallback within UsageAuthorizationRegistry context
+	} else if t.bindings.PaymentVault == nil {
+		return nil, errors.New("both payment vault and usage authorization registry not deployed")
 	}
 
 	// In the new API, we need to specify a quorumId (only 0 enabled for deposits)

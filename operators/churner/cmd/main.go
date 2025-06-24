@@ -73,7 +73,7 @@ func run(ctx *cli.Context) error {
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	tx, err := coreeth.NewWriter(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr)
+	tx, err := coreeth.NewWriter(logger, gethClient, config.BLSOperatorStateRetrieverAddr, config.EigenDAServiceManagerAddr, config.UsageAuthorizationRegistryAddr)
 	if err != nil {
 		log.Fatalln("could not create new transactor", err)
 	}

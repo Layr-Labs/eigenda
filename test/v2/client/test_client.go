@@ -221,7 +221,8 @@ func NewTestClient(
 		logger,
 		ethClient,
 		config.BLSOperatorStateRetrieverAddr,
-		config.EigenDAServiceManagerAddr)
+		config.EigenDAServiceManagerAddr,
+		"0x0000000000000000000000000000000000000000")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Ethereum reader: %w", err)
 	}

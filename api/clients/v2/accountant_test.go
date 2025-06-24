@@ -2,232 +2,224 @@ package clients
 
 import (
 	"encoding/hex"
-	"fmt"
+	"math"
 	"math/big"
 	"sync"
 	"testing"
 	"time"
 
-	disperser_rpc "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
+	v2 "github.com/Layr-Labs/eigenda/api/grpc/disperser/v2"
 	"github.com/Layr-Labs/eigenda/core"
 	"github.com/Layr-Labs/eigenda/core/meterer"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-const numBins = uint32(3)
-
-type newAccountantTest struct {
-	name              string
-	accountId         gethcommon.Address
-	reservation       *core.ReservedPayment
-	onDemand          *core.OnDemandPayment
-	reservationWindow uint64
-	pricePerSymbol    uint64
-	minNumSymbols     uint64
-	expectedRecords   []PeriodRecord
+// Helper function to create standard PaymentVaultParams for testing
+func createTestPaymentVaultParams(reservationWindow, pricePerSymbol, minNumSymbols uint64) *v2.PaymentVaultParams {
+	return &v2.PaymentVaultParams{
+		QuorumPaymentConfigs: map[uint32]*v2.PaymentQuorumConfig{
+			0: {
+				ReservationSymbolsPerSecond: 2000,
+				OnDemandSymbolsPerSecond:    1000,
+				OnDemandPricePerSymbol:      pricePerSymbol,
+			},
+			1: {
+				ReservationSymbolsPerSecond: 2000,
+				OnDemandSymbolsPerSecond:    1000,
+				OnDemandPricePerSymbol:      pricePerSymbol,
+			},
+		},
+		QuorumProtocolConfigs: map[uint32]*v2.PaymentQuorumProtocolConfig{
+			0: {
+				MinNumSymbols:              minNumSymbols,
+				ReservationAdvanceWindow:   10,
+				ReservationRateLimitWindow: reservationWindow,
+				OnDemandRateLimitWindow:    30,
+				OnDemandEnabled:            true,
+			},
+			1: {
+				MinNumSymbols:              minNumSymbols,
+				ReservationAdvanceWindow:   10,
+				ReservationRateLimitWindow: reservationWindow,
+				OnDemandRateLimitWindow:    30,
+				OnDemandEnabled:            true,
+			},
+		},
+		OnDemandQuorumNumbers: []uint32{0, 1},
+	}
 }
 
-func TestNewAccountant(t *testing.T) {
-	privateKey1, err := crypto.GenerateKey()
-	assert.NoError(t, err)
-	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
+func TestAccountant(t *testing.T) {
+	accountID := gethcommon.HexToAddress("0x123")
+	reservations := map[uint8]*core.ReservedPayment{
+		0: {
+			SymbolsPerSecond: 100,
+			StartTimestamp:   uint64(time.Now().Unix()),
+			EndTimestamp:     uint64(time.Now().Add(time.Hour).Unix()),
+		},
+		1: {
+			SymbolsPerSecond: 200,
+			StartTimestamp:   uint64(time.Now().Unix()),
+			EndTimestamp:     uint64(time.Now().Add(time.Hour).Unix()),
+		},
+	}
+	onDemand := &core.OnDemandPayment{
+		CumulativePayment: big.NewInt(1000),
+	}
 
-	tests := []newAccountantTest{
-		{
-			name:      "basic accountant initialization",
-			accountId: accountId,
-			reservation: &core.ReservedPayment{
+	acc := NewAccountant(accountID)
+	now := time.Now()
+	err := acc.SetPaymentState(&v2.GetPaymentStateForAllQuorumsReply{
+		PaymentVaultParams:       createTestPaymentVaultParams(10, 1, 100),
+		OnchainCumulativePayment: big.NewInt(1000).Bytes(),
+		Reservations: map[uint32]*v2.QuorumReservation{
+			0: {
 				SymbolsPerSecond: 100,
-				StartTimestamp:   100,
-				EndTimestamp:     200,
-				QuorumSplits:     []byte{50, 50},
-				QuorumNumbers:    []uint8{0, 1},
+				StartTimestamp:   uint32(now.Unix()),
+				EndTimestamp:     uint32(now.Add(time.Hour).Unix()),
 			},
-			onDemand: &core.OnDemandPayment{
-				CumulativePayment: big.NewInt(500),
-			},
-			reservationWindow: 6,
-			pricePerSymbol:    1,
-			minNumSymbols:     100,
-			expectedRecords: []PeriodRecord{
-				{Index: 0, Usage: 0},
-				{Index: 1, Usage: 0},
-				{Index: 2, Usage: 0},
+			1: {
+				SymbolsPerSecond: 200,
+				StartTimestamp:   uint32(now.Unix()),
+				EndTimestamp:     uint32(now.Add(time.Hour).Unix()),
 			},
 		},
-	}
+	})
+	require.NoError(t, err)
+	require.NotNil(t, acc)
+	assert.Equal(t, accountID, acc.accountID)
+	assert.Equal(t, reservations, acc.reservations)
+	assert.Equal(t, onDemand, acc.onDemand)
+	assert.NotNil(t, acc.periodRecords)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			accountant := NewAccountant(tt.accountId, tt.reservation, tt.onDemand, tt.reservationWindow, tt.pricePerSymbol, tt.minNumSymbols, numBins)
+	// Should return minimum symbols for zero symbols
+	header, err := acc.AccountBlob(now.UnixNano(), 0, []uint8{0})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "zero symbols requested")
+	assert.Nil(t, header)
 
-			assert.NotNil(t, accountant)
-			assert.Equal(t, tt.reservation, accountant.reservation)
-			assert.Equal(t, tt.onDemand, accountant.onDemand)
-			assert.Equal(t, tt.reservationWindow, accountant.reservationWindow)
-			assert.Equal(t, tt.pricePerSymbol, accountant.pricePerSymbol)
-			assert.Equal(t, tt.minNumSymbols, accountant.minNumSymbols)
-			assert.Equal(t, tt.expectedRecords, accountant.periodRecords)
-			assert.Equal(t, big.NewInt(0), accountant.cumulativePayment)
-		})
-	}
+	// Should return zero payment for empty quorum list
+	header, err = acc.AccountBlob(now.UnixNano(), 50, []uint8{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no quorums provided")
+	assert.Nil(t, header)
+
+	// Try to use maximum possible symbols
+	maxSymbols := uint64(math.MaxUint64)
+	header, err = acc.AccountBlob(now.UnixNano(), maxSymbols, []uint8{0})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "insufficient ondemand payment")
+	assert.Nil(t, header)
 }
 
-type accountBlobReservationTest struct {
-	name           string
-	symbolLength   uint64
-	expectedHeader *core.PaymentMetadata
-	expectedState  periodRecordState
-}
-
-func TestAccountBlob_Reservation(t *testing.T) {
-	baseTime := time.Now()
-	reservation := &core.ReservedPayment{
+func TestAccountant_Reservation(t *testing.T) {
+	reservation := &v2.QuorumReservation{
 		SymbolsPerSecond: 200,
-		StartTimestamp:   uint64(baseTime.Add(-10 * time.Second).Unix()),
-		EndTimestamp:     uint64(baseTime.Add(10 * time.Second).Unix()),
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
-	}
-	onDemand := &core.OnDemandPayment{
-		CumulativePayment: big.NewInt(500),
+		StartTimestamp:   uint32(time.Now().Unix()),
+		EndTimestamp:     uint32(time.Now().Add(time.Hour).Unix()),
 	}
 	reservationWindow := uint64(5)
-	pricePerSymbol := uint64(1)
-	minNumSymbols := uint64(100)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	accountant := NewAccountant(accountId)
 
+	// Create payment state with test configurations
+	paymentState := &v2.GetPaymentStateForAllQuorumsReply{
+		PaymentVaultParams:       createTestPaymentVaultParams(reservationWindow, 1, 100),
+		OnchainCumulativePayment: big.NewInt(500).Bytes(),
+		Reservations:             map[uint32]*v2.QuorumReservation{0: reservation, 1: reservation},
+	}
+	err = accountant.SetPaymentState(paymentState)
+	assert.NoError(t, err)
+
+	symbolLength := uint64(500)
 	quorums := []uint8{0, 1}
+	now := time.Now().UnixNano()
 
-	tests := []accountBlobReservationTest{
-		{
-			name:         "First call - use reservation",
-			symbolLength: 500,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(0),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 500,
-				NextPeriodUsage:    0,
-				OverflowUsage:      0,
-			},
-		},
-		{
-			name:         "Second call - use reservation with overflow",
-			symbolLength: 700,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(0),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 1200,
-				NextPeriodUsage:    0,
-				OverflowUsage:      200,
-			},
-		},
-		{
-			name:         "Third call - use on-demand payment",
-			symbolLength: 300,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(300),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 1200,
-				NextPeriodUsage:    0,
-				OverflowUsage:      200,
-			},
-		},
-	}
+	header, err := accountant.AccountBlob(now, symbolLength, []uint8{0, 1, 2})
+	assert.Nil(t, header)
+	assert.Error(t, err, "no reservation found for quorum")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			now := baseTime.UnixNano()
-			header, err := accountant.AccountBlob(now, tt.symbolLength, quorums)
+	header, err = accountant.AccountBlob(now, symbolLength, quorums)
+	assert.NoError(t, err)
+	window := accountant.paymentVaultParams.QuorumProtocolConfigs[0].ReservationRateLimitWindow
+	assert.Equal(t, meterer.GetReservationPeriod(time.Now().Unix(), window), meterer.GetReservationPeriodByNanosecond(header.Timestamp, window))
+	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 
-			assert.NoError(t, err)
-			assert.NotEqual(t, uint64(0), header.Timestamp)
-			assert.Equal(t, tt.expectedHeader.AccountID, header.AccountID)
-			assert.Equal(t, tt.expectedHeader.CumulativePayment, header.CumulativePayment)
+	// Check that usage for quorum 0 was updated properly
+	currentPeriod := meterer.GetReservationPeriodByNanosecond(now, window)
+	record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, 0)
+	assert.Equal(t, symbolLength, record.Usage)
 
-			period := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
-			assert.Equal(t, tt.expectedState.CurrentPeriodUsage, getRelativePeriodRecord(period, reservationWindow, accountant.periodRecords).Usage)
-			assert.Equal(t, tt.expectedState.NextPeriodUsage, getRelativePeriodRecord(period+reservationWindow, reservationWindow, accountant.periodRecords).Usage)
-			assert.Equal(t, tt.expectedState.OverflowUsage, getRelativePeriodRecord(meterer.GetOverflowPeriod(period, reservationWindow), reservationWindow, accountant.periodRecords).Usage)
-		})
-	}
+	symbolLength = uint64(700)
+
+	now = time.Now().UnixNano()
+	header, err = accountant.AccountBlob(now, symbolLength, quorums)
+
+	assert.NoError(t, err)
+	assert.NotEqual(t, uint64(0), header.Timestamp)
+	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
+
+	// With overflow, usage should be at the limit in the current period
+	binLimit := meterer.GetReservationBinLimit(accountant.reservations[0], window)
+	expectedUsage := binLimit
+	assert.Equal(t, expectedUsage, record.Usage)
+
+	// Check overflow usage
+	overflowIndex := meterer.GetOverflowPeriod(currentPeriod, window)
+	expectedOverflow := symbolLength - (binLimit - 500) // 700 - (1000 - 500) = 200
+	relativeRecord := accountant.periodRecords.GetRelativePeriodRecord(overflowIndex, 0)
+	assert.Equal(t, expectedOverflow, relativeRecord.Usage)
+
+	// Second call should use on-demand payment
+	now = time.Now().UnixNano()
+	header, err = accountant.AccountBlob(now, 300, quorums)
+
+	assert.NoError(t, err)
+	assert.NotEqual(t, uint64(0), header.Timestamp)
+	assert.Equal(t, big.NewInt(300), header.CumulativePayment)
 }
 
-type accountBlobOnDemandTest struct {
-	name           string
-	symbolLength   uint64
-	expectedHeader *core.PaymentMetadata
-	expectedState  periodRecordState
-}
-
-func TestAccountBlob_OnDemand(t *testing.T) {
-	reservation := &core.ReservedPayment{
-		SymbolsPerSecond: 200,
-		StartTimestamp:   100,
-		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
-	}
-	onDemand := &core.OnDemandPayment{
-		CumulativePayment: big.NewInt(1500),
-	}
-	reservationWindow := uint64(5)
-	pricePerSymbol := uint64(1)
-	minNumSymbols := uint64(100)
-
+func TestAccountant_OnDemand(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
-	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
-
+	numSymbols := uint64(1500)
 	quorums := []uint8{0, 1}
-	baseTime := time.Now().UnixNano()
+	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
+	accountant := NewAccountant(accountId)
+	err = accountant.SetPaymentState(&v2.GetPaymentStateForAllQuorumsReply{
+		PaymentVaultParams:       createTestPaymentVaultParams(5, 1, 100),
+		OnchainCumulativePayment: big.NewInt(1500).Bytes(),
+		Reservations:             map[uint32]*v2.QuorumReservation{},
+	})
+	assert.NoError(t, err)
 
-	tests := []accountBlobOnDemandTest{
-		{
-			name:         "Use on-demand payment",
-			symbolLength: 1500,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(1500),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 0,
-				NextPeriodUsage:    0,
-				OverflowUsage:      0,
-			},
-		},
+	now := time.Now().UnixNano()
+
+	// valid payment
+	header, err := accountant.AccountBlob(now, numSymbols, quorums)
+	assert.NoError(t, err)
+
+	pricePerSymbol := accountant.paymentVaultParams.QuorumPaymentConfigs[0].OnDemandPricePerSymbol
+	assert.NoError(t, err)
+	expectedPayment := big.NewInt(int64(numSymbols * pricePerSymbol))
+	assert.NotEqual(t, uint64(0), header.Timestamp)
+	assert.Equal(t, expectedPayment, header.CumulativePayment)
+
+	// Check that no reservation usage was recorded
+	for quorumNumber, records := range accountant.periodRecords {
+		for _, record := range records {
+			assert.Equal(t, uint64(0), record.Usage, "Usage should be 0 for quorum %d", quorumNumber)
+		}
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			now := baseTime
-			header, err := accountant.AccountBlob(now, tt.symbolLength, quorums)
+	assert.Equal(t, expectedPayment, accountant.cumulativePayment)
 
-			assert.NoError(t, err)
-			assert.NotEqual(t, uint64(0), header.Timestamp)
-			assert.Equal(t, tt.expectedHeader.AccountID, header.AccountID)
-			assert.Equal(t, tt.expectedHeader.CumulativePayment, header.CumulativePayment)
-
-			period := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
-			assert.Equal(t, tt.expectedState.CurrentPeriodUsage, getRelativePeriodRecord(period, reservationWindow, accountant.periodRecords).Usage)
-			assert.Equal(t, tt.expectedState.NextPeriodUsage, getRelativePeriodRecord(period+reservationWindow, reservationWindow, accountant.periodRecords).Usage)
-			assert.Equal(t, tt.expectedState.OverflowUsage, getRelativePeriodRecord(meterer.GetOverflowPeriod(period, reservationWindow), reservationWindow, accountant.periodRecords).Usage)
-			assert.Equal(t, tt.expectedHeader.CumulativePayment, accountant.cumulativePayment)
-		})
-	}
 }
 
 type accountBlobInsufficientOnDemandTest struct {
@@ -237,19 +229,20 @@ type accountBlobInsufficientOnDemandTest struct {
 	errorMessage string
 }
 
-func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
-	reservation := &core.ReservedPayment{}
-	onDemand := &core.OnDemandPayment{
-		CumulativePayment: big.NewInt(500),
-	}
-	reservationWindow := uint64(60)
-	pricePerSymbol := uint64(100)
-	minNumSymbols := uint64(100)
-
+func TestAccountant_InsufficientOnDemand(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	accountant := NewAccountant(accountId)
+
+	// Create payment state with test configurations
+	paymentState := &v2.GetPaymentStateForAllQuorumsReply{
+		PaymentVaultParams:       createTestPaymentVaultParams(60, 100, 100),
+		OnchainCumulativePayment: big.NewInt(500).Bytes(),
+		Reservations:             map[uint32]*v2.QuorumReservation{},
+	}
+	err = accountant.SetPaymentState(paymentState)
+	assert.NoError(t, err)
 
 	quorums := []uint8{0, 1}
 	baseTime := time.Now().UnixNano()
@@ -266,12 +259,14 @@ func TestAccountBlob_InsufficientOnDemand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			now := baseTime
-			_, err := accountant.AccountBlob(now, tt.symbolLength, quorums)
+			header, err := accountant.AccountBlob(now, tt.symbolLength, quorums)
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMessage)
+				assert.Nil(t, header)
 			} else {
 				assert.NoError(t, err)
+				assert.NotNil(t, header)
 			}
 		})
 	}
@@ -281,31 +276,37 @@ type accountBlobCallSeriesTest struct {
 	name           string
 	symbolLength   uint64
 	expectedHeader *core.PaymentMetadata
-	expectedState  periodRecordState
+	expectedState  meterer.PeriodRecord
 	expectError    bool
 	errorMessage   string
 }
 
-func TestAccountBlobCallSeries(t *testing.T) {
-	baseTime := time.Now()
-	reservation := &core.ReservedPayment{
-		SymbolsPerSecond: 200,
-		StartTimestamp:   uint64(baseTime.Add(-10 * time.Second).Unix()),
-		EndTimestamp:     uint64(baseTime.Add(10 * time.Second).Unix()),
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
-	}
-	onDemand := &core.OnDemandPayment{
-		CumulativePayment: big.NewInt(1000),
-	}
-	reservationWindow := uint64(5)
-	pricePerSymbol := uint64(1)
-	minNumSymbols := uint64(100)
-
+func TestAccountant_AccountBlobCallSeries(t *testing.T) {
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
+	reservationWindow := uint64(5)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	accountant := NewAccountant(accountId)
+
+	// Create payment state with test configurations
+	paymentState := &v2.GetPaymentStateForAllQuorumsReply{
+		PaymentVaultParams:       createTestPaymentVaultParams(reservationWindow, 1, 100),
+		OnchainCumulativePayment: big.NewInt(1000).Bytes(),
+		Reservations: map[uint32]*v2.QuorumReservation{
+			0: {
+				SymbolsPerSecond: 200,
+				StartTimestamp:   uint32(time.Now().Unix()),
+				EndTimestamp:     uint32(time.Now().Add(time.Hour).Unix()),
+			},
+			1: {
+				SymbolsPerSecond: 200,
+				StartTimestamp:   uint32(time.Now().Unix()),
+				EndTimestamp:     uint32(time.Now().Add(time.Hour).Unix()),
+			},
+		},
+	}
+	err = accountant.SetPaymentState(paymentState)
+	assert.NoError(t, err)
 
 	quorums := []uint8{0, 1}
 
@@ -317,10 +318,9 @@ func TestAccountBlobCallSeries(t *testing.T) {
 				AccountID:         accountId,
 				CumulativePayment: big.NewInt(0),
 			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 800,
-				NextPeriodUsage:    0,
-				OverflowUsage:      0,
+			expectedState: meterer.PeriodRecord{
+				Index: 800,
+				Usage: 800,
 			},
 		},
 		{
@@ -330,10 +330,9 @@ func TestAccountBlobCallSeries(t *testing.T) {
 				AccountID:         accountId,
 				CumulativePayment: big.NewInt(0),
 			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 1100,
-				NextPeriodUsage:    0,
-				OverflowUsage:      100,
+			expectedState: meterer.PeriodRecord{
+				Index: 1100,
+				Usage: 100,
 			},
 		},
 		{
@@ -343,10 +342,9 @@ func TestAccountBlobCallSeries(t *testing.T) {
 				AccountID:         accountId,
 				CumulativePayment: big.NewInt(500),
 			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 1100,
-				NextPeriodUsage:    0,
-				OverflowUsage:      100,
+			expectedState: meterer.PeriodRecord{
+				Index: 1100,
+				Usage: 100,
 			},
 		},
 		{
@@ -359,7 +357,7 @@ func TestAccountBlobCallSeries(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			now := baseTime.UnixNano()
+			now := time.Now().UnixNano()
 			header, err := accountant.AccountBlob(now, tt.symbolLength, quorums)
 
 			if tt.expectError {
@@ -370,763 +368,730 @@ func TestAccountBlobCallSeries(t *testing.T) {
 				assert.NotEqual(t, uint64(0), header.Timestamp)
 				assert.Equal(t, tt.expectedHeader.AccountID, header.AccountID)
 				assert.Equal(t, tt.expectedHeader.CumulativePayment, header.CumulativePayment)
-
-				period := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
-				assert.Equal(t, tt.expectedState.CurrentPeriodUsage, getRelativePeriodRecord(period, reservationWindow, accountant.periodRecords).Usage)
-				assert.Equal(t, tt.expectedState.NextPeriodUsage, getRelativePeriodRecord(period+reservationWindow, reservationWindow, accountant.periodRecords).Usage)
-				assert.Equal(t, tt.expectedState.OverflowUsage, getRelativePeriodRecord(meterer.GetOverflowPeriod(period, reservationWindow), reservationWindow, accountant.periodRecords).Usage)
 			}
 		})
 	}
-}
-
-type accountBlobBinRotationTest struct {
-	name           string
-	timeOffset     time.Duration
-	symbolLength   uint64
-	expectedHeader *core.PaymentMetadata
-	expectedState  periodRecordState
 }
 
 func TestAccountBlob_BinRotation(t *testing.T) {
-	baseTime := time.Now()
-	reservation := &core.ReservedPayment{
-		SymbolsPerSecond: 1000,
-		StartTimestamp:   uint64(baseTime.Add(-10 * time.Second).Unix()),
-		EndTimestamp:     uint64(baseTime.Add(10 * time.Second).Unix()),
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
-	}
-	onDemand := &core.OnDemandPayment{
-		CumulativePayment: big.NewInt(1000),
-	}
-	reservationWindow := uint64(1) // Set to 1 second for testing
-	pricePerSymbol := uint64(1)
-	minNumSymbols := uint64(100)
-
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
+	reservationWindow := uint64(1)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	accountant := NewAccountant(accountId)
+
+	// Create payment state with test configurations
+	paymentState := &v2.GetPaymentStateForAllQuorumsReply{
+		PaymentVaultParams:       createTestPaymentVaultParams(reservationWindow, 1, 100),
+		OnchainCumulativePayment: big.NewInt(1000).Bytes(),
+		Reservations: map[uint32]*v2.QuorumReservation{
+			0: {
+				SymbolsPerSecond: 1000,
+				StartTimestamp:   uint32(time.Now().Unix()),
+				EndTimestamp:     uint32(time.Now().Add(time.Hour).Unix()),
+			},
+			1: {
+				SymbolsPerSecond: 1000,
+				StartTimestamp:   uint32(time.Now().Unix()),
+				EndTimestamp:     uint32(time.Now().Add(time.Hour).Unix()),
+			},
+		},
+	}
+	err = accountant.SetPaymentState(paymentState)
+	assert.NoError(t, err)
 
 	quorums := []uint8{0, 1}
 
-	tests := []accountBlobBinRotationTest{
-		{
-			name:         "First call - Initial usage",
-			timeOffset:   0,
-			symbolLength: 800,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(0),
+	// First call
+	now := time.Now().UnixNano()
+	currentPeriod := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+	_, err = accountant.AccountBlob(now, 800, quorums)
+	assert.NoError(t, err)
+
+	// Check bin 0 has usage 800 for charged quorums
+	for _, quorumNumber := range quorums {
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		assert.Equal(t, uint64(800), record.Usage)
+	}
+
+	// Second call
+	now += int64(reservationWindow) * time.Second.Nanoseconds()
+	nextPeriod := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+	_, err = accountant.AccountBlob(now, 300, quorums)
+	assert.NoError(t, err)
+
+	// Check bin 1 has usage 300
+	for _, quorumNumber := range quorums {
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		assert.Equal(t, uint64(800), record.Usage)
+		record = accountant.periodRecords.GetRelativePeriodRecord(nextPeriod, quorumNumber)
+		assert.Equal(t, uint64(300), record.Usage)
+	}
+
+	// Third call
+	_, err = accountant.AccountBlob(now, 500, quorums)
+	assert.NoError(t, err)
+
+	// Check bin 1 now has usage 800
+	for _, quorumNumber := range quorums {
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		assert.Equal(t, uint64(800), record.Usage)
+		record = accountant.periodRecords.GetRelativePeriodRecord(nextPeriod, quorumNumber)
+		assert.Equal(t, uint64(800), record.Usage)
+	}
+}
+
+func TestAccountant_Concurrent(t *testing.T) {
+	privateKey1, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+	reservationWindow := uint64(1)
+	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
+	accountant := NewAccountant(accountId)
+
+	// Create payment state with test configurations
+	paymentState := &v2.GetPaymentStateForAllQuorumsReply{
+		PaymentVaultParams:       createTestPaymentVaultParams(reservationWindow, 1, 100),
+		OnchainCumulativePayment: big.NewInt(1000).Bytes(),
+		Reservations: map[uint32]*v2.QuorumReservation{
+			0: {
+				SymbolsPerSecond: 1000,
+				StartTimestamp:   uint32(time.Now().Unix()),
+				EndTimestamp:     uint32(time.Now().Add(time.Hour).Unix()),
 			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 800,
-				NextPeriodUsage:    0,
-				OverflowUsage:      0,
-			},
-		},
-		{
-			name:         "Second call - After window",
-			timeOffset:   time.Duration(reservationWindow) * time.Second,
-			symbolLength: 300,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(0),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 300,
-				NextPeriodUsage:    0,
-				OverflowUsage:      800, // previous bin not reset yet
-			},
-		},
-		{
-			name:         "Third call - Same window",
-			timeOffset:   time.Duration(reservationWindow) * time.Second,
-			symbolLength: 500,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(0),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 800,
-				NextPeriodUsage:    0,
-				OverflowUsage:      800,
+			1: {
+				SymbolsPerSecond: 1000,
+				StartTimestamp:   uint32(time.Now().Unix()),
+				EndTimestamp:     uint32(time.Now().Add(time.Hour).Unix()),
 			},
 		},
 	}
+	err = accountant.SetPaymentState(paymentState)
+	assert.NoError(t, err)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			now := baseTime.UnixNano() + tt.timeOffset.Nanoseconds()
-			header, err := accountant.AccountBlob(now, tt.symbolLength, quorums)
+	quorums := []uint8{0, 1}
 
+	// Start concurrent AccountBlob calls
+	now := time.Now().UnixNano()
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := accountant.AccountBlob(now, 100, quorums)
 			assert.NoError(t, err)
-			assert.NotEqual(t, uint64(0), header.Timestamp)
-			assert.Equal(t, tt.expectedHeader.AccountID, header.AccountID)
-			assert.Equal(t, tt.expectedHeader.CumulativePayment, header.CumulativePayment)
-
-			period := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
-			assert.Equal(t, tt.expectedState.CurrentPeriodUsage, getRelativePeriodRecord(period, reservationWindow, accountant.periodRecords).Usage)
-			assert.Equal(t, tt.expectedState.NextPeriodUsage, getRelativePeriodRecord(period+reservationWindow, reservationWindow, accountant.periodRecords).Usage)
-			assert.Equal(t, tt.expectedState.OverflowUsage, getRelativePeriodRecord(meterer.GetOverflowPeriod(period, reservationWindow), reservationWindow, accountant.periodRecords).Usage)
-		})
-	}
-}
-
-type concurrentBinRotationTest struct {
-	name          string
-	numGoroutines int
-	symbolLength  uint64
-	expectedTotal uint64
-}
-
-func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
-	baseTime := time.Now()
-	reservation := &core.ReservedPayment{
-		SymbolsPerSecond: 1000,
-		StartTimestamp:   uint64(baseTime.Add(-10 * time.Second).Unix()),
-		EndTimestamp:     uint64(baseTime.Add(10 * time.Second).Unix()),
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
-	}
-	onDemand := &core.OnDemandPayment{
-		CumulativePayment: big.NewInt(1000),
-	}
-	reservationWindow := uint64(1) // Set to 1 second for testing
-	pricePerSymbol := uint64(1)
-	minNumSymbols := uint64(100)
-
-	privateKey1, err := crypto.GenerateKey()
-	assert.NoError(t, err)
-	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
-
-	quorums := []uint8{0, 1}
-
-	tests := []concurrentBinRotationTest{
-		{
-			name:          "Concurrent calls with 10 goroutines",
-			numGoroutines: 10,
-			symbolLength:  100,
-			expectedTotal: 1000,
-		},
+		}()
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var wg sync.WaitGroup
-			for i := 0; i < tt.numGoroutines; i++ {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					now := time.Now().UnixNano()
-					_, err := accountant.AccountBlob(now, tt.symbolLength, quorums)
-					assert.NoError(t, err)
-				}()
-			}
+	// Wait for all goroutines to finish
+	wg.Wait()
 
-			// Wait for all goroutines to finish
-			wg.Wait()
-
-			// Check final state
-			now := time.Now().UnixNano()
-			period := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
-			totalUsage := getRelativePeriodRecord(period, reservationWindow, accountant.periodRecords).Usage +
-				getRelativePeriodRecord(period+reservationWindow, reservationWindow, accountant.periodRecords).Usage +
-				getRelativePeriodRecord(meterer.GetOverflowPeriod(period, reservationWindow), reservationWindow, accountant.periodRecords).Usage
-			assert.Equal(t, tt.expectedTotal, totalUsage)
-		})
+	// Check final state
+	for _, quorumNumber := range quorums {
+		currentPeriod := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		assert.Equal(t, uint64(1000), record.Usage)
 	}
-}
-
-type accountBlobReservationWithOneOverflowTest struct {
-	name           string
-	symbolLength   uint64
-	expectedHeader *core.PaymentMetadata
-	expectedState  periodRecordState
 }
 
 func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
-	baseTime := time.Now()
-	reservation := &core.ReservedPayment{
-		SymbolsPerSecond: 200,
-		StartTimestamp:   uint64(baseTime.Add(-10 * time.Second).Unix()),
-		EndTimestamp:     uint64(baseTime.Add(10 * time.Second).Unix()),
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
-	}
-	onDemand := &core.OnDemandPayment{
-		CumulativePayment: big.NewInt(1000),
-	}
-	reservationWindow := uint64(5)
-	pricePerSymbol := uint64(1)
-	minNumSymbols := uint64(100)
-
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
+	reservationWindow := uint64(5)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	accountant := NewAccountant(accountId)
+
+	// Create payment state with test configurations
+	paymentState := &v2.GetPaymentStateForAllQuorumsReply{
+		PaymentVaultParams:       createTestPaymentVaultParams(reservationWindow, 1, 100),
+		OnchainCumulativePayment: big.NewInt(1000).Bytes(),
+		Reservations: map[uint32]*v2.QuorumReservation{
+			0: {
+				SymbolsPerSecond: 200,
+				StartTimestamp:   uint32(time.Now().Unix()),
+				EndTimestamp:     uint32(time.Now().Add(time.Hour).Unix()),
+			},
+			1: {
+				SymbolsPerSecond: 200,
+				StartTimestamp:   uint32(time.Now().Unix()),
+				EndTimestamp:     uint32(time.Now().Add(time.Hour).Unix()),
+			},
+		},
+	}
+	err = accountant.SetPaymentState(paymentState)
+	assert.NoError(t, err)
 
 	quorums := []uint8{0, 1}
+	now := time.Now().UnixNano()
+	currentPeriod := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+	header, err := accountant.AccountBlob(now, 800, quorums)
+	assert.NoError(t, err)
+	timestamp := (time.Duration(header.Timestamp) * time.Nanosecond).Seconds()
+	assert.Equal(t, uint64(meterer.GetReservationPeriodByNanosecond(now, reservationWindow)), uint64(meterer.GetReservationPeriod(int64(timestamp), reservationWindow)))
+	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
 
-	tests := []accountBlobReservationWithOneOverflowTest{
-		{
-			name:         "First call - Okay reservation",
-			symbolLength: 800,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(0),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 800,
-				NextPeriodUsage:    0,
-				OverflowUsage:      0,
-			},
-		},
-		{
-			name:         "Second call - Allow one overflow",
-			symbolLength: 500,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(0),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 1300,
-				NextPeriodUsage:    0,
-				OverflowUsage:      300,
-			},
-		},
-		{
-			name:         "Third call - Use on-demand payment",
-			symbolLength: 200,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(200),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 1300,
-				NextPeriodUsage:    0,
-				OverflowUsage:      300,
-			},
-		},
+	// Check current period usage
+	for _, quorumNumber := range quorums {
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		assert.Equal(t, uint64(800), record.Usage)
+	}
+	// Second call: Allow one overflow
+	header, err = accountant.AccountBlob(now, 500, quorums)
+	assert.NoError(t, err)
+	assert.Equal(t, big.NewInt(0), header.CumulativePayment)
+
+	// Check current period is at limit
+	binLimit := accountant.reservations[0].SymbolsPerSecond * uint64(reservationWindow) // 1000
+	for _, quorumNumber := range quorums {
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		assert.Equal(t, binLimit, record.Usage)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			now := baseTime.UnixNano()
-			header, err := accountant.AccountBlob(now, tt.symbolLength, quorums)
-
-			assert.NoError(t, err)
-			assert.NotEqual(t, uint64(0), header.Timestamp)
-			assert.Equal(t, tt.expectedHeader.AccountID, header.AccountID)
-			assert.Equal(t, tt.expectedHeader.CumulativePayment, header.CumulativePayment)
-
-			period := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
-			assert.Equal(t, tt.expectedState.CurrentPeriodUsage, getRelativePeriodRecord(period, reservationWindow, accountant.periodRecords).Usage)
-			assert.Equal(t, tt.expectedState.NextPeriodUsage, getRelativePeriodRecord(period+reservationWindow, reservationWindow, accountant.periodRecords).Usage)
-			assert.Equal(t, tt.expectedState.OverflowUsage, getRelativePeriodRecord(meterer.GetOverflowPeriod(period, reservationWindow), reservationWindow, accountant.periodRecords).Usage)
-		})
+	// Check overflow period has the overflow
+	for _, quorumNumber := range quorums {
+		overflowRecord := accountant.periodRecords.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, reservationWindow), quorumNumber)
+		assert.Equal(t, uint64(300), overflowRecord.Usage) // 800 + 500 - 1000 = 300
 	}
-}
 
-type accountBlobReservationOverflowResetTest struct {
-	name           string
-	timeOffset     time.Duration
-	symbolLength   uint64
-	expectedHeader *core.PaymentMetadata
-	expectedState  periodRecordState
+	// Third call: Should use on-demand payment
+	now = time.Now().UnixNano()
+	header, err = accountant.AccountBlob(now, 200, quorums)
+	assert.NoError(t, err)
+	assert.NotEqual(t, uint64(0), header.Timestamp)
+	assert.Equal(t, big.NewInt(200), header.CumulativePayment)
+	for _, quorumNumber := range quorums {
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		assert.Equal(t, uint64(binLimit), record.Usage)
+		record = accountant.periodRecords.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, reservationWindow), quorumNumber)
+		assert.Equal(t, uint64(300), record.Usage)
+	}
 }
 
 func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
-	baseTime := time.Now()
-	reservation := &core.ReservedPayment{
-		SymbolsPerSecond: 1000,
-		StartTimestamp:   uint64(baseTime.Add(-10 * time.Second).Unix()),
-		EndTimestamp:     uint64(baseTime.Add(10 * time.Second).Unix()),
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
+	privateKey1, err := crypto.GenerateKey()
+	assert.NoError(t, err)
+	reservationWindow := uint64(1)
+	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
+	accountant := NewAccountant(accountId)
+
+	// Create payment state with test configurations
+	paymentState := &v2.GetPaymentStateForAllQuorumsReply{
+		PaymentVaultParams:       createTestPaymentVaultParams(reservationWindow, 1, 100),
+		OnchainCumulativePayment: big.NewInt(1000).Bytes(),
+		Reservations: map[uint32]*v2.QuorumReservation{
+			0: {
+				SymbolsPerSecond: 1000,
+				StartTimestamp:   uint32(time.Now().Unix()),
+				EndTimestamp:     uint32(time.Now().Add(time.Hour).Unix()),
+			},
+			1: {
+				SymbolsPerSecond: 1000,
+				StartTimestamp:   uint32(time.Now().Unix()),
+				EndTimestamp:     uint32(time.Now().Add(time.Hour).Unix()),
+			},
+		},
 	}
-	onDemand := &core.OnDemandPayment{
-		CumulativePayment: big.NewInt(1000),
+	err = accountant.SetPaymentState(paymentState)
+	assert.NoError(t, err)
+
+	quorums := []uint8{0, 1}
+
+	// full reservation
+	now := time.Now().UnixNano()
+	currentPeriod := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+	_, err = accountant.AccountBlob(now, 1000, quorums)
+	assert.NoError(t, err)
+
+	// Check current period is at limit
+	for _, quorumNumber := range quorums {
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		assert.Equal(t, uint64(1000), record.Usage)
 	}
-	reservationWindow := uint64(1) // Set to 1 second for testing
-	pricePerSymbol := uint64(1)
-	minNumSymbols := uint64(100)
+
+	// no overflow
+	now = time.Now().UnixNano()
+	header, err := accountant.AccountBlob(now, 500, quorums)
+	assert.NoError(t, err)
+	for _, quorumNumber := range quorums {
+		record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, quorumNumber)
+		assert.Equal(t, uint64(1000), record.Usage)
+	}
+	assert.Equal(t, big.NewInt(500), header.CumulativePayment)
+
+	// Wait for next reservation duration
+	time.Sleep(time.Duration(reservationWindow) * time.Second)
+
+	// Third call: Should use new bin and allow overflow again
+	now = time.Now().UnixNano()
+	nextPeriod := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
+	assert.Equal(t, currentPeriod+1, nextPeriod, "Should be next period")
+
+	_, err = accountant.AccountBlob(now, 500, quorums)
+	assert.NoError(t, err)
+
+	// Check next period has usage 500
+	for _, quorumNumber := range quorums {
+		record := accountant.periodRecords.GetRelativePeriodRecord(nextPeriod, quorumNumber)
+		assert.Equal(t, uint64(500), record.Usage)
+	}
+}
+
+func TestAccountant_SetPaymentState(t *testing.T) {
+	accountID := gethcommon.HexToAddress("0x123")
+	acc := NewAccountant(accountID)
+
+	tests := []struct {
+		name    string
+		state   *v2.GetPaymentStateForAllQuorumsReply
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "nil payment state",
+			state:   nil,
+			wantErr: true,
+			errMsg:  "payment state cannot be nil",
+		},
+		{
+			name:    "nil payment vault params",
+			state:   &v2.GetPaymentStateForAllQuorumsReply{},
+			wantErr: true,
+			errMsg:  "payment vault params cannot be nil",
+		},
+		{
+			name: "successful state update",
+			state: &v2.GetPaymentStateForAllQuorumsReply{
+				PaymentVaultParams: &v2.PaymentVaultParams{
+					QuorumPaymentConfigs: map[uint32]*v2.PaymentQuorumConfig{
+						0: {
+							ReservationSymbolsPerSecond: 100,
+							OnDemandSymbolsPerSecond:    200,
+							OnDemandPricePerSymbol:      10,
+						},
+					},
+					QuorumProtocolConfigs: map[uint32]*v2.PaymentQuorumProtocolConfig{
+						0: {
+							MinNumSymbols:              1,
+							ReservationAdvanceWindow:   2,
+							ReservationRateLimitWindow: 3,
+							OnDemandRateLimitWindow:    4,
+							OnDemandEnabled:            true,
+						},
+					},
+				},
+				Reservations: map[uint32]*v2.QuorumReservation{
+					0: {
+						SymbolsPerSecond: 100,
+						StartTimestamp:   1000,
+						EndTimestamp:     2000,
+					},
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := acc.SetPaymentState(tt.state)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, acc.paymentVaultParams.QuorumPaymentConfigs[0])
+				assert.NotNil(t, acc.paymentVaultParams.QuorumProtocolConfigs[0])
+				assert.NotNil(t, acc.reservations[0])
+			}
+		})
+	}
+}
+
+func TestAccountant_UseReservation(t *testing.T) {
+	accountID := gethcommon.HexToAddress("0x123")
+	now := time.Now().UnixNano()
+	acc := NewAccountant(accountID)
+	err := acc.SetPaymentState(&v2.GetPaymentStateForAllQuorumsReply{
+		PaymentVaultParams: createTestPaymentVaultParams(6, 1, 100),
+		Reservations: map[uint32]*v2.QuorumReservation{
+			0: {
+				SymbolsPerSecond: 100,
+				StartTimestamp:   uint32(now/1e9 - 1000),
+				EndTimestamp:     uint32(now/1e9 + 1000),
+			},
+			1: {
+				SymbolsPerSecond: 200,
+				StartTimestamp:   uint32(now/1e9 - 1000),
+				EndTimestamp:     uint32(now/1e9 + 1000),
+			},
+		},
+		OnchainCumulativePayment: big.NewInt(1000).Bytes(),
+	})
+	require.NoError(t, err)
+	// Set up protocol configs
+	binInterval := uint64(1)
+	acc.paymentVaultParams.QuorumProtocolConfigs[0] = &core.PaymentQuorumProtocolConfig{
+		ReservationRateLimitWindow: binInterval,
+		MinNumSymbols:              1,
+	}
+	acc.paymentVaultParams.QuorumProtocolConfigs[1] = &core.PaymentQuorumProtocolConfig{
+		ReservationRateLimitWindow: binInterval,
+		MinNumSymbols:              1,
+	}
+
+	tests := []struct {
+		name          string
+		numSymbols    uint64
+		quorumNumbers []uint8
+		timestamp     int64
+		wantErr       bool
+		errMsg        string
+	}{
+		{
+			name:          "successful reservation usage",
+			numSymbols:    50,
+			quorumNumbers: []uint8{0, 1},
+			timestamp:     now,
+			wantErr:       false,
+		},
+		{
+			name:          "quorum without reservation",
+			numSymbols:    50,
+			quorumNumbers: []uint8{0, 2},
+			timestamp:     now,
+			wantErr:       true,
+			errMsg:        "quorum number mismatch",
+		},
+		{
+			name:          "reservation limit exceeded",
+			numSymbols:    200,
+			quorumNumbers: []uint8{0},
+			timestamp:     now,
+			wantErr:       true,
+			errMsg:        "exceeds bin limit",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := acc.reservationUsage(tt.numSymbols, tt.quorumNumbers, tt.timestamp)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestAccountant_UseOnDemand(t *testing.T) {
+	accountID := gethcommon.HexToAddress("0x123")
+	now := time.Now().UnixNano()
+	acc := NewAccountant(accountID)
+	err := acc.SetPaymentState(&v2.GetPaymentStateForAllQuorumsReply{
+		PaymentVaultParams: createTestPaymentVaultParams(6, 1, 100),
+		Reservations: map[uint32]*v2.QuorumReservation{
+			0: {
+				SymbolsPerSecond: 100,
+				StartTimestamp:   uint32(now/1e9 - 1000),
+				EndTimestamp:     uint32(now/1e9 - 500),
+			},
+		},
+		OnchainCumulativePayment: big.NewInt(1000).Bytes(),
+	})
+	require.NoError(t, err)
+	// Set up payment configs
+	acc.paymentVaultParams.QuorumPaymentConfigs[0] = &core.PaymentQuorumConfig{
+		OnDemandPricePerSymbol: 10,
+	}
+	acc.paymentVaultParams.QuorumProtocolConfigs[0] = &core.PaymentQuorumProtocolConfig{
+		MinNumSymbols: 1,
+	}
+	acc.paymentVaultParams.OnDemandQuorumNumbers = []uint8{0, 1}
+
+	tests := []struct {
+		name          string
+		numSymbols    uint64
+		quorumNumbers []uint8
+		timestamp     int64
+		wantErr       bool
+		errMsg        string
+	}{
+		{
+			name:          "successful on-demand payment",
+			numSymbols:    50,
+			quorumNumbers: []uint8{0, 1},
+			timestamp:     now,
+			wantErr:       false,
+		},
+		{
+			name:          "insufficient balance",
+			numSymbols:    200,
+			quorumNumbers: []uint8{0, 1},
+			timestamp:     now,
+			wantErr:       true,
+			errMsg:        "insufficient ondemand payment",
+		},
+		{
+			name:          "invalid quorum",
+			numSymbols:    50,
+			quorumNumbers: []uint8{2},
+			timestamp:     now,
+			wantErr:       true,
+			errMsg:        "quorum number mismatch: 2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			payment, err := acc.onDemandUsage(tt.numSymbols, tt.quorumNumbers)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+				assert.Nil(t, payment)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, payment)
+				assert.True(t, payment.Cmp(big.NewInt(0)) > 0)
+			}
+		})
+	}
+}
+
+func TestAccountant_MultipleOverflows(t *testing.T) {
+	accountID := gethcommon.HexToAddress("0x123")
+	now := time.Now()
+	acc := NewAccountant(accountID)
+	err := acc.SetPaymentState(&v2.GetPaymentStateForAllQuorumsReply{
+		PaymentVaultParams: createTestPaymentVaultParams(6, 1, 100),
+		Reservations: map[uint32]*v2.QuorumReservation{
+			0: {
+				SymbolsPerSecond: 100,
+				StartTimestamp:   uint32(now.Add(time.Second * -1000).Unix()),
+				EndTimestamp:     uint32(now.Add(time.Second * 1000).Unix()),
+			},
+		},
+		OnchainCumulativePayment: big.NewInt(1000).Bytes(),
+	})
+	require.NoError(t, err)
+	// Set up protocol configs
+	binInterval := uint64(1)
+	acc.paymentVaultParams.QuorumProtocolConfigs[0] = &core.PaymentQuorumProtocolConfig{
+		ReservationRateLimitWindow: binInterval,
+		OnDemandRateLimitWindow:    binInterval,
+		MinNumSymbols:              1,
+	}
+
+	acc.paymentVaultParams.QuorumPaymentConfigs[0] = &core.PaymentQuorumConfig{
+		ReservationSymbolsPerSecond: 0,
+		OnDemandSymbolsPerSecond:    100,
+		OnDemandPricePerSymbol:      1,
+	}
+	acc.paymentVaultParams.OnDemandQuorumNumbers = []uint8{0}
+
+	// First call: Use current bin
+	_, err = acc.AccountBlob(now.UnixNano(), 50, []uint8{0})
+	require.NoError(t, err)
+	currentPeriod := meterer.GetReservationPeriodByNanosecond(now.UnixNano(), 1)
+	record := acc.periodRecords.GetRelativePeriodRecord(currentPeriod, 0)
+	assert.Equal(t, uint64(50), record.Usage)
+	record = acc.periodRecords.GetRelativePeriodRecord(currentPeriod+1*binInterval, 0)
+	assert.Equal(t, uint64(0), record.Usage)
+	record = acc.periodRecords.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, binInterval), 0)
+	assert.Equal(t, uint64(0), record.Usage)
+
+	// Second call: Overflow
+	_, err = acc.AccountBlob(now.UnixNano(), 100, []uint8{0})
+	require.NoError(t, err)
+	record = acc.periodRecords.GetRelativePeriodRecord(currentPeriod, 0)
+	assert.Equal(t, uint64(100), record.Usage)
+	record = acc.periodRecords.GetRelativePeriodRecord(currentPeriod+1*binInterval, 0)
+	assert.Equal(t, uint64(0), record.Usage)
+	record = acc.periodRecords.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, binInterval), 0)
+	assert.Equal(t, uint64(50), record.Usage)
+
+	// Third call: Cannot overflow again
+	_, err = acc.AccountBlob(now.UnixNano(), 100, []uint8{0})
+	require.NoError(t, err)
+	record = acc.periodRecords.GetRelativePeriodRecord(currentPeriod, 0)
+	assert.Equal(t, uint64(100), record.Usage)
+	record = acc.periodRecords.GetRelativePeriodRecord(currentPeriod+1*binInterval, 0)
+	assert.Equal(t, uint64(0), record.Usage)
+	record = acc.periodRecords.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, binInterval), 0)
+	assert.Equal(t, uint64(50), record.Usage)
+}
+
+func TestAccountant_MixedReservationStates(t *testing.T) {
+	accountID := gethcommon.HexToAddress("0x123")
+	now := time.Now()
+	acc := NewAccountant(accountID)
+
+	// Set up protocol configs
+	vaultParams := &v2.PaymentVaultParams{
+		QuorumProtocolConfigs: make(map[uint32]*v2.PaymentQuorumProtocolConfig),
+		QuorumPaymentConfigs:  make(map[uint32]*v2.PaymentQuorumConfig),
+	}
+	for i := uint32(0); i < 3; i++ {
+		// Set up protocol configs
+		vaultParams.QuorumProtocolConfigs[i] = &v2.PaymentQuorumProtocolConfig{
+			ReservationRateLimitWindow: 1,
+			OnDemandRateLimitWindow:    1,
+			MinNumSymbols:              1,
+		}
+
+		vaultParams.QuorumPaymentConfigs[i] = &v2.PaymentQuorumConfig{
+			ReservationSymbolsPerSecond: 0,
+			OnDemandSymbolsPerSecond:    100,
+			OnDemandPricePerSymbol:      1,
+		}
+	}
+	err := acc.SetPaymentState(&v2.GetPaymentStateForAllQuorumsReply{
+		PaymentVaultParams: vaultParams,
+		Reservations: map[uint32]*v2.QuorumReservation{
+			0: {
+				SymbolsPerSecond: 100,
+				StartTimestamp:   uint32(now.Add(time.Hour * 1).Unix()),
+				EndTimestamp:     uint32(now.Add(time.Hour * 2).Unix()), // Future
+			},
+			1: {
+				SymbolsPerSecond: 100,
+				StartTimestamp:   uint32(now.Add(time.Hour * -2).Unix()),
+				EndTimestamp:     uint32(now.Add(time.Hour * -1).Unix()), // Expired
+			},
+			2: {
+				SymbolsPerSecond: 100,
+				StartTimestamp:   uint32(now.Add(time.Hour * -1).Unix()),
+				EndTimestamp:     uint32(now.Add(time.Hour * 1).Unix()), // Active
+			},
+		},
+		OnchainCumulativePayment: big.NewInt(1000).Bytes(),
+	})
+	require.NoError(t, err)
+	acc.paymentVaultParams.OnDemandQuorumNumbers = []uint8{0, 1}
+
+	// Reservations and OnDemand are not sufficient for all three quorums
+	payment, err := acc.AccountBlob(now.UnixNano(), 50, []uint8{0, 1, 2})
+	assert.Nil(t, payment)
+	assert.Contains(t, err.Error(), "cannot create payment information")
+
+	// Separate reservation dispersal is sufficient for quorum 2
+	payment, err = acc.AccountBlob(now.UnixNano(), 50, []uint8{2})
+	// 1749697512 1749701112 1749693912.770014000
+	require.NoError(t, err)
+	assert.NotNil(t, payment)
+	assert.True(t, payment.CumulativePayment.Cmp(big.NewInt(0)) == 0)
+
+	// Alternatively use ondemand for quorum 0 or/and 1
+	payment, err = acc.AccountBlob(now.UnixNano(), 50, []uint8{0, 1})
+	require.NoError(t, err)
+	assert.NotNil(t, payment)
+	assert.True(t, payment.CumulativePayment.Cmp(big.NewInt(0)) > 0)
+}
+
+func TestAccountant_ReservationRollback(t *testing.T) {
+	reservation := &v2.QuorumReservation{
+		SymbolsPerSecond: 50,
+		StartTimestamp:   uint32(time.Now().Unix()),
+		EndTimestamp:     uint32(time.Now().Add(time.Hour).Unix()),
+	}
+	reservationWindow := uint64(2)
 
 	privateKey1, err := crypto.GenerateKey()
 	assert.NoError(t, err)
 	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
+	accountant := NewAccountant(accountId)
 
-	quorums := []uint8{0, 1}
-
-	tests := []accountBlobReservationOverflowResetTest{
-		{
-			name:         "First call - Full reservation",
-			timeOffset:   0,
-			symbolLength: 1000,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(0),
+	// Create payment state with test configurations
+	paymentState := &v2.GetPaymentStateForAllQuorumsReply{
+		PaymentVaultParams: &v2.PaymentVaultParams{
+			QuorumPaymentConfigs: map[uint32]*v2.PaymentQuorumConfig{
+				0: {
+					ReservationSymbolsPerSecond: 100,
+					OnDemandSymbolsPerSecond:    100,
+					OnDemandPricePerSymbol:      1,
+				},
+				1: {
+					ReservationSymbolsPerSecond: 100,
+					OnDemandSymbolsPerSecond:    100,
+					OnDemandPricePerSymbol:      1,
+				},
 			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 1000,
-				NextPeriodUsage:    0,
-				OverflowUsage:      0,
+			QuorumProtocolConfigs: map[uint32]*v2.PaymentQuorumProtocolConfig{
+				0: {
+					MinNumSymbols:              1,
+					ReservationAdvanceWindow:   10,
+					ReservationRateLimitWindow: reservationWindow,
+					OnDemandRateLimitWindow:    30,
+					OnDemandEnabled:            true,
+				},
+				1: {
+					MinNumSymbols:              1,
+					ReservationAdvanceWindow:   10,
+					ReservationRateLimitWindow: reservationWindow,
+					OnDemandRateLimitWindow:    30,
+					OnDemandEnabled:            true,
+				},
 			},
+			OnDemandQuorumNumbers: []uint32{0, 1},
 		},
-		{
-			name:         "Second call - No overflow",
-			timeOffset:   0,
-			symbolLength: 500,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(500),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 1000,
-				NextPeriodUsage:    0,
-				OverflowUsage:      0,
-			},
-		},
-		{
-			name:         "Third call - New window",
-			timeOffset:   time.Duration(reservationWindow) * time.Second,
-			symbolLength: 500,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(0),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 500,
-				NextPeriodUsage:    0,
-				OverflowUsage:      1000,
-			},
-		},
+		OnchainCumulativePayment: big.NewInt(0).Bytes(),
+		Reservations:             map[uint32]*v2.QuorumReservation{0: reservation, 1: reservation},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			now := baseTime.UnixNano() + tt.timeOffset.Nanoseconds()
-			header, err := accountant.AccountBlob(now, tt.symbolLength, quorums)
-
-			assert.NoError(t, err)
-			assert.NotEqual(t, uint64(0), header.Timestamp)
-			assert.Equal(t, tt.expectedHeader.AccountID, header.AccountID)
-			assert.Equal(t, tt.expectedHeader.CumulativePayment, header.CumulativePayment)
-
-			period := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
-			assert.Equal(t, tt.expectedState.CurrentPeriodUsage, getRelativePeriodRecord(period, reservationWindow, accountant.periodRecords).Usage)
-			assert.Equal(t, tt.expectedState.NextPeriodUsage, getRelativePeriodRecord(period+reservationWindow, reservationWindow, accountant.periodRecords).Usage)
-			assert.Equal(t, tt.expectedState.OverflowUsage, getRelativePeriodRecord(meterer.GetOverflowPeriod(period, reservationWindow), reservationWindow, accountant.periodRecords).Usage)
-		})
-	}
-}
-
-type periodRecordState struct {
-	CurrentPeriodUsage uint64
-	NextPeriodUsage    uint64
-	OverflowUsage      uint64
-}
-
-type testScenario struct {
-	name           string
-	timeOffset     time.Duration // Offset from base time
-	symbolLength   uint64
-	expectedHeader *core.PaymentMetadata
-	expectedState  periodRecordState
-}
-
-func TestAccountBlob_ReservationOverflowWithWindow(t *testing.T) {
-	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	reservation := &core.ReservedPayment{
-		SymbolsPerSecond: 1000,
-		StartTimestamp:   uint64(baseTime.Add(-10 * time.Second).Unix()),
-		EndTimestamp:     uint64(baseTime.Add(10 * time.Second).Unix()),
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
-	}
-	onDemand := &core.OnDemandPayment{
-		CumulativePayment: big.NewInt(3500),
-	}
-	reservationWindow := uint64(2) // Set to 2 seconds for testing
-	pricePerSymbol := uint64(1)
-	minNumSymbols := uint64(100)
-
-	privateKey1, err := crypto.GenerateKey()
+	err = accountant.SetPaymentState(paymentState)
 	assert.NoError(t, err)
-	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey1.D.Bytes()))
-	accountant := NewAccountant(accountId, reservation, onDemand, reservationWindow, pricePerSymbol, minNumSymbols, numBins)
 
-	quorums := []uint8{0, 1}
+	// Test rollback when a later quorum fails
+	now := time.Now().UnixNano()
+	currentPeriod := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
 
-	windowSize := time.Duration(reservationWindow) * time.Second
-
-	scenarios := []testScenario{
-		{
-			name:         "Current bin under limit -> Simple increment",
-			timeOffset:   0,
-			symbolLength: 1000,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(0),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 1000,
-				NextPeriodUsage:    0,
-				OverflowUsage:      0,
-			},
-		},
-		{
-			name:         "Current bin over limit but overflow bin empty -> can use overflow period",
-			timeOffset:   windowSize / 2,
-			symbolLength: 1500,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(0),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 2500,
-				NextPeriodUsage:    0,
-				OverflowUsage:      500,
-			},
-		},
-		{
-			name:         "Current bin over limit and overflow bin used -> reject, use on-demand",
-			timeOffset:   windowSize/2 + 100*time.Nanosecond,
-			symbolLength: 500,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(500),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 2500,
-				NextPeriodUsage:    0,
-				OverflowUsage:      500,
-			},
-		},
-		{
-			name:         "New window - request cannot fit into a bin -> reject, use on-demand",
-			timeOffset:   windowSize,
-			symbolLength: 2500,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(3000),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 0,
-				NextPeriodUsage:    500,
-				OverflowUsage:      0,
-			},
-		},
-		{
-			name:         "New window - request within bin limit -> Simple increment",
-			timeOffset:   windowSize + 100*time.Nanosecond,
-			symbolLength: 1000,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(0),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 1000,
-				NextPeriodUsage:    500,
-				OverflowUsage:      0,
-			},
-		},
-		{
-			name:         "New window - current bin over limit but can use overflow",
-			timeOffset:   windowSize + windowSize/2,
-			symbolLength: 1500,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(0),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 2500,
-				NextPeriodUsage:    500,
-				OverflowUsage:      500,
-			},
-		},
-		{
-			name:         "New window 2 - Exact bin limit usage",
-			timeOffset:   2 * windowSize,
-			symbolLength: 1500,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(0),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 2000,
-				NextPeriodUsage:    500,
-				OverflowUsage:      2500,
-			},
-		},
-		{
-			name:         "New window 2 - current bin at limit -> use on-demand",
-			timeOffset:   2*windowSize + 100*time.Nanosecond,
-			symbolLength: 500,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(3500),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 2000,
-				NextPeriodUsage:    500,
-				OverflowUsage:      0,
-			},
-		},
-		{
-			name:         "New window 2 - current bin at limit, on-demand used up, cannot serve",
-			timeOffset:   2*windowSize + 100*time.Nanosecond,
-			symbolLength: 500,
-			expectedHeader: &core.PaymentMetadata{
-				AccountID:         accountId,
-				CumulativePayment: big.NewInt(3500),
-			},
-			expectedState: periodRecordState{
-				CurrentPeriodUsage: 2000,
-				NextPeriodUsage:    500,
-				OverflowUsage:      0,
-			},
-		},
-	}
-
-	for _, tt := range scenarios {
-		t.Run(tt.name, func(t *testing.T) {
-			now := baseTime.UnixNano() + tt.timeOffset.Nanoseconds()
-			header, err := accountant.AccountBlob(now, tt.symbolLength, quorums)
-
-			if tt.name == "New window 2 - current bin at limit, on-demand used up, cannot serve" {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "insufficient ondemand payment")
-			} else {
-				assert.NoError(t, err)
-				assert.NotEqual(t, uint64(0), header.Timestamp)
-				assert.Equal(t, tt.expectedHeader.AccountID, header.AccountID)
-				assert.Equal(t, tt.expectedHeader.CumulativePayment, header.CumulativePayment)
-			}
-
-			period := meterer.GetReservationPeriodByNanosecond(now, reservationWindow)
-			assert.Equal(t, tt.expectedState.CurrentPeriodUsage, getRelativePeriodRecord(period, reservationWindow, accountant.periodRecords).Usage)
-			assert.Equal(t, tt.expectedState.NextPeriodUsage, getRelativePeriodRecord(period+reservationWindow, reservationWindow, accountant.periodRecords).Usage)
-			assert.Equal(t, tt.expectedState.OverflowUsage, getRelativePeriodRecord(meterer.GetOverflowPeriod(period, reservationWindow), reservationWindow, accountant.periodRecords).Usage)
-		})
-	}
-}
-
-type quorumCheckTest struct {
-	name           string
-	quorumNumbers  []uint8
-	allowedNumbers []uint8
-	expectError    bool
-	errorMessage   string
-}
-
-func TestQuorumCheck(t *testing.T) {
-	tests := []quorumCheckTest{
-		{
-			name:           "valid quorum numbers",
-			quorumNumbers:  []uint8{0, 1},
-			allowedNumbers: []uint8{0, 1, 2},
-			expectError:    false,
-		},
-		{
-			name:           "empty quorum numbers",
-			quorumNumbers:  []uint8{},
-			allowedNumbers: []uint8{0, 1},
-			expectError:    true,
-			errorMessage:   "no quorum numbers provided in the request",
-		},
-		{
-			name:           "invalid quorum number",
-			quorumNumbers:  []uint8{0, 2},
-			allowedNumbers: []uint8{0, 1},
-			expectError:    true,
-			errorMessage:   "quorum number mismatch: 2",
-		},
-		{
-			name:           "empty allowed numbers",
-			quorumNumbers:  []uint8{0},
-			allowedNumbers: []uint8{},
-			expectError:    true,
-			errorMessage:   "quorum number mismatch: 0",
-		},
-		{
-			name:           "multiple invalid quorums",
-			quorumNumbers:  []uint8{2, 3, 4},
-			allowedNumbers: []uint8{0, 1},
-			expectError:    true,
-			errorMessage:   "quorum number mismatch: 2",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := meterer.ValidateQuorum(tt.quorumNumbers, tt.allowedNumbers)
-			if tt.expectError {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorMessage)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-type setPaymentStateTest struct {
-	name          string
-	state         *disperser_rpc.GetPaymentStateReply
-	expectError   bool
-	errorMessage  string
-	expectedState *Accountant
-}
-
-func TestSetPaymentState(t *testing.T) {
-	privateKey, err := crypto.GenerateKey()
+	// First update should succeed
+	moreUsedQuorum := uint8(1)
+	lessUsedQuorum := uint8(0)
+	_, err = accountant.AccountBlob(now, 50, []uint8{moreUsedQuorum})
 	assert.NoError(t, err)
-	accountId := gethcommon.HexToAddress(hex.EncodeToString(privateKey.D.Bytes()))
 
-	emptyReservation := &core.ReservedPayment{
-		SymbolsPerSecond: 0,
-		StartTimestamp:   0,
-		EndTimestamp:     0,
-		QuorumNumbers:    []uint8{},
-		QuorumSplits:     []byte{},
-	}
+	// Verify first quorum was updated
+	record := accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, moreUsedQuorum)
+	assert.Equal(t, uint64(50), record.Usage)
 
-	emptyOnDemand := &core.OnDemandPayment{
-		CumulativePayment: big.NewInt(0),
-	}
+	// Use both quorums, more used quorum overflows
+	_, err = accountant.AccountBlob(now, 60, []uint8{moreUsedQuorum, lessUsedQuorum})
+	assert.NoError(t, err)
+	record = accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, moreUsedQuorum)
+	assert.Equal(t, uint64(100), record.Usage)
+	record = accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, lessUsedQuorum)
+	assert.Equal(t, uint64(60), record.Usage)
+	record = accountant.periodRecords.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, reservationWindow), moreUsedQuorum)
+	assert.Equal(t, uint64(10), record.Usage)
 
-	tests := []setPaymentStateTest{
-		{
-			name:         "nil payment state",
-			state:        nil,
-			expectError:  true,
-			errorMessage: "payment state cannot be nil",
-		},
-		{
-			name:         "nil payment global params",
-			state:        &disperser_rpc.GetPaymentStateReply{},
-			expectError:  true,
-			errorMessage: "payment global params cannot be nil",
-		},
-		{
-			name: "successful set payment state with all fields",
-			state: &disperser_rpc.GetPaymentStateReply{
-				PaymentGlobalParams: &disperser_rpc.PaymentGlobalParams{
-					MinNumSymbols:     100,
-					PricePerSymbol:    50,
-					ReservationWindow: 60,
-				},
-				OnchainCumulativePayment: big.NewInt(1000).Bytes(),
-				CumulativePayment:        big.NewInt(500).Bytes(),
-				Reservation: &disperser_rpc.Reservation{
-					SymbolsPerSecond: 300,
-					StartTimestamp:   100,
-					EndTimestamp:     200,
-					QuorumNumbers:    []uint32{0},
-					QuorumSplits:     []uint32{100},
-				},
-				PeriodRecords: []*disperser_rpc.PeriodRecord{
-					{
-						Index: 1,
-						Usage: 150,
-					},
-					{
-						Index: 0,
-						Usage: 0,
-					},
-					{
-						Index: 0,
-						Usage: 0,
-					},
-				},
-			},
-			expectError: false,
-			expectedState: &Accountant{
-				accountID: accountId,
-				reservation: &core.ReservedPayment{
-					SymbolsPerSecond: 300,
-					StartTimestamp:   100,
-					EndTimestamp:     200,
-					QuorumNumbers:    []uint8{0},
-					QuorumSplits:     []byte{100},
-				},
-				onDemand: &core.OnDemandPayment{
-					CumulativePayment: big.NewInt(1000),
-				},
-				reservationWindow: 60,
-				pricePerSymbol:    50,
-				minNumSymbols:     100,
-				cumulativePayment: big.NewInt(500),
-				periodRecords: []PeriodRecord{
-					{Index: 1, Usage: 150},
-					{Index: 0, Usage: 0},
-					{Index: 0, Usage: 0},
-				},
-			},
-		},
-		{
-			name: "successful set payment state with minimal fields",
-			state: &disperser_rpc.GetPaymentStateReply{
-				PaymentGlobalParams: &disperser_rpc.PaymentGlobalParams{
-					MinNumSymbols:     50,
-					PricePerSymbol:    25,
-					ReservationWindow: 30,
-				},
-			},
-			expectError: false,
-			expectedState: &Accountant{
-				accountID:         accountId,
-				reservation:       emptyReservation,
-				onDemand:          emptyOnDemand,
-				reservationWindow: 30,
-				pricePerSymbol:    25,
-				minNumSymbols:     50,
-				cumulativePayment: big.NewInt(0),
-				periodRecords:     []PeriodRecord{},
-			},
-		},
-	}
+	// Use both quorums, more used quorum cannot overflow again
+	_, err = accountant.AccountBlob(now, 60, []uint8{moreUsedQuorum, lessUsedQuorum})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "reservation limit exceeded")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			accountant := NewAccountant(accountId, emptyReservation, emptyOnDemand, 0, 0, 0, numBins)
-			err := accountant.SetPaymentState(tt.state)
+	// No reservation updates were made
+	record = accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, moreUsedQuorum)
+	assert.Equal(t, uint64(100), record.Usage)
+	record = accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, lessUsedQuorum)
+	assert.Equal(t, uint64(60), record.Usage)
+	record = accountant.periodRecords.GetRelativePeriodRecord(meterer.GetOverflowPeriod(currentPeriod, reservationWindow), moreUsedQuorum)
+	assert.Equal(t, uint64(10), record.Usage)
 
-			if tt.expectError {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorMessage)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedState.pricePerSymbol, accountant.pricePerSymbol)
-				assert.Equal(t, tt.expectedState.reservationWindow, accountant.reservationWindow)
-				assert.Equal(t, tt.expectedState.minNumSymbols, accountant.minNumSymbols)
-				assert.Equal(t, tt.expectedState.onDemand.CumulativePayment, accountant.onDemand.CumulativePayment)
-				assert.Equal(t, tt.expectedState.cumulativePayment, accountant.cumulativePayment)
-				assert.Equal(t, tt.expectedState.reservation.SymbolsPerSecond, accountant.reservation.SymbolsPerSecond)
-				assert.Equal(t, tt.expectedState.reservation.StartTimestamp, accountant.reservation.StartTimestamp)
-				assert.Equal(t, tt.expectedState.reservation.EndTimestamp, accountant.reservation.EndTimestamp)
-				assert.Equal(t, tt.expectedState.reservation.QuorumNumbers, accountant.reservation.QuorumNumbers)
+	// Test rollback when a quorum doesn't exist
+	_, err = accountant.AccountBlob(now, 50, []uint8{lessUsedQuorum, 2})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "quorum number mismatch")
+	// quorum usage rolled back
+	record = accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, lessUsedQuorum)
+	assert.Equal(t, uint64(60), record.Usage)
 
-				// Check period records
-				for i := range tt.expectedState.periodRecords {
-					assert.Equal(t, tt.expectedState.periodRecords[i].Index, accountant.periodRecords[i].Index)
-					assert.Equal(t, tt.expectedState.periodRecords[i].Usage, accountant.periodRecords[i].Usage)
-				}
-			}
-		})
-	}
-}
-
-// getRelativePeriodRecord returns the period record for the given index
-func getRelativePeriodRecord(index uint64, reservationWindow uint64, periodRecords []PeriodRecord) *PeriodRecord {
-	relativeIndex := uint32((index / reservationWindow) % uint64(len(periodRecords)))
-	// Return empty record if the index is greater than the number of bins (should never happen by accountant initialization)
-	if relativeIndex >= uint32(len(periodRecords)) {
-		panic(fmt.Sprintf("relativeIndex %d is greater than the number of bins %d cached", relativeIndex, len(periodRecords)))
-	}
-	return &periodRecords[relativeIndex]
+	// Test rollback when config is missing
+	// Remove config for quorum 1
+	delete(accountant.paymentVaultParams.QuorumProtocolConfigs, 1)
+	_, err = accountant.AccountBlob(now, 50, []uint8{0, 1})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "quorum config not found")
+	// quorum usage stays the same
+	record = accountant.periodRecords.GetRelativePeriodRecord(currentPeriod, lessUsedQuorum)
+	assert.Equal(t, uint64(60), record.Usage)
 }

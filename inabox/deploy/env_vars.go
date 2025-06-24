@@ -136,6 +136,8 @@ type DisperserVars struct {
 	DISPERSER_SERVER_PRELOAD_ENCODER string
 
 	DISPERSER_SERVER_G2_POWER_OF_2_PATH string
+
+	DISPERSER_SERVER_USAGE_AUTHORIZATION_REGISTRY string
 }
 
 func (vars DisperserVars) getEnvMap() map[string]string {
@@ -255,6 +257,8 @@ type BatcherVars struct {
 	BATCHER_KMS_KEY_REGION string
 
 	BATCHER_KMS_KEY_DISABLE string
+
+	BATCHER_USAGE_AUTHORIZATION_REGISTRY string
 }
 
 func (vars BatcherVars) getEnvMap() map[string]string {
@@ -527,6 +531,8 @@ type OperatorVars struct {
 	NODE_LOG_PATH string
 
 	NODE_LOG_FORMAT string
+
+	NODE_USAGE_AUTHORIZATION_REGISTRY string
 }
 
 func (vars OperatorVars) getEnvMap() map[string]string {
@@ -592,6 +598,8 @@ type RetrieverVars struct {
 	RETRIEVER_LOG_PATH string
 
 	RETRIEVER_LOG_FORMAT string
+
+	RETRIEVER_USAGE_AUTHORIZATION_REGISTRY string
 }
 
 func (vars RetrieverVars) getEnvMap() map[string]string {
@@ -643,6 +651,8 @@ type ChurnerVars struct {
 	CHURNER_GRAPH_BACKOFF string
 
 	CHURNER_GRAPH_MAX_RETRIES string
+
+	CHURNER_USAGE_AUTHORIZATION_REGISTRY string
 }
 
 func (vars ChurnerVars) getEnvMap() map[string]string {
@@ -756,6 +766,8 @@ type ControllerVars struct {
 	CONTROLLER_GRAPH_BACKOFF string
 
 	CONTROLLER_GRAPH_MAX_RETRIES string
+
+	CONTROLLER_USAGE_AUTHORIZATION_REGISTRY string
 }
 
 func (vars ControllerVars) getEnvMap() map[string]string {
@@ -897,6 +909,8 @@ type RelayVars struct {
 	RELAY_GRAPH_BACKOFF string
 
 	RELAY_GRAPH_MAX_RETRIES string
+
+	RELAY_USAGE_AUTHORIZATION_REGISTRY_ADDR string
 }
 
 func (vars RelayVars) getEnvMap() map[string]string {

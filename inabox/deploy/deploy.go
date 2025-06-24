@@ -275,7 +275,8 @@ func (env *Config) RegisterDisperserKeypair(ethClient common.EthClient) error {
 		logger,
 		ethClient,
 		env.Retriever.RETRIEVER_BLS_OPERATOR_STATE_RETRIEVER,
-		env.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER)
+		env.Retriever.RETRIEVER_EIGENDA_SERVICE_MANAGER,
+		"0x0000000000000000000000000000000000000000")
 	if err != nil {
 		return fmt.Errorf("could not create writer: %v", err)
 	}
@@ -420,6 +421,7 @@ func (env *Config) RunNodePluginBinary(operation string, operator OperatorVars) 
 		"NODE_BLS_OPERATOR_STATE_RETRIVER=" + operator.NODE_BLS_OPERATOR_STATE_RETRIVER,
 		"NODE_EIGENDA_SERVICE_MANAGER=" + operator.NODE_EIGENDA_SERVICE_MANAGER,
 		"NODE_CHURNER_URL=" + operator.NODE_CHURNER_URL,
+		"NODE_USAGE_AUTHORIZATION_REGISTRY=" + operator.NODE_USAGE_AUTHORIZATION_REGISTRY,
 		"NODE_NUM_CONFIRMATIONS=0",
 	}
 

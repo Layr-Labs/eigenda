@@ -477,17 +477,17 @@ func middleFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDelet
 	middleIndex := lowestSegmentIndex + (highestSegmentIndex-lowestSegmentIndex)/2
 
 	filePath := ""
-		switch typeToDelete {
-		case "key":
-			filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.KeyFileExtension)
-		case "value":
-			shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
-			shard := rand.Uint32Range(0, shardingFactor)
-			filePath = fmt.Sprintf(
-				"%s/table/segments/%d-%d%s", directory, middleIndex, shard, segment.ValuesFileExtension)
-		default:
-			filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.MetadataFileExtension)
-		}
+	switch typeToDelete {
+	case "key":
+		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.KeyFileExtension)
+	case "value":
+		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
+		shard := rand.Uint32Range(0, shardingFactor)
+		filePath = fmt.Sprintf(
+			"%s/table/segments/%d-%d%s", directory, middleIndex, shard, segment.ValuesFileExtension)
+	default:
+		filePath = fmt.Sprintf("%s/table/segments/%d%s", directory, middleIndex, segment.MetadataFileExtension)
+	}
 	exists, err := util.Exists(filePath)
 	require.NoError(t, err)
 	require.True(t, exists)
@@ -599,17 +599,18 @@ func initialFileMissingTest(t *testing.T, tableBuilder *tableBuilder, typeToDele
 
 	// Delete a file in the initial segment.
 	filePath := ""
-		switch typeToDelete {
-		case "key":
-			filePath = fmt.Sprintf("%s/table/segments/%d%s",
-				directory, lowestSegmentIndex, segment.KeyFileExtension)
-		case "value":
-			shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
-			shard := rand.Uint32Range(0, shardingFactor)
-			filePath = fmt.Sprintf(
-				"%s/table/segments/%d-%d%s",
-				directory, lowestSegmentIndex, shard, segment.ValuesFileExtension)
-		default:		filePath = fmt.Sprintf("%s/table/segments/%d%s",
+	switch typeToDelete {
+	case "key":
+		filePath = fmt.Sprintf("%s/table/segments/%d%s",
+			directory, lowestSegmentIndex, segment.KeyFileExtension)
+	case "value":
+		shardingFactor := table.(*DiskTable).metadata.GetShardingFactor()
+		shard := rand.Uint32Range(0, shardingFactor)
+		filePath = fmt.Sprintf(
+			"%s/table/segments/%d-%d%s",
+			directory, lowestSegmentIndex, shard, segment.ValuesFileExtension)
+	default:
+		filePath = fmt.Sprintf("%s/table/segments/%d%s",
 			directory, lowestSegmentIndex, segment.MetadataFileExtension)
 	}
 	exists, err := util.Exists(filePath)
