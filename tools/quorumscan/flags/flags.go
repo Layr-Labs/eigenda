@@ -26,6 +26,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
+	UsageAuthorizationRegistryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "usage-authorization-registry"),
+		Usage:    "Address of the Usage Authorization Registry",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "USAGE_AUTHORIZATION_REGISTRY"),
+	}
 	/* Optional Flags*/
 	BlockNumberFlag = cli.Uint64Flag{
 		Name:     common.PrefixFlag(FlagPrefix, "block-number"),
@@ -64,6 +70,7 @@ var (
 var requiredFlags = []cli.Flag{
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	UsageAuthorizationRegistryFlag,
 }
 
 var optionalFlags = []cli.Flag{

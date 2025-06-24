@@ -29,6 +29,7 @@ type Config struct {
 
 	BLSOperatorStateRetrieverAddr string
 	EigenDAServiceManagerAddr     string
+	UsageAuthorizationRegistryAddr string
 }
 
 func ReadConfig(ctx *cli.Context) *Config {
@@ -49,6 +50,7 @@ func ReadConfig(ctx *cli.Context) *Config {
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
 		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
 		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		UsageAuthorizationRegistryAddr: ctx.GlobalString(flags.UsageAuthorizationRegistryFlag.Name),
 		QuorumIDs:                     quorumIDs,
 		BlockNumber:                   ctx.Uint64(flags.BlockNumberFlag.Name),
 		TopN:                          ctx.Uint(flags.TopNFlag.Name),

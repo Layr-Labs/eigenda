@@ -35,6 +35,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
+	UsageAuthorizationRegistryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "usage-authorization-registry"),
+		Usage:    "Address of the Usage Authorization Registry",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USAGE_AUTHORIZATION_REGISTRY"),
+	}
 	UseGraphFlag = cli.BoolTFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "use-graph"),
 		Usage:    "Whether to use the graph node",
@@ -237,6 +243,7 @@ var requiredFlags = []cli.Flag{
 	DynamoDBTableNameFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	UsageAuthorizationRegistryFlag,
 	UseGraphFlag,
 	EncodingPullIntervalFlag,
 	AvailableRelaysFlag,

@@ -124,6 +124,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
+	UsageAuthorizationRegistryFlag = cli.StringFlag{
+		Name:     "usage-authorization-registry",
+		Usage:    "Address of the Usage Authorization Registry",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(flags.EnvVarPrefix, "USAGE_AUTHORIZATION_REGISTRY"),
+	}
 	ChurnerUrlFlag = cli.StringFlag{
 		Name:     "churner-url",
 		Usage:    "URL of the Churner",
@@ -152,9 +158,10 @@ type Config struct {
 	Socket                        string
 	QuorumIDList                  []core.QuorumID
 	ChainRpcUrl                   string
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
-	ChurnerUrl                    string
+	BLSOperatorStateRetrieverAddr  string
+	EigenDAServiceManagerAddr      string
+	UsageAuthorizationRegistryAddr string
+	ChurnerUrl                     string
 	NumConfirmations              int
 	BLSSignerAPIKey               string
 }
@@ -194,9 +201,10 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		Socket:                        ctx.GlobalString(SocketFlag.Name),
 		QuorumIDList:                  ids,
 		ChainRpcUrl:                   ctx.GlobalString(ChainRpcUrlFlag.Name),
-		BLSOperatorStateRetrieverAddr: ctx.GlobalString(BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.GlobalString(EigenDAServiceManagerFlag.Name),
-		ChurnerUrl:                    ctx.GlobalString(ChurnerUrlFlag.Name),
+		BLSOperatorStateRetrieverAddr:  ctx.GlobalString(BlsOperatorStateRetrieverFlag.Name),
+		EigenDAServiceManagerAddr:      ctx.GlobalString(EigenDAServiceManagerFlag.Name),
+		UsageAuthorizationRegistryAddr: ctx.GlobalString(UsageAuthorizationRegistryFlag.Name),
+		ChurnerUrl:                     ctx.GlobalString(ChurnerUrlFlag.Name),
 		NumConfirmations:              ctx.GlobalInt(NumConfirmationsFlag.Name),
 		BLSSignerAPIKey:               ctx.GlobalString(BLSSignerAPIKeyFlag.Name),
 	}, nil

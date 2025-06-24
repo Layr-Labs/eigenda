@@ -48,6 +48,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
+	UsageAuthorizationRegistryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "usage-authorization-registry"),
+		Usage:    "Address of the Usage Authorization Registry",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USAGE_AUTHORIZATION_REGISTRY"),
+	}
 	EncoderSocket = cli.StringFlag{
 		Name:     "encoder-socket",
 		Usage:    "the http ip:port which the distributed encoder server is listening",
@@ -228,6 +234,7 @@ var requiredFlags = []cli.Flag{
 	PullIntervalFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	UsageAuthorizationRegistryFlag,
 	EncoderSocket,
 	EnableMetrics,
 	BatchSizeLimitFlag,

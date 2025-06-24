@@ -16,8 +16,9 @@ type Config struct {
 	MetricsConfig    MetricsConfig
 	ChainStateConfig thegraph.Config
 
-	BLSOperatorStateRetrieverAddr string
-	EigenDAServiceManagerAddr     string
+	BLSOperatorStateRetrieverAddr  string
+	EigenDAServiceManagerAddr      string
+	UsageAuthorizationRegistryAddr string
 
 	PerPublicKeyRateLimit time.Duration
 	ChurnApprovalInterval time.Duration
@@ -32,8 +33,9 @@ func NewConfig(ctx *cli.Context) (*Config, error) {
 		EthClientConfig:               geth.ReadEthClientConfig(ctx),
 		LoggerConfig:                  *loggerConfig,
 		ChainStateConfig:              thegraph.ReadCLIConfig(ctx),
-		BLSOperatorStateRetrieverAddr: ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
-		EigenDAServiceManagerAddr:     ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		BLSOperatorStateRetrieverAddr:  ctx.GlobalString(flags.BlsOperatorStateRetrieverFlag.Name),
+		EigenDAServiceManagerAddr:      ctx.GlobalString(flags.EigenDAServiceManagerFlag.Name),
+		UsageAuthorizationRegistryAddr: ctx.GlobalString(flags.UsageAuthorizationRegistryFlag.Name),
 		PerPublicKeyRateLimit:         ctx.GlobalDuration(flags.PerPublicKeyRateLimit.Name),
 		ChurnApprovalInterval:         ctx.GlobalDuration(flags.ChurnApprovalInterval.Name),
 		MetricsConfig: MetricsConfig{

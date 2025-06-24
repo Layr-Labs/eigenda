@@ -214,6 +214,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGEN_DA_SERVICE_MANAGER_ADDR"),
 	}
+	UsageAuthorizationRegistryAddrFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "usage-authorization-registry-addr"),
+		Usage:    "Address of the Usage Authorization Registry",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USAGE_AUTHORIZATION_REGISTRY_ADDR"),
+	}
 	AuthenticationKeyCacheSizeFlag = cli.IntFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "authentication-key-cache-size"),
 		Usage:    "Max number of items in the authentication key cache",
@@ -332,6 +338,7 @@ var requiredFlags = []cli.Flag{
 	RelayKeysFlag,
 	BlsOperatorStateRetrieverAddrFlag,
 	EigenDAServiceManagerAddrFlag,
+	UsageAuthorizationRegistryAddrFlag,
 	EnableMetricsFlag,
 }
 

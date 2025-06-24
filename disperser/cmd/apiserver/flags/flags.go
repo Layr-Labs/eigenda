@@ -58,6 +58,12 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envVarPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
+	UsageAuthorizationRegistryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "usage-authorization-registry"),
+		Usage:    "Address of the Usage Authorization Registry",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envVarPrefix, "USAGE_AUTHORIZATION_REGISTRY"),
+	}
 	/* Optional Flags*/
 	DisperserVersionFlag = cli.UintFlag{
 		Name:     common.PrefixFlag(FlagPrefix, "disperser-version"),
@@ -272,6 +278,7 @@ var requiredFlags = []cli.Flag{
 	BucketTableName,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	UsageAuthorizationRegistryFlag,
 }
 
 var optionalFlags = []cli.Flag{

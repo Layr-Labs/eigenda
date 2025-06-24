@@ -42,8 +42,6 @@ func TestNewAccountant(t *testing.T) {
 				SymbolsPerSecond: 100,
 				StartTimestamp:   100,
 				EndTimestamp:     200,
-				QuorumSplits:     []byte{50, 50},
-				QuorumNumbers:    []uint8{0, 1},
 			},
 			onDemand: &core.OnDemandPayment{
 				CumulativePayment: big.NewInt(500),
@@ -88,8 +86,6 @@ func TestAccountBlob_Reservation(t *testing.T) {
 		SymbolsPerSecond: 200,
 		StartTimestamp:   uint64(baseTime.Add(-10 * time.Second).Unix()),
 		EndTimestamp:     uint64(baseTime.Add(10 * time.Second).Unix()),
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(500),
@@ -177,8 +173,6 @@ func TestAccountBlob_OnDemand(t *testing.T) {
 		SymbolsPerSecond: 200,
 		StartTimestamp:   100,
 		EndTimestamp:     200,
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1500),
@@ -292,8 +286,6 @@ func TestAccountBlobCallSeries(t *testing.T) {
 		SymbolsPerSecond: 200,
 		StartTimestamp:   uint64(baseTime.Add(-10 * time.Second).Unix()),
 		EndTimestamp:     uint64(baseTime.Add(10 * time.Second).Unix()),
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -394,8 +386,6 @@ func TestAccountBlob_BinRotation(t *testing.T) {
 		SymbolsPerSecond: 1000,
 		StartTimestamp:   uint64(baseTime.Add(-10 * time.Second).Unix()),
 		EndTimestamp:     uint64(baseTime.Add(10 * time.Second).Unix()),
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -487,8 +477,6 @@ func TestConcurrentBinRotationAndAccountBlob(t *testing.T) {
 		SymbolsPerSecond: 1000,
 		StartTimestamp:   uint64(baseTime.Add(-10 * time.Second).Unix()),
 		EndTimestamp:     uint64(baseTime.Add(10 * time.Second).Unix()),
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -553,8 +541,6 @@ func TestAccountBlob_ReservationWithOneOverflow(t *testing.T) {
 		SymbolsPerSecond: 200,
 		StartTimestamp:   uint64(baseTime.Add(-10 * time.Second).Unix()),
 		EndTimestamp:     uint64(baseTime.Add(10 * time.Second).Unix()),
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -644,8 +630,6 @@ func TestAccountBlob_ReservationOverflowReset(t *testing.T) {
 		SymbolsPerSecond: 1000,
 		StartTimestamp:   uint64(baseTime.Add(-10 * time.Second).Unix()),
 		EndTimestamp:     uint64(baseTime.Add(10 * time.Second).Unix()),
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(1000),
@@ -744,8 +728,6 @@ func TestAccountBlob_ReservationOverflowWithWindow(t *testing.T) {
 		SymbolsPerSecond: 1000,
 		StartTimestamp:   uint64(baseTime.Add(-10 * time.Second).Unix()),
 		EndTimestamp:     uint64(baseTime.Add(10 * time.Second).Unix()),
-		QuorumSplits:     []byte{50, 50},
-		QuorumNumbers:    []uint8{0, 1},
 	}
 	onDemand := &core.OnDemandPayment{
 		CumulativePayment: big.NewInt(3500),
@@ -991,8 +973,6 @@ func TestSetPaymentState(t *testing.T) {
 		SymbolsPerSecond: 0,
 		StartTimestamp:   0,
 		EndTimestamp:     0,
-		QuorumNumbers:    []uint8{},
-		QuorumSplits:     []byte{},
 	}
 
 	emptyOnDemand := &core.OnDemandPayment{
@@ -1026,8 +1006,6 @@ func TestSetPaymentState(t *testing.T) {
 					SymbolsPerSecond: 300,
 					StartTimestamp:   100,
 					EndTimestamp:     200,
-					QuorumNumbers:    []uint32{0},
-					QuorumSplits:     []uint32{100},
 				},
 				PeriodRecords: []*disperser_rpc.PeriodRecord{
 					{
@@ -1051,8 +1029,6 @@ func TestSetPaymentState(t *testing.T) {
 					SymbolsPerSecond: 300,
 					StartTimestamp:   100,
 					EndTimestamp:     200,
-					QuorumNumbers:    []uint8{0},
-					QuorumSplits:     []byte{100},
 				},
 				onDemand: &core.OnDemandPayment{
 					CumulativePayment: big.NewInt(1000),
@@ -1109,7 +1085,6 @@ func TestSetPaymentState(t *testing.T) {
 				assert.Equal(t, tt.expectedState.reservation.SymbolsPerSecond, accountant.reservation.SymbolsPerSecond)
 				assert.Equal(t, tt.expectedState.reservation.StartTimestamp, accountant.reservation.StartTimestamp)
 				assert.Equal(t, tt.expectedState.reservation.EndTimestamp, accountant.reservation.EndTimestamp)
-				assert.Equal(t, tt.expectedState.reservation.QuorumNumbers, accountant.reservation.QuorumNumbers)
 
 				// Check period records
 				for i := range tt.expectedState.periodRecords {

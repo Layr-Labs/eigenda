@@ -214,9 +214,7 @@ func (pcs *OnchainPaymentState) refreshReservedPayments(ctx context.Context) err
 		accountIDs = append(accountIDs, accountID)
 	}
 
-	// TODO(hopeyen): with payment vault update, this function will take quorum numbers;
-	// Currently we just build the same reservation for each quorum
-	reservedPayments, err := pcs.tx.GetReservedPayments(ctx, accountIDs)
+	reservedPayments, err := pcs.tx.GetReservedPayments(ctx, accountIDs, quorumNumbers)
 	if err != nil {
 		return err
 	}
@@ -274,7 +272,7 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx contex
 	pcs.ReservationsLock.RUnlock()
 
 	// pulls the chain state
-	allRes, err := pcs.tx.GetReservedPaymentByAccount(ctx, accountID)
+	allRes, err := pcs.tx.GetReservedPayments(ctx, []gethcommon.Address{accountID}, quorumNumbers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reserved payment: %w", err)
 	}
@@ -290,7 +288,7 @@ func (pcs *OnchainPaymentState) GetReservedPaymentByAccountAndQuorums(ctx contex
 	// Update cache with new data and filter for requested quorums
 	res := make(map[core.QuorumID]*core.ReservedPayment)
 	for _, quorumNumber := range quorumNumbers {
-		if reservation, ok := allRes[quorumNumber]; ok {
+		if reservation, ok := allRes[accountID][quorumNumber]; ok {
 			pcs.ReservedPayments[accountID][quorumNumber] = reservation
 			res[quorumNumber] = reservation
 		}

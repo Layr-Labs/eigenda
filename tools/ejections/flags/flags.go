@@ -59,12 +59,19 @@ var (
 		Required: true,
 		EnvVar:   common.PrefixEnvVar(envPrefix, "EIGENDA_SERVICE_MANAGER"),
 	}
+	UsageAuthorizationRegistryFlag = cli.StringFlag{
+		Name:     common.PrefixFlag(FlagPrefix, "usage-authorization-registry"),
+		Usage:    "Address of the Usage Authorization Registry",
+		Required: true,
+		EnvVar:   common.PrefixEnvVar(envPrefix, "USAGE_AUTHORIZATION_REGISTRY"),
+	}
 )
 
 var requiredFlags = []cli.Flag{
 	SubgraphEndpointFlag,
 	BlsOperatorStateRetrieverFlag,
 	EigenDAServiceManagerFlag,
+	UsageAuthorizationRegistryFlag,
 }
 
 var optionalFlags = []cli.Flag{

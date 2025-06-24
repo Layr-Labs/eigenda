@@ -217,7 +217,7 @@ func createTransactorFromScratch(privateKey, operatorStateRetriever, serviceMana
 		log.Fatalln("could not start tcp listener", err)
 	}
 
-	return eth.NewWriter(logger, gethClient, operatorStateRetriever, serviceManager)
+	return eth.NewWriter(logger, gethClient, operatorStateRetriever, serviceManager, "0x0000000000000000000000000000000000000000")
 }
 
 func newTestServer(t *testing.T) *churner.Server {
