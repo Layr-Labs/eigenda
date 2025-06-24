@@ -21,5 +21,9 @@ RUN sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd
 RUN chown -R testuser:testuser /home/testuser/.ssh
 RUN chmod 700 /home/testuser/.ssh
 
+# Copy startup script with self-destruct mechanism
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
 EXPOSE 22
-CMD ["/usr/sbin/sshd", "-D"]
+CMD ["/start.sh"]

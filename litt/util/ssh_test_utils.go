@@ -253,6 +253,17 @@ func BuildSSHTestImage(
 		return fmt.Errorf("failed to read Dockerfile: %w", err)
 	}
 
+	// Copy start.sh script to build context
+	startScriptPath := filepath.Join(filepath.Dir(currentFile), "testdata", "start.sh")
+	startScriptContent, err := os.ReadFile(startScriptPath)
+	if err != nil {
+		return fmt.Errorf("failed to read start.sh script: %w", err)
+	}
+	err = os.WriteFile(filepath.Join(buildContext, "start.sh"), startScriptContent, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to copy start.sh to build context: %w", err)
+	}
+
 	// Add the public key setup to the Dockerfile
 	publicKeySetup := fmt.Sprintf(
 		"\n# Add test SSH public key\n"+
